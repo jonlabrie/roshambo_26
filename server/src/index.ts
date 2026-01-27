@@ -13,6 +13,9 @@ import storeRouter from './routes/store';
 
 dotenv.config();
 
+const TEST_MODE = process.env.TEST_MODE === 'true';
+console.log(`[SYS] Roshambo Server Init. TEST_MODE: ${TEST_MODE}`);
+
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -94,14 +97,72 @@ async function initializeState() {
     }
 }
 
+async function resolveUser(identifier: { userId?: string, deviceId?: string }) {
+    if (!dbConnected) return null;
+
+    let user = null;
+
+    // 1. Try Authenticated User First
+    if (identifier.userId) {
+        user = await User.findById(identifier.userId);
+        if (user) {
+            // Greedy Cleanup: If we also have a deviceId, ensure it's not tied to some other stale guest record
+            if (identifier.deviceId) {
+                const collisions = await User.find({
+                    deviceId: identifier.deviceId,
+                    _id: { $ne: user._id }
+                });
+                if (collisions.length > 0) {
+                    console.log(`[SYNC-CLEANUP] Removing deviceId ${identifier.deviceId} from ${collisions.length} stale records to favor Auth User ${user._id}`);
+                    await User.updateMany(
+                        { deviceId: identifier.deviceId, _id: { $ne: user._id } },
+                        { $unset: { deviceId: 1 } }
+                    );
+                }
+            }
+            return user;
+        }
+    }
+
+    // 2. Fallback to Device ID (Guest)
+    if (identifier.deviceId) {
+        // Find all records claiming this deviceId, sorted by most recently updated
+        const records = await User.find({ deviceId: identifier.deviceId }).sort({ updatedAt: -1 });
+
+        if (records.length > 0) {
+            user = records[0];
+            // If there are multiple guest records, keep the most recent one as the device owner 
+            // and unset the others to avoid "past state" confusion.
+            if (records.length > 1) {
+                console.warn(`[SYNC-COLLISION] Found ${records.length} records for device ${identifier.deviceId}. Picking most recent (${user._id}).`);
+                await User.updateMany(
+                    { deviceId: identifier.deviceId, _id: { $ne: user._id } },
+                    { $unset: { deviceId: 1 } }
+                );
+            }
+            return user;
+        }
+
+        // 3. Create new Guest if none exist
+        user = await User.findOneAndUpdate(
+            { deviceId: identifier.deviceId },
+            { $setOnInsert: { deviceId: identifier.deviceId } },
+            { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+        return user;
+    }
+
+    return null;
+}
+
 function calculateResult(player: 'R' | 'P' | 'S', world: string): string {
-    if (player === world) return 'LOSS';
+    if (player === world) return 'SAFE';
     if (
         (player === 'R' && world === 'S') ||
         (player === 'P' && world === 'R') ||
         (player === 'S' && world === 'P')
     ) return 'WIN';
-    return 'SAFE';
+    return 'LOSS';
 }
 
 function startLoop() {
@@ -111,16 +172,29 @@ function startLoop() {
             timeLeft--;
         } else {
             // Transition point: End of round
-            const throws: ('R' | 'P' | 'S')[] = ['R', 'P', 'S'];
-            lastWorldThrow = throws[roundCount % throws.length];
-            roundCount++;
-
-            // Calculate real distribution
+            const TEST_MODE = process.env.TEST_MODE === 'true';
             const counts = { R: 0, P: 0, S: 0 };
             const participants = Array.from(activeRoundThrows.entries());
             participants.forEach(([_, data]) => {
                 counts[data.throw]++;
             });
+
+            if (TEST_MODE) {
+                const throws: ('R' | 'P' | 'S')[] = ['R', 'P', 'S'];
+                lastWorldThrow = throws[roundCount % throws.length];
+                console.log(`[TEST_MODE] Deterministic World Throw: ${lastWorldThrow}`);
+            } else {
+                // Plurality calculation
+                if (participants.length > 0) {
+                    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+                    lastWorldThrow = sorted[0][0] as Throw;
+                } else {
+                    const throws: Throw[] = ['R', 'P', 'S'];
+                    lastWorldThrow = throws[Math.floor(Math.random() * throws.length)];
+                }
+                console.log(`[LIVE_MODE] Plurality World Throw: ${lastWorldThrow} (R:${counts.R}, P:${counts.P}, S:${counts.S})`);
+            }
+            roundCount++;
 
             const totalParticipants = participants.length;
             const distribution = totalParticipants > 0 ? {
@@ -143,54 +217,79 @@ function startLoop() {
                 Round.create(roundData).catch(err => console.error('Error saving round:', (err as Error).message));
 
                 // Persist individual player results and update scores
-                for (const [deviceId, data] of participants) {
+                const playerUpdatePromises = participants.map(async ([deviceId, data]) => {
                     const result = calculateResult(data.throw, roundData.worldThrow);
 
-                    // Update User Score and Streaks
-                    const query = data.userId ? { _id: data.userId } : { deviceId: deviceId };
-                    User.findOne(query).then(async (user) => {
+                    try {
+                        const user = await resolveUser({ userId: data.userId, deviceId });
+
                         if (user) {
+                            const oldStake = user.stakingStreak > 0 ? Math.pow(3, user.stakingStreak - 1) : 0;
                             let delta = 0;
-                            const prevStakingPotential = user.stakingStreak > 0 ? Math.pow(3, user.stakingStreak - 1) : 0;
+                            let update: any = {};
 
                             if (result === 'WIN') {
-                                user.currentStreak += 1;
-                                user.bestStreak = Math.max(user.bestStreak, user.currentStreak);
-                                user.stakingStreak += 1;
-                                delta = Math.pow(3, user.stakingStreak - 1);
+                                const nextCurrentStreak = (user.currentStreak || 0) + 1;
+                                const nextStakingStreak = (user.stakingStreak || 0) + 1;
+                                const nextBestStreak = Math.max(user.bestStreak || 0, nextCurrentStreak);
+                                delta = Math.pow(3, nextStakingStreak - 1);
+
+                                update = {
+                                    $set: {
+                                        currentStreak: nextCurrentStreak,
+                                        bestStreak: nextBestStreak,
+                                        stakingStreak: nextStakingStreak
+                                    }
+                                };
                             } else if (result === 'SAFE') {
-                                // delta remains 0, streaks unchanged
+                                // No state change for SAFE
                             } else if (result === 'LOSS') {
-                                delta = -prevStakingPotential;
-                                user.currentStreak = 0;
-                                user.stakingStreak = 0;
+                                delta = -oldStake;
+                                update = {
+                                    $set: {
+                                        currentStreak: 0,
+                                        stakingStreak: 0
+                                    }
+                                };
                             }
 
-                            await user.save();
+                            // Use findByIdAndUpdate for atomic persistence on the specific ID resolved
+                            let updatedUser = user;
+                            if (Object.keys(update).length > 0) {
+                                updatedUser = (await User.findByIdAndUpdate(user._id, update, { new: true })) || user;
+                                console.log(`[REVEAL] ${deviceId}: Res=${result}, Points=${updatedUser.totalPoints}, Streak=${updatedUser.currentStreak}`);
+                            }
+
+                            console.log(`[REVEAL-RESULT] ${deviceId}: Points=${updatedUser.totalPoints}, Streak=${updatedUser.currentStreak}, Δ=${delta}`);
+                            await PlayerRound.create({
+                                deviceId,
+                                userId: data.userId,
+                                roundId,
+                                playerThrow: data.throw,
+                                playerResult: result,
+                                pointsDelta: delta,
+                                timestamp: roundData.timestamp
+                            });
 
                             // Emit personalized data back to the socket for responsiveness
                             const personalHistory = await PlayerRound.find({
                                 $or: [
-                                    { userId: user._id },
-                                    { deviceId: user.deviceId }
+                                    { userId: updatedUser._id },
+                                    { deviceId: updatedUser.deviceId }
                                 ]
                             })
                                 .sort({ timestamp: -1 })
                                 .limit(30);
 
-                            io.to(deviceId).emit('player-data', { user, history: personalHistory });
+                            io.to(deviceId).emit('player-data', { user: updatedUser, history: personalHistory });
                         }
-                    }).catch(err => console.error('Error updating user score:', (err as Error).message));
+                    } catch (err) {
+                        console.error(`Error processing player ${deviceId}:`, (err as Error).message);
+                    }
+                });
 
-                    PlayerRound.create({
-                        deviceId,
-                        userId: data.userId,
-                        roundId,
-                        playerThrow: data.throw,
-                        playerResult: result,
-                        timestamp: roundData.timestamp
-                    }).catch(err => console.error('Error saving player round:', (err as Error).message));
-                }
+                // Await all player updates before proceeding to broadcast reveal
+                await Promise.all(playerUpdatePromises);
             }
 
             activeRoundThrows.clear();
@@ -236,18 +335,12 @@ io.on('connection', (socket) => {
             return;
         }
         try {
-            let user;
-            if (isAuthenticated && userId) {
-                user = await User.findById(userId);
-            } else {
-                user = await User.findOne({ deviceId: data.deviceId });
-                if (!user && data.deviceId) {
-                    user = await User.create({ deviceId: data.deviceId });
-                    console.log('Created new user for device:', data.deviceId);
-                }
-            }
+            const user = await resolveUser({ userId, deviceId: data.deviceId });
 
-            if (!user) return;
+            if (!user) {
+                console.log(`[SYNC-ERROR] No user found/created for device ${data.deviceId} or userId ${userId}`);
+                return;
+            }
 
             // Get last 30 rounds for this player
             const personalHistory = await PlayerRound.find({
@@ -259,9 +352,10 @@ io.on('connection', (socket) => {
                 .sort({ timestamp: -1 })
                 .limit(30);
 
+            console.log(`[SYNC-DATA] Sending data to ${data.deviceId}. Points: ${user.totalPoints}, StakeStreak: ${user.stakingStreak}`);
             socket.emit('player-data', { user, history: personalHistory });
         } catch (err) {
-            console.error('Error syncing player:', (err as Error).message);
+            console.error('[SYNC-CRITICAL] Error syncing player:', (err as Error).message);
         }
     });
 
@@ -334,26 +428,35 @@ io.on('connection', (socket) => {
         if (!dbConnected) return;
 
         try {
-            const query = (isAuthenticated && userId) ? { _id: userId } : { deviceId: data.deviceId };
-            const user = await User.findOne(query);
+            const user = await resolveUser({ userId, deviceId: data.deviceId });
 
             if (user && user.stakingStreak > 0) {
                 const earnings = Math.pow(3, user.stakingStreak - 1);
-                user.totalPoints += earnings;
-                user.stakingStreak = 0;
-                await user.save();
 
-                // Get last 30 rounds for this player to send back full context
-                const personalHistory = await PlayerRound.find({
-                    $or: [
-                        { userId: user._id },
-                        { deviceId: user.deviceId }
-                    ]
-                })
-                    .sort({ timestamp: -1 })
-                    .limit(30);
+                // Atomic update for banking on the specific ID resolved
+                const updatedUser = await User.findByIdAndUpdate(
+                    user._id,
+                    {
+                        $inc: { totalPoints: earnings },
+                        $set: { stakingStreak: 0, currentStreak: 0 }
+                    },
+                    { new: true }
+                );
 
-                socket.emit('player-data', { user, history: personalHistory });
+                if (updatedUser) {
+                    // Get last 30 rounds for this player
+                    const personalHistory = await PlayerRound.find({
+                        $or: [
+                            { userId: updatedUser._id },
+                            { deviceId: updatedUser.deviceId }
+                        ]
+                    })
+                        .sort({ timestamp: -1 })
+                        .limit(30);
+
+                    socket.emit('player-data', { user: updatedUser, history: personalHistory });
+                    console.log(`[BANK] User ${data.deviceId} banked ${earnings} pts. Total: ${updatedUser.totalPoints}`);
+                }
             }
         } catch (err) {
             console.error('Error banking points:', (err as Error).message);
@@ -372,12 +475,12 @@ io.on('connection', (socket) => {
         if (!dbConnected) return;
 
         try {
-            const query = (isAuthenticated && userId) ? { _id: userId } : { deviceId: data.deviceId };
+            const user = await resolveUser({ userId, deviceId: data.deviceId });
             const update: any = {};
             if (data.displayName) update.displayName = data.displayName;
 
-            if (Object.keys(update).length > 0) {
-                await User.findOneAndUpdate(query, update);
+            if (user && Object.keys(update).length > 0) {
+                await User.findByIdAndUpdate(user._id, update);
             }
         } catch (err) {
             console.error('Error updating progress:', (err as Error).message);

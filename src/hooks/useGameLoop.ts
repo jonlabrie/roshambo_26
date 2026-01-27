@@ -40,7 +40,7 @@ export function useGameLoop() {
     const [catalog, setCatalog] = useState<any[]>([])
 
     // Identity / Persistence
-    const deviceIdRef = useRef<string | null>(null)
+    const deviceIdRef = useRef<string | null>(localStorage.getItem('roshambo_device_id'))
     const isSyncedRef = useRef(false)
     const socketRef = useRef<Socket | null>(null)
     const playerThrowRef = useRef<Throw>(null)
@@ -48,14 +48,13 @@ export function useGameLoop() {
     const stakingStreakRef = useRef(0)
     const lastRoundRef = useRef<RoundData | null>(null)
 
-    // Initialize Device ID
+    // Initialize Device ID if missing
     useEffect(() => {
-        let id = localStorage.getItem('roshambo_device_id')
-        if (!id) {
-            id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
+        if (!deviceIdRef.current) {
+            const id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
             localStorage.setItem('roshambo_device_id', id)
+            deviceIdRef.current = id
         }
-        deviceIdRef.current = id
     }, [])
 
     // Fetch Catalog
@@ -149,13 +148,13 @@ export function useGameLoop() {
 
     const calculateResult = useCallback((player: Throw, world: Throw): Result => {
         if (!player || !world) return null
-        if (player === world) return 'LOSS'
+        if (player === world) return 'SAFE'
         if (
             (player === 'R' && world === 'S') ||
             (player === 'P' && world === 'R') ||
             (player === 'S' && world === 'P')
         ) return 'WIN'
-        return 'SAFE'
+        return 'LOSS'
     }, [])
 
     const handleServerReveal = useCallback((serverRound: any) => {
@@ -169,10 +168,22 @@ export function useGameLoop() {
 
         if (currentIsLocked && currentThrow) {
             res = calculateResult(currentThrow, worldThrow)
+            const oldStake = currentStakingStreak > 0 ? Math.pow(3, currentStakingStreak - 1) : 0
 
             if (res === 'WIN') {
+                // Optimistic Update
+                setCurrentStreak(s => {
+                    const next = s + 1
+                    setBestStreak(b => Math.max(b, next))
+                    return next
+                })
+                setStakingStreak(s => s + 1)
+
                 setRoundResult('WIN')
                 setShowDecision(true)
+
+                // Show total potential stake for this round
+                delta = Math.pow(3, currentStakingStreak)
             } else if (res === 'SAFE') {
                 if (currentStakingStreak > 0) {
                     setRoundResult('SAFE')
@@ -182,6 +193,11 @@ export function useGameLoop() {
                     setShowDecision(false)
                 }
             } else if (res === 'LOSS') {
+                // Optimistic Reset
+                setCurrentStreak(0)
+                setStakingStreak(0)
+
+                delta = -oldStake
                 setRoundResult('LOSS')
                 setShowDecision(false)
             }
@@ -220,6 +236,7 @@ export function useGameLoop() {
         socketRef.current = socket
 
         socket.on('connect', () => {
+            console.log('[SOCKET] Connected. Ready to sync...')
             if (deviceIdRef.current) {
                 socket.emit('sync-player', { deviceId: deviceIdRef.current })
             }
@@ -231,6 +248,7 @@ export function useGameLoop() {
 
         socket.on('player-data', (data) => {
             if (data && data.user) {
+                console.log(`[SYNC] Player Data Received: Points=${data.user.totalPoints}, StakeStreak=${data.user.stakingStreak}`)
                 setTotalPoints(data.user.totalPoints || 0)
                 setBestStreak(data.user.bestStreak || 0)
                 setCurrentStreak(data.user.currentStreak || 0)
@@ -315,6 +333,12 @@ export function useGameLoop() {
 
     const bank = () => {
         if (stakingStreak > 0 && socketRef.current && deviceIdRef.current) {
+            // Optimistic Update
+            const earnings = Math.pow(3, stakingStreak - 1)
+            setTotalPoints(prev => prev + earnings)
+            setCurrentStreak(0)
+            setStakingStreak(0)
+
             socketRef.current.emit('bank', { deviceId: deviceIdRef.current })
         }
         setRoundResult(null)
