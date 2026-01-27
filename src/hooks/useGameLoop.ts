@@ -128,30 +128,10 @@ export function useGameLoop() {
     useEffect(() => { stakingStreakRef.current = stakingStreak }, [stakingStreak])
     useEffect(() => { lastRoundRef.current = lastRound }, [lastRound])
 
-    // Push progress to server when it changes (and we are synced)
+    // Removal of client-side progress pushing. Server is now the source of truth for scores.
     useEffect(() => {
-        if (isSyncedRef.current && socketRef.current && deviceIdRef.current) {
-            const payload: any = {
-                deviceId: deviceIdRef.current,
-                totalPoints,
-                bestStreak,
-                currentStreak,
-                stakingStreak
-            }
-            if (token) {
-                payload.token = token
-            }
-
-            // If the last round was just updated in the current "decision" phase,
-            // we send its result info to update the history record on server.
-            if (lastRoundRef.current) {
-                payload.lastRoundId = lastRoundRef.current.id
-                payload.lastPointsDelta = lastRoundRef.current.pointsDelta
-            }
-
-            socketRef.current.emit('update-progress', payload)
-        }
-    }, [totalPoints, bestStreak, currentStreak, stakingStreak, lastRound, token])
+        // No longer pushing progress from client to server.
+    }, [token])
 
     // Emit throw when locked
     useEffect(() => {
@@ -189,31 +169,19 @@ export function useGameLoop() {
 
         if (currentIsLocked && currentThrow) {
             res = calculateResult(currentThrow, worldThrow)
-            const prevStakingPotential = currentStakingStreak > 0 ? Math.pow(3, currentStakingStreak - 1) : 0
 
             if (res === 'WIN') {
-                setCurrentStreak(s => {
-                    const next = s + 1
-                    setBestStreak(b => Math.max(b, next))
-                    return next
-                })
-                setStakingStreak(prev => prev + 1)
                 setRoundResult('WIN')
                 setShowDecision(true)
-                delta = Math.pow(3, currentStakingStreak)
             } else if (res === 'SAFE') {
                 if (currentStakingStreak > 0) {
                     setRoundResult('SAFE')
                     setShowDecision(true)
-                    delta = 0
                 } else {
                     setRoundResult(null)
                     setShowDecision(false)
                 }
             } else if (res === 'LOSS') {
-                delta = -prevStakingPotential
-                setCurrentStreak(0)
-                setStakingStreak(0)
                 setRoundResult('LOSS')
                 setShowDecision(false)
             }
@@ -346,11 +314,9 @@ export function useGameLoop() {
     }, [])
 
     const bank = () => {
-        if (stakingStreak > 0) {
-            const roundEarnings = Math.pow(3, stakingStreak - 1)
-            setTotalPoints(p => p + roundEarnings)
+        if (stakingStreak > 0 && socketRef.current && deviceIdRef.current) {
+            socketRef.current.emit('bank', { deviceId: deviceIdRef.current })
         }
-        setStakingStreak(0)
         setRoundResult(null)
         setShowDecision(false)
     }

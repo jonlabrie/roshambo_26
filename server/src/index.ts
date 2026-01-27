@@ -142,9 +142,45 @@ function startLoop() {
             if (dbConnected) {
                 Round.create(roundData).catch(err => console.error('Error saving round:', (err as Error).message));
 
-                // Persist individual player results
+                // Persist individual player results and update scores
                 for (const [deviceId, data] of participants) {
                     const result = calculateResult(data.throw, roundData.worldThrow);
+
+                    // Update User Score and Streaks
+                    const query = data.userId ? { _id: data.userId } : { deviceId: deviceId };
+                    User.findOne(query).then(async (user) => {
+                        if (user) {
+                            let delta = 0;
+                            const prevStakingPotential = user.stakingStreak > 0 ? Math.pow(3, user.stakingStreak - 1) : 0;
+
+                            if (result === 'WIN') {
+                                user.currentStreak += 1;
+                                user.bestStreak = Math.max(user.bestStreak, user.currentStreak);
+                                user.stakingStreak += 1;
+                                delta = Math.pow(3, user.stakingStreak - 1);
+                            } else if (result === 'SAFE') {
+                                // delta remains 0, streaks unchanged
+                            } else if (result === 'LOSS') {
+                                delta = -prevStakingPotential;
+                                user.currentStreak = 0;
+                                user.stakingStreak = 0;
+                            }
+
+                            await user.save();
+
+                            // Emit personalized data back to the socket for responsiveness
+                            const personalHistory = await PlayerRound.find({
+                                $or: [
+                                    { userId: user._id },
+                                    { deviceId: user.deviceId }
+                                ]
+                            })
+                                .sort({ timestamp: -1 })
+                                .limit(30);
+
+                            io.to(deviceId).emit('player-data', { user, history: personalHistory });
+                        }
+                    }).catch(err => console.error('Error updating user score:', (err as Error).message));
 
                     PlayerRound.create({
                         deviceId,
@@ -190,6 +226,8 @@ io.on('connection', (socket) => {
         const isAuthenticated = (socket as any).isAuthenticated;
 
         if (!data.deviceId && !userId) return;
+        socket.join(data.deviceId); // Join a room for this device to allow targeted emits
+
         if (!dbConnected) {
             socket.emit('player-data', {
                 user: { deviceId: data.deviceId, totalPoints: 0, bestStreak: 0, currentStreak: 0, stakingStreak: 0 },
@@ -287,15 +325,45 @@ io.on('connection', (socket) => {
         }
     });
 
-    // Update Player Progress
+    // Bank Potential Winnings
+    socket.on('bank', async (data: { deviceId: string }) => {
+        const userId = (socket as any).userId;
+        const isAuthenticated = (socket as any).isAuthenticated;
+
+        if (!data.deviceId && !userId) return;
+        if (!dbConnected) return;
+
+        try {
+            const query = (isAuthenticated && userId) ? { _id: userId } : { deviceId: data.deviceId };
+            const user = await User.findOne(query);
+
+            if (user && user.stakingStreak > 0) {
+                const earnings = Math.pow(3, user.stakingStreak - 1);
+                user.totalPoints += earnings;
+                user.stakingStreak = 0;
+                await user.save();
+
+                // Get last 30 rounds for this player to send back full context
+                const personalHistory = await PlayerRound.find({
+                    $or: [
+                        { userId: user._id },
+                        { deviceId: user.deviceId }
+                    ]
+                })
+                    .sort({ timestamp: -1 })
+                    .limit(30);
+
+                socket.emit('player-data', { user, history: personalHistory });
+            }
+        } catch (err) {
+            console.error('Error banking points:', (err as Error).message);
+        }
+    });
+
+    // Update Player Progress (Restricted)
     socket.on('update-progress', async (data: {
         deviceId: string,
-        totalPoints: number,
-        bestStreak: number,
-        currentStreak: number,
-        stakingStreak: number,
-        lastRoundId?: string,
-        lastPointsDelta?: number
+        displayName?: string
     }) => {
         const userId = (socket as any).userId;
         const isAuthenticated = (socket as any).isAuthenticated;
@@ -305,30 +373,11 @@ io.on('connection', (socket) => {
 
         try {
             const query = (isAuthenticated && userId) ? { _id: userId } : { deviceId: data.deviceId };
-            await User.findOneAndUpdate(
-                query,
-                {
-                    totalPoints: data.totalPoints,
-                    bestStreak: data.bestStreak,
-                    currentStreak: data.currentStreak,
-                    stakingStreak: data.stakingStreak
-                }
-            );
+            const update: any = {};
+            if (data.displayName) update.displayName = data.displayName;
 
-            // If we have round result info, update or delete the history record
-            if (data.lastRoundId && data.lastPointsDelta !== undefined) {
-                if (data.lastPointsDelta < 3) {
-                    // Stop persisting small payouts/losses to save space
-                    await PlayerRound.deleteOne({
-                        deviceId: data.deviceId,
-                        roundId: data.lastRoundId
-                    });
-                } else {
-                    await PlayerRound.findOneAndUpdate(
-                        { deviceId: data.deviceId, roundId: data.lastRoundId },
-                        { pointsDelta: data.lastPointsDelta }
-                    );
-                }
+            if (Object.keys(update).length > 0) {
+                await User.findOneAndUpdate(query, update);
             }
         } catch (err) {
             console.error('Error updating progress:', (err as Error).message);
