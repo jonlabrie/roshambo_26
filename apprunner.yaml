@@ -1,0 +1,8 @@
+version: 1.0
+runtime: docker
+build:
+  dockerfile: server/Dockerfile
+run:
+  port: 3001
+  runtime-environment-variables:
+    PORT: 3001

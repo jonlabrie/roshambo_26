@@ -9,15 +9,13 @@ This guide covers the steps to move from your local Docker environment to a live
 4. Copy your **Connection String**. It should look like: `mongodb+srv://<user>:<password>@cluster.abc.mongodb.net/roshambo?retryWrites=true&w=majority`
 
 ## 2. Backend: AWS App Runner
-1. **Source**: Select "Container registry" or link your GitHub repo if you want App Runner to build the image (recommended).
-2. **Build Configuration**:
-   - If using GitHub: Select "Source code repo", choose the `server` directory, and use the existing `Dockerfile`.
+1. **Source**: Select **"Source code repository"** and link your GitHub repo.
+2. **Configuration**: Choose **"Use a configuration file"**.
+   - AWS will automatically read `apprunner.yaml` from the root.
 3. **Service Configuration**:
-   - **Port**: `3001`
-   - **Environment Variables**:
+   - In the "Configure service" step, add these **Environment Variables**:
      - `MONGODB_URI`: (Your Atlas connection string)
      - `JWT_SECRET`: (A long, random string)
-     - `PORT`: `3001`
 4. **Networking**: Ensure it is public so the frontend can connect.
 
 ## 3. Frontend: AWS Amplify
