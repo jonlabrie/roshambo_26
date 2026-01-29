@@ -9,7 +9,10 @@ run:
   network:
     port: 3001
   env:
-    PORT: "3001"
-    MONGODB_URI: "mongodb+srv://jonlabrie_db_user:eYBOQwdAkGgU2jnC@roshambocluster0.ckjseml.mongodb.net/?appName=RoshamboCluster0"
-    JWT_SECRET: "roshambo_super_secret_1337"
+    - name : PORT
+      value : "3001"
+    - name: MONGODB_URI
+      value: "mongodb+srv://jonlabrie_db_user:eYBOQwdAkGgU2jnC@roshambocluster0.ckjseml.mongodb.net/?appName=RoshamboCluster0"
+    - name: JWT_SECRET
+      value: "roshambo_super_secret_1337"
 
