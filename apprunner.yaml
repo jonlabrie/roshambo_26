@@ -3,8 +3,9 @@ runtime: nodejs22
 build:
   commands:
     build:
-      - npm install --prefix server
-      - npm run build --prefix server
+      - pwd
+      - ls -la
+      - cd server && npm install && npm run build
 run:
   command: node server/dist/index.js
   network:
