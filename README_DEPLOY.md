@@ -10,9 +10,12 @@ This guide covers the steps to move from your local Docker environment to a live
 
 ## 2. Backend: AWS App Runner
 1. **Source**: Select **"Source code repository"** and link your GitHub repo.
-2. **Directory**: Under "Source directory", **LEAVE IT EMPTY** (Default).
+2. **Directory Settings**: 
+   > [!IMPORTANT]
+   > You **MUST** set the **"Source directory"** to **`server`**.  
+   > This is the only way for the build to find the correct `package.json`.
 3. **Configuration**: Choose **"Use a configuration file"**.
-   - AWS will automatically find the `apprunner.yaml` in your root.
+   - AWS will now look for `server/apprunner.yaml`.
 4. **Security (Instance Role)**:
    - This role gives your code permissions to talk to *other* AWS services (like S3 or Secrets Manager).
    - **Since we are using MongoDB Atlas, you don't need any special permissions.** 
