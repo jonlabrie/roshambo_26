@@ -59,6 +59,7 @@ interface RiveArenaProps {
     lastRound: any
     playerName: string
     character: any
+    actionMessage: string | null
 }
 
 const THROW_LABEL: Record<string, string> = {
@@ -74,7 +75,8 @@ export const RiveArena: React.FC<RiveArenaProps> = ({
     showResult,
     lastRound,
     playerName,
-    character
+    character,
+    actionMessage
 }) => {
     // Current "State" of the Arena logic
     const currentVisualState = showResult ? 'RESULT' : playerThrow ? 'SELECTION' : 'IDLE'
@@ -127,7 +129,7 @@ export const RiveArena: React.FC<RiveArenaProps> = ({
                                         exit={{ opacity: 0, scale: 1.1 }}
                                         className="px-6 py-2 bg-slate-950/80 backdrop-blur-md rounded-2xl border border-blue-500/30 flex flex-col items-center gap-1"
                                     >
-                                        <span className="text-[10px] font-black text-blue-500 animate-pulse uppercase tracking-[0.3em] italic">
+                                        <span className="text-sm font-black text-blue-500 animate-pulse uppercase tracking-[0.3em] italic">
                                             {`${playerName} throws ${playerThrow ? THROW_LABEL[playerThrow] : '...'}`}
                                         </span>
                                     </motion.div>
@@ -181,17 +183,37 @@ export const RiveArena: React.FC<RiveArenaProps> = ({
                             initial={{ opacity: 0, y: 10 }}
                             animate={{ opacity: 1, y: 0 }}
                             className={cn(
-                                "mt-4 text-[10px] font-black tracking-widest uppercase tabular-nums",
+                                "mt-4 text-[20px] font-black tracking-widest uppercase tabular-nums drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]",
                                 !lastRound.playerResult ? "text-slate-500" :
                                     lastRound.pointsDelta > 0 ? "text-green-400" : "text-red-400"
                             )}
                         >
                             {!lastRound.playerResult ? 'NO THROW' :
-                                `${lastRound.pointsDelta > 0 ? '+' : ''}${lastRound.pointsDelta} PTS`}
+                                lastRound.pointsDelta > 0 ? `+${lastRound.pointsDelta} PTS` :
+                                    lastRound.pointsDelta < 0 ? `${Math.abs(lastRound.pointsDelta)} Staked Points Lost` :
+                                        '0 PTS'}
                         </motion.span>
                     </motion.div>
                 </div>
             )}
+
+            {/* ACTION MESSAGE OVERLAY */}
+            <AnimatePresence>
+                {actionMessage && (
+                    <motion.div
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 1.5, opacity: 0 }}
+                        className="absolute inset-0 flex items-center justify-center z-[100] pointer-events-none"
+                    >
+                        <div className="px-8 py-4 bg-slate-950/60 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl">
+                            <span className="text-[32px] font-black uppercase italic tracking-tighter text-white drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)] text-center">
+                                {actionMessage}
+                            </span>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     )
 }

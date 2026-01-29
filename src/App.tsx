@@ -33,7 +33,7 @@ export default function App() {
         roundCount,
         currentStreak,
         bestStreak,
-        stakingStreak,
+        pointsAtStake,
         totalPoints,
         lastRound,
         history,
@@ -51,13 +51,14 @@ export default function App() {
         equippedCharacter,
         catalog,
         buyCharacter,
-        equipCharacter
+        equipCharacter,
+        actionMessage
     } = useGameLoop()
 
     const [visualTier, setVisualTier] = useState<'LITE' | 'FULL' | 'ULTRA'>('FULL')
     const [currentView, setCurrentView] = useState<'GAME' | 'USER_STATS' | 'GLOBAL_STATS' | 'AUTH' | 'STORE'>('GAME')
 
-    const currentPotential = stakingStreak > 0 ? Math.pow(3, stakingStreak - 1) : 0
+    const currentPotential = pointsAtStake
 
     if (currentView === 'AUTH') {
         return (
@@ -175,6 +176,7 @@ export default function App() {
                         lastRound={lastRound}
                         playerName={user?.displayName || 'Player'}
                         character={equippedCharacter}
+                        actionMessage={actionMessage}
                     />
                 ) : visualTier === 'FULL' ? (
                     <RiveArena
@@ -185,6 +187,7 @@ export default function App() {
                         lastRound={lastRound}
                         playerName={user?.displayName || 'Player'}
                         character={equippedCharacter}
+                        actionMessage={actionMessage}
                     />
                 ) : (
                     <VideoArena
@@ -195,6 +198,7 @@ export default function App() {
                         lastRound={lastRound}
                         playerName={user?.displayName || 'Player'}
                         character={equippedCharacter}
+                        actionMessage={actionMessage}
                     />
                 )}
 
@@ -239,7 +243,7 @@ export default function App() {
                                     {roundResult === 'WIN' ? 'Winner!' : roundResult === 'LOSS' ? 'Lose' : 'Safe Result'}
                                 </h2>
                                 <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
-                                    {roundResult === 'WIN' ? 'Stake current points or Bank?' :
+                                    {roundResult === 'WIN' ? 'Stake current points or Points?' :
                                         roundResult === 'LOSS' ? 'Try again!' : 'Preserved. Continue playing?'}
                                 </p>
                             </motion.div>
@@ -294,7 +298,7 @@ export default function App() {
 
                     <div className="flex items-center gap-4 border-l border-slate-800 pl-4">
                         <div className="flex flex-col items-end leading-tight">
-                            <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Bank</span>
+                            <span className="text-[8px] font-black text-slate-500 uppercase tracking-widest">Points</span>
                             <span className="text-base font-black text-blue-400 tabular-nums">
                                 {totalPoints.toLocaleString()}
                             </span>

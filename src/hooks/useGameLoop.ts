@@ -28,6 +28,7 @@ export function useGameLoop() {
     const [currentStreak, setCurrentStreak] = useState(0)
     const [bestStreak, setBestStreak] = useState(0)
     const [stakingStreak, setStakingStreak] = useState(0)
+    const [pointsAtStake, setPointsAtStake] = useState(0)
     const [totalPoints, setTotalPoints] = useState(0)
     const [lastRound, setLastRound] = useState<RoundData | null>(null)
     const [history, setHistory] = useState<RoundData[]>([])
@@ -38,6 +39,7 @@ export function useGameLoop() {
     const [inventory, setInventory] = useState<string[]>(['default'])
     const [equippedId, setEquippedId] = useState<string>('default')
     const [catalog, setCatalog] = useState<any[]>([])
+    const [actionMessage, setActionMessage] = useState<string | null>(null)
 
     // Identity / Persistence
     const deviceIdRef = useRef<string | null>(localStorage.getItem('roshambo_device_id'))
@@ -46,7 +48,9 @@ export function useGameLoop() {
     const playerThrowRef = useRef<Throw>(null)
     const isLockedRef = useRef(false)
     const stakingStreakRef = useRef(0)
+    const pointsAtStakeRef = useRef(0)
     const lastRoundRef = useRef<RoundData | null>(null)
+    const serverResultRef = useRef<{ result: Result; delta: number } | null>(null)
 
     // Initialize Device ID if missing
     useEffect(() => {
@@ -125,6 +129,7 @@ export function useGameLoop() {
     useEffect(() => { playerThrowRef.current = playerThrow }, [playerThrow])
     useEffect(() => { isLockedRef.current = isLocked }, [isLocked])
     useEffect(() => { stakingStreakRef.current = stakingStreak }, [stakingStreak])
+    useEffect(() => { pointsAtStakeRef.current = pointsAtStake }, [pointsAtStake])
     useEffect(() => { lastRoundRef.current = lastRound }, [lastRound])
 
     // Removal of client-side progress pushing. Server is now the source of truth for scores.
@@ -164,40 +169,28 @@ export function useGameLoop() {
 
         const currentThrow = playerThrowRef.current
         const currentIsLocked = isLockedRef.current
-        const currentStakingStreak = stakingStreakRef.current
 
         if (currentIsLocked && currentThrow) {
             res = calculateResult(currentThrow, worldThrow)
-            const oldStake = currentStakingStreak > 0 ? Math.pow(3, currentStakingStreak - 1) : 0
+
+            // Authoritative server data takes precedence
+            if (serverResultRef.current) {
+                res = serverResultRef.current.result
+                delta = serverResultRef.current.delta
+                serverResultRef.current = null // Consume
+            } else {
+                // Safety fallback for local calculation
+                if (res === 'WIN') delta = pointsAtStakeRef.current === 0 ? 1 : pointsAtStakeRef.current * 3
+                else if (res === 'LOSS') delta = -pointsAtStakeRef.current
+            }
 
             if (res === 'WIN') {
-                // Optimistic Update
-                setCurrentStreak(s => {
-                    const next = s + 1
-                    setBestStreak(b => Math.max(b, next))
-                    return next
-                })
-                setStakingStreak(s => s + 1)
-
                 setRoundResult('WIN')
                 setShowDecision(true)
-
-                // Show total potential stake for this round
-                delta = Math.pow(3, currentStakingStreak)
             } else if (res === 'SAFE') {
-                if (currentStakingStreak > 0) {
-                    setRoundResult('SAFE')
-                    setShowDecision(true)
-                } else {
-                    setRoundResult(null)
-                    setShowDecision(false)
-                }
+                setRoundResult('SAFE')
+                setShowDecision(false)
             } else if (res === 'LOSS') {
-                // Optimistic Reset
-                setCurrentStreak(0)
-                setStakingStreak(0)
-
-                delta = -oldStake
                 setRoundResult('LOSS')
                 setShowDecision(false)
             }
@@ -253,16 +246,21 @@ export function useGameLoop() {
                 setBestStreak(data.user.bestStreak || 0)
                 setCurrentStreak(data.user.currentStreak || 0)
                 setStakingStreak(data.user.stakingStreak || 0)
+                setPointsAtStake(data.user.pointsAtStake || 0)
                 setInventory(data.user.inventory || ['default'])
                 setEquippedId(data.user.equippedCharacterId || 'default')
 
+                if (data.lastResult) {
+                    serverResultRef.current = {
+                        result: data.lastResult.result as Result,
+                        delta: data.lastResult.delta
+                    }
+                }
+
                 // Reconstitute history if we have global history already or when it arrives
                 if (data.history && data.history.length > 0) {
-                    const lastPersonal = data.history[0]
-                    if ((data.user.stakingStreak || 0) > 0) {
-                        setRoundResult(lastPersonal.playerResult as Result)
-                        setShowDecision(true)
-                    }
+                    // We DO NOT auto-trigger Decision UI on refresh anymore to prevent Arena occlusion
+                    // The user can see their pot in the header and will get a fresh decision after the next round.
 
                     setHistory(prev => {
                         return prev.map(globalRound => {
@@ -332,20 +330,27 @@ export function useGameLoop() {
     }, [])
 
     const bank = () => {
-        if (stakingStreak > 0 && socketRef.current && deviceIdRef.current) {
+        if (pointsAtStake > 0 && socketRef.current && deviceIdRef.current) {
             // Optimistic Update
-            const earnings = Math.pow(3, stakingStreak - 1)
+            const earnings = pointsAtStake
             setTotalPoints(prev => prev + earnings)
-            setCurrentStreak(0)
+            // Note: currentStreak is NOT reset on bank (independent)
             setStakingStreak(0)
+            setPointsAtStake(0)
 
             socketRef.current.emit('bank', { deviceId: deviceIdRef.current })
+            setActionMessage(`Bank ${earnings.toLocaleString()} pts`)
+            setTimeout(() => setActionMessage(null), 2000)
         }
         setRoundResult(null)
         setShowDecision(false)
     }
 
     const stake = () => {
+        if (pointsAtStake > 0) {
+            setActionMessage(`Stake ${pointsAtStake.toLocaleString()} pts!`)
+            setTimeout(() => setActionMessage(null), 2000)
+        }
         setRoundResult(null)
         setShowDecision(false)
     }
@@ -363,6 +368,7 @@ export function useGameLoop() {
         currentStreak,
         bestStreak,
         stakingStreak,
+        pointsAtStake,
         totalPoints,
         lastRound,
         history,
@@ -380,6 +386,7 @@ export function useGameLoop() {
         equippedCharacter: catalog.find(c => c.id === equippedId) || catalog.find(c => c.id === 'default'),
         catalog,
         buyCharacter,
-        equipCharacter
+        equipCharacter,
+        actionMessage
     }
 }

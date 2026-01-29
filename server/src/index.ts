@@ -31,8 +31,17 @@ const io = new Server(httpServer, {
 });
 
 const PORT = process.env.PORT || 3001;
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/roshambo';
+const MONGODB_URI = process.env.MONGODB_URI;
 const JWT_SECRET = process.env.JWT_SECRET || 'roshambo_super_secret_1337';
+
+if (!MONGODB_URI) {
+    console.error('[FATAL] MONGODB_URI is not defined in .env! Cannot start server without a persistent database.');
+    process.exit(1);
+}
+
+// Clean URI for logging (mask password)
+const maskedUri = MONGODB_URI.replace(/:([^@]+)@/, ':****@');
+console.log(`[SYS] Target Database: ${maskedUri}`);
 
 // Socket Middleware for Authentication
 io.use((socket, next) => {
@@ -56,12 +65,14 @@ mongoose.connect(MONGODB_URI, {
     serverSelectionTimeoutMS: 5000,
 })
     .then(() => {
-        console.log('Connected to MongoDB');
+        const connection = mongoose.connection;
+        console.log(`[SYS] Connected to MongoDB Atlas Cluster: ${connection.host}, Database: ${connection.name}`);
         dbConnected = true;
         initializeState();
     })
     .catch(err => {
-        console.error('MongoDB connection error (running in memory mode):', (err as Error).message);
+        console.error('[FATAL] MongoDB connection failed:', (err as Error).message);
+        process.exit(1); // Fail loud if we can't persist
     });
 
 // Constants
@@ -113,11 +124,17 @@ async function resolveUser(identifier: { userId?: string, deviceId?: string }) {
                     _id: { $ne: user._id }
                 });
                 if (collisions.length > 0) {
-                    console.log(`[SYNC-CLEANUP] Removing deviceId ${identifier.deviceId} from ${collisions.length} stale records to favor Auth User ${user._id}`);
-                    await User.updateMany(
-                        { deviceId: identifier.deviceId, _id: { $ne: user._id } },
-                        { $unset: { deviceId: 1 } }
-                    );
+                    console.log(`[SYNC-CLEANUP] Moving deviceId ${identifier.deviceId} from ${collisions.length} stale records to favor Auth User ${user._id}`);
+                    try {
+                        // Instead of $unset (which might collide on null if index not sparse), use a unique stale identifier
+                        await Promise.all(collisions.map(c =>
+                            User.findByIdAndUpdate(c._id, {
+                                $set: { deviceId: `stale_${Date.now()}_${c._id}` }
+                            })
+                        ));
+                    } catch (cleanupErr) {
+                        console.error('[SYNC-CLEANUP-ERROR] Failed to dissociate stale records:', (cleanupErr as Error).message);
+                    }
                 }
             }
             return user;
@@ -132,13 +149,19 @@ async function resolveUser(identifier: { userId?: string, deviceId?: string }) {
         if (records.length > 0) {
             user = records[0];
             // If there are multiple guest records, keep the most recent one as the device owner 
-            // and unset the others to avoid "past state" confusion.
+            // and move the others to avoid "past state" confusion.
             if (records.length > 1) {
                 console.warn(`[SYNC-COLLISION] Found ${records.length} records for device ${identifier.deviceId}. Picking most recent (${user._id}).`);
-                await User.updateMany(
-                    { deviceId: identifier.deviceId, _id: { $ne: user._id } },
-                    { $unset: { deviceId: 1 } }
-                );
+                try {
+                    const others = records.slice(1);
+                    await Promise.all(others.map(o =>
+                        User.findByIdAndUpdate(o._id, {
+                            $set: { deviceId: `stale_${Date.now()}_${o._id}` }
+                        })
+                    ));
+                } catch (cleanupErr) {
+                    console.error('[SYNC-COLLISION-ERROR] Failed to clean duplicates:', (cleanupErr as Error).message);
+                }
             }
             return user;
         }
@@ -184,15 +207,10 @@ function startLoop() {
                 lastWorldThrow = throws[roundCount % throws.length];
                 console.log(`[TEST_MODE] Deterministic World Throw: ${lastWorldThrow}`);
             } else {
-                // Plurality calculation
-                if (participants.length > 0) {
-                    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
-                    lastWorldThrow = sorted[0][0] as Throw;
-                } else {
-                    const throws: Throw[] = ['R', 'P', 'S'];
-                    lastWorldThrow = throws[Math.floor(Math.random() * throws.length)];
-                }
-                console.log(`[LIVE_MODE] Plurality World Throw: ${lastWorldThrow} (R:${counts.R}, P:${counts.P}, S:${counts.S})`);
+                // Independent Random World Throw
+                const throws: Throw[] = ['R', 'P', 'S'];
+                lastWorldThrow = throws[Math.floor(Math.random() * throws.length)];
+                console.log(`[LIVE_MODE] Independent Random World Throw: ${lastWorldThrow} (Player Throws: R:${counts.R}, P:${counts.P}, S:${counts.S})`);
             }
             roundCount++;
 
@@ -224,7 +242,6 @@ function startLoop() {
                         const user = await resolveUser({ userId: data.userId, deviceId });
 
                         if (user) {
-                            const oldStake = user.stakingStreak > 0 ? Math.pow(3, user.stakingStreak - 1) : 0;
                             let delta = 0;
                             let update: any = {};
 
@@ -232,32 +249,46 @@ function startLoop() {
                                 const nextCurrentStreak = (user.currentStreak || 0) + 1;
                                 const nextStakingStreak = (user.stakingStreak || 0) + 1;
                                 const nextBestStreak = Math.max(user.bestStreak || 0, nextCurrentStreak);
-                                delta = Math.pow(3, nextStakingStreak - 1);
+
+                                // Authoritative Pot Math: 1, 3, 9, 27, 81...
+                                const currentPot = user.pointsAtStake || 0;
+                                const nextPointsAtStake = currentPot === 0 ? 1 : currentPot * 3;
+                                delta = nextPointsAtStake;
 
                                 update = {
                                     $set: {
                                         currentStreak: nextCurrentStreak,
                                         bestStreak: nextBestStreak,
-                                        stakingStreak: nextStakingStreak
+                                        stakingStreak: nextStakingStreak,
+                                        pointsAtStake: nextPointsAtStake
                                     }
                                 };
                             } else if (result === 'SAFE') {
-                                // No state change for SAFE
-                            } else if (result === 'LOSS') {
-                                delta = -oldStake;
+                                // Rule Change: Win streak resets on SAFE, but Pot remains!
                                 update = {
                                     $set: {
                                         currentStreak: 0,
                                         stakingStreak: 0
                                     }
                                 };
+                                console.log(`[REVEAL] ${deviceId}: SAFE. Pot preserved (${user.pointsAtStake}), Streak reset.`);
+                            } else if (result === 'LOSS') {
+                                delta = -user.pointsAtStake;
+                                update = {
+                                    $set: {
+                                        currentStreak: 0,
+                                        stakingStreak: 0,
+                                        pointsAtStake: 0
+                                    }
+                                };
+                                console.log(`[REVEAL] ${deviceId}: LOSS. Resetting stake pot. (Pot was ${user.pointsAtStake})`);
                             }
 
                             // Use findByIdAndUpdate for atomic persistence on the specific ID resolved
                             let updatedUser = user;
                             if (Object.keys(update).length > 0) {
                                 updatedUser = (await User.findByIdAndUpdate(user._id, update, { new: true })) || user;
-                                console.log(`[REVEAL] ${deviceId}: Res=${result}, Points=${updatedUser.totalPoints}, Streak=${updatedUser.currentStreak}`);
+                                console.log(`[REVEAL] ${deviceId} (ID: ${user._id}): Res=${result}, Pts=${updatedUser.totalPoints}, Pot=${updatedUser.pointsAtStake}, WinStreak=${updatedUser.currentStreak}`);
                             }
 
                             console.log(`[REVEAL-RESULT] ${deviceId}: Points=${updatedUser.totalPoints}, Streak=${updatedUser.currentStreak}, Δ=${delta}`);
@@ -272,6 +303,7 @@ function startLoop() {
                             });
 
                             // Emit personalized data back to the socket for responsiveness
+                            // Include the authoritative result and delta for the reveal UI
                             const personalHistory = await PlayerRound.find({
                                 $or: [
                                     { userId: updatedUser._id },
@@ -281,7 +313,11 @@ function startLoop() {
                                 .sort({ timestamp: -1 })
                                 .limit(30);
 
-                            io.to(deviceId).emit('player-data', { user: updatedUser, history: personalHistory });
+                            io.to(deviceId).emit('player-data', {
+                                user: updatedUser,
+                                history: personalHistory,
+                                lastResult: { result, delta }
+                            });
                         }
                     } catch (err) {
                         console.error(`Error processing player ${deviceId}:`, (err as Error).message);
@@ -352,7 +388,7 @@ io.on('connection', (socket) => {
                 .sort({ timestamp: -1 })
                 .limit(30);
 
-            console.log(`[SYNC-DATA] Sending data to ${data.deviceId}. Points: ${user.totalPoints}, StakeStreak: ${user.stakingStreak}`);
+            console.log(`[SYNC-DATA] ${data.deviceId} (ID: ${user._id}): Pts=${user.totalPoints}, Pot=${user.pointsAtStake}, Streak=${user.stakingStreak}`);
             socket.emit('player-data', { user, history: personalHistory });
         } catch (err) {
             console.error('[SYNC-CRITICAL] Error syncing player:', (err as Error).message);
@@ -430,20 +466,22 @@ io.on('connection', (socket) => {
         try {
             const user = await resolveUser({ userId, deviceId: data.deviceId });
 
-            if (user && user.stakingStreak > 0) {
-                const earnings = Math.pow(3, user.stakingStreak - 1);
+            if (user && user.pointsAtStake > 0) {
+                const earnings = user.pointsAtStake;
+                console.log(`[BANK-REQ] ${data.deviceId} (ID: ${user._id}): Auth Pot=${earnings}`);
 
                 // Atomic update for banking on the specific ID resolved
                 const updatedUser = await User.findByIdAndUpdate(
                     user._id,
                     {
                         $inc: { totalPoints: earnings },
-                        $set: { stakingStreak: 0, currentStreak: 0 }
+                        $set: { pointsAtStake: 0, stakingStreak: 0 }
                     },
                     { new: true }
                 );
 
                 if (updatedUser) {
+                    console.log(`[BANK-SUCCESS] ${data.deviceId} (ID: ${user._id}): Banked ${earnings}. Total=${updatedUser.totalPoints}, WinStreak=${updatedUser.currentStreak}`);
                     // Get last 30 rounds for this player
                     const personalHistory = await PlayerRound.find({
                         $or: [

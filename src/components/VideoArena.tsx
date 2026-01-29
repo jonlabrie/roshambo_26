@@ -11,6 +11,7 @@ interface VideoArenaProps {
     lastRound: any
     playerName: string
     character: any
+    actionMessage: string | null
 }
 
 const THROW_LABEL: Record<string, string> = {
@@ -29,7 +30,8 @@ export const VideoArena: React.FC<VideoArenaProps> = ({
     showResult,
     lastRound,
     playerName,
-    character
+    character,
+    actionMessage
 }) => {
     const videoRef = useRef<HTMLVideoElement>(null)
     const [currentClip, setCurrentClip] = useState<string>('')
@@ -144,7 +146,7 @@ export const VideoArena: React.FC<VideoArenaProps> = ({
                                     />
                                 </div>
                                 <div className="px-6 py-2 bg-black/60 backdrop-blur-md rounded-2xl border border-blue-500/30">
-                                    <span className="text-[10px] font-black text-blue-500 animate-pulse uppercase tracking-[0.3em] italic">
+                                    <span className="text-sm font-black text-blue-500 animate-pulse uppercase tracking-[0.3em] italic">
                                         {`${playerName} throws ${THROW_LABEL[playerThrow]}`}
                                     </span>
                                 </div>
@@ -189,16 +191,36 @@ export const VideoArena: React.FC<VideoArenaProps> = ({
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         className={cn(
-                            "mt-4 text-sm font-black tracking-widest uppercase tabular-nums",
+                            "mt-4 text-[28px] font-black tracking-widest uppercase tabular-nums drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]",
                             !lastRound.playerResult ? "text-slate-500" :
                                 lastRound.pointsDelta > 0 ? "text-green-400" : "text-red-400"
                         )}
                     >
                         {!lastRound.playerResult ? 'NO THROW' :
-                            `${lastRound.pointsDelta > 0 ? '+' : ''}${lastRound.pointsDelta} PTS`}
+                            lastRound.pointsDelta > 0 ? `+${lastRound.pointsDelta} PTS` :
+                                lastRound.pointsDelta < 0 ? `${Math.abs(lastRound.pointsDelta)} Staked Points Lost` :
+                                    '0 PTS'}
                     </motion.span>
                 </div>
             )}
+
+            {/* ACTION MESSAGE OVERLAY */}
+            <AnimatePresence>
+                {actionMessage && (
+                    <motion.div
+                        initial={{ scale: 0.5, opacity: 0 }}
+                        animate={{ scale: 1, opacity: 1 }}
+                        exit={{ scale: 1.5, opacity: 0 }}
+                        className="absolute inset-0 flex items-center justify-center z-[100] pointer-events-none"
+                    >
+                        <div className="px-10 py-5 bg-black/60 backdrop-blur-2xl rounded-[2rem] border border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
+                            <span className="text-[40px] font-black uppercase italic tracking-tighter text-white drop-shadow-[0_4px_15px_rgba(0,0,0,0.8)] text-center">
+                                {actionMessage}
+                            </span>
+                        </div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
         </div>
     )
 }

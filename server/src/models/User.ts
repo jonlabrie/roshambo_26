@@ -13,6 +13,7 @@ export interface IUser extends Document {
     bestStreak: number;
     currentStreak: number;
     stakingStreak: number;
+    pointsAtStake: number;
     inventory: string[];
     equippedCharacterId: string;
     updatedAt: Date;
@@ -31,6 +32,7 @@ const UserSchema: Schema = new Schema({
     bestStreak: { type: Number, default: 0 },
     currentStreak: { type: Number, default: 0 },
     stakingStreak: { type: Number, default: 0 },
+    pointsAtStake: { type: Number, default: 0 },
     inventory: { type: [String], default: ['default'] },
     equippedCharacterId: { type: String, default: 'default' },
 }, { timestamps: true });

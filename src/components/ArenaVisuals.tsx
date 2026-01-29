@@ -11,6 +11,7 @@ interface ArenaVisualsProps {
     lastRound: any
     playerName: string
     character: any
+    actionMessage: string | null
 }
 
 const THROW_LABEL: Record<string, string> = {
@@ -26,7 +27,8 @@ export const ArenaVisuals: React.FC<ArenaVisualsProps> = ({
     showResult,
     lastRound,
     playerName,
-    character
+    character,
+    actionMessage
 }) => {
     const primaryColor = character?.lite?.primaryColor || '#3b82f6'
     const accentColor = character?.lite?.accentColor || '#60a5fa'
@@ -135,13 +137,15 @@ export const ArenaVisuals: React.FC<ArenaVisualsProps> = ({
                                 initial={{ opacity: 0, y: 10 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 className={cn(
-                                    "text-[10px] font-black tracking-widest uppercase tabular-nums",
+                                    "text-[20px] font-black tracking-widest uppercase tabular-nums drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]",
                                     !lastRound.playerResult ? "text-slate-500" :
                                         lastRound.pointsDelta > 0 ? "text-green-500" : "text-red-500"
                                 )}
                             >
                                 {!lastRound.playerResult ? 'NO THROW' :
-                                    `${lastRound.pointsDelta > 0 ? '+' : ''}${lastRound.pointsDelta} PTS`}
+                                    lastRound.pointsDelta > 0 ? `+${lastRound.pointsDelta} PTS` :
+                                        lastRound.pointsDelta < 0 ? `${Math.abs(lastRound.pointsDelta)} Staked Points Lost` :
+                                            '0 PTS'}
                             </motion.span>
                         </motion.div>
 
@@ -176,7 +180,7 @@ export const ArenaVisuals: React.FC<ArenaVisualsProps> = ({
                                 />
                             </div>
                             <span className={cn(
-                                "text-[10px] font-black uppercase tracking-[0.4em] italic",
+                                "text-sm font-black uppercase tracking-[0.4em] italic",
                                 isLocked ? "animate-pulse" : "text-slate-500"
                             )} style={{ color: isLocked ? primaryColor : undefined }}>
                                 {isLocked ? `${playerName} throws ${playerThrow ? THROW_LABEL[playerThrow] : '...'}` : 'RECONNAISSANCE'}
@@ -209,6 +213,24 @@ export const ArenaVisuals: React.FC<ArenaVisualsProps> = ({
                             <p className="text-slate-600 uppercase text-[9px] font-black tracking-[0.2em] mt-2">
                                 {gameState === 'ACTIVE' ? 'Choose Your Weapon' : 'Calculating...'}
                             </p>
+                        </motion.div>
+                    )}
+                </AnimatePresence>
+
+                {/* ACTION MESSAGE OVERLAY */}
+                <AnimatePresence>
+                    {actionMessage && (
+                        <motion.div
+                            initial={{ scale: 0.5, opacity: 0 }}
+                            animate={{ scale: 1, opacity: 1 }}
+                            exit={{ scale: 1.5, opacity: 0 }}
+                            className="absolute inset-0 flex items-center justify-center z-[100] pointer-events-none"
+                        >
+                            <div className="px-8 py-4 bg-slate-950/60 backdrop-blur-xl rounded-3xl border border-white/10 shadow-2xl">
+                                <span className="text-[32px] font-black uppercase italic tracking-tighter text-white drop-shadow-[0_4px_10px_rgba(0,0,0,0.8)] text-center">
+                                    {actionMessage}
+                                </span>
+                            </div>
                         </motion.div>
                     )}
                 </AnimatePresence>

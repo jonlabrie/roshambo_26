@@ -100,7 +100,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
                 <div className="glass-panel p-4 rounded-2xl flex flex-col gap-1 border-b-4 border-blue-500/50">
                     <div className="flex items-center gap-2 text-blue-400">
                         <Trophy className="w-4 h-4" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Your Bank</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest">Your Points</span>
                     </div>
                     <span className="text-2xl font-black tabular-nums">{playerStats.totalPoints.toLocaleString()}</span>
                 </div>
@@ -219,7 +219,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
 
     const renderSubPage = (type: 'POINTS' | 'WINS') => {
         const list = type === 'POINTS' ? serverStats?.topPoints : serverStats?.biggestWins
-        const title = type === 'POINTS' ? 'Total Bank Records' : 'Massive Wins Hall'
+        const title = type === 'POINTS' ? 'Total Points Records' : 'Massive Wins Hall'
         const icon = type === 'POINTS' ? <Trophy className="w-4 h-4 text-yellow-500" /> : <Zap className="w-4 h-4 text-blue-500" />
 
         return (
