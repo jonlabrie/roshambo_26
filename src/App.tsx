@@ -55,7 +55,7 @@ export default function App() {
         actionMessage
     } = useGameLoop()
 
-    const [visualTier, setVisualTier] = useState<'LITE' | 'FULL' | 'ULTRA'>('FULL')
+    const [visualTier, setVisualTier] = useState<'LITE' | 'FULL' | 'ULTRA'>('ULTRA')
     const [currentView, setCurrentView] = useState<'GAME' | 'USER_STATS' | 'GLOBAL_STATS' | 'AUTH' | 'STORE'>('GAME')
 
     const currentPotential = pointsAtStake
