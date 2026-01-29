@@ -10,9 +10,9 @@ This guide covers the steps to move from your local Docker environment to a live
 
 ## 2. Backend: AWS App Runner
 1. **Source**: Select **"Source code repository"** and link your GitHub repo.
-2. **Configuration**: Choose **"Use a configuration file"**.
-   - AWS will automatically read `apprunner.yaml` from the root.
-   - I've configured this to use **Node.js 22**, which handles the TypeScript build automatically.
+2. **Directory**: Under "Source directory", enter **`server`**. (This is the fix for the previous build error!)
+3. **Configuration**: Choose **"Use a configuration file"**.
+   - AWS will now look for `server/apprunner.yaml` and run it from that folder.
 3. **Service Configuration**:
    - In the "Configure service" step, add these **Environment Variables**:
      - `MONGODB_URI`: (Your Atlas connection string)
