@@ -13,7 +13,11 @@ This guide covers the steps to move from your local Docker environment to a live
 2. **Directory**: Under "Source directory", enter **`server`**. (This is the fix for the previous build error!)
 3. **Configuration**: Choose **"Use a configuration file"**.
    - AWS will now look for `server/apprunner.yaml` and run it from that folder.
-3. **Service Configuration**:
+4. **Security (Instance Role)**:
+   - This role gives your code permissions to talk to *other* AWS services (like S3 or Secrets Manager).
+   - **Since we are using MongoDB Atlas, you don't need any special permissions.** 
+   - You can leave this as the **Default** or **None** if it allows you. If forced, select "Create new" and give it a name like `RoshamboAppRunnerInstanceRole`.
+5. **Service Configuration**:
    - In the "Configure service" step, add these **Environment Variables**:
      - `MONGODB_URI`: (Your Atlas connection string)
      - `JWT_SECRET`: (A long, random string)
