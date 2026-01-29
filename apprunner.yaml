@@ -1,9 +1,13 @@
 version: 1.0
-runtime: docker
+runtime: nodejs22
 build:
-  dockerfile: server/Dockerfile
+  commands:
+    build:
+      - cd server && npm install && npm run build
 run:
-  port: 3001
+  command: node server/dist/index.js
+  network:
+    port: 3001
   runtime-environment-variables:
     PORT: "3001"
     MONGODB_URI: "mongodb+srv://jonlabrie_db_user:eYBOQwdAkGgU2jnC@roshambocluster0.ckjseml.mongodb.net/?appName=RoshamboCluster0"
