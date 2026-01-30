@@ -56,7 +56,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
     }
 
     const renderProfile = () => (
-        <main className="flex-1 overflow-y-auto p-4 space-y-8">
+        <main className="flex-1 overflow-y-auto p-4 pb-10 space-y-8">
             {/* Identity Banner */}
             <div className="flex items-center justify-between px-1">
                 <div className="flex flex-col">
@@ -215,7 +215,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
     )
 
     const renderGlobalMain = () => (
-        <main className="flex-1 overflow-y-auto p-4 space-y-8">
+        <main className="flex-1 overflow-y-auto p-4 pb-10 space-y-8">
             {/* Global Sentiment */}
             <section className="space-y-3">
                 <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] px-1">Global Sentiment</h3>
@@ -293,7 +293,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
         const icon = type === 'POINTS' ? <Trophy className="w-4 h-4 text-yellow-500" /> : <Zap className="w-4 h-4 text-blue-500" />
 
         return (
-            <main className="flex-1 overflow-y-auto px-4 pt-4">
+            <main className="flex-1 overflow-y-auto px-4 pt-4 pb-10">
                 <div className="flex items-center gap-3 mb-6 px-1">
                     {icon}
                     <h3 className="text-[12px] font-black text-white uppercase tracking-[0.3em]">{title}</h3>

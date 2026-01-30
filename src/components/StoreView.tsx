@@ -80,9 +80,9 @@ export const StoreView: React.FC<StoreViewProps> = ({
                 </div>
             </header>
 
-            <main className="flex-1 overflow-hidden flex flex-col md:flex-row">
+            <main className="flex-1 overflow-y-auto flex flex-col md:flex-row pb-10">
                 {/* Catalog Grid */}
-                <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-6">
+                <div className="flex-1 md:overflow-y-auto p-4 md:p-8 space-y-6 shrink-0">
                     <div className="grid grid-cols-1 gap-4">
                         {catalog.map((char) => {
                             const isOwned = inventory.includes(char.id)
@@ -138,7 +138,7 @@ export const StoreView: React.FC<StoreViewProps> = ({
                 </div>
 
                 {/* Preview / Detail Panel */}
-                <div className="w-full md:w-96 bg-slate-900/30 border-l border-white/5 p-8 flex flex-col gap-8">
+                <div className="w-full md:w-96 bg-slate-900/30 border-l border-white/5 p-8 flex flex-col gap-8 shrink-0">
                     {selectedChar && (
                         <AnimatePresence mode="wait">
                             <motion.div

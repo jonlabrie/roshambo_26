@@ -62,6 +62,8 @@ export function useGameLoop() {
     const lastRoundRef = useRef<RoundData | null>(null)
     const serverResultRef = useRef<{ result: Result; delta: number } | null>(null)
     const audioCtxRef = useRef<AudioContext | null>(null)
+    const audioEnabledRef = useRef(audioEnabled)
+    const audioVolumeRef = useRef(audioVolume)
 
     // Initialize Device ID if missing
     useEffect(() => {
@@ -143,13 +145,15 @@ export function useGameLoop() {
     useEffect(() => { pointsAtStakeRef.current = pointsAtStake }, [pointsAtStake])
     useEffect(() => { lastRoundRef.current = lastRound }, [lastRound])
 
-    // Persistence for Audio Settings
+    // Persistence and Ref Sync for Audio Settings
     useEffect(() => {
         localStorage.setItem('roshambo_audio_enabled', audioEnabled.toString())
+        audioEnabledRef.current = audioEnabled
     }, [audioEnabled])
 
     useEffect(() => {
         localStorage.setItem('roshambo_audio_volume', audioVolume.toString())
+        audioVolumeRef.current = audioVolume
     }, [audioVolume])
 
     // Removal of client-side progress pushing. Server is now the source of truth for scores.
@@ -184,7 +188,7 @@ export function useGameLoop() {
 
     // SFX: Modern Gong synthesis (FM + Noise)
     const playGongSound = useCallback(() => {
-        if (!audioEnabled) return
+        if (!audioEnabledRef.current) return
 
         try {
             if (!audioCtxRef.current) {
@@ -204,7 +208,7 @@ export function useGameLoop() {
             const duration = 6
             const masterGain = ctx.createGain()
 
-            masterGain.gain.setValueAtTime(audioVolume, now)
+            masterGain.gain.setValueAtTime(audioVolumeRef.current, now)
             masterGain.connect(ctx.destination)
 
             // --- PART A: The Metal Ring (FM Synthesis) ---
@@ -270,7 +274,7 @@ export function useGameLoop() {
         } catch (e) {
             console.warn('[SFX] Could not play gong:', e)
         }
-    }, [audioEnabled, audioVolume])
+    }, [])
 
     const handleServerReveal = useCallback((serverRound: any) => {
         // Trigger SFX
@@ -327,7 +331,7 @@ export function useGameLoop() {
 
         setPlayerThrow(null)
         setIsLocked(false)
-    }, [calculateResult])
+    }, [calculateResult, playGongSound])
 
     const getStats = useCallback((timeframe: 'hour' | 'day' | 'week' | 'all') => {
         if (socketRef.current) {
