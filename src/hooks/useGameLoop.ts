@@ -6,7 +6,7 @@ export type Result = 'WIN' | 'LOSS' | 'SAFE' | null
 export type GameState = 'ACTIVE' | 'REVEAL'
 
 // Use your local IP for mobile access on the same network
-const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || 'http://192.168.1.18:3001'
+const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || ''
 
 interface RoundData {
     id: string
