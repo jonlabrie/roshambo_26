@@ -17,7 +17,11 @@ const TEST_MODE = process.env.TEST_MODE === 'true';
 console.log(`[SYS] Roshambo Server Init. TEST_MODE: ${TEST_MODE}`);
 
 const app = express();
-app.use(cors());
+app.use(cors({
+    origin: true, // Echoes the request origin, required for Safari + Credentials
+    credentials: true,
+    allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 app.use('/auth', authRouter);
 app.use('/store', storeRouter);
@@ -25,8 +29,9 @@ app.use('/store', storeRouter);
 const httpServer = createServer(app);
 const io = new Server(httpServer, {
     cors: {
-        origin: "*",
-        methods: ["GET", "POST"]
+        origin: true,
+        methods: ["GET", "POST"],
+        credentials: true
     }
 });
 
