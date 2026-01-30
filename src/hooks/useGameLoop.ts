@@ -162,7 +162,70 @@ export function useGameLoop() {
         return 'LOSS'
     }, [])
 
+    // SFX: Modern Gong synthesis
+    const playGongSound = useCallback(() => {
+        try {
+            const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext
+            if (!AudioContextClass) return
+
+            const ctx = new AudioContextClass()
+            const now = ctx.currentTime
+
+            // 1. Deep Base Resonance (The "Hum")
+            const baseOsc = ctx.createOscillator()
+            const baseGain = ctx.createGain()
+            baseOsc.type = 'sine'
+            baseOsc.frequency.setValueAtTime(80, now) // Low G
+            baseGain.gain.setValueAtTime(0, now)
+            baseGain.gain.linearRampToValueAtTime(0.4, now + 0.05)
+            baseGain.gain.exponentialRampToValueAtTime(0.001, now + 2.5)
+            baseOsc.connect(baseGain)
+            baseGain.connect(ctx.destination)
+
+            // 2. Metallic Impact (The "Clash")
+            const metalOsc = ctx.createOscillator()
+            const metalGain = ctx.createGain()
+            metalOsc.type = 'triangle'
+            metalOsc.frequency.setValueAtTime(120, now)
+            metalOsc.frequency.exponentialRampToValueAtTime(60, now + 0.5)
+            metalGain.gain.setValueAtTime(0.3, now)
+            metalGain.gain.exponentialRampToValueAtTime(0.001, now + 0.8)
+            metalOsc.connect(metalGain)
+            metalGain.connect(ctx.destination)
+
+            // 3. High Harmonic Overtones (The "Shimmer")
+            const shimmerOsc = ctx.createOscillator()
+            const shimmerGain = ctx.createGain()
+            shimmerOsc.type = 'square'
+            shimmerOsc.frequency.setValueAtTime(440, now) // A4
+            shimmerGain.gain.setValueAtTime(0.05, now)
+            shimmerGain.gain.exponentialRampToValueAtTime(0.001, now + 1.2)
+            shimmerOsc.connect(shimmerGain)
+            shimmerGain.connect(ctx.destination)
+
+            // Start all layers
+            baseOsc.start(now)
+            metalOsc.start(now)
+            shimmerOsc.start(now)
+
+            // Cleanup oscillators
+            baseOsc.stop(now + 2.6)
+            metalOsc.stop(now + 1.0)
+            shimmerOsc.stop(now + 1.5)
+
+            // Resume context (required for some browsers)
+            if (ctx.state === 'suspended') {
+                ctx.resume()
+            }
+        } catch (e) {
+            console.warn('[SFX] Could not play gong:', e)
+        }
+    }, [])
+
     const handleServerReveal = useCallback((serverRound: any) => {
+        // Trigger SFX
+        playGongSound()
+
         const worldThrow = serverRound.worldThrow
         let res: Result = null
         let delta = 0
