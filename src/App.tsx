@@ -126,7 +126,7 @@ export default function App() {
     }
 
     return (
-        <div className="flex flex-col h-full overflow-hidden font-sans max-h-screen">
+        <div className="flex flex-col h-[100dvh] overflow-hidden font-sans max-h-screen">
             <header className="p-4 pt-[calc(1rem+env(safe-area-inset-top))] border-b border-slate-800 bg-slate-900/50 backdrop-blur-md">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex flex-col leading-none">

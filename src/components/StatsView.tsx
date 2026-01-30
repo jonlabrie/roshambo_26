@@ -384,7 +384,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
                 </motion.div>
             </AnimatePresence>
 
-            <footer className="p-4 border-t border-slate-800 bg-slate-950 shrink-0">
+            <footer className="p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] border-t border-slate-800 bg-slate-950 shrink-0">
                 <button
                     onClick={onBack}
                     className="w-full py-4 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 transition-all font-black uppercase tracking-widest text-[11px] active:scale-95"

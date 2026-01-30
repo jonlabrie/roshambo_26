@@ -61,6 +61,7 @@ export function useGameLoop() {
     const pointsAtStakeRef = useRef(0)
     const lastRoundRef = useRef<RoundData | null>(null)
     const serverResultRef = useRef<{ result: Result; delta: number } | null>(null)
+    const audioCtxRef = useRef<AudioContext | null>(null)
 
     // Initialize Device ID if missing
     useEffect(() => {
@@ -181,66 +182,91 @@ export function useGameLoop() {
         return 'LOSS'
     }, [])
 
-    // SFX: Modern Gong synthesis
+    // SFX: Modern Gong synthesis (FM + Noise)
     const playGongSound = useCallback(() => {
         if (!audioEnabled) return
 
         try {
-            const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext
-            if (!AudioContextClass) return
+            if (!audioCtxRef.current) {
+                const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext
+                if (!AudioContextClass) return
+                audioCtxRef.current = new AudioContextClass()
+            }
 
-            const ctx = new AudioContextClass()
-            const now = ctx.currentTime
-            const masterGain = ctx.createGain()
-            masterGain.gain.setValueAtTime(audioVolume, now)
-            masterGain.connect(ctx.destination)
+            const ctx = audioCtxRef.current
+            if (!ctx) return
 
-            // 1. Deep Base Resonance (The "Hum")
-            const baseOsc = ctx.createOscillator()
-            const baseGain = ctx.createGain()
-            baseOsc.type = 'sine'
-            baseOsc.frequency.setValueAtTime(80, now) // Low G
-            baseGain.gain.setValueAtTime(0, now)
-            baseGain.gain.linearRampToValueAtTime(0.4, now + 0.05)
-            baseGain.gain.exponentialRampToValueAtTime(0.001, now + 2.5)
-            baseOsc.connect(baseGain)
-            baseGain.connect(masterGain)
-
-            // 2. Metallic Impact (The "Clash")
-            const metalOsc = ctx.createOscillator()
-            const metalGain = ctx.createGain()
-            metalOsc.type = 'triangle'
-            metalOsc.frequency.setValueAtTime(120, now)
-            metalOsc.frequency.exponentialRampToValueAtTime(60, now + 0.5)
-            metalGain.gain.setValueAtTime(0.3, now)
-            metalGain.gain.exponentialRampToValueAtTime(0.001, now + 0.8)
-            metalOsc.connect(metalGain)
-            metalGain.connect(masterGain)
-
-            // 3. High Harmonic Overtones (The "Shimmer")
-            const shimmerOsc = ctx.createOscillator()
-            const shimmerGain = ctx.createGain()
-            shimmerOsc.type = 'square'
-            shimmerOsc.frequency.setValueAtTime(440, now) // A4
-            shimmerGain.gain.setValueAtTime(0.05, now)
-            shimmerGain.gain.exponentialRampToValueAtTime(0.001, now + 1.2)
-            shimmerOsc.connect(shimmerGain)
-            shimmerGain.connect(masterGain)
-
-            // Start all layers
-            baseOsc.start(now)
-            metalOsc.start(now)
-            shimmerOsc.start(now)
-
-            // Cleanup oscillators
-            baseOsc.stop(now + 2.6)
-            metalOsc.stop(now + 1.0)
-            shimmerOsc.stop(now + 1.5)
-
-            // Resume context (required for some browsers)
             if (ctx.state === 'suspended') {
                 ctx.resume()
             }
+
+            const now = ctx.currentTime
+            const duration = 6
+            const masterGain = ctx.createGain()
+
+            masterGain.gain.setValueAtTime(audioVolume, now)
+            masterGain.connect(ctx.destination)
+
+            // --- PART A: The Metal Ring (FM Synthesis) ---
+            const frequencies = [200, 203, 196]
+            frequencies.forEach((baseFreq) => {
+                const carrier = ctx.createOscillator()
+                const modulator = ctx.createOscillator()
+                const modGain = ctx.createGain()
+                const layerGain = ctx.createGain()
+
+                carrier.type = 'sine'
+                carrier.frequency.value = baseFreq
+
+                modulator.type = 'sine'
+                modulator.frequency.value = baseFreq * 1.42
+
+                // FM Index: High modulation at start (crash), low at end (hum)
+                const modulationDepth = baseFreq * 2
+                modGain.gain.setValueAtTime(modulationDepth, now)
+                modGain.gain.exponentialRampToValueAtTime(0.1, now + (duration * 0.5))
+
+                // Layer Volume
+                layerGain.gain.setValueAtTime(0, now)
+                layerGain.gain.linearRampToValueAtTime(0.3, now + 0.05)
+                layerGain.gain.exponentialRampToValueAtTime(0.001, now + duration)
+
+                // Connections
+                modulator.connect(modGain)
+                modGain.connect(carrier.frequency)
+                carrier.connect(layerGain)
+                layerGain.connect(masterGain)
+
+                modulator.start(now)
+                carrier.start(now)
+                modulator.stop(now + duration)
+                carrier.stop(now + duration)
+            })
+
+            // --- PART B: The Mallet Thud (Subtractive Synthesis) ---
+            const bufferSize = ctx.sampleRate * 0.1
+            const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
+            const output = noiseBuffer.getChannelData(0)
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1
+            }
+
+            const noise = ctx.createBufferSource()
+            noise.buffer = noiseBuffer
+
+            const noiseFilter = ctx.createBiquadFilter()
+            noiseFilter.type = 'lowpass'
+            noiseFilter.frequency.value = 800
+
+            const noiseGain = ctx.createGain()
+            noiseGain.gain.setValueAtTime(0.5, now)
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.1)
+
+            noise.connect(noiseFilter)
+            noiseFilter.connect(noiseGain)
+            noiseGain.connect(masterGain)
+            noise.start(now)
+
         } catch (e) {
             console.warn('[SFX] Could not play gong:', e)
         }
