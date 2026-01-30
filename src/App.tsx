@@ -52,7 +52,11 @@ export default function App() {
         catalog,
         buyCharacter,
         equipCharacter,
-        actionMessage
+        actionMessage,
+        audioEnabled,
+        setAudioEnabled,
+        audioVolume,
+        setAudioVolume
     } = useGameLoop()
 
     const [visualTier, setVisualTier] = useState<'LITE' | 'FULL' | 'ULTRA'>('ULTRA')
@@ -112,6 +116,10 @@ export default function App() {
                     onLogout={logout}
                     onStoreRequest={() => setCurrentView('STORE')}
                     user={user}
+                    audioEnabled={audioEnabled}
+                    setAudioEnabled={setAudioEnabled}
+                    audioVolume={audioVolume}
+                    setAudioVolume={setAudioVolume}
                 />
             </AnimatePresence>
         )

@@ -1,6 +1,6 @@
 import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, Trophy, Zap } from 'lucide-react'
+import { ArrowLeft, Trophy, Zap, Volume2, VolumeX } from 'lucide-react'
 import { cn } from '../lib/utils'
 
 interface StatsViewProps {
@@ -20,6 +20,10 @@ interface StatsViewProps {
     onLogout: () => void
     onStoreRequest: () => void
     user: any
+    audioEnabled: boolean
+    setAudioEnabled: (enabled: boolean) => void
+    audioVolume: number
+    setAudioVolume: (volume: number) => void
 }
 
 export const StatsView: React.FC<StatsViewProps> = ({
@@ -31,7 +35,11 @@ export const StatsView: React.FC<StatsViewProps> = ({
     onLoginRequest,
     onLogout,
     onStoreRequest,
-    user
+    user,
+    audioEnabled,
+    setAudioEnabled,
+    audioVolume,
+    setAudioVolume
 }) => {
     const [tab, setTab] = React.useState<'PROFILE' | 'GLOBAL'>(initialTab)
     const [timeframe, setTimeframe] = React.useState<'hour' | 'day' | 'week' | 'all'>('hour')
@@ -123,8 +131,70 @@ export const StatsView: React.FC<StatsViewProps> = ({
                 </div>
             </div>
 
+            {/* System Settings */}
+            <div className="space-y-4">
+                <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] px-1">System Settings</h3>
+                <div className="glass-panel p-5 rounded-2xl border border-white/5 space-y-6">
+                    {/* Mute Toggle */}
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className={cn(
+                                "p-2 rounded-lg transition-colors",
+                                audioEnabled ? "bg-blue-500/10 text-blue-400" : "bg-red-500/10 text-red-500"
+                            )}>
+                                {audioEnabled ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+                            </div>
+                            <div className="flex flex-col">
+                                <span className="text-[11px] font-black uppercase tracking-wider">Audio Output</span>
+                                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-widest">
+                                    {audioEnabled ? 'Master SFX Enabled' : 'Sounds Muted'}
+                                </span>
+                            </div>
+                        </div>
+                        <button
+                            onClick={() => setAudioEnabled(!audioEnabled)}
+                            className={cn(
+                                "w-12 h-6 rounded-full transition-all relative",
+                                audioEnabled ? "bg-blue-600" : "bg-slate-800"
+                            )}
+                        >
+                            <motion.div
+                                animate={{ x: audioEnabled ? 24 : 4 }}
+                                className="absolute top-1 w-4 h-4 bg-white rounded-full shadow-lg"
+                                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                            />
+                        </button>
+                    </div>
+
+                    {/* Volume Slider */}
+                    <div className="space-y-3 opacity-90">
+                        <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest text-slate-500">
+                            <span>Volume Level</span>
+                            <span className="text-white">{Math.round(audioVolume * 100)}%</span>
+                        </div>
+                        <div className="relative group">
+                            <div className="absolute inset-0 bg-blue-500/20 blur-xl opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <input
+                                type="range"
+                                min="0"
+                                max="1"
+                                step="0.01"
+                                value={audioVolume}
+                                onChange={(e) => setAudioVolume(parseFloat(e.target.value))}
+                                disabled={!audioEnabled}
+                                className={cn(
+                                    "w-full h-1.5 bg-slate-800 rounded-lg appearance-none cursor-pointer transition-all relative z-10",
+                                    !audioEnabled && "opacity-30 cursor-not-allowed",
+                                    "accent-blue-500"
+                                )}
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div >
+
             {/* Placeholder Chart */}
-            <div className="space-y-4 pt-4">
+            < div className="space-y-4 pt-4" >
                 <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em] px-1">Activity Evolution</h3>
                 <div className="h-32 w-full glass-panel rounded-2xl flex items-end justify-between p-4 gap-1 border-b border-slate-800">
                     {[40, 70, 45, 90, 65, 80, 50, 95, 30, 60].map((h, i) => (
@@ -140,8 +210,8 @@ export const StatsView: React.FC<StatsViewProps> = ({
                         />
                     ))}
                 </div>
-            </div>
-        </main>
+            </div >
+        </main >
     )
 
     const renderGlobalMain = () => (

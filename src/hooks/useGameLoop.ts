@@ -41,6 +41,16 @@ export function useGameLoop() {
     const [catalog, setCatalog] = useState<any[]>([])
     const [actionMessage, setActionMessage] = useState<string | null>(null)
 
+    // Audio Settings
+    const [audioEnabled, setAudioEnabled] = useState<boolean>(() => {
+        const saved = localStorage.getItem('roshambo_audio_enabled')
+        return saved === null ? true : saved === 'true'
+    })
+    const [audioVolume, setAudioVolume] = useState<number>(() => {
+        const saved = localStorage.getItem('roshambo_audio_volume')
+        return saved === null ? 0.5 : parseFloat(saved)
+    })
+
     // Identity / Persistence
     const deviceIdRef = useRef<string | null>(localStorage.getItem('roshambo_device_id'))
     const isSyncedRef = useRef(false)
@@ -132,6 +142,15 @@ export function useGameLoop() {
     useEffect(() => { pointsAtStakeRef.current = pointsAtStake }, [pointsAtStake])
     useEffect(() => { lastRoundRef.current = lastRound }, [lastRound])
 
+    // Persistence for Audio Settings
+    useEffect(() => {
+        localStorage.setItem('roshambo_audio_enabled', audioEnabled.toString())
+    }, [audioEnabled])
+
+    useEffect(() => {
+        localStorage.setItem('roshambo_audio_volume', audioVolume.toString())
+    }, [audioVolume])
+
     // Removal of client-side progress pushing. Server is now the source of truth for scores.
     useEffect(() => {
         // No longer pushing progress from client to server.
@@ -164,12 +183,17 @@ export function useGameLoop() {
 
     // SFX: Modern Gong synthesis
     const playGongSound = useCallback(() => {
+        if (!audioEnabled) return
+
         try {
             const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext
             if (!AudioContextClass) return
 
             const ctx = new AudioContextClass()
             const now = ctx.currentTime
+            const masterGain = ctx.createGain()
+            masterGain.gain.setValueAtTime(audioVolume, now)
+            masterGain.connect(ctx.destination)
 
             // 1. Deep Base Resonance (The "Hum")
             const baseOsc = ctx.createOscillator()
@@ -180,7 +204,7 @@ export function useGameLoop() {
             baseGain.gain.linearRampToValueAtTime(0.4, now + 0.05)
             baseGain.gain.exponentialRampToValueAtTime(0.001, now + 2.5)
             baseOsc.connect(baseGain)
-            baseGain.connect(ctx.destination)
+            baseGain.connect(masterGain)
 
             // 2. Metallic Impact (The "Clash")
             const metalOsc = ctx.createOscillator()
@@ -191,7 +215,7 @@ export function useGameLoop() {
             metalGain.gain.setValueAtTime(0.3, now)
             metalGain.gain.exponentialRampToValueAtTime(0.001, now + 0.8)
             metalOsc.connect(metalGain)
-            metalGain.connect(ctx.destination)
+            metalGain.connect(masterGain)
 
             // 3. High Harmonic Overtones (The "Shimmer")
             const shimmerOsc = ctx.createOscillator()
@@ -201,7 +225,7 @@ export function useGameLoop() {
             shimmerGain.gain.setValueAtTime(0.05, now)
             shimmerGain.gain.exponentialRampToValueAtTime(0.001, now + 1.2)
             shimmerOsc.connect(shimmerGain)
-            shimmerGain.connect(ctx.destination)
+            shimmerGain.connect(masterGain)
 
             // Start all layers
             baseOsc.start(now)
@@ -220,7 +244,7 @@ export function useGameLoop() {
         } catch (e) {
             console.warn('[SFX] Could not play gong:', e)
         }
-    }, [])
+    }, [audioEnabled, audioVolume])
 
     const handleServerReveal = useCallback((serverRound: any) => {
         // Trigger SFX
@@ -450,6 +474,10 @@ export function useGameLoop() {
         catalog,
         buyCharacter,
         equipCharacter,
-        actionMessage
+        actionMessage,
+        audioEnabled,
+        setAudioEnabled,
+        audioVolume,
+        setAudioVolume
     }
 }
