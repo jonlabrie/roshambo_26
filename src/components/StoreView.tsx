@@ -63,7 +63,7 @@ export const StoreView: React.FC<StoreViewProps> = ({
             initial={{ opacity: 0, x: 50 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -50 }}
-            className="fixed inset-0 z-[100] bg-slate-950 flex flex-col"
+            className="fixed inset-0 z-[100] bg-slate-950 flex flex-col h-full overflow-hidden"
         >
             {/* Header */}
             <header className="p-6 pt-[calc(1.5rem+env(safe-area-inset-top))] border-b border-white/5 flex items-center justify-between">

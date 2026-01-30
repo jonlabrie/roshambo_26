@@ -57,7 +57,7 @@ export const AuthView: React.FC<AuthViewProps> = ({ onBack, onAuthSuccess, initi
             initial={{ opacity: 0, scale: 1.05 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center overflow-y-auto py-12 px-6"
+            className="fixed inset-0 z-[100] bg-slate-950 flex flex-col items-center h-full overflow-hidden overflow-y-auto py-12 px-6"
         >
             <div className="w-full max-w-md space-y-8">
                 {/* Header */}

@@ -318,7 +318,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -20 }}
-            className="flex-1 flex flex-col bg-slate-950 text-white overflow-hidden"
+            className="h-full flex flex-col bg-slate-950 text-white overflow-hidden"
         >
             {/* Header */}
             <header className="p-4 pt-[calc(1rem+env(safe-area-inset-top))] border-b border-slate-800 bg-slate-900/50 backdrop-blur-md flex items-center justify-between shrink-0">
