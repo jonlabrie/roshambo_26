@@ -36,6 +36,7 @@ This guide covers the steps to move from your local Docker environment to a live
 | :--- | :--- | :--- |
 | `MONGODB_URI` | App Runner | Connection to database |
 | `JWT_SECRET` | App Runner | Token signing |
+| `TEST_MODE` | App Runner | Set 'true' for deterministic testing (R->P->S) |
 | `VITE_SOCKET_URL` | Amplify | Points frontend to the backend |
 
 ---
