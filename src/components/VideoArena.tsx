@@ -34,7 +34,6 @@ export const VideoArena: React.FC<VideoArenaProps> = ({
     actionMessage
 }) => {
     const videoRef = useRef<HTMLVideoElement>(null)
-    const [currentClip, setCurrentClip] = useState<string>('')
     const [selectionFinished, setSelectionFinished] = useState(false)
 
     // Reset selection state when a new round starts (isLocked becomes false)
@@ -68,6 +67,16 @@ export const VideoArena: React.FC<VideoArenaProps> = ({
         }
     }, [character])
 
+    const [currentClip, setCurrentClip] = useState<string>(() => {
+        const availableClips = characterManifest[visualState as keyof typeof characterManifest];
+        if (availableClips && availableClips.length > 0) {
+            const randomIndex = Math.floor(Math.random() * availableClips.length);
+            const filename = availableClips[randomIndex];
+            return `/videos/${visualState}/${filename}`;
+        }
+        return '';
+    })
+
     // Randomize clip whenever the visual state changes
     useEffect(() => {
         const availableClips = characterManifest[visualState as keyof typeof characterManifest]
@@ -77,6 +86,15 @@ export const VideoArena: React.FC<VideoArenaProps> = ({
             setCurrentClip(`/videos/${visualState}/${filename}`)
         }
     }, [visualState, characterManifest])
+
+    // Explicitly play video on source mount to help iOS Safari
+    useEffect(() => {
+        if (videoRef.current && currentClip) {
+            videoRef.current.play().catch((err) => {
+                console.warn('Video playback prevented by browser:', err);
+            });
+        }
+    }, [currentClip])
 
     const handleVideoEnded = () => {
         if (visualState === 'selection') {
@@ -107,7 +125,6 @@ export const VideoArena: React.FC<VideoArenaProps> = ({
                     className="absolute inset-0 z-0"
                 >
                     <video
-                        key={source}
                         ref={videoRef}
                         src={source}
                         autoPlay
@@ -115,6 +132,8 @@ export const VideoArena: React.FC<VideoArenaProps> = ({
                         onEnded={handleVideoEnded}
                         muted
                         playsInline
+                        controls={false}
+                        preload="auto"
                         className="w-full h-full object-cover"
                     />
                     {/* Vignette Overlay for Depth */}
