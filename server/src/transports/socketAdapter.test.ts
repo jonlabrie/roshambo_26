@@ -11,6 +11,7 @@ import { attachSocketAdapter } from './socketAdapter';
 let httpServer: HttpServer;
 let engine: RoundEngine;
 let client: ClientSocket;
+let initPromise: Promise<any>;
 
 function waitFor<T>(socket: ClientSocket, event: string): Promise<T> {
     return new Promise(resolve => socket.once(event, resolve));
@@ -34,27 +35,28 @@ describe('socket adapter wire format', () => {
         await new Promise<void>(r => httpServer.listen(0, r));
         const port = (httpServer.address() as AddressInfo).port;
         client = clientIo(`http://localhost:${port}`, { auth: {} });
+        initPromise = new Promise<any>(resolve => client.once('init', resolve));
         await waitFor(client, 'connect');
     });
 
     afterEach(() => { client.disconnect(); httpServer.close(); });
 
     it('emits legacy-shaped init on connect', async () => {
-        const init = await waitFor<any>(client, 'init');
+        const init = await initPromise;
         expect(init).toMatchObject({ phase: 'ACTIVE', roundCount: 0 });
         expect(init.history).toEqual([]);
         expect(typeof init.timeLeft).toBe('number');
     });
 
     it('emits sync heartbeats on tick with timeLeft and playerCount', async () => {
-        await waitFor(client, 'init');
+        await initPromise;
         const sync = waitFor<any>(client, 'sync');
         engine.tick();
         expect(await sync).toMatchObject({ phase: 'ACTIVE', timeLeft: 1, roundCount: 0, playerCount: 1 });
     });
 
     it('full round: submit-throw -> reveal with distribution -> player-data with lastResult', async () => {
-        await waitFor(client, 'init');
+        await initPromise;
         client.emit('sync-player', { deviceId: 'devA' });
         await waitFor(client, 'player-data');
 
@@ -77,7 +79,7 @@ describe('socket adapter wire format', () => {
     });
 
     it('buffers a throw submitted during TALLY/REVEAL and enters it next round', async () => {
-        await waitFor(client, 'init');
+        await initPromise;
         client.emit('sync-player', { deviceId: 'devA' });
         await waitFor(client, 'player-data');
 
@@ -93,7 +95,7 @@ describe('socket adapter wire format', () => {
     });
 
     it('bank moves pot to totalPoints over the socket', async () => {
-        await waitFor(client, 'init');
+        await initPromise;
         const User = (await import('../models/User')).default;
         await User.create({ deviceId: 'devA', totalPoints: 1, pointsAtStake: 9 });
         client.emit('sync-player', { deviceId: 'devA' });

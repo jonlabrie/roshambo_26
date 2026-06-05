@@ -104,26 +104,15 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
 
     // --- per-connection handlers ---
     io.on('connection', (socket: Socket) => {
-        // The legacy server emitted 'init' synchronously on connect, and the PWA
-        // attaches its 'init' listener BEFORE connecting — so the synchronous emit
-        // below preserves the production wire contract exactly. We additionally
-        // re-emit on a short spread of delays: a consumer that attaches its 'init'
-        // listener only AFTER awaiting 'connect' (e.g. integration tests) misses
-        // the synchronous copy because socket.io-client drops events with no
-        // listener once `connected` flips true. The spread tolerates a worker
-        // thread being briefly starved under parallel-test CPU contention. 'init'
-        // is an idempotent state snapshot, so the duplicates are harmless.
-        const emitInit = () => {
-            const snap = engine.snapshot();
-            socket.emit('init', {
-                phase: snap.phase,
-                timeLeft: snap.phase === 'ACTIVE' ? snap.secondsLeft : 0,
-                roundCount: snap.roundCount,
-                history: store.tape(10),
-            });
-        };
-        emitInit();
-        for (const d of [10, 50, 150]) setTimeout(emitInit, d);
+        // The PWA attaches its 'init' listener BEFORE connecting, so this single
+        // synchronous emit preserves the production wire contract exactly.
+        const snap = engine.snapshot();
+        socket.emit('init', {
+            phase: snap.phase,
+            timeLeft: snap.phase === 'ACTIVE' ? snap.secondsLeft : 0,
+            roundCount: snap.roundCount,
+            history: store.tape(10),
+        });
 
         // Player Persistence Sync (ported verbatim from index.ts:364-401)
         socket.on('sync-player', async (data: { deviceId: string }) => {
