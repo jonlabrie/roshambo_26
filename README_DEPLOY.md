@@ -22,6 +22,7 @@ This guide covers the steps to move from your local Docker environment to a live
    - In the "Configure service" step, add these **Environment Variables**:
      - `MONGODB_URI`: (Your Atlas connection string)
      - `JWT_SECRET`: (A long, random string)
+6. Add `API_KEY` as an environment variable in the App Runner console (do not commit it to `apprunner.yaml`).
 4. **Networking**: Ensure it is public so the frontend can connect.
 
 ## 3. Frontend: AWS Amplify
@@ -37,6 +38,7 @@ This guide covers the steps to move from your local Docker environment to a live
 | `MONGODB_URI` | App Runner | Connection to database |
 | `JWT_SECRET` | App Runner | Token signing |
 | `TEST_MODE` | App Runner | Set 'true' for deterministic testing (R->P->S) |
+| `API_KEY` | App Runner | Server-to-server auth for /api/v1 (Roblox game servers) |
 | `VITE_SOCKET_URL` | Amplify | Points frontend to the backend |
 
 ---
