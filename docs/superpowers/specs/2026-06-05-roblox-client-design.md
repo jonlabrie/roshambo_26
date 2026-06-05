@@ -50,7 +50,7 @@ All under `/api/v1`. Auth: `X-API-Key` header; the key lives in Roblox's secrets
 
 | Endpoint | Purpose | Cadence per Roblox server |
 |---|---|---|
-| `GET /state` | `{roundId, phase, phaseEndsAt, serverTime, roundCount, tape}` (tape = recent World Throw history, as in the PWA) — cacheable ~1s | ~1/round + drift checks |
+| `GET /state` | `{roundId, phase, phaseEndsAt, serverTime, roundCount, tape}` (tape = recent World Throw history, as in the PWA) — **no-store**: carries per-request clock fields; a shared cache would serve stale clocks at near-zero RTT, which min-RTT sample selection would then *prefer*. Low cadence keeps origin load trivial | ~1/round + drift checks |
 | `POST /throws` | Delta batch (see below) → `202` | 1–4/round |
 | `GET /rounds/:id/result` | `{worldThrow, distribution, totalPlayers}` — identical for all callers, CDN-cacheable | 1/round at reveal |
 | `GET /instances/:id/rounds/:rid/results` | Authoritative per-player outcomes `{userId, result, delta, totalPoints, pot, streak}[]` — **deferred reconciliation**, fetched with jitter during the *next* ACTIVE window, not at reveal | 1/round, spread |
