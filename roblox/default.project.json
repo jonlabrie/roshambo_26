@@ -1,0 +1,16 @@
+{
+    "name": "roshambo-roblox",
+    "tree": {
+        "$className": "DataModel",
+        "HttpService": {
+            "$className": "HttpService",
+            "$properties": { "HttpEnabled": true }
+        },
+        "ReplicatedStorage": {
+            "RoshamboShared": { "$path": "src/shared" }
+        },
+        "ServerScriptService": {
+            "Roshambo": { "$path": "src/server" }
+        }
+    }
+}
