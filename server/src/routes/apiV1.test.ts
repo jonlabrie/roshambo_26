@@ -40,12 +40,12 @@ describe('/api/v1', () => {
     });
 
     describe('GET /state', () => {
-        it('returns snapshot with timing and tape, cacheable 1s', async () => {
+        it('returns snapshot with timing and tape, no-store (clock-sync safety)', async () => {
             const engine = makeEngine();
             const store = new ResultsStore();
             const res = await request(makeApp(engine, store))
                 .get('/api/v1/state').set('X-API-Key', API_KEY).expect(200);
-            expect(res.headers['cache-control']).toBe('public, max-age=1');
+            expect(res.headers['cache-control']).toBe('no-store');
             expect(res.body).toMatchObject({ roundId: 'round-1', phase: 'ACTIVE', roundCount: 0, tape: [] });
             expect(res.body.phaseEndsAt).toBeGreaterThan(res.body.serverTime);
             expect(res.body.phaseEndsAt - res.body.serverTime).toBe(20000);
@@ -197,6 +197,26 @@ describe('/api/v1', () => {
         it('400 on bad scope', async () => {
             await request(makeApp(makeEngine(), new ResultsStore()))
                 .get('/api/v1/leaderboards?scope=galaxy').set('X-API-Key', API_KEY).expect(400);
+        });
+
+        it('400 when scope=country but country param is missing', async () => {
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .get('/api/v1/leaderboards?scope=country').set('X-API-Key', API_KEY).expect(400);
+            expect(res.body).toEqual({ error: 'BAD_REQUEST' });
+        });
+    });
+
+    describe('auth misconfig', () => {
+        it('503 API_NOT_CONFIGURED when API_KEY env is unset', async () => {
+            const saved = process.env.API_KEY;
+            try {
+                delete process.env.API_KEY;
+                const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                    .get('/api/v1/state').set('X-API-Key', API_KEY).expect(503);
+                expect(res.body).toEqual({ error: 'API_NOT_CONFIGURED' });
+            } finally {
+                process.env.API_KEY = saved;
+            }
         });
     });
 });

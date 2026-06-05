@@ -14,7 +14,12 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     router.get('/state', (_req, res) => {
         const snap = engine.snapshot();
         const now = Date.now();
-        res.set('Cache-Control', 'public, max-age=1');
+        // no-store, NOT public/max-age: this response carries per-request clock
+        // fields (serverTime/phaseEndsAt) consumed by min-RTT clock sync. A shared
+        // cache would serve stale clocks with near-zero RTT — which the min-RTT
+        // selector would then PREFER. The herd-safe cacheable read is
+        // /rounds/:id/result; /state is only polled ~1/round + drift checks.
+        res.set('Cache-Control', 'no-store');
         res.json({
             roundId: snap.roundId,
             phase: snap.phase,
@@ -121,8 +126,12 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
                 res.status(400).json({ error: 'BAD_SCOPE' });
                 return;
             }
+            if (scope === 'country' && !String(req.query.country ?? '').trim()) {
+                res.status(400).json({ error: 'BAD_REQUEST' });
+                return;
+            }
             const filter = scope === 'country'
-                ? { country: String(req.query.country ?? '') }
+                ? { country: String(req.query.country) }
                 : {};
             const leaders = await User.find(filter)
                 .sort({ totalPoints: -1 })
