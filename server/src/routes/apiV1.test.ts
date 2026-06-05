@@ -71,4 +71,49 @@ describe('/api/v1', () => {
             expect(res.body).toMatchObject({ id: 'round-1', worldThrow: 'S', totalPlayers: 1 });
         });
     });
+
+    describe('POST /throws', () => {
+        const body = (over: object = {}) => ({
+            instanceId: 'job-1', roundId: 'round-1', seq: 1,
+            throws: [{ robloxUserId: '77', throw: 'R' }, { robloxUserId: '88', throw: 'P' }],
+            ...over,
+        });
+
+        it('202 accepts a valid batch into the engine', async () => {
+            const engine = makeEngine();
+            const res = await request(makeApp(engine, new ResultsStore()))
+                .post('/api/v1/throws').set('X-API-Key', API_KEY).send(body()).expect(202);
+            expect(res.body).toEqual({ accepted: 2, rejected: [] });
+        });
+
+        it('409 ROUND_MISMATCH for a stale roundId, returning the current one', async () => {
+            const engine = makeEngine();
+            const res = await request(makeApp(engine, new ResultsStore()))
+                .post('/api/v1/throws').set('X-API-Key', API_KEY).send(body({ roundId: 'round-0' })).expect(409);
+            expect(res.body).toEqual({ error: 'ROUND_MISMATCH', currentRoundId: 'round-1' });
+        });
+
+        it('409 PICKS_CLOSED outside ACTIVE', async () => {
+            const engine = makeEngine();
+            for (let i = 0; i < 20; i++) engine.tick(); // exhaust ACTIVE -> TALLY
+            await request(makeApp(engine, new ResultsStore()))
+                .post('/api/v1/throws').set('X-API-Key', API_KEY).send(body()).expect(409);
+        });
+
+        it('reports per-player rejections (stale seq) without failing the batch', async () => {
+            const engine = makeEngine();
+            const app = makeApp(engine, new ResultsStore());
+            await request(app).post('/api/v1/throws').set('X-API-Key', API_KEY)
+                .send(body({ seq: 5, throws: [{ robloxUserId: '77', throw: 'P' }] })).expect(202);
+            const res = await request(app).post('/api/v1/throws').set('X-API-Key', API_KEY)
+                .send(body({ seq: 3 })).expect(202);
+            expect(res.body.accepted).toBe(1); // 88 accepted, 77 stale
+            expect(res.body.rejected).toEqual([{ robloxUserId: '77', reason: 'STALE_SEQ' }]);
+        });
+
+        it('400 on malformed body', async () => {
+            await request(makeApp(makeEngine(), new ResultsStore()))
+                .post('/api/v1/throws').set('X-API-Key', API_KEY).send({ nope: true }).expect(400);
+        });
+    });
 });
