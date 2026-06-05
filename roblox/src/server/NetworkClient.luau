@@ -54,9 +54,13 @@ function NetworkClient._get(self: any, path: string): Result
         if resp.ok and resp.statusCode then
             local code = resp.statusCode
             if code >= 200 and code < 300 then
+                local decodeOk, decoded = pcall(d.jsonDecode, resp.body or "null")
+                if not decodeOk then
+                    return { ok = false, status = code, error = "DECODE_FAILED" }
+                end
                 return {
                     ok = true,
-                    data = d.jsonDecode(resp.body or "null"),
+                    data = decoded,
                     status = code,
                     rttMs = receivedAt - sentAt,
                     localReceiveMs = receivedAt,

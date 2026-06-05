@@ -83,6 +83,14 @@ describe("NetworkClient.getState", function()
         expect(#f.calls).toBe(3)
     end)
 
+    test("invalid JSON on a 2xx returns DECODE_FAILED instead of throwing", function()
+        local f = makeDeps({ { ok = true, statusCode = 200, body = "not json" } })
+        local net = NetworkClient.new(CONFIG, f.deps)
+        local res = net:getState()
+        expect(res.ok).toBe(false)
+        expect(res.error).toBe("DECODE_FAILED")
+    end)
+
     test("5xx retries; 401 does not (fail fast, surfaced)", function()
         local f5 = makeDeps(
             { { ok = true, statusCode = 503, body = "" }, { ok = true, statusCode = 200, body = "{}" } },
