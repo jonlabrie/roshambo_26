@@ -36,6 +36,14 @@ Full local stack (MongoDB + server + frontend on :8080):
 docker-compose up --build
 ```
 
+Roblox client (`roblox/`, requires [Rokit](https://github.com/rojo-rbx/rokit) — run `rokit install` once from `roblox/`):
+```bash
+lune run tests/run          # headless Luau tests (bespoke harness; Jest-Lua can't run under Lune)
+rojo serve                  # live-sync into an open Studio place (Rojo plugin -> Connect)
+rojo build -o build.rbxl    # build a place file
+stylua --check src tests && selene src   # format + lint
+```
+
 Node version is pinned via `.nvmrc` (24.x).
 
 The server requires `MONGODB_URI` (exits immediately without it; `server/.env` holds local config) and `API_KEY` (required for `/api/v1`; PWA works without it). The frontend needs `VITE_SOCKET_URL` pointing at the backend (defaults to same-origin if unset). Set `TEST_MODE=true` on the server for a deterministic World Throw cycle (R→P→S) instead of random.
@@ -45,7 +53,7 @@ The server requires `MONGODB_URI` (exits immediately without it; `server/.env` h
 ### Server is authoritative (`server/src/`, modular since the 2026-06 refactor)
 
 `index.ts` is an ~80-line composition root. The pieces:
-- `engine/GameRules.ts` — pure result/pot/streak math, fixture-tested against `shared-fixtures/game-rules.json` (repo root; the future Roblox Luau mirror runs the same fixtures — keep them in sync)
+- `engine/GameRules.ts` — pure result/pot/streak math, fixture-tested against `shared-fixtures/game-rules.json` (repo root; the Roblox Luau mirror `roblox/src/shared/GameRules.luau` runs the same fixtures — keep them in sync)
 - `engine/RoundEngine.ts` — timer-less phase machine (`ACTIVE 20s → TALLY 2s → REVEAL 3s`), ticked by a `setInterval` in the composition root; collects throws with per-player seq-guarded upserts
 - `engine/Settlement.ts` — persists rounds, scores all participants (PWA + Roblox) via `identity.resolveUser`
 - `engine/ResultsStore.ts` — in-memory recent results (global, per-instance, tape)
@@ -58,6 +66,10 @@ Game rules (`GameRules.calculateResult`, duplicated client-side in `useGameLoop.
 - World beats player → **LOSS**: pot forfeited, streaks reset
 
 - At round end: World Throw is chosen (random, or deterministic in TEST_MODE — **not** derived from player votes despite the spec), each participant's result is computed and persisted, per-player `player-data` is emitted to their device room, then `reveal` broadcasts the round to everyone.
+
+### Roblox client (`roblox/`, milestone 2+)
+
+Luau modules are **dependency-injected and never `require` each other**, so the same files run under Lune (tests) and Roblox (runtime). `main.server.luau` is the only Roblox-runtime file — it wires HttpService/task/DateTime into NetworkClient/RoundCoordinator/RoundClock. Local connection settings come from `SecretsLocal.luau` (gitignored; copy `SecretsExample.luau`). `GameRules.luau` mirrors `server/src/engine/GameRules.ts` — both are tested against `shared-fixtures/game-rules.json`, so drift fails CI.
 
 ### Identity: deviceId + optional JWT
 
