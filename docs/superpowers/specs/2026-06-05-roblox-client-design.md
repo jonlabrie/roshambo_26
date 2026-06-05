@@ -53,7 +53,7 @@ All under `/api/v1`. Auth: `X-API-Key` header; the key lives in Roblox's secrets
 | `GET /state` | `{roundId, phase, phaseEndsAt, serverTime, roundCount, tape}` (tape = recent World Throw history, as in the PWA) — **no-store**: carries per-request clock fields; a shared cache would serve stale clocks at near-zero RTT, which min-RTT sample selection would then *prefer*. Low cadence keeps origin load trivial | ~1/round + drift checks |
 | `POST /throws` | Delta batch (see below) → `202` | 1–4/round |
 | `GET /rounds/:id/result` | `{worldThrow, distribution, totalPlayers}` — identical for all callers, CDN-cacheable | 1/round at reveal |
-| `GET /instances/:id/rounds/:rid/results` | Authoritative per-player outcomes `{userId, result, delta, totalPoints, pot, streak}[]` — **deferred reconciliation**, fetched with jitter during the *next* ACTIVE window, not at reveal | 1/round, spread |
+| `GET /instances/:id/rounds/:rid/results` | Authoritative per-player outcomes `{robloxUserId, result, delta, totalPoints, pot, streak}[]` — **deferred reconciliation**, fetched with jitter during the *next* ACTIVE window, not at reveal | 1/round, spread |
 | `POST /bank` | `{robloxUserId}` — server-mediated Bank decision | on demand |
 | `GET /players/:robloxUserId` | Profile sync on join (points, pot, streaks) | on join |
 | `GET /leaderboards?scope=world\|country` | World Record + country leaders — cacheable ~30s | ~2/min |
