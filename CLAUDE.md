@@ -2,9 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Working Preferences
+
+- **TDD**: Write a failing test first, then the implementation. The project currently has no tests — new work should add them rather than extend the untested pattern.
+
 ## What This Is
 
 Roshambo: a massively multiplayer rock-paper-scissors PWA where players compete against the "World Throw" (server-decided each round). Wins triple a staked pot (3^n progression); players choose to Bank (cash out) or Stake (keep riding the streak). Two independent codebases in one repo: a React frontend (root) and an Express/Socket.io backend (`server/`), each with its own `package.json` and tsconfig.
+
+A demo is live at **playroshambo.com**, running in TEST_MODE (deterministic R→P→S World Throw cycle). The app was originally built with Google's Antigravity IDE and is unfinished.
 
 `requirements.md` is the original spec — the implementation has since diverged from it (e.g., the spec says matching the World Throw is a LOSS; the code treats a match as SAFE with pot preserved). The code is the source of truth.
 
