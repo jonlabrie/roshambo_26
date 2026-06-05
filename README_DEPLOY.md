@@ -15,15 +15,16 @@ This guide covers the steps to move from your local Docker environment to a live
 3. **Configuration**: Choose **"Use a configuration file"**.
    - AWS will automatically find the `apprunner.yaml` in your root.
 4. **Security (Instance Role)**:
-   - This role gives your code permissions to talk to *other* AWS services (like S3 or Secrets Manager).
-   - **Since we are using MongoDB Atlas, you don't need any special permissions.** 
-   - You can leave this as the **Default** or **None** if it allows you. If forced, select "Create new" and give it a name like `RoshamboAppRunnerInstanceRole`.
-5. **Service Configuration**:
-   - In the "Configure service" step, add these **Environment Variables**:
-     - `MONGODB_URI`: (Your Atlas connection string)
-     - `JWT_SECRET`: (A long, random string)
-6. Add `API_KEY` as an environment variable in the App Runner console (do not commit it to `apprunner.yaml`).
-4. **Networking**: Ensure it is public so the frontend can connect.
+   - The service uses the instance role `RoshamboAppRunnerInstanceRole`, which grants `ssm:GetParameters` on `arn:aws:ssm:us-east-1:<account>:parameter/roshambo/*`.
+   - This is required: all secrets are read from SSM at deploy time (see step 5).
+5. **Secrets (SSM Parameter Store, us-east-1)**:
+   - Secrets are NOT committed to the repo or set in the console. `apprunner.yaml` references them via `secrets:`/`value-from`:
+     - `/roshambo/MONGODB_URI` (SecureString): Atlas connection string
+     - `/roshambo/JWT_SECRET` (SecureString): token-signing secret
+     - `/roshambo/API_KEY` (SecureString): server-to-server auth for `/api/v1`
+   - To rotate one: `aws ssm put-parameter --region us-east-1 --name /roshambo/<NAME> --type SecureString --overwrite --value '<new>'`, then trigger a deployment.
+6. **Networking**: Ensure it is public so the frontend can connect.
+7. **Deploys**: Auto-deploy is OFF — pushing to GitHub does not deploy the backend. Trigger manually (console "Deploy" button or `aws apprunner start-deployment`).
 
 ## 3. Frontend: AWS Amplify
 1. Connect your GitHub repository to [AWS Amplify](https://console.aws.amazon.com/amplify).
@@ -33,12 +34,13 @@ This guide covers the steps to move from your local Docker environment to a live
 4. **Deploy**: Trigger the build.
 
 ## 4. Environment Variables Checklist
-| Variable | AWS Service | Purpose |
+| Variable | Source | Purpose |
 | :--- | :--- | :--- |
-| `MONGODB_URI` | App Runner | Connection to database |
-| `JWT_SECRET` | App Runner | Token signing |
-| `TEST_MODE` | App Runner | Set 'true' for deterministic testing (R->P->S) |
-| `API_KEY` | App Runner | Server-to-server auth for /api/v1 (Roblox game servers) |
+| `MONGODB_URI` | SSM `/roshambo/MONGODB_URI` | Connection to database |
+| `JWT_SECRET` | SSM `/roshambo/JWT_SECRET` | Token signing |
+| `API_KEY` | SSM `/roshambo/API_KEY` | Server-to-server auth for /api/v1 (Roblox game servers) |
+| `TEST_MODE` | `apprunner.yaml` (plain env) | Set 'true' for deterministic testing (R->P->S) |
+| `PORT` | `apprunner.yaml` (plain env) | Server port (3001) |
 | `VITE_SOCKET_URL` | Amplify | Points frontend to the backend |
 
 ---

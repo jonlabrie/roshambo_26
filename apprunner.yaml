@@ -13,9 +13,12 @@ run:
   env:
     - name: PORT
       value: "3001"
-    - name: MONGODB_URI
-      value: "mongodb+srv://jonlabrie_db_user:eYBOQwdAkGgU2jnC@roshambocluster0.ckjseml.mongodb.net/?appName=RoshamboCluster0"
-    - name: JWT_SECRET
-      value: "roshambo_super_secret_1337"
     - name: TEST_MODE
       value: "true"
+  secrets:
+    - name: MONGODB_URI
+      value-from: "arn:aws:ssm:us-east-1:198886313292:parameter/roshambo/MONGODB_URI"
+    - name: JWT_SECRET
+      value-from: "arn:aws:ssm:us-east-1:198886313292:parameter/roshambo/JWT_SECRET"
+    - name: API_KEY
+      value-from: "arn:aws:ssm:us-east-1:198886313292:parameter/roshambo/API_KEY"
