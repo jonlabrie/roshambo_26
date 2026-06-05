@@ -108,7 +108,8 @@ roblox/
               PlayerRegistry (join/leave, profile sync, lockout enforcement)
     client/   PickUI, CountdownDisplay, Effects (grow/anvil/shimmer),
               Pedestals, WorldRecordHolo
-  tests/      Jest-Lua specs (run headless via Lune): shared/ fully,
+  tests/      Lune-run specs via a minimal bespoke harness (Jest-Lua requires the
+              Roblox runtime and cannot run under Lune/CI today): shared/ fully,
               server logic against a fake NetworkClient
 ```
 
