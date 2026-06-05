@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Working Preferences
 
-- **TDD**: Write a failing test first, then the implementation. The project currently has no tests — new work should add them rather than extend the untested pattern.
+- **TDD**: Write a failing test first, then the implementation. The server has a Vitest suite (`server/`: `npm test`); the React frontend has no tests yet.
 
 ## What This Is
 
@@ -28,6 +28,7 @@ Backend (`server/`):
 npm run dev        # ts-node src/index.ts
 npm run build      # tsc → dist/
 npm start          # node dist/index.js
+npm test           # vitest (also: npm run test:watch)
 ```
 
 Full local stack (MongoDB + server + frontend on :8080):
@@ -35,22 +36,28 @@ Full local stack (MongoDB + server + frontend on :8080):
 docker-compose up --build
 ```
 
-There are no tests in either package. Node version is pinned via `.nvmrc` (24.x).
+Node version is pinned via `.nvmrc` (24.x).
 
-The server requires `MONGODB_URI` (exits immediately without it; `server/.env` holds local config). The frontend needs `VITE_SOCKET_URL` pointing at the backend (defaults to same-origin if unset). Set `TEST_MODE=true` on the server for a deterministic World Throw cycle (R→P→S) instead of random.
+The server requires `MONGODB_URI` (exits immediately without it; `server/.env` holds local config) and `API_KEY` (required for `/api/v1`; PWA works without it). The frontend needs `VITE_SOCKET_URL` pointing at the backend (defaults to same-origin if unset). Set `TEST_MODE=true` on the server for a deterministic World Throw cycle (R→P→S) instead of random.
 
 ## Architecture
 
-### Server is authoritative (`server/src/index.ts`, single file)
+### Server is authoritative (`server/src/`, modular since the 2026-06 refactor)
 
-The entire game loop lives in one `setInterval(1000)` tick:
-- 20-second rounds (`ROUND_TIME`). Every tick broadcasts a `sync` heartbeat (timeLeft, roundCount, playerCount) — the client has **no local timer**; it renders only what `sync` says.
-- At round end: World Throw is chosen (random, or deterministic in TEST_MODE — **not** derived from player votes despite the spec), each participant's result is computed and persisted, per-player `player-data` is emitted to their device room, then `reveal` broadcasts the round to everyone.
+`index.ts` is an ~80-line composition root. The pieces:
+- `engine/GameRules.ts` — pure result/pot/streak math, fixture-tested against `shared-fixtures/game-rules.json` (repo root; the future Roblox Luau mirror runs the same fixtures — keep them in sync)
+- `engine/RoundEngine.ts` — timer-less phase machine (`ACTIVE 20s → TALLY 2s → REVEAL 3s`), ticked by a `setInterval` in the composition root; collects throws with per-player seq-guarded upserts
+- `engine/Settlement.ts` — persists rounds, scores all participants (PWA + Roblox) via `identity.resolveUser`
+- `engine/ResultsStore.ts` — in-memory recent results (global, per-instance, tape)
+- `transports/socketAdapter.ts` — the PWA's Socket.io wire format, unchanged from the legacy server
+- `routes/apiV1.ts` — REST surface for Roblox game servers (`X-API-Key` auth via `API_KEY` env var)
 
-Game rules (`calculateResult`, duplicated client-side in `useGameLoop.ts` — keep in sync):
+Game rules (`GameRules.calculateResult`, duplicated client-side in `useGameLoop.ts` — keep in sync):
 - Player beats world → **WIN**: pot goes 0→1, then ×3 per win; streak +1
 - Player matches world → **SAFE**: pot preserved, streaks reset to 0
 - World beats player → **LOSS**: pot forfeited, streaks reset
+
+- At round end: World Throw is chosen (random, or deterministic in TEST_MODE — **not** derived from player votes despite the spec), each participant's result is computed and persisted, per-player `player-data` is emitted to their device room, then `reveal` broadcasts the round to everyone.
 
 ### Identity: deviceId + optional JWT
 

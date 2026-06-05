@@ -17,6 +17,7 @@ services:
       - PORT=3001
       - JWT_SECRET=roshambo_local_dev_secret
       - TEST_MODE=true
+      - API_KEY=roshambo_local_dev_api_key
     ports:
       - "3001:3001"
     depends_on:
