@@ -64,5 +64,76 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
         res.status(202).json({ accepted, rejected });
     });
 
+    router.get('/instances/:instanceId/rounds/:roundId/results', (req, res) => {
+        const results = store.getInstance(req.params.roundId, req.params.instanceId);
+        if (!results) { res.status(404).json({ error: 'RESULTS_NOT_READY' }); return; }
+        res.set('Cache-Control', 'no-store');
+        res.json(results.map(({ user, ...rest }) => rest));
+    });
+
+    router.get('/players/:robloxUserId', async (req, res) => {
+        try {
+            const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
+            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            const country = typeof req.query.country === 'string' ? req.query.country : undefined;
+            if (country && user.country !== country) {
+                await User.findByIdAndUpdate(user._id, { $set: { country } });
+            }
+            res.set('Cache-Control', 'no-store');
+            res.json({
+                robloxUserId: req.params.robloxUserId,
+                displayName: user.displayName,
+                totalPoints: user.totalPoints,
+                pointsAtStake: user.pointsAtStake,
+                currentStreak: user.currentStreak,
+                stakingStreak: user.stakingStreak,
+                bestStreak: user.bestStreak,
+                identityTier: user.identityTier,
+            });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
+    router.post('/bank', async (req, res) => {
+        try {
+            const robloxUserId = String(req.body?.robloxUserId ?? '');
+            if (!robloxUserId) { res.status(400).json({ error: 'BAD_REQUEST' }); return; }
+            const user = await resolveUser({ robloxUserId });
+            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            const updated = await bankPot(user._id.toString());
+            if (!updated) { res.status(409).json({ error: 'NOTHING_STAKED' }); return; }
+            res.json({
+                totalPoints: updated.totalPoints,
+                pointsAtStake: updated.pointsAtStake,
+                stakingStreak: updated.stakingStreak,
+                currentStreak: updated.currentStreak,
+            });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
+    router.get('/leaderboards', async (req, res) => {
+        try {
+            const scope = req.query.scope;
+            if (scope !== 'world' && scope !== 'country') {
+                res.status(400).json({ error: 'BAD_SCOPE' });
+                return;
+            }
+            const filter = scope === 'country'
+                ? { country: String(req.query.country ?? '') }
+                : {};
+            const leaders = await User.find(filter)
+                .sort({ totalPoints: -1 })
+                .limit(50)
+                .select('displayName totalPoints robloxId identityTier currentStreak bestStreak');
+            res.set('Cache-Control', 'public, max-age=30');
+            res.json({ scope, leaders });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
     return router;
 }

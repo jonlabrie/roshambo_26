@@ -116,4 +116,87 @@ describe('/api/v1', () => {
                 .post('/api/v1/throws').set('X-API-Key', API_KEY).send({ nope: true }).expect(400);
         });
     });
+
+    describe('GET /instances/:id/rounds/:rid/results', () => {
+        it('returns per-player outcomes for the instance, no cache', async () => {
+            const engine = makeEngine();
+            const store = new ResultsStore();
+            const { round, players } = await settleRound({
+                roundId: 'round-1', worldThrow: 'S', counts: { R: 1, P: 1, S: 0 },
+                throws: new Map([
+                    ['roblox:77', { throw: 'R', seq: 1, platform: 'roblox', robloxUserId: '77', instanceId: 'job-1' }],
+                    ['roblox:88', { throw: 'P', seq: 1, platform: 'roblox', robloxUserId: '88', instanceId: 'job-2' }],
+                ]),
+                timestamp: new Date(),
+            });
+            store.storeRound(round, players);
+            const app = makeApp(engine, store);
+
+            const res = await request(app)
+                .get('/api/v1/instances/job-1/rounds/round-1/results').set('X-API-Key', API_KEY).expect(200);
+            expect(res.headers['cache-control']).toBe('no-store');
+            expect(res.body).toHaveLength(1);
+            expect(res.body[0]).toMatchObject({ robloxUserId: '77', result: 'WIN', pot: 1, streak: 1 });
+            expect(res.body[0].user).toBeUndefined(); // internal doc not exposed
+
+            await request(app)
+                .get('/api/v1/instances/job-x/rounds/round-1/results').set('X-API-Key', API_KEY).expect(404);
+        });
+    });
+
+    describe('GET /players/:robloxUserId', () => {
+        it('returns (and creates) the wallet, recording optional country', async () => {
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const res = await request(app)
+                .get('/api/v1/players/12345?country=US').set('X-API-Key', API_KEY).expect(200);
+            expect(res.body).toMatchObject({
+                robloxUserId: '12345', totalPoints: 0, pointsAtStake: 0,
+                currentStreak: 0, stakingStreak: 0, bestStreak: 0, identityTier: 'roblox',
+            });
+            const u = await User.findOne({ robloxId: '12345' });
+            expect(u?.country).toBe('US');
+        });
+    });
+
+    describe('POST /bank', () => {
+        it('banks a staked pot', async () => {
+            await User.create({ robloxId: '77', identityTier: 'roblox', totalPoints: 5, pointsAtStake: 9, stakingStreak: 2 });
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .post('/api/v1/bank').set('X-API-Key', API_KEY).send({ robloxUserId: '77' }).expect(200);
+            expect(res.body).toMatchObject({ totalPoints: 14, pointsAtStake: 0, stakingStreak: 0 });
+        });
+
+        it('409 when nothing staked', async () => {
+            await User.create({ robloxId: '77', identityTier: 'roblox', pointsAtStake: 0 });
+            await request(makeApp(makeEngine(), new ResultsStore()))
+                .post('/api/v1/bank').set('X-API-Key', API_KEY).send({ robloxUserId: '77' }).expect(409);
+        });
+    });
+
+    describe('GET /leaderboards', () => {
+        it('world scope: top totalPoints, cacheable 30s', async () => {
+            await User.create({ deviceId: 'devA', displayName: 'WebChamp', totalPoints: 100 });
+            await User.create({ robloxId: '77', identityTier: 'roblox', displayName: 'BloxKid', totalPoints: 50 });
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .get('/api/v1/leaderboards?scope=world').set('X-API-Key', API_KEY).expect(200);
+            expect(res.headers['cache-control']).toBe('public, max-age=30');
+            expect(res.body.scope).toBe('world');
+            expect(res.body.leaders[0]).toMatchObject({ displayName: 'WebChamp', totalPoints: 100, identityTier: 'guest' });
+            expect(res.body.leaders[1]).toMatchObject({ displayName: 'BloxKid', robloxId: '77' });
+        });
+
+        it('country scope filters by country code', async () => {
+            await User.create({ robloxId: '77', identityTier: 'roblox', country: 'US', totalPoints: 50 });
+            await User.create({ robloxId: '88', identityTier: 'roblox', country: 'JP', totalPoints: 70 });
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .get('/api/v1/leaderboards?scope=country&country=US').set('X-API-Key', API_KEY).expect(200);
+            expect(res.body.leaders).toHaveLength(1);
+            expect(res.body.leaders[0].robloxId).toBe('77');
+        });
+
+        it('400 on bad scope', async () => {
+            await request(makeApp(makeEngine(), new ResultsStore()))
+                .get('/api/v1/leaderboards?scope=galaxy').set('X-API-Key', API_KEY).expect(400);
+        });
+    });
 });
