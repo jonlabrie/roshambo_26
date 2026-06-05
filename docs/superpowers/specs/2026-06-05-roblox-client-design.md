@@ -60,10 +60,10 @@ All under `/api/v1`. Auth: `X-API-Key` header; the key lives in Roblox's secrets
 
 **Throw submission semantics**
 
-- Each `POST /throws` carries `{instanceId, roundId, idempotencyKey, throws: [{robloxUserId, throw}]}` and is **delta-only**: only picks not yet acknowledged by a prior 2xx. Retries are safe (idempotency key = `instanceId:roundId:seq`).
+- Each `POST /throws` carries `{instanceId, roundId, seq, throws: [{robloxUserId, throw}]}` and is **delta-only**: only picks not yet acknowledged by a prior 2xx. Safety comes from **data-level idempotency, not an idempotency-key registry**: the server upserts per `(roundId, robloxUserId)` tagged with `seq`, applying an update only if `seq ≥` the stored value. Retries are harmless re-upserts; out-of-order/stale retransmits are rejected by the monotonic check (so a delayed old batch can never clobber a player's newer pick). `instanceId` is `game.JobId`, which is never reused — a crashed instance's replacement starts fresh under a new id.
 - Flush triggers: every 5s during ACTIVE, **or** when 10 unflushed picks accumulate, **plus** a final delta flush dispatched immediately after pick lockout. A dropped final packet whiffs only the stragglers in that delta, never the whole instance.
 - Roblox-side pick lockout is **T₀−2s**; the final delta flush goes out right after lockout (jittered within ~500ms), leaving ≥1s of network headroom before the tally closes at T₀. Late batches are rejected; affected players get a "throw didn't count" whiff animation — the server never invents results.
-- **Timing**: all Roblox-side countdowns derive from `serverTime` offset (rolling average over the first 3 pings to filter handshake latency), never local clocks.
+- **Timing**: all Roblox-side countdowns derive from a `serverTime` offset, never local clocks. `RoundClock` estimates the offset on every `/state` poll (`offset = serverTime + RTT/2 − localReceiveTime`) and keeps the sample with the smallest RTT (Cristian's algorithm) — routing spikes inflate RTT and are thereby discarded; re-sampled each round. Design tolerance is seconds (lockout headroom ≥1s), so RTT/2 asymmetry error is immaterial.
 
 **Why reveal traffic doesn't melt the origin**: the only synchronized instant is the reveal, which is read-side and identical for everyone → CDN absorbs it. Per-instance reads are deferred and jittered; per-instance writes are spread across the whole ACTIVE window because players lock early.
 
@@ -87,7 +87,7 @@ One arena place:
   - **LOSS** — anvil falls, comedic flatten, respring.
   - **SAFE** — shield shimmer.
 - **Pedestals**: podium row for *this server* and *country* leaders — real Roblox avatars, physically knocked off when surpassed. Country via `LocalizationService:GetCountryRegionForPlayerAsync`.
-- **World Record hologram**: the cross-platform global champion. A Roblox (or linked) champion's holo shows their real avatar; an unlinked web champion appears as a filtered-name "outsider" glow — no dummy avatars. **All externally-sourced display names must pass `TextService` filtering before display** (Roblox text-safety requirement). The same World Record motif later appears in the PWA.
+- **World Record hologram**: the cross-platform global champion. A Roblox (or linked) champion's holo shows their real avatar; an unlinked web champion appears as a filtered-name "outsider" glow — no dummy avatars. **All externally-sourced display names must pass `TextService` filtering before display** (Roblox text-safety requirement). Filtering can throttle, error, or redact to hashes: on failure or heavy redaction, fall back to a generic epithet ("a challenger from the wider world") rather than rendering raw text or `####`; cache successful filter results per name. The same World Record motif later appears in the PWA.
 
 ## 7. Roblox Code Architecture
 
