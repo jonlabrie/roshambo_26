@@ -61,7 +61,7 @@ Game rules (`GameRules.calculateResult`, duplicated client-side in `useGameLoop.
 
 ### Identity: deviceId + optional JWT
 
-Guests are identified by a random `deviceId` in localStorage; logging in (email/password via `/auth` REST routes) adds a JWT passed in the socket handshake (`auth.token`). `resolveUser()` in `server/src/index.ts` merges the two — authenticated user wins, with cleanup logic that re-tags stale duplicate device records (`stale_<ts>_<id>`). Sockets join a room named after their deviceId so the server can emit targeted `player-data`.
+Guests are identified by a random `deviceId` in localStorage; logging in (email/password via `/auth` REST routes) adds a JWT passed in the socket handshake (`auth.token`). `resolveUser()` in `server/src/identity.ts` merges the two (plus `robloxId` for Roblox players) — authenticated user wins, with cleanup logic that re-tags stale duplicate device records (`stale_<ts>_<id>`). Sockets join a room named after their deviceId so the server can emit targeted `player-data`.
 
 ### Socket protocol
 
