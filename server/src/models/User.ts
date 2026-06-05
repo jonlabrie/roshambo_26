@@ -8,6 +8,9 @@ export interface IUser extends Document {
     appleId?: string;
     facebookId?: string;
     instagramId?: string;
+    robloxId?: string;
+    identityTier: 'guest' | 'email' | 'roblox';
+    country?: string;
     displayName?: string;
     totalPoints: number;
     bestStreak: number;
@@ -27,6 +30,9 @@ const UserSchema: Schema = new Schema({
     appleId: { type: String, unique: true, sparse: true },
     facebookId: { type: String, unique: true, sparse: true },
     instagramId: { type: String, unique: true, sparse: true },
+    robloxId: { type: String, unique: true, sparse: true },
+    identityTier: { type: String, enum: ['guest', 'email', 'roblox'], default: 'guest' },
+    country: { type: String },
     displayName: { type: String },
     totalPoints: { type: Number, default: 0 },
     bestStreak: { type: Number, default: 0 },

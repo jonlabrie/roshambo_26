@@ -35,11 +35,12 @@ router.post('/register', async (req, res) => {
                 user.email = email;
                 user.password = hashedPassword;
                 user.displayName = displayName;
+                user.identityTier = 'email';
                 user.set('deviceId', undefined); // Explicitly remove to prevent guest collisions
                 await user.save();
                 console.log(`[AUTH] Migrated anonymous device ${deviceId} to registered user ${user._id}`);
             } else {
-                user = new User({ email, password: hashedPassword, displayName });
+                user = new User({ email, password: hashedPassword, displayName, identityTier: 'email' });
                 await user.save();
             }
         } else {
@@ -110,6 +111,7 @@ router.post('/sso', async (req, res) => {
 
                 if (!user.displayName) user.displayName = displayName;
                 if (!user.email) user.email = email;
+                user.identityTier = 'email';
                 user.set('deviceId', undefined); // Explicitly remove to prevent guest collisions
                 await user.save();
                 console.log(`[SSO] Merged/Linked device ${deviceId} to user ${user._id}`);
@@ -119,7 +121,8 @@ router.post('/sso', async (req, res) => {
                     ...query,
                     email,
                     displayName,
-                    totalPoints: 0
+                    totalPoints: 0,
+                    identityTier: 'email'
                 });
                 await user.save();
             }
