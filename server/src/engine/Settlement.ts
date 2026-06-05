@@ -21,7 +21,7 @@ export interface SettledPlayer {
     instanceId?: string;
     result: RoundResult;
     delta: number;
-    totalPoints: number;
+    totalPoints: number; // wallet total — unaffected by staking; changes only on bank
     pot: number;
     streak: number;
     user: IUser; // full updated doc, used by the socket adapter's player-data emit
@@ -57,6 +57,8 @@ export async function settleRound(data: RoundToSettle): Promise<{ round: GlobalR
     await Round.create(round).catch(err =>
         console.error('Error saving round:', (err as Error).message));
 
+    // Settlement assumes each resolved user appears at most once per round (engine
+    // keys by participant; account linking must not violate this invariant).
     const players = await Promise.all(
         Array.from(data.throws.entries()).map(async ([key, entry]): Promise<SettledPlayer | null> => {
             try {
@@ -71,15 +73,9 @@ export async function settleRound(data: RoundToSettle): Promise<{ round: GlobalR
                 const streak = nextStreak(user.currentStreak || 0, result);
                 const bestStreak = Math.max(user.bestStreak || 0, streak);
 
-                const updated = (await User.findByIdAndUpdate(user._id, {
-                    $set: {
-                        pointsAtStake: pot,
-                        currentStreak: streak,
-                        stakingStreak: nextStreak(user.stakingStreak || 0, result),
-                        bestStreak,
-                    },
-                }, { new: true })) || user;
-
+                // Write history row FIRST: if this fails the wallet is untouched
+                // (player unscored that round — recoverable). The reverse ordering
+                // would mutate the wallet with no audit row and cause client desync.
                 await PlayerRound.create({
                     deviceId: entry.deviceId,
                     userId: entry.userId,
@@ -91,6 +87,15 @@ export async function settleRound(data: RoundToSettle): Promise<{ round: GlobalR
                     pointsDelta: delta,
                     timestamp: data.timestamp,
                 });
+
+                const updated = (await User.findByIdAndUpdate(user._id, {
+                    $set: {
+                        pointsAtStake: pot,
+                        currentStreak: streak,
+                        stakingStreak: nextStreak(user.stakingStreak || 0, result),
+                        bestStreak,
+                    },
+                }, { new: true })) || user;
 
                 return {
                     key,

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, vi } from 'vitest';
 import { connectTestDb, clearTestDb, disconnectTestDb } from '../test/db';
 import User from '../models/User';
 import Round from '../models/Round';
@@ -56,5 +56,45 @@ describe('settleRound', () => {
             roundId: 'r3', worldThrow: 'R', counts: { R: 0, P: 0, S: 0 }, throws: new Map(), timestamp: new Date(),
         });
         expect(round.distribution).toEqual({ R: 33, P: 33, S: 33 });
+    });
+
+    it('leaves wallet untouched when PlayerRound.create fails; other participants still settle', async () => {
+        // roblox:88 will LOSE (P vs worldThrow S) — with pointsAtStake:9 their pot would be zeroed.
+        // We want to assert that mutation never happens if the history write fails first.
+        await User.create({ robloxId: '88', identityTier: 'roblox', pointsAtStake: 9, currentStreak: 2 });
+
+        const original = (PlayerRound.create as any).bind(PlayerRound);
+        const spy = vi.spyOn(PlayerRound, 'create').mockImplementation(((doc: any) =>
+            doc.robloxUserId === '88' ? Promise.reject(new Error('boom')) : original(doc)) as any);
+
+        let result: Awaited<ReturnType<typeof settleRound>>;
+        try {
+            result = await settleRound({
+                roundId: 'r4',
+                worldThrow: 'S', // roblox:77 (S) SAFE; roblox:88 (P) LOSS
+                counts: { R: 0, P: 1, S: 1 },
+                throws: throwsMap([
+                    ['roblox:77', { throw: 'S', seq: 1, platform: 'roblox', robloxUserId: '77' }],
+                    ['roblox:88', { throw: 'P', seq: 1, platform: 'roblox', robloxUserId: '88' }],
+                ]),
+                timestamp: new Date(),
+            });
+        } finally {
+            spy.mockRestore();
+        }
+
+        // (a) roblox:88's User doc must be unchanged — pot and streak untouched
+        const user88 = await User.findOne({ robloxId: '88' });
+        expect(user88!.pointsAtStake).toBe(9);
+        expect(user88!.currentStreak).toBe(2);
+
+        // (b) roblox:77 (SAFE, auto-created) still settles normally
+        const safe = result!.players.find(p => p.key === 'roblox:77');
+        expect(safe).toBeDefined();
+        expect(safe!.result).toBe('SAFE');
+
+        // (c) failed participant absent from returned players array
+        const absent = result!.players.find(p => p.key === 'roblox:88');
+        expect(absent).toBeUndefined();
     });
 });
