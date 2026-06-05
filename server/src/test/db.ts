@@ -5,7 +5,7 @@ let mongod: MongoMemoryServer | undefined;
 
 export async function connectTestDb(): Promise<void> {
     mongod = await MongoMemoryServer.create({
-        instance: { startupTimeout: 60000 },
+        instance: { launchTimeout: 60000 },
     });
     await mongoose.connect(mongod.getUri());
 }
