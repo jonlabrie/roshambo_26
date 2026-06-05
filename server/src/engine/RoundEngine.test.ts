@@ -127,3 +127,59 @@ describe('RoundEngine authority lock-in', () => {
         expect((capturedThrows as unknown as Map<string, unknown>).has('pwa:devA')).toBe(true);
     });
 });
+
+describe('RoundEngine.submitThrow', () => {
+    it('accepts during ACTIVE and counts into the tally', () => {
+        const e = makeEngine();
+        expect(e.submitThrow('roblox:1', { throw: 'R', seq: 1, platform: 'roblox', robloxUserId: '1' }).accepted).toBe(true);
+        expect(e.submitThrow('pwa:devA', { throw: 'P', seq: 1, platform: 'pwa', deviceId: 'devA' }).accepted).toBe(true);
+        const closed = vi.fn();
+        e.on('roundClosed', closed);
+        for (let i = 0; i < 3; i++) e.tick();
+        expect(closed.mock.calls[0][0].counts).toEqual({ R: 1, P: 1, S: 0 });
+    });
+
+    it('last write wins for equal or newer seq (player changes pick)', () => {
+        const e = makeEngine();
+        e.submitThrow('roblox:1', { throw: 'R', seq: 1, platform: 'roblox', robloxUserId: '1' });
+        expect(e.submitThrow('roblox:1', { throw: 'P', seq: 2, platform: 'roblox', robloxUserId: '1' }).accepted).toBe(true);
+        const closed = vi.fn();
+        e.on('roundClosed', closed);
+        for (let i = 0; i < 3; i++) e.tick();
+        expect(closed.mock.calls[0][0].counts).toEqual({ R: 0, P: 1, S: 0 });
+    });
+
+    it('rejects stale seq (delayed retransmit cannot clobber a newer pick)', () => {
+        const e = makeEngine();
+        e.submitThrow('roblox:1', { throw: 'P', seq: 5, platform: 'roblox', robloxUserId: '1' });
+        const r = e.submitThrow('roblox:1', { throw: 'R', seq: 3, platform: 'roblox', robloxUserId: '1' });
+        expect(r).toEqual({ accepted: false, reason: 'STALE_SEQ' });
+    });
+
+    it('rejects outside ACTIVE', () => {
+        const e = makeEngine();
+        for (let i = 0; i < 3; i++) e.tick(); // now TALLY
+        const r = e.submitThrow('roblox:1', { throw: 'R', seq: 1, platform: 'roblox', robloxUserId: '1' });
+        expect(r).toEqual({ accepted: false, reason: 'PICKS_CLOSED' });
+    });
+
+    it('clears throws between rounds', () => {
+        const e = makeEngine();
+        e.submitThrow('roblox:1', { throw: 'R', seq: 1, platform: 'roblox', robloxUserId: '1' });
+        for (let i = 0; i < 7; i++) e.tick(); // full cycle into next ACTIVE
+        const closed = vi.fn();
+        e.on('roundClosed', closed);
+        for (let i = 0; i < 3; i++) e.tick();
+        expect(closed.mock.calls[0][0].counts).toEqual({ R: 0, P: 0, S: 0 });
+    });
+
+    it('accepts an equal-seq resubmit (idempotent retry) and the resubmitted value wins', () => {
+        const e = makeEngine();
+        expect(e.submitThrow('roblox:1', { throw: 'R', seq: 1, platform: 'roblox', robloxUserId: '1' }).accepted).toBe(true);
+        expect(e.submitThrow('roblox:1', { throw: 'P', seq: 1, platform: 'roblox', robloxUserId: '1' }).accepted).toBe(true);
+        const closed = vi.fn();
+        e.on('roundClosed', closed);
+        for (let i = 0; i < 3; i++) e.tick();
+        expect(closed.mock.calls[0][0].counts).toEqual({ R: 0, P: 1, S: 0 });
+    });
+});
