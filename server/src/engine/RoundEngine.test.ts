@@ -54,3 +54,76 @@ describe('RoundEngine phases', () => {
         expect(tick).toHaveBeenCalledWith(expect.objectContaining({ phase: 'ACTIVE', secondsLeft: 2 }));
     });
 });
+
+describe('RoundEngine re-entrancy guard', () => {
+    it('ignores a synchronous tick() called from inside a roundClosed listener', () => {
+        const e = makeEngine();
+        const phases: Phase[] = [];
+        const tickCount: number[] = [];
+        let tickFires = 0;
+
+        e.on('tick', () => { tickFires++; });
+
+        // A re-entrant call from inside 'roundClosed'
+        e.on('roundClosed', () => {
+            e.tick(); // should be ignored (re-entrancy guard)
+        });
+
+        // Drain to round-close (3 ticks on activeSeconds=3)
+        for (let i = 0; i < 3; i++) {
+            tickFires = 0;
+            e.tick();
+            phases.push(e.snapshot().phase);
+            tickCount.push(tickFires);
+        }
+
+        // After 3 ticks: phases should be ACTIVE, ACTIVE, TALLY
+        // (the nested call from the listener must NOT push to REVEAL)
+        expect(phases).toEqual(['ACTIVE', 'ACTIVE', 'TALLY']);
+        // The outer tick() on tick #3 emits exactly 1 'tick' event;
+        // the nested call is swallowed so no extra 'tick' fires.
+        expect(tickCount[2]).toBe(1);
+    });
+});
+
+describe('RoundEngine authority lock-in', () => {
+    it('passes correct roundCount and throw counts to pickWorldThrow', () => {
+        const picker = vi.fn(() => 'R' as const);
+        const e = makeEngine({ pickWorldThrow: picker });
+
+        // Submit: 'roblox:1' R seq 1, 'roblox:2' R seq 1, 'pwa:devA' S seq 1
+        e.submitThrow('roblox:1', { throw: 'R', seq: 1, platform: 'roblox' });
+        e.submitThrow('roblox:2', { throw: 'R', seq: 1, platform: 'roblox' });
+        e.submitThrow('pwa:devA', { throw: 'S', seq: 1, platform: 'pwa' });
+
+        // Tick to round close (3 ticks for activeSeconds=3)
+        for (let i = 0; i < 3; i++) e.tick();
+
+        expect(picker).toHaveBeenCalledOnce();
+        expect(picker).toHaveBeenCalledWith(0, { R: 2, P: 0, S: 1 });
+    });
+
+    it('roundClosed throws map is isolated — captured payload survives the next round', () => {
+        const e = makeEngine();
+        e.submitThrow('roblox:1', { throw: 'R', seq: 1, platform: 'roblox' });
+        e.submitThrow('roblox:2', { throw: 'R', seq: 1, platform: 'roblox' });
+        e.submitThrow('pwa:devA', { throw: 'S', seq: 1, platform: 'pwa' });
+
+        let capturedThrows: Map<string, unknown> | null = null;
+        e.on('roundClosed', (evt) => { capturedThrows = evt.throws; });
+
+        // Tick through to close (3) then full tally+reveal cycle to next ACTIVE (4 more = 7 total)
+        for (let i = 0; i < 7; i++) e.tick();
+
+        // Engine should now be in the next ACTIVE (internal throws cleared)
+        expect(e.snapshot().phase).toBe('ACTIVE');
+        expect(e.snapshot().roundCount).toBe(1);
+
+        // But the captured map must still hold the original entries
+        expect(capturedThrows).not.toBeNull();
+        expect((capturedThrows as unknown as Map<string, unknown>).size).toBe(3);
+        expect((capturedThrows as unknown as Map<string, unknown>).has('roblox:1')).toBe(true);
+        expect((capturedThrows as unknown as Map<string, unknown>).has('roblox:2')).toBe(true);
+        expect((capturedThrows as unknown as Map<string, unknown>).has('pwa:devA')).toBe(true);
+    });
+});

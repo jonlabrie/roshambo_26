@@ -41,6 +41,7 @@ export class RoundEngine extends EventEmitter {
     private roundCount: number;
     private roundId: string;
     private throws = new Map<string, ThrowEntry>();
+    private ticking = false;
 
     constructor(private cfg: EngineConfig, initialRoundCount = 0) {
         super();
@@ -73,6 +74,12 @@ export class RoundEngine extends EventEmitter {
     }
 
     tick(): void {
+        if (this.ticking) {
+            console.warn('[ENGINE] re-entrant tick() ignored');
+            return;
+        }
+        this.ticking = true;
+        try {
         this.secondsLeft--;
         if (this.secondsLeft <= 0) {
             if (this.phase === 'ACTIVE') {
@@ -98,5 +105,8 @@ export class RoundEngine extends EventEmitter {
             }
         }
         this.emit('tick', this.snapshot());
+        } finally {
+            this.ticking = false;
+        }
     }
 }
