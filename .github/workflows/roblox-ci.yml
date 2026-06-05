@@ -1,0 +1,33 @@
+name: roblox-ci
+on:
+  push:
+    paths: ["roblox/**", "shared-fixtures/**", ".github/workflows/roblox-ci.yml"]
+  pull_request:
+    paths: ["roblox/**", "shared-fixtures/**", ".github/workflows/roblox-ci.yml"]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: roblox
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rokit
+        run: |
+          curl -sSf https://raw.githubusercontent.com/rojo-rbx/rokit/main/scripts/install.sh | bash
+          echo "$HOME/.rokit/bin" >> "$GITHUB_PATH"
+      - name: Install pinned tools
+        run: rokit install --no-trust-check
+      - name: Lune tests
+        run: lune run tests/run
+      - name: Format check
+        run: stylua --check src tests
+      - name: Lint
+        run: selene src
+      - name: Rojo build
+        run: rojo build -o roshambo-skeleton.rbxl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: roshambo-skeleton
+          path: roblox/roshambo-skeleton.rbxl
