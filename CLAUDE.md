@@ -69,7 +69,9 @@ Game rules (`GameRules.calculateResult`, duplicated client-side in `useGameLoop.
 
 ### Roblox client (`roblox/`, milestone 2+)
 
-Luau modules are **dependency-injected and never `require` each other**, so the same files run under Lune (tests) and Roblox (runtime). `main.server.luau` is the only Roblox-runtime file — it wires HttpService/task/DateTime into NetworkClient/RoundCoordinator/RoundClock. Local connection settings come from `SecretsLocal.luau` (gitignored; copy `SecretsExample.luau`). `GameRules.luau` mirrors `server/src/engine/GameRules.ts` — both are tested against `shared-fixtures/game-rules.json`, so drift fails CI.
+Luau modules are **dependency-injected and never `require` each other**, so the same files run under Lune (tests) and Roblox (runtime). `main.server.luau` and `main.client.luau` are the only Roblox-runtime files — the server entry wires HttpService/task/DateTime into NetworkClient/RoundCoordinator/RoundClock/ThrowBuffer/PlayerProfiles; the client entry owns the pick UI. Local connection settings come from `SecretsLocal.luau` (gitignored; copy `SecretsExample.luau`). `GameRules.luau` mirrors `server/src/engine/GameRules.ts` — both are tested against `shared-fixtures/game-rules.json`, so drift fails CI.
+
+Milestone 3 adds the playable loop: picks flow client→`SubmitPick` RemoteEvent→`RoundCoordinator:submitPick`→`ThrowBuffer`→delta-flushed to `POST /api/v1/throws` (5s cadence / 10 picks / final flush at the T₀−2s lockout). Reveals are computed locally from the mirrored GameRules and reconciled next round via `GET /instances/.../results` (authoritative overwrite in `PlayerProfiles`). RemoteEvents contract lives in `default.project.json` (`RoshamboRemotes`).
 
 ### Identity: deviceId + optional JWT
 
