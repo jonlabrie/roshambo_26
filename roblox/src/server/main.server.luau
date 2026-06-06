@@ -23,6 +23,7 @@ local deps = {
             })
         end)
         if not ok then
+            warn(`[NET] transport error: {resp}`)
             return { ok = false }
         end
         return { ok = true, statusCode = resp.StatusCode, body = resp.Body }
