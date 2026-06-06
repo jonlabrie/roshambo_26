@@ -94,6 +94,7 @@ local function okState(roundId: string, phase: string, roundCount: number, phase
             roundCount = roundCount,
             serverTime = 1,
             phaseEndsAt = phaseEndsAt or 100000,
+            tape = { { id = roundId, worldThrow = "R" } },
         },
         rttMs = 10,
         localReceiveMs = 1,
@@ -430,5 +431,54 @@ describe("RoundCoordinator v2 reveal + reconciliation", function()
         expect(f.instanceCalls[1].roundId).toBe("r1")
         expect(#reconciled).toBe(1)
         expect(reconciled[1][1].robloxUserId).toBe("9")
+    end)
+end)
+
+describe("RoundCoordinator v3 payload extensions", function()
+    test("onRound includes the tape from /state", function()
+        local f = makeFakes({ okState("r1", "ACTIVE", 7) }, {})
+        local rounds: { any } = {}
+        local c = makeCoordinator(f, {
+            onRound = function(info: any)
+                table.insert(rounds, info)
+            end,
+        })
+        c:pollOnce()
+        expect(#rounds).toBe(1)
+        expect(rounds[1].tape[1].worldThrow).toBe("R")
+    end)
+
+    test("onReveal includes the whiffed set", function()
+        -- now() consumption: submitPick takes 0; poll2's flush check takes 1000
+        -- (cadence baseline, no flush); poll3 takes 7000 (6s elapsed -> flush,
+        -- which whiffs); poll4 is TALLY (no flush check) and fires the reveal.
+        local f = makeFakes({
+            okState("r1", "ACTIVE", 7, 99000),
+            okState("r1", "ACTIVE", 7, 99000),
+            okState("r1", "ACTIVE", 7, 99000),
+            okState("r1", "TALLY", 7),
+        }, {
+            {
+                ok = true,
+                data = { worldThrow = "S", distribution = { R = 100, P = 0, S = 0 }, totalPlayers = 1 },
+            },
+        }, { nows = { 0, 1000, 7000 } })
+        f.net.postThrows = function(_self, batch: any): any
+            table.insert(f.postCalls, batch)
+            return { ok = false, status = 409, error = "PICKS_CLOSED" }
+        end
+        local reveals: { any } = {}
+        local c = makeCoordinator(f, {
+            onReveal = function(r: any)
+                table.insert(reveals, r)
+            end,
+        })
+        c:pollOnce() -- no picks: consumes no now()
+        c:submitPick("9", "R")
+        c:pollOnce() -- baseline, no flush
+        c:pollOnce() -- flush -> PICKS_CLOSED -> whiff
+        c:pollOnce() -- TALLY: reveal fires
+        expect(reveals[1].whiffed["9"]).toBe(true)
+        expect(reveals[1].results["9"]).toBeNil()
     end)
 end)

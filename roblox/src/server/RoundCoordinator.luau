@@ -151,6 +151,7 @@ function RoundCoordinator._fetchRevealIfDue(self: any, state: any)
             distribution = r.distribution,
             totalPlayers = r.totalPlayers,
             results = results,
+            whiffed = self._whiffed,
         })
     end
 end
@@ -217,6 +218,7 @@ function RoundCoordinator.pollOnce(self: any): number
                 phase = state.phase,
                 roundCount = self._roundCount,
                 secondsToLockout = secondsToLockout,
+                tape = state.tape,
             })
         end
     end
