@@ -73,6 +73,8 @@ Luau modules are **dependency-injected and never `require` each other**, so the 
 
 Milestone 3 adds the playable loop: picks flow client→`SubmitPick` RemoteEvent→`RoundCoordinator:submitPick`→`ThrowBuffer`→delta-flushed to `POST /api/v1/throws` (5s cadence / 10 picks / final flush at the T₀−2s lockout). Reveals are computed locally from the mirrored GameRules and reconciled next round via `GET /instances/.../results` (authoritative overwrite in `PlayerProfiles`). RemoteEvents contract lives in `default.project.json` (`RoshamboRemotes`).
 
+Milestone 4a adds the arena machinery: pure modules (`FlapScheduler`, `HammerCurve`, `DoomEscalation`, `ChoreographyMachine`, `FateRegistry`, `ThemeManifest`+`themes/ZenDojo`, `EffectRegistry`/`EffectSelector`) drive client controllers (`BoardController`, `HammerController`, `TheaterController`, `FateController`) over a client-side `EventBus`. New remotes: `RevealTheater` (arena-wide results), `FateResolved` (victim-authority catch/accept), `BoardData`. Fate-bound players cannot throw until their fate resolves (server gate in `main.server.luau`). All visuals are placeholders pending milestone 4b's art pass.
+
 ### Identity: deviceId + optional JWT
 
 Guests are identified by a random `deviceId` in localStorage; logging in (email/password via `/auth` REST routes) adds a JWT passed in the socket handshake (`auth.token`). `resolveUser()` in `server/src/identity.ts` merges the two (plus `robloxId` for Roblox players) — authenticated user wins, with cleanup logic that re-tags stale duplicate device records (`stale_<ts>_<id>`). Sockets join a room named after their deviceId so the server can emit targeted `player-data`.
