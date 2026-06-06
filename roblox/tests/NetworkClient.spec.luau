@@ -6,8 +6,8 @@ local describe, test, expect = harness.describe, harness.test, harness.expect
 
 type Resp = { ok: boolean, statusCode: number?, body: string? }
 
-local function makeDeps(script: { Resp }, opts: { now: { number }? })
-    local calls: { { url: string, headers: { [string]: string } } } = {}
+local function makeDeps(script: { Resp }, opts: { now: { number }? }?)
+    local calls: { { url: string, method: string, headers: { [string]: string }, body: string? } } = {}
     local sleeps: { number } = {}
     local i = 0
     local nowQueue = opts and opts.now or nil
@@ -16,13 +16,24 @@ local function makeDeps(script: { Resp }, opts: { now: { number }? })
         calls = calls,
         sleeps = sleeps,
         deps = {
-            request = function(req: { Url: string, Method: string, Headers: { [string]: string } }): Resp
-                table.insert(calls, { url = req.Url, headers = req.Headers })
+            request = function(req: {
+                Url: string,
+                Method: string,
+                Headers: { [string]: string },
+                Body: string?,
+            }): Resp
+                table.insert(
+                    calls,
+                    { url = req.Url, method = req.Method, headers = req.Headers, body = req.Body }
+                )
                 i += 1
                 return script[math.min(i, #script)]
             end,
             jsonDecode = function(s: string): any
                 return serde.decode("json", s)
+            end,
+            jsonEncode = function(t: any): string
+                return serde.encode("json", t)
             end,
             sleep = function(t: number)
                 table.insert(sleeps, t)
@@ -125,6 +136,91 @@ describe("NetworkClient.getRoundResult", function()
         local res = net:getRoundResult("r9")
         expect(res.ok).toBe(false)
         expect(res.notReady).toBe(true)
+        expect(#f.calls).toBe(1)
+    end)
+end)
+
+describe("NetworkClient.postThrows", function()
+    test("POSTs the encoded batch with content-type and returns the 202 body", function()
+        local f = makeDeps({ { ok = true, statusCode = 202, body = '{"accepted":2,"rejected":[]}' } })
+        local net = NetworkClient.new(CONFIG, f.deps)
+        local res = net:postThrows({
+            instanceId = "job-1",
+            roundId = "r1",
+            seq = 1,
+            throws = { { robloxUserId = "9", throw = "R" } },
+        })
+        expect(res.ok).toBe(true)
+        expect(res.data.accepted).toBe(2)
+        expect(f.calls[1].method).toBe("POST")
+        expect(f.calls[1].url).toBe("http://x/api/v1/throws")
+        expect(f.calls[1].headers["Content-Type"]).toBe("application/json")
+        local sent = serde.decode("json", f.calls[1].body :: string)
+        expect(sent.seq).toBe(1)
+        expect(sent.throws[1].robloxUserId).toBe("9")
+    end)
+
+    test("409 fails fast with the decoded server error (no retry burn)", function()
+        local f = makeDeps({ { ok = true, statusCode = 409, body = '{"error":"PICKS_CLOSED"}' } })
+        local net = NetworkClient.new(CONFIG, f.deps)
+        local res = net:postThrows({ instanceId = "j", roundId = "r", seq = 1, throws = {} })
+        expect(res.ok).toBe(false)
+        expect(res.status).toBe(409)
+        expect(res.error).toBe("PICKS_CLOSED")
+        expect(#f.calls).toBe(1)
+    end)
+
+    test("transport failure retries POSTs like GETs", function()
+        local f = makeDeps({
+            { ok = false },
+            { ok = true, statusCode = 202, body = '{"accepted":0,"rejected":[]}' },
+        })
+        local net = NetworkClient.new(CONFIG, f.deps)
+        expect(net:postThrows({ instanceId = "j", roundId = "r", seq = 1, throws = {} }).ok).toBe(true)
+        expect(#f.calls).toBe(2)
+    end)
+end)
+
+describe("NetworkClient.getInstanceResults", function()
+    test("hits the per-instance results path; 404 maps to notReady", function()
+        local f = makeDeps({ { ok = true, statusCode = 404, body = '{"error":"RESULTS_NOT_READY"}' } })
+        local net = NetworkClient.new(CONFIG, f.deps)
+        local res = net:getInstanceResults("job-1", "r9")
+        expect(res.notReady).toBe(true)
+        expect(f.calls[1].url).toBe("http://x/api/v1/instances/job-1/rounds/r9/results")
+    end)
+end)
+
+describe("NetworkClient.getPlayer", function()
+    test("plain fetch and country-recording variant", function()
+        local f = makeDeps({
+            { ok = true, statusCode = 200, body = '{"robloxUserId":"9","totalPoints":5}' },
+            { ok = true, statusCode = 200, body = '{"robloxUserId":"9","totalPoints":5}' },
+        })
+        local net = NetworkClient.new(CONFIG, f.deps)
+        expect(net:getPlayer("9").data.totalPoints).toBe(5)
+        expect(f.calls[1].url).toBe("http://x/api/v1/players/9")
+        net:getPlayer("9", "US")
+        expect(f.calls[2].url).toBe("http://x/api/v1/players/9?country=US")
+    end)
+end)
+
+describe("NetworkClient.postBank", function()
+    test("banks and returns the wallet", function()
+        local f = makeDeps({ { ok = true, statusCode = 200, body = '{"totalPoints":14,"pointsAtStake":0}' } })
+        local net = NetworkClient.new(CONFIG, f.deps)
+        local res = net:postBank("9")
+        expect(res.data.totalPoints).toBe(14)
+        local sent = serde.decode("json", f.calls[1].body :: string)
+        expect(sent.robloxUserId).toBe("9")
+    end)
+
+    test("409 NOTHING_STAKED fails fast with the decoded error", function()
+        local f = makeDeps({ { ok = true, statusCode = 409, body = '{"error":"NOTHING_STAKED"}' } })
+        local net = NetworkClient.new(CONFIG, f.deps)
+        local res = net:postBank("9")
+        expect(res.ok).toBe(false)
+        expect(res.error).toBe("NOTHING_STAKED")
         expect(#f.calls).toBe(1)
     end)
 end)

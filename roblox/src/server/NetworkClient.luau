@@ -11,6 +11,7 @@ export type Deps = {
         req: { Url: string, Method: string, Headers: { [string]: string }, Body: string? }
     ) -> Response,
     jsonDecode: (s: string) -> any,
+    jsonEncode: (t: any) -> string,
     sleep: (seconds: number) -> (),
     now: () -> number, -- local epoch ms
     random: () -> number, -- [0,1)
@@ -41,15 +42,18 @@ local function backoffSeconds(attempt: number, random: () -> number): number
     return 0.5 * 2 ^ (attempt - 1) + random() * 0.5
 end
 
-function NetworkClient._get(self: any, path: string): Result
+function NetworkClient._request(self: any, method: string, path: string, bodyTable: any?): Result
     local d: Deps = self._deps
+    local headers: { [string]: string } = { ["X-API-Key"] = self._key }
+    local bodyStr: string? = nil
+    if bodyTable ~= nil then
+        headers["Content-Type"] = "application/json"
+        bodyStr = d.jsonEncode(bodyTable)
+    end
     for attempt = 1, self._maxAttempts do
         local sentAt = d.now()
-        local resp = d.request({
-            Url = self._base .. path,
-            Method = "GET",
-            Headers = { ["X-API-Key"] = self._key },
-        })
+        local resp =
+            d.request({ Url = self._base .. path, Method = method, Headers = headers, Body = bodyStr })
         local receivedAt = d.now()
         if resp.ok and resp.statusCode then
             local code = resp.statusCode
@@ -70,10 +74,17 @@ function NetworkClient._get(self: any, path: string): Result
                 return { ok = false, notReady = true, status = code }
             end
             if code < 500 then
-                -- 4xx other than 404: our bug or config problem; retrying won't help
-                return { ok = false, status = code, error = "HTTP_" .. tostring(code) }
+                -- 4xx: fail fast. Surface the server's error string when the body has one
+                -- (409 ROUND_MISMATCH / PICKS_CLOSED / NOTHING_STAKED are protocol signals).
+                local decodeOk, decoded = pcall(d.jsonDecode, resp.body or "null")
+                local serverError = if decodeOk and type(decoded) == "table" then decoded.error else nil
+                return {
+                    ok = false,
+                    status = code,
+                    error = serverError or ("HTTP_" .. tostring(code)),
+                    data = if decodeOk then decoded else nil,
+                }
             end
-            -- 5xx falls through to retry
         end
         if attempt < self._maxAttempts then
             d.sleep(backoffSeconds(attempt, d.random))
@@ -83,11 +94,31 @@ function NetworkClient._get(self: any, path: string): Result
 end
 
 function NetworkClient.getState(self: any): Result
-    return self:_get("/api/v1/state")
+    return self:_request("GET", "/api/v1/state")
 end
 
 function NetworkClient.getRoundResult(self: any, roundId: string): Result
-    return self:_get(`/api/v1/rounds/{roundId}/result`)
+    return self:_request("GET", `/api/v1/rounds/{roundId}/result`)
+end
+
+function NetworkClient.postThrows(self: any, batch: any): Result
+    return self:_request("POST", "/api/v1/throws", batch)
+end
+
+function NetworkClient.getInstanceResults(self: any, instanceId: string, roundId: string): Result
+    return self:_request("GET", `/api/v1/instances/{instanceId}/rounds/{roundId}/results`)
+end
+
+function NetworkClient.getPlayer(self: any, robloxUserId: string, country: string?): Result
+    local path = `/api/v1/players/{robloxUserId}`
+    if country then
+        path ..= `?country={country}`
+    end
+    return self:_request("GET", path)
+end
+
+function NetworkClient.postBank(self: any, robloxUserId: string): Result
+    return self:_request("POST", "/api/v1/bank", { robloxUserId = robloxUserId })
 end
 
 return NetworkClient
