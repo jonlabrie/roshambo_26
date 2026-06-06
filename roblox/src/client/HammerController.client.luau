@@ -21,6 +21,7 @@ local lastPhase = "ACTIVE"
 local secondsToLockout: number? = nil
 local phaseAt = os.clock()
 local wasLatched = false
+local striking = false
 
 RoundUpdate.OnClientEvent:Connect(function(info)
     lastPhase = info.phase
@@ -28,11 +29,13 @@ RoundUpdate.OnClientEvent:Connect(function(info)
     phaseAt = os.clock()
     if info.phase == "ACTIVE" then
         wasLatched = false
+        striking = false
     end
 end)
 
 EventBus.Cue.Event:Connect(function(cue)
     if cue.kind == "gongStrike" then
+        striking = true
         TweenService
             :Create(arm, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
                 CFrame = pivot * CFrame.Angles(math.rad(-20), 0, 0) * CFrame.new(0, 0, -arm.Size.Z / 2),
@@ -64,6 +67,9 @@ EventBus.Cue.Event:Connect(function(cue)
 end)
 
 RunService.Heartbeat:Connect(function()
+    if striking then
+        return
+    end
     local secondsLeft: number
     if lastPhase == "ACTIVE" then
         local lead = 2

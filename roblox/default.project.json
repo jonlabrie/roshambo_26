@@ -41,7 +41,7 @@
                 "GongPad": {
                     "$className": "Part",
                     "$properties": {
-                        "Anchored": true, "Size": [6, 6, 0.6], "CFrame": [14, 6, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+                        "Anchored": true, "Size": [0.6, 6, 6], "CFrame": [14, 6, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
                         "Color": [0.79, 0.64, 0.42], "Shape": "Cylinder"
                     }
                 }
