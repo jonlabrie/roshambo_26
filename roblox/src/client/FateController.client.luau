@@ -24,6 +24,7 @@ type Flight = {
     lastSpawn: number,
     entities: { BasePart },
     accepted: boolean,
+    resolving: boolean,
 }
 local flights: { [string]: Flight } = {}
 
@@ -101,6 +102,7 @@ EventBus.Cue.Event:Connect(function(cue)
             lastSpawn = 0,
             entities = {},
             accepted = false,
+            resolving = false,
         }
     elseif cue.kind == "acceptFate" then
         local flight = flights[tostring(localPlayer.UserId)]
@@ -154,8 +156,12 @@ RunService.Heartbeat:Connect(function(dt)
         if isLocal then
             local humanoid = character and character:FindFirstChildOfClass("Humanoid")
             local victimSpeed = humanoid and humanoid.MoveDirection.Magnitude * humanoid.WalkSpeed or 0
-            if flight.accepted or caught or Doom.shouldFastCatch(victimSpeed, elapsed) then
+            if
+                not flight.resolving
+                and (flight.accepted or caught or Doom.shouldFastCatch(victimSpeed, elapsed))
+            then
                 FateResolved:FireServer(if flight.accepted then "accepted" else "caught")
+                flight.resolving = true
                 flight.accepted = false
                 flight.startedAt = now + 60 -- debounce until the broadcast clears it
             end
