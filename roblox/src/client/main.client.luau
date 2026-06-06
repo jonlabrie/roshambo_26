@@ -96,9 +96,54 @@ bankButton.MouseButton1Click:Connect(function()
     BankRequest:FireServer()
 end)
 
+local acceptButton = Instance.new("TextButton")
+acceptButton.Name = "AcceptFate"
+acceptButton.Size = UDim2.fromOffset(180, 44)
+acceptButton.AnchorPoint = Vector2.new(0, 1)
+acceptButton.Position = UDim2.new(0, 16, 1, -24)
+acceptButton.Text = "ACCEPT YOUR FATE"
+acceptButton.TextSize = 16
+acceptButton.Font = Enum.Font.GothamBold
+acceptButton.TextColor3 = Color3.fromRGB(240, 234, 216)
+acceptButton.BackgroundColor3 = Color3.fromRGB(90, 40, 40)
+acceptButton.Visible = false
+acceptButton.Parent = gui
+
+local fateBound = false
+local EventBus = require(script.Parent:WaitForChild("EventBus"))
+local RevealTheater = remotes:WaitForChild("RevealTheater") :: RemoteEvent
+local FateResolvedEvt = remotes:WaitForChild("FateResolved") :: RemoteEvent
+
+acceptButton.MouseButton1Click:Connect(function()
+    EventBus.Cue:Fire({ kind = "acceptFate" })
+end)
+
+RevealTheater.OnClientEvent:Connect(function(r)
+    local myId = tostring(player.UserId)
+    local mine = r.results and r.results[myId]
+    if mine and mine.result == "LOSS" then
+        fateBound = true
+        acceptButton.Visible = true
+    end
+    if r.whiffed and r.whiffed[myId] then
+        resultLabel.Text = "⏳ TOO LATE — your throw didn't count"
+        resultLabel.Visible = true
+        task.delay(3, function()
+            resultLabel.Visible = false
+        end)
+    end
+end)
+
+FateResolvedEvt.OnClientEvent:Connect(function(userId)
+    if userId == tostring(player.UserId) then
+        fateBound = false
+        acceptButton.Visible = false
+    end
+end)
+
 RoundUpdate.OnClientEvent:Connect(function(info)
     if info.phase == "ACTIVE" then
-        canPick = true
+        canPick = not fateBound
         myPick = nil
         lockoutAt = if info.secondsToLockout then os.clock() + info.secondsToLockout else nil
     else
@@ -137,7 +182,9 @@ end)
 
 task.spawn(function()
     while true do
-        if canPick and lockoutAt then
+        if fateBound then
+            statusLabel.Text = "FACE YOUR FATE — accept it or be caught"
+        elseif canPick and lockoutAt then
             local left = lockoutAt - os.clock()
             if left <= 0 then
                 canPick = false
