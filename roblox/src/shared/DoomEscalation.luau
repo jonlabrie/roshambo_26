@@ -6,12 +6,20 @@ local DoomEscalation = {}
 
 local STAGE_SECONDS = 5
 local FAST_CATCH_SPEED = 1 -- studs/sec: "standing still"
-local FAST_CATCH_AFTER = 1.5
+local FAST_CATCH_AFTER = 4
 
 DoomEscalation.CONFIG = {
     fateBoulder = { plateau = 6, baseSpawnSec = 2.5, minSpawnSec = 0.6, baseSpeed = 14, speedPerStage = 3 },
     fatePaper = { plateau = 40, baseSpawnSec = 0.8, minSpawnSec = 0.15, baseSpeed = 16, speedPerStage = 2 },
-    fateShears = { plateau = 8, baseSpawnSec = 2.0, minSpawnSec = 0.5, baseSpeed = 0, speedPerStage = 0 },
+    fateShears = {
+        plateau = 8,
+        baseSpawnSec = 2.0,
+        minSpawnSec = 0.5,
+        baseSpeed = 0,
+        speedPerStage = 0,
+        lungeRange = 14,
+        lungeSpeed = 28,
+    },
 }
 
 export type Vec = { x: number, y: number, z: number }

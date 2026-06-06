@@ -78,18 +78,56 @@ local function squash(character: Model)
     end
 end
 
+local function performCatch(flight: Flight, character: Model)
+    local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+    -- Nearest entity delivers the blow; the rest fade.
+    local nearest: BasePart? = nil
+    local best = math.huge
+    for _, e in flight.entities do
+        local d = if root then (e.Position - root.Position).Magnitude else math.huge
+        if d < best then
+            best, nearest = d, e
+        end
+        TweenService:Create(e, TweenInfo.new(0.8), { Transparency = 1 }):Play()
+    end
+    if nearest and root then
+        nearest.Transparency = 0
+        if flight.fateId == "fateBoulder" then
+            -- SLAM to the ground at the victim: this is "the rock reaches the ground"
+            local groundY = root.Position.Y - 2.5
+            TweenService
+                :Create(nearest, TweenInfo.new(0.25, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
+                    Position = Vector3.new(root.Position.X, groundY + nearest.Size.Y / 2, root.Position.Z),
+                })
+                :Play()
+        else
+            TweenService:Create(nearest, TweenInfo.new(0.3), { Position = root.Position }):Play()
+        end
+    end
+    task.delay(1.6, function()
+        for _, e in flight.entities do
+            e:Destroy()
+        end
+    end)
+end
+
 local function endFlight(userId: string)
     local flight = flights[userId]
     if not flight then
         return
     end
-    for _, e in flight.entities do
-        e:Destroy()
-    end
     flights[userId] = nil
     local character = characterOf(userId)
     if character then
-        squash(character)
+        performCatch(flight, character)
+        -- Slam THEN squash so the impact reads in order.
+        task.delay(0.3, function()
+            squash(character)
+        end)
+    else
+        for _, e in flight.entities do
+            e:Destroy()
+        end
     end
 end
 
@@ -99,11 +137,19 @@ EventBus.Cue.Event:Connect(function(cue)
             userId = cue.userId,
             fateId = cue.effect,
             startedAt = os.clock(),
-            lastSpawn = 0,
+            lastSpawn = os.clock(),
             entities = {},
             accepted = false,
             resolving = false,
         }
+        -- Spawn one entity immediately so the doom is visible before any catch
+        -- can fire. If the victim has no character yet, the Heartbeat spawner
+        -- covers it next frame.
+        local victim = characterOf(cue.userId)
+        local victimRoot = victim and victim:FindFirstChild("HumanoidRootPart") :: BasePart?
+        if victimRoot then
+            table.insert(flights[cue.userId].entities, makeEntity(cue.effect, victimRoot.Position))
+        end
     elseif cue.kind == "acceptFate" then
         local flight = flights[tostring(localPlayer.UserId)]
         if flight then
@@ -147,6 +193,15 @@ RunService.Heartbeat:Connect(function(dt)
                     dt
                 )
                 e.Position = Vector3.new(p.x, p.y, p.z)
+            elseif (e.Position - root.Position).Magnitude < Doom.CONFIG.fateShears.lungeRange then
+                -- Distant shears stay planted (creepy); near ones leap to catch.
+                local p = Doom.homingStep(
+                    { x = e.Position.X, y = e.Position.Y, z = e.Position.Z },
+                    { x = root.Position.X, y = root.Position.Y + 2, z = root.Position.Z },
+                    Doom.CONFIG.fateShears.lungeSpeed,
+                    dt
+                )
+                e.Position = Vector3.new(p.x, p.y, p.z)
             end
             if isLocal and (e.Position - root.Position).Magnitude < 3.5 then
                 caught = true
@@ -156,10 +211,8 @@ RunService.Heartbeat:Connect(function(dt)
         if isLocal then
             local humanoid = character and character:FindFirstChildOfClass("Humanoid")
             local victimSpeed = humanoid and humanoid.MoveDirection.Magnitude * humanoid.WalkSpeed or 0
-            if
-                not flight.resolving
-                and (flight.accepted or caught or Doom.shouldFastCatch(victimSpeed, elapsed))
-            then
+            local fastCatch = #flight.entities > 0 and Doom.shouldFastCatch(victimSpeed, elapsed)
+            if not flight.resolving and (flight.accepted or caught or fastCatch) then
                 FateResolved:FireServer(if flight.accepted then "accepted" else "caught")
                 flight.resolving = true
                 flight.accepted = false
