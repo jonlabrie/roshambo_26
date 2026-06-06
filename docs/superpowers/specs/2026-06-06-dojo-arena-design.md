@@ -9,7 +9,7 @@
 - **≥10-minute average session** — the Creator Rewards engagement threshold is the design KPI; every feature is judged by "does this make someone stay another round?"
 - **R15 avatars pinned** (Game Settings → Avatar Type = R15, never PlayerChoice): eligibility condition for the +42% DevEx rate on US 18+ spend effective 2026-06-08. The grow effect already requires R15 scale NumberValues, so this also de-risks the marquee effect.
 - **China-portable theming** — Roblox/Tencent plan to relaunch LuoBu in 2026. The arena must re-skin to a Chinese theme as assets + data, with zero code changes.
-- Ships the M3 carry-over: a visible whiff signal ("LATE" paddle, §6).
+- Ships the M3 carry-over: a whiff signal — a personal "TOO LATE" toast + small dust poff visible to the whiffed player (private; to others they read as a spectator that round).
 
 ## 2. Three-layer architecture
 
@@ -83,17 +83,29 @@ The Water Hammer is **REVEAL variant #1** in the EffectRegistry. The machine is 
 
 ## 6. Round choreography (player-facing beats)
 
-- **ACTIVE**: lanterns ambient; picking via M3 UI; on lock the avatar plays a **wind-up bow** (hands in sleeves — pick stays secret). Ticker: "THE WORLD CHOOSES IN N".
-- **Lockout (latch click)**: every participant raises a **wooden paddle showing their glyph** — picks are server-locked, so going public is safe and creates the crowd-read moment ("too many rocks this round!"). **Whiffed players** (final flush missed the cutoff; M3 already suppresses their local results) raise a **blank grey paddle with a "LATE" stamp** — the M3 carry-over made visible.
+- **ACTIVE**: lanterns ambient; picking via M3 UI; on lock the avatar plays a **wind-up bow** (hands in sleeves — the pick itself stays secret until the reveal's consequences make it readable). Ticker: "THE WORLD CHOOSES IN N".
+- **Lockout (latch click)**: the hammer's latch click is the arena-wide signal that picks are closed. No pick disclosure (an earlier paddles-up beat was cut: once the world throw lands, visible picks would let everyone read all outcomes before the effects fire, killing the surprise). **Whiffed players** get the private TOO LATE toast (§1).
 - **TALLY**: §5 drumroll assemblage.
 - **REVEAL + consequences** (staggered 0–600ms across players for crowd ripple):
   - **WIN** — avatar grows ~1.6× via R15 Humanoid scale NumberValues tweened with overshoot bounce (never `ApplyDescription`); gold petal burst (theme-shaped: sakura now, plum later); a pot tile flips up over their head with the new amount; decays back over ~8s (winners walk around big — social flex window)
-  - **LOSS** — classic iron anvil drops (deliberately culture-absurd against the zen; max **8 physical anvils** per reveal, overflow losers get dust-poof-and-flatten); paddle splinters
+  - **LOSS** — **The Three Fates** (§6.1): the loser's doom matches the World Throw and *pursues them*
   - **SAFE** — paper umbrella (wagasa) pops open overhead, a leaf bounces off, twirls closed (oil-paper umbrellas are Chinese-origin: ports as-is)
 - **Board updates**: LAST 5 flips; ticker flashes the result line.
 - **Bank moment** (next ACTIVE): banking plays a **coin-toss into the offering box** by the dais (clink, glow) + ticker shoutout.
 
-All effects are **client-side, driven by the existing M3 events** (`RoundUpdate`, `RevealResult`, `ProfileUpdate`) — zero new server traffic and no new REST surface. Particles via shared emitters, not per-player instances.
+### 6.1 The Three Fates (LOSS consequences)
+
+The doom is the thing that beat you, in period-authentic per-theme dress (model refs live in the ArenaTheme manifest):
+
+| World Throw | Fate | ZenDojo (Edo Japan) | JadeCourt (Qing China) |
+|---|---|---|---|
+| ○ Rock | **The Boulder** — drops on a shadow tracking the fleeing player; a well-timed dodge earns a crowd-visible "DODGED!" board flash, then a second, inescapable drop. Catch: squash-flatten-respring; boulder crumbles to gravel | Weathered moss-flecked garden stone | Taihu scholar's rock (holes whistle as it falls) |
+| ─ Paper | **The Paper Storm** — a swirling vortex of sheets pursues, gaining speed. Catch: engulfed and wrapped in an unfurling scroll, then burst-flatten-respring | Washi sheets (kozo fiber, cream, deckled edges, abstract sumi strokes — never readable text); emakimono scroll wrap | Xuan paper; handscroll wrap |
+| ∧ Scissors | **The Shears** — scuttle after the player, snapping with rising tempo. Catch: a flurry of snips shreds a brief paper aura to confetti; flatten-respring beneath | Giant **nigiri-basami** (one-piece U-spring snips — it clenches, not scissors) | **Zhang Xiaoquan-style** ring-handled scissors (the 1781 Qianlong-endorsed form) |
+
+**Chase rules**: doom spawns at reveal +0.5s; speed ramps on a curve guaranteeing catch by ~6s (exceeds max sprint); standing still = caught in ~1.5s (acceptance is faster — fittingly zen). Dooms pursue through doors, over bridges, into the koi pond (soggy paper storm slaps — bonus gag). Pursuit may spill into the next ACTIVE; the pick UI stays live — **fleeing players can commit their next throw mid-chase**, which is the brand. Cap: **12 full pursuits** per reveal; overflow losers get the instant-catch squash. The retired anvil may someday return as a rare EffectRegistry variant.
+
+**Event architecture**: M3's `RevealResult` fires per-player with only that player's outcome — insufficient for arena-wide theater. M4 adds a **`RevealTheater` broadcast** (FireAllClients) carrying `{worldThrow, distribution, results: {userId → result}}` so every client renders all grows/fates/umbrellas locally. Pursuit simulation is **fully client-side** (cosmetic; outcomes already settled; no replication, no server physics) — minor visual divergence between clients is acceptable. The per-player `RevealResult` remains for authoritative personal UI. No new REST surface; no new server→Node traffic.
 
 ## 7. Brand integration (final set)
 
@@ -116,6 +128,7 @@ Same dual-runtime discipline as M2/M3 — Roblox-runtime files stay thin; schedu
 | `FlapScheduler` | Given (current board state, target state) → ordered flip steps per cell with timing offsets; cascade and drum-stepping logic |
 | `HammerCurve` | Arm height/angle as f(timeLeft, phase); latch threshold; release trigger |
 | `EffectSelector` | Registry lookup + selection policy (`random` now; policy interface takes pot context) |
+| `DoomSteering` | Pursuit homing curve: position step as f(target, elapsed); speed ramp constants; catch-guarantee + stand-still fast-catch thresholds |
 | `ThemeManifest` | Schema validation of theme data modules (missing key = loud failure at boot, not silent gray prop) |
 | `ChoreographyMachine` | Phase-driven state machine consuming the M3 `onRound`/`onReveal` callbacks → ordered effect cues |
 
@@ -123,7 +136,7 @@ Roblox-runtime additions: arena geometry (built in Studio, committed as Rojo-syn
 
 **Animation constraint:** custom Animation assets require uploads to the creator's Roblox account (an M5-style dependency). M4 therefore implements avatar gestures **programmatically** (CFrame/Motor6D tweens for the paddle raise; a catalog/default emote for the wind-up bow) — custom authored animations are an optional later upgrade, not a dependency.
 
-**Performance guardrails (design-level, not afterthoughts):** grow = 4 tweened NumberValues per winner (cheap at any count); anvil cap 8; shared particle emitters; pooled sounds (clacks ≤6 concurrent); 2D flap sim for all board cells (only the hero tile is physical); reactive water only in the basin; Terrain water elsewhere; staggered consequence cues spread load across frames.
+**Performance guardrails (design-level, not afterthoughts):** grow = 4 tweened NumberValues per winner (cheap at any count); pursuit cap 12 (one anchored homing model + one particle trail per doom, client-side, zero replication); shared particle emitters; pooled sounds (clacks ≤6 concurrent); 2D flap sim for all board cells (only the hero tile is physical); reactive water only in the basin; Terrain water elsewhere; staggered consequence cues spread load across frames.
 
 ## 9. R15 & avatar settings
 
@@ -136,6 +149,7 @@ Roblox-runtime additions: arena geometry (built in Studio, committed as Rojo-syn
 - **Pedestals (parent §6) are deferred**: the jumbotron's HOT STREAK row carries the "current leaders, visible to all" job. Physical podiums with knock-off animations can join a later content pass — the social-drama idea is good, but it's not load-bearing for the 10-minute KPI and M4 is already large.
 - **World Record holo (parent §6) is absorbed** into the jumbotron's WORLD REC row (same filtering/async rules).
 - Parent §6's "shield shimmer" SAFE effect is replaced by the wagasa umbrella.
+- Parent §6's "anvil falls on losers" is replaced by the Three Fates (§6.1) — the doom matches the World Throw and pursues the loser.
 
 ## 11. Future theme mapping (recorded for asset planning — NOT built in M4)
 
@@ -149,13 +163,18 @@ Roblox-runtime additions: arena geometry (built in Studio, committed as Rojo-syn
 | Gate | Torii | Páifāng |
 | Drumroll | Taiko | Dàgǔ + guzheng sting |
 | WIN petals | Sakura-shaped | Plum-blossom-shaped |
-| SAFE / LOSS | Umbrella / anvil | Same / same |
+| SAFE | Wagasa umbrella | Oil-paper umbrella (same form) |
+| LOSS fates | Garden boulder / washi storm + emakimono / nigiri-basami | Taihu rock / xuan storm + handscroll / Zhang Xiaoquan shears |
 | Bank ritual | Saisen box | Merit box (功德箱) |
 | Watermark | Woven in tatami | Etched in paver grain |
 
-## 12. Out of scope (M4)
+## 12. Out of scope (M4) — and M5 notes
 
 JadeCourt assets; merch/cosmetics; pot-escalation effect policy (hook only); physical pedestals; arena-theme monetization; Open Cloud publishing, image-asset uploads, `HttpService:GetSecret` (all M5); PWA shared-theater refresh.
+
+**Recorded for the M5 plan:**
+- Create a **Roblox Group** to own the experience and all assets (animations, images, sounds, meshes) — group ownership beats personal-account ownership for team/CI reuse.
+- **Animation session**: author the gesture set (wind-up bow, victory stance, flee panic, acceptance bow) via Studio's **video Animation Capture** (perform on webcam, clean up keyframes), publish to the group, and flip the ThemeManifest entries from programmatic gestures to authored asset ids.
 
 ## 13. Decisions log
 
@@ -170,3 +189,6 @@ JadeCourt assets; merch/cosmetics; pot-escalation effect policy (hook only); phy
 | Glyph canon | ∧ up-caret in gameplay; ∨ only on the mascot face; single-circle ring | Matches PWA vectors and wordmark diacritics; user correction on ◎ |
 | Branding | Gong face + subtle tatami watermark + hero tile idle; no wordmark signage | User preference: discoverable, not plastered |
 | Pedestals | Deferred in favor of HOT STREAK row | Scope control; board does the job |
+| Paddles-up beat | Cut | Post-reveal, visible picks would spoil all outcomes before effects fire; whiff signal became a private toast |
+| LOSS effect | Three Fates: throw-matched pursuing dooms, client-side, escape attempts allowed but futile | "Destroyed by what beat you" is the game made flesh; spectator comedy; dwell time; pick-while-fleeing |
+| Fate authenticity | 18th-c. East Asian designs per theme (nigiri-basami / Zhang Xiaoquan; washi-emakimono / xuan-handscroll; garden stone / taihu rock) | User requirement; China-market sensitivity; verified historical forms |
