@@ -353,6 +353,57 @@ describe("RoundCoordinator v2 reveal + reconciliation", function()
         expect(reveals[1].results["10"].result).toBe("LOSS")
     end)
 
+    test("whiffed picks are excluded from local reveal results (never invent results)", function()
+        -- Player 9 flushes successfully (cadence); player 10 picks late and the
+        -- final lockout-triggered flush whiffs (PICKS_CLOSED). Reveal must not
+        -- include player 10 (spec §9 – server never invents results).
+        --
+        -- nows queue consumption:
+        --   submitPick("9","R")  -> now[1]=0    (lockout check)
+        --   pollOnce() picks>0, _lastFlushMs nil -> now[2]=1000 (baseline, no flush)
+        --   pollOnce() elapsed 6000 >= 5000     -> now[3]=7000 (cadence flush #1 SUCCEEDS)
+        --   submitPick("10","P") -> now[4]=7500  (lockout check, 7500<8000 accepted)
+        --   pollOnce() pastLockout 8100>=8000   -> now[5]=8100 (final flush WHIFFS)
+        --   pollOnce() TALLY: no picks->no now()
+        local f = makeFakes({
+            okState("r1", "ACTIVE", 7, 10000),
+            okState("r1", "ACTIVE", 7, 10000),
+            okState("r1", "ACTIVE", 7, 10000),
+            okState("r1", "ACTIVE", 7, 10000),
+            okState("r1", "TALLY", 7),
+        }, {
+            {
+                ok = true,
+                data = { worldThrow = "S", distribution = { R = 100, P = 0, S = 0 }, totalPlayers = 1 },
+            },
+        }, { nows = { 0, 1000, 7000, 7500, 8100 } })
+        local postCount = 0
+        f.net.postThrows = function(_self, batch: any): any
+            postCount += 1
+            table.insert(f.postCalls, batch)
+            if postCount == 1 then
+                return { ok = true, data = { accepted = #batch.throws, rejected = {} } }
+            end
+            return { ok = false, status = 409, error = "PICKS_CLOSED" }
+        end
+        local reveals: { any } = {}
+        local c = makeCoordinator(f, {
+            onReveal = function(r: any)
+                table.insert(reveals, r)
+            end,
+        })
+        c:pollOnce() -- ACTIVE, no picks: consumes no now()
+        c:submitPick("9", "R") -- now=0; R beats S -> WIN
+        c:pollOnce() -- now=1000: baseline set, no flush
+        c:pollOnce() -- now=7000: elapsed 6000 >= 5000 -> flush #1 (player 9) SUCCEEDS
+        c:submitPick("10", "P") -- now=7500 < lockout 8000 -> accepted
+        c:pollOnce() -- now=8100 >= lockout 8000 -> final flush (player 10) WHIFFS
+        c:pollOnce() -- TALLY: reveal fires
+        expect(#reveals).toBe(1)
+        expect(reveals[1].results["9"].result).toBe("WIN")
+        expect(reveals[1].results["10"]).toBeNil() -- whiffed: must not invent a result
+    end)
+
     test("reconciliation fetches instance results on the next ACTIVE and passes rows through", function()
         local rows = { { robloxUserId = "9", result = "WIN", totalPoints = 0, pot = 1, streak = 1 } }
         local f = makeFakes({

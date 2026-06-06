@@ -42,6 +42,7 @@ function RoundCoordinator.new(deps: Deps)
         _lastFlushMs = nil :: number?,
         _picksClosed = false,
         _pendingReconcileRoundId = nil :: string?,
+        _whiffed = {} :: { [string]: boolean },
     }, RoundCoordinator)
 end
 
@@ -79,6 +80,9 @@ function RoundCoordinator._flush(self: any)
     if res.error == "PICKS_CLOSED" or res.error == "ROUND_MISMATCH" then
         -- Whiff: these picks didn't make the round. Never invent results (spec §9).
         self._picksClosed = true
+        for _, entry in delta do
+            self._whiffed[entry.robloxUserId] = true
+        end
         d.log(`[FLUSH] {#delta} pick(s) whiffed: {res.error}`)
     else
         d.buffer:requeue(delta)
@@ -136,7 +140,9 @@ function RoundCoordinator._fetchRevealIfDue(self: any, state: any)
     )
     local results: { [string]: any } = {}
     for userId, pick in d.buffer:picks() do
-        results[userId] = { pick = pick, result = d.rules.calculateResult(pick, r.worldThrow) }
+        if not self._whiffed[userId] then
+            results[userId] = { pick = pick, result = d.rules.calculateResult(pick, r.worldThrow) }
+        end
     end
     if d.callbacks and d.callbacks.onReveal then
         d.callbacks.onReveal({
@@ -191,6 +197,7 @@ function RoundCoordinator.pollOnce(self: any): number
         self._seq = 0
         self._lastFlushMs = nil
         self._picksClosed = false
+        self._whiffed = {}
     end
 
     if state.phase == "ACTIVE" and d.clock:hasSync() then
