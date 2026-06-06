@@ -14,7 +14,37 @@
                 "BankRequest": { "$className": "RemoteEvent" },
                 "RoundUpdate": { "$className": "RemoteEvent" },
                 "RevealResult": { "$className": "RemoteEvent" },
-                "ProfileUpdate": { "$className": "RemoteEvent" }
+                "ProfileUpdate": { "$className": "RemoteEvent" },
+                "RevealTheater": { "$className": "RemoteEvent" },
+                "FateResolved": { "$className": "RemoteEvent" },
+                "BoardData": { "$className": "RemoteEvent" }
+            }
+        },
+        "Workspace": {
+            "$className": "Workspace",
+            "RoshamboStage": {
+                "$className": "Folder",
+                "JumbotronBoard": {
+                    "$className": "Part",
+                    "$properties": {
+                        "Anchored": true, "Size": [28, 9, 1], "CFrame": [0, 24, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+                        "Color": [0.16, 0.13, 0.09]
+                    }
+                },
+                "HammerArm": {
+                    "$className": "Part",
+                    "$properties": {
+                        "Anchored": true, "Size": [0.8, 0.8, 9], "CFrame": [8, 8, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+                        "Color": [0.54, 0.43, 0.27]
+                    }
+                },
+                "GongPad": {
+                    "$className": "Part",
+                    "$properties": {
+                        "Anchored": true, "Size": [6, 6, 0.6], "CFrame": [14, 6, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+                        "Color": [0.79, 0.64, 0.42], "Shape": "Cylinder"
+                    }
+                }
             }
         },
         "StarterPlayer": {

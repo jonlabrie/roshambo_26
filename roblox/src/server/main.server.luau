@@ -12,6 +12,9 @@ local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local RoundClock = require(shared:WaitForChild("RoundClock"))
 local GameRules = require(shared:WaitForChild("GameRules"))
 local PlayerProfiles = require(shared:WaitForChild("PlayerProfiles"))
+local ThemeManifest = require(shared:WaitForChild("ThemeManifest"))
+local ZenDojo = require(shared:WaitForChild("themes"):WaitForChild("ZenDojo"))
+local FateRegistry = require(shared:WaitForChild("FateRegistry"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local SubmitPick = remotes:WaitForChild("SubmitPick") :: RemoteEvent
@@ -19,10 +22,20 @@ local BankRequest = remotes:WaitForChild("BankRequest") :: RemoteEvent
 local RoundUpdate = remotes:WaitForChild("RoundUpdate") :: RemoteEvent
 local RevealResult = remotes:WaitForChild("RevealResult") :: RemoteEvent
 local ProfileUpdate = remotes:WaitForChild("ProfileUpdate") :: RemoteEvent
+local RevealTheater = remotes:WaitForChild("RevealTheater") :: RemoteEvent
+local FateResolved = remotes:WaitForChild("FateResolved") :: RemoteEvent
+local BoardData = remotes:WaitForChild("BoardData") :: RemoteEvent
+local TweenService = game:GetService("TweenService")
+local TextService = game:GetService("TextService")
 
 local secretsModule = script.Parent:FindFirstChild("SecretsLocal")
     or script.Parent:WaitForChild("SecretsExample")
 local config = require(secretsModule) :: { baseUrl: string, apiKey: string }
+
+local themeOk, themeErrs = ThemeManifest.validate(ZenDojo)
+if not themeOk then
+    error("[THEME] ZenDojo invalid: " .. table.concat(themeErrs, "; "))
+end
 
 local deps = {
     request = function(req)
@@ -60,6 +73,45 @@ local deps = {
 local net = NetworkClient.new({ baseUrl = config.baseUrl, apiKey = config.apiKey }, deps)
 local clock = RoundClock.new()
 local profiles = PlayerProfiles.new(GameRules)
+local fates = FateRegistry.new()
+
+local function applyGrow(player: Player)
+    local character = player.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then
+        return
+    end
+    for _, name in { "BodyHeightScale", "BodyWidthScale", "BodyDepthScale", "HeadScale" } do
+        local v = humanoid:FindFirstChild(name) :: NumberValue?
+        if v then
+            local up = TweenService:Create(
+                v,
+                TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+                { Value = 1.6 }
+            )
+            up:Play()
+            task.delay(8, function()
+                TweenService:Create(v, TweenInfo.new(1.2), { Value = 1 }):Play()
+            end)
+        end
+    end
+end
+
+local EPITHET = "A WANDERER"
+local function filterExternalName(name: string): string
+    local anyPlayer = Players:GetPlayers()[1]
+    if not anyPlayer then
+        return EPITHET
+    end
+    local ok, result = pcall(function()
+        local r = TextService:FilterStringAsync(name, anyPlayer.UserId)
+        return r:GetNonChatStringForBroadcastAsync()
+    end)
+    if not ok or result:find("#") then
+        return EPITHET
+    end
+    return result
+end
 
 local function leaderstatsFor(player: Player): Folder?
     return player:FindFirstChild("leaderstats") :: Folder?
@@ -99,6 +151,8 @@ local function playerByUserId(userId: string): Player?
     return nil
 end
 
+local lastTape: any = {}
+
 local coordinator = RoundCoordinator.new({
     net = net,
     clock = clock,
@@ -111,10 +165,21 @@ local coordinator = RoundCoordinator.new({
     callbacks = {
         onRound = function(info)
             RoundUpdate:FireAllClients(info)
+            if info.tape then
+                lastTape = info.tape
+            end
         end,
         onReveal = function(reveal)
+            RevealTheater:FireAllClients({
+                worldThrow = reveal.worldThrow,
+                distribution = reveal.distribution,
+                totalPlayers = reveal.totalPlayers,
+                results = reveal.results,
+                whiffed = reveal.whiffed,
+            })
             for _, player in Players:GetPlayers() do
-                local mine = reveal.results[tostring(player.UserId)]
+                local userId = tostring(player.UserId)
+                local mine = reveal.results[userId]
                 RevealResult:FireClient(player, {
                     worldThrow = reveal.worldThrow,
                     distribution = reveal.distribution,
@@ -123,9 +188,14 @@ local coordinator = RoundCoordinator.new({
                     result = mine and mine.result,
                 })
                 if mine then
-                    profiles:applyLocalResult(tostring(player.UserId), mine.result)
+                    profiles:applyLocalResult(userId, mine.result)
                     pushStats(player)
                     fireProfile(player, "local")
+                    if mine.result == "WIN" then
+                        applyGrow(player)
+                    elseif mine.result == "LOSS" then
+                        fates:begin(userId)
+                    end
                 end
             end
         end,
@@ -187,6 +257,10 @@ SubmitPick.OnServerEvent:Connect(function(player, throwValue)
     if type(throwValue) ~= "string" then
         return
     end
+    if fates:isBound(tostring(player.UserId)) then
+        print(`[PICK] {player.Name} rejected: FATE_BOUND`)
+        return
+    end
     local accepted, reason = coordinator:submitPick(tostring(player.UserId), throwValue)
     if not accepted then
         print(`[PICK] {player.Name} rejected: {reason}`)
@@ -208,6 +282,57 @@ BankRequest.OnServerEvent:Connect(function(player)
             fireProfile(player, "banked")
         end
     end)
+end)
+
+FateResolved.OnServerEvent:Connect(function(player, reason)
+    if reason ~= "caught" and reason ~= "accepted" then
+        return
+    end
+    local userId = tostring(player.UserId)
+    if fates:resolve(userId) then
+        FateResolved:FireAllClients(userId, reason)
+    end
+end)
+
+Players.PlayerRemoving:Connect(function(player)
+    fates:remove(tostring(player.UserId))
+end)
+
+local lastBoard: any = nil
+task.spawn(function()
+    while true do
+        local res = net:getLeaderboards("world")
+        local worldRec, hotStreak = nil, nil
+        if res.ok and res.data.leaders then
+            local top = res.data.leaders[1]
+            if top then
+                worldRec = { points = top.totalPoints, name = filterExternalName(top.displayName or "?") }
+            end
+            local best, bestName = 0, nil
+            for _, l in res.data.leaders do
+                if (l.currentStreak or 0) > best then
+                    best, bestName = l.currentStreak, l.displayName
+                end
+            end
+            if bestName then
+                hotStreak = { streak = best, name = filterExternalName(bestName) }
+            end
+        end
+        lastBoard = {
+            tape = lastTape,
+            worldRec = worldRec,
+            hotStreak = hotStreak,
+            playersNow = (lastTape[1] and lastTape[1].totalPlayers) or 0,
+        }
+        BoardData:FireAllClients(lastBoard)
+        task.wait(30)
+    end
+end)
+
+Players.PlayerAdded:Connect(function(player)
+    if lastBoard then
+        BoardData:FireClient(player, lastBoard)
+    end
 end)
 
 print(`[ROSHAMBO] playable loop starting against {config.baseUrl}`)
