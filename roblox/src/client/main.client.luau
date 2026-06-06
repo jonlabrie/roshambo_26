@@ -1,0 +1,2 @@
+--!strict
+-- Placeholder: the pick UI lands in the next commit.

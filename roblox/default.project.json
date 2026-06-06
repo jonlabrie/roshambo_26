@@ -7,7 +7,22 @@
             "$properties": { "HttpEnabled": true }
         },
         "ReplicatedStorage": {
-            "RoshamboShared": { "$path": "src/shared" }
+            "RoshamboShared": { "$path": "src/shared" },
+            "RoshamboRemotes": {
+                "$className": "Folder",
+                "SubmitPick": { "$className": "RemoteEvent" },
+                "BankRequest": { "$className": "RemoteEvent" },
+                "RoundUpdate": { "$className": "RemoteEvent" },
+                "RevealResult": { "$className": "RemoteEvent" },
+                "ProfileUpdate": { "$className": "RemoteEvent" }
+            }
+        },
+        "StarterPlayer": {
+            "$className": "StarterPlayer",
+            "StarterPlayerScripts": {
+                "$className": "StarterPlayerScripts",
+                "RoshamboClient": { "$path": "src/client" }
+            }
         },
         "ServerScriptService": {
             "Roshambo": { "$path": "src/server" }
