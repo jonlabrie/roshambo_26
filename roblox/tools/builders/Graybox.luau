@@ -16,7 +16,7 @@ function Graybox.build(L)
         }),
         Spec.part("ToriiShell", {
             Size = { 14, 12, 2 },
-            CFrame = Spec.cframe({ L.torii.pos[1], 6, L.torii.pos[3] }),
+            CFrame = Spec.cframe({ L.torii.pos[1], L.torii.pos[2] + 6, L.torii.pos[3] }),
             Color = GRAY,
         }),
         Spec.part("FlumeShell", {
@@ -35,7 +35,7 @@ function Graybox.build(L)
         }),
         Spec.part("SteleShell", {
             Size = { 4, 7, 1.2 },
-            CFrame = Spec.cframe({ L.stele.pos[1], 3.5, L.stele.pos[3] }),
+            CFrame = Spec.cframe({ L.stele.pos[1], L.stele.pos[2] + 3.5, L.stele.pos[3] }),
             Color = GRAY,
         }),
     }

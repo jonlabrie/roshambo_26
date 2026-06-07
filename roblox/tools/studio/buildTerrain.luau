@@ -33,4 +33,13 @@ Terrain:FillCylinder(CFrame.new(0, -2, 0), 4, L.basinRadius, Enum.Material.Water
 local kx, kz = L.koiPond.pos[1], L.koiPond.pos[3]
 Terrain:FillCylinder(CFrame.new(kx, 14, kz), 12, L.koiPond.radius, Enum.Material.Air)
 Terrain:FillCylinder(CFrame.new(kx, 8, kz), 4, L.koiPond.radius, Enum.Material.Water)
+-- sandō ramp: carved channel descending the tier walls, rim plaza → apron.
+-- Channel boxes step every 8 studs; floor slab 4 thick, headroom 16.
+local sando = { fromZ = -96, toZ = -44, fromY = 14, toY = 2, width = 10 }
+for z = sando.fromZ, sando.toZ, 8 do
+    local t = (z - sando.fromZ) / (sando.toZ - sando.fromZ)
+    local floorY = sando.fromY + (sando.toY - sando.fromY) * t
+    Terrain:FillBlock(CFrame.new(0, floorY + 10, z), Vector3.new(sando.width, 16, 9), Enum.Material.Air)
+    Terrain:FillBlock(CFrame.new(0, floorY - 2, z), Vector3.new(sando.width, 4, 9), Enum.Material.Ground)
+end
 return "terrain built"

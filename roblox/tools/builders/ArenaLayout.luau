@@ -30,12 +30,14 @@ local ArenaLayout = {
         { pos = { 52, 8, -46 }, facing = -45 }, -- SE
         { pos = { -64, 14, 30 }, facing = 115 }, -- NW upper
     },
-    torii = { pos = { 0, 0, -100 } },
-    sando = { fromZ = -98, toZ = -44, width = 6 }, -- gate to apron edge
-    stele = { pos = { -10, 0, -92 } },
+    -- Entrance: gate plaza ON the rim (surface y≈14); the sandō descends
+    -- through carved tier walls down to the apron (arrive high, walk down).
+    torii = { pos = { 0, 14, -100 } },
+    sando = { fromZ = -96, toZ = -44, width = 6, fromY = 14, toY = 2 }, -- rim plaza → apron edge
+    stele = { pos = { -10, 14, -92 } },
     koiPond = { pos = { -70, 0, -62 }, radius = 14 },
     jumbotron = { pos = { 0, 26, 0 }, size = { 28, 9, 1 } },
     heroTile = { pos = { 0, 18, 0 }, size = { 5, 6.5, 0.8 } },
-    spawn = { pos = { 0, 1, -52 } }, -- on the sandō, facing the bell
+    spawn = { pos = { 0, 15, -92 } }, -- on the rim plaza, facing the bell
 }
 return ArenaLayout
