@@ -23,7 +23,7 @@ function HammerCurve.state(phase: string, secondsLeft: number, cfg: Cfg?): State
     return {
         angleDeg = c.restDeg + (c.apexDeg - c.restDeg) * p,
         latched = secondsLeft <= c.lockoutLeadSec,
-        trembling = false,
+        trembling = secondsLeft <= c.lockoutLeadSec,
         released = false,
     }
 end

@@ -15,12 +15,14 @@ describe("HammerCurve", function()
         -- crank runs over 18s (20 - 2 lockout lead); at secondsLeft 11, elapsed 9 -> p = 0.5
         local s = HammerCurve.state("ACTIVE", 11)
         expect(s.angleDeg).toBeCloseTo(50)
+        expect(s.trembling).toBe(false)
     end)
 
     test("at lockout: apex + latched", function()
         local s = HammerCurve.state("ACTIVE", 2)
         expect(s.angleDeg).toBe(100)
         expect(s.latched).toBe(true)
+        expect(s.trembling).toBe(true)
     end)
 
     test("TALLY: trembling at apex", function()
