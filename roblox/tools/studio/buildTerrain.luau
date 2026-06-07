@@ -92,18 +92,20 @@ local function tierSurface(rw)
     return TIERS[#TIERS].h
 end
 
--- rolling backdrop hills: a quick berm just above eye height off the rim
--- (blocks the rim sightline without hiding the bowl from an aerial view),
--- then big Perlin rolling hills layered on top farther out.
+-- rolling backdrop hills (2026-06-07 gate tune: less steep, more organic).
+-- Long gentle climb out of the bowl (88-stud run, not a berm wall), an
+-- undulating ridge line so the rim horizon isn't a constant ring, low-octave
+-- rolling swells farther out, and a soft mid-scale undulation layer.
 local function hills(x, z, r)
-    local rise = ss(192, 212, r)
+    local rise = ss(196, 280, r)
     if rise <= 0 then
         return 0
     end
-    local berm = 42 -- ~11 studs over the rim, just above eye y31
-    local n = fbm(x, z, 5, 0.0050, 2.0, 0.55)
-    local big = ss(240, 300, r) * ((n + 1) * 0.5 * 45) -- +0..45 rolling beyond
-    return ((berm - 28) + big) * rise
+    local ridge = 40 + fbm(x + 3000, z + 3000, 2, 0.004, 2.0, 0.5) * 5 -- 35..45 ridge line
+    local swell = fbm(x, z, 3, 0.0035, 2.2, 0.45) -- long rolling swells
+    local detail = fbm(x + 7000, z + 7000, 2, 0.012, 2.0, 0.5) * 6 * ss(220, 260, r)
+    local big = ss(240, 340, r) * ((swell + 1) * 0.5 * 46)
+    return ((ridge - 28) + detail + big) * rise
 end
 
 -- per-column descriptor: g = ground surface Y; optional wb/wt = water bottom/top.
@@ -125,7 +127,7 @@ local function evalColumn(x, z)
         local t = ss(PAD_SUPP - 5, PAD_SUPP, pd)
         surf = pp[3] * (1 - t) + surf * t
     end
-    surf = surf + hills(x, z, r)
+    surf = math.min(surf + hills(x, z, r), 96) -- stay under the build ceiling (y 100)
     -- which tier plateau (by warped radius), for the paddy band
     local ti
     if rw >= TIERS[1].r and rw < TIERS[2].r then
