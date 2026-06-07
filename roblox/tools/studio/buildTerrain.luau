@@ -160,7 +160,7 @@ end
 -- E/W ramps climb apron→rim at z≈0.
 local function channel(x, z)
     if x >= -5 and x <= 5 and z <= -86 and z >= -192 then
-        local t = (z - (-192)) / ((-86) - (-192))
+        local t = (z - -192) / (-86 - -192)
         return 28 + (2 - 28) * t
     end
     if z >= -5 and z <= 5 then
@@ -190,8 +190,8 @@ local X0, X1 = -432, 432
 local Y0, Y1 = -24, 100
 local TILE = 96
 local function buildTile(tx, tz)
-    local region =
-        Region3.new(Vector3.new(tx, Y0, tz), Vector3.new(tx + TILE, Y1, tz + TILE)):ExpandToGrid(RES)
+    local region = Region3.new(Vector3.new(tx, Y0, tz), Vector3.new(tx + TILE, Y1, tz + TILE))
+        :ExpandToGrid(RES)
     local size = region.Size
     local nx, ny, nz = math.floor(size.X / RES), math.floor(size.Y / RES), math.floor(size.Z / RES)
     local base = region.CFrame.Position - size / 2
@@ -219,9 +219,8 @@ local function buildTile(tx, tz)
                 elseif wy - RES / 2 < c.g then
                     local of = occFor(wy, c.g)
                     if of > 0 then
-                        if c.grav then
-                            m = GROUND
-                        elseif wy > c.g - 4 then
+                        -- grass skin on the top 4 studs unless this column is gravel
+                        if not c.grav and wy > c.g - 4 then
                             m = GRASS
                         else
                             m = GROUND
