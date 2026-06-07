@@ -24,22 +24,27 @@ local GLYPH = { R = "○", P = "─", S = "∧" }
 local faces: { { { TextLabel } } } = {} -- face -> row -> col
 local current: { [number]: string } = {} -- row -> displayed line
 
+-- Cell metrics: 2x canvas density + heavy face for read-at-distance
+-- (gate feedback 2026-06-07: board doubled, font legibility).
+local CELL_W, CELL_H = 72, 104
+local CELL_STEP_X, CELL_STEP_Y = 80, 116
+
 local function buildFace(faceEnum: Enum.NormalId): { { TextLabel } }
     local gui = Instance.new("SurfaceGui")
     gui.Face = faceEnum
-    gui.CanvasSize = Vector2.new(1120, 360)
+    gui.CanvasSize = Vector2.new(2240, 720)
     gui.Parent = board
     local grid: { { TextLabel } } = {}
     for r = 1, #ROWS do
         grid[r] = {}
         for c = 1, COLS do
             local cell = Instance.new("TextLabel")
-            cell.Size = UDim2.fromOffset(36, 52)
-            cell.Position = UDim2.fromOffset((c - 1) * 40 + 4, (r - 1) * 58 + 6)
+            cell.Size = UDim2.fromOffset(CELL_W, CELL_H)
+            cell.Position = UDim2.fromOffset((c - 1) * CELL_STEP_X + 8, (r - 1) * CELL_STEP_Y + 12)
             cell.BackgroundColor3 = Color3.fromRGB(244, 238, 222)
             cell.TextColor3 = Color3.fromRGB(58, 46, 30)
-            cell.TextSize = 30
-            cell.Font = Enum.Font.RobotoMono
+            cell.TextScaled = true
+            cell.Font = Enum.Font.GothamBlack
             cell.Text = " "
             cell.Parent = gui
             grid[r][c] = cell
@@ -49,11 +54,11 @@ local function buildFace(faceEnum: Enum.NormalId): { { TextLabel } }
 end
 
 local function flapTo(cell: TextLabel, char: string)
-    local squash = TweenService:Create(cell, TweenInfo.new(0.04), { Size = UDim2.fromOffset(36, 4) })
+    local squash = TweenService:Create(cell, TweenInfo.new(0.04), { Size = UDim2.fromOffset(CELL_W, 8) })
     squash:Play()
     squash.Completed:Once(function()
         cell.Text = char
-        TweenService:Create(cell, TweenInfo.new(0.04), { Size = UDim2.fromOffset(36, 52) }):Play()
+        TweenService:Create(cell, TweenInfo.new(0.04), { Size = UDim2.fromOffset(CELL_W, CELL_H) }):Play()
     end)
 end
 
