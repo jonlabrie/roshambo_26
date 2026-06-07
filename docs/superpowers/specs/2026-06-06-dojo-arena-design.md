@@ -65,21 +65,26 @@ One giant **true-3D physical split-flap tile** mounted above the gong: two hinge
 - Scissors = **Caret ∧ (up-pointing)**, green engraving — matches the PWA `Symbols.tsx` vectors and the wordmark's circumflex
 - The icon's down-pointing ∨ is the **mascot face's smile only** — it never represents scissors in gameplay surfaces
 
-## 5. The Water Hammer (reveal machine & diegetic timer)
+## 5. The Water Striker (reveal machine & diegetic timer)
 
-Terrace streams → waterwheel → ratchet chain → hammer arm on a pivot beside the gong.
+The structural mechanism: **a suspended striker, drawn back by water machinery through the round, released at the reveal to deliver one massive resonant strike.** The striker rig is themed:
+
+- **ZenDojo**: a bronze **bonshō** temple bell (Chion-in style) in a timber shōrō pavilion at arena center; the striker is the horizontal **shu-moku log** on chains, drawn straight back (rising slightly on its suspension arc) through ACTIVE and released to ram the bell's lotus boss. Gongs read as Chinese; the bell-and-log is the authentically Japanese form.
+- **JadeCourt**: a luo **gong** (vertical, suspended) struck by a falling mallet arm that hangs at rest against the gong face, is cranked upward through the round, and falls back to strike.
+
+Terrace streams → waterwheel → ratchet rope/chain → striker draw.
 
 | Phase | Machine behavior |
 |---|---|
-| ACTIVE (20s) | Wheel turns; chain cranks the hammer arm upward. **Arm height = f(RoundClock time remaining)** — synced to `phaseEndsAt` via the existing clock offset, not animation wall-time. The hammer is the arena-wide countdown. |
-| T₀−2s (lockout) | Hammer ratchets past a visible **latch** with an audible arena-wide *click* — the diegetic lockout signal. Paddles go up (§6). |
-| TALLY (2s) | Hammer trembles at apex; taiko roll; hero tile spins; board ticker cascades. |
-| REVEAL | Latch releases → hammer swings the arc → **GONG** (single massive strike, screen-space shockwave ring, lantern flare) → **basin erupts** → hero tile lands on the World Throw. |
-| Reset | Hammer returns to bottom; wheel resumes; water ambience carries the calm. |
+| ACTIVE (20s) | Wheel turns; the striker is drawn back. **Draw amount = f(RoundClock time remaining)** — synced to `phaseEndsAt` via the existing clock offset, not animation wall-time. The striker's displacement is the arena-wide countdown. |
+| T₀−2s (lockout) | The draw ratchets past a visible **catch** with an audible arena-wide *click* — the diegetic lockout signal. |
+| TALLY (2s) | Striker trembles at full draw; taiko roll; hero tile spins; board ticker cascades. |
+| REVEAL | Catch releases → the striker swings its natural pendulum fall (~0.45s, gravity-accelerated easing, then a small **recoil bounce** off the bell — the recoil sells the mass) → **BONG** (single massive strike, screen-space shockwave ring, lantern flare) → **basin ripples** → hero tile lands on the World Throw. |
+| Reset | Striker returns to rest; wheel resumes; water ambience carries the calm. |
 
 **Reactive basin**: the pond under the dais is a **skinned-mesh water plane** (bone-deformed) rippled on command — impact rings radiate from the strike point + particle splash crown. Decorative water elsewhere (koi pond, streams) is plain Terrain water (cheap, auto-degrades on weak devices). Rule: **ambient water free, reactive water choreographed** — reactive surfaces only at contained pond scale.
 
-The Water Hammer is **REVEAL variant #1** in the EffectRegistry. The machine is historically authentic in both target cultures (Japanese karausu / Chinese duì 碓 water trip-hammers), so it survives re-theming with dressing changes only.
+The Water Striker is **REVEAL variant #1** in the EffectRegistry. Water-powered striking machinery is historically authentic in both target cultures (Japanese karausu / Chinese duì 碓 water trip-hammers), and the bell-vs-gong split assigns each culture its correct instrument.
 
 ## 6. Round choreography (player-facing beats)
 
@@ -161,7 +166,7 @@ Roblox-runtime additions: arena geometry (built in Studio, committed as Rojo-syn
 | Structure element | ZenDojo (ships) | JadeCourt (future) |
 |---|---|---|
 | Play floor | Tatami circle, moss green | Stone pavers, jade inlay ring |
-| Gong + dais | Weathered bronze | Same (luo 锣 is Chinese); redder bronze |
+| Bell/gong + striker | Bonshō bell + shu-moku log in a shōrō pavilion | Luo gong + falling mallet arm |
 | Hero tile / jumbotron | Ivory + dark lacquer | Same tiles; carved rosewood frame |
 | Terraces | Garden, stone lanterns | Pavilion steps, red pillar lanterns |
 | Alcoves | Teahouses, shoji, noren | Pavilions, lattice, ménlián |
@@ -198,3 +203,5 @@ JadeCourt assets; merch/cosmetics; pot-escalation effect policy (hook only); phy
 | LOSS effect | Three Fates: throw-matched escalating pursuits, NO guaranteed catch — contact or acceptance ends it | "Destroyed by what beat you" made flesh; skilled flights are spectator theater; dwell time |
 | Fate-binding | No throwing while fate-bound; Accept Fate action is the deliberate door back | Fleeing must cost something; glory vs. participation trade-off (supersedes win-banish/compounding) |
 | Fate authenticity | 18th-c. East Asian designs per theme (nigiri-basami / Zhang Xiaoquan; washi-emakimono / xuan-handscroll; garden stone / taihu rock) | User requirement; China-market sensitivity; verified historical forms |
+| Striker instrument | ZenDojo = bonshō bell + horizontal shu-moku log; JadeCourt = gong + mallet (the gong moved themes, not out of the game) | Gongs are Chinese; Japanese temples use bell-and-log (user correction, Chion-in reference) |
+| Strike physics | ~0.45s gravity-eased pendulum fall + recoil bounce | A 0.18s tween reads as a slam, not a fall (live-session feedback) |
