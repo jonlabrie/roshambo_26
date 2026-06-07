@@ -105,11 +105,11 @@ RunService.Heartbeat:Connect(function()
         local drawZ = p * 6 -- drawn 6 studs backward (away from the bell, +Z)
         local riseY = p * p * 1.2 -- slight pendulum rise on the suspension arc
         local shiver = if state.trembling
-            then math.sin(os.clock() * 28) * 0.6 + (math.random() - 0.5) * 0.1
+            then math.sin(os.clock() * 28) * 0.15 + (math.random() - 0.5) * 0.04
             else 0
         local pose = restCFrame * CFrame.new(0, riseY, drawZ + shiver)
         if state.trembling then
-            pose = pose * CFrame.Angles(0, math.rad(math.sin(os.clock() * 23) * 1.5), 0)
+            pose = pose * CFrame.Angles(0, math.rad(math.sin(os.clock() * 23) * 0.4), 0)
         end
         arm.CFrame = pose
         if state.latched and not wasLatched then
