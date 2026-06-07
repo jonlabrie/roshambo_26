@@ -44,7 +44,8 @@
                         "Anchored": true, "Size": [7, 6, 6], "CFrame": [8, 5, 0, 0, -1, 0, 1, 0, 0, 0, 0, 1],
                         "Color": [0.79, 0.64, 0.42], "Shape": "Cylinder"
                     }
-                }
+                },
+                "PipelineProofLantern": { "$path": "assets/PipelineProofLantern.model.json" }
             }
         },
         "StarterPlayer": {

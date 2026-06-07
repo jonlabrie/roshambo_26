@@ -21,10 +21,14 @@ jobs:
         run: rokit install --no-trust-check
       - name: Lune tests
         run: lune run tests/run
+      - name: Generated models are current
+        run: |
+          lune run tools/genmodels
+          git diff --exit-code assets
       - name: Format check
-        run: stylua --check src tests
+        run: stylua --check src tests tools
       - name: Lint
-        run: selene src
+        run: selene src tools
       - name: Rojo build
         run: rojo build -o roshambo-skeleton.rbxl
       - uses: actions/upload-artifact@v4
