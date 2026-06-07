@@ -15,7 +15,7 @@ local RoundUpdate = remotes:WaitForChild("RoundUpdate") :: RemoteEvent
 local stage = workspace:WaitForChild("RoshamboStage")
 local arm = stage:WaitForChild("HammerArm") :: BasePart
 local gong = stage:WaitForChild("GongPad") :: BasePart
-local pivot = arm.CFrame * CFrame.new(0, 0, arm.Size.Z / 2) -- hinge at the arm's rear end
+local restCFrame = arm.CFrame -- rest pose: log hanging at the front of its swing
 
 local lastPhase = "ACTIVE"
 local secondsToLockout: number? = nil
@@ -36,33 +36,53 @@ end)
 EventBus.Cue.Event:Connect(function(cue)
     if cue.kind == "gongStrike" then
         striking = true
-        TweenService
-            :Create(arm, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                CFrame = pivot * CFrame.Angles(math.rad(-8 - 90), 0, 0) * CFrame.new(0, 0, -arm.Size.Z / 2),
-            })
-            :Play()
-        local light = Instance.new("PointLight")
-        light.Brightness = 12
-        light.Range = 30
-        light.Parent = gong
-        task.delay(0.6, function()
-            light:Destroy()
+        -- Stage 1: swing forward (gravity-accelerated) to overshoot into the bell.
+        local swing = TweenService:Create(
+            arm,
+            TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            { CFrame = restCFrame * CFrame.new(0, 0, -0.8) }
+        )
+        swing.Completed:Connect(function()
+            -- Contact moment: flash + basin ring fire here, not at cue time.
+            local light = Instance.new("PointLight")
+            light.Brightness = 12
+            light.Range = 30
+            light.Parent = gong
+            task.delay(0.6, function()
+                light:Destroy()
+            end)
+            local ring = Instance.new("Part")
+            ring.Shape = Enum.PartType.Cylinder
+            ring.Anchored = true
+            ring.CanCollide = false
+            ring.Transparency = 0.5
+            ring.Color = Color3.fromRGB(127, 180, 201)
+            ring.Size = Vector3.new(0.3, 2, 2)
+            ring.CFrame = CFrame.new(gong.Position.X, 0.5, gong.Position.Z)
+                * CFrame.Angles(0, 0, math.rad(90))
+            ring.Parent = workspace
+            TweenService
+                :Create(ring, TweenInfo.new(1.2), { Size = Vector3.new(0.3, 26, 26), Transparency = 1 })
+                :Play()
+            task.delay(1.3, function()
+                ring:Destroy()
+            end)
+            -- Stage 2: recoil bounce off the bell, then settle back to rest.
+            local recoil = TweenService:Create(
+                arm,
+                TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                { CFrame = restCFrame * CFrame.new(0, 0.15, 1.1) }
+            )
+            recoil.Completed:Connect(function()
+                TweenService:Create(
+                    arm,
+                    TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+                    { CFrame = restCFrame }
+                ):Play()
+            end)
+            recoil:Play()
         end)
-    elseif cue.kind == "basinErupt" then
-        local ring = Instance.new("Part")
-        ring.Shape = Enum.PartType.Cylinder
-        ring.Anchored = true
-        ring.CanCollide = false
-        ring.Transparency = 0.5
-        ring.Color = Color3.fromRGB(127, 180, 201)
-        ring.Size = Vector3.new(0.3, 2, 2)
-        ring.CFrame = CFrame.new(gong.Position.X, 0.5, gong.Position.Z) * CFrame.Angles(0, 0, math.rad(90))
-        ring.Parent = workspace
-        TweenService:Create(ring, TweenInfo.new(1.2), { Size = Vector3.new(0.3, 26, 26), Transparency = 1 })
-            :Play()
-        task.delay(1.3, function()
-            ring:Destroy()
-        end)
+        swing:Play()
     end
 end)
 
@@ -80,10 +100,11 @@ RunService.Heartbeat:Connect(function()
     end
     local state = HammerCurve.state(lastPhase, secondsLeft)
     if not state.released then
-        local tremble = if state.trembling then math.rad((math.random() - 0.5) * 2) else 0
-        arm.CFrame = pivot
-            * CFrame.Angles(math.rad(state.angleDeg - 90) + tremble, 0, 0)
-            * CFrame.new(0, 0, -arm.Size.Z / 2)
+        local p = state.angleDeg / 100 -- 0..1 draw percent
+        local drawZ = p * 6 -- drawn 6 studs backward (away from the bell, +Z)
+        local riseY = p * p * 1.2 -- slight pendulum rise on the suspension arc
+        local tremble = if state.trembling then (math.random() - 0.5) * 0.15 else 0
+        arm.CFrame = restCFrame * CFrame.new(0, riseY, drawZ + tremble)
         if state.latched and not wasLatched then
             wasLatched = true
             EventBus.Cue:Fire({ kind = "latchClick" })
