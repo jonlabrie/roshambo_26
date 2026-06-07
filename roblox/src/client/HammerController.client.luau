@@ -45,10 +45,11 @@ EventBus.Cue.Event:Connect(function(cue)
         swing.Completed:Connect(function()
             -- Contact moment: flash + basin ring fire here, not at cue time.
             local light = Instance.new("PointLight")
-            light.Brightness = 12
-            light.Range = 30
+            light.Brightness = 6
+            light.Range = 18
             light.Parent = gong
-            task.delay(0.6, function()
+            TweenService:Create(light, TweenInfo.new(0.25), { Brightness = 0 }):Play()
+            task.delay(0.3, function()
                 light:Destroy()
             end)
             local ring = Instance.new("Part")
@@ -103,8 +104,14 @@ RunService.Heartbeat:Connect(function()
         local p = state.angleDeg / 100 -- 0..1 draw percent
         local drawZ = p * 6 -- drawn 6 studs backward (away from the bell, +Z)
         local riseY = p * p * 1.2 -- slight pendulum rise on the suspension arc
-        local tremble = if state.trembling then (math.random() - 0.5) * 0.15 else 0
-        arm.CFrame = restCFrame * CFrame.new(0, riseY, drawZ + tremble)
+        local shiver = if state.trembling
+            then math.sin(os.clock() * 28) * 0.3 + (math.random() - 0.5) * 0.1
+            else 0
+        local pose = restCFrame * CFrame.new(0, riseY, drawZ + shiver)
+        if state.trembling then
+            pose = pose * CFrame.Angles(0, math.rad(math.sin(os.clock() * 23) * 0.8), 0)
+        end
+        arm.CFrame = pose
         if state.latched and not wasLatched then
             wasLatched = true
             EventBus.Cue:Fire({ kind = "latchClick" })
