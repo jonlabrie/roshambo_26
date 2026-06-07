@@ -20,12 +20,29 @@ function Graybox.build(L)
             Color = GRAY,
         }),
         Spec.part("FlumeShell", {
-            Size = { 2, 1.5, 56 },
-            CFrame = Spec.cframe({
-                (L.flume.poolPos[1] + L.flume.wheelPos[1]) / 2,
-                (L.flume.poolPos[2] + L.flume.wheelPos[2] + L.flume.wheelRadius) / 2 + 1,
-                (L.flume.poolPos[3] + L.flume.wheelPos[3]) / 2,
-            }),
+            Size = {
+                2,
+                1.5,
+                math.sqrt(
+                    (L.flume.poolPos[1] - L.flume.wheelPos[1]) ^ 2
+                        + (L.flume.poolPos[3] - L.flume.wheelPos[3]) ^ 2
+                ),
+            },
+            CFrame = Spec.cframe(
+                {
+                    (L.flume.poolPos[1] + L.flume.wheelPos[1]) / 2,
+                    (L.flume.poolPos[2] + L.flume.wheelPos[2] + L.flume.wheelRadius) / 2 + 1,
+                    (L.flume.poolPos[3] + L.flume.wheelPos[3]) / 2,
+                },
+                Spec.yaw(
+                    math.deg(
+                        math.atan2(
+                            L.flume.poolPos[1] - L.flume.wheelPos[1],
+                            L.flume.poolPos[3] - L.flume.wheelPos[3]
+                        )
+                    )
+                )
+            ),
             Color = GRAY,
         }),
         Spec.part("PoolShell", {
@@ -44,9 +61,8 @@ function Graybox.build(L)
             children,
             Spec.part(`TeahouseShell{i}`, {
                 Size = { 16, 9, 12 },
-                CFrame = Spec.cframe({ t.pos[1], t.pos[2] + 4.5, t.pos[3] }),
-                Color = GRAY,
-                Transparency = 0.3,
+                CFrame = Spec.cframe({ t.pos[1], t.pos[2] + 4.5, t.pos[3] }, Spec.yaw(t.facing)),
+                Color = { 0.55, 0.42, 0.28 }, -- legible timber brown (gate feedback)
             })
         )
     end

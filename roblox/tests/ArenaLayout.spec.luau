@@ -25,10 +25,18 @@ describe("ArenaLayout", function()
     test("flume runs downhill: pool higher than wheel top", function()
         expect(L.flume.poolPos[2] > L.flume.wheelPos[2] + L.flume.wheelRadius).toBe(true)
     end)
-    test("teahouses sit on tiers, outside the apron", function()
+    test("teahouses sit on a tier band at that tier's height", function()
         for _, t in L.teahouses do
             local d = math.sqrt(t.pos[1] ^ 2 + t.pos[3] ^ 2)
-            expect(d > L.apronRadius).toBe(true)
+            local matched = false
+            for i, tier in L.tiers do
+                local inner = if i == 1 then L.apronRadius else L.tiers[i - 1].radius
+                if d > inner and d < tier.radius then
+                    expect(t.pos[2]).toBe(tier.height)
+                    matched = true
+                end
+            end
+            expect(matched).toBe(true)
         end
     end)
     test("waterwheel clears every pavilion post", function()
