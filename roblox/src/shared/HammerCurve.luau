@@ -7,7 +7,7 @@ local HammerCurve = {}
 export type Cfg = { activeSeconds: number, lockoutLeadSec: number, restDeg: number, apexDeg: number }
 export type State = { angleDeg: number, latched: boolean, trembling: boolean, released: boolean }
 
-local DEFAULT: Cfg = { activeSeconds = 20, lockoutLeadSec = 2, restDeg = -75, apexDeg = 55 }
+local DEFAULT: Cfg = { activeSeconds = 20, lockoutLeadSec = 2, restDeg = 0, apexDeg = 100 }
 
 function HammerCurve.state(phase: string, secondsLeft: number, cfg: Cfg?): State
     local c = cfg or DEFAULT

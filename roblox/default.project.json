@@ -34,14 +34,14 @@
                 "HammerArm": {
                     "$className": "Part",
                     "$properties": {
-                        "Anchored": true, "Size": [0.8, 0.8, 9], "CFrame": [8, 6, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+                        "Anchored": true, "Size": [0.8, 0.8, 9], "CFrame": [8, 11, -4.5, 1, 0, 0, 0, 1, 0, 0, 0, 1],
                         "Color": [0.54, 0.43, 0.27]
                     }
                 },
                 "GongPad": {
                     "$className": "Part",
                     "$properties": {
-                        "Anchored": true, "Size": [0.6, 6, 6], "CFrame": [8, 0.6, -2.9, 0, -1, 0, 1, 0, 0, 0, 0, 1],
+                        "Anchored": true, "Size": [0.6, 6, 6], "CFrame": [8, 2.5, 1.2, 0, 0, 1, 0, 1, 0, -1, 0, 0],
                         "Color": [0.79, 0.64, 0.42], "Shape": "Cylinder"
                     }
                 }
