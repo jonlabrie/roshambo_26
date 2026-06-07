@@ -85,8 +85,9 @@ describe("ThemeManifest", function()
     test("v2: missing lighting key fails loudly", function()
         local theme = validTheme()
         theme.lighting.clockTime = nil
-        local ok = ThemeManifest.validate(theme)
+        local ok, errs = ThemeManifest.validate(theme)
         expect(ok).toBe(false)
+        expect(table.concat(errs, ";"):find("lighting.clockTime") ~= nil).toBe(true)
     end)
 
     test("v2: waterAmbience is a required sound", function()
