@@ -31,4 +31,32 @@ describe("ArenaLayout", function()
             expect(d > L.apronRadius).toBe(true)
         end
     end)
+    test("waterwheel clears every pavilion post", function()
+        local s = L.pavilion.postSpacing / 2
+        for _, corner in { { s, s }, { s, -s }, { -s, s }, { -s, -s } } do
+            local dx = L.flume.wheelPos[1] - corner[1]
+            local dz = L.flume.wheelPos[3] - corner[2]
+            expect(math.sqrt(dx * dx + dz * dz) > L.flume.wheelRadius).toBe(true)
+        end
+    end)
+    test("flume pool sits on tier 2's band", function()
+        local d = math.sqrt(L.flume.poolPos[1] ^ 2 + L.flume.poolPos[3] ^ 2)
+        expect(d > L.tiers[1].radius and d < L.tiers[2].radius).toBe(true)
+    end)
+    test("koi pond fits inside the bowl", function()
+        local d = math.sqrt(L.koiPond.pos[1] ^ 2 + L.koiPond.pos[3] ^ 2)
+        expect(d + L.koiPond.radius < L.bowlRadius).toBe(true)
+    end)
+    test("spawn lands on the sandō", function()
+        expect(L.spawn.pos[3] >= L.sando.fromZ and L.spawn.pos[3] <= L.sando.toZ).toBe(true)
+        expect(math.abs(L.spawn.pos[1]) <= L.sando.width / 2).toBe(true)
+    end)
+    test("vertical stack: jumbotron clears hero tile clears bell", function()
+        local jumboBottom = L.jumbotron.pos[2] - L.jumbotron.size[2] / 2
+        local heroTop = L.heroTile.pos[2] + L.heroTile.size[2] / 2
+        local heroBottom = L.heroTile.pos[2] - L.heroTile.size[2] / 2
+        local bellTop = L.bell.pos[2] + L.bell.height / 2
+        expect(jumboBottom > heroTop).toBe(true)
+        expect(heroBottom > bellTop).toBe(true)
+    end)
 end)
