@@ -3,8 +3,10 @@
 -- never a silent gray prop (spec §8).
 local ThemeManifest = {}
 
-ThemeManifest.REQUIRED_SOUNDS = { "clack", "gong", "drumroll", "latch", "splash", "bank" }
+ThemeManifest.REQUIRED_SOUNDS = { "clack", "gong", "drumroll", "latch", "splash", "bank", "waterAmbience" }
 ThemeManifest.REQUIRED_MODELS = { "boulder", "paperSheet", "shears", "umbrella" }
+ThemeManifest.REQUIRED_PALETTE = { "moss", "ivory", "vermilion", "ink", "gold", "water", "gravel", "timber" }
+ThemeManifest.REQUIRED_LIGHTING = { "clockTime", "brightness", "ambient", "outdoorAmbient" }
 
 function ThemeManifest.validate(theme: any): (boolean, { string })
     local errs: { string } = {}
@@ -27,6 +29,19 @@ function ThemeManifest.validate(theme: any): (boolean, { string })
     for _, key in ThemeManifest.REQUIRED_MODELS do
         if type(models[key]) ~= "string" then
             table.insert(errs, `missing model: {key}`)
+        end
+    end
+    local palette = if type(theme.palette) == "table" then theme.palette else {}
+    for _, key in ThemeManifest.REQUIRED_PALETTE do
+        local c = palette[key]
+        if type(c) ~= "table" or #c ~= 3 then
+            table.insert(errs, `missing palette.{key}`)
+        end
+    end
+    local lighting = if type(theme.lighting) == "table" then theme.lighting else {}
+    for _, key in ThemeManifest.REQUIRED_LIGHTING do
+        if lighting[key] == nil then
+            table.insert(errs, `missing lighting.{key}`)
         end
     end
     return #errs == 0, errs

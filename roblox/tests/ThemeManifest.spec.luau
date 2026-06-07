@@ -8,8 +8,32 @@ local function validTheme(): any
     return {
         name = "T",
         labels = { boardHeader = "世界 · THE WORLD" },
-        sounds = { clack = "0", gong = "0", drumroll = "0", latch = "0", splash = "0", bank = "0" },
+        sounds = {
+            clack = "0",
+            gong = "0",
+            drumroll = "0",
+            latch = "0",
+            splash = "0",
+            bank = "0",
+            waterAmbience = "0",
+        },
         models = { boulder = "0", paperSheet = "0", shears = "0", umbrella = "0" },
+        palette = {
+            moss = { 0.48, 0.54, 0.39 },
+            ivory = { 0.87, 0.84, 0.76 },
+            vermilion = { 0.63, 0.36, 0.27 },
+            ink = { 0.18, 0.19, 0.22 },
+            gold = { 0.83, 0.69, 0.40 },
+            water = { 0.20, 0.35, 0.43 },
+            gravel = { 0.79, 0.76, 0.70 },
+            timber = { 0.42, 0.31, 0.20 },
+        },
+        lighting = {
+            clockTime = 16.5,
+            brightness = 2.4,
+            ambient = { 90, 88, 84 },
+            outdoorAmbient = { 130, 120, 105 },
+        },
     }
 end
 
@@ -48,5 +72,32 @@ describe("ThemeManifest", function()
         local ok, errs = ThemeManifest.validate(ZenDojo)
         expect(ok).toBe(true)
         expect(#errs).toBe(0)
+    end)
+
+    test("v2: missing palette key fails loudly", function()
+        local theme = validTheme()
+        theme.palette.moss = nil
+        local ok, errs = ThemeManifest.validate(theme)
+        expect(ok).toBe(false)
+        expect(table.concat(errs, ";"):find("palette.moss") ~= nil).toBe(true)
+    end)
+
+    test("v2: missing lighting key fails loudly", function()
+        local theme = validTheme()
+        theme.lighting.clockTime = nil
+        local ok = ThemeManifest.validate(theme)
+        expect(ok).toBe(false)
+    end)
+
+    test("v2: waterAmbience is a required sound", function()
+        local theme = validTheme()
+        theme.sounds.waterAmbience = nil
+        local ok = ThemeManifest.validate(theme)
+        expect(ok).toBe(false)
+    end)
+
+    test("ZenDojo theme passes v2 validation", function()
+        local ok, errs = ThemeManifest.validate(ZenDojo)
+        expect(ok).toBe(true)
     end)
 end)
