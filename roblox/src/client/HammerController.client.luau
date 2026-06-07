@@ -38,7 +38,7 @@ EventBus.Cue.Event:Connect(function(cue)
         striking = true
         TweenService
             :Create(arm, TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {
-                CFrame = pivot * CFrame.Angles(math.rad(-20), 0, 0) * CFrame.new(0, 0, -arm.Size.Z / 2),
+                CFrame = pivot * CFrame.Angles(math.rad(-35), 0, 0) * CFrame.new(0, 0, -arm.Size.Z / 2),
             })
             :Play()
         local light = Instance.new("PointLight")
@@ -56,7 +56,7 @@ EventBus.Cue.Event:Connect(function(cue)
         ring.Transparency = 0.5
         ring.Color = Color3.fromRGB(127, 180, 201)
         ring.Size = Vector3.new(0.3, 2, 2)
-        ring.CFrame = gong.CFrame * CFrame.new(0, -4, 0) * CFrame.Angles(0, 0, math.rad(90))
+        ring.CFrame = CFrame.new(gong.Position + Vector3.new(0, 0.5, 0)) * CFrame.Angles(0, 0, math.rad(90))
         ring.Parent = workspace
         TweenService:Create(ring, TweenInfo.new(1.2), { Size = Vector3.new(0.3, 26, 26), Transparency = 1 })
             :Play()
