@@ -27,7 +27,7 @@
                 "JumbotronBoard": {
                     "$className": "Part",
                     "$properties": {
-                        "Anchored": true, "Size": [28, 9, 1], "CFrame": [0, 26, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+                        "Anchored": true, "Size": [42, 13.5, 1], "CFrame": [0, 30, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
                         "Color": [0.16, 0.13, 0.09]
                     }
                 },
@@ -48,7 +48,7 @@
                 "Graybox": { "$path": "assets/Graybox.model.json" },
                 "ArenaSpawn": {
                     "$className": "SpawnLocation",
-                    "$properties": { "Anchored": true, "Size": [8, 1, 8], "CFrame": [0, 22, -162, -1, 0, 0, 0, 1, 0, 0, 0, -1], "Neutral": true }
+                    "$properties": { "Anchored": true, "Size": [8, 1, 8], "CFrame": [0, 29, -188, -1, 0, 0, 0, 1, 0, 0, 0, -1], "Neutral": true }
                 }
             }
         },
