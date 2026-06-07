@@ -24,10 +24,11 @@ Spec.ROT = { IDENTITY = IDENTITY, CYL_VERTICAL = CYL_VERTICAL, CYL_ALONG_Z = CYL
 
 function Spec.part(name: string, props: { [string]: any }): PartSpec
     local kids = props.children
-    props.children = nil
     local properties: { [string]: any } = { Anchored = true }
     for k, v in props do
-        properties[k] = v
+        if k ~= "children" then
+            properties[k] = v
+        end
     end
     return { name = name, className = "Part", properties = properties, children = kids }
 end

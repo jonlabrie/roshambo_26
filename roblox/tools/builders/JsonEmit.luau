@@ -1,6 +1,8 @@
 --!strict
 -- Deterministic JSON (sorted object keys) so generated model.json files are
 -- stable across runs — required for the CI drift check.
+-- NOTE: handles ASCII printable strings only (builder names/properties).
+-- Control characters and CJK must not pass through builders.
 local JsonEmit = {}
 
 local function isArray(t: { [any]: any }): boolean
@@ -14,10 +16,13 @@ end
 function JsonEmit.encode(v: any): string
     local ty = type(v)
     if ty == "number" then
+        if v ~= v or v == math.huge or v == -math.huge then
+            error("JsonEmit: non-finite number")
+        end
         if v % 1 == 0 and math.abs(v) < 2 ^ 53 then
             return string.format("%d", v)
         end
-        return string.format("%.6g", v)
+        return string.format("%.9g", v)
     elseif ty == "string" then
         local s = (string.format("%q", v):gsub("\\\n", "\\n"))
         return s

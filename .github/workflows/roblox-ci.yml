@@ -24,7 +24,7 @@ jobs:
       - name: Generated models are current
         run: |
           lune run tools/genmodels
-          git diff --exit-code assets
+          git add -N assets && git diff --exit-code assets
       - name: Format check
         run: stylua --check src tests tools
       - name: Lint
