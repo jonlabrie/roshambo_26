@@ -3,8 +3,8 @@
 -- committed; never hand-edit. Run from roblox/: lune run tools/genmodels
 local fs = require("@lune/fs")
 local JsonEmit = require("./builders/JsonEmit")
-local ZenDojo = require("../src/shared/themes/ZenDojo")
-local StoneLantern = require("./builders/StoneLantern")
+local Graybox = require("./builders/Graybox")
+local ArenaLayout = require("./builders/ArenaLayout")
 
 local function toRojo(spec): any
     local node: any = { className = spec.className, properties = spec.properties }
@@ -20,7 +20,7 @@ local function toRojo(spec): any
 end
 
 local OUTPUTS: { [string]: any } = {
-    ["PipelineProofLantern"] = StoneLantern.build(ZenDojo.palette, { 0, 0, 20 }),
+    ["Graybox"] = Graybox.build(ArenaLayout),
 }
 
 if not fs.isDir("assets") then

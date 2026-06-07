@@ -27,25 +27,29 @@
                 "JumbotronBoard": {
                     "$className": "Part",
                     "$properties": {
-                        "Anchored": true, "Size": [28, 9, 1], "CFrame": [0, 24, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+                        "Anchored": true, "Size": [28, 9, 1], "CFrame": [0, 26, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
                         "Color": [0.16, 0.13, 0.09]
                     }
                 },
                 "HammerArm": {
                     "$className": "Part",
                     "$properties": {
-                        "Anchored": true, "Size": [1.2, 1.2, 7], "CFrame": [8, 5, 8, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+                        "Anchored": true, "Size": [1.2, 1.2, 7], "CFrame": [0, 6.2, 9.5, 1, 0, 0, 0, 1, 0, 0, 0, 1],
                         "Color": [0.54, 0.43, 0.27]
                     }
                 },
                 "GongPad": {
                     "$className": "Part",
                     "$properties": {
-                        "Anchored": true, "Size": [7, 6, 6], "CFrame": [8, 5, 0, 0, -1, 0, 1, 0, 0, 0, 0, 1],
+                        "Anchored": true, "Size": [7, 6, 6], "CFrame": [0, 7.5, 0, 0, -1, 0, 1, 0, 0, 0, 0, 1],
                         "Color": [0.79, 0.64, 0.42], "Shape": "Cylinder"
                     }
                 },
-                "PipelineProofLantern": { "$path": "assets/PipelineProofLantern.model.json" }
+                "Graybox": { "$path": "assets/Graybox.model.json" },
+                "ArenaSpawn": {
+                    "$className": "SpawnLocation",
+                    "$properties": { "Anchored": true, "Size": [8, 1, 8], "CFrame": [0, 1, -52, 1, 0, 0, 0, 1, 0, 0, 0, 1], "Neutral": true }
+                }
             }
         },
         "StarterPlayer": {
