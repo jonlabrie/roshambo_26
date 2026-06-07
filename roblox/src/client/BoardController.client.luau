@@ -43,10 +43,18 @@ local function buildFace(faceEnum: Enum.NormalId): { { TextLabel } }
             cell.Position = UDim2.fromOffset((c - 1) * CELL_STEP_X + 8, (r - 1) * CELL_STEP_Y + 12)
             cell.BackgroundColor3 = Color3.fromRGB(244, 238, 222)
             cell.TextColor3 = Color3.fromRGB(58, 46, 30)
-            cell.TextScaled = true
-            cell.Font = Enum.Font.GothamBlack
+            cell.TextSize = 66 -- ~2/3 of cell height: legible without shouting
+            cell.Font = Enum.Font.GothamMedium
             cell.Text = " "
             cell.Parent = gui
+            -- split-flap midline: the fold seam every real flap board wears
+            local seam = Instance.new("Frame")
+            seam.Size = UDim2.new(1, 0, 0, 4)
+            seam.Position = UDim2.new(0, 0, 0.5, -2)
+            seam.BackgroundColor3 = Color3.fromRGB(189, 180, 160)
+            seam.BorderSizePixel = 0
+            seam.ZIndex = 3
+            seam.Parent = cell
             grid[r][c] = cell
         end
     end
