@@ -27,7 +27,7 @@
                 "JumbotronBoard": {
                     "$className": "Part",
                     "$properties": {
-                        "Anchored": true, "Size": [84, 27, 1], "CFrame": [0, 90, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
+                        "Anchored": true, "Size": [168, 54, 1], "CFrame": [0, 90, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
                         "Color": [0.16, 0.13, 0.09]
                     }
                 },

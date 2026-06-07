@@ -24,15 +24,15 @@ local GLYPH = { R = "○", P = "─", S = "∧" }
 local faces: { { { TextLabel } } } = {} -- face -> row -> col
 local current: { [number]: string } = {} -- row -> displayed line
 
--- Cell metrics: 2x canvas density + heavy face for read-at-distance
--- (gate feedback 2026-06-07: board doubled, font legibility).
-local CELL_W, CELL_H = 72, 104
-local CELL_STEP_X, CELL_STEP_Y = 80, 116
+-- Cell metrics: canvas density tracks the part size for crisp tiles
+-- (gate feedback 2026-06-07: board doubled twice, font legibility, seams).
+local CELL_W, CELL_H = 144, 208
+local CELL_STEP_X, CELL_STEP_Y = 160, 232
 
 local function buildFace(faceEnum: Enum.NormalId): { { TextLabel } }
     local gui = Instance.new("SurfaceGui")
     gui.Face = faceEnum
-    gui.CanvasSize = Vector2.new(2240, 720)
+    gui.CanvasSize = Vector2.new(4480, 1440)
     gui.Parent = board
     local grid: { { TextLabel } } = {}
     for r = 1, #ROWS do
@@ -40,17 +40,17 @@ local function buildFace(faceEnum: Enum.NormalId): { { TextLabel } }
         for c = 1, COLS do
             local cell = Instance.new("TextLabel")
             cell.Size = UDim2.fromOffset(CELL_W, CELL_H)
-            cell.Position = UDim2.fromOffset((c - 1) * CELL_STEP_X + 8, (r - 1) * CELL_STEP_Y + 12)
+            cell.Position = UDim2.fromOffset((c - 1) * CELL_STEP_X + 16, (r - 1) * CELL_STEP_Y + 24)
             cell.BackgroundColor3 = Color3.fromRGB(244, 238, 222)
             cell.TextColor3 = Color3.fromRGB(58, 46, 30)
-            cell.TextSize = 66 -- ~2/3 of cell height: legible without shouting
+            cell.TextSize = 132 -- ~2/3 of cell height: legible without shouting
             cell.Font = Enum.Font.GothamMedium
             cell.Text = " "
             cell.Parent = gui
             -- split-flap midline: the fold seam every real flap board wears
             local seam = Instance.new("Frame")
-            seam.Size = UDim2.new(1, 0, 0, 4)
-            seam.Position = UDim2.new(0, 0, 0.5, -2)
+            seam.Size = UDim2.new(1, 0, 0, 8)
+            seam.Position = UDim2.new(0, 0, 0.5, -4)
             seam.BackgroundColor3 = Color3.fromRGB(189, 180, 160)
             seam.BorderSizePixel = 0
             seam.ZIndex = 3
@@ -62,7 +62,7 @@ local function buildFace(faceEnum: Enum.NormalId): { { TextLabel } }
 end
 
 local function flapTo(cell: TextLabel, char: string)
-    local squash = TweenService:Create(cell, TweenInfo.new(0.04), { Size = UDim2.fromOffset(CELL_W, 8) })
+    local squash = TweenService:Create(cell, TweenInfo.new(0.04), { Size = UDim2.fromOffset(CELL_W, 16) })
     squash:Play()
     squash.Completed:Once(function()
         cell.Text = char
