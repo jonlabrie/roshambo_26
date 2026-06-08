@@ -4,7 +4,6 @@
 local fs = require("@lune/fs")
 local JsonEmit = require("./builders/JsonEmit")
 local Graybox = require("./builders/Graybox")
-local JumbotronFrame = require("./builders/JumbotronFrame")
 local Bonsho = require("./builders/Bonsho")
 local Shoro = require("./builders/Shoro")
 local Waterwheel = require("./builders/Waterwheel")
@@ -28,7 +27,6 @@ end
 
 local OUTPUTS: { [string]: any } = {
     ["Graybox"] = Graybox.build(ArenaLayout),
-    ["JumbotronFrame"] = JumbotronFrame.build(ArenaLayout),
     ["BonshoRig"] = Bonsho.build(ZenDojo.palette, ArenaLayout),
     ["Shoro"] = Shoro.build(ZenDojo.palette, ArenaLayout),
     ["Waterwheel"] = Waterwheel.build(ZenDojo.palette, ArenaLayout),

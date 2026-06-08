@@ -24,19 +24,11 @@
             "$className": "Workspace",
             "RoshamboStage": {
                 "$className": "Folder",
-                "JumbotronBoard": {
-                    "$className": "Part",
-                    "$properties": {
-                        "Anchored": true, "Size": [168, 96, 1], "CFrame": [0, 96, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1],
-                        "Color": [0.16, 0.13, 0.09]
-                    }
-                },
                 "BonshoRig": { "$path": "assets/BonshoRig.model.json" },
                 "Shoro": { "$path": "assets/Shoro.model.json" },
                 "Graybox": { "$path": "assets/Graybox.model.json" },
                 "Waterwheel": { "$path": "assets/Waterwheel.model.json" },
                 "Kakehi": { "$path": "assets/Kakehi.model.json" },
-                "JumbotronFrame": { "$path": "assets/JumbotronFrame.model.json" },
                 "ThrowDrum": { "$path": "assets/ThrowDrum.model.json" },
                 "ArenaSpawn": {
                     "$className": "SpawnLocation",

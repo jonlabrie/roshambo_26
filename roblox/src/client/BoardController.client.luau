@@ -15,7 +15,13 @@ local BoardData = remotes:WaitForChild("BoardData") :: RemoteEvent
 local RoundUpdate = remotes:WaitForChild("RoundUpdate") :: RemoteEvent
 local RevealTheater = remotes:WaitForChild("RevealTheater") :: RemoteEvent
 
-local board = workspace:WaitForChild("RoshamboStage"):WaitForChild("JumbotronBoard")
+-- Jumbotron removed (display redesign — kōsatsu boards + HUD, T23). Until the
+-- board renderer is retargeted to the kōsatsu, this controller no-ops if the
+-- old board part is absent.
+local board = workspace:WaitForChild("RoshamboStage"):FindFirstChild("JumbotronBoard")
+if not board then
+    return
+end
 
 local COLS = 18 -- fewer, bigger tiles read at distance (gate feedback 2026-06-07)
 local ROWS = { "LAST5", "WORLDREC", "HOTSTREAK", "PLAYERS", "TICKER1", "TICKER2" }
