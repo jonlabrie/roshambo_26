@@ -17,22 +17,28 @@ local RevealTheater = remotes:WaitForChild("RevealTheater") :: RemoteEvent
 
 local board = workspace:WaitForChild("RoshamboStage"):WaitForChild("JumbotronBoard")
 
-local COLS = 28
+local COLS = 18 -- fewer, bigger tiles read at distance (gate feedback 2026-06-07)
 local ROWS = { "LAST5", "WORLDREC", "HOTSTREAK", "PLAYERS", "TICKER1", "TICKER2" }
 local GLYPH = { R = "○", P = "─", S = "∧" }
 
 local faces: { { { TextLabel } } } = {} -- face -> row -> col
 local current: { [number]: string } = {} -- row -> displayed line
 
--- Cell metrics: canvas density tracks the part size for crisp tiles
--- (gate feedback 2026-06-07: board doubled twice, font legibility, seams).
-local CELL_W, CELL_H = 144, 208
-local CELL_STEP_X, CELL_STEP_Y = 160, 232
+-- Cell metrics: 18 cols × 6 rows over a high-res canvas. Big bold glyphs that
+-- nearly fill the tile so the board reads from across the bowl (gate feedback
+-- 2026-06-07: tiles were unreadable — too many, too thin, seam cut the glyph).
+local CANVAS_W, CANVAS_H = 4608, 1536
+local CELL_STEP_X = CANVAS_W / COLS -- 256
+local CELL_STEP_Y = CANVAS_H / #ROWS -- 256
+local CELL_GAP = 14
+local CELL_W = CELL_STEP_X - CELL_GAP
+local CELL_H = CELL_STEP_Y - CELL_GAP
+local GLYPH_SIZE = math.floor(CELL_H * 0.92) -- glyph nearly fills the tile height
 
 local function buildFace(faceEnum: Enum.NormalId): { { TextLabel } }
     local gui = Instance.new("SurfaceGui")
     gui.Face = faceEnum
-    gui.CanvasSize = Vector2.new(4480, 1440)
+    gui.CanvasSize = Vector2.new(CANVAS_W, CANVAS_H)
     gui.Parent = board
     local grid: { { TextLabel } } = {}
     for r = 1, #ROWS do
@@ -40,21 +46,24 @@ local function buildFace(faceEnum: Enum.NormalId): { { TextLabel } }
         for c = 1, COLS do
             local cell = Instance.new("TextLabel")
             cell.Size = UDim2.fromOffset(CELL_W, CELL_H)
-            cell.Position = UDim2.fromOffset((c - 1) * CELL_STEP_X + 16, (r - 1) * CELL_STEP_Y + 24)
+            cell.Position =
+                UDim2.fromOffset((c - 1) * CELL_STEP_X + CELL_GAP / 2, (r - 1) * CELL_STEP_Y + CELL_GAP / 2)
             cell.BackgroundColor3 = Color3.fromRGB(244, 238, 222)
-            cell.TextColor3 = Color3.fromRGB(58, 46, 30)
-            cell.TextSize = 132 -- ~2/3 of cell height: legible without shouting
-            cell.Font = Enum.Font.GothamMedium
+            cell.TextColor3 = Color3.fromRGB(40, 30, 18)
+            cell.TextSize = GLYPH_SIZE
+            cell.Font = Enum.Font.GothamBlack -- heaviest built-in face
             cell.Text = " "
             cell.Parent = gui
-            -- split-flap midline: the fold seam every real flap board wears
+            -- split-flap midline: thin fold seam, drawn UNDER the glyph (low
+            -- ZIndex) so it doesn't slice the character's legibility.
             local seam = Instance.new("Frame")
-            seam.Size = UDim2.new(1, 0, 0, 8)
-            seam.Position = UDim2.new(0, 0, 0.5, -4)
-            seam.BackgroundColor3 = Color3.fromRGB(189, 180, 160)
+            seam.Size = UDim2.new(1, 0, 0, 6)
+            seam.Position = UDim2.new(0, 0, 0.5, -3)
+            seam.BackgroundColor3 = Color3.fromRGB(196, 188, 168)
             seam.BorderSizePixel = 0
-            seam.ZIndex = 3
+            seam.ZIndex = 1
             seam.Parent = cell
+            cell.ZIndex = 2
             grid[r][c] = cell
         end
     end
@@ -62,7 +71,7 @@ local function buildFace(faceEnum: Enum.NormalId): { { TextLabel } }
 end
 
 local function flapTo(cell: TextLabel, char: string)
-    local squash = TweenService:Create(cell, TweenInfo.new(0.04), { Size = UDim2.fromOffset(CELL_W, 16) })
+    local squash = TweenService:Create(cell, TweenInfo.new(0.04), { Size = UDim2.fromOffset(CELL_W, 12) })
     squash:Play()
     squash.Completed:Once(function()
         cell.Text = char
@@ -109,9 +118,9 @@ end)
 
 RoundUpdate.OnClientEvent:Connect(function(info)
     if info.phase == "ACTIVE" then
-        setRow(5, "THE WORLD CHOOSES SOON")
+        setRow(5, "WORLD CHOOSES SOON")
     elseif info.phase == "TALLY" then
-        setRow(5, "THE WORLD CHOOSES NOW")
+        setRow(5, "WORLD CHOOSES NOW")
     end
 end)
 

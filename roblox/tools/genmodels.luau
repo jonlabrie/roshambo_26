@@ -4,6 +4,7 @@
 local fs = require("@lune/fs")
 local JsonEmit = require("./builders/JsonEmit")
 local Graybox = require("./builders/Graybox")
+local JumbotronFrame = require("./builders/JumbotronFrame")
 local ArenaLayout = require("./builders/ArenaLayout")
 
 local function toRojo(spec): any
@@ -21,6 +22,7 @@ end
 
 local OUTPUTS: { [string]: any } = {
     ["Graybox"] = Graybox.build(ArenaLayout),
+    ["JumbotronFrame"] = JumbotronFrame.build(ArenaLayout),
 }
 
 if not fs.isDir("assets") then
