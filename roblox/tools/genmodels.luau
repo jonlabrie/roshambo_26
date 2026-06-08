@@ -7,6 +7,7 @@ local Graybox = require("./builders/Graybox")
 local JumbotronFrame = require("./builders/JumbotronFrame")
 local Bonsho = require("./builders/Bonsho")
 local Shoro = require("./builders/Shoro")
+local Waterwheel = require("./builders/Waterwheel")
 local ArenaLayout = require("./builders/ArenaLayout")
 local ZenDojo = require("../src/shared/themes/ZenDojo")
 
@@ -28,6 +29,7 @@ local OUTPUTS: { [string]: any } = {
     ["JumbotronFrame"] = JumbotronFrame.build(ArenaLayout),
     ["BonshoRig"] = Bonsho.build(ZenDojo.palette, ArenaLayout),
     ["Shoro"] = Shoro.build(ZenDojo.palette, ArenaLayout),
+    ["Waterwheel"] = Waterwheel.build(ZenDojo.palette, ArenaLayout),
 }
 
 if not fs.isDir("assets") then
