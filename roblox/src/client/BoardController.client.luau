@@ -24,23 +24,24 @@ local GLYPH = { R = "○", P = "─", S = "∧" }
 local faces: { { { TextLabel } } } = {} -- face -> row -> col
 local current: { [number]: string } = {} -- row -> displayed line
 
--- Cell metrics: 18 cols × 6 rows over a high-res canvas. Big bold glyphs that
--- nearly fill the tile so the board reads from across the bowl (gate feedback
--- 2026-06-07: tiles were unreadable — too many, too thin, seam cut the glyph).
--- Scale-based layout: cells are fractions of the board face and glyphs use
--- TextScaled, so each glyph fills its tile regardless of the SurfaceGui's
--- canvas-pixel mapping (the prior fixed-pixel TextSize rendered tiny because
--- the canvas mapped at a different scale than assumed). CanvasSize only sets
--- render crispness now, not layout. (gate feedback 2026-06-07)
-local CELL_W = 1 / COLS -- scale
+-- Cell metrics. KEY CONSTRAINT (learned the hard way 2026-06-07): Roblox
+-- TextLabel.TextSize is hard-capped at 100px and TextScaled does not reliably
+-- scale up on this SurfaceGui. So instead of a big canvas + big TextSize, use a
+-- SMALL canvas where the 100px-capped glyph is already large relative to it;
+-- the SurfaceGui stretches that small canvas across the 96-stud board, so a
+-- TextSize-90 glyph maps to ~10 studs tall — readable across the bowl.
+local CELL_W = 1 / COLS -- scale (positions/sizes are fractions of the face)
 local CELL_H = 1 / #ROWS -- scale
-local PAD = 0.06 -- inset fraction within each cell
+local PAD = 0.08 -- inset fraction within each cell
+local CANVAS_H = #ROWS * 150 -- ~150 canvas-px per row → the 90px glyph reads big
+local CANVAS_W = math.floor(CANVAS_H * 168 / 96) -- match the 168x96 board aspect
+local GLYPH_SIZE = 90 -- just under the 100px engine cap
 
 local function buildFace(faceEnum: Enum.NormalId): { { TextLabel } }
     local gui = Instance.new("SurfaceGui")
     gui.Face = faceEnum
     gui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
-    gui.CanvasSize = Vector2.new(4608, 2640)
+    gui.CanvasSize = Vector2.new(CANVAS_W, CANVAS_H)
     gui.Parent = board
     local grid: { { TextLabel } } = {}
     for r = 1, #ROWS do
@@ -52,7 +53,8 @@ local function buildFace(faceEnum: Enum.NormalId): { { TextLabel } }
                 UDim2.fromScale((c - 1) * CELL_W + CELL_W * PAD / 2, (r - 1) * CELL_H + CELL_H * PAD / 2)
             cell.BackgroundColor3 = Color3.fromRGB(244, 238, 222)
             cell.TextColor3 = Color3.fromRGB(40, 30, 18)
-            cell.TextScaled = true -- glyph fills the tile
+            cell.TextScaled = false
+            cell.TextSize = GLYPH_SIZE
             cell.Font = Enum.Font.GothamBlack -- heaviest built-in face
             cell.Text = " "
             cell.ZIndex = 2
