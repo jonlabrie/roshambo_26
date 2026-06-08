@@ -63,7 +63,7 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
         })
     )
     local roofHalf = s + 4
-    local pitch = 4.5
+    local pitch = 2.25 -- halved 2026-06-08: the roof slab read too thick under the drum
     local wedges = {
         { rot = { 1, 0, 0, 0, 1, 0, 0, 0, 1 }, pos = { 0, roofY + pitch / 2, roofHalf / 2 } },
         { rot = { -1, 0, 0, 0, 1, 0, 0, 0, -1 }, pos = { 0, roofY + pitch / 2, -roofHalf / 2 } },

@@ -14,8 +14,10 @@ local ArenaLayout = {
     },
     -- flooded paddy strip: outer N studs of each tier surface, against the wall
     paddyStripWidth = 10,
-    pavilion = { pos = { 0, 0, 0 }, postSpacing = 14, roofHeight = 18 },
-    bell = { pos = { 0, 7.5, 0 }, height = 9, radius = 3.4 }, -- bottom lip ~3 studs over water
+    pavilion = { pos = { 0, 0, 0 }, postSpacing = 18, roofHeight = 22 }, -- grown to clear the +50% bell
+    -- bell +50% (2026-06-08 gate): diameter ~10 matches the waterwheel; raised so
+    -- the taller body keeps ~3 studs of clearance over the basin water.
+    bell = { pos = { 0, 9.75, 0 }, height = 13.5, radius = 5.1 },
     shuMoku = {
         restPos = { 0, 6.2, 9.5 },
         length = 7,
@@ -58,7 +60,7 @@ local ArenaLayout = {
     heroTile = { pos = { 0, 18, 0 }, size = { 5, 6.5, 0.8 } },
     -- Hexagonal World-Throw drum atop the shōrō (ridge ~y22; y24 clears the
     -- y28 top tier enough to read). Horizontal axis = world X (E/W).
-    throwDrum = { pos = { 0, 29, 0 }, length = 14, radius = 7, faces = 6 },
+    throwDrum = { pos = { 0, 31, 0 }, length = 14, radius = 7, faces = 6 }, -- rides the raised roof
     spawn = { pos = { 0, 29, -188 } }, -- on the rim plaza, facing the bell
 }
 return ArenaLayout

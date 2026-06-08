@@ -61,12 +61,14 @@ describe("ArenaLayout", function()
         expect(L.spawn.pos[3] >= L.sando.fromZ and L.spawn.pos[3] <= L.sando.toZ).toBe(true)
         expect(math.abs(L.spawn.pos[1]) <= L.sando.width / 2).toBe(true)
     end)
-    test("vertical stack: jumbotron clears hero tile clears bell", function()
-        local jumboBottom = L.jumbotron.pos[2] - L.jumbotron.size[2] / 2
-        local heroTop = L.heroTile.pos[2] + L.heroTile.size[2] / 2
-        local heroBottom = L.heroTile.pos[2] - L.heroTile.size[2] / 2
+    test("vertical stack: drum clears the bell, roof clears the bell, bell clears the water", function()
+        -- The jumbotron/heroTile display was replaced by the throw drum atop the
+        -- shōrō; the live stack is drum → roof → suspended bell → basin water.
         local bellTop = L.bell.pos[2] + L.bell.height / 2
-        expect(jumboBottom > heroTop).toBe(true)
-        expect(heroBottom > bellTop).toBe(true)
+        local bellBottom = L.bell.pos[2] - L.bell.height / 2
+        local drumBottom = L.throwDrum.pos[2] - L.throwDrum.radius
+        expect(drumBottom > bellTop).toBe(true)
+        expect(L.pavilion.roofHeight > bellTop).toBe(true)
+        expect(bellBottom > 0).toBe(true)
     end)
 end)
