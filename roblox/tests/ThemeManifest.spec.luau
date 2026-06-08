@@ -98,7 +98,7 @@ describe("ThemeManifest", function()
     end)
 
     test("ZenDojo theme passes v2 validation", function()
-        local ok, errs = ThemeManifest.validate(ZenDojo)
+        local ok = ThemeManifest.validate(ZenDojo)
         expect(ok).toBe(true)
     end)
 end)

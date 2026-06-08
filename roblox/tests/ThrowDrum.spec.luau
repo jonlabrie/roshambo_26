@@ -13,10 +13,18 @@ describe("ThrowDrum builder", function()
             names[c.name] = true
         end
         expect(names["Drum"]).toBe(true)
+        expect(names["Shaft"]).toBe(true)
         for k = 0, 5 do
             expect(names["Face" .. k]).toBe(true)
         end
-        expect(names["Housing"] ~= nil).toBe(true)
+        -- 12 spokes (6 per end) form the open internal structure
+        local spokes = 0
+        for _, c in spec.children :: any do
+            if (c.name :: string):match("^Spoke%d+$") then
+                spokes += 1
+            end
+        end
+        expect(spokes).toBe(12)
     end)
     test("opposite faces carry the same symbol (R/P/S/R/P/S)", function()
         -- faces 0,3 share; 1,4 share; 2,5 share — verified by builder construction.
