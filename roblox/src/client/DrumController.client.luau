@@ -9,7 +9,6 @@
 -- only ships the timber slabs). 4b refines visuals.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local DrumStep = require(shared:WaitForChild("DrumStep"))
@@ -72,22 +71,26 @@ for k = 0, 5 do
     label.Parent = gui
 end
 
--- Geometry: at hub angle θ=0, face 3 sits at the −Z front window. The hub
--- rotates about its local X by θ; a face's world angle is k*60° + θ, and the
--- window is at 180°. Advancing `currentFace` by +1 needs θ to DECREASE by 60°
--- (θ = 180° − currentFace*60°). θ stays continuous (never reset) so no snap.
-local DETENT = math.rad(60)
-local STEP_TIME = 0.08
+-- MOTION (continuous, cue-anchored). The drum spins about the hub's local X by a
+-- continuous angle θ (decreasing). It does NOT use the round's TALLY phase — that
+-- arrives via REST polling and the 2s window is often skipped/late, which is why
+-- the old stepper "only span ~0.5s then jarred". Instead it anchors to the two
+-- RELIABLE EventBus cues the hammer drives off the clock:
+--   • latchClick (lockout)  → start a slow spin that gently decelerates
+--   • gongStrike (reveal)   → ease to rest on the World Throw (no snap)
+-- A face k sits at the −Z window when θ ≡ 180° − k*60° (mod 360°). θ is never
+-- reset, so the rest pose is always a true detent (never an edge).
+local TWO_PI = 2 * math.pi
+local SPIN_OMEGA0 = 5.0 -- rad/s at lockout (≈ a relaxed half-turn/sec drumroll)
+local SPIN_DAMP = 0.45 -- per-second exponential slow-down while spinning
+local SPIN_FLOOR = 1.1 -- keep drifting this slow until the strike lands it
+local LAND_RATE = 3.2 -- ease-out approach rate toward the resting detent
+local GRACE_TURNS = 1.5 -- extra full turns rolled into the landing for a soft finish
 
-local currentFace = 3 -- face at the −Z window at θ=0 → symbol R
-local theta = 0 -- continuous hub angle (radians)
--- Single-stepper state machine. Exactly one coroutine (`startStepper`) ever
--- advances the hub; TALLY/gongStrike/ACTIVE only set `mode`/`target`, never
--- spawn their own steppers. This removes the parallel-coroutine fights and the
--- overlapping-reveal races the old `rolling` + per-cue task.spawn design had.
-local mode = "idle" -- "idle" | "rolling" | "landing"
-local target: number? = nil -- face index to land on (landing mode only)
-local stepperAlive = false
+local theta = 0 -- continuous hub angle (radians); 0 → face 3 (R) at the window
+local omega = 0 -- current angular speed (rad/s)
+local mode = "hold" -- "hold" | "spin" | "land"
+local landTheta = 0 -- target θ (a detent) once landing
 local latestWorldThrow: string? = nil
 
 local function applyTheta()
@@ -97,85 +100,58 @@ local function applyTheta()
     end
 end
 
--- Tween the hub one +1 detent (currentFace += 1, θ -= 60°). Returns once the
--- tween completes so a stepper can await it (one tween at a time → no fights).
-local function stepOnce(duration: number)
-    currentFace = (currentFace + 1) % 6
-    theta -= DETENT
-    local targetCFrame = hub * CFrame.Angles(theta, 0, 0)
-    local tween =
-        TweenService:Create(drum, TweenInfo.new(duration, Enum.EasingStyle.Sine), { CFrame = targetCFrame })
-    tween:Play()
-    -- Heartbeat-follow the tweened hub so the faces track it each frame (the
-    -- faces aren't children of the hub, so they don't inherit its tween).
-    local hb = RunService.Heartbeat:Connect(function()
-        local spun = drum.CFrame
-        for i, p in spinParts do
-            p.CFrame = spun * spinOffsets[i]
-        end
-    end)
-    tween.Completed:Wait()
-    hb:Disconnect()
-    -- settle exactly on the detent (avoid float drift accumulating across steps)
-    applyTheta()
+-- The resting θ that shows `throw` at the window, placed GRACE_TURNS+ below the
+-- current θ so the ease-out rolls through a satisfying spin-down before settling.
+local function landTargetFor(throw: string): number
+    local sym = DrumStep.faceForThrow(throw) -- 0/1/2; face `sym` shows it
+    local tgt = math.rad(180 - sym * 60) -- a detent with `sym` at the −Z window
+    while tgt > theta - GRACE_TURNS * TWO_PI do
+        tgt -= TWO_PI -- step down (continuing the −θ spin direction)
+    end
+    return tgt
 end
 
 applyTheta()
 
--- The ONE stepper. While `mode ~= "idle"` it advances the hub one detent at a
--- time (each `stepOnce` awaited → never overlapping tweens, `currentFace`/`theta`
--- mutated only here). In "landing" mode it stops the instant it reaches `target`.
--- Guarded by `stepperAlive` so repeated `startStepper()` calls are idempotent —
--- TALLY, a missed-TALLY strike, and back-to-back reveals all share this loop.
-local function startStepper()
-    if stepperAlive then
-        return
-    end
-    stepperAlive = true
-    task.spawn(function()
-        while mode ~= "idle" do
-            local duration = if mode == "landing" then 0.12 else STEP_TIME
-            stepOnce(duration)
-            if mode == "landing" and currentFace == target then
-                mode = "idle"
-            end
+RunService.Heartbeat:Connect(function(dt)
+    if mode == "spin" then
+        omega = math.max(SPIN_FLOOR, omega * (1 - SPIN_DAMP * dt))
+        theta -= omega * dt
+        applyTheta()
+    elseif mode == "land" then
+        theta += (landTheta - theta) * math.min(1, LAND_RATE * dt)
+        if math.abs(landTheta - theta) < 0.004 then
+            theta = landTheta -- settle exactly on the detent
+            mode = "hold"
         end
-        stepperAlive = false
-    end)
-end
+        applyTheta()
+    end
+    -- "hold": faces stay put (showing the prior throw); no per-frame work needed
+end)
 
 RevealTheater.OnClientEvent:Connect(function(reveal)
     latestWorldThrow = reveal.worldThrow
 end)
 
 RoundUpdate.OnClientEvent:Connect(function(info)
-    if info.phase == "TALLY" then
-        -- start the rapid free drumroll: it does NOT know the target; it just
-        -- cycles +1 detents until the strike sets a landing target.
-        mode = "rolling"
-        target = nil
-        startStepper()
-    elseif info.phase == "ACTIVE" then
-        -- holding the prior throw; signal the stepper to exit after its current
-        -- step. The drum holds on the landed face = the prior throw.
-        mode = "idle"
+    -- Safety: a fresh ACTIVE means the previous round is well over; stop any spin
+    -- still running (e.g. a dropped reveal) and hold the last face.
+    if info.phase == "ACTIVE" and mode == "spin" then
+        mode = "hold"
     end
 end)
 
 EventBus.Cue.Event:Connect(function(cue)
-    if cue.kind ~= "gongStrike" then
-        return
+    if cue.kind == "latchClick" then
+        -- picks closed: the world spins up its decision.
+        omega = SPIN_OMEGA0
+        mode = "spin"
+    elseif cue.kind == "gongStrike" then
+        local throw = latestWorldThrow
+        if not throw then
+            return -- nothing authoritative yet; keep spinning/holding
+        end
+        landTheta = landTargetFor(throw)
+        mode = "land" -- ease-out to rest on the throw (decelerating, no snap)
     end
-    local throw = latestWorldThrow
-    if not throw then
-        return -- nothing authoritative yet; hold wherever we are
-    end
-    -- Aim the (single) stepper at the result and switch to landing. landingStep
-    -- returns a face 1..3 +1-steps ahead of `currentFace`, so the stepper always
-    -- reaches it continuing the same +1 direction. A second strike just re-sets
-    -- target/mode (idempotent); startStepper no-ops while one is already running,
-    -- and starts a fresh one only if TALLY was missed.
-    target = DrumStep.landingStep(currentFace, throw)
-    mode = "landing"
-    startStepper()
 end)
