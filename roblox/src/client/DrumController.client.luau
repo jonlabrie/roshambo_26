@@ -77,20 +77,20 @@ end
 -- the old stepper "only span ~0.5s then jarred". Instead it anchors to the two
 -- RELIABLE EventBus cues the hammer drives off the clock:
 --   • latchClick (lockout)  → start a slow spin that gently decelerates
---   • gongStrike (reveal)   → ease to rest on the World Throw (no snap)
--- A face k sits at the −Z window when θ ≡ 180° − k*60° (mod 360°). θ is never
+--   • gongStrike (reveal)   → decelerate to rest on the World Throw (no snap)
+-- A face k sits at the −Z window when θ ≡ 180° + k*60° (mod 360°). Because face
+-- k and k+3 share a glyph, any one symbol recurs every 180° (π) of θ. θ is never
 -- reset, so the rest pose is always a true detent (never an edge).
-local TWO_PI = 2 * math.pi
 local SPIN_OMEGA0 = 5.0 -- rad/s at lockout (≈ a relaxed half-turn/sec drumroll)
 local SPIN_DAMP = 0.45 -- per-second exponential slow-down while spinning
-local SPIN_FLOOR = 1.1 -- keep drifting this slow until the strike lands it
-local LAND_RATE = 3.2 -- ease-out approach rate toward the resting detent
-local GRACE_TURNS = 1.5 -- extra full turns rolled into the landing for a soft finish
+local SPIN_FLOOR = 2.0 -- keep drifting this fast until the strike lands it
+local GLIDE = 1.3 -- nominal seconds the landing glide should take to rest
 
-local theta = 0 -- continuous hub angle (radians); 0 → face 3 (R) at the window
+local theta = 0 -- continuous hub angle (radians); decreases as the drum spins
 local omega = 0 -- current angular speed (rad/s)
 local mode = "hold" -- "hold" | "spin" | "land"
 local landTheta = 0 -- target θ (a detent) once landing
+local landDecel = 0 -- constant angular deceleration (rad/s²) during landing
 local latestWorldThrow: string? = nil
 
 local function applyTheta()
@@ -100,13 +100,14 @@ local function applyTheta()
     end
 end
 
--- The resting θ that shows `throw` at the window, placed GRACE_TURNS+ below the
--- current θ so the ease-out rolls through a satisfying spin-down before settling.
-local function landTargetFor(throw: string): number
+-- The resting θ that shows `throw` at the −Z window, placed at least `dmin`
+-- below the current θ so the drum keeps turning the same direction into rest.
+-- Detents for a given symbol recur every π (face `sym` and `sym`+3 share it).
+local function landTargetFor(throw: string, dmin: number): number
     local sym = DrumStep.faceForThrow(throw) -- 0/1/2; face `sym` shows it
-    local tgt = math.rad(180 - sym * 60) -- a detent with `sym` at the −Z window
-    while tgt > theta - GRACE_TURNS * TWO_PI do
-        tgt -= TWO_PI -- step down (continuing the −θ spin direction)
+    local tgt = math.rad(180 + sym * 60) -- a detent with `sym` at the −Z window
+    while tgt > theta - dmin do
+        tgt -= math.pi -- step down by a half-turn (continuing the −θ direction)
     end
     return tgt
 end
@@ -119,10 +120,15 @@ RunService.Heartbeat:Connect(function(dt)
         theta -= omega * dt
         applyTheta()
     elseif mode == "land" then
-        theta += (landTheta - theta) * math.min(1, LAND_RATE * dt)
-        if math.abs(landTheta - theta) < 0.004 then
+        -- constant deceleration continuing from the live spin speed: no jump,
+        -- ω falls to 0 exactly as θ reaches the detent.
+        omega -= landDecel * dt
+        if omega <= 0 or theta <= landTheta then
             theta = landTheta -- settle exactly on the detent
+            omega = 0
             mode = "hold"
+        else
+            theta -= omega * dt
         end
         applyTheta()
     end
@@ -151,7 +157,16 @@ EventBus.Cue.Event:Connect(function(cue)
         if not throw then
             return -- nothing authoritative yet; keep spinning/holding
         end
-        landTheta = landTargetFor(throw)
-        mode = "land" -- ease-out to rest on the throw (decelerating, no snap)
+        -- Pick a detent at least far enough ahead to glide into at the current
+        -- speed (ω·GLIDE/2 is the constant-decel stopping distance), but never a
+        -- snap-short quarter turn. Then solve the decel that lands ω at 0 there.
+        if omega < SPIN_FLOOR then
+            omega = SPIN_FLOOR -- ensure a live speed to decelerate from
+        end
+        local dmin = math.max(omega * GLIDE * 0.5, math.rad(90))
+        landTheta = landTargetFor(throw, dmin)
+        local dist = theta - landTheta
+        landDecel = (omega * omega) / (2 * dist)
+        mode = "land" -- decelerate to rest on the throw (no snap)
     end
 end)
