@@ -27,11 +27,12 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
     local timber = palette.timber
     local ink = palette.ink
 
-    local rr = r - 0.3 -- radius the face slabs sit at
     local step = (2 * math.pi) / faces -- 60° per face
-    local faceW = 2 * rr * math.tan(math.pi / faces) -- flat hexagon-face width
+    local apothem = r * math.cos(math.pi / faces) -- center→edge-midpoint (face sits here)
+    local side = 2 * r * math.sin(math.pi / faces) -- hexagon edge length (= r for a hexagon)
+    local faceW = side * 1.04 -- slight overlap so faces meet cleanly at the vertices
 
-    -- Top-level model children: the hub + 6 faces, plus a Housing sub-model.
+    -- Top-level model children: the hub + solid core + 6 faces, plus Housing.
     local top: { Spec.PartSpec } = {}
 
     -- invisible rotation hub: its local X is the spin axis the controller turns
@@ -46,16 +47,30 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
         })
     )
 
-    -- 6 timber slabs around the X axis. Face k is at angle k*60° from +Z (so
-    -- face 0 faces +Z/back, face 3 faces −Z/front at drum angle θ=0).
+    -- solid round core (round axis = local X = the spin axis) so the drum reads
+    -- as one solid body, not 6 floating panels. Static — a round cylinder looks
+    -- identical spun, so the controller only needs to rotate the lettered faces.
+    table.insert(
+        top,
+        Spec.part("Core", {
+            Size = { length, 2 * (apothem - 0.2), 2 * (apothem - 0.2) },
+            Shape = "Cylinder",
+            CFrame = Spec.cframe({ px, py, pz }),
+            Color = timber,
+            Material = "Wood",
+        })
+    )
+
+    -- 6 timber faces tiling a closed hexagon at the apothem. Face k is at angle
+    -- k*60° from +Z (so face 0 faces +Z/back, face 3 faces −Z/front at θ=0).
     for k = 0, faces - 1 do
         local a = k * step
-        local fy = py + rr * math.sin(a)
-        local fz = pz + rr * math.cos(a)
+        local fy = py + apothem * math.sin(a)
+        local fz = pz + apothem * math.cos(a)
         table.insert(
             top,
             Spec.part(`Face{k}`, {
-                Size = { length, faceW, 0.4 },
+                Size = { length, faceW, 0.5 },
                 CFrame = Spec.cframe({ px, fy, fz }, rotX(a)),
                 Color = timber,
                 Material = "Wood",

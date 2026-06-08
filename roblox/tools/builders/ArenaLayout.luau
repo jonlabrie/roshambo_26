@@ -31,7 +31,7 @@ local ArenaLayout = {
         ropeBottomRest = { 0, 6.2, 13 }, -- the log's back end (rest); the rope's log end
     }, -- draws toward +Z
     flume = {
-        poolPos = { 0, 20, 48 }, -- raised header cistern on the Z axis, north of the wheel
+        poolPos = { 0, 26, 62 }, -- raised header cistern on the Z axis, north of the wheel
         poolSize = { 10, 2, 8 },
         wheelPos = { 0, 7, 26 }, -- directly north of the log, on the Z axis
         wheelRadius = 5,

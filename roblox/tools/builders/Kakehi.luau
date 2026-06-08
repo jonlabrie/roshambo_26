@@ -5,11 +5,18 @@ local Spec = require("./Spec")
 
 local Kakehi = {}
 
-local SEGMENTS = 4
+local SEGMENTS = 6
 
 function Kakehi.build(palette: { [string]: { number } }, L: any)
+    -- The flume drops water onto the wheel's NORTH (+Z) upper quadrant — the
+    -- side that descends — not the apex, so it actually drives the wheel.
+    local wr = L.flume.wheelRadius
     local from = { L.flume.poolPos[1], L.flume.poolPos[2] + 0.8, L.flume.poolPos[3] }
-    local to = { L.flume.wheelPos[1], L.flume.wheelPos[2] + L.flume.wheelRadius + 1.2, L.flume.wheelPos[3] }
+    local to = {
+        L.flume.wheelPos[1],
+        L.flume.wheelPos[2] + wr * 0.55,
+        L.flume.wheelPos[3] + wr * 0.7,
+    }
     local children = {
         Spec.part("Pool", {
             Size = L.flume.poolSize,
@@ -48,7 +55,7 @@ function Kakehi.build(palette: { [string]: { number } }, L: any)
     local dx = (to[1] - from[1]) / SEGMENTS
     local dy = (to[2] - from[2]) / SEGMENTS
     local dz = (to[3] - from[3]) / SEGMENTS
-    local segLen = math.sqrt(dx * dx + dz * dz) + 0.6
+    local segLen = math.sqrt(dx * dx + dz * dz) + 1.8 -- overlap so segments read as one channel
     -- yaw the trough so its local Z (length) points along the pool→wheel run.
     -- Spec.yaw maps local Z → (sin θ, 0, cos θ); θ = atan2(dx, dz) = the heading.
     local rot = Spec.yaw(math.deg(math.atan2(dx, dz)))
