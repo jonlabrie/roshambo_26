@@ -37,6 +37,12 @@ local CANVAS_H = #ROWS * 150 -- ~150 canvas-px per row → the 90px glyph reads 
 local CANVAS_W = math.floor(CANVAS_H * 168 / 96) -- match the 168x96 board aspect
 local GLYPH_SIZE = 90 -- just under the 100px engine cap
 
+-- Each tile is a Frame (ivory bg + center seam) holding a transparent glyph
+-- label. The glyph label carries a UIPadding to optically center all-caps (the
+-- line box reserves descender space, so caps ride high without it); the seam is
+-- a sibling of the glyph so the padding never shifts it. (gate 2026-06-07)
+local BOARD_FONT = Enum.Font.Merriweather -- warm elegant serif
+
 local function buildFace(faceEnum: Enum.NormalId): { { TextLabel } }
     local gui = Instance.new("SurfaceGui")
     gui.Face = faceEnum
@@ -47,41 +53,56 @@ local function buildFace(faceEnum: Enum.NormalId): { { TextLabel } }
     for r = 1, #ROWS do
         grid[r] = {}
         for c = 1, COLS do
-            local cell = Instance.new("TextLabel")
-            cell.Size = UDim2.fromScale(CELL_W * (1 - PAD), CELL_H * (1 - PAD))
-            cell.Position =
+            local tile = Instance.new("Frame")
+            tile.Size = UDim2.fromScale(CELL_W * (1 - PAD), CELL_H * (1 - PAD))
+            tile.Position =
                 UDim2.fromScale((c - 1) * CELL_W + CELL_W * PAD / 2, (r - 1) * CELL_H + CELL_H * PAD / 2)
-            cell.BackgroundColor3 = Color3.fromRGB(244, 238, 222)
-            cell.TextColor3 = Color3.fromRGB(40, 30, 18)
-            cell.TextScaled = false
-            cell.TextSize = GLYPH_SIZE
-            cell.Font = Enum.Font.JosefinSans -- elegant airy face (gate pick 2026-06-07)
-            cell.Text = " "
-            cell.ZIndex = 2
-            cell.Parent = gui
-            -- split-flap midline: thin fold seam drawn OVER the glyph.
+            tile.BackgroundColor3 = Color3.fromRGB(244, 238, 222)
+            tile.BorderSizePixel = 0
+            tile.ClipsDescendants = true
+            tile.ZIndex = 2
+            tile.Parent = gui
+
             local seam = Instance.new("Frame")
-            seam.Size = UDim2.fromScale(1, 0.04)
-            seam.Position = UDim2.fromScale(0, 0.48)
+            seam.Size = UDim2.fromScale(1, 0.035)
+            seam.Position = UDim2.fromScale(0, 0.5)
+            seam.AnchorPoint = Vector2.new(0, 0.5)
             seam.BackgroundColor3 = Color3.fromRGB(150, 142, 124)
             seam.BorderSizePixel = 0
-            seam.ZIndex = 5
-            seam.Parent = cell
-            grid[r][c] = cell
+            seam.ZIndex = 4
+            seam.Parent = tile
+
+            local glyph = Instance.new("TextLabel")
+            glyph.Size = UDim2.fromScale(1, 1)
+            glyph.BackgroundTransparency = 1
+            glyph.TextColor3 = Color3.fromRGB(40, 30, 18)
+            glyph.TextScaled = false
+            glyph.TextSize = GLYPH_SIZE
+            glyph.Font = BOARD_FONT
+            glyph.TextXAlignment = Enum.TextXAlignment.Center
+            glyph.TextYAlignment = Enum.TextYAlignment.Center
+            glyph.Text = " "
+            glyph.ZIndex = 3
+            glyph.Parent = tile
+            local pad = Instance.new("UIPadding")
+            pad.PaddingTop = UDim.new(0.1, 0) -- drop the cap to optical center
+            pad.Parent = glyph
+
+            grid[r][c] = glyph
         end
     end
     return grid
 end
 
-local CELL_FULL = UDim2.fromScale(CELL_W * (1 - PAD), CELL_H * (1 - PAD))
-local CELL_SQUASHED = UDim2.fromScale(CELL_W * (1 - PAD), 0.004)
+local GLYPH_FULL = UDim2.fromScale(1, 1)
+local GLYPH_SQUASHED = UDim2.fromScale(1, 0.05)
 
 local function flapTo(cell: TextLabel, char: string)
-    local squash = TweenService:Create(cell, TweenInfo.new(0.04), { Size = CELL_SQUASHED })
+    local squash = TweenService:Create(cell, TweenInfo.new(0.04), { Size = GLYPH_SQUASHED })
     squash:Play()
     squash.Completed:Once(function()
         cell.Text = char
-        TweenService:Create(cell, TweenInfo.new(0.04), { Size = CELL_FULL }):Play()
+        TweenService:Create(cell, TweenInfo.new(0.04), { Size = GLYPH_FULL }):Play()
     end)
 end
 
