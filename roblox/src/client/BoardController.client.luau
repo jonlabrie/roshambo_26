@@ -55,7 +55,7 @@ local function buildFace(faceEnum: Enum.NormalId): { { TextLabel } }
             cell.TextColor3 = Color3.fromRGB(40, 30, 18)
             cell.TextScaled = false
             cell.TextSize = GLYPH_SIZE
-            cell.Font = Enum.Font.GothamBlack -- heaviest built-in face
+            cell.Font = Enum.Font.JosefinSans -- elegant airy face (gate pick 2026-06-07)
             cell.Text = " "
             cell.ZIndex = 2
             cell.Parent = gui
