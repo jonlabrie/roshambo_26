@@ -103,82 +103,8 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
         )
     end
 
-    -- Miya housing: a timber box around the drum with a front (−Z) and back (+Z)
-    -- aperture each ~one face wide, so only the front/back faces show. Rough; the
-    -- art pass refines.
-    local housing: { Spec.PartSpec } = {}
-    local boxLen = length + 2
-    local wallT = 0.5
-    local apertureW = faceW + 1 -- one-face-wide window, a touch of slack
-    local sideZ = r + 0.4 -- inner Z faces of the housing
-
-    -- left/right end caps (X extremes) hide the inside faces from the ends
-    for i, ex in { -(boxLen / 2 + wallT / 2), boxLen / 2 + wallT / 2 } do
-        table.insert(
-            housing,
-            Spec.part(`HousingEnd{i}`, {
-                Size = { wallT, 2 * r + 1, 2 * sideZ + wallT },
-                CFrame = Spec.cframe({ px + ex, py, pz }),
-                Color = timber,
-                Material = "Wood",
-            })
-        )
-    end
-
-    -- front (−Z) and back (+Z) panels: two posts framing the central aperture,
-    -- plus a lintel above it, so a single face peeks through each window.
-    local sideRun = (boxLen - apertureW) / 2 -- width of each framing post per side
-    for _, zdir in { -1, 1 } do
-        local label = if zdir < 0 then "Front" else "Back"
-        local zw = pz + zdir * (sideZ + wallT / 2)
-        for j, sx in { -(apertureW / 2 + sideRun / 2), apertureW / 2 + sideRun / 2 } do
-            table.insert(
-                housing,
-                Spec.part(`Housing{label}{j}`, {
-                    Size = { sideRun, 2 * r + 1, wallT },
-                    CFrame = Spec.cframe({ px + sx, py, zw }),
-                    Color = timber,
-                    Material = "Wood",
-                })
-            )
-        end
-        table.insert(
-            housing,
-            Spec.part(`Housing{label}Lintel`, {
-                Size = { apertureW, r, wallT },
-                CFrame = Spec.cframe({ px, py + r / 2 + 0.5, zw }),
-                Color = timber,
-                Material = "Wood",
-            })
-        )
-    end
-
-    -- simple hipped roof: two wedges meeting at a ridge running along X
-    local roofHalf = sideZ + wallT + 1.5
-    local pitch = 3
-    local roofY = py + r + 1 + pitch / 2
-    local wedges = {
-        { rot = { 1, 0, 0, 0, 1, 0, 0, 0, 1 }, pos = { px, roofY, pz + roofHalf / 2 } },
-        { rot = { -1, 0, 0, 0, 1, 0, 0, 0, -1 }, pos = { px, roofY, pz - roofHalf / 2 } },
-    }
-    for i, w in wedges do
-        table.insert(
-            housing,
-            {
-                name = `HousingRoof{i}`,
-                className = "WedgePart",
-                properties = {
-                    Anchored = true,
-                    Size = { boxLen + 2 * wallT, pitch, roofHalf },
-                    CFrame = Spec.cframe(w.pos, w.rot),
-                    Color = ink,
-                    Material = "Slate",
-                },
-            } :: Spec.PartSpec
-        )
-    end
-
-    table.insert(top, Spec.model("Housing", housing))
+    -- No housing: the open hex prism reads clearly on its own. A roof matching
+    -- the kōsatsu signboards may be added over it later (T23 design pass).
 
     return Spec.model("ThrowDrum", top)
 end

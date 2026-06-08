@@ -48,26 +48,28 @@ local GLYPH = { [0] = "○", [1] = "─", [2] = "∧" }
 local GOLD = Color3.fromRGB(212, 176, 102)
 for k = 0, 5 do
     local face = faces[k]
-    -- Front (+local Z) and Back (−local Z) of the slab both can face a window
-    -- across the drum's half-turn, so label both faces of the slab.
-    for _, faceEnum in { Enum.NormalId.Front, Enum.NormalId.Back } do
-        local gui = Instance.new("SurfaceGui")
-        gui.Face = faceEnum
-        gui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
-        gui.CanvasSize = Vector2.new(300, 300)
-        gui.Parent = face
-        local label = Instance.new("TextLabel")
-        label.Size = UDim2.fromScale(1, 1)
-        label.BackgroundTransparency = 1
-        label.TextColor3 = GOLD
-        label.TextScaled = false
-        label.TextSize = 200
-        label.Font = Enum.Font.GothamBlack
-        label.TextXAlignment = Enum.TextXAlignment.Center
-        label.TextYAlignment = Enum.TextYAlignment.Center
-        label.Text = GLYPH[k % 3]
-        label.Parent = gui
-    end
+    -- Only the OUTWARD face (local +Z = the radial/visible side) carries the
+    -- glyph; the inward side faces the open interior and would be a duplicate.
+    -- Canvas matches the face's X:Y aspect so the glyph stays round (a square
+    -- canvas on the 2:1 slab squashed the ring into an oval). Small canvas +
+    -- fixed TextSize so the glyph reads big (TextSize caps at 100px).
+    local fs = face.Size
+    local gui = Instance.new("SurfaceGui")
+    gui.Face = Enum.NormalId.Front
+    gui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+    gui.CanvasSize = Vector2.new(math.floor(100 * fs.X / fs.Y), 100)
+    gui.Parent = face
+    local label = Instance.new("TextLabel")
+    label.Size = UDim2.fromScale(1, 1)
+    label.BackgroundTransparency = 1
+    label.TextColor3 = GOLD
+    label.TextScaled = false
+    label.TextSize = 92
+    label.Font = Enum.Font.GothamBlack
+    label.TextXAlignment = Enum.TextXAlignment.Center
+    label.TextYAlignment = Enum.TextYAlignment.Center
+    label.Text = GLYPH[k % 3]
+    label.Parent = gui
 end
 
 -- Geometry: at hub angle θ=0, face 3 sits at the −Z front window. The hub
