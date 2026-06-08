@@ -12,37 +12,6 @@ function Graybox.build(L)
             CFrame = Spec.cframe({ L.torii.pos[1], L.torii.pos[2] + 6, L.torii.pos[3] }),
             Color = GRAY,
         }),
-        Spec.part("FlumeShell", {
-            Size = {
-                2,
-                1.5,
-                math.sqrt(
-                    (L.flume.poolPos[1] - L.flume.wheelPos[1]) ^ 2
-                        + (L.flume.poolPos[3] - L.flume.wheelPos[3]) ^ 2
-                ),
-            },
-            CFrame = Spec.cframe(
-                {
-                    (L.flume.poolPos[1] + L.flume.wheelPos[1]) / 2,
-                    (L.flume.poolPos[2] + L.flume.wheelPos[2] + L.flume.wheelRadius) / 2 + 1,
-                    (L.flume.poolPos[3] + L.flume.wheelPos[3]) / 2,
-                },
-                Spec.yaw(
-                    math.deg(
-                        math.atan2(
-                            L.flume.poolPos[1] - L.flume.wheelPos[1],
-                            L.flume.poolPos[3] - L.flume.wheelPos[3]
-                        )
-                    )
-                )
-            ),
-            Color = GRAY,
-        }),
-        Spec.part("PoolShell", {
-            Size = L.flume.poolSize,
-            CFrame = Spec.cframe(L.flume.poolPos),
-            Color = { 0.3, 0.45, 0.55 },
-        }),
         Spec.part("SteleShell", {
             Size = { 4, 7, 1.2 },
             CFrame = Spec.cframe({ L.stele.pos[1], L.stele.pos[2] + 3.5, L.stele.pos[3] }),
