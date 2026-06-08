@@ -44,7 +44,7 @@ local ArenaLayout = {
     heroTile = { pos = { 0, 18, 0 }, size = { 5, 6.5, 0.8 } },
     -- Hexagonal World-Throw drum atop the shōrō (ridge ~y22; y24 clears the
     -- y28 top tier enough to read). Horizontal axis = world X (E/W).
-    throwDrum = { pos = { 0, 24, 0 }, length = 10, radius = 6, faces = 6 },
+    throwDrum = { pos = { 0, 29, 0 }, length = 14, radius = 7, faces = 6 },
     spawn = { pos = { 0, 29, -188 } }, -- on the rim plaza, facing the bell
 }
 return ArenaLayout

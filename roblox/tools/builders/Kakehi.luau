@@ -29,9 +29,9 @@ function Kakehi.build(palette: { [string]: { number } }, L: any)
     local dy = (to[2] - from[2]) / SEGMENTS
     local dz = (to[3] - from[3]) / SEGMENTS
     local segLen = math.sqrt(dx * dx + dz * dz) + 0.6
-    local yaw = math.atan2(dx, dz)
-    local cy, sy = math.cos(yaw), math.sin(yaw)
-    local rot = { sy, 0, cy, 0, 1, 0, cy, 0, -sy }
+    -- yaw the trough so its local Z (length) points along the pool→wheel run.
+    -- Spec.yaw maps local Z → (sin θ, 0, cos θ); θ = atan2(dx, dz) = the heading.
+    local rot = Spec.yaw(math.deg(math.atan2(dx, dz)))
     for i = 1, SEGMENTS do
         local cxp = from[1] + dx * (i - 0.5)
         local cyp = from[2] + dy * (i - 0.5)
