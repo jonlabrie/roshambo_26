@@ -23,22 +23,14 @@ function Waterwheel.build(palette: { [string]: { number } }, L: any)
             Color = palette.ink,
             Material = "Metal",
         }),
+        -- on the south face of the wheel, between wheel and log; the runtime
+        -- DriveRope (HammerController) leaves from here toward the log.
         Spec.part("RatchetDrum", {
             Size = { 1.6, 1.6, 1.6 },
             Shape = "Cylinder",
-            CFrame = Spec.cframe({ w[1] + 2.4, w[2], w[3] }),
+            CFrame = Spec.cframe({ w[1], w[2], w[3] - 2.4 }),
             Color = palette.ink,
             Material = "Metal",
-        }),
-        Spec.part("DrawRope", {
-            Size = { 0.25, 0.25, 11 },
-            CFrame = Spec.cframe({
-                (w[1] + L.shuMoku.restPos[1]) / 2 + 1.2,
-                (w[2] + L.shuMoku.restPos[2]) / 2,
-                (w[3] + L.shuMoku.restPos[3]) / 2,
-            }),
-            Color = { 0.55, 0.48, 0.35 },
-            Material = "Fabric",
         }),
     }
     for i = 1, 8 do

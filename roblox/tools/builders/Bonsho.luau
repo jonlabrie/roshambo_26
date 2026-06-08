@@ -77,13 +77,45 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
             Material = "Wood",
         })
     )
-    for i, off in { -2.2, 2.2 } do
+    -- Gantry: two side rails (along Z at x = ±railX, y = railY) on four posts.
+    local sm = L.shuMoku
+    local railX, railY = sm.railX, sm.railY
+    local railZ1, railZ2 = sm.railZ[1], sm.railZ[2]
+    local railLen = railZ2 - railZ1 + 1
+    local railMidZ = (railZ1 + railZ2) / 2
+    local y2 = 2 -- gantry posts rise from the apron gravel
+    for i, rx in { railX, -railX } do
+        table.insert(
+            children,
+            Spec.part(`Rail{i}`, {
+                Size = { 0.8, 0.8, railLen },
+                CFrame = Spec.cframe({ rx, railY, railMidZ }),
+                Color = palette.timber,
+                Material = "Wood",
+            })
+        )
+    end
+    local postSpots = { { railX, railZ1 }, { -railX, railZ1 }, { railX, railZ2 }, { -railX, railZ2 } }
+    for i, spot in postSpots do
+        table.insert(
+            children,
+            Spec.part(`GantryPost{i}`, {
+                Size = { 0.8, railY - y2, 0.8 },
+                CFrame = Spec.cframe({ spot[1], (railY + y2) / 2, spot[2] }),
+                Color = palette.timber,
+                Material = "Wood",
+            })
+        )
+    end
+    -- 4 angled chains: fixed rail tops down to the log's rest attach points.
+    for i = 1, 4 do
+        local pos, len, rot = Spec.segment(sm.chainTops[i], sm.chainBottomsRest[i])
         table.insert(
             children,
             Spec.part(`Chain{i}`, {
-                Size = { 7, 0.25, 0.25 },
+                Size = { len, 0.25, 0.25 },
                 Shape = "Cylinder",
-                CFrame = Spec.cframe({ sp[1], sp[2] + 3.8, sp[3] + off }, Spec.ROT.CYL_VERTICAL),
+                CFrame = Spec.cframe(pos, rot),
                 Color = { 0.25, 0.25, 0.28 },
                 Material = "Metal",
             })

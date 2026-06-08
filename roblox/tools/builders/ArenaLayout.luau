@@ -16,13 +16,27 @@ local ArenaLayout = {
     paddyStripWidth = 10,
     pavilion = { pos = { 0, 0, 0 }, postSpacing = 14, roofHeight = 18 },
     bell = { pos = { 0, 7.5, 0 }, height = 9, radius = 3.4 }, -- bottom lip ~3 studs over water
-    shuMoku = { restPos = { 0, 6.2, 9.5 }, length = 7, radius = 0.8, drawStuds = 6 }, -- draws toward +Z
+    shuMoku = {
+        restPos = { 0, 6.2, 9.5 },
+        length = 7,
+        radius = 0.8,
+        drawStuds = 6,
+        -- gantry the log hangs from (rails along Z at x = ±railX, height railY)
+        railX = 3,
+        railY = 15,
+        railZ = { 5, 20 }, -- gantry post Z positions (straddle the log's draw range)
+        -- 4 chain attach points: fixed tops on the rails, rest bottoms on the log
+        chainTops = { { 3, 15, 7.5 }, { 3, 15, 11.5 }, { -3, 15, 7.5 }, { -3, 15, 11.5 } },
+        chainBottomsRest = { { 0.8, 6.6, 7.5 }, { 0.8, 6.6, 11.5 }, { -0.8, 6.6, 7.5 }, { -0.8, 6.6, 11.5 } },
+        ropeBottomRest = { 0, 6.2, 13 }, -- the log's back end (rest); the rope's log end
+    }, -- draws toward +Z
     flume = {
-        poolPos = { 107, 17, -80 }, -- pool on tier 2 (SE, radial ~134); base on the tier-16 surface
+        poolPos = { 0, 20, 48 }, -- raised header cistern on the Z axis, north of the wheel
         poolSize = { 10, 2, 8 },
-        wheelPos = { 12, 4, 9 }, -- NE of the pavilion, outside the posts
-        wheelRadius = 4,
-        -- flume runs pool → over the apron → drops onto wheel top
+        wheelPos = { 0, 7, 26 }, -- directly north of the log, on the Z axis
+        wheelRadius = 5,
+        ropeWheelAnchor = { 0, 7, 25 }, -- fixed point on the wheel/drum the rope leaves from
+        -- flume runs pool → descends → drops onto wheel top
     },
     promontories = {
         { name = "Record", pos = { 0, 16, 134 } }, -- north (opposite entrance)

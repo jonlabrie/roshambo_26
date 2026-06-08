@@ -47,9 +47,11 @@ describe("ArenaLayout", function()
             expect(math.sqrt(dx * dx + dz * dz) > L.flume.wheelRadius).toBe(true)
         end
     end)
-    test("flume pool sits on tier 2's band", function()
-        local d = math.sqrt(L.flume.poolPos[1] ^ 2 + L.flume.poolPos[3] ^ 2)
-        expect(d > L.tiers[1].radius and d < L.tiers[2].radius).toBe(true)
+    test("flume pool is a raised header cistern on the Z axis, north of the wheel", function()
+        -- pool moved off the tiers: it's a raised cistern feeding the wheel
+        expect(L.flume.poolPos[1]).toBe(0) -- on the Z axis
+        expect(L.flume.poolPos[2] > L.flume.wheelPos[2]).toBe(true) -- raised above the wheel
+        expect(L.flume.poolPos[3] > L.flume.wheelPos[3]).toBe(true) -- north of the wheel
     end)
     test("koi pond fits inside the bowl", function()
         local d = math.sqrt(L.koiPond.pos[1] ^ 2 + L.koiPond.pos[3] ^ 2)

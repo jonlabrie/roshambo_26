@@ -19,12 +19,78 @@ local rig = stage:WaitForChild("BonshoRig")
 local arm = rig:WaitForChild("ShuMoku") :: BasePart
 local gong = rig:WaitForChild("Bonsho") :: BasePart
 local restCFrame = arm.CFrame -- rest pose: log hanging at the front of its swing
-local chains = { rig:WaitForChild("Chain1") :: BasePart, rig:WaitForChild("Chain2") :: BasePart }
-local chainRest = { chains[1].CFrame, chains[2].CFrame }
 -- Offsets are applied in WORLD space (pre-multiply: `CFrame.new(v) * rest`) so
 -- the draw/swing/recoil go straight back/forward regardless of each part's rest
 -- rotation. ShuMoku rests rotated (CYL_ALONG_Z), so a local-frame offset would
--- send the draw sideways — world-space keeps arm and chains moving together.
+-- send the draw sideways — world-space keeps the log moving straight.
+
+-- Suspension + drive-rope geometry. The four chains hang from FIXED rail tops;
+-- their bottoms ride the log. The drive rope runs from a fixed wheel anchor to
+-- the log's back end. Both follow the log's LIVE CFrame each frame (see the
+-- dedicated Heartbeat below) — never mirrored offsets.
+-- These constants MIRROR ArenaLayout.shuMoku / .flume (build-time only, not
+-- replicated to the client). Keep in sync with tools/builders/ArenaLayout.luau.
+local function v3(t: { number }): Vector3
+    return Vector3.new(t[1], t[2], t[3])
+end
+
+-- A cylinder (long axis = +X = RightVector) spanning a→b: CFrame + length.
+local function segCF(a: Vector3, b: Vector3): (CFrame, number)
+    local dir = b - a
+    local len = dir.Magnitude
+    local x = dir.Unit
+    local up = if math.abs(x.Y) > 0.99 then Vector3.new(1, 0, 0) else Vector3.new(0, 1, 0)
+    local z = x:Cross(up).Unit
+    local y = z:Cross(x).Unit
+    return CFrame.fromMatrix((a + b) / 2, x, y, z), len
+end
+
+local chains = {
+    rig:WaitForChild("Chain1") :: BasePart,
+    rig:WaitForChild("Chain2") :: BasePart,
+    rig:WaitForChild("Chain3") :: BasePart,
+    rig:WaitForChild("Chain4") :: BasePart,
+}
+local chainTops = {
+    v3({ 3, 15, 7.5 }),
+    v3({ 3, 15, 11.5 }),
+    v3({ -3, 15, 7.5 }),
+    v3({ -3, 15, 11.5 }),
+}
+local chainBottomsRest = {
+    v3({ 0.8, 6.6, 7.5 }),
+    v3({ 0.8, 6.6, 11.5 }),
+    v3({ -0.8, 6.6, 7.5 }),
+    v3({ -0.8, 6.6, 11.5 }),
+}
+
+-- The drive rope is a client visual created at runtime (no builder part).
+local ropeWheelAnchor = v3({ 0, 7, 25 }) -- ArenaLayout.flume.ropeWheelAnchor
+local ropeBottomRest = v3({ 0, 6.2, 13 }) -- ArenaLayout.shuMoku.ropeBottomRest
+local driveRope = Instance.new("Part")
+driveRope.Name = "DriveRope"
+driveRope.Anchored = true
+driveRope.CanCollide = false
+driveRope.Shape = Enum.PartType.Cylinder
+driveRope.Color = Color3.new(0.55, 0.48, 0.35)
+driveRope.Material = Enum.Material.Fabric
+driveRope.Size = Vector3.new(1, 0.2, 0.2)
+driveRope.Parent = rig
+
+-- Recompute all 4 chains + the drive rope from the log's CURRENT CFrame.
+local function updateSuspension()
+    local delta = arm.CFrame * restCFrame:Inverse()
+    for i, chain in chains do
+        local botW = delta * chainBottomsRest[i]
+        local cf, len = segCF(chainTops[i], botW)
+        chain.CFrame = cf
+        chain.Size = Vector3.new(len, 0.25, 0.25)
+    end
+    local ropeLog = delta * ropeBottomRest
+    local rcf, rlen = segCF(ropeWheelAnchor, ropeLog)
+    driveRope.CFrame = rcf
+    driveRope.Size = Vector3.new(rlen, 0.2, 0.2)
+end
 
 local lastPhase = "ACTIVE"
 local secondsToLockout: number? = nil
@@ -51,13 +117,6 @@ EventBus.Cue.Event:Connect(function(cue)
             TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
             { CFrame = CFrame.new(0, 0, -0.8) * restCFrame }
         )
-        for i, chain in chains do
-            TweenService:Create(
-                chain,
-                TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-                { CFrame = CFrame.new(0, 0, -0.8) * chainRest[i] }
-            ):Play()
-        end
         swing.Completed:Connect(function()
             -- Contact moment: flash + basin ring fire here, not at cue time.
             local light = Instance.new("PointLight")
@@ -108,28 +167,12 @@ EventBus.Cue.Event:Connect(function(cue)
                 TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
                 { CFrame = CFrame.new(0, 0.15, 1.1) * restCFrame }
             )
-            for i, chain in chains do
-                TweenService:Create(
-                    chain,
-                    TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                    { CFrame = CFrame.new(0, 0.15, 1.1) * chainRest[i] }
-                ):Play()
-            end
             recoil.Completed:Connect(function()
                 TweenService:Create(
                     arm,
                     TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
                     { CFrame = restCFrame }
                 ):Play()
-                for i, chain in chains do
-                    TweenService
-                        :Create(
-                            chain,
-                            TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-                            { CFrame = chainRest[i] }
-                        )
-                        :Play()
-                end
             end)
             recoil:Play()
         end)
@@ -163,12 +206,14 @@ RunService.Heartbeat:Connect(function()
             pose = pose * CFrame.Angles(0, math.rad(math.sin(os.clock() * 23) * 0.4), 0)
         end
         arm.CFrame = pose
-        for i in chains do
-            chains[i].CFrame = draw * chainRest[i]
-        end
         if state.latched and not wasLatched then
             wasLatched = true
             EventBus.Cue:Fire({ kind = "latchClick" })
         end
     end
 end)
+
+-- Chains + drive rope FOLLOW the log every frame, whether the log is posed by
+-- the draw heartbeat above or moved by the strike tweens. Single authority:
+-- always recompute from the log's live CFrame — never mirror offsets.
+RunService.Heartbeat:Connect(updateSuspension)

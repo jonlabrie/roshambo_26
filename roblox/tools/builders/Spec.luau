@@ -37,6 +37,26 @@ function Spec.model(name: string, children: { PartSpec }): PartSpec
     return { name = name, className = "Model", properties = {}, children = children }
 end
 
+-- A cylinder (long axis = local X) spanning points a→b: returns midpoint pos,
+-- length, and a row-major rotation matrix aligning local X with (b-a).
+function Spec.segment(a: { number }, b: { number }): ({ number }, number, { number })
+    local dx, dy, dz = b[1] - a[1], b[2] - a[2], b[3] - a[3]
+    local len = math.sqrt(dx * dx + dy * dy + dz * dz)
+    local ux, uy, uz = dx / len, dy / len, dz / len -- local X (long axis)
+    local rx, ry, rz = 0, 1, 0 -- up reference
+    if math.abs(uy) > 0.99 then
+        rx, ry, rz = 1, 0, 0
+    end
+    local d = rx * ux + ry * uy + rz * uz
+    local yx, yy, yz = rx - d * ux, ry - d * uy, rz - d * uz
+    local yl = math.sqrt(yx * yx + yy * yy + yz * yz)
+    yx, yy, yz = yx / yl, yy / yl, yz / yl
+    local zx, zy, zz = uy * yz - uz * yy, uz * yx - ux * yz, ux * yy - uy * yx -- u × y
+    local rot = { ux, yx, zx, uy, yy, zy, uz, yz, zz } -- columns = X(u), Y, Z
+    local pos = { (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, (a[3] + b[3]) / 2 }
+    return pos, len, rot
+end
+
 function Spec.yaw(deg: number): { number }
     local a = math.rad(deg)
     local c, s = math.cos(a), math.sin(a)
