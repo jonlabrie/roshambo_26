@@ -4,8 +4,9 @@
 -- all streaming prose — round prompts, the TOO-LATE toast, announcements —
 -- scrolls across a ticker strip on the very bottom edge (fed by
 -- EventBus.TickerMessage). The top of the screen stays clear so the bonshō bell
--- and the World-Throw drum read unobstructed. The WIN/SAFE/LOSS headline is a
--- transient mid-screen toast (kept big — it's the moment, not prose).
+-- and the World-Throw drum read unobstructed. The WIN/SAFE/LOSS headline lands in
+-- the status bar — and only after the drum stops turning (drumRest cue), so the
+-- text never spoils the throw before the wheel settles on it.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -42,26 +43,11 @@ local BTN_Y = TICKER_H + GAP -- pick/bank/accept baseline sits above the ticker
 local STATUS_Y = BTN_Y + BTN_H + GAP -- status bar sits above the buttons
 
 local THROWS = { "R", "P", "S" }
-local LABELS = { R = "🪨 Rock", P = "📄 Paper", S = "✂️ Scissors" }
-
--- centered, transient reveal headline (WIN/SAFE/LOSS) — a mid-screen toast.
-local resultLabel = Instance.new("TextLabel")
-resultLabel.Name = "Result"
-resultLabel.AnchorPoint = Vector2.new(0.5, 0.5)
-resultLabel.Position = UDim2.fromScale(0.5, 0.35)
-resultLabel.Size = UDim2.fromOffset(560, 48)
-resultLabel.BackgroundTransparency = 0.35
-resultLabel.BackgroundColor3 = WASHI
-resultLabel.TextColor3 = INK_CREAM
-resultLabel.TextSize = 28
-resultLabel.Font = Enum.Font.GothamBold
-resultLabel.Visible = false
-resultLabel.Parent = gui
-do
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(0, 8)
-    c.Parent = resultLabel
-end
+-- The approved ZenDojo R/P/S glyphs (gold), matching the drum faces and boards.
+local GLYPH = { R = "○", P = "─", S = "∧" }
+local NAMES = { R = "Rock", P = "Paper", S = "Scissors" }
+-- The WIN/SAFE/LOSS reveal is no longer a center toast — it lands in the status
+-- bar (see RevealResult / showReveal), and only after the drum stops turning.
 
 -- ===== slim bottom status bar: phase + countdown (left), PTS/POT/STREAK (right) =====
 local statusBar = Instance.new("Frame")
@@ -210,7 +196,8 @@ for i, value in THROWS do
     b.Size = UDim2.fromOffset(130, BTN_H)
     b.AnchorPoint = Vector2.new(0.5, 1)
     b.Position = UDim2.new(0.5, (i - 2) * 145, 1, -BTN_Y)
-    b.Text = LABELS[value]
+    b.RichText = true
+    b.Text = `<font color="#D4B066">{GLYPH[value]}</font>  {NAMES[value]}`
     b.TextSize = 20
     b.Font = Enum.Font.GothamBold
     b.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -256,8 +243,29 @@ acceptButton.Parent = gui
 
 local fateBound = false
 
+-- The World-Throw reveal headline waits in the status bar until the drum has
+-- stopped turning. RevealResult arrives independently of the drum's glide-to-
+-- rest, so we stash the headline and only paint it once BOTH have happened.
+local pendingHeadline: string? = nil
+local drumAtRest = false
+
+local function maybeShowReveal()
+    if pendingHeadline and drumAtRest then
+        statusLabel.Text = pendingHeadline
+        pendingHeadline = nil
+    end
+end
+
 acceptButton.MouseButton1Click:Connect(function()
     EventBus.Cue:Fire({ kind = "acceptFate" })
+end)
+
+-- DrumController fires this once its landing decel reaches rest on the throw.
+EventBus.Cue.Event:Connect(function(cue)
+    if cue.kind == "drumRest" then
+        drumAtRest = true
+        maybeShowReveal()
+    end
 end)
 
 RevealTheater.OnClientEvent:Connect(function(r)
@@ -284,6 +292,8 @@ RoundUpdate.OnClientEvent:Connect(function(info)
         canPick = not fateBound
         myPick = nil
         lockoutAt = if info.secondsToLockout then os.clock() + info.secondsToLockout else nil
+        pendingHeadline = nil -- clear last round's reveal; the drum will respin
+        drumAtRest = false
         if not fateBound then
             tickerSay("New round — pick now and beat the World Throw!")
         end
@@ -308,11 +318,20 @@ RevealResult.OnClientEvent:Connect(function(r)
     else
         headline = `World threw {r.worldThrow}`
     end
-    resultLabel.Text = `{headline}  (R {r.distribution.R}% P {r.distribution.P}% S {r.distribution.S}%)`
-    resultLabel.Visible = true
-    task.delay(4, function()
-        resultLabel.Visible = false
+    pendingHeadline = headline
+    maybeShowReveal() -- shows now only if the drum already came to rest
+    -- Safety: if the drum never reports rest (e.g. a dropped strike cue), don't
+    -- strand the result — force it out shortly after.
+    task.delay(3, function()
+        if pendingHeadline == headline then
+            drumAtRest = true
+            maybeShowReveal()
+        end
     end)
+    -- the throw distribution is prose — it rides the ticker, not the status bar.
+    tickerSay(
+        `World threw {r.worldThrow} — R {r.distribution.R}% · P {r.distribution.P}% · S {r.distribution.S}%`
+    )
 end)
 
 ProfileUpdate.OnClientEvent:Connect(function(p)

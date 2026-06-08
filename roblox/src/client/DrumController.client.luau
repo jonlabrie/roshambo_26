@@ -127,6 +127,7 @@ RunService.Heartbeat:Connect(function(dt)
             theta = landTheta -- settle exactly on the detent
             omega = 0
             mode = "hold"
+            EventBus.Cue:Fire({ kind = "drumRest" }) -- the throw may now be revealed
         else
             theta -= omega * dt
         end
