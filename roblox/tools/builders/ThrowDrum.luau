@@ -93,7 +93,10 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
             top,
             Spec.part(`Face{k}`, {
                 Size = { length, faceW, 0.5 },
-                CFrame = Spec.cframe({ px, fy, fz }, rotX(a)),
+                -- rotX(-a): the slab's outward normal (local +Z) must point along
+                -- the radial (0, sin a, cos a). rotX(+a) reflected it, so 4 of 6
+                -- faces were mis-oriented; only a=0/180 (faces 0,3) were correct.
+                CFrame = Spec.cframe({ px, fy, fz }, rotX(-a)),
                 Color = timber,
                 Material = "Wood",
             })
