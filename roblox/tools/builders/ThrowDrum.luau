@@ -32,7 +32,7 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
     local side = 2 * r * math.sin(math.pi / faces) -- hexagon edge length (= r for a hexagon)
     local faceW = side * 1.04 -- slight overlap so faces meet cleanly at the vertices
 
-    -- Top-level model children: the hub + solid core + 6 faces, plus Housing.
+    -- Top-level children: hub + shaft + 12 spokes + 6 rim faces, plus Housing.
     local top: { Spec.PartSpec } = {}
 
     -- invisible rotation hub: its local X is the spin axis the controller turns
@@ -47,19 +47,41 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
         })
     )
 
-    -- solid round core (round axis = local X = the spin axis) so the drum reads
-    -- as one solid body, not 6 floating panels. Static — a round cylinder looks
-    -- identical spun, so the controller only needs to rotate the lettered faces.
+    -- central shaft = the bearing/axle along local X; protrudes 1 stud past each
+    -- end face to read as the bearing the housing holds. (Round + symmetric, so
+    -- the controller leaves it static — spinning it is invisible.)
     table.insert(
         top,
-        Spec.part("Core", {
-            Size = { length, 2 * (apothem - 0.2), 2 * (apothem - 0.2) },
+        Spec.part("Shaft", {
+            Size = { length + 2, 1.2, 1.2 },
             Shape = "Cylinder",
             CFrame = Spec.cframe({ px, py, pz }),
-            Color = timber,
-            Material = "Wood",
+            Color = ink,
+            Material = "Metal",
         })
     )
+
+    -- 6 spokes per end (12 total) radiating from the shaft to the hexagon's
+    -- corners — the open internal structure that supports the rim faces.
+    local spoke = 0
+    for _, ex in { -length / 2 + 0.3, length / 2 - 0.3 } do
+        for k = 0, faces - 1 do
+            local v = (k + 0.5) * step -- vertex angle (between two faces)
+            local vy = py + r * math.sin(v)
+            local vz = pz + r * math.cos(v)
+            local sp, slen, srot = Spec.segment({ px + ex, py, pz }, { px + ex, vy, vz })
+            spoke += 1
+            table.insert(
+                top,
+                Spec.part(`Spoke{spoke}`, {
+                    Size = { slen, 0.4, 0.4 },
+                    CFrame = Spec.cframe(sp, srot),
+                    Color = ink,
+                    Material = "WoodPlanks",
+                })
+            )
+        end
+    end
 
     -- 6 timber faces tiling a closed hexagon at the apothem. Face k is at angle
     -- k*60° from +Z (so face 0 faces +Z/back, face 3 faces −Z/front at θ=0).

@@ -24,14 +24,23 @@ local rig = stage:WaitForChild("ThrowDrum")
 local drum = rig:WaitForChild("Drum") :: BasePart
 local hub = drum.CFrame
 
--- capture each face's offset from the hub so we can re-place it under any hub
--- rotation (the WheelController pattern).
+-- capture each spinning part's offset from the hub so we can re-place it under
+-- any hub rotation (the WheelController pattern). The whole hex prism spins:
+-- the 6 rim faces AND the 12 spokes. The shaft is round/symmetric → left static.
 local faces: { [number]: BasePart } = {}
-local faceOffsets: { [number]: CFrame } = {}
+local spinParts: { BasePart } = {}
+local spinOffsets: { CFrame } = {}
 for k = 0, 5 do
     local face = rig:WaitForChild("Face" .. k) :: BasePart
     faces[k] = face
-    faceOffsets[k] = hub:ToObjectSpace(face.CFrame)
+    table.insert(spinParts, face)
+    table.insert(spinOffsets, hub:ToObjectSpace(face.CFrame))
+end
+for _, child in rig:GetChildren() do
+    if (child.Name :: string):match("^Spoke%d+$") then
+        table.insert(spinParts, child :: BasePart)
+        table.insert(spinOffsets, hub:ToObjectSpace((child :: BasePart).CFrame))
+    end
 end
 
 -- Symbol glyphs (BoardController's GLYPH table). Attach one SurfaceGui per face.
@@ -81,8 +90,8 @@ local latestWorldThrow: string? = nil
 
 local function applyTheta()
     local spun = hub * CFrame.Angles(theta, 0, 0)
-    for k = 0, 5 do
-        faces[k].CFrame = spun * faceOffsets[k]
+    for i, p in spinParts do
+        p.CFrame = spun * spinOffsets[i]
     end
 end
 
@@ -99,8 +108,8 @@ local function stepOnce(duration: number)
     -- faces aren't children of the hub, so they don't inherit its tween).
     local hb = RunService.Heartbeat:Connect(function()
         local spun = drum.CFrame
-        for k = 0, 5 do
-            faces[k].CFrame = spun * faceOffsets[k]
+        for i, p in spinParts do
+            p.CFrame = spun * spinOffsets[i]
         end
     end)
     tween.Completed:Wait()
