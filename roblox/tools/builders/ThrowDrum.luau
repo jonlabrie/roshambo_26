@@ -14,10 +14,14 @@ local ThrowDrum = {}
 -- k, k+3 share it. Exposed for tests (k and k+3 must match).
 ThrowDrum.SYMBOL_FOR_FACE = { [0] = "○", [1] = "─", [2] = "∧", [3] = "○", [4] = "─", [5] = "∧" }
 
--- rotation matrix (3x3, row-major) for "rotate a part about world X by angle a".
-local function rotX(a: number): { number }
+-- Orient a rim slab so its Roblox FRONT face (−Z) points radially OUTWARD at
+-- hexagon angle a — i.e. the labelled "front" of the panel is the side that
+-- shows (where the glyph SurfaceGui goes). = rotX(-a) then 180° about local Y;
+-- this keeps the slab's vertical axis (∧ stays up) and only mirrors along the
+-- drum axis, which is invisible for the symmetric ○ ─ ∧.
+local function faceRot(a: number): { number }
     local c, s = math.cos(a), math.sin(a)
-    return { 1, 0, 0, 0, c, -s, 0, s, c }
+    return { -1, 0, 0, 0, c, -s, 0, -s, -c }
 end
 
 function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSpec
@@ -93,10 +97,9 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
             top,
             Spec.part(`Face{k}`, {
                 Size = { length, faceW, 0.5 },
-                -- rotX(-a): the slab's outward normal (local +Z) must point along
-                -- the radial (0, sin a, cos a). rotX(+a) reflected it, so 4 of 6
-                -- faces were mis-oriented; only a=0/180 (faces 0,3) were correct.
-                CFrame = Spec.cframe({ px, fy, fz }, rotX(-a)),
+                -- faceRot(a): the slab's FRONT (−Z) faces radially outward, so the
+                -- glyph SurfaceGui (on Front) is the showing side.
+                CFrame = Spec.cframe({ px, fy, fz }, faceRot(a)),
                 Color = timber,
                 Material = "Wood",
             })

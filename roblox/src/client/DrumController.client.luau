@@ -55,7 +55,7 @@ for k = 0, 5 do
     -- fixed TextSize so the glyph reads big (TextSize caps at 100px).
     local fs = face.Size
     local gui = Instance.new("SurfaceGui")
-    gui.Face = Enum.NormalId.Back -- the OUTWARD slab face (Front points into the open hex)
+    gui.Face = Enum.NormalId.Front -- the slab is built Front-outward (see faceRot)
     gui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
     gui.CanvasSize = Vector2.new(math.floor(100 * fs.X / fs.Y), 100)
     gui.Parent = face
