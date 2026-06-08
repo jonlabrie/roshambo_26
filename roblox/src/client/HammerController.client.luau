@@ -17,8 +17,12 @@ local rig = stage:WaitForChild("BonshoRig")
 local arm = rig:WaitForChild("ShuMoku") :: BasePart
 local gong = rig:WaitForChild("Bonsho") :: BasePart
 local restCFrame = arm.CFrame -- rest pose: log hanging at the front of its swing
-local chains = { rig:WaitForChild("Chain1"), rig:WaitForChild("Chain2") }
+local chains = { rig:WaitForChild("Chain1") :: BasePart, rig:WaitForChild("Chain2") :: BasePart }
 local chainRest = { chains[1].CFrame, chains[2].CFrame }
+-- Offsets are applied in WORLD space (pre-multiply: `CFrame.new(v) * rest`) so
+-- the draw/swing/recoil go straight back/forward regardless of each part's rest
+-- rotation. ShuMoku rests rotated (CYL_ALONG_Z), so a local-frame offset would
+-- send the draw sideways — world-space keeps arm and chains moving together.
 
 local lastPhase = "ACTIVE"
 local secondsToLockout: number? = nil
@@ -43,13 +47,13 @@ EventBus.Cue.Event:Connect(function(cue)
         local swing = TweenService:Create(
             arm,
             TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-            { CFrame = restCFrame * CFrame.new(0, 0, -0.8) }
+            { CFrame = CFrame.new(0, 0, -0.8) * restCFrame }
         )
         for i, chain in chains do
             TweenService:Create(
-                chain :: BasePart,
+                chain,
                 TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-                { CFrame = chainRest[i] * CFrame.new(0, 0, -0.8) }
+                { CFrame = CFrame.new(0, 0, -0.8) * chainRest[i] }
             ):Play()
         end
         swing.Completed:Connect(function()
@@ -82,13 +86,13 @@ EventBus.Cue.Event:Connect(function(cue)
             local recoil = TweenService:Create(
                 arm,
                 TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                { CFrame = restCFrame * CFrame.new(0, 0.15, 1.1) }
+                { CFrame = CFrame.new(0, 0.15, 1.1) * restCFrame }
             )
             for i, chain in chains do
                 TweenService:Create(
-                    chain :: BasePart,
+                    chain,
                     TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                    { CFrame = chainRest[i] * CFrame.new(0, 0.15, 1.1) }
+                    { CFrame = CFrame.new(0, 0.15, 1.1) * chainRest[i] }
                 ):Play()
             end
             recoil.Completed:Connect(function()
@@ -100,7 +104,7 @@ EventBus.Cue.Event:Connect(function(cue)
                 for i, chain in chains do
                     TweenService
                         :Create(
-                            chain :: BasePart,
+                            chain,
                             TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
                             { CFrame = chainRest[i] }
                         )
@@ -133,13 +137,14 @@ RunService.Heartbeat:Connect(function()
         local shiver = if state.trembling
             then math.sin(os.clock() * 28) * 0.15 + (math.random() - 0.5) * 0.04
             else 0
-        local pose = restCFrame * CFrame.new(0, riseY, drawZ + shiver)
+        local draw = CFrame.new(0, riseY, drawZ + shiver) -- world-space: +Z back, +Y rise
+        local pose = draw * restCFrame
         if state.trembling then
             pose = pose * CFrame.Angles(0, math.rad(math.sin(os.clock() * 23) * 0.4), 0)
         end
         arm.CFrame = pose
-        for i, chain in chains do
-            (chain :: BasePart).CFrame = chainRest[i] * CFrame.new(0, riseY, drawZ + shiver)
+        for i in chains do
+            chains[i].CFrame = draw * chainRest[i]
         end
         if state.latched and not wasLatched then
             wasLatched = true
