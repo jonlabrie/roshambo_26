@@ -2252,3 +2252,41 @@ Expected: all green; no asset drift.
 - **Spec coverage:** §2 amendments → Tasks 5/6 (layout), 10 (flume), 18 (champions), watermark deferred (no task — correct); §3 layout → Tasks 4–6, 13–15; §4 champions → Tasks 17–18; §5 art direction → palette in Task 1, used everywhere; §6 production table → Tasks 3 (mesh probe), 5 (terrain), 7–16 (builders + store vetting), 19 (audio); §7 sequence → pass structure; §8 testing → per-task Lune tests + MCP gates + CI drift check; §9 deferrals → no tasks (correct); §10 done criteria → Task 21.
 - **Brand geometry note:** the parent spec's bell-boss mascot glyphs are represented by the gold `LotusBoss` in Task 7; engraving the glyph relief (ring + macron eyes, ∨ smile as raised geometry) is a Task 12 tuning item with the user present — flagged here so it isn't lost.
 - **Type consistency check:** `ChampionSeats.Seats` field names (`record/streak/localHero`) match `StatueDresser.plan` seat keys and `SEAT_PEDESTAL`; builder part names (`Bonsho`, `ShuMoku`, `Wheel`, `WaterfallAnchor`, `Pedestal_*`, `StatueAnchor`, `Beacon`, `SteleFace`) match every controller/composition lookup; `FateController` entity refactor (BasePart → Model + PivotTo) is specified at its single definition site.
+
+---
+
+## Addendum — Display redesign (2026-06-08 gate)
+
+The giant floating jumbotron is **removed**; spec §4b replaces it with three channels. Layout numbers below come from the 2× scale (`ArenaLayout`: bowl r220, rim y28, tiers r116/152/188 at h6/16/28, pedestals at (0,16,134)/(-128,16,38)/(128,16,38)). These tasks slot into the existing passes; the original Task 6's `JumbotronBoard`/`JumbotronFrame` graybox stays in place until Task 23 removes it (so `BoardController` doesn't error in the interim).
+
+### Task 22 — Throw Drum + DrumController (Pass 2, after Task 8 shōrō)
+
+**Files:** Create `roblox/tools/builders/ThrowDrum.luau`, `roblox/src/client/DrumController.client.luau`, test `roblox/tests/ThrowDrum.spec.luau`, `roblox/tests/DrumStep.spec.luau`; modify `roblox/tools/builders/ArenaLayout.luau` (add `throwDrum`), `roblox/tools/genmodels.luau`, `roblox/default.project.json`, `roblox/src/shared/ChoreographyMachine.luau` only if a new cue is needed (prefer reusing the existing `gongStrike` cue).
+
+- **ArenaLayout.throwDrum**: `{ pos = {0, <pavilion.roofHeight + 6>, 0}, length = 10, radius = 6, faces = 6 }` (atop the shōrō, clearing the y28 top tier).
+- **ThrowDrum builder**: a `Model` named `ThrowDrum` with: a hexagonal-prism `Drum` part (the contract part the controller rotates — a 6-sided prism via a `CylinderHandleAdornment`-free part-built hexagon: 6 thin face slabs parented under an invisible `Drum` anchor, OR a single cylinder placeholder named `Drum` for graybox with face decals later), six face markers, and a `Housing` (miya box: 4 timber walls + hipped roof, front `+Z` and back `-Z` apertures ~one face wide). Faces carry the gold R/P/S/R/P/S symbols (SurfaceGui per face, **small-canvas + fixed TextSize per the [[roblox-surfacegui-textsize]] lesson**, or gold-inlaid part glyphs). Two-sided correctness: face `i` and face `i+3` carry the same symbol.
+- **Pure module `DrumStep`** (Lune-tested, in `roblox/src/shared/`): `DrumStep.faceForThrow(throw) → index`, `DrumStep.symmetric(index) → opposite index` (`(i+3)%6`), and `DrumStep.rollPlan(fromThrow, toThrow, steps) → {indices}` (the drumroll sequence ending on the target). Pure math, no Instances.
+- **DrumController**: holds the **prior** round's throw face during ACTIVE + lockout (Round 1 → idle mascot face); on `RoundUpdate` phase=TALLY begin the rapid escapement step (rotate the `Drum` part in 60° detented snaps, never resting on an edge — tween to each 60° stop); on the `gongStrike` cue (the same EventBus cue HammerController uses) land the final snap on `DrumStep.faceForThrow(reveal.worldThrow)` and lock; store that throw as the new "prior". Read `worldThrow` from `RevealTheater`. No server changes.
+- **Tests**: `DrumStep` covers face mapping, 180° symmetry, and that a roll plan ends on the target; `ThrowDrum` builder covers 6 faces with correct R/P/S/R/P/S pairing + housing present.
+- **MCP gate**: playtest a full round — drum shows prior throw, drumrolls in TALLY, locks on the World Throw with the BONG; both windows show the same symbol.
+
+### Task 23 — Kōsatsu boards + board renderer refactor (Pass 4, after Task 18 pedestals)
+
+**Files:** Create `roblox/tools/builders/Kosatsu.luau`, test `roblox/tests/Kosatsu.spec.luau`; modify `roblox/src/client/BoardController.client.luau` (retarget from the removed jumbotron to the 3 kōsatsu), `roblox/tools/builders/ArenaLayout.luau` (add `kosatsu` positions at the 3 pedestal bases; remove `jumbotron`/`heroTile`), `roblox/tools/genmodels.luau` (drop `JumbotronFrame`, add `Kosatsu`), `roblox/default.project.json` (**remove `JumbotronBoard` + `JumbotronFrame`**, add `Kosatsu`), delete `roblox/tools/builders/JumbotronFrame.luau` + its spec + asset.
+
+- **Kosatsu builder**: 3 boards (one per pedestal), each a single-faced split-flap panel (~8×4 studs) on two timber posts + a small roof, at the pedestal base, **facing inward** (toward origin — yaw computed from the pedestal position). Tile grid sized for the content (round#/players/last-5 ≈ 18 cols × 3 rows is plenty; smaller board than the old jumbotron).
+- **BoardController refactor**: build the flap grid on each of the 3 `Kosatsu` boards instead of the one jumbotron; render only rows ROUND/PLAYERS/LAST5 (drop the WORLDREC/HOTSTREAK/ticker rows — those moved to statues/HUD). Reuse `FlapScheduler`, the small-canvas + fixed-TextSize technique, Merriweather, and the frame+padded-glyph+seam tile structure already proven on the jumbotron. Same `BoardData` feed.
+- **Tests**: `Kosatsu` builder covers 3 boards present, single-faced, facing inward (inner normal points toward origin).
+- **MCP gate**: the 3 boards read round state from the apron and the terraces; no floating jumbotron remains.
+
+### Task 24 — Minimal bottom HUD + ticker (Pass 3)
+
+**Files:** modify `roblox/src/client/main.client.luau` (the HUD owner).
+
+- Move the round-status panel from top-center to a **slim bottom status line** above the R/P/S pick buttons (phase + countdown + your PTS/POT/STREAK). Washi-translucent dark panel, thin gold hairline, ink-cream text. Top of screen stays clear.
+- Add a **ticker strip** along the very bottom edge: a scrolling `TextLabel` fed by the existing `EventBus.TickerMessage` event + any announcement source; carries round prompts, badge hints, hype, the TOO-LATE toast. This is the streaming-prose home (flap boards no longer carry ticker rows).
+- Optional: fade the cluster toward invisible between rounds.
+- **MCP gate**: top of screen unobstructed (bell + drum visible); status + ticker read at the bottom; styling matches the environment.
+
+### Sequencing note
+Build order unchanged through Task 21's structure, with: Task 22 right after Task 8 (drum needs the pavilion); Task 24 during Pass 3; Task 23 after Task 18 (kōsatsu need the pedestals, and it's the task that finally deletes the jumbotron). The Task 12 and Task 20 user gates now also cover the drum and the HUD respectively.
