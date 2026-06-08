@@ -27,57 +27,59 @@ local current: { [number]: string } = {} -- row -> displayed line
 -- Cell metrics: 18 cols × 6 rows over a high-res canvas. Big bold glyphs that
 -- nearly fill the tile so the board reads from across the bowl (gate feedback
 -- 2026-06-07: tiles were unreadable — too many, too thin, seam cut the glyph).
--- Canvas matches the 168x96 board aspect (1.75); tall rows → big glyphs.
-local CANVAS_W, CANVAS_H = 4608, 2640
-local CELL_STEP_X = CANVAS_W / COLS -- 256
-local CELL_STEP_Y = CANVAS_H / #ROWS -- 440
-local CELL_GAP = 16
-local CELL_W = CELL_STEP_X - CELL_GAP
-local CELL_H = CELL_STEP_Y - CELL_GAP
-local GLYPH_SIZE = math.floor(CELL_H * 0.94) -- glyph nearly fills the tile height
+-- Scale-based layout: cells are fractions of the board face and glyphs use
+-- TextScaled, so each glyph fills its tile regardless of the SurfaceGui's
+-- canvas-pixel mapping (the prior fixed-pixel TextSize rendered tiny because
+-- the canvas mapped at a different scale than assumed). CanvasSize only sets
+-- render crispness now, not layout. (gate feedback 2026-06-07)
+local CELL_W = 1 / COLS -- scale
+local CELL_H = 1 / #ROWS -- scale
+local PAD = 0.06 -- inset fraction within each cell
 
 local function buildFace(faceEnum: Enum.NormalId): { { TextLabel } }
     local gui = Instance.new("SurfaceGui")
     gui.Face = faceEnum
-    gui.CanvasSize = Vector2.new(CANVAS_W, CANVAS_H)
+    gui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
+    gui.CanvasSize = Vector2.new(4608, 2640)
     gui.Parent = board
     local grid: { { TextLabel } } = {}
     for r = 1, #ROWS do
         grid[r] = {}
         for c = 1, COLS do
             local cell = Instance.new("TextLabel")
-            cell.Size = UDim2.fromOffset(CELL_W, CELL_H)
+            cell.Size = UDim2.fromScale(CELL_W * (1 - PAD), CELL_H * (1 - PAD))
             cell.Position =
-                UDim2.fromOffset((c - 1) * CELL_STEP_X + CELL_GAP / 2, (r - 1) * CELL_STEP_Y + CELL_GAP / 2)
+                UDim2.fromScale((c - 1) * CELL_W + CELL_W * PAD / 2, (r - 1) * CELL_H + CELL_H * PAD / 2)
             cell.BackgroundColor3 = Color3.fromRGB(244, 238, 222)
             cell.TextColor3 = Color3.fromRGB(40, 30, 18)
-            cell.TextSize = GLYPH_SIZE
+            cell.TextScaled = true -- glyph fills the tile
             cell.Font = Enum.Font.GothamBlack -- heaviest built-in face
             cell.Text = " "
+            cell.ZIndex = 2
             cell.Parent = gui
-            -- split-flap midline: thin fold seam drawn OVER the glyph (the real
-            -- flap look — a hairline gap across the character, not under the
-            -- opaque tile where it would be invisible).
+            -- split-flap midline: thin fold seam drawn OVER the glyph.
             local seam = Instance.new("Frame")
-            seam.Size = UDim2.new(1, 0, 0, 7)
-            seam.Position = UDim2.new(0, 0, 0.5, -3)
+            seam.Size = UDim2.fromScale(1, 0.04)
+            seam.Position = UDim2.fromScale(0, 0.48)
             seam.BackgroundColor3 = Color3.fromRGB(150, 142, 124)
             seam.BorderSizePixel = 0
             seam.ZIndex = 5
             seam.Parent = cell
-            cell.ZIndex = 2
             grid[r][c] = cell
         end
     end
     return grid
 end
 
+local CELL_FULL = UDim2.fromScale(CELL_W * (1 - PAD), CELL_H * (1 - PAD))
+local CELL_SQUASHED = UDim2.fromScale(CELL_W * (1 - PAD), 0.004)
+
 local function flapTo(cell: TextLabel, char: string)
-    local squash = TweenService:Create(cell, TweenInfo.new(0.04), { Size = UDim2.fromOffset(CELL_W, 12) })
+    local squash = TweenService:Create(cell, TweenInfo.new(0.04), { Size = CELL_SQUASHED })
     squash:Play()
     squash.Completed:Once(function()
         cell.Text = char
-        TweenService:Create(cell, TweenInfo.new(0.04), { Size = UDim2.fromOffset(CELL_W, CELL_H) }):Play()
+        TweenService:Create(cell, TweenInfo.new(0.04), { Size = CELL_FULL }):Play()
     end)
 end
 
