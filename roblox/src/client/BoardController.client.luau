@@ -27,13 +27,14 @@ local current: { [number]: string } = {} -- row -> displayed line
 -- Cell metrics: 18 cols × 6 rows over a high-res canvas. Big bold glyphs that
 -- nearly fill the tile so the board reads from across the bowl (gate feedback
 -- 2026-06-07: tiles were unreadable — too many, too thin, seam cut the glyph).
-local CANVAS_W, CANVAS_H = 4608, 1536
+-- Canvas matches the 168x96 board aspect (1.75); tall rows → big glyphs.
+local CANVAS_W, CANVAS_H = 4608, 2640
 local CELL_STEP_X = CANVAS_W / COLS -- 256
-local CELL_STEP_Y = CANVAS_H / #ROWS -- 256
-local CELL_GAP = 14
+local CELL_STEP_Y = CANVAS_H / #ROWS -- 440
+local CELL_GAP = 16
 local CELL_W = CELL_STEP_X - CELL_GAP
 local CELL_H = CELL_STEP_Y - CELL_GAP
-local GLYPH_SIZE = math.floor(CELL_H * 0.92) -- glyph nearly fills the tile height
+local GLYPH_SIZE = math.floor(CELL_H * 0.94) -- glyph nearly fills the tile height
 
 local function buildFace(faceEnum: Enum.NormalId): { { TextLabel } }
     local gui = Instance.new("SurfaceGui")
@@ -54,14 +55,15 @@ local function buildFace(faceEnum: Enum.NormalId): { { TextLabel } }
             cell.Font = Enum.Font.GothamBlack -- heaviest built-in face
             cell.Text = " "
             cell.Parent = gui
-            -- split-flap midline: thin fold seam, drawn UNDER the glyph (low
-            -- ZIndex) so it doesn't slice the character's legibility.
+            -- split-flap midline: thin fold seam drawn OVER the glyph (the real
+            -- flap look — a hairline gap across the character, not under the
+            -- opaque tile where it would be invisible).
             local seam = Instance.new("Frame")
-            seam.Size = UDim2.new(1, 0, 0, 6)
+            seam.Size = UDim2.new(1, 0, 0, 7)
             seam.Position = UDim2.new(0, 0, 0.5, -3)
-            seam.BackgroundColor3 = Color3.fromRGB(196, 188, 168)
+            seam.BackgroundColor3 = Color3.fromRGB(150, 142, 124)
             seam.BorderSizePixel = 0
-            seam.ZIndex = 1
+            seam.ZIndex = 5
             seam.Parent = cell
             cell.ZIndex = 2
             grid[r][c] = cell

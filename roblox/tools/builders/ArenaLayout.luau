@@ -40,7 +40,7 @@ local ArenaLayout = {
     sando = { fromZ = -192, toZ = -86, width = 6, fromY = 28, toY = 2 }, -- rim plaza → apron edge
     stele = { pos = { -14, 28, -186 } },
     koiPond = { pos = { -130, 0, -115 }, radius = 14 },
-    jumbotron = { pos = { 0, 90, 0 }, size = { 168, 54, 1 } }, -- hung sports-arena high over the bell
+    jumbotron = { pos = { 0, 96, 0 }, size = { 168, 96, 1 } }, -- hung sports-arena high; tall rows for big legible tiles
     heroTile = { pos = { 0, 18, 0 }, size = { 5, 6.5, 0.8 } },
     spawn = { pos = { 0, 29, -188 } }, -- on the rim plaza, facing the bell
 }
