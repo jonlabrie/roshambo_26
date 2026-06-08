@@ -32,6 +32,7 @@
                     }
                 },
                 "BonshoRig": { "$path": "assets/BonshoRig.model.json" },
+                "Shoro": { "$path": "assets/Shoro.model.json" },
                 "Graybox": { "$path": "assets/Graybox.model.json" },
                 "JumbotronFrame": { "$path": "assets/JumbotronFrame.model.json" },
                 "ArenaSpawn": {

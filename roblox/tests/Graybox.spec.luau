@@ -11,7 +11,7 @@ describe("Graybox", function()
         for _, c in spec.children :: any do
             names[c.name] = true
         end
-        for _, want in { "PavilionShell", "ToriiShell", "FlumeShell", "PoolShell", "SteleShell" } do
+        for _, want in { "ToriiShell", "FlumeShell", "PoolShell", "SteleShell" } do
             expect(names[want]).toBe(true)
         end
         expect(names["TeahouseShell1"]).toBe(true)

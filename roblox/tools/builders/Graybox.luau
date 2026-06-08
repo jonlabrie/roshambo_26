@@ -7,13 +7,6 @@ local GRAY = { 0.55, 0.55, 0.58 }
 
 function Graybox.build(L)
     local children = {
-        Spec.part("PavilionShell", {
-            Size = { L.pavilion.postSpacing + 4, L.pavilion.roofHeight, L.pavilion.postSpacing + 4 },
-            CFrame = Spec.cframe({ 0, L.pavilion.roofHeight / 2, 0 }),
-            Color = GRAY,
-            Transparency = 0.55,
-            CanCollide = false,
-        }),
         Spec.part("ToriiShell", {
             Size = { 14, 12, 2 },
             CFrame = Spec.cframe({ L.torii.pos[1], L.torii.pos[2] + 6, L.torii.pos[3] }),
