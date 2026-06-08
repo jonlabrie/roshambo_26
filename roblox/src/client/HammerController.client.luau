@@ -7,7 +7,9 @@ local TweenService = game:GetService("TweenService")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local HammerCurve = require(shared:WaitForChild("HammerCurve"))
+local ZenDojo = require(shared:WaitForChild("themes"):WaitForChild("ZenDojo"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
+local WATER = Color3.new(ZenDojo.palette.water[1], ZenDojo.palette.water[2], ZenDojo.palette.water[3])
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local RoundUpdate = remotes:WaitForChild("RoundUpdate") :: RemoteEvent
@@ -66,21 +68,39 @@ EventBus.Cue.Event:Connect(function(cue)
             task.delay(0.3, function()
                 light:Destroy()
             end)
-            local ring = Instance.new("Part")
-            ring.Shape = Enum.PartType.Cylinder
-            ring.Anchored = true
-            ring.CanCollide = false
-            ring.Transparency = 0.5
-            ring.Color = Color3.fromRGB(127, 180, 201)
-            ring.Size = Vector3.new(0.3, 2, 2)
-            ring.CFrame = CFrame.new(gong.Position.X, 0.5, gong.Position.Z)
-                * CFrame.Angles(0, 0, math.rad(90))
-            ring.Parent = workspace
-            TweenService
-                :Create(ring, TweenInfo.new(1.2), { Size = Vector3.new(0.3, 26, 26), Transparency = 1 })
-                :Play()
-            task.delay(1.3, function()
-                ring:Destroy()
+            for i = 1, 3 do
+                task.delay((i - 1) * 0.22, function()
+                    local ring = Instance.new("Part")
+                    ring.Shape = Enum.PartType.Cylinder
+                    ring.Anchored = true
+                    ring.CanCollide = false
+                    ring.Transparency = 0.35 + (i - 1) * 0.15
+                    ring.Color = WATER
+                    ring.Size = Vector3.new(0.25, 2, 2)
+                    ring.CFrame = CFrame.new(gong.Position.X, 0.4, gong.Position.Z)
+                        * CFrame.Angles(0, 0, math.rad(90))
+                    ring.Parent = workspace
+                    TweenService
+                        :Create(ring, TweenInfo.new(1.4, Enum.EasingStyle.Sine), {
+                            Size = Vector3.new(0.25, 30 - i * 4, 30 - i * 4),
+                            Transparency = 1,
+                        })
+                        :Play()
+                    task.delay(1.5, function()
+                        ring:Destroy()
+                    end)
+                end)
+            end
+            local splash = Instance.new("ParticleEmitter")
+            splash.Color = ColorSequence.new(WATER)
+            splash.Lifetime = NumberRange.new(0.5, 0.9)
+            splash.Speed = NumberRange.new(9, 14)
+            splash.SpreadAngle = Vector2.new(70, 70)
+            splash.Rate = 0
+            splash.Parent = gong
+            splash:Emit(36)
+            task.delay(1.2, function()
+                splash:Destroy()
             end)
             -- Stage 2: recoil bounce off the bell, then settle back to rest.
             local recoil = TweenService:Create(
