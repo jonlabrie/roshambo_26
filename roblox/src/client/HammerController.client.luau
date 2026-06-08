@@ -13,9 +13,12 @@ local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local RoundUpdate = remotes:WaitForChild("RoundUpdate") :: RemoteEvent
 
 local stage = workspace:WaitForChild("RoshamboStage")
-local arm = stage:WaitForChild("HammerArm") :: BasePart
-local gong = stage:WaitForChild("GongPad") :: BasePart
+local rig = stage:WaitForChild("BonshoRig")
+local arm = rig:WaitForChild("ShuMoku") :: BasePart
+local gong = rig:WaitForChild("Bonsho") :: BasePart
 local restCFrame = arm.CFrame -- rest pose: log hanging at the front of its swing
+local chains = { rig:WaitForChild("Chain1"), rig:WaitForChild("Chain2") }
+local chainRest = { chains[1].CFrame, chains[2].CFrame }
 
 local lastPhase = "ACTIVE"
 local secondsToLockout: number? = nil
@@ -42,6 +45,13 @@ EventBus.Cue.Event:Connect(function(cue)
             TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
             { CFrame = restCFrame * CFrame.new(0, 0, -0.8) }
         )
+        for i, chain in chains do
+            TweenService:Create(
+                chain :: BasePart,
+                TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+                { CFrame = chainRest[i] * CFrame.new(0, 0, -0.8) }
+            ):Play()
+        end
         swing.Completed:Connect(function()
             -- Contact moment: flash + basin ring fire here, not at cue time.
             local light = Instance.new("PointLight")
@@ -74,12 +84,28 @@ EventBus.Cue.Event:Connect(function(cue)
                 TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
                 { CFrame = restCFrame * CFrame.new(0, 0.15, 1.1) }
             )
+            for i, chain in chains do
+                TweenService:Create(
+                    chain :: BasePart,
+                    TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                    { CFrame = chainRest[i] * CFrame.new(0, 0.15, 1.1) }
+                ):Play()
+            end
             recoil.Completed:Connect(function()
                 TweenService:Create(
                     arm,
                     TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
                     { CFrame = restCFrame }
                 ):Play()
+                for i, chain in chains do
+                    TweenService
+                        :Create(
+                            chain :: BasePart,
+                            TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+                            { CFrame = chainRest[i] }
+                        )
+                        :Play()
+                end
             end)
             recoil:Play()
         end)
@@ -112,6 +138,9 @@ RunService.Heartbeat:Connect(function()
             pose = pose * CFrame.Angles(0, math.rad(math.sin(os.clock() * 23) * 0.4), 0)
         end
         arm.CFrame = pose
+        for i, chain in chains do
+            (chain :: BasePart).CFrame = chainRest[i] * CFrame.new(0, riseY, drawZ + shiver)
+        end
         if state.latched and not wasLatched then
             wasLatched = true
             EventBus.Cue:Fire({ kind = "latchClick" })

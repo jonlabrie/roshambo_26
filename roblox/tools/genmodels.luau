@@ -5,7 +5,9 @@ local fs = require("@lune/fs")
 local JsonEmit = require("./builders/JsonEmit")
 local Graybox = require("./builders/Graybox")
 local JumbotronFrame = require("./builders/JumbotronFrame")
+local Bonsho = require("./builders/Bonsho")
 local ArenaLayout = require("./builders/ArenaLayout")
+local ZenDojo = require("../src/shared/themes/ZenDojo")
 
 local function toRojo(spec): any
     local node: any = { className = spec.className, properties = spec.properties }
@@ -23,6 +25,7 @@ end
 local OUTPUTS: { [string]: any } = {
     ["Graybox"] = Graybox.build(ArenaLayout),
     ["JumbotronFrame"] = JumbotronFrame.build(ArenaLayout),
+    ["BonshoRig"] = Bonsho.build(ZenDojo.palette, ArenaLayout),
 }
 
 if not fs.isDir("assets") then
