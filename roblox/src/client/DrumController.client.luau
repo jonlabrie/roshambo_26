@@ -70,9 +70,14 @@ local STEP_TIME = 0.08
 
 local currentFace = 3 -- face at the −Z window at θ=0 → symbol R
 local theta = 0 -- continuous hub angle (radians)
-local rolling = false
+-- Single-stepper state machine. Exactly one coroutine (`startStepper`) ever
+-- advances the hub; TALLY/gongStrike/ACTIVE only set `mode`/`target`, never
+-- spawn their own steppers. This removes the parallel-coroutine fights and the
+-- overlapping-reveal races the old `rolling` + per-cue task.spawn design had.
+local mode = "idle" -- "idle" | "rolling" | "landing"
+local target: number? = nil -- face index to land on (landing mode only)
+local stepperAlive = false
 local latestWorldThrow: string? = nil
-local priorThrow: string? = nil
 
 local function applyTheta()
     local spun = hub * CFrame.Angles(theta, 0, 0)
@@ -86,9 +91,9 @@ end
 local function stepOnce(duration: number)
     currentFace = (currentFace + 1) % 6
     theta -= DETENT
-    local target = hub * CFrame.Angles(theta, 0, 0)
+    local targetCFrame = hub * CFrame.Angles(theta, 0, 0)
     local tween =
-        TweenService:Create(drum, TweenInfo.new(duration, Enum.EasingStyle.Sine), { CFrame = target })
+        TweenService:Create(drum, TweenInfo.new(duration, Enum.EasingStyle.Sine), { CFrame = targetCFrame })
     tween:Play()
     -- Heartbeat-follow the tweened hub so the faces track it each frame (the
     -- faces aren't children of the hub, so they don't inherit its tween).
@@ -106,6 +111,28 @@ end
 
 applyTheta()
 
+-- The ONE stepper. While `mode ~= "idle"` it advances the hub one detent at a
+-- time (each `stepOnce` awaited → never overlapping tweens, `currentFace`/`theta`
+-- mutated only here). In "landing" mode it stops the instant it reaches `target`.
+-- Guarded by `stepperAlive` so repeated `startStepper()` calls are idempotent —
+-- TALLY, a missed-TALLY strike, and back-to-back reveals all share this loop.
+local function startStepper()
+    if stepperAlive then
+        return
+    end
+    stepperAlive = true
+    task.spawn(function()
+        while mode ~= "idle" do
+            local duration = if mode == "landing" then 0.12 else STEP_TIME
+            stepOnce(duration)
+            if mode == "landing" and currentFace == target then
+                mode = "idle"
+            end
+        end
+        stepperAlive = false
+    end)
+end
+
 RevealTheater.OnClientEvent:Connect(function(reveal)
     latestWorldThrow = reveal.worldThrow
 end)
@@ -113,20 +140,14 @@ end)
 RoundUpdate.OnClientEvent:Connect(function(info)
     if info.phase == "TALLY" then
         -- start the rapid free drumroll: it does NOT know the target; it just
-        -- cycles +1 detents until the strike lands.
-        if rolling then
-            return
-        end
-        rolling = true
-        task.spawn(function()
-            while rolling do
-                stepOnce(STEP_TIME)
-            end
-        end)
+        -- cycles +1 detents until the strike sets a landing target.
+        mode = "rolling"
+        target = nil
+        startStepper()
     elseif info.phase == "ACTIVE" then
-        -- holding the prior throw; ensure the roll is stopped (it already is
-        -- after the strike, but clear the flag defensively).
-        rolling = false
+        -- holding the prior throw; signal the stepper to exit after its current
+        -- step. The drum holds on the landed face = the prior throw.
+        mode = "idle"
     end
 end)
 
@@ -134,20 +155,16 @@ EventBus.Cue.Event:Connect(function(cue)
     if cue.kind ~= "gongStrike" then
         return
     end
-    rolling = false -- stop the free roll; any in-flight step finishes its tween
     local throw = latestWorldThrow
     if not throw then
         return -- nothing authoritative yet; hold wherever we are
     end
-    task.spawn(function()
-        -- continue the +1 direction onto the result (1..3 detents), then lock.
-        local landFace = DrumStep.landingStep(currentFace, throw)
-        local steps = (landFace - currentFace) % 6
-        for _ = 1, steps do
-            stepOnce(0.12)
-        end
-        currentFace = landFace
-        priorThrow = throw
-        local _ = priorThrow -- becomes next round's held symbol (faces stay put)
-    end)
+    -- Aim the (single) stepper at the result and switch to landing. landingStep
+    -- returns a face 1..3 +1-steps ahead of `currentFace`, so the stepper always
+    -- reaches it continuing the same +1 direction. A second strike just re-sets
+    -- target/mode (idempotent); startStepper no-ops while one is already running,
+    -- and starts a fresh one only if TALLY was missed.
+    target = DrumStep.landingStep(currentFace, throw)
+    mode = "landing"
+    startStepper()
 end)
