@@ -71,7 +71,7 @@ end
 -- onto the line from the origin; `off` = perpendicular distance to it. Carves a
 -- bed that descends rim→mouth and lays a connected water ribbon; overrides the
 -- tier/basin terrain where it applies, and notches into the basin's NW edge.
-local CREEK = { halfW = 4, mouthAlong = 12, rimAlong = 190, bedMouth = -1, bedRim = 25 }
+local CREEK = { halfW = 6, mouthAlong = 12, rimAlong = 190, bedMouth = -1, bedRim = 24 }
 local CK_DIRX, CK_DIRZ = -0.8387, -0.5446 -- (sin, cos) of driveYaw 237°
 local function creekColumn(x, z)
     local along = x * CK_DIRX + z * CK_DIRZ
@@ -84,8 +84,10 @@ local function creekColumn(x, z)
     end
     local t = math.clamp((along - CREEK.mouthAlong) / (CREEK.rimAlong - CREEK.mouthAlong), 0, 1)
     local bed = CREEK.bedMouth + t * (CREEK.bedRim - CREEK.bedMouth)
-    local edge = ss(CREEK.halfW - 1.5, CREEK.halfW, off) -- sloped banks toward the cut's rim
-    return { g = bed + edge * 1.5, wb = bed - 1, wt = bed + 1.0 }
+    -- sloped banks toward the cut's rim; a 4-stud-deep water layer reads as one
+    -- continuous ribbon at RES 4 (a 2-stud layer broke up between voxel rows).
+    local edge = ss(CREEK.halfW - 2, CREEK.halfW, off)
+    return { g = bed + edge * 2.5, wb = bed - 2, wt = bed + 2 }
 end
 
 -- domain-warped radial offset: 0 inside r<55 and within ~PAD_SUPP of any pad
