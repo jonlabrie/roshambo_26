@@ -358,6 +358,35 @@ local function refreshButtons()
     end
 end
 
+-- Matte-onyx disc behind the triangle, unifying the three picks into one
+-- element. Sized from the button spots so it always encloses them + a margin.
+do
+    local cx = (BTN_SPOT.R.x + BTN_SPOT.P.x + BTN_SPOT.S.x) / 3
+    local cy = (BTN_SPOT.R.y + BTN_SPOT.P.y + BTN_SPOT.S.y) / 3
+    local function reach(s: { x: number, y: number }): number
+        return math.sqrt((s.x - cx) * (s.x - cx) + (s.y - cy) * (s.y - cy))
+    end
+    local rad = math.max(reach(BTN_SPOT.R), reach(BTN_SPOT.P), reach(BTN_SPOT.S)) + BTN_D / 2 + 12
+    local onyx = Instance.new("Frame")
+    onyx.Name = "PickCluster"
+    onyx.AnchorPoint = Vector2.new(0.5, 0.5)
+    onyx.Position = UDim2.new(0, cx, 1, -cy)
+    onyx.Size = UDim2.fromOffset(rad * 2, rad * 2)
+    onyx.BackgroundColor3 = Color3.fromRGB(20, 19, 23) -- deep matte onyx (flat, non-glossy)
+    onyx.BackgroundTransparency = 0.06
+    onyx.BorderSizePixel = 0
+    onyx.ZIndex = 0 -- behind the ivory buttons (default ZIndex 1)
+    onyx.Parent = gui
+    local oCorner = Instance.new("UICorner")
+    oCorner.CornerRadius = UDim.new(1, 0)
+    oCorner.Parent = onyx
+    local oEdge = Instance.new("UIStroke")
+    oEdge.Color = Color3.fromRGB(48, 45, 54)
+    oEdge.Thickness = 1.5
+    oEdge.Transparency = 0.3
+    oEdge.Parent = onyx
+end
+
 for _, value in THROWS do
     local spot = BTN_SPOT[value]
     local b = Instance.new("TextButton")
