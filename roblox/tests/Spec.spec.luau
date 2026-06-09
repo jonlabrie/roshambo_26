@@ -32,3 +32,20 @@ describe("Spec.segment", function()
         expect(math.abs(len - euclid) < 1e-6).toBe(true)
     end)
 end)
+
+describe("Spec", function()
+    test("rotY sends +Z to the SW diagonal at yaw 225", function()
+        local p = Spec.rotY({ 0, 6, 10 }, 225)
+        expect(p[1]).toBeCloseTo(-7.071, 0.01)
+        expect(p[2]).toBe(6)
+        expect(p[3]).toBeCloseTo(-7.071, 0.01)
+    end)
+    test("matMul of identity is identity", function()
+        local id = { 1, 0, 0, 0, 1, 0, 0, 0, 1 }
+        local r = Spec.matMul(id, Spec.rotYMat(225))
+        local y = Spec.rotYMat(225)
+        for i = 1, 9 do
+            expect(r[i]).toBeCloseTo(y[i], 0.0001)
+        end
+    end)
+end)

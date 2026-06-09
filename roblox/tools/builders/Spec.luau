@@ -63,4 +63,33 @@ function Spec.yaw(deg: number): { number }
     return { c, 0, s, 0, 1, 0, -s, 0, c }
 end
 
+-- Rotation about world-Y through the origin. Row-major 3x3 (matches Spec.cframe).
+function Spec.rotYMat(deg: number): { number }
+    local a = math.rad(deg)
+    local c, s = math.cos(a), math.sin(a)
+    return { c, 0, s, 0, 1, 0, -s, 0, c }
+end
+
+-- Rotate a point about world-Y through the origin.
+function Spec.rotY(p: { number }, deg: number): { number }
+    local a = math.rad(deg)
+    local c, s = math.cos(a), math.sin(a)
+    return { p[1] * c + p[3] * s, p[2], -p[1] * s + p[3] * c }
+end
+
+-- Row-major 3x3 multiply (a * b).
+function Spec.matMul(a: { number }, b: { number }): { number }
+    local r = {}
+    for row = 0, 2 do
+        for col = 0, 2 do
+            local s = 0
+            for k = 0, 2 do
+                s += a[row * 3 + k + 1] * b[k * 3 + col + 1]
+            end
+            r[row * 3 + col + 1] = s
+        end
+    end
+    return r
+end
+
 return Spec
