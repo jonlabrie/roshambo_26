@@ -54,7 +54,7 @@ local chains = {
 -- The drive train is rotated onto the SW->NE diagonal (mirrors
 -- ArenaLayout.shuMoku.yaw = 225). yawV rotates the proven +Z gantry geometry;
 -- BACK is the draw direction (back toward the wheel = SW).
-local YAW = CFrame.Angles(0, math.rad(225), 0)
+local YAW = CFrame.Angles(0, math.rad(237), 0)
 local function yawV(t: { number }): Vector3
     return (YAW * CFrame.new(v3(t))).Position
 end
@@ -74,7 +74,8 @@ local chainBottomsRest = {
 }
 
 -- The drive rope is a client visual created at runtime (no builder part).
-local ropeWheelAnchor = Vector3.new(-14.6, 5, -14.6) -- ArenaLayout.waterwheel.ropeAnchor (world SW)
+-- mirrors ArenaLayout.waterwheel.ropeAnchor = onLine(20.6, 5) at the same yaw
+local ropeWheelAnchor = (YAW * CFrame.new(0, 5, 20.6)).Position
 local ropeBottomRest = yawV({ 0, 6.2, 13 }) -- ArenaLayout.shuMoku.ropeBottomRest (rotated)
 local driveRope = Instance.new("Part")
 driveRope.Name = "DriveRope"

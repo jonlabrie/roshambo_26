@@ -63,7 +63,7 @@ function Waterwheel.build(palette: { [string]: { number } }, L: any)
     end
 
     local dc = W.centers[W.driver]
-    local toward = Spec.rotY({ 0, 0, -2.4 }, W.yaw)
+    local toward = Spec.rotY({ 0, 0, -2.4 }, W.driveYaw) -- toward the bell along the drive line
     table.insert(
         children,
         Spec.part("RatchetDrum", {

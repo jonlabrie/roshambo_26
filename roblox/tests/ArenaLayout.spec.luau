@@ -74,25 +74,31 @@ describe("ArenaLayout", function()
         expect(L.creek.entry[1] < 0 and L.creek.entry[3] < 0).toBe(true)
         expect(L.creek.mouth[1] < 0 and L.creek.mouth[3] < 0).toBe(true)
     end)
-    test("waterwheels sit on the SW creek line, descending order, inside the apron-ish band", function()
+    test("waterwheels sit on the creek line (SW quadrant), descending order", function()
+        local mmag = math.sqrt(L.creek.mouth[1] ^ 2 + L.creek.mouth[3] ^ 2)
         local prev = 0
         for i, c in L.waterwheel.centers do
-            expect(c[1] < 0 and c[3] < 0).toBe(true)
-            expect(math.abs(c[1] - c[3]) < 2).toBe(true)
-            local r = math.sqrt(c[1] ^ 2 + c[3] ^ 2)
+            expect(c[1] < 0 and c[3] < 0).toBe(true) -- SW quadrant
+            local cmag = math.sqrt(c[1] ^ 2 + c[3] ^ 2)
+            -- collinear with the creek mouth direction (normalized cross ~ 0)
+            local cross = (c[1] * L.creek.mouth[3] - c[3] * L.creek.mouth[1]) / (cmag * mmag)
+            expect(math.abs(cross) < 0.02).toBe(true)
             if i > 1 then
-                expect(r > prev).toBe(true)
+                expect(cmag > prev).toBe(true) -- further out as we go up the creek
             end
-            prev = r
+            prev = cmag
         end
         expect(L.waterwheel.driver >= 1 and L.waterwheel.driver <= #L.waterwheel.centers).toBe(true)
     end)
-    test("shu-moku is rotated onto the SW axis and rests outside the bell", function()
-        expect(L.shuMoku.yaw).toBe(225)
+    test("shu-moku rests on the drive line, SW of and outside the bell", function()
         local rest = Spec.rotY(L.shuMoku.restPos, L.shuMoku.yaw)
-        expect(rest[1] < 0 and rest[3] < 0).toBe(true)
+        expect(rest[1] < 0 and rest[3] < 0).toBe(true) -- SW quadrant
         local d = math.sqrt(rest[1] ^ 2 + rest[3] ^ 2)
-        expect(d > L.bell.radius).toBe(true)
+        expect(d > L.bell.radius).toBe(true) -- clears the bell body
+        -- collinear with the creek line, so the log aligns with the wheel driving it
+        local mmag = math.sqrt(L.creek.mouth[1] ^ 2 + L.creek.mouth[3] ^ 2)
+        local cross = (rest[1] * L.creek.mouth[3] - rest[3] * L.creek.mouth[1]) / (d * mmag)
+        expect(math.abs(cross) < 0.02).toBe(true)
     end)
     test("sozu sits streamside near the driving wheel; cord targets the drum axle end", function()
         local driver = L.waterwheel.centers[L.waterwheel.driver]

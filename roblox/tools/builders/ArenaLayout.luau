@@ -1,8 +1,21 @@
 --!strict
 -- Single source of truth for every world coordinate in the ZenDojo arena.
--- Y=0 is the basin waterline. South (−Z) is the entrance.
+-- Y=0 is the basin waterline. The entrance (torii/spawn) is at −Z, which is
+-- NORTH in Roblox's compass; +Z is South, +X is East, −X is West.
 -- 2026-06-07 gate feedback: full 2x scale; tanada (rice-paddy) terraces with
 -- flooded outer strips; the monument stays avatar-scale at center.
+local Spec = require("./Spec")
+
+-- The whole water drive train (creek → wheels → log → bell) runs down ONE straight
+-- line from the entrance-side (NW) rim to the bell. driveYaw rotates that line: 225
+-- is the dead NW corner, but that ran the log through the NW pavilion post, so it's
+-- nudged a few degrees (toward −X / west) to thread past it. Points are placed in a
+-- local frame — +Z = downhill toward the bell (radius → 0) — then rotated by driveYaw.
+local driveYaw = 237
+local function onLine(radius: number, y: number, cross: number?): { number }
+    return Spec.rotY({ cross or 0, y, radius }, driveYaw)
+end
+
 local ArenaLayout = {
     bowlRadius = 220,
     basinRadius = 16,
@@ -23,7 +36,7 @@ local ArenaLayout = {
         length = 7,
         radius = 0.8,
         drawStuds = 6,
-        yaw = 225, -- rotate the proven +Z geometry onto the SW->NE diagonal
+        yaw = driveYaw, -- rotate the proven +Z geometry onto the drive line
         -- gantry the log hangs from (rails along Z at x = ±railX, height railY)
         railX = 3,
         railY = 15,
@@ -33,24 +46,25 @@ local ArenaLayout = {
         chainBottomsRest = { { 0.8, 6.6, 7.5 }, { 0.8, 6.6, 11.5 }, { -0.8, 6.6, 7.5 }, { -0.8, 6.6, 11.5 } },
         ropeBottomRest = { 0, 6.2, 13 }, -- the log's back end (rest); the rope's log end
     }, -- draws toward +Z
-    -- Natural creek down the SW diagonal (replaced the kakehi flume).
+    -- Natural creek down the SW-ish drive line (replaced the kakehi flume).
     creek = {
-        entry = { -134, 28, -134 }, -- on the rim (tier-3 height) at ~225 deg
-        mouth = { -12, 0, -12 }, -- meets the basin water at the SW edge
+        entry = onLine(189.5, 28), -- on the rim (tier-3 height)
+        mouth = onLine(17, 0), -- meets the basin water at the SW edge
         width = 8, -- channel width (studs)
         fastReachRadius = 46, -- inside this radius the channel flattens for the wheels
     },
     -- Asakura-style undershot cluster sitting IN the creek; centers[driver] drives the striker.
     waterwheel = {
         radius = 5,
-        yaw = 45, -- axle along NW-SE so wheels roll along the SW->NE current
-        centers = { { -18, 5, -18 }, { -26, 6, -26 }, { -34, 7, -34 } },
+        yaw = driveYaw - 180, -- disc axle perpendicular to the current
+        driveYaw = driveYaw, -- the line direction (RatchetDrum offsets toward the bell along it)
+        centers = { onLine(25.5, 5), onLine(36.8, 6), onLine(48.1, 7) },
         driver = 1,
-        ropeAnchor = { -14.6, 5, -14.6 }, -- on the driver toward the log; DriveRope leaves here
+        ropeAnchor = onLine(20.6, 5), -- on the driver toward the log; DriveRope leaves here
     },
     -- Streamside sozu (shishi-odoshi) that meters the round and kicks the drum.
     sozu = {
-        pivot = { -22, 4, -13 }, -- pivot point, beside the driving wheel
+        pivot = onLine(20, 4, -6), -- beside the driving wheel, on the left bank
         troughLen = 5,
         cordTop = { -7, 31, 0 }, -- drum W axle end (throwDrum at {0,31,0}, length 14)
     },
