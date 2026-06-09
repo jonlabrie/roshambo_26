@@ -6,14 +6,19 @@ local ZenDojo = require("../src/shared/themes/ZenDojo")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 
 describe("Shoro builder", function()
-    test("four posts at postSpacing corners", function()
+    test("four posts at the postSpacing corner radius (yaw-invariant)", function()
+        -- The pavilion is yawed (pavilion.yaw) to clear the gantry, so a post's
+        -- individual x/z are rotated — but its distance from the origin is the
+        -- corner radius (postSpacing/2 along each axis) and stays fixed under yaw.
         local spec = Shoro.build(ZenDojo.palette, L)
+        local s = L.pavilion.postSpacing / 2
+        local cornerR = math.sqrt(s * s + s * s)
         local posts = 0
         for _, c in spec.children :: any do
             if c.name:match("^Post%d$") then
                 posts += 1
-                expect(math.abs(c.properties.CFrame[1])).toBe(L.pavilion.postSpacing / 2)
-                expect(math.abs(c.properties.CFrame[3])).toBe(L.pavilion.postSpacing / 2)
+                local x, z = c.properties.CFrame[1], c.properties.CFrame[3]
+                expect(math.sqrt(x * x + z * z)).toBeCloseTo(cornerR)
             end
         end
         expect(posts).toBe(4)

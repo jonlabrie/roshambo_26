@@ -16,6 +16,13 @@ local function onLine(radius: number, y: number, cross: number?): { number }
     return Spec.rotY({ cross or 0, y, radius }, driveYaw)
 end
 
+-- The shōrō pavilion (and the throw drum atop it) are yawed a few degrees off
+-- square so the SW corner post clears the bonshō gantry's west rail + chain,
+-- which the drive line (driveYaw) otherwise threads straight through. Negative =
+-- the corner swings away from the rail. Both Shoro and ThrowDrum sit at x=z=0, so
+-- a rotation about the world-Y origin spins each about its own vertical axis.
+local pavilionYaw = -13
+
 local ArenaLayout = {
     bowlRadius = 220,
     basinRadius = 16,
@@ -27,7 +34,7 @@ local ArenaLayout = {
     },
     -- flooded paddy strip: outer N studs of each tier surface, against the wall
     paddyStripWidth = 10,
-    pavilion = { pos = { 0, 0, 0 }, postSpacing = 18, roofHeight = 22 }, -- grown to clear the +50% bell
+    pavilion = { pos = { 0, 0, 0 }, postSpacing = 18, roofHeight = 22, yaw = pavilionYaw }, -- grown to clear the +50% bell; yawed to clear the gantry
     -- bell +50% (2026-06-08 gate): diameter ~10 matches the waterwheel; raised so
     -- the taller body keeps ~3 studs of clearance over the basin water.
     bell = { pos = { 0, 9.75, 0 }, height = 13.5, radius = 5.1 },
@@ -54,19 +61,23 @@ local ArenaLayout = {
         fastReachRadius = 46, -- inside this radius the channel flattens for the wheels
     },
     -- Asakura-style undershot cluster sitting IN the creek; centers[driver] drives the striker.
+    -- The apron creek surface is flat (y≈1), so all three wheels share ONE low height
+    -- (radius 5 → bottom y−1) to dip ~2 studs into the current; support posts reach the
+    -- carved creek bed (bedY). Stepping the wheels up left the outer two above the water.
     waterwheel = {
         radius = 5,
         yaw = driveYaw - 180, -- disc axle perpendicular to the current
         driveYaw = driveYaw, -- the line direction (RatchetDrum offsets toward the bell along it)
-        centers = { onLine(25.5, 5), onLine(36.8, 6), onLine(48.1, 7) },
+        bedY = -4, -- creek floor the support posts stand on (apron surf 2 − creek depth 6)
+        centers = { onLine(25.5, 4), onLine(36.8, 4), onLine(48.1, 4) },
         driver = 1,
-        ropeAnchor = onLine(20.6, 5), -- on the driver toward the log; DriveRope leaves here
+        ropeAnchor = onLine(20.6, 4), -- on the driver toward the log; DriveRope leaves here
     },
     -- Streamside sozu (shishi-odoshi) that meters the round and kicks the drum.
     sozu = {
         pivot = onLine(20, 4, -6), -- beside the driving wheel, on the left bank
         troughLen = 5,
-        cordTop = { -7, 31, 0 }, -- drum W axle end (throwDrum at {0,31,0}, length 14)
+        cordTop = { -6.82, 31, -1.58 }, -- drum W axle end (throwDrum {0,31,0} len 14, yawed by pavilionYaw)
     },
     promontories = {
         { name = "Record", pos = { 0, 16, 134 } }, -- north (opposite entrance)
@@ -88,7 +99,7 @@ local ArenaLayout = {
     heroTile = { pos = { 0, 18, 0 }, size = { 5, 6.5, 0.8 } },
     -- Hexagonal World-Throw drum atop the shōrō (ridge ~y22; y24 clears the
     -- y28 top tier enough to read). Horizontal axis = world X (E/W).
-    throwDrum = { pos = { 0, 31, 0 }, length = 14, radius = 7, faces = 6 }, -- rides the raised roof
+    throwDrum = { pos = { 0, 31, 0 }, length = 14, radius = 7, faces = 6, yaw = pavilionYaw }, -- rides the raised roof; yawed with the pavilion
     spawn = { pos = { 0, 29, -188 } }, -- on the rim plaza, facing the bell
 }
 return ArenaLayout

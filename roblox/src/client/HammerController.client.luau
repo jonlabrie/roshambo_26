@@ -74,8 +74,8 @@ local chainBottomsRest = {
 }
 
 -- The drive rope is a client visual created at runtime (no builder part).
--- mirrors ArenaLayout.waterwheel.ropeAnchor = onLine(20.6, 5) at the same yaw
-local ropeWheelAnchor = (YAW * CFrame.new(0, 5, 20.6)).Position
+-- mirrors ArenaLayout.waterwheel.ropeAnchor = onLine(20.6, 4) at the same yaw
+local ropeWheelAnchor = (YAW * CFrame.new(0, 4, 20.6)).Position
 local ropeBottomRest = yawV({ 0, 6.2, 13 }) -- ArenaLayout.shuMoku.ropeBottomRest (rotated)
 local driveRope = Instance.new("Part")
 driveRope.Name = "DriveRope"

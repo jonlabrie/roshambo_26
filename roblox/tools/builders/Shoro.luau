@@ -10,13 +10,19 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
     local timber = palette.timber
     local ink = palette.ink
     local children = {}
+    -- The pavilion is centred at the origin, so yaw it about world-Y to clear the
+    -- gantry: rotate every part's position AND orientation by L.pavilion.yaw.
+    local yaw = L.pavilion.yaw or 0
+    local function place(pos: { number }, rot: { number }?): { number }
+        return Spec.cframe(Spec.rotY(pos, yaw), Spec.matMul(Spec.rotYMat(yaw), rot or Spec.ROT.IDENTITY))
+    end
     local corners = { { s, s }, { s, -s }, { -s, s }, { -s, -s } }
     for i, c in corners do
         table.insert(
             children,
             Spec.part(`Plinth{i}`, {
                 Size = { 2.4, 1.2, 2.4 },
-                CFrame = Spec.cframe({ c[1], 0.6, c[2] }),
+                CFrame = place({ c[1], 0.6, c[2] }),
                 Color = palette.gravel,
                 Material = "Slate",
             })
@@ -25,7 +31,7 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
             children,
             Spec.part(`Post{i}`, {
                 Size = { 1.4, roofY - 1.2, 1.4 },
-                CFrame = Spec.cframe({ c[1], 1.2 + (roofY - 1.2) / 2, c[2] }),
+                CFrame = place({ c[1], 1.2 + (roofY - 1.2) / 2, c[2] }),
                 Color = timber,
                 Material = "Wood",
             })
@@ -36,7 +42,7 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
             children,
             Spec.part(`RingBeamX{i}`, {
                 Size = { 2 * s + 2.4, 1.2, 1.4 },
-                CFrame = Spec.cframe({ 0, roofY - 0.6, z }),
+                CFrame = place({ 0, roofY - 0.6, z }),
                 Color = timber,
                 Material = "Wood",
             })
@@ -47,7 +53,7 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
             children,
             Spec.part(`RingBeamZ{i}`, {
                 Size = { 1.4, 1.2, 2 * s + 2.4 },
-                CFrame = Spec.cframe({ x, roofY - 0.6, 0 }),
+                CFrame = place({ x, roofY - 0.6, 0 }),
                 Color = timber,
                 Material = "Wood",
             })
@@ -57,7 +63,7 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
         children,
         Spec.part("BellBeam", {
             Size = { 2.2, 1.8, 2 * s + 2.4 },
-            CFrame = Spec.cframe({ 0, roofY - 1.8, 0 }),
+            CFrame = place({ 0, roofY - 1.8, 0 }),
             Color = timber,
             Material = "Wood",
         })
@@ -77,7 +83,7 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
             properties = {
                 Anchored = true,
                 Size = { 2 * roofHalf, pitch, roofHalf },
-                CFrame = Spec.cframe(w.pos, w.rot),
+                CFrame = place(w.pos, w.rot),
                 Color = ink,
                 Material = "Slate",
             },
@@ -87,7 +93,7 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
         children,
         Spec.part("Finial", {
             Size = { 1, 2.2, 1 },
-            CFrame = Spec.cframe({ 0, roofY + pitch + 1.1, 0 }),
+            CFrame = place({ 0, roofY + pitch + 1.1, 0 }),
             Color = palette.gold,
             Material = "Metal",
         })

@@ -30,6 +30,13 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
     local length, r, faces = d.length, d.radius, d.faces
     local timber = palette.timber
     local ink = palette.ink
+    -- The drum is centred at x=z=0, so yaw it about world-Y to keep it square with
+    -- the (also-yawed) pavilion roof. The DrumController captures every spinning
+    -- part as an offset from the hub, so this rotation is transparent to it.
+    local yaw = d.yaw or 0
+    local function place(pos: { number }, rot: { number }?): { number }
+        return Spec.cframe(Spec.rotY(pos, yaw), Spec.matMul(Spec.rotYMat(yaw), rot or Spec.ROT.IDENTITY))
+    end
 
     local step = (2 * math.pi) / faces -- 60° per face
     local apothem = r * math.cos(math.pi / faces) -- center→edge-midpoint (face sits here)
@@ -44,7 +51,7 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
         top,
         Spec.part("Drum", {
             Size = { length, 2 * r, 2 * r },
-            CFrame = Spec.cframe({ px, py, pz }),
+            CFrame = place({ px, py, pz }),
             Transparency = 1,
             CanCollide = false,
             Color = ink,
@@ -59,7 +66,7 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
         Spec.part("Shaft", {
             Size = { length + 2, 1.2, 1.2 },
             Shape = "Cylinder",
-            CFrame = Spec.cframe({ px, py, pz }),
+            CFrame = place({ px, py, pz }),
             Color = ink,
             Material = "Metal",
         })
@@ -79,7 +86,7 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
                 top,
                 Spec.part(`Spoke{spoke}`, {
                     Size = { slen, 0.4, 0.4 },
-                    CFrame = Spec.cframe(sp, srot),
+                    CFrame = place(sp, srot),
                     Color = ink,
                     Material = "WoodPlanks",
                 })
@@ -99,7 +106,7 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
                 Size = { length, faceW, 0.5 },
                 -- faceRot(a): the slab's FRONT (−Z) faces radially outward, so the
                 -- glyph SurfaceGui (on Front) is the showing side.
-                CFrame = Spec.cframe({ px, fy, fz }, faceRot(a)),
+                CFrame = place({ px, fy, fz }, faceRot(a)),
                 Color = timber,
                 Material = "Wood",
             })

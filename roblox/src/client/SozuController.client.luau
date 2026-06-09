@@ -19,8 +19,9 @@ local restCFrame = lever.CFrame
 local FILL = restCFrame
 local DUMP = restCFrame * CFrame.Angles(math.rad(34), 0, 0)
 
--- Cord from the lever tip up to the drum's W axle end (ArenaLayout.sozu.cordTop).
-local cordTop = Vector3.new(-7, 31, 0)
+-- Cord from the lever tip up to the drum's W axle end (ArenaLayout.sozu.cordTop;
+-- the drum is yawed by pavilionYaw so the axle end shifts off −X).
+local cordTop = Vector3.new(-6.82, 31, -1.58)
 local cord = Instance.new("Part")
 cord.Name = "SozuCord"
 cord.Anchored = true

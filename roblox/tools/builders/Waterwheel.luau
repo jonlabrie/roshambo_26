@@ -48,13 +48,16 @@ function Waterwheel.build(palette: { [string]: { number } }, L: any)
                 })
             )
         end
+        -- bearing posts at the axle ends, standing on the carved creek bed (W.bedY)
+        -- and rising just past the axle, so they don't float over the water trench.
+        local postTop = c[2] + R * 0.4
         for si, d in { -1.6, 1.6 } do
             local off = Spec.rotY({ d, 0, 0 }, W.yaw)
             table.insert(
                 children,
                 Spec.part(`Support{wi}_{si}`, {
-                    Size = { 0.9, c[2] + R * 0.4, 0.9 },
-                    CFrame = Spec.cframe({ c[1] + off[1], (c[2] + R * 0.4) / 2, c[3] + off[3] }),
+                    Size = { 0.9, postTop - W.bedY, 0.9 },
+                    CFrame = Spec.cframe({ c[1] + off[1], (postTop + W.bedY) / 2, c[3] + off[3] }),
                     Color = timber,
                     Material = "Wood",
                 })
