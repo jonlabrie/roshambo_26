@@ -23,9 +23,6 @@ describe("ArenaLayout", function()
             expect(p.pos[2]).toBe(L.tiers[2].height)
         end
     end)
-    test("flume runs downhill: pool higher than wheel top", function()
-        expect(L.flume.poolPos[2] > L.flume.wheelPos[2] + L.flume.wheelRadius).toBe(true)
-    end)
     test("teahouses sit on a tier band at that tier's height", function()
         for _, t in L.teahouses do
             local d = math.sqrt(t.pos[1] ^ 2 + t.pos[3] ^ 2)
@@ -40,19 +37,15 @@ describe("ArenaLayout", function()
             expect(matched).toBe(true)
         end
     end)
-    test("waterwheel clears every pavilion post", function()
+    test("waterwheel cluster clears every pavilion post", function()
         local s = L.pavilion.postSpacing / 2
-        for _, corner in { { s, s }, { s, -s }, { -s, s }, { -s, -s } } do
-            local dx = L.flume.wheelPos[1] - corner[1]
-            local dz = L.flume.wheelPos[3] - corner[2]
-            expect(math.sqrt(dx * dx + dz * dz) > L.flume.wheelRadius).toBe(true)
+        for _, c in L.waterwheel.centers do
+            for _, corner in { { s, s }, { s, -s }, { -s, s }, { -s, -s } } do
+                local dx = c[1] - corner[1]
+                local dz = c[3] - corner[2]
+                expect(math.sqrt(dx * dx + dz * dz) > L.waterwheel.radius).toBe(true)
+            end
         end
-    end)
-    test("flume pool is a raised header cistern on the Z axis, north of the wheel", function()
-        -- pool moved off the tiers: it's a raised cistern feeding the wheel
-        expect(L.flume.poolPos[1]).toBe(0) -- on the Z axis
-        expect(L.flume.poolPos[2] > L.flume.wheelPos[2]).toBe(true) -- raised above the wheel
-        expect(L.flume.poolPos[3] > L.flume.wheelPos[3]).toBe(true) -- north of the wheel
     end)
     test("koi pond fits inside the bowl", function()
         local d = math.sqrt(L.koiPond.pos[1] ^ 2 + L.koiPond.pos[3] ^ 2)

@@ -33,15 +33,7 @@ local ArenaLayout = {
         chainBottomsRest = { { 0.8, 6.6, 7.5 }, { 0.8, 6.6, 11.5 }, { -0.8, 6.6, 7.5 }, { -0.8, 6.6, 11.5 } },
         ropeBottomRest = { 0, 6.2, 13 }, -- the log's back end (rest); the rope's log end
     }, -- draws toward +Z
-    flume = {
-        poolPos = { 0, 26, 62 }, -- raised header cistern on the Z axis, north of the wheel
-        poolSize = { 10, 2, 8 },
-        wheelPos = { 0, 7, 26 }, -- directly north of the log, on the Z axis
-        wheelRadius = 5,
-        ropeWheelAnchor = { 0, 7, 25 }, -- fixed point on the wheel/drum the rope leaves from
-        -- flume runs pool → descends → drops onto wheel top
-    },
-    -- Natural creek down the SW diagonal (replaces the flume; flume removed in a later task).
+    -- Natural creek down the SW diagonal (replaced the kakehi flume).
     creek = {
         entry = { -134, 28, -134 }, -- on the rim (tier-3 height) at ~225 deg
         mouth = { -12, 0, -12 }, -- meets the basin water at the SW edge

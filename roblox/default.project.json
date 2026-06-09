@@ -28,7 +28,6 @@
                 "Shoro": { "$path": "assets/Shoro.model.json" },
                 "Graybox": { "$path": "assets/Graybox.model.json" },
                 "Waterwheel": { "$path": "assets/Waterwheel.model.json" },
-                "Kakehi": { "$path": "assets/Kakehi.model.json" },
                 "ThrowDrum": { "$path": "assets/ThrowDrum.model.json" },
                 "ArenaSpawn": {
                     "$className": "SpawnLocation",

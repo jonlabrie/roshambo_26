@@ -28,7 +28,7 @@ local restCFrame = arm.CFrame -- rest pose: log hanging at the front of its swin
 -- their bottoms ride the log. The drive rope runs from a fixed wheel anchor to
 -- the log's back end. Both follow the log's LIVE CFrame each frame (see the
 -- dedicated Heartbeat below) — never mirrored offsets.
--- These constants MIRROR ArenaLayout.shuMoku / .flume (build-time only, not
+-- These constants MIRROR ArenaLayout.shuMoku / .waterwheel (build-time only, not
 -- replicated to the client). Keep in sync with tools/builders/ArenaLayout.luau.
 local function v3(t: { number }): Vector3
     return Vector3.new(t[1], t[2], t[3])
