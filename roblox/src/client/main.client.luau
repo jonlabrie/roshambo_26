@@ -125,22 +125,38 @@ for i = 1, HIST_N do
     histTiles[i] = { frame = tile, glyph = glyph, badge = badge }
 end
 
-local history: { { worldThrow: string, result: string? } } = {} -- newest first
+-- History renders DIRECTLY from the authoritative World-Throw tape (newest-first,
+-- deduped, each entry carries a round id), carried by both RoundUpdate (every
+-- phase) and BoardData (on join + every 30s). Rendering from the tape — rather
+-- than accumulating client-side — means it seeds the instant either arrives and
+-- can never duplicate. Personal WIN/LOSS/SAFE badges are keyed by round id, set
+-- when the local drum finishes revealing that round.
+local tape: { { id: string, worldThrow: string } } = {}
+local badgeById: { [string]: string } = {}
+local currentRoundId: string? = nil -- the round in play (from RoundUpdate)
+local revealedRoundId: string? = nil -- the latest round our drum has finished
 
 local function renderHistory()
+    -- Spoiler gate: if the newest tape entry is the round still being revealed
+    -- (drum not yet at rest), hold it back until the wheel settles on it.
+    local skip = 0
+    if currentRoundId and tape[1] and tape[1].id == currentRoundId and currentRoundId ~= revealedRoundId then
+        skip = 1
+    end
     for i = 1, HIST_N do
         local slot = histTiles[i]
-        local entry = history[i]
+        local entry = tape[i + skip]
         if entry then
             slot.frame.Visible = true
             slot.glyph.Text = GLYPH[entry.worldThrow] or "?"
-            if entry.result == "WIN" then
+            local result = badgeById[entry.id]
+            if result == "WIN" then
                 slot.badge.BackgroundColor3 = WIN_GREEN
                 slot.badge.Visible = true
-            elseif entry.result == "LOSS" then
+            elseif result == "LOSS" then
                 slot.badge.BackgroundColor3 = LOSS_RED
                 slot.badge.Visible = true
-            elseif entry.result == "SAFE" then
+            elseif result == "SAFE" then
                 slot.badge.BackgroundColor3 = GOLD
                 slot.badge.Visible = true
             else
@@ -152,27 +168,18 @@ local function renderHistory()
     end
 end
 
--- Seed the strip from the authoritative World-Throw tape on join. The server
--- caches the tape (polled ~once/round, shared by everyone on the instance) and
--- pushes it via BoardData on PlayerAdded — so this costs the external server
--- nothing per player. Seed once: the tape only holds SETTLED rounds, so it can't
--- spoil the live round, and the gated reveal flow owns updates afterward. Any
--- entries already accumulated (badged) are kept; older throws backfill behind.
+local function setTape(t: any)
+    if t and #t > 0 then
+        tape = t
+        renderHistory()
+    end
+end
+
+-- BoardData (pushed on join + every 30s) seeds the strip immediately from the
+-- instance-cached tape — no per-player cost to the external server.
 local BoardData = remotes:WaitForChild("BoardData") :: RemoteEvent
-local seeded = false
 BoardData.OnClientEvent:Connect(function(d)
-    if seeded then
-        return
-    end
-    local tape = d and d.tape
-    if not tape or #tape == 0 then
-        return -- fresh instance with no tape yet; wait for the next push
-    end
-    seeded = true
-    for i = #history + 1, math.min(#tape, HIST_N) do
-        table.insert(history, { worldThrow = tape[i].worldThrow, result = nil })
-    end
-    renderHistory()
+    setTape(d and d.tape)
 end)
 
 -- ===== bottom-center: status line (phase/countdown + wallet) =====
@@ -463,7 +470,7 @@ local fateBound = false
 -- The reveal headline AND the new history tile wait for the drum to stop turning
 -- (drumRest), so the throw isn't spoiled mid-spin. `lastReveal` persists in the
 -- status line across the next round until <10s forces the pick prompt.
-local pendingReveal: { headline: string, worldThrow: string, result: string? }? = nil
+local pendingReveal: { headline: string, roundId: string?, result: string? }? = nil
 local drumAtRest = false
 local lastReveal: string? = nil
 
@@ -473,9 +480,12 @@ local function maybeShowReveal()
         pendingReveal = nil
         lastReveal = p.headline
         statusLabel.Text = p.headline
-        table.insert(history, 1, { worldThrow = p.worldThrow, result = p.result })
-        while #history > HIST_N do
-            table.remove(history)
+        -- Badge this round by id and un-gate it in the strip now the drum's rest.
+        if p.roundId then
+            if p.result then
+                badgeById[p.roundId] = p.result
+            end
+            revealedRoundId = p.roundId
         end
         renderHistory()
     end
@@ -512,6 +522,8 @@ FateResolvedEvt.OnClientEvent:Connect(function(userId)
 end)
 
 RoundUpdate.OnClientEvent:Connect(function(info)
+    currentRoundId = info.roundId
+    setTape(info.tape) -- authoritative World-Throw history, every phase change
     if info.phase == "ACTIVE" then
         canPick = not fateBound
         myPick = nil
@@ -538,7 +550,8 @@ RevealResult.OnClientEvent:Connect(function(r)
     else
         headline = `World threw {r.worldThrow}`
     end
-    pendingReveal = { headline = headline, worldThrow = r.worldThrow, result = r.result }
+    -- The revealing round == the one RoundUpdate last named (REVEAL phase).
+    pendingReveal = { headline = headline, roundId = currentRoundId, result = r.result }
     maybeShowReveal() -- only paints if the drum is already at rest
     task.delay(3, function()
         if pendingReveal and pendingReveal.headline == headline then
