@@ -36,6 +36,15 @@ describe("Bonsho builder", function()
             end
         end
     end)
+    test("the strike boss sits on the bell's SW face (x<0 and z<0)", function()
+        local spec = Bonsho.build(ZenDojo.palette, L)
+        for _, c in spec.children :: any do
+            if c.name == "LotusBoss" then
+                expect(c.properties.CFrame[1] < 0).toBe(true)
+                expect(c.properties.CFrame[3] < 0).toBe(true)
+            end
+        end
+    end)
     test("bell sections widen toward the skirt", function()
         local spec = Bonsho.build(ZenDojo.palette, L)
         local radii = {}
