@@ -66,6 +66,28 @@ local function padDist(x, z)
     return md, mp
 end
 
+-- Creek: a water channel down the drive line (heading driveYaw = 237° in
+-- ArenaLayout — re-paste the unit dir on layout change). `along` = projection
+-- onto the line from the origin; `off` = perpendicular distance to it. Carves a
+-- bed that descends rim→mouth and lays a connected water ribbon; overrides the
+-- tier/basin terrain where it applies, and notches into the basin's NW edge.
+local CREEK = { halfW = 4, mouthAlong = 12, rimAlong = 190, bedMouth = -1, bedRim = 25 }
+local CK_DIRX, CK_DIRZ = -0.8387, -0.5446 -- (sin, cos) of driveYaw 237°
+local function creekColumn(x, z)
+    local along = x * CK_DIRX + z * CK_DIRZ
+    if along < CREEK.mouthAlong or along > CREEK.rimAlong then
+        return nil
+    end
+    local off = math.abs(x * CK_DIRZ - z * CK_DIRX)
+    if off > CREEK.halfW then
+        return nil
+    end
+    local t = math.clamp((along - CREEK.mouthAlong) / (CREEK.rimAlong - CREEK.mouthAlong), 0, 1)
+    local bed = CREEK.bedMouth + t * (CREEK.bedRim - CREEK.bedMouth)
+    local edge = ss(CREEK.halfW - 1.5, CREEK.halfW, off) -- sloped banks toward the cut's rim
+    return { g = bed + edge * 1.5, wb = bed - 1, wt = bed + 1.0 }
+end
+
 -- domain-warped radial offset: 0 inside r<55 and within ~PAD_SUPP of any pad
 local function warpAmt(x, z, r, pd)
     if r < 55 then
@@ -111,6 +133,11 @@ end
 -- per-column descriptor: g = ground surface Y; optional wb/wt = water bottom/top.
 local function evalColumn(x, z)
     local r = math.sqrt(x * x + z * z)
+    -- creek wins where it runs (incl. the basin NW notch), so it cuts through tiers
+    local creek = creekColumn(x, z)
+    if creek then
+        return creek
+    end
     -- basin: water 0 down to -6 over ground (monument zone, exact)
     if r < BASIN_R then
         return { g = -6, wb = -6, wt = 0 }
