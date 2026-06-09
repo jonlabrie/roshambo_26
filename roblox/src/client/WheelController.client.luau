@@ -1,11 +1,10 @@
 --!strict
--- Spins the waterwheel while the machine draws; ratchet-freezes at latch.
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+-- Continuously spins the waterwheels. The creek always flows, so the wheels never
+-- stop — they kept turning through the round before, then froze on the lockout
+-- "ratchet", which read wrong (a live stream with stalled wheels). The striker's
+-- draw/latch is driven by the clock (HammerCurve), not the wheel's real rotation,
+-- so the two are decoupled and the wheels just turn forever.
 local RunService = game:GetService("RunService")
-
-local EventBus = require(script.Parent:WaitForChild("EventBus"))
-local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
-local RoundUpdate = remotes:WaitForChild("RoundUpdate") :: RemoteEvent
 
 local stage = workspace:WaitForChild("RoshamboStage")
 local rig = stage:WaitForChild("Waterwheel")
@@ -45,26 +44,9 @@ if driver then
     fall.Parent = sink
 end
 
-local spinning = true
 local angle = 0
 
-RoundUpdate.OnClientEvent:Connect(function(info)
-    if info.phase == "ACTIVE" then
-        spinning = true
-        fall.Rate = 26
-    end
-end)
-EventBus.Cue.Event:Connect(function(cue)
-    if cue.kind == "latchClick" then
-        spinning = false
-        fall.Rate = 4
-    end
-end)
-
 RunService.Heartbeat:Connect(function(dt)
-    if not spinning then
-        return
-    end
     -- Undershot: the creek flows downhill toward the centre, so the submerged
     -- bottom paddles are pushed that way → the wheel turns NEGATIVELY about its
     -- axle (local X). Positive spun it backwards (water appearing to climb uphill).
