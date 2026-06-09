@@ -60,10 +60,10 @@ function Creek.build(palette: { [string]: { number } }, L: any)
                 Material = "Slate",
             })
         )
-        -- a cascade rock midstream every third sample, sitting at the water surface
-        -- (local terrace top − 1, matching the carved creek's water level there).
+        -- a cascade rock midstream every third sample, poking through the water
+        -- surface (the carved creek is brimful at the local terrace grade).
         if i % 3 == 1 then
-            local waterTop = tierSurface(math.sqrt(x * x + z * z), L) - 1
+            local waterTop = tierSurface(math.sqrt(x * x + z * z), L)
             table.insert(
                 children,
                 Spec.part(`Cascade{i}`, {

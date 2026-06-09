@@ -65,7 +65,10 @@ RunService.Heartbeat:Connect(function(dt)
     if not spinning then
         return
     end
-    angle += dt * 0.9
+    -- Undershot: the creek flows downhill toward the centre, so the submerged
+    -- bottom paddles are pushed that way → the wheel turns NEGATIVELY about its
+    -- axle (local X). Positive spun it backwards (water appearing to climb uphill).
+    angle -= dt * 0.9
     for _, s in spins do
         local spun = s.hub * CFrame.Angles(angle, 0, 0)
         s.part.CFrame = spun

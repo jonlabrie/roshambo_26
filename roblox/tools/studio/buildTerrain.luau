@@ -73,10 +73,11 @@ end
 -- always reads as a recessed channel that steps down the tiers rather than a fixed
 -- slope that floats above the lower mid-section. The water top sits 1 stud below
 -- the local surface, so the columns just outside halfW (full terrain) contain it.
--- depth 6 keeps the water span (floor→wt) at 5 studs — wider than the RES-4 voxel
--- pitch, so every column lands at least one full water voxel and the ribbon never
--- breaks up (a 3-stud span could fall between voxel centers and render nothing).
-local CREEK = { halfW = 6, mouthAlong = 12, rimAlong = 190, depth = 6 }
+-- The water fills the channel to the LOCAL GRADE (brimful), not a stud below: a
+-- sunken surface left the sloped trench walls, the submerged wheel parts and the
+-- apron tiles showing through a thin ribbon. depth 5 keeps the water span (floor→
+-- wt) wider than the RES-4 voxel pitch so the ribbon never breaks between voxels.
+local CREEK = { halfW = 6, mouthAlong = 12, rimAlong = 190, depth = 5 }
 local CK_DIRX, CK_DIRZ = -0.8387, -0.5446 -- (sin, cos) of driveYaw 237°
 local function creekColumn(x, z, surfaceTop)
     local along = x * CK_DIRX + z * CK_DIRZ
@@ -87,10 +88,11 @@ local function creekColumn(x, z, surfaceTop)
     if off > CREEK.halfW then
         return nil
     end
-    -- flat-bottomed cut: floor DEPTH below local surface, filled with water to 1
-    -- stud under that surface. Both g and wb are the floor (no air gap under water).
+    -- flat-bottomed cut: floor DEPTH below local surface, water filled up to the
+    -- local grade so it reads as a stream at grade (banks submerged, not exposed).
+    -- Both g and wb are the floor (no air gap under the water).
     local floor = surfaceTop - CREEK.depth
-    return { g = floor, wb = floor, wt = surfaceTop - 1 }
+    return { g = floor, wb = floor, wt = surfaceTop }
 end
 
 -- domain-warped radial offset: 0 inside r<55 and within ~PAD_SUPP of any pad
