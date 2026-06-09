@@ -69,50 +69,60 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
             CanCollide = false,
         })
     )
-    local sp = L.shuMoku.restPos
+    local sp = Spec.rotY(L.shuMoku.restPos, L.shuMoku.yaw)
+    local logRot = Spec.matMul(Spec.rotYMat(L.shuMoku.yaw), Spec.ROT.CYL_ALONG_Z)
     table.insert(
         children,
         Spec.part("ShuMoku", {
             Size = { L.shuMoku.length, 2 * L.shuMoku.radius, 2 * L.shuMoku.radius },
             Shape = "Cylinder",
-            CFrame = Spec.cframe(sp, Spec.ROT.CYL_ALONG_Z),
+            CFrame = Spec.cframe(sp, logRot),
             Color = palette.timber,
             Material = "Wood",
         })
     )
-    -- Gantry: two side rails (along Z at x = ±railX, y = railY) on four posts.
+    -- Gantry: two side rails (along the yaw-rotated Z axis at ±railX, y = railY) on four posts.
     local sm = L.shuMoku
-    local railX, railY = sm.railX, sm.railY
-    local railZ1, railZ2 = sm.railZ[1], sm.railZ[2]
-    local railLen = railZ2 - railZ1 + 1
-    local railMidZ = (railZ1 + railZ2) / 2
+    local yaw = sm.yaw
+    local railLen = sm.railZ[2] - sm.railZ[1] + 1
+    local railMidZ = (sm.railZ[1] + sm.railZ[2]) / 2
+    local railRot = Spec.matMul(Spec.rotYMat(yaw), Spec.ROT.IDENTITY)
     local y2 = 2 -- gantry posts rise from the apron gravel
-    for i, rx in { railX, -railX } do
+    for i, rx in { sm.railX, -sm.railX } do
+        local p = Spec.rotY({ rx, sm.railY, railMidZ }, yaw)
         table.insert(
             children,
             Spec.part(`Rail{i}`, {
                 Size = { 0.8, 0.8, railLen },
-                CFrame = Spec.cframe({ rx, railY, railMidZ }),
+                CFrame = Spec.cframe(p, railRot),
                 Color = palette.timber,
                 Material = "Wood",
             })
         )
     end
-    local postSpots = { { railX, railZ1 }, { -railX, railZ1 }, { railX, railZ2 }, { -railX, railZ2 } }
+    local postSpots = {
+        { sm.railX, sm.railZ[1] },
+        { -sm.railX, sm.railZ[1] },
+        { sm.railX, sm.railZ[2] },
+        { -sm.railX, sm.railZ[2] },
+    }
     for i, spot in postSpots do
+        local p = Spec.rotY({ spot[1], (sm.railY + y2) / 2, spot[2] }, yaw)
         table.insert(
             children,
             Spec.part(`GantryPost{i}`, {
-                Size = { 0.8, railY - y2, 0.8 },
-                CFrame = Spec.cframe({ spot[1], (railY + y2) / 2, spot[2] }),
+                Size = { 0.8, sm.railY - y2, 0.8 },
+                CFrame = Spec.cframe(p),
                 Color = palette.timber,
                 Material = "Wood",
             })
         )
     end
-    -- 4 angled chains: fixed rail tops down to the log's rest attach points.
+    -- 4 angled chains: fixed rail tops down to the log's rest attach points (rotated).
     for i = 1, 4 do
-        local pos, len, rot = Spec.segment(sm.chainTops[i], sm.chainBottomsRest[i])
+        local top = Spec.rotY(sm.chainTops[i], yaw)
+        local bot = Spec.rotY(sm.chainBottomsRest[i], yaw)
+        local pos, len, rot = Spec.segment(top, bot)
         table.insert(
             children,
             Spec.part(`Chain{i}`, {

@@ -3,6 +3,7 @@ local harness = require("./harness")
 local Bonsho = require("../tools/builders/Bonsho")
 local L = require("../tools/builders/ArenaLayout")
 local ZenDojo = require("../src/shared/themes/ZenDojo")
+local Spec = require("../tools/builders/Spec")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 
 describe("Bonsho builder", function()
@@ -17,9 +18,21 @@ describe("Bonsho builder", function()
     end)
     test("ShuMoku rest position matches layout", function()
         local spec = Bonsho.build(ZenDojo.palette, L)
+        local rest = Spec.rotY(L.shuMoku.restPos, L.shuMoku.yaw)
         for _, c in spec.children :: any do
             if c.name == "ShuMoku" then
-                expect(c.properties.CFrame[3]).toBe(L.shuMoku.restPos[3])
+                expect(c.properties.CFrame[1]).toBeCloseTo(rest[1], 0.001)
+                expect(c.properties.CFrame[2]).toBeCloseTo(rest[2], 0.001)
+                expect(c.properties.CFrame[3]).toBeCloseTo(rest[3], 0.001)
+            end
+        end
+    end)
+    test("ShuMoku is swung onto the SW axis (rest x<0 and z<0)", function()
+        local spec = Bonsho.build(ZenDojo.palette, L)
+        for _, c in spec.children :: any do
+            if c.name == "ShuMoku" then
+                expect(c.properties.CFrame[1] < 0).toBe(true)
+                expect(c.properties.CFrame[3] < 0).toBe(true)
             end
         end
     end)
