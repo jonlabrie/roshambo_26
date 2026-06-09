@@ -53,7 +53,7 @@ local PADS = {
     { 0, -188, 28 }, -- spawn plaza
 }
 local PAD_SUPP = 14 -- pad flatten / warp-suppression radius
-local KOI = { x = -130, z = -115, r = 14, surf = 28 } -- koi pond carved into tier 3
+local KOI = { x = -130, z = -115, r = 14 } -- koi pond; level derived from local tier (see KOI_LEVEL)
 
 local function padDist(x, z)
     local md, mp = 1e9, nil
@@ -68,12 +68,17 @@ end
 
 -- Creek: a water channel down the drive line (heading driveYaw = 237° in
 -- ArenaLayout — re-paste the unit dir on layout change). `along` = projection
--- onto the line from the origin; `off` = perpendicular distance to it. Carves a
--- bed that descends rim→mouth and lays a connected water ribbon; overrides the
--- tier/basin terrain where it applies, and notches into the basin's NW edge.
-local CREEK = { halfW = 6, mouthAlong = 12, rimAlong = 190, bedMouth = -1, bedRim = 24 }
+-- onto the line from the origin; `off` = perpendicular distance to it. The bed is
+-- carved DEPTH studs into whatever the local terrain surface is (passed in), so it
+-- always reads as a recessed channel that steps down the tiers rather than a fixed
+-- slope that floats above the lower mid-section. The water top sits 1 stud below
+-- the local surface, so the columns just outside halfW (full terrain) contain it.
+-- depth 6 keeps the water span (floor→wt) at 5 studs — wider than the RES-4 voxel
+-- pitch, so every column lands at least one full water voxel and the ribbon never
+-- breaks up (a 3-stud span could fall between voxel centers and render nothing).
+local CREEK = { halfW = 6, mouthAlong = 12, rimAlong = 190, depth = 6 }
 local CK_DIRX, CK_DIRZ = -0.8387, -0.5446 -- (sin, cos) of driveYaw 237°
-local function creekColumn(x, z)
+local function creekColumn(x, z, surfaceTop)
     local along = x * CK_DIRX + z * CK_DIRZ
     if along < CREEK.mouthAlong or along > CREEK.rimAlong then
         return nil
@@ -82,12 +87,10 @@ local function creekColumn(x, z)
     if off > CREEK.halfW then
         return nil
     end
-    local t = math.clamp((along - CREEK.mouthAlong) / (CREEK.rimAlong - CREEK.mouthAlong), 0, 1)
-    local bed = CREEK.bedMouth + t * (CREEK.bedRim - CREEK.bedMouth)
-    -- sloped banks toward the cut's rim; a 4-stud-deep water layer reads as one
-    -- continuous ribbon at RES 4 (a 2-stud layer broke up between voxel rows).
-    local edge = ss(CREEK.halfW - 2, CREEK.halfW, off)
-    return { g = bed + edge * 2.5, wb = bed - 2, wt = bed + 2 }
+    -- flat-bottomed cut: floor DEPTH below local surface, filled with water to 1
+    -- stud under that surface. Both g and wb are the floor (no air gap under water).
+    local floor = surfaceTop - CREEK.depth
+    return { g = floor, wb = floor, wt = surfaceTop - 1 }
 end
 
 -- domain-warped radial offset: 0 inside r<55 and within ~PAD_SUPP of any pad
@@ -116,6 +119,11 @@ local function tierSurface(rw)
     return TIERS[#TIERS].h
 end
 
+-- the koi pond's flat water level = the tier surface at the pond's center radius
+-- (≈16, tier 2). A single level keeps the pond flat; the tier-3 wall rising past
+-- its NW rim simply nestles the pond against the slope rather than tilting it.
+local KOI_LEVEL = tierSurface(math.sqrt(KOI.x ^ 2 + KOI.z ^ 2))
+
 -- rolling backdrop hills (2026-06-07 gate tune: less steep, more organic).
 -- Long gentle climb out of the bowl (88-stud run, not a berm wall), an
 -- undulating ridge line so the rim horizon isn't a constant ring, low-octave
@@ -135,53 +143,56 @@ end
 -- per-column descriptor: g = ground surface Y; optional wb/wt = water bottom/top.
 local function evalColumn(x, z)
     local r = math.sqrt(x * x + z * z)
-    -- creek wins where it runs (incl. the basin NW notch), so it cuts through tiers
-    local creek = creekColumn(x, z)
-    if creek then
-        return creek
-    end
-    -- basin: water 0 down to -6 over ground (monument zone, exact)
+    -- first compute the BASE terrain (no creek): basin / apron / tiers + paddy + koi.
+    local res
     if r < BASIN_R then
-        return { g = -6, wb = -6, wt = 0 }
-    end
-    -- gravel apron, flat surface 2 (monument zone, exact)
-    if r < APRON_R then
-        return { g = 2, grav = true }
-    end
-    local pd, pp = padDist(x, z)
-    local rw = r + warpAmt(x, z, r, pd)
-    local surf = tierSurface(rw)
-    -- flatten onto pad height near a content pad
-    if pd < PAD_SUPP then
-        local t = ss(PAD_SUPP - 5, PAD_SUPP, pd)
-        surf = pp[3] * (1 - t) + surf * t
-    end
-    surf = math.min(surf + hills(x, z, r), 96) -- stay under the build ceiling (y 100)
-    -- which tier plateau (by warped radius), for the paddy band
-    local ti
-    if rw >= TIERS[1].r and rw < TIERS[2].r then
-        ti = 1
-    elseif rw >= TIERS[2].r and rw < TIERS[3].r then
-        ti = 2
-    elseif rw >= TIERS[3].r and rw < TIERS[3].r + 30 then
-        ti = 3
-    end
-    local res = { g = surf }
-    -- paddy: outer band of tiers 1 & 2, hugging the wall of the tier above.
-    -- band [tierAbove.r-12, tierAbove.r-2]; floor recessed, top WATER at h-2.
-    if ti and ti < #TIERS and pd >= PAD_SUPP then
-        local tr = TIERS[ti + 1].r
-        local bandIn, bandOut = tr - 12, tr - 2
-        if rw >= bandIn and rw <= bandOut then
-            local th = TIERS[ti].h
-            res.g, res.wb, res.wt = th - 4, th - 4, th - 2
+        -- basin: water 0 down to -6 over ground (monument zone, exact)
+        res = { g = -6, wb = -6, wt = 0 }
+    elseif r < APRON_R then
+        -- gravel apron, flat surface 2 (monument zone, exact)
+        res = { g = 2, grav = true }
+    else
+        local pd, pp = padDist(x, z)
+        local rw = r + warpAmt(x, z, r, pd)
+        local surf = tierSurface(rw)
+        -- flatten onto pad height near a content pad
+        if pd < PAD_SUPP then
+            local t = ss(PAD_SUPP - 5, PAD_SUPP, pd)
+            surf = pp[3] * (1 - t) + surf * t
+        end
+        surf = math.min(surf + hills(x, z, r), 96) -- stay under the build ceiling (y 100)
+        -- which tier plateau (by warped radius), for the paddy band
+        local ti
+        if rw >= TIERS[1].r and rw < TIERS[2].r then
+            ti = 1
+        elseif rw >= TIERS[2].r and rw < TIERS[3].r then
+            ti = 2
+        elseif rw >= TIERS[3].r and rw < TIERS[3].r + 30 then
+            ti = 3
+        end
+        res = { g = surf }
+        -- paddy: outer band of tiers 1 & 2, hugging the wall of the tier above.
+        -- band [tierAbove.r-12, tierAbove.r-2]; floor recessed, top WATER at h-2.
+        if ti and ti < #TIERS and pd >= PAD_SUPP then
+            local tr = TIERS[ti + 1].r
+            local bandIn, bandOut = tr - 12, tr - 2
+            if rw >= bandIn and rw <= bandOut then
+                local th = TIERS[ti].h
+                res.g, res.wb, res.wt = th - 4, th - 4, th - 2
+            end
+        end
+        -- koi pond recessed into its local tier (flat KOI_LEVEL, not a fixed height)
+        local kd = math.sqrt((x - KOI.x) ^ 2 + (z - KOI.z) ^ 2)
+        if kd < KOI.r then
+            local fl = KOI_LEVEL - 4
+            res.g, res.wb, res.wt = fl, fl, KOI_LEVEL - 1
         end
     end
-    -- koi pond carved into tier 3
-    local kd = math.sqrt((x - KOI.x) ^ 2 + (z - KOI.z) ^ 2)
-    if kd < KOI.r then
-        local fl = KOI.surf - 7
-        res.g, res.wb, res.wt = fl, fl, KOI.surf - 3
+    -- creek carves LAST, into the local surface top (water-or-ground), so it reads
+    -- as a recessed channel that steps down the tiers and notches the basin's edge.
+    local creek = creekColumn(x, z, res.wt or res.g)
+    if creek then
+        return creek
     end
     return res
 end
