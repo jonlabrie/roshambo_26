@@ -39,6 +39,13 @@ local GOLD = Color3.fromRGB(212, 176, 102)
 local WASHI = Color3.fromRGB(26, 24, 28)
 local WIN_GREEN = Color3.fromRGB(86, 196, 120)
 local LOSS_RED = Color3.fromRGB(206, 86, 86)
+-- Ivory display-tile palette (pick buttons + history tiles)
+local IVORY = Color3.fromRGB(244, 238, 222)
+local IVORY_DIM = Color3.fromRGB(214, 208, 192)
+local TAN_RIM = Color3.fromRGB(176, 164, 138)
+local INK = Color3.fromRGB(60, 45, 28)
+local HILITE = Color3.fromRGB(255, 252, 244)
+local SEL_BLUE = Color3.fromRGB(74, 150, 255)
 
 local THROWS = { "R", "P", "S" }
 -- World-facing glyphs (history) match the drum/boards: scissors = caret ∧.
@@ -80,8 +87,8 @@ for i = 1, HIST_N do
     tile.AnchorPoint = Vector2.new(0, 1)
     tile.Position = UDim2.new(0, (i - 1) * (HIST_TILE + HIST_GAP), 1, 0)
     tile.Size = UDim2.fromOffset(HIST_TILE, HIST_TILE)
-    tile.BackgroundColor3 = WASHI
-    tile.BackgroundTransparency = 0.3
+    tile.BackgroundColor3 = IVORY
+    tile.BackgroundTransparency = 0.1
     tile.BorderSizePixel = 0
     tile.Visible = false
     tile.Parent = histStrip
@@ -89,15 +96,15 @@ for i = 1, HIST_N do
     corner.CornerRadius = UDim.new(0, 5)
     corner.Parent = tile
     local stroke = Instance.new("UIStroke")
-    stroke.Color = GOLD
+    stroke.Color = TAN_RIM
     stroke.Thickness = 1
-    stroke.Transparency = 0.55
+    stroke.Transparency = 0.3
     stroke.Parent = tile
 
     local glyph = Instance.new("TextLabel")
     glyph.Size = UDim2.fromScale(1, 1)
     glyph.BackgroundTransparency = 1
-    glyph.TextColor3 = GOLD
+    glyph.TextColor3 = INK
     glyph.TextSize = 22
     glyph.Font = Enum.Font.GothamBlack
     glyph.Text = ""
@@ -144,6 +151,29 @@ local function renderHistory()
         end
     end
 end
+
+-- Seed the strip from the authoritative World-Throw tape on join. The server
+-- caches the tape (polled ~once/round, shared by everyone on the instance) and
+-- pushes it via BoardData on PlayerAdded — so this costs the external server
+-- nothing per player. Seed once: the tape only holds SETTLED rounds, so it can't
+-- spoil the live round, and the gated reveal flow owns updates afterward. Any
+-- entries already accumulated (badged) are kept; older throws backfill behind.
+local BoardData = remotes:WaitForChild("BoardData") :: RemoteEvent
+local seeded = false
+BoardData.OnClientEvent:Connect(function(d)
+    if seeded then
+        return
+    end
+    local tape = d and d.tape
+    if not tape or #tape == 0 then
+        return -- fresh instance with no tape yet; wait for the next push
+    end
+    seeded = true
+    for i = #history + 1, math.min(#tape, HIST_N) do
+        table.insert(history, { worldThrow = tape[i].worldThrow, result = nil })
+    end
+    renderHistory()
+end)
 
 -- ===== bottom-center: status line (phase/countdown + wallet) =====
 -- The status line and the ticker are the two stacked feedback lines below the
@@ -289,32 +319,35 @@ local BTN_SPOT = {
 -- The ○ ring reads small at a shared size; give rock a bigger glyph.
 local BTN_TEXT = { R = 58, P = 32, S = 34 }
 local buttons: { [string]: TextButton } = {}
-local rings: { [string]: UIStroke } = {}
+local glyphMain: { [string]: TextLabel } = {}
+local glyphHi: { [string]: TextLabel } = {}
+local glyphGlow: { [string]: UIStroke } = {}
 local myPick: string? = nil
 local canPick = false
 local lockoutAt: number? = nil
 
+-- Ivory pressed-tile buttons. The glyph is embossed (a light highlight peeking
+-- down-right behind an ink glyph); the current pick glows blue.
 local function refreshButtons()
     for value, b in buttons do
-        local ring = rings[value]
+        local main, hi, glow = glyphMain[value], glyphHi[value], glyphGlow[value]
         if value == myPick then
-            b.BackgroundColor3 = Color3.fromRGB(58, 46, 24)
-            ring.Color = GOLD
-            ring.Thickness = 3
-            ring.Transparency = 0
+            b.BackgroundColor3 = IVORY
+            main.TextColor3 = SEL_BLUE
+            glow.Transparency = 0.1
+            hi.TextTransparency = 1
         elseif canPick then
-            b.BackgroundColor3 = WASHI
-            ring.Color = GOLD
-            ring.Thickness = 1.5
-            ring.Transparency = 0.45
+            b.BackgroundColor3 = IVORY
+            main.TextColor3 = INK
+            glow.Transparency = 1
+            hi.TextTransparency = 0
         else
-            b.BackgroundColor3 = WASHI
-            ring.Color = GOLD
-            ring.Thickness = 1
-            ring.Transparency = 0.8
+            b.BackgroundColor3 = IVORY_DIM
+            main.TextColor3 = INK
+            glow.Transparency = 1
+            hi.TextTransparency = 0.3
         end
         b.AutoButtonColor = canPick
-        b.TextTransparency = if canPick or value == myPick then 0 else 0.35
     end
 end
 
@@ -325,22 +358,52 @@ for _, value in THROWS do
     b.AnchorPoint = Vector2.new(0.5, 0.5)
     b.Position = UDim2.new(0, spot.x, 1, -spot.y)
     b.Size = UDim2.fromOffset(BTN_D, BTN_D)
-    b.BackgroundColor3 = WASHI
-    b.BackgroundTransparency = 0.2
+    b.BackgroundColor3 = IVORY
     b.AutoButtonColor = false
-    b.Text = BTN_GLYPH[value]
-    b.TextColor3 = GOLD
-    b.TextSize = BTN_TEXT[value]
-    b.Font = Enum.Font.GothamBlack
+    b.Text = ""
     b.Parent = gui
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(1, 0) -- circle
     corner.Parent = b
-    local ring = Instance.new("UIStroke")
-    ring.Color = GOLD
-    ring.Thickness = 1.5
-    ring.Transparency = 0.45
-    ring.Parent = b
+    local rim = Instance.new("UIStroke") -- tan edge so it reads as a raised tile
+    rim.Color = TAN_RIM
+    rim.Thickness = 2
+    rim.Transparency = 0.1
+    rim.Parent = b
+    local sheen = Instance.new("UIGradient") -- subtle top-lit 3D button feel
+    sheen.Color = ColorSequence.new(Color3.fromRGB(255, 253, 247), Color3.fromRGB(226, 219, 201))
+    sheen.Rotation = 90
+    sheen.Parent = b
+
+    -- emboss: a light highlight offset down-right, behind the ink glyph
+    local hi = Instance.new("TextLabel")
+    hi.Name = "Hi"
+    hi.Size = UDim2.fromScale(1, 1)
+    hi.Position = UDim2.fromOffset(1, 2)
+    hi.BackgroundTransparency = 1
+    hi.Text = BTN_GLYPH[value]
+    hi.TextColor3 = HILITE
+    hi.TextSize = BTN_TEXT[value]
+    hi.Font = Enum.Font.GothamBlack
+    hi.ZIndex = 2
+    hi.Parent = b
+
+    local main = Instance.new("TextLabel")
+    main.Name = "Glyph"
+    main.Size = UDim2.fromScale(1, 1)
+    main.BackgroundTransparency = 1
+    main.Text = BTN_GLYPH[value]
+    main.TextColor3 = INK
+    main.TextSize = BTN_TEXT[value]
+    main.Font = Enum.Font.GothamBlack
+    main.ZIndex = 3
+    main.Parent = b
+    local glow = Instance.new("UIStroke") -- blue halo around the glyph when picked
+    glow.Color = SEL_BLUE
+    glow.Thickness = 2.5
+    glow.Transparency = 1
+    glow.Parent = main
+
     b.MouseButton1Click:Connect(function()
         if canPick then
             myPick = value
@@ -349,17 +412,20 @@ for _, value in THROWS do
         end
     end)
     buttons[value] = b
-    rings[value] = ring
+    glyphMain[value] = main
+    glyphHi[value] = hi
+    glyphGlow[value] = glow
 end
 
--- ===== bottom-right corner: bank + accept-fate (stacked) =====
+-- ===== bank sits right beside the wallet (same row + height as the status line) =====
+local STATUS_Y = 8 + TICKER_H + GAP -- bottom offset shared with the status bar
 local bankButton = Instance.new("TextButton")
 bankButton.Name = "Bank"
-bankButton.Size = UDim2.fromOffset(150, 38)
-bankButton.AnchorPoint = Vector2.new(1, 1)
-bankButton.Position = UDim2.new(1, -8, 1, -8)
+bankButton.Size = UDim2.fromOffset(98, 30)
+bankButton.AnchorPoint = Vector2.new(0, 1)
+bankButton.Position = UDim2.new(0.75, 8, 1, -STATUS_Y) -- just right of the ½-width status bar
 bankButton.Text = "BANK"
-bankButton.TextSize = 18
+bankButton.TextSize = 16
 bankButton.Font = Enum.Font.GothamBold
 bankButton.TextColor3 = Color3.fromRGB(20, 20, 20)
 bankButton.BackgroundColor3 = Color3.fromRGB(255, 200, 40)
@@ -376,11 +442,11 @@ end)
 
 local acceptButton = Instance.new("TextButton")
 acceptButton.Name = "AcceptFate"
-acceptButton.Size = UDim2.fromOffset(176, 38)
+acceptButton.Size = UDim2.fromOffset(176, 30)
 acceptButton.AnchorPoint = Vector2.new(1, 1)
-acceptButton.Position = UDim2.new(1, -8, 1, -(8 + 38 + 6)) -- above bank
+acceptButton.Position = UDim2.new(0.25, -8, 1, -STATUS_Y) -- left of the status bar, same row
 acceptButton.Text = "ACCEPT YOUR FATE"
-acceptButton.TextSize = 15
+acceptButton.TextSize = 14
 acceptButton.Font = Enum.Font.GothamBold
 acceptButton.TextColor3 = Color3.fromRGB(240, 234, 216)
 acceptButton.BackgroundColor3 = Color3.fromRGB(90, 40, 40)
