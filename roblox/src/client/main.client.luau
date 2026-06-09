@@ -1,12 +1,17 @@
 --!strict
--- Playable-loop UI. ZenDojo HUD pass (4b, T24): the persistent status + wallet
--- live in a slim washi panel at the BOTTOM (above the R/P/S pick buttons), and
--- all streaming prose — round prompts, the TOO-LATE toast, announcements —
--- scrolls across a ticker strip on the very bottom edge (fed by
--- EventBus.TickerMessage). The top of the screen stays clear so the bonshō bell
--- and the World-Throw drum read unobstructed. The WIN/SAFE/LOSS headline lands in
--- the status bar — and only after the drum stops turning (drumRest cue), so the
--- text never spoils the throw before the wheel settles on it.
+-- Playable-loop UI (ZenDojo HUD). Layout:
+--   • top-center  : persistent World-Throw HISTORY strip (last 10, newest left;
+--                   gold glyph + personal WIN/LOSS/SAFE badge). Mirrors the PWA
+--                   tape. Updated only once the drum settles (no spoiler).
+--   • bottom-left : round R/P/S pick buttons in the LOGO triangle (○ rock top-
+--                   left, ─ paper top-right, ∨ scissors bottom-center). Glyph
+--                   only; the current pick is illuminated (gold ring).
+--   • bottom-right: a slim status line (phase/countdown + PTS/POT/STREAK) over a
+--                   scrolling prose ticker (~2/3 width). The status line HOLDS
+--                   the prior round's throw and only switches to "Choose a
+--                   throw!" under 10s left, so last round's result lingers.
+-- The WIN/SAFE/LOSS headline lands in the status line after the drum stops
+-- (drumRest cue), never before — the throw isn't spoiled while the wheel turns.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -28,33 +33,126 @@ gui.Name = "RoshamboUI"
 gui.ResetOnSpawn = false
 gui.Parent = player:WaitForChild("PlayerGui")
 
--- ZenDojo HUD palette: washi-dark panels, gold hairlines, ink-cream text.
+-- ZenDojo HUD palette
 local INK_CREAM = Color3.fromRGB(240, 234, 216)
 local GOLD = Color3.fromRGB(212, 176, 102)
 local WASHI = Color3.fromRGB(26, 24, 28)
-
--- bottom-cluster vertical budget (px, stacked from the screen's bottom edge up):
--- ticker → pick/bank/accept row → status bar.
-local TICKER_H = 26
-local GAP = 8
-local BTN_H = 56
-local STATUS_H = 30
-local BTN_Y = TICKER_H + GAP -- pick/bank/accept baseline sits above the ticker
-local STATUS_Y = BTN_Y + BTN_H + GAP -- status bar sits above the buttons
+local WIN_GREEN = Color3.fromRGB(86, 196, 120)
+local LOSS_RED = Color3.fromRGB(206, 86, 86)
 
 local THROWS = { "R", "P", "S" }
--- The approved ZenDojo R/P/S glyphs (gold), matching the drum faces and boards.
+-- World-facing glyphs (history) match the drum/boards: scissors = caret ∧.
 local GLYPH = { R = "○", P = "─", S = "∧" }
-local NAMES = { R = "Rock", P = "Paper", S = "Scissors" }
--- The WIN/SAFE/LOSS reveal is no longer a center toast — it lands in the status
--- bar (see RevealResult / showReveal), and only after the drum stops turning.
+-- The player's own buttons use the LOGO arrangement + the caron ∨ (the mascot
+-- smile) for scissors — the brand-facing variant of the happy/sad asymmetry.
+local BTN_GLYPH = { R = "○", P = "─", S = "∨" }
 
--- ===== slim bottom status bar: phase + countdown (left), PTS/POT/STREAK (right) =====
+-- ===== top-center: persistent World-Throw history strip =====
+local HIST_N = 10
+local HIST_TILE = 34
+local HIST_GAP = 4
+local histStrip = Instance.new("Frame")
+histStrip.Name = "History"
+histStrip.AnchorPoint = Vector2.new(0.5, 0)
+histStrip.Position = UDim2.new(0.5, 0, 0, 10)
+histStrip.Size = UDim2.fromOffset(HIST_N * (HIST_TILE + HIST_GAP) - HIST_GAP, HIST_TILE + 14)
+histStrip.BackgroundTransparency = 1
+histStrip.Parent = gui
+
+local histLabel = Instance.new("TextLabel")
+histLabel.Name = "Caption"
+histLabel.AnchorPoint = Vector2.new(0.5, 0)
+histLabel.Position = UDim2.fromScale(0.5, 0)
+histLabel.Size = UDim2.new(1, 0, 0, 12)
+histLabel.BackgroundTransparency = 1
+histLabel.TextColor3 = GOLD
+histLabel.TextTransparency = 0.25
+histLabel.TextSize = 10
+histLabel.Font = Enum.Font.GothamBold
+histLabel.Text = "WORLD THROW HISTORY" -- (no CJK: Gotham renders 世界 as tofu)
+histLabel.Parent = histStrip
+
+local histTiles: { { frame: Frame, glyph: TextLabel, badge: Frame } } = {}
+for i = 1, HIST_N do
+    local tile = Instance.new("Frame")
+    tile.Name = `H{i}`
+    tile.AnchorPoint = Vector2.new(0, 1)
+    tile.Position = UDim2.new(0, (i - 1) * (HIST_TILE + HIST_GAP), 1, 0)
+    tile.Size = UDim2.fromOffset(HIST_TILE, HIST_TILE)
+    tile.BackgroundColor3 = WASHI
+    tile.BackgroundTransparency = 0.3
+    tile.BorderSizePixel = 0
+    tile.Visible = false
+    tile.Parent = histStrip
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 5)
+    corner.Parent = tile
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = GOLD
+    stroke.Thickness = 1
+    stroke.Transparency = 0.55
+    stroke.Parent = tile
+
+    local glyph = Instance.new("TextLabel")
+    glyph.Size = UDim2.fromScale(1, 1)
+    glyph.BackgroundTransparency = 1
+    glyph.TextColor3 = GOLD
+    glyph.TextSize = 22
+    glyph.Font = Enum.Font.GothamBlack
+    glyph.Text = ""
+    glyph.Parent = tile
+
+    local badge = Instance.new("Frame")
+    badge.AnchorPoint = Vector2.new(1, 0)
+    badge.Position = UDim2.new(1, 2, 0, -2)
+    badge.Size = UDim2.fromOffset(9, 9)
+    badge.BackgroundColor3 = WIN_GREEN
+    badge.BorderSizePixel = 0
+    badge.Visible = false
+    badge.Parent = tile
+    local bc = Instance.new("UICorner")
+    bc.CornerRadius = UDim.new(1, 0)
+    bc.Parent = badge
+
+    histTiles[i] = { frame = tile, glyph = glyph, badge = badge }
+end
+
+local history: { { worldThrow: string, result: string? } } = {} -- newest first
+
+local function renderHistory()
+    for i = 1, HIST_N do
+        local slot = histTiles[i]
+        local entry = history[i]
+        if entry then
+            slot.frame.Visible = true
+            slot.glyph.Text = GLYPH[entry.worldThrow] or "?"
+            if entry.result == "WIN" then
+                slot.badge.BackgroundColor3 = WIN_GREEN
+                slot.badge.Visible = true
+            elseif entry.result == "LOSS" then
+                slot.badge.BackgroundColor3 = LOSS_RED
+                slot.badge.Visible = true
+            elseif entry.result == "SAFE" then
+                slot.badge.BackgroundColor3 = GOLD
+                slot.badge.Visible = true
+            else
+                slot.badge.Visible = false
+            end
+        else
+            slot.frame.Visible = false
+        end
+    end
+end
+
+-- ===== bottom-right: status line (phase/countdown + wallet) =====
+local STATUS_W = 0.62 -- scale; sits over the ~2/3-width ticker
+local TICKER_H = 30
+local GAP = 6
 local statusBar = Instance.new("Frame")
 statusBar.Name = "StatusBar"
-statusBar.AnchorPoint = Vector2.new(0.5, 1)
-statusBar.Position = UDim2.new(0.5, 0, 1, -STATUS_Y)
-statusBar.Size = UDim2.fromOffset(540, STATUS_H)
+statusBar.AnchorPoint = Vector2.new(1, 1)
+statusBar.Position = UDim2.new(1, -8, 1, -(8 + TICKER_H + GAP))
+statusBar.Size = UDim2.new(STATUS_W, 0, 0, 30)
 statusBar.BackgroundColor3 = WASHI
 statusBar.BackgroundTransparency = 0.35
 statusBar.BorderSizePixel = 0
@@ -100,21 +198,25 @@ walletLabel.TextXAlignment = Enum.TextXAlignment.Right
 walletLabel.Text = "PTS 0 · POT 0 · STREAK 0"
 walletLabel.Parent = statusBar
 
--- ===== bottom-edge ticker strip: the streaming-prose home =====
+-- ===== bottom-right: scrolling prose ticker (~2/3 width, bigger font) =====
 local ticker = Instance.new("Frame")
 ticker.Name = "Ticker"
-ticker.AnchorPoint = Vector2.new(0.5, 1)
-ticker.Position = UDim2.fromScale(0.5, 1)
-ticker.Size = UDim2.new(1, 0, 0, TICKER_H)
+ticker.AnchorPoint = Vector2.new(1, 1)
+ticker.Position = UDim2.new(1, -8, 1, -8)
+ticker.Size = UDim2.new(0.66, 0, 0, TICKER_H)
 ticker.BackgroundColor3 = WASHI
 ticker.BackgroundTransparency = 0.25
 ticker.BorderSizePixel = 0
 ticker.ClipsDescendants = true
 ticker.Parent = gui
+do
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6)
+    c.Parent = ticker
+end
 
 local tickerLine = Instance.new("Frame") -- gold hairline along the strip's top edge
 tickerLine.Name = "Hairline"
-tickerLine.AnchorPoint = Vector2.new(0, 0)
 tickerLine.Position = UDim2.fromScale(0, 0)
 tickerLine.Size = UDim2.new(1, 0, 0, 1)
 tickerLine.BackgroundColor3 = GOLD
@@ -124,33 +226,33 @@ tickerLine.Parent = ticker
 
 local tickerText = Instance.new("TextLabel")
 tickerText.Name = "Scroll"
-tickerText.AutomaticSize = Enum.AutomaticSize.X -- width tracks the message length
+tickerText.AutomaticSize = Enum.AutomaticSize.X
 tickerText.AnchorPoint = Vector2.new(0, 0.5)
 tickerText.Position = UDim2.fromScale(1, 0.5)
 tickerText.Size = UDim2.fromScale(0, 1)
 tickerText.BackgroundTransparency = 1
 tickerText.TextColor3 = INK_CREAM
-tickerText.TextSize = 16
+tickerText.TextSize = 19 -- bigger than the old 16
 tickerText.Font = Enum.Font.Gotham
 tickerText.TextXAlignment = Enum.TextXAlignment.Left
 tickerText.Text = ""
 tickerText.Parent = ticker
 
-local IDLE_LINE = "世界 · BEAT THE WORLD THROW — bank your pot or stake it and ride the streak ×3"
-local TICKER_SPEED = 120 -- px/sec marquee scroll
+local IDLE_LINE = "BEAT THE WORLD THROW — bank your pot or stake it and ride the streak ×3"
+local TICKER_SPEED = 120
 local tickerQueue: { string } = {}
-local tickerX = 0 -- live left-edge x of the scrolling label, in px
+local tickerX = 0
 
 local function tickerNext(): string
     if #tickerQueue > 0 then
         return table.remove(tickerQueue, 1)
     end
-    return IDLE_LINE -- nothing queued: keep the house line crawling
+    return IDLE_LINE
 end
 
 local function tickerLoad(line: string)
     tickerText.Text = line
-    tickerX = ticker.AbsoluteSize.X -- (re)enter from the right edge
+    tickerX = ticker.AbsoluteSize.X
     tickerText.Position = UDim2.new(0, tickerX, 0.5, 0)
 end
 
@@ -158,50 +260,81 @@ RunService.RenderStepped:Connect(function(dt)
     tickerX -= TICKER_SPEED * dt
     tickerText.Position = UDim2.new(0, tickerX, 0.5, 0)
     if tickerX + tickerText.AbsoluteSize.X < 0 then
-        tickerLoad(tickerNext()) -- fully off the left: pull the next line
+        tickerLoad(tickerNext())
     end
 end)
 tickerLoad(IDLE_LINE)
 
 local function tickerSay(line: string)
-    EventBus.TickerMessage:Fire(line) -- shared contract (BoardController also listens)
+    EventBus.TickerMessage:Fire(line)
 end
 
 EventBus.TickerMessage.Event:Connect(function(line: string)
     table.insert(tickerQueue, line)
 end)
 
--- ===== pick buttons (R/P/S), bank, accept-fate =====
+-- ===== bottom-left: round pick buttons in the logo triangle =====
+-- Centers in px from the bottom-left corner: rock top-left, paper top-right,
+-- scissors bottom-center (an inverted triangle, matching the brand logo).
+local BTN_D = 62
+local BTN_SPOT = {
+    R = { x = 58, y = 150 },
+    P = { x = 132, y = 150 },
+    S = { x = 95, y = 86 },
+}
 local buttons: { [string]: TextButton } = {}
+local rings: { [string]: UIStroke } = {}
 local myPick: string? = nil
 local canPick = false
-local lockoutAt: number? = nil -- os.clock() deadline
+local lockoutAt: number? = nil
 
 local function refreshButtons()
     for value, b in buttons do
+        local ring = rings[value]
         if value == myPick then
-            b.BackgroundColor3 = Color3.fromRGB(40, 110, 255)
+            b.BackgroundColor3 = Color3.fromRGB(58, 46, 24)
+            ring.Color = GOLD
+            ring.Thickness = 3
+            ring.Transparency = 0
         elseif canPick then
-            b.BackgroundColor3 = Color3.fromRGB(60, 60, 80)
+            b.BackgroundColor3 = WASHI
+            ring.Color = GOLD
+            ring.Thickness = 1.5
+            ring.Transparency = 0.45
         else
-            b.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+            b.BackgroundColor3 = WASHI
+            ring.Color = GOLD
+            ring.Thickness = 1
+            ring.Transparency = 0.8
         end
         b.AutoButtonColor = canPick
+        b.TextTransparency = if canPick or value == myPick then 0 else 0.35
     end
 end
 
-for i, value in THROWS do
+for _, value in THROWS do
+    local spot = BTN_SPOT[value]
     local b = Instance.new("TextButton")
     b.Name = value
-    b.Size = UDim2.fromOffset(130, BTN_H)
-    b.AnchorPoint = Vector2.new(0.5, 1)
-    b.Position = UDim2.new(0.5, (i - 2) * 145, 1, -BTN_Y)
-    b.RichText = true
-    b.Text = `<font color="#D4B066">{GLYPH[value]}</font>  {NAMES[value]}`
-    b.TextSize = 20
-    b.Font = Enum.Font.GothamBold
-    b.TextColor3 = Color3.fromRGB(255, 255, 255)
+    b.AnchorPoint = Vector2.new(0.5, 0.5)
+    b.Position = UDim2.new(0, spot.x, 1, -spot.y)
+    b.Size = UDim2.fromOffset(BTN_D, BTN_D)
+    b.BackgroundColor3 = WASHI
+    b.BackgroundTransparency = 0.2
+    b.AutoButtonColor = false
+    b.Text = BTN_GLYPH[value]
+    b.TextColor3 = GOLD
+    b.TextSize = 30
+    b.Font = Enum.Font.GothamBlack
     b.Parent = gui
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(1, 0) -- circle
+    corner.Parent = b
+    local ring = Instance.new("UIStroke")
+    ring.Color = GOLD
+    ring.Thickness = 1.5
+    ring.Transparency = 0.45
+    ring.Parent = b
     b.MouseButton1Click:Connect(function()
         if canPick then
             myPick = value
@@ -210,13 +343,16 @@ for i, value in THROWS do
         end
     end)
     buttons[value] = b
+    rings[value] = ring
 end
 
+-- ===== bottom-right: bank + accept-fate (above the status line) =====
+local CLUSTER_TOP = 8 + TICKER_H + GAP + 30 + GAP -- above status bar
 local bankButton = Instance.new("TextButton")
 bankButton.Name = "Bank"
-bankButton.Size = UDim2.fromOffset(160, 44)
+bankButton.Size = UDim2.fromOffset(150, 38)
 bankButton.AnchorPoint = Vector2.new(1, 1)
-bankButton.Position = UDim2.new(1, -16, 1, -BTN_Y)
+bankButton.Position = UDim2.new(1, -8, 1, -CLUSTER_TOP)
 bankButton.Text = "BANK"
 bankButton.TextSize = 18
 bankButton.Font = Enum.Font.GothamBold
@@ -224,35 +360,53 @@ bankButton.TextColor3 = Color3.fromRGB(20, 20, 20)
 bankButton.BackgroundColor3 = Color3.fromRGB(255, 200, 40)
 bankButton.Visible = false
 bankButton.Parent = gui
+do
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6)
+    c.Parent = bankButton
+end
 bankButton.MouseButton1Click:Connect(function()
     BankRequest:FireServer()
 end)
 
 local acceptButton = Instance.new("TextButton")
 acceptButton.Name = "AcceptFate"
-acceptButton.Size = UDim2.fromOffset(180, 44)
-acceptButton.AnchorPoint = Vector2.new(0, 1)
-acceptButton.Position = UDim2.new(0, 16, 1, -BTN_Y)
+acceptButton.Size = UDim2.fromOffset(176, 38)
+acceptButton.AnchorPoint = Vector2.new(1, 1)
+acceptButton.Position = UDim2.new(1, -166, 1, -CLUSTER_TOP)
 acceptButton.Text = "ACCEPT YOUR FATE"
-acceptButton.TextSize = 16
+acceptButton.TextSize = 15
 acceptButton.Font = Enum.Font.GothamBold
 acceptButton.TextColor3 = Color3.fromRGB(240, 234, 216)
 acceptButton.BackgroundColor3 = Color3.fromRGB(90, 40, 40)
 acceptButton.Visible = false
 acceptButton.Parent = gui
+do
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6)
+    c.Parent = acceptButton
+end
 
 local fateBound = false
 
--- The World-Throw reveal headline waits in the status bar until the drum has
--- stopped turning. RevealResult arrives independently of the drum's glide-to-
--- rest, so we stash the headline and only paint it once BOTH have happened.
-local pendingHeadline: string? = nil
+-- The reveal headline AND the new history tile wait for the drum to stop turning
+-- (drumRest), so the throw isn't spoiled mid-spin. `lastReveal` persists in the
+-- status line across the next round until <10s forces the pick prompt.
+local pendingReveal: { headline: string, worldThrow: string, result: string? }? = nil
 local drumAtRest = false
+local lastReveal: string? = nil
 
 local function maybeShowReveal()
-    if pendingHeadline and drumAtRest then
-        statusLabel.Text = pendingHeadline
-        pendingHeadline = nil
+    if pendingReveal and drumAtRest then
+        local p = pendingReveal
+        pendingReveal = nil
+        lastReveal = p.headline
+        statusLabel.Text = p.headline
+        table.insert(history, 1, { worldThrow = p.worldThrow, result = p.result })
+        while #history > HIST_N do
+            table.remove(history)
+        end
+        renderHistory()
     end
 end
 
@@ -260,7 +414,6 @@ acceptButton.MouseButton1Click:Connect(function()
     EventBus.Cue:Fire({ kind = "acceptFate" })
 end)
 
--- DrumController fires this once its landing decel reaches rest on the throw.
 EventBus.Cue.Event:Connect(function(cue)
     if cue.kind == "drumRest" then
         drumAtRest = true
@@ -292,15 +445,11 @@ RoundUpdate.OnClientEvent:Connect(function(info)
         canPick = not fateBound
         myPick = nil
         lockoutAt = if info.secondsToLockout then os.clock() + info.secondsToLockout else nil
-        pendingHeadline = nil -- clear last round's reveal; the drum will respin
+        pendingReveal = nil -- the drum respins; last round's headline stays in view
         drumAtRest = false
-        if not fateBound then
-            tickerSay("New round — pick now and beat the World Throw!")
-        end
     else
         canPick = false
         lockoutAt = nil
-        statusLabel.Text = `Round {info.roundCount} — {info.phase}…`
     end
     refreshButtons()
 end)
@@ -318,17 +467,14 @@ RevealResult.OnClientEvent:Connect(function(r)
     else
         headline = `World threw {r.worldThrow}`
     end
-    pendingHeadline = headline
-    maybeShowReveal() -- shows now only if the drum already came to rest
-    -- Safety: if the drum never reports rest (e.g. a dropped strike cue), don't
-    -- strand the result — force it out shortly after.
+    pendingReveal = { headline = headline, worldThrow = r.worldThrow, result = r.result }
+    maybeShowReveal() -- only paints if the drum is already at rest
     task.delay(3, function()
-        if pendingHeadline == headline then
-            drumAtRest = true
+        if pendingReveal and pendingReveal.headline == headline then
+            drumAtRest = true -- safety: never strand a result if the cue dropped
             maybeShowReveal()
         end
     end)
-    -- the throw distribution is prose — it rides the ticker, not the status bar.
     tickerSay(
         `World threw {r.worldThrow} — R {r.distribution.R}% · P {r.distribution.P}% · S {r.distribution.S}%`
     )
@@ -340,6 +486,8 @@ ProfileUpdate.OnClientEvent:Connect(function(p)
     bankButton.Text = `BANK {p.pointsAtStake}`
 end)
 
+-- Status-line text each tick. The prior round's result LINGERS until under 10s
+-- remain, when it yields to the pick prompt.
 task.spawn(function()
     while true do
         if fateBound then
@@ -350,9 +498,13 @@ task.spawn(function()
                 canPick = false
                 refreshButtons()
                 statusLabel.Text = "Locked — waiting for the world…"
+            elseif left < 10 then
+                statusLabel.Text = `Choose a throw! Locks in {math.ceil(left)}s`
             else
-                statusLabel.Text = `Pick now! Locks in {math.ceil(left)}s`
+                statusLabel.Text = lastReveal or "New round — beat the World Throw"
             end
+        elseif lastReveal then
+            statusLabel.Text = lastReveal -- TALLY/REVEAL: hold the prior throw
         end
         task.wait(0.25)
     end
