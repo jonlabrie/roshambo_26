@@ -37,6 +37,18 @@ if not themeOk then
     error("[THEME] ZenDojo invalid: " .. table.concat(themeErrs, "; "))
 end
 
+-- StreamingEnabled is on, but the central monument is the focal point every
+-- player watches from spawn (~200 studs away). Mark its models Persistent so they
+-- (and all their parts) are always replicated — otherwise client controllers that
+-- capture parts once at startup (e.g. WheelController's rig:GetChildren()) run
+-- before the parts stream in and silently capture nothing.
+local stage = workspace:WaitForChild("RoshamboStage")
+for _, child in stage:GetChildren() do
+    if child:IsA("Model") then
+        child.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+    end
+end
+
 local deps = {
     request = function(req)
         local ok, resp = pcall(function()

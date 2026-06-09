@@ -7,6 +7,13 @@ local Spec = require("./Spec")
 
 local Waterwheel = {}
 
+-- Rotation about local X (the wheel's axle) by angle a, row-major. Used to tilt
+-- each float so it radiates from the hub instead of all pointing the same way.
+local function rotX(a: number): { number }
+    local c, s = math.cos(a), math.sin(a)
+    return { 1, 0, 0, 0, c, -s, 0, s, c }
+end
+
 function Waterwheel.build(palette: { [string]: { number } }, L: any)
     local W = L.waterwheel
     local R = W.radius
@@ -38,11 +45,14 @@ function Waterwheel.build(palette: { [string]: { number } }, L: any)
         for i = 1, 8 do
             local a = (i - 1) * math.pi / 4
             local off = Spec.rotY({ 0, (R - 0.6) * math.cos(a), (R - 0.6) * math.sin(a) }, W.yaw)
+            -- spin each float about the axle by its rim angle so its blade radiates
+            -- (1.8 = radial height, 0.4 = thin face catching the current tangentially).
+            local prot = Spec.matMul(rot, rotX(a))
             table.insert(
                 children,
                 Spec.part(`Paddle{wi}_{i}`, {
                     Size = { 1.4, 1.8, 0.4 },
-                    CFrame = Spec.cframe({ c[1] + off[1], c[2] + off[2], c[3] + off[3] }, rot),
+                    CFrame = Spec.cframe({ c[1] + off[1], c[2] + off[2], c[3] + off[3] }, prot),
                     Color = timber,
                     Material = "WoodPlanks",
                 })
