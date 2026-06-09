@@ -47,28 +47,29 @@ local GLYPH = { R = "○", P = "─", S = "∧" }
 -- smile) for scissors — the brand-facing variant of the happy/sad asymmetry.
 local BTN_GLYPH = { R = "○", P = "─", S = "∨" }
 
--- ===== top-center: persistent World-Throw history strip =====
+-- ===== bottom-left: persistent World-Throw history strip (below the buttons) =====
 local HIST_N = 10
 local HIST_TILE = 34
 local HIST_GAP = 4
 local histStrip = Instance.new("Frame")
 histStrip.Name = "History"
-histStrip.AnchorPoint = Vector2.new(0.5, 0)
-histStrip.Position = UDim2.new(0.5, 0, 0, 10)
+histStrip.AnchorPoint = Vector2.new(0, 1)
+histStrip.Position = UDim2.new(0, 12, 1, -6)
 histStrip.Size = UDim2.fromOffset(HIST_N * (HIST_TILE + HIST_GAP) - HIST_GAP, HIST_TILE + 14)
 histStrip.BackgroundTransparency = 1
 histStrip.Parent = gui
 
 local histLabel = Instance.new("TextLabel")
 histLabel.Name = "Caption"
-histLabel.AnchorPoint = Vector2.new(0.5, 0)
-histLabel.Position = UDim2.fromScale(0.5, 0)
+histLabel.AnchorPoint = Vector2.new(0, 0)
+histLabel.Position = UDim2.fromOffset(2, 0)
 histLabel.Size = UDim2.new(1, 0, 0, 12)
 histLabel.BackgroundTransparency = 1
 histLabel.TextColor3 = GOLD
 histLabel.TextTransparency = 0.25
 histLabel.TextSize = 10
 histLabel.Font = Enum.Font.GothamBold
+histLabel.TextXAlignment = Enum.TextXAlignment.Left
 histLabel.Text = "WORLD THROW HISTORY" -- (no CJK: Gotham renders 世界 as tofu)
 histLabel.Parent = histStrip
 
@@ -144,15 +145,17 @@ local function renderHistory()
     end
 end
 
--- ===== bottom-right: status line (phase/countdown + wallet) =====
-local STATUS_W = 0.62 -- scale; sits over the ~2/3-width ticker
+-- ===== bottom-center: status line (phase/countdown + wallet) =====
+-- The status line and the ticker are the two stacked feedback lines below the
+-- player: identical width (½ screen), centered.
+local FEED_W = 0.5 -- scale
 local TICKER_H = 30
 local GAP = 6
 local statusBar = Instance.new("Frame")
 statusBar.Name = "StatusBar"
-statusBar.AnchorPoint = Vector2.new(1, 1)
-statusBar.Position = UDim2.new(1, -8, 1, -(8 + TICKER_H + GAP))
-statusBar.Size = UDim2.new(STATUS_W, 0, 0, 30)
+statusBar.AnchorPoint = Vector2.new(0.5, 1)
+statusBar.Position = UDim2.new(0.5, 0, 1, -(8 + TICKER_H + GAP))
+statusBar.Size = UDim2.new(FEED_W, 0, 0, 30)
 statusBar.BackgroundColor3 = WASHI
 statusBar.BackgroundTransparency = 0.35
 statusBar.BorderSizePixel = 0
@@ -198,12 +201,12 @@ walletLabel.TextXAlignment = Enum.TextXAlignment.Right
 walletLabel.Text = "PTS 0 · POT 0 · STREAK 0"
 walletLabel.Parent = statusBar
 
--- ===== bottom-right: scrolling prose ticker (~2/3 width, bigger font) =====
+-- ===== bottom-center: scrolling prose ticker (½ width, matches the status line) =====
 local ticker = Instance.new("Frame")
 ticker.Name = "Ticker"
-ticker.AnchorPoint = Vector2.new(1, 1)
-ticker.Position = UDim2.new(1, -8, 1, -8)
-ticker.Size = UDim2.new(0.66, 0, 0, TICKER_H)
+ticker.AnchorPoint = Vector2.new(0.5, 1)
+ticker.Position = UDim2.new(0.5, 0, 1, -8)
+ticker.Size = UDim2.new(FEED_W, 0, 0, TICKER_H)
 ticker.BackgroundColor3 = WASHI
 ticker.BackgroundTransparency = 0.25
 ticker.BorderSizePixel = 0
@@ -277,11 +280,14 @@ end)
 -- Centers in px from the bottom-left corner: rock top-left, paper top-right,
 -- scissors bottom-center (an inverted triangle, matching the brand logo).
 local BTN_D = 62
+-- Raised to leave room for the history strip beneath the triangle.
 local BTN_SPOT = {
-    R = { x = 58, y = 150 },
-    P = { x = 132, y = 150 },
-    S = { x = 95, y = 86 },
+    R = { x = 58, y = 168 },
+    P = { x = 132, y = 168 },
+    S = { x = 95, y = 104 },
 }
+-- The ○ ring reads small at a shared size; give rock a bigger glyph.
+local BTN_TEXT = { R = 58, P = 32, S = 34 }
 local buttons: { [string]: TextButton } = {}
 local rings: { [string]: UIStroke } = {}
 local myPick: string? = nil
@@ -324,7 +330,7 @@ for _, value in THROWS do
     b.AutoButtonColor = false
     b.Text = BTN_GLYPH[value]
     b.TextColor3 = GOLD
-    b.TextSize = 30
+    b.TextSize = BTN_TEXT[value]
     b.Font = Enum.Font.GothamBlack
     b.Parent = gui
     local corner = Instance.new("UICorner")
@@ -346,13 +352,12 @@ for _, value in THROWS do
     rings[value] = ring
 end
 
--- ===== bottom-right: bank + accept-fate (above the status line) =====
-local CLUSTER_TOP = 8 + TICKER_H + GAP + 30 + GAP -- above status bar
+-- ===== bottom-right corner: bank + accept-fate (stacked) =====
 local bankButton = Instance.new("TextButton")
 bankButton.Name = "Bank"
 bankButton.Size = UDim2.fromOffset(150, 38)
 bankButton.AnchorPoint = Vector2.new(1, 1)
-bankButton.Position = UDim2.new(1, -8, 1, -CLUSTER_TOP)
+bankButton.Position = UDim2.new(1, -8, 1, -8)
 bankButton.Text = "BANK"
 bankButton.TextSize = 18
 bankButton.Font = Enum.Font.GothamBold
@@ -373,7 +378,7 @@ local acceptButton = Instance.new("TextButton")
 acceptButton.Name = "AcceptFate"
 acceptButton.Size = UDim2.fromOffset(176, 38)
 acceptButton.AnchorPoint = Vector2.new(1, 1)
-acceptButton.Position = UDim2.new(1, -166, 1, -CLUSTER_TOP)
+acceptButton.Position = UDim2.new(1, -8, 1, -(8 + 38 + 6)) -- above bank
 acceptButton.Text = "ACCEPT YOUR FATE"
 acceptButton.TextSize = 15
 acceptButton.Font = Enum.Font.GothamBold

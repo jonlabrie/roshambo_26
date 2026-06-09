@@ -45,12 +45,15 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
             Material = "Metal",
         })
     )
+    -- The tsuki-za strike boss sits at the LOG's height, not a fraction of the
+    -- bell — so it stays aligned with the shu-moku through any bell resize.
+    local strikeY = L.shuMoku.restPos[2]
     table.insert(
         children,
         Spec.part("LotusBoss", {
             Size = { 0.6, 1.8, 1.8 },
             Shape = "Cylinder",
-            CFrame = Spec.cframe({ bx, by - h * 0.1, bz + r + 0.2 }, Spec.ROT.CYL_ALONG_Z),
+            CFrame = Spec.cframe({ bx, strikeY, bz + r + 0.2 }, Spec.ROT.CYL_ALONG_Z),
             Color = palette.gold,
             Material = "Metal",
         })
