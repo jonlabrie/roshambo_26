@@ -51,22 +51,31 @@ local chains = {
     rig:WaitForChild("Chain3") :: BasePart,
     rig:WaitForChild("Chain4") :: BasePart,
 }
+-- The drive train is rotated onto the SW->NE diagonal (mirrors
+-- ArenaLayout.shuMoku.yaw = 225). yawV rotates the proven +Z gantry geometry;
+-- BACK is the draw direction (back toward the wheel = SW).
+local YAW = CFrame.Angles(0, math.rad(225), 0)
+local function yawV(t: { number }): Vector3
+    return (YAW * CFrame.new(v3(t))).Position
+end
+local BACK = (YAW * CFrame.new(0, 0, 1)).Position
+
 local chainTops = {
-    v3({ 3, 15, 7.5 }),
-    v3({ 3, 15, 11.5 }),
-    v3({ -3, 15, 7.5 }),
-    v3({ -3, 15, 11.5 }),
+    yawV({ 3, 15, 7.5 }),
+    yawV({ 3, 15, 11.5 }),
+    yawV({ -3, 15, 7.5 }),
+    yawV({ -3, 15, 11.5 }),
 }
 local chainBottomsRest = {
-    v3({ 0.8, 6.6, 7.5 }),
-    v3({ 0.8, 6.6, 11.5 }),
-    v3({ -0.8, 6.6, 7.5 }),
-    v3({ -0.8, 6.6, 11.5 }),
+    yawV({ 0.8, 6.6, 7.5 }),
+    yawV({ 0.8, 6.6, 11.5 }),
+    yawV({ -0.8, 6.6, 7.5 }),
+    yawV({ -0.8, 6.6, 11.5 }),
 }
 
 -- The drive rope is a client visual created at runtime (no builder part).
-local ropeWheelAnchor = v3({ 0, 7, 25 }) -- ArenaLayout.flume.ropeWheelAnchor
-local ropeBottomRest = v3({ 0, 6.2, 13 }) -- ArenaLayout.shuMoku.ropeBottomRest
+local ropeWheelAnchor = Vector3.new(-14.6, 5, -14.6) -- ArenaLayout.waterwheel.ropeAnchor (world SW)
+local ropeBottomRest = yawV({ 0, 6.2, 13 }) -- ArenaLayout.shuMoku.ropeBottomRest (rotated)
 local driveRope = Instance.new("Part")
 driveRope.Name = "DriveRope"
 driveRope.Anchored = true
@@ -111,11 +120,11 @@ end)
 EventBus.Cue.Event:Connect(function(cue)
     if cue.kind == "gongStrike" then
         striking = true
-        -- Stage 1: swing forward (gravity-accelerated) to overshoot into the bell.
+        -- Stage 1: swing forward (toward the bell = -BACK) to overshoot into it.
         local swing = TweenService:Create(
             arm,
             TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-            { CFrame = CFrame.new(0, 0, -0.8) * restCFrame }
+            { CFrame = CFrame.new(-BACK * 0.8) * restCFrame }
         )
         swing.Completed:Connect(function()
             -- Contact moment: flash + basin ring fire here, not at cue time.
@@ -161,11 +170,11 @@ EventBus.Cue.Event:Connect(function(cue)
             task.delay(1.2, function()
                 splash:Destroy()
             end)
-            -- Stage 2: recoil bounce off the bell, then settle back to rest.
+            -- Stage 2: recoil back toward the wheel (+BACK), then settle to rest.
             local recoil = TweenService:Create(
                 arm,
                 TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                { CFrame = CFrame.new(0, 0.15, 1.1) * restCFrame }
+                { CFrame = CFrame.new(BACK * 1.1 + Vector3.new(0, 0.15, 0)) * restCFrame }
             )
             recoil.Completed:Connect(function()
                 TweenService:Create(
@@ -200,7 +209,8 @@ RunService.Heartbeat:Connect(function()
         local shiver = if state.trembling
             then math.sin(os.clock() * 28) * 0.15 + (math.random() - 0.5) * 0.04
             else 0
-        local draw = CFrame.new(0, riseY, drawZ + shiver) -- world-space: +Z back, +Y rise
+        -- draw back toward the wheel along the SW axis (BACK), plus a slight rise
+        local draw = CFrame.new(BACK * (drawZ + shiver) + Vector3.new(0, riseY, 0))
         local pose = draw * restCFrame
         if state.trembling then
             pose = pose * CFrame.Angles(0, math.rad(math.sin(os.clock() * 23) * 0.4), 0)
