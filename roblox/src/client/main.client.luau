@@ -46,10 +46,13 @@ local TAN_RIM = Color3.fromRGB(176, 164, 138)
 local INK = Color3.fromRGB(60, 45, 28)
 local HILITE = Color3.fromRGB(255, 252, 244)
 local SEL_BLUE = Color3.fromRGB(74, 150, 255)
+local AGED_IVORY = Color3.fromRGB(146, 112, 64) -- ivory patinas warm + dark with age
 
 local THROWS = { "R", "P", "S" }
 -- World-facing glyphs (history) match the drum/boards: scissors = caret ∧.
 local GLYPH = { R = "○", P = "─", S = "∧" }
+-- The ○ ring reads small at a shared size; give rock a bigger glyph in the tiles.
+local HIST_TEXT = { R = 32, P = 22, S = 24 }
 -- The player's own buttons use the LOGO arrangement + the caron ∨ (the mascot
 -- smile) for scissors — the brand-facing variant of the happy/sad asymmetry.
 local BTN_GLYPH = { R = "○", P = "─", S = "∨" }
@@ -87,13 +90,13 @@ for i = 1, HIST_N do
     tile.AnchorPoint = Vector2.new(0, 1)
     tile.Position = UDim2.new(0, (i - 1) * (HIST_TILE + HIST_GAP), 1, 0)
     tile.Size = UDim2.fromOffset(HIST_TILE, HIST_TILE)
-    tile.BackgroundColor3 = IVORY
+    tile.BackgroundColor3 = IVORY -- aged per-render across the visible count
     tile.BackgroundTransparency = 0.1
     tile.BorderSizePixel = 0
     tile.Visible = false
     tile.Parent = histStrip
     local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 5)
+    corner.CornerRadius = UDim.new(1, 0) -- circle, like the pick buttons
     corner.Parent = tile
     local stroke = Instance.new("UIStroke")
     stroke.Color = TAN_RIM
@@ -111,8 +114,8 @@ for i = 1, HIST_N do
     glyph.Parent = tile
 
     local badge = Instance.new("Frame")
-    badge.AnchorPoint = Vector2.new(1, 0)
-    badge.Position = UDim2.new(1, 2, 0, -2)
+    badge.AnchorPoint = Vector2.new(0.5, 0.5)
+    badge.Position = UDim2.fromScale(0.85, 0.15) -- on the circle's upper-right edge
     badge.Size = UDim2.fromOffset(9, 9)
     badge.BackgroundColor3 = WIN_GREEN
     badge.BorderSizePixel = 0
@@ -143,12 +146,17 @@ local function renderHistory()
     if currentRoundId and tape[1] and tape[1].id == currentRoundId and currentRoundId ~= revealedRoundId then
         skip = 1
     end
+    -- Age across the VISIBLE count so the oldest shown always reaches full amber
+    -- (a clear newest→oldest gradient even when only a few rounds are in the tape).
+    local count = math.min(#tape - skip, HIST_N)
     for i = 1, HIST_N do
         local slot = histTiles[i]
         local entry = tape[i + skip]
         if entry then
             slot.frame.Visible = true
+            slot.frame.BackgroundColor3 = IVORY:Lerp(AGED_IVORY, (i - 1) / math.max(1, count - 1))
             slot.glyph.Text = GLYPH[entry.worldThrow] or "?"
+            slot.glyph.TextSize = HIST_TEXT[entry.worldThrow] or 22
             local result = badgeById[entry.id]
             if result == "WIN" then
                 slot.badge.BackgroundColor3 = WIN_GREEN
