@@ -23,6 +23,7 @@ local ArenaLayout = {
         length = 7,
         radius = 0.8,
         drawStuds = 6,
+        yaw = 225, -- rotate the proven +Z geometry onto the SW->NE diagonal
         -- gantry the log hangs from (rails along Z at x = ±railX, height railY)
         railX = 3,
         railY = 15,
@@ -39,6 +40,27 @@ local ArenaLayout = {
         wheelRadius = 5,
         ropeWheelAnchor = { 0, 7, 25 }, -- fixed point on the wheel/drum the rope leaves from
         -- flume runs pool → descends → drops onto wheel top
+    },
+    -- Natural creek down the SW diagonal (replaces the flume; flume removed in a later task).
+    creek = {
+        entry = { -134, 28, -134 }, -- on the rim (tier-3 height) at ~225 deg
+        mouth = { -12, 0, -12 }, -- meets the basin water at the SW edge
+        width = 8, -- channel width (studs)
+        fastReachRadius = 46, -- inside this radius the channel flattens for the wheels
+    },
+    -- Asakura-style undershot cluster sitting IN the creek; centers[driver] drives the striker.
+    waterwheel = {
+        radius = 5,
+        yaw = 45, -- axle along NW-SE so wheels roll along the SW->NE current
+        centers = { { -18, 5, -18 }, { -26, 6, -26 }, { -34, 7, -34 } },
+        driver = 1,
+        ropeAnchor = { -14.6, 5, -14.6 }, -- on the driver toward the log; DriveRope leaves here
+    },
+    -- Streamside sozu (shishi-odoshi) that meters the round and kicks the drum.
+    sozu = {
+        pivot = { -22, 4, -13 }, -- pivot point, beside the driving wheel
+        troughLen = 5,
+        cordTop = { -7, 31, 0 }, -- drum W axle end (throwDrum at {0,31,0}, length 14)
     },
     promontories = {
         { name = "Record", pos = { 0, 16, 134 } }, -- north (opposite entrance)

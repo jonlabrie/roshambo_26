@@ -1,6 +1,7 @@
 --!strict
 local harness = require("./harness")
 local L = require("../tools/builders/ArenaLayout")
+local Spec = require("../tools/builders/Spec")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 
 describe("ArenaLayout", function()
@@ -70,5 +71,43 @@ describe("ArenaLayout", function()
         expect(drumBottom > bellTop).toBe(true)
         expect(L.pavilion.roofHeight > bellTop).toBe(true)
         expect(bellBottom > 0).toBe(true)
+    end)
+    test("creek descends from rim to basin mouth on the SW diagonal", function()
+        expect(L.creek.entry[2] > L.creek.mouth[2]).toBe(true) -- downhill
+        local er = math.sqrt(L.creek.entry[1] ^ 2 + L.creek.entry[3] ^ 2)
+        local mr = math.sqrt(L.creek.mouth[1] ^ 2 + L.creek.mouth[3] ^ 2)
+        expect(er > L.tiers[3].radius).toBe(true)
+        expect(mr < L.apronRadius).toBe(true)
+        expect(L.creek.entry[1] < 0 and L.creek.entry[3] < 0).toBe(true)
+        expect(L.creek.mouth[1] < 0 and L.creek.mouth[3] < 0).toBe(true)
+    end)
+    test("waterwheels sit on the SW creek line, descending order, inside the apron-ish band", function()
+        local prev = 0
+        for i, c in L.waterwheel.centers do
+            expect(c[1] < 0 and c[3] < 0).toBe(true)
+            expect(math.abs(c[1] - c[3]) < 2).toBe(true)
+            local r = math.sqrt(c[1] ^ 2 + c[3] ^ 2)
+            if i > 1 then
+                expect(r > prev).toBe(true)
+            end
+            prev = r
+        end
+        expect(L.waterwheel.driver >= 1 and L.waterwheel.driver <= #L.waterwheel.centers).toBe(true)
+    end)
+    test("shu-moku is rotated onto the SW axis and rests outside the bell", function()
+        expect(L.shuMoku.yaw).toBe(225)
+        local rest = Spec.rotY(L.shuMoku.restPos, L.shuMoku.yaw)
+        expect(rest[1] < 0 and rest[3] < 0).toBe(true)
+        local d = math.sqrt(rest[1] ^ 2 + rest[3] ^ 2)
+        expect(d > L.bell.radius).toBe(true)
+    end)
+    test("sozu sits streamside near the driving wheel; cord targets the drum axle end", function()
+        local driver = L.waterwheel.centers[L.waterwheel.driver]
+        local d = math.sqrt((L.sozu.pivot[1] - driver[1]) ^ 2 + (L.sozu.pivot[3] - driver[3]) ^ 2)
+        expect(d < 14).toBe(true)
+        expect(math.abs(L.sozu.cordTop[2] - L.throwDrum.pos[2]) < 1).toBe(true)
+        expect(math.abs(math.abs(L.sozu.cordTop[1] - L.throwDrum.pos[1]) - L.throwDrum.length / 2) < 1.5).toBe(
+            true
+        )
     end)
 end)
