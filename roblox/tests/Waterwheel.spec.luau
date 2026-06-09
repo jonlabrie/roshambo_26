@@ -5,27 +5,42 @@ local L = require("../tools/builders/ArenaLayout")
 local ZenDojo = require("../src/shared/themes/ZenDojo")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 
-describe("Waterwheel builder", function()
-    test("has the spinning Wheel part centered at layout wheelPos", function()
+describe("Waterwheel cluster builder", function()
+    test("one Wheel part per layout center, at that center", function()
+        local spec = Waterwheel.build(ZenDojo.palette, L)
+        local wheels = 0
+        for _, c in spec.children :: any do
+            local i = c.name:match("^Wheel(%d+)$")
+            if i then
+                wheels += 1
+                local ctr = L.waterwheel.centers[tonumber(i) :: number]
+                expect(c.properties.CFrame[1]).toBe(ctr[1])
+                expect(c.properties.CFrame[3]).toBe(ctr[3])
+            end
+        end
+        expect(wheels).toBe(#L.waterwheel.centers)
+    end)
+    test("eight paddles ring every wheel", function()
+        local spec = Waterwheel.build(ZenDojo.palette, L)
+        local counts: { [string]: number } = {}
+        for _, c in spec.children :: any do
+            local w = c.name:match("^Paddle(%d+)_%d+$")
+            if w then
+                counts[w] = (counts[w] or 0) + 1
+            end
+        end
+        for i = 1, #L.waterwheel.centers do
+            expect(counts[tostring(i)]).toBe(8)
+        end
+    end)
+    test("the driver carries the RatchetDrum", function()
         local spec = Waterwheel.build(ZenDojo.palette, L)
         local found = false
         for _, c in spec.children :: any do
-            if c.name == "Wheel" then
+            if c.name == "RatchetDrum" then
                 found = true
-                expect(c.properties.CFrame[1]).toBe(L.flume.wheelPos[1])
-                expect(c.properties.Size[2]).toBe(2 * L.flume.wheelRadius)
             end
         end
         expect(found).toBe(true)
-    end)
-    test("eight paddles ring the wheel", function()
-        local spec = Waterwheel.build(ZenDojo.palette, L)
-        local paddles = 0
-        for _, c in spec.children :: any do
-            if c.name:match("^Paddle%d$") then
-                paddles += 1
-            end
-        end
-        expect(paddles).toBe(8)
     end)
 end)
