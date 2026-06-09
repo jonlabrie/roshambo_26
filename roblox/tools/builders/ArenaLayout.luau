@@ -60,18 +60,20 @@ local ArenaLayout = {
         width = 8, -- channel width (studs)
         fastReachRadius = 46, -- inside this radius the channel flattens for the wheels
     },
-    -- Asakura-style undershot cluster sitting IN the creek; centers[driver] drives the striker.
-    -- The apron creek surface is flat (y≈1), so all three wheels share ONE low height
-    -- (radius 5 → bottom y−1) to dip ~2 studs into the current; support posts reach the
-    -- carved creek bed (bedY). Stepping the wheels up left the outer two above the water.
+    -- A SINGLE Asakura scoop wheel sitting IN the creek: its raked rim buckets both
+    -- catch the current (drive) and lift water, which a launder pours into the sōzu.
+    -- One wheel does every job — driving the striker and feeding the sōzu — so the
+    -- space stays simple. radius 5 → bottom y−1 dips ~2 studs into the flat (y≈1)
+    -- apron current; support posts reach the carved creek bed (bedY).
     waterwheel = {
         radius = 5,
         yaw = driveYaw - 180, -- disc axle perpendicular to the current
         driveYaw = driveYaw, -- the line direction (RatchetDrum offsets toward the bell along it)
         bedY = -4, -- creek floor the support posts stand on (apron surf 2 − creek depth 6)
-        centers = { onLine(25.5, 4), onLine(36.8, 4), onLine(48.1, 4) },
+        centers = { onLine(25.5, 4) }, -- the lone scoop wheel
         driver = 1,
         ropeAnchor = onLine(20.6, 4), -- on the driver toward the log; DriveRope leaves here
+        launderTo = onLine(19, 6, -6), -- the sōzu mouth the lifted water is poured toward
     },
     -- Streamside sozu (shishi-odoshi) that meters the round and kicks the drum.
     sozu = {

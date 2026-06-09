@@ -42,16 +42,18 @@ function Waterwheel.build(palette: { [string]: { number } }, L: any)
                 Material = "Metal",
             })
         )
+        -- Scoop buckets ring the rim: raked ~26° off radial so they read as Asakura
+        -- scoop tubes that both catch the current (drive) and cup water to lift it.
+        -- (Kept the Paddle name so WheelController spins them unchanged.)
+        local RAKE = 0.45
         for i = 1, 8 do
             local a = (i - 1) * math.pi / 4
             local off = Spec.rotY({ 0, (R - 0.6) * math.cos(a), (R - 0.6) * math.sin(a) }, W.yaw)
-            -- spin each float about the axle by its rim angle so its blade radiates
-            -- (1.8 = radial height, 0.4 = thin face catching the current tangentially).
-            local prot = Spec.matMul(rot, rotX(a))
+            local prot = Spec.matMul(rot, rotX(a + RAKE))
             table.insert(
                 children,
                 Spec.part(`Paddle{wi}_{i}`, {
-                    Size = { 1.4, 1.8, 0.4 },
+                    Size = { 1.4, 1.6, 0.9 }, -- deeper than a flat blade → reads as a cup
                     CFrame = Spec.cframe({ c[1] + off[1], c[2] + off[2], c[3] + off[3] }, prot),
                     Color = timber,
                     Material = "WoodPlanks",
@@ -85,6 +87,20 @@ function Waterwheel.build(palette: { [string]: { number } }, L: any)
             CFrame = Spec.cframe({ dc[1] + toward[1], dc[2] + toward[2], dc[3] + toward[3] }, rot),
             Color = palette.ink,
             Material = "Metal",
+        })
+    )
+
+    -- launder (open trough) carrying scoop-lifted water from the wheel top down to
+    -- the sōzu mouth (waterwheel.launderTo). Static — it does not spin with the wheel.
+    local ltop = { dc[1], dc[2] + R, dc[3] }
+    local lpos, llen, lrot = Spec.segment(ltop, W.launderTo)
+    table.insert(
+        children,
+        Spec.part("Launder", {
+            Size = { llen, 0.5, 1.4 },
+            CFrame = Spec.cframe(lpos, lrot),
+            Color = timber,
+            Material = "Wood",
         })
     )
     return Spec.model("Waterwheel", children)
