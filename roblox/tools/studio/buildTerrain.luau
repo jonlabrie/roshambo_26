@@ -77,7 +77,7 @@ end
 -- sunken surface left the sloped trench walls, the submerged wheel parts and the
 -- apron tiles showing through a thin ribbon. depth 5 keeps the water span (floor→
 -- wt) wider than the RES-4 voxel pitch so the ribbon never breaks between voxels.
-local CREEK = { halfW = 6, mouthAlong = 12, rimAlong = 190, depth = 5 }
+local CREEK = { halfW = 6, mouthAlong = 12, rimAlong = 190, depth = 5, lip = 0.8 }
 local CK_DIRX, CK_DIRZ = -0.8387, -0.5446 -- (sin, cos) of driveYaw 237°
 local function creekColumn(x, z, surfaceTop)
     local along = x * CK_DIRX + z * CK_DIRZ
@@ -88,11 +88,12 @@ local function creekColumn(x, z, surfaceTop)
     if off > CREEK.halfW then
         return nil
     end
-    -- flat-bottomed cut: floor DEPTH below local surface, water filled up to the
-    -- local grade so it reads as a stream at grade (banks submerged, not exposed).
+    -- flat-bottomed cut: floor DEPTH below local surface, water filled to just
+    -- shy of grade (CREEK.lip below) — full to the brim read a touch high, sunk a
+    -- whole stud read too low; the fractional surface lands it in between.
     -- Both g and wb are the floor (no air gap under the water).
     local floor = surfaceTop - CREEK.depth
-    return { g = floor, wb = floor, wt = surfaceTop }
+    return { g = floor, wb = floor, wt = surfaceTop - CREEK.lip }
 end
 
 -- domain-warped radial offset: 0 inside r<55 and within ~PAD_SUPP of any pad
@@ -258,8 +259,11 @@ local function buildTile(tx, tz)
                     if of > 0 then
                         m, o = GROUND, of
                     end
-                elseif c.wt and wy <= c.wt and wy > c.wb then
-                    m, o = WATER, 1
+                elseif c.wt and wy > c.wb and wy - RES / 2 < c.wt then
+                    -- fractional occupancy at the surface (like the ground skin) so
+                    -- the waterline can sit between the 4-stud voxel rows, not just
+                    -- snap to them — lets the creek level be tuned in sub-voxel steps.
+                    m, o = WATER, occFor(wy, c.wt)
                 elseif wy - RES / 2 < c.g then
                     local of = occFor(wy, c.g)
                     if of > 0 then
