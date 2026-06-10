@@ -38,10 +38,11 @@ local GROUND_LIFT = 2
 function TerraceDressing.build(palette: { [string]: { number } }, L: any)
     local children = {}
     for ti, tier in L.tiers do
-        -- centre of this tier's flat plateau, where the ground really sits at
-        -- tier.height — placing at tier.radius-4 dropped items onto the inner wall.
-        local nextWall = if L.tiers[ti + 1] then L.tiers[ti + 1].radius - WALL_RUN else tier.radius + 8
-        local r = (tier.radius + nextWall) / 2
+        -- lanterns line the OUTER (rear) edge of each terrace, against the wall up
+        -- to the next tier, leaving the inner plateau clear for the teahouses that
+        -- were pushed toward the centre. (Last tier's shelf was widened to ~210.)
+        local nextWall = if L.tiers[ti + 1] then L.tiers[ti + 1].radius - WALL_RUN else tier.radius + 22
+        local r = nextWall - 3
         local gy = tier.height + GROUND_LIFT -- ground the dressing rests on
         for i = 1, 8 do
             local a = (i - 0.5) * math.pi / 4
