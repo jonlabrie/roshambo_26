@@ -29,9 +29,10 @@ describe("TerraceDressing builder", function()
             if c.name:match("^Cushion_") then
                 cushions += 1
                 local y = c.properties.CFrame[2]
+                -- rests just above a tier surface (tier.height + a small ground-lift)
                 local onTier = false
                 for _, tier in L.tiers do
-                    if y == tier.height + 0.25 then
+                    if y > tier.height and y <= tier.height + 4 then
                         onTier = true
                     end
                 end
