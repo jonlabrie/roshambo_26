@@ -118,62 +118,70 @@ local function hut(
         })
     end
     local TY = 0.4 + WALL -- wall top
-    local ov = 3.5 -- eave overhang past the walls
+    local ovX, ovZ = 1.5, 2.5 -- overhang past the walls: gable-end (length) / eave (width)
     local EY, RY = TY + 0.3, TY + 4.5 -- eave height, ridge height
-    local ZE = hd + ov -- front/back eave reach (z)
+    local ZE = hd + ovZ -- front/back eave reach (z)
     local theta = math.atan2(RY - EY, ZE)
     local SL = math.sqrt(ZE * ZE + (RY - EY) ^ 2) -- slope length
-    part("RoofFront", { W + 2 * ov, 0.5, SL }, 0, (RY + EY) / 2, ZE / 2, ink, "Slate", rotX(theta))
-    part("RoofBack", { W + 2 * ov, 0.5, SL }, 0, (RY + EY) / 2, -ZE / 2, ink, "Slate", rotX(-theta))
+    part("RoofFront", { W + 2 * ovX, 0.5, SL }, 0, (RY + EY) / 2, ZE / 2, ink, "Slate", rotX(theta))
+    part("RoofBack", { W + 2 * ovX, 0.5, SL }, 0, (RY + EY) / 2, -ZE / 2, ink, "Slate", rotX(-theta))
     part("Ridge", { W + 1, 0.7, 1.2 }, 0, RY, 0, ink, "Slate")
-    -- closed gable ends: two right-triangle wedges per end (plaster infill, peak
-    -- centred under the ridge). WedgePart is full-height at +Z, so the +z half is
-    -- the one that gets flipped to bring its tall edge inward to the centre.
-    local GH, FLIP = RY - TY, { -1, 0, 0, 0, 1, 0, 0, 0, -1 }
+    -- gable infill. The opening is only as wide as the wall (between the corner
+    -- posts), so a triangle from the wall top to the ridge would be STEEPER than the
+    -- shallow roof and leave a gap. Instead the plaster triangle spans only from
+    -- where the roof underside meets the wall edge (gBaseY) up to the ridge — so its
+    -- slope equals the roof's — and a short rectangular band fills below it.
+    -- WedgePart is full-height at +Z, so the +z half is flipped to peak at centre.
+    local FLIP = { -1, 0, 0, 0, 1, 0, 0, 0, -1 }
+    local gBaseY = RY - (RY - EY) * hd / ZE -- roof underside height at the wall edge
+    local GH = RY - gBaseY -- triangle height → slope (RY-EY)/ZE matches the roof
     for gi, sx in { -hw, hw } do
-        wedge(`GableA{gi}`, { 0.4, GH, hd }, sx, TY + GH / 2, hd / 2, FLIP, ivory, "Plaster")
-        wedge(`GableB{gi}`, { 0.4, GH, hd }, sx, TY + GH / 2, -hd / 2, nil, ivory, "Plaster")
+        part(`GableBand{gi}`, { 0.4, gBaseY - TY, 2 * hd }, sx, (TY + gBaseY) / 2, 0, ivory, "Plaster")
+        wedge(`GableA{gi}`, { 0.4, GH, hd }, sx, gBaseY + GH / 2, hd / 2, FLIP, ivory, "Plaster")
+        wedge(`GableB{gi}`, { 0.4, GH, hd }, sx, gBaseY + GH / 2, -hd / 2, nil, ivory, "Plaster")
     end
-    -- lower eave skirt: a hipped band wrapping below the main eaves. The four slabs
-    -- only reach the wall line (no perpendicular overhang) and the corners are
-    -- mitred with CornerWedgePart hips, so nothing overlaps/crosses at the corners.
-    local function cwedge(pn, size, lx, ly, lz, lrot, color, mat)
-        table.insert(kids, {
-            name = pn,
-            className = "CornerWedgePart",
-            properties = {
-                Anchored = true,
-                Size = size,
-                CFrame = place(lx, ly, lz, lrot),
-                Color = color,
-                Material = mat,
-            },
-        })
-    end
+    -- lower eave skirt: a true hipped band. Each side is a TRAPEZOID (short base =
+    -- the wall it sits on, long base = the wider eave) = a central rect plus two
+    -- coplanar triangular wedge ends whose 45° hypotenuses are the hip lines, so
+    -- adjacent panels meet cleanly at the corners with no overlap. Front/back use
+    -- width W, the sides use D; each panel is the same shape turned by 0/90/180/270.
     local sOv, sDr = 4, 2 -- skirt overhang, drop
     local sT = math.atan2(sDr, sOv)
     local sSL = math.sqrt(sOv * sOv + sDr * sDr)
     local syc = TY - sDr / 2
-    part("SkirtF", { W, 0.35, sSL }, 0, syc, hd + sOv / 2, ink, "Slate", rotX(sT))
-    part("SkirtB", { W, 0.35, sSL }, 0, syc, -(hd + sOv / 2), ink, "Slate", rotX(-sT))
-    part("SkirtL", { sSL, 0.35, D }, -(hw + sOv / 2), syc, 0, ink, "Slate", rotZ(sT))
-    part("SkirtR", { sSL, 0.35, D }, hw + sOv / 2, syc, 0, ink, "Slate", rotZ(-sT))
-    -- hip corners complete each panel into a trapezoid (short base = wall, long
-    -- base = eave): apex over the wall corner, sloping out. CornerWedgePart's apex
-    -- is at −X−Z, so each yaw turns it to point at its corner's inner direction.
-    for _, c in { { 1, 1, 0 }, { 1, -1, 90 }, { -1, -1, 180 }, { -1, 1, 270 } } do
-        local sx, sz = c[1], c[2]
-        cwedge(
-            `Hip{c[3]}`,
-            { sOv, sDr, sOv },
-            sx * (hw + sOv / 2),
-            syc,
-            sz * (hd + sOv / 2),
-            Spec.yaw(c[3]),
-            ink,
-            "Slate"
+    local function trapPanel(wid: number, dIn: number, pYaw: number, tag: string)
+        local eyM = Spec.yaw(deg + pYaw) -- this panel's frame = hut yaw + panel turn
+        local function placeE(lx, ly, lz, lrot)
+            local o = Spec.rotY({ lx, 0, lz }, deg + pYaw)
+            return Spec.cframe({ cx + o[1], gy + ly, cz + o[3] }, Spec.matMul(eyM, lrot))
+        end
+        table.insert(
+            kids,
+            Spec.part(`Skirt{tag}`, {
+                Size = { wid, 0.35, sSL },
+                CFrame = placeE(0, syc, dIn + sOv / 2, rotX(sT)),
+                Color = ink,
+                Material = "Slate",
+            })
         )
+        for _, e in { { wid / 2 + sOv / 2, -math.pi / 2, "R" }, { -(wid / 2 + sOv / 2), math.pi / 2, "L" } } do
+            table.insert(kids, {
+                name = `Skirt{tag}{e[3]}`,
+                className = "WedgePart",
+                properties = {
+                    Anchored = true,
+                    Size = { 0.35, sOv, sSL },
+                    CFrame = placeE(e[1], syc, dIn + sOv / 2, Spec.matMul(rotX(sT), rotZ(e[2]))),
+                    Color = ink,
+                    Material = "Slate",
+                },
+            })
+        end
     end
+    trapPanel(W, hd, 0, "F")
+    trapPanel(W, hd, 180, "B")
+    trapPanel(D, hw, 270, "R")
+    trapPanel(D, hw, 90, "L")
     part("Porch", { 7, 0.4, 3 }, 0, 0.2, hd + 1.5, timber, "WoodPlanks")
     part("Noren", { 4, 3, 0.15 }, 0, WALL - 2, hd, ink, "Fabric", nil, { CanCollide = false })
     part("Table", { 3.5, 1.8, 3.5 }, 0, 1.1, 0, timber, "Wood")
