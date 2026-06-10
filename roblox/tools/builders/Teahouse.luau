@@ -134,16 +134,44 @@ local function hut(
         wedge(`GableA{gi}`, { 0.4, GH, hd }, sx, TY + GH / 2, hd / 2, FLIP, ivory, "Plaster")
         wedge(`GableB{gi}`, { 0.4, GH, hd }, sx, TY + GH / 2, -hd / 2, nil, ivory, "Plaster")
     end
-    -- lower eave skirt: a shallow second roof wrapping below the main eaves, deeper
-    -- overhang over the porch — the two-tier silhouette from the reference.
+    -- lower eave skirt: a hipped band wrapping below the main eaves. The four slabs
+    -- only reach the wall line (no perpendicular overhang) and the corners are
+    -- mitred with CornerWedgePart hips, so nothing overlaps/crosses at the corners.
+    local function cwedge(pn, size, lx, ly, lz, lrot, color, mat)
+        table.insert(kids, {
+            name = pn,
+            className = "CornerWedgePart",
+            properties = {
+                Anchored = true,
+                Size = size,
+                CFrame = place(lx, ly, lz, lrot),
+                Color = color,
+                Material = mat,
+            },
+        })
+    end
     local sOv, sDr = 4, 2 -- skirt overhang, drop
     local sT = math.atan2(sDr, sOv)
     local sSL = math.sqrt(sOv * sOv + sDr * sDr)
     local syc = TY - sDr / 2
-    part("SkirtF", { W + 2 * sOv, 0.35, sSL }, 0, syc, hd + sOv / 2, ink, "Slate", rotX(sT))
-    part("SkirtB", { W + 2 * sOv, 0.35, sSL }, 0, syc, -(hd + sOv / 2), ink, "Slate", rotX(-sT))
-    part("SkirtL", { sSL, 0.35, D + 2 * sOv }, -(hw + sOv / 2), syc, 0, ink, "Slate", rotZ(sT))
-    part("SkirtR", { sSL, 0.35, D + 2 * sOv }, hw + sOv / 2, syc, 0, ink, "Slate", rotZ(-sT))
+    part("SkirtF", { W, 0.35, sSL }, 0, syc, hd + sOv / 2, ink, "Slate", rotX(sT))
+    part("SkirtB", { W, 0.35, sSL }, 0, syc, -(hd + sOv / 2), ink, "Slate", rotX(-sT))
+    part("SkirtL", { sSL, 0.35, D }, -(hw + sOv / 2), syc, 0, ink, "Slate", rotZ(sT))
+    part("SkirtR", { sSL, 0.35, D }, hw + sOv / 2, syc, 0, ink, "Slate", rotZ(-sT))
+    -- hip corners: apex over each wall corner, sloping out to the eave corner
+    for _, c in { { 1, 1, 180 }, { 1, -1, 270 }, { -1, -1, 0 }, { -1, 1, 90 } } do
+        local sx, sz = c[1], c[2]
+        cwedge(
+            `Hip{c[3]}`,
+            { sOv, sDr, sOv },
+            sx * (hw + sOv / 2),
+            syc,
+            sz * (hd + sOv / 2),
+            Spec.yaw(c[3]),
+            ink,
+            "Slate"
+        )
+    end
     part("Porch", { 7, 0.4, 3 }, 0, 0.2, hd + 1.5, timber, "WoodPlanks")
     part("Noren", { 4, 3, 0.15 }, 0, WALL - 2, hd, ink, "Fabric", nil, { CanCollide = false })
     part("Table", { 3.5, 1.8, 3.5 }, 0, 1.1, 0, timber, "Wood")
