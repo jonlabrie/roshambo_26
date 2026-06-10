@@ -1,36 +1,50 @@
 --!strict
--- Teahouse village: small enclosed huts for private conversation (≈5 standing).
--- Rings of huts on the middle terrace (6) and the top terrace (12); none on the
--- lowest. Each faces the arena centre (door + porch inward) so sightlines to the
--- World Throw stay open. Placement skips the creek channel, the koi pond, and the
--- sandō entrance gap. One enclosed hut is the ONLY place tea seating appears —
--- the open-air terrace tables/cushions were removed (see TerraceDressing.luau).
+-- Teahouse village: enclosed huts for private conversation (≈5 standing). Rings on
+-- all three terraces (none on the lowest shrine level): 7 on tier 1, 9 on tier 2,
+-- 15 on the widened tier 3. Each is rectangular with its LONG side (the door wall)
+-- facing the arena centre, so sightlines to the World Throw stay open. Positions
+-- carry a little deterministic jitter (forward/back + closer/nearer) and no hut is
+-- stacked directly above/below one on an adjacent tier. Placement skips the creek,
+-- koi pond, promontory pads, and the sandō entrance gap. These enclosed huts are
+-- the ONLY tea seating — the open-air terrace seating was removed (TerraceDressing).
 local Spec = require("./Spec")
 
 local Teahouse = {}
 
 local CK_DIRX, CK_DIRZ = -0.8387, -0.5446 -- creek drive line (driveYaw 237°)
 local GROUND_LIFT = 2 -- terrain renders ~2 studs proud (matches TerraceDressing)
+local W, D, WALL = 16, 8, 9 -- footprint width (faces centre) × depth, wall height
 
--- where a hut must NOT sit: in the sandō gap, across the creek, or in the koi pond.
+-- deterministic pseudo-random in [0,1): keeps genmodels output stable (no math.random,
+-- which would fail the CI drift check) while giving each hut a repeatable wobble.
+local function rand(seed: number): number
+    local v = math.sin(seed * 12.9898) * 43758.5453
+    return v - math.floor(v)
+end
+
 local function blockedTea(x: number, z: number, a: number, L: any): boolean
-    if math.abs(a - 1.5 * math.pi) < 0.32 then -- sandō/entrance gap at −Z
+    if math.abs(a - 1.5 * math.pi) < 0.3 then -- sandō/entrance gap at −Z
         return true
     end
-    if math.abs(x * CK_DIRZ - z * CK_DIRX) < 11 then -- creek channel (wide margin for the hut)
+    if math.abs(x * CK_DIRZ - z * CK_DIRX) < 12 then -- creek channel
         return true
     end
     local k = L.koiPond.pos
-    if math.sqrt((x - k[1]) ^ 2 + (z - k[3]) ^ 2) < L.koiPond.radius + 9 then
+    if math.sqrt((x - k[1]) ^ 2 + (z - k[3]) ^ 2) < L.koiPond.radius + 10 then
         return true
+    end
+    for _, p in L.promontories do -- champion pedestals on tier 1
+        if math.sqrt((x - p.pos[1]) ^ 2 + (z - p.pos[3]) ^ 2) < 14 then
+            return true
+        end
     end
     return false
 end
 
--- one hut, 8×8 footprint: timber back wall, a front wall split around a door,
--- shoji side panels, a flat overhanging roof + cap, a porch and noren toward the
--- centre, and a low central table. Built in a local frame (door faces local +Z),
--- then yawed to `deg` and dropped at (cx, gy, cz).
+-- one hut, W×D footprint, WALL tall: timber back, shoji sides, a front wall split
+-- around a door with a noren, porch toward the centre, flat overhanging roof + cap,
+-- low central table. Built in a local frame (door faces local +Z) then yawed to
+-- `deg` and dropped at (cx, gy, cz).
 local function hut(
     palette: { [string]: { number } },
     name: string,
@@ -40,6 +54,7 @@ local function hut(
     deg: number
 )
     local timber, ink, ivory = palette.timber, palette.ink, palette.ivory
+    local hw, hd, wy = W / 2, D / 2, 0.4 + WALL / 2
     local kids = {}
     local function place(lx: number, ly: number, lz: number): { number }
         local o = Spec.rotY({ lx, 0, lz }, deg)
@@ -55,46 +70,60 @@ local function hut(
         end
         table.insert(kids, Spec.part(pn, props))
     end
-    part("Floor", { 8, 0.4, 8 }, 0, 0.2, 0, palette.gravel, "Slate")
-    part("BackWall", { 8, 6, 0.4 }, 0, 3.2, -4, timber, "Wood")
-    part("ShojiL", { 0.4, 6, 8 }, -4, 3.2, 0, ivory, "SmoothPlastic", { Transparency = 0.45 })
-    part("ShojiR", { 0.4, 6, 8 }, 4, 3.2, 0, ivory, "SmoothPlastic", { Transparency = 0.45 })
-    part("FrontL", { 2.5, 6, 0.4 }, -2.75, 3.2, 4, timber, "Wood")
-    part("FrontR", { 2.5, 6, 0.4 }, 2.75, 3.2, 4, timber, "Wood")
-    part("Roof", { 9.8, 0.6, 9.8 }, 0, 6.5, 0, ink, "Slate")
-    part("Cap", { 4.5, 1.4, 4.5 }, 0, 7.4, 0, ink, "Slate")
-    part("Porch", { 4, 0.4, 2.6 }, 0, 0.2, 5.3, timber, "WoodPlanks")
-    part("Noren", { 3, 2, 0.15 }, 0, 4.6, 4, ink, "Fabric", { CanCollide = false })
-    part("Table", { 2.4, 1.5, 2.4 }, 0, 0.95, 0, timber, "Wood")
+    part("Floor", { W, 0.4, D }, 0, 0.2, 0, palette.gravel, "Slate")
+    part("BackWall", { W, WALL, 0.4 }, 0, wy, -hd, timber, "Wood")
+    part("ShojiL", { 0.4, WALL, D }, -hw, wy, 0, ivory, "SmoothPlastic", { Transparency = 0.45 })
+    part("ShojiR", { 0.4, WALL, D }, hw, wy, 0, ivory, "SmoothPlastic", { Transparency = 0.45 })
+    part("FrontL", { hw - 2, WALL, 0.4 }, -(hw + 2) / 2, wy, hd, timber, "Wood")
+    part("FrontR", { hw - 2, WALL, 0.4 }, (hw + 2) / 2, wy, hd, timber, "Wood")
+    part("Roof", { W + 2, 0.7, D + 2 }, 0, 0.4 + WALL + 0.35, 0, ink, "Slate")
+    part("Cap", { 8, 1.8, 4.5 }, 0, 0.4 + WALL + 1.6, 0, ink, "Slate")
+    part("Porch", { 7, 0.4, 3 }, 0, 0.2, hd + 1.5, timber, "WoodPlanks")
+    part("Noren", { 4, 3, 0.15 }, 0, WALL - 2, hd, ink, "Fabric", { CanCollide = false })
+    part("Table", { 3.5, 1.8, 3.5 }, 0, 1.1, 0, timber, "Wood")
     return Spec.model(name, kids)
 end
 
 function Teahouse.build(palette: { [string]: { number } }, L: any)
     local children = {}
-    -- ring radii sit on the OUTER part of each terrace's flat plateau, clear of the
-    -- inner lantern ring; the top terrace was widened (r188→~210) to seat 12.
+    -- ring radii sit on the OUTER part of each terrace plateau, clear of the inner
+    -- lantern ring; the top terrace was widened (r188→~210) to seat 15.
     local rings = {
-        { ti = 2, count = 6, r = 174 },
-        { ti = 3, count = 12, r = 202 },
+        { ti = 1, count = 7, r = 139, phase = 0.0 },
+        { ti = 2, count = 9, r = 174, phase = 0.21 },
+        { ti = 3, count = 15, r = 202, phase = 0.13 },
     }
-    for _, ring in rings do
-        local gy = L.tiers[ring.ti].height + GROUND_LIFT
-        -- collect valid angles around the ring, then pick `count` spread evenly
-        -- through them so the huts dodge the creek/koi/gap yet stay roughly regular.
-        local valid = {}
-        local STEPS = 96
-        for s = 0, STEPS - 1 do
-            local a = s / STEPS * 2 * math.pi
-            local x, z = ring.r * math.cos(a), ring.r * math.sin(a)
-            if not blockedTea(x, z, a, L) then
-                table.insert(valid, a)
+    local placed = {} -- {ti, a} of every hut, to keep adjacent tiers from stacking
+    local function stacked(a: number, ti: number): boolean
+        for _, h in placed do
+            if math.abs(h.ti - ti) == 1 then
+                local d = math.abs((a - h.a + math.pi) % (2 * math.pi) - math.pi)
+                if d < 0.13 then -- within ~7.5° of a hut one tier away → directly above/below
+                    return true
+                end
             end
         end
+        return false
+    end
+    for _, ring in rings do
+        local gy = L.tiers[ring.ti].height + GROUND_LIFT
+        local step = 2 * math.pi / ring.count
         for k = 0, ring.count - 1 do
-            local a = valid[math.floor(k * #valid / ring.count) + 1]
-            local x, z = ring.r * math.cos(a), ring.r * math.sin(a)
-            local deg = math.deg(math.atan2(-x, -z)) -- yaw so the door/porch face the centre
+            local seed = ring.ti * 97 + k
+            local a = ring.phase + k * step + (rand(seed) - 0.5) * 0.12 -- closer/nearer jitter
+            local r = ring.r + (rand(seed + 0.5) - 0.5) * 5 -- forward/back jitter
+            -- nudge around the ring out of the creek/koi/pad/gap and off any stack
+            local tries = 0
+            while
+                (blockedTea(r * math.cos(a), r * math.sin(a), a, L) or stacked(a, ring.ti)) and tries < 60
+            do
+                a += 0.045
+                tries += 1
+            end
+            local x, z = r * math.cos(a), r * math.sin(a)
+            local deg = math.deg(math.atan2(-x, -z)) -- yaw so the long door wall faces the centre
             table.insert(children, hut(palette, `Teahouse_{ring.ti}_{k + 1}`, x, z, gy, deg))
+            table.insert(placed, { ti = ring.ti, a = a })
         end
     end
     return Spec.model("Teahouses", children)
