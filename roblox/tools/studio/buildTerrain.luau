@@ -77,7 +77,7 @@ end
 -- sunken surface left the sloped trench walls, the submerged wheel parts and the
 -- apron tiles showing through a thin ribbon. depth 5 keeps the water span (floor→
 -- wt) wider than the RES-4 voxel pitch so the ribbon never breaks between voxels.
-local CREEK = { halfW = 6, mouthAlong = 12, rimAlong = 190, depth = 5, lip = 0.8 }
+local CREEK = { halfW = 4.2, mouthAlong = 12, rimAlong = 190, depth = 5, lip = 0.8 }
 local CK_DIRX, CK_DIRZ = -0.8387, -0.5446 -- (sin, cos) of driveYaw 237°
 local function creekColumn(x, z, surfaceTop)
     local along = x * CK_DIRX + z * CK_DIRZ

@@ -57,7 +57,7 @@ local ArenaLayout = {
     creek = {
         entry = onLine(189.5, 28), -- on the rim (tier-3 height)
         mouth = onLine(17, 0), -- meets the basin water at the SW edge
-        width = 8, -- channel width (studs)
+        width = 5.6, -- channel width (studs); 30% narrower than the original 8
         fastReachRadius = 46, -- inside this radius the channel flattens for the wheels
     },
     -- A SINGLE Asakura scoop wheel sitting IN the creek: its raked rim buckets both
@@ -66,13 +66,13 @@ local ArenaLayout = {
     -- space stays simple. radius 5 → bottom y−1 dips ~2 studs into the flat (y≈1)
     -- apron current; support posts reach the carved creek bed (bedY).
     waterwheel = {
-        radius = 5,
+        radius = 7.5, -- +50% (was 5) so it reads at the bell/drum scale, not dwarfed
         yaw = driveYaw - 180, -- disc axle perpendicular to the current
         driveYaw = driveYaw, -- the line direction (RatchetDrum offsets toward the bell along it)
-        bedY = -4, -- creek floor the support posts stand on (apron surf 2 − creek depth 6)
-        centers = { onLine(25.5, 4) }, -- the lone scoop wheel
+        bedY = -4, -- creek floor the support posts stand on
+        centers = { onLine(25.5, 6.5) }, -- raised with the radius so the bottom keeps its ~2-stud dip
         driver = 1,
-        ropeAnchor = onLine(20.6, 4), -- on the driver toward the log; DriveRope leaves here
+        ropeAnchor = onLine(20.6, 6.5), -- on the driver toward the log; DriveRope leaves here
         launderTo = onLine(19, 6, -6), -- the sōzu mouth the lifted water is poured toward
     },
     -- Streamside sozu (shishi-odoshi) that meters the round and kicks the drum.
