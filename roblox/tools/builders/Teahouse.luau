@@ -158,8 +158,10 @@ local function hut(
     part("SkirtB", { W, 0.35, sSL }, 0, syc, -(hd + sOv / 2), ink, "Slate", rotX(-sT))
     part("SkirtL", { sSL, 0.35, D }, -(hw + sOv / 2), syc, 0, ink, "Slate", rotZ(sT))
     part("SkirtR", { sSL, 0.35, D }, hw + sOv / 2, syc, 0, ink, "Slate", rotZ(-sT))
-    -- hip corners: apex over each wall corner, sloping out to the eave corner
-    for _, c in { { 1, 1, 180 }, { 1, -1, 270 }, { -1, -1, 0 }, { -1, 1, 90 } } do
+    -- hip corners complete each panel into a trapezoid (short base = wall, long
+    -- base = eave): apex over the wall corner, sloping out. CornerWedgePart's apex
+    -- is at −X−Z, so each yaw turns it to point at its corner's inner direction.
+    for _, c in { { 1, 1, 0 }, { 1, -1, 90 }, { -1, -1, 180 }, { -1, 1, 270 } } do
         local sx, sz = c[1], c[2]
         cwedge(
             `Hip{c[3]}`,
