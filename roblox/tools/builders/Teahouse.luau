@@ -15,10 +15,14 @@ local CK_DIRX, CK_DIRZ = -0.8387, -0.5446 -- creek drive line (driveYaw 237°)
 local GROUND_LIFT = 2 -- terrain renders ~2 studs proud (matches TerraceDressing)
 local W, D, WALL = 16, 8, 9 -- footprint width (faces centre) × depth, wall height
 
--- rotation about local X (row-major), for tilting the roof planes before the yaw.
+-- rotations about local X / Z (row-major), for tilting the roof planes before yaw.
 local function rotX(t: number): { number }
     local c, s = math.cos(t), math.sin(t)
     return { 1, 0, 0, 0, c, -s, 0, s, c }
+end
+local function rotZ(t: number): { number }
+    local c, s = math.cos(t), math.sin(t)
+    return { c, -s, 0, s, c, 0, 0, 0, 1 }
 end
 
 -- deterministic pseudo-random in [0,1): keeps genmodels output stable (no math.random,
@@ -99,7 +103,20 @@ local function hut(
             )
         end
     end
-    -- gabled deep-eave roof: two tilted planes meeting at a ridge along X.
+    -- ── roof: upper gable + closed gable ends + a lower eave skirt (irimoya read) ──
+    local function wedge(pn, size, lx, ly, lz, lrot, color, mat)
+        table.insert(kids, {
+            name = pn,
+            className = "WedgePart",
+            properties = {
+                Anchored = true,
+                Size = size,
+                CFrame = place(lx, ly, lz, lrot),
+                Color = color,
+                Material = mat,
+            },
+        })
+    end
     local TY = 0.4 + WALL -- wall top
     local ov = 3.5 -- eave overhang past the walls
     local EY, RY = TY + 0.3, TY + 4.5 -- eave height, ridge height
@@ -109,6 +126,24 @@ local function hut(
     part("RoofFront", { W + 2 * ov, 0.5, SL }, 0, (RY + EY) / 2, ZE / 2, ink, "Slate", rotX(theta))
     part("RoofBack", { W + 2 * ov, 0.5, SL }, 0, (RY + EY) / 2, -ZE / 2, ink, "Slate", rotX(-theta))
     part("Ridge", { W + 1, 0.7, 1.2 }, 0, RY, 0, ink, "Slate")
+    -- closed gable ends: two right-triangle wedges per end (plaster infill, peak
+    -- centred under the ridge). WedgePart is full-height at +Z, so the +z half is
+    -- the one that gets flipped to bring its tall edge inward to the centre.
+    local GH, FLIP = RY - TY, { -1, 0, 0, 0, 1, 0, 0, 0, -1 }
+    for gi, sx in { -hw, hw } do
+        wedge(`GableA{gi}`, { 0.4, GH, hd }, sx, TY + GH / 2, hd / 2, FLIP, ivory, "Plaster")
+        wedge(`GableB{gi}`, { 0.4, GH, hd }, sx, TY + GH / 2, -hd / 2, nil, ivory, "Plaster")
+    end
+    -- lower eave skirt: a shallow second roof wrapping below the main eaves, deeper
+    -- overhang over the porch — the two-tier silhouette from the reference.
+    local sOv, sDr = 4, 2 -- skirt overhang, drop
+    local sT = math.atan2(sDr, sOv)
+    local sSL = math.sqrt(sOv * sOv + sDr * sDr)
+    local syc = TY - sDr / 2
+    part("SkirtF", { W + 2 * sOv, 0.35, sSL }, 0, syc, hd + sOv / 2, ink, "Slate", rotX(sT))
+    part("SkirtB", { W + 2 * sOv, 0.35, sSL }, 0, syc, -(hd + sOv / 2), ink, "Slate", rotX(-sT))
+    part("SkirtL", { sSL, 0.35, D + 2 * sOv }, -(hw + sOv / 2), syc, 0, ink, "Slate", rotZ(-sT))
+    part("SkirtR", { sSL, 0.35, D + 2 * sOv }, hw + sOv / 2, syc, 0, ink, "Slate", rotZ(sT))
     part("Porch", { 7, 0.4, 3 }, 0, 0.2, hd + 1.5, timber, "WoodPlanks")
     part("Noren", { 4, 3, 0.15 }, 0, WALL - 2, hd, ink, "Fabric", nil, { CanCollide = false })
     part("Table", { 3.5, 1.8, 3.5 }, 0, 1.1, 0, timber, "Wood")
