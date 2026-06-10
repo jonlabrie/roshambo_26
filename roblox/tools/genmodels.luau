@@ -12,6 +12,7 @@ local Sozu = require("./builders/Sozu")
 local Creek = require("./builders/Creek")
 local TerraceDressing = require("./builders/TerraceDressing")
 local Teahouse = require("./builders/Teahouse")
+local Footpath = require("./builders/Footpath")
 local ArenaLayout = require("./builders/ArenaLayout")
 local ZenDojo = require("../src/shared/themes/ZenDojo")
 
@@ -38,6 +39,7 @@ local OUTPUTS: { [string]: any } = {
     ["Creek"] = Creek.build(ZenDojo.palette, ArenaLayout),
     ["TerraceDressing"] = TerraceDressing.build(ZenDojo.palette, ArenaLayout),
     ["Teahouses"] = Teahouse.build(ZenDojo.palette, ArenaLayout),
+    ["Footpath"] = Footpath.build(ZenDojo.palette, ArenaLayout),
 }
 
 if not fs.isDir("assets") then
