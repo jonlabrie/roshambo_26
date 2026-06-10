@@ -38,10 +38,8 @@ local GROUND_LIFT = 2
 function TerraceDressing.build(palette: { [string]: { number } }, L: any)
     local children = {}
     for ti, tier in L.tiers do
-        -- lanterns line the OUTER (rear) edge of each terrace, against the wall up
-        -- to the next tier, leaving the inner plateau clear for the teahouses that
-        -- were pushed toward the centre. (Last tier's shelf was widened to ~210.)
-        -- garden tiers: just centre-ward of the path (dry plateau); top tier: an
+        -- garden tiers (1 & 2): lanterns line the path on its centre side, clear of
+        -- the water channel that now fronts the teahouses. The dry top tier keeps an
         -- outer ring out toward the rim. Never on the channel band.
         local r
         local g = nil
