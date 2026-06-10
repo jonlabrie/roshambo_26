@@ -15,6 +15,12 @@ local CK_DIRX, CK_DIRZ = -0.8387, -0.5446 -- creek drive line (driveYaw 237°)
 local GROUND_LIFT = 2 -- terrain renders ~2 studs proud (matches TerraceDressing)
 local W, D, WALL = 16, 8, 9 -- footprint width (faces centre) × depth, wall height
 
+-- rotation about local X (row-major), for tilting the roof planes before the yaw.
+local function rotX(t: number): { number }
+    local c, s = math.cos(t), math.sin(t)
+    return { 1, 0, 0, 0, c, -s, 0, s, c }
+end
+
 -- deterministic pseudo-random in [0,1): keeps genmodels output stable (no math.random,
 -- which would fail the CI drift check) while giving each hut a repeatable wobble.
 local function rand(seed: number): number
@@ -41,10 +47,11 @@ local function blockedTea(x: number, z: number, a: number, L: any): boolean
     return false
 end
 
--- one hut, W×D footprint, WALL tall: timber back, shoji sides, a front wall split
--- around a door with a noren, porch toward the centre, flat overhanging roof + cap,
--- low central table. Built in a local frame (door faces local +Z) then yawed to
--- `deg` and dropped at (cx, gy, cz).
+-- one hut, W×D footprint, WALL tall: timber posts + back wall, shoji sides, a front
+-- wall split around a door with a noren, porch toward the centre, and a deep-eaved
+-- GABLED roof (ridge along the long X axis, so the wide front presents a low
+-- overhanging eave over the door). Built in a local frame (door faces local +Z),
+-- then yawed to `deg` and dropped at (cx, gy, cz).
 local function hut(
     palette: { [string]: { number } },
     name: string,
@@ -56,13 +63,15 @@ local function hut(
     local timber, ink, ivory = palette.timber, palette.ink, palette.ivory
     local hw, hd, wy = W / 2, D / 2, 0.4 + WALL / 2
     local kids = {}
-    local function place(lx: number, ly: number, lz: number): { number }
+    local yawM = Spec.yaw(deg)
+    local function place(lx: number, ly: number, lz: number, lrot: { number }?): { number }
         local o = Spec.rotY({ lx, 0, lz }, deg)
-        return Spec.cframe({ cx + o[1], gy + ly, cz + o[3] }, Spec.yaw(deg))
+        local rot = if lrot then Spec.matMul(yawM, lrot) else yawM
+        return Spec.cframe({ cx + o[1], gy + ly, cz + o[3] }, rot)
     end
-    local function part(pn, size, lx, ly, lz, color, mat, extra)
+    local function part(pn, size, lx, ly, lz, color, mat, lrot, extra)
         local props: { [string]: any } =
-            { Size = size, CFrame = place(lx, ly, lz), Color = color, Material = mat }
+            { Size = size, CFrame = place(lx, ly, lz, lrot), Color = color, Material = mat }
         if extra then
             for k, v in extra do
                 props[k] = v
@@ -72,14 +81,36 @@ local function hut(
     end
     part("Floor", { W, 0.4, D }, 0, 0.2, 0, palette.gravel, "Slate")
     part("BackWall", { W, WALL, 0.4 }, 0, wy, -hd, timber, "Wood")
-    part("ShojiL", { 0.4, WALL, D }, -hw, wy, 0, ivory, "SmoothPlastic", { Transparency = 0.45 })
-    part("ShojiR", { 0.4, WALL, D }, hw, wy, 0, ivory, "SmoothPlastic", { Transparency = 0.45 })
+    part("ShojiL", { 0.4, WALL, D }, -hw, wy, 0, ivory, "SmoothPlastic", nil, { Transparency = 0.45 })
+    part("ShojiR", { 0.4, WALL, D }, hw, wy, 0, ivory, "SmoothPlastic", nil, { Transparency = 0.45 })
     part("FrontL", { hw - 2, WALL, 0.4 }, -(hw + 2) / 2, wy, hd, timber, "Wood")
     part("FrontR", { hw - 2, WALL, 0.4 }, (hw + 2) / 2, wy, hd, timber, "Wood")
-    part("Roof", { W + 2, 0.7, D + 2 }, 0, 0.4 + WALL + 0.35, 0, ink, "Slate")
-    part("Cap", { 8, 1.8, 4.5 }, 0, 0.4 + WALL + 1.6, 0, ink, "Slate")
+    -- corner posts carry the deep eaves (the engawa-frame look from the reference)
+    for i, sx in { -1, 1 } do
+        for j, sz in { -1, 1 } do
+            part(
+                `Post{i}{j}`,
+                { 0.6, WALL + 0.6, 0.6 },
+                sx * hw,
+                (0.4 + WALL + 0.6) / 2,
+                sz * hd,
+                timber,
+                "Wood"
+            )
+        end
+    end
+    -- gabled deep-eave roof: two tilted planes meeting at a ridge along X.
+    local TY = 0.4 + WALL -- wall top
+    local ov = 3.5 -- eave overhang past the walls
+    local EY, RY = TY + 0.3, TY + 4.5 -- eave height, ridge height
+    local ZE = hd + ov -- front/back eave reach (z)
+    local theta = math.atan2(RY - EY, ZE)
+    local SL = math.sqrt(ZE * ZE + (RY - EY) ^ 2) -- slope length
+    part("RoofFront", { W + 2 * ov, 0.5, SL }, 0, (RY + EY) / 2, ZE / 2, ink, "Slate", rotX(theta))
+    part("RoofBack", { W + 2 * ov, 0.5, SL }, 0, (RY + EY) / 2, -ZE / 2, ink, "Slate", rotX(-theta))
+    part("Ridge", { W + 1, 0.7, 1.2 }, 0, RY, 0, ink, "Slate")
     part("Porch", { 7, 0.4, 3 }, 0, 0.2, hd + 1.5, timber, "WoodPlanks")
-    part("Noren", { 4, 3, 0.15 }, 0, WALL - 2, hd, ink, "Fabric", { CanCollide = false })
+    part("Noren", { 4, 3, 0.15 }, 0, WALL - 2, hd, ink, "Fabric", nil, { CanCollide = false })
     part("Table", { 3.5, 1.8, 3.5 }, 0, 1.1, 0, timber, "Wood")
     return Spec.model(name, kids)
 end
