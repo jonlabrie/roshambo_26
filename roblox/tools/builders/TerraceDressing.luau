@@ -30,10 +30,18 @@ local function blocked(x: number, z: number, L: any): boolean
     return false
 end
 
+-- WALL_RUN mirrors buildTerrain: each tier's wall ramps over this many studs just
+-- inside the NEXT tier's radius. So a tier's flat plateau runs from its own radius
+-- out to (nextTier.radius - WALL_RUN); the last tier's runs out toward the rim.
+local WALL_RUN = 7
+
 function TerraceDressing.build(palette: { [string]: { number } }, L: any)
     local children = {}
     for ti, tier in L.tiers do
-        local r = tier.radius - 4
+        -- centre of this tier's flat plateau, where the ground really sits at
+        -- tier.height — placing at tier.radius-4 dropped items onto the inner wall.
+        local nextWall = if L.tiers[ti + 1] then L.tiers[ti + 1].radius - WALL_RUN else tier.radius + 8
+        local r = (tier.radius + nextWall) / 2
         for i = 1, 8 do
             local a = (i - 0.5) * math.pi / 4
             local x, z = r * math.cos(a), r * math.sin(a)
@@ -46,7 +54,7 @@ function TerraceDressing.build(palette: { [string]: { number } }, L: any)
         end
         for i = 1, 6 do
             local a = i * math.pi / 3 + 0.26
-            local cx, cz = (r - 5) * math.cos(a), (r - 5) * math.sin(a)
+            local cx, cz = r * math.cos(a), r * math.sin(a)
             if not blocked(cx, cz, L) then
                 table.insert(
                     children,
