@@ -31,6 +31,7 @@
                 "ThrowDrum": { "$path": "assets/ThrowDrum.model.json" },
                 "Sozu": { "$path": "assets/Sozu.model.json" },
                 "Creek": { "$path": "assets/Creek.model.json" },
+                "TerraceDressing": { "$path": "assets/TerraceDressing.model.json" },
                 "ArenaSpawn": {
                     "$className": "SpawnLocation",
                     "$properties": { "Anchored": true, "Size": [8, 1, 8], "CFrame": [0, 29, -188, -1, 0, 0, 0, 1, 0, 0, 0, -1], "Neutral": true }
