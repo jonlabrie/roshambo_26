@@ -8,6 +8,7 @@
 -- koi pond, promontory pads, and the sandō entrance gap. These enclosed huts are
 -- the ONLY tea seating — the open-air terrace seating was removed (TerraceDressing).
 local Spec = require("./Spec")
+local Bridge = require("./Bridge")
 
 local Teahouse = {}
 
@@ -62,7 +63,8 @@ local function hut(
     cx: number,
     cz: number,
     gy: number,
-    deg: number
+    deg: number,
+    wet: { channelR: number, pathR: number, houseR: number }? -- nil on the dry top tier
 )
     local timber, ink, ivory = palette.timber, palette.ink, palette.ivory
     local hw, hd, wy = W / 2, D / 2, 0.4 + WALL / 2
@@ -72,6 +74,10 @@ local function hut(
         local o = Spec.rotY({ lx, 0, lz }, deg)
         local rot = if lrot then Spec.matMul(yawM, lrot) else yawM
         return Spec.cframe({ cx + o[1], gy + ly, cz + o[3] }, rot)
+    end
+    local function worldPos(lx: number, ly: number, lz: number): { number }
+        local o = Spec.rotY({ lx, 0, lz }, deg)
+        return { cx + o[1], gy + ly, cz + o[3] }
     end
     local function part(pn, size, lx, ly, lz, color, mat, lrot, extra)
         local props: { [string]: any } =
@@ -185,6 +191,25 @@ local function hut(
     part("Porch", { 7, 0.4, 3 }, 0, 0.2, hd + 1.5, timber, "WoodPlanks")
     part("Noren", { 4, 3, 0.15 }, 0, WALL - 2, hd, ink, "Fabric", nil, { CanCollide = false })
     part("Table", { 3.5, 1.8, 3.5 }, 0, 1.1, 0, timber, "Wood")
+    -- engawa veranda over the channel + a bridge back to the path (wet tiers only).
+    -- Local +Z faces the arena centre; the channel and path are centre-ward, so the
+    -- veranda cantilevers +Z over the water and the bridge continues +Z to the path.
+    if wet then
+        local engOut = 3 -- how far the veranda oversails the front wall
+        local engZ = hd + engOut / 2
+        part("Engawa", { W - 1, 0.3, engOut }, 0, 0.25, engZ, palette.timber, "WoodPlanks")
+        -- two posts dropping from the veranda's outer corners into the channel
+        for _, e in { { (W - 1) / 2 - 0.5, "R" }, { -((W - 1) / 2 - 0.5), "L" } } do
+            part(`EngawaPost{e[2]}`, { 0.5, 4, 0.5 }, e[1], -1.85, hd + engOut, palette.timber, "Wood")
+        end
+        -- bridge from the path (houseR-pathR studs toward centre) to the veranda lip
+        local toPath = wet.houseR - wet.pathR -- local +Z distance to the path
+        local aWorld = worldPos(0, 0.25, hd + engOut) -- veranda outer edge
+        local bWorld = worldPos(0, 0.0, toPath) -- path point
+        for _, bp in Bridge.arch(palette, aWorld, bWorld, 3, "BR") do
+            table.insert(kids, bp)
+        end
+    end
     return Spec.model(name, kids)
 end
 
@@ -232,7 +257,13 @@ function Teahouse.build(palette: { [string]: { number } }, L: any)
             end
             local x, z = r * math.cos(a), r * math.sin(a)
             local deg = math.deg(math.atan2(-x, -z)) -- yaw so the long door wall faces the centre
-            table.insert(children, hut(palette, `Teahouse_{ring.ti}_{k + 1}`, x, z, gy, deg))
+            local wet = nil
+            for _, g in L.gardenTiers do
+                if g.tier == ring.ti then
+                    wet = { channelR = g.channelR, pathR = g.pathR, houseR = g.houseR }
+                end
+            end
+            table.insert(children, hut(palette, `Teahouse_{ring.ti}_{k + 1}`, x, z, gy, deg, wet))
             table.insert(placed, { ti = ring.ti, a = a })
         end
     end

@@ -64,4 +64,32 @@ describe("Teahouse village", function()
             expect(px ^ 2 + pz ^ 2 < fx ^ 2 + fz ^ 2).toBe(true)
         end
     end)
+
+    test("every hut on tiers 1 & 2 has an engawa, two posts and a bridge deck", function()
+        local spec = Teahouse.build(ZenDojo.palette, L)
+        for _, house in spec.children :: any do
+            local ti = tonumber(house.name:match("^Teahouse_(%d)_"))
+            if ti == 1 or ti == 2 then
+                local have = {}
+                for _, p in house.children do
+                    have[p.name] = true
+                end
+                expect(have["Engawa"]).toBe(true)
+                expect(have["EngawaPostL"]).toBe(true)
+                expect(have["EngawaPostR"]).toBe(true)
+                expect(have["DeckBR"]).toBe(true) -- bridge deck, tag "BR"
+            end
+        end
+    end)
+
+    test("tier 3 huts are dry — no engawa", function()
+        local spec = Teahouse.build(ZenDojo.palette, L)
+        for _, house in spec.children :: any do
+            if house.name:match("^Teahouse_3_") then
+                for _, p in house.children do
+                    expect(p.name ~= "Engawa").toBe(true)
+                end
+            end
+        end
+    end)
 end)
