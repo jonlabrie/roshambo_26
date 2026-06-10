@@ -108,7 +108,7 @@ end
 -- sunken surface left the sloped trench walls, the submerged wheel parts and the
 -- apron tiles showing through a thin ribbon. depth 5 keeps the water span (floor→
 -- wt) wider than the RES-4 voxel pitch so the ribbon never breaks between voxels.
-local CREEK = { halfW = 4.2, mouthAlong = 12, rimAlong = 190, depth = 5, lip = 0.8 }
+local CREEK = { halfW = 4.2, mouthAlong = 12, rimAlong = 190, depth = 5, lip = 0.8, fastReach = 46 }
 local CK_DIRX, CK_DIRZ = -0.8387, -0.5446 -- (sin, cos) of driveYaw 237°
 local function creekColumn(x, z, surfaceTop)
     local along = x * CK_DIRX + z * CK_DIRZ
@@ -118,7 +118,10 @@ local function creekColumn(x, z, surfaceTop)
     -- meander: shift the channel centreline laterally by amp·sin(t·waves·2π),
     -- where t is progress along the run (mouth..rim mapped 0..1).
     local t = (along - CREEK.mouthAlong) / (CREEK.rimAlong - CREEK.mouthAlong)
-    local centre = CK_AMP * math.sin(t * CK_WAVES * 2 * math.pi)
+    -- keep the channel DEAD STRAIGHT through the wheel/fast reach (along < fastReach)
+    -- so the current still drives the wheel; the meander only grows upstream of it.
+    local fade = ss(CREEK.fastReach, CREEK.fastReach + 30, along)
+    local centre = CK_AMP * math.sin(t * CK_WAVES * 2 * math.pi) * fade
     local off = math.abs((x * CK_DIRZ - z * CK_DIRX) - centre)
     if off > CREEK.halfW then
         return nil

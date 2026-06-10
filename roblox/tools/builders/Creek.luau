@@ -44,9 +44,14 @@ function Creek.build(palette: { [string]: { number } }, L: any)
     local N = 9
     for i = 0, N do
         local t = i / N
-        local mo = L.creek.meander.amp * math.sin(t * L.creek.meander.waves * 2 * math.pi)
-        local x = e[1] + dx * t + perpX * mo
-        local z = e[3] + dz * t + perpZ * mo
+        local bx, bz = e[1] + dx * t, e[3] + dz * t -- base point on the straight line
+        -- suppress the meander through the wheel/fast reach (small radius) so the
+        -- stones stay straight where the wheel sits, matching the carved water; the
+        -- wiggle only grows upstream toward the rim.
+        local fade = ss(L.creek.fastReachRadius, L.creek.fastReachRadius + 30, math.sqrt(bx * bx + bz * bz))
+        local mo = L.creek.meander.amp * math.sin(t * L.creek.meander.waves * 2 * math.pi) * fade
+        local x = bx + perpX * mo
+        local z = bz + perpZ * mo
         local side = (i % 2 == 0) and 1 or -1
         local d = side * (L.creek.width / 2 + 0.6)
         -- bank stone rests on the LOCAL terrace surface at the stone's own radius
