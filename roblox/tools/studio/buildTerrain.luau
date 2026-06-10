@@ -38,6 +38,37 @@ end
 local BASIN_R, APRON_R = 16, 84
 local TIERS = { { r = 116, h = 6 }, { r = 152, h = 16 }, { r = 188, h = 28 } }
 local WALL_RUN = 7 -- horizontal run of each paddy wall (steep, not a cliff)
+-- Garden water (mirror of ArenaLayout.gardenTiers). Each wet tier has a channel
+-- ring centred at channelR (width w) on the centre side of the hut ring, holding
+-- water to ~0.5 below the tier grade; it widens into still pools (radius POOLR) at
+-- the gaps between hut clusters. Re-paste on layout change.
+local GARDEN = {
+    { tier = 1, h = 6, channelR = 122, w = 6, houseCount = 7, phase = 0.0 },
+    { tier = 2, h = 16, channelR = 157, w = 6, houseCount = 9, phase = 0.21 },
+}
+local POOLR = 6
+local CK_AMP, CK_WAVES = 6, 2.5 -- creek meander (mirror ArenaLayout.creek.meander)
+
+-- water descriptor for a garden tier at (x,z), or nil. The channel is brimful to
+-- grade-0.5; pools dip a touch deeper and read still.
+local function gardenWater(x, z, r)
+    for _, g in GARDEN do
+        -- still pools at the cluster gaps
+        local pools = math.floor(g.houseCount / 2)
+        for p = 0, pools - 1 do
+            local pa = g.phase + (p + 0.5) * (2 * math.pi / pools)
+            local px, pz = g.channelR * math.cos(pa), g.channelR * math.sin(pa)
+            if (x - px) ^ 2 + (z - pz) ^ 2 < POOLR * POOLR then
+                return { g = g.h - 4, wb = g.h - 4, wt = g.h - 0.4 }
+            end
+        end
+        -- the channel ring
+        if math.abs(r - g.channelR) < g.w / 2 then
+            return { g = g.h - 3, wb = g.h - 3, wt = g.h - 0.5 }
+        end
+    end
+    return nil
+end
 -- content pads: {x, z, surfaceY}. Warp suppressed and surface flattened nearby
 -- so promontories / teahouses / flume pool / rim plaza sit flat on their tier.
 local PADS = {
@@ -84,7 +115,11 @@ local function creekColumn(x, z, surfaceTop)
     if along < CREEK.mouthAlong or along > CREEK.rimAlong then
         return nil
     end
-    local off = math.abs(x * CK_DIRZ - z * CK_DIRX)
+    -- meander: shift the channel centreline laterally by amp·sin(t·waves·2π),
+    -- where t is progress along the run (mouth..rim mapped 0..1).
+    local t = (along - CREEK.mouthAlong) / (CREEK.rimAlong - CREEK.mouthAlong)
+    local centre = CK_AMP * math.sin(t * CK_WAVES * 2 * math.pi)
+    local off = math.abs((x * CK_DIRZ - z * CK_DIRX) - centre)
     if off > CREEK.halfW then
         return nil
     end
@@ -167,24 +202,13 @@ local function evalColumn(x, z)
             surf = pp[3] * (1 - t) + surf * t
         end
         surf = math.min(surf + hills(x, z, r), 96) -- stay under the build ceiling (y 100)
-        -- which tier plateau (by warped radius), for the paddy band
-        local ti
-        if rw >= TIERS[1].r and rw < TIERS[2].r then
-            ti = 1
-        elseif rw >= TIERS[2].r and rw < TIERS[3].r then
-            ti = 2
-        elseif rw >= TIERS[3].r and rw < TIERS[3].r + 30 then
-            ti = 3
-        end
         res = { g = surf }
-        -- paddy: outer band of tiers 1 & 2, hugging the wall of the tier above.
-        -- band [tierAbove.r-12, tierAbove.r-2]; floor recessed, top WATER at h-2.
-        if ti and ti < #TIERS and pd >= PAD_SUPP then
-            local tr = TIERS[ti + 1].r
-            local bandIn, bandOut = tr - 12, tr - 2
-            if rw >= bandIn and rw <= bandOut then
-                local th = TIERS[ti].h
-                res.g, res.wb, res.wt = th - 4, th - 4, th - 2
+        -- garden channels + still pools (replaced the paddy band). Suppressed near
+        -- content pads so teahouse/promontory footings stay dry.
+        if pd >= PAD_SUPP then
+            local gw = gardenWater(x, z, rw)
+            if gw then
+                res.g, res.wb, res.wt = gw.g, gw.wb, gw.wt
             end
         end
         -- koi pond recessed into its local tier (flat KOI_LEVEL, not a fixed height)
