@@ -193,11 +193,16 @@ function Teahouse.build(palette: { [string]: { number } }, L: any)
     -- ring radii sit on the OUTER part of each terrace plateau, clear of the inner
     -- lantern ring; the top terrace was widened (r188→~210) to seat 15.
     -- pushed ~10 studs toward the centre from the rear edge (lanterns took the rear).
-    local rings = {
-        { ti = 1, count = 7, r = 129, phase = 0.0 },
-        { ti = 2, count = 9, r = 164, phase = 0.21 },
-        { ti = 3, count = 15, r = 192, phase = 0.13 },
-    }
+    local rings = {}
+    for _, g in L.gardenTiers do
+        table.insert(rings, { ti = g.tier, count = g.houseCount, r = g.houseR, phase = g.housePhase })
+    end
+    table.insert(rings, {
+        ti = L.topTier.tier,
+        count = L.topTier.houseCount,
+        r = L.topTier.houseR,
+        phase = L.topTier.housePhase,
+    })
     local placed = {} -- {ti, a} of every hut, to keep adjacent tiers from stacking
     local function stacked(a: number, ti: number): boolean
         for _, h in placed do
