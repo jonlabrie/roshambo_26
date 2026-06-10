@@ -24,7 +24,7 @@ function Bridge.arch(
         table.insert(
             parts,
             Spec.part(`Deck{tag}{if i == 1 then "" else "2"}`, {
-                Size = { width, 0.3, len },
+                Size = { len, 0.3, width },
                 CFrame = Spec.cframe(p, rot),
                 Color = timber,
                 Material = "WoodPlanks",
@@ -44,7 +44,7 @@ function Bridge.arch(
         table.insert(
             parts,
             Spec.part(`Rail{tag}{e[2]}`, {
-                Size = { 0.25, 0.8, len },
+                Size = { len, 0.8, 0.25 },
                 CFrame = Spec.cframe(p, rot),
                 Color = timber,
                 Material = "Wood",

@@ -28,4 +28,17 @@ describe("Bridge.arch", function()
         end
         expect(deckY > 6).toBe(true)
     end)
+
+    test("deck length runs ALONG the span, width across it", function()
+        -- a 10-stud span, width 4: each of the two deck segments must be longer
+        -- than it is wide (length on X, width on Z) — guards the segment axis order.
+        local parts = Bridge.arch(ZenDojo.palette, { 0, 6, 0 }, { 0, 6, 10 }, 4, "Z")
+        for _, p in parts do
+            if p.name == "DeckZ" then
+                local sx, sz = p.properties.Size[1], p.properties.Size[3]
+                expect(sx > sz).toBe(true) -- length(X) > width(Z)
+                expect(sz).toBe(4) -- width preserved on Z
+            end
+        end
+    end)
 end)
