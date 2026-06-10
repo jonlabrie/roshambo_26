@@ -142,8 +142,8 @@ local function hut(
     local syc = TY - sDr / 2
     part("SkirtF", { W + 2 * sOv, 0.35, sSL }, 0, syc, hd + sOv / 2, ink, "Slate", rotX(sT))
     part("SkirtB", { W + 2 * sOv, 0.35, sSL }, 0, syc, -(hd + sOv / 2), ink, "Slate", rotX(-sT))
-    part("SkirtL", { sSL, 0.35, D + 2 * sOv }, -(hw + sOv / 2), syc, 0, ink, "Slate", rotZ(-sT))
-    part("SkirtR", { sSL, 0.35, D + 2 * sOv }, hw + sOv / 2, syc, 0, ink, "Slate", rotZ(sT))
+    part("SkirtL", { sSL, 0.35, D + 2 * sOv }, -(hw + sOv / 2), syc, 0, ink, "Slate", rotZ(sT))
+    part("SkirtR", { sSL, 0.35, D + 2 * sOv }, hw + sOv / 2, syc, 0, ink, "Slate", rotZ(-sT))
     part("Porch", { 7, 0.4, 3 }, 0, 0.2, hd + 1.5, timber, "WoodPlanks")
     part("Noren", { 4, 3, 0.15 }, 0, WALL - 2, hd, ink, "Fabric", nil, { CanCollide = false })
     part("Table", { 3.5, 1.8, 3.5 }, 0, 1.1, 0, timber, "Wood")
