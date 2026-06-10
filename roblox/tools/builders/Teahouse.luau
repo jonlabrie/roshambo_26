@@ -64,7 +64,7 @@ local function hut(
     cz: number,
     gy: number,
     deg: number,
-    wet: { channelR: number, pathR: number, houseR: number }? -- nil on the dry top tier
+    wet: { channelR: number, pathR: number, houseR: number, actualR: number }? -- nil on the dry top tier
 )
     local timber, ink, ivory = palette.timber, palette.ink, palette.ivory
     local hw, hd, wy = W / 2, D / 2, 0.4 + WALL / 2
@@ -197,13 +197,13 @@ local function hut(
     if wet then
         local engOut = 3 -- how far the veranda oversails the front wall
         local engZ = hd + engOut / 2
-        part("Engawa", { W - 1, 0.3, engOut }, 0, 0.25, engZ, palette.timber, "WoodPlanks")
+        part("Engawa", { W - 1, 0.3, engOut }, 0, 0.25, engZ, timber, "WoodPlanks")
         -- two posts dropping from the veranda's outer corners into the channel
         for _, e in { { (W - 1) / 2 - 0.5, "R" }, { -((W - 1) / 2 - 0.5), "L" } } do
-            part(`EngawaPost{e[2]}`, { 0.5, 4, 0.5 }, e[1], -1.85, hd + engOut, palette.timber, "Wood")
+            part(`EngawaPost{e[2]}`, { 0.5, 4, 0.5 }, e[1], -1.85, hd + engOut, timber, "Wood")
         end
         -- bridge from the path (houseR-pathR studs toward centre) to the veranda lip
-        local toPath = wet.houseR - wet.pathR -- local +Z distance to the path
+        local toPath = wet.actualR - wet.pathR -- radial gap (hut's true radius) to the path ring
         local aWorld = worldPos(0, 0.25, hd + engOut) -- veranda outer edge
         local bWorld = worldPos(0, 0.0, toPath) -- path point
         for _, bp in Bridge.arch(palette, aWorld, bWorld, 3, "BR") do
@@ -260,7 +260,7 @@ function Teahouse.build(palette: { [string]: { number } }, L: any)
             local wet = nil
             for _, g in L.gardenTiers do
                 if g.tier == ring.ti then
-                    wet = { channelR = g.channelR, pathR = g.pathR, houseR = g.houseR }
+                    wet = { channelR = g.channelR, pathR = g.pathR, houseR = g.houseR, actualR = r }
                 end
             end
             table.insert(children, hut(palette, `Teahouse_{ring.ti}_{k + 1}`, x, z, gy, deg, wet))
