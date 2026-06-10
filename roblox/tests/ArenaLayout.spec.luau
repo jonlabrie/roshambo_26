@@ -110,3 +110,33 @@ describe("ArenaLayout", function()
         )
     end)
 end)
+
+describe("ArenaLayout garden", function()
+    test("gardenTiers covers tiers 1 & 2 with the established counts", function()
+        expect(#L.gardenTiers).toBe(2)
+        expect(L.gardenTiers[1].tier).toBe(1)
+        expect(L.gardenTiers[1].houseCount).toBe(7)
+        expect(L.gardenTiers[2].houseCount).toBe(9)
+        expect(L.topTier.houseCount).toBe(15) -- tier 3, dry garden
+    end)
+
+    test("each garden tier nests path < channel < houses, all on its plateau", function()
+        for _, g in L.gardenTiers do
+            expect(g.pathR < g.channelR).toBe(true)
+            expect(g.channelR < g.houseR).toBe(true)
+            local tier = L.tiers[g.tier]
+            local nextR = L.tiers[g.tier + 1].radius
+            expect(g.pathR > tier.radius).toBe(true)
+            expect(g.houseR < nextR - 7).toBe(true)
+        end
+    end)
+
+    test("creek meander + branch weirs + pool radius are defined", function()
+        expect(L.creek.meander.amp > 0).toBe(true)
+        expect(L.creek.meander.waves > 0).toBe(true)
+        expect(#L.branchWeirs).toBe(2)
+        expect(L.poolRadius > 0).toBe(true)
+        expect(#L.foliage.heroCherry).toBe(3)
+        expect(L.firefly.heroLightCount > 0).toBe(true)
+    end)
+end)

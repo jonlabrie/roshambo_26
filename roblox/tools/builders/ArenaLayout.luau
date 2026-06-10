@@ -59,6 +59,10 @@ local ArenaLayout = {
         mouth = onLine(17, 0), -- meets the basin water at the SW edge
         width = 5.6, -- channel width (studs); 30% narrower than the original 8
         fastReachRadius = 46, -- inside this radius the channel flattens for the wheels
+        -- Sinuous lateral wiggle so the creek reads found, not surveyed. Lateral
+        -- offset along the run t∈[0,1] = amp*sin(t*waves*2π), applied perpendicular
+        -- to the drive line. Shared by Creek.luau (stones) and buildTerrain (water).
+        meander = { amp = 6, waves = 2.5 },
     },
     -- A SINGLE Asakura scoop wheel sitting IN the creek: its raked rim buckets both
     -- catch the current (drive) and lift water, which a launder pours into the sōzu.
@@ -91,6 +95,42 @@ local ArenaLayout = {
         { pos = { 98, 16, -88 }, facing = -45 }, -- SE tier 2
         { pos = { -145, 28, 68 }, facing = 115 }, -- NW tier 3 (upper)
     },
+    -- Garden tiers (bottom two terraces). Single source of truth for teahouse
+    -- rings AND the water garden in front of them. Radii sit on each tier's
+    -- plateau: channel is centre-ward of the hut ring, path centre-ward of the
+    -- channel, so a bridge crosses path -> channel -> engawa toward the centre.
+    gardenTiers = {
+        {
+            tier = 1,
+            height = 6,
+            houseR = 129,
+            houseCount = 7,
+            housePhase = 0.0,
+            channelR = 122,
+            channelWidth = 6,
+            pathR = 118,
+        },
+        {
+            tier = 2,
+            height = 16,
+            houseR = 164,
+            houseCount = 9,
+            housePhase = 0.21,
+            channelR = 157,
+            channelWidth = 6,
+            pathR = 153,
+        },
+    },
+    -- Tier 3 is DRY garden: huts + lanterns + foliage, no channel.
+    topTier = { tier = 3, height = 28, houseR = 192, houseCount = 15, housePhase = 0.13 },
+    poolRadius = 6, -- still reflecting-pool widenings between hut clusters
+    -- the creek bleeds a little water into each tier channel where it crosses
+    -- that channel's radius (small stone-lined weirs). onLine() = the drive line.
+    branchWeirs = { onLine(157, 16), onLine(122, 6) },
+    foliage = {
+        heroCherry = { -22, 28, -180 }, -- weeping cherry by the torii/stele on the rim
+    },
+    firefly = { heroLightCount = 18 }, -- real-PointLight motes near the water (Phase 2)
     -- Entrance: gate plaza ON the rim (surface ~y28); the sandō descends
     -- through carved tier walls down to the apron (arrive high, walk down).
     torii = { pos = { 0, 28, -196 } },
