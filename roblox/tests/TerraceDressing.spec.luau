@@ -5,27 +5,46 @@ local L = require("../tools/builders/ArenaLayout")
 local ZenDojo = require("../src/shared/themes/ZenDojo")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 
-describe("TerraceDressing builder", function()
-    test("lantern ring on tiers, skipping features/gap", function()
+describe("TerraceDressing lanterns", function()
+    test("no lantern sits in a garden tier's channel band", function()
         local spec = TerraceDressing.build(ZenDojo.palette, L)
-        local lanterns = 0
-        for _, c in spec.children :: any do
-            if c.name:match("^Lantern_") then
-                lanterns += 1
+        for _, lan in spec.children :: any do
+            local ti = tonumber(lan.name:match("^Lantern_(%d)_"))
+            local base
+            for _, p in lan.children do
+                if p.name == "Base" then
+                    base = p
+                end
+            end
+            local x, z = base.properties.CFrame[1], base.properties.CFrame[3]
+            local r = math.sqrt(x * x + z * z)
+            for _, g in L.gardenTiers do
+                if g.tier == ti then
+                    local inBand = r > g.channelR - g.channelWidth / 2 - 2
+                        and r < g.channelR + g.channelWidth / 2 + 2
+                    expect(inBand).toBe(false)
+                end
             end
         end
-        -- 3 tiers x 8 = 24 candidate positions on each tier's flat plateau. At the
-        -- current coordinates the half-step ring (22.5°,67.5°,…) threads cleanly
-        -- past the sandō gap, creek, koi pond and promontories — all 24 survive.
-        -- (Re-pin if ArenaLayout coordinates change.)
-        expect(lanterns).toBe(24)
     end)
 
-    test("dressing is lanterns only — no open-air seating", function()
+    test("garden-tier lanterns sit just inside the path", function()
         local spec = TerraceDressing.build(ZenDojo.palette, L)
-        for _, c in spec.children :: any do
-            expect(c.name:match("^Cushion_") == nil).toBe(true)
-            expect(c.name:match("^Table_") == nil).toBe(true)
+        for _, lan in spec.children :: any do
+            local ti = tonumber(lan.name:match("^Lantern_(%d)_"))
+            local base
+            for _, p in lan.children do
+                if p.name == "Base" then
+                    base = p
+                end
+            end
+            local x, z = base.properties.CFrame[1], base.properties.CFrame[3]
+            local r = math.sqrt(x * x + z * z)
+            for _, g in L.gardenTiers do
+                if g.tier == ti then
+                    expect(r < g.pathR).toBe(true)
+                end
+            end
         end
     end)
 end)

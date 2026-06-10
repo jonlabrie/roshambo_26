@@ -41,8 +41,22 @@ function TerraceDressing.build(palette: { [string]: { number } }, L: any)
         -- lanterns line the OUTER (rear) edge of each terrace, against the wall up
         -- to the next tier, leaving the inner plateau clear for the teahouses that
         -- were pushed toward the centre. (Last tier's shelf was widened to ~210.)
-        local nextWall = if L.tiers[ti + 1] then L.tiers[ti + 1].radius - WALL_RUN else tier.radius + 22
-        local r = nextWall - 3
+        -- garden tiers: just centre-ward of the path (dry plateau); top tier: an
+        -- outer ring out toward the rim. Never on the channel band.
+        local r
+        local g = nil
+        for _, gt in L.gardenTiers do
+            if gt.tier == ti then
+                g = gt
+            end
+        end
+        if g then
+            r = g.pathR - 2
+        elseif L.tiers[ti + 1] then
+            r = L.tiers[ti + 1].radius - WALL_RUN - 3
+        else
+            r = tier.radius + 22
+        end
         local gy = tier.height + GROUND_LIFT -- ground the dressing rests on
         for i = 1, 8 do
             local a = (i - 0.5) * math.pi / 4
