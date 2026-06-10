@@ -14,8 +14,8 @@ describe("Graybox", function()
         for _, want in { "ToriiShell", "SteleShell" } do
             expect(names[want]).toBe(true)
         end
-        expect(names["TeahouseShell1"]).toBe(true)
-        expect(names["TeahouseShell3"]).toBe(true)
+        -- TeahouseShells dropped — real huts ship via Teahouse.luau now.
+        expect(names["TeahouseShell1"] == nil).toBe(true)
         expect(names["Promontory_Record"]).toBe(true)
         expect(names["Promontory_LocalHero"]).toBe(true)
     end)

@@ -131,15 +131,17 @@ local KOI_LEVEL = tierSurface(math.sqrt(KOI.x ^ 2 + KOI.z ^ 2))
 -- Long gentle climb out of the bowl (88-stud run, not a berm wall), an
 -- undulating ridge line so the rim horizon isn't a constant ring, low-octave
 -- rolling swells farther out, and a soft mid-scale undulation layer.
+-- onset pushed out 196→210 so tier 3's flat shelf is ~22 studs deep (r188→210),
+-- wide enough to seat the upper teahouse village; hills then climb to the backdrop.
 local function hills(x, z, r)
-    local rise = ss(196, 280, r)
+    local rise = ss(210, 290, r)
     if rise <= 0 then
         return 0
     end
     local ridge = 40 + fbm(x + 3000, z + 3000, 2, 0.004, 2.0, 0.5) * 5 -- 35..45 ridge line
     local swell = fbm(x, z, 3, 0.0035, 2.2, 0.45) -- long rolling swells
-    local detail = fbm(x + 7000, z + 7000, 2, 0.012, 2.0, 0.5) * 6 * ss(220, 260, r)
-    local big = ss(240, 340, r) * ((swell + 1) * 0.5 * 46)
+    local detail = fbm(x + 7000, z + 7000, 2, 0.012, 2.0, 0.5) * 6 * ss(234, 274, r)
+    local big = ss(254, 354, r) * ((swell + 1) * 0.5 * 46)
     return ((ridge - 28) + detail + big) * rise
 end
 

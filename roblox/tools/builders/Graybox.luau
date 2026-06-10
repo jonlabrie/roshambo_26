@@ -18,16 +18,7 @@ function Graybox.build(L)
             Color = GRAY,
         }),
     }
-    for i, t in L.teahouses do
-        table.insert(
-            children,
-            Spec.part(`TeahouseShell{i}`, {
-                Size = { 16, 9, 12 },
-                CFrame = Spec.cframe({ t.pos[1], t.pos[2] + 4.5, t.pos[3] }, Spec.yaw(t.facing)),
-                Color = { 0.55, 0.42, 0.28 }, -- legible timber brown (gate feedback)
-            })
-        )
-    end
+    -- (TeahouseShell massing removed — real huts now ship via Teahouse.luau.)
     for _, p in L.promontories do
         table.insert(
             children,

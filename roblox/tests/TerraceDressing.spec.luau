@@ -14,31 +14,18 @@ describe("TerraceDressing builder", function()
                 lanterns += 1
             end
         end
-        -- 3 tiers x 8 = 24 candidate positions on each tier's flat plateau. The
-        -- sandō gap (a≈3π/2) carves one out, and now that the ring sits at the
-        -- plateau mid-radius (where the content pads live) one more lantern lands
-        -- close enough to a promontory/teahouse pad for blocked() to skip it.
-        -- Net surviving: 23. (Re-pin if ArenaLayout coordinates change.)
-        expect(lanterns).toBe(23)
+        -- 3 tiers x 8 = 24 candidate positions on each tier's flat plateau. At the
+        -- current coordinates the half-step ring (22.5°,67.5°,…) threads cleanly
+        -- past the sandō gap, creek, koi pond and promontories — all 24 survive.
+        -- (Re-pin if ArenaLayout coordinates change.)
+        expect(lanterns).toBe(24)
     end)
 
-    test("cushions land on a tier surface", function()
+    test("dressing is lanterns only — no open-air seating", function()
         local spec = TerraceDressing.build(ZenDojo.palette, L)
-        local cushions = 0
         for _, c in spec.children :: any do
-            if c.name:match("^Cushion_") then
-                cushions += 1
-                local y = c.properties.CFrame[2]
-                -- rests just above a tier surface (tier.height + a small ground-lift)
-                local onTier = false
-                for _, tier in L.tiers do
-                    if y > tier.height and y <= tier.height + 4 then
-                        onTier = true
-                    end
-                end
-                expect(onTier).toBe(true)
-            end
+            expect(c.name:match("^Cushion_") == nil).toBe(true)
+            expect(c.name:match("^Table_") == nil).toBe(true)
         end
-        expect(cushions > 12).toBe(true)
     end)
 end)
