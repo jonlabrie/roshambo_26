@@ -149,8 +149,9 @@ local function evalColumn(x, z)
     -- first compute the BASE terrain (no creek): basin / apron / tiers + paddy + koi.
     local res
     if r < BASIN_R then
-        -- basin: water 0 down to -6 over ground (monument zone, exact)
-        res = { g = -6, wb = -6, wt = 0 }
+        -- basin pool under the bell: surface at 1.2 (flush with the creek mouth so
+        -- they read as one body; was 0, which sat too low), deep floor at -6.
+        res = { g = -6, wb = -6, wt = 1.2 }
     elseif r < APRON_R then
         -- gravel apron, flat surface 2 (monument zone, exact)
         res = { g = 2, grav = true }

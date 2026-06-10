@@ -146,7 +146,7 @@ EventBus.Cue.Event:Connect(function(cue)
                     ring.Transparency = 0.35 + (i - 1) * 0.15
                     ring.Color = WATER
                     ring.Size = Vector3.new(0.25, 2, 2)
-                    ring.CFrame = CFrame.new(gong.Position.X, 0.4, gong.Position.Z)
+                    ring.CFrame = CFrame.new(gong.Position.X, 1.3, gong.Position.Z)
                         * CFrame.Angles(0, 0, math.rad(90))
                     ring.Parent = workspace
                     TweenService

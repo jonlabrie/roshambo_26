@@ -36,7 +36,7 @@ local ArenaLayout = {
     paddyStripWidth = 10,
     pavilion = { pos = { 0, 0, 0 }, postSpacing = 18, roofHeight = 22, yaw = pavilionYaw }, -- grown to clear the +50% bell; yawed to clear the gantry
     -- bell +50% (2026-06-08 gate): diameter ~10 matches the waterwheel; raised so
-    -- the taller body keeps ~3 studs of clearance over the basin water.
+    -- the body keeps ~1.8 studs of clearance over the basin pool (raised to y1.2).
     bell = { pos = { 0, 9.75, 0 }, height = 13.5, radius = 5.1 },
     shuMoku = {
         restPos = { 0, 6.2, 9.5 },
