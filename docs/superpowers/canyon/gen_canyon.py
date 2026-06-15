@@ -76,6 +76,21 @@ u16 = (H / MAXY * 65535.0).astype(np.uint16)
 Image.fromarray(u16).save(f"{OUT}/heightmap.png")            # 16-bit, the import file
 Image.fromarray((H / MAXY * 255).astype(np.uint8)).save(f"{OUT}/heightmap_preview.png")
 
+# ---- floor-protection erosion mask ----
+# BLACK (0) over the channel floor + the immediate cliff foot; ramps to WHITE (1)
+# up the walls and across the plateau. Feed to Gaea's erosion mask input where
+# WHITE = "erode here". (If your node reads the mask as "protect where white",
+# invert it.) Protecting a few studs up from the floor edge stops the over-incision
+# at the cliff base.
+emask = smoothstep((D - (I + 4.0)) / 12.0)
+Image.fromarray((emask * 255).astype(np.uint8)).save(f"{OUT}/erosion_mask.png")
+
+# ---- flat floor-reference heightmap (for a Combine->Max clamp) ----
+# Same gorge, but walls cut off at the floor level -> a "tub" you Max against so
+# erosion can carve detail but never drop the bottom below the channel grade.
+floorRef = np.clip(F, 0, MAXY)  # the descending floor, full width (no walls)
+Image.fromarray((floorRef / MAXY * 65535).astype(np.uint16)).save(f"{OUT}/floor_reference.png")
+
 # ---- deterministic perch anchors (~18) ----
 def frac(s):
     v = math.sin(s * 12.9898) * 43758.5453; return v - math.floor(v)
