@@ -29,8 +29,8 @@ CP = [
 ]
 RIM      = 205.0
 WALLRUN  = 30.0    # horizontal run of the steep wall (inner edge -> rim) — steeper
-RIVER_H  = 9.0     # incised central river groove half-width
-RIVER_CUT= 3.0
+# NOTE: no pre-incised river channel — the floor is left flat-ish (just the
+# down-canyon gradient) so Gaea's hydraulic erosion carves the river itself.
 MAXY     = 260.0   # heightmap maps world Y 0..MAXY -> 0..65535
 # square region centred to contain the gorge
 CX, CZ, HALF = -85.0, 0.0, 220.0   # centre + half-extent (studs)
@@ -63,9 +63,7 @@ D = np.abs(zs)[:, None] + np.zeros((RES, RES))
 wall = F + (RIM - F) * smoothstep((D - I) / WALLRUN)
 H = np.where(D <= I, F, wall)
 H = np.minimum(H, RIM)
-# incised river groove on the floor
-groove = np.where(D <= RIVER_H, RIVER_CUT * (1 - (D / RIVER_H) ** 2), 0.0)
-H = np.where(D <= I, H - groove, H)
+# (no river groove — flat-ish floor; erosion carves the channel)
 # subtle deterministic plateau texture so it isn't mathematically flat
 rng = np.random.default_rng(7)
 low = rng.standard_normal((32, 32))
