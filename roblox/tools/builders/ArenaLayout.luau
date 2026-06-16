@@ -62,7 +62,7 @@ local ArenaLayout = {
         yaw = 0,
         railX = 3,
         railY = 127,
-        railZ = { 5, 20 },
+        railZ = { 6, 13 }, -- shortened to the shu-moku's actual cam-driven draw (was {5,20})
         chainTops = { { 3, 127, 7.5 }, { 3, 127, 11.5 }, { -3, 127, 7.5 }, { -3, 127, 11.5 } },
         chainBottomsRest = {
             { 0.8, 118.6, 7.5 },

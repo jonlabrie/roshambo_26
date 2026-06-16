@@ -85,6 +85,19 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
             Material = "Wood",
         })
     )
+    -- dowel peg on the shu-moku flank: sweeps with the swing and kicks the BellDrive paddle
+    local dw = L.shuMoku.dowel
+    local dpos, dlen, drot = Spec.segment(dw.from, { dw.from[1], dw.from[2], dw.from[3] + dw.length })
+    table.insert(
+        children,
+        Spec.part("ShuMokuDowel", {
+            Size = { dlen, 0.5, 0.5 },
+            Shape = "Cylinder",
+            CFrame = Spec.cframe(dpos, drot),
+            Color = palette.timber,
+            Material = "Wood",
+        })
+    )
     -- Gantry: two side rails (along the yaw-rotated Z axis at ±railX, y = railY) on four posts.
     local sm = L.shuMoku
     local yaw = sm.yaw

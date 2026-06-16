@@ -56,3 +56,24 @@ describe("Bonsho builder", function()
         expect(radii[1] > radii[3]).toBe(true)
     end)
 end)
+
+describe("Bonsho dowel + gantry", function()
+    test("emits a ShuMokuDowel peg", function()
+        local spec = Bonsho.build(ZenDojo.palette, L)
+        local found = false
+        for _, c in spec.children :: any do
+            if c.name == "ShuMokuDowel" then
+                found = true
+            end
+        end
+        expect(found).toBe(true)
+    end)
+    test("gantry rail is no longer than the shu-moku draw needs (<= 9 studs)", function()
+        local spec = Bonsho.build(ZenDojo.palette, L)
+        for _, c in spec.children :: any do
+            if c.name:match("^Rail%d$") then
+                expect(c.properties.Size[3] <= 9).toBe(true)
+            end
+        end
+    end)
+end)
