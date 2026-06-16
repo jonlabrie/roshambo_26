@@ -27,19 +27,19 @@ for _, child in rig:GetChildren() do
     end
 end
 
--- Undershot: foam at the driving wheel's waterline (no overshot waterfall).
+-- Overshot: water sheets off the wheel's bottom where the buckets empty into the pool.
 local driver = rig:FindFirstChild("Wheel1") :: BasePart?
 local fall = Instance.new("ParticleEmitter")
 fall.Color = ColorSequence.new(Color3.fromRGB(210, 222, 228))
 fall.Size = NumberSequence.new(0.5, 1.1)
 fall.Transparency = NumberSequence.new(0.5)
 fall.Lifetime = NumberRange.new(0.3, 0.5)
-fall.Rate = 22
+fall.Rate = 14 -- a draining drip, not a churning waterline
 fall.Speed = NumberRange.new(3, 5)
 fall.SpreadAngle = Vector2.new(40, 40)
 if driver then
     local sink = Instance.new("Attachment")
-    sink.Position = Vector3.new(0, -driver.Size.Y / 2 + 0.4, 0)
+    sink.Position = Vector3.new(0, -driver.Size.Y / 2, 0) -- the wheel bottom
     sink.Parent = driver
     fall.Parent = sink
 end
@@ -47,10 +47,10 @@ end
 local angle = 0
 
 RunService.Heartbeat:Connect(function(dt)
-    -- Undershot: the creek flows downhill toward the centre, so the submerged
-    -- bottom paddles are pushed that way → the wheel turns NEGATIVELY about its
-    -- axle (local X). Positive spun it backwards (water appearing to climb uphill).
-    angle -= dt * 0.9
+    -- Overshot: the headrace loads water onto the TOP of the wheel on the head side,
+    -- so the loaded side descends and the wheel turns POSITIVELY about its axle
+    -- (local X) — the opposite of the old undershot (bottom-pushed) direction.
+    angle += dt * 0.9
     for _, s in spins do
         local spun = s.hub * CFrame.Angles(angle, 0, 0)
         s.part.CFrame = spun
