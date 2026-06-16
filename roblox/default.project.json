@@ -27,6 +27,7 @@
                 "BonshoRig": { "$path": "assets/BonshoRig.model.json" },
                 "Shoro": { "$path": "assets/Shoro.model.json" },
                 "Waterwheel": { "$path": "assets/Waterwheel.model.json" },
+                "BellDrive": { "$path": "assets/BellDrive.model.json" },
                 "ThrowDrum": { "$path": "assets/ThrowDrum.model.json" },
                 "Sozu": { "$path": "assets/Sozu.model.json" },
                 "ArenaSpawn": {
