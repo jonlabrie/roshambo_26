@@ -30,12 +30,18 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
     local length, r, faces = d.length, d.radius, d.faces
     local timber = palette.timber
     local ink = palette.ink
-    -- The drum is centred at x=z=0, so yaw it about world-Y to keep it square with
-    -- the (also-yawed) pavilion roof. The DrumController captures every spinning
-    -- part as an offset from the hub, so this rotation is transparent to it.
+    -- The drum rides the bell-engine's vertical shaft (off-origin), so yaw it about
+    -- its OWN centre (px,py,pz), not the world origin: yaw 90 swings the prism axis
+    -- (local X) onto world Z so the showing faces present up/downriver (±X). The
+    -- DrumController captures every spinning part as an offset from the hub, so this
+    -- rotation is transparent to it.
     local yaw = d.yaw or 0
     local function place(pos: { number }, rot: { number }?): { number }
-        return Spec.cframe(Spec.rotY(pos, yaw), Spec.matMul(Spec.rotYMat(yaw), rot or Spec.ROT.IDENTITY))
+        local off = Spec.rotY({ pos[1] - px, pos[2] - py, pos[3] - pz }, yaw)
+        return Spec.cframe(
+            { px + off[1], py + off[2], pz + off[3] },
+            Spec.matMul(Spec.rotYMat(yaw), rot or Spec.ROT.IDENTITY)
+        )
     end
 
     local step = (2 * math.pi) / faces -- 60° per face

@@ -41,3 +41,21 @@ describe("ThrowDrum builder", function()
         end
     end)
 end)
+
+describe("ThrowDrum on the vertical shaft", function()
+    test("the drum body sits at the vertical-shaft top", function()
+        local spec = ThrowDrum.build(ZenDojo.palette, L)
+        for _, c in spec.children :: any do
+            if c.name == "ThrowDrum" or c.name == "Drum" then
+                expect(math.abs(c.properties.CFrame[1] - L.bellDrive.vertTop[1]) < 3).toBe(true)
+                expect(math.abs(c.properties.CFrame[3] - L.bellDrive.vertTop[3]) < 3).toBe(true)
+            end
+        end
+    end)
+    test("no self-supporting legs (yoke carries it) — no part named Leg/Post", function()
+        local spec = ThrowDrum.build(ZenDojo.palette, L)
+        for _, c in spec.children :: any do
+            expect(c.name:match("Leg") == nil and c.name:match("Post") == nil).toBe(true)
+        end
+    end)
+end)
