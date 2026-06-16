@@ -71,6 +71,7 @@ local ArenaLayout = {
             { -0.8, 118.6, 11.5 },
         },
         ropeBottomRest = { -2, 118, 13 },
+        dowel = { from = { -2, 118, 6 }, length = 3, yaw = 0 }, -- flank peg → kicks the BellDrive paddle
     },
     -- Natural creek down the SW-ish drive line (replaced the kakehi flume).
     creek = {
@@ -83,19 +84,19 @@ local ArenaLayout = {
         -- to the drive line. Shared by Creek.luau (stones) and buildTerrain (water).
         meander = { amp = 6, waves = 2.5 },
     },
-    -- IN-RIVER waterwheel: rests in the river on the +X (downstream) side of the
-    -- tower, turned by the current flowing out of the in-fall pool. The lower paddles
-    -- dip into the water (undershot); supports stand on the riverbed. Moving it here
-    -- (was a central overshot wheel) pulls its bulk off the gathering terrace.
+    -- IN-RIVER waterwheel: rests in the river due North (−Z) of the tower, on the
+    -- tower axis, turned by the current flowing out of the in-fall pool. Its Z-axle
+    -- runs South into the house as the bell-engine main shaft. The lower paddles dip
+    -- into the water (undershot); supports stand on the riverbed.
     waterwheel = {
         radius = 6,
         overshot = false,
         yaw = 90, -- axle along Z; disc faces the +Z gathering, paddles catch the +X current
         driveYaw = 0, -- drive line toward the bell (RatchetDrum offsets along it)
         bedY = 104, -- support posts stand on the riverbed (river floor ~104)
-        centers = { { 17, 112, -18 } }, -- in the river, downstream-right of the tower (bottom ~106 in water ~108)
+        centers = { { 0, 112, -18 } }, -- in the river, due North of the tower; axle (Z) runs South into the house
         driver = 1,
-        ropeAnchor = { 14, 112, -15 }, -- on the driver toward the bell; DriveRope leaves here
+        ropeAnchor = { 0, 112, -10 },
     },
     -- sōzu (shishi-odoshi) beside the wheel; meters the round and kicks the drum.
     sozu = {
@@ -159,7 +160,31 @@ local ArenaLayout = {
     heroTile = { pos = { 0, 18, 0 }, size = { 5, 6.5, 0.8 } },
     -- Hexagonal World-Throw drum atop the shōrō (ridge ~y22; y24 clears the
     -- y28 top tier enough to read). Horizontal axis = world X (E/W).
-    throwDrum = { pos = { -2, 138, 0 }, length = 14, radius = 7, faces = 6, yaw = 0 }, -- rides the shōrō above the bell, on the clearing axis
+    throwDrum = { pos = { 6, 140, 4 }, length = 14, radius = 7, faces = 6, yaw = 90 }, -- rides the vertical drum shaft above the bell; faces up/downriver (±X)
+    -- ===== Bell engine drive train (exposed on the open frame) =====
+    -- One input (the river wheel's Z-axle) → gear-down → cam draws/trips the shu-moku;
+    -- the shu-moku's dowel kicks the vertical shaft → spins the drum. Starting coords;
+    -- tuned at the staging gate. Builders read these by name.
+    bellDrive = {
+        shaftFrom = { 0, 112, -18 },
+        shaftTo = { 0, 112, -3 },
+        shaftR = 0.5, -- wheel axle into the house
+        driverGear = { 0, 112, -3 },
+        driverR = 1.6, -- small fast gear on the main shaft
+        camGear = { 0, 117.2, -3 },
+        camR = 3.6, -- big slow gear (centre 5.2 above → meshes)
+        camShaftFrom = { 0, 117.2, -3 },
+        camShaftTo = { -2, 117.2, 7 }, -- cam shaft (along Z) to the striker
+        cam = { -2, 117.2, 7 },
+        camLobe = 2.2, -- wiper that draws the shu-moku tail
+        vertBase = { 6, 112, 4 },
+        vertTop = { 6, 140, 4 },
+        vertR = 0.7, -- vertical drum shaft
+        paddle = { 6, 118, 4 },
+        paddleLen = 2.4, -- struck by the shu-moku dowel
+        yoke = { 6, 140, 4 },
+        yokeSpan = 10, -- bearing arms holding the drum above the roof
+    },
     spawn = { pos = { 0, 29, -188 } }, -- on the rim plaza, facing the bell
 }
 return ArenaLayout
