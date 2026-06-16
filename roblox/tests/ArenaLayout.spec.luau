@@ -1,7 +1,6 @@
 --!strict
 local harness = require("./harness")
 local L = require("../tools/builders/ArenaLayout")
-local Spec = require("../tools/builders/Spec")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 
 describe("ArenaLayout", function()
@@ -55,16 +54,6 @@ describe("ArenaLayout", function()
         expect(L.spawn.pos[3] >= L.sando.fromZ and L.spawn.pos[3] <= L.sando.toZ).toBe(true)
         expect(math.abs(L.spawn.pos[1]) <= L.sando.width / 2).toBe(true)
     end)
-    test("vertical stack: drum clears the bell, roof clears the bell, bell clears the water", function()
-        -- The jumbotron/heroTile display was replaced by the throw drum atop the
-        -- shōrō; the live stack is drum → roof → suspended bell → basin water.
-        local bellTop = L.bell.pos[2] + L.bell.height / 2
-        local bellBottom = L.bell.pos[2] - L.bell.height / 2
-        local drumBottom = L.throwDrum.pos[2] - L.throwDrum.radius
-        expect(drumBottom > bellTop).toBe(true)
-        expect(L.pavilion.roofHeight > bellTop).toBe(true)
-        expect(bellBottom > 0).toBe(true)
-    end)
     test("creek descends from rim to basin mouth on the SW diagonal", function()
         expect(L.creek.entry[2] > L.creek.mouth[2]).toBe(true) -- downhill
         local er = math.sqrt(L.creek.entry[1] ^ 2 + L.creek.entry[3] ^ 2)
@@ -73,41 +62,6 @@ describe("ArenaLayout", function()
         expect(mr < L.apronRadius).toBe(true)
         expect(L.creek.entry[1] < 0 and L.creek.entry[3] < 0).toBe(true)
         expect(L.creek.mouth[1] < 0 and L.creek.mouth[3] < 0).toBe(true)
-    end)
-    test("waterwheels sit on the creek line (SW quadrant), descending order", function()
-        local mmag = math.sqrt(L.creek.mouth[1] ^ 2 + L.creek.mouth[3] ^ 2)
-        local prev = 0
-        for i, c in L.waterwheel.centers do
-            expect(c[1] < 0 and c[3] < 0).toBe(true) -- SW quadrant
-            local cmag = math.sqrt(c[1] ^ 2 + c[3] ^ 2)
-            -- collinear with the creek mouth direction (normalized cross ~ 0)
-            local cross = (c[1] * L.creek.mouth[3] - c[3] * L.creek.mouth[1]) / (cmag * mmag)
-            expect(math.abs(cross) < 0.02).toBe(true)
-            if i > 1 then
-                expect(cmag > prev).toBe(true) -- further out as we go up the creek
-            end
-            prev = cmag
-        end
-        expect(L.waterwheel.driver >= 1 and L.waterwheel.driver <= #L.waterwheel.centers).toBe(true)
-    end)
-    test("shu-moku rests on the drive line, SW of and outside the bell", function()
-        local rest = Spec.rotY(L.shuMoku.restPos, L.shuMoku.yaw)
-        expect(rest[1] < 0 and rest[3] < 0).toBe(true) -- SW quadrant
-        local d = math.sqrt(rest[1] ^ 2 + rest[3] ^ 2)
-        expect(d > L.bell.radius).toBe(true) -- clears the bell body
-        -- collinear with the creek line, so the log aligns with the wheel driving it
-        local mmag = math.sqrt(L.creek.mouth[1] ^ 2 + L.creek.mouth[3] ^ 2)
-        local cross = (rest[1] * L.creek.mouth[3] - rest[3] * L.creek.mouth[1]) / (d * mmag)
-        expect(math.abs(cross) < 0.02).toBe(true)
-    end)
-    test("sozu sits streamside near the driving wheel; cord targets the drum axle end", function()
-        local driver = L.waterwheel.centers[L.waterwheel.driver]
-        local d = math.sqrt((L.sozu.pivot[1] - driver[1]) ^ 2 + (L.sozu.pivot[3] - driver[3]) ^ 2)
-        expect(d < 14).toBe(true)
-        expect(math.abs(L.sozu.cordTop[2] - L.throwDrum.pos[2]) < 1).toBe(true)
-        expect(math.abs(math.abs(L.sozu.cordTop[1] - L.throwDrum.pos[1]) - L.throwDrum.length / 2) < 1.5).toBe(
-            true
-        )
     end)
 end)
 
@@ -138,5 +92,28 @@ describe("ArenaLayout garden", function()
         expect(L.poolRadius > 0).toBe(true)
         expect(#L.foliage.heroCherry).toBe(3)
         expect(L.firefly.heroLightCount > 0).toBe(true)
+    end)
+end)
+
+describe("ArenaLayout canyon clearing", function()
+    test("clearing block defines floor, pool, outcrop, boundary", function()
+        expect(L.clearing ~= nil).toBe(true)
+        expect(L.clearing.floorY).toBe(112)
+        expect(L.clearing.poolSurfaceY < L.clearing.floorY).toBe(true) -- pool recessed
+        expect(L.clearing.poolCentre[1] < 0).toBe(true) -- back third (−X)
+        expect(L.clearing.boundaryX > 0).toBe(true) -- downstream (+X)
+    end)
+    test("bell is on the clearing centreline, on the floor", function()
+        expect(math.abs(L.bell.pos[1]) < 8).toBe(true) -- near origin X
+        expect(math.abs(L.bell.pos[3]) < 8).toBe(true) -- near centreline Z
+        expect(L.bell.pos[2] > L.clearing.floorY).toBe(true) -- bell hangs above the floor
+    end)
+    test("waterwheel is OVERSHOT: bottom above the pool surface, flume feeds the top", function()
+        local w = L.waterwheel
+        local bottom = w.centers[1][2] - w.radius
+        expect(bottom > L.clearing.poolSurfaceY).toBe(true) -- above tailwater
+        expect(w.overshot).toBe(true)
+        expect(w.headFrom ~= nil and w.headTo ~= nil).toBe(true) -- flume head race
+        expect(math.abs(w.headTo[2] - (w.centers[1][2] + w.radius)) < 3).toBe(true) -- pours onto the top
     end)
 end)

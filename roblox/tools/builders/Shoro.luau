@@ -10,11 +10,17 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
     local timber = palette.timber
     local ink = palette.ink
     local children = {}
-    -- The pavilion is centred at the origin, so yaw it about world-Y to clear the
-    -- gantry: rotate every part's position AND orientation by L.pavilion.yaw.
+    -- Positions are authored relative to the pavilion base; yaw about world-Y, then
+    -- translate to L.pavilion.pos so the pavilion sits at its layout location and
+    -- elevation (the clearing floor), not the world origin.
     local yaw = L.pavilion.yaw or 0
+    local base = L.pavilion.pos
     local function place(pos: { number }, rot: { number }?): { number }
-        return Spec.cframe(Spec.rotY(pos, yaw), Spec.matMul(Spec.rotYMat(yaw), rot or Spec.ROT.IDENTITY))
+        local p = Spec.rotY(pos, yaw)
+        return Spec.cframe(
+            { base[1] + p[1], base[2] + p[2], base[3] + p[3] },
+            Spec.matMul(Spec.rotYMat(yaw), rot or Spec.ROT.IDENTITY)
+        )
     end
     local corners = { { s, s }, { s, -s }, { -s, s }, { -s, -s } }
     for i, c in corners do

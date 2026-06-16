@@ -27,21 +27,20 @@ describe("Bonsho builder", function()
             end
         end
     end)
-    test("ShuMoku is swung onto the SW axis (rest x<0 and z<0)", function()
+    test("ShuMoku draws on the clearing axis (+Z, near the centreline)", function()
         local spec = Bonsho.build(ZenDojo.palette, L)
         for _, c in spec.children :: any do
             if c.name == "ShuMoku" then
-                expect(c.properties.CFrame[1] < 0).toBe(true)
-                expect(c.properties.CFrame[3] < 0).toBe(true)
+                expect(c.properties.CFrame[3] > 0).toBe(true) -- draws toward +Z
+                expect(math.abs(c.properties.CFrame[1]) < 8).toBe(true) -- near centreline
             end
         end
     end)
-    test("the strike boss sits on the bell's SW face (x<0 and z<0)", function()
+    test("the strike boss sits on the bell's +Z face", function()
         local spec = Bonsho.build(ZenDojo.palette, L)
         for _, c in spec.children :: any do
             if c.name == "LotusBoss" then
-                expect(c.properties.CFrame[1] < 0).toBe(true)
-                expect(c.properties.CFrame[3] < 0).toBe(true)
+                expect(c.properties.CFrame[3] > 0).toBe(true) -- the face the striker swings into
             end
         end
     end)

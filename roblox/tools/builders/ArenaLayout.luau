@@ -34,25 +34,44 @@ local ArenaLayout = {
     },
     -- flooded paddy strip: outer N studs of each tier surface, against the wall
     paddyStripWidth = 10,
-    pavilion = { pos = { 0, 0, 0 }, postSpacing = 18, roofHeight = 22, yaw = pavilionYaw }, -- grown to clear the +50% bell; yawed to clear the gantry
-    -- bell +50% (2026-06-08 gate): diameter ~10 matches the waterwheel; raised so
-    -- the body keeps ~1.8 studs of clearance over the basin pool (raised to y1.2).
-    bell = { pos = { 0, 9.75, 0 }, height = 13.5, radius = 5.1 },
+    -- ===== Canyon clearing (focal heart) — supersedes the bowl monument zone =====
+    -- World origin = clearing centre. Pool/in-fall upstream (−X); boundary fall
+    -- downstream (+X); the machine is centred at the pool's downstream lip, Y on the
+    -- leveled clearing floor. Starting values — tuned at the terrain/machine gates.
+    clearing = {
+        floorY = 112,
+        poolCentre = { -34, 110, 0 },
+        poolHalf = 28,
+        poolSurfaceY = 110, -- recessed basin
+        outcropCentre = { 40, 112, 0 },
+        outcropHalf = { 48, 34 }, -- gathering shelf
+        boundaryX = 124,
+        boundaryLipY = 100, -- lowest fall
+        inFallTopY = 150, -- in-fall crest
+    },
+    pavilion = { pos = { -2, 112, 0 }, postSpacing = 18, roofHeight = 22, yaw = 0 },
+    -- bonshō bell: hangs centred above the clearing floor (radius/height unchanged).
+    bell = { pos = { -2, 121, 0 }, height = 13.5, radius = 5.1 },
+    -- shu-moku striker, re-staged on the clearing axis (yaw 0; draws toward +Z, swings
+    -- into the bell's +Z face). Y values lifted to the clearing floor (~112+).
     shuMoku = {
-        restPos = { 0, 6.2, 9.5 },
+        restPos = { -2, 118, 9 },
         length = 7,
         radius = 0.8,
         drawStuds = 6,
-        yaw = driveYaw, -- rotate the proven +Z geometry onto the drive line
-        -- gantry the log hangs from (rails along Z at x = ±railX, height railY)
+        yaw = 0,
         railX = 3,
-        railY = 15,
-        railZ = { 5, 20 }, -- gantry post Z positions (straddle the log's draw range)
-        -- 4 chain attach points: fixed tops on the rails, rest bottoms on the log
-        chainTops = { { 3, 15, 7.5 }, { 3, 15, 11.5 }, { -3, 15, 7.5 }, { -3, 15, 11.5 } },
-        chainBottomsRest = { { 0.8, 6.6, 7.5 }, { 0.8, 6.6, 11.5 }, { -0.8, 6.6, 7.5 }, { -0.8, 6.6, 11.5 } },
-        ropeBottomRest = { 0, 6.2, 13 }, -- the log's back end (rest); the rope's log end
-    }, -- draws toward +Z
+        railY = 127,
+        railZ = { 5, 20 },
+        chainTops = { { 3, 127, 7.5 }, { 3, 127, 11.5 }, { -3, 127, 7.5 }, { -3, 127, 11.5 } },
+        chainBottomsRest = {
+            { 0.8, 118.6, 7.5 },
+            { 0.8, 118.6, 11.5 },
+            { -0.8, 118.6, 7.5 },
+            { -0.8, 118.6, 11.5 },
+        },
+        ropeBottomRest = { -2, 118, 13 },
+    },
     -- Natural creek down the SW-ish drive line (replaced the kakehi flume).
     creek = {
         entry = onLine(189.5, 28), -- on the rim (tier-3 height)
@@ -64,26 +83,27 @@ local ArenaLayout = {
         -- to the drive line. Shared by Creek.luau (stones) and buildTerrain (water).
         meander = { amp = 6, waves = 2.5 },
     },
-    -- A SINGLE Asakura scoop wheel sitting IN the creek: its raked rim buckets both
-    -- catch the current (drive) and lift water, which a launder pours into the sōzu.
-    -- One wheel does every job — driving the striker and feeding the sōzu — so the
-    -- space stays simple. radius 5 → bottom y−1 dips ~2 studs into the flat (y≈1)
-    -- apron current; support posts reach the carved creek bed (bedY).
+    -- OVERSHOT waterwheel: sits ABOVE the plunge pool (bottom clears the water), fed
+    -- on top by a headrace flume tapping the in-fall, draining into the pool below.
+    -- hub y118, radius 6 → bottom 112 (= floor) clears the pool surface (110).
     waterwheel = {
-        radius = 7.5, -- +50% (was 5) so it reads at the bell/drum scale, not dwarfed
-        yaw = driveYaw - 180, -- disc axle perpendicular to the current
-        driveYaw = driveYaw, -- the line direction (RatchetDrum offsets toward the bell along it)
-        bedY = -4, -- creek floor the support posts stand on
-        centers = { onLine(25.5, 6.5) }, -- raised with the radius so the bottom keeps its ~2-stud dip
+        radius = 6,
+        overshot = true,
+        yaw = 90, -- disc axle across the clearing (X), wheel face along the current
+        driveYaw = 0, -- drive line toward the bell (RatchetDrum offsets along it)
+        bedY = 112, -- support posts stand on the clearing floor (not submerged)
+        centers = { { -16, 118, -4 } },
         driver = 1,
-        ropeAnchor = onLine(20.6, 6.5), -- on the driver toward the log; DriveRope leaves here
-        launderTo = onLine(19, 6, -6), -- the sōzu mouth the lifted water is poured toward
+        ropeAnchor = { -13, 118, -4 }, -- on the driver toward the bell; DriveRope leaves here
+        headFrom = { -30, 132, -4 }, -- taps the in-fall
+        headTo = { -16, 124, -4 }, -- pours onto the wheel top (hub 118 + radius 6)
+        launderTo = { -8, 116, 8 }, -- small bleed trough to the sōzu mouth
     },
-    -- Streamside sozu (shishi-odoshi) that meters the round and kicks the drum.
+    -- sōzu (shishi-odoshi) beside the wheel; meters the round and kicks the drum.
     sozu = {
-        pivot = onLine(20, 4, -6), -- beside the driving wheel, on the left bank
+        pivot = { -8, 116, 8 },
         troughLen = 5,
-        cordTop = { -6.82, 31, -1.58 }, -- drum W axle end (throwDrum {0,31,0} len 14, yawed by pavilionYaw)
+        cordTop = { -2, 138, -2 }, -- the throw drum's axle end
     },
     promontories = {
         { name = "Record", pos = { 0, 16, 134 } }, -- north (opposite entrance)
@@ -141,7 +161,7 @@ local ArenaLayout = {
     heroTile = { pos = { 0, 18, 0 }, size = { 5, 6.5, 0.8 } },
     -- Hexagonal World-Throw drum atop the shōrō (ridge ~y22; y24 clears the
     -- y28 top tier enough to read). Horizontal axis = world X (E/W).
-    throwDrum = { pos = { 0, 31, 0 }, length = 14, radius = 7, faces = 6, yaw = pavilionYaw }, -- rides the raised roof; yawed with the pavilion
+    throwDrum = { pos = { -2, 138, 0 }, length = 14, radius = 7, faces = 6, yaw = 0 }, -- rides the shōrō above the bell, on the clearing axis
     spawn = { pos = { 0, 29, -188 } }, -- on the rim plaza, facing the bell
 }
 return ArenaLayout
