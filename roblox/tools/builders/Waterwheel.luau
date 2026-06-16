@@ -1,8 +1,9 @@
 --!strict
--- Asakura-style undershot waterwheel cluster sitting in the SW creek. Each wheel
--- is a timber disc whose axle lies along NW-SE (waterwheel.yaw) so it rolls with
--- the SW->NE current. centers[driver] carries the RatchetDrum that the runtime
--- DriveRope (HammerController) leaves from toward the shu-moku log.
+-- OVERSHOT waterwheel for the canyon clearing: a timber disc sitting ABOVE the
+-- plunge pool, fed on top by a headrace flume (waterwheel.headFrom→headTo) that
+-- taps the in-fall; the loaded buckets turn it and water drains into the pool below.
+-- centers[driver] carries the RatchetDrum the runtime DriveRope (HammerController)
+-- leaves from toward the shu-moku log. Support posts stand on the clearing floor.
 local Spec = require("./Spec")
 
 local Waterwheel = {}
@@ -90,14 +91,26 @@ function Waterwheel.build(palette: { [string]: { number } }, L: any)
         })
     )
 
-    -- launder (open trough) carrying scoop-lifted water from the wheel top down to
-    -- the sōzu mouth (waterwheel.launderTo). Static — it does not spin with the wheel.
+    -- OVERSHOT headrace: an open flume taps the in-fall and pours onto the wheel TOP.
+    if W.overshot and W.headFrom and W.headTo then
+        local hpos, hlen, hrot = Spec.segment(W.headFrom, W.headTo)
+        table.insert(
+            children,
+            Spec.part("Headrace", {
+                Size = { hlen, 0.5, 1.6 },
+                CFrame = Spec.cframe(hpos, hrot),
+                Color = timber,
+                Material = "Wood",
+            })
+        )
+    end
+    -- small bleed trough from the wheel top to the sōzu mouth (waterwheel.launderTo).
     local ltop = { dc[1], dc[2] + R, dc[3] }
     local lpos, llen, lrot = Spec.segment(ltop, W.launderTo)
     table.insert(
         children,
         Spec.part("Launder", {
-            Size = { llen, 0.5, 1.4 },
+            Size = { llen, 0.4, 0.9 },
             CFrame = Spec.cframe(lpos, lrot),
             Color = timber,
             Material = "Wood",
