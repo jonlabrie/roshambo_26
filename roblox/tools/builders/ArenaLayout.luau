@@ -83,21 +83,19 @@ local ArenaLayout = {
         -- to the drive line. Shared by Creek.luau (stones) and buildTerrain (water).
         meander = { amp = 6, waves = 2.5 },
     },
-    -- OVERSHOT waterwheel: sits ABOVE the plunge pool (bottom clears the water), fed
-    -- on top by a headrace flume tapping the in-fall, draining into the pool below.
-    -- hub y118, radius 6 → bottom 112 (= floor) clears the pool surface (110).
+    -- IN-RIVER waterwheel: rests in the river on the +X (downstream) side of the
+    -- tower, turned by the current flowing out of the in-fall pool. The lower paddles
+    -- dip into the water (undershot); supports stand on the riverbed. Moving it here
+    -- (was a central overshot wheel) pulls its bulk off the gathering terrace.
     waterwheel = {
         radius = 6,
-        overshot = true,
-        yaw = 90, -- disc axle across the clearing (X), wheel face along the current
+        overshot = false,
+        yaw = 90, -- axle along Z; disc faces the +Z gathering, paddles catch the +X current
         driveYaw = 0, -- drive line toward the bell (RatchetDrum offsets along it)
-        bedY = 112, -- support posts stand on the clearing floor (not submerged)
-        centers = { { -16, 118, -4 } },
+        bedY = 104, -- support posts stand on the riverbed (river floor ~104)
+        centers = { { 17, 112, -18 } }, -- in the river, downstream-right of the tower (bottom ~106 in water ~108)
         driver = 1,
-        ropeAnchor = { -13, 118, -4 }, -- on the driver toward the bell; DriveRope leaves here
-        headFrom = { -30, 132, -4 }, -- taps the in-fall
-        headTo = { -16, 124, -4 }, -- pours onto the wheel top (hub 118 + radius 6)
-        launderTo = { -8, 116, 8 }, -- small bleed trough to the sōzu mouth
+        ropeAnchor = { 14, 112, -15 }, -- on the driver toward the bell; DriveRope leaves here
     },
     -- sōzu (shishi-odoshi) beside the wheel; meters the round and kicks the drum.
     sozu = {

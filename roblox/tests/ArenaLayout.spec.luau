@@ -108,12 +108,12 @@ describe("ArenaLayout canyon clearing", function()
         expect(math.abs(L.bell.pos[3]) < 8).toBe(true) -- near centreline Z
         expect(L.bell.pos[2] > L.clearing.floorY).toBe(true) -- bell hangs above the floor
     end)
-    test("waterwheel is OVERSHOT: bottom above the pool surface, flume feeds the top", function()
+    test("waterwheel is IN-RIVER undershot: downstream (+X), lower paddles in the water", function()
         local w = L.waterwheel
         local bottom = w.centers[1][2] - w.radius
-        expect(bottom > L.clearing.poolSurfaceY).toBe(true) -- above tailwater
-        expect(w.overshot).toBe(true)
-        expect(w.headFrom ~= nil and w.headTo ~= nil).toBe(true) -- flume head race
-        expect(math.abs(w.headTo[2] - (w.centers[1][2] + w.radius)) < 3).toBe(true) -- pours onto the top
+        expect(w.centers[1][1] > 0).toBe(true) -- on the +X (downstream) side of the tower
+        expect(bottom < L.clearing.poolSurfaceY).toBe(true) -- bottom dips into the river current
+        expect(w.overshot).toBe(false)
+        expect(w.headFrom == nil).toBe(true) -- no headrace flume (undershot)
     end)
 end)

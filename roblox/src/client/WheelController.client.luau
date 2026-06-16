@@ -27,14 +27,14 @@ for _, child in rig:GetChildren() do
     end
 end
 
--- Overshot: water sheets off the wheel's bottom where the buckets empty into the pool.
+-- Undershot: the lower paddles churn through the river current at the waterline.
 local driver = rig:FindFirstChild("Wheel1") :: BasePart?
 local fall = Instance.new("ParticleEmitter")
 fall.Color = ColorSequence.new(Color3.fromRGB(210, 222, 228))
 fall.Size = NumberSequence.new(0.5, 1.1)
 fall.Transparency = NumberSequence.new(0.5)
 fall.Lifetime = NumberRange.new(0.3, 0.5)
-fall.Rate = 14 -- a draining drip, not a churning waterline
+fall.Rate = 30 -- churning spray where the paddles meet the current
 fall.Speed = NumberRange.new(3, 5)
 fall.SpreadAngle = Vector2.new(40, 40)
 if driver then
@@ -47,10 +47,9 @@ end
 local angle = 0
 
 RunService.Heartbeat:Connect(function(dt)
-    -- Overshot: the headrace loads water onto the TOP of the wheel on the head side,
-    -- so the loaded side descends and the wheel turns POSITIVELY about its axle
-    -- (local X) — the opposite of the old undershot (bottom-pushed) direction.
-    angle += dt * 0.9
+    -- Undershot: the river current (+X, draining the in-fall pool) pushes the lower
+    -- paddles downstream, turning the wheel NEGATIVELY about its axle (local X).
+    angle -= dt * 0.9
     for _, s in spins do
         local spun = s.hub * CFrame.Angles(angle, 0, 0)
         s.part.CFrame = spun

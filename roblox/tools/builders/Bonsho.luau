@@ -91,7 +91,7 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
     local railLen = sm.railZ[2] - sm.railZ[1] + 1
     local railMidZ = (sm.railZ[1] + sm.railZ[2]) / 2
     local railRot = Spec.matMul(Spec.rotYMat(yaw), Spec.ROT.IDENTITY)
-    local y2 = 2 -- gantry posts rise from the apron gravel
+    local y2 = L.clearing.floorY -- gantry posts rise from the clearing floor
     for i, rx in { sm.railX, -sm.railX } do
         local p = Spec.rotY({ rx, sm.railY, railMidZ }, yaw)
         table.insert(

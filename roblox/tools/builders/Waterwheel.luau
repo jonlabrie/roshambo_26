@@ -1,9 +1,10 @@
 --!strict
--- OVERSHOT waterwheel for the canyon clearing: a timber disc sitting ABOVE the
--- plunge pool, fed on top by a headrace flume (waterwheel.headFrom→headTo) that
--- taps the in-fall; the loaded buckets turn it and water drains into the pool below.
--- centers[driver] carries the RatchetDrum the runtime DriveRope (HammerController)
--- leaves from toward the shu-moku log. Support posts stand on the clearing floor.
+-- Waterwheel for the canyon clearing: a timber disc whose lower paddles ride the
+-- river current (undershot). Optionally OVERSHOT (waterwheel.overshot) with a headrace
+-- flume (headFrom→headTo) pouring on top + a launder bleed (launderTo) — both emitted
+-- only when those fields are present. centers[driver] carries the RatchetDrum the
+-- runtime DriveRope (HammerController) leaves from toward the shu-moku log. Support
+-- posts stand on waterwheel.bedY (the riverbed for an in-water wheel).
 local Spec = require("./Spec")
 
 local Waterwheel = {}
@@ -104,18 +105,20 @@ function Waterwheel.build(palette: { [string]: { number } }, L: any)
             })
         )
     end
-    -- small bleed trough from the wheel top to the sōzu mouth (waterwheel.launderTo).
-    local ltop = { dc[1], dc[2] + R, dc[3] }
-    local lpos, llen, lrot = Spec.segment(ltop, W.launderTo)
-    table.insert(
-        children,
-        Spec.part("Launder", {
-            Size = { llen, 0.4, 0.9 },
-            CFrame = Spec.cframe(lpos, lrot),
-            Color = timber,
-            Material = "Wood",
-        })
-    )
+    -- small bleed trough from the wheel top to the sōzu mouth (overshot only).
+    if W.launderTo then
+        local ltop = { dc[1], dc[2] + R, dc[3] }
+        local lpos, llen, lrot = Spec.segment(ltop, W.launderTo)
+        table.insert(
+            children,
+            Spec.part("Launder", {
+                Size = { llen, 0.4, 0.9 },
+                CFrame = Spec.cframe(lpos, lrot),
+                Color = timber,
+                Material = "Wood",
+            })
+        )
+    end
     return Spec.model("Waterwheel", children)
 end
 

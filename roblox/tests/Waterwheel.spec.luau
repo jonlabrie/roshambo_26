@@ -45,17 +45,17 @@ describe("Waterwheel cluster builder", function()
     end)
 end)
 
-describe("Waterwheel (overshot)", function()
-    test("emits a Headrace flume part feeding the wheel top", function()
+describe("Waterwheel (in-river undershot)", function()
+    test("no Headrace flume when not overshot (undershot, current-driven)", function()
         local spec = Waterwheel.build(ZenDojo.palette, L)
         local names = {}
         for _, c in spec.children :: any do
             names[c.name] = true
         end
-        expect(names["Headrace"]).toBe(true)
+        expect(names["Headrace"] == nil).toBe(true)
         expect(names["Wheel1"]).toBe(true)
     end)
-    test("support posts reach the clearing floor, not a submerged bed", function()
+    test("support posts stand on the riverbed (bedY), not floating", function()
         local spec = Waterwheel.build(ZenDojo.palette, L)
         for _, c in spec.children :: any do
             if c.name:match("^Support") then

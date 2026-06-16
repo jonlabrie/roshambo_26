@@ -10,11 +10,12 @@ local Sozu = {}
 function Sozu.build(palette: { [string]: { number } }, L: any)
     local s = L.sozu
     local px, py, pz = s.pivot[1], s.pivot[2], s.pivot[3]
+    local fy = L.clearing.floorY -- post/stone sit on the clearing floor, not world y0
     local bamboo = palette.timber
     local children = {
         Spec.part("Pivot", {
-            Size = { 0.6, py + 1, 0.6 },
-            CFrame = Spec.cframe({ px, (py + 1) / 2, pz }),
+            Size = { 0.6, py + 1 - fy, 0.6 },
+            CFrame = Spec.cframe({ px, (py + 1 + fy) / 2, pz }),
             Color = palette.ink,
             Material = "Wood",
         }),
@@ -28,7 +29,7 @@ function Sozu.build(palette: { [string]: { number } }, L: any)
         -- catch stone the lever clacks against
         Spec.part("CatchStone", {
             Size = { 1.6, 0.8, 1.2 },
-            CFrame = Spec.cframe({ px, 0.4, pz - s.troughLen / 2 }),
+            CFrame = Spec.cframe({ px, fy + 0.4, pz - s.troughLen / 2 }),
             Color = palette.gravel,
             Material = "Slate",
         }),

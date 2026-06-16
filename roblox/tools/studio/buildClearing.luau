@@ -23,18 +23,18 @@ local AIR, BASALT, SAND, WATER =
     Enum.Material.Air, Enum.Material.Basalt, Enum.Material.Sand, Enum.Material.Water
 
 -- ---- clearing constants (mirror ArenaLayout.clearing) ----
-local CX, CZ = -4, 8 -- terrace oval centre (offset +Z; the −Z side is water)
-local A, B = 54, 34 -- terrace oval semi-axes (~108 × 68 footprint)
+local CX, CZ = 4, 11 -- terrace oval centre (shifted downstream so it reaches further +X)
+local A, B = 86, 48 -- terrace oval semi-axes (~172 × 96 footprint; extended down-canyon)
 local FLAT_Y = 111 -- gathering grade (≈1 stud above the pool surface = a strand)
 local SKIN = 3 -- gravel skin depth on the terrace top
 local GRAVEL = Color3.fromRGB(150, 146, 138) -- fine-gravel tint for the Sand material
--- water (all on the −Z side)
-local POOL_C = { -42, -14 } -- rounded in-fall basin centre (back −Z corner)
-local POOL_R = 22 -- basin radius (noise-perturbed)
+-- water (all on the −Z / North side)
+local POOL_C = { -57, -20 } -- rounded in-fall basin centre (back −Z corner)
+local POOL_R = 28 -- basin radius (noise-perturbed)
 local POOL_SURF = 110 -- pool/upper-river water surface
-local POOL_FLOOR = 103 -- basin floor
-local RIV_X0 = -52 -- river starts at the pool's back
-local FALL_X = 38 -- the lip: river ends here, the fall begins
+local POOL_FLOOR = 102 -- basin floor
+local RIV_X0 = -71 -- river starts at the pool's back
+local FALL_X = 70 -- the lip: river ends here, the fall begins
 
 -- ---- pure helpers ----
 local function ss(e0, e1, x)
@@ -75,18 +75,18 @@ local function clearingColumn(x, z, eh)
     if pr < POOL_R + n2(x, z, 0.06) * 3.5 then
         return { g = POOL_FLOOR, wb = POOL_FLOOR, wt = POOL_SURF, skin = true }
     end
-    local bank = -12 + n2(x, 0, 0.035) * 5 -- meandering +Z waterline (terrace / river edge)
+    local bank = -17 + n2(x, 0, 0.035) * 7 -- meandering +Z waterline (terrace / river edge)
     if z <= bank then
-        -- −Z water side: river → lip → fall face → plunge, all within a 13-stud band
-        if x > RIV_X0 and z > bank - 13 then
+        -- −Z water side: river → lip → fall face → plunge, all within an 18-stud band
+        if x > RIV_X0 and z > bank - 18 then
             if x <= FALL_X then -- river hugging the cliff, descending to the lip
                 local rsurf = POOL_SURF + (107 - POOL_SURF) * ss(POOL_C[1], FALL_X, x)
                 return { g = rsurf - 6, wb = rsurf - 6, wt = rsurf, skin = true }
-            elseif x <= FALL_X + 10 then -- single fall face: bare rock (Task-7 VFX sheet pours here)
-                local g = 105 + (90 - 105) * ss(FALL_X, FALL_X + 10, x)
+            elseif x <= FALL_X + 14 then -- single fall face: bare rock (Task-7 VFX sheet pours here)
+                local g = 105 + (90 - 105) * ss(FALL_X, FALL_X + 14, x)
                 return { g = g, skin = false }
-            elseif x <= FALL_X + 34 then -- plunge pool + outflow draining down-canyon
-                local w = 90 + (85 - 90) * ss(FALL_X + 10, FALL_X + 34, x)
+            elseif x <= FALL_X + 48 then -- plunge pool + outflow draining down-canyon
+                local w = 90 + (85 - 90) * ss(FALL_X + 14, FALL_X + 48, x)
                 return { g = w - 5, wb = w - 5, wt = w, skin = true }
             end
         end
@@ -115,7 +115,7 @@ if snap then
     )
 end
 
-local region = Region3.new(Vector3.new(-74, 60, -58), Vector3.new(84, 160, 48)):ExpandToGrid(RES)
+local region = Region3.new(Vector3.new(-98, 56, -46), Vector3.new(120, 164, 62)):ExpandToGrid(RES)
 local size = region.Size
 local nx, ny, nz = math.floor(size.X / RES), math.floor(size.Y / RES), math.floor(size.Z / RES)
 local base = region.CFrame.Position - size / 2
