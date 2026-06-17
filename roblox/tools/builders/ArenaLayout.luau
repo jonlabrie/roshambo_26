@@ -78,7 +78,7 @@ local ArenaLayout = {
         drawDowel = { from = { -1.5, 118, 11 }, to = { -4, 118, 11 } },
         -- KICK dowel: a SHORT east-flank peg (to x=1) that kicks the vertical-shaft
         -- paddle; short enough to clear the east gantry leg (x=2).
-        kickDowel = { from = { -1.5, 118, 6 }, to = { 1, 118, 6 } },
+        kickDowel = { from = { -1.5, 118, 6 }, to = { 0.75, 118, 6 } }, -- tip pulled back to clear the vertical drive shaft (x=1)
     },
     -- Natural creek down the SW-ish drive line (replaced the kakehi flume).
     creek = {
@@ -185,7 +185,7 @@ local ArenaLayout = {
         driverGear = { -15, 116, 9.4 },
         driverR = 1.6,
         camGear = { -13.4, 116, 11 },
-        camR = 3.6,
+        camR = 3.0, -- shrunk so the rim clears the ground (was 3.6)
         -- E–W CAM SHAFT: along X at the shu-moku tail (z=11, between the tower posts at
         -- z=9 and the gantry at z=13; South of the bell), pointed East at the log.
         camShaftFrom = { -15, 116, 11 },

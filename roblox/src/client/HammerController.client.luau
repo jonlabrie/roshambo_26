@@ -200,6 +200,9 @@ EventBus.Cue.Event:Connect(function(cue)
             { CFrame = CFrame.new(-BACK * 0.8) * restCFrame }
         )
         swing.Completed:Connect(function()
+            -- Contact moment (the actual strike): the dowel kicks the pin-wheel HERE, not at
+            -- the swing's start — fire a "gongHit" cue so the drum spins on contact, not early.
+            EventBus.Cue:Fire({ kind = "gongHit" })
             -- Contact moment: flash + basin ring fire here, not at cue time.
             local light = Instance.new("PointLight")
             light.Brightness = 6
@@ -295,6 +298,7 @@ end)
 -- (live-tunable via the "CamPhaseDeg" attribute, degrees). Everything else is sold by the cam
 -- PROFILE, not by coupling. CAM_DIR flips the spin direction.
 local CAM_DIR = 1
+local DRIVER_DIR = 1 -- sign of the driver gear + main shaft about Z (live-tunable "DriverDir")
 RunService.Heartbeat:Connect(function()
     if #camSpinners == 0 then
         captureSpinners() -- parts hadn't replicated at init; keep trying until they do
@@ -311,10 +315,16 @@ RunService.Heartbeat:Connect(function()
     for _, s in camSpinners do
         s.part.CFrame = s.pivotCF * rot * s.pivotCF:Inverse() * s.restCF
     end
-    local drot = CFrame.Angles(0, 0, -camNet * REDUCTION) -- driver gear + main shaft turn with the cam
+    -- Driver gear + main shaft are CO-AXIAL with the waterwheel (one N-S shaft), so they
+    -- turn at the cam rate × REDUCTION. We publish that shaft's signed angular velocity so
+    -- WheelController can LOCK the wheel to it (matched rate + direction) instead of
+    -- free-spinning at its own constant. DRIVER_DIR flips the whole shaft live.
+    local driverDir = (stage:GetAttribute("DriverDir") :: number) or DRIVER_DIR
+    local drot = CFrame.Angles(0, 0, driverDir * camNet * REDUCTION)
     for _, s in driverSpinners do
         s.part.CFrame = s.pivotCF * drot * s.pivotCF:Inverse() * s.restCF
     end
+    stage:SetAttribute("DriveOmega", driverDir * CAM_DIR * camOmega * REDUCTION) -- rad/s about Z, for the wheel
 end)
 
 -- Chains + drive rope FOLLOW the log every frame, whether the log is posed by

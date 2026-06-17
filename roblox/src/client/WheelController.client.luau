@@ -45,11 +45,17 @@ if driver then
 end
 
 local angle = 0
+local FALLBACK_OMEGA = 0.5 -- rad/s until HammerController publishes the real shaft rate (signed for WHEEL_DIR below)
+local WHEEL_DIR = -1 -- maps the published shaft ω onto the wheel's local axle (live-tunable "WheelDir")
 
 RunService.Heartbeat:Connect(function(dt)
-    -- Undershot: the river current (+X, draining the in-fall pool) pushes the lower
-    -- paddles downstream, turning the wheel NEGATIVELY about its axle (local X).
-    angle -= dt * 0.9
+    -- The wheel IS the driver gear's shaft, so it turns at the EXACT angular velocity the
+    -- bell-engine drive publishes ("DriveOmega", rad/s about Z) — matched rate + direction,
+    -- not a free constant that out-runs the gears. WHEEL_DIR corrects the wheel's local axle
+    -- orientation; flip it (or "DriverDir") live to fix the spin direction.
+    local driveOmega = (stage:GetAttribute("DriveOmega") :: number) or FALLBACK_OMEGA
+    local wheelDir = (stage:GetAttribute("WheelDir") :: number) or WHEEL_DIR
+    angle += dt * driveOmega * wheelDir
     for _, s in spins do
         local spun = s.hub * CFrame.Angles(angle, 0, 0)
         s.part.CFrame = spun

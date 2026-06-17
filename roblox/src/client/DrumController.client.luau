@@ -77,15 +77,20 @@ end
 -- hub's local X (= the drum's world-Z axle after the yaw). A face k sits at the −Z
 -- window when θ ≡ 180° + k*60° (mod 360°); faces k and k+3 share a glyph so any symbol
 -- recurs every 180° (π). θ is never reset, so rest is always a true detent.
-local DRUM_KICK = 14 -- rad/s impulse the strike imparts to the drum
-local SPINUP_TURNS = 3 -- it spins ~this many turns before settling on the face
+local DRUM_KICK = 4 -- rad/s the drum spins at during the constant phase (live-tunable via "DrumKick" attr)
+local SPIN_SEC = 1.0 -- the drum spins at a steady speed for this long after the strike…
+local GLIDE_SEC = 2.0 -- …then eases smoothly to rest on the World Throw over this long
 local KICK_DUR = 0.5 -- seconds the pin-wheel flick (a half turn) takes
 
 local theta = 0 -- continuous hub angle (radians); decreases as the drum spins
-local omega = 0 -- current angular speed (rad/s)
-local mode = "hold" -- "hold" | "land"
-local landTheta = 0 -- target θ (a detent) once landing
-local landDecel = 0 -- constant angular deceleration (rad/s²) during landing
+local omega = 0 -- steady spin speed (rad/s) captured at the strike; reused as the glide's start velocity
+local mode = "hold" -- "hold" | "spin" | "glide"
+local spinUntil = 0 -- os.clock() at which the steady spin ends and the glide begins
+local glideT0 = 0 -- os.clock() when the glide began
+local glideP0 = 0 -- θ at the glide's start
+local glideD = 0 -- total θ the glide travels (glideP0 → landTheta)
+local landTheta = 0 -- target θ (a detent showing the World Throw) the glide ends on
+local strikeT0 = -1 -- os.clock() of the current strike; for the stuck-guard on ACTIVE
 local latestWorldThrow: string? = nil
 
 -- PIN-WHEEL parts that flick on the strike (BellDrive). The kick shaft + gear A turn
@@ -103,10 +108,11 @@ local function addKick(name: string, px: number, pz: number, sign: number)
         )
     end
 end
-addKick("VertShaft", 1, 6, 1)
-addKick("DriveGearA", 1, 6, 1)
-addKick("DriveGearB", -1.18, 7, -1)
-addKick("DrivePaddle", -1.18, 7, -1)
+addKick("VertShaft", 1, 6, -1)
+addKick("VertPaddle", 1, 6, -1) -- the paddle the kick dowel strikes — turns with the kick shaft
+addKick("DriveGearA", 1, 6, -1)
+addKick("DriveGearB", -1.18, 7, 1)
+addKick("DrivePaddle", -1.18, 7, 1)
 local kickT0 = -1 -- os.clock() when the flick started; <0 = idle
 local kickBase = 0 -- accumulated flick angle (the pawl ratchets one half-turn per strike)
 local function applyKick(angle: number)
@@ -138,17 +144,35 @@ end
 applyTheta()
 
 RunService.Heartbeat:Connect(function(dt)
-    if mode == "land" then
-        -- kicked at DRUM_KICK, decelerating constantly so ω hits 0 exactly as θ
-        -- reaches the detent → spin-up-then-settle on the World Throw, no snap.
-        omega -= landDecel * dt
-        if omega <= 0 or theta <= landTheta then
+    if mode == "spin" then
+        -- steady spin for SPIN_SEC; then hand off to the glide on the next branch.
+        theta -= omega * dt
+        if os.clock() >= spinUntil then
+            -- set up the glide: pick the World-Throw detent nearest the natural
+            -- ease-out distance (ω·T/2, the constant-decel reach), then land on it
+            -- exactly via a cubic that starts at the spin velocity ω and ends at 0.
+            local throw = latestWorldThrow or "rock"
+            landTheta = landTargetFor(throw, omega * GLIDE_SEC / 2)
+            glideP0 = theta
+            glideD = theta - landTheta
+            glideT0 = os.clock()
+            mode = "glide"
+        end
+        applyTheta()
+    elseif mode == "glide" then
+        -- cubic Hermite over GLIDE_SEC: p(s) = p0 − D·(3s²−2s³) − ω·T·(s³−2s²+s).
+        -- p'(0) = −ω (continuous with the spin), p'(T) = 0 (rests on the detent),
+        -- p(T) = landTheta exactly → a smooth glide to the World Throw, no snap.
+        local s = (os.clock() - glideT0) / GLIDE_SEC
+        if s >= 1 then
             theta = landTheta -- settle exactly on the detent
             omega = 0
             mode = "hold"
             EventBus.Cue:Fire({ kind = "drumRest" }) -- the throw may now be revealed
         else
-            theta -= omega * dt
+            theta = glideP0
+                - glideD * (3 * s * s - 2 * s * s * s)
+                - omega * GLIDE_SEC * (s * s * s - 2 * s * s + s)
         end
         applyTheta()
     end
@@ -171,30 +195,41 @@ RevealTheater.OnClientEvent:Connect(function(reveal)
 end)
 
 RoundUpdate.OnClientEvent:Connect(function(info)
-    -- Safety: a fresh ACTIVE means the previous round is well over; if a landing was
-    -- somehow left running (e.g. a dropped reveal), settle to hold on the last face.
-    if info.phase == "ACTIVE" and mode ~= "hold" then
-        omega = 0
-        mode = "hold"
+    -- Stuck-guard: the spin+glide is a deterministic ~4s, so it normally finishes on
+    -- its own (a touch into this fresh ACTIVE — fine, the next strike is a round away).
+    -- Only step in if it's clearly OVERDUE (stalled), and only then snap to the throw
+    -- detent — never cut a glide that's still gracefully running.
+    if info.phase == "ACTIVE" and mode ~= "hold" and strikeT0 >= 0 then
+        if os.clock() - strikeT0 > SPIN_SEC + GLIDE_SEC + 1 then
+            if latestWorldThrow then
+                landTheta = landTargetFor(latestWorldThrow, 0)
+            end
+            theta = landTheta
+            omega = 0
+            mode = "hold"
+            applyTheta()
+        end
     end
 end)
 
 EventBus.Cue.Event:Connect(function(cue)
-    -- The drum is at rest until the STRIKE. (latchClick is ignored now — no TALLY
-    -- drumroll; the drum only moves when the dowel kicks the pin-wheel.)
-    if cue.kind == "gongStrike" then
+    -- The drum is at rest until CONTACT. We key off "gongHit" (fired at the swing's end,
+    -- when the log actually reaches the bell and the dowel meets the paddle) — NOT
+    -- "gongStrike" (the swing's start), so the drum spins on the strike, not before it.
+    if cue.kind == "gongHit" then
         local throw = latestWorldThrow
         if not throw then
             return -- nothing authoritative yet; stay at rest on the prior face
         end
-        -- The kick: impulse the drum to DRUM_KICK, pick the World Throw detent ~SPINUP_TURNS
-        -- ahead, and solve the constant decel that lands ω at 0 exactly there.
-        omega = DRUM_KICK
-        local dmin = SPINUP_TURNS * 2 * math.pi
-        landTheta = landTargetFor(throw, dmin)
-        local dist = theta - landTheta
-        landDecel = (omega * omega) / (2 * dist)
-        mode = "land"
+        -- The kick: spin the drum at a steady DRUM_KICK for SPIN_SEC, then glide to the
+        -- World Throw over GLIDE_SEC (handled in the heartbeat). The motion is a fixed
+        -- ~4s regardless of speed, so the landing is deterministic; `throw` is bound now
+        -- so the glide targets the right detent even if a later reveal arrives.
+        latestWorldThrow = throw
+        omega = (stage:GetAttribute("DrumKick") :: number) or DRUM_KICK
+        spinUntil = os.clock() + SPIN_SEC
+        strikeT0 = os.clock()
+        mode = "spin"
         kickT0 = os.clock() -- flick the pin-wheel in lockstep
     end
 end)

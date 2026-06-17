@@ -139,7 +139,7 @@ describe("ArenaLayout bell engine", function()
         expect(d.camShaftTo[1] - d.camShaftFrom[1] > 5).toBe(true) -- a real E-W run, pointing East
         expect(d.camShaftFrom[3] > 5.5).toBe(true) -- South of the bell (z-span ±5), clear of it
         expect(math.abs(d.camShaftFrom[3] - L.shuMoku.restPos[3]) < 4).toBe(true) -- aimed at the shu-moku
-        expect(d.camR > d.driverR * 2).toBe(true) -- big reduction (cam shaft creeps once/round)
+        expect(d.camR > d.driverR * 1.7).toBe(true) -- cam gear clearly the bigger reduction gear (gate-tuned ~1.9:1)
     end)
     test("kick shaft carries the paddle at the shu-moku swing level (decoupled from the drum)", function()
         local d = L.bellDrive
