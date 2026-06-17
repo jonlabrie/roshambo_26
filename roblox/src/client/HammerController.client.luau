@@ -84,17 +84,15 @@ end
 -- counter-rotates at the reduction — selling the linkage as causal (theatre, not
 -- physics). Axle geometry mirrors ArenaLayout.bellDrive.
 local bell = stage:WaitForChild("BellDrive")
-local CAM_DIR = 1 -- cam-shaft spin direction (flip to reverse the cam + its gear)
--- cam mounting offset on the shaft (rotates the lobe/drop to the right clock position).
--- Tuning frame: viewed from EAST looking WEST, +angle = anti-clockwise (rotation about +X).
-local CAM_PHASE = math.rad(69) -- high point lands on the dowel at full pullback (tuned); East-looking-West frame
--- The cam makes ONE continuous revolution per round (the wheel never stops, so the
--- drive train free-runs — NOT gated by the draw). Round length isn't in the payload,
--- so we measure it (ACTIVE→ACTIVE) and set ω = 2π/period; this default holds round 1.
+-- The cam is mechanically COUPLED to the draw (see the coupled-cam heartbeat below); it
+-- no longer free-runs. camOmega is the measured round rate, kept only to time the DRAW
+-- ramp (p = elapsed/period). Round length isn't in the payload, so we measure it
+-- (ACTIVE→ACTIVE) and set ω = 2π/period; this default holds round 1.
 local camOmega = 2 * math.pi / 22 -- rad/s (≈ once per 22s until measured)
 local CAM_AXLE_YZ = Vector2.new(116, 11) -- E-W cam shaft: world-X axis through (y116, z11)
 local MAIN_AXLE_XY = Vector2.new(-15, 116) -- N-S main shaft: world-Z axis through (x-15, y116)
 local REDUCTION = 2 -- driver gear turns this much faster than the cam (integer → wraps seamlessly each round)
+local CAM_PHASE_DEG = 0 -- fine-tune offset for the high point at the strike (0 = peak exactly on the dowel)
 
 -- Each spinner: { part, restCF, pivotCF, axis } where axis ∈ {"X","Z"}; we rotate the
 -- rest pose about the world axle line through pivotCF each frame.
@@ -153,9 +151,15 @@ end
 
 local striking = false
 local prevRoundId: any = nil -- to detect each new round and measure its period
-local lastActiveAt: number? = nil -- start of the CURRENT round's ACTIVE (cam + draw anchor)
-local camAngle = 0 -- the cam's live spin angle (shared so the strike can sample it)
-local lastStrikeCamAngle = 0 -- cam angle captured at the last strike (for freeze-to-tune)
+local lastActiveAt: number? = nil -- start of the CURRENT round's ACTIVE (draw ramp anchor)
+local omegaLocked = false -- freeze the rate after one good sample (constant ω between strikes)
+-- The cam is anchored to the RELEASE (strike) event, not ACTIVE: at each strike we set its
+-- orientation so the high point is exactly on the dowel, then it free-runs at camOmega until
+-- the next strike. This makes the high point meet the dowel at EVERY release regardless of
+-- the independent network jitter between the ACTIVE and reveal events. anchorNet = cam net
+-- rotation pinned at the last strike; anchorAt = when.
+local anchorNet: number? = nil
+local anchorAt: number? = nil
 
 RoundUpdate.OnClientEvent:Connect(function(info)
     if info.phase == "ACTIVE" then
@@ -163,15 +167,15 @@ RoundUpdate.OnClientEvent:Connect(function(info)
         if info.roundId ~= prevRoundId then
             prevRoundId = info.roundId
             local nowc = os.clock()
-            -- Re-measure the round period EVERY round (ACTIVE→ACTIVE) and re-anchor here.
-            -- Re-anchoring each round means the cam re-zeroes per round → NO accumulated
-            -- drift (the previous first-ACTIVE anchor drifted ~100°/long session). The cam
-            -- completes ~one rev per round, so its orientation at the pullback-top is
-            -- repeatable and the dowel alignment holds.
-            if lastActiveAt then
+            -- Measure the period ONCE (ACTIVE→ACTIVE), then FREEZE the rate. Re-measuring
+            -- every round let tiny period jitter wobble the cam's accumulated angle by the
+            -- strike (~±10°). A constant ω + the per-round re-anchor below = stable strike
+            -- orientation (no wobble) AND no long-term drift.
+            if lastActiveAt and not omegaLocked then
                 local period = nowc - lastActiveAt
                 if period > 5 and period < 120 then -- ignore restarts / outliers
                     camOmega = 2 * math.pi / period
+                    omegaLocked = true
                 end
             end
             lastActiveAt = nowc
@@ -182,7 +186,13 @@ end)
 EventBus.Cue.Event:Connect(function(cue)
     if cue.kind == "gongStrike" then
         striking = true
-        lastStrikeCamAngle = camAngle -- remember the cam's pose at the strike (freeze-to-tune)
+        -- Pin the cam so its high point is on the dowel at THIS release. The high point
+        -- points along the cam's net rotation, so set net = the dowel's current world-angle
+        -- about the axle (+ a small fine-tune offset). It free-runs from here until the next.
+        local dp = dowels[1].Position
+        local fineDeg = (stage:GetAttribute("CamPhaseDeg") :: number) or CAM_PHASE_DEG
+        anchorNet = math.atan2(dp.Z - 11, dp.Y - 116) + math.rad(fineDeg)
+        anchorAt = os.clock()
         -- Stage 1: swing forward (toward the bell = -BACK) to overshoot into it.
         local swing = TweenService:Create(
             arm,
@@ -256,7 +266,7 @@ end)
 -- still climbing when the strike interrupts it — so there is NO dwell/pause at the top.
 -- p ramps 0→1 across the whole round period; the strike (gongStrike) always fires before
 -- the round ends, so p is mid-climb at release and the swing takes over seamlessly.
-local DRAW_STUDS = 2.9 -- South draw at p=1 (tuned so the dowel rests on the cam high point)
+local DRAW_STUDS = 4.06 -- South draw at p=1 (tuned so the dowel rests on the cam high point at the strike)
 RunService.Heartbeat:Connect(function()
     -- DRAW HOLD (tuning): while the "DrawHold" attribute is set, pin the log at FULL draw
     -- (p=1, the top of its travel) and ignore the strike — so we can park the dowel at its
@@ -278,36 +288,30 @@ RunService.Heartbeat:Connect(function()
     arm.CFrame = CFrame.new(BACK * drawZ + Vector3.new(0, riseY, 0)) * restCFrame
 end)
 
--- Cam + gear-down run CONTINUOUSLY off the wheel — they never stop (the draw value
--- plateaus while the log is latched, so the mechanism must NOT be gated by it). The cam
--- (and cam gear) rotate about the E-W shaft (world X); the driver gear + main shaft
--- counter-rotate about the main shaft (world Z) at the reduction, so the mesh reads
--- correct. A free-running angle accumulates every frame regardless of phase.
+-- CONSTANT-SPEED cam. The cam turns continuously at the round rate (camOmega = 2π/period),
+-- anchored to the CURRENT round's ACTIVE so it re-zeroes each round (no accumulated drift)
+-- and reaches the SAME orientation at the strike every round. The ONLY timing constraint is
+-- that the high point is on the dowel at the moment of release (the strike) — set by CAM_PHASE
+-- (live-tunable via the "CamPhaseDeg" attribute, degrees). Everything else is sold by the cam
+-- PROFILE, not by coupling. CAM_DIR flips the spin direction.
+local CAM_DIR = 1
 RunService.Heartbeat:Connect(function()
     if #camSpinners == 0 then
         captureSpinners() -- parts hadn't replicated at init; keep trying until they do
     end
-    -- Anchored to the CURRENT round's ACTIVE (re-zeroed each round → no accumulated drift).
-    -- At the measured rate (2π/period) the cam does ~one rev/round and lands at the same
-    -- orientation at the pullback-top every round, so the dowel alignment (CAM_PHASE / the
-    -- live "CamPhaseDeg" attribute) holds. Wraps at 2π → seamless when the period is steady.
-    -- FREEZE-TO-TUNE: while the "CamTuneFreeze" attribute is set, hold the cam at its last
-    -- strike pose so the pullback-top orientation can be seen and dialed; clear it to resume.
-    if stage:GetAttribute("CamTuneFreeze") then
-        camAngle = lastStrikeCamAngle
+    -- Free-run at constant speed FROM the last release anchor (so the high point is on the
+    -- dowel at each strike, by construction). Before the first strike, free-run from ACTIVE.
+    local camNet
+    if anchorNet and anchorAt then
+        camNet = anchorNet + CAM_DIR * camOmega * (os.clock() - anchorAt)
     else
-        camAngle = camOmega * (os.clock() - (lastActiveAt or os.clock()))
+        camNet = CAM_DIR * camOmega * (os.clock() - (lastActiveAt or os.clock()))
     end
-    local phase = CAM_PHASE
-    local override = stage:GetAttribute("CamPhaseDeg")
-    if typeof(override) == "number" then
-        phase = math.rad(override)
-    end
-    local rot = CFrame.Angles(CAM_DIR * camAngle + phase, 0, 0)
+    local rot = CFrame.Angles(camNet, 0, 0)
     for _, s in camSpinners do
         s.part.CFrame = s.pivotCF * rot * s.pivotCF:Inverse() * s.restCF
     end
-    local drot = CFrame.Angles(0, 0, CAM_DIR * camAngle * REDUCTION) -- driver gear: faster, at the reduction
+    local drot = CFrame.Angles(0, 0, -camNet * REDUCTION) -- driver gear + main shaft turn with the cam
     for _, s in driverSpinners do
         s.part.CFrame = s.pivotCF * drot * s.pivotCF:Inverse() * s.restCF
     end

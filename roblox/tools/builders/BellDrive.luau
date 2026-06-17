@@ -60,17 +60,35 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             Material = "Metal",
         })
     )
-    -- SNAIL (scroll) draw cam, profile in the Y-Z plane on the X cam shaft. The radius
-    -- climbs from baseR to peakR over one full turn (the gradual draw as the follower
-    -- rides out), then drops sharply back to baseR (the trip). Built faceted: a base
-    -- circle (Cam) + a fan of thin radial "shell" planks (CamSpiralN) whose outer tips
-    -- trace the spiral, + a radial drop wall (CamDrop) at the step. All named ^Cam so
-    -- the controller spins them together about the cam shaft. Stylized but in-pipeline.
-    local thick = 0.6 -- axial thickness (along X) — half the previous
-    local baseR, peakR = d.camHubR, d.camLobeR
+    -- SNAIL draw cam, profile in the Y-Z plane on the X cam shaft. The rising FLANK is
+    -- shaped to the shu-moku draw dowel's MEASURED path, so the dowel rides the edge up
+    -- without intersecting; at the peak it reaches the SHARP DROP WALL and falls off, so the
+    -- log free-falls into the bell. Local angle 0° = +Y = the peak/release. FLANK[] is the
+    -- measured edge radius every 15° down the draw flank (0→225°); a dwell (base circle) fills
+    -- 225→DROP0; the drop wall (DROP0→360°, base→peak) is the steep release face. Faceted
+    -- radial planks, all named ^Cam so the controller spins them about the cam shaft.
+    local thick = 0.6 -- axial thickness (along X)
+    local baseR = d.camHubR
     local cx, cy, cz = d.cam[1], d.cam[2], d.cam[3]
-    local WIND = -1 -- spiral handedness: which way the radius climbs (flip to reverse the cam)
-    -- a part whose LOCAL X points radially at angle θ (from +Y, toward +Z), local Z = axle
+    -- measured edge radius at local 0,15,…,225° (the draw flank; falls peak→near-base)
+    local FLANK =
+        { 3.99, 3.81, 3.63, 3.45, 3.28, 3.11, 2.94, 2.78, 2.62, 2.46, 2.31, 2.17, 2.04, 1.93, 1.84, 1.78 }
+    local TIGHTEN = 0.25 -- shave half the dowel diameter off the edge all around (tighter fit)
+    local PEAK = FLANK[1] - TIGHTEN
+    local DROP0 = 345 -- the drop wall spans DROP0..360° (base → peak): the sharp free-fall face
+    local function profileR(deg: number): number
+        if deg <= 225 then -- gradual draw flank: interpolate the measured curve (shaved)
+            local i = math.floor(deg / 15)
+            local f = (deg - i * 15) / 15
+            local a = FLANK[i + 1]
+            local b = FLANK[math.min(i + 2, #FLANK)]
+            return (a + (b - a) * f) - TIGHTEN
+        elseif deg >= DROP0 then -- sharp drop wall (free-fall face)
+            return baseR + (PEAK - baseR) * (deg - DROP0) / (360 - DROP0)
+        else -- dwell at the base circle
+            return baseR
+        end
+    end
     local function plankRot(theta: number): { number }
         local c, s = math.cos(theta), math.sin(theta)
         return { 0, 0, 1, c, -s, 0, s, c, 0 } -- columns: X=(0,c,s) Y=(0,-s,c) Z=(1,0,0)
@@ -78,26 +96,26 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
     table.insert(
         children,
         Spec.part("Cam", {
-            Size = { thick, baseR * 2, baseR * 2 }, -- base circle (the dwell / min radius)
+            Size = { thick, baseR * 2, baseR * 2 }, -- base circle (hub / dwell radius)
             Shape = "Cylinder",
             CFrame = Spec.cframe(d.cam),
             Color = timber,
             Material = "Wood",
         })
     )
-    local N = 144 -- fine facets → the spiral reads smooth
-    local plankW = (2 * math.pi * peakR / N) + 0.3 -- chord at the rim + overlap, so facets meet
-    for i = 1, N do
-        local frac = i / N
-        local theta = 2 * math.pi * frac * WIND
-        local rI = baseR + (peakR - baseR) * frac
-        local len = rI - baseR
-        if len > 0.1 then
-            local midR = (baseR + rI) / 2
+    local STEP = 3 -- degrees per facet
+    local plankW = (2 * math.pi * PEAK * STEP / 360) + 0.25 -- chord at the rim + overlap
+    local n = 0
+    for deg = 0, 360 - STEP, STEP do
+        local r = profileR(deg)
+        if r > baseR + 0.03 then
+            local theta = math.rad(deg)
+            local midR = (baseR + r) / 2
+            n += 1
             table.insert(
                 children,
-                Spec.part(`CamSpiral{i}`, {
-                    Size = { len + 0.25, plankW, thick }, -- radial length × angular width × axial
+                Spec.part(`CamEdge{n}`, {
+                    Size = { (r - baseR) + 0.2, plankW, thick }, -- radial length × angular width × axial
                     CFrame = Spec.cframe(
                         { cx, cy + math.cos(theta) * midR, cz + math.sin(theta) * midR },
                         plankRot(theta)
@@ -108,16 +126,6 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             )
         end
     end
-    -- the sharp drop wall (release face): a radial plank from baseR→peakR at the step
-    table.insert(
-        children,
-        Spec.part("CamDrop", {
-            Size = { peakR - baseR, 0.7, thick },
-            CFrame = Spec.cframe({ cx, cy + (baseR + peakR) / 2, cz }, plankRot(0)),
-            Color = timber,
-            Material = "Wood",
-        })
-    )
     -- vertical drum shaft + the paddle the dowel kicks
     local vp, vlen = Spec.segment(d.vertBase, d.vertTop)
     table.insert(
