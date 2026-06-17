@@ -1,12 +1,11 @@
 --!strict
--- Drives the hexagonal World-Throw drum atop the shōrō (spec §4b). It HOLDS the
--- prior round's throw through ACTIVE+lockout; on TALLY it free-cycles a rapid
--- drumroll (target unknown); on the bell strike (`gongStrike` cue at REVEAL) it
--- snaps onto the actual World Throw via DrumStep.landingStep and locks — that
--- becomes the next round's "prior". Mirrors WheelController's offset-capture +
--- phase/cue handling. Symbol SurfaceGuis are attached here at runtime (the face
--- frame rotates with the drum, so orientation is a runtime concern; the builder
--- only ships the timber slabs). 4b refines visuals.
+-- Drives the hexagonal World-Throw drum atop the shōrō (spec §4b). It RESTS through
+-- ACTIVE + TALLY showing the prior round's throw; on the bell strike (`gongStrike` cue
+-- at REVEAL) the shu-moku's dowel flicks the pin-wheel and the drum is kicked into a
+-- fast spin that decelerates to rest on the actual World Throw — that becomes the next
+-- round's "prior". Offset-capture pattern (cf. WheelController). Symbol SurfaceGuis are
+-- attached here at runtime (the face frame rotates with the drum, so orientation is a
+-- runtime concern; the builder only ships the timber slabs). 4b refines visuals.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
@@ -71,27 +70,51 @@ for k = 0, 5 do
     label.Parent = gui
 end
 
--- MOTION (continuous, cue-anchored). The drum spins about the hub's local X by a
--- continuous angle θ (decreasing). It does NOT use the round's TALLY phase — that
--- arrives via REST polling and the 2s window is often skipped/late, which is why
--- the old stepper "only span ~0.5s then jarred". Instead it anchors to the two
--- RELIABLE EventBus cues the hammer drives off the clock:
---   • latchClick (lockout)  → start a slow spin that gently decelerates
---   • gongStrike (reveal)   → decelerate to rest on the World Throw (no snap)
--- A face k sits at the −Z window when θ ≡ 180° + k*60° (mod 360°). Because face
--- k and k+3 share a glyph, any one symbol recurs every 180° (π) of θ. θ is never
--- reset, so the rest pose is always a true detent (never an edge).
-local SPIN_OMEGA0 = 5.0 -- rad/s at lockout (≈ a relaxed half-turn/sec drumroll)
-local SPIN_DAMP = 0.45 -- per-second exponential slow-down while spinning
-local SPIN_FLOOR = 2.0 -- keep drifting this fast until the strike lands it
-local GLIDE = 1.3 -- nominal seconds the landing glide should take to rest
+-- MOTION (strike-keyed). The drum RESTS through ACTIVE + TALLY (showing the prior
+-- throw). On the bell strike the shu-moku's east-flank dowel flicks the pin-wheel
+-- (kick shaft → gears A/B → paddle beam → a drum spoke); the drum is kicked into a
+-- fast spin and then DECELERATES to rest on the actual World Throw. Spin is about the
+-- hub's local X (= the drum's world-Z axle after the yaw). A face k sits at the −Z
+-- window when θ ≡ 180° + k*60° (mod 360°); faces k and k+3 share a glyph so any symbol
+-- recurs every 180° (π). θ is never reset, so rest is always a true detent.
+local DRUM_KICK = 14 -- rad/s impulse the strike imparts to the drum
+local SPINUP_TURNS = 3 -- it spins ~this many turns before settling on the face
+local KICK_DUR = 0.5 -- seconds the pin-wheel flick (a half turn) takes
 
 local theta = 0 -- continuous hub angle (radians); decreases as the drum spins
 local omega = 0 -- current angular speed (rad/s)
-local mode = "hold" -- "hold" | "spin" | "land"
+local mode = "hold" -- "hold" | "land"
 local landTheta = 0 -- target θ (a detent) once landing
 local landDecel = 0 -- constant angular deceleration (rad/s²) during landing
 local latestWorldThrow: string? = nil
+
+-- PIN-WHEEL parts that flick on the strike (BellDrive). The kick shaft + gear A turn
+-- about the kick-shaft axis (x=1,z=6); gear B + the paddle beam turn the opposite way
+-- (1:1) about gear B's axis (x=-1.18,z=7), so the paddle sweeps and flicks the drum
+-- spoke. Geometry mirrors ArenaLayout.bellDrive (build-time; keep in sync).
+local bell = stage:WaitForChild("BellDrive")
+local kickParts: { any } = {}
+local function addKick(name: string, px: number, pz: number, sign: number)
+    local p = bell:FindFirstChild(name)
+    if p and p:IsA("BasePart") then
+        table.insert(
+            kickParts,
+            { part = p, restCF = p.CFrame, restY = p.Position.Y, px = px, pz = pz, sign = sign }
+        )
+    end
+end
+addKick("VertShaft", 1, 6, 1)
+addKick("DriveGearA", 1, 6, 1)
+addKick("DriveGearB", -1.18, 7, -1)
+addKick("DrivePaddle", -1.18, 7, -1)
+local kickT0 = -1 -- os.clock() when the flick started; <0 = idle
+local kickBase = 0 -- accumulated flick angle (the pawl ratchets one half-turn per strike)
+local function applyKick(angle: number)
+    for _, k in kickParts do
+        local piv = CFrame.new(k.px, k.restY, k.pz)
+        k.part.CFrame = piv * CFrame.Angles(0, k.sign * angle, 0) * piv:Inverse() * k.restCF
+    end
+end
 
 local function applyTheta()
     local spun = hub * CFrame.Angles(theta, 0, 0)
@@ -115,13 +138,9 @@ end
 applyTheta()
 
 RunService.Heartbeat:Connect(function(dt)
-    if mode == "spin" then
-        omega = math.max(SPIN_FLOOR, omega * (1 - SPIN_DAMP * dt))
-        theta -= omega * dt
-        applyTheta()
-    elseif mode == "land" then
-        -- constant deceleration continuing from the live spin speed: no jump,
-        -- ω falls to 0 exactly as θ reaches the detent.
+    if mode == "land" then
+        -- kicked at DRUM_KICK, decelerating constantly so ω hits 0 exactly as θ
+        -- reaches the detent → spin-up-then-settle on the World Throw, no snap.
         omega -= landDecel * dt
         if omega <= 0 or theta <= landTheta then
             theta = landTheta -- settle exactly on the detent
@@ -133,6 +152,17 @@ RunService.Heartbeat:Connect(function(dt)
         end
         applyTheta()
     end
+    -- pin-wheel flick: a half-turn eased out over KICK_DUR, then held (ratcheted).
+    if kickT0 >= 0 then
+        local prog = (os.clock() - kickT0) / KICK_DUR
+        if prog >= 1 then
+            applyKick(kickBase + math.pi)
+            kickBase += math.pi
+            kickT0 = -1
+        else
+            applyKick(kickBase + math.pi * (1 - (1 - prog) * (1 - prog))) -- ease-out
+        end
+    end
     -- "hold": faces stay put (showing the prior throw); no per-frame work needed
 end)
 
@@ -141,33 +171,30 @@ RevealTheater.OnClientEvent:Connect(function(reveal)
 end)
 
 RoundUpdate.OnClientEvent:Connect(function(info)
-    -- Safety: a fresh ACTIVE means the previous round is well over; stop any spin
-    -- still running (e.g. a dropped reveal) and hold the last face.
-    if info.phase == "ACTIVE" and mode == "spin" then
+    -- Safety: a fresh ACTIVE means the previous round is well over; if a landing was
+    -- somehow left running (e.g. a dropped reveal), settle to hold on the last face.
+    if info.phase == "ACTIVE" and mode ~= "hold" then
+        omega = 0
         mode = "hold"
     end
 end)
 
 EventBus.Cue.Event:Connect(function(cue)
-    if cue.kind == "latchClick" then
-        -- picks closed: the world spins up its decision.
-        omega = SPIN_OMEGA0
-        mode = "spin"
-    elseif cue.kind == "gongStrike" then
+    -- The drum is at rest until the STRIKE. (latchClick is ignored now — no TALLY
+    -- drumroll; the drum only moves when the dowel kicks the pin-wheel.)
+    if cue.kind == "gongStrike" then
         local throw = latestWorldThrow
         if not throw then
-            return -- nothing authoritative yet; keep spinning/holding
+            return -- nothing authoritative yet; stay at rest on the prior face
         end
-        -- Pick a detent at least far enough ahead to glide into at the current
-        -- speed (ω·GLIDE/2 is the constant-decel stopping distance), but never a
-        -- snap-short quarter turn. Then solve the decel that lands ω at 0 there.
-        if omega < SPIN_FLOOR then
-            omega = SPIN_FLOOR -- ensure a live speed to decelerate from
-        end
-        local dmin = math.max(omega * GLIDE * 0.5, math.rad(90))
+        -- The kick: impulse the drum to DRUM_KICK, pick the World Throw detent ~SPINUP_TURNS
+        -- ahead, and solve the constant decel that lands ω at 0 exactly there.
+        omega = DRUM_KICK
+        local dmin = SPINUP_TURNS * 2 * math.pi
         landTheta = landTargetFor(throw, dmin)
         local dist = theta - landTheta
         landDecel = (omega * omega) / (2 * dist)
-        mode = "land" -- decelerate to rest on the throw (no snap)
+        mode = "land"
+        kickT0 = os.clock() -- flick the pin-wheel in lockstep
     end
 end)
