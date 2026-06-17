@@ -189,13 +189,14 @@ local ArenaLayout = {
         -- E–W CAM SHAFT: along X at the shu-moku tail (z=11, between the tower posts at
         -- z=9 and the gantry at z=13; South of the bell), pointed East at the log.
         camShaftFrom = { -15, 116, 11 },
-        camShaftTo = { -4, 116, 11 },
+        camShaftTo = { -3.5, 116, 11 }, -- extended East ~0.5 so the cam reaches into the draw dowel's plane
         camShaftR = 0.6,
-        -- single-lobe cam on the X cam shaft (turns about X at `cam` once per round): a
-        -- hub disc + one protruding lobe with enough throw to draw the dowel.
-        cam = { -4, 116, 11 },
-        camHubR = 2, -- cam body (hub) radius
-        camLobeR = 5.5, -- single lobe reaches this far from the axle — the draw throw
+        -- snail draw cam on the X cam shaft (turns about X at `cam` once per round).
+        -- ~30% smaller; the draw is faked in the controller, so cam size is visual —
+        -- contact with the dowel is tuned at the gate. Sits within the dowel span (x[-4..-1.5]).
+        cam = { -3.5, 116, 11 },
+        camHubR = 1.4, -- cam body (hub / base-circle) radius
+        camLobeR = 3.85, -- snail peak reaches this far from the axle — the draw throw
         -- KICK shaft + paddle (drum kick), just East/South of the shu-moku, by the kick
         -- dowel's tip (x=1, z=6) and clear of the bell (z>5.1) and posts. Capped UNDER
         -- the roof — it no longer runs up through the drum (drum is centred elsewhere);

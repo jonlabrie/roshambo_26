@@ -78,6 +78,53 @@ for i, d in dowels do
     dowelRest[i] = d.CFrame
 end
 
+-- ===== Bell-engine drive train (cam + gear-down) =====
+-- The river wheel's main shaft → bevel gear-down → E-W cam shaft → single-lobe cam
+-- that draws the shu-moku. We rotate these parts off the SAME draw value `p` the log
+-- uses, so the cam visibly creeps the log back through ACTIVE and the gear pair
+-- counter-rotates at the reduction — selling the linkage as causal (theatre, not
+-- physics). Axle geometry mirrors ArenaLayout.bellDrive.
+local bell = stage:FindFirstChild("BellDrive")
+local CAM_DRAW_DEG = 150 -- cam sweep over the full draw (tuned live)
+local CAM_AXLE_YZ = Vector2.new(116, 11) -- E-W cam shaft: world-X axis through (y116, z11)
+local MAIN_AXLE_XY = Vector2.new(-15, 116) -- N-S main shaft: world-Z axis through (x-15, y116)
+local REDUCTION = 3.6 / 1.6 -- camR / driverR: the driver gear turns this much faster
+
+-- Each spinner: { part, restCF, pivotCF, axis } where axis ∈ {"X","Z"}; we rotate the
+-- rest pose about the world axle line through pivotCF each frame.
+local camSpinners = {} -- rotate with the cam (about X), angle = p * CAM_DRAW_DEG
+local driverSpinners = {} -- the fast driver gear (about Z), counter + at the reduction
+local function addCamPart(name: string)
+    local part = bell and bell:FindFirstChild(name)
+    if part and part:IsA("BasePart") then
+        table.insert(camSpinners, {
+            part = part,
+            restCF = part.CFrame,
+            pivotCF = CFrame.new(part.Position.X, CAM_AXLE_YZ.X, CAM_AXLE_YZ.Y),
+        })
+    end
+end
+local function addDriverPart(name: string)
+    local part = bell and bell:FindFirstChild(name)
+    if part and part:IsA("BasePart") then
+        table.insert(driverSpinners, {
+            part = part,
+            restCF = part.CFrame,
+            pivotCF = CFrame.new(MAIN_AXLE_XY.X, MAIN_AXLE_XY.Y, part.Position.Z),
+        })
+    end
+end
+-- Spin every cam-shaft part (the snail cam's base + spiral planks + drop wall, and the
+-- cam gear) about the E-W cam shaft. They're all named ^Cam in the builder.
+if bell then
+    for _, part in bell:GetChildren() do
+        if part:IsA("BasePart") and part.Name:match("^Cam") then
+            addCamPart(part.Name)
+        end
+    end
+end
+addDriverPart("DriverGear")
+
 -- Recompute the 4 chains and reposition the dowels from the log's CURRENT CFrame.
 local function updateSuspension()
     local delta = arm.CFrame * restCFrame:Inverse()
@@ -180,10 +227,8 @@ EventBus.Cue.Event:Connect(function(cue)
     end
 end)
 
-RunService.Heartbeat:Connect(function()
-    if striking then
-        return
-    end
+-- The hammer state (draw p, latched, released) as a pure read of the live clock.
+local function currentState(): HammerCurve.State
     local secondsLeft: number
     if lastPhase == "ACTIVE" then
         local lead = 2
@@ -192,11 +237,18 @@ RunService.Heartbeat:Connect(function()
     else
         secondsLeft = 1
     end
-    local state = HammerCurve.state(lastPhase, secondsLeft)
+    return HammerCurve.state(lastPhase, secondsLeft)
+end
+
+RunService.Heartbeat:Connect(function()
+    if striking then
+        return
+    end
+    local state = currentState()
     if not state.released then
         local p = state.angleDeg / 100 -- 0..1 draw percent
-        local drawZ = p * 6 -- drawn 6 studs South (away from the bell, +Z)
-        local riseY = p * p * 1.2 -- slight pendulum rise on the suspension arc
+        local drawZ = p * 3.5 -- drawn ~3.5 studs South — matches the cam lobe's throw
+        local riseY = p * p * 0.8 -- slight pendulum rise on the suspension arc
         -- The cam holds the log steady at full draw (no human/rope "tremble") until
         -- the trip — draw straight South (BACK = +Z) with a slight rise.
         arm.CFrame = CFrame.new(BACK * drawZ + Vector3.new(0, riseY, 0)) * restCFrame
@@ -204,6 +256,24 @@ RunService.Heartbeat:Connect(function()
             wasLatched = true
             EventBus.Cue:Fire({ kind = "latchClick" })
         end
+    end
+end)
+
+-- Cam + gear-down track the SAME draw value. The cam (and cam gear) rotate about the
+-- E-W shaft (world X); the driver gear counter-rotates about the main shaft (world Z)
+-- at the reduction, so the mesh reads correct. Runs every frame (incl. the strike) so
+-- the cam holds at the trip while the log swings, then resets next ACTIVE.
+RunService.Heartbeat:Connect(function()
+    local p = currentState().angleDeg / 100
+    local camTheta = -math.rad(CAM_DRAW_DEG) * p -- lobe sweeps to draw the dowel back
+    local rot = CFrame.Angles(camTheta, 0, 0)
+    for _, s in camSpinners do
+        s.part.CFrame = s.pivotCF * rot * s.pivotCF:Inverse() * s.restCF
+    end
+    local driverTheta = math.rad(CAM_DRAW_DEG) * p * REDUCTION -- faster, opposite sense
+    local drot = CFrame.Angles(0, 0, driverTheta)
+    for _, s in driverSpinners do
+        s.part.CFrame = s.pivotCF * drot * s.pivotCF:Inverse() * s.restCF
     end
 end)
 

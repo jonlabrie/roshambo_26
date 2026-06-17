@@ -60,25 +60,60 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             Material = "Metal",
         })
     )
-    -- single-lobe cam: a hub disc on the X cam shaft (axle = X = cylinder default) plus
-    -- one protruding lobe (the draw throw). At rest the lobe points +Y toward the dowel;
-    -- the controller turns it once per round to draw the log then trip it.
+    -- SNAIL (scroll) draw cam, profile in the Y-Z plane on the X cam shaft. The radius
+    -- climbs from baseR to peakR over one full turn (the gradual draw as the follower
+    -- rides out), then drops sharply back to baseR (the trip). Built faceted: a base
+    -- circle (Cam) + a fan of thin radial "shell" planks (CamSpiralN) whose outer tips
+    -- trace the spiral, + a radial drop wall (CamDrop) at the step. All named ^Cam so
+    -- the controller spins them together about the cam shaft. Stylized but in-pipeline.
+    local thick = 0.6 -- axial thickness (along X) — half the previous
+    local baseR, peakR = d.camHubR, d.camLobeR
+    local cx, cy, cz = d.cam[1], d.cam[2], d.cam[3]
+    local WIND = -1 -- spiral handedness: which way the radius climbs (flip to reverse the cam)
+    -- a part whose LOCAL X points radially at angle θ (from +Y, toward +Z), local Z = axle
+    local function plankRot(theta: number): { number }
+        local c, s = math.cos(theta), math.sin(theta)
+        return { 0, 0, 1, c, -s, 0, s, c, 0 } -- columns: X=(0,c,s) Y=(0,-s,c) Z=(1,0,0)
+    end
     table.insert(
         children,
         Spec.part("Cam", {
-            Size = { 1.0, d.camHubR * 2, d.camHubR * 2 },
+            Size = { thick, baseR * 2, baseR * 2 }, -- base circle (the dwell / min radius)
             Shape = "Cylinder",
             CFrame = Spec.cframe(d.cam),
             Color = timber,
             Material = "Wood",
         })
     )
-    local loLen = d.camLobeR - d.camHubR
+    local N = 144 -- fine facets → the spiral reads smooth
+    local plankW = (2 * math.pi * peakR / N) + 0.3 -- chord at the rim + overlap, so facets meet
+    for i = 1, N do
+        local frac = i / N
+        local theta = 2 * math.pi * frac * WIND
+        local rI = baseR + (peakR - baseR) * frac
+        local len = rI - baseR
+        if len > 0.1 then
+            local midR = (baseR + rI) / 2
+            table.insert(
+                children,
+                Spec.part(`CamSpiral{i}`, {
+                    Size = { len + 0.25, plankW, thick }, -- radial length × angular width × axial
+                    CFrame = Spec.cframe(
+                        { cx, cy + math.cos(theta) * midR, cz + math.sin(theta) * midR },
+                        plankRot(theta)
+                    ),
+                    Color = timber,
+                    Material = "Wood",
+                })
+            )
+        end
+    end
+    -- the sharp drop wall (release face): a radial plank from baseR→peakR at the step
     table.insert(
         children,
-        Spec.part("CamLobe", {
-            Size = { 1.0, loLen, 1.4 }, -- protrudes radially (+Y at rest), tangential width 1.4
-            CFrame = Spec.cframe({ d.cam[1], d.cam[2] + d.camHubR + loLen / 2, d.cam[3] }),
+        Spec.part("CamDrop", {
+            Size = { peakR - baseR, 0.7, thick },
+            CFrame = Spec.cframe({ cx, cy + (baseR + peakR) / 2, cz }, plankRot(0)),
             Color = timber,
             Material = "Wood",
         })
