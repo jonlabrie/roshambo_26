@@ -25,14 +25,9 @@ local restCFrame = arm.CFrame -- rest pose: log hanging at the front of its swin
 -- send the draw sideways — world-space keeps the log moving straight.
 
 -- Suspension + drive-rope geometry. The four chains hang from FIXED rail tops;
--- their bottoms ride the log. The drive rope runs from a fixed wheel anchor to
--- the log's back end. Both follow the log's LIVE CFrame each frame (see the
--- dedicated Heartbeat below) — never mirrored offsets.
--- These constants MIRROR ArenaLayout.shuMoku / .waterwheel (build-time only, not
--- replicated to the client). Keep in sync with tools/builders/ArenaLayout.luau.
-local function v3(t: { number }): Vector3
-    return Vector3.new(t[1], t[2], t[3])
-end
+-- their bottoms ride the log; the dowels are rigid to it. All follow the log's LIVE
+-- CFrame each frame (see updateSuspension) — never mirrored offsets. These constants
+-- MIRROR ArenaLayout.shuMoku (build-time only). Keep in sync with ArenaLayout.luau.
 
 -- A cylinder (long axis = +X = RightVector) spanning a→b: CFrame + length.
 local function segCF(a: Vector3, b: Vector3): (CFrame, number)
@@ -51,43 +46,39 @@ local chains = {
     rig:WaitForChild("Chain3") :: BasePart,
     rig:WaitForChild("Chain4") :: BasePart,
 }
--- The drive train is rotated onto the SW->NE diagonal (mirrors
--- ArenaLayout.shuMoku.yaw = 225). yawV rotates the proven +Z gantry geometry;
--- BACK is the draw direction (back toward the wheel = SW).
-local YAW = CFrame.Angles(0, math.rad(237), 0)
-local function yawV(t: { number }): Vector3
-    return (YAW * CFrame.new(v3(t))).Position
-end
-local BACK = (YAW * CFrame.new(0, 0, 1)).Position
+-- Re-staged clearing: the shu-moku hangs on the clearing axis (ArenaLayout.shuMoku.yaw
+-- = 0). It draws SOUTH (+Z, away from the bell at z=0) and swings North (-Z) into it.
+-- (The cam now draws the log — the old wheel→log drive rope is gone.)
+local BACK = Vector3.new(0, 0, 1) -- draw direction = South (+Z)
 
+-- Chain rail tops are FIXED; bottoms ride the log. World coords mirror
+-- ArenaLayout.shuMoku (no yaw): chainTops y127, chainBottomsRest y118.6.
 local chainTops = {
-    yawV({ 3, 15, 7.5 }),
-    yawV({ 3, 15, 11.5 }),
-    yawV({ -3, 15, 7.5 }),
-    yawV({ -3, 15, 11.5 }),
+    Vector3.new(2, 124.5, 7.5),
+    Vector3.new(2, 124.5, 11.5),
+    Vector3.new(-6, 124.5, 7.5),
+    Vector3.new(-6, 124.5, 11.5),
 }
 local chainBottomsRest = {
-    yawV({ 0.8, 6.6, 7.5 }),
-    yawV({ 0.8, 6.6, 11.5 }),
-    yawV({ -0.8, 6.6, 7.5 }),
-    yawV({ -0.8, 6.6, 11.5 }),
+    Vector3.new(-1.2, 118.6, 7.5),
+    Vector3.new(-1.2, 118.6, 11.5),
+    Vector3.new(-2.8, 118.6, 7.5),
+    Vector3.new(-2.8, 118.6, 11.5),
 }
 
--- The drive rope is a client visual created at runtime (no builder part).
--- mirrors ArenaLayout.waterwheel.ropeAnchor = onLine(20.6, 6.5) at the same yaw
-local ropeWheelAnchor = (YAW * CFrame.new(0, 6.5, 20.6)).Position
-local ropeBottomRest = yawV({ 0, 6.2, 13 }) -- ArenaLayout.shuMoku.ropeBottomRest (rotated)
-local driveRope = Instance.new("Part")
-driveRope.Name = "DriveRope"
-driveRope.Anchored = true
-driveRope.CanCollide = false
-driveRope.Shape = Enum.PartType.Cylinder
-driveRope.Color = Color3.new(0.55, 0.48, 0.35)
-driveRope.Material = Enum.Material.Fabric
-driveRope.Size = Vector3.new(1, 0.2, 0.2)
-driveRope.Parent = rig
+-- The dowels are rigid to the log (the cam catches the draw dowel; the swing kicks the
+-- drum via the east-flank dowel), so they must move WITH it. Capture their built rest
+-- CFrames and re-apply the log's delta each frame.
+local dowels = {
+    rig:WaitForChild("ShuMokuDrawDowel") :: BasePart,
+    rig:WaitForChild("ShuMokuDowel") :: BasePart,
+}
+local dowelRest = {}
+for i, d in dowels do
+    dowelRest[i] = d.CFrame
+end
 
--- Recompute all 4 chains + the drive rope from the log's CURRENT CFrame.
+-- Recompute the 4 chains and reposition the dowels from the log's CURRENT CFrame.
 local function updateSuspension()
     local delta = arm.CFrame * restCFrame:Inverse()
     for i, chain in chains do
@@ -96,10 +87,9 @@ local function updateSuspension()
         chain.CFrame = cf
         chain.Size = Vector3.new(len, 0.25, 0.25)
     end
-    local ropeLog = delta * ropeBottomRest
-    local rcf, rlen = segCF(ropeWheelAnchor, ropeLog)
-    driveRope.CFrame = rcf
-    driveRope.Size = Vector3.new(rlen, 0.2, 0.2)
+    for i, d in dowels do
+        d.CFrame = delta * dowelRest[i]
+    end
 end
 
 local lastPhase = "ACTIVE"
@@ -146,7 +136,7 @@ EventBus.Cue.Event:Connect(function(cue)
                     ring.Transparency = 0.35 + (i - 1) * 0.15
                     ring.Color = WATER
                     ring.Size = Vector3.new(0.25, 2, 2)
-                    ring.CFrame = CFrame.new(gong.Position.X, 1.3, gong.Position.Z)
+                    ring.CFrame = CFrame.new(gong.Position.X, gong.Position.Y, gong.Position.Z)
                         * CFrame.Angles(0, 0, math.rad(90))
                     ring.Parent = workspace
                     TweenService
@@ -205,18 +195,11 @@ RunService.Heartbeat:Connect(function()
     local state = HammerCurve.state(lastPhase, secondsLeft)
     if not state.released then
         local p = state.angleDeg / 100 -- 0..1 draw percent
-        local drawZ = p * 6 -- drawn 6 studs backward (away from the bell, +Z)
+        local drawZ = p * 6 -- drawn 6 studs South (away from the bell, +Z)
         local riseY = p * p * 1.2 -- slight pendulum rise on the suspension arc
-        local shiver = if state.trembling
-            then math.sin(os.clock() * 28) * 0.15 + (math.random() - 0.5) * 0.04
-            else 0
-        -- draw back toward the wheel along the SW axis (BACK), plus a slight rise
-        local draw = CFrame.new(BACK * (drawZ + shiver) + Vector3.new(0, riseY, 0))
-        local pose = draw * restCFrame
-        if state.trembling then
-            pose = pose * CFrame.Angles(0, math.rad(math.sin(os.clock() * 23) * 0.4), 0)
-        end
-        arm.CFrame = pose
+        -- The cam holds the log steady at full draw (no human/rope "tremble") until
+        -- the trip — draw straight South (BACK = +Z) with a slight rise.
+        arm.CFrame = CFrame.new(BACK * drawZ + Vector3.new(0, riseY, 0)) * restCFrame
         if state.latched and not wasLatched then
             wasLatched = true
             EventBus.Cue:Fire({ kind = "latchClick" })

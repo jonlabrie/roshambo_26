@@ -42,7 +42,7 @@ local ArenaLayout = {
         floorY = 112,
         poolCentre = { -34, 110, 0 },
         poolHalf = 28,
-        poolSurfaceY = 110, -- recessed basin
+        poolSurfaceY = 111, -- raised ~3 studs (was 108 in terrain) so the wheel sits in the current; just below the y112 banks
         outcropCentre = { 40, 112, 0 },
         outcropHalf = { 48, 34 }, -- gathering shelf
         boundaryX = 124,
@@ -60,18 +60,25 @@ local ArenaLayout = {
         radius = 0.8,
         drawStuds = 6,
         yaw = 0,
-        railX = 3,
-        railY = 127,
+        railX = 4, -- wider arm spacing so the dowels clear the gantry legs through the swing (was 3)
+        railY = 124.5, -- gantry post height (raised 20% from 122.5 so the chains hang cleaner); top frame braced
         railZ = { 6, 13 }, -- shortened to the shu-moku's actual cam-driven draw (was {5,20})
-        chainTops = { { 3, 127, 7.5 }, { 3, 127, 11.5 }, { -3, 127, 7.5 }, { -3, 127, 11.5 } },
+        -- chain attach points, centred on the shu-moku centreline (x=-2): rail tops at
+        -- x=-2±4 = {2,-6} (match railX), y=railY; log attach points at x=-2±0.8 = {-1.2,-2.8}.
+        chainTops = { { 2, 124.5, 7.5 }, { 2, 124.5, 11.5 }, { -6, 124.5, 7.5 }, { -6, 124.5, 11.5 } },
         chainBottomsRest = {
-            { 0.8, 118.6, 7.5 },
-            { 0.8, 118.6, 11.5 },
-            { -0.8, 118.6, 7.5 },
-            { -0.8, 118.6, 11.5 },
+            { -1.2, 118.6, 7.5 },
+            { -1.2, 118.6, 11.5 },
+            { -2.8, 118.6, 7.5 },
+            { -2.8, 118.6, 11.5 },
         },
         ropeBottomRest = { -2, 118, 13 },
-        dowel = { from = { -2, 118, 6 }, length = 3, yaw = 0 }, -- flank peg → kicks the BellDrive paddle
+        -- DRAW dowel: a SHORT horizontal peg out the log's tail (z≈11) reaching West to
+        -- the BellDrive cam (x=-4); short enough to clear the west gantry leg (x=-6).
+        drawDowel = { from = { -1.5, 118, 11 }, to = { -4, 118, 11 } },
+        -- KICK dowel: a SHORT east-flank peg (to x=1) that kicks the vertical-shaft
+        -- paddle; short enough to clear the east gantry leg (x=2).
+        kickDowel = { from = { -1.5, 118, 6 }, to = { 1, 118, 6 } },
     },
     -- Natural creek down the SW-ish drive line (replaced the kakehi flume).
     creek = {
@@ -84,26 +91,22 @@ local ArenaLayout = {
         -- to the drive line. Shared by Creek.luau (stones) and buildTerrain (water).
         meander = { amp = 6, waves = 2.5 },
     },
-    -- IN-RIVER waterwheel: rests in the river due North (−Z) of the tower, on the
-    -- tower axis, turned by the current flowing out of the in-fall pool. Its Z-axle
-    -- runs South into the house as the bell-engine main shaft. The lower paddles dip
-    -- into the water (undershot); supports stand on the riverbed.
+    -- IN-RIVER waterwheel: rests in the river North (−Z) of the tower, shifted UPRIVER
+    -- (West, −X) so the drive train clears the bell + tower posts. Bigger + raised so
+    -- its Z-axle (the main shaft) sits well above the clearing floor. Turned by the +X
+    -- current; lower paddles dip into the water (undershot); supports on the riverbed.
     waterwheel = {
-        radius = 6,
+        radius = 9, -- bigger: lifts the axle/main shaft above ground while paddles stay in the water
+        width = 2.4, -- twice as thick (was 1.2) — a beefier mill wheel
         overshot = false,
         yaw = 90, -- axle along Z; disc faces the +Z gathering, paddles catch the +X current
         driveYaw = 0, -- drive line toward the bell (RatchetDrum offsets along it)
         bedY = 104, -- support posts stand on the riverbed (river floor ~104)
-        centers = { { 0, 112, -18 } }, -- in the river, due North of the tower; axle (Z) runs South into the house
+        centers = { { -15, 116, -23 } }, -- farther North, out into the river channel (off the gravel bank)
         driver = 1,
-        ropeAnchor = { 0, 112, -10 },
+        ropeAnchor = { -15, 116, -15 },
     },
-    -- sōzu (shishi-odoshi) beside the wheel; meters the round and kicks the drum.
-    sozu = {
-        pivot = { -8, 116, 8 },
-        troughLen = 5,
-        cordTop = { -2, 138, -2 }, -- the throw drum's axle end
-    },
+    -- (sōzu removed — the throw-lockout beat moves to sound/UI; see the bell-engine spec.)
     promontories = {
         { name = "Record", pos = { 0, 16, 134 } }, -- north (opposite entrance)
         { name = "Streak", pos = { -128, 16, 38 } }, -- west
@@ -160,30 +163,65 @@ local ArenaLayout = {
     heroTile = { pos = { 0, 18, 0 }, size = { 5, 6.5, 0.8 } },
     -- Hexagonal World-Throw drum atop the shōrō (ridge ~y22; y24 clears the
     -- y28 top tier enough to read). Horizontal axis = world X (E/W).
-    throwDrum = { pos = { 6, 140, 4 }, length = 14, radius = 7, faces = 6, yaw = 90 }, -- rides the vertical drum shaft above the bell; faces up/downriver (±X)
+    -- southSpokeR: the +Z (south) end spokes extend to this radius so they hang down as
+    -- PINS near the roof (148 - 12 = y136) for the drive paddles to flick.
+    throwDrum = { pos = { -2, 148, 0 }, length = 11, radius = 7, faces = 6, yaw = 90, southSpokeR = 11.5 }, -- centred over the roof; faces up/downriver (±X)
     -- ===== Bell engine drive train (exposed on the open frame) =====
-    -- One input (the river wheel's Z-axle) → gear-down → cam draws/trips the shu-moku;
-    -- the shu-moku's dowel kicks the vertical shaft → spins the drum. Starting coords;
-    -- tuned at the staging gate. Builders read these by name.
+    -- One water input → two outputs. The wheel's Z-axle is the MAIN SHAFT; it runs
+    -- South down the WEST (upriver) side of the bell+tower (clearing both), then a
+    -- right-angle BEVEL turns the drive onto an E–W CAM SHAFT pointed East at the
+    -- shu-moku. A cam on that E–W shaft (sweeping the N–S vertical plane) catches the
+    -- shu-moku's horizontal draw dowel, drawing the log back over the round then
+    -- releasing it (gong). The swing's east-flank dowel kicks the vertical-shaft
+    -- paddle → spins the drum. Starting coords; tuned at the staging gate.
     bellDrive = {
-        shaftFrom = { 0, 112, -18 },
-        shaftTo = { 0, 112, -3 },
-        shaftR = 0.5, -- wheel axle into the house
-        driverGear = { 0, 112, -3 },
-        driverR = 1.6, -- small fast gear on the main shaft
-        camGear = { 0, 117.2, -3 },
-        camR = 3.6, -- big slow gear (centre 5.2 above → meshes)
-        camShaftFrom = { 0, 117.2, -3 },
-        camShaftTo = { -2, 117.2, 7 }, -- cam shaft (along Z) to the striker
-        cam = { -2, 117.2, 7 },
-        camLobe = 2.2, -- wiper that draws the shu-moku tail
-        vertBase = { 6, 112, 4 },
-        vertTop = { 6, 140, 4 },
-        vertR = 0.7, -- vertical drum shaft
-        paddle = { 6, 118, 4 },
-        paddleLen = 2.4, -- struck by the shu-moku dowel
-        yoke = { 6, 140, 4 },
-        yokeSpan = 10, -- bearing arms holding the drum above the roof
+        -- MAIN SHAFT: along Z (N–S), West of the bell+posts, raised to the wheel axle.
+        shaftFrom = { -15, 116, -23 }, -- = wheel centre (moved out into the river)
+        shaftTo = { -15, 116, 11 },
+        shaftR = 0.6,
+        -- BEVEL gear-down at the SW corner: small DriverGear (axle Z) on the main shaft
+        -- meshes the big slow CamGear (axle X) on the cam shaft → the once-per-round
+        -- reduction, turned through 90°.
+        driverGear = { -15, 116, 9.4 },
+        driverR = 1.6,
+        camGear = { -13.4, 116, 11 },
+        camR = 3.6,
+        -- E–W CAM SHAFT: along X at the shu-moku tail (z=11, between the tower posts at
+        -- z=9 and the gantry at z=13; South of the bell), pointed East at the log.
+        camShaftFrom = { -15, 116, 11 },
+        camShaftTo = { -4, 116, 11 },
+        camShaftR = 0.6,
+        -- single-lobe cam on the X cam shaft (turns about X at `cam` once per round): a
+        -- hub disc + one protruding lobe with enough throw to draw the dowel.
+        cam = { -4, 116, 11 },
+        camHubR = 2, -- cam body (hub) radius
+        camLobeR = 5.5, -- single lobe reaches this far from the axle — the draw throw
+        -- KICK shaft + paddle (drum kick), just East/South of the shu-moku, by the kick
+        -- dowel's tip (x=1, z=6) and clear of the bell (z>5.1) and posts. Capped UNDER
+        -- the roof — it no longer runs up through the drum (drum is centred elsewhere);
+        -- how it drives the centred drum is the next staging question.
+        vertBase = { 1, 112, 6 },
+        vertTop = { 1, 137.6, 6 }, -- reaches up into DriveGearA (y137.5) so the shaft meets the gear
+        vertR = 0.23, -- slim drive rod (~1/3 the old diameter)
+        paddle = { 1, 118, 6 },
+        paddleLen = 2.4, -- kicked by the shu-moku's east-flank dowel
+        -- Drum drive (pin-wheel): a flat gear caps the kick shaft (DriveGearA, spins
+        -- about Y); it meshes an EQUAL-radius flat gear (DriveGearB) — equal so A's
+        -- ½-turn = B's ½-turn. B carries two paddles sticking OUTWARD (horizontal, on its
+        -- E/W sides); a kick sweeps them across the drum's hanging south spoke → spin.
+        -- Starting coords — the mesh + paddle reach are tuned at the gate.
+        driveGearA = { 1, 137.5, 6 },
+        driveGearAR = 1.2,
+        driveGearB = { -1.18, 137.5, 7 }, -- 2.4 from A → 1:1 mesh at radius 1.2
+        driveGearBR = 1.2,
+        paddleReach = 1.6, -- horizontal paddle-arm length out past B's rim (±X)
+        -- shaft bearings (trestle post + saddle): two on the main-shaft run (wheel→bevel),
+        -- one at the bevel corner, one just behind the cam on the E-W shaft. {x, z} on
+        -- the shaft line at shaft height; posts drop to bearingBaseY.
+        bearings = { { -15, -6 }, { -15, 2 }, { -15, 11 }, { -5.5, 11 } },
+        bearingBaseY = 110,
+        -- The drum's bearing yoke (A-frames) is built from throwDrum.pos + the pavilion
+        -- roof, so the support follows the drum wherever it's centred.
     },
     spawn = { pos = { 0, 29, -188 } }, -- on the rim plaza, facing the bell
 }

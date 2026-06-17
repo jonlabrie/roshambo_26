@@ -45,6 +45,20 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
             Material = "Metal",
         })
     )
+    -- BellHanger: an iron strap from the crown lug up to the shōrō BellBeam underside,
+    -- so the bell visibly HANGS from the crossbeam. beamBottomY mirrors Shoro.BellBeam
+    -- (placed at roofHeight-1.8, height 1.8 → underside = base + roofHeight - 2.7).
+    local crownTopY = by + h / 2 + 1.9
+    local beamBottomY = L.pavilion.pos[2] + L.pavilion.roofHeight - 2.7
+    table.insert(
+        children,
+        Spec.part("BellHanger", {
+            Size = { 0.5, (beamBottomY - crownTopY) + 1.0, 0.5 }, -- overlaps 0.5 into the lug + the beam
+            CFrame = Spec.cframe({ bx, (crownTopY + beamBottomY) / 2, bz }),
+            Color = { 0.22, 0.22, 0.25 },
+            Material = "Metal",
+        })
+    )
     -- The tsuki-za strike boss sits at the LOG's height, not a fraction of the
     -- bell — so it stays aligned with the shu-moku through any bell resize.
     -- strike boss on the bell's SW face, aligned with the rotated shu-moku log
@@ -85,28 +99,46 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
             Material = "Wood",
         })
     )
-    -- dowel peg on the shu-moku flank: sweeps with the swing and kicks the BellDrive paddle
-    local dw = L.shuMoku.dowel
-    local dpos, dlen, drot = Spec.segment(dw.from, { dw.from[1], dw.from[2], dw.from[3] + dw.length })
+    -- DRAW dowel: a horizontal peg through the log's tail that the BellDrive cam
+    -- catches to draw the log back over the round (reaches West to the cam).
+    local draw = L.shuMoku.drawDowel
+    local drp, drl, drr = Spec.segment(draw.from, draw.to)
     table.insert(
         children,
-        Spec.part("ShuMokuDowel", {
-            Size = { dlen, 0.5, 0.5 },
+        Spec.part("ShuMokuDrawDowel", {
+            Size = { drl, 0.5, 0.5 },
             Shape = "Cylinder",
-            CFrame = Spec.cframe(dpos, drot),
+            CFrame = Spec.cframe(drp, drr),
             Color = palette.timber,
             Material = "Wood",
         })
     )
-    -- Gantry: two side rails (along the yaw-rotated Z axis at ±railX, y = railY) on four posts.
+    -- KICK dowel: an east-flank peg; the forward swing kicks the BellDrive
+    -- vertical-shaft paddle to spin the throw drum.
+    local kick = L.shuMoku.kickDowel
+    local kdp, kdl, kdr = Spec.segment(kick.from, kick.to)
+    table.insert(
+        children,
+        Spec.part("ShuMokuDowel", {
+            Size = { kdl, 0.5, 0.5 },
+            Shape = "Cylinder",
+            CFrame = Spec.cframe(kdp, kdr),
+            Color = palette.timber,
+            Material = "Wood",
+        })
+    )
+    -- Gantry: two side rails (along the yaw-rotated Z axis at ±railX, y = railY) on four
+    -- posts. railX/railZ are half-widths about the shu-moku's CENTRELINE (cx), so the
+    -- gantry straddles the log instead of the world origin.
     local sm = L.shuMoku
+    local cx = sm.restPos[1] -- shu-moku centreline X (gantry + chains centre here)
     local yaw = sm.yaw
     local railLen = sm.railZ[2] - sm.railZ[1] + 1
     local railMidZ = (sm.railZ[1] + sm.railZ[2]) / 2
     local railRot = Spec.matMul(Spec.rotYMat(yaw), Spec.ROT.IDENTITY)
     local y2 = L.clearing.floorY -- gantry posts rise from the clearing floor
     for i, rx in { sm.railX, -sm.railX } do
-        local p = Spec.rotY({ rx, sm.railY, railMidZ }, yaw)
+        local p = Spec.rotY({ cx + rx, sm.railY, railMidZ }, yaw)
         table.insert(
             children,
             Spec.part(`Rail{i}`, {
@@ -118,10 +150,10 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
         )
     end
     local postSpots = {
-        { sm.railX, sm.railZ[1] },
-        { -sm.railX, sm.railZ[1] },
-        { sm.railX, sm.railZ[2] },
-        { -sm.railX, sm.railZ[2] },
+        { cx + sm.railX, sm.railZ[1] },
+        { cx - sm.railX, sm.railZ[1] },
+        { cx + sm.railX, sm.railZ[2] },
+        { cx - sm.railX, sm.railZ[2] },
     }
     for i, spot in postSpots do
         local p = Spec.rotY({ spot[1], (sm.railY + y2) / 2, spot[2] }, yaw)
@@ -130,6 +162,20 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
             Spec.part(`GantryPost{i}`, {
                 Size = { 0.8, sm.railY - y2, 0.8 },
                 CFrame = Spec.cframe(p),
+                Color = palette.timber,
+                Material = "Wood",
+            })
+        )
+    end
+    -- Cross-braces (along X) tying the two rails together at the top of each post pair,
+    -- so the gantry reads as a rigid frame.
+    for i, bz in { sm.railZ[1], sm.railZ[2] } do
+        local p = Spec.rotY({ cx, sm.railY, bz }, yaw)
+        table.insert(
+            children,
+            Spec.part(`GantryBrace{i}`, {
+                Size = { 2 * sm.railX, 0.8, 0.8 },
+                CFrame = Spec.cframe(p, railRot),
                 Color = palette.timber,
                 Material = "Wood",
             })

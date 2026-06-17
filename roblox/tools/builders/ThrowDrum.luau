@@ -78,14 +78,18 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
         })
     )
 
-    -- 6 spokes per end (12 total) radiating from the shaft to the hexagon's
-    -- corners — the open internal structure that supports the rim faces.
+    -- 6 spokes per end (12 total) radiating from the shaft to the hexagon's corners —
+    -- the open internal structure that supports the rim faces. The SOUTH end (ei == 1,
+    -- which the 90° yaw maps to +Z) extends its spokes to southR so they reach down
+    -- near the roof as PINS for the drive paddles to flick (the down-spoke is the catch).
+    local southR = d.southSpokeR or r
     local spoke = 0
-    for _, ex in { -length / 2 + 0.3, length / 2 - 0.3 } do
+    for ei, ex in { -length / 2 + 0.3, length / 2 - 0.3 } do
+        local sr = if ei == 1 then southR else r
         for k = 0, faces - 1 do
             local v = (k + 0.5) * step -- vertex angle (between two faces)
-            local vy = py + r * math.sin(v)
-            local vz = pz + r * math.cos(v)
+            local vy = py + sr * math.sin(v)
+            local vz = pz + sr * math.cos(v)
             local sp, slen, srot = Spec.segment({ px + ex, py, pz }, { px + ex, vy, vz })
             spoke += 1
             table.insert(

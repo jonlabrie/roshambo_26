@@ -99,7 +99,7 @@ describe("ArenaLayout canyon clearing", function()
     test("clearing block defines floor, pool, outcrop, boundary", function()
         expect(L.clearing ~= nil).toBe(true)
         expect(L.clearing.floorY).toBe(112)
-        expect(L.clearing.poolSurfaceY < L.clearing.floorY).toBe(true) -- pool recessed
+        expect(L.clearing.poolSurfaceY <= L.clearing.floorY).toBe(true) -- water fills the channel up to the terrace edge
         expect(L.clearing.poolCentre[1] < 0).toBe(true) -- back third (−X)
         expect(L.clearing.boundaryX > 0).toBe(true) -- downstream (+X)
     end)
@@ -108,10 +108,11 @@ describe("ArenaLayout canyon clearing", function()
         expect(math.abs(L.bell.pos[3]) < 8).toBe(true) -- near centreline Z
         expect(L.bell.pos[2] > L.clearing.floorY).toBe(true) -- bell hangs above the floor
     end)
-    test("waterwheel is IN-RIVER undershot: on the tower axis (North), lower paddles in the water", function()
+    test("waterwheel is IN-RIVER undershot: North & upriver, lower paddles in the water", function()
         local w = L.waterwheel
         local bottom = w.centers[1][2] - w.radius
-        expect(math.abs(w.centers[1][1]) < 10).toBe(true) -- ~on the tower axis (axle runs South into the house)
+        expect(w.centers[1][1] < -5).toBe(true) -- shifted upriver (West) to clear the bell+tower
+        expect(w.centers[1][3] < -8).toBe(true) -- North, in the river channel
         expect(bottom < L.clearing.poolSurfaceY).toBe(true) -- bottom dips into the river current
         expect(w.overshot).toBe(false)
         expect(w.headFrom == nil).toBe(true) -- no headrace flume (undershot)
@@ -119,31 +120,40 @@ describe("ArenaLayout canyon clearing", function()
 end)
 
 describe("ArenaLayout bell engine", function()
-    test("waterwheel sits riverside (North, -Z) directly off the tower", function()
+    test("waterwheel sits North in the river, shifted upriver (West) of the tower", function()
         local c = L.waterwheel.centers[1]
         expect(c[3] < -8).toBe(true) -- North of the tower
-        expect(math.abs(c[1]) < 10).toBe(true) -- ~on the tower axis, not downriver
+        expect(c[1] < -5).toBe(true) -- upriver (West), clear of the bell+tower
     end)
-    test("bellDrive block defines a meshing gear-down", function()
+    test("main shaft runs N-S and extends South toward the bell, West of the bell+tower", function()
         local d = L.bellDrive
-        expect(d ~= nil).toBe(true)
-        local dx = d.camGear[1] - d.driverGear[1]
-        local dy = d.camGear[2] - d.driverGear[2]
-        local dz = d.camGear[3] - d.driverGear[3]
-        local centre = math.sqrt(dx * dx + dy * dy + dz * dz)
-        expect(math.abs(centre - (d.driverR + d.camR)) < 0.6).toBe(true) -- pitch circles touch
-        expect(d.camR > d.driverR * 2).toBe(true) -- big reduction (cam creeps)
+        expect(d.shaftFrom[1]).toBe(d.shaftTo[1]) -- constant X → runs along Z (N-S)
+        expect(d.shaftFrom[2]).toBe(d.shaftTo[2]) -- constant Y (horizontal axle)
+        expect(d.shaftTo[3] > d.shaftFrom[3]).toBe(true) -- extends South (+Z) from the wheel toward the bell
+        expect(d.shaftFrom[1] < -12).toBe(true) -- West of the bell (edge -8.8) and the west tower posts (-11)
     end)
-    test("vertical shaft carries the drum and its paddle is at the shu-moku swing level", function()
+    test("a bevel turns the Z drive onto an E-W cam shaft pointed East at the shu-moku", function()
         local d = L.bellDrive
-        expect(d.vertTop[2] > d.vertBase[2] + 15).toBe(true) -- a tall shaft up to the drum
-        expect(math.abs(d.paddle[2] - L.shuMoku.restPos[2]) < 4).toBe(true) -- paddle meets the dowel arc
-        expect(math.abs(d.vertTop[1] - L.throwDrum.pos[1]) < 4).toBe(true) -- drum rides the shaft top
-        expect(math.abs(d.vertTop[3] - L.throwDrum.pos[3]) < 4).toBe(true)
+        expect(d.camShaftFrom[2]).toBe(d.camShaftTo[2]) -- constant Y
+        expect(d.camShaftFrom[3]).toBe(d.camShaftTo[3]) -- constant Z → runs along X (E-W)
+        expect(d.camShaftTo[1] - d.camShaftFrom[1] > 5).toBe(true) -- a real E-W run, pointing East
+        expect(d.camShaftFrom[3] > 5.5).toBe(true) -- South of the bell (z-span ±5), clear of it
+        expect(math.abs(d.camShaftFrom[3] - L.shuMoku.restPos[3]) < 4).toBe(true) -- aimed at the shu-moku
+        expect(d.camR > d.driverR * 2).toBe(true) -- big reduction (cam shaft creeps once/round)
     end)
-    test("shu-moku has a dowel that reaches toward the paddle", function()
-        expect(L.shuMoku.dowel ~= nil).toBe(true)
-        expect(L.shuMoku.dowel.length > 1).toBe(true)
+    test("kick shaft carries the paddle at the shu-moku swing level (decoupled from the drum)", function()
+        local d = L.bellDrive
+        expect(d.vertTop[2] > d.vertBase[2] + 15).toBe(true) -- a real vertical shaft
+        expect(math.abs(d.paddle[2] - L.shuMoku.restPos[2]) < 4).toBe(true) -- paddle at the kick-dowel level
+    end)
+    test("throw drum is centred over the pavilion roof, clear above it", function()
+        expect(math.abs(L.throwDrum.pos[1] - L.pavilion.pos[1]) < 1).toBe(true) -- centred in X
+        expect(math.abs(L.throwDrum.pos[3] - L.pavilion.pos[3]) < 1).toBe(true) -- centred in Z
+        expect(L.throwDrum.pos[2] > L.pavilion.pos[2] + L.pavilion.roofHeight).toBe(true) -- clear above the roof
+    end)
+    test("shu-moku has a draw dowel (cam) and a kick dowel (drum)", function()
+        expect(L.shuMoku.drawDowel ~= nil).toBe(true)
+        expect(L.shuMoku.kickDowel ~= nil).toBe(true)
     end)
     test("throw drum is re-oriented to face up/downriver (yaw 90)", function()
         expect(L.throwDrum.yaw).toBe(90)

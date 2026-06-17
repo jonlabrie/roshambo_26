@@ -19,6 +19,7 @@ end
 function Waterwheel.build(palette: { [string]: { number } }, L: any)
     local W = L.waterwheel
     local R = W.radius
+    local width = W.width or 1.2 -- axial thickness of the wheel (disc + buckets)
     local timber = palette.timber
     local rot = Spec.yaw(W.yaw) -- axle (local X of the cylinder) swung to NW-SE
     local children = {}
@@ -27,7 +28,7 @@ function Waterwheel.build(palette: { [string]: { number } }, L: any)
         table.insert(
             children,
             Spec.part(`Wheel{wi}`, {
-                Size = { 1.2, 2 * R, 2 * R },
+                Size = { width, 2 * R, 2 * R },
                 Shape = "Cylinder",
                 CFrame = Spec.cframe(c, rot),
                 Color = timber,
@@ -55,7 +56,7 @@ function Waterwheel.build(palette: { [string]: { number } }, L: any)
             table.insert(
                 children,
                 Spec.part(`Paddle{wi}_{i}`, {
-                    Size = { 1.4, 1.6, 0.9 }, -- deeper than a flat blade → reads as a cup
+                    Size = { width + 0.2, 1.6, 0.9 }, -- buckets span the wheel width; deeper than a flat blade → a cup
                     CFrame = Spec.cframe({ c[1] + off[1], c[2] + off[2], c[3] + off[3] }, prot),
                     Color = timber,
                     Material = "WoodPlanks",
