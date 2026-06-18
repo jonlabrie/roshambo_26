@@ -159,3 +159,41 @@ describe("ArenaLayout bell engine", function()
         expect(L.throwDrum.yaw).toBe(90)
     end)
 end)
+
+describe("ZenDojo overlooks", function()
+    local o = L.overlooks
+    test("two decks cantilever East off the clearing edge at distinct tiers", function()
+        expect(#o.decks).toBe(2)
+        local upper, lower
+        for _, d in o.decks do
+            if d.tier == "upper" then
+                upper = d
+            elseif d.tier == "lower" then
+                lower = d
+            end
+        end
+        expect(upper ~= nil).toBe(true)
+        expect(lower ~= nil).toBe(true)
+        expect(upper.pos[1] > 54).toBe(true) -- East of the terrace edge (~x54)
+        expect(lower.pos[1] > 54).toBe(true)
+        expect(upper.pos[2] > lower.pos[2]).toBe(true) -- upper deck sits higher
+    end)
+    test("the look direction faces downcanyon (East + a touch North)", function()
+        expect(o.facing[1] > 0).toBe(true) -- East
+        expect(o.facing[3] < 0).toBe(true) -- and North (−Z)
+    end)
+    test("the prow sits East of the decks and below the clearing floor", function()
+        expect(o.prow[1] > o.decks[1].pos[1]).toBe(true) -- further East than the decks
+        expect(o.prow[2] < 111).toBe(true) -- below clearing floor
+    end)
+    test("the gorge swerves North and keeps descending past the prow", function()
+        expect(o.swerveTo[3] < o.prow[3]).toBe(true) -- North (−Z) of the prow
+        expect(o.swerveTo[2] < o.prow[2]).toBe(true) -- lower than the prow (still descending)
+    end)
+    test("lantern perches recede and descend down the gorge", function()
+        expect(#o.lanternPerches >= 3).toBe(true)
+        local first, last = o.lanternPerches[1], o.lanternPerches[#o.lanternPerches]
+        expect(last[1] > first[1]).toBe(true) -- further East (deeper)
+        expect(last[2] < first[2]).toBe(true) -- and lower
+    end)
+end)

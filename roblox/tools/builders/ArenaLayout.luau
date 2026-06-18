@@ -225,5 +225,23 @@ local ArenaLayout = {
         -- roof, so the support follows the drum wherever it's centred.
     },
     spawn = { pos = { 0, 29, -188 } }, -- on the rim plaza, facing the bell
+    -- Downcanyon overlook: tiered twin decks off the clearing's EAST edge, aimed ESE
+    -- down the gorge. Decks/stair/rail are built by Overlook.luau; the prow/swerve/
+    -- perch anchors drive the live terrain carve + greening/lantern passes. Starting
+    -- coords — tuned at the gate (Y always provisional → raycast-snapped).
+    overlooks = {
+        facing = { 1, 0, -0.35 }, -- ESE look direction (East + slightly North)
+        railH = 2.8, -- bamboo handrail height
+        decks = {
+            { tier = "upper", pos = { 56, 113, 4 }, size = { 14, 0.6, 10 } },
+            { tier = "lower", pos = { 60, 107, -2 }, size = { 12, 0.6, 9 } },
+        },
+        stair = { from = { 54, 111, 2 }, to = { 58, 107, 0 }, width = 4 }, -- lantern-lined steps between tiers
+        postDrop = 12, -- kake-zukuri posts drop this far below a deck to seat in the terrace lip
+        -- downcanyon set-piece anchors (terrain itself is carved live in Studio):
+        prow = { 158, 92, 0 }, -- mossy buttress centre, mid-distance straight-ish East
+        swerveTo = { 190, 70, -70 }, -- gorge bends North toward here, then fogs out
+        lanternPerches = { { 120, 96, -30 }, { 150, 88, -48 }, { 175, 80, -70 } }, -- far warm-glow dots
+    },
 }
 return ArenaLayout
