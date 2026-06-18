@@ -14,6 +14,7 @@ local TerraceDressing = require("./builders/TerraceDressing")
 local Teahouse = require("./builders/Teahouse")
 local Footpath = require("./builders/Footpath")
 local Foliage = require("./builders/Foliage")
+local Overlook = require("./builders/Overlook")
 local ArenaLayout = require("./builders/ArenaLayout")
 local ZenDojo = require("../src/shared/themes/ZenDojo")
 
@@ -42,6 +43,7 @@ local OUTPUTS: { [string]: any } = {
     ["Teahouses"] = Teahouse.build(ZenDojo.palette, ArenaLayout),
     ["Footpath"] = Footpath.build(ZenDojo.palette, ArenaLayout),
     ["Foliage"] = Foliage.build(ZenDojo.palette, ArenaLayout),
+    ["Overlook"] = Overlook.build(ZenDojo.palette, ArenaLayout),
 }
 
 if not fs.isDir("assets") then
