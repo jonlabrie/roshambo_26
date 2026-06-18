@@ -102,7 +102,7 @@ local ArenaLayout = {
         yaw = 90, -- axle along Z; disc faces the +Z gathering, paddles catch the +X current
         driveYaw = 0, -- drive line toward the bell (RatchetDrum offsets along it)
         bedY = 104, -- support posts stand on the riverbed (river floor ~104)
-        centers = { { -15, 116, -23 } }, -- farther North, out into the river channel (off the gravel bank)
+        centers = { { -15, 116, -19 } }, -- in the river channel, nudged ~4ft South toward the bank (was -23)
         driver = 1,
         ropeAnchor = { -15, 116, -15 },
     },
@@ -176,7 +176,7 @@ local ArenaLayout = {
     -- paddle → spins the drum. Starting coords; tuned at the staging gate.
     bellDrive = {
         -- MAIN SHAFT: along Z (N–S), West of the bell+posts, raised to the wheel axle.
-        shaftFrom = { -15, 116, -23 }, -- = wheel centre (moved out into the river)
+        shaftFrom = { -15, 116, -19 }, -- = wheel centre (nudged South toward the bank)
         shaftTo = { -15, 116, 11 },
         shaftR = 0.6,
         -- BEVEL gear-down at the SW corner: small DriverGear (axle Z) on the main shaft
