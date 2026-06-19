@@ -233,10 +233,14 @@ local ArenaLayout = {
         facing = { 1, 0, -0.35 }, -- ESE look direction (East + slightly North)
         railH = 2.8, -- bamboo handrail height
         decks = {
-            { tier = "upper", pos = { 56, 113, 4 }, size = { 14, 0.6, 10 } },
-            { tier = "lower", pos = { 60, 107, -2 }, size = { 12, 0.6, 9 } },
+            -- upper: big cantilevered overlook — south edge tucked against the rising south
+            -- terrain (~z46), long axis thrown East out over the gorge drop, hanging out
+            { tier = "upper", pos = { 74, 113, 28 }, size = { 34, 0.6, 30 } },
+            -- lower: second tier stepped ~7 down and North over the gorge; WEST end pulled in 4
+            -- (East/gorge edge stays at x84) so it doesn't bury in the terrace
+            { tier = "lower", pos = { 76, 106, 3 }, size = { 16, 0.6, 17 } },
         },
-        stair = { from = { 54, 111, 2 }, to = { 58, 107, 0 }, width = 4 }, -- lantern-lined steps between tiers
+        stair = { from = { 72, 112, 13 }, to = { 72, 106, 5 }, width = 6 }, -- lantern-lined steps linking the two tiers
         postDrop = 12, -- kake-zukuri posts drop this far below a deck to seat in the terrace lip
         -- downcanyon set-piece anchors (terrain itself is carved live in Studio):
         prow = { 158, 92, 0 }, -- mossy buttress centre, mid-distance straight-ish East

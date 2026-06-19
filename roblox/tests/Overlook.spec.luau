@@ -37,9 +37,19 @@ describe("Overlook", function()
         expect(countPrefix(model, "Rail") >= 1).toBe(true)
         expect(countPrefix(model, "Step") >= 2).toBe(true)
     end)
-    test("carries warm lanterns (hero chochin + rail ishidoro)", function()
-        expect(find(model, "Chochin") ~= nil).toBe(true)
-        expect(countPrefix(model, "Ishidoro") >= 1).toBe(true)
+    test("carries dimmed Hanji lanterns atop the railing endposts", function()
+        -- count parts that carry a PointLight child (the glowing lanterns)
+        local lit = 0
+        for _, c in model.children do
+            if c.children then
+                for _, gc in c.children do
+                    if gc.className == "PointLight" then
+                        lit += 1
+                    end
+                end
+            end
+        end
+        expect(lit >= 4).toBe(true) -- a lantern atop several railing newels
     end)
     test("the upper deck slab is placed above the lower deck slab", function()
         local upperY = find(model, "UpperDeck").properties.CFrame[2]
