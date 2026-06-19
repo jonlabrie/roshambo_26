@@ -79,4 +79,125 @@ function CanyonPath.placeAlong(
     return out
 end
 
+-- A standing paper-lantern on a dark post.
+function CanyonPath.lanternPole(palette: { [string]: { number } }, at: { number }): Spec.PartSpec
+    local x, y, z = at[1], at[2], at[3]
+    return Spec.model("LanternPole", {
+        Spec.part("Pole", {
+            Size = { 0.3, 6, 0.3 },
+            CFrame = Spec.cframe({ x, y + 3, z }),
+            Color = palette.ink,
+            Material = "Wood",
+        }),
+        Spec.part("Chochin", {
+            Size = { 1.6, 2.2, 1.6 },
+            CFrame = Spec.cframe({ x, y + 6, z }),
+            Color = palette.gold,
+            Material = "Neon",
+            Transparency = 0.25,
+            children = {
+                {
+                    name = "Glow",
+                    className = "PointLight",
+                    properties = { Brightness = 0.9, Range = 16, Color = { 1.0, 0.78, 0.46 } },
+                },
+            },
+        }),
+    })
+end
+
+-- Build one route's full geometry from its waypoints.
+function CanyonPath.build(palette: { [string]: { number } }, route: any): Spec.PartSpec
+    local width = route.class == "spur" and CanyonPath.SPUR_WIDTH or CanyonPath.TRUNK_WIDTH
+    local pts = route.points
+    local children = {}
+
+    -- tread + invisible collision ramp per segment
+    for i = 2, #pts do
+        local a, b = pts[i - 1], pts[i]
+        local pos, len, rot = Spec.segment(a, b)
+        local kind = CanyonPath.classifySegment(a, b)
+        table.insert(
+            children,
+            Spec.part("Ramp" .. (i - 1), {
+                Size = { len, 0.5, width },
+                CFrame = Spec.cframe(pos, rot),
+                Transparency = 1,
+                Material = "SmoothPlastic",
+                CanCollide = true,
+            })
+        )
+        table.insert(
+            children,
+            Spec.part((kind == "steps" and "Steps" or "Paver") .. (i - 1), {
+                Size = { len, 0.4, width - 0.4 },
+                CFrame = Spec.cframe({ pos[1], pos[2] + 0.45, pos[3] }, rot),
+                Color = kind == "steps" and palette.timber or palette.gravel,
+                Material = kind == "steps" and "WoodPlanks" or "Slate",
+                CanCollide = false,
+            })
+        )
+    end
+
+    -- rail posts on both edges
+    local posts = CanyonPath.placeAlong(pts, CanyonPath.RAIL_SPACING, true)
+    for k, s in posts do
+        local px, pz = -s.dir[2], s.dir[1] -- perpendicular in XZ
+        for _, side in { -1, 1 } do
+            table.insert(
+                children,
+                Spec.part(("RailPost%d_%d"):format(k, side), {
+                    Size = { 0.4, CanyonPath.RAIL_HEIGHT, 0.4 },
+                    CFrame = Spec.cframe({
+                        s.pos[1] + px * (width / 2) * side,
+                        s.pos[2] + CanyonPath.RAIL_HEIGHT / 2,
+                        s.pos[3] + pz * (width / 2) * side,
+                    }),
+                    Color = palette.timber,
+                    Material = "Wood",
+                    CanCollide = false,
+                })
+            )
+        end
+    end
+
+    -- top rails per segment, both sides
+    for i = 2, #pts do
+        local a, b = pts[i - 1], pts[i]
+        local run = hyp(b[1] - a[1], b[3] - a[3])
+        local px = run > 1e-4 and -(b[3] - a[3]) / run or 0
+        local pz = run > 1e-4 and (b[1] - a[1]) / run or 1
+        for _, side in { -1, 1 } do
+            local ox, oz = px * (width / 2) * side, pz * (width / 2) * side
+            local aa = { a[1] + ox, a[2] + CanyonPath.RAIL_HEIGHT, a[3] + oz }
+            local bb = { b[1] + ox, b[2] + CanyonPath.RAIL_HEIGHT, b[3] + oz }
+            local rpos, rlen, rrot = Spec.segment(aa, bb)
+            table.insert(
+                children,
+                Spec.part(("RailTop%d_%d"):format(i - 1, side), {
+                    Size = { rlen, 0.3, 0.3 },
+                    CFrame = Spec.cframe(rpos, rrot),
+                    Color = palette.timber,
+                    Material = "Wood",
+                    CanCollide = false,
+                })
+            )
+        end
+    end
+
+    -- lanterns at intervals, alternating pole / stone, set just off the path edge
+    local stops = CanyonPath.placeAlong(pts, CanyonPath.LANTERN_INTERVAL, false)
+    for k, s in stops do
+        local px, pz = -s.dir[2], s.dir[1]
+        local edge = { s.pos[1] + px * (width / 2 + 1), s.pos[2], s.pos[3] + pz * (width / 2 + 1) }
+        if k % 2 == 1 then
+            table.insert(children, CanyonPath.lanternPole(palette, edge))
+        else
+            table.insert(children, StoneLantern.build(palette, edge))
+        end
+    end
+
+    return Spec.model(route.name or "CanyonPath", children)
+end
+
 return CanyonPath

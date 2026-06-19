@@ -35,3 +35,55 @@ describe("CanyonPath.placeAlong", function()
         expect(s[1].pos[1]).toBeCloseTo(20)
     end)
 end)
+
+local ZenDojo = require("../src/shared/themes/ZenDojo")
+
+local function findPrefix(node, prefix)
+    for _, c in node.children do
+        if (c.name :: string):sub(1, #prefix) == prefix then
+            return c
+        end
+    end
+    return nil
+end
+local function anyLight(node)
+    if not node.children then
+        return false
+    end
+    for _, c in node.children do
+        if c.className == "PointLight" then
+            return true
+        end
+        if anyLight(c) then
+            return true
+        end
+    end
+    return false
+end
+
+describe("CanyonPath.build", function()
+    local route = { name = "TestTrunk", class = "trunk", points = { { 0, 0, 0 }, { 40, 0, 0 }, { 40, 20, 40 } } }
+    local m = CanyonPath.build(ZenDojo.palette, route)
+    test("returns a Model", function()
+        expect(m.className).toBe("Model")
+    end)
+    test("has an invisible colliding ramp per segment", function()
+        local ramp = findPrefix(m, "Ramp")
+        expect(ramp ~= nil).toBe(true)
+        expect(ramp.properties.CanCollide).toBe(true)
+        expect(ramp.properties.Transparency).toBe(1)
+    end)
+    test("trunk ramp is the trunk width", function()
+        expect(findPrefix(m, "Ramp").properties.Size[3]).toBe(8)
+    end)
+    test("has rails", function()
+        expect(findPrefix(m, "RailPost") ~= nil).toBe(true)
+    end)
+    test("has at least one lantern light", function()
+        expect(anyLight(m)).toBe(true)
+    end)
+    test("spur class is narrower", function()
+        local sm = CanyonPath.build(ZenDojo.palette, { name = "S", class = "spur", points = { { 0, 0, 0 }, { 40, 0, 0 } } })
+        expect(findPrefix(sm, "Ramp").properties.Size[3]).toBe(5)
+    end)
+end)
