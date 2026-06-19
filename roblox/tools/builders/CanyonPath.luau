@@ -7,6 +7,8 @@
 local Spec = require("./Spec")
 local StoneLantern = require("./StoneLantern")
 
+type Route = { name: string?, class: string?, points: { { number } } }
+
 local CanyonPath = {}
 
 CanyonPath.TRUNK_WIDTH = 8
@@ -107,7 +109,7 @@ function CanyonPath.lanternPole(palette: { [string]: { number } }, at: { number 
 end
 
 -- Build one route's full geometry from its waypoints.
-function CanyonPath.build(palette: { [string]: { number } }, route: any): Spec.PartSpec
+function CanyonPath.build(palette: { [string]: { number } }, route: Route): Spec.PartSpec
     local width = route.class == "spur" and CanyonPath.SPUR_WIDTH or CanyonPath.TRUNK_WIDTH
     local pts = route.points
     local children = {}
@@ -115,6 +117,10 @@ function CanyonPath.build(palette: { [string]: { number } }, route: any): Spec.P
     -- tread + invisible collision ramp per segment
     for i = 2, #pts do
         local a, b = pts[i - 1], pts[i]
+        local dx, dy, dz = b[1] - a[1], b[2] - a[2], b[3] - a[3]
+        if math.sqrt(dx * dx + dy * dy + dz * dz) < 1e-4 then
+            continue
+        end
         local pos, len, rot = Spec.segment(a, b)
         local kind = CanyonPath.classifySegment(a, b)
         table.insert(
@@ -164,6 +170,10 @@ function CanyonPath.build(palette: { [string]: { number } }, route: any): Spec.P
     -- top rails per segment, both sides
     for i = 2, #pts do
         local a, b = pts[i - 1], pts[i]
+        local dx, dy, dz = b[1] - a[1], b[2] - a[2], b[3] - a[3]
+        if math.sqrt(dx * dx + dy * dy + dz * dz) < 1e-4 then
+            continue
+        end
         local run = hyp(b[1] - a[1], b[3] - a[3])
         local px = run > 1e-4 and -(b[3] - a[3]) / run or 0
         local pz = run > 1e-4 and (b[1] - a[1]) / run or 1

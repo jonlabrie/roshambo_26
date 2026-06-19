@@ -34,6 +34,14 @@ describe("CanyonPath.placeAlong", function()
         local s = CanyonPath.placeAlong(line, 20, false)
         expect(s[1].pos[1]).toBeCloseTo(20)
     end)
+    test("samples cross a segment boundary correctly", function()
+        local bent = { { 0, 0, 0 }, { 30, 0, 0 }, { 30, 0, 30 } } -- total 60
+        local s = CanyonPath.placeAlong(bent, 20, false)
+        expect(#s).toBe(2) -- d=20 on seg1, d=40 on seg2
+        expect(s[2].pos[1]).toBeCloseTo(30)
+        expect(s[2].pos[3]).toBeCloseTo(10)
+        expect(s[2].dir[2]).toBeCloseTo(1) -- heading +Z on the second segment
+    end)
 end)
 
 local ZenDojo = require("../src/shared/themes/ZenDojo")
@@ -90,6 +98,22 @@ describe("CanyonPath.build", function()
         )
         expect(findPrefix(sm, "Ramp").properties.Size[3]).toBe(5)
     end)
+    test("duplicate consecutive waypoints are skipped without NaN", function()
+        local m = CanyonPath.build(ZenDojo.palette, {
+            name = "Degenerate",
+            class = "trunk",
+            points = { { 0, 0, 0 }, { 0, 0, 0 }, { 40, 0, 0 } },
+        })
+        expect(m.className).toBe("Model")
+        -- only the one real segment (pts[2]->pts[3]) yields a ramp
+        local ramps = 0
+        for _, c in m.children do
+            if (c.name :: string):sub(1, 4) == "Ramp" then
+                ramps += 1
+            end
+        end
+        expect(ramps).toBe(1)
+    end)
 end)
 
 describe("CanyonPath.landing", function()
@@ -104,5 +128,9 @@ describe("CanyonPath.landing", function()
     end)
     test("has a lantern light", function()
         expect(anyLight(L)).toBe(true)
+    end)
+    test("pad diameter follows radius", function()
+        local L = CanyonPath.landing(ZenDojo.palette, { 0, 100, 0 }, 16)
+        expect(findPrefix(L, "Pad").properties.Size[2]).toBe(32)
     end)
 end)
