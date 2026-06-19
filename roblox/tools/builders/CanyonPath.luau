@@ -200,4 +200,20 @@ function CanyonPath.build(palette: { [string]: { number } }, route: any): Spec.P
     return Spec.model(route.name or "CanyonPath", children)
 end
 
+-- A small flat paver node where routes branch/meet, with a feature lantern.
+function CanyonPath.landing(palette: { [string]: { number } }, at: { number }, radius: number): Spec.PartSpec
+    local x, y, z = at[1], at[2], at[3]
+    return Spec.model("Landing", {
+        Spec.part("Pad", {
+            Shape = "Cylinder",
+            Size = { 0.5, radius * 2, radius * 2 },
+            CFrame = Spec.cframe({ x, y, z }, Spec.ROT.CYL_VERTICAL),
+            Color = palette.gravel,
+            Material = "Slate",
+            CanCollide = true,
+        }),
+        CanyonPath.lanternPole(palette, { x, y, z }),
+    })
+end
+
 return CanyonPath

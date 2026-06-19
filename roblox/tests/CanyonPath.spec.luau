@@ -62,7 +62,8 @@ local function anyLight(node)
 end
 
 describe("CanyonPath.build", function()
-    local route = { name = "TestTrunk", class = "trunk", points = { { 0, 0, 0 }, { 40, 0, 0 }, { 40, 20, 40 } } }
+    local route =
+        { name = "TestTrunk", class = "trunk", points = { { 0, 0, 0 }, { 40, 0, 0 }, { 40, 20, 40 } } }
     local m = CanyonPath.build(ZenDojo.palette, route)
     test("returns a Model", function()
         expect(m.className).toBe("Model")
@@ -83,7 +84,25 @@ describe("CanyonPath.build", function()
         expect(anyLight(m)).toBe(true)
     end)
     test("spur class is narrower", function()
-        local sm = CanyonPath.build(ZenDojo.palette, { name = "S", class = "spur", points = { { 0, 0, 0 }, { 40, 0, 0 } } })
+        local sm = CanyonPath.build(
+            ZenDojo.palette,
+            { name = "S", class = "spur", points = { { 0, 0, 0 }, { 40, 0, 0 } } }
+        )
         expect(findPrefix(sm, "Ramp").properties.Size[3]).toBe(5)
+    end)
+end)
+
+describe("CanyonPath.landing", function()
+    local L = CanyonPath.landing(ZenDojo.palette, { 0, 100, 0 }, 16)
+    test("returns a Model", function()
+        expect(L.className).toBe("Model")
+    end)
+    test("has a collidable pad", function()
+        local pad = findPrefix(L, "Pad")
+        expect(pad ~= nil).toBe(true)
+        expect(pad.properties.CanCollide).toBe(true)
+    end)
+    test("has a lantern light", function()
+        expect(anyLight(L)).toBe(true)
     end)
 end)
