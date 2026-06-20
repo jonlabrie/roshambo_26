@@ -26,4 +26,5 @@ return {
 	{ name = "Teahouse_10", pos = { -191.0, 213.5, -98.8 }, face = { 0.63, -0.78 }, wall = "far", hand = "right", note = "by FarWall_62; rotated, pad, pulled SE (tucked under cliff)" },
 	{ name = "Teahouse_11", pos = { -187.9, 185.0, -65.8 }, face = { -0.10, 1.00 }, wall = "far", hand = "right", note = "lower tier below 10; near floor zone; rotated+pad" },
 	{ name = "Teahouse_12", pos = { -122.8, 166.4, -67.5 }, face = { 0.72, 0.69 }, wall = "far", hand = "right", note = "descending down-canyon; near floor zone; rotated+pad" },
+	{ name = "Teahouse_13", pos = { 3.0, 202.9, -144.5 }, face = { 0.11, 0.99 }, wall = "far", hand = "right", note = "down-far-wall stretch (z-144); faces across the gorge; pad cut" },
 }
