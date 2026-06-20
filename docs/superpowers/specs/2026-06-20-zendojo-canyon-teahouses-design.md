@@ -46,6 +46,7 @@ Teahouses are placed from an ordered list of **site specs**, baked into `ArenaLa
   egress      = "front" | "right" | "front-left" | ...,  -- which bay opens + where the path meets it
   engawaSides = { "front", "right" }, -- which sides get veranda + shoji (default front+right)
   stiltMode   = "cliff" | "pad",      -- understructure mode (see below)
+  hand        = "right" | "left",     -- which corner the engawa/shoji wrap (see Handed variant)
   pathLink    = <Vector3 | marker>,   -- the spur connection point this teahouse's egress ties to
   frozen      = false,                -- if true, builder SKIPS this instance (fully hand-authored)
 }
@@ -63,6 +64,15 @@ Each teahouse connects to the path network on whatever side the spur approaches,
 
 - **`cliff`** — posts raycast straight down to the terrain/cliff face (variable length; the kake-zukuri look). Used for wall perches.
 - **`pad`** — posts to a flat shelf/foundation pad (uniform short length). Used where a perch sits on a ledge.
+
+### Handed (mirror) variant — `hand = "right" | "left"`
+
+The engawa + shoji wrap a **fixed corner** of the building (front + one side). Rotation can't change *which* corner wraps relative to the facing — so the open/view side and the slope can't both be satisfied on **both** gorge walls with one handedness. Near-wall perches generally want the **right** wrap; far-wall perches (mirrored geometry, facing back across the gorge) generally want the **left** wrap. So handedness is a per-site parameter, not something rotation solves.
+
+- **`right`** (the base form): engawa + shoji wrap **front (−Z) + right (+X)**; solid walls back + left; doorway/corner-lantern on the right; understructure footprint = teahouse + half engawa on front+right.
+- **`left`** (mirror): the same, reflected across the model's local **X=0** plane — engawa/shoji **front + left**, solid back + right, lantern on the left, understructure footprint mirrored.
+
+Implementation (verified): **do NOT geometrically reflect the whole model** — the roof uses WedgeParts (gables `GableA/GableB`, eave `SkirtEnd`) and angled hip rafters that flip the wrong way under reflection (they stab up through the roof). The shell, roof, gables, hip rafters, and shoji are symmetric/shared and stay **untouched**. The left variant only **negates local X of the engawa-assembly box parts** — `EngawaF`, `EngawaS`, the kōran (`RailCap/RailMid/Newel/Baluster`), the understructure (`PerimF/B/L/R`, `JoistF/JoistR`) — plus the **hanging lamp** (`Lantern/Cord/LanCap/LanRib`), then refits the `EngawaPost` stilts at the mirrored footprint. Captured as `makeLeftHand(model)`; template `ServerStorage.TeahousePrototypeL` = clone + makeLeftHand. (NOTE: the shoji panels currently stay on the original front+right side — TBD whether to also mirror `Shoji/ShojiGlow/Mull`, same safe negate-X, so the screens face the left veranda.) In the parameterized builder this is native: build the handed pieces with X negated from the start.
 
 ## Override hook + frozen instances (escape hatches for true one-offs)
 
