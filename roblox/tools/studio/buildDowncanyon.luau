@@ -122,8 +122,13 @@ local old = stage:FindFirstChild("DowncanyonVFX")
 if old then
     old:Destroy()
 end
-local folder = Instance.new("Folder")
+-- A Model with Persistent streaming (NOT a Folder): each cascade Beam spans two parts
+-- (_TOP + _BOT) ~20-30 studs apart. Under StreamingEnabled those parts stream by region
+-- independently, so a beam often has only one endpoint loaded on the client and renders
+-- nothing. Persistent keeps the whole VFX set replicated so the falls always draw.
+local folder = Instance.new("Model")
 folder.Name = "DowncanyonVFX"
+folder.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 folder.Parent = stage
 local WCOL = Color3.fromRGB(214, 230, 238)
 local SMOKE = "rbxasset://textures/particles/smoke_main.dds"
