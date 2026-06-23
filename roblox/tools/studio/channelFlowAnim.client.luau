@@ -16,16 +16,20 @@ local AssetService = game:GetService("AssetService")
 local RunService = game:GetService("RunService")
 local Workspace = game:GetService("Workspace")
 
-local MESH = "rbxassetid://127494282675154" -- ZenChannelRibbon (published)
-local FLOW_TILES_PER_SEC = 0.25
+local MESH = "rbxassetid://101344850099792" -- ZenChannelRibbon v2 (lowered ends, lifted center)
+local FLOW_TILES_PER_SEC = 0.30 -- +20% from 0.25
 local STATIC_PATH = { "RoshamboStage", "OutfallChannelPOC", "ChannelRibbon" }
 
+-- WaitForChild, not FindFirstChild: this is a client script and the stage geometry
+-- replicates from the server asynchronously. FindFirstChild returns nil if the script
+-- wins the race against replication, so the script would bail and never animate
+-- (intermittent "no flow"). Waiting blocks until each node has replicated.
 local function resolve(path: { string }): Instance?
 	local node: Instance = Workspace
 	for _, name in path do
-		local nxt = node:FindFirstChild(name)
+		local nxt = node:WaitForChild(name, 30)
 		if not nxt then
-			return nil
+			return nil -- genuinely absent after 30s
 		end
 		node = nxt
 	end
@@ -34,7 +38,8 @@ end
 
 local static = resolve(STATIC_PATH)
 if not (static and static:IsA("BasePart")) then
-	return -- channel not present; nothing to animate
+	warn("[ChannelFlowAnim] static channel ribbon never replicated; not animating")
+	return
 end
 
 -- load the published mesh as an editable copy (geometry from the asset, not rebuilt)
