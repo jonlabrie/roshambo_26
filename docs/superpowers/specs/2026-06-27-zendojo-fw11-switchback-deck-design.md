@@ -88,7 +88,35 @@ timber-newel + Neon style — match the Overlook, not StoneLantern, for consiste
 - Any ishigaki facing on the descent's downhill edge.
 - Greening / planting around the deck.
 
+## As-built (2026-06-27)
+
+Built via the `SwitchbackDeck` builder (genmodels → Rojo), synced to
+`Workspace.RoshamboStage.SwitchbackDeck`. Diverged from the original design in these ways:
+
+- **Relocated** by the user from the original basin-edge spot out onto a higher promontory shelf:
+  deck center **(159.7, −66.6)**, top **138.46**, footprint 18 × 15. Sits on near-grade ground on the
+  North/cliff edge, cantilevering over the drop toward the SE corner.
+- **Legs:** six vertical posts (1.125 sq, 25% lighter than the Overlook), feet baked from the terrain
+  survey; under-slab girder frame (two long + one cross, 1.2 × 0.825). The SE "raking strut" idea was
+  tried and dropped — terrain there is higher than expected, so a plain vertical reads better.
+- **Railing:** KŌRAN (cap + mid-rail + balusters to the cap + three newels) on the East (downcanyon) and
+  South (X1) open-air edges; North (cliff) + West (path) open.
+- **Lantern:** ONE hanji **result-lantern** on the SE corner (not two plain lanterns). Body named
+  `DeckLantern` so the runtime `LanternController` paints the live World-Throw result SurfaceGui on it
+  (recipe matched from `Overlook.luau`'s `hanjiLantern`: Neon body + warm PointLight + ink timber cap).
+- **Upper-path extension:** the upper FW11→tunnel cobble path was extended ~20 studs (near-flat) to reach
+  the relocated deck, landing flush on the West edge. Built **ad-hoc in `Workspace.PathExtension`**
+  (`ExtTimber_*` + `ExtBed` Parts; `ExtCobbles` per-section Voronoi mesh **published as
+  `rbxassetid://82556346085009`**; `ExtThreshold` Slate sill at the deck join). Cobble recipe = the
+  existing run's (per-section gaps, min-sep 0.55, dome 0.42, flat-up normals, 122/127/117).
+
+## Deferred follow-ups
+
+- **FW11 → FW10 descent** — the actual downhill traverse route (and any step-downs off the deck) is its
+  own project; not designed yet. Needs a separate spec/plan. (The plan's Task-5 step-down stub was dropped.)
+- **Consolidate the extension into the pipeline** — `PathExtension` is ad-hoc workspace geometry; fold it
+  into a builder or committed/published model so it's reproducible like the deck.
+
 ## Open questions
 
-- Exact deck rectangle corners (sub-stud) — finalize against terrain at build time; user adjusts.
-- Whether the East posts want a stone footing pad where they meet the basin (deferred; cosmetic).
+- Whether the far/drop-edge posts want a stone footing pad where they meet the slope (deferred; cosmetic).
