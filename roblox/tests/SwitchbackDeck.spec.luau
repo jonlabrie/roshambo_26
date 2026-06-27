@@ -54,7 +54,7 @@ describe("SwitchbackDeck", function()
         expect(countPrefix(model, "Newel_") >= 2).toBe(true)
     end)
 
-    test("carries two warm Neon lanterns with PointLights at the rail-run ends", function()
+    test("carries a single result-lantern (named *Lantern, Neon, one PointLight) + cap", function()
         local lit = 0
         for _, c in model.children do
             if c.children then
@@ -65,8 +65,12 @@ describe("SwitchbackDeck", function()
                 end
             end
         end
-        expect(lit).toBe(2)
-        local l1 = find(model, "Lantern_1")
-        expect(l1 ~= nil and l1.properties.Material == "Neon").toBe(true)
+        expect(lit).toBe(1)
+        local lantern = find(model, "DeckLantern")
+        expect(lantern ~= nil).toBe(true)
+        expect(lantern.properties.Material).toBe("Neon")
+        -- name must end in "Lantern" so LanternController paints the result SurfaceGui
+        expect((lantern.name :: string):match("Lantern$") ~= nil).toBe(true)
+        expect(find(model, "DeckLanternCap") ~= nil).toBe(true)
     end)
 end)

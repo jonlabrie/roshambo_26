@@ -1,7 +1,8 @@
 --!strict
 -- Small posted timber viewing deck at the FarWall_11 hairpin (spec 2026-06-27).
 -- A smaller/simpler sibling of Overlook: single slab on a post ring, KORAN railing on
--- the East+South edges, two lanterns, a threshold + timber step-downs at the West exit.
+-- the East+South edges, one hanji result-lantern on the SE corner, a threshold + timber
+-- step-downs at the West exit.
 -- Pure & deterministic; post feet are baked from the recorded terrain survey.
 local Spec = require("./Spec")
 
@@ -17,7 +18,10 @@ local DECK_W, DECK_D = 18, 15 -- size: X width, Z depth
 local X0, X1 = CX - DECK_W / 2, CX + DECK_W / 2 -- West, South edges
 local Z0, Z1 = CZ - DECK_D / 2, CZ + DECK_D / 2 -- North, East edges
 local TIMBER = { 0.42, 0.31, 0.20 }
-local LANTERN = { 0.63, 0.49, 0.28 } -- warm Neon lantern (matches the Overlook)
+-- Hanji result-lantern recipe (matches the Overlook). The body MUST be named "*Lantern"
+-- so the runtime LanternController finds it and paints the World-Throw result SurfaceGui.
+local LANTERN_BODY = { 0.635, 0.49, 0.28 } -- warm amber Neon
+local LANTERN_LIGHT = { 1.0, 0.76, 0.46 } -- dim warm PointLight
 
 local SLAB_BOTTOM = DECK_TOP - SLAB_T
 local POST_W = 1.125 -- 25% lighter than the Overlook's 1.5
@@ -112,7 +116,7 @@ local function railRun(
     end
 end
 
-function SwitchbackDeck.build(_palette: any, _layout: any): Spec.PartSpec
+function SwitchbackDeck.build(palette: any, _layout: any): Spec.PartSpec
     local kids: { Spec.PartSpec } = {}
 
     -- deck slab
@@ -192,27 +196,39 @@ function SwitchbackDeck.build(_palette: any, _layout: any): Spec.PartSpec
         )
     end
 
-    -- two lanterns atop the end newels (the jutting corner sits between them)
-    for i, c in { { x0r, zRail }, { xRail, z0r } } do
-        table.insert(kids, {
-            name = `Lantern_{i}`,
-            className = "Part",
-            properties = {
-                Anchored = true,
-                Size = { 1, 1.5, 1 },
-                CFrame = Spec.cframe({ c[1], DECK_TOP + NEWEL_H + 0.75, c[2] }),
-                Color = LANTERN,
-                Material = "Neon",
+    -- single hanji result-lantern atop the SE corner newel (the jutting view corner).
+    -- Name ends in "Lantern" so the runtime LanternController paints the World-Throw result on it.
+    local lanternBaseY = DECK_TOP + NEWEL_H
+    local lh = 1.5
+    table.insert(kids, {
+        name = "DeckLantern",
+        className = "Part",
+        properties = {
+            Anchored = true,
+            Shape = "Block",
+            Size = { 1.0, lh, 1.0 },
+            CFrame = Spec.cframe({ xRail, lanternBaseY + lh / 2, zRail }),
+            Color = LANTERN_BODY,
+            Material = "Neon",
+        },
+        children = {
+            {
+                name = "DeckLanternLight",
+                className = "PointLight",
+                properties = { Color = LANTERN_LIGHT, Brightness = 0.68, Range = 9 },
             },
-            children = {
-                {
-                    name = `Lantern_{i}Light`,
-                    className = "PointLight",
-                    properties = { Color = LANTERN, Brightness = 1.2, Range = 14 },
-                },
-            },
+        },
+    })
+    table.insert(
+        kids,
+        Spec.part("DeckLanternCap", {
+            Shape = "Block",
+            Size = { 1.2, 0.18, 1.2 },
+            CFrame = Spec.cframe({ xRail, lanternBaseY + lh + 0.09, zRail }),
+            Color = palette.ink,
+            Material = "Wood",
         })
-    end
+    )
 
     return Spec.model("SwitchbackDeck", kids)
 end
