@@ -53,4 +53,20 @@ describe("SwitchbackDeck", function()
         expect(countPrefix(model, "Baluster_") >= 6).toBe(true)
         expect(countPrefix(model, "Newel_") >= 2).toBe(true)
     end)
+
+    test("carries two warm Neon lanterns with PointLights at the rail-run ends", function()
+        local lit = 0
+        for _, c in model.children do
+            if c.children then
+                for _, gc in c.children do
+                    if gc.className == "PointLight" then
+                        lit += 1
+                    end
+                end
+            end
+        end
+        expect(lit).toBe(2)
+        local l1 = find(model, "Lantern_1")
+        expect(l1 ~= nil and l1.properties.Material == "Neon").toBe(true)
+    end)
 end)

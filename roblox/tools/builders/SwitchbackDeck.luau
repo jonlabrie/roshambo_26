@@ -17,6 +17,7 @@ local DECK_W, DECK_D = 18, 15 -- size: X width, Z depth
 local X0, X1 = CX - DECK_W / 2, CX + DECK_W / 2 -- West, South edges
 local Z0, Z1 = CZ - DECK_D / 2, CZ + DECK_D / 2 -- North, East edges
 local TIMBER = { 0.42, 0.31, 0.20 }
+local LANTERN = { 0.63, 0.49, 0.28 } -- warm Neon lantern (matches the Overlook)
 
 local SLAB_BOTTOM = DECK_TOP - SLAB_T
 local POST_W = 1.125 -- 25% lighter than the Overlook's 1.5
@@ -189,6 +190,28 @@ function SwitchbackDeck.build(_palette: any, _layout: any): Spec.PartSpec
                 Material = "Wood",
             })
         )
+    end
+
+    -- two lanterns atop the end newels (the jutting corner sits between them)
+    for i, c in { { x0r, zRail }, { xRail, z0r } } do
+        table.insert(kids, {
+            name = `Lantern_{i}`,
+            className = "Part",
+            properties = {
+                Anchored = true,
+                Size = { 1, 1.5, 1 },
+                CFrame = Spec.cframe({ c[1], DECK_TOP + NEWEL_H + 0.75, c[2] }),
+                Color = LANTERN,
+                Material = "Neon",
+            },
+            children = {
+                {
+                    name = `Lantern_{i}Light`,
+                    className = "PointLight",
+                    properties = { Color = LANTERN, Brightness = 1.2, Range = 14 },
+                },
+            },
+        })
     end
 
     return Spec.model("SwitchbackDeck", kids)
