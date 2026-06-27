@@ -247,7 +247,7 @@ function SwitchbackDeck.build(palette: any, _layout: any): Spec.PartSpec
                 Size = { 2.0, 0.5, STAIR_W }, -- 2 deep along travel (-X), STAIR_W wide across (Z)
                 CFrame = Spec.cframe({
                     STAIR_TOP[1] + (STAIR_FOOT[1] - STAIR_TOP[1]) * t,
-                    STAIR_TOP[2] + (STAIR_FOOT[2] - STAIR_TOP[2]) * t,
+                    STAIR_TOP[2] + (STAIR_FOOT[2] - STAIR_TOP[2]) * t - 0.33, -- seat treads ~4in lower on the stringers
                     STAIR_Z,
                 }),
                 Color = palette.ink,
