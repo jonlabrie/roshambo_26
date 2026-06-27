@@ -66,9 +66,9 @@ local RAIL_INSET = 0.35 -- sit the rail line just inboard of the deck edge
 -- ===== deck->path stair (Overlook-style, off the West-south edge) =====
 local STAIR_Z = -62 -- centerline on the West edge, south end
 local STAIR_W = 5.0 -- tread width (across, along Z)
-local STAIR_STEPS = 6
+local STAIR_STEPS = 7
 local STAIR_TOP = { X0, DECK_TOP, STAIR_Z } -- head of flight at the deck edge
-local STAIR_FOOT = { 138.7, 130.91, STAIR_Z } -- user-placed target: ~7.5 drop over 12 studs -X
+local STAIR_FOOT = { 136.7, 129.65, STAIR_Z } -- one step past the original target (same per-step run/rise)
 SwitchbackDeck.STAIR_FOOT = STAIR_FOOT -- exposed: the descent's first route marker
 
 -- axis-aligned timber beam between XZ points p0,p1 at height y, cross-section ch(height) x cw(width)

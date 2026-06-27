@@ -75,9 +75,9 @@ through user-adjusted draft markers (see Route workflow):
 
 ## As-built (2026-06-27)
 
-- **Stair** (in `SwitchbackDeck` builder, synced via Rojo): **6** Slate treads (`2 × 0.5 × 5`, `palette.ink`)
+- **Stair** (in `SwitchbackDeck` builder, synced via Rojo): **7** Slate treads (`2 × 0.5 × 5`, `palette.ink`)
   on two Wood stringers + two framing newels, off the West-south edge, descending −X from the deck top
-  (138.46) to the foot at **(138.7, 130.9, −62)**. `SwitchbackDeck.STAIR_FOOT` publishes that point.
+  (138.46) to the foot at **(136.7, 129.65, −62)**. `SwitchbackDeck.STAIR_FOOT` publishes that point.
   (Tread `Size` is `{2, 0.5, 5}` — 2 deep along travel, 5 wide across; an earlier `{5,0.5,2}` read rotated.)
 - **Route:** draft markers (`Workspace.PathDraft.Descent.Marker_0..8`) dropped stair-foot → FW10 and
   **user-adjusted**; the bottom marker sits ~8 studs back from **FW10 = `Bridge3_B`** (one end of Bridge 3
