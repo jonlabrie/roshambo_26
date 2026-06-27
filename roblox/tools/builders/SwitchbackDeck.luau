@@ -65,10 +65,10 @@ local RAIL_INSET = 0.35 -- sit the rail line just inboard of the deck edge
 
 -- ===== deck->path stair (Overlook-style, off the West-south edge) =====
 local STAIR_Z = -62 -- centerline on the West edge, south end
-local STAIR_W = 5.0 -- tread width (along Z)
-local STAIR_STEPS = 3
+local STAIR_W = 5.0 -- tread width (across, along Z)
+local STAIR_STEPS = 6
 local STAIR_TOP = { X0, DECK_TOP, STAIR_Z } -- head of flight at the deck edge
-local STAIR_FOOT = { X0 - 6, 134.95, STAIR_Z } -- ~3.5 drop over 6 studs -X
+local STAIR_FOOT = { 138.7, 130.91, STAIR_Z } -- user-placed target: ~7.5 drop over 12 studs -X
 SwitchbackDeck.STAIR_FOOT = STAIR_FOOT -- exposed: the descent's first route marker
 
 -- axis-aligned timber beam between XZ points p0,p1 at height y, cross-section ch(height) x cw(width)
@@ -244,7 +244,7 @@ function SwitchbackDeck.build(palette: any, _layout: any): Spec.PartSpec
         table.insert(
             kids,
             Spec.part(`Step{k}`, {
-                Size = { STAIR_W, 0.5, 2.0 },
+                Size = { 2.0, 0.5, STAIR_W }, -- 2 deep along travel (-X), STAIR_W wide across (Z)
                 CFrame = Spec.cframe({
                     STAIR_TOP[1] + (STAIR_FOOT[1] - STAIR_TOP[1]) * t,
                     STAIR_TOP[2] + (STAIR_FOOT[2] - STAIR_TOP[2]) * t,
