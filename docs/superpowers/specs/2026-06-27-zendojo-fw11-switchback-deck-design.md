@@ -107,8 +107,9 @@ Built via the `SwitchbackDeck` builder (genmodels → Rojo), synced to
 - **Upper-path extension:** the upper FW11→tunnel cobble path was extended ~20 studs (near-flat) to reach
   the relocated deck, landing flush on the West edge. Built **ad-hoc in `Workspace.PathExtension`**
   (`ExtTimber_*` + `ExtBed` Parts; `ExtCobbles` per-section Voronoi mesh **published as
-  `rbxassetid://82556346085009`**; `ExtThreshold` Slate sill at the deck join). Cobble recipe = the
-  existing run's (per-section gaps, min-sep 0.55, dome 0.42, flat-up normals, 122/127/117).
+  `rbxassetid://82556346085009`**). Cobble recipe = the existing run's (per-section gaps, min-sep 0.55,
+  dome 0.42, flat-up normals, 122/127/117). The cobbles meet the deck's West edge directly — a Slate
+  threshold sill was tried and **pulled** (didn't read right); no sill.
 
 ## Deferred follow-ups
 
