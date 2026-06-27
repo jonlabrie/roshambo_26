@@ -78,8 +78,32 @@ turns scattered pebbles into fitted dry-stack. **Validated on one prototype span
 - **Capstones / coping** on the wall tops, planting in the joints — possible later polish, not this pass.
 - Pipelining the walls (or the paths) into Rojo — intentionally ad-hoc, matching the existing paths.
 
-## Open questions
+## As-built (2026-06-27)
 
-- Exact float threshold (2.5 assumed) and minimum span length — confirm against the prototype.
-- Whether marginal (~2–2.5) spans adjacent to a walled span should be joined in for continuity — decide when
-  the spans are listed.
+Built ad-hoc into `Workspace.RetainingWalls` (published meshes); the recipe evolved over 4 prototype
+iterations on span PathSteps 25–29 before batching.
+
+**Final geometry (differs from the original recipe):** the early "Voronoi-domed pebbles on a flat face" read
+as scattered pebbles, then as flat wallpaper. What worked: a **dark recessed backing** (`COL_JOINT`
+46/47/45) over the whole battered face, with **flat proud stones on top** (`RELIEF` 0.22 above the backing,
+joints = real recessed shadow), **horizontally-coursed** cells (vertical stretch `SY` 2.0, min-sep `MS`
+1.15), near-**monochromatic** stone (`COL_STONE` 96/98/94, ±3 jitter), `INSET` 0.12.
+
+**Other fixes:** wall top at the **bed underside** (`TOP_BELOW` 0.6 below the timber centre) so it supports
+the path with timbers/bed-edge visible above; stone field mapped to **local** wall height (`w = vs/Hs`) so
+it fills base→top with no mid-span dip; **Perlin-noise crown + base** so neither edge is a clean line;
+`TAPER` 2.0 to a small ragged stub (no sharp points). Batter top ±3.2 → base ±3.7, base = terrain − 0.4.
+
+**Spans walled** (each padded ±1 timber so short/single spans taper naturally; all downhill side):
+
+| MeshPart (`Workspace.RetainingWalls`) | asset |
+|---|---|
+| `Wall_PathSteps_0_1` | `rbxassetid://96190289838990` |
+| `Wall_PathSteps_2_6` | `rbxassetid://126649083086342` |
+| `Wall_PathSteps_25_29` | `rbxassetid://92760557763018` |
+| `Wall_PathSteps_36_39` | `rbxassetid://91978715979561` |
+| `Wall_PathSteps_42_44` | `rbxassetid://99173661423063` |
+| `Wall_PathExtension_1_2` | `rbxassetid://138759613376275` |
+| `Wall_DescentPath_17_19` | `rbxassetid://102374031207978` |
+
+Persists via the saved place + published assets (ad-hoc, like the paths).
