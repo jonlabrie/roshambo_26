@@ -63,6 +63,14 @@ local NEWEL_W, NEWEL_H = 0.62, 3.7
 local BAL_W, BAL_STEP = 0.34, 2.0
 local RAIL_INSET = 0.35 -- sit the rail line just inboard of the deck edge
 
+-- ===== deck->path stair (Overlook-style, off the West-south edge) =====
+local STAIR_Z = -62 -- centerline on the West edge, south end
+local STAIR_W = 5.0 -- tread width (along Z)
+local STAIR_STEPS = 3
+local STAIR_TOP = { X0, DECK_TOP, STAIR_Z } -- head of flight at the deck edge
+local STAIR_FOOT = { X0 - 6, 134.95, STAIR_Z } -- ~3.5 drop over 6 studs -X
+SwitchbackDeck.STAIR_FOOT = STAIR_FOOT -- exposed: the descent's first route marker
+
 -- axis-aligned timber beam between XZ points p0,p1 at height y, cross-section ch(height) x cw(width)
 local function barSeg(
     kids: { Spec.PartSpec },
@@ -229,6 +237,51 @@ function SwitchbackDeck.build(palette: any, _layout: any): Spec.PartSpec
             Material = "Wood",
         })
     )
+
+    -- deck->path stair: 3 Slate treads from the deck edge down to the foot
+    for k = 1, STAIR_STEPS do
+        local t = (k - 0.5) / STAIR_STEPS
+        table.insert(
+            kids,
+            Spec.part(`Step{k}`, {
+                Size = { STAIR_W, 0.5, 2.0 },
+                CFrame = Spec.cframe({
+                    STAIR_TOP[1] + (STAIR_FOOT[1] - STAIR_TOP[1]) * t,
+                    STAIR_TOP[2] + (STAIR_FOOT[2] - STAIR_TOP[2]) * t,
+                    STAIR_Z,
+                }),
+                Color = palette.ink,
+                Material = "Slate",
+            })
+        )
+    end
+    -- two sloped stringers under the tread edges
+    for si, off in { -(STAIR_W / 2 - 0.3), STAIR_W / 2 - 0.3 } do
+        local a = { STAIR_TOP[1], STAIR_TOP[2] - 0.7, STAIR_Z + off }
+        local b = { STAIR_FOOT[1], STAIR_FOOT[2] - 0.7, STAIR_Z + off }
+        local pos, len, rot = Spec.segment(a, b)
+        table.insert(
+            kids,
+            Spec.part(`Stringer{si}`, {
+                Size = { len, 0.9, 0.5 },
+                CFrame = Spec.cframe(pos, rot),
+                Color = TIMBER,
+                Material = "Wood",
+            })
+        )
+    end
+    -- two newels framing the head of the flight (West edge is otherwise open)
+    for i, zoff in { -(STAIR_W / 2), STAIR_W / 2 } do
+        table.insert(
+            kids,
+            Spec.part(`StairNewel_{i}`, {
+                Size = { NEWEL_W, NEWEL_H, NEWEL_W },
+                CFrame = Spec.cframe({ X0 + NEWEL_W / 2, DECK_TOP + NEWEL_H / 2, STAIR_Z + zoff }),
+                Color = TIMBER,
+                Material = "Wood",
+            })
+        )
+    end
 
     return Spec.model("SwitchbackDeck", kids)
 end

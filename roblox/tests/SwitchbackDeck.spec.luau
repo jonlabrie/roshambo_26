@@ -73,4 +73,17 @@ describe("SwitchbackDeck", function()
         expect((lantern.name :: string):match("Lantern$") ~= nil).toBe(true)
         expect(find(model, "DeckLanternCap") ~= nil).toBe(true)
     end)
+
+    test("has a 3-step Slate stair on stringers off the West-south edge, descending", function()
+        local s1, s2, s3 = find(model, "Step1"), find(model, "Step2"), find(model, "Step3")
+        expect(s1 ~= nil and s2 ~= nil and s3 ~= nil).toBe(true)
+        expect(s1.properties.Material).toBe("Slate")
+        -- treads descend in Y from the deck toward the foot
+        expect(s1.properties.CFrame[2] > s2.properties.CFrame[2]).toBe(true)
+        expect(s2.properties.CFrame[2] > s3.properties.CFrame[2]).toBe(true)
+        expect(countPrefix(model, "Stringer") >= 2).toBe(true)
+        expect(countPrefix(model, "StairNewel_") >= 2).toBe(true)
+        -- publishes the descent's first route point, below the deck top
+        expect(SwitchbackDeck.STAIR_FOOT[2] < 138.46).toBe(true)
+    end)
 end)
