@@ -52,6 +52,65 @@ local function flushZ(z: number): number
     return z
 end
 
+-- ===== railing (KORAN: cap + mid-rail + balusters + newels) =====
+local RAIL_H = 3.2
+local NEWEL_W, NEWEL_H = 0.62, 3.7
+local BAL_W, BAL_STEP = 0.34, 2.0
+local RAIL_INSET = 0.35 -- sit the rail line just inboard of the deck edge
+
+-- axis-aligned timber beam between XZ points p0,p1 at height y, cross-section ch(height) x cw(width)
+local function barSeg(
+    kids: { Spec.PartSpec },
+    name: string,
+    p0: { number },
+    p1: { number },
+    y: number,
+    ch: number,
+    cw: number
+)
+    local dx, dz = p1[1] - p0[1], p1[2] - p0[2]
+    local size = if math.abs(dx) >= math.abs(dz)
+        then { math.abs(dx) + cw, ch, cw }
+        else { cw, ch, math.abs(dz) + cw }
+    table.insert(
+        kids,
+        Spec.part(name, {
+            Size = size,
+            CFrame = Spec.cframe({ (p0[1] + p1[1]) / 2, y, (p0[2] + p1[2]) / 2 }),
+            Color = TIMBER,
+            Material = "Wood",
+        })
+    )
+end
+
+-- railing run a->b ({x,z}): flat top cap + mid-rail + square balusters
+local function railRun(
+    kids: { Spec.PartSpec },
+    tag: string,
+    a: { number },
+    b: { number },
+    balC: { v: number }
+)
+    barSeg(kids, `Rail{tag}Cap`, a, b, DECK_TOP + RAIL_H, 0.3, 0.6)
+    barSeg(kids, `Rail{tag}Mid`, a, b, DECK_TOP + RAIL_H - 1.1, 0.2, 0.3)
+    local dx, dz = b[1] - a[1], b[2] - a[2]
+    local len = math.sqrt(dx * dx + dz * dz)
+    local n = math.max(2, math.floor(len / BAL_STEP))
+    for i = 0, n do
+        local t = i / n
+        balC.v += 1
+        table.insert(
+            kids,
+            Spec.part(`Baluster_{balC.v}`, {
+                Size = { BAL_W, RAIL_H - 0.3, BAL_W },
+                CFrame = Spec.cframe({ a[1] + dx * t, DECK_TOP + (RAIL_H - 0.3) / 2, a[2] + dz * t }),
+                Color = TIMBER,
+                Material = "Wood",
+            })
+        )
+    end
+end
+
 function SwitchbackDeck.build(_palette: any, _layout: any): Spec.PartSpec
     local kids: { Spec.PartSpec } = {}
 
@@ -105,6 +164,27 @@ function SwitchbackDeck.build(_palette: any, _layout: any): Spec.PartSpec
             Spec.part(`Post_{i}`, {
                 Size = { POST_W, h, POST_W },
                 CFrame = Spec.cframe({ flushX(px), foot + h / 2, flushZ(pz) }),
+                Color = TIMBER,
+                Material = "Wood",
+            })
+        )
+    end
+
+    -- railing on the two open-air edges: East = far/downcanyon (Z1), South = X1. Open on North (cliff) + West (path).
+    local zRail = Z1 - RAIL_INSET
+    local xRail = X1 - RAIL_INSET
+    local x0r, x1r = X0 + RAIL_INSET, X1 - RAIL_INSET
+    local z0r = Z0 + RAIL_INSET
+    local balC = { v = 0 }
+    railRun(kids, "East", { x0r, zRail }, { x1r, zRail }, balC) -- far/downcanyon edge
+    railRun(kids, "South", { xRail, z0r }, { xRail, zRail }, balC) -- X1 edge
+    -- newels at the L-run ends + the jutting corner
+    for i, c in { { x0r, zRail }, { xRail, zRail }, { xRail, z0r } } do
+        table.insert(
+            kids,
+            Spec.part(`Newel_{i}`, {
+                Size = { NEWEL_W, NEWEL_H, NEWEL_W },
+                CFrame = Spec.cframe({ c[1], DECK_TOP + NEWEL_H / 2, c[2] }),
                 Color = TIMBER,
                 Material = "Wood",
             })

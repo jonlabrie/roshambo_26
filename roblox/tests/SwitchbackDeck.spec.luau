@@ -44,4 +44,13 @@ describe("SwitchbackDeck", function()
         -- posts are vertical (identity rotation): no StrutSE
         expect(find(model, "StrutSE")).toBe(nil)
     end)
+
+    test("railing only on the East + South open-air edges, with balusters and newels", function()
+        expect(find(model, "RailEastCap") ~= nil).toBe(true)
+        expect(find(model, "RailSouthCap") ~= nil).toBe(true)
+        expect(countPrefix(model, "RailNorth")).toBe(0)
+        expect(countPrefix(model, "RailWest")).toBe(0)
+        expect(countPrefix(model, "Baluster_") >= 6).toBe(true)
+        expect(countPrefix(model, "Newel_") >= 2).toBe(true)
+    end)
 end)
