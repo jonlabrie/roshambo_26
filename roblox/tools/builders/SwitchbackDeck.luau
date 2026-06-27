@@ -102,8 +102,8 @@ local function railRun(
         table.insert(
             kids,
             Spec.part(`Baluster_{balC.v}`, {
-                Size = { BAL_W, RAIL_H - 0.3, BAL_W },
-                CFrame = Spec.cframe({ a[1] + dx * t, DECK_TOP + (RAIL_H - 0.3) / 2, a[2] + dz * t }),
+                Size = { BAL_W, RAIL_H, BAL_W }, -- up to the cap (no gap below the top rail)
+                CFrame = Spec.cframe({ a[1] + dx * t, DECK_TOP + RAIL_H / 2, a[2] + dz * t }),
                 Color = TIMBER,
                 Material = "Wood",
             })
