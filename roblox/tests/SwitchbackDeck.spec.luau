@@ -38,14 +38,10 @@ describe("SwitchbackDeck", function()
         expect(slab.properties.Size[3]).toBe(15)
     end)
 
-    test("stands on >=5 vertical posts plus a raking SE strut, with under-slab girders", function()
-        expect(countPrefix(model, "Post_") >= 5).toBe(true)
+    test("stands on 6 vertical posts with under-slab girders", function()
+        expect(countPrefix(model, "Post_")).toBe(6)
         expect(countPrefix(model, "Girder") >= 3).toBe(true)
-        local strut = find(model, "StrutSE")
-        expect(strut ~= nil).toBe(true)
-        -- raking, not vertical: the strut's long axis (local X = rot col 1 = cf[4],cf[7],cf[10])
-        -- is not world-X, so cf[4] (ux) is well below 1
-        local cf = strut.properties.CFrame
-        expect(math.abs(cf[4]) < 0.5).toBe(true)
+        -- posts are vertical (identity rotation): no StrutSE
+        expect(find(model, "StrutSE")).toBe(nil)
     end)
 end)

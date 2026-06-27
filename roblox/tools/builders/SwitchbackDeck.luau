@@ -19,22 +19,38 @@ local Z0, Z1 = CZ - DECK_D / 2, CZ + DECK_D / 2 -- North, East edges
 local TIMBER = { 0.42, 0.31, 0.20 }
 
 local SLAB_BOTTOM = DECK_TOP - SLAB_T
-local POST_W = 1.5
+local POST_W = 1.125 -- 25% lighter than the Overlook's 1.5
 local GIRDER_TOP = SLAB_BOTTOM -- girder top flush under slab
-local GIRDER_H, GIRDER_W = 1.6, 1.1
+local GIRDER_H, GIRDER_W = 1.2, 0.825 -- 25% lighter than 1.6 x 1.1
 
 -- Post feet baked from the terrain survey (2026-06-27, after the user's lower+terrain tweak).
--- North/cliff edge sits near grade (short stubs); far/drop edge grows toward the SE corner.
+-- All vertical; North/cliff edge sits near grade (short stubs), far/drop edge grows toward SE.
 local VERT_POSTS = {
     { X0, Z0, 137.0 }, -- NW (cliff + up-canyon)
     { CX, Z0, 137.2 }, -- N mid
     { X1, Z0, 137.0 }, -- NE (cliff + downcanyon)
     { X0, Z1, 135.9 }, -- SW (far edge, up-canyon)
     { CX, Z1, 134.3 }, -- S mid (far edge)
+    { X1, Z1, 130.2 }, -- SE (far edge, downcanyon; tallest)
 }
--- SE corner: a ~30deg raking strut back into the rising slope instead of a tall vertical stilt.
-local SE_STRUT_FOOT = { X1, 132.65, CZ + DECK_D / 2 - 4.1 } -- (168.7, 132.65, -63.2): ~30deg rake
-local SE_STRUT_TOP = { X1, SLAB_BOTTOM, Z1 } -- deck SE corner underside
+
+-- inset a coordinate so a post/beam's OUTER face sits flush with the deck edge
+local function flushX(x: number): number
+    if math.abs(x - X0) < 0.01 then
+        return x + POST_W / 2
+    elseif math.abs(x - X1) < 0.01 then
+        return x - POST_W / 2
+    end
+    return x
+end
+local function flushZ(z: number): number
+    if math.abs(z - Z0) < 0.01 then
+        return z + POST_W / 2
+    elseif math.abs(z - Z1) < 0.01 then
+        return z - POST_W / 2
+    end
+    return z
+end
 
 function SwitchbackDeck.build(_palette: any, _layout: any): Spec.PartSpec
     local kids: { Spec.PartSpec } = {}
@@ -56,7 +72,7 @@ function SwitchbackDeck.build(_palette: any, _layout: any): Spec.PartSpec
         kids,
         Spec.part("GirderX_N", {
             Size = { DECK_W, GIRDER_H, GIRDER_W },
-            CFrame = Spec.cframe({ CX, gy, Z0 }),
+            CFrame = Spec.cframe({ CX, gy, Z0 + GIRDER_W / 2 }), -- flush with North edge
             Color = TIMBER,
             Material = "Wood",
         })
@@ -65,7 +81,7 @@ function SwitchbackDeck.build(_palette: any, _layout: any): Spec.PartSpec
         kids,
         Spec.part("GirderX_Far", {
             Size = { DECK_W, GIRDER_H, GIRDER_W },
-            CFrame = Spec.cframe({ CX, gy, Z1 }),
+            CFrame = Spec.cframe({ CX, gy, Z1 - GIRDER_W / 2 }), -- flush with far edge
             Color = TIMBER,
             Material = "Wood",
         })
@@ -80,7 +96,7 @@ function SwitchbackDeck.build(_palette: any, _layout: any): Spec.PartSpec
         })
     )
 
-    -- vertical posts (foot on terrain up to slab underside)
+    -- vertical posts (foot on terrain up to slab underside), inset so outer faces sit flush with the deck edges
     for i, p in VERT_POSTS do
         local px, pz, foot = p[1], p[2], p[3]
         local h = math.max(SLAB_BOTTOM - foot, 0.8)
@@ -88,24 +104,12 @@ function SwitchbackDeck.build(_palette: any, _layout: any): Spec.PartSpec
             kids,
             Spec.part(`Post_{i}`, {
                 Size = { POST_W, h, POST_W },
-                CFrame = Spec.cframe({ px, foot + h / 2, pz }),
+                CFrame = Spec.cframe({ flushX(px), foot + h / 2, flushZ(pz) }),
                 Color = TIMBER,
                 Material = "Wood",
             })
         )
     end
-
-    -- SE raking strut (~30deg into the slope)
-    local pos, len, rot = Spec.segment(SE_STRUT_FOOT, SE_STRUT_TOP)
-    table.insert(
-        kids,
-        Spec.part("StrutSE", {
-            Size = { len, POST_W, POST_W }, -- long axis = local X (Spec.segment aligns X with foot->top)
-            CFrame = Spec.cframe(pos, rot),
-            Color = TIMBER,
-            Material = "Wood",
-        })
-    )
 
     return Spec.model("SwitchbackDeck", kids)
 end
