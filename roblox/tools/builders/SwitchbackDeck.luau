@@ -10,8 +10,8 @@ local SwitchbackDeck = {}
 -- ===== constants (see plan Global Constraints) =====
 local DECK_TOP = 138.0
 local SLAB_T = 0.6
-local X0, X1 = 124, 136 -- West, South edges
-local Z0, Z1 = -76, -66 -- North, East edges
+local X0, X1 = 121, 139 -- West, South edges (18 wide along the cliff)
+local Z0, Z1 = -76, -61 -- North, East edges (15 deep; North tucks at cliff, extends east over drop)
 local TIMBER = { 0.42, 0.31, 0.20 }
 
 function SwitchbackDeck.build(_palette: any, _layout: any): Spec.PartSpec
