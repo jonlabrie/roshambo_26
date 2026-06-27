@@ -8,7 +8,7 @@ local Spec = require("./Spec")
 local SwitchbackDeck = {}
 
 -- ===== constants (see plan Global Constraints) =====
-local DECK_TOP = 138.8
+local DECK_TOP = 138.46
 local SLAB_T = 0.6
 -- Position baked from the user's in-Studio placement (2026-06-27): center (159.7, -66.6),
 -- out on the higher promontory shelf east of FW11; reached by extending the upper path.
@@ -17,6 +17,24 @@ local DECK_W, DECK_D = 18, 15 -- size: X width, Z depth
 local X0, X1 = CX - DECK_W / 2, CX + DECK_W / 2 -- West, South edges
 local Z0, Z1 = CZ - DECK_D / 2, CZ + DECK_D / 2 -- North, East edges
 local TIMBER = { 0.42, 0.31, 0.20 }
+
+local SLAB_BOTTOM = DECK_TOP - SLAB_T
+local POST_W = 1.5
+local GIRDER_TOP = SLAB_BOTTOM -- girder top flush under slab
+local GIRDER_H, GIRDER_W = 1.6, 1.1
+
+-- Post feet baked from the terrain survey (2026-06-27, after the user's lower+terrain tweak).
+-- North/cliff edge sits near grade (short stubs); far/drop edge grows toward the SE corner.
+local VERT_POSTS = {
+    { X0, Z0, 137.0 }, -- NW (cliff + up-canyon)
+    { CX, Z0, 137.2 }, -- N mid
+    { X1, Z0, 137.0 }, -- NE (cliff + downcanyon)
+    { X0, Z1, 135.9 }, -- SW (far edge, up-canyon)
+    { CX, Z1, 134.3 }, -- S mid (far edge)
+}
+-- SE corner: a ~30deg raking strut back into the rising slope instead of a tall vertical stilt.
+local SE_STRUT_FOOT = { X1, 132.65, CZ + DECK_D / 2 - 4.1 } -- (168.7, 132.65, -63.2): ~30deg rake
+local SE_STRUT_TOP = { X1, SLAB_BOTTOM, Z1 } -- deck SE corner underside
 
 function SwitchbackDeck.build(_palette: any, _layout: any): Spec.PartSpec
     local kids: { Spec.PartSpec } = {}
@@ -29,6 +47,63 @@ function SwitchbackDeck.build(_palette: any, _layout: any): Spec.PartSpec
             CFrame = Spec.cframe({ CX, DECK_TOP - SLAB_T / 2, CZ }),
             Color = TIMBER,
             Material = "WoodPlanks",
+        })
+    )
+
+    -- under-slab girders: two long beams (along X) at the edges + one cross beam (along Z) mid-span
+    local gy = GIRDER_TOP - GIRDER_H / 2
+    table.insert(
+        kids,
+        Spec.part("GirderX_N", {
+            Size = { DECK_W, GIRDER_H, GIRDER_W },
+            CFrame = Spec.cframe({ CX, gy, Z0 }),
+            Color = TIMBER,
+            Material = "Wood",
+        })
+    )
+    table.insert(
+        kids,
+        Spec.part("GirderX_Far", {
+            Size = { DECK_W, GIRDER_H, GIRDER_W },
+            CFrame = Spec.cframe({ CX, gy, Z1 }),
+            Color = TIMBER,
+            Material = "Wood",
+        })
+    )
+    table.insert(
+        kids,
+        Spec.part("GirderZ_M", {
+            Size = { GIRDER_W, GIRDER_H, DECK_D },
+            CFrame = Spec.cframe({ CX, gy, CZ }),
+            Color = TIMBER,
+            Material = "Wood",
+        })
+    )
+
+    -- vertical posts (foot on terrain up to slab underside)
+    for i, p in VERT_POSTS do
+        local px, pz, foot = p[1], p[2], p[3]
+        local h = math.max(SLAB_BOTTOM - foot, 0.8)
+        table.insert(
+            kids,
+            Spec.part(`Post_{i}`, {
+                Size = { POST_W, h, POST_W },
+                CFrame = Spec.cframe({ px, foot + h / 2, pz }),
+                Color = TIMBER,
+                Material = "Wood",
+            })
+        )
+    end
+
+    -- SE raking strut (~30deg into the slope)
+    local pos, len, rot = Spec.segment(SE_STRUT_FOOT, SE_STRUT_TOP)
+    table.insert(
+        kids,
+        Spec.part("StrutSE", {
+            Size = { len, POST_W, POST_W }, -- long axis = local X (Spec.segment aligns X with foot->top)
+            CFrame = Spec.cframe(pos, rot),
+            Color = TIMBER,
+            Material = "Wood",
         })
     )
 
