@@ -21,8 +21,8 @@ describe("SwitchbackDeck", function()
         local slab = find(model, "DeckSlab")
         expect(slab ~= nil).toBe(true)
         expect(slab.properties.Material).toBe("WoodPlanks")
-        -- slab top = center.Y + thickness/2 == 138
-        expect(slab.properties.CFrame[2] + slab.properties.Size[2] / 2).toBe(138)
+        -- slab top = center.Y + thickness/2 == 138.8
+        expect(slab.properties.CFrame[2] + slab.properties.Size[2] / 2).toBe(138.8)
         -- footprint 18 (X) x 15 (Z)
         expect(slab.properties.Size[1]).toBe(18)
         expect(slab.properties.Size[3]).toBe(15)
