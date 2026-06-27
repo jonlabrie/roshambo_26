@@ -73,7 +73,25 @@ through user-adjusted draft markers (see Route workflow):
 - **FW10 connection** — how the descent ties into whatever continues below FW10 (its own step).
 - **Consolidating** the ad-hoc descent path into the builder pipeline (tracked with the extension cleanup).
 
+## As-built (2026-06-27)
+
+- **Stair** (in `SwitchbackDeck` builder, synced via Rojo): **6** Slate treads (`2 × 0.5 × 5`, `palette.ink`)
+  on two Wood stringers + two framing newels, off the West-south edge, descending −X from the deck top
+  (138.46) to the foot at **(138.7, 130.9, −62)**. `SwitchbackDeck.STAIR_FOOT` publishes that point.
+  (Tread `Size` is `{2, 0.5, 5}` — 2 deep along travel, 5 wide across; an earlier `{5,0.5,2}` read rotated.)
+- **Route:** draft markers (`Workspace.PathDraft.Descent.Marker_0..8`) dropped stair-foot → FW10 and
+  **user-adjusted**; the bottom marker sits ~8 studs back from **FW10 = `Bridge3_B`** (one end of Bridge 3
+  across the river) to leave the bridge transition.
+- **Descent path** (ad-hoc, `Workspace.DescentPath`): **19** `DescTimber_*` risers (Wood `74/52/32`,
+  6.4 × 1.6 × 1.2) along a Catmull-Rom spline through the markers; **19** `DescBed_*` flat per-gap slabs
+  (Concrete + `ZenCement2`, **5.8** wide, top ~0.05 below each gap's downhill-timber tread); `DescCobbles`
+  **published `rbxassetid://132480572793631`** — per-section Voronoi cobbles, **flat per tread** (stepped,
+  not sloped), half-width **2.6** (≈5.2 wide, inside the bed so ends are covered while the 6.4 timber ends
+  stay proud), apex `tread + 0.25`, dome 0.42, flat-up normals, mossy 122/127/117.
+- **Key sizing rule learned:** timber (6.4) > bed (5.8) > cobbles (~5.2) — so timber ends reveal, cobble
+  ends stay tucked in the gravel.
+
 ## Open questions
 
-- Exact step count/rise of the stair (3 assumed) — confirm against the real drop once the foot is sited.
-- Marker count/spacing for the descent — set when dropping the draft row.
+- The descent **floats over the basin** mid-run (by design) — pending the separate retaining-wall pass.
+- `StairTarget` (cyan ball) is kept as the path's top reference; draft markers remain (DevMarker, hidden in Play).
