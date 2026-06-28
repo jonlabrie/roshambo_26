@@ -1,0 +1,99 @@
+# ZenDojo Path Railings & Hanging Chōchin (Design)
+
+Status: design, awaiting user review (2026-06-27).
+
+Related: `docs/superpowers/specs/2026-06-27-zendojo-fw11-switchback-deck-design.md` (KŌRAN railing + hanji
+result-lantern), `2026-06-27-zendojo-retaining-walls-design.md`; memory `zendojo-fw11-switchback-deck`.
+Reference: user's images — bamboo post-and-rail on the drop edge, hanging ribbed chōchin on cross-arm poles
+up the cliff edge.
+
+## Purpose
+
+Furnish the canyon path system (upper run, extension, descent — ~270 studs) with a **bamboo railing** along
+the downhill/drop edge and **hanging chōchin lanterns** on cross-arm poles up the cliff edge. The chōchin
+**display the World-Throw result** like the deck/canyon lanterns. The existing teahouse "lantern" (a plain
+Neon block + cylinder SpecialMesh) is the look being replaced — a proper ribbed chōchin is designed and
+prototyped first, and the shared lantern controller is generalized to drive both block and round styles.
+
+## Sub-projects / build order
+
+1. **LanternController generalization** (code) — support a `round` display style.
+2. **Chōchin model** (Parts) — prototype + iterate the look; must glow AND show the result in Play.
+3. **Bamboo railing** — prototype one stretch.
+4. **Deploy** railings + chōchin poles along all three paths.
+
+Build 1+2 together (the chōchin can't be validated without the controller change). Prototype-first throughout.
+
+## §1 — Chōchin model
+
+A round ribbed paper lantern, built from Parts (fast to iterate, reused per pole):
+
+- **Body:** warm Neon barrel with a slight bulge (e.g. stacked cylinders or a short barrel), warm cream
+  (~`255/225/170`), partial transparency for paper feel; a warm `PointLight` inside (range ~16).
+- **Ribs:** ~10–12 thin rib rings around the body (slightly darker/proud) — the bamboo banding.
+- **Caps:** dark wood disc caps top & bottom, with small red/dark accent rings (the fittings).
+- **Cord:** a short thin dark cord from the top cap up to the hanger.
+- **Result display:** CollectionService-tagged **`RoundLantern`**; the controller paints a **billboard
+  glyph** (see §2). No flat faces needed.
+- Reusable as a unit (clone/rebuild per pole).
+
+## §2 — LanternController generalization (`src/client/LanternController.client.luau`)
+
+Today: finds `*Lantern` BaseParts under `Workspace.RoshamboStage`, builds a kumiko-frame + glyph
+**SurfaceGui on 4 faces** (Front/Back/Left/Right). **Leave that block path exactly as-is** (no regression,
+no retagging, and the teahouse `Lantern` stays untouched), and **add** a parallel round path:
+
+- **Round lanterns are discovered by CollectionService tag `RoundLantern`** (`GetTagged` +
+  `GetInstanceAddedSignal`), canyon-wide (anywhere in `workspace`).
+- Each round lantern gets a single **BillboardGui** with the warm-ink glyph (GothamBlack), centred and sized
+  to the body, facing the viewer — instead of the 4-face SurfaceGui.
+- **Shared telegraph:** round glyph labels register in the same `glyphLabels` list and ride the existing
+  reveal→drumRest→show, fade, and blank-lead logic unchanged. Glyph set `{R="○",P="─",S="∧"}`, ink colour
+  shared with the block path.
+- Net change: the script keeps its current block behaviour and gains a `RoundLantern`-tag scan + a
+  `buildBillboard(part)` branch. Existing deck/Overlook/canyon lanterns need no edits.
+
+## §3 — Bamboo railing
+
+Warm-tan bamboo **cylinder** post-and-rail along the **downhill edge** of each path:
+
+- **Posts:** ~0.45 dia, ~3.4 tall, every **~2 timbers (~7 studs)**, at the bed edge, plumb (slight grade lean
+  ok). Bamboo colour (~`170/150/90`), Material Wood/Bamboo-like.
+- **Rails:** two horizontal bamboo runs (~0.3 dia) post-to-post following the path — **top ~2.9** and **mid
+  ~1.5** above the tread. Open between (no balusters).
+- Continuous along all three paths' downhill edges.
+
+## §4 — Chōchin poles & placement
+
+- **Pole:** tall bamboo upright (~0.35 dia, ~5.5 tall) on the **uphill/cliff edge**, with a short horizontal
+  **cross-arm bracket** near the top; the chōchin hangs from the cross-arm end by its cord.
+- **Spacing:** ~every **6 timbers** (accents, a handful per path).
+- Each hung chōchin is CollectionService-tagged **`RoundLantern`**.
+
+## Units
+
+- **LanternController** (`src/`) — adds a `RoundLantern`-tag scan + `buildBillboard` branch; block path
+  unchanged. Verified in Play. (Client runtime script, not lune-tested — verification is Play + the existing
+  lune suite stays green and untouched.)
+- **Chōchin** (Parts unit) — body + ribs + caps + cord + light; tagged.
+- **ChochinPole** (Parts) — upright + cross-arm + hung chōchin, placed along the uphill edge.
+- **BambooRailing** (Parts) — posts + 2 rails along the downhill edge.
+
+## Where it lives
+
+- Controller: `src/client/LanternController.client.luau` (Rojo pipeline, committed).
+- Geometry: ad-hoc Parts in `Workspace.PathRailings` + `Workspace.PathLanterns` (tag-driven controller finds
+  lanterns anywhere). Persists via the saved place. Consistent with the ad-hoc paths.
+
+## Out of scope
+
+- Standing box lanterns (the square peaked-roof type in the ref) — only the round hanging chōchin this pass.
+- Replacing the teahouse lantern model — out of scope here (this designs the path chōchin; the teahouse swap
+  can reuse it later).
+- The river bridge(s).
+
+## Open questions
+
+- Exact rib count / barrel proportions / cord length — tuned on the prototype.
+- Billboard glyph size & how "painted-on" vs floating it reads — tuned on the prototype in Play.
+- Railing post spacing (~2 timbers) and lantern spacing (~6 timbers) — confirm on the prototype stretch.
