@@ -158,10 +158,18 @@ single-timber spans taper naturally instead of forming nubs). Per-span **publish
 
 ---
 
-## 6. Efficiency TODO (next big win)
+## 6. Reusable build scripts (`roblox/tools/studio/`)
 
-The per-stretch build scripts (cobble-path generator, ishigaki generator, railing/pole/chōchin builders) were
-written ad-hoc and live in the as-built specs + this session. **Extract them into reusable parameterized
-functions** under `roblox/tools/studio/` (e.g. `buildSteppedPath(markersFolder)`, `buildIshigakiSpan(span)`,
-`buildBambooRailing(model, prefix)`, `buildChochinPole(cframe)`) so the next valley stretch is "drop markers →
-call the function," not re-derive. Biggest lever for the remaining ~95%.
+Proven generators are extracted into configurable runnables — set the `CONFIG` block at the top and run in
+Studio (command bar / MCP `execute_luau`). They build into `Workspace.*` and **publish** their meshes.
+
+- **`buildSteppedCobblePath.luau`** — drops a path from a `Workspace.PathDraft.<draft>` marker folder:
+  Catmull-Rom spline → timber risers → flat per-tread cobbles + bed → published cobble mesh. CONFIG: `draft`,
+  `outModel`, `timberPrefix`, `SPACING`, `COBBLE_HW`, `BED_W`. (Workflow: drop markers, user shapes them, run.)
+- **`buildIshigakiWalls.luau`** — finds the floating spans (>`THRESH`) of the listed `CONFIG.paths` and builds
+  a battered fitted-stone wall per span into `Workspace.RetainingWalls`. CONFIG: `paths`, `HW`, `THRESH`, `PAD`.
+
+**Smoke-test each on its first reuse** (they're faithful extractions of the FW11 build, not yet re-run from
+the files). **Still TODO:** `buildBambooRailing` + `buildChochinPole` (extract once built — see the railings/
+lanterns plan), and **parameterizing `SwitchbackDeck.build`** (center/footprint/terrain-feet/stair-target) so
+decks can be dropped anywhere instead of one baked position.
