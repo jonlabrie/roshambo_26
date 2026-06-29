@@ -121,16 +121,33 @@ single-timber spans taper naturally instead of forming nubs). Per-span **publish
 
 ---
 
-## 4. Bamboo railing + hanging chōchin  *(speced/planned, building next — fill in as-built after)*
+## 4. Bamboo railing + hanging chōchin
 
 - **Bamboo railing** (Parts, cylinders, tan `~170/150/90`): posts `~0.45 dia × 3.4` every **~2 timbers** at
   the bed edge on the **downhill** edge; **top rail ~2.9 + mid rail ~1.5**, open between. (Cylinder long axis
-  = local X → vertical needs `CFrame.Angles(0,0,90°)`; rails along a run via `CFrame.lookAt`.)
-- **Hanging chōchin** (Parts): ribbed barrel (Neon cream + thin dark rib rings + dark caps + cord +
-  PointLight) on a **bamboo upright + cross-arm pole** on the **uphill** edge, ~every 6 timbers.
-- **Round result display:** `LanternController` is being generalized — round lanterns are found by
-  CollectionService tag **`RoundLantern`** and get a **BillboardGui** glyph (the block path = `*Lantern` name
-  + 4-face SurfaceGui stays unchanged). Round lanterns can live anywhere (tag-driven).
+  = local X → vertical needs `CFrame.Angles(0,0,90°)`; rails along a run via `CFrame.lookAt`.)  *(NOT built yet.)*
+
+- **Hanging chōchin — LOCKED, extracted to `tools/studio/buildChochinPole.luau`** (exact params + deployment
+  in `specs/2026-06-27-zendojo-path-railings-lanterns-design.md` "As-built"). The hard-won lessons:
+  - **Glyph display = SurfaceGui on a thin transparent `GlyphPlate`, NOT a BillboardGui.** A billboard reads as
+    a floating label (and `AlwaysOnTop` makes it worse); a plate-mounted SurfaceGui is occluded + scales with
+    distance → reads as ink on the paper. **Size the plate in studs (scale), never pixels (offset)** or it's huge
+    from afar. Two plates **perpendicular to the crosspiece** (universal, not path-relative) → readable both ways.
+    Round glyphs rest at **20% transparency** (block faces 0) via a per-label `ShownT` attribute the telegraph
+    fades to. Tag the plate `RoundLantern`; `LanternController` paints it.
+  - **Warm "oil-lamp through paper" glow, cheaply (no extra lights):** translucent Neon barrel (`T~0.42`,
+    desaturated cream) + a small bright **Flame** ball + a dim translucent **FlameHalo** ball at centre = soft
+    hotspot. **Vertical gradient via per-slice colour** (centre bright → ends ~0.55–0.8, top a touch dimmer)
+    for the lit-from-within look. Pure Neon = flat/uniform (wrong).
+  - **Barrel shape = stacked Neon slices on a superellipse profile** `r=capR+(Rmax−capR)(1−dⁿ)^0.5`
+    (n≈6 → straight middle + sharp corners). **Continuous profile (no straight+taper boundary) avoids a
+    brightness STEP** at the shoulder (overlap-doubling jumps where tapering starts); **keep slice overlap
+    (×1.15) to hide seams** (removing it exposes dark gaps). Vertical ribs at constant radius **only span the
+    straight zone** or they poke past the curved ends.
+  - **Sway:** `ChochinSway.client.luau` rocks each tagged `Swing` sub-model (pivot at the crosspiece hang point)
+    ±~3° on a slow desynced sine.
+  - **Deploy** every ~6 timbers on the **uphill** edge with a **±0.35-gap stagger** (≈5–10%, seeded) so it's
+    not a rigid line; **a couple on the downhill side** only where a raycast finds terrain within `dhMaxDrop`.
 
 ---
 
@@ -168,8 +185,10 @@ Studio (command bar / MCP `execute_luau`). They build into `Workspace.*` and **p
   `outModel`, `timberPrefix`, `SPACING`, `COBBLE_HW`, `BED_W`. (Workflow: drop markers, user shapes them, run.)
 - **`buildIshigakiWalls.luau`** — finds the floating spans (>`THRESH`) of the listed `CONFIG.paths` and builds
   a battered fitted-stone wall per span into `Workspace.RetainingWalls`. CONFIG: `paths`, `HW`, `THRESH`, `PAD`.
+- **`buildChochinPole.luau`** — places hanging chōchin on bamboo posts along a path's uphill edge (staggered;
+  a couple downhill where terrain allows); tags them so `LanternController`/`ChochinSway` drive them. CONFIG:
+  `path`, `interval`, `posJitter`, `uphillOffset`, `maxDownhill`, `dhMaxDrop`, `seed`. (See §4; locked 2026-06-29.)
 
-**Smoke-test each on its first reuse** (they're faithful extractions of the FW11 build, not yet re-run from
-the files). **Still TODO:** `buildBambooRailing` + `buildChochinPole` (extract once built — see the railings/
-lanterns plan), and **parameterizing `SwitchbackDeck.build`** (center/footprint/terrain-feet/stair-target) so
-decks can be dropped anywhere instead of one baked position.
+**Smoke-test each on its first reuse** (faithful extractions, not all re-run from the files). **Still TODO:**
+`buildBambooRailing` (extract once built — see the railings/lanterns plan), and **parameterizing
+`SwitchbackDeck.build`** (center/footprint/terrain-feet/stair-target) so decks can be dropped anywhere.

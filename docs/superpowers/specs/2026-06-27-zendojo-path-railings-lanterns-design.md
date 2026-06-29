@@ -97,3 +97,44 @@ Warm-tan bamboo **cylinder** post-and-rail along the **downhill edge** of each p
 - Exact rib count / barrel proportions / cord length — tuned on the prototype.
 - Billboard glyph size & how "painted-on" vs floating it reads — tuned on the prototype in Play.
 - Railing post spacing (~2 timbers) and lantern spacing (~6 timbers) — confirm on the prototype stretch.
+
+---
+
+## As-built — chōchin + pole (2026-06-29)
+
+Prototyped and locked through ~18 visual iterations in Studio; extracted to the reusable Studio runnable
+**`roblox/tools/studio/buildChochinPole.luau`** (CONFIG: path/interval/posJitter/uphillOffset/maxDownhill/
+dhMaxDrop/seed). Geometry is **place-only** (Workspace.PathLanterns); the controllers (Rojo) drive it by tag.
+
+**Controllers (committed):**
+- `LanternController.client.luau` — round lanterns paint a **world-space SurfaceGui glyph on a tagged
+  `GlyphPlate`** (occluded, scales with distance → reads as ink on the paper), NOT a billboard. Round glyphs
+  rest at **20% transparency** (block `*Lantern` faces stay at 0). Two plates per lantern, oriented
+  **perpendicular to the crosspiece** (universal — not path-relative), so a walker sees a glyph from either way.
+- `ChochinSway.client.luau` — rocks each tagged `Swing` sub-model ±~3° on a slow desynced sine (a light breeze).
+
+**Bamboo frame (static, in the pole model):** dark wood `RGB 88,70,40`, `Material Wood`.
+- Pole: `0.38` dia × `12.8` tall, foot at ~path level (uphill edge, +RightVector × 4.5).
+- Crosspiece: `0.225` dia, reaches `2.38` over the path + `poleR+0.12` back through the pole (~1in stub).
+- Knee brace: `0.18` dia, pole(−1.4) → arm(+1.1 out).
+
+**Hanging assembly (in `Swing` sub-model; WorldPivot = hang point on the crosspiece; tagged `ChochinSwing`):**
+- Metal loop: 14-seg torus, `0.10` tube, `RGB 120,122,128` Metal, draped over the crosspiece end.
+- Paper barrel: **18 Neon slices**, `bodyH 2.8`, superellipse profile `r=capR+(Rmax−capR)(1−d⁶)^0.5`
+  (`Rmax 0.9`, `capR 0.30` → straight middle, sharp corners, continuous = no brightness step), overlap ×1.15
+  (hides seams), `Transparency 0.42`. **Vertical gradient** (per-slice colour ×f, `f=clamp(1−0.22d−topExtra,0.4,1)`,
+  `topExtra=0.15(2t−1)` for the upper half → centre bright, top dimmer) on desaturated cream base `RGB 200,170,143`.
+- Ribs (`INK 46,40,30`, Wood): 16 **horizontal** `0.025` thick (r=profile+0.05); **6 vertical** `0.03` thick at
+  `Rmax+0.05`, offset 30° from the glyph faces, spanning horizontal ribs j4..j13 (straight zone, so ends don't
+  poke past the curve).
+- Caps: `0.66` dia × 0.26 (−40% from the first pass), INK.
+- Soft point source (cheap, no extra lights): **Flame** ball `0.5` `RGB 255,238,205` T0.12 + **FlameHalo** ball
+  `1.15` `RGB 255,205,150` T0.88, both at barrel centre. PointLight `RGB 255,168,96` bri 0.5 range 16, no shadows.
+- Glyph plates: 2 transparent `1.2×1.6×0.05` at `lc ± perp×(Rmax+0.04)`, facing ±perp, tagged `RoundLantern`.
+
+**Deployment (first pass):** `PathSteps`, a pole every **6 timbers** with **±0.35-gap stagger** (≈5–10% spacing
+variation, seeded), **2 on the downhill side** where terrain was within `dhMaxDrop 8` studs (raycast-gated,
+grounded to that terrain). 8 poles. Spawn left at `DevChannelSpawn` (on the path) for ongoing review.
+
+**Still TODO:** bamboo railings (Task 3); chōchin + railings on `PathExtension` / `DescentPath`; then restore
+the clearing spawn. SAVE THE PLACE (lanterns are place-only).
