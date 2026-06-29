@@ -91,42 +91,48 @@ for _, d in stage:GetDescendants() do
 end
 stage.DescendantAdded:Connect(tryBuild)
 
--- round lanterns (chōchin): a single billboard glyph instead of the 4-face SurfaceGui. Tagged
--- "RoundLantern" anywhere in the workspace; the label joins the same telegraph as the block faces.
-local function buildBillboard(part: Instance)
+-- round lanterns (chōchin): the glyph is printed on the paper, not floating in front. The
+-- geometry supplies a thin transparent "GlyphPlate" sitting just proud of the barrel's front,
+-- tagged "RoundLantern" and oriented so its Front face points outward toward the path; we put a
+-- world-space SurfaceGui on it. Being real surface geometry, it's occluded normally and scales
+-- with distance — so it reads as ink on the paper rather than a billboard label.
+local function buildRoundFace(part: Instance)
     if not part:IsA("BasePart") or built[part] then
         return
     end
     built[part] = true
-    local bb = Instance.new("BillboardGui")
-    bb.Name = "LanternFace"
-    bb.Adornee = part
-    bb.Size = UDim2.fromOffset(150, 180) -- tuned in Play
-    bb.LightInfluence = 0
-    bb.MaxDistance = 220
-    bb.Parent = part
+    local gui = Instance.new("SurfaceGui")
+    gui.Name = "LanternFace"
+    gui.Face = Enum.NormalId.Front
+    gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+    gui.PixelsPerStud = 50
+    gui.LightInfluence = 0
+    gui.Parent = part
     local g = Instance.new("TextLabel")
     g.Name = "Glyph"
     g.BackgroundTransparency = 1
-    g.Size = UDim2.fromScale(1, 1)
+    g.AnchorPoint = Vector2.new(0.5, 0.5)
+    g.Position = UDim2.fromScale(0.5, 0.5)
+    g.Size = UDim2.fromScale(0.7, 0.7)
     g.Font = Enum.Font.GothamBlack
     g.TextColor3 = INK
     g.TextScaled = true
+    g:SetAttribute("ShownT", 0.2) -- round glyphs rest at 20% transparency (softer ink on the paper)
     -- late-arriving lanterns pick up whatever throw is currently shown
     if current then
         g.Text = GLYPH[current] or ""
-        g.TextTransparency = 0
+        g.TextTransparency = 0.2
     else
         g.Text = ""
         g.TextTransparency = 1
     end
-    g.Parent = bb
+    g.Parent = gui
     table.insert(glyphLabels, g)
 end
 for _, p in CollectionService:GetTagged("RoundLantern") do
-    buildBillboard(p)
+    buildRoundFace(p)
 end
-CollectionService:GetInstanceAddedSignal("RoundLantern"):Connect(buildBillboard)
+CollectionService:GetInstanceAddedSignal("RoundLantern"):Connect(buildRoundFace)
 
 -- ===== telegraph state =====
 local pending: string? = nil -- the throw revealed but not yet shown (waiting for the drum to settle)
@@ -134,9 +140,17 @@ local lastRevealAt = 0
 local period = 25 -- measured reveal→reveal; default a touch over a round
 local shownAt: number? = nil -- when the current glyph went up (for the blank lead)
 
-local function fadeAll(t: number)
+local function fadeBlank()
     for _, g in glyphLabels do
-        TweenService:Create(g, FADE, { TextTransparency = t }):Play()
+        TweenService:Create(g, FADE, { TextTransparency = 1 }):Play()
+    end
+end
+
+local function fadeShown()
+    -- each label rises to its own resting transparency (block faces 0, round chōchin 0.2)
+    for _, g in glyphLabels do
+        local st = (g:GetAttribute("ShownT") :: number?) or 0
+        TweenService:Create(g, FADE, { TextTransparency = st }):Play()
     end
 end
 
@@ -145,12 +159,12 @@ local function showThrow(throw: string)
     if not glyph then
         return
     end
-    fadeAll(1) -- fade the old symbol down…
+    fadeBlank() -- fade the old symbol down…
     task.delay(0.2, function()
         for _, g in glyphLabels do
             g.Text = glyph
         end
-        fadeAll(0) -- …swap, then fade the new one up
+        fadeShown() -- …swap, then fade the new one up
     end)
 end
 
@@ -180,7 +194,7 @@ end)
 -- blank ~BLANK_LEAD seconds before the next reveal (period − lead after this one)
 RunService.Heartbeat:Connect(function()
     if shownAt and current and os.clock() - shownAt >= math.max(4, period - BLANK_LEAD) then
-        fadeAll(1)
+        fadeBlank()
         current = nil
         shownAt = nil
     end
