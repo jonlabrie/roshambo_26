@@ -169,7 +169,9 @@ single-timber spans taper naturally instead of forming nubs). Per-span **publish
   - **Sway:** `ChochinSway.client.luau` rocks each tagged `Swing` sub-model (pivot at the crosspiece hang point)
     ±~3° on a slow desynced sine.
   - **Deploy** every ~6 timbers on the **uphill** edge with a **±0.35-gap stagger** (≈5–10%, seeded) so it's
-    not a rigid line; **a couple on the downhill side** only where a raycast finds terrain within `dhMaxDrop`.
+    not a rigid line; **up to 30% (`downhillFrac`) on the downhill side** where a raycast finds terrain within
+    `dhMaxDrop`. `uphillSign` picks which RightVector end is the cliff (+1 PathSteps, −1 DescentPath); each path
+    deploys into its own `PathLanterns.Chochin_<path>` sub-model (re-running one path won't disturb another).
 
 ---
 
@@ -208,8 +210,9 @@ Studio (command bar / MCP `execute_luau`). They build into `Workspace.*` and **p
 - **`buildIshigakiWalls.luau`** — finds the floating spans (>`THRESH`) of the listed `CONFIG.paths` and builds
   a battered fitted-stone wall per span into `Workspace.RetainingWalls`. CONFIG: `paths`, `HW`, `THRESH`, `PAD`.
 - **`buildChochinPole.luau`** — places hanging chōchin on bamboo posts along a path's uphill edge (staggered;
-  a couple downhill where terrain allows); tags them so `LanternController`/`ChochinSway` drive them. CONFIG:
-  `path`, `interval`, `posJitter`, `uphillOffset`, `maxDownhill`, `dhMaxDrop`, `seed`. (See §4; locked 2026-06-29.)
+  up to 30% downhill where terrain allows); tags them so `LanternController`/`ChochinSway` drive them. CONFIG:
+  `path`, `timberPrefix`, `interval`, `posJitter`, `uphillOffset`, `uphillSign`, `downhillFrac`, `dhMaxDrop`,
+  `seed`. Deploys into `PathLanterns.Chochin_<path>`. (See §4; locked 2026-06-29.)
 - **`buildBambooRailing.luau`** — runs a continuous bamboo railing along a path's downhill/open-air edge
   (smooth top rail + rustic-jittered lower rail + posts + invisible barriers), one `Rail_<name>` sub-model per
   run, idempotent. CONFIG: a `RUNS` list (`path`, `prefix`, `i0`/`i1`, `edgeSign`) + `CONNECTORS` list to bridge

@@ -15,11 +15,12 @@ local CONFIG = {
     timberPrefix = "Timber", -- timber part name prefix (Timber_0, Timber_1, ...)
     interval = 6, -- base timbers between poles
     posJitter = 0.35, -- ±fraction of a timber gap to stagger each pole along the path (~5-10% spacing)
-    uphillOffset = 4.5, -- studs from the timber toward the cliff (+RightVector = uphill)
-    maxDownhill = 2, -- up to N poles on the DOWNHILL side, where terrain allows
+    uphillOffset = 4.5, -- studs from the timber toward the cliff (uphill) edge
+    uphillSign = 1, -- which RightVector end is uphill/cliff: +1 PathSteps; -1 DescentPath (prefix "DescTimber")
+    downhillFrac = 0.30, -- up to this FRACTION of the placed poles may sit on the DOWNHILL side, terrain permitting
     dhMaxDrop = 8, -- downhill pole placed only if terrain is within this many studs below the path
     seed = 20260629, -- deterministic stagger (same place each run)
-    outModel = "PathLanterns", -- Workspace output model
+    outModel = "PathLanterns", -- Workspace output model (poles go in a per-path sub-model under it)
 }
 
 -- ===== locked colours / materials =====
@@ -254,9 +255,19 @@ end
 -- ===== deploy along the path =====
 local pathModel = ws:FindFirstChild(CONFIG.path)
 assert(pathModel, "missing Workspace." .. CONFIG.path)
-local parent = ws:FindFirstChild(CONFIG.outModel) or Instance.new("Model")
-parent.Name = CONFIG.outModel
-parent.Parent = ws
+local root = ws:FindFirstChild(CONFIG.outModel) or Instance.new("Model")
+root.Name = CONFIG.outModel
+root.Parent = ws
+-- one sub-model per path so re-running one path never disturbs another path's lanterns (idempotent).
+-- (NOTE: PathSteps' first deploy predates this and lives loose under the root; a future PathSteps
+--  re-run lands in Chochin_PathSteps — sweep the loose ChochinPole_* then.)
+local parent = root:FindFirstChild("Chochin_" .. CONFIG.path)
+if parent then
+    parent:Destroy()
+end
+parent = Instance.new("Model")
+parent.Name = "Chochin_" .. CONFIG.path
+parent.Parent = root
 
 -- sorted timbers
 local timbers = {}
@@ -270,21 +281,23 @@ table.sort(timbers, function(a, b)
     return a.i < b.i
 end)
 
--- clear previously-deployed poles + the prototype (idempotent); leave any unrelated children
-for _, c in parent:GetChildren() do
-    if c.Name:match("^ChochinPole_") then -- ChochinPole_<i> and ChochinPole_PROTO
-        c:Destroy()
-    end
-end
-
 math.randomseed(CONFIG.seed)
 local rp = RaycastParams.new()
 rp.FilterType = Enum.RaycastFilterType.Exclude
-rp.FilterDescendantsInstances = { parent }
+rp.FilterDescendantsInstances = { root } -- never raycast-hit any deployed lantern
 local function horizUp(t: BasePart): Vector3
     local u = t.CFrame.RightVector
-    return Vector3.new(u.X, 0, u.Z).Unit
+    return Vector3.new(u.X, 0, u.Z).Unit * CONFIG.uphillSign
 end
+
+-- cap downhill poles at `downhillFrac` of the total to be placed (up to 30% by default)
+local totalPoles = 0
+for i = 1, #timbers do
+    if (i - 1) % CONFIG.interval == 0 then
+        totalPoles += 1
+    end
+end
+local maxDownhill = math.floor(CONFIG.downhillFrac * totalPoles)
 
 local made, dh, count = 0, 0, 0
 for idx, entry in timbers do
@@ -297,7 +310,7 @@ for idx, entry in timbers do
         local center = t.Position:Lerp(nb.Position, math.abs(jf))
         -- on alternating poles, try the DOWNHILL side if terrain is close enough below
         local side, footY = "up", 0
-        if count % 2 == 1 and dh < CONFIG.maxDownhill then
+        if count % 2 == 1 and dh < maxDownhill then
             local dhBase = center - up * CONFIG.uphillOffset
             local hit = workspace:Raycast(
                 dhBase + Vector3.new(0, 6, 0),

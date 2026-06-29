@@ -136,8 +136,14 @@ dhMaxDrop/seed). Geometry is **place-only** (Workspace.PathLanterns); the contro
 variation, seeded), **2 on the downhill side** where terrain was within `dhMaxDrop 8` studs (raycast-gated,
 grounded to that terrain). 8 poles. Spawn left at `DevChannelSpawn` (on the path) for ongoing review.
 
-**Still TODO:** chōchin on `PathExtension` / `DescentPath`; the top-of-DescentPath deck-style railing; then
-restore the clearing spawn. SAVE THE PLACE (lanterns + railings are place-only).
+**Still TODO:** the top-of-DescentPath deck-style railing; then restore the clearing spawn. SAVE THE PLACE
+(lanterns + railings are place-only).
+
+**Chōchin on DescentPath (2026-06-29):** 4 poles into `PathLanterns.Chochin_DescentPath` on the cliff side
+(`uphillSign = -1`, since DescentPath's downhill/railing edge is +Right), 2 of them downhill where terrain
+allowed. PathExtension intentionally left bare (no chōchin). Recipe change for future runs: the downhill
+allowance is now a **fraction (`downhillFrac`, up to 30%)** of the placed poles, not a fixed count; and the
+builder deploys per-path sub-models so re-running one path leaves the others' lanterns untouched.
 
 ### Update (2026-06-29, evening) — glow sprite, deck lanterns, light spill
 
