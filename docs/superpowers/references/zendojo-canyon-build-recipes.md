@@ -241,6 +241,31 @@ Studio (command bar / MCP `execute_luau`). They build into `Workspace.*` and **p
   (smooth top rail + rustic-jittered lower rail + posts + invisible barriers), one `Rail_<name>` sub-model per
   run, idempotent. CONFIG: a `RUNS` list (`path`, `prefix`, `i0`/`i1`, `edgeSign`) + `CONNECTORS` list to bridge
   run seams. As-built: PathSteps/PathExtension/DescentPath into `Workspace.PathRailings`. (See §4; locked 2026-06-29.)
+- **`buildBridge.luau`** — gentle Japanese arch footbridges (see §7), one `Bridges.<name>` sub-model per bridge,
+  idempotent. CONFIG: a `BRIDGES` list with **baked** `A`/`B` endpoints + `rise`/`width`. (See §7; 2026-06-29.)
 
 **Smoke-test each on its first reuse** (faithful extractions, not all re-run from the files). **Still TODO:**
 **parameterizing `SwitchbackDeck.build`** (center/footprint/terrain-feet/stair-target) so decks can be dropped anywhere.
+
+---
+
+## 7. Arch bridge (taiko-bashi) — `tools/studio/buildBridge.luau`
+
+A gentle Japanese arch footbridge in the **deck-timber language** (NOT a Rojo builder — fully-curved geometry
+needs `CFrame.fromMatrix`, which the pure-Lune `Spec` can't do; place-only like the paths, SAVE THE PLACE).
+
+- **Endpoints are BAKED** (`A`/`B` = the grade-spring point at each landing), surveyed once from the approved
+  prototype. **Never read draft markers at build time** — they're deleted in the finished terrain (learned the
+  hard way: a marker-reading builder broke the moment the markers were removed).
+- **Profile:** a **parabola** `y(t) = lerp(A,B,t).Y + rise·4t(1−t)` — gentle (rise ~3 over a ~24 span);
+  **springs from grade** at both ends (no end step). Deck = ~20 short `WoodPlanks` segments whose **top** follows
+  the curve (segment centre = curvePoint − ½·thick·deckNormal), each oriented via `CFrame.fromMatrix(mid, xAxis,
+  yAxis)` with `xAxis` = along-curve, `yAxis = xAxis×zAxis`, `zAxis` = horizontal cross.
+- **Everything squares to the bridge axis** via `CFrame.fromMatrix(pos, zAxis, Vector3.yAxis)` — newels, balusters,
+  footings. (World-axis `CFrame.new` leaves them visibly cocked on a skewed span — the bug we hit twice.)
+- **Curved KŌRAN railing both sides:** cap `0.3×0.6` + mid `0.2×0.3` (both follow the curve as segments) +
+  plumb balusters + **end newels only**. **Top rail (cap) is dark/black timber** `30,26,20`; everything else deck
+  timber `107,79,51`. **No giboshi finials** (rejected — don't match the deck architecture) and **no invisible
+  fall-walls** on this bridge (user opted out).
+- **Squared stone footings** (`Slate`, `WIDTH+1 × 3 × 4`) sunk at each landing so the ends don't read as floating.
+- As-built: `Bridge3` (span 23.6, rise 3.0, width 6.5) in `Workspace.Bridges`.
