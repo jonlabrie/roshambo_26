@@ -124,17 +124,20 @@ local function hanjiLantern(
             Shape = "Block",
             Size = { 1.0, h, 1.0 }, -- square paper lantern
             CFrame = Spec.cframe({ x, cy, z }),
-            Color = { 0.635, 0.49, 0.28 }, -- warm amber, midway between the bright and dim passes
+            Color = { 0.588, 0.5, 0.421 }, -- chōchin paper tone, dimmed ×0.75 (core dimmed to match → stays blended)
             Material = "Neon",
+            Transparency = 0.42, -- translucent paper so the inner glow reads through (chōchin recipe)
             children = {
                 {
                     name = `{name}Light`,
                     className = "PointLight",
-                    properties = { Color = { 1.0, 0.76, 0.46 }, Brightness = 0.68, Range = 9 },
+                    properties = { Color = { 1.0, 0.659, 0.376 }, Brightness = 0.5, Range = 9 },
                 },
             },
         })
     )
+    -- the "lit-from-within" glow is a soft radial sprite added at runtime by LanternController
+    -- (a Neon ball read as a hard sphere on this small box); the builder ships only the paper + cap.
     table.insert(
         children,
         Spec.part(`{name}Cap`, {
@@ -155,7 +158,8 @@ local function newel(
     z: number,
     topY: number,
     railH: number,
-    palette: { [string]: { number } }
+    palette: { [string]: { number } },
+    noLantern: boolean?
 )
     local h = railH + 0.9
     local newelTop = topY + h - 0.2
@@ -169,7 +173,9 @@ local function newel(
             Material = "Wood",
         })
     )
-    hanjiLantern(children, name, x, z, newelTop, palette)
+    if not noLantern then -- some newels keep the post but drop the lantern (thinning the row)
+        hanjiLantern(children, name, x, z, newelTop, palette)
+    end
 end
 
 -- invisible, collidable safety wall along an edge run a→b: tall enough that a jump from
@@ -202,9 +208,11 @@ local function deck(
     palette: { [string]: { number } },
     railH: number,
     postDrop: number,
-    rail: { open: string?, gapEdge: string?, gapC: number?, gapH: number?, noBarrier: string? }?
+    rail: { open: string?, gapEdge: string?, gapC: number?, gapH: number?, noBarrier: string? }?,
+    skipLanterns: { [string]: boolean }? -- post names whose lantern is dropped (post kept)
 )
     local timber, ink = palette.timber, palette.ink
+    skipLanterns = skipLanterns or {}
     local px, py, pz = d.pos[1], d.pos[2], d.pos[3]
     local sx, sy, sz = d.size[1], d.size[2], d.size[3]
     local nw, ne = px - sx / 2, px + sx / 2
@@ -274,8 +282,26 @@ local function deck(
             end
         end
         if gc and ghalf then -- frame the stair opening with endposts (gapped edges run along X)
-            newel(children, `Rail{e}{name}EndA`, gc - ghalf, a[2], topY, railH, palette)
-            newel(children, `Rail{e}{name}EndB`, gc + ghalf, a[2], topY, railH, palette)
+            newel(
+                children,
+                `Rail{e}{name}EndA`,
+                gc - ghalf,
+                a[2],
+                topY,
+                railH,
+                palette,
+                skipLanterns[`Rail{e}{name}EndA`]
+            )
+            newel(
+                children,
+                `Rail{e}{name}EndB`,
+                gc + ghalf,
+                a[2],
+                topY,
+                railH,
+                palette,
+                skipLanterns[`Rail{e}{name}EndB`]
+            )
         end
     end
     edge("N", { nw, zn }, { ne, zn })
@@ -284,7 +310,7 @@ local function deck(
     edge("W", { nw, zn }, { nw, zs })
     -- chunky newels at the four corners, each capped with a Hanji lantern
     for ci, c in { { nw, zn }, { ne, zn }, { ne, zs }, { nw, zs } } do
-        newel(children, `Newel{name}{ci}`, c[1], c[2], topY, railH, palette)
+        newel(children, `Newel{name}{ci}`, c[1], c[2], topY, railH, palette, skipLanterns[`Newel{name}{ci}`])
     end
     return px, py, pz, sx, sy, sz
 end
@@ -306,12 +332,24 @@ function Overlook.build(palette: { [string]: { number } }, L: any)
         palette,
         o.railH,
         o.postDrop,
-        { open = "W", gapEdge = "N", gapC = stairX, gapH = gapHalf }
+        { open = "W", gapEdge = "N", gapC = stairX, gapH = gapHalf },
+        -- thin the row: drop the NW-corner lantern + the two stair-top (N-rail end) lanterns
+        { NewelUpperDeck1 = true, RailNUpperDeckEndA = true, RailNUpperDeckEndB = true }
     )
     -- Lower deck: West edge is the open entry (no rail); South/N/E all railed, the South
     -- rail contiguous (it crosses the stair). No barrier on the South edge — that's the
     -- stair landing (inland-facing, not the gorge), and a barrier there blocks the steps.
-    deck(children, "LowerDeck", lower, palette, o.railH, o.postDrop, { open = "W", noBarrier = "S" })
+    -- thin the row: drop the SE-corner lantern of the lower deck
+    deck(
+        children,
+        "LowerDeck",
+        lower,
+        palette,
+        o.railH,
+        o.postDrop,
+        { open = "W", noBarrier = "S" },
+        { NewelLowerDeck3 = true }
+    )
 
     -- single low threshold step onto the upper deck from the clearing (the open West edge),
     -- half the deck width, centred. Top ~1.2 below the deck; deepened to meet the terrace.

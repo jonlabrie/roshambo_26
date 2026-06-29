@@ -21,7 +21,7 @@ local GLYPH = { R = "○", P = "─", S = "∧" }
 local INK = Color3.fromRGB(36, 30, 24) -- dark silhouette on the glowing warm paper
 local LATTICE = Color3.fromRGB(40, 32, 24)
 local FACES = { Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Left, Enum.NormalId.Right }
-local FADE = TweenInfo.new(0.18, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+local FADE = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local BLANK_LEAD = 10 -- blank this many seconds before the next reveal
 
 local glyphLabels: { TextLabel } = {}
@@ -33,7 +33,18 @@ local function buildFace(part: BasePart, face: Enum.NormalId)
     gui.Name = "LanternFace"
     gui.Face = face
     gui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
-    gui.CanvasSize = Vector2.new(100, 100)
+    -- match the canvas aspect to the face so glyphs aren't stretched on a non-square box
+    -- (a 1×1.5 lantern face with a square canvas squashes the ○ into a vertical oval)
+    local sz = part.Size
+    local fw, fh
+    if face == Enum.NormalId.Left or face == Enum.NormalId.Right then
+        fw, fh = sz.Z, sz.Y
+    elseif face == Enum.NormalId.Top or face == Enum.NormalId.Bottom then
+        fw, fh = sz.X, sz.Z
+    else -- Front / Back
+        fw, fh = sz.X, sz.Y
+    end
+    gui.CanvasSize = Vector2.new(100, math.round(100 * fh / fw))
     gui.LightInfluence = 0 -- the paper reads at full warmth regardless of world light
     gui.Parent = part
 
@@ -75,6 +86,25 @@ local function buildFace(part: BasePart, face: Enum.NormalId)
     table.insert(glyphLabels, g)
 end
 
+-- soft warm "lit-from-within" glow on the block lantern body — a feathered radial sprite that
+-- reads as lamplight (a Neon ball reads as a hard sphere on the small box). Custom glow image.
+local GLOW_TEXTURE = "rbxassetid://135490760661320"
+local function buildGlow(part: BasePart)
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "LanternGlow"
+    bb.Adornee = part
+    bb.Size = UDim2.fromScale(2.1, 2.1) -- larger than the box so the soft halo extends past the silhouette
+    bb.LightInfluence = 0
+    bb.Parent = part
+    local img = Instance.new("ImageLabel")
+    img.BackgroundTransparency = 1
+    img.Size = UDim2.fromScale(1, 1)
+    img.Image = GLOW_TEXTURE
+    img.ImageColor3 = Color3.fromRGB(255, 208, 155)
+    img.ImageTransparency = 0.1
+    img.Parent = bb
+end
+
 -- build faces for every lantern, now and as they replicate/stream in (handles the
 -- startup race where the Overlook model hasn't arrived when this script first runs).
 local built: { [BasePart]: boolean } = {}
@@ -84,6 +114,7 @@ local function tryBuild(d: Instance)
         for _, face in FACES do
             buildFace(d, face)
         end
+        buildGlow(d)
     end
 end
 for _, d in stage:GetDescendants() do
@@ -160,7 +191,7 @@ local function showThrow(throw: string)
         return
     end
     fadeBlank() -- fade the old symbol down…
-    task.delay(0.2, function()
+    task.delay(0.4, function() -- swap after the (slower) fade-out completes
         for _, g in glyphLabels do
             g.Text = glyph
         end

@@ -20,8 +20,8 @@ local Z0, Z1 = CZ - DECK_D / 2, CZ + DECK_D / 2 -- North, East edges
 local TIMBER = { 0.42, 0.31, 0.20 }
 -- Hanji result-lantern recipe (matches the Overlook). The body MUST be named "*Lantern"
 -- so the runtime LanternController finds it and paints the World-Throw result SurfaceGui.
-local LANTERN_BODY = { 0.635, 0.49, 0.28 } -- warm amber Neon
-local LANTERN_LIGHT = { 1.0, 0.76, 0.46 } -- dim warm PointLight
+local LANTERN_BODY = { 0.588, 0.5, 0.421 } -- chōchin paper tone, dimmed ×0.75 (core dimmed to match → stays blended)
+local LANTERN_LIGHT = { 1.0, 0.659, 0.376 } -- warm PointLight (matches the chōchin)
 
 local SLAB_BOTTOM = DECK_TOP - SLAB_T
 local POST_W = 1.125 -- 25% lighter than the Overlook's 1.5
@@ -218,15 +218,18 @@ function SwitchbackDeck.build(palette: any, _layout: any): Spec.PartSpec
             CFrame = Spec.cframe({ xRail, lanternBaseY + lh / 2, zRail }),
             Color = LANTERN_BODY,
             Material = "Neon",
+            Transparency = 0.42, -- translucent paper so the inner glow reads through (chōchin recipe)
         },
         children = {
             {
                 name = "DeckLanternLight",
                 className = "PointLight",
-                properties = { Color = LANTERN_LIGHT, Brightness = 0.68, Range = 9 },
+                properties = { Color = LANTERN_LIGHT, Brightness = 0.5, Range = 9 },
             },
         },
     })
+    -- the "lit-from-within" glow is a soft radial sprite added at runtime by LanternController
+    -- (a Neon ball read as a hard sphere on this small box); the builder ships only the paper + cap.
     table.insert(
         kids,
         Spec.part("DeckLanternCap", {
