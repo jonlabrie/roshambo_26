@@ -123,9 +123,26 @@ single-timber spans taper naturally instead of forming nubs). Per-span **publish
 
 ## 4. Bamboo railing + hanging chōchin
 
-- **Bamboo railing** (Parts, cylinders, tan `~170/150/90`): posts `~0.45 dia × 3.4` every **~2 timbers** at
-  the bed edge on the **downhill** edge; **top rail ~2.9 + mid rail ~1.5**, open between. (Cylinder long axis
-  = local X → vertical needs `CFrame.Angles(0,0,90°)`; rails along a run via `CFrame.lookAt`.)  *(NOT built yet.)*
+- **Bamboo railing — LOCKED, extracted to `tools/studio/buildBambooRailing.luau`** (user-approved 2026-06-29).
+  Dark bamboo (`70,55,32`, Wood). The edge line follows each timber's **±RightVector END**, `HW=3.0` from
+  centre (≈ the timber edge — posts ALWAYS embed at the timber edge, **terrain is irrelevant**, never plant on
+  ground). Baseline = timber top. Per run:
+  - **Top rail** — SMOOTH continuous **Catmull-Rom** through the per-timber edge points (`S=4` subdivisions),
+    cylinder segments + ball joints, dia `0.32` at **+2.9** over baseline.
+  - **Lower rail** — the SAME run dia `0.22` at **+1.25**, BUT its control points get low-frequency
+    **lateral+vertical jitter** (`±0.154` / `±0.112`, seeded `20260629`) *before* the spline → a gentle
+    hand-built wobble while the top rail stays true. Jitter is applied to interior control points only
+    (endpoints stay put so adjacent runs/connectors meet cleanly). Rustic "lashed on site" read.
+  - **Posts** — vertical bamboo dia `0.45 × 3.0` every **2 timbers** at the edge baseline.
+  - **Invisible fall-barrier** — a `CanCollide`, `Transparency 1` box per gap (`10` tall, `0.4` thick) so
+    players can't fall through the open rail; reads only the bamboo.
+  - **Side** = the **downhill / open-air (finite-drop) edge**; the no-terrain-hit (`999`) side is the
+    cliff/wall — do NOT rail it. Probe both ends if unsure, but the USER knows the side — ask. `edgeSign`
+    (`-1` = `-Right`, `+1` = `+Right`) picks it; a run is one side end-to-end (switch sides = a new run).
+  - **Connectors** bridge a gap between two runs' endpoints (straight top+mid rail + barrier) so adjacent
+    sections read continuous (e.g. PathSteps↔PathExtension's ~4.4-stud seam). As-built: PathSteps `0–47`
+    (downhill), PathExtension `1–5`, DescentPath `2–20` (downhill), into `Workspace.PathRailings`.
+  (Cylinder long axis = local X → vertical needs `CFrame.Angles(0,0,90°)`; rails along a run via `CFrame.lookAt`.)
 
 - **Hanging chōchin — LOCKED, extracted to `tools/studio/buildChochinPole.luau`** (exact params + deployment
   in `specs/2026-06-27-zendojo-path-railings-lanterns-design.md` "As-built"). The hard-won lessons:
@@ -193,7 +210,10 @@ Studio (command bar / MCP `execute_luau`). They build into `Workspace.*` and **p
 - **`buildChochinPole.luau`** — places hanging chōchin on bamboo posts along a path's uphill edge (staggered;
   a couple downhill where terrain allows); tags them so `LanternController`/`ChochinSway` drive them. CONFIG:
   `path`, `interval`, `posJitter`, `uphillOffset`, `maxDownhill`, `dhMaxDrop`, `seed`. (See §4; locked 2026-06-29.)
+- **`buildBambooRailing.luau`** — runs a continuous bamboo railing along a path's downhill/open-air edge
+  (smooth top rail + rustic-jittered lower rail + posts + invisible barriers), one `Rail_<name>` sub-model per
+  run, idempotent. CONFIG: a `RUNS` list (`path`, `prefix`, `i0`/`i1`, `edgeSign`) + `CONNECTORS` list to bridge
+  run seams. As-built: PathSteps/PathExtension/DescentPath into `Workspace.PathRailings`. (See §4; locked 2026-06-29.)
 
 **Smoke-test each on its first reuse** (faithful extractions, not all re-run from the files). **Still TODO:**
-`buildBambooRailing` (extract once built — see the railings/lanterns plan), and **parameterizing
-`SwitchbackDeck.build`** (center/footprint/terrain-feet/stair-target) so decks can be dropped anywhere.
+**parameterizing `SwitchbackDeck.build`** (center/footprint/terrain-feet/stair-target) so decks can be dropped anywhere.

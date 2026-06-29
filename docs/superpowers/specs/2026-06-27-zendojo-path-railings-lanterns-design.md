@@ -136,8 +136,8 @@ dhMaxDrop/seed). Geometry is **place-only** (Workspace.PathLanterns); the contro
 variation, seeded), **2 on the downhill side** where terrain was within `dhMaxDrop 8` studs (raycast-gated,
 grounded to that terrain). 8 poles. Spawn left at `DevChannelSpawn` (on the path) for ongoing review.
 
-**Still TODO:** bamboo railings (Task 3); chōchin + railings on `PathExtension` / `DescentPath`; then restore
-the clearing spawn. SAVE THE PLACE (lanterns are place-only).
+**Still TODO:** chōchin on `PathExtension` / `DescentPath`; the top-of-DescentPath deck-style railing; then
+restore the clearing spawn. SAVE THE PLACE (lanterns + railings are place-only).
 
 ### Update (2026-06-29, evening) — glow sprite, deck lanterns, light spill
 
@@ -159,3 +159,26 @@ the clearing spawn. SAVE THE PLACE (lanterns are place-only).
   renders round, not a vertical oval; fade slowed 0.18→0.35s.
 - **Light spill cut** on all lanterns: PointLight Brightness 0.5→0.3; Range chōchin 16→9, deck 9→5 — so
   they read as contained warm points at dusk rather than washing the cliff.
+
+### As-built — bamboo railing (2026-06-29) — LOCKED, `tools/studio/buildBambooRailing.luau`
+
+Continuous bamboo post-and-rail along each path's **downhill/open-air edge**, dark bamboo (`70,55,32`, Wood).
+Supersedes the §3 sketch (warm tan → dark; mid rail 1.5 → 1.25; +smooth top / rustic lower / barriers).
+
+- **Edge line:** each timber's **±RightVector END**, `HW=3.0` from centre (≈ the timber edge). Posts ALWAYS
+  embed at the timber edge — **terrain is irrelevant, never plant on ground**. Baseline = timber top.
+- **Top rail:** SMOOTH continuous **Catmull-Rom** (`S=4`) through the edge points; cylinder segs + ball joints,
+  dia `0.32` at **+2.9**.
+- **Lower rail:** same run dia `0.22` at **+1.25**, control points get low-frequency **jitter** (`±0.154`
+  lateral / `±0.112` vertical, seeded `20260629`) before the spline → hand-built wobble; interior points only
+  (endpoints stay put → clean joins). User wanted it ~30% looser than the first pass, then "leave it."
+- **Posts:** dia `0.45 × 3.0`, every **2 timbers** at the edge baseline.
+- **Barriers:** invisible `CanCollide` `Transparency 1` box per gap (`10` tall, `0.4` thick).
+- **Side selection:** rail the **finite-drop** edge; the no-hit (`999`) side is the cliff/wall — don't rail it.
+  `edgeSign` picks it; one side per run (switching sides = a new run). The USER knows the side — ask, don't
+  guess from a terrain probe alone (a wrong-side pick cost a redo here).
+- **Connectors:** straight top+mid rail + barrier bridging two runs' endpoints so sections read continuous.
+- **Deployed:** `Rail_PathSteps` (`Timber 0–47`, downhill), `Rail_PathExtension` (`ExtTimber 1–5`),
+  `Rail_DescentPath` (`DescTimber 2–20`, downhill), `Connector_1` (PathSteps↔PathExtension ~4.4-stud seam),
+  all in `Workspace.PathRailings`. DescentPath top (`DescTimber_2`) terminates clean for a future deck-style
+  railing; its bottom stands alone.
