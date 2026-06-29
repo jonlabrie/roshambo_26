@@ -18,11 +18,20 @@ As-built specs to mine for exact numbers:
 1. **brainstorm → spec → plan → inline execution.** Each stretch = its own spec+plan in `docs/superpowers/`.
 2. **Prototype-first, ONE attempt, then STOP and ask.** Build one unit/stretch, let the user look in Studio,
    iterate on *their* read; only then batch. Never self-judge visuals. (`stop-and-ask-after-each-attempt`.)
-3. **The user drives placement.** They move decks, shape draft markers, tune heights, sculpt terrain. You
-   survey what they did (read live Studio state) and build to it.
-4. **Draft-marker routing.** Drop a row of `Marker_*` balls (Neon, tag `DevMarker` → hidden in Play by
-   `tools/studio/hideDevMarkers.client.luau`) in a `Workspace.PathDraft.<name>` folder; user drags them;
-   you route a **Catmull-Rom** spline through them.
+3. **The user drives placement; you build to it.** They move decks, tune heights, and **finish-smooth
+   terrain**. You survey what they did (read live Studio state) and build to it. Terrain is a *handoff*,
+   not all-manual — see the path-creation flow next.
+4. **Path-creation flow (markers → terrain → cobbles).** This is the canonical order for a new stretch:
+   - **a. (user)** drops a row of `Marker_*` balls (Neon, tag `DevMarker` → hidden in Play by
+     `tools/studio/hideDevMarkers.client.luau`) in `Workspace.PathDraft.<name>`, between two+ endpoints,
+     and drags them into place.
+   - **b. (you) carve a rough terrain path** along the marker line — a rough walkable grade/channel cut
+     between the points (Terrain ops along the marker spline). This IS your step; don't wait for the user
+     to do it.
+   - **c. (user) smooths** the rough-carved terrain.
+   - **d. (you) build the cobbled path** (§1): route a **Catmull-Rom** spline through the markers →
+     timber risers + cement-gravel bed + flagstone cobbles → publish the cobble mesh.
+   - **e. (you)** add walls (§3, where it floats), chōchin (§4), bamboo railing + invisible barriers (§4).
 5. **Where things live:**
    - **Pipelined (Rojo + lune):** the arena, the **switchback deck** (`tools/builders/SwitchbackDeck.luau` →
      genmodels → `assets/*.model.json` → mapped in `default.project.json`), `LanternController`.
@@ -94,6 +103,19 @@ placement** (Rojo serve is one-way; read their move, bake it).
 - Place the **foot via a user-dragged target marker** (a cyan ball they position = where the path/bridge
   meets the bottom); build head→target; tune tread seat (down) + forward-overhang on the stringers to taste.
 
+**Deck-style stair railing (raked KŌRAN, in `SwitchbackDeck.stairRail`):** a KŌRAN railing down BOTH sides of
+the stairway, built via `Spec.segment` (raked) — same cap/mid/newel dims as the flat deck railing.
+- **Cap + mid-rail** are one continuous raked run, head → an **extended foot out on the path flagstone**
+  (`RAIL_FOOT`, continuing the stair rake past the last step so the deck rail meets the bamboo path's top —
+  this is the *style transition* between deck-KŌRAN and bamboo).
+- **Balusters: exactly ONE per step**, plumb, seated **on each tread** near the front (downhill) edge, rising
+  to the cap. (Evenly spacing along the rake makes them drift off the steps / float — don't.)
+- **Foot newels** sit at the extended flagstone foot. Where a side **aligns with an existing deck corner
+  newel**, reuse it (shift the whole stairway a few studs so the rail head lands on it — don't double up).
+  *(Cement "footings" at the newel feet were tried and rejected — newels sit straight on the flagstone.)*
+- **Invisible fall-wall** along the open side, raked, **15-stud vertical** (perp height = `15 / cos(rake)`),
+  same jump-proof rule as everywhere.
+
 ---
 
 ## 3. Ishigaki retaining wall
@@ -134,8 +156,10 @@ single-timber spans taper naturally instead of forming nubs). Per-span **publish
     hand-built wobble while the top rail stays true. Jitter is applied to interior control points only
     (endpoints stay put so adjacent runs/connectors meet cleanly). Rustic "lashed on site" read.
   - **Posts** — vertical bamboo dia `0.45 × 3.0` every **2 timbers** at the edge baseline.
-  - **Invisible fall-barrier** — a `CanCollide`, `Transparency 1` box per gap (`10` tall, `0.4` thick) so
-    players can't fall through the open rail; reads only the bamboo.
+  - **Invisible fall-barrier** — a `CanCollide`, `Transparency 1`, `CastShadow false` box per gap, **`15`
+    tall**, `0.4` thick, rising from the path edge. **15, not 10:** a player can jump onto the rail cap
+    (~3.2) then jump again (~7.2 ≈ 10.4) and clear a 10-stud wall — 15 defeats that. (Same 15-stud rule on
+    the deck/stair fall-walls.) Reads only the bamboo.
   - **Side** = the **downhill / open-air (finite-drop) edge**; the no-terrain-hit (`999`) side is the
     cliff/wall — do NOT rail it. Probe both ends if unsure, but the USER knows the side — ask. `edgeSign`
     (`-1` = `-Right`, `+1` = `+Right`) picks it; a run is one side end-to-end (switch sides = a new run).
