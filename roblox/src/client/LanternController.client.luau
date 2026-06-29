@@ -4,8 +4,9 @@
 -- double-line motif + a glyph). On reveal every lantern smoothly fades to the new throw;
 -- ~10s before the next reveal they fade blank (the lull before the next strike). All
 -- lanterns read the same round events, so they pulse in unison up both gorge walls.
--- Lanterns are found by name ("*Lantern") for now; a CollectionService tag will generalize
--- this canyon-wide. Glyphs/events mirror BoardController.
+-- Block lanterns are found by name ("*Lantern") under the stage; round lanterns (chōchin) are
+-- found by the CollectionService "RoundLantern" tag canyon-wide. Glyphs/events mirror BoardController.
+local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
@@ -89,6 +90,43 @@ for _, d in stage:GetDescendants() do
     tryBuild(d)
 end
 stage.DescendantAdded:Connect(tryBuild)
+
+-- round lanterns (chōchin): a single billboard glyph instead of the 4-face SurfaceGui. Tagged
+-- "RoundLantern" anywhere in the workspace; the label joins the same telegraph as the block faces.
+local function buildBillboard(part: Instance)
+    if not part:IsA("BasePart") or built[part] then
+        return
+    end
+    built[part] = true
+    local bb = Instance.new("BillboardGui")
+    bb.Name = "LanternFace"
+    bb.Adornee = part
+    bb.Size = UDim2.fromOffset(150, 180) -- tuned in Play
+    bb.LightInfluence = 0
+    bb.MaxDistance = 220
+    bb.Parent = part
+    local g = Instance.new("TextLabel")
+    g.Name = "Glyph"
+    g.BackgroundTransparency = 1
+    g.Size = UDim2.fromScale(1, 1)
+    g.Font = Enum.Font.GothamBlack
+    g.TextColor3 = INK
+    g.TextScaled = true
+    -- late-arriving lanterns pick up whatever throw is currently shown
+    if current then
+        g.Text = GLYPH[current] or ""
+        g.TextTransparency = 0
+    else
+        g.Text = ""
+        g.TextTransparency = 1
+    end
+    g.Parent = bb
+    table.insert(glyphLabels, g)
+end
+for _, p in CollectionService:GetTagged("RoundLantern") do
+    buildBillboard(p)
+end
+CollectionService:GetInstanceAddedSignal("RoundLantern"):Connect(buildBillboard)
 
 -- ===== telegraph state =====
 local pending: string? = nil -- the throw revealed but not yet shown (waiting for the drum to settle)
