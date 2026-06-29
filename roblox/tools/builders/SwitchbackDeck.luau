@@ -62,7 +62,7 @@ local RAIL_H = 3.2
 local NEWEL_W, NEWEL_H = 0.62, 3.7
 local BAL_W, BAL_STEP = 0.34, 2.0
 local RAIL_INSET = 0.35 -- sit the rail line just inboard of the deck edge
-local WALL_H = 5 -- invisible CanCollide fall-wall height (fills the baluster gaps on open-air edges)
+local WALL_H = 10 -- invisible CanCollide fall-wall height — above the ~7.2 default jump so the rail can't be cleared
 
 -- ===== deck->path stair (Overlook-style, off the West-south edge) =====
 local STAIR_Z = -61.6 -- centerline; nudged ~0.4 south so the stair's S rail lands on the deck corner Newel_1
@@ -208,10 +208,12 @@ local function stairRail(
         )
     end
     if barrier then
-        -- invisible CanCollide fall-wall, raked along the flight; raise = (h/2)·cos(rake) so its
-        -- lower face sits ~at the tread line (cos(rake) = |dx|/runLen).
-        local hb = 6
-        local raise = (hb / 2) * (math.abs(dx) / runLen)
+        -- invisible CanCollide fall-wall, raked along the flight, sized so its VERTICAL height is
+        -- WALL_H (jump-proof). cos(rake) = |dx|/runLen → perp height = WALL_H/cos; raise = WALL_H/2
+        -- puts the lower face ~at the tread line.
+        local cosr = math.abs(dx) / runLen
+        local hb = WALL_H / cosr
+        local raise = WALL_H / 2
         local qpos, qlen, qrot = Spec.segment({ ax, ay + raise, railZ }, { bx, by + raise, railZ })
         table.insert(
             kids,
