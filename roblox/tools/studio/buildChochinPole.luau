@@ -53,21 +53,6 @@ local function cyl(
     return p
 end
 
-local function ball(parent: Instance, name: string, dia: number, cf: CFrame, color: Color3, trans: number)
-    local p = Instance.new("Part")
-    p.Name = name
-    p.Shape = Enum.PartType.Ball
-    p.Size = Vector3.new(dia, dia, dia)
-    p.CFrame = cf
-    p.Anchored = true
-    p.CanCollide = false
-    p.Color = color
-    p.Material = Enum.Material.Neon
-    p.Transparency = trans
-    p.Parent = parent
-    return p
-end
-
 -- straight cylindrical middle, sharp-rounded shoulders to small caps (continuous → no brightness step)
 local Rmax, capR = 0.9, 0.30
 local function profile(tt: number): number
@@ -221,13 +206,27 @@ local function buildOne(parent: Instance, name: string, base: Vector3, up: Vecto
         Enum.Material.Wood
     )
 
-    -- soft point source: hot core + dim translucent halo (cheap falloff, no extra lights)
-    ball(swing, "FlameHalo", 1.15, CFrame.new(lc), Color3.fromRGB(255, 205, 150), 0.88)
-    ball(swing, "Flame", 0.5, CFrame.new(lc), Color3.fromRGB(255, 238, 205), 0.12)
+    -- soft warm glow sprite (replaces the Neon balls): a feathered radial bloom that reads as
+    -- lamplight rather than a sphere; one camera-facing quad → lighter than two translucent balls
+    do
+        local bb = Instance.new("BillboardGui")
+        bb.Name = "LanternGlow"
+        bb.Adornee = body
+        bb.Size = UDim2.fromScale(3.2, 3.2) -- sized to the barrel; soft halo extends past it
+        bb.LightInfluence = 0
+        bb.Parent = body
+        local img = Instance.new("ImageLabel")
+        img.BackgroundTransparency = 1
+        img.Size = UDim2.fromScale(1, 1)
+        img.Image = "rbxassetid://135490760661320"
+        img.ImageColor3 = Color3.fromRGB(255, 208, 155)
+        img.ImageTransparency = 0.2 -- a touch fainter than the deck (the gradient paper already glows)
+        img.Parent = bb
+    end
     local light = Instance.new("PointLight")
     light.Color = Color3.fromRGB(255, 168, 96)
-    light.Brightness = 0.5
-    light.Range = 16
+    light.Brightness = 0.3 -- less spill (amount)
+    light.Range = 9 -- less spill (distance)
     light.Shadows = false
     light.Parent = body
 

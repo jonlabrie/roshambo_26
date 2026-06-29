@@ -224,7 +224,7 @@ function SwitchbackDeck.build(palette: any, _layout: any): Spec.PartSpec
             {
                 name = "DeckLanternLight",
                 className = "PointLight",
-                properties = { Color = LANTERN_LIGHT, Brightness = 0.5, Range = 9 },
+                properties = { Color = LANTERN_LIGHT, Brightness = 0.3, Range = 5 },
             },
         },
     })

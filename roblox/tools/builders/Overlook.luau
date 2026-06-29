@@ -131,7 +131,7 @@ local function hanjiLantern(
                 {
                     name = `{name}Light`,
                     className = "PointLight",
-                    properties = { Color = { 1.0, 0.659, 0.376 }, Brightness = 0.5, Range = 9 },
+                    properties = { Color = { 1.0, 0.659, 0.376 }, Brightness = 0.3, Range = 5 },
                 },
             },
         })
