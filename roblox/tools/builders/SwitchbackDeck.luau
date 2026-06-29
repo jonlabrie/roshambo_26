@@ -270,18 +270,6 @@ function SwitchbackDeck.build(palette: any, _layout: any): Spec.PartSpec
             })
         )
     end
-    -- two newels framing the head of the flight (West edge is otherwise open)
-    for i, zoff in { -(STAIR_W / 2), STAIR_W / 2 } do
-        table.insert(
-            kids,
-            Spec.part(`StairNewel_{i}`, {
-                Size = { NEWEL_W, NEWEL_H, NEWEL_W },
-                CFrame = Spec.cframe({ X0 + NEWEL_W / 2, DECK_TOP + NEWEL_H / 2, STAIR_Z + zoff }),
-                Color = TIMBER,
-                Material = "Wood",
-            })
-        )
-    end
 
     return Spec.model("SwitchbackDeck", kids)
 end
