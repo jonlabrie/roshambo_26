@@ -62,13 +62,14 @@ local RAIL_H = 3.2
 local NEWEL_W, NEWEL_H = 0.62, 3.7
 local BAL_W, BAL_STEP = 0.34, 2.0
 local RAIL_INSET = 0.35 -- sit the rail line just inboard of the deck edge
+local WALL_H = 5 -- invisible CanCollide fall-wall height (fills the baluster gaps on open-air edges)
 
 -- ===== deck->path stair (Overlook-style, off the West-south edge) =====
-local STAIR_Z = -62 -- centerline on the West edge, south end
+local STAIR_Z = -61.6 -- centerline; nudged ~0.4 south so the stair's S rail lands on the deck corner Newel_1
 local STAIR_W = 5.0 -- tread width (across, along Z)
 local STAIR_STEPS = 7
-local STAIR_TOP = { X0, DECK_TOP, STAIR_Z } -- head of flight at the deck edge
-local STAIR_FOOT = { 136.7, 129.65, STAIR_Z } -- one step past the original target (same per-step run/rise)
+local STAIR_TOP = { X0 + RAIL_INSET, DECK_TOP, STAIR_Z } -- head; +RAIL_INSET east so the S rail meets Newel_1 (x0r)
+local STAIR_FOOT = { 136.7 + RAIL_INSET, 129.65, STAIR_Z } -- foot shifted the same +X to keep the rake a clean translate
 SwitchbackDeck.STAIR_FOOT = STAIR_FOOT -- exposed: the descent's first route marker
 
 -- axis-aligned timber beam between XZ points p0,p1 at height y, cross-section ch(height) x cw(width)
@@ -106,6 +107,21 @@ local function railRun(
 )
     barSeg(kids, `Rail{tag}Cap`, a, b, DECK_TOP + RAIL_H, 0.3, 0.6)
     barSeg(kids, `Rail{tag}Mid`, a, b, DECK_TOP + RAIL_H - 1.1, 0.2, 0.3)
+    -- invisible CanCollide fall-wall along the run (fills the baluster gaps on this open edge)
+    local wsize = if math.abs(b[1] - a[1]) >= math.abs(b[2] - a[2])
+        then { math.abs(b[1] - a[1]) + 0.4, WALL_H, 0.4 }
+        else { 0.4, WALL_H, math.abs(b[2] - a[2]) + 0.4 }
+    table.insert(
+        kids,
+        Spec.part(`Rail{tag}Wall`, {
+            Size = wsize,
+            CFrame = Spec.cframe({ (a[1] + b[1]) / 2, DECK_TOP + WALL_H / 2, (a[2] + b[2]) / 2 }),
+            Transparency = 1,
+            CanCollide = true,
+            CastShadow = false,
+            Material = "SmoothPlastic",
+        })
+    )
     local dx, dz = b[1] - a[1], b[2] - a[2]
     local len = math.sqrt(dx * dx + dz * dz)
     local n = math.max(2, math.floor(len / BAL_STEP))
@@ -119,6 +135,93 @@ local function railRun(
                 CFrame = Spec.cframe({ a[1] + dx * t, DECK_TOP + RAIL_H / 2, a[2] + dz * t }),
                 Color = TIMBER,
                 Material = "Wood",
+            })
+        )
+    end
+end
+
+-- raked KORAN stair railing along one side (constant z): raked cap + mid-rail + plumb balusters
+-- + foot newel. The top newel is optional — the South side reuses the deck's corner Newel_1
+-- (the stairway has been aligned so its S rail head lands exactly on it).
+local function stairRail(
+    kids: { Spec.PartSpec },
+    tag: string,
+    railZ: number,
+    topNewel: boolean,
+    barrier: boolean
+)
+    local ax, ay = STAIR_TOP[1], STAIR_TOP[2] -- head, at the walking surface
+    local bx, by = STAIR_FOOT[1], STAIR_FOOT[2] -- foot
+    -- raked cap (0.3 tall x 0.6 wide) at pitch + RAIL_H
+    local cpos, clen, crot = Spec.segment({ ax, ay + RAIL_H, railZ }, { bx, by + RAIL_H, railZ })
+    table.insert(
+        kids,
+        Spec.part(
+            `StairCap{tag}`,
+            { Size = { clen, 0.3, 0.6 }, CFrame = Spec.cframe(cpos, crot), Color = TIMBER, Material = "Wood" }
+        )
+    )
+    -- raked mid-rail (0.2 x 0.3), 1.1 below the cap
+    local mpos, mlen, mrot = Spec.segment({ ax, ay + RAIL_H - 1.1, railZ }, { bx, by + RAIL_H - 1.1, railZ })
+    table.insert(
+        kids,
+        Spec.part(
+            `StairMid{tag}`,
+            { Size = { mlen, 0.2, 0.3 }, CFrame = Spec.cframe(mpos, mrot), Color = TIMBER, Material = "Wood" }
+        )
+    )
+    -- plumb balusters between the newels
+    local dx, dy = bx - ax, by - ay
+    local runLen = math.sqrt(dx * dx + dy * dy)
+    local n = math.max(2, math.floor(runLen / BAL_STEP))
+    for i = 1, n - 1 do
+        local t = i / n
+        table.insert(
+            kids,
+            Spec.part(`StairBal{tag}_{i}`, {
+                Size = { BAL_W, RAIL_H, BAL_W },
+                CFrame = Spec.cframe({ ax + dx * t, ay + dy * t + RAIL_H / 2, railZ }),
+                Color = TIMBER,
+                Material = "Wood",
+            })
+        )
+    end
+    -- foot newel (always); top newel only when not reusing the deck corner newel
+    table.insert(
+        kids,
+        Spec.part(`StairNewel{tag}Foot`, {
+            Size = { NEWEL_W, NEWEL_H, NEWEL_W },
+            CFrame = Spec.cframe({ bx, by + NEWEL_H / 2, railZ }),
+            Color = TIMBER,
+            Material = "Wood",
+        })
+    )
+    if topNewel then
+        table.insert(
+            kids,
+            Spec.part(`StairNewel{tag}Top`, {
+                Size = { NEWEL_W, NEWEL_H, NEWEL_W },
+                CFrame = Spec.cframe({ ax, ay + NEWEL_H / 2, railZ }),
+                Color = TIMBER,
+                Material = "Wood",
+            })
+        )
+    end
+    if barrier then
+        -- invisible CanCollide fall-wall, raked along the flight; raise = (h/2)·cos(rake) so its
+        -- lower face sits ~at the tread line (cos(rake) = |dx|/runLen).
+        local hb = 6
+        local raise = (hb / 2) * (math.abs(dx) / runLen)
+        local qpos, qlen, qrot = Spec.segment({ ax, ay + raise, railZ }, { bx, by + raise, railZ })
+        table.insert(
+            kids,
+            Spec.part(`StairWall{tag}`, {
+                Size = { qlen, hb, 0.4 },
+                CFrame = Spec.cframe(qpos, qrot),
+                Transparency = 1,
+                CanCollide = true,
+                CastShadow = false,
+                Material = "SmoothPlastic",
             })
         )
     end
@@ -203,6 +306,11 @@ function SwitchbackDeck.build(palette: any, _layout: any): Spec.PartSpec
             })
         )
     end
+
+    -- deck-style railings down BOTH sides of the stairway (raked KORAN). The South rail is aligned
+    -- to the deck's corner Newel_1 (reused as its head post); the North side gets its own head newel.
+    stairRail(kids, "S", STAIR_Z + STAIR_W / 2 - RAIL_INSET, false, true) -- = zRail (Newel_1 line); +fall-wall
+    stairRail(kids, "N", STAIR_Z - STAIR_W / 2 + RAIL_INSET, true, false)
 
     -- single hanji result-lantern atop the SE corner newel (the jutting view corner).
     -- Name ends in "Lantern" so the runtime LanternController paints the World-Throw result on it.
