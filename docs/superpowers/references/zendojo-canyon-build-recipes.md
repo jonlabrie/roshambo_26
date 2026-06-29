@@ -135,10 +135,15 @@ single-timber spans taper naturally instead of forming nubs). Per-span **publish
     from afar. Two plates **perpendicular to the crosspiece** (universal, not path-relative) → readable both ways.
     Round glyphs rest at **20% transparency** (block faces 0) via a per-label `ShownT` attribute the telegraph
     fades to. Tag the plate `RoundLantern`; `LanternController` paints it.
-  - **Warm "oil-lamp through paper" glow, cheaply (no extra lights):** translucent Neon barrel (`T~0.42`,
-    desaturated cream) + a small bright **Flame** ball + a dim translucent **FlameHalo** ball at centre = soft
-    hotspot. **Vertical gradient via per-slice colour** (centre bright → ends ~0.55–0.8, top a touch dimmer)
-    for the lit-from-within look. Pure Neon = flat/uniform (wrong).
+  - **Warm "oil-lamp through paper" glow = a soft radial glow SPRITE** (current approach, ALL lanterns).
+    A Neon **ball** reads as a hard "uniform sphere" (esp. on the small block lanterns) — superseded. Use a
+    `BillboardGui`+`ImageLabel` with a **custom soft radial-glow PNG** (white centre→transparent edge, tint via
+    ImageColor3): **`rbxassetid://135490760661320`** (uploaded — marketplace "circle" *Decals* don't load in
+    an ImageLabel, `IsLoaded=false`; upload your own *Image*; allow moderation time for other players). Size
+    the sprite a bit larger than the body so the soft halo extends past the silhouette. Translucent Neon paper
+    (`T~0.42`) behind it. The chōchin also keeps a **vertical gradient via per-slice colour** (centre bright →
+    ends dimmer) for extra depth; the block box can't (single part for the 4-face glyph). **Light spill:**
+    keep the PointLight low (Brightness ~0.3, Range ~5–9) so lanterns read as contained points, not cliff wash.
   - **Barrel shape = stacked Neon slices on a superellipse profile** `r=capR+(Rmax−capR)(1−dⁿ)^0.5`
     (n≈6 → straight middle + sharp corners). **Continuous profile (no straight+taper boundary) avoids a
     brightness STEP** at the shoulder (overlap-doubling jumps where tapering starts); **keep slice overlap

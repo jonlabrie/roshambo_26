@@ -138,3 +138,24 @@ grounded to that terrain). 8 poles. Spawn left at `DevChannelSpawn` (on the path
 
 **Still TODO:** bamboo railings (Task 3); chōchin + railings on `PathExtension` / `DescentPath`; then restore
 the clearing spawn. SAVE THE PLACE (lanterns are place-only).
+
+### Update (2026-06-29, evening) — glow sprite, deck lanterns, light spill
+
+- **Lit-from-within glow is now a soft radial SPRITE, not Neon balls** (on ALL lanterns). A Neon ball
+  reads as a hard "uniform sphere" — especially on the small block deck lanterns. Replaced with a
+  `BillboardGui` + `ImageLabel` using a **custom soft radial-glow PNG uploaded to the user's account:
+  `rbxassetid://135490760661320`** (white center → transparent edge; tint via ImageColor3). One
+  camera-facing quad → lighter than two translucent Neon spheres. NOTE: marketplace "circle" assets are
+  Decals whose IDs don't load in an ImageLabel (`IsLoaded=false`) — had to upload our own Image. NOTE:
+  freshly-uploaded asset may need moderation time to show for other players.
+  - **Chōchin** (round, in `buildChochinPole.luau`): sprite parented to `ChochinBody` (sways), Size scale
+    3.2, tint `255,208,155`, ImageTransparency 0.2 (the gradient paper already glows).
+  - **Deck/block lanterns** (`LanternController.buildGlow`, runtime): sprite Size 2.1, tint `255,208,155`,
+    ImageTransparency 0.1; added to every `*Lantern` under `RoshamboStage` alongside the 4 glyph faces.
+- **Deck result-lanterns retoned to match the chōchin** (warm cream, dimmed ×0.75), **translucent paper**
+  (T 0.42), and the **Overlook thinned 10→6** (skip NW-upper, SE-lower, + the two stair-top N-rail-end
+  lanterns; posts kept, via a `skipLanterns` set on `deck()`).
+- **Glyph fixes** (`LanternController`): canvas aspect now matches the (non-square 1×1.5) face so the ○
+  renders round, not a vertical oval; fade slowed 0.18→0.35s.
+- **Light spill cut** on all lanterns: PointLight Brightness 0.5→0.3; Range chōchin 16→9, deck 9→5 — so
+  they read as contained warm points at dusk rather than washing the cliff.
