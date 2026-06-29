@@ -23,7 +23,7 @@ local CONFIG = {
 }
 
 -- ===== locked colours / materials =====
-local WOOD = Color3.fromRGB(88, 70, 40) -- dark bamboo post/arm/brace
+local WOOD = Color3.fromRGB(70, 55, 32) -- dark bamboo post/arm/brace
 local INK = Color3.fromRGB(46, 40, 30) -- ribs, caps
 local METAL = Color3.fromRGB(120, 122, 128) -- hanging loop
 local PAPER = { 200, 170, 143 } -- desaturated warm-cream paper base (gradient-scaled per slice)
