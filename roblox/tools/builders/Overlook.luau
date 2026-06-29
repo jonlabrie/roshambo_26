@@ -8,6 +8,8 @@ local Spec = require("./Spec")
 
 local Overlook = {}
 
+local CAP_DARK = { 0.118, 0.102, 0.078 } -- dark/black top rail (matches the arch bridge cap)
+
 -- ===== helpers =====
 -- axis-aligned horizontal box beam from p0 to p1 (each {x,z}) at height y, cross-section
 -- ch (height) × cw (width); auto-orients along whichever of X/Z varies more.
@@ -77,7 +79,7 @@ local function railRun(
     local capY = deckTopY + railH
     local midY = deckTopY + railH - 1.1
     for si, seg in splitRun(a, b, vertical, gapC, gapH) do
-        barSeg(children, `{name}Cap{si}`, seg[1], seg[2], capY, 0.3, 0.6, timber) -- flat top cap
+        barSeg(children, `{name}Cap{si}`, seg[1], seg[2], capY, 0.3, 0.6, CAP_DARK) -- flat top cap (dark/black)
         barSeg(children, `{name}Mid{si}`, seg[1], seg[2], midY, 0.25, 0.42, timber) -- mid rail
     end
     local _, len = Spec.segment({ a[1], capY, a[2] }, { b[1], capY, b[2] })

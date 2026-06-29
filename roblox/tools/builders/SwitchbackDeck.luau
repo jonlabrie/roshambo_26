@@ -18,6 +18,7 @@ local DECK_W, DECK_D = 18, 15 -- size: X width, Z depth
 local X0, X1 = CX - DECK_W / 2, CX + DECK_W / 2 -- West, South edges
 local Z0, Z1 = CZ - DECK_D / 2, CZ + DECK_D / 2 -- North, East edges
 local TIMBER = { 0.42, 0.31, 0.20 }
+local CAP_DARK = { 0.118, 0.102, 0.078 } -- dark/black top rail (matches the arch bridge cap)
 -- Hanji result-lantern recipe (matches the Overlook). The body MUST be named "*Lantern"
 -- so the runtime LanternController finds it and paints the World-Throw result SurfaceGui.
 local LANTERN_BODY = { 0.588, 0.5, 0.421 } -- chōchin paper tone, dimmed ×0.75 (core dimmed to match → stays blended)
@@ -87,7 +88,8 @@ local function barSeg(
     p1: { number },
     y: number,
     ch: number,
-    cw: number
+    cw: number,
+    color: { number }?
 )
     local dx, dz = p1[1] - p0[1], p1[2] - p0[2]
     local size = if math.abs(dx) >= math.abs(dz)
@@ -98,7 +100,7 @@ local function barSeg(
         Spec.part(name, {
             Size = size,
             CFrame = Spec.cframe({ (p0[1] + p1[1]) / 2, y, (p0[2] + p1[2]) / 2 }),
-            Color = TIMBER,
+            Color = color or TIMBER,
             Material = "Wood",
         })
     )
@@ -112,7 +114,7 @@ local function railRun(
     b: { number },
     balC: { v: number }
 )
-    barSeg(kids, `Rail{tag}Cap`, a, b, DECK_TOP + RAIL_H, 0.3, 0.6)
+    barSeg(kids, `Rail{tag}Cap`, a, b, DECK_TOP + RAIL_H, 0.3, 0.6, CAP_DARK)
     barSeg(kids, `Rail{tag}Mid`, a, b, DECK_TOP + RAIL_H - 1.1, 0.2, 0.3)
     -- invisible CanCollide fall-wall along the run (fills the baluster gaps on this open edge)
     local wsize = if math.abs(b[1] - a[1]) >= math.abs(b[2] - a[2])
@@ -163,10 +165,12 @@ local function stairRail(
     local cpos, clen, crot = Spec.segment({ ax, ay + RAIL_H, railZ }, { fx, fy + RAIL_H, railZ })
     table.insert(
         kids,
-        Spec.part(
-            `StairCap{tag}`,
-            { Size = { clen, 0.3, 0.6 }, CFrame = Spec.cframe(cpos, crot), Color = TIMBER, Material = "Wood" }
-        )
+        Spec.part(`StairCap{tag}`, {
+            Size = { clen, 0.3, 0.6 },
+            CFrame = Spec.cframe(cpos, crot),
+            Color = CAP_DARK,
+            Material = "Wood",
+        })
     )
     local mpos, mlen, mrot = Spec.segment({ ax, ay + RAIL_H - 1.1, railZ }, { fx, fy + RAIL_H - 1.1, railZ })
     table.insert(
