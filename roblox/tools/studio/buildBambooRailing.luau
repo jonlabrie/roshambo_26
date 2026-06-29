@@ -35,12 +35,6 @@ local CONNECTORS = {
         a = { path = "PathSteps", prefix = "Timber", i = 0, edgeSign = -1 },
         b = { path = "PathExtension", prefix = "ExtTimber", i = 1, edgeSign = -1 },
     },
-    { -- SwitchbackDeck stair foot (deck side) <-> DescentPath top: barrier-only patch closing the
-        -- drop-side coverage gap where the deck stairs meet the path (deck-style rail transition TBD).
-        barrierOnly = true,
-        a = { point = { 137.05, 129.65, -59.45 } }, -- stair foot, south (drop) corner
-        b = { path = "DescentPath", prefix = "DescTimber", i = 2, edgeSign = 1 },
-    },
 }
 
 -- ===== locked constants =====
@@ -201,12 +195,8 @@ local function buildOne(run): string
     return string.format("%s: %d control pts, %d posts, %d barriers", run.name, #base, posts, #base - 1)
 end
 
--- edge point for a connector endpoint spec: an explicit {point={x,y,z}} (e.g. a deck stair foot)
--- or a timber end (timber top + edgeSign·RightVector·HW).
+-- edge point (timber end, baseline = timber top) for a connector endpoint spec
 local function edgeOf(spec): Vector3
-    if spec.point then
-        return Vector3.new(spec.point[1], spec.point[2], spec.point[3])
-    end
     local model = ws:FindFirstChild(spec.path)
     assert(model, "missing Workspace." .. spec.path)
     local t = model:FindFirstChild(spec.prefix .. "_" .. spec.i) :: BasePart
@@ -221,23 +211,19 @@ local function buildConnector(parent: Instance, conn, n: number)
     sub.Name = "Connector_" .. n
     sub.Parent = parent
     local a, b = edgeOf(conn.a), edgeOf(conn.b)
-    -- barrierOnly bridges (e.g. a deck-stair → bamboo-path junction) skip the rails; the visible
-    -- rail transition is built in the other style. Otherwise draw the matching top+mid rail.
-    if not conn.barrierOnly then
-        for _, lvl in { { y = TOPY, dia = TOP_DIA }, { y = MIDY, dia = MID_DIA } } do
-            local pa, pb = a + Vector3.new(0, lvl.y, 0), b + Vector3.new(0, lvl.y, 0)
-            local seg = cyl(
-                sub,
-                "Rail",
-                Vector3.new((pb - pa).Magnitude + lvl.dia * 0.5, lvl.dia, lvl.dia),
-                CFrame.lookAt((pa + pb) / 2, pb) * CFrame.Angles(0, math.rad(90), 0)
-            )
-            seg.Name = "Rail"
-            for _, p in { pa, pb } do
-                local j = cyl(sub, "Joint", Vector3.new(lvl.dia, lvl.dia, lvl.dia), CFrame.new(p))
-                j.Shape = Enum.PartType.Ball
-                j.Name = "Joint"
-            end
+    for _, lvl in { { y = TOPY, dia = TOP_DIA }, { y = MIDY, dia = MID_DIA } } do
+        local pa, pb = a + Vector3.new(0, lvl.y, 0), b + Vector3.new(0, lvl.y, 0)
+        local seg = cyl(
+            sub,
+            "Rail",
+            Vector3.new((pb - pa).Magnitude + lvl.dia * 0.5, lvl.dia, lvl.dia),
+            CFrame.lookAt((pa + pb) / 2, pb) * CFrame.Angles(0, math.rad(90), 0)
+        )
+        seg.Name = "Rail"
+        for _, p in { pa, pb } do
+            local j = cyl(sub, "Joint", Vector3.new(lvl.dia, lvl.dia, lvl.dia), CFrame.new(p))
+            j.Shape = Enum.PartType.Ball
+            j.Name = "Joint"
         end
     end
     local midXZ = (a + b) / 2

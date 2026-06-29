@@ -72,6 +72,13 @@ local STAIR_TOP = { X0 + RAIL_INSET, DECK_TOP, STAIR_Z } -- head; +RAIL_INSET ea
 local STAIR_FOOT = { 136.7 + RAIL_INSET, 129.65, STAIR_Z } -- foot shifted the same +X to keep the rake a clean translate
 SwitchbackDeck.STAIR_FOOT = STAIR_FOOT -- exposed: the descent's first route marker
 
+-- Extend the stair handrail PAST the last step, down the same rake onto the path flagstone, so the
+-- deck-style railing reaches DescentPath's top (plugging the style/coverage gap). The foot newels
+-- relocate here. RAIL_FOOT_X is just shy of DescentPath's top edge (~134.9).
+local RAIL_FOOT_X = 135.0
+local STAIR_SLOPE = (STAIR_FOOT[2] - STAIR_TOP[2]) / (STAIR_FOOT[1] - STAIR_TOP[1])
+local RAIL_FOOT = { RAIL_FOOT_X, STAIR_FOOT[2] + STAIR_SLOPE * (RAIL_FOOT_X - STAIR_FOOT[1]) }
+
 -- axis-aligned timber beam between XZ points p0,p1 at height y, cross-section ch(height) x cw(width)
 local function barSeg(
     kids: { Spec.PartSpec },
@@ -151,9 +158,9 @@ local function stairRail(
     barrier: boolean
 )
     local ax, ay = STAIR_TOP[1], STAIR_TOP[2] -- head, at the walking surface
-    local bx, by = STAIR_FOOT[1], STAIR_FOOT[2] -- foot
-    -- raked cap (0.3 tall x 0.6 wide) at pitch + RAIL_H
-    local cpos, clen, crot = Spec.segment({ ax, ay + RAIL_H, railZ }, { bx, by + RAIL_H, railZ })
+    local fx, fy = RAIL_FOOT[1], RAIL_FOOT[2] -- extended foot, out on the flagstone
+    -- continuous raked cap (0.3 x 0.6) + mid-rail (0.2 x 0.3) from the head down past the last step
+    local cpos, clen, crot = Spec.segment({ ax, ay + RAIL_H, railZ }, { fx, fy + RAIL_H, railZ })
     table.insert(
         kids,
         Spec.part(
@@ -161,8 +168,7 @@ local function stairRail(
             { Size = { clen, 0.3, 0.6 }, CFrame = Spec.cframe(cpos, crot), Color = TIMBER, Material = "Wood" }
         )
     )
-    -- raked mid-rail (0.2 x 0.3), 1.1 below the cap
-    local mpos, mlen, mrot = Spec.segment({ ax, ay + RAIL_H - 1.1, railZ }, { bx, by + RAIL_H - 1.1, railZ })
+    local mpos, mlen, mrot = Spec.segment({ ax, ay + RAIL_H - 1.1, railZ }, { fx, fy + RAIL_H - 1.1, railZ })
     table.insert(
         kids,
         Spec.part(
@@ -170,28 +176,29 @@ local function stairRail(
             { Size = { mlen, 0.2, 0.3 }, CFrame = Spec.cframe(mpos, mrot), Color = TIMBER, Material = "Wood" }
         )
     )
-    -- plumb balusters between the newels
-    local dx, dy = bx - ax, by - ay
-    local runLen = math.sqrt(dx * dx + dy * dy)
-    local n = math.max(2, math.floor(runLen / BAL_STEP))
-    for i = 1, n - 1 do
-        local t = i / n
+    -- ONE plumb baluster per step, seated on its tread near the front (downhill) edge, rising to the cap
+    for k = 1, STAIR_STEPS do
+        local t = (k - 0.5) / STAIR_STEPS
+        local stepCx = STAIR_TOP[1] + (STAIR_FOOT[1] - STAIR_TOP[1]) * t - 0.33 -- step centre X (matches the step loop)
+        local treadTop = STAIR_TOP[2] + (STAIR_FOOT[2] - STAIR_TOP[2]) * t - 0.25 -- tread top (centre −0.5 + half 0.25)
+        local bx = stepCx - 0.7 -- near the front nosing
+        local capY = STAIR_TOP[2] + STAIR_SLOPE * (bx - STAIR_TOP[1]) + RAIL_H
         table.insert(
             kids,
-            Spec.part(`StairBal{tag}_{i}`, {
-                Size = { BAL_W, RAIL_H, BAL_W },
-                CFrame = Spec.cframe({ ax + dx * t, ay + dy * t + RAIL_H / 2, railZ }),
+            Spec.part(`StairBal{tag}_{k}`, {
+                Size = { BAL_W, capY - treadTop, BAL_W },
+                CFrame = Spec.cframe({ bx, (treadTop + capY) / 2, railZ }),
                 Color = TIMBER,
                 Material = "Wood",
             })
         )
     end
-    -- foot newel (always); top newel only when not reusing the deck corner newel
+    -- foot newel out on the flagstone
     table.insert(
         kids,
         Spec.part(`StairNewel{tag}Foot`, {
             Size = { NEWEL_W, NEWEL_H, NEWEL_W },
-            CFrame = Spec.cframe({ bx, by + NEWEL_H / 2, railZ }),
+            CFrame = Spec.cframe({ fx, fy + NEWEL_H / 2, railZ }),
             Color = TIMBER,
             Material = "Wood",
         })
@@ -208,13 +215,12 @@ local function stairRail(
         )
     end
     if barrier then
-        -- invisible CanCollide fall-wall, raked along the flight, sized so its VERTICAL height is
-        -- WALL_H (jump-proof). cos(rake) = |dx|/runLen → perp height = WALL_H/cos; raise = WALL_H/2
-        -- puts the lower face ~at the tread line.
-        local cosr = math.abs(dx) / runLen
-        local hb = WALL_H / cosr
-        local raise = WALL_H / 2
-        local qpos, qlen, qrot = Spec.segment({ ax, ay + raise, railZ }, { bx, by + raise, railZ })
+        -- invisible CanCollide fall-wall, raked along the WHOLE run (head → extended foot), sized so its
+        -- VERTICAL height is WALL_H (jump-proof). cos(rake) = |dx|/runLen → perp height = WALL_H/cos.
+        local dx, dy = fx - ax, fy - ay
+        local runLen = math.sqrt(dx * dx + dy * dy)
+        local hb = WALL_H / (math.abs(dx) / runLen)
+        local qpos, qlen, qrot = Spec.segment({ ax, ay + WALL_H / 2, railZ }, { fx, fy + WALL_H / 2, railZ })
         table.insert(
             kids,
             Spec.part(`StairWall{tag}`, {
