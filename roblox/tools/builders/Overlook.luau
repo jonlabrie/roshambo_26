@@ -181,7 +181,7 @@ end
 -- invisible, collidable safety wall along an edge run a→b: tall enough that a jump from
 -- the cap rail can't clear it, so players can't launch off into the gorge.
 local function barrierSeg(children: { any }, name: string, p0: { number }, p1: { number }, deckTopY: number)
-    local H = 12
+    local H = 15 -- clears rail-cap (~3.2) + jump (~7.2) so you can't double-jump off the cap
     local dx, dz = p1[1] - p0[1], p1[2] - p0[2]
     local size = if math.abs(dx) >= math.abs(dz) then { math.abs(dx), H, 0.4 } else { 0.4, H, math.abs(dz) }
     table.insert(

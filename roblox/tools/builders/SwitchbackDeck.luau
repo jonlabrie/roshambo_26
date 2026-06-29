@@ -62,7 +62,7 @@ local RAIL_H = 3.2
 local NEWEL_W, NEWEL_H = 0.62, 3.7
 local BAL_W, BAL_STEP = 0.34, 2.0
 local RAIL_INSET = 0.35 -- sit the rail line just inboard of the deck edge
-local WALL_H = 10 -- invisible CanCollide fall-wall height — above the ~7.2 default jump so the rail can't be cleared
+local WALL_H = 15 -- invisible fall-wall height — clears rail-cap (~3.2) + jump (~7.2) so you can't double-jump off the cap
 
 -- ===== deck->path stair (Overlook-style, off the West-south edge) =====
 local STAIR_Z = -61.6 -- centerline; nudged ~0.4 south so the stair's S rail lands on the deck corner Newel_1

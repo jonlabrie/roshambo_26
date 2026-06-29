@@ -44,7 +44,7 @@ local MIDY, MID_DIA = 1.25, 0.22 -- mid rail height / diameter
 local POSTH, POST_DIA, POST_EVERY = 3.0, 0.45, 2 -- post height / diameter / timbers between posts
 local S = 4 -- Catmull-Rom subdivisions per control segment
 local JIT_LAT, JIT_VERT, SEED = 0.154, 0.112, 20260629 -- mid-rail control-point jitter + seed
-local BARRIER_H, BARRIER_T = 10, 0.4 -- invisible fall-barrier box height / thickness
+local BARRIER_H, BARRIER_T = 15, 0.4 -- invisible fall-barrier box height / thickness (clears rail-cap + jump)
 local WOOD = Color3.fromRGB(70, 55, 32) -- dark bamboo
 local VERT = CFrame.Angles(0, 0, math.rad(90)) -- cylinder long axis is local X; vertical needs this
 
