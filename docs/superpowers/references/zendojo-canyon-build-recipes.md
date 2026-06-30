@@ -243,6 +243,10 @@ Studio (command bar / MCP `execute_luau`). They build into `Workspace.*` and **p
   run seams. As-built: PathSteps/PathExtension/DescentPath into `Workspace.PathRailings`. (See §4; locked 2026-06-29.)
 - **`buildBridge.luau`** — gentle Japanese arch footbridges (see §7), one `Bridges.<name>` sub-model per bridge,
   idempotent. CONFIG: a `BRIDGES` list with **baked** `A`/`B` endpoints + `rise`/`width`. (See §7; 2026-06-29.)
+- **`buildTeahouseChochin.luau`** — swaps each teahouse's old block lamp for the latest chōchin, hung from a
+  small metal hook up at the beam (no rod/cord). Reads each teahouse's OLD `Lantern` (XZ + horizontal
+  LookVector = glyph facing) + `Cord` top (hang Y), so it auto-adapts to each teahouse's position, rotation,
+  AND left/right mirror. Idempotent (skips already-converted). CONFIG: `CONTAINERS` list. (2026-06-29.)
 
 **Smoke-test each on its first reuse** (faithful extractions, not all re-run from the files). **Still TODO:**
 **parameterizing `SwitchbackDeck.build`** (center/footprint/terrain-feet/stair-target) so decks can be dropped anywhere.
