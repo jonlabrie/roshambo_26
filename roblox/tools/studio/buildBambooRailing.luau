@@ -186,6 +186,7 @@ local function buildOne(run): string
         bar.Anchored = true
         bar.CanCollide = true
         bar.Transparency = 1
+        bar.CastShadow = false -- invisible part still casts a shadow otherwise (15-stud shadow strip)
         bar.Size = Vector3.new(len + BARRIER_T, BARRIER_H, BARRIER_T)
         bar.CFrame = CFrame.lookAt(Vector3.new(midXZ.X, cy, midXZ.Z), Vector3.new(b.X, cy, b.Z))
             * CFrame.Angles(0, math.rad(90), 0)
@@ -234,6 +235,7 @@ local function buildConnector(parent: Instance, conn, n: number)
     bar.Anchored = true
     bar.CanCollide = true
     bar.Transparency = 1
+    bar.CastShadow = false -- invisible part still casts a shadow otherwise (15-stud shadow strip)
     bar.Size = Vector3.new(len + BARRIER_T, BARRIER_H, BARRIER_T)
     bar.CFrame = CFrame.lookAt(Vector3.new(midXZ.X, cy, midXZ.Z), Vector3.new(b.X, cy, b.Z))
         * CFrame.Angles(0, math.rad(90), 0)

@@ -162,7 +162,10 @@ local nUp = em:AddNormal(Vector3.yAxis)
 local built = 0
 for gi = 1, #boundaries - 1 do
     local A, B = boundaries[gi], boundaries[gi + 1]
-    local tread = B.grade -- FLAT tread, level with the downhill timber
+    -- FLAT tread at the DOWNHILL (lower) timber's grade. The timber is the FRONT (downhill
+    -- riser) of its step; the tread sits at its top and the UPHILL timber rises above it as
+    -- the back riser to the next step. min() keeps this correct whichever way the markers run.
+    local tread = math.min(A.grade, B.grade)
     local d = B.pos - A.pos
     local dirH = Vector3.new(d.X, 0, d.Z).Unit
     local cross = Vector3.new(dirH.Z, 0, -dirH.X)
@@ -233,7 +236,7 @@ for gi = 1, #boundaries - 1 do
                     end
                     if #ck >= 3 then
                         local domeH = DOME * rng:NextNumber(0.85, 1.25)
-                        local apexY = tread + 0.25 -- proud of the bed, just at the timber tops
+                        local apexY = tread + 0.25 -- proud of the bed, flush with the DOWNHILL timber top
                         local col = Color3.fromRGB(
                             122 + math.floor((rng:NextNumber() - 0.5) * 8),
                             127 + math.floor((rng:NextNumber() - 0.5) * 8),

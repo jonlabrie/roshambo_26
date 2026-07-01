@@ -52,7 +52,15 @@ spacing** along the spline arc-length.
 
 **Treads are FLAT per gap, stepping down at each timber — NOT sloped.** (Sloped treads bury the cobbles and
 read wrong. The path is a staircase: flat tread, vertical riser at the timber.) Each gap's tread sits flat at
-its **downhill** timber's grade.
+its **downhill (lower)** timber's grade.
+
+**The timber is the FRONT (downhill riser) of its step, NOT the back.** A step = a timber riser with its tread
+sitting *behind/above* it at the timber's top; the **uphill** timber of the gap then rises above that tread as
+the riser up to the next step. So for the gap between two timbers, key the tread to the **lower** one —
+`tread = math.min(A.grade, B.grade)` in the builder, **never the "next" timber**. Keying to the uphill timber
+buries the downhill timber at the *back* of the tread and reads wrong; using `min` keeps it correct no matter
+which way the markers run (uphill→downhill or downhill→uphill). *(Bug fixed 2026-06-30: the builder keyed to the
+later boundary, which is the uphill timber when markers ascend — buried the downhill riser. Now uses `min`.)*
 
 **Cobbles (one published mesh for the whole run):**
 - **Per-section Voronoi** — generate a separate cell field **inside each timber-to-timber gap** (clipped to
