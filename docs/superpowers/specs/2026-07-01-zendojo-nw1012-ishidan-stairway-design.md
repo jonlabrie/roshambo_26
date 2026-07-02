@@ -44,8 +44,14 @@ flight). Full stairway: **~47.5 rise over ~106 studs of arc ≈ 75–80 steps + 
 - **Landings:** 1–2, at natural meander points (~⅓ and ~⅔ of the flight; exact spots proposed at build time),
   4–6 studs long, dead flat, built in the existing cobble+gravel path vocabulary (§1 of the recipe doc, minus
   timbers — a flat cobble/gravel pad).
-- **Foot arrival:** small flagstone apron near the Overlook's NW corner at grade ~113.3–115; user smooths the
-  final approach terrain.
+- **Foot arrival (revised 2026-07-02, user choice "B" from browser mockups):** the stair keeps the marker
+  line's natural ~35°-skewed approach and lands on an **angled landing pad** — a small deck extension in the
+  Overlook's vocabulary, **rotated square to the stair's final heading** ("a section of deck squared up to the
+  path"). Pad top flush with the Overlook upper deck (Y 113.3); the last slate slab steps down ~0.6 onto it.
+  The pad joins the deck's west edge with an **oblique seam near the lamp newel** (`NewelUpperDeck4` at
+  (57, 114.9, 43), result-lantern on top — preserved untouched), with a triangular infill zone as needed so no
+  gap opens between pad and deck edge. The stair's **uphill flank runs at the newel line**, stair body landing
+  just south (right, in the user's overhead view) of the newel — confirmed against the user's screenshot.
 
 ## 2. Step construction (all plain Parts — no EditableMesh, nothing to publish)
 
@@ -82,8 +88,17 @@ flight). Full stairway: **~47.5 rise over ~106 studs of arc ≈ 75–80 steps + 
   (downhill allowed at landings where terrain permits).
 - **Head:** Timber_23-equivalent top step stays at the current head position/level, so the existing
   `Rail_NW1012_Tunnel` connector should still meet it; re-link if the new head geometry misses it.
-- **Foot:** bamboo terminates at posts on the flagstone apron. **No KŌRAN splice** — the Overlook keeps its
-  own railing vocabulary; the apron is the transition.
+- **Foot / landing pad (revised 2026-07-02):** the angled pad is the transition piece. Pad build in Overlook
+  deck vocabulary (§2 recipe dims where they carry over: WoodPlanks 0.6 slab matching the UpperDeck color,
+  Overlook-weight **1.5-sq posts** with terrain-surveyed feet, 0.6 newels, KŌRAN cap/mid/baluster dims):
+  - **Footprint:** stair width 6.4 + margin → **~7.5 cross × ~5–6 along heading** (exact dims from the final
+    marker survey at build time), rotated to the stair's final heading, oblique seam + triangular infill
+    against the deck's west edge.
+  - **Railing:** KŌRAN on the pad's open/downhill edges only; the bamboo stair rails terminate at pad newels
+    (deck-KŌRAN↔bamboo style transition per §2's stair-rail pattern). The lamp newel is preserved; where a
+    pad rail line lands on it, reuse it rather than doubling up (§2 rule).
+  - **Terrain:** cut-down around the pad (ground there is currently ~1.5–2 studs above deck top), cut-only +
+    snapshot, user smooths.
 
 ## 5. Teardown, tooling, persistence
 
@@ -95,6 +110,7 @@ flight). Full stairway: **~47.5 rise over ~106 studs of arc ≈ 75–80 steps + 
   idempotent (`outModel` replace-on-rerun) in the style of the existing §6 builders.
 - **Place-only build** (like all paths — [[roblox-rojo-vs-place-state]]): SAVE THE PLACE after every session;
   ship by publishing the place.
-- **First-attempt gate (stop-and-ask):** attempt #1 = **foot leg + lowest flight only** (~20 steps + apron),
-  then STOP for the user to walk it before batching the remaining flights, landings, walls, railing, chōchin.
+- **First-attempt gate (stop-and-ask):** attempt #1 = **landing pad + foot leg + lowest flight only**
+  (~20 steps), then STOP for the user to walk it before batching the remaining flights, landings, walls,
+  railing, chōchin.
 - Record as-built (final params, counts) back into this spec when done.
