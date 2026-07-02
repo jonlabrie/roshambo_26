@@ -42,7 +42,52 @@ As-built specs to mine for exact numbers:
 
 ---
 
-## 1. Stepped-cobble path
+## 1a. ★ ISHIDAN STAIR / PATH — THE CANONICAL STEP RECIPE (2026-07-02)
+
+**"Worn dark timber backed by worn flagstone."** User-locked on the NW1012 stairway; this is the step
+treatment for ALL new stairs/paths and the target for re-skinning the existing ones (PathSteps,
+PathExtension, DescentPath, NW1211Path use the older §1 look and are due for conversion). The engineering
+lives in `tools/builders/IshidanStairs.luau` (`resample` → `layout` → **`dress`**, Lune-tested) with the
+Studio mirror `tools/studio/buildIshidanStairs.luau` (CONFIG at top; publishes flag meshes).
+
+**Layout (unchanged from the stair math):** Catmull-Rom through BAKED control points; **uniform risers per
+flight** (target 0.6; terrain is carved to the stair, never the stair keyed to terrain bumps); flat landings;
+2R+T ≈ 2.0–2.1 comfort check. Steep flights (tread < ~1) read timber-dominant; gentle ones (tread ≥ ~1.2)
+show the full flagstone field — this scaling is intentional and matches the reference image.
+
+**Per step, `dress()` emits:**
+- **Riser beam** (`Riser_<i>[a|b]`): worn timber Part, `6.4 × (0.6–0.72) × 0.45`, top = tread, at the step
+  FRONT; Wood, color **72/60/48 ±7** per beam; 35% split into 2 planks (0.06 gap); yaw ±1.5°, lateral ±0.06.
+- **Gravel bed** (`Step_<i>` — the downstream contract part for ishigaki/railing/chōchin CONFIG runs):
+  Concrete + **`ZenGravel1`** MaterialVariant (generated fine decomposed-granite, **StudsPerTile 4**), tint
+  150/146/138, `5.8 wide × 1.2`, top = tread − 0.05, **spanning riser to riser** (front+0.2 → front+pitch+0.3
+  — a centered/short bed leaves flag edges hanging in air; a front-flush bed pokes concrete out of the riser
+  face. Both bit us.)
+- **Flagstones** (published mesh, `Flags_<n>`): flat Voronoi flags in the zone `u ±2.7, v 0.55 → pitch−0.08`
+  (skip if usable depth < 0.4; landings use the full pad). Seeds min-sep 1.2 (8 tries, 14 on deep treads).
+  **Rough outline pipeline: subdivide edges to ≤0.45 → per-point radial inset 0.05–0.14 with 12% NOTCHES
+  (+0.15–0.33) and 8% slight bulges → ONE Chaikin pass** (two passes = smooth ovals, the classic mistake).
+  **Rolled-edge profile:** bevel ring at top−0.07, crown ring inset 22% toward centroid at top, apex +0.012,
+  skirt to top−0.32; SMOOTH per-vertex normals (flat facets read CNC-cut). Per-flag top jitter ±0.02.
+  **Palette: grey g = 78–116 (mean ~96 — 25% darker than instinct), 35% warm variant (g+8, g, g−12), else
+  cool (g, g+1, g−3); sides 52/52/49.** MeshPart: Slate, Color white, DoubleSided, **CanCollide FALSE**
+  (players walk on beds/risers), CollisionFidelity Box, CFrame origin, world-space verts, publish
+  (`CreateAssetAsync`). **Chunk ≤ 20 steps per mesh** — one mesh for a full run blows Studio's triangle
+  limit; contiguous chunks share the style stream so seams are invisible.
+
+**Timber retaining walls** (the pocket/cutting treatment, replaces ishigaki for CUT faces; ishigaki §3 stays
+for under-path floating spans): stacked lagging boards `0.75 h × 0.4 t` (0.04 gaps), length/depth jitter,
+**step-timber color 72/60/48 ±7**; proud vertical posts `1.1 sq` in **teahouse EngawaPost ink 45/48/56**,
+ends + ~4-stud rhythm, no center post on short walls, NO top cap; height ≤ **11** (user cap), bays step with
+grade/rim; **register to the BUILT structure ±1.5–2 studs, never the excavation** (see memory
+`roblox-walls-register-to-structure`), then rough-BACKFILL behind (additive, ~0.7 below the top board).
+
+**Landing deck:** WoodPlanks slab, deck color 107/79/51, **flush black frame band** (0.6 wide, ink 30/26/20)
+around the perimeter, girders + short grounded posts; NO railings by default. Junction rule: stair treads
+arrive FLUSH at the deck top; leave ~0.05 butt gaps (coplanar overlaps z-fight); non-90° turns fan the last
+~3 steps (winder-style) instead of wedge gaps.
+
+## 1. Stepped-cobble path — SUPERSEDED for steps by §1a (kept for reference / un-converted paths)
 
 A meandering mountain stair: timber risers + flat cobble treads + cement-gravel bed, routed through markers.
 

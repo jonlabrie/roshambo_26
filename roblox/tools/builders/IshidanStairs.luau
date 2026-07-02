@@ -163,83 +163,206 @@ local function makeRng(seed: number): () -> number
     end
 end
 
-type SlabOpts = {
-    width: number,
-    depth: number,
-    body: number,
-    bedW: number,
-    bedH: number,
+-- ============================================================================
+-- dress() — THE CANONICAL STEP RECIPE ("worn dark timber backed by worn
+-- flagstone", user-locked 2026-07-02 on the NW1012 stairway; supersedes the
+-- earlier slate-slab and cobble-dome treatments for steps everywhere).
+-- Per step: a worn timber riser beam at the front (top = tread), a fine-gravel
+-- bed spanning riser to riser, and (where the tread is deep enough) flat
+-- flagstones with rough notched organic outlines. Pure data out; the Studio
+-- mirror turns flags into a published EditableMesh (chunk <= 20 steps per mesh:
+-- Studio's triangle limit) and the rest into Parts.
+-- ============================================================================
+
+type Pt = { u: number, v: number }
+
+local function subdivide(poly: { Pt }, maxSeg: number): { Pt }
+    local out = {}
+    for i = 1, #poly do
+        local a, b = poly[i], poly[(i % #poly) + 1]
+        table.insert(out, a)
+        local d = math.sqrt((b.u - a.u) ^ 2 + (b.v - a.v) ^ 2)
+        local nSub = math.floor(d / maxSeg)
+        for k = 1, nSub do
+            local t = k / (nSub + 1)
+            table.insert(out, { u = a.u + (b.u - a.u) * t, v = a.v + (b.v - a.v) * t })
+        end
+    end
+    return out
+end
+
+local function chaikin(poly: { Pt }): { Pt }
+    local out = {}
+    for i = 1, #poly do
+        local a, b = poly[i], poly[(i % #poly) + 1]
+        table.insert(out, { u = 0.75 * a.u + 0.25 * b.u, v = 0.75 * a.v + 0.25 * b.v })
+        table.insert(out, { u = 0.25 * a.u + 0.75 * b.u, v = 0.25 * a.v + 0.75 * b.v })
+    end
+    return out
+end
+
+local function clipCell(poly: { Pt }, S: Pt, O: Pt): { Pt }
+    local dx, dv = S.u - O.u, S.v - O.v
+    local mx, mv = (S.u + O.u) / 2, (S.v + O.v) / 2
+    local function inside(p: Pt)
+        return (p.u - mx) * dx + (p.v - mv) * dv >= 0
+    end
+    local function isect(a: Pt, b: Pt): Pt
+        local da = (a.u - mx) * dx + (a.v - mv) * dv
+        local db = (b.u - mx) * dx + (b.v - mv) * dv
+        local t = da / (da - db)
+        return { u = a.u + (b.u - a.u) * t, v = a.v + (b.v - a.v) * t }
+    end
+    local out = {}
+    for i = 1, #poly do
+        local a, b = poly[i], poly[(i % #poly) + 1]
+        local ina, inb = inside(a), inside(b)
+        if ina then
+            table.insert(out, a)
+        end
+        if ina ~= inb then
+            table.insert(out, isect(a, b))
+        end
+    end
+    return out
+end
+
+type DressOpts = {
     seed: number,
-    splitFrac: number?, -- probability a step splits into 2 stones (default 0.5)
-    yawDeg: number?, -- max per-stone yaw jitter (default 2)
-    latJitter: number?, -- max per-stone lateral jitter (default 0.15)
+    riserWidth: number?, -- default 6.4
+    riserDepth: number?, -- default 0.45
+    splitFrac: number?, -- default 0.35 (chance a beam splits into 2 planks)
+    flagHW: number?, -- default 2.7 (flag field half-width)
+    flagMinDepth: number?, -- default 0.4 (skip flags on tighter treads)
+    bedW: number?, -- default 5.8
+    bedH: number?, -- default 1.2
 }
 
-function IshidanStairs.slabs(layout: any, opts: SlabOpts)
+function IshidanStairs.dress(layout: any, opts: DressOpts)
     local rng = makeRng(opts.seed)
-    local splitFrac = opts.splitFrac or 0.5
-    local yawAmp = opts.yawDeg or 2
-    local latAmp = opts.latJitter or 0.15
+    local RW = opts.riserWidth or 6.4
+    local RD = opts.riserDepth or 0.45
+    local splitFrac = opts.splitFrac or 0.35
+    local HW = opts.flagHW or 2.7
+    local minDepth = opts.flagMinDepth or 0.4
+    local bedW = opts.bedW or 5.8
+    local bedH = opts.bedH or 1.2
     local out = {}
     for _, s in layout.steps :: { Step } do
-        local perp = { -s.dir[2], s.dir[1] } -- unit cross-stream (left of travel)
-        if s.kind == "landing" then
-            local len = (s.len :: number) + 1
-            table.insert(out, {
-                i = s.i,
-                kind = s.kind,
-                stones = {},
-                bed = {
-                    pos = { s.pos[1], s.tread - 0.05 - opts.bedH / 2, s.pos[3] },
+        local isLanding = s.kind == "landing"
+        local pitch = isLanding and (s.len :: number) or s.pitch
+        local front = { s.pos[1] - s.dir[1] * pitch / 2, s.pos[3] - s.dir[2] * pitch / 2 }
+        local entry = { i = s.i, kind = s.kind, risers = {}, flags = {}, bed = nil }
+        -- worn timber riser beam(s) at the step front (landings get none)
+        if not isLanding then
+            local split = rng() < splitFrac
+            local pieces = split and 2 or 1
+            local splitF = 0.35 + 0.3 * rng()
+            local widths = pieces == 1 and { RW } or { RW * splitF - 0.03, RW * (1 - splitF) - 0.03 }
+            local edge = -RW / 2
+            for _, wd in widths do
+                local h = 0.6 + 0.12 * rng()
+                local cCross = edge + wd / 2
+                edge += wd + 0.06
+                local tint = math.floor((rng() * 2 - 1) * 7 + 0.5)
+                local latJ = (rng() * 2 - 1) * 0.06
+                local lenTrim = 0.05 * rng()
+                local yaw = (rng() * 2 - 1) * 1.5
+                local perp = { -s.dir[2], s.dir[1] }
+                table.insert(entry.risers, {
+                    pos = {
+                        front[1] + s.dir[1] * (RD / 2) + perp[1] * (cCross + latJ),
+                        s.tread - h / 2,
+                        front[2] + s.dir[2] * (RD / 2) + perp[2] * (cCross + latJ),
+                    },
                     dir = s.dir,
-                    size = { opts.bedW, opts.bedH, len },
-                },
-            })
-            continue
+                    size = { wd - lenTrim, h, RD },
+                    yawDeg = yaw,
+                    color = { 72 + tint, 60 + tint, 48 + tint },
+                })
+            end
         end
-        local stones = {}
-        local split = rng() < splitFrac
-        local depth = opts.depth * (0.95 + 0.10 * rng())
-        local widths = { opts.width }
-        if split then
-            local f = 0.4 + 0.2 * rng() -- 40–60% split
-            widths = { opts.width * f - 0.04, opts.width * (1 - f) - 0.04 } -- 0.08 grout gap
-        end
-        local edge = -opts.width / 2
-        for _, w in widths do
-            local cCross = edge + w / 2
-            edge += w + 0.08
-            local lat = (rng() * 2 - 1) * latAmp
-            local along = (rng() * 2 - 1) * 0.1
-            table.insert(stones, {
-                pos = {
-                    s.pos[1] + perp[1] * (cCross + lat) + s.dir[1] * along,
-                    s.tread - opts.body / 2,
-                    s.pos[3] + perp[2] * (cCross + lat) + s.dir[2] * along,
-                },
-                dir = s.dir,
-                yawDeg = (rng() * 2 - 1) * yawAmp,
-                size = { w, opts.body, depth },
-                tint = math.floor((rng() * 2 - 1) * 3 + 0.5),
-            })
-        end
-        table.insert(out, {
-            i = s.i,
-            kind = s.kind,
-            stones = stones,
-            bed = {
-                -- tucked 0.35 uphill so the bed's downhill face hides behind the
-                -- stone's riser face (recipe §1 bed rule); centered beds alternated
-                -- concrete/slate riser faces depending on stone jitter (2026-07-02)
-                pos = {
-                    s.pos[1] + s.dir[1] * 0.35,
-                    s.tread - 0.05 - opts.bedH / 2,
-                    s.pos[3] + s.dir[2] * 0.35,
-                },
-                dir = s.dir,
-                size = { opts.bedW, opts.bedH, s.pitch + 0.5 },
+        -- fine-gravel bed: spans riser to riser (front+0.2 .. front+pitch+0.3)
+        local bedLen = pitch + 0.1
+        local bedCtrAlong = 0.2 + bedLen / 2 -- from the front
+        entry.bed = {
+            pos = {
+                front[1] + s.dir[1] * bedCtrAlong,
+                s.tread - 0.05 - bedH / 2,
+                front[2] + s.dir[2] * bedCtrAlong,
             },
-        })
+            dir = s.dir,
+            size = { bedW, bedH, bedLen },
+        }
+        -- flat flagstones with rough notched outlines (only where the tread is deep enough)
+        local V0 = isLanding and 0.3 or 0.55
+        local V1 = isLanding and pitch + 0.7 or pitch - 0.08
+        if V1 - V0 >= minDepth then
+            local seeds = {}
+            local tries = (V1 - V0) > 1.4 and 14 or 8
+            for _ = 1, tries do
+                local su, sv = -HW + 2 * HW * rng(), V0 + (V1 - V0) * rng()
+                local ok = true
+                for _, s2 in seeds do
+                    if (s2.u - su) ^ 2 + (s2.v - sv) ^ 2 < 1.44 then
+                        ok = false
+                        break
+                    end
+                end
+                if ok then
+                    table.insert(seeds, { u = su, v = sv })
+                end
+            end
+            local R0 = { { u = -HW, v = V0 }, { u = HW, v = V0 }, { u = HW, v = V1 }, { u = -HW, v = V1 } }
+            for _, S in seeds do
+                local poly = R0
+                for _, O in seeds do
+                    if O ~= S then
+                        poly = clipCell(poly, S, O)
+                    end
+                    if #poly < 3 then
+                        break
+                    end
+                end
+                if #poly >= 3 then
+                    local cu, cv = 0, 0
+                    for _, p in poly do
+                        cu, cv = cu + p.u, cv + p.v
+                    end
+                    cu, cv = cu / #poly, cv / #poly
+                    -- rough outline: subdivide -> radial jitter with notches -> ONE chaikin
+                    local ins = {}
+                    for _, p in subdivide(poly, 0.45) do
+                        local du, dv = cu - p.u, cv - p.v
+                        local ml = math.sqrt(du * du + dv * dv)
+                        if ml > 1e-4 then
+                            local amt = 0.05 + rng() * 0.09
+                            local roll = rng()
+                            if roll < 0.12 then
+                                amt = amt + 0.15 + rng() * 0.18 -- notch
+                            elseif roll > 0.92 then
+                                amt = amt - 0.06 -- slight bulge
+                            end
+                            table.insert(ins, { u = p.u + du / ml * amt, v = p.v + dv / ml * amt })
+                        end
+                    end
+                    if #ins >= 3 then
+                        ins = chaikin(ins) -- single pass: worn, not oval
+                        local topJ = (rng() * 2 - 1) * 0.02
+                        local warm = rng() < 0.35
+                        local g = math.floor(78 + rng() * 38) -- dark mean ~96, wide spread
+                        table.insert(entry.flags, {
+                            outline = ins,
+                            centroid = { u = cu, v = cv },
+                            topJitter = topJ,
+                            warm = warm,
+                            g = g,
+                        })
+                    end
+                end
+            end
+        end
+        table.insert(out, entry)
     end
     return out
 end

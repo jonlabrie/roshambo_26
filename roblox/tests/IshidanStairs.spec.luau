@@ -82,77 +82,91 @@ describe("IshidanStairs.layout", function()
     end)
 end)
 
-describe("IshidanStairs.slabs", function()
-    local line = {}
-    for d = 0, 78 do
-        table.insert(line, { d, 113.3 + d * (42.4 / 78), 0 })
+describe("IshidanStairs.dress (worn timber + flagstone — the canonical step recipe)", function()
+    -- steep run (short pitch: timber-dominant, no flags) and gentle run (flags fit)
+    local steep, gentle = {}, {}
+    for d = 0, 22 do
+        table.insert(steep, { d, 113.3 + d * (16.6 / 22), 0 })
     end
-    local layout =
-        IshidanStairs.layout(line, { riserTarget = 0.6, footY = 113.3, headY = 155.7, landings = {} })
-    local opts = { width = 6.4, depth = 1.25, body = 0.8, bedW = 5.8, bedH = 1.2, seed = 20260702 }
+    for d = 0, 66 do
+        table.insert(gentle, { d, 128.9 + d * (31.9 / 66), 0 })
+    end
+    local Lsteep =
+        IshidanStairs.layout(steep, { riserTarget = 0.6, footY = 113.3, headY = 129.9, landings = {} })
+    local Lgentle =
+        IshidanStairs.layout(gentle, { riserTarget = 0.6, footY = 128.9, headY = 160.8, landings = {} })
 
     test("deterministic for a fixed seed", function()
-        local a = IshidanStairs.slabs(layout, opts)
-        local b = IshidanStairs.slabs(layout, opts)
-        expect(a[1].stones[1].pos[1]).toBeCloseTo(b[1].stones[1].pos[1])
-        expect(a[1].stones[1].yawDeg).toBeCloseTo(b[1].stones[1].yawDeg)
-    end)
-    test("stone tops sit at the tread", function()
-        local S = IshidanStairs.slabs(layout, opts)
-        local step = layout.steps[1]
-        local stone = S[1].stones[1]
-        expect(stone.pos[2] + stone.size[2] / 2).toBeCloseTo(step.tread)
-    end)
-    test("bed top is 0.05 below the tread and narrower than the stones' full width", function()
-        local S = IshidanStairs.slabs(layout, opts)
-        local step = layout.steps[1]
-        expect(S[1].bed.pos[2] + S[1].bed.size[2] / 2).toBeCloseTo(step.tread - 0.05)
-        expect(S[1].bed.size[1]).toBeCloseTo(5.8)
-    end)
-    test("bed tucks uphill so its face hides behind the stone's riser face", function()
-        -- bed center sits 0.35 uphill of the step center; with bed len pitch+0.5 its
-        -- downhill face is then >= 0.2 behind the stone front even at worst jitter
-        local S = IshidanStairs.slabs(layout, opts)
-        local step = layout.steps[1]
-        expect(S[1].bed.pos[1]).toBeCloseTo(step.pos[1] + step.dir[1] * 0.35)
-        expect(S[1].bed.pos[3]).toBeCloseTo(step.pos[3] + step.dir[2] * 0.35)
-    end)
-    test("split steps: cross widths sum to width minus one 0.08 grout gap", function()
-        local S = IshidanStairs.slabs(layout, opts)
-        local found = false
-        for _, sb in S do
-            if #sb.stones == 2 then
-                found = true
-                expect(sb.stones[1].size[1] + sb.stones[2].size[1]).toBeCloseTo(6.4 - 0.08, 1)
-            end
-        end
-        expect(found).toBe(true) -- with ~70 steps and splitFrac 0.5, at least one split
-    end)
-    test("jitter stays in bounds", function()
-        local S = IshidanStairs.slabs(layout, opts)
-        for _, sb in S do
-            for _, st in sb.stones do
-                expect(math.abs(st.yawDeg) <= 2 + 1e-6).toBe(true)
-                expect(math.abs(st.tint) <= 3 + 1e-6).toBe(true)
-            end
+        local a = IshidanStairs.dress(Lgentle, { seed = 20260711 })
+        local b = IshidanStairs.dress(Lgentle, { seed = 20260711 })
+        expect(a[3].risers[1].pos[1]).toBeCloseTo(b[3].risers[1].pos[1])
+        expect(#a[3].flags).toBe(#b[3].flags)
+        if #a[3].flags > 0 then
+            expect(a[3].flags[1].outline[1].u).toBeCloseTo(b[3].flags[1].outline[1].u)
         end
     end)
-    test("splitFrac=0 yields single stones; yawDeg caps jitter", function()
-        local calm = {
-            width = 6.4,
-            depth = 1.25,
-            body = 0.8,
-            bedW = 5.8,
-            bedH = 1.2,
-            seed = 20260702,
-            splitFrac = 0,
-            yawDeg = 1.2,
-            latJitter = 0.1,
-        }
-        local S = IshidanStairs.slabs(layout, calm)
-        for _, sb in S do
-            expect(#sb.stones).toBe(1)
-            expect(math.abs(sb.stones[1].yawDeg) <= 1.2 + 1e-6).toBe(true)
+    test("riser top sits at the tread, beam at the step front", function()
+        local D = IshidanStairs.dress(Lgentle, { seed = 20260711 })
+        local step = Lgentle.steps[1]
+        local r = D[1].risers[1]
+        expect(r.pos[2] + r.size[2] / 2).toBeCloseTo(step.tread)
+        -- beam center ~0.225 ahead of the front boundary (front = pos - dir*pitch/2)
+        local frontX = step.pos[1] - step.dir[1] * step.pitch / 2
+        expect(math.abs(r.pos[1] - (frontX + step.dir[1] * 0.225)) < 0.15).toBe(true)
+    end)
+    test("bed spans riser to riser (front+0.2 .. front+pitch+0.3)", function()
+        local D = IshidanStairs.dress(Lgentle, { seed = 20260711 })
+        local step = Lgentle.steps[1]
+        local bed = D[1].bed
+        expect(bed.size[3]).toBeCloseTo(step.pitch + 0.1)
+        -- center = stepCenter + dir*0.25
+        expect(bed.pos[1]).toBeCloseTo(step.pos[1] + step.dir[1] * 0.25)
+        expect(bed.pos[2] + bed.size[2] / 2).toBeCloseTo(step.tread - 0.05)
+    end)
+    test("flags appear on gentle treads and stay within the flag zone", function()
+        local D = IshidanStairs.dress(Lgentle, { seed = 20260711 })
+        local step = Lgentle.steps[1]
+        local any = false
+        for _, f in D[1].flags do
+            any = true
+            for _, p in f.outline do
+                expect(p.u >= -2.7 - 0.01 and p.u <= 2.7 + 0.01).toBe(true)
+                expect(p.v >= 0.35 and p.v <= step.pitch + 0.01).toBe(true)
+            end
+            expect(#f.outline >= 6).toBe(true) -- subdivided + chaikin = dense organic outline
+        end
+        expect(any).toBe(true)
+    end)
+    test("steep treads get no flags (zone below minimum depth)", function()
+        local D = IshidanStairs.dress(Lsteep, { seed = 20260711 })
+        for _, d in D do
+            if d.kind == "step" then
+                expect(#d.flags).toBe(0)
+            end
+        end
+    end)
+    test("flag palette: darker mean, wide spread, bounded", function()
+        local D = IshidanStairs.dress(Lgentle, { seed = 20260711 })
+        local sum, n = 0, 0
+        for _, d in D do
+            for _, f in d.flags do
+                sum += f.g
+                n += 1
+                expect(f.g >= 78 and f.g <= 116).toBe(true)
+            end
+        end
+        expect(n > 20).toBe(true)
+        local mean = sum / n
+        expect(mean > 88 and mean < 104).toBe(true)
+    end)
+    test("riser colors are the worn-timber palette", function()
+        local D = IshidanStairs.dress(Lgentle, { seed = 20260711 })
+        for _, d in D do
+            for _, r in d.risers do
+                expect(r.color[1] >= 65 and r.color[1] <= 79).toBe(true)
+                expect(r.color[2]).toBe(r.color[1] - 12)
+                expect(r.color[3]).toBe(r.color[1] - 24)
+            end
         end
     end)
 end)

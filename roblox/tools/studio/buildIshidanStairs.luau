@@ -1,66 +1,40 @@
--- buildIshidanStairs.luau — slate ishidan stairway from a BAKED centerline.
+-- buildIshidanStairs.luau — canonical stair/path builder: uniform-riser layout
+-- dressed as "worn dark timber backed by worn flagstone" (user-locked 2026-07-02).
 -- MIRROR of tools/builders/IshidanStairs.luau (Lune-tested) — keep in sync.
 -- Run in Studio (command bar / MCP execute_luau, Edit datamodel). Idempotent:
 -- destroys and rebuilds Workspace.<CONFIG.outModel>.
--- Part contract for downstream builders (ishigaki/railing/chochin): per step a
--- full-width bed Part "Step_<i>" (RightVector = cross-stream, top = tread-0.05)
--- plus Slate stones "Stone_<i>a/b". CONFIG.buildRange stages partial builds
--- WITHOUT reshuffling jitter (slabs always computes every step; the range only
--- filters Part creation — do not "optimize" by slicing steps before slabs).
+--
+-- Emits per step: Riser_<i>[a|b] worn-timber beam Parts (top = tread),
+-- Step_<i> fine-gravel bed Part (the downstream contract for ishigaki/railing/
+-- chochin builders: RightVector = cross-stream, top = tread - 0.05), and flat
+-- flagstones on treads deep enough (>= 0.4 usable), published as Flags_<n>
+-- EditableMesh chunks of <= CONFIG.chunkSteps steps (Studio triangle limit).
+-- Flags are CanCollide false — players walk on beds/risers.
 -- Spec: docs/superpowers/specs/2026-07-01-zendojo-nw1012-ishidan-stairway-design.md
 local CONFIG = {
     outModel = "NW1012Stairs",
-    -- BAKED {x,y,z} centerline control points, FOOT (pad edge) FIRST —
-    -- from bakeNW1012Stairway.luau, surveyed 2026-07-02:
-    control = {
-        -- stair foot = pad stair-side edge midpoint (pad top level)
-        { 50.65, 113.30, 43.28 },
-        -- foot marker (terrain Y - 1; interior Y only shapes flight-boundary grades)
-        { 47.85, 116.65, 45.22 },
-        -- old timber centers (tread grade)
-        { 45.00, 120.20, 47.18 },
-        { 41.77, 122.27, 49.05 },
-        { 38.95, 124.45, 50.60 },
-        { 36.10, 126.36, 52.01 },
-        { 33.14, 128.10, 53.40 },
-        { 29.73, 130.24, 55.11 },
-        { 26.84, 132.40, 56.65 },
-        { 23.60, 134.00, 58.27 },
-        { 19.86, 135.80, 60.03 },
-        { 16.15, 138.05, 61.52 },
-        { 13.04, 140.16, 62.59 },
-        { 9.86, 141.96, 63.69 },
-        { 6.56, 143.72, 64.89 },
-        { 3.23, 145.41, 66.11 },
-        { -0.46, 147.40, 67.35 },
-        { -3.58, 149.18, 68.26 },
-        { -6.90, 151.39, 69.29 },
-        { -9.60, 153.55, 70.31 },
-        { -13.12, 155.80, 71.53 },
-        { -16.47, 157.69, 72.55 },
-        { -20.43, 159.40, 73.76 },
-        { -23.86, 161.09, 74.85 },
-        { -27.20, 162.60, 75.93 },
-    },
-    footY = 113.3, -- pad top; first tread = footY + riser
-    headY = 162.6, -- must equal the old Timber_23 top so Rail_NW1012_Tunnel still meets the head
+    -- BAKED {x,y,z} centerline control points, FOOT FIRST (survey once, bake,
+    -- never read draft markers at build time):
+    control = {},
+    footY = 0,
+    headY = 0,
     riserTarget = 0.6,
-    landings = { { frac = 0.33, len = 5 }, { frac = 0.66, len = 5 } },
-    width = 6.4,
-    depth = 1.25,
-    body = 0.8,
+    landings = {}, -- { { frac = 0..1, len = studs } }
+    seed = 20260711,
+    buildRange = nil, -- {i0, i1} step indices; nil = all
+    resampleSpacing = 2.0,
+    chunkSteps = 20, -- steps per published flag mesh (triangle limit headroom)
+    -- style constants (the locked recipe — change only with a user gate):
+    riserWidth = 6.4,
+    riserDepth = 0.45,
+    splitFrac = 0.35,
+    flagHW = 2.7,
+    flagMinDepth = 0.4,
     bedW = 5.8,
     bedH = 1.2,
-    seed = 20260702,
-    splitFrac = 0.25, -- calmed from 0.5 (user gate 2026-07-02: "too busy")
-    yawDeg = 1.2, -- calmed from 2
-    latJitter = 0.1, -- calmed from 0.15
-    buildRange = nil, -- {i0, i1} step indices to build; nil = all
-    resampleSpacing = 2.0,
-    stoneColor = { 96, 98, 94 }, -- base RGB, per-stone tint added
-    bedColor = Color3.fromRGB(138, 142, 142),
-    -- "" = plain Concrete; ZenCement2 read as river rock at this scale (user gate)
-    bedMaterialVariant = "",
+    bedVariant = "ZenGravel1", -- fine decomposed-granite gravel (StudsPerTile 4)
+    bedColor = Color3.fromRGB(150, 146, 138),
+    flagSideColor = Color3.fromRGB(52, 52, 49),
 }
 
 ----------------------------------------------------------------------------
@@ -215,83 +189,180 @@ local function makeRng(seed: number): () -> number
     end
 end
 
-type SlabOpts = {
-    width: number,
-    depth: number,
-    body: number,
-    bedW: number,
-    bedH: number,
-    seed: number,
-    splitFrac: number?,
-    yawDeg: number?,
-    latJitter: number?,
-}
+type Pt = { u: number, v: number }
 
-local function slabs(layoutR: any, opts: SlabOpts)
+local function subdivide(poly: { Pt }, maxSeg: number): { Pt }
+    local out = {}
+    for i = 1, #poly do
+        local a, b = poly[i], poly[(i % #poly) + 1]
+        table.insert(out, a)
+        local d = math.sqrt((b.u - a.u) ^ 2 + (b.v - a.v) ^ 2)
+        local nSub = math.floor(d / maxSeg)
+        for k = 1, nSub do
+            local t = k / (nSub + 1)
+            table.insert(out, { u = a.u + (b.u - a.u) * t, v = a.v + (b.v - a.v) * t })
+        end
+    end
+    return out
+end
+
+local function chaikin(poly: { Pt }): { Pt }
+    local out = {}
+    for i = 1, #poly do
+        local a, b = poly[i], poly[(i % #poly) + 1]
+        table.insert(out, { u = 0.75 * a.u + 0.25 * b.u, v = 0.75 * a.v + 0.25 * b.v })
+        table.insert(out, { u = 0.25 * a.u + 0.75 * b.u, v = 0.25 * a.v + 0.75 * b.v })
+    end
+    return out
+end
+
+local function clipCell(poly: { Pt }, S: Pt, O: Pt): { Pt }
+    local dx, dv = S.u - O.u, S.v - O.v
+    local mx, mv = (S.u + O.u) / 2, (S.v + O.v) / 2
+    local function inside(p: Pt)
+        return (p.u - mx) * dx + (p.v - mv) * dv >= 0
+    end
+    local function isect(a: Pt, b: Pt): Pt
+        local da = (a.u - mx) * dx + (a.v - mv) * dv
+        local db = (b.u - mx) * dx + (b.v - mv) * dv
+        local t = da / (da - db)
+        return { u = a.u + (b.u - a.u) * t, v = a.v + (b.v - a.v) * t }
+    end
+    local out = {}
+    for i = 1, #poly do
+        local a, b = poly[i], poly[(i % #poly) + 1]
+        local ina, inb = inside(a), inside(b)
+        if ina then
+            table.insert(out, a)
+        end
+        if ina ~= inb then
+            table.insert(out, isect(a, b))
+        end
+    end
+    return out
+end
+
+local function dress(layoutR: any, opts: any)
     local rng = makeRng(opts.seed)
-    local splitFrac = opts.splitFrac or 0.5
-    local yawAmp = opts.yawDeg or 2
-    local latAmp = opts.latJitter or 0.15
+    local RW = opts.riserWidth or 6.4
+    local RD = opts.riserDepth or 0.45
+    local splitFrac = opts.splitFrac or 0.35
+    local HW = opts.flagHW or 2.7
+    local minDepth = opts.flagMinDepth or 0.4
+    local bedW = opts.bedW or 5.8
+    local bedH = opts.bedH or 1.2
     local out = {}
     for _, s in layoutR.steps :: { Step } do
-        local perp = { -s.dir[2], s.dir[1] } -- unit cross-stream (left of travel)
-        if s.kind == "landing" then
-            local len = (s.len :: number) + 1
-            table.insert(out, {
-                i = s.i,
-                kind = s.kind,
-                stones = {},
-                bed = {
-                    pos = { s.pos[1], s.tread - 0.05 - opts.bedH / 2, s.pos[3] },
+        local isLanding = s.kind == "landing"
+        local pitch = isLanding and (s.len :: number) or s.pitch
+        local front = { s.pos[1] - s.dir[1] * pitch / 2, s.pos[3] - s.dir[2] * pitch / 2 }
+        local entry = { i = s.i, kind = s.kind, risers = {}, flags = {}, bed = nil }
+        if not isLanding then
+            local split = rng() < splitFrac
+            local pieces = split and 2 or 1
+            local splitF = 0.35 + 0.3 * rng()
+            local widths = pieces == 1 and { RW } or { RW * splitF - 0.03, RW * (1 - splitF) - 0.03 }
+            local edge = -RW / 2
+            for _, wd in widths do
+                local h = 0.6 + 0.12 * rng()
+                local cCross = edge + wd / 2
+                edge += wd + 0.06
+                local tint = math.floor((rng() * 2 - 1) * 7 + 0.5)
+                local latJ = (rng() * 2 - 1) * 0.06
+                local lenTrim = 0.05 * rng()
+                local yaw = (rng() * 2 - 1) * 1.5
+                local perp = { -s.dir[2], s.dir[1] }
+                table.insert(entry.risers, {
+                    pos = {
+                        front[1] + s.dir[1] * (RD / 2) + perp[1] * (cCross + latJ),
+                        s.tread - h / 2,
+                        front[2] + s.dir[2] * (RD / 2) + perp[2] * (cCross + latJ),
+                    },
                     dir = s.dir,
-                    size = { opts.bedW, opts.bedH, len },
-                },
-            })
-            continue
+                    size = { wd - lenTrim, h, RD },
+                    yawDeg = yaw,
+                    color = { 72 + tint, 60 + tint, 48 + tint },
+                })
+            end
         end
-        local stones = {}
-        local split = rng() < splitFrac
-        local depth = opts.depth * (0.95 + 0.10 * rng())
-        local widths = { opts.width }
-        if split then
-            local f = 0.4 + 0.2 * rng() -- 40–60% split
-            widths = { opts.width * f - 0.04, opts.width * (1 - f) - 0.04 } -- 0.08 grout gap
-        end
-        local edge = -opts.width / 2
-        for _, w in widths do
-            local cCross = edge + w / 2
-            edge += w + 0.08
-            local lat = (rng() * 2 - 1) * latAmp
-            local along = (rng() * 2 - 1) * 0.1
-            table.insert(stones, {
-                pos = {
-                    s.pos[1] + perp[1] * (cCross + lat) + s.dir[1] * along,
-                    s.tread - opts.body / 2,
-                    s.pos[3] + perp[2] * (cCross + lat) + s.dir[2] * along,
-                },
-                dir = s.dir,
-                yawDeg = (rng() * 2 - 1) * yawAmp,
-                size = { w, opts.body, depth },
-                tint = math.floor((rng() * 2 - 1) * 3 + 0.5),
-            })
-        end
-        table.insert(out, {
-            i = s.i,
-            kind = s.kind,
-            stones = stones,
-            bed = {
-                -- tucked 0.35 uphill so the bed's downhill face hides behind the
-                -- stone's riser face (recipe §1 bed rule); centered beds alternated
-                -- concrete/slate riser faces depending on stone jitter (2026-07-02)
-                pos = {
-                    s.pos[1] + s.dir[1] * 0.35,
-                    s.tread - 0.05 - opts.bedH / 2,
-                    s.pos[3] + s.dir[2] * 0.35,
-                },
-                dir = s.dir,
-                size = { opts.bedW, opts.bedH, s.pitch + 0.5 },
+        local bedLen = pitch + 0.1
+        local bedCtrAlong = 0.2 + bedLen / 2
+        entry.bed = {
+            pos = {
+                front[1] + s.dir[1] * bedCtrAlong,
+                s.tread - 0.05 - bedH / 2,
+                front[2] + s.dir[2] * bedCtrAlong,
             },
-        })
+            dir = s.dir,
+            size = { bedW, bedH, bedLen },
+        }
+        local V0 = isLanding and 0.3 or 0.55
+        local V1 = isLanding and pitch + 0.7 or pitch - 0.08
+        if V1 - V0 >= minDepth then
+            local seeds = {}
+            local tries = (V1 - V0) > 1.4 and 14 or 8
+            for _ = 1, tries do
+                local su, sv = -HW + 2 * HW * rng(), V0 + (V1 - V0) * rng()
+                local ok = true
+                for _, s2 in seeds do
+                    if (s2.u - su) ^ 2 + (s2.v - sv) ^ 2 < 1.44 then
+                        ok = false
+                        break
+                    end
+                end
+                if ok then
+                    table.insert(seeds, { u = su, v = sv })
+                end
+            end
+            local R0 = { { u = -HW, v = V0 }, { u = HW, v = V0 }, { u = HW, v = V1 }, { u = -HW, v = V1 } }
+            for _, S in seeds do
+                local poly = R0
+                for _, O in seeds do
+                    if O ~= S then
+                        poly = clipCell(poly, S, O)
+                    end
+                    if #poly < 3 then
+                        break
+                    end
+                end
+                if #poly >= 3 then
+                    local cu, cv = 0, 0
+                    for _, p in poly do
+                        cu, cv = cu + p.u, cv + p.v
+                    end
+                    cu, cv = cu / #poly, cv / #poly
+                    local ins = {}
+                    for _, p in subdivide(poly, 0.45) do
+                        local du, dv = cu - p.u, cv - p.v
+                        local ml = math.sqrt(du * du + dv * dv)
+                        if ml > 1e-4 then
+                            local amt = 0.05 + rng() * 0.09
+                            local roll = rng()
+                            if roll < 0.12 then
+                                amt = amt + 0.15 + rng() * 0.18
+                            elseif roll > 0.92 then
+                                amt = amt - 0.06
+                            end
+                            table.insert(ins, { u = p.u + du / ml * amt, v = p.v + dv / ml * amt })
+                        end
+                    end
+                    if #ins >= 3 then
+                        ins = chaikin(ins)
+                        local topJ = (rng() * 2 - 1) * 0.02
+                        local warm = rng() < 0.35
+                        local g = math.floor(78 + rng() * 38)
+                        table.insert(entry.flags, {
+                            outline = ins,
+                            centroid = { u = cu, v = cv },
+                            topJitter = topJ,
+                            warm = warm,
+                            g = g,
+                        })
+                    end
+                end
+            end
+        end
+        table.insert(out, entry)
     end
     return out
 end
@@ -299,26 +370,9 @@ end
 -- >>> END MIRROR <<<
 ----------------------------------------------------------------------------
 
-local function box(name: string, b, material: Enum.Material, color: Color3, parent: Instance, yawDeg: number?)
-    local p = Instance.new("Part")
-    p.Name = name
-    p.Anchored = true
-    p.Material = material
-    p.Color = color
-    p.Size = Vector3.new(b.size[1], b.size[2], b.size[3])
-    local cross = Vector3.new(-b.dir[2], 0, b.dir[1])
-    local cf = CFrame.fromMatrix(Vector3.new(b.pos[1], b.pos[2], b.pos[3]), cross, Vector3.yAxis)
-    if yawDeg and yawDeg ~= 0 then
-        cf = cf * CFrame.Angles(0, math.rad(yawDeg), 0)
-    end
-    p.CFrame = cf
-    p.TopSurface = Enum.SurfaceType.Smooth
-    p.BottomSurface = Enum.SurfaceType.Smooth
-    p.Parent = parent
-    return p
-end
+local AssetService = game:GetService("AssetService")
 
-assert(#CONFIG.control >= 2, "CONFIG.control is empty — paste the baked centerline first (plan Task 4)")
+assert(#CONFIG.control >= 2, "CONFIG.control is empty — paste a baked centerline first")
 
 local old = workspace:FindFirstChild(CONFIG.outModel)
 if old then
@@ -335,40 +389,133 @@ local layoutR = layout(polyline, {
     headY = CONFIG.headY,
     landings = CONFIG.landings,
 })
-local builds = slabs(layoutR, {
-    width = CONFIG.width,
-    depth = CONFIG.depth,
-    body = CONFIG.body,
-    bedW = CONFIG.bedW,
-    bedH = CONFIG.bedH,
-    seed = CONFIG.seed,
-    splitFrac = CONFIG.splitFrac,
-    yawDeg = CONFIG.yawDeg,
-    latJitter = CONFIG.latJitter,
-})
-local made = 0
-for _, sb in builds do
-    if CONFIG.buildRange and (sb.i < CONFIG.buildRange[1] or sb.i > CONFIG.buildRange[2]) then
+local dressed = dress(layoutR, CONFIG)
+
+-- step frames for world conversion (front + axes per entry)
+local stepByI = {}
+for _, s in layoutR.steps do
+    stepByI[s.i] = s
+end
+
+local function mkPart(name, b, material, color, yawDeg)
+    local q = Instance.new("Part")
+    q.Name = name
+    q.Anchored = true
+    q.Material = material
+    q.Color = color
+    q.Size = Vector3.new(b.size[1], b.size[2], b.size[3])
+    local cross = Vector3.new(-b.dir[2], 0, b.dir[1])
+    local cf = CFrame.fromMatrix(Vector3.new(b.pos[1], b.pos[2], b.pos[3]), cross, Vector3.yAxis)
+    if yawDeg and yawDeg ~= 0 then
+        cf = cf * CFrame.Angles(0, math.rad(yawDeg), 0)
+    end
+    q.CFrame = cf
+    q.TopSurface = Enum.SurfaceType.Smooth
+    q.BottomSurface = Enum.SurfaceType.Smooth
+    q.Parent = model
+    return q
+end
+
+local made, chunkIdx, chunkCount = 0, 1, 0
+local em = AssetService:CreateEditableMesh()
+local emFlags = 0
+local report = {}
+
+local function publishChunk()
+    if emFlags == 0 then
+        return
+    end
+    local res, assetId = AssetService:CreateAssetAsync(
+        em,
+        Enum.AssetType.Mesh,
+        { Name = "ZenFlagTreads", Description = CONFIG.outModel .. " flags chunk " .. chunkIdx }
+    )
+    assert(res == Enum.CreateAssetResult.Success, "flag publish failed: " .. tostring(res))
+    local mp = AssetService:CreateMeshPartAsync(Content.fromUri("rbxassetid://" .. assetId))
+    mp.Name = "Flags_" .. chunkIdx
+    mp.Material = Enum.Material.Slate
+    mp.Color = Color3.new(1, 1, 1)
+    mp.DoubleSided = true
+    mp.Anchored = true
+    mp.CanCollide = false
+    mp.CollisionFidelity = Enum.CollisionFidelity.Box
+    mp.CFrame = CFrame.new()
+    mp:SetAttribute("PublishedAsset", "rbxassetid://" .. assetId)
+    mp.Parent = model
+    table.insert(report, string.format("Flags_%d: %d flags, asset %d", chunkIdx, emFlags, assetId))
+    chunkIdx += 1
+    chunkCount = 0
+    emFlags = 0
+    em = AssetService:CreateEditableMesh()
+end
+
+for _, e in dressed do
+    if CONFIG.buildRange and (e.i < CONFIG.buildRange[1] or e.i > CONFIG.buildRange[2]) then
         continue
     end
-    local bed = box("Step_" .. sb.i, sb.bed, Enum.Material.Concrete, CONFIG.bedColor, model)
-    if CONFIG.bedMaterialVariant ~= "" then
-        bed.MaterialVariant = CONFIG.bedMaterialVariant
-    end
-    for si, st in sb.stones do
-        box(
-            "Stone_" .. sb.i .. string.char(96 + si),
-            st,
-            Enum.Material.Slate,
-            Color3.fromRGB(
-                CONFIG.stoneColor[1] + st.tint,
-                CONFIG.stoneColor[2] + st.tint,
-                CONFIG.stoneColor[3] + st.tint
-            ),
-            model,
-            st.yawDeg
+    local s = stepByI[e.i]
+    local pitch = (s.kind == "landing") and (s.len :: number) or s.pitch
+    local front = { s.pos[1] - s.dir[1] * pitch / 2, s.pos[3] - s.dir[2] * pitch / 2 }
+    local dirV = Vector3.new(s.dir[1], 0, s.dir[2])
+    local crossV = Vector3.new(-s.dir[2], 0, s.dir[1])
+    local frontV = Vector3.new(front[1], 0, front[2])
+    for ri, r in e.risers do
+        mkPart(
+            "Riser_" .. e.i .. (#e.risers == 2 and string.char(96 + ri) or ""),
+            r,
+            Enum.Material.Wood,
+            Color3.fromRGB(r.color[1], r.color[2], r.color[3]),
+            r.yawDeg
         )
     end
+    local bed = mkPart("Step_" .. e.i, e.bed, Enum.Material.Concrete, CONFIG.bedColor)
+    if CONFIG.bedVariant ~= "" then
+        bed.MaterialVariant = CONFIG.bedVariant
+    end
+    for _, f in e.flags do
+        local topY = s.tread + f.topJitter
+        local col = f.warm and Color3.fromRGB(f.g + 8, f.g, f.g - 12) or Color3.fromRGB(f.g, f.g + 1, f.g - 3)
+        local cTop, cSide = em:AddColor(col, 1), em:AddColor(CONFIG.flagSideColor, 1)
+        local cW = frontV + crossV * f.centroid.u + dirV * f.centroid.v
+        local bevIds, crownIds, botIds, vNormB, vNormC = {}, {}, {}, {}, {}
+        for _, p in f.outline do
+            local wp = frontV + crossV * p.u + dirV * p.v
+            local outN = (wp - cW).Unit
+            bevIds[#bevIds + 1] = em:AddVertex(Vector3.new(wp.X, topY - 0.07, wp.Z))
+            vNormB[#vNormB + 1] = em:AddNormal((outN + Vector3.new(0, 1.2, 0)).Unit)
+            local cp = wp:Lerp(cW, 0.22)
+            crownIds[#crownIds + 1] = em:AddVertex(Vector3.new(cp.X, topY, cp.Z))
+            vNormC[#vNormC + 1] = em:AddNormal((outN * 0.25 + Vector3.new(0, 1, 0)).Unit)
+            botIds[#botIds + 1] = em:AddVertex(Vector3.new(wp.X, topY - 0.32, wp.Z))
+        end
+        local apex = em:AddVertex(Vector3.new(cW.X, topY + 0.012, cW.Z))
+        local apexN = em:AddNormal(Vector3.new(0, 1, 0))
+        local n = #bevIds
+        for i2 = 1, n do
+            local j = (i2 % n) + 1
+            local fq = em:AddTriangle(crownIds[i2], crownIds[j], apex)
+            em:SetFaceNormals(fq, { vNormC[i2], vNormC[j], apexN })
+            em:SetFaceColors(fq, { cTop, cTop, cTop })
+            local b1 = em:AddTriangle(bevIds[i2], bevIds[j], crownIds[j])
+            em:SetFaceNormals(b1, { vNormB[i2], vNormB[j], vNormC[j] })
+            em:SetFaceColors(b1, { cTop, cTop, cTop })
+            local b2 = em:AddTriangle(bevIds[i2], crownIds[j], crownIds[i2])
+            em:SetFaceNormals(b2, { vNormB[i2], vNormC[j], vNormC[i2] })
+            em:SetFaceColors(b2, { cTop, cTop, cTop })
+            local s1 = em:AddTriangle(botIds[i2], botIds[j], bevIds[j])
+            em:SetFaceNormals(s1, { vNormB[i2], vNormB[j], vNormB[j] })
+            em:SetFaceColors(s1, { cSide, cSide, cTop })
+            local s2 = em:AddTriangle(botIds[i2], bevIds[j], bevIds[i2])
+            em:SetFaceNormals(s2, { vNormB[i2], vNormB[j], vNormB[i2] })
+            em:SetFaceColors(s2, { cSide, cTop, cTop })
+        end
+        emFlags += 1
+    end
     made += 1
+    chunkCount += 1
+    if chunkCount >= CONFIG.chunkSteps then
+        publishChunk()
+    end
 end
-print(("NW1012Stairs: built %d/%d steps (flights: %d)"):format(made, #builds, #layoutR.flights))
+publishChunk()
+print(("%s: %d steps dressed; %s"):format(CONFIG.outModel, made, table.concat(report, "; ")))

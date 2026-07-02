@@ -137,6 +137,25 @@ measured):
 - Old foot geometry (steps 0–20 along the dead line) demolished at rebuild; pad-area terrain dish refilled to
   terrace grade for the user's smoothing pass. NearWall_10's role as foot anchor is obsolete.
 
+## FINAL AS-BUILT (2026-07-02, all gates passed)
+
+- **Route:** clearing edge (38.8, ~114.1, 49.7) → 28-step due-south flight (riser 0.593, tread 0.79) in a
+  timber-walled cutting → **LandingDeck** (8×8 WoodPlanks + flush black frame, top 130.68, bare, at the
+  90.4°-junction the user placed; west face square to the west run, last 3 south steps fanned 7.7°) →
+  53-step due-west traverse (riser 0.602, tread 1.23) along Z≈76 → 4 spaced steps (pitch 2.55) landing flush
+  on the tunnel-approach plateau at 165.0. Old `Rail_NW1012_Tunnel` deleted (stair-rail pass will span it).
+- **Step style (canonical, recipe doc §1a):** worn-timber risers + `ZenGravel1` beds + 183 notched flagstones
+  in 3 chunk meshes (assets 83744918338443 / 98399692190636 / 71300067751320), palette g 78–116.
+- **Walls:** `TimberWall_Pocket_U` + `_E` (corner junction) + `TimberWall_WestTraverse` (4 bays, steps 2–21) —
+  boards step-timber 72/60/48, posts EngawaPost ink 45/48/56, ≤11 tall, user-positioned standoffs;
+  ishigaki `Wall_NW1012West_28_32` (asset 129407318687780) on the floating span. South cutting: no walls
+  (user call). Backfill behind pocket walls; pad-dish refilled.
+- **Models:** `NW1012South`, `NW1012West` (Step_/Riser_/Flags_*), `RoshamboStage.LandingDeck`,
+  `RetainingWalls.TimberWall_*`. Retired originals still in `ServerStorage.NW1012Retired`; carve snapshot in
+  `ServerStorage.NW1012CarveBackup` (corner −36,104,28).
+- **Still open:** bamboo railings (downhill edges + tunnel-approach gap), chōchin, user terrain smoothing
+  (south cutting walls' upper band, hollow under west steps 53–54, pocket rim, foot apron).
+
 ## As-built (2026-07-02 survey — plan Task 4)
 
 Baked centerline is in `roblox/tools/studio/buildIshidanStairs.luau` CONFIG (25 control points, foot-first:
