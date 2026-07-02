@@ -280,7 +280,14 @@ local function slabs(layoutR: any, opts: SlabOpts)
             kind = s.kind,
             stones = stones,
             bed = {
-                pos = { s.pos[1], s.tread - 0.05 - opts.bedH / 2, s.pos[3] },
+                -- tucked 0.35 uphill so the bed's downhill face hides behind the
+                -- stone's riser face (recipe §1 bed rule); centered beds alternated
+                -- concrete/slate riser faces depending on stone jitter (2026-07-02)
+                pos = {
+                    s.pos[1] + s.dir[1] * 0.35,
+                    s.tread - 0.05 - opts.bedH / 2,
+                    s.pos[3] + s.dir[2] * 0.35,
+                },
                 dir = s.dir,
                 size = { opts.bedW, opts.bedH, s.pitch + 0.5 },
             },

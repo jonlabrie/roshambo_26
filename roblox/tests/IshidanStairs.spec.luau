@@ -109,6 +109,14 @@ describe("IshidanStairs.slabs", function()
         expect(S[1].bed.pos[2] + S[1].bed.size[2] / 2).toBeCloseTo(step.tread - 0.05)
         expect(S[1].bed.size[1]).toBeCloseTo(5.8)
     end)
+    test("bed tucks uphill so its face hides behind the stone's riser face", function()
+        -- bed center sits 0.35 uphill of the step center; with bed len pitch+0.5 its
+        -- downhill face is then >= 0.2 behind the stone front even at worst jitter
+        local S = IshidanStairs.slabs(layout, opts)
+        local step = layout.steps[1]
+        expect(S[1].bed.pos[1]).toBeCloseTo(step.pos[1] + step.dir[1] * 0.35)
+        expect(S[1].bed.pos[3]).toBeCloseTo(step.pos[3] + step.dir[2] * 0.35)
+    end)
     test("split steps: cross widths sum to width minus one 0.08 grout gap", function()
         local S = IshidanStairs.slabs(layout, opts)
         local found = false
