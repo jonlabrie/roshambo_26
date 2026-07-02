@@ -8,9 +8,9 @@
 --   * bamboo tan 118/95/52 (the old 70/55/32 read too dark).
 --   * top rail   — SMOOTH continuous Catmull-Rom run (dia 0.32) at +2.9 over the edge baseline.
 --   * mid rail   — the SAME run dia 0.22 at +1.25 with low-frequency control-point jitter for a
---                  hand-lashed wobble. Jitter is per-run scaled (`jitScale`): the base amplitudes
---                  were tuned for 3.5-stud timber spacing; DENSE control points (ishidan steps,
---                  ~1.2 studs) triple the wobble frequency, so scale DOWN (NW1012West uses 0.25).
+--                  hand-lashed wobble. Jitter is per-run scaled (`jitScale`): base amplitudes suit
+--                  3.5-stud timber spacing; ANY denser control line (ishidan steps, whether 1.2 or
+--                  1.7 pitch) uses 0.25 — 0.5 at 1.7 spacing already read "wacky" (user, 2026-07-02).
 --   * node rings — rounded ellipsoid collars (sphere mesh: radial dia+0.022, swell 0.16, color
 --                  96/76/40) every ~2.2-3.1 studs along both rails and 3 per post. Geometry, not
 --                  texture: surface materials map world-space so banding can never follow the culm.
