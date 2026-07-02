@@ -25,13 +25,22 @@ local ws = workspace
 -- one entry per path to rail. edgeSign: -1 = the -RightVector end, +1 = the +RightVector end (the
 -- timber end facing the open-air drop; see the per-path terrain probe in the build-recipes doc).
 local RUNS = {
-    -- PathSteps: one continuous run, downhill side (-Right), the entire path.
-    { name = "PathSteps", path = "PathSteps", prefix = "Timber", i0 = 0, i1 = 47, edgeSign = -1 },
-    -- PathExtension: drop side (-Right), opposite the terrain side.
-    { name = "PathExtension", path = "PathExtension", prefix = "ExtTimber", i0 = 1, i1 = 5, edgeSign = -1 },
-    -- DescentPath: downhill side (+Right, the finite-drop edge; -Right is the cliff/wall), full length.
-    -- Bottom stands alone; the top (DescTimber_2) will later meet a deck-style railing (built separately).
-    { name = "DescentPath", path = "DescentPath", prefix = "DescTimber", i0 = 2, i1 = 20, edgeSign = 1 },
+    -- ALL paths now use the §1a ishidan Step_<i> bed contract (reskinPath, 2026-07-02).
+    -- PathSteps: 47 relayout steps (pitch 3.43 -> classic density), downhill -Right.
+    { name = "PathSteps", path = "PathSteps", prefix = "Step", i0 = 0, i1 = 46, edgeSign = -1 },
+    -- PathExtension: 4 preserved steps, drop side -Right.
+    { name = "PathExtension", path = "PathExtension", prefix = "Step", i0 = 0, i1 = 3, edgeSign = -1 },
+    -- DescentPath: 26 relayout steps (pitch ~2.3 -> jitScale 0.25), downhill +Right.
+    {
+        name = "DescentPath",
+        path = "DescentPath",
+        prefix = "Step",
+        i0 = 0,
+        i1 = 25,
+        edgeSign = 1,
+        postEvery = 3,
+        jitScale = 0.25,
+    },
     -- NW1012 west traverse (ishidan steps, pitch 1.23 -> postEvery 5 ≈ the old 2-timber cadence).
     -- Downhill/open side is +Right (uphill -Right holds the timber wall). South flight is a walled
     -- cutting with no open edge — deliberately un-railed. The LandingDeck is bare by user decision.
