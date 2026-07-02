@@ -25,6 +25,18 @@ local RUNS = {
     -- DescentPath: downhill side (+Right, the finite-drop edge; -Right is the cliff/wall), full length.
     -- Bottom stands alone; the top (DescTimber_2) will later meet a deck-style railing (built separately).
     { name = "DescentPath", path = "DescentPath", prefix = "DescTimber", i0 = 2, i1 = 20, edgeSign = 1 },
+    -- NW1012 west traverse (ishidan steps, pitch 1.23 -> postEvery 5 ≈ the old 2-timber cadence).
+    -- Downhill/open side is +Right (uphill -Right holds the timber wall). South flight is a walled
+    -- cutting with no open edge — deliberately un-railed. The LandingDeck is bare by user decision.
+    {
+        name = "NW1012West",
+        path = "NW1012West",
+        prefix = "Step",
+        i0 = 0,
+        i1 = 56,
+        edgeSign = 1,
+        postEvery = 5,
+    },
 }
 
 -- Connectors bridge a gap between two run endpoints with a straight top+mid rail (and barrier),
@@ -160,10 +172,11 @@ local function buildOne(run): string
     end
     buildRail(sub, densify(midPts), MID_DIA)
 
-    -- posts every POST_EVERY timbers (at the un-jittered baseline edge points)
+    -- posts every postEvery timbers/steps (at the un-jittered baseline edge points)
     local posts = 0
+    local postEvery = run.postEvery or POST_EVERY
     for k = 1, #base do
-        if (k - 1) % POST_EVERY == 0 then
+        if (k - 1) % postEvery == 0 then
             local p = base[k]
             cyl(
                 sub,
