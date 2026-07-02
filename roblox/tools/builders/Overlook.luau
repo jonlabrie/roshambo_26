@@ -354,14 +354,15 @@ function Overlook.build(palette: { [string]: { number } }, L: any)
     )
 
     -- single low threshold step onto the upper deck from the clearing (the open West edge),
-    -- half the deck width, centred. Top ~1.2 below the deck; deepened to meet the terrace.
+    -- half the deck width minus a foot each side, centred. Top ~1.2 below the deck;
+    -- deepened to meet the terrace.
     local deckTop = uy + usy / 2
     local stepH = 2.1
     table.insert(
         children,
         Spec.part("UpperStep", {
             Shape = "Block",
-            Size = { 4, stepH, usz * 0.5 },
+            Size = { 4, stepH, usz * 0.5 - 2 },
             CFrame = Spec.cframe({ (ux - usx / 2) - 1, (deckTop - 1.2) - stepH / 2, uz }),
             Color = palette.timber,
             Material = "Wood",
