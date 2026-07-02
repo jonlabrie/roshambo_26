@@ -114,3 +114,20 @@ flight). Full stairway: **~47.5 rise over ~106 studs of arc ≈ 75–80 steps + 
   (~20 steps), then STOP for the user to walk it before batching the remaining flights, landings, walls,
   railing, chōchin.
 - Record as-built (final params, counts) back into this spec when done.
+
+## As-built (2026-07-02 survey — plan Task 4)
+
+Baked centerline is in `roblox/tools/studio/buildIshidanStairs.luau` CONFIG (25 control points, foot-first:
+pad-edge foot, Marker_1, 23 old timber tread points; head 162.6 preserved).
+
+**Pad-frame correction discovered at bake time:** NearWall_10 sits only ~0.75 studs from the deck edge plane
+(centerline crosses X=57 at (57.00, 38.89)), so the plan's original "pad centered beyond NW10" formula would
+have put the pad inside the existing deck. Corrected geometry (encoded in `bakeNW1012Stairway.luau`): the pad
+tucks against the deck edge plane with ALL corners outside it (seam infill planks fill the oblique gap), and
+the stair foot moves uphill to the pad's stair-side edge — which lands at **(50.65, 113.30, 43.28)**, almost
+exactly the user's Marker_2. Marker_3 + the NW10 spot are absorbed by the pad footprint.
+
+```
+PAD = { center = {52.71, 41.86}, heading = {0.823, -0.569}, perp = {0.569, 0.823}, topY = 113.30,
+        wCross = 7.5, dAlong = 5.0, deckEdgeX = 57.0, deckColor = {107, 79, 51} }
+```

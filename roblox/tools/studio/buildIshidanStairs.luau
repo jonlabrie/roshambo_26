@@ -11,8 +11,37 @@
 local CONFIG = {
     outModel = "NW1012Stairs",
     -- BAKED {x,y,z} centerline control points, FOOT (pad edge) FIRST —
-    -- paste from bakeNW1012Stairway.luau output (plan Task 4):
-    control = {},
+    -- from bakeNW1012Stairway.luau, surveyed 2026-07-02:
+    control = {
+        -- stair foot = pad stair-side edge midpoint (pad top level)
+        { 50.65, 113.30, 43.28 },
+        -- foot marker (terrain Y - 1; interior Y only shapes flight-boundary grades)
+        { 47.85, 116.65, 45.22 },
+        -- old timber centers (tread grade)
+        { 45.00, 120.20, 47.18 },
+        { 41.77, 122.27, 49.05 },
+        { 38.95, 124.45, 50.60 },
+        { 36.10, 126.36, 52.01 },
+        { 33.14, 128.10, 53.40 },
+        { 29.73, 130.24, 55.11 },
+        { 26.84, 132.40, 56.65 },
+        { 23.60, 134.00, 58.27 },
+        { 19.86, 135.80, 60.03 },
+        { 16.15, 138.05, 61.52 },
+        { 13.04, 140.16, 62.59 },
+        { 9.86, 141.96, 63.69 },
+        { 6.56, 143.72, 64.89 },
+        { 3.23, 145.41, 66.11 },
+        { -0.46, 147.40, 67.35 },
+        { -3.58, 149.18, 68.26 },
+        { -6.90, 151.39, 69.29 },
+        { -9.60, 153.55, 70.31 },
+        { -13.12, 155.80, 71.53 },
+        { -16.47, 157.69, 72.55 },
+        { -20.43, 159.40, 73.76 },
+        { -23.86, 161.09, 74.85 },
+        { -27.20, 162.60, 75.93 },
+    },
     footY = 113.3, -- pad top; first tread = footY + riser
     headY = 162.6, -- must equal the old Timber_23 top so Rail_NW1012_Tunnel still meets the head
     riserTarget = 0.6,
