@@ -129,4 +129,22 @@ describe("IshidanStairs.slabs", function()
             end
         end
     end)
+    test("splitFrac=0 yields single stones; yawDeg caps jitter", function()
+        local calm = {
+            width = 6.4,
+            depth = 1.25,
+            body = 0.8,
+            bedW = 5.8,
+            bedH = 1.2,
+            seed = 20260702,
+            splitFrac = 0,
+            yawDeg = 1.2,
+            latJitter = 0.1,
+        }
+        local S = IshidanStairs.slabs(layout, calm)
+        for _, sb in S do
+            expect(#sb.stones).toBe(1)
+            expect(math.abs(sb.stones[1].yawDeg) <= 1.2 + 1e-6).toBe(true)
+        end
+    end)
 end)

@@ -52,11 +52,15 @@ local CONFIG = {
     bedW = 5.8,
     bedH = 1.2,
     seed = 20260702,
+    splitFrac = 0.25, -- calmed from 0.5 (user gate 2026-07-02: "too busy")
+    yawDeg = 1.2, -- calmed from 2
+    latJitter = 0.1, -- calmed from 0.15
     buildRange = nil, -- {i0, i1} step indices to build; nil = all
     resampleSpacing = 2.0,
     stoneColor = { 96, 98, 94 }, -- base RGB, per-stone tint added
     bedColor = Color3.fromRGB(138, 142, 142),
-    bedMaterialVariant = "ZenCement2",
+    -- "" = plain Concrete; ZenCement2 read as river rock at this scale (user gate)
+    bedMaterialVariant = "",
 }
 
 ----------------------------------------------------------------------------
@@ -211,10 +215,23 @@ local function makeRng(seed: number): () -> number
     end
 end
 
-type SlabOpts = { width: number, depth: number, body: number, bedW: number, bedH: number, seed: number }
+type SlabOpts = {
+    width: number,
+    depth: number,
+    body: number,
+    bedW: number,
+    bedH: number,
+    seed: number,
+    splitFrac: number?,
+    yawDeg: number?,
+    latJitter: number?,
+}
 
 local function slabs(layoutR: any, opts: SlabOpts)
     local rng = makeRng(opts.seed)
+    local splitFrac = opts.splitFrac or 0.5
+    local yawAmp = opts.yawDeg or 2
+    local latAmp = opts.latJitter or 0.15
     local out = {}
     for _, s in layoutR.steps :: { Step } do
         local perp = { -s.dir[2], s.dir[1] } -- unit cross-stream (left of travel)
@@ -233,7 +250,7 @@ local function slabs(layoutR: any, opts: SlabOpts)
             continue
         end
         local stones = {}
-        local split = rng() < 0.5
+        local split = rng() < splitFrac
         local depth = opts.depth * (0.95 + 0.10 * rng())
         local widths = { opts.width }
         if split then
@@ -244,7 +261,7 @@ local function slabs(layoutR: any, opts: SlabOpts)
         for _, w in widths do
             local cCross = edge + w / 2
             edge += w + 0.08
-            local lat = (rng() * 2 - 1) * 0.15
+            local lat = (rng() * 2 - 1) * latAmp
             local along = (rng() * 2 - 1) * 0.1
             table.insert(stones, {
                 pos = {
@@ -253,7 +270,7 @@ local function slabs(layoutR: any, opts: SlabOpts)
                     s.pos[3] + perp[2] * (cCross + lat) + s.dir[2] * along,
                 },
                 dir = s.dir,
-                yawDeg = (rng() * 2 - 1) * 2,
+                yawDeg = (rng() * 2 - 1) * yawAmp,
                 size = { w, opts.body, depth },
                 tint = math.floor((rng() * 2 - 1) * 3 + 0.5),
             })
@@ -318,6 +335,9 @@ local builds = slabs(layoutR, {
     bedW = CONFIG.bedW,
     bedH = CONFIG.bedH,
     seed = CONFIG.seed,
+    splitFrac = CONFIG.splitFrac,
+    yawDeg = CONFIG.yawDeg,
+    latJitter = CONFIG.latJitter,
 })
 local made = 0
 for _, sb in builds do
@@ -325,7 +345,9 @@ for _, sb in builds do
         continue
     end
     local bed = box("Step_" .. sb.i, sb.bed, Enum.Material.Concrete, CONFIG.bedColor, model)
-    bed.MaterialVariant = CONFIG.bedMaterialVariant
+    if CONFIG.bedMaterialVariant ~= "" then
+        bed.MaterialVariant = CONFIG.bedMaterialVariant
+    end
     for si, st in sb.stones do
         box(
             "Stone_" .. sb.i .. string.char(96 + si),

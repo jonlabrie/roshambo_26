@@ -163,10 +163,23 @@ local function makeRng(seed: number): () -> number
     end
 end
 
-type SlabOpts = { width: number, depth: number, body: number, bedW: number, bedH: number, seed: number }
+type SlabOpts = {
+    width: number,
+    depth: number,
+    body: number,
+    bedW: number,
+    bedH: number,
+    seed: number,
+    splitFrac: number?, -- probability a step splits into 2 stones (default 0.5)
+    yawDeg: number?, -- max per-stone yaw jitter (default 2)
+    latJitter: number?, -- max per-stone lateral jitter (default 0.15)
+}
 
 function IshidanStairs.slabs(layout: any, opts: SlabOpts)
     local rng = makeRng(opts.seed)
+    local splitFrac = opts.splitFrac or 0.5
+    local yawAmp = opts.yawDeg or 2
+    local latAmp = opts.latJitter or 0.15
     local out = {}
     for _, s in layout.steps :: { Step } do
         local perp = { -s.dir[2], s.dir[1] } -- unit cross-stream (left of travel)
@@ -185,7 +198,7 @@ function IshidanStairs.slabs(layout: any, opts: SlabOpts)
             continue
         end
         local stones = {}
-        local split = rng() < 0.5
+        local split = rng() < splitFrac
         local depth = opts.depth * (0.95 + 0.10 * rng())
         local widths = { opts.width }
         if split then
@@ -196,7 +209,7 @@ function IshidanStairs.slabs(layout: any, opts: SlabOpts)
         for _, w in widths do
             local cCross = edge + w / 2
             edge += w + 0.08
-            local lat = (rng() * 2 - 1) * 0.15
+            local lat = (rng() * 2 - 1) * latAmp
             local along = (rng() * 2 - 1) * 0.1
             table.insert(stones, {
                 pos = {
@@ -205,7 +218,7 @@ function IshidanStairs.slabs(layout: any, opts: SlabOpts)
                     s.pos[3] + perp[2] * (cCross + lat) + s.dir[2] * along,
                 },
                 dir = s.dir,
-                yawDeg = (rng() * 2 - 1) * 2,
+                yawDeg = (rng() * 2 - 1) * yawAmp,
                 size = { w, opts.body, depth },
                 tint = math.floor((rng() * 2 - 1) * 3 + 0.5),
             })

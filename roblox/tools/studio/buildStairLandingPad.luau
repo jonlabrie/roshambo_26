@@ -17,7 +17,6 @@ local PAD = {
     deckEdgeX = 57.0,
     deckColor = Color3.fromRGB(107, 79, 51),
 }
-local CAP_COLOR = Color3.fromRGB(30, 26, 20) -- black top rail, deck style
 local OUT_NAME = "OverlookStairPad"
 
 local h = Vector3.new(PAD.heading[1], 0, PAD.heading[2])
@@ -139,79 +138,34 @@ for _, s in postSpots do
     )
 end
 
----------------------------------------------------------------- KŌRAN railing on the downhill (-perp) boundary
--- run: outer corner -> deck-side corner -> along the infill's south boundary to the seam
-local NEWEL, CAP_H = 0.62, 3.0
-local function newel(name: string, alongH: number, alongP: number)
-    part(
-        name,
-        Vector3.new(NEWEL, 3.7, NEWEL),
-        padCf(alongH, alongP, topY + 3.7 / 2 - 0.3),
-        Enum.Material.Wood,
-        PAD.deckColor
-    )
-    part(
-        name .. "Cap",
-        Vector3.new(1.0, 0.2, 1.0),
-        padCf(alongH, alongP, topY + 3.7 - 0.3 + 0.1),
-        Enum.Material.Wood,
-        CAP_COLOR
-    )
-end
--- rail segment helper along the -perp edge (in pad frame, along heading)
-local function railRun(name: string, h0: number, h1: number, alongP: number)
-    local len = h1 - h0
-    local mid = (h0 + h1) / 2
-    part(
-        name .. "Cap",
-        Vector3.new(0.6, 0.3, len - NEWEL),
-        padCf(mid, alongP, topY + CAP_H),
-        Enum.Material.Wood,
-        CAP_COLOR
-    )
-    part(
-        name .. "Mid",
-        Vector3.new(0.3, 0.2, len - NEWEL),
-        padCf(mid, alongP, topY + 1.4),
-        Enum.Material.Wood,
-        PAD.deckColor
-    )
-    local nBal = math.max(2, math.floor(len / 0.9))
-    for b = 1, nBal do
-        local hb = h0 + (b - 0.5) * (len / nBal)
-        part(
-            name .. "B" .. b,
-            Vector3.new(0.34, CAP_H - 0.15, 0.34),
-            padCf(hb, alongP, topY + (CAP_H - 0.15) / 2 + 0.15),
-            Enum.Material.Wood,
-            PAD.deckColor
-        )
+-- (KŌRAN railing + fall barrier removed at the 2026-07-02 gate: "ugly and
+-- unneeded" — the pad is a low landing beside grade, not an exposed deck edge.)
+
+---------------------------------------------------------------- seam wedges
+-- Each plank's far end is a square cut keyed to its +perp corner, which leaves a
+-- plan-view right triangle (legs: plank width along perp × plankW·p.X/h.X along
+-- heading) between the plank end and the deck plane. Fill each with a WedgePart
+-- turned so its triangular cross-section lies horizontal: frame (X=down, Y=perp,
+-- Z=-heading) is right-handed and puts the wedge's right-angle edge at the
+-- plank's -perp end corner with the hypotenuse along the deck plane.
+local GAP_H = PLANK_W * p.X / h.X -- heading-leg of the triangle
+for k = 1, nPlanks do
+    local ck = -halfW + PLANK_W * (k - 0.5)
+    local edge = C + h * halfD + p * ck
+    local len = (PAD.deckEdgeX - 0.05 - edge.X - (PLANK_W / 2) * p.X) / h.X
+    if len > 0.15 then
+        local wedge = Instance.new("WedgePart")
+        wedge.Name = "SeamWedge_" .. k
+        wedge.Anchored = true
+        wedge.Material = Enum.Material.WoodPlanks
+        wedge.Color = PAD.deckColor
+        wedge.Size = Vector3.new(0.6, PLANK_W - 0.03, GAP_H)
+        local pos = C + h * (halfD + len + GAP_H / 2) + p * ck
+        wedge.CFrame = CFrame.fromMatrix(Vector3.new(pos.X, topY - 0.3, pos.Z), Vector3.new(0, -1, 0), p, -h)
+        wedge.TopSurface = Enum.SurfaceType.Smooth
+        wedge.BottomSurface = Enum.SurfaceType.Smooth
+        wedge.Parent = model
     end
 end
-local southP = -(halfW - NEWEL / 2)
--- main pad stretch: outer corner to deck-side corner
-newel("NewelOuter", -halfD + NEWEL / 2, southP)
-railRun("RailS", -halfD + NEWEL / 2, halfD - NEWEL / 2, southP)
--- infill stretch: deck-side corner to the seam (length of the southmost plank)
-local edgeS = C + h * halfD + p * southP
-local lenS = (PAD.deckEdgeX - 0.05 - edgeS.X) / h.X
-newel("NewelMid", halfD - NEWEL / 2, southP)
-if lenS > 1.2 then
-    railRun("RailSeam", halfD + NEWEL / 2, halfD + lenS - NEWEL / 2, southP)
-    newel("NewelSeam", halfD + lenS - NEWEL / 2, southP)
-end
-
----------------------------------------------------------------- invisible fall barrier (15 studs, south boundary)
-local barLen = PAD.dAlong + math.max(lenS, 0)
-local bar = part(
-    "FallBarrier",
-    Vector3.new(0.4, 15, barLen),
-    padCf(-halfD + barLen / 2, -halfW, topY + 7.5),
-    Enum.Material.SmoothPlastic,
-    Color3.new(1, 1, 1)
-)
-bar.Transparency = 1
-bar.CastShadow = false
-bar.CanCollide = true
 
 print(("OverlookStairPad built: %d parts"):format(#model:GetChildren()))
