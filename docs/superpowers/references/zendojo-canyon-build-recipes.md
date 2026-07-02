@@ -206,13 +206,15 @@ single-timber spans taper naturally instead of forming nubs). Per-span **publish
 
 ## 4. Bamboo railing + hanging chōchin
 
-- **Bamboo railing — LOCKED v2, `tools/studio/buildBambooRailing.luau`** (user-approved 2026-07-02 on
-  NW1012West; the 2026-06-29 dark ring-less look is superseded — old runs due for re-run). **Warm bamboo tan
-  `118,95,52`**; **rounded node collars** (sphere-mesh ellipsoids, radial +0.022, swell 0.16, `96,76,40`)
-  every ~2.2–3.1 studs on both rails + 3 per post (geometry, not texture — world-space materials can't band
-  along the culm); **posts dia 0.36 × 3.25** (~2 in proud of the top-rail crown), per-run `postEvery`
-  (2 for 3.5-stud timbers, 5 for ishidan steps); **per-run `jitScale`** on the mid-rail wobble (base
-  amplitudes were tuned for 3.5-stud control spacing — dense ishidan controls need 0.25 or it reads frantic). The edge line follows each timber's **±RightVector END**, `HW=3.0` from
+- **Bamboo railing — LOCKED v2.1, `tools/studio/buildBambooRailing.luau`** (user-approved 2026-07-02;
+  deployed canyon-wide). **Warm bamboo tan `118,95,52`**; **rounded node collars** (sphere-mesh ellipsoids,
+  radial +0.022, swell 0.16, `96,76,40`) every ~2.2–3.1 studs on both rails + 3 per post (geometry, not
+  texture — world-space materials can't band along the culm); **posts dia 0.36 × 3.25** (~2 in proud of the
+  top-rail crown) every **~7 studs of arc**. **Line generation: even 1.5-stud linear resample + 4 Laplacian
+  relax passes** — NEVER Catmull-Rom through raw step points (overshoots at seams/grade changes; the
+  PathSteps seam sag). Mid-rail wobble (amp 0.154, ~7-stud wavelength) rides ON the smooth line, so it's
+  density-independent (the old `jitScale` knob is gone). **Contiguous path models rail as ONE stitched run**
+  (`paths` list) — separate runs + a straight connector kink at the seam. The edge line follows each timber's **±RightVector END**, `HW=3.0` from
   centre (≈ the timber edge — posts ALWAYS embed at the timber edge, **terrain is irrelevant**, never plant on
   ground). Baseline = timber top. Per run:
   - **Top rail** — SMOOTH continuous **Catmull-Rom** through the per-timber edge points (`S=4` subdivisions),
