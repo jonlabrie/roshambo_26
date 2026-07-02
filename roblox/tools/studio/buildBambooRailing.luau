@@ -26,9 +26,12 @@ local ws = workspace
 -- timber end facing the open-air drop; see the per-path terrain probe in the build-recipes doc).
 local RUNS = {
     -- ALL paths now use the §1a ishidan Step_<i> bed contract (reskinPath, 2026-07-02).
-    -- PathSteps: 47 relayout steps (pitch 3.43 -> classic density), downhill -Right.
+    -- NOTE: PathExtension + PathSteps are railed as ONE MERGED RUN (Rail_PathSteps, 53 control
+    -- points: PE Step_0..5 then PS Step_0..46) — a straight Connector across the seam shelved
+    -- flat on top and ramped hard below (mismatched end tangents); a single spline reads clean.
+    -- The RUNS schema is single-model, so the merged run was built ad-hoc (2026-07-02); re-running
+    -- these two entries separately would RE-INTRODUCE the kink — merge them if you rebuild.
     { name = "PathSteps", path = "PathSteps", prefix = "Step", i0 = 0, i1 = 46, edgeSign = -1 },
-    -- PathExtension: 4 preserved steps + 2 seam-bridge steps to PathSteps, drop side -Right.
     { name = "PathExtension", path = "PathExtension", prefix = "Step", i0 = 0, i1 = 5, edgeSign = -1 },
     -- DescentPath: 26 relayout steps (pitch ~2.3 -> jitScale 0.25), downhill +Right.
     {
