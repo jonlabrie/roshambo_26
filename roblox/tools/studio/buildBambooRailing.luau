@@ -44,9 +44,12 @@ local RUNS = {
     { name = "NW1012West", paths = { { path = "NW1012West", i0 = 0, i1 = 56 } }, edgeSign = 1 },
     -- NW1211: 10 relayout steps, drop side -Right.
     { name = "NW1211", paths = { { path = "NW1211Path", i0 = 0, i1 = 9 } }, edgeSign = -1 },
-    -- NW2040: 50 relayout steps, railed BOTH sides (exposed spine — the old A/B arrangement).
-    { name = "NW2040_A", paths = { { path = "NW2040Path", i0 = 0, i1 = 49 } }, edgeSign = 1 },
-    { name = "NW2040_B", paths = { { path = "NW2040Path", i0 = 0, i1 = 49 } }, edgeSign = -1 },
+    -- NW2040: 50 relayout steps, DOWNHILL (+Right) ONLY (uphill rail removed per user), built as
+    -- TWO segments with an open gap at steps 11-13 (the teahouse access below NearWall_30) — end
+    -- posts frame the opening. Built ad-hoc as Rail_NW2040 (the RUNS schema has no gap support);
+    -- if you rebuild, keep the gap or you fence off the teahouse.
+    { name = "NW2040_S1", paths = { { path = "NW2040Path", i0 = 0, i1 = 10 } }, edgeSign = 1 },
+    { name = "NW2040_S2", paths = { { path = "NW2040Path", i0 = 14, i1 = 49 } }, edgeSign = 1 },
 }
 
 -- ===== locked constants (v2.1, 2026-07-02) =====
