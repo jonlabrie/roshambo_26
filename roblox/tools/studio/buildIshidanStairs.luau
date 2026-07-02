@@ -23,7 +23,9 @@ local CONFIG = {
     seed = 20260711,
     buildRange = nil, -- {i0, i1} step indices; nil = all
     resampleSpacing = 2.0,
-    chunkSteps = 20, -- steps per published flag mesh (triangle limit headroom)
+    -- publish a flag mesh every N FLAGS (NOT steps: deep treads pack 8-14 flags each and a
+    -- step-count chunk blows Studio's triangle limit — bit us twice on 2026-07-02)
+    chunkFlags = 40,
     -- style constants (the locked recipe — change only with a user gate):
     riserWidth = 6.4,
     riserDepth = 0.45,
@@ -416,7 +418,7 @@ local function mkPart(name, b, material, color, yawDeg)
     return q
 end
 
-local made, chunkIdx, chunkCount = 0, 1, 0
+local made, chunkIdx = 0, 1
 local em = AssetService:CreateEditableMesh()
 local emFlags = 0
 local report = {}
@@ -444,7 +446,6 @@ local function publishChunk()
     mp.Parent = model
     table.insert(report, string.format("Flags_%d: %d flags, asset %d", chunkIdx, emFlags, assetId))
     chunkIdx += 1
-    chunkCount = 0
     emFlags = 0
     em = AssetService:CreateEditableMesh()
 end
@@ -512,8 +513,7 @@ for _, e in dressed do
         emFlags += 1
     end
     made += 1
-    chunkCount += 1
-    if chunkCount >= CONFIG.chunkSteps then
+    if emFlags >= CONFIG.chunkFlags then
         publishChunk()
     end
 end

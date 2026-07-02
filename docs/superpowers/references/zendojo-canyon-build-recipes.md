@@ -72,8 +72,12 @@ show the full flagstone field — this scaling is intentional and matches the re
   **Palette: grey g = 78–116 (mean ~96 — 25% darker than instinct), 35% warm variant (g+8, g, g−12), else
   cool (g, g+1, g−3); sides 52/52/49.** MeshPart: Slate, Color white, DoubleSided, **CanCollide FALSE**
   (players walk on beds/risers), CollisionFidelity Box, CFrame origin, world-space verts, publish
-  (`CreateAssetAsync`). **Chunk ≤ 20 steps per mesh** — one mesh for a full run blows Studio's triangle
-  limit; contiguous chunks share the style stream so seams are invisible.
+  (`CreateAssetAsync`). **Chunk by FLAG COUNT (~40 flags per mesh), never by step count** — deep treads pack
+  8–14 flags each, so a step-count chunk blows Studio's triangle limit (bit us twice); contiguous chunks
+  share the style stream so seams are invisible. NEW paths: `buildIshidanStairs.luau` (baked centerline);
+  CONVERSIONS of old cobble paths: `reskinPath.luau` (survey → relayout if old risers > ~0.8, else
+  preserve). Railing gaps for spur access (e.g. NW2040's teahouse opening) = build the run as two RUNS
+  segments with end posts framing the opening — never leave a barrier across it.
 
 **Timber retaining walls** (the pocket/cutting treatment, replaces ishigaki for CUT faces; ishigaki §3 stays
 for under-path floating spans): stacked lagging boards `0.75 h × 0.4 t` (0.04 gaps), length/depth jitter,

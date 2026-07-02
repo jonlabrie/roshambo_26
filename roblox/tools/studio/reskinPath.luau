@@ -14,9 +14,10 @@
 --      SEPARATE call afterwards (same-call terrain reads are stale).
 --   5. Demolishes the old dressing (timbers, beds, cobble/ribbon meshes by name patterns).
 --   6. Builds §1a: Riser_<i> worn beams, Step_<i> ZenGravel1 beds (riser-to-riser span),
---      Flags_<n> published meshes (<= 20 steps per chunk — Studio triangle limit).
--- AFTERWARDS (separate runs): rebuild the path's bamboo railing v2 (buildBambooRailing,
--- prefix "Step", jitScale 0.25, postEvery ~= 7/pitch) and re-check ishigaki spans.
+--      Flags_<n> published meshes chunked by FLAG COUNT (chunkFlags — Studio triangle limit;
+--      deep treads pack 8-14 flags/step, so never chunk by step count).
+-- AFTERWARDS (separate runs): rebuild the path's bamboo railing v2.1 (buildBambooRailing —
+-- add a RUNS entry; stitch contiguous paths into ONE run) and re-check ishigaki spans.
 -- Chochin poles are static — leave them unless spacing now reads wrong.
 -- Geometry is PLACE-ONLY — SAVE THE PLACE after running.
 local CONFIG = {
@@ -27,7 +28,9 @@ local CONFIG = {
     riserTarget = 0.6,
     carve = true,
     seed = 20260718,
-    chunkSteps = 20,
+    -- publish a flag mesh every N FLAGS (NOT steps — deep treads pack 8-14 flags each and a
+    -- step-count chunk blows Studio's triangle limit)
+    chunkFlags = 40,
 }
 
 local AssetService = game:GetService("AssetService")
@@ -215,7 +218,7 @@ local function subdivide(poly2, maxSeg)
 end
 local report = {}
 local em = AssetService:CreateEditableMesh()
-local emFlags, chunkIdx, chunkCount = 0, 1, 0
+local emFlags, chunkIdx = 0, 1
 local function publishChunk()
     if emFlags == 0 then
         return
@@ -239,7 +242,6 @@ local function publishChunk()
     mp.Parent = m
     report[#report + 1] = string.format("Flags_%d: %d flags, asset %d", chunkIdx, emFlags, assetId)
     chunkIdx += 1
-    chunkCount = 0
     emFlags = 0
     em = AssetService:CreateEditableMesh()
 end
@@ -384,8 +386,7 @@ for si, s in steps do
             end
         end
     end
-    chunkCount += 1
-    if chunkCount >= CONFIG.chunkSteps then
+    if emFlags >= CONFIG.chunkFlags then
         publishChunk()
     end
 end
