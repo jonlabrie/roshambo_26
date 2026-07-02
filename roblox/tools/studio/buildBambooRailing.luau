@@ -3,13 +3,20 @@
 -- Studio runnable (command bar / MCP execute_luau); builds ad-hoc Parts into Workspace.PathRailings
 -- (one sub-Model "Rail_<name>" per run) and is idempotent (clears that sub-Model first).
 --
--- The look (locked prototype, user-approved 2026-06-29):
+-- The look (locked v2, user-approved 2026-07-02 on NW1012West; supersedes the 2026-06-29 dark
+-- ring-less version — PathSteps/PathExtension/DescentPath are due for a re-run):
+--   * bamboo tan 118/95/52 (the old 70/55/32 read too dark).
 --   * top rail   — SMOOTH continuous Catmull-Rom run (dia 0.32) at +2.9 over the edge baseline.
---   * mid rail   — the SAME run dia 0.22 at +1.25, but its 21 control points get low-frequency
---                  lateral+vertical JITTER before the spline, so it carries a gentle hand-built
---                  wobble (rustic / "lashed on site") while the top rail stays true.
---   * posts      — vertical bamboo (dia 0.45 × 3.0) every 2 timbers at the edge baseline.
---   * barrier    — an invisible CanCollide box per gap (10 tall, 0.4 thick) so players can't fall
+--   * mid rail   — the SAME run dia 0.22 at +1.25 with low-frequency control-point jitter for a
+--                  hand-lashed wobble. Jitter is per-run scaled (`jitScale`): the base amplitudes
+--                  were tuned for 3.5-stud timber spacing; DENSE control points (ishidan steps,
+--                  ~1.2 studs) triple the wobble frequency, so scale DOWN (NW1012West uses 0.25).
+--   * node rings — rounded ellipsoid collars (sphere mesh: radial dia+0.022, swell 0.16, color
+--                  96/76/40) every ~2.2-3.1 studs along both rails and 3 per post. Geometry, not
+--                  texture: surface materials map world-space so banding can never follow the culm.
+--   * posts      — vertical bamboo dia 0.36 × 3.25 (top ~2in PROUD of the top-rail crown) every
+--                  `postEvery` timbers/steps (default 2 for 3.5-stud timbers; 5 for ishidan steps).
+--   * barrier    — an invisible CanCollide box per gap (15 tall, 0.4 thick) so players can't fall
 --                  through the open rail. Transparency 1 → reads only the bamboo.
 -- The edge line follows each timber's ±RightVector END (HW studs from centre), baseline = timber top.
 -- Geometry is PLACE-ONLY (not Rojo) — SAVE THE PLACE after running.
@@ -36,6 +43,7 @@ local RUNS = {
         i1 = 56,
         edgeSign = 1,
         postEvery = 5,
+        jitScale = 0.25,
     },
 }
 
@@ -49,15 +57,18 @@ local CONNECTORS = {
     },
 }
 
--- ===== locked constants =====
+-- ===== locked constants (v2, 2026-07-02) =====
 local HW = 3.0 -- studs from timber centre to its end (the edge line)
 local TOPY, TOP_DIA = 2.9, 0.32 -- top rail height over baseline / diameter
 local MIDY, MID_DIA = 1.25, 0.22 -- mid rail height / diameter
-local POSTH, POST_DIA, POST_EVERY = 3.0, 0.45, 2 -- post height / diameter / timbers between posts
+local POSTH, POST_DIA, POST_EVERY = 3.25, 0.36, 2 -- post height (~2in proud of rail crown) / dia / cadence
 local S = 4 -- Catmull-Rom subdivisions per control segment
-local JIT_LAT, JIT_VERT, SEED = 0.154, 0.112, 20260629 -- mid-rail control-point jitter + seed
+local JIT_LAT, JIT_VERT, SEED = 0.154, 0.112, 20260629 -- BASE mid-rail jitter (× run.jitScale) + seed
 local BARRIER_H, BARRIER_T = 15, 0.4 -- invisible fall-barrier box height / thickness (clears rail-cap + jump)
-local WOOD = Color3.fromRGB(70, 55, 32) -- dark bamboo
+local WOOD = Color3.fromRGB(118, 95, 52) -- warm bamboo tan
+local NODE_COL = Color3.fromRGB(96, 76, 40) -- node collar, a shade darker
+local NODE_BULGE, NODE_SWELL = 0.022, 0.16 -- collar: radial bulge over the culm / axial swell length
+local NODE_SEED = 20260715
 local VERT = CFrame.Angles(0, 0, math.rad(90)) -- cylinder long axis is local X; vertical needs this
 
 local function cyl(parent: Instance, name: string, size: Vector3, cf: CFrame)
@@ -120,6 +131,44 @@ local function buildRail(parent: Instance, dense: { Vector3 }, dia: number)
     end
 end
 
+-- rounded node collar (squashed sphere -> the bamboo joint swell) at pos along axis
+local function nodeRing(parent: Instance, pos: Vector3, axis: Vector3, dia: number)
+    local p = Instance.new("Part")
+    p.Name = "Node"
+    p.Anchored = true
+    p.CanCollide = false
+    p.Color = NODE_COL
+    p.Material = Enum.Material.Wood
+    p.Size = Vector3.new(dia + NODE_BULGE, dia + NODE_BULGE, NODE_SWELL)
+    p.CFrame = CFrame.lookAt(pos, pos + axis)
+    local mesh = Instance.new("SpecialMesh")
+    mesh.MeshType = Enum.MeshType.Sphere
+    mesh.Parent = p
+    p.Parent = parent
+    return p
+end
+
+-- node collars every ~2.2-3.1 studs along a dense polyline (deterministic)
+local function buildNodes(parent: Instance, dense: { Vector3 }, dia: number)
+    local state = NODE_SEED % 2 ^ 32
+    local function rng(): number
+        state = (1664525 * state + 1013904223) % 2 ^ 32
+        return state / 2 ^ 32
+    end
+    local nextAt = 1.6 + rng()
+    local acc = 0
+    for i = 1, #dense - 1 do
+        local a, b = dense[i], dense[i + 1]
+        local seg = (b - a).Magnitude
+        while acc + seg >= nextAt do
+            local t = (nextAt - acc) / seg
+            nodeRing(parent, a:Lerp(b, t), b - a, dia)
+            nextAt = nextAt + 2.2 + rng() * 0.9
+        end
+        acc += seg
+    end
+end
+
 local function buildOne(run): string
     local model = ws:FindFirstChild(run.path)
     assert(model, "missing Workspace." .. run.path)
@@ -153,10 +202,13 @@ local function buildOne(run): string
     for _, p in base do
         topPts[#topPts + 1] = p + Vector3.new(0, TOPY, 0)
     end
-    buildRail(sub, densify(topPts), TOP_DIA)
+    local topDense = densify(topPts)
+    buildRail(sub, topDense, TOP_DIA)
+    buildNodes(sub, topDense, TOP_DIA)
 
-    -- mid rail: jitter the control points (low-frequency), then spline → rustic wobble
+    -- mid rail: jitter the control points (low-frequency, × run.jitScale), then spline → rustic wobble
     math.randomseed(SEED)
+    local jitScale = run.jitScale or 1
     local midPts = {}
     for _, p in base do
         midPts[#midPts + 1] = p + Vector3.new(0, MIDY, 0)
@@ -167,10 +219,12 @@ local function buildOne(run): string
         tan = (tan.Magnitude > 0) and tan.Unit or Vector3.new(1, 0, 0)
         local perp = Vector3.new(tan.Z, 0, -tan.X)
         midPts[i] = midPts[i]
-            + perp * ((math.random() * 2 - 1) * JIT_LAT)
-            + Vector3.new(0, (math.random() * 2 - 1) * JIT_VERT, 0)
+            + perp * ((math.random() * 2 - 1) * JIT_LAT * jitScale)
+            + Vector3.new(0, (math.random() * 2 - 1) * JIT_VERT * jitScale, 0)
     end
-    buildRail(sub, densify(midPts), MID_DIA)
+    local midDense = densify(midPts)
+    buildRail(sub, midDense, MID_DIA)
+    buildNodes(sub, midDense, MID_DIA)
 
     -- posts every postEvery timbers/steps (at the un-jittered baseline edge points)
     local posts = 0
@@ -184,6 +238,10 @@ local function buildOne(run): string
                 Vector3.new(POSTH, POST_DIA, POST_DIA),
                 CFrame.new(p + Vector3.new(0, POSTH / 2, 0)) * VERT
             )
+            -- node collars at thirds + just above the top rail crossing
+            for _, hy in { 0.95, 2.0, 3.12 } do
+                nodeRing(sub, p + Vector3.new(0, hy, 0), Vector3.yAxis, POST_DIA)
+            end
             posts += 1
         end
     end
