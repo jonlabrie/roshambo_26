@@ -28,8 +28,8 @@ local RUNS = {
     -- ALL paths now use the §1a ishidan Step_<i> bed contract (reskinPath, 2026-07-02).
     -- PathSteps: 47 relayout steps (pitch 3.43 -> classic density), downhill -Right.
     { name = "PathSteps", path = "PathSteps", prefix = "Step", i0 = 0, i1 = 46, edgeSign = -1 },
-    -- PathExtension: 4 preserved steps, drop side -Right.
-    { name = "PathExtension", path = "PathExtension", prefix = "Step", i0 = 0, i1 = 3, edgeSign = -1 },
+    -- PathExtension: 4 preserved steps + 2 seam-bridge steps to PathSteps, drop side -Right.
+    { name = "PathExtension", path = "PathExtension", prefix = "Step", i0 = 0, i1 = 5, edgeSign = -1 },
     -- DescentPath: 26 relayout steps (pitch ~2.3 -> jitScale 0.25), downhill +Right.
     {
         name = "DescentPath",
