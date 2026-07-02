@@ -48,7 +48,9 @@ A meandering mountain stair: timber risers + flat cobble treads + cement-gravel 
 
 **Timbers (risers):** Part `6.4 (cross) × 1.6 (h) × 1.2 (depth)`, `Wood`, color `RGB 74,52,32`. Local **X
 (RightVector) = cross-stream**; place with `CFrame.fromMatrix(pos, cross, Vector3.yAxis)`. **~3.5-stud
-spacing** along the spline arc-length.
+spacing** along the spline arc-length. **Start on a riser:** with `leadFromFirstMarker`, place a lead timber
+(index 0) *at the first marker* so the path opens on a timber, not a bare bed/cobble tread. *(Added 2026-07-01;
+the old `leadFromFirstMarker` made marker[0] a bed-only boundary, so the path started on a cobble.)*
 
 **Treads are FLAT per gap, stepping down at each timber — NOT sloped.** (Sloped treads bury the cobbles and
 read wrong. The path is a staircase: flat tread, vertical riser at the timber.) Each gap's tread sits flat at
@@ -73,6 +75,12 @@ later boundary, which is the uphill timber when markers ascend — buried the do
 **Bed (cement-gravel):** `Concrete` + **`ZenCement2`** MaterialVariant, tint `138/142/142`. **Flat slab per
 gap** (horizontal), top **~0.05 below the downhill tread**, ~1.2 thick. (A single tilted/long bed buries the
 downhill end — do it per-gap, flat, keyed to the downhill timber.)
+- **Length: tuck the downhill end, hide the uphill overshoot.** Span the slab from `u = 0.3` (just behind the
+  downhill timber's face) to `u = L + 0.5` (a small overshoot *under* the next timber). Do **NOT** center a
+  `L + 1.0` slab across the gap — the old recipe did, and its 0.5 overshoot past the *downhill* timber poked a
+  grey cement block into that timber's face (the bed top sits only 0.25 below the timber top, so the overshoot
+  showed). Tucking the downhill end kills that; the uphill overshoot stays hidden under the higher next timber
+  (its top is below that timber's body), so no seam/terrain gap opens. *(Bug fixed 2026-07-01.)*
 
 **THE SIZING RULE (so it reads right):** **timber width (6.4) > bed width (~5.8–6.4) > cobble width (~5.2–6.4).**
 Timber ends then reveal proud; cobble ends tuck into the gravel. (Upper run: bed 6.42, cobbles HW 3.2. Descent:

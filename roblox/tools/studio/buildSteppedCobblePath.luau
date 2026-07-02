@@ -112,8 +112,25 @@ model.Name = CONFIG.outModel
 model.Parent = ws
 
 -- ===== 2. timbers along the spline (center = grade - 0.6, top = grade + 0.2) =====
+-- With leadFromFirstMarker, a lead timber (index 0) is placed AT the first marker so the path
+-- STARTS on a riser instead of a bare bed/cobble tread.
 local spline = sampleSpline(pts, 8)
+local function placeTimber(idx, at, dirH)
+    local cross = Vector3.new(dirH.Z, 0, -dirH.X)
+    local tb = Instance.new("Part")
+    tb.Name = string.format("%s_%d", CONFIG.timberPrefix, idx)
+    tb.Size = Vector3.new(6.4, 1.6, 1.2)
+    tb.CFrame = CFrame.fromMatrix(Vector3.new(at.X, at.Y - 0.6, at.Z), cross, Vector3.yAxis)
+    tb.Anchored = true
+    tb.Material = Enum.Material.Wood
+    tb.Color = TIMBER_COL
+    tb.Parent = model
+end
 do
+    if CONFIG.leadFromFirstMarker then
+        local a, b = spline[1], spline[2]
+        placeTimber(0, pts[1], Vector3.new((b - a).X, 0, (b - a).Z).Unit)
+    end
     local acc, ti = CONFIG.SPACING, 0
     for s = 1, #spline - 1 do
         local a, b = spline[s], spline[s + 1]
@@ -121,25 +138,13 @@ do
         if acc >= CONFIG.SPACING then
             acc = 0
             ti += 1
-            local horiz = Vector3.new((b - a).X, 0, (b - a).Z).Unit
-            local cross = Vector3.new(horiz.Z, 0, -horiz.X)
-            local tb = Instance.new("Part")
-            tb.Name = string.format("%s_%d", CONFIG.timberPrefix, ti)
-            tb.Size = Vector3.new(6.4, 1.6, 1.2)
-            tb.CFrame = CFrame.fromMatrix(Vector3.new(b.X, b.Y - 0.6, b.Z), cross, Vector3.yAxis)
-            tb.Anchored = true
-            tb.Material = Enum.Material.Wood
-            tb.Color = TIMBER_COL
-            tb.Parent = model
+            placeTimber(ti, b, Vector3.new((b - a).X, 0, (b - a).Z).Unit)
         end
     end
 end
 
--- ===== 3. boundaries (optional lead marker + timbers), then flat bed + flat cobbles per gap =====
+-- ===== 3. boundaries (timbers, incl. lead Timber_0), then flat bed + flat cobbles per gap =====
 local boundaries = {}
-if CONFIG.leadFromFirstMarker then
-    table.insert(boundaries, { pos = pts[1], grade = pts[1].Y })
-end
 do
     local ts = {}
     for _, c in model:GetChildren() do
@@ -170,16 +175,20 @@ for gi = 1, #boundaries - 1 do
     local dirH = Vector3.new(d.X, 0, d.Z).Unit
     local cross = Vector3.new(dirH.Z, 0, -dirH.X)
     local L = Vector3.new(d.X, 0, d.Z).Magnitude
-    local mid = A.pos:Lerp(B.pos, 0.5)
     local function worldXZ(u, v)
         local p = A.pos + dirH * u + cross * v
         return p.X, p.Z
     end
-    -- flat bed (top ~0.05 below the downhill tread)
+    -- flat bed (top ~0.05 below the downhill tread). Tuck the downhill end 0.3 behind the
+    -- downhill timber so it never overshoots that timber's face (that overshoot showed as a grey
+    -- cement block embedded in the timber). Keep a small 0.5 uphill overshoot that stays hidden
+    -- under the next timber, so no seam/terrain gap opens between bed and riser.
+    local uDown, uUp = 0.3, L + 0.5
+    local bedCtr = A.pos + dirH * ((uDown + uUp) / 2)
     local bed = Instance.new("Part")
     bed.Name = string.format("DescBed_%d", gi)
-    bed.Size = Vector3.new(L + 1.0, 1.2, CONFIG.BED_W)
-    bed.CFrame = CFrame.fromMatrix(Vector3.new(mid.X, tread - 0.05 - 0.6, mid.Z), dirH, Vector3.yAxis)
+    bed.Size = Vector3.new(uUp - uDown, 1.2, CONFIG.BED_W)
+    bed.CFrame = CFrame.fromMatrix(Vector3.new(bedCtr.X, tread - 0.05 - 0.6, bedCtr.Z), dirH, Vector3.yAxis)
     bed.Anchored = true
     bed.Material = Enum.Material.Concrete
     bed.Color = BED_COL
@@ -189,7 +198,7 @@ for gi = 1, #boundaries - 1 do
     bed.Parent = model
     -- flat cobbles
     local HW = CONFIG.COBBLE_HW
-    local uLo = (gi == 1) and 0.4 or TIMBER_HALF
+    local uLo = TIMBER_HALF
     local uHi = L - TIMBER_HALF
     if uHi - uLo > 0.6 then
         local ss = {}
