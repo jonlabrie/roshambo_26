@@ -3,8 +3,8 @@
 -- Studio runnable (command bar / MCP execute_luau); builds ad-hoc Parts into Workspace.PathRailings
 -- (one sub-Model "Rail_<name>" per run) and is idempotent (clears that sub-Model first).
 --
--- The look (locked v2, user-approved 2026-07-02 on NW1012West; supersedes the 2026-06-29 dark
--- ring-less version — PathSteps/PathExtension/DescentPath are due for a re-run):
+-- The look (locked v2, user-approved 2026-07-02 on NW1012West; deployed on ALL paths as of the
+-- 2026-07-02 reskin campaign — the 2026-06-29 dark ring-less v1 is fully retired):
 --   * bamboo tan 118/95/52 (the old 70/55/32 read too dark).
 --   * top rail   — SMOOTH continuous Catmull-Rom run (dia 0.32) at +2.9 over the edge baseline.
 --   * mid rail   — the SAME run dia 0.22 at +1.25 with low-frequency control-point jitter for a
@@ -60,9 +60,9 @@ local RUNS = {
 -- so adjacent path sections read as one continuous railing. Each side names the timber whose edge
 -- the run terminates on (the run's i0 or i1) and that run's edgeSign.
 local CONNECTORS = {
-    { -- PathSteps T0 <-> PathExtension E1 (the ~4.4-stud seam where the two sections meet)
-        a = { path = "PathSteps", prefix = "Timber", i = 0, edgeSign = -1 },
-        b = { path = "PathExtension", prefix = "ExtTimber", i = 1, edgeSign = -1 },
+    { -- PathSteps <-> PathExtension (the ~8-stud seam where the two sections meet)
+        a = { path = "PathSteps", prefix = "Step", i = 0, edgeSign = -1 },
+        b = { path = "PathExtension", prefix = "Step", i = 0, edgeSign = -1 },
     },
 }
 
