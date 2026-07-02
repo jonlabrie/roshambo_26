@@ -115,6 +115,28 @@ flight). Full stairway: **~47.5 rise over ~106 studs of arc ≈ 75–80 steps + 
   railing, chōchin.
 - Record as-built (final params, counts) back into this spec when done.
 
+## REVISION 2 (2026-07-02 gate): hairpin switchback deck replaces the deck-attached foot
+
+The angled landing pad at the Overlook was built, walked, and **rejected** ("dog's breakfast") — attaching the
+stair to the Overlook was the wrong idea. Demolished. New foot design (user-directed, markers dragged +
+measured):
+
+- **South flight:** from the clearing floor at **(20.9, 113.3, 39.3)** the stair climbs SSE→E through
+  Marker_Mid (28.1, 52.3) to the turn at **(32.5, ~128.3, 53.7)** — run ~19.5, rise 15.0, **grade 76%**
+  (25 steps, riser 0.6, tread 0.78, 2R+T ≈ 1.98). The steepest flight on the hill, deliberately.
+- **Stand-alone HAIRPIN deck** at the turn (the old landing-1 spot, 0.7 studs off the existing upper line):
+  arrival (heading ~E) and west exit meet on its uphill side ~136° apart; the platform **juts out over the
+  descent** (+X, toward the clearing drop where terrain falls to ~119) on tall posts — FW11-switchback
+  vocabulary, deck top at **128.3** (= 113.3 + 25 × 0.6). KŌRAN with black cap on the jutting faces only;
+  both path connections open. Prototype ad-hoc (place-only) first; extract into the parameterized
+  `SwitchbackDeck` builder (§6 TODO) after the user approves the look.
+- **West run:** deck exit → the existing baked upper line → head 162.6 (rise 34.3, ~57 steps), with ONE flat
+  cobble landing near its midpoint (replaces the old 0.33/0.66 pair; the deck IS the lower landing).
+- **Two stair models** (`SouthFlight` + `WestRun`, each with its own Step_/Stone_ contract indices) instead of
+  one model with landings-in-line. Downstream builders get one CONFIG entry per model.
+- Old foot geometry (steps 0–20 along the dead line) demolished at rebuild; pad-area terrain dish refilled to
+  terrace grade for the user's smoothing pass. NearWall_10's role as foot anchor is obsolete.
+
 ## As-built (2026-07-02 survey — plan Task 4)
 
 Baked centerline is in `roblox/tools/studio/buildIshidanStairs.luau` CONFIG (25 control points, foot-first:
