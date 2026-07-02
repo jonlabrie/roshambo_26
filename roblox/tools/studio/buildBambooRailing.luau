@@ -3,87 +3,63 @@
 -- Studio runnable (command bar / MCP execute_luau); builds ad-hoc Parts into Workspace.PathRailings
 -- (one sub-Model "Rail_<name>" per run) and is idempotent (clears that sub-Model first).
 --
--- The look (locked v2, user-approved 2026-07-02 on NW1012West; deployed on ALL paths as of the
--- 2026-07-02 reskin campaign — the 2026-06-29 dark ring-less v1 is fully retired):
---   * bamboo tan 118/95/52 (the old 70/55/32 read too dark).
---   * top rail   — SMOOTH continuous Catmull-Rom run (dia 0.32) at +2.9 over the edge baseline.
---   * mid rail   — the SAME run dia 0.22 at +1.25 with low-frequency control-point jitter for a
---                  hand-lashed wobble. Jitter is per-run scaled (`jitScale`): base amplitudes suit
---                  3.5-stud timber spacing; ANY denser control line (ishidan steps, whether 1.2 or
---                  1.7 pitch) uses 0.25 — 0.5 at 1.7 spacing already read "wacky" (user, 2026-07-02).
---   * node rings — rounded ellipsoid collars (sphere mesh: radial dia+0.022, swell 0.16, color
---                  96/76/40) every ~2.2-3.1 studs along both rails and 3 per post. Geometry, not
---                  texture: surface materials map world-space so banding can never follow the culm.
---   * posts      — vertical bamboo dia 0.36 × 3.25 (top ~2in PROUD of the top-rail crown) every
---                  `postEvery` timbers/steps (default 2 for 3.5-stud timbers; 5 for ishidan steps).
---   * barrier    — an invisible CanCollide box per gap (15 tall, 0.4 thick) so players can't fall
---                  through the open rail. Transparency 1 → reads only the bamboo.
--- The edge line follows each timber's ±RightVector END (HW studs from centre), baseline = timber top.
--- Geometry is PLACE-ONLY (not Rojo) — SAVE THE PLACE after running.
+-- The look (locked v2.1, user-approved 2026-07-02; deployed canyon-wide with the ishidan reskin):
+--   * bamboo tan 118/95/52.
+--   * LINE GENERATION (v2.1): the edge points are linearly resampled at an even 1.5 studs and
+--     relaxed with 4 Laplacian passes (endpoints pinned), and the rails run straight through the
+--     result. The old approach (Catmull-Rom through raw step points) OVERSHOT wherever control
+--     spacing or grade changed — e.g. sagged across the PathExtension/PathSteps seam. The relax
+--     method is identical on uniform runs and clean at seams, and it made `jitScale` obsolete.
+--   * top rail   — dia 0.32 at +2.9 over the smoothed line.
+--   * mid rail   — dia 0.22 at +1.25 with a seeded low-frequency WOBBLE (amp 0.154 lateral +
+--                  0.7x vertical, ~7-stud wavelength) applied ON TOP of the smooth line — the
+--                  hand-lashed look, independent of step density.
+--   * node rings — rounded ellipsoid collars (sphere mesh: radial +0.022, swell 0.16, 96/76/40)
+--                  every ~2.2-3.1 studs on both rails + 3 per post. Geometry, not texture:
+--                  world-space materials can't band along the culm.
+--   * posts      — vertical bamboo dia 0.36 x 3.25 (~2in proud of the top-rail crown) every
+--                  ~7 STUDS of arc (postSpacing), collars at 0.95/2.0/3.12.
+--   * barrier    — invisible CanCollide boxes (15 tall, 0.4 thick) along the line.
+-- A run may span MULTIPLE contiguous path models (`paths` list) — rail them as ONE line; a
+-- separate run per model + a straight Connector kinks at the seam (the lesson of 2026-07-02).
+-- The edge line follows each Step bed's +/-RightVector end (HW studs from centre), baseline =
+-- bed top. Geometry is PLACE-ONLY (not Rojo) — SAVE THE PLACE after running.
 local ws = workspace
 
--- one entry per path to rail. edgeSign: -1 = the -RightVector end, +1 = the +RightVector end (the
--- timber end facing the open-air drop; see the per-path terrain probe in the build-recipes doc).
+-- one entry per railing run. edgeSign: -1 = the -RightVector end, +1 = +RightVector (the side
+-- facing the open-air drop; probe terrain if unsure). paths are stitched in walk order.
 local RUNS = {
-    -- ALL paths now use the §1a ishidan Step_<i> bed contract (reskinPath, 2026-07-02).
-    -- NOTE: PathExtension + PathSteps are railed as ONE MERGED RUN (Rail_PathSteps, 53 control
-    -- points: PE Step_0..5 then PS Step_0..46) — a straight Connector across the seam shelved
-    -- flat on top and ramped hard below (mismatched end tangents); a single spline reads clean.
-    -- The RUNS schema is single-model, so the merged run was built ad-hoc (2026-07-02); re-running
-    -- these two entries separately would RE-INTRODUCE the kink — merge them if you rebuild.
-    { name = "PathSteps", path = "PathSteps", prefix = "Step", i0 = 0, i1 = 46, edgeSign = -1 },
-    { name = "PathExtension", path = "PathExtension", prefix = "Step", i0 = 0, i1 = 5, edgeSign = -1 },
-    -- DescentPath: 26 relayout steps (pitch ~2.3 -> jitScale 0.25), downhill +Right.
+    -- PathExtension (4 preserved + 2 seam-bridge steps) flowing into PathSteps (47 steps): ONE line.
     {
-        name = "DescentPath",
-        path = "DescentPath",
-        prefix = "Step",
-        i0 = 0,
-        i1 = 25,
-        edgeSign = 1,
-        postEvery = 3,
-        jitScale = 0.25,
+        name = "PathSteps",
+        paths = {
+            { path = "PathExtension", i0 = 0, i1 = 5 },
+            { path = "PathSteps", i0 = 0, i1 = 46 },
+        },
+        edgeSign = -1,
     },
-    -- NW1012 west traverse (ishidan steps, pitch 1.23 -> postEvery 5 ≈ the old 2-timber cadence).
-    -- Downhill/open side is +Right (uphill -Right holds the timber wall). South flight is a walled
-    -- cutting with no open edge — deliberately un-railed. The LandingDeck is bare by user decision.
-    {
-        name = "NW1012West",
-        path = "NW1012West",
-        prefix = "Step",
-        i0 = 0,
-        i1 = 56,
-        edgeSign = 1,
-        postEvery = 5,
-        jitScale = 0.25,
-    },
+    -- DescentPath: 26 relayout steps, downhill +Right.
+    { name = "DescentPath", paths = { { path = "DescentPath", i0 = 0, i1 = 25 } }, edgeSign = 1 },
+    -- NW1012 west traverse: downhill +Right (uphill holds the timber wall).
+    { name = "NW1012West", paths = { { path = "NW1012West", i0 = 0, i1 = 56 } }, edgeSign = 1 },
+    -- NW1211: 10 relayout steps, drop side -Right.
+    { name = "NW1211", paths = { { path = "NW1211Path", i0 = 0, i1 = 9 } }, edgeSign = -1 },
 }
 
--- Connectors bridge a gap between two run endpoints with a straight top+mid rail (and barrier),
--- so adjacent path sections read as one continuous railing. Each side names the timber whose edge
--- the run terminates on (the run's i0 or i1) and that run's edgeSign.
-local CONNECTORS = {
-    { -- PathSteps <-> PathExtension (the ~8-stud seam where the two sections meet)
-        a = { path = "PathSteps", prefix = "Step", i = 0, edgeSign = -1 },
-        b = { path = "PathExtension", prefix = "Step", i = 0, edgeSign = -1 },
-    },
-}
+-- ===== locked constants (v2.1, 2026-07-02) =====
+local HW = 3.0 -- studs from bed centre to its end (the edge line)
+local TOPY, TOP_DIA = 2.9, 0.32
+local MIDY, MID_DIA = 1.25, 0.22
+local POSTH, POST_DIA, POST_SPACING = 3.25, 0.36, 7
+local RESAMPLE, RELAX_PASSES = 1.5, 4
+local WOB_AMP, WOB_WAVE, WOB_SEED = 0.154, 7, 20260629
+local BARRIER_H, BARRIER_T = 15, 0.4
+local WOOD = Color3.fromRGB(118, 95, 52)
+local NODE_COL = Color3.fromRGB(96, 76, 40)
+local NODE_BULGE, NODE_SWELL, NODE_SEED = 0.022, 0.16, 20260715
+local VERT = CFrame.Angles(0, 0, math.rad(90)) -- cylinder long axis is local X
 
--- ===== locked constants (v2, 2026-07-02) =====
-local HW = 3.0 -- studs from timber centre to its end (the edge line)
-local TOPY, TOP_DIA = 2.9, 0.32 -- top rail height over baseline / diameter
-local MIDY, MID_DIA = 1.25, 0.22 -- mid rail height / diameter
-local POSTH, POST_DIA, POST_EVERY = 3.25, 0.36, 2 -- post height (~2in proud of rail crown) / dia / cadence
-local S = 4 -- Catmull-Rom subdivisions per control segment
-local JIT_LAT, JIT_VERT, SEED = 0.154, 0.112, 20260629 -- BASE mid-rail jitter (× run.jitScale) + seed
-local BARRIER_H, BARRIER_T = 15, 0.4 -- invisible fall-barrier box height / thickness (clears rail-cap + jump)
-local WOOD = Color3.fromRGB(118, 95, 52) -- warm bamboo tan
-local NODE_COL = Color3.fromRGB(96, 76, 40) -- node collar, a shade darker
-local NODE_BULGE, NODE_SWELL = 0.022, 0.16 -- collar: radial bulge over the culm / axial swell length
-local NODE_SEED = 20260715
-local VERT = CFrame.Angles(0, 0, math.rad(90)) -- cylinder long axis is local X; vertical needs this
-
-local function cyl(parent: Instance, name: string, size: Vector3, cf: CFrame)
+local function cyl(parent: Instance, name: string, size: Vector3, cf: CFrame): Part
     local p = Instance.new("Part")
     p.Name = name
     p.Shape = Enum.PartType.Cylinder
@@ -97,53 +73,6 @@ local function cyl(parent: Instance, name: string, size: Vector3, cf: CFrame)
     return p
 end
 
--- horizontal unit vector along a timber's +RightVector
-local function horizRight(t: BasePart): Vector3
-    local r = t.CFrame.RightVector
-    return Vector3.new(r.X, 0, r.Z).Unit
-end
-
-local function cr(p0: Vector3, p1: Vector3, p2: Vector3, p3: Vector3, t: number): Vector3
-    local t2, t3 = t * t, t * t * t
-    return 0.5
-        * ((p1 * 2) + (p2 - p0) * t + (p0 * 2 - p1 * 5 + p2 * 4 - p3) * t2 + (p1 * 3 - p0 - p2 * 3 + p3) * t3)
-end
-
--- dense-sample a Catmull-Rom spline through `pts` (S subdivisions per segment, endpoints included)
-local function densify(pts: { Vector3 }): { Vector3 }
-    local dense = {}
-    for i = 1, #pts - 1 do
-        local p0 = pts[math.max(i - 1, 1)]
-        local p1, p2 = pts[i], pts[i + 1]
-        local p3 = pts[math.min(i + 2, #pts)]
-        local last = (i == #pts - 1) and S or (S - 1)
-        for s = 0, last do
-            dense[#dense + 1] = cr(p0, p1, p2, p3, s / S)
-        end
-    end
-    return dense
-end
-
--- build a continuous rail (cylinder segments + ball joints) through dense points
-local function buildRail(parent: Instance, dense: { Vector3 }, dia: number)
-    for i = 1, #dense - 1 do
-        local a, b = dense[i], dense[i + 1]
-        local seg = cyl(
-            parent,
-            "Rail",
-            Vector3.new((b - a).Magnitude + dia * 0.5, dia, dia),
-            CFrame.lookAt((a + b) / 2, b) * CFrame.Angles(0, math.rad(90), 0)
-        )
-        seg.Name = "Rail"
-    end
-    for i = 1, #dense do
-        local j = cyl(parent, "Joint", Vector3.new(dia, dia, dia), CFrame.new(dense[i]))
-        j.Shape = Enum.PartType.Ball
-        j.Name = "Joint"
-    end
-end
-
--- rounded node collar (squashed sphere -> the bamboo joint swell) at pos along axis
 local function nodeRing(parent: Instance, pos: Vector3, axis: Vector3, dia: number)
     local p = Instance.new("Part")
     p.Name = "Node"
@@ -157,24 +86,70 @@ local function nodeRing(parent: Instance, pos: Vector3, axis: Vector3, dia: numb
     mesh.MeshType = Enum.MeshType.Sphere
     mesh.Parent = p
     p.Parent = parent
-    return p
 end
 
--- node collars every ~2.2-3.1 studs along a dense polyline (deterministic)
-local function buildNodes(parent: Instance, dense: { Vector3 }, dia: number)
-    local state = NODE_SEED % 2 ^ 32
-    local function rng(): number
+local function makeRng(seed: number): () -> number
+    local state = seed % 2 ^ 32
+    return function(): number
         state = (1664525 * state + 1013904223) % 2 ^ 32
         return state / 2 ^ 32
     end
+end
+
+local function linResample(pts: { Vector3 }, spacing: number): { Vector3 }
+    local out = { pts[1] }
+    local carry = 0
+    for i = 1, #pts - 1 do
+        local a, b = pts[i], pts[i + 1]
+        local seg = (b - a).Magnitude
+        local d = spacing - carry
+        while d <= seg do
+            out[#out + 1] = a:Lerp(b, d / seg)
+            d += spacing
+        end
+        carry = seg - (d - spacing)
+    end
+    out[#out + 1] = pts[#pts]
+    return out
+end
+
+local function relax(pts: { Vector3 }, passes: number): { Vector3 }
+    for _ = 1, passes do
+        local nxt = { pts[1] }
+        for i = 2, #pts - 1 do
+            nxt[i] = pts[i] * 0.5 + (pts[i - 1] + pts[i + 1]) * 0.25
+        end
+        nxt[#pts] = pts[#pts]
+        pts = nxt
+    end
+    return pts
+end
+
+local function railThrough(parent: Instance, dense: { Vector3 }, dia: number)
+    for i = 1, #dense - 1 do
+        local a, b = dense[i], dense[i + 1]
+        cyl(
+            parent,
+            "Rail",
+            Vector3.new((b - a).Magnitude + dia * 0.5, dia, dia),
+            CFrame.lookAt((a + b) / 2, b) * CFrame.Angles(0, math.rad(90), 0)
+        )
+    end
+    for i = 1, #dense do
+        local j = cyl(parent, "Joint", Vector3.new(dia, dia, dia), CFrame.new(dense[i]))
+        j.Shape = Enum.PartType.Ball
+    end
+end
+
+local function nodesAlong(parent: Instance, dense: { Vector3 }, dia: number)
+    local rng = makeRng(NODE_SEED)
     local nextAt = 1.6 + rng()
     local acc = 0
     for i = 1, #dense - 1 do
         local a, b = dense[i], dense[i + 1]
         local seg = (b - a).Magnitude
         while acc + seg >= nextAt do
-            local t = (nextAt - acc) / seg
-            nodeRing(parent, a:Lerp(b, t), b - a, dia)
+            nodeRing(parent, a:Lerp(b, (nextAt - acc) / seg), b - a, dia)
             nextAt = nextAt + 2.2 + rng() * 0.9
         end
         acc += seg
@@ -182,23 +157,24 @@ local function buildNodes(parent: Instance, dense: { Vector3 }, dia: number)
 end
 
 local function buildOne(run): string
-    local model = ws:FindFirstChild(run.path)
-    assert(model, "missing Workspace." .. run.path)
-
-    -- edge control points (timber end on the chosen side, baseline = timber top)
-    local base = {}
-    for i = run.i0, run.i1 do
-        local t = model:FindFirstChild(run.prefix .. "_" .. i) :: BasePart?
-        if t then
-            local rh = horizRight(t)
-            local edge = Vector3.new(t.Position.X, t.Position.Y + t.Size.Y / 2, t.Position.Z)
-                + rh * (HW * run.edgeSign)
-            base[#base + 1] = edge
+    -- ordered edge points across the run's stitched paths
+    local base: { Vector3 } = {}
+    for _, seg in run.paths do
+        local model = ws:FindFirstChild(seg.path)
+        assert(model, "missing Workspace." .. seg.path)
+        for i = seg.i0, seg.i1 do
+            local t = model:FindFirstChild("Step_" .. i) :: BasePart?
+            if t then
+                local r = t.CFrame.RightVector
+                local rh = Vector3.new(r.X, 0, r.Z).Unit
+                base[#base + 1] = Vector3.new(t.Position.X, t.Position.Y + t.Size.Y / 2, t.Position.Z)
+                    + rh * (HW * run.edgeSign)
+            end
         end
     end
-    assert(#base >= 2, "need >=2 timbers for " .. run.name)
+    assert(#base >= 2, "need >= 2 steps for " .. run.name)
+    local pts = relax(linResample(base, RESAMPLE), RELAX_PASSES)
 
-    -- top rail: smooth (no jitter)
     local parent = ws:FindFirstChild("PathRailings") or Instance.new("Model")
     parent.Name = "PathRailings"
     parent.Parent = ws
@@ -210,143 +186,83 @@ local function buildOne(run): string
     sub.Name = "Rail_" .. run.name
     sub.Parent = parent
 
-    local topPts = {}
-    for _, p in base do
-        topPts[#topPts + 1] = p + Vector3.new(0, TOPY, 0)
+    -- top rail
+    local topLine = {}
+    for _, p in pts do
+        topLine[#topLine + 1] = p + Vector3.new(0, TOPY, 0)
     end
-    local topDense = densify(topPts)
-    buildRail(sub, topDense, TOP_DIA)
-    buildNodes(sub, topDense, TOP_DIA)
+    railThrough(sub, topLine, TOP_DIA)
+    nodesAlong(sub, topLine, TOP_DIA)
 
-    -- mid rail: jitter the control points (low-frequency, × run.jitScale), then spline → rustic wobble
-    math.randomseed(SEED)
-    local jitScale = run.jitScale or 1
-    local midPts = {}
-    for _, p in base do
-        midPts[#midPts + 1] = p + Vector3.new(0, MIDY, 0)
+    -- mid rail: low-frequency wobble over the smooth line
+    local jr = makeRng(WOB_SEED)
+    local wobA, wobB, tacc = (jr() * 2 - 1) * WOB_AMP, (jr() * 2 - 1) * WOB_AMP, 0
+    local midLine = {}
+    for i, p in pts do
+        if i > 1 then
+            tacc += (pts[i] - pts[i - 1]).Magnitude
+        end
+        if tacc > WOB_WAVE then
+            wobA, wobB = wobB, (jr() * 2 - 1) * WOB_AMP
+            tacc -= WOB_WAVE
+        end
+        local f = tacc / WOB_WAVE
+        local w = wobA * (1 - f) + wobB * f
+        local dirN = pts[math.min(i + 1, #pts)] - pts[math.max(i - 1, 1)]
+        dirN = Vector3.new(dirN.X, 0, dirN.Z)
+        dirN = dirN.Magnitude > 0 and dirN.Unit or Vector3.new(1, 0, 0)
+        local perp = Vector3.new(dirN.Z, 0, -dirN.X)
+        midLine[#midLine + 1] = p + Vector3.new(0, MIDY + w * 0.7, 0) + perp * w
     end
-    for i = 2, #midPts - 1 do
-        local tan = midPts[i + 1] - midPts[i - 1]
-        tan = Vector3.new(tan.X, 0, tan.Z)
-        tan = (tan.Magnitude > 0) and tan.Unit or Vector3.new(1, 0, 0)
-        local perp = Vector3.new(tan.Z, 0, -tan.X)
-        midPts[i] = midPts[i]
-            + perp * ((math.random() * 2 - 1) * JIT_LAT * jitScale)
-            + Vector3.new(0, (math.random() * 2 - 1) * JIT_VERT * jitScale, 0)
-    end
-    local midDense = densify(midPts)
-    buildRail(sub, midDense, MID_DIA)
-    buildNodes(sub, midDense, MID_DIA)
+    railThrough(sub, midLine, MID_DIA)
+    nodesAlong(sub, midLine, MID_DIA)
 
-    -- posts every postEvery timbers/steps (at the un-jittered baseline edge points)
+    -- posts every POST_SPACING studs of arc
     local posts = 0
-    local postEvery = run.postEvery or POST_EVERY
-    for k = 1, #base do
-        if (k - 1) % postEvery == 0 then
-            local p = base[k]
+    local acc, nextPost = 0, 0.5
+    for i = 1, #pts - 1 do
+        local a, b = pts[i], pts[i + 1]
+        local seg = (b - a).Magnitude
+        while acc + seg >= nextPost do
+            local p = a:Lerp(b, (nextPost - acc) / seg)
             cyl(
                 sub,
-                "Post_" .. (run.i0 + k - 1),
+                "Post_" .. posts,
                 Vector3.new(POSTH, POST_DIA, POST_DIA),
                 CFrame.new(p + Vector3.new(0, POSTH / 2, 0)) * VERT
             )
-            -- node collars at thirds + just above the top rail crossing
             for _, hy in { 0.95, 2.0, 3.12 } do
                 nodeRing(sub, p + Vector3.new(0, hy, 0), Vector3.yAxis, POST_DIA)
             end
             posts += 1
+            nextPost += POST_SPACING
         end
+        acc += seg
     end
 
-    -- invisible CanCollide fall-barrier per gap (rises BARRIER_H from the path edge)
-    for i = 1, #base - 1 do
-        local a, b = base[i], base[i + 1]
+    -- invisible fall barriers along the line
+    for i = 1, #pts - 1, 2 do
+        local a, b = pts[i], pts[math.min(i + 2, #pts)]
         local midXZ = (a + b) / 2
         local len = (Vector3.new(a.X, 0, a.Z) - Vector3.new(b.X, 0, b.Z)).Magnitude
         local cy = (a.Y + b.Y) / 2 + BARRIER_H / 2
         local bar = Instance.new("Part")
-        bar.Name = "Barrier_" .. (run.i0 + i - 1)
+        bar.Name = "Barrier_" .. i
         bar.Anchored = true
         bar.CanCollide = true
         bar.Transparency = 1
-        bar.CastShadow = false -- invisible part still casts a shadow otherwise (15-stud shadow strip)
+        bar.CastShadow = false
         bar.Size = Vector3.new(len + BARRIER_T, BARRIER_H, BARRIER_T)
         bar.CFrame = CFrame.lookAt(Vector3.new(midXZ.X, cy, midXZ.Z), Vector3.new(b.X, cy, b.Z))
             * CFrame.Angles(0, math.rad(90), 0)
         bar.Parent = sub
     end
-
-    return string.format("%s: %d control pts, %d posts, %d barriers", run.name, #base, posts, #base - 1)
-end
-
--- edge point (timber end, baseline = timber top) for a connector endpoint spec
-local function edgeOf(spec): Vector3
-    local model = ws:FindFirstChild(spec.path)
-    assert(model, "missing Workspace." .. spec.path)
-    local t = model:FindFirstChild(spec.prefix .. "_" .. spec.i) :: BasePart
-    assert(t, "missing " .. spec.path .. "." .. spec.prefix .. "_" .. spec.i)
-    local rh = horizRight(t)
-    return Vector3.new(t.Position.X, t.Position.Y + t.Size.Y / 2, t.Position.Z) + rh * (HW * spec.edgeSign)
-end
-
--- straight top+mid rail (and invisible barrier) bridging two run endpoints
-local function buildConnector(parent: Instance, conn, n: number)
-    local sub = Instance.new("Model")
-    sub.Name = "Connector_" .. n
-    sub.Parent = parent
-    local a, b = edgeOf(conn.a), edgeOf(conn.b)
-    for _, lvl in { { y = TOPY, dia = TOP_DIA }, { y = MIDY, dia = MID_DIA } } do
-        local pa, pb = a + Vector3.new(0, lvl.y, 0), b + Vector3.new(0, lvl.y, 0)
-        local seg = cyl(
-            sub,
-            "Rail",
-            Vector3.new((pb - pa).Magnitude + lvl.dia * 0.5, lvl.dia, lvl.dia),
-            CFrame.lookAt((pa + pb) / 2, pb) * CFrame.Angles(0, math.rad(90), 0)
-        )
-        seg.Name = "Rail"
-        for _, p in { pa, pb } do
-            local j = cyl(sub, "Joint", Vector3.new(lvl.dia, lvl.dia, lvl.dia), CFrame.new(p))
-            j.Shape = Enum.PartType.Ball
-            j.Name = "Joint"
-        end
-    end
-    local midXZ = (a + b) / 2
-    local len = (Vector3.new(a.X, 0, a.Z) - Vector3.new(b.X, 0, b.Z)).Magnitude
-    local cy = (a.Y + b.Y) / 2 + BARRIER_H / 2
-    local bar = Instance.new("Part")
-    bar.Name = "Barrier"
-    bar.Anchored = true
-    bar.CanCollide = true
-    bar.Transparency = 1
-    bar.CastShadow = false -- invisible part still casts a shadow otherwise (15-stud shadow strip)
-    bar.Size = Vector3.new(len + BARRIER_T, BARRIER_H, BARRIER_T)
-    bar.CFrame = CFrame.lookAt(Vector3.new(midXZ.X, cy, midXZ.Z), Vector3.new(b.X, cy, b.Z))
-        * CFrame.Angles(0, math.rad(90), 0)
-    bar.Parent = sub
-    return string.format("Connector_%d: %.1f-stud bridge", n, len)
+    return string.format("%s: %d line pts, %d posts", run.name, #pts, posts)
 end
 
 -- ===== deploy =====
--- drop the old single-prototype model if present (superseded by per-run sub-models)
-local pr = ws:FindFirstChild("PathRailings")
-if pr then
-    local old = pr:FindFirstChild("Rail_PROTO")
-    if old then
-        old:Destroy()
-    end
-    for _, c in pr:GetChildren() do
-        if c.Name:match("^Connector_") then
-            c:Destroy()
-        end
-    end
-end
-
 local report = {}
 for _, run in RUNS do
     report[#report + 1] = buildOne(run)
-end
-local parent = ws:FindFirstChild("PathRailings")
-for i, conn in CONNECTORS do
-    report[#report + 1] = buildConnector(parent, conn, i)
 end
 return table.concat(report, "\n")
