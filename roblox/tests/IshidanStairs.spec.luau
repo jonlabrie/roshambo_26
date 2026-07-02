@@ -81,3 +81,52 @@ describe("IshidanStairs.layout", function()
         expect(L.steps[1].dir[2]).toBeCloseTo(0)
     end)
 end)
+
+describe("IshidanStairs.slabs", function()
+    local line = {}
+    for d = 0, 78 do
+        table.insert(line, { d, 113.3 + d * (42.4 / 78), 0 })
+    end
+    local layout =
+        IshidanStairs.layout(line, { riserTarget = 0.6, footY = 113.3, headY = 155.7, landings = {} })
+    local opts = { width = 6.4, depth = 1.25, body = 0.8, bedW = 5.8, bedH = 1.2, seed = 20260702 }
+
+    test("deterministic for a fixed seed", function()
+        local a = IshidanStairs.slabs(layout, opts)
+        local b = IshidanStairs.slabs(layout, opts)
+        expect(a[1].stones[1].pos[1]).toBeCloseTo(b[1].stones[1].pos[1])
+        expect(a[1].stones[1].yawDeg).toBeCloseTo(b[1].stones[1].yawDeg)
+    end)
+    test("stone tops sit at the tread", function()
+        local S = IshidanStairs.slabs(layout, opts)
+        local step = layout.steps[1]
+        local stone = S[1].stones[1]
+        expect(stone.pos[2] + stone.size[2] / 2).toBeCloseTo(step.tread)
+    end)
+    test("bed top is 0.05 below the tread and narrower than the stones' full width", function()
+        local S = IshidanStairs.slabs(layout, opts)
+        local step = layout.steps[1]
+        expect(S[1].bed.pos[2] + S[1].bed.size[2] / 2).toBeCloseTo(step.tread - 0.05)
+        expect(S[1].bed.size[1]).toBeCloseTo(5.8)
+    end)
+    test("split steps: cross widths sum to width minus one 0.08 grout gap", function()
+        local S = IshidanStairs.slabs(layout, opts)
+        local found = false
+        for _, sb in S do
+            if #sb.stones == 2 then
+                found = true
+                expect(sb.stones[1].size[1] + sb.stones[2].size[1]).toBeCloseTo(6.4 - 0.08, 1)
+            end
+        end
+        expect(found).toBe(true) -- with ~70 steps and splitFrac 0.5, at least one split
+    end)
+    test("jitter stays in bounds", function()
+        local S = IshidanStairs.slabs(layout, opts)
+        for _, sb in S do
+            for _, st in sb.stones do
+                expect(math.abs(st.yawDeg) <= 2 + 1e-6).toBe(true)
+                expect(math.abs(st.tint) <= 3 + 1e-6).toBe(true)
+            end
+        end
+    end)
+end)

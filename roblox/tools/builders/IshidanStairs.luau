@@ -154,4 +154,74 @@ function IshidanStairs.layout(polyline: { { number } }, opts: LayoutOpts)
     return { flights = flights, steps = steps }
 end
 
+-- deterministic LCG (Numerical Recipes constants), returns [0,1)
+local function makeRng(seed: number): () -> number
+    local state = seed % 2 ^ 32
+    return function(): number
+        state = (1664525 * state + 1013904223) % 2 ^ 32
+        return state / 2 ^ 32
+    end
+end
+
+type SlabOpts = { width: number, depth: number, body: number, bedW: number, bedH: number, seed: number }
+
+function IshidanStairs.slabs(layout: any, opts: SlabOpts)
+    local rng = makeRng(opts.seed)
+    local out = {}
+    for _, s in layout.steps :: { Step } do
+        local perp = { -s.dir[2], s.dir[1] } -- unit cross-stream (left of travel)
+        if s.kind == "landing" then
+            local len = (s.len :: number) + 1
+            table.insert(out, {
+                i = s.i,
+                kind = s.kind,
+                stones = {},
+                bed = {
+                    pos = { s.pos[1], s.tread - 0.05 - opts.bedH / 2, s.pos[3] },
+                    dir = s.dir,
+                    size = { opts.bedW, opts.bedH, len },
+                },
+            })
+            continue
+        end
+        local stones = {}
+        local split = rng() < 0.5
+        local depth = opts.depth * (0.95 + 0.10 * rng())
+        local widths = { opts.width }
+        if split then
+            local f = 0.4 + 0.2 * rng() -- 40–60% split
+            widths = { opts.width * f - 0.04, opts.width * (1 - f) - 0.04 } -- 0.08 grout gap
+        end
+        local edge = -opts.width / 2
+        for _, w in widths do
+            local cCross = edge + w / 2
+            edge += w + 0.08
+            local lat = (rng() * 2 - 1) * 0.15
+            local along = (rng() * 2 - 1) * 0.1
+            table.insert(stones, {
+                pos = {
+                    s.pos[1] + perp[1] * (cCross + lat) + s.dir[1] * along,
+                    s.tread - opts.body / 2,
+                    s.pos[3] + perp[2] * (cCross + lat) + s.dir[2] * along,
+                },
+                dir = s.dir,
+                yawDeg = (rng() * 2 - 1) * 2,
+                size = { w, opts.body, depth },
+                tint = math.floor((rng() * 2 - 1) * 3 + 0.5),
+            })
+        end
+        table.insert(out, {
+            i = s.i,
+            kind = s.kind,
+            stones = stones,
+            bed = {
+                pos = { s.pos[1], s.tread - 0.05 - opts.bedH / 2, s.pos[3] },
+                dir = s.dir,
+                size = { opts.bedW, opts.bedH, s.pitch + 0.5 },
+            },
+        })
+    end
+    return out
+end
+
 return IshidanStairs
