@@ -34,7 +34,11 @@ The rules that force the split-economy decision (Roblox ToU, Commerce Standards,
 
 **A teahouse is data, not geography.** Each player's teahouse is a saved loadout — structural tier + placed catalog items + garden choices — persisted in our Mongo via `/api/v1` (not Roblox DataStores, so any game server can load it), scoped as **Roblox-platform data** under the shared identity record. On joining a server the player claims a **pad** and their teahouse materializes onto it for the session; the pad frees when they leave. With pad count ≈ server capacity, everyone present has their teahouse standing — scarcity evaporates rather than being managed.
 
-- **Customization = catalog + structural tiers.** A curated ZenDojo-kit furniture/decor catalog placed freely within the pad, plus discrete purchasable structure upgrades (larger floorplan, engawa wrap, second story, garden features) as the aspirational ladder. **No free-form building** (serialization weight, moderation exposure, aesthetic clash).
+- **Customization = catalog + structural tiers.** A curated ZenDojo-kit furniture/decor catalog placed freely within the pad, plus discrete purchasable structure upgrades as the aspirational ladder. **No free-form building** (serialization weight, moderation exposure, aesthetic clash). The structural-tier catalog is **site-class-aware** (below): same price ladder, different luxury vocabulary per pad class.
+- **Pad classes.** Two classes with class-specific structural vocabularies:
+  - **Valley-floor pads** (the new valleys) get the *ground* vocabulary: larger floorplans, walled gardens, courtyards, excavated ponds. The new valleys are designed **pad-first** — footprints, garden aprons, and pond basins sized before any dressing goes in — so this class carries the roomy-garden fantasy natively.
+  - **Cliff-perch pads** (the original ~18) get the *air* vocabulary, kake-zukuri style (Kiyomizu-dera stage construction): cantilevered moon-viewing decks, hanging lantern gardens on extended stages, deck-mounted pond basins, second engawa rings on longer stilts. Expansion is **built structure, not terrain** — the locked teahouse form is already stilted and raycast-down-the-cliff, so premium growth needs air and anchorage, not ground. The premium story: cliff houses trade the walled garden for the view, and hang their gardens in the air.
+  - Buildings are builder-stamped and regenerable (per the teahouse builder spec); terrain is the only non-regenerable asset. **No global valley rescale, ever** — any cliff-site footprint growth is per-site, data-driven, and local.
 - **Hard per-pad furniture cap** (~40–80 placed items) so 50+ furnished teahouses hold per-server perf.
 - **Claiming is walk-up.** Pads have a gate post; touch a vacant one and the teahouse builds in with a flourish. The server remembers the player's usual pad and may offer "claim my usual spot?" at spawn. Claiming-as-ritual shows off the valleys and opens the session.
 - **Pad tiers, one-time unlocks.** Pads are tiered by location prestige (the original ~18 cliff perches are the top tier; new valleys hold standard tiers). Spending banked points permanently unlocks *eligibility* for a tier — the economy's big-denomination sink. No rent, no leases, no eviction.
@@ -45,7 +49,7 @@ Two new residential valleys radiating from the existing clearing, bringing total
 
 - **Hub-and-spoke:** all paths converge on the clearing (shrine, bell engine, festivals). Canyon walls give natural occlusion between valleys; `StreamingEnabled` handles the rest. From the clearing you see valley mouths, not depths.
 - **Each valley has a distinct character** (e.g., bamboo / mist / waterfall) and anchors a pad tier; valley identity also drives familiar species rosters (below).
-- **Side valleys are compact and recipe-built** — residential streets, not a second grand descent. They lean on the established builders and recipes (ishidan steps, cobble paths, railings, teahouse kit) that exist precisely to make this cheap. The original canyon remains the premium, dramatic tier.
+- **Side valleys are compact, recipe-built, and pad-first** — residential streets, not a second grand descent. Pad footprints (including top-tier garden/pond envelopes) are laid out *before* terrain dressing, so valley-floor pads never face the retrofit problem. They lean on the established builders and recipes (ishidan steps, cobble paths, railings, teahouse kit) that exist precisely to make this cheap. The original canyon remains the premium, dramatic tier.
 
 ## Familiars
 
@@ -88,3 +92,4 @@ Rounds are playable from anywhere, so every meta-system *adds* minutes without c
 - Dusk cycle mechanism (see above).
 - Koi pooled-render sampling rules.
 - Furniture cap number — validate 40–80 against real part counts from the teahouse kit.
+- **Cliff-site expansion-envelope audit**: a Lune/Studio tool that occupancy-sweeps each perch site's surrounding volume (outward, along-wall, up — same technique as the tunnel-bore verification) and emits a per-site envelope table grading which sites support which structural tiers. Replaces guessing with data; any resulting terrain edits are per-site and follow the standing registration rules.
