@@ -12,14 +12,25 @@
 -- Flags are CanCollide false — players walk on beds/risers.
 -- Spec: docs/superpowers/specs/2026-07-01-zendojo-nw1012-ishidan-stairway-design.md
 local CONFIG = {
-    outModel = "NW1012Stairs",
+    outModel = "NW80FallsStair",
     -- BAKED {x,y,z} centerline control points, FOOT FIRST (survey once, bake,
     -- never read draft markers at build time):
-    control = {},
-    footY = 0,
-    headY = 0,
+    -- NW_40->2A is a VALLEY (down from tunnel, up to falls); the builder needs
+    -- monotonic ascent, so it's TWO runs from the bench low (NW_52). This is the
+    -- main CLIMB: NW_52 (foot) -> Bridge2_A rim (head). Y = smoothed carve floor.
+    control = {
+        { -350.7, 201, 54.3 }, -- NW_52 foot (bench low)
+        { -369.1, 206, 47.0 }, -- NW_60
+        { -390.4, 210, 41.6 }, -- NW_62 (grade break -> landing)
+        { -410.3, 221, 42.0 }, -- NW_70 (turn-landing at the ~45 deg bend)
+        { -419.9, 228, 31.7 }, -- NW_75
+        { -425.9, 234, 22.8 }, -- NW_80 (grade break -> landing)
+        { -430.6, 245, -13.2 }, -- Bridge2_A head (rim)
+    },
+    footY = 201,
+    headY = 245,
     riserTarget = 0.6,
-    landings = {}, -- { { frac = 0..1, len = studs } }
+    landings = { { frac = 0.340, len = 3 }, { frac = 0.502, len = 5 }, { frac = 0.704, len = 3 } },
     seed = 20260711,
     buildRange = nil, -- {i0, i1} step indices; nil = all
     resampleSpacing = 2.0,

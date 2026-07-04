@@ -50,6 +50,11 @@ local RUNS = {
     -- if you rebuild, keep the gap or you fence off the teahouse.
     { name = "NW2040_S1", paths = { { path = "NW2040Path", i0 = 0, i1 = 10 } }, edgeSign = 1 },
     { name = "NW2040_S2", paths = { { path = "NW2040Path", i0 = 14, i1 = 49 } }, edgeSign = 1 },
+    -- NW_40 flight (valley: two ishidan models meeting at the NW_52 bench; foot step of each removed
+    -- for the BenchLanding). Downhill/canyon edge: descent = -Right, climb = +Right (climb's cliff
+    -- -Right holds NWFallsWall). Continuous runs; the BenchLanding's open canyon edge = the T07 access.
+    { name = "NW40Descent", paths = { { path = "NW40Descent", i0 = 1, i1 = 17 } }, edgeSign = -1 },
+    { name = "NW80FallsStair", paths = { { path = "NW80FallsStair", i0 = 1, i1 = 76 } }, edgeSign = 1 },
 }
 
 -- ===== locked constants (v2.1, 2026-07-02) =====
