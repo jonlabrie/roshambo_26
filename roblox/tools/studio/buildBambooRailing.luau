@@ -42,8 +42,15 @@ local RUNS = {
     { name = "DescentPath", paths = { { path = "DescentPath", i0 = 0, i1 = 25 } }, edgeSign = 1 },
     -- NW1012 west traverse: downhill +Right (uphill holds the timber wall).
     { name = "NW1012West", paths = { { path = "NW1012West", i0 = 0, i1 = 56 } }, edgeSign = 1 },
-    -- NW1211: 10 relayout steps, drop side -Right.
-    { name = "NW1211", paths = { { path = "NW1211Path", i0 = 0, i1 = 9 } }, edgeSign = -1 },
+    -- NW1211: 11 steps (foot step added 2026-07-04), drop side -Right, NARROWED path (-25% width)
+    -- so hw=2.25 (default 3.0) keeps the rail at the new riser edge.
+    {
+        name = "NW1211",
+        paths = { { path = "NW1211Path", i0 = 0, i1 = 10 } },
+        edgeSign = -1,
+        hw = 2.25,
+        postEnds = true,
+    },
     -- NW2040: 50 relayout steps, DOWNHILL (+Right) ONLY (uphill rail removed per user), THREE
     -- segments with two openings (as-built 2026-07-04, canonical v2.1 rebuild): steps 11-13 =
     -- Teahouse_02 access (below NearWall_30); steps 20-22 = Teahouse3Bridge landing at Step_21
@@ -171,6 +178,8 @@ end
 
 local function buildOne(run): string
     -- ordered edge points across the run's stitched paths
+    -- run.hw overrides the default edge offset for narrowed paths (NW1211 at -25% width, 2026-07-04)
+    local hw = run.hw or HW
     local base: { Vector3 } = {}
     for _, seg in run.paths do
         local model = ws:FindFirstChild(seg.path)
@@ -181,7 +190,7 @@ local function buildOne(run): string
                 local r = t.CFrame.RightVector
                 local rh = Vector3.new(r.X, 0, r.Z).Unit
                 base[#base + 1] = Vector3.new(t.Position.X, t.Position.Y + t.Size.Y / 2, t.Position.Z)
-                    + rh * (HW * run.edgeSign)
+                    + rh * (hw * run.edgeSign)
             end
         end
     end
@@ -230,14 +239,34 @@ local function buildOne(run): string
     railThrough(sub, midLine, MID_DIA)
     nodesAlong(sub, midLine, MID_DIA)
 
-    -- posts every POST_SPACING studs of arc
+    -- post arc positions. Default: every POST_SPACING from 0.5 (open-ended, fine for long runs).
+    -- run.postEnds = true: evenly spaced with a post AT EACH END — short runs otherwise leave the
+    -- cap cantilevering past the last post into space and float the foot post (bit us on NW1211,
+    -- 2026-07-04). n = round(arc/POST_SPACING)+1, so interior spacing stays near POST_SPACING.
+    local totalArc = 0
+    for i = 1, #pts - 1 do
+        totalArc += (pts[i + 1] - pts[i]).Magnitude
+    end
+    local postArcs = {}
+    if run.postEnds then
+        local n = math.max(2, math.floor(totalArc / POST_SPACING + 0.5) + 1)
+        for k = 0, n - 1 do
+            postArcs[#postArcs + 1] = totalArc * k / (n - 1)
+        end
+    else
+        local a = 0.5
+        while a < totalArc do
+            postArcs[#postArcs + 1] = a
+            a += POST_SPACING
+        end
+    end
     local posts = 0
-    local acc, nextPost = 0, 0.5
+    local acc, pi = 0, 1
     for i = 1, #pts - 1 do
         local a, b = pts[i], pts[i + 1]
         local seg = (b - a).Magnitude
-        while acc + seg >= nextPost do
-            local p = a:Lerp(b, (nextPost - acc) / seg)
+        while pi <= #postArcs and postArcs[pi] <= acc + seg + 1e-6 do
+            local p = a:Lerp(b, seg > 1e-9 and math.clamp((postArcs[pi] - acc) / seg, 0, 1) or 0)
             cyl(
                 sub,
                 "Post_" .. posts,
@@ -248,7 +277,7 @@ local function buildOne(run): string
                 nodeRing(sub, p + Vector3.new(0, hy, 0), Vector3.yAxis, POST_DIA)
             end
             posts += 1
-            nextPost += POST_SPACING
+            pi += 1
         end
         acc += seg
     end
