@@ -199,6 +199,15 @@ single-timber spans taper naturally instead of forming nubs). Per-span **publish
 **❌ What FAILED (don't repeat):** Voronoi-**domed bulgy pebbles** on a flat face (inset 0.12, dome 0.35) →
 "scattered pebbles." Then flat low-dome cells → "flat wallpaper" (no joint shadows).
 
+**Builder (`buildIshigakiWalls.luau`, Step_-native since 2026-07-04):** surveys the ishidan `Step_<i>`
+bed contract (NOT old timbers — the reskin deletes those). CONFIG per path is `{ model, edgeSign, hw? }`
+like the railing RUNS: `edgeSign` is EXPLICIT (no auto-detect), `hw` overrides the 3.2 edge for narrowed
+paths. `findSpans` measures downhill float at the **bed underside** vs terrain; contiguous runs >THRESH
+(2.5), padded ±1. Each path's `Wall_<model>_*` are ALL cleared before rebuild (idempotent from scratch);
+a path with no float >2.5 correctly yields no wall (e.g. DescentPath after its relayout). Re-run after any
+path relayout/reskin — the old walls won't match the new float profile. As-built 2026-07-04: PathSteps
+0_9/11_14/22_29/38_45, PathExtension 3_5, DescentPath none.
+
 **✅ What WORKS (the recipe):**
 - **Dark recessed backing** over the whole battered face (`COL_JOINT ~46/47/45`) + **flat proud stones on
   top** (`RELIEF ~0.22` above the backing → the gaps between stones are real recessed shadow = reads 3D).

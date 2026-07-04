@@ -6,22 +6,27 @@
 -- zendojo-canyon-build-recipes.md §3 for the why; params below are the approved v4 recipe.
 --
 -- USAGE: set CONFIG.paths to the path model(s) to wall, then run. Each path -> the floating
--- spans (>THRESH), padded +/-1 timber, each a published Wall_<model>_<first>_<last> MeshPart.
+-- spans (>THRESH), padded +/-1 step, each a published Wall_<model>_<first>_<last> MeshPart.
+--
+-- STEP_-NATIVE (2026-07-04): surveys the ishidan `Step_<i>` bed contract (the same beds the
+-- railing/chochin builders read), NOT the old cobble timbers (deleted by the 2026-07-02 reskin).
+-- Downhill edge is EXPLICIT per path via edgeSign (like buildBambooRailing RUNS), never auto-
+-- detected. Before building a path, ALL its Wall_<model>_* meshes are cleared (rebuild from
+-- scratch). Wall top sits at the bed underside (recipe §3). The §3 mesh recipe is unchanged.
 
 local CONFIG = {
-    paths = { -- { model = WorkspaceModelName, prefix = timberNamePrefix }
-        { model = "PathSteps", prefix = "Timber" },
-        { model = "PathExtension", prefix = "ExtTimber" },
-        { model = "DescentPath", prefix = "DescTimber" },
+    paths = { -- { model = WorkspaceModelName, edgeSign = -1|+1, hw? = edge half-width override }
+        { model = "PathSteps", edgeSign = -1 },
+        { model = "PathExtension", edgeSign = -1 },
+        { model = "DescentPath", edgeSign = 1 },
     },
-    HW = 3.2, -- path half-width (bed edge); top edge of the wall
     THRESH = 2.5, -- only wall spans whose downhill float exceeds this
-    PAD = 1, -- pad each span by this many timbers per side (so singles taper, not nub)
+    PAD = 1, -- pad each span by this many steps per side (so singles taper, not nub)
 }
 
 -- ===== locked v4 wall recipe (see recipe doc §3) =====
 local HW_TOP, HW_BASE, BASEEMBED = 3.2, 3.7, 0.4
-local TOP_BELOW, SY, MS = 0.6, 2.0, 1.15 -- top at bed underside; vertical stretch; min-sep
+local SY, MS = 2.0, 1.15 -- vertical stretch; min-sep (wall top = bed underside, read per step)
 local INSET, RELIEF, TAPER = 0.12, 0.22, 2.0
 local COL_STONE, COL_JOINT = Color3.fromRGB(96, 98, 94), Color3.fromRGB(46, 47, 45)
 
@@ -67,11 +72,11 @@ local function centroid(poly)
     return { u = cu / #poly, v = cv / #poly }
 end
 
--- index range of a model's timbers
-local function range(model, prefix)
+-- index range of a model's Step_ beds
+local function range(model)
     local lo, hi = math.huge, -math.huge
     for _, c in ws[model]:GetChildren() do
-        local i = tonumber((c.Name :: string):match("^" .. prefix .. "_(%d+)$"))
+        local i = tonumber((c.Name :: string):match("^Step_(%d+)$"))
         if i then
             lo, hi = math.min(lo, i), math.max(hi, i)
         end
@@ -79,11 +84,13 @@ local function range(model, prefix)
     return lo, hi
 end
 
--- contiguous floating spans (downhill float > THRESH); sign = -1 (-Right) or +1 (+Right)
-local function findSpans(model, prefix)
+-- contiguous floating spans on the EXPLICIT downhill edge (edgeSign). Float is measured at the
+-- bed underside (bed.Position.Y - bed.Size.Y/2) vs terrain at the wall-face XZ.
+local function findSpans(model, edgeSign, hw)
+    local hwTop = hw or HW_TOP
     local ts = {}
     for _, c in ws[model]:GetChildren() do
-        local i = tonumber((c.Name :: string):match("^" .. prefix .. "_(%d+)$"))
+        local i = tonumber((c.Name :: string):match("^Step_(%d+)$"))
         if i then
             table.insert(ts, { i = i, part = c })
         end
@@ -95,16 +102,15 @@ local function findSpans(model, prefix)
     for _, t in ts do
         local p, r = t.part.Position, t.part.CFrame.RightVector
         r = Vector3.new(r.X, 0, r.Z).Unit
-        local yp, ym =
-            terr(p.X + r.X * CONFIG.HW, p.Z + r.Z * CONFIG.HW),
-            terr(p.X - r.X * CONFIG.HW, p.Z - r.Z * CONFIG.HW)
-        local fp, fm = yp and (p.Y - yp) or 0, ym and (p.Y - ym) or 0
-        local sign = (fm >= fp) and -1 or 1
-        if math.max(fp, fm) > CONFIG.THRESH then
-            if cur and cur.sign == sign and t.i == cur.last + 1 then
+        local outward = r * edgeSign
+        local bedUnder = p.Y - t.part.Size.Y / 2
+        local ty = terr(p.X + outward.X * hwTop, p.Z + outward.Z * hwTop)
+        local float = ty and (bedUnder - ty) or 0
+        if float > CONFIG.THRESH then
+            if cur and t.i == cur.last + 1 then
                 cur.last = t.i
             else
-                cur = { model = model, prefix = prefix, first = t.i, last = t.i, sign = sign }
+                cur = { model = model, edgeSign = edgeSign, hw = hw, first = t.i, last = t.i }
                 table.insert(spans, cur)
             end
         else
@@ -117,16 +123,18 @@ end
 local function buildWall(span)
     local m = ws[span.model]
     local rng = Random.new(span.first * 1000 + span.last)
+    local hwTop = span.hw or HW_TOP
+    local hwBase = hwTop + (HW_BASE - HW_TOP) -- keep the +0.5 batter flare
     local nodes, u, prevTop = {}, 0, nil
     for i = span.first, span.last do
-        local t = m:FindFirstChild(span.prefix .. "_" .. i)
+        local t = m:FindFirstChild("Step_" .. i)
         if t then
             local p, r = t.Position, t.CFrame.RightVector
             r = Vector3.new(r.X, 0, r.Z).Unit
-            local outward = r * span.sign
-            local topY = p.Y - TOP_BELOW
-            local topP = Vector3.new(p.X + outward.X * HW_TOP, topY, p.Z + outward.Z * HW_TOP)
-            local bx, bz = p.X + outward.X * HW_BASE, p.Z + outward.Z * HW_BASE
+            local outward = r * span.edgeSign
+            local topY = p.Y - t.Size.Y / 2 -- wall top AT the bed underside (§3)
+            local topP = Vector3.new(p.X + outward.X * hwTop, topY, p.Z + outward.Z * hwTop)
+            local bx, bz = p.X + outward.X * hwBase, p.Z + outward.Z * hwBase
             local baseP = Vector3.new(bx, (terr(bx, bz) or (topY - 4)) - BASEEMBED, bz)
             if prevTop then
                 u = u + (Vector3.new(topP.X, 0, topP.Z) - Vector3.new(prevTop.X, 0, prevTop.Z)).Magnitude
@@ -307,14 +315,34 @@ end
 local out = {}
 for _, path in CONFIG.paths do
     if ws:FindFirstChild(path.model) then
-        local lo, hi = range(path.model, path.prefix)
-        for _, span in findSpans(path.model, path.prefix) do
+        -- rebuild from scratch: clear ALL of this path's existing walls first
+        local rw = ws:FindFirstChild("RetainingWalls")
+        if rw then
+            local cleared = 0
+            for _, w in rw:GetChildren() do
+                if (w.Name :: string):match("^Wall_" .. path.model .. "_") then
+                    w:Destroy()
+                    cleared += 1
+                end
+            end
+            if cleared > 0 then
+                out[#out + 1] = string.format("(cleared %d stale %s walls)", cleared, path.model)
+            end
+        end
+        local lo, hi = range(path.model)
+        local spans = findSpans(path.model, path.edgeSign, path.hw)
+        if #spans == 0 then
+            out[#out + 1] = path.model .. ": no floating spans > THRESH — no wall needed"
+        end
+        for _, span in spans do
             span.first = math.max(lo, span.first - CONFIG.PAD)
             span.last = math.min(hi, span.last + CONFIG.PAD)
             local r, err = buildWall(span)
             out[#out + 1] = r
                 or string.format("Wall_%s_%d_%d FAIL: %s", span.model, span.first, span.last, tostring(err))
         end
+    else
+        out[#out + 1] = path.model .. ": MISSING"
     end
 end
 return table.concat(out, "\n")
