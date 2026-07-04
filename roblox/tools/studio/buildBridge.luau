@@ -12,6 +12,11 @@
 local ws = workspace
 
 -- A/B are baked grade-spring endpoints, surveyed from the approved prototype (NOT read from markers).
+-- Optional per-bridge fields (Teahouse3Bridge introduced these, 2026-07-04):
+--   rise = 0            -> FLAT span (the parabola degenerates to the straight lerp)
+--   footingA {pos,size} -> as-built override for the A footing (user-placed)
+--   noFootingB = true   -> skip the B footing (e.g. the deck lands on an engawa; stone would float)
+--   pierParts {..}      -> baked as-built stone pier stack (squared to the bridge axis)
 local BRIDGES = {
     {
         name = "Bridge3",
@@ -19,6 +24,26 @@ local BRIDGES = {
         B = { 50.80, 110.80, -36.40 },
         rise = 3.0,
         width = 6.5,
+    },
+    -- Teahouse3Bridge (2026-07-04): flat span + stone pier, the pad-access bridge for Teahouse_03
+    -- (recipe §0.7 — access registers to the pad, replaced Teahouse3Stair/Landing, now parked in
+    -- ServerStorage.RetiredTeahouse3Access along with the engawa-corner kōran newel it displaced).
+    -- A = the line's crossing of NW2040Path's gorge edge at Step_21 (railing opening steps 20-22,
+    -- see buildBambooRailing RUNS); B = 0.4 past Teahouse_03's engawa outer edge, deck top tucked
+    -- 0.06 under the engawa lip (no z-fight, no gap). Footing + pier baked AS-BUILT (user-tuned).
+    {
+        name = "Teahouse3Bridge",
+        A = { -144.55, 187.55, 90.43 },
+        B = { -180.97, 189.86, 59.73 },
+        rise = 0,
+        width = 6.5,
+        footingA = { pos = { -144.59, 182.77, 90.40 }, size = { 7.50, 8.45, 4.00 } },
+        noFootingB = true,
+        pierParts = {
+            { name = "PierBase", pos = { -168.22, 175.86, 70.48 }, size = { 4.90, 2.00, 4.10 } },
+            { name = "PierShaft", pos = { -168.22, 182.05, 70.48 }, size = { 3.75, 12.39, 3.00 } },
+            { name = "PierCap", pos = { -168.22, 187.85, 70.48 }, size = { 5.60, 1.20, 3.45 } },
+        },
     },
 }
 
@@ -139,19 +164,54 @@ local function buildOne(parent: Instance, cfg): string
         end
     end
 
-    -- squared stone footings at the landings
-    for i, e in { A, B } do
+    -- squared stone footings at the landings (overridable per landing; see BRIDGES field docs)
+    if cfg.footingA then
         part(
             sub,
-            "Footing_" .. (if i == 1 then "A" else "B"),
+            "Footing_A",
+            Vector3.new(cfg.footingA.size[1], cfg.footingA.size[2], cfg.footingA.size[3]),
+            CFrame.fromMatrix(
+                Vector3.new(cfg.footingA.pos[1], cfg.footingA.pos[2], cfg.footingA.pos[3]),
+                zAxis,
+                Vector3.yAxis
+            ),
+            STONE,
+            Enum.Material.Slate
+        )
+    else
+        part(
+            sub,
+            "Footing_A",
             Vector3.new(WIDTH + 1, 3, 4),
-            CFrame.fromMatrix(Vector3.new(e.X, e.Y - 1.0, e.Z), zAxis, Vector3.yAxis),
+            CFrame.fromMatrix(Vector3.new(A.X, A.Y - 1.0, A.Z), zAxis, Vector3.yAxis),
+            STONE,
+            Enum.Material.Slate
+        )
+    end
+    if not cfg.noFootingB then
+        part(
+            sub,
+            "Footing_B",
+            Vector3.new(WIDTH + 1, 3, 4),
+            CFrame.fromMatrix(Vector3.new(B.X, B.Y - 1.0, B.Z), zAxis, Vector3.yAxis),
             STONE,
             Enum.Material.Slate
         )
     end
 
-    return string.format("%s: arch span %.1f, rise %.1f", cfg.name, (B - A).Magnitude, RISE)
+    -- baked as-built stone pier stack, squared to the bridge axis
+    for _, pp in (cfg.pierParts or {}) :: { any } do
+        part(
+            sub,
+            pp.name,
+            Vector3.new(pp.size[1], pp.size[2], pp.size[3]),
+            CFrame.fromMatrix(Vector3.new(pp.pos[1], pp.pos[2], pp.pos[3]), zAxis, Vector3.yAxis),
+            STONE,
+            Enum.Material.Slate
+        )
+    end
+
+    return string.format("%s: span %.1f, rise %.1f", cfg.name, (B - A).Magnitude, RISE)
 end
 
 local parent = ws:FindFirstChild("Bridges") or Instance.new("Model")

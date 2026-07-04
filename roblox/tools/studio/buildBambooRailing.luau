@@ -44,12 +44,14 @@ local RUNS = {
     { name = "NW1012West", paths = { { path = "NW1012West", i0 = 0, i1 = 56 } }, edgeSign = 1 },
     -- NW1211: 10 relayout steps, drop side -Right.
     { name = "NW1211", paths = { { path = "NW1211Path", i0 = 0, i1 = 9 } }, edgeSign = -1 },
-    -- NW2040: 50 relayout steps, DOWNHILL (+Right) ONLY (uphill rail removed per user), built as
-    -- TWO segments with an open gap at steps 11-13 (the teahouse access below NearWall_30) — end
-    -- posts frame the opening. Built ad-hoc as Rail_NW2040 (the RUNS schema has no gap support);
-    -- if you rebuild, keep the gap or you fence off the teahouse.
+    -- NW2040: 50 relayout steps, DOWNHILL (+Right) ONLY (uphill rail removed per user), THREE
+    -- segments with two openings (as-built 2026-07-04, canonical v2.1 rebuild): steps 11-13 =
+    -- Teahouse_02 access (below NearWall_30); steps 20-22 = Teahouse3Bridge landing at Step_21
+    -- (see buildBridge.luau). Segment-end posts frame both openings. If you rebuild, keep BOTH
+    -- gaps or you fence off a teahouse/the bridge.
     { name = "NW2040_S1", paths = { { path = "NW2040Path", i0 = 0, i1 = 10 } }, edgeSign = 1 },
-    { name = "NW2040_S2", paths = { { path = "NW2040Path", i0 = 14, i1 = 49 } }, edgeSign = 1 },
+    { name = "NW2040_S2", paths = { { path = "NW2040Path", i0 = 14, i1 = 19 } }, edgeSign = 1 },
+    { name = "NW2040_S3", paths = { { path = "NW2040Path", i0 = 23, i1 = 49 } }, edgeSign = 1 },
     -- NW_40 flight (valley: two ishidan models meeting at the NW_52 bench; foot step of each removed
     -- for the BenchLanding). Downhill/canyon edge: descent = -Right, climb = +Right (climb's cliff
     -- -Right holds NWFallsWall). Continuous runs; the BenchLanding's open canyon edge = the T07 access.
