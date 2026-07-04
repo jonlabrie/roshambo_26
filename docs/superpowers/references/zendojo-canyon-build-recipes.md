@@ -51,8 +51,9 @@ As-built specs to mine for exact numbers:
 ## 1a. ★ ISHIDAN STAIR / PATH — THE CANONICAL STEP RECIPE (2026-07-02)
 
 **"Worn dark timber backed by worn flagstone."** User-locked on the NW1012 stairway; this is the step
-treatment for ALL new stairs/paths and the target for re-skinning the existing ones (PathSteps,
-PathExtension, DescentPath, NW1211Path use the older §1 look and are due for conversion). The engineering
+treatment for ALL new stairs/paths. The old §1 cobble paths have all been converted (PathSteps,
+PathExtension, DescentPath, NW1211Path — done 2026-07-02; NW1211 later narrowed −25% + a foot step added
+2026-07-04). The engineering
 lives in `tools/builders/IshidanStairs.luau` (`resample` → `layout` → **`dress`**, Lune-tested) with the
 Studio mirror `tools/studio/buildIshidanStairs.luau` (CONFIG at top; publishes flag meshes).
 
