@@ -14,13 +14,25 @@ The core loop (global ~60s rounds vs. the World Throw) and the acceleration laye
 ## Economy principles
 
 - **Points-only for v1.** Everything in the valley is earned by playing — no Robux purchases yet. Cleanest to tune, and it makes every visible possession proof of play. Future monetization shape (explicitly chosen, explicitly deferred): **dual currency with separate catalogs** — Robux buys a cosmetic-only catalog that never overlaps point items. **Robux-buys-points is ruled out permanently** (a purchased pagoda proves nothing; whales trivialize every sink).
+- **Split economies per platform (policy-driven).** The Roblox valley economy is **self-contained**: points earned in Roblox are spent in Roblox. The PWA is a separate product (targeted more at adults) with its own wallet and inventory that evolve independently. Shared *plumbing* (one Node server, one Mongo, one identity record via `resolveUser`) is fine and standard; a shared *wallet* is not, because it survives only while both sides are free — the moment real money touches either side, a shared economy violates Roblox policy from one direction or the other. See "Platform policy constraints" below.
 - **Two-tier sink structure.** Cheap consumables (single digits to tens of points: fireworks shells, familiar feed, lanterns) that the median player burns every session, plus large durables (hundreds to thousands: structural teahouse tiers, premium pad unlocks, rare koi) that drain streak-lord wealth.
 - **The best cosmetic real estate is the reveal.** Every player watches the RevealTheater every round; purchasable throw/reveal skins get more eyeballs than any avatar item. Milestone 4a's `EffectRegistry`/`EffectSelector`/`ThemeManifest` is already the plumbing — purchasable effects are registry entries gated by inventory.
-- **Server-authoritative spending.** Points live in MongoDB and are shared with the PWA. Every spend is a server-side transaction: Roblox client → game server → `/api/v1` spend/inventory endpoints (extending the existing `X-API-Key` surface), mirroring how the PWA's `/store` routes already work. The Roblox client never computes balances.
+- **Server-authoritative spending.** Points live in MongoDB in a **Roblox-scoped wallet**. Every spend is a server-side transaction: Roblox client → game server → `/api/v1` spend/inventory endpoints (extending the existing `X-API-Key` surface), mirroring how the PWA's `/store` routes work for the PWA's own wallet. The Roblox client never computes balances.
+
+## Platform policy constraints (researched 2026-07-04)
+
+The rules that force the split-economy decision (Roblox ToU, Commerce Standards, Promo Offers for Virtual Rewards, Creator Third Party App Policy):
+
+- Virtual content may only be sold/exchanged for **Robux**; in-experience items must have **no real-world monetary value**.
+- Experiences may not **direct users off-platform to purchase** anything (actively enforced with takedowns).
+- The one sanctioned bridge: an off-platform action may grant an in-experience reward **only if** the reward is usable solely in that experience, has no Robux/real-money value, and redemption terms are public ("Promo Offers for Virtual Rewards").
+- Third-party apps may not **profile/track Roblox users across platforms** — constrains account-linking design, not just commerce.
+- Precedent check found **no shared cross-boundary economy anywhere** on the platform: brand experiences (Nikeland vs. Nike apps) keep fully separate economies; companion apps are read-only; Roblox→Steam ports ship with separate progression. Hard separation is the ecosystem norm.
+- Explicitly fine: external backends per se. `HttpService`/Open Cloud calls to our own server for game state are standard and unrestricted — storage location is not "off-platform migration."
 
 ## Personal teahouses
 
-**A teahouse is data, not geography.** Each player's teahouse is a saved loadout — structural tier + placed catalog items + garden choices — persisted server-side alongside points/inventory (Mongo via `/api/v1`, not Roblox DataStores, so PWA and Roblox share one identity). On joining a server the player claims a **pad** and their teahouse materializes onto it for the session; the pad frees when they leave. With pad count ≈ server capacity, everyone present has their teahouse standing — scarcity evaporates rather than being managed.
+**A teahouse is data, not geography.** Each player's teahouse is a saved loadout — structural tier + placed catalog items + garden choices — persisted in our Mongo via `/api/v1` (not Roblox DataStores, so any game server can load it), scoped as **Roblox-platform data** under the shared identity record. On joining a server the player claims a **pad** and their teahouse materializes onto it for the session; the pad frees when they leave. With pad count ≈ server capacity, everyone present has their teahouse standing — scarcity evaporates rather than being managed.
 
 - **Customization = catalog + structural tiers.** A curated ZenDojo-kit furniture/decor catalog placed freely within the pad, plus discrete purchasable structure upgrades (larger floorplan, engawa wrap, second story, garden features) as the aspirational ladder. **No free-form building** (serialization weight, moderation exposure, aesthetic clash).
 - **Hard per-pad furniture cap** (~40–80 placed items) so 50+ furnished teahouses hold per-server perf.
@@ -64,12 +76,14 @@ Rounds are playable from anywhere, so every meta-system *adds* minutes without c
 - **Bell ring as a purchasable flex** — the water-bell engine stays a sacred ambient centerpiece, not a player-spammable horn.
 - **Fortune eggs / gacha acquisition** — paid randomness invites gambling optics and odds-disclosure obligations; ruled out at least for v1.
 - **Robux catalogs** (dual-currency structure reserved), **drone swarms**, **ema plaques / omikuji**, **statue-of-the-day**, **gifting**.
+- **PWA→Roblox promo bridge** — at most a one-way "play the PWA, unlock a valley cosmetic" promo, and only under the Promo Offers conditions (reward usable only in the experience, no monetary value, public terms). Never the reverse; never anything money-touched.
 
 ## Open questions for planning
 
 - Pricing pass: tier unlock costs, catalog price bands, feed costs — tuned against real banked-pot distributions from the live PWA.
 - Pad counts per tier and per valley; behavior when a tier is full in a server.
-- Teahouse loadout schema + where it lives (extend the existing Mongo user/inventory model so PWA and Roblox share one wallet and one inventory).
+- Teahouse loadout schema + wallet/inventory namespacing: extend the Mongo user model with per-platform wallets (`roblox` vs `pwa`) under the single `resolveUser` identity — decide whether existing PWA lifetime points seed the Roblox wallet at launch or the valley starts everyone fresh.
+- Account-linking UX between PWA and Roblox accounts, designed within the Third Party App Policy's no-cross-platform-profiling constraint.
 - `/api/v1` additions: spend, inventory, teahouse loadout read/write, familiar collection state.
 - Dusk cycle mechanism (see above).
 - Koi pooled-render sampling rules.
