@@ -39,6 +39,12 @@ As-built specs to mine for exact numbers:
      existing `PathSteps`/`PathMesh`. They persist via the **saved .rbxl place + published mesh assets**.
      *Remind the user to SAVE the place after any ad-hoc build.*
 6. **Record as-built** (final params, counts, published asset IDs) in the stretch's spec when done.
+7. **Teahouse access registers to the PAD, not the teahouse** (2026-07-04, meta-game spec). Spurs/
+   stairs/bridges terminate at the pad boundary (the future claim-gate post), OUTSIDE the site's max
+   expansion envelope (`references/2026-07-04-teahouse-envelope-audit.md`) — never on/against the
+   current teahouse deck/engawa. Teahouses will be regenerated and grown (structural tiers); access
+   built to the current form blocks the envelope or orphans on upgrade (see `Teahouse3Stair`).
+   Railing gaps for the access opening follow the existing spur-gap rule above.
 
 ---
 
