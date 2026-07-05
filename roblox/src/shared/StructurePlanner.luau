@@ -27,6 +27,15 @@ export type Plan = {
 
 type Catalog = { get: (string) -> any }
 
+local function contains(list: { string }, v: string): boolean
+    for _, x in list do
+        if x == v then
+            return true
+        end
+    end
+    return false
+end
+
 local function resolveRecolors(loadout: Loadout, manifest: Manifest, catalog: Catalog): { Recolor }
     local out: { Recolor } = {}
     if not loadout.colorScheme then
@@ -67,11 +76,27 @@ local function resolveTextures(loadout: Loadout, manifest: Manifest, catalog: Ca
     return out
 end
 
+local function resolveAttachments(loadout: Loadout, manifest: Manifest, catalog: Catalog): { Attachment }
+    local out: { Attachment } = {}
+    if not loadout.flags then
+        return out
+    end
+    for _, f in loadout.flags do
+        if contains(manifest.flagMounts, f.mount) then
+            local e = catalog.get(f.item)
+            if e and e.type == "attachment" then
+                table.insert(out, { mount = f.mount, prefabId = e.payload.prefabId })
+            end
+        end
+    end
+    return out
+end
+
 function StructurePlanner.plan(loadout: Loadout, mount: Mount, manifest: Manifest, catalog: Catalog): Plan
     return {
         recolors = resolveRecolors(loadout, manifest, catalog),
         textures = resolveTextures(loadout, manifest, catalog),
-        attachments = {},
+        attachments = resolveAttachments(loadout, manifest, catalog),
         mirror = false,
         pivotCF = mount.cframe,
     }

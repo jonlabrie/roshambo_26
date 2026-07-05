@@ -40,3 +40,13 @@ test("textures: tatami skipped when the base has no tatami surface", function()
     local plan = Planner.plan({ baseStyle = "teahouse-1story", tatami = "tatami.gold" }, baseMount(), manifest, Catalog)
     expect(plan.textures).toEqual({})
 end)
+
+test("attachments: flags map to their mount; unknown mounts are skipped", function()
+    local manifest = { roles = {}, shojiBays = {}, hasTatami = false, flagMounts = { "FlagMount_1", "FlagMount_2" } }
+    local loadout = {
+        baseStyle = "teahouse-1story",
+        flags = { { mount = "FlagMount_1", item = "flag.clan" }, { mount = "FlagMount_9", item = "flag.noren" } },
+    }
+    local plan = Planner.plan(loadout, baseMount(), manifest, Catalog)
+    expect(plan.attachments).toEqual({ { mount = "FlagMount_1", prefabId = "flag_clan" } })
+end)
