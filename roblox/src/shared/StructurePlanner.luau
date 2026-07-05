@@ -97,7 +97,7 @@ function StructurePlanner.plan(loadout: Loadout, mount: Mount, manifest: Manifes
         recolors = resolveRecolors(loadout, manifest, catalog),
         textures = resolveTextures(loadout, manifest, catalog),
         attachments = resolveAttachments(loadout, manifest, catalog),
-        mirror = false,
+        mirror = mount.hand == "left",
         pivotCF = mount.cframe,
     }
 end
