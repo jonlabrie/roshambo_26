@@ -11,8 +11,10 @@
 --     the frame-underside centre, front = veranda (-Z), so PivotTo(mount) places+orients
 --   * Role_timber/wall/roof/cap tags for recolor
 --   * MirrorX tags on the parts that negate-X for a left-hand build (engawa assembly,
---     koran, understructure, lamp, side shoji+glow+mull, SideWall) — the set that
---     fixes the left-hand shoji/SideWall bug; roof/gables/front stay untagged
+--     koran, understructure, side shoji+glow+mull, SideWall) — the set that fixes the
+--     left-hand shoji/SideWall bug; roof/gables/front stay untagged
+--   * MirrorXRigid tag on the ChochinSwing sub-assembly (a grouped lantern) so the
+--     mirror rigid-relocates it to the opposite corner rather than reflecting it internally
 --   * ShojiBay tag + Bay attribute (1..3) on the front shoji panels
 --   * Tatami tag on the mat; FlagMount_1/FlagMount_2 attachments on PerimF
 -- Prefab is place-only (save the place after); committing a .rbxmx is a follow-up.
@@ -62,8 +64,7 @@ local function capture()
 	}
 	local MIRROR = {
 		EngawaF = true, EngawaS = true, RailCap = true, RailMid = true, Newel = true, Baluster = true,
-		PerimF = true, PerimB = true, PerimL = true, PerimR = true, Joist = true,
-		Lantern = true, Cord = true, LanCap = true, LanRib = true, SideWall = true,
+		PerimF = true, PerimB = true, PerimL = true, PerimR = true, Joist = true, SideWall = true,
 	}
 	for _, p in m:GetDescendants() do
 		if p:IsA("BasePart") then
@@ -84,6 +85,15 @@ local function capture()
 			if p.Name == "Tatami" then
 				p:AddTag("Tatami")
 			end
+		end
+	end
+
+	-- 3b) the chochin is a grouped sub-assembly (ChochinSwing) whose part names are not in
+	-- the MIRROR set; tag the whole model MirrorXRigid so the mirror relocates it rigidly
+	-- to the opposite corner (no internal reflection — a lantern must not be left/right flipped)
+	for _, d in m:GetDescendants() do
+		if d:IsA("Model") and d.Name == "ChochinSwing" then
+			d:AddTag("MirrorXRigid")
 		end
 	end
 
