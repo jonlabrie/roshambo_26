@@ -21,6 +21,10 @@ local ENTRIES: { [string]: Entry } = {
         id = "scheme.vermilion", type = "recolor", slot = "colorScheme",
         payload = { timber = { 120, 45, 35 }, wall = { 232, 216, 190 }, roof = { 40, 42, 48 }, cap = { 40, 42, 48 } },
     },
+    ["scheme.dormant"] = {
+        id = "scheme.dormant", type = "recolor", slot = "colorScheme",
+        payload = { timber = { 48, 46, 44 }, wall = { 70, 68, 64 }, roof = { 36, 37, 40 }, cap = { 40, 42, 46 } },
+    },
     ["shoji.plain"] = { id = "shoji.plain", type = "texture", slot = "shoji", payload = { assetId = "rbxassetid://0" } },
     ["shoji.crane"] = { id = "shoji.crane", type = "texture", slot = "shoji", payload = { assetId = "rbxassetid://102000000001" } },
     ["tatami.green"] = { id = "tatami.green", type = "texture", slot = "tatami", payload = { assetId = "rbxassetid://102000000010" } },
