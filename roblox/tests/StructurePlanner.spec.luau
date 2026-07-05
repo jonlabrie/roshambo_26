@@ -23,3 +23,20 @@ test("recolors: empty when no colorScheme in loadout", function()
     local plan = Planner.plan({ baseStyle = "teahouse-1story" }, baseMount(), manifest, Catalog)
     expect(plan.recolors).toEqual({})
 end)
+
+test("textures: per-bay shoji prints + tatami, only for bays the manifest exposes", function()
+    local manifest = { roles = {}, shojiBays = { 1, 2, 3 }, hasTatami = true, flagMounts = {} }
+    local loadout = { baseStyle = "teahouse-1story", shoji = { [1] = "shoji.crane", [3] = "shoji.plain" }, tatami = "tatami.gold" }
+    local plan = Planner.plan(loadout, baseMount(), manifest, Catalog)
+    expect(plan.textures).toEqual({
+        { target = "ShojiBay:1", assetId = "rbxassetid://102000000001" },
+        { target = "ShojiBay:3", assetId = "rbxassetid://0" },
+        { target = "Tatami", assetId = "rbxassetid://102000000011" },
+    })
+end)
+
+test("textures: tatami skipped when the base has no tatami surface", function()
+    local manifest = { roles = {}, shojiBays = {}, hasTatami = false, flagMounts = {} }
+    local plan = Planner.plan({ baseStyle = "teahouse-1story", tatami = "tatami.gold" }, baseMount(), manifest, Catalog)
+    expect(plan.textures).toEqual({})
+end)

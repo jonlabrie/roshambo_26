@@ -45,10 +45,32 @@ local function resolveRecolors(loadout: Loadout, manifest: Manifest, catalog: Ca
     return out
 end
 
+local function resolveTextures(loadout: Loadout, manifest: Manifest, catalog: Catalog): { Texture }
+    local out: { Texture } = {}
+    if loadout.shoji then
+        for _, bay in manifest.shojiBays do
+            local id = loadout.shoji[bay]
+            if id then
+                local e = catalog.get(id)
+                if e and e.type == "texture" then
+                    table.insert(out, { target = "ShojiBay:" .. bay, assetId = e.payload.assetId })
+                end
+            end
+        end
+    end
+    if manifest.hasTatami and loadout.tatami then
+        local e = catalog.get(loadout.tatami)
+        if e and e.type == "texture" then
+            table.insert(out, { target = "Tatami", assetId = e.payload.assetId })
+        end
+    end
+    return out
+end
+
 function StructurePlanner.plan(loadout: Loadout, mount: Mount, manifest: Manifest, catalog: Catalog): Plan
     return {
         recolors = resolveRecolors(loadout, manifest, catalog),
-        textures = {},
+        textures = resolveTextures(loadout, manifest, catalog),
         attachments = {},
         mirror = false,
         pivotCF = mount.cframe,
