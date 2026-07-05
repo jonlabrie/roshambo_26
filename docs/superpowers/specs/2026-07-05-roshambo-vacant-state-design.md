@@ -59,7 +59,11 @@ Callers discriminate on `kind`: `"structure"` → build via `StructureBuilder` w
 
 ### Applier (Studio gate only, this increment)
 
-For a `kind="structure"` treatment, build via A's builder for `treatment.loadout`, then set the `ShojiGlow` parts' visibility per `treatment.lit` (unlit = high transparency). This increment's gate only exercises `"structure"` (cliff); a `"garden"` applier is deferred. A committed module `ops` for this is D's concern; here it lives in the visual-gate script (MCP can't `require` repo modules — same mirror pattern as A/B demos).
+For a `kind="structure"` treatment, build via A's builder for `treatment.loadout`, then apply the **dormant treatment keyed off `treatment.lit`**:
+- `lit = true` (claimed): `ShojiGlow` visible (translucent, ~0.6), chōchin kept — the inhabited look.
+- `lit = false` (vacant): the full "shut up" look — `ShojiGlow` off (transparency 1), the `Shoji` panels set **opaque** (transparency 0, closed), and the **`ChochinSwing` removed** (no lantern hung; the owner hangs their own on claiming). Combined with the dark `scheme.dormant` recolor, this reads as a dark shuttered shell.
+
+So `resolve` stays `{loadout, lit}` — the extra vacant deltas (opaque shoji, glow off, chōchin removed) live in the **applier**, not the resolver. This increment's gate only exercises `"structure"` (cliff); a `"garden"` applier is deferred. A committed `ops` module is D's concern; here it lives in the visual-gate script (MCP can't `require` repo modules — same mirror pattern as A/B demos).
 
 ## Testing
 

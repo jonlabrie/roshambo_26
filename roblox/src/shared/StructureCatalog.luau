@@ -23,7 +23,7 @@ local ENTRIES: { [string]: Entry } = {
     },
     ["scheme.dormant"] = {
         id = "scheme.dormant", type = "recolor", slot = "colorScheme",
-        payload = { timber = { 48, 46, 44 }, wall = { 70, 68, 64 }, roof = { 36, 37, 40 }, cap = { 40, 42, 46 } },
+        payload = { timber = { 32, 30, 28 }, wall = { 40, 38, 36 }, roof = { 28, 29, 33 }, cap = { 30, 31, 36 } },
     },
     ["shoji.plain"] = { id = "shoji.plain", type = "texture", slot = "shoji", payload = { assetId = "rbxassetid://0" } },
     ["shoji.crane"] = { id = "shoji.crane", type = "texture", slot = "shoji", payload = { assetId = "rbxassetid://102000000001" } },
