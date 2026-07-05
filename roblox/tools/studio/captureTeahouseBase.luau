@@ -50,6 +50,16 @@ local function capture()
 			y0 = math.min(y0, piv:ToObjectSpace(p.CFrame).Position.Y - p.Size.Y / 2)
 		end
 	end
+	local below = {}
+	for _, p in m:GetDescendants() do
+		if p:IsA("BasePart") then
+			local lb = piv:ToObjectSpace(p.CFrame).Position.Y - p.Size.Y / 2
+			if lb < y0 - 0.01 then
+				table.insert(below, p.Name)
+			end
+		end
+	end
+	assert(#below == 0, "parts below the datum (Y0) are the pad's job: " .. table.concat(below, ","))
 	local posW = piv:PointToWorldSpace(Vector3.new(0, y0, 0))
 	local frontW = piv:VectorToWorldSpace(Vector3.new(0, 0, -1))
 	m.WorldPivot = CFrame.lookAt(posW, posW + frontW, Vector3.yAxis)

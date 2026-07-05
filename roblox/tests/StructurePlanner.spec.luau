@@ -60,3 +60,13 @@ test("mirror: true only for a left-hand mount", function()
     expect(left.mirror).toBe(true)
     expect(left.pivotCF).toEqual({ 5, 6, 7, 1, 0, 0, 0, 1, 0, 0, 0, 1 })
 end)
+
+test("textures: non-contiguous shojiBays index by bay value, not array position", function()
+    local manifest = { roles = {}, shojiBays = { 2, 4 }, hasTatami = false, flagMounts = {} }
+    local loadout = { baseStyle = "teahouse-1story", shoji = { [2] = "shoji.crane", [4] = "shoji.plain" } }
+    local plan = Planner.plan(loadout, baseMount(), manifest, Catalog)
+    expect(plan.textures).toEqual({
+        { target = "ShojiBay:2", assetId = "rbxassetid://102000000001" },
+        { target = "ShojiBay:4", assetId = "rbxassetid://0" },
+    })
+end)
