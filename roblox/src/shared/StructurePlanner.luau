@@ -12,7 +12,11 @@ export type Loadout = {
     tatami: string?,
     flags: { { mount: string, item: string } }?,
 }
-export type Mount = { cframe: { number }, hand: string, footprint: { x: number, z: number } }
+export type Mount = {
+    cframe: { number },
+    hand: string,
+    footprint: { minX: number, maxX: number, minZ: number, maxZ: number },
+}
 export type Manifest =
     { roles: { string }, shojiBays: { number }, hasTatami: boolean, flagMounts: { string } }
 export type Recolor = { role: string, color: Color }

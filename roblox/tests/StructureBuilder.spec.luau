@@ -33,8 +33,11 @@ end
 
 test("build drives ops in order: clone, mirror(if left), recolor, texture, attach, pivot", function()
     local log: { any } = {}
-    local mount =
-        { cframe = { 1, 2, 3, 1, 0, 0, 0, 1, 0, 0, 0, 1 }, hand = "left", footprint = { x = 26, z = 20 } }
+    local mount = {
+        cframe = { 1, 2, 3, 1, 0, 0, 0, 1, 0, 0, 0, 1 },
+        hand = "left",
+        footprint = { minX = -13, maxX = 13, minZ = -10, maxZ = 10 },
+    }
     local loadout = {
         baseStyle = "teahouse-1story",
         colorScheme = "scheme.ink",
@@ -55,8 +58,11 @@ end)
 
 test("build skips mirror for a right-hand mount", function()
     local log: { any } = {}
-    local mount =
-        { cframe = { 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1 }, hand = "right", footprint = { x = 26, z = 20 } }
+    local mount = {
+        cframe = { 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1 },
+        hand = "right",
+        footprint = { minX = -13, maxX = 13, minZ = -10, maxZ = 10 },
+    }
     Builder.build({ baseStyle = "teahouse-1story" }, mount, Catalog, fakeOps(log))
     expect(log).toEqual({ { op = "clone", style = "teahouse-1story" }, { op = "pivot" } })
 end)

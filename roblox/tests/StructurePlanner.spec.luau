@@ -5,7 +5,11 @@ local Catalog = require("../src/shared/StructureCatalog")
 local Planner = require("../src/shared/StructurePlanner")
 
 local function baseMount(): any
-    return { cframe = { 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1 }, hand = "right", footprint = { x = 26, z = 20 } }
+    return {
+        cframe = { 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1 },
+        hand = "right",
+        footprint = { minX = -13, maxX = 13, minZ = -10, maxZ = 10 },
+    }
 end
 
 test("recolors: emits one entry per manifest role present in the palette", function()
