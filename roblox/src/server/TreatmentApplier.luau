@@ -63,7 +63,7 @@ local function shutter(model: Model)
     end
 end
 
-function TreatmentApplier:apply(padId: string, spec: any, treatment: any)
+function TreatmentApplier:apply(padId: string, spec: any, treatment: any, scale: number?)
     local folder = self:_folder(padId)
     if treatment.kind ~= "structure" then
         local existing = folder:FindFirstChild("Structure")
@@ -82,6 +82,9 @@ function TreatmentApplier:apply(padId: string, spec: any, treatment: any)
     end
     local model = result :: Model
     model.Name = "Structure"
+    if scale ~= nil and scale ~= 1 then
+        model:ScaleTo(scale)
+    end
     if not treatment.lit then
         shutter(model)
     end
