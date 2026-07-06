@@ -30,7 +30,7 @@ function SiteCoordinator:vacantActions(): { Action }
     local out: { Action } = {}
     for _, id in self._padIds do
         local rec = self._registry:get(id)
-        if rec then
+        if rec and rec.occupant == nil then
             table.insert(out, {
                 padId = id,
                 spec = rec.spec,
@@ -42,6 +42,9 @@ function SiteCoordinator:vacantActions(): { Action }
 end
 
 function SiteCoordinator:onJoin(playerId: string, ownedLoadout: any?): Action?
+    if self._held[playerId] ~= nil then
+        return nil
+    end
     if ownedLoadout == nil then
         return nil
     end
