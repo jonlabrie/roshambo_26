@@ -235,3 +235,29 @@ describe("NetworkClient.getLeaderboards", function()
         expect(f.calls[1].url).toBe("http://x/api/v1/leaderboards?scope=world")
     end)
 end)
+
+describe("NetworkClient.getTeahouses", function()
+    test("hits the player teahouses path and decodes the map", function()
+        local f = makeDeps({
+            {
+                ok = true,
+                statusCode = 200,
+                body = '{"teahouses":{"M":{"baseStyle":"teahouse-1story","colorScheme":"scheme.vermilion"}}}',
+            },
+        })
+        local net = NetworkClient.new(CONFIG, f.deps)
+        local res = net:getTeahouses("90000001")
+        expect(res.ok).toBe(true)
+        expect(res.data.teahouses.M.baseStyle).toBe("teahouse-1story")
+        expect(f.calls[1].url).toBe("http://x/api/v1/players/90000001/teahouses")
+        expect(f.calls[1].method).toBe("GET")
+    end)
+
+    test("wanderer returns an empty map, still ok", function()
+        local f = makeDeps({ { ok = true, statusCode = 200, body = '{"teahouses":{}}' } })
+        local net = NetworkClient.new(CONFIG, f.deps)
+        local res = net:getTeahouses("90000001")
+        expect(res.ok).toBe(true)
+        expect(next(res.data.teahouses)).toBe(nil)
+    end)
+end)

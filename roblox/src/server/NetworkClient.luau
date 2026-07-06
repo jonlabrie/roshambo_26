@@ -125,4 +125,8 @@ function NetworkClient.getLeaderboards(self: any, scope: string): Result
     return self:_request("GET", `/api/v1/leaderboards?scope={scope}`)
 end
 
+function NetworkClient.getTeahouses(self: any, robloxUserId: string): Result
+    return self:_request("GET", `/api/v1/players/{robloxUserId}/teahouses`)
+end
+
 return NetworkClient
