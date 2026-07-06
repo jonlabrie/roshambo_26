@@ -9,9 +9,12 @@ local CollectionService = game:GetService("CollectionService")
 local StructureOps = {}
 
 function StructureOps.clonePrefab(baseStyle: string): Model
-    return (ServerStorage:FindFirstChild("StructurePrefabs") :: Folder)
-            :FindFirstChild(baseStyle)
-            :Clone() :: Model
+    local prefabs = ServerStorage:FindFirstChild("StructurePrefabs")
+    local prefab = prefabs and prefabs:FindFirstChild(baseStyle)
+    if not prefab then
+        error(`StructureOps.clonePrefab: no prefab named '{baseStyle}' under ServerStorage.StructurePrefabs`)
+    end
+    return prefab:Clone() :: Model
 end
 
 function StructureOps.readManifest(model: Model): any
@@ -78,20 +81,32 @@ function StructureOps.setTexture(m: Model, target: string, assetId: string)
     if target == "Tatami" then
         for _, p in m:GetDescendants() do
             if p:HasTag("Tatami") then
-                -- selene: allow(deprecated)
-                local d = p:FindFirstChildOfClass("Decal") or Instance.new("Decal", p)
-                d.Face = Enum.NormalId.Top
-                d.Texture = assetId
+                local d = p:FindFirstChildOfClass("Decal")
+                if d then
+                    d.Face = Enum.NormalId.Top
+                    d.Texture = assetId
+                else
+                    d = Instance.new("Decal")
+                    d.Face = Enum.NormalId.Top
+                    d.Texture = assetId
+                    d.Parent = p
+                end
             end
         end
     else
         local bay = tonumber(target:match("ShojiBay:(%d+)"))
         for _, p in m:GetDescendants() do
             if p:HasTag("ShojiBay") and p:GetAttribute("Bay") == bay then
-                -- selene: allow(deprecated)
-                local d = p:FindFirstChildOfClass("Decal") or Instance.new("Decal", p)
-                d.Face = Enum.NormalId.Front
-                d.Texture = assetId
+                local d = p:FindFirstChildOfClass("Decal")
+                if d then
+                    d.Face = Enum.NormalId.Front
+                    d.Texture = assetId
+                else
+                    d = Instance.new("Decal")
+                    d.Face = Enum.NormalId.Front
+                    d.Texture = assetId
+                    d.Parent = p
+                end
             end
         end
     end
