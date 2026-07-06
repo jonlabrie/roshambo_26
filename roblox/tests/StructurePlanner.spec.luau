@@ -77,8 +77,11 @@ end)
 test("mirror: true only for a left-hand mount", function()
     local manifest = { roles = {}, shojiBays = {}, hasTatami = false, flagMounts = {} }
     local right = Planner.plan({ baseStyle = "teahouse-1story" }, baseMount(), manifest, Catalog)
-    local leftMount =
-        { cframe = { 5, 6, 7, 1, 0, 0, 0, 1, 0, 0, 0, 1 }, hand = "left", footprint = { x = 26, z = 20 } }
+    local leftMount = {
+        cframe = { 5, 6, 7, 1, 0, 0, 0, 1, 0, 0, 0, 1 },
+        hand = "left",
+        footprint = { minX = -13, maxX = 13, minZ = -10, maxZ = 10 },
+    }
     local left = Planner.plan({ baseStyle = "teahouse-1story" }, leftMount, manifest, Catalog)
     expect(right.mirror).toBe(false)
     expect(left.mirror).toBe(true)
