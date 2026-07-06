@@ -11,9 +11,10 @@
 -- 6 support posts hit terrain (back short, front long over the drop). D.1's static
 -- materialization stands one persisted teahouse here.
 --
--- cliff-proof-2: a second terrain-backed shelf ~73 studs from cliff-proof, datum
--- lowered to 240 so its stilts (7-32) match; MCP-verified 6/6 on 2026-07-06. It
--- stays dormant while cliff-proof is claimed.
+-- cliff-proof-2: the LARGE pad (footprint 2x base, fits size class L). A shelf
+-- ~73 studs from cliff-proof at datum 240; MCP-verified 6/6 for the 2x-base
+-- footprint on 2026-07-06 (D.3). Registered first so a joiner claims it with L;
+-- cliff-proof (the small base-footprint pad) stays dormant at S.
 return {
     ["cliff-proof"] = {
         id = "cliff-proof",
@@ -26,7 +27,7 @@ return {
         id = "cliff-proof-2",
         mountCF = { -130, 240, 125, 1, 0, 0, 0, 1, 0, 0, 0, 1 },
         hand = "right",
-        footprint = { minX = -7.40, maxX = 15.00, minZ = -11.70, maxZ = 4.32 },
+        footprint = { minX = -14.80, maxX = 30.00, minZ = -23.40, maxZ = 8.64 },
         vacantForm = "dormant-structure",
     },
 }
