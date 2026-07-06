@@ -1,14 +1,22 @@
 --!strict
 -- Per-server orchestration brain for sub-project D materialization. Turns player
 -- join/leave + startup into Actions by composing an injected PadRegistry (claim/
--- release) with VacantState (which treatment). Pure (Lune-tested): no Roblox
--- datatypes. The Studio-side TreatmentApplier executes the Actions.
+-- release) with VacantState (treatment) and SizeClasses (multi-size fit). Pure
+-- (Lune-tested): no Roblox datatypes. The Studio-side TreatmentApplier executes
+-- the Actions (and applies Action.scale via Model:ScaleTo).
 local VacantState = require("./VacantState")
+local SizeClasses = require("./SizeClasses")
 
 local SiteCoordinator = {}
 SiteCoordinator.__index = SiteCoordinator
 
-export type Action = { padId: string, spec: any, treatment: VacantState.Treatment }
+export type Action = {
+    padId: string,
+    spec: any,
+    treatment: VacantState.Treatment,
+    scale: number,
+    sizeClass: string?,
+}
 
 function SiteCoordinator.new(registry: any)
     return setmetatable({
@@ -26,6 +34,11 @@ function SiteCoordinator:registerPad(id: string, spec: any): boolean
     return ok
 end
 
+local function dormantScale(spec: any): number
+    local native = spec and SizeClasses.nativeSize(spec.footprint)
+    return if native then SizeClasses.scale[native] else 1
+end
+
 function SiteCoordinator:vacantActions(): { Action }
     local out: { Action } = {}
     for _, id in self._padIds do
@@ -35,29 +48,37 @@ function SiteCoordinator:vacantActions(): { Action }
                 padId = id,
                 spec = rec.spec,
                 treatment = VacantState.resolve(nil, nil, rec.spec.vacantForm),
+                scale = dormantScale(rec.spec),
             })
         end
     end
     return out
 end
 
-function SiteCoordinator:onJoin(playerId: string, ownedLoadout: any?): Action?
+function SiteCoordinator:onJoin(playerId: string, ownedTeahouses: { [string]: any }?): Action?
     if self._held[playerId] ~= nil then
         return nil
     end
-    if ownedLoadout == nil then
+    if ownedTeahouses == nil then
         return nil
     end
-    local claim = self._registry:claimVacant(playerId)
-    if not claim then
-        return nil
+    for _, size in SizeClasses.order do
+        local loadout = ownedTeahouses[size]
+        if loadout ~= nil then
+            local claim = self._registry:claimVacantFor(playerId, SizeClasses.footprintFor(size))
+            if claim then
+                self._held[playerId] = claim.id
+                return {
+                    padId = claim.id,
+                    spec = claim.spec,
+                    treatment = VacantState.resolve(playerId, loadout, claim.spec.vacantForm),
+                    scale = SizeClasses.scale[size],
+                    sizeClass = size,
+                }
+            end
+        end
     end
-    self._held[playerId] = claim.id
-    return {
-        padId = claim.id,
-        spec = claim.spec,
-        treatment = VacantState.resolve(playerId, ownedLoadout, claim.spec.vacantForm),
-    }
+    return nil
 end
 
 function SiteCoordinator:onLeave(playerId: string): Action?
@@ -73,6 +94,7 @@ function SiteCoordinator:onLeave(playerId: string): Action?
         padId = padId,
         spec = spec,
         treatment = VacantState.resolve(nil, nil, spec and spec.vacantForm),
+        scale = dormantScale(spec),
     }
 end
 
