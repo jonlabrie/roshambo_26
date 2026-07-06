@@ -19,6 +19,7 @@ export interface IUser extends Document {
     pointsAtStake: number;
     inventory: string[];
     equippedCharacterId: string;
+    teahouses: Map<string, unknown>;
     updatedAt: Date;
 }
 
@@ -41,6 +42,7 @@ const UserSchema: Schema = new Schema({
     pointsAtStake: { type: Number, default: 0 },
     inventory: { type: [String], default: ['default'] },
     equippedCharacterId: { type: String, default: 'default' },
+    teahouses: { type: Map, of: Schema.Types.Mixed, default: {} },
 }, { timestamps: true });
 
 export default mongoose.model<IUser>('User', UserSchema);

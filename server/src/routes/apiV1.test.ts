@@ -219,4 +219,49 @@ describe('/api/v1', () => {
             }
         });
     });
+
+    describe('teahouses persistence', () => {
+        it('GET returns {} for a wanderer, no-store', async () => {
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .get('/api/v1/players/roblox-1/teahouses').set('X-API-Key', API_KEY).expect(200);
+            expect(res.body).toEqual({ teahouses: {} });
+            expect(res.headers['cache-control']).toBe('no-store');
+        });
+
+        it('PUT then GET round-trips a loadout', async () => {
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const loadout = { baseStyle: 'teahouse-1story', colorScheme: 'scheme.vermilion' };
+            await request(app).put('/api/v1/players/roblox-1/teahouses/M')
+                .set('X-API-Key', API_KEY).send({ loadout }).expect(200);
+            const res = await request(app).get('/api/v1/players/roblox-1/teahouses')
+                .set('X-API-Key', API_KEY).expect(200);
+            expect(res.body.teahouses.M).toEqual(loadout);
+        });
+
+        it('stores multiple sizes and overwrites a size', async () => {
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const put = (sc: string, cs: string) => request(app)
+                .put(`/api/v1/players/roblox-1/teahouses/${sc}`).set('X-API-Key', API_KEY)
+                .send({ loadout: { baseStyle: 'teahouse-1story', colorScheme: cs } }).expect(200);
+            await put('S', 'scheme.ink'); await put('L', 'scheme.vermilion'); await put('S', 'scheme.dormant');
+            const res = await request(app).get('/api/v1/players/roblox-1/teahouses')
+                .set('X-API-Key', API_KEY).expect(200);
+            expect(res.body.teahouses.S.colorScheme).toBe('scheme.dormant');
+            expect(res.body.teahouses.L.colorScheme).toBe('scheme.vermilion');
+        });
+
+        it('rejects invalid loadouts with 400', async () => {
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const put = (body: unknown) => request(app)
+                .put('/api/v1/players/roblox-1/teahouses/M').set('X-API-Key', API_KEY).send(body as object);
+            await put({ loadout: 'nope' }).expect(400);
+            await put({ loadout: { colorScheme: 'x' } }).expect(400);
+            await put({ loadout: { baseStyle: 't', bogus: 1 } }).expect(400);
+        });
+
+        it('requires the API key', async () => {
+            await request(makeApp(makeEngine(), new ResultsStore()))
+                .get('/api/v1/players/roblox-1/teahouses').expect(401);
+        });
+    });
 });

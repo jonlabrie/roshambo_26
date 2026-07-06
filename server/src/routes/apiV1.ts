@@ -6,6 +6,7 @@ import { resolveUser } from '../identity';
 import { bankPot } from '../wallet';
 import User from '../models/User';
 import { Throw } from '../engine/GameRules';
+import { validateLoadout, validateSizeClass } from '../loadout';
 
 export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     const router = express.Router();
@@ -95,6 +96,38 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
                 bestStreak: user.bestStreak,
                 identityTier: user.identityTier,
             });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
+    router.get('/players/:robloxUserId/teahouses', async (req, res) => {
+        try {
+            const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
+            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            res.set('Cache-Control', 'no-store');
+            const teahouses = user.teahouses ? Object.fromEntries(user.teahouses as Map<string, unknown>) : {};
+            res.json({ teahouses });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
+    router.put('/players/:robloxUserId/teahouses/:sizeClass', async (req, res) => {
+        try {
+            const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
+            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            const sizeClass = req.params.sizeClass;
+            const loadout = req.body?.loadout;
+            const existing = user.teahouses ? Array.from((user.teahouses as Map<string, unknown>).keys()) : [];
+            const sc = validateSizeClass(sizeClass, existing);
+            if (!sc.ok) { res.status(400).json({ error: sc.error }); return; }
+            const ld = validateLoadout(loadout);
+            if (!ld.ok) { res.status(400).json({ error: ld.error }); return; }
+            if (!user.teahouses) { (user as { teahouses: Map<string, unknown> }).teahouses = new Map(); }
+            (user.teahouses as Map<string, unknown>).set(sizeClass, loadout);
+            await user.save();
+            res.json({ sizeClass, loadout });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
         }
