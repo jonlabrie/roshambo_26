@@ -57,7 +57,7 @@ local function tree(
     return Spec.model(name, kids)
 end
 
-function Foliage.build(palette: { [string]: { number } }, L: any)
+function Foliage.build(_palette: { [string]: { number } }, L: any)
     local children = {}
 
     -- hero weeping cherry on the rim by the torii/stele

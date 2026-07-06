@@ -13,7 +13,8 @@ export type Loadout = {
     flags: { { mount: string, item: string } }?,
 }
 export type Mount = { cframe: { number }, hand: string, footprint: { x: number, z: number } }
-export type Manifest = { roles: { string }, shojiBays: { number }, hasTatami: boolean, flagMounts: { string } }
+export type Manifest =
+    { roles: { string }, shojiBays: { number }, hasTatami: boolean, flagMounts: { string } }
 export type Recolor = { role: string, color: Color }
 export type Texture = { target: string, assetId: string }
 export type Attachment = { mount: string, prefabId: string }

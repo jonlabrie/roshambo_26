@@ -14,23 +14,74 @@ export type Entry = {
 
 local ENTRIES: { [string]: Entry } = {
     ["scheme.ink"] = {
-        id = "scheme.ink", type = "recolor", slot = "colorScheme",
-        payload = { timber = { 74, 55, 38 }, wall = { 120, 100, 74 }, roof = { 45, 48, 56 }, cap = { 45, 48, 56 } },
+        id = "scheme.ink",
+        type = "recolor",
+        slot = "colorScheme",
+        payload = {
+            timber = { 74, 55, 38 },
+            wall = { 120, 100, 74 },
+            roof = { 45, 48, 56 },
+            cap = { 45, 48, 56 },
+        },
     },
     ["scheme.vermilion"] = {
-        id = "scheme.vermilion", type = "recolor", slot = "colorScheme",
-        payload = { timber = { 120, 45, 35 }, wall = { 232, 216, 190 }, roof = { 40, 42, 48 }, cap = { 40, 42, 48 } },
+        id = "scheme.vermilion",
+        type = "recolor",
+        slot = "colorScheme",
+        payload = {
+            timber = { 120, 45, 35 },
+            wall = { 232, 216, 190 },
+            roof = { 40, 42, 48 },
+            cap = { 40, 42, 48 },
+        },
     },
     ["scheme.dormant"] = {
-        id = "scheme.dormant", type = "recolor", slot = "colorScheme",
-        payload = { timber = { 32, 30, 28 }, wall = { 40, 38, 36 }, roof = { 28, 29, 33 }, cap = { 30, 31, 36 } },
+        id = "scheme.dormant",
+        type = "recolor",
+        slot = "colorScheme",
+        payload = {
+            timber = { 32, 30, 28 },
+            wall = { 40, 38, 36 },
+            roof = { 28, 29, 33 },
+            cap = { 30, 31, 36 },
+        },
     },
-    ["shoji.plain"] = { id = "shoji.plain", type = "texture", slot = "shoji", payload = { assetId = "rbxassetid://0" } },
-    ["shoji.crane"] = { id = "shoji.crane", type = "texture", slot = "shoji", payload = { assetId = "rbxassetid://102000000001" } },
-    ["tatami.green"] = { id = "tatami.green", type = "texture", slot = "tatami", payload = { assetId = "rbxassetid://102000000010" } },
-    ["tatami.gold"] = { id = "tatami.gold", type = "texture", slot = "tatami", payload = { assetId = "rbxassetid://102000000011" } },
-    ["flag.clan"] = { id = "flag.clan", type = "attachment", slot = "flags", payload = { prefabId = "flag_clan" } },
-    ["flag.noren"] = { id = "flag.noren", type = "attachment", slot = "flags", payload = { prefabId = "flag_noren" } },
+    ["shoji.plain"] = {
+        id = "shoji.plain",
+        type = "texture",
+        slot = "shoji",
+        payload = { assetId = "rbxassetid://0" },
+    },
+    ["shoji.crane"] = {
+        id = "shoji.crane",
+        type = "texture",
+        slot = "shoji",
+        payload = { assetId = "rbxassetid://102000000001" },
+    },
+    ["tatami.green"] = {
+        id = "tatami.green",
+        type = "texture",
+        slot = "tatami",
+        payload = { assetId = "rbxassetid://102000000010" },
+    },
+    ["tatami.gold"] = {
+        id = "tatami.gold",
+        type = "texture",
+        slot = "tatami",
+        payload = { assetId = "rbxassetid://102000000011" },
+    },
+    ["flag.clan"] = {
+        id = "flag.clan",
+        type = "attachment",
+        slot = "flags",
+        payload = { prefabId = "flag_clan" },
+    },
+    ["flag.noren"] = {
+        id = "flag.noren",
+        type = "attachment",
+        slot = "flags",
+        payload = { prefabId = "flag_noren" },
+    },
 }
 
 function StructureCatalog.get(id: string): Entry?

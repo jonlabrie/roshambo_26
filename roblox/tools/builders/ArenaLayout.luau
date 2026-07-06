@@ -21,7 +21,7 @@ end
 -- which the drive line (driveYaw) otherwise threads straight through. Negative =
 -- the corner swings away from the rail. Both Shoro and ThrowDrum sit at x=z=0, so
 -- a rotation about the world-Y origin spins each about its own vertical axis.
-local pavilionYaw = -13
+local _pavilionYaw = -13
 
 local ArenaLayout = {
     bowlRadius = 220,

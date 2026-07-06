@@ -26,59 +26,59 @@ local Terrain = workspace.Terrain
 -- CopyRegion backup of the AABB of a (possibly rotated) box, keyed by name. Guarded:
 -- only backs up once per name so re-runs never capture already-carved terrain.
 local function backup(name: string, cf: CFrame, size: Vector3)
-	if ServerStorage:FindFirstChild(name) then
-		return
-	end
-	local hs = size / 2
-	local mn, mx
-	for _, sx in { -1, 1 } do
-		for _, sy in { -1, 1 } do
-			for _, sz in { -1, 1 } do
-				local c = cf * Vector3.new(sx * hs.X, sy * hs.Y, sz * hs.Z)
-				mn = mn and Vector3.new(math.min(mn.X, c.X), math.min(mn.Y, c.Y), math.min(mn.Z, c.Z)) or c
-				mx = mx and Vector3.new(math.max(mx.X, c.X), math.max(mx.Y, c.Y), math.max(mx.Z, c.Z)) or c
-			end
-		end
-	end
-	local region = Region3.new(mn, mx):ExpandToGrid(4)
-	local base = region.CFrame.Position - region.Size / 2
-	local cx, cy, cz = base.X / 4, base.Y / 4, base.Z / 4
-	local nx, ny, nz = region.Size.X / 4, region.Size.Y / 4, region.Size.Z / 4
-	local bk = Terrain:CopyRegion(
-		Region3int16.new(Vector3int16.new(cx, cy, cz), Vector3int16.new(cx + nx, cy + ny, cz + nz))
-	)
-	bk.Name = name
-	bk.Parent = ServerStorage
+    if ServerStorage:FindFirstChild(name) then
+        return
+    end
+    local hs = size / 2
+    local mn, mx
+    for _, sx in { -1, 1 } do
+        for _, sy in { -1, 1 } do
+            for _, sz in { -1, 1 } do
+                local c = cf * Vector3.new(sx * hs.X, sy * hs.Y, sz * hs.Z)
+                mn = mn and Vector3.new(math.min(mn.X, c.X), math.min(mn.Y, c.Y), math.min(mn.Z, c.Z)) or c
+                mx = mx and Vector3.new(math.max(mx.X, c.X), math.max(mx.Y, c.Y), math.max(mx.Z, c.Z)) or c
+            end
+        end
+    end
+    local region = Region3.new(mn, mx):ExpandToGrid(4)
+    local base = region.CFrame.Position - region.Size / 2
+    local cx, cy, cz = base.X / 4, base.Y / 4, base.Z / 4
+    local nx, ny, nz = region.Size.X / 4, region.Size.Y / 4, region.Size.Z / 4
+    local bk = Terrain:CopyRegion(
+        Region3int16.new(Vector3int16.new(cx, cy, cz), Vector3int16.new(cx + nx, cy + ny, cz + nz))
+    )
+    bk.Name = name
+    bk.Parent = ServerStorage
 end
 
 -- carve away terrain (Air) inside an axis-aligned box from floorY up to topY
 local function carveDownTo(centerXZ: Vector2, sizeXZ: Vector2, floorY: number, topY: number)
-	local h = topY - floorY
-	Terrain:FillBlock(
-		CFrame.new(centerXZ.X, (floorY + topY) / 2, centerXZ.Y),
-		Vector3.new(sizeXZ.X, h, sizeXZ.Y),
-		Enum.Material.Air
-	)
+    local h = topY - floorY
+    Terrain:FillBlock(
+        CFrame.new(centerXZ.X, (floorY + topY) / 2, centerXZ.Y),
+        Vector3.new(sizeXZ.X, h, sizeXZ.Y),
+        Enum.Material.Air
+    )
 end
 
 -- add rock (build terrain up) inside an axis-aligned box from baseY to topY
 local function fillRock(centerXZ: Vector2, sizeXZ: Vector2, baseY: number, topY: number)
-	local h = topY - baseY
-	Terrain:FillBlock(
-		CFrame.new(centerXZ.X, (baseY + topY) / 2, centerXZ.Y),
-		Vector3.new(sizeXZ.X, h, sizeXZ.Y),
-		Enum.Material.Rock
-	)
+    local h = topY - baseY
+    Terrain:FillBlock(
+        CFrame.new(centerXZ.X, (baseY + topY) / 2, centerXZ.Y),
+        Vector3.new(sizeXZ.X, h, sizeXZ.Y),
+        Enum.Material.Rock
+    )
 end
 
 -- fill water inside a box (basin/stream)
 local function fillWater(centerXZ: Vector2, sizeXZ: Vector2, botY: number, surfY: number)
-	local h = surfY - botY
-	Terrain:FillBlock(
-		CFrame.new(centerXZ.X, (botY + surfY) / 2, centerXZ.Y),
-		Vector3.new(sizeXZ.X, h, sizeXZ.Y),
-		Enum.Material.Water
-	)
+    local h = surfY - botY
+    Terrain:FillBlock(
+        CFrame.new(centerXZ.X, (botY + surfY) / 2, centerXZ.Y),
+        Vector3.new(sizeXZ.X, h, sizeXZ.Y),
+        Enum.Material.Water
+    )
 end
 
 -- ========================================================================

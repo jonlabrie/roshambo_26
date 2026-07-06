@@ -13,7 +13,8 @@ end)
 
 test("findVacant returns first-registered vacant id; nil when full", function()
     local r = PadRegistry.new()
-    r:register("a", 1); r:register("b", 2)
+    r:register("a", 1)
+    r:register("b", 2)
     expect(r:findVacant()).toBe("a")
     r:claim("a", "owner1")
     expect(r:findVacant()).toBe("b")
@@ -32,7 +33,8 @@ end)
 
 test("claimVacant returns {id,spec}, marks claimed, hands out in registration order", function()
     local r = PadRegistry.new()
-    r:register("a", "sa"); r:register("b", "sb")
+    r:register("a", "sa")
+    r:register("b", "sb")
     local first = r:claimVacant("o1")
     expect(first.id).toBe("a")
     expect(first.spec).toBe("sa")
@@ -59,11 +61,11 @@ end)
 
 test("fits: contained/exact -> true; overhang -> false", function()
     local pad = { minX = -10, maxX = 15, minZ = -12, maxZ = 5 }
-    expect(PadRegistry.fits(pad, { minX = -7, maxX = 12, minZ = -10, maxZ = 4 })).toBe(true)  -- contained
-    expect(PadRegistry.fits(pad, pad)).toBe(true)                                              -- exact
+    expect(PadRegistry.fits(pad, { minX = -7, maxX = 12, minZ = -10, maxZ = 4 })).toBe(true) -- contained
+    expect(PadRegistry.fits(pad, pad)).toBe(true) -- exact
     expect(PadRegistry.fits(pad, { minX = -7, maxX = 16, minZ = -10, maxZ = 4 })).toBe(false) -- wider +X
     expect(PadRegistry.fits(pad, { minX = -7, maxX = 12, minZ = -10, maxZ = 6 })).toBe(false) -- deeper +Z
-    expect(PadRegistry.fits(pad, { minX = -11, maxX = 12, minZ = -10, maxZ = 4 })).toBe(false)-- under-min -X
+    expect(PadRegistry.fits(pad, { minX = -11, maxX = 12, minZ = -10, maxZ = 4 })).toBe(false) -- under-min -X
 end)
 
 test("claimVacantFor: skips a too-small vacant pad, claims the first fitting one", function()

@@ -25,27 +25,27 @@ local STATIC_PATH = { "RoshamboStage", "OutfallChannelPOC", "ChannelRibbon" }
 -- wins the race against replication, so the script would bail and never animate
 -- (intermittent "no flow"). Waiting blocks until each node has replicated.
 local function resolve(path: { string }): Instance?
-	local node: Instance = Workspace
-	for _, name in path do
-		local nxt = node:WaitForChild(name, 30)
-		if not nxt then
-			return nil -- genuinely absent after 30s
-		end
-		node = nxt
-	end
-	return node
+    local node: Instance = Workspace
+    for _, name in path do
+        local nxt = node:WaitForChild(name, 30)
+        if not nxt then
+            return nil -- genuinely absent after 30s
+        end
+        node = nxt
+    end
+    return node
 end
 
 local static = resolve(STATIC_PATH)
 if not (static and static:IsA("BasePart")) then
-	warn("[ChannelFlowAnim] static channel ribbon never replicated; not animating")
-	return
+    warn("[ChannelFlowAnim] static channel ribbon never replicated; not animating")
+    return
 end
 
 -- load the published mesh as an editable copy (geometry from the asset, not rebuilt)
 local em = AssetService:CreateEditableMeshAsync(Content.fromUri(MESH))
 local part = AssetService:CreateMeshPartAsync(Content.fromObject(em), {
-	CollisionFidelity = Enum.CollisionFidelity.Box, -- NB: there is no CollisionFidelity.None
+    CollisionFidelity = Enum.CollisionFidelity.Box, -- NB: there is no CollisionFidelity.None
 })
 part.Name = "ChannelRibbonAnim"
 part.Anchored = true
@@ -60,7 +60,7 @@ part:PivotTo(static:GetPivot()) -- match the (lowered) static placement exactly
 -- clone the SurfaceAppearance (runtime can't WRITE ColorMap/NormalMap, but cloning is fine)
 local srcSA = static:FindFirstChildOfClass("SurfaceAppearance")
 if srcSA then
-	srcSA:Clone().Parent = part
+    srcSA:Clone().Parent = part
 end
 
 -- hide the static persistent part locally so only the animated copy shows
@@ -69,12 +69,12 @@ static.LocalTransparencyModifier = 1
 -- snapshot base UVs, then scroll V each frame (wrap at 1.0 = texture period → invisible reset)
 local base = {}
 for _, id in em:GetUVs() do
-	base[#base + 1] = { id = id, uv = em:GetUV(id) }
+    base[#base + 1] = { id = id, uv = em:GetUV(id) }
 end
 local scroll = 0
 RunService.RenderStepped:Connect(function(dt)
-	scroll = (scroll + FLOW_TILES_PER_SEC * dt) % 1
-	for _, rec in base do
-		em:SetUV(rec.id, Vector2.new(rec.uv.X, rec.uv.Y - scroll))
-	end
+    scroll = (scroll + FLOW_TILES_PER_SEC * dt) % 1
+    for _, rec in base do
+        em:SetUV(rec.id, Vector2.new(rec.uv.X, rec.uv.Y - scroll))
+    end
 end)

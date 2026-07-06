@@ -9,9 +9,9 @@
 -- toward the veranda (front -Z + right +X) and rises toward the cliff/back (+Z).
 -- All 6 support posts hit terrain (back short, front long over the drop).
 return {
-	cliff_proof = {
-		mountCF = { -60, 274, 105, 1, 0, 0, 0, 1, 0, 0, 0, 1 },
-		hand = "right",
-		footprint = { minX = -7.40, maxX = 15.00, minZ = -11.70, maxZ = 4.32 },
-	},
+    cliff_proof = {
+        mountCF = { -60, 274, 105, 1, 0, 0, 0, 1, 0, 0, 0, 1 },
+        hand = "right",
+        footprint = { minX = -7.40, maxX = 15.00, minZ = -11.70, maxZ = 4.32 },
+    },
 }

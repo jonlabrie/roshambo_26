@@ -169,6 +169,7 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
     end
     -- Cross-braces (along X) tying the two rails together at the top of each post pair,
     -- so the gantry reads as a rigid frame.
+    -- selene: allow(shadowing)
     for i, bz in { sm.railZ[1], sm.railZ[2] } do
         local p = Spec.rotY({ cx, sm.railY, bz }, yaw)
         table.insert(

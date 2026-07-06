@@ -31,7 +31,9 @@ test("build skips buildPost for over-void posts", function()
     local built = 0
     local ops = {
         raycastGround = function(_x, z)
-            if z < -5 then return nil end
+            if z < -5 then
+                return nil
+            end
             return 0
         end,
         buildPost = function(_pos, _height)

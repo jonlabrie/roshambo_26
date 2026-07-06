@@ -13,17 +13,28 @@ local function fakeOps(log: { any })
         readManifest = function(_m)
             return { roles = { "cap" }, shojiBays = { 1 }, hasTatami = false, flagMounts = { "FlagMount_1" } }
         end,
-        mirrorX = function(_m) table.insert(log, { op = "mirror" }) end,
-        recolor = function(_m, role: string, _c) table.insert(log, { op = "recolor", role = role }) end,
-        setTexture = function(_m, target: string, _a) table.insert(log, { op = "texture", target = target }) end,
-        attachPrefab = function(_m, mount: string, _p) table.insert(log, { op = "attach", mount = mount }) end,
-        pivotTo = function(_m, _cf) table.insert(log, { op = "pivot" }) end,
+        mirrorX = function(_m)
+            table.insert(log, { op = "mirror" })
+        end,
+        recolor = function(_m, role: string, _c)
+            table.insert(log, { op = "recolor", role = role })
+        end,
+        setTexture = function(_m, target: string, _a)
+            table.insert(log, { op = "texture", target = target })
+        end,
+        attachPrefab = function(_m, mount: string, _p)
+            table.insert(log, { op = "attach", mount = mount })
+        end,
+        pivotTo = function(_m, _cf)
+            table.insert(log, { op = "pivot" })
+        end,
     }
 end
 
 test("build drives ops in order: clone, mirror(if left), recolor, texture, attach, pivot", function()
     local log: { any } = {}
-    local mount = { cframe = { 1, 2, 3, 1, 0, 0, 0, 1, 0, 0, 0, 1 }, hand = "left", footprint = { x = 26, z = 20 } }
+    local mount =
+        { cframe = { 1, 2, 3, 1, 0, 0, 0, 1, 0, 0, 0, 1 }, hand = "left", footprint = { x = 26, z = 20 } }
     local loadout = {
         baseStyle = "teahouse-1story",
         colorScheme = "scheme.ink",
@@ -44,7 +55,8 @@ end)
 
 test("build skips mirror for a right-hand mount", function()
     local log: { any } = {}
-    local mount = { cframe = { 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1 }, hand = "right", footprint = { x = 26, z = 20 } }
+    local mount =
+        { cframe = { 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1 }, hand = "right", footprint = { x = 26, z = 20 } }
     Builder.build({ baseStyle = "teahouse-1story" }, mount, Catalog, fakeOps(log))
     expect(log).toEqual({ { op = "clone", style = "teahouse-1story" }, { op = "pivot" } })
 end)

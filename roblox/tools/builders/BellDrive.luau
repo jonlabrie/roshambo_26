@@ -156,6 +156,7 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
     local halfLen = L.throwDrum.length / 2 + 1
     local roofY = L.pavilion.pos[2] + L.pavilion.roofHeight
     local roofHalf = L.pavilion.postSpacing / 2 + 3.5 -- feet just INSIDE the eave (roof edge is at +4) so they don't overhang
+    -- selene: allow(shadowing)
     local n = 0
     for _, ze in { axle[3] - halfLen, axle[3] + halfLen } do
         for _, fx in { L.pavilion.pos[1] - roofHalf, L.pavilion.pos[1] + roofHalf } do

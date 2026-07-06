@@ -29,7 +29,7 @@ Terrain:SetMaterialColor(Enum.Material.Rock, Color3.fromRGB(36, 52, 30))
 local stage = workspace.RoshamboStage
 local old = stage:FindFirstChild("UpcanyonVFX")
 if old then
-	old:Destroy()
+    old:Destroy()
 end
 local vfx = Instance.new("Model")
 vfx.Name = "UpcanyonVFX"
@@ -37,76 +37,76 @@ vfx.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 vfx.Parent = stage
 
 local function node(x, y, z, nm)
-	local p = Instance.new("Part")
-	p.Anchored, p.CanCollide, p.Transparency = true, false, 1
-	p.Size = Vector3.new(0.5, 0.5, 0.5)
-	p.CFrame = CFrame.new(x, y, z)
-	p.Name = nm
-	p.Parent = vfx
-	local a = Instance.new("Attachment")
-	a.Parent = p
-	return a
+    local p = Instance.new("Part")
+    p.Anchored, p.CanCollide, p.Transparency = true, false, 1
+    p.Size = Vector3.new(0.5, 0.5, 0.5)
+    p.CFrame = CFrame.new(x, y, z)
+    p.Name = nm
+    p.Parent = vfx
+    local a = Instance.new("Attachment")
+    a.Parent = p
+    return a
 end
 
 local CASCADE_TR = NumberSequence.new({
-	NumberSequenceKeypoint.new(0, 1),
-	NumberSequenceKeypoint.new(0.12, 0.06),
-	NumberSequenceKeypoint.new(0.80, 0.12),
-	NumberSequenceKeypoint.new(1, 0.40),
+    NumberSequenceKeypoint.new(0, 1),
+    NumberSequenceKeypoint.new(0.12, 0.06),
+    NumberSequenceKeypoint.new(0.80, 0.12),
+    NumberSequenceKeypoint.new(1, 0.40),
 })
 local SLOW_TR = NumberSequence.new({
-	NumberSequenceKeypoint.new(0, 1),
-	NumberSequenceKeypoint.new(0.18, 0.50),
-	NumberSequenceKeypoint.new(1, 0.70),
+    NumberSequenceKeypoint.new(0, 1),
+    NumberSequenceKeypoint.new(0.18, 0.50),
+    NumberSequenceKeypoint.new(1, 0.70),
 })
 
 -- {name, tx,ty,tz, bx,by,bz, cW0,cW1, sW0,sW1, spdC,spdS, mistSize,mistRate}
 local FALLS = {
-	{ "HeroInfall", -431, 273, -27, -412, 212, -24, 6, 10, 8, 13, 0.55, 0.35, 10, 20 },
-	{ "TopToOutfall", -374, 208, -5, -370, 187, -5, 6, 9, 8.4, 12.6, 0.55, 0.35, 7, 12 },
-	{ "OutfallToMicro", -338, 190, -4, -326, 184, -1, 8, 12, 11.2, 16.8, 0.385, 0.245, 7, 12 },
-	{ "MicroToLargest", -306, 184, 4, -296, 176, 4, 4, 6, 5.6, 8.4, 0.55, 0.35, 5, 10 },
-	{ "LargestInfall", -224, 175, 18, -214, 160, 17, 6, 9, 8.4, 12.6, 0.55, 0.35, 8, 16 },
-	{ "Step159ToStep150", -188, 159, 5, -168, 152, -8, 4, 6, 5.6, 8.4, 0.55, 0.35, 5, 10 },
-	{ "Step150ToLower", -150, 150, -6, -141, 149, -3, 4, 6, 5.6, 8.4, 0.55, 0.35, 5, 10 },
-	{ "LowerStep", -132, 148, -3, -126, 143, -3, 3, 4.5, 4, 6, 0.55, 0.35, 4, 8 },
-	{ "ClearingInfall", -83, 133, -11, -74, 111, -10, 6, 9, 8.4, 12.6, 0.55, 0.35, 9, 18 },
+    { "HeroInfall", -431, 273, -27, -412, 212, -24, 6, 10, 8, 13, 0.55, 0.35, 10, 20 },
+    { "TopToOutfall", -374, 208, -5, -370, 187, -5, 6, 9, 8.4, 12.6, 0.55, 0.35, 7, 12 },
+    { "OutfallToMicro", -338, 190, -4, -326, 184, -1, 8, 12, 11.2, 16.8, 0.385, 0.245, 7, 12 },
+    { "MicroToLargest", -306, 184, 4, -296, 176, 4, 4, 6, 5.6, 8.4, 0.55, 0.35, 5, 10 },
+    { "LargestInfall", -224, 175, 18, -214, 160, 17, 6, 9, 8.4, 12.6, 0.55, 0.35, 8, 16 },
+    { "Step159ToStep150", -188, 159, 5, -168, 152, -8, 4, 6, 5.6, 8.4, 0.55, 0.35, 5, 10 },
+    { "Step150ToLower", -150, 150, -6, -141, 149, -3, 4, 6, 5.6, 8.4, 0.55, 0.35, 5, 10 },
+    { "LowerStep", -132, 148, -3, -126, 143, -3, 3, 4.5, 4, 6, 0.55, 0.35, 4, 8 },
+    { "ClearingInfall", -83, 133, -11, -74, 111, -10, 6, 9, 8.4, 12.6, 0.55, 0.35, 9, 18 },
 }
 
 for _, f in FALLS do
-	local a0 = node(f[2], f[3], f[4], f[1] .. "_TOP")
-	local a1 = node(f[5], f[6], f[7], f[1] .. "_BOT")
-	local function beam(nm, len, spd, w0, w1, tr)
-		local b = Instance.new("Beam")
-		b.Name, b.Attachment0, b.Attachment1 = nm, a0, a1
-		b.Texture, b.TextureMode, b.TextureLength, b.TextureSpeed = WTEX, Enum.TextureMode.Stretch, len, spd
-		b.Width0, b.Width1, b.CurveSize0, b.CurveSize1 = w0, w1, 2, -1
-		b.Segments, b.FaceCamera = 12, true
-		b.Color, b.LightEmission, b.LightInfluence = ColorSequence.new(WHITE), 0.20, 0
-		b.Transparency = tr
-		b.Parent = a0.Parent
-	end
-	beam("Cascade", 1, f[12], f[8], f[9], CASCADE_TR)
-	beam("CascadeSlow", 2, f[13], f[10], f[11], SLOW_TR)
-	-- foam mist at the base
-	local mp = Instance.new("Part")
-	mp.Name, mp.Anchored, mp.CanCollide, mp.Transparency = f[1] .. "_Mist", true, false, 1
-	mp.Size = Vector3.new(1, 1, 1)
-	mp.CFrame = CFrame.new(f[5], f[6] + 1, f[7])
-	mp.Parent = vfx
-	local ma = Instance.new("Attachment")
-	ma.Parent = mp
-	local e = Instance.new("ParticleEmitter")
-	e.Color, e.Texture = ColorSequence.new(FOAM_COLOR), FOAM
-	e.Transparency = NumberSequence.new({
-		NumberSequenceKeypoint.new(0, 1),
-		NumberSequenceKeypoint.new(0.4, 0.82),
-		NumberSequenceKeypoint.new(1, 1),
-	})
-	e.Size, e.Lifetime, e.Rate = NumberSequence.new(f[14]), NumberRange.new(2.5, 5), f[15]
-	e.Speed, e.SpreadAngle, e.Acceleration = NumberRange.new(1, 3), Vector2.new(55, 55), Vector3.new(0, 2, 0)
-	e.Rotation, e.RotSpeed = NumberRange.new(0, 360), NumberRange.new(-10, 10)
-	e.Parent = ma
+    local a0 = node(f[2], f[3], f[4], f[1] .. "_TOP")
+    local a1 = node(f[5], f[6], f[7], f[1] .. "_BOT")
+    local function beam(nm, len, spd, w0, w1, tr)
+        local b = Instance.new("Beam")
+        b.Name, b.Attachment0, b.Attachment1 = nm, a0, a1
+        b.Texture, b.TextureMode, b.TextureLength, b.TextureSpeed = WTEX, Enum.TextureMode.Stretch, len, spd
+        b.Width0, b.Width1, b.CurveSize0, b.CurveSize1 = w0, w1, 2, -1
+        b.Segments, b.FaceCamera = 12, true
+        b.Color, b.LightEmission, b.LightInfluence = ColorSequence.new(WHITE), 0.20, 0
+        b.Transparency = tr
+        b.Parent = a0.Parent
+    end
+    beam("Cascade", 1, f[12], f[8], f[9], CASCADE_TR)
+    beam("CascadeSlow", 2, f[13], f[10], f[11], SLOW_TR)
+    -- foam mist at the base
+    local mp = Instance.new("Part")
+    mp.Name, mp.Anchored, mp.CanCollide, mp.Transparency = f[1] .. "_Mist", true, false, 1
+    mp.Size = Vector3.new(1, 1, 1)
+    mp.CFrame = CFrame.new(f[5], f[6] + 1, f[7])
+    mp.Parent = vfx
+    local ma = Instance.new("Attachment")
+    ma.Parent = mp
+    local e = Instance.new("ParticleEmitter")
+    e.Color, e.Texture = ColorSequence.new(FOAM_COLOR), FOAM
+    e.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(0.4, 0.82),
+        NumberSequenceKeypoint.new(1, 1),
+    })
+    e.Size, e.Lifetime, e.Rate = NumberSequence.new(f[14]), NumberRange.new(2.5, 5), f[15]
+    e.Speed, e.SpreadAngle, e.Acceleration = NumberRange.new(1, 3), Vector2.new(55, 55), Vector3.new(0, 2, 0)
+    e.Rotation, e.RotSpeed = NumberRange.new(0, 360), NumberRange.new(-10, 10)
+    e.Parent = ma
 end
 
 return ("up-canyon: %d falls rebuilt + cliffs tinted green"):format(#FALLS)
