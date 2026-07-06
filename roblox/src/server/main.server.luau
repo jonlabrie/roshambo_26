@@ -385,9 +385,20 @@ end
 Players.PlayerAdded:Connect(function(player)
     task.spawn(function()
         local res = net:getTeahouses(tostring(player.UserId))
+        -- a non-ok fetch reads as "owns nothing" (no pad this session, no retry) — a D.3+ concern
         local loadout = if res.ok then (res.data.teahouses or {}).M else nil
         local action = siteCoordinator:onJoin(tostring(player.UserId), loadout)
         if action then
+            -- getTeahouses yields; if the player left mid-call, PlayerRemoving's onLeave
+            -- already ran as a no-op (nothing was held yet). Release the just-claimed pad
+            -- so it doesn't leak lit for a departed player (and _held doesn't go stale).
+            if not player:IsDescendantOf(Players) then
+                local rel = siteCoordinator:onLeave(tostring(player.UserId))
+                if rel then
+                    applier:apply(rel.padId, rel.spec, rel.treatment)
+                end
+                return
+            end
             applier:apply(action.padId, action.spec, action.treatment)
             print(`[D.2] {player.UserId} claimed {action.padId}`)
         end
