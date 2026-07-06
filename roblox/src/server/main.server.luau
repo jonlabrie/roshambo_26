@@ -347,6 +347,46 @@ Players.PlayerAdded:Connect(function(player)
     end
 end)
 
+-- D.1: static materialization spine — stand TEST_OWNER's persisted teahouse on a
+-- surveyed pad (cliff-proof shelf). No lifecycle: one hardcoded owner + pad, at startup.
+local StructureBuilder = require(shared:WaitForChild("StructureBuilder"))
+local PadBuilder = require(shared:WaitForChild("PadBuilder"))
+local StructureCatalog = require(shared:WaitForChild("StructureCatalog"))
+local StructureOps = require(script.Parent:WaitForChild("StructureOps"))
+local PadOps = require(script.Parent:WaitForChild("PadOps"))
+local PadSites = require(script.Parent:WaitForChild("PadSites"))
+
+local TEST_OWNER = "90000001"
+
+task.spawn(function()
+    local res = net:getTeahouses(TEST_OWNER)
+    if not res.ok then
+        warn(`[D.1] getTeahouses failed: {res.error or res.status}`)
+        return
+    end
+    local loadout = (res.data.teahouses or {}).M
+    if not loadout then
+        warn("[D.1] TEST_OWNER has no 'M' teahouse; seed one via PUT .../teahouses/M")
+        return
+    end
+
+    local site = PadSites["cliff-proof"]
+    local folder = Instance.new("Folder")
+    folder.Name = "MaterializedSite_" .. site.id
+    folder.Parent = workspace
+
+    local mountCF = CFrame.new(table.unpack(site.mountCF))
+    local mount = PadBuilder.build(site, PadOps.new(mountCF, folder))
+    print(`[D.1] pad built: {#folder:GetChildren()} posts`)
+
+    local model = StructureBuilder.build(loadout, mount, StructureCatalog, StructureOps)
+    model.Parent = folder
+    if model:IsA("Model") then
+        model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+    end
+    print(`[D.1] materialized {loadout.baseStyle}/{tostring(loadout.colorScheme)} on {site.id}`)
+end)
+
 print(`[ROSHAMBO] playable loop starting against {config.baseUrl}`)
 task.spawn(function()
     while true do
