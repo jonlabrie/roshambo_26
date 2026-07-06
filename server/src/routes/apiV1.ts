@@ -124,7 +124,8 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             if (!sc.ok) { res.status(400).json({ error: sc.error }); return; }
             const ld = validateLoadout(loadout);
             if (!ld.ok) { res.status(400).json({ error: ld.error }); return; }
-            if (!user.teahouses) { (user as { teahouses: Map<string, unknown> }).teahouses = new Map(); }
+            // teahouses is always a MongooseMap (schema default {} applies on insert + lazily on read),
+            // so .set() tracks the mutation for save() — no fallback/markModified needed.
             (user.teahouses as Map<string, unknown>).set(sizeClass, loadout);
             await user.save();
             res.json({ sizeClass, loadout });
