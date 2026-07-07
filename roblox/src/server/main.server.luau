@@ -373,13 +373,12 @@ local applier = TreatmentApplier.new({
     padOpsNew = PadOps.new,
 })
 
--- cliff-proof-2 (large) registered first: the sole local joiner claims it with L; cliff-proof (small) stays dormant at S
-for _, id in { "cliff-proof-2", "cliff-proof" } do
+-- real perches, T02 (max L) registered first so the sole local joiner claims it with L
+for _, id in { "T02", "T06", "T04" } do
     siteCoordinator:registerPad(id, PadSites[id])
 end
 for _, action in siteCoordinator:vacantActions() do
-    applier:buildSupport(action.spec)
-    applier:apply(action.padId, action.spec, action.treatment, action.scale)
+    applier:apply(action.padId, action.spec, action.treatment, action.scale, action.footprint)
 end
 
 Players.PlayerAdded:Connect(function(player)
@@ -395,12 +394,12 @@ Players.PlayerAdded:Connect(function(player)
             if not player:IsDescendantOf(Players) then
                 local rel = siteCoordinator:onLeave(tostring(player.UserId))
                 if rel then
-                    applier:apply(rel.padId, rel.spec, rel.treatment, rel.scale)
+                    applier:apply(rel.padId, rel.spec, rel.treatment, rel.scale, rel.footprint)
                 end
                 return
             end
-            applier:apply(action.padId, action.spec, action.treatment, action.scale)
-            print(`[D.3] {player.UserId} claimed {action.padId} @ {tostring(action.sizeClass)}`)
+            applier:apply(action.padId, action.spec, action.treatment, action.scale, action.footprint)
+            print(`[D.4] {player.UserId} claimed {action.padId} @ {tostring(action.sizeClass)}`)
         end
     end)
 end)
@@ -408,8 +407,8 @@ end)
 Players.PlayerRemoving:Connect(function(player)
     local action = siteCoordinator:onLeave(tostring(player.UserId))
     if action then
-        applier:apply(action.padId, action.spec, action.treatment, action.scale)
-        print(`[D.3] {player.UserId} released {action.padId}`)
+        applier:apply(action.padId, action.spec, action.treatment, action.scale, action.footprint)
+        print(`[D.4] {player.UserId} released {action.padId}`)
     end
 end)
 
