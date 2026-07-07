@@ -1,9 +1,10 @@
 --!strict
 -- Per-server orchestration brain for sub-project D materialization. Turns player
 -- join/leave + startup into Actions by composing an injected PadRegistry (claim/
--- release) with VacantState (treatment) and SizeClasses (multi-size fit). Pure
--- (Lune-tested): no Roblox datatypes. The Studio-side TreatmentApplier executes
--- the Actions (and applies Action.scale via Model:ScaleTo).
+-- release) with VacantState (treatment) and SizeClasses (size-cap fit). Pure
+-- (Lune-tested): no Roblox datatypes. A site carries a `maxSize`; onJoin claims the
+-- first vacant site whose maxSize accommodates the player's largest owned size,
+-- biggest-first. The Studio-side TreatmentApplier executes the Actions (scale + posts).
 local VacantState = require("./VacantState")
 local SizeClasses = require("./SizeClasses")
 
@@ -16,6 +17,7 @@ export type Action = {
     treatment: VacantState.Treatment,
     scale: number,
     sizeClass: string?,
+    footprint: SizeClasses.Footprint?,
 }
 
 function SiteCoordinator.new(registry: any)
@@ -34,9 +36,13 @@ function SiteCoordinator:registerPad(id: string, spec: any): boolean
     return ok
 end
 
-local function dormantScale(spec: any): number
-    local native = spec and SizeClasses.nativeSize(spec.footprint)
-    return if native then SizeClasses.scale[native] else 1
+-- A vacant site renders its dormant shell at the site's own max size.
+local function dormantOf(spec: any): (number, SizeClasses.Footprint?)
+    local maxSize = spec and spec.maxSize
+    if maxSize == nil then
+        return 1, nil
+    end
+    return SizeClasses.scale[maxSize], SizeClasses.footprintFor(maxSize)
 end
 
 function SiteCoordinator:vacantActions(): { Action }
@@ -44,11 +50,13 @@ function SiteCoordinator:vacantActions(): { Action }
     for _, id in self._padIds do
         local rec = self._registry:get(id)
         if rec and rec.occupant == nil then
+            local scale, footprint = dormantOf(rec.spec)
             table.insert(out, {
                 padId = id,
                 spec = rec.spec,
                 treatment = VacantState.resolve(nil, nil, rec.spec.vacantForm),
-                scale = dormantScale(rec.spec),
+                scale = scale,
+                footprint = footprint,
             })
         end
     end
@@ -62,19 +70,23 @@ function SiteCoordinator:onJoin(playerId: string, ownedTeahouses: { [string]: an
     if ownedTeahouses == nil then
         return nil
     end
-    for _, size in SizeClasses.order do
+    for _, size in SizeClasses.order do -- L, M, S (biggest first)
         local loadout = ownedTeahouses[size]
         if loadout ~= nil then
-            local claim = self._registry:claimVacantFor(playerId, SizeClasses.footprintFor(size))
-            if claim then
-                self._held[playerId] = claim.id
-                return {
-                    padId = claim.id,
-                    spec = claim.spec,
-                    treatment = VacantState.resolve(playerId, loadout, claim.spec.vacantForm),
-                    scale = SizeClasses.scale[size],
-                    sizeClass = size,
-                }
+            for _, id in self._padIds do -- registration order (first-fit)
+                local rec = self._registry:get(id)
+                if rec and rec.occupant == nil and SizeClasses.fitsWithin(size, rec.spec.maxSize) then
+                    self._registry:claim(id, playerId)
+                    self._held[playerId] = id
+                    return {
+                        padId = id,
+                        spec = rec.spec,
+                        treatment = VacantState.resolve(playerId, loadout, rec.spec.vacantForm),
+                        scale = SizeClasses.scale[size],
+                        sizeClass = size,
+                        footprint = SizeClasses.footprintFor(size),
+                    }
+                end
             end
         end
     end
@@ -90,11 +102,13 @@ function SiteCoordinator:onLeave(playerId: string): Action?
     self._held[playerId] = nil
     local rec = self._registry:get(padId)
     local spec = rec and rec.spec
+    local scale, footprint = dormantOf(spec)
     return {
         padId = padId,
         spec = spec,
         treatment = VacantState.resolve(nil, nil, spec and spec.vacantForm),
-        scale = dormantScale(spec),
+        scale = scale,
+        footprint = footprint,
     }
 end
 
