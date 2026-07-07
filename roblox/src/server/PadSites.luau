@@ -1,33 +1,32 @@
 --!strict
--- Baked surveyed PadSpec(s) for sub-project D materialization. mountCF is in
--- CFrame:GetComponents order (pos + row-major rotation); the datum plane is the
--- structure's floor-underside (probe Deck/EngawaF/Table, never the buried pivot).
--- footprint is the teahouse-1story prefab's frame extents (shared by all
--- teahouse-1story pads). id/vacantForm are carried for D.2 (the registry + the
--- vacant-state applier).
+-- Baked surveyed sites for sub-project D materialization. Each site is Deck-anchored
+-- (mountCF pos = deck floor-underside datum, rot = deck rotation) and carries a
+-- survey-derived `maxSize` (the largest teahouse the perch's terrain supports on posts
+-- with no void corners). Dynamic posts (PadPlanner/PadOps) build a stilt only where
+-- terrain drops below the deck; embed corners bed into the slope. Captured 2026-07-07
+-- via MCP from the real legacy perches; supersedes the D.1-D.3 cliff-proof synthetic pads.
 --
--- cliff-proof: the empty promontory shelf (gapB, ~ -60,105) reused verbatim from
--- the A<->B proof (tools/studio/padSites.luau). Verified 2026-07-06 via MCP: all
--- 6 support posts hit terrain (back short, front long over the drop). D.1's static
--- materialization stands one persisted teahouse here.
---
--- cliff-proof-2: the LARGE pad (footprint 2x base, fits size class L). A shelf
--- ~73 studs from cliff-proof at datum 240; MCP-verified 6/6 for the 2x-base
--- footprint on 2026-07-06 (D.3). Registered first so a joiner claims it with L;
--- cliff-proof (the small base-footprint pad) stays dormant at S.
+-- Current survey maxSize: T02=L, T06=M, T04=S (all clearable to L via a later terrain cut).
 return {
-    ["cliff-proof"] = {
-        id = "cliff-proof",
-        mountCF = { -60, 274, 105, 1, 0, 0, 0, 1, 0, 0, 0, 1 },
+    ["T02"] = {
+        id = "T02",
+        mountCF = { -142.2818, 173.0035, 70.2984, 0.9754, 0, 0.2204, 0, 1, 0, -0.2204, 0, 0.9754 },
         hand = "right",
-        footprint = { minX = -7.40, maxX = 15.00, minZ = -11.70, maxZ = 4.32 },
+        maxSize = "L",
         vacantForm = "dormant-structure",
     },
-    ["cliff-proof-2"] = {
-        id = "cliff-proof-2",
-        mountCF = { -130, 240, 125, 1, 0, 0, 0, 1, 0, 0, 0, 1 },
+    ["T06"] = {
+        id = "T06",
+        mountCF = { -381.7, 222.9114, 65, 0.6, 0, -0.8, 0, 1, 0, 0.8, 0, 0.6 },
         hand = "right",
-        footprint = { minX = -14.80, maxX = 30.00, minZ = -23.40, maxZ = 8.64 },
+        maxSize = "M",
+        vacantForm = "dormant-structure",
+    },
+    ["T04"] = {
+        id = "T04",
+        mountCF = { -190.7751, 217.7481, 94.3078, 0.9634, 0, -0.268, 0, 1, 0, 0.268, 0, 0.9634 },
+        hand = "right",
+        maxSize = "S",
         vacantForm = "dormant-structure",
     },
 }
