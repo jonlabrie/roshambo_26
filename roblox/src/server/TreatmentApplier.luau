@@ -97,10 +97,17 @@ function TreatmentApplier:apply(padId: string, spec: any, treatment: any, scale:
     end
     if footprint ~= nil then
         local mountCF = CFrame.new(table.unpack(spec.mountCF))
-        self._padBuilder.build(
-            { mountCF = spec.mountCF, hand = spec.hand, footprint = footprint },
-            self._padOpsNew(mountCF, folder)
-        )
+        local okPosts, postErr = pcall(function()
+            self._padBuilder.build(
+                { mountCF = spec.mountCF, hand = spec.hand, footprint = footprint },
+                self._padOpsNew(mountCF, folder)
+            )
+        end)
+        if not okPosts then
+            -- degraded, not fatal: the structure is already built; a missing post set must not
+            -- blank the site or abort the caller's vacantActions loop (F2).
+            warn(`[D.5] post rebuild failed for {padId}: {postErr}`)
+        end
     end
     model.Parent = folder
     if model:IsA("Model") then
