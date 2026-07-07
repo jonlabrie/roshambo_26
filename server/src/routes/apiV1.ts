@@ -6,7 +6,7 @@ import { resolveUser } from '../identity';
 import { bankPot } from '../wallet';
 import User from '../models/User';
 import { Throw } from '../engine/GameRules';
-import { validateLoadout, validateSizeClass } from '../loadout';
+import { validateLoadout, validateSizeClass, validatePadPreferences } from '../loadout';
 
 export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     const router = express.Router();
@@ -107,7 +107,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
             res.set('Cache-Control', 'no-store');
             const teahouses = user.teahouses ? Object.fromEntries(user.teahouses as Map<string, unknown>) : {};
-            res.json({ teahouses });
+            res.json({ teahouses, padPreferences: user.padPreferences ?? [] });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
         }
@@ -129,6 +129,21 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             (user.teahouses as Map<string, unknown>).set(sizeClass, loadout);
             await user.save();
             res.json({ sizeClass, loadout });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
+    router.put('/players/:robloxUserId/preferences', async (req, res) => {
+        try {
+            const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
+            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            const padPreferences = req.body?.padPreferences;
+            const check = validatePadPreferences(padPreferences);
+            if (!check.ok) { res.status(400).json({ error: check.error }); return; }
+            user.padPreferences = padPreferences as string[];
+            await user.save();
+            res.json({ padPreferences: user.padPreferences });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
         }

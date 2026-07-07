@@ -224,7 +224,7 @@ describe('/api/v1', () => {
         it('GET returns {} for a wanderer, no-store', async () => {
             const res = await request(makeApp(makeEngine(), new ResultsStore()))
                 .get('/api/v1/players/roblox-1/teahouses').set('X-API-Key', API_KEY).expect(200);
-            expect(res.body).toEqual({ teahouses: {} });
+            expect(res.body).toEqual({ teahouses: {}, padPreferences: [] });
             expect(res.headers['cache-control']).toBe('no-store');
         });
 
@@ -262,6 +262,40 @@ describe('/api/v1', () => {
         it('requires the API key', async () => {
             await request(makeApp(makeEngine(), new ResultsStore()))
                 .get('/api/v1/players/roblox-1/teahouses').expect(401);
+        });
+    });
+
+    describe('preferences persistence', () => {
+        it('PUT then GET teahouses returns padPreferences', async () => {
+            const app = makeApp(makeEngine(), new ResultsStore());
+            await request(app).put('/api/v1/players/roblox-1/preferences')
+                .set('X-API-Key', API_KEY).send({ padPreferences: ['T06', 'T02'] }).expect(200);
+            const res = await request(app).get('/api/v1/players/roblox-1/teahouses')
+                .set('X-API-Key', API_KEY).expect(200);
+            expect(res.body.padPreferences).toEqual(['T06', 'T02']);
+        });
+
+        it('PUT echoes the stored preferences', async () => {
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .put('/api/v1/players/roblox-1/preferences')
+                .set('X-API-Key', API_KEY).send({ padPreferences: ['T04'] }).expect(200);
+            expect(res.body).toEqual({ padPreferences: ['T04'] });
+        });
+
+        it('400 on a non-array / oversize / non-string body', async () => {
+            const app = makeApp(makeEngine(), new ResultsStore());
+            await request(app).put('/api/v1/players/roblox-1/preferences')
+                .set('X-API-Key', API_KEY).send({ padPreferences: 'T06' }).expect(400);
+            await request(app).put('/api/v1/players/roblox-1/preferences')
+                .set('X-API-Key', API_KEY).send({ padPreferences: [42] }).expect(400);
+            await request(app).put('/api/v1/players/roblox-1/preferences')
+                .set('X-API-Key', API_KEY)
+                .send({ padPreferences: Array.from({ length: 33 }, (_, i) => `T${i}`) }).expect(400);
+        });
+
+        it('401 without the API key', async () => {
+            await request(makeApp(makeEngine(), new ResultsStore()))
+                .put('/api/v1/players/roblox-1/preferences').send({ padPreferences: [] }).expect(401);
         });
     });
 });
