@@ -1,8 +1,9 @@
 --!strict
--- Studio-runtime applier for sub-project D. Builds a pad's support posts once
--- (buildSupport) and transactionally (re)builds its Structure child per a
--- VacantState Treatment (apply), shuttering the structure when not lit. Roblox
--- datatypes -> not Lune-testable; proven by the D.2 visual gate. A thin adapter:
+-- Studio-runtime applier for sub-project D. `apply` transactionally (re)builds a
+-- site's Structure child per a VacantState Treatment AND its dynamic support posts
+-- (built to the materialized footprint: a stilt only where terrain drops below the
+-- deck; embed/void corners get none), shuttering the structure when not lit. Roblox
+-- datatypes -> not Lune-testable; proven by the visual gate. A thin adapter:
 -- the builders/ops/catalog are injected.
 local TreatmentApplier = {}
 TreatmentApplier.__index = TreatmentApplier
@@ -39,12 +40,6 @@ function TreatmentApplier:_folder(padId: string): Folder
     return f
 end
 
-function TreatmentApplier:buildSupport(spec: any)
-    local folder = self:_folder(spec.id)
-    local mountCF = CFrame.new(table.unpack(spec.mountCF))
-    self._padBuilder.build(spec, self._padOpsNew(mountCF, folder))
-end
-
 local function shutter(model: Model)
     for _, d in model:GetDescendants() do
         if d:IsA("PointLight") then
@@ -63,22 +58,22 @@ local function shutter(model: Model)
     end
 end
 
-function TreatmentApplier:apply(padId: string, spec: any, treatment: any, scale: number?)
+function TreatmentApplier:apply(padId: string, spec: any, treatment: any, scale: number?, footprint: any?)
     local folder = self:_folder(padId)
     if treatment.kind ~= "structure" then
         local existing = folder:FindFirstChild("Structure")
         if existing then
             existing:Destroy()
         end
-        return -- garden treatment: applier deferred to D.5
+        return -- garden treatment: applier deferred to a later increment
     end
-    local mount = { cframe = spec.mountCF, hand = spec.hand, footprint = spec.footprint }
+    local mount = { cframe = spec.mountCF, hand = spec.hand, footprint = footprint }
     local ok, result = pcall(function()
         return self._structureBuilder.build(treatment.loadout, mount, self._catalog, self._structureOps)
     end)
     if not ok then
-        warn(`[D.2] apply failed for {padId}: {result}`)
-        return -- keep whatever structure was already there (F4: no crash, no orphan swap)
+        warn(`[D.4] apply failed for {padId}: {result}`)
+        return -- keep whatever was there (F4: no crash, no orphan swap)
     end
     local model = result :: Model
     model.Name = "Structure"
@@ -88,9 +83,24 @@ function TreatmentApplier:apply(padId: string, spec: any, treatment: any, scale:
     if not treatment.lit then
         shutter(model)
     end
+    -- transactional swap: drop the old structure + old posts, build the new posts to
+    -- the materialized footprint (dynamic: a stilt only where terrain is below the deck),
+    -- then parent the new structure.
     local existing = folder:FindFirstChild("Structure")
     if existing then
         existing:Destroy()
+    end
+    for _, c in folder:GetChildren() do
+        if c.Name == "PadPost" then
+            c:Destroy()
+        end
+    end
+    if footprint ~= nil then
+        local mountCF = CFrame.new(table.unpack(spec.mountCF))
+        self._padBuilder.build(
+            { mountCF = spec.mountCF, hand = spec.hand, footprint = footprint },
+            self._padOpsNew(mountCF, folder)
+        )
     end
     model.Parent = folder
     if model:IsA("Model") then
