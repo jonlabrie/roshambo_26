@@ -373,21 +373,21 @@ local applier = TreatmentApplier.new({
     padOpsNew = PadOps.new,
 })
 
--- cliff-proof registered first: the sole local joiner claims it; cliff-proof-2 stays dormant
-for _, id in { "cliff-proof", "cliff-proof-2" } do
+-- cliff-proof-2 (large) registered first: the sole local joiner claims it with L; cliff-proof (small) stays dormant at S
+for _, id in { "cliff-proof-2", "cliff-proof" } do
     siteCoordinator:registerPad(id, PadSites[id])
 end
 for _, action in siteCoordinator:vacantActions() do
     applier:buildSupport(action.spec)
-    applier:apply(action.padId, action.spec, action.treatment)
+    applier:apply(action.padId, action.spec, action.treatment, action.scale)
 end
 
 Players.PlayerAdded:Connect(function(player)
     task.spawn(function()
         local res = net:getTeahouses(tostring(player.UserId))
-        -- a non-ok fetch reads as "owns nothing" (no pad this session, no retry) — a D.3+ concern
-        local loadout = if res.ok then (res.data.teahouses or {}).M else nil
-        local action = siteCoordinator:onJoin(tostring(player.UserId), loadout)
+        -- a non-ok fetch reads as "owns nothing" (no pad this session, no retry)
+        local owned = if res.ok then res.data.teahouses or {} else nil
+        local action = siteCoordinator:onJoin(tostring(player.UserId), owned)
         if action then
             -- getTeahouses yields; if the player left mid-call, PlayerRemoving's onLeave
             -- already ran as a no-op (nothing was held yet). Release the just-claimed pad
@@ -395,12 +395,12 @@ Players.PlayerAdded:Connect(function(player)
             if not player:IsDescendantOf(Players) then
                 local rel = siteCoordinator:onLeave(tostring(player.UserId))
                 if rel then
-                    applier:apply(rel.padId, rel.spec, rel.treatment)
+                    applier:apply(rel.padId, rel.spec, rel.treatment, rel.scale)
                 end
                 return
             end
-            applier:apply(action.padId, action.spec, action.treatment)
-            print(`[D.2] {player.UserId} claimed {action.padId}`)
+            applier:apply(action.padId, action.spec, action.treatment, action.scale)
+            print(`[D.3] {player.UserId} claimed {action.padId} @ {tostring(action.sizeClass)}`)
         end
     end)
 end)
@@ -408,8 +408,8 @@ end)
 Players.PlayerRemoving:Connect(function(player)
     local action = siteCoordinator:onLeave(tostring(player.UserId))
     if action then
-        applier:apply(action.padId, action.spec, action.treatment)
-        print(`[D.2] {player.UserId} released {action.padId}`)
+        applier:apply(action.padId, action.spec, action.treatment, action.scale)
+        print(`[D.3] {player.UserId} released {action.padId}`)
     end
 end)
 
