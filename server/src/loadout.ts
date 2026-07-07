@@ -32,3 +32,21 @@ export function validateSizeClass(sizeClass: unknown, existingClasses: string[])
     }
     return { ok: true };
 }
+
+export const MAX_PREFERENCES = 32;
+export const MAX_PREFERENCE_LEN = 32;
+
+export function validatePadPreferences(value: unknown): Check {
+    if (!Array.isArray(value)) {
+        return { ok: false, error: 'BAD_REQUEST' };
+    }
+    if (value.length > MAX_PREFERENCES) {
+        return { ok: false, error: 'BAD_REQUEST' };
+    }
+    for (const entry of value) {
+        if (typeof entry !== 'string' || entry.length === 0 || entry.length > MAX_PREFERENCE_LEN) {
+            return { ok: false, error: 'BAD_REQUEST' };
+        }
+    }
+    return { ok: true };
+}

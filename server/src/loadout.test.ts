@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateLoadout, validateSizeClass, MAX_CLASSES } from './loadout';
+import { validateLoadout, validateSizeClass, validatePadPreferences, MAX_CLASSES } from './loadout';
 
 describe('validateLoadout', () => {
     it('accepts a well-formed loadout', () => {
@@ -36,5 +36,26 @@ describe('validateSizeClass', () => {
         const full = Array.from({ length: MAX_CLASSES }, (_, i) => `c${i}`);
         expect(validateSizeClass('new', full).ok).toBe(false); // 9th distinct
         expect(validateSizeClass('c0', full).ok).toBe(true);   // overwriting an existing one is fine
+    });
+});
+
+describe('validatePadPreferences', () => {
+    it('accepts an array of short strings, and an empty array', () => {
+        expect(validatePadPreferences([]).ok).toBe(true);
+        expect(validatePadPreferences(['T06', 'T02']).ok).toBe(true);
+    });
+    it('rejects a non-array', () => {
+        expect(validatePadPreferences('T06').ok).toBe(false);
+        expect(validatePadPreferences(null).ok).toBe(false);
+        expect(validatePadPreferences({ 0: 'T06' }).ok).toBe(false);
+    });
+    it('rejects more than 32 entries', () => {
+        expect(validatePadPreferences(Array.from({ length: 33 }, (_, i) => `T${i}`)).ok).toBe(false);
+    });
+    it('rejects a non-string entry', () => {
+        expect(validatePadPreferences(['T06', 42]).ok).toBe(false);
+    });
+    it('rejects an entry longer than 32 chars', () => {
+        expect(validatePadPreferences(['x'.repeat(33)]).ok).toBe(false);
     });
 });
