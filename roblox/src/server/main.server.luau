@@ -386,7 +386,8 @@ Players.PlayerAdded:Connect(function(player)
         local res = net:getTeahouses(tostring(player.UserId))
         -- a non-ok fetch reads as "owns nothing" (no pad this session, no retry)
         local owned = if res.ok then res.data.teahouses or {} else nil
-        local action = siteCoordinator:onJoin(tostring(player.UserId), owned)
+        local prefs = if res.ok then res.data.padPreferences else nil
+        local action = siteCoordinator:onJoin(tostring(player.UserId), owned, prefs)
         if action then
             -- getTeahouses yields; if the player left mid-call, PlayerRemoving's onLeave
             -- already ran as a no-op (nothing was held yet). Release the just-claimed pad
@@ -399,7 +400,7 @@ Players.PlayerAdded:Connect(function(player)
                 return
             end
             applier:apply(action.padId, action.spec, action.treatment, action.scale, action.footprint)
-            print(`[D.4] {player.UserId} claimed {action.padId} @ {tostring(action.sizeClass)}`)
+            print(`[D.5] {player.UserId} claimed {action.padId} @ {tostring(action.sizeClass)}`)
         end
     end)
 end)
