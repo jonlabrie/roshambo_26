@@ -13,6 +13,11 @@ export type Footprint = { minX: number, maxX: number, minZ: number, maxZ: number
 SizeClasses.BASE_FOOTPRINT = { minX = -7.40, maxX = 15.00, minZ = -11.70, maxZ = 4.32 } :: Footprint
 SizeClasses.order = { "L", "M", "S" } -- largest first
 SizeClasses.scale = { S = 1.0, M = 1.5, L = 2.0 } :: { [string]: number }
+SizeClasses.rank = { S = 1, M = 2, L = 3 } :: { [string]: number }
+
+function SizeClasses.fitsWithin(size: string, maxSize: string): boolean
+    return SizeClasses.rank[size] <= SizeClasses.rank[maxSize]
+end
 
 function SizeClasses.footprintFor(sizeClass: string): Footprint
     local s = SizeClasses.scale[sizeClass]
