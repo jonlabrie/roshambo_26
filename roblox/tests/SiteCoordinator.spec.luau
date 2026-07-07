@@ -83,6 +83,48 @@ describe("SiteCoordinator.onJoin", function()
     end)
 end)
 
+describe("SiteCoordinator.onJoin preference", function()
+    local function sites()
+        return { spec("T02", "L"), spec("T06", "M"), spec("T04", "S") }
+    end
+    local OWNED_MS = { M = LOADOUT, S = LOADOUT }
+
+    test("a preferred site is claimed first within the fitting size tier", function()
+        local c = coord(sites())
+        local a = c:onJoin("p1", OWNED_MS, { "T06" })
+        expect((a :: any).padId).toBe("T06")
+        expect((a :: any).sizeClass).toBe("M")
+    end)
+
+    test("size stays primary: preference never trades away a larger owned size", function()
+        local c = coord(sites())
+        -- owns only L; prefers the M-max site T06, which cannot fit L
+        local a = c:onJoin("p1", { L = LOADOUT }, { "T06" })
+        expect((a :: any).padId).toBe("T02")
+        expect((a :: any).sizeClass).toBe("L")
+    end)
+
+    test("nil preference reproduces registration order", function()
+        local c = coord(sites())
+        -- M is the biggest owned; T06 is the only M-max site (T02 is L-max and fits M too);
+        -- registration order tries T02 first, which fits M -> T02.
+        local a = c:onJoin("p1", OWNED_MS, nil)
+        expect((a :: any).padId).toBe("T02")
+    end)
+
+    test("a stale/unregistered preference id is ignored", function()
+        local c = coord(sites())
+        local a = c:onJoin("p1", OWNED_MS, { "NOPE", "T06" })
+        expect((a :: any).padId).toBe("T06")
+    end)
+
+    test("a duplicate preferred id does not double-place or error", function()
+        local c = coord(sites())
+        local a = c:onJoin("p1", OWNED_MS, { "T06", "T06" })
+        expect((a :: any).padId).toBe("T06")
+    end)
+end)
+
 describe("SiteCoordinator.onLeave", function()
     test("a holder releases dormant at the site's max size and frees it", function()
         local c = coord({ spec("L1", "L") })

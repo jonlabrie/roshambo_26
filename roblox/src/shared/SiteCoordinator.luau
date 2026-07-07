@@ -4,7 +4,8 @@
 -- release) with VacantState (treatment) and SizeClasses (size-cap fit). Pure
 -- (Lune-tested): no Roblox datatypes. A site carries a `maxSize`; onJoin claims the
 -- first vacant site whose maxSize accommodates the player's largest owned size,
--- biggest-first. The Studio-side TreatmentApplier executes the Actions (scale + posts).
+-- biggest-first. Within a size tier, a player's preferred site ids (passed to onJoin)
+-- are scanned first. The Studio-side TreatmentApplier executes the Actions (scale + posts).
 local VacantState = require("./VacantState")
 local SizeClasses = require("./SizeClasses")
 
@@ -63,17 +64,48 @@ function SiteCoordinator:vacantActions(): { Action }
     return out
 end
 
-function SiteCoordinator:onJoin(playerId: string, ownedTeahouses: { [string]: any }?): Action?
+-- Sites to scan for this join: preferred ids (in preference order, deduped, filtered
+-- to registered ids) first, then the remaining registered ids in registration order.
+function SiteCoordinator:_orderedSiteIds(preferences: { string }?): { string }
+    if preferences == nil then
+        return self._padIds
+    end
+    local registered: { [string]: boolean } = {}
+    for _, id in self._padIds do
+        registered[id] = true
+    end
+    local ordered: { string } = {}
+    local taken: { [string]: boolean } = {}
+    for _, id in preferences do
+        if registered[id] and not taken[id] then
+            taken[id] = true
+            table.insert(ordered, id)
+        end
+    end
+    for _, id in self._padIds do
+        if not taken[id] then
+            table.insert(ordered, id)
+        end
+    end
+    return ordered
+end
+
+function SiteCoordinator:onJoin(
+    playerId: string,
+    ownedTeahouses: { [string]: any }?,
+    preferences: { string }?
+): Action?
     if self._held[playerId] ~= nil then
         return nil
     end
     if ownedTeahouses == nil then
         return nil
     end
+    local order = self:_orderedSiteIds(preferences)
     for _, size in SizeClasses.order do -- L, M, S (biggest first)
         local loadout = ownedTeahouses[size]
         if loadout ~= nil then
-            for _, id in self._padIds do -- registration order (first-fit)
+            for _, id in order do -- preferred-first within this size tier
                 local rec = self._registry:get(id)
                 if rec and rec.occupant == nil and SizeClasses.fitsWithin(size, rec.spec.maxSize) then
                     self._registry:claim(id, playerId)
