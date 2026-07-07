@@ -35,4 +35,11 @@ describe('schema additions', () => {
         });
         expect(legacy.platform).toBe('pwa'); // default preserves existing rows' meaning
     });
+
+    it('User.padPreferences defaults to an empty array and round-trips', async () => {
+        const fresh = await User.create({ deviceId: 'devPrefs' });
+        expect(fresh.padPreferences).toEqual([]);
+        const set = await User.create({ deviceId: 'devPrefs2', padPreferences: ['T06', 'T02'] });
+        expect(set.padPreferences).toEqual(['T06', 'T02']);
+    });
 });

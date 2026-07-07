@@ -20,6 +20,7 @@ export interface IUser extends Document {
     inventory: string[];
     equippedCharacterId: string;
     teahouses: Map<string, unknown>;
+    padPreferences: string[];
     updatedAt: Date;
 }
 
@@ -43,6 +44,7 @@ const UserSchema: Schema = new Schema({
     inventory: { type: [String], default: ['default'] },
     equippedCharacterId: { type: String, default: 'default' },
     teahouses: { type: Map, of: Schema.Types.Mixed, default: {} },
+    padPreferences: { type: [String], default: [] },
 }, { timestamps: true });
 
 export default mongoose.model<IUser>('User', UserSchema);
