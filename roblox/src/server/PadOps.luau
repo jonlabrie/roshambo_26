@@ -14,7 +14,7 @@ function PadOps.new(mountCF: CFrame, parent: Instance)
             rp.FilterType = Enum.RaycastFilterType.Include
             rp.FilterDescendantsInstances = { workspace.Terrain }
             local hit =
-                workspace:Raycast(Vector3.new(x, mountCF.Position.Y + 4, z), Vector3.new(0, -600, 0), rp)
+                workspace:Raycast(Vector3.new(x, mountCF.Position.Y + 250, z), Vector3.new(0, -350, 0), rp)
             return hit and hit.Position.Y or nil
         end,
         buildPost = function(pos: { number }, height: number)

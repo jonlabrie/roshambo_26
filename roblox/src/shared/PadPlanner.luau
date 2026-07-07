@@ -11,6 +11,7 @@ export type Support = { posts: { Post }, omitted: { string } }
 
 local PH = 0.6 -- half of the 1.2-stud post (outer corner flush to the footprint corner)
 local EMBED = 1.0 -- studs the post foot sinks into terrain
+local MAXPOST = 80 -- max stilt length; deeper ground reads as void (over-gorge)
 
 local function xf(cf: { number }, lx: number, ly: number, lz: number): { number }
     return {
@@ -39,7 +40,9 @@ function PadPlanner.planSupport(
     for _, p in layout do
         local top = xf(mountCF, p[2] :: number, 0, p[3] :: number)
         local groundY = groundAt(top[1], top[3])
-        if groundY == nil then
+        -- build a post only where terrain sits BELOW the datum within reach (normal);
+        -- omit corners embedded in the slope (ground >= datum) or over a void (nil / deeper than MAXPOST).
+        if groundY == nil or groundY >= top[2] or (top[2] - groundY) > MAXPOST then
             table.insert(omitted, p[1] :: string)
         else
             local foot = groundY - EMBED

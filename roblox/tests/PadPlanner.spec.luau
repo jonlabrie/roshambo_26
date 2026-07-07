@@ -55,3 +55,21 @@ test("rotated mount: 180-degree yaw negates local X/Z into world", function()
     expect(s.posts[1].pos[1]).toBe(106.4)
     expect(s.posts[1].pos[3]).toBe(60.4)
 end)
+
+test("embed: ground at/above the datum omits the post (deck beds into the slope)", function()
+    -- datum plane y = 20; ground at +25 everywhere (above the deck) -> all 6 omitted
+    local s = PadPlanner.planSupport(FP, IDENT, function()
+        return 25
+    end)
+    expect(#s.posts).toBe(0)
+    expect(#s.omitted).toBe(6)
+end)
+
+test("too-deep: ground more than MAXPOST(80) below the datum omits the post (void)", function()
+    -- datum y = 20; ground at -70 -> depth 90 > 80 -> omit
+    local s = PadPlanner.planSupport(FP, IDENT, function()
+        return -70
+    end)
+    expect(#s.posts).toBe(0)
+    expect(#s.omitted).toBe(6)
+end)
