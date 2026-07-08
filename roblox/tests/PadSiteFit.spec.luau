@@ -49,7 +49,7 @@ describe("PadSiteFit.spacingMax", function()
         expect(PadSiteFit.spacingMax(IDENT, {})).toBe("L")
     end)
     test("a keep-out clear of M but inside L -> M", function()
-        -- M maxX = 15*1.5 = 22.5; L maxX = 15*2 = 30. A rect at x[23,28] hits L, misses M.
+        -- M maxX = 15*1.3 = 19.5; L maxX = 15*1.6 = 24. A rect at x[23,28] hits L, misses M.
         expect(PadSiteFit.spacingMax(IDENT, { rect(23, -5, 28, 5) })).toBe("M")
     end)
     test("a keep-out over the origin collides with every size -> nil", function()
