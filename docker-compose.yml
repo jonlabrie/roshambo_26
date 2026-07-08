@@ -1,27 +1,13 @@
 services:
-  mongodb:
-    image: mongo:6.0
-    container_name: roshambo-db
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-
   server:
     build:
       context: ./server
       dockerfile: Dockerfile
     container_name: roshambo-server
-    environment:
-      - MONGODB_URI=mongodb://mongodb:27017/roshambo
-      - PORT=3001
-      - JWT_SECRET=roshambo_local_dev_secret
-      - TEST_MODE=true
-      - API_KEY=roshambo_local_dev_api_key
+    env_file:
+      - ./server/.env
     ports:
       - "3001:3001"
-    depends_on:
-      - mongodb
 
   frontend:
     build:
@@ -34,6 +20,3 @@ services:
       - "8080:80"
     depends_on:
       - server
-
-volumes:
-  mongodb_data:
