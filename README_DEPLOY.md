@@ -2,14 +2,25 @@
 
 This guide covers the steps to move from your local Docker environment to a live AWS production environment.
 
-## 0. Local Development (against Atlas — no local database)
+## 0. Development environments (against Atlas — no local database)
 
-Local dev and Roblox Studio testing run against a **`roshambo-dev`** database on the same Atlas cluster as production (`roshambo`); there is no local MongoDB container.
+Everything runs on **one Atlas cluster**: production uses the **`roshambo`** database, all dev/testing uses **`roshambo-dev`**. There is no local MongoDB. Atlas prerequisites: the `roshambo_app` user has `readWriteAnyDatabase` and Network Access allows `0.0.0.0/0`.
 
-1. In Atlas, ensure the `roshambo_app` Database User has `readWriteAnyDatabase` (or `readWrite` on both `roshambo` and `roshambo-dev`), and Network Access allows your IP.
-2. Put the connection string in `server/.env` (gitignored), with the database in the path: `mongodb+srv://…/roshambo-dev?retryWrites=true&w=majority`. Also set `API_KEY`, `JWT_SECRET`, `PORT=3001`, `TEST_MODE=true`.
-3. Run the stack: `docker compose up --build` (server + frontend, no database), or `cd server && npm run dev`.
-4. Roblox: copy `roblox/src/server/SecretsExample.luau` to `SecretsLocal.luau` (gitignored) and set `baseUrl = "http://localhost:3001"`, `apiKey` = your dev `API_KEY`.
+### 0a. Cloud dev backend — `roshambo_server_dev` (App Runner, the default)
+
+A second App Runner service runs the dev backend so Studio/PWA dev needs no local server at all:
+- **Service:** `roshambo_server_dev` → `https://zzaw22ugpq.us-east-1.awsapprunner.com`
+- **Source:** GitHub `m4b-zendojo-art-pass`, **auto-deploy ON** (pushes redeploy dev automatically), configured via the **API** (not `apprunner.yaml`, so it can't inherit prod's `/roshambo/*` secrets).
+- **Secrets:** `/roshambo/dev/*` SSM SecureStrings (`MONGODB_URI` → `roshambo-dev`, `API_KEY`, `JWT_SECRET`). The prod instance role `RoshamboAppRunnerInstanceRole` already grants these (its `/roshambo/*` wildcard covers `/roshambo/dev/*`).
+- **Env:** `TEST_MODE=true`, `PORT=3001`. Size `0.25 vCPU / 0.5 GB` (pause the service when idle to cut cost).
+- **Roblox:** set `roblox/src/server/SecretsLocal.luau` (gitignored) `baseUrl` to the dev URL above, `apiKey` = the dev `API_KEY`.
+
+### 0b. Local backend (optional fallback)
+
+To run the server on your own machine instead (e.g. to test un-pushed code before it reaches the dev service):
+1. Put the `roshambo-dev` connection string in `server/.env` (gitignored) — `mongodb+srv://…/roshambo-dev?retryWrites=true&w=majority` — plus `API_KEY`, `JWT_SECRET`, `PORT=3001`, `TEST_MODE=true`.
+2. `docker compose up --build` (server + frontend, no database) or `cd server && npm run dev`.
+3. Point `SecretsLocal.luau` `baseUrl` at `http://localhost:3001`.
 
 ## 1. MongoDB Atlas Setup
 1. Create a free cluster at [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
