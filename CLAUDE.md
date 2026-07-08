@@ -76,6 +76,23 @@ Milestone 3 adds the playable loop: picks flow client→`SubmitPick` RemoteEvent
 
 Milestone 4a adds the arena machinery: pure modules (`FlapScheduler`, `HammerCurve`, `DoomEscalation`, `ChoreographyMachine`, `FateRegistry`, `ThemeManifest`+`themes/ZenDojo`, `EffectRegistry`/`EffectSelector`) drive client controllers (`BoardController`, `HammerController`, `TheaterController`, `FateController`) over a client-side `EventBus`. New remotes: `RevealTheater` (arena-wide results), `FateResolved` (victim-authority catch/accept), `BoardData`. Fate-bound players cannot throw until their fate resolves (server gate in `main.server.luau`). All visuals are placeholders pending milestone 4b's art pass.
 
+### Workspace organization (Rojo vs place-only)
+
+Rojo manages **exactly what `default.project.json` names** — all of it lives under
+`Workspace.RoshamboStage` (7 hero-prop models from `assets/*.model.json` + `ArenaSpawn`).
+`RoshamboStage` holds nothing else; never hand-add children to it in Studio.
+
+Everything else in Workspace is **place-only** (saved in the place, not in git) and
+organized by lifecycle:
+- `Workspace.CanyonWorld` — shipped hand-built geometry/VFX: `Arena` (river/falls VFX +
+  rocks near the arena, kept `Persistent` for distant spawn-watchers via
+  `StagePersistence`), `Paths`, `Structures`, `Legacy` (the frozen 14 `CanyonTeahouses`).
+- `Workspace.Sandbox` — throwaway prototypes/drafts.
+
+Ship by **publishing/saving the place, never `rojo build`** (that emits only the declared
+RoshamboStage children and drops all place-only content). CI fails if a `.rbxl(x)` is
+committed; before publishing, run `tools/studio/verifyWorkspaceConvention.luau` in Studio.
+
 ### Identity: deviceId + optional JWT
 
 Guests are identified by a random `deviceId` in localStorage; logging in (email/password via `/auth` REST routes) adds a JWT passed in the socket handshake (`auth.token`). `resolveUser()` in `server/src/identity.ts` merges the two (plus `robloxId` for Roblox players) — authenticated user wins, with cleanup logic that re-tags stale duplicate device records (`stale_<ts>_<id>`). Sockets join a room named after their deviceId so the server can emit targeted `player-data`.

@@ -22,6 +22,15 @@ To run the server on your own machine instead (e.g. to test un-pushed code befor
 2. `docker compose up --build` (server + frontend, no database) or `cd server && npm run dev`.
 3. Point `SecretsLocal.luau` `baseUrl` at `http://localhost:3001`.
 
+### 0c. Before publishing the Roblox place
+
+Ship the Roblox place by **publishing/saving it in Studio, never `rojo build`** — `rojo
+build` only emits the declared `Workspace.RoshamboStage` children (`default.project.json`)
+and silently drops all place-only content (`CanyonWorld`, `Sandbox`). Before publishing,
+run `roblox/tools/studio/verifyWorkspaceConvention.luau` in Studio to confirm the Workspace
+still matches the Rojo/place-only convention (see CLAUDE.md, "Workspace organization").
+CI separately fails the build if a `.rbxl(x)` file is ever committed.
+
 ## 1. MongoDB Atlas Setup
 1. Create a free cluster at [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
 2. Go to **Network Access** and add your IP (for initial setup) and `0.0.0.0/0` (for App Runner connectivity).
