@@ -2,6 +2,15 @@
 
 This guide covers the steps to move from your local Docker environment to a live AWS production environment.
 
+## 0. Local Development (against Atlas — no local database)
+
+Local dev and Roblox Studio testing run against a **`roshambo-dev`** database on the same Atlas cluster as production (`roshambo`); there is no local MongoDB container.
+
+1. In Atlas, ensure the `roshambo_app` Database User has `readWriteAnyDatabase` (or `readWrite` on both `roshambo` and `roshambo-dev`), and Network Access allows your IP.
+2. Put the connection string in `server/.env` (gitignored), with the database in the path: `mongodb+srv://…/roshambo-dev?retryWrites=true&w=majority`. Also set `API_KEY`, `JWT_SECRET`, `PORT=3001`, `TEST_MODE=true`.
+3. Run the stack: `docker compose up --build` (server + frontend, no database), or `cd server && npm run dev`.
+4. Roblox: copy `roblox/src/server/SecretsExample.luau` to `SecretsLocal.luau` (gitignored) and set `baseUrl = "http://localhost:3001"`, `apiKey` = your dev `API_KEY`.
+
 ## 1. MongoDB Atlas Setup
 1. Create a free cluster at [MongoDB Atlas](https://www.mongodb.com/cloud/atlas).
 2. Go to **Network Access** and add your IP (for initial setup) and `0.0.0.0/0` (for App Runner connectivity).

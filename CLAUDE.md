@@ -31,10 +31,11 @@ npm start          # node dist/index.js
 npm test           # vitest (also: npm run test:watch)
 ```
 
-Full local stack (MongoDB + server + frontend on :8080):
+Full local stack (server + frontend on :8080, backed by MongoDB Atlas — no local database):
 ```bash
 docker-compose up --build
 ```
+The `server` service reads `server/.env` (gitignored) for its Atlas connection; local dev and Studio testing use the `roshambo-dev` database on the shared cluster (prod uses `roshambo`). There is no local MongoDB container.
 
 Roblox client (`roblox/`, requires [Rokit](https://github.com/rojo-rbx/rokit) — run `rokit install` once from `roblox/`):
 ```bash
@@ -46,7 +47,7 @@ stylua --check src tests && selene src   # format + lint
 
 Node version is pinned via `.nvmrc` (24.x).
 
-The server requires `MONGODB_URI` (exits immediately without it; `server/.env` holds local config) and `API_KEY` (required for `/api/v1`; PWA works without it). The frontend needs `VITE_SOCKET_URL` pointing at the backend (defaults to same-origin if unset). Set `TEST_MODE=true` on the server for a deterministic World Throw cycle (R→P→S) instead of random.
+The server requires `MONGODB_URI` (exits immediately without it; `server/.env` holds local config — an Atlas `roshambo-dev` connection string, not a local database) and `API_KEY` (required for `/api/v1`; PWA works without it). The frontend needs `VITE_SOCKET_URL` pointing at the backend (defaults to same-origin if unset). Set `TEST_MODE=true` on the server for a deterministic World Throw cycle (R→P→S) instead of random.
 
 ## Architecture
 
