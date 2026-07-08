@@ -15,6 +15,7 @@ local PlayerProfiles = require(shared:WaitForChild("PlayerProfiles"))
 local ThemeManifest = require(shared:WaitForChild("ThemeManifest"))
 local ZenDojo = require(shared:WaitForChild("themes"):WaitForChild("ZenDojo"))
 local FateRegistry = require(shared:WaitForChild("FateRegistry"))
+local PreferenceEditor = require(shared:WaitForChild("PreferenceEditor"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local SubmitPick = remotes:WaitForChild("SubmitPick") :: RemoteEvent
@@ -25,6 +26,8 @@ local ProfileUpdate = remotes:WaitForChild("ProfileUpdate") :: RemoteEvent
 local RevealTheater = remotes:WaitForChild("RevealTheater") :: RemoteEvent
 local FateResolved = remotes:WaitForChild("FateResolved") :: RemoteEvent
 local BoardData = remotes:WaitForChild("BoardData") :: RemoteEvent
+local SetPadPreference = remotes:WaitForChild("SetPadPreference") :: RemoteEvent
+local PreferenceState = remotes:WaitForChild("PreferenceState") :: RemoteEvent
 local TweenService = game:GetService("TweenService")
 local TextService = game:GetService("TextService")
 
@@ -359,6 +362,9 @@ local PadOps = require(script.Parent:WaitForChild("PadOps"))
 local PadSites = require(script.Parent:WaitForChild("PadSites"))
 local TreatmentApplier = require(script.Parent:WaitForChild("TreatmentApplier"))
 
+local playerPrefs: { [string]: { string } } = {}
+local PREF_CAP = 32
+
 local siteCoordinator = SiteCoordinator.new(PadRegistry.new())
 local sitesFolder = Instance.new("Folder")
 sitesFolder.Name = "TeahouseSites"
@@ -387,29 +393,63 @@ Players.PlayerAdded:Connect(function(player)
         -- a non-ok fetch reads as "owns nothing" (no pad this session, no retry)
         local owned = if res.ok then res.data.teahouses or {} else nil
         local prefs = if res.ok then res.data.padPreferences else nil
-        local action = siteCoordinator:onJoin(tostring(player.UserId), owned, prefs)
+        local uid = tostring(player.UserId)
+        playerPrefs[uid] = prefs or {}
+        local action = siteCoordinator:onJoin(uid, owned, prefs)
         if action then
             -- getTeahouses yields; if the player left mid-call, PlayerRemoving's onLeave
             -- already ran as a no-op (nothing was held yet). Release the just-claimed pad
             -- so it doesn't leak lit for a departed player (and _held doesn't go stale).
             if not player:IsDescendantOf(Players) then
-                local rel = siteCoordinator:onLeave(tostring(player.UserId))
+                local rel = siteCoordinator:onLeave(uid)
                 if rel then
                     applier:apply(rel.padId, rel.spec, rel.treatment, rel.scale, rel.footprint)
                 end
+                playerPrefs[uid] = nil
                 return
             end
             applier:apply(action.padId, action.spec, action.treatment, action.scale, action.footprint)
             print(`[D.5] {player.UserId} claimed {action.padId} @ {tostring(action.sizeClass)}`)
         end
+        if player:IsDescendantOf(Players) then
+            PreferenceState:FireClient(player, { padPreferences = playerPrefs[uid] })
+        end
     end)
 end)
 
 Players.PlayerRemoving:Connect(function(player)
+    playerPrefs[tostring(player.UserId)] = nil
     local action = siteCoordinator:onLeave(tostring(player.UserId))
     if action then
         applier:apply(action.padId, action.spec, action.treatment, action.scale, action.footprint)
         print(`[D.4] {player.UserId} released {action.padId}`)
+    end
+end)
+
+SetPadPreference.OnServerEvent:Connect(function(player, siteId)
+    if type(siteId) ~= "string" or PadSites[siteId] == nil then
+        return -- ignore ill-typed / unknown site ids
+    end
+    local uid = tostring(player.UserId)
+    local current = playerPrefs[uid] or {}
+    local newList, favorited = PreferenceEditor.togglePreference(current, siteId, PREF_CAP)
+    playerPrefs[uid] = newList
+    local persisted = net:setPreferences(uid, newList)
+    if not persisted.ok then
+        warn(`[D.5] setPreferences failed for {uid}: {tostring(persisted.error)}`)
+        playerPrefs[uid] = current
+        if player:IsDescendantOf(Players) then
+            PreferenceState:FireClient(player, { padPreferences = current }) -- revert client, no toast
+        end
+        return
+    end
+    if player:IsDescendantOf(Players) then
+        PreferenceState:FireClient(player, {
+            padPreferences = newList,
+            changed = siteId,
+            favorited = favorited,
+            name = PadSites[siteId].displayName or siteId,
+        })
     end
 end)
 
