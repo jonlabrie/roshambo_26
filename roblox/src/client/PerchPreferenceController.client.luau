@@ -75,39 +75,58 @@ local function anchorPart(structure: Instance): BasePart?
     return structure:FindFirstChildWhichIsA("BasePart", true)
 end
 
-local function ensurePrompt(folder: Instance)
-    local siteId = folder.Name:match("^MaterializedSite_(.+)$")
-    if not siteId or prompts[siteId] then
+local boundStructure: { [string]: Instance } = {}
+
+local function makePrompt(siteId: string, anchor: BasePart)
+    local prompt = Instance.new("ProximityPrompt")
+    prompt.ActionText = labelFor(siteId)
+    prompt.ObjectText = "Perch"
+    prompt.KeyboardKeyCode = Enum.KeyCode.E
+    prompt.MaxActivationDistance = 16
+    prompt.RequiresLineOfSight = false
+    prompt.Parent = anchor
+    prompt.Triggered:Connect(function()
+        SetPadPreference:FireServer(siteId)
+    end)
+    prompts[siteId] = prompt
+end
+
+-- (Re)bind whenever a Structure appears, so the prompt survives the server rebuilding
+-- the Structure child on occupancy changes. Dedupe per Structure instance so the
+-- initial FindFirstChild + ChildAdded can't double-create for the same one.
+local function attachToStructure(siteId: string, structure: Instance)
+    if boundStructure[siteId] == structure then
         return
     end
-    task.spawn(function()
-        local structure = folder:WaitForChild("Structure", 15)
-        if not structure then
-            return
+    local anchor = anchorPart(structure)
+    if not anchor then
+        return
+    end
+    boundStructure[siteId] = structure
+    makePrompt(siteId, anchor)
+end
+
+local function bindSite(folder: Instance)
+    local siteId = folder.Name:match("^MaterializedSite_(.+)$")
+    if not siteId then
+        return
+    end
+    folder.ChildAdded:Connect(function(child)
+        if child.Name == "Structure" then
+            attachToStructure(siteId, child)
         end
-        local anchor = anchorPart(structure)
-        if not anchor then
-            return
-        end
-        local prompt = Instance.new("ProximityPrompt")
-        prompt.ActionText = labelFor(siteId)
-        prompt.ObjectText = "Perch"
-        prompt.KeyboardKeyCode = Enum.KeyCode.E
-        prompt.MaxActivationDistance = 16
-        prompt.RequiresLineOfSight = false
-        prompt.Parent = anchor
-        prompt.Triggered:Connect(function()
-            SetPadPreference:FireServer(siteId)
-        end)
-        prompts[siteId] = prompt
     end)
+    local existing = folder:FindFirstChild("Structure")
+    if existing then
+        attachToStructure(siteId, existing)
+    end
 end
 
 local sitesFolder = workspace:WaitForChild("TeahouseSites")
 for _, f in sitesFolder:GetChildren() do
-    ensurePrompt(f)
+    bindSite(f)
 end
-sitesFolder.ChildAdded:Connect(ensurePrompt)
+sitesFolder.ChildAdded:Connect(bindSite)
 
 PreferenceState.OnClientEvent:Connect(function(payload)
     favored = {}
