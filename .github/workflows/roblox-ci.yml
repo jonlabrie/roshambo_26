@@ -13,6 +13,16 @@ jobs:
         working-directory: roblox
     steps:
       - uses: actions/checkout@v4
+      - name: No committed place files
+        working-directory: ${{ github.workspace }}
+        run: |
+          matches=$(git ls-files '*.rbxl' '*.rbxlx')
+          if [ -n "$matches" ]; then
+            echo "::error::Committed Roblox place file(s) found. The place is place-only; never commit a built .rbxl(x):"
+            echo "$matches"
+            exit 1
+          fi
+          echo "OK — no tracked place files."
       - name: Install Rokit
         run: |
           curl -sSf https://raw.githubusercontent.com/rojo-rbx/rokit/main/scripts/install.sh | bash
