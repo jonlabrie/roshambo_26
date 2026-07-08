@@ -35,13 +35,16 @@ git checkout -b chore/atlas-consolidation
 git rev-parse --abbrev-ref HEAD   # expect: chore/atlas-consolidation
 ```
 
-- [ ] **Step 2: Provision Atlas (USER — in the Atlas console)**
+- [ ] **Step 2: Confirm Atlas access (USER — in the Atlas console)**
 
-The user performs these; Claude cannot reach the Atlas console. Hand the user this checklist:
-1. **Database user:** ensure a DB user has `readWrite` on **`roshambo-dev`** (a cluster-wide `readWriteAnyDatabase` user, or a dev-scoped user — either is fine). Confirm the production user still has `readWrite` on `roshambo`.
+Reuse the **existing `roshambo_app`** user (the one production uses) — no new user needed. The user performs these; Claude cannot reach the Atlas console. Hand the user this checklist:
+1. **Role check** (Database Access → `roshambo_app` → role):
+   - If **`readWriteAnyDatabase`** / **`atlasAdmin`** (cluster-wide) → reuse as-is; nothing to change. `roshambo-dev` is created implicitly on first write.
+   - If **`readWrite` scoped to `roshambo`** specifically → add a second role `readWrite @ roshambo-dev` (or broaden to `readWriteAnyDatabase`). Still no new user.
 2. **Network access:** the developer's current IP (or `0.0.0.0/0` for dev convenience) is allow-listed.
-3. **Connection string** with the db in the path:
-   `mongodb+srv://<devUser>:<pw>@roshambocluster0.ckjseml.mongodb.net/roshambo-dev?retryWrites=true&w=majority&appName=RoshamboCluster0`
+3. **Connection string** = the working `roshambo_app` string, with the db in the path switched to **`/roshambo-dev`**:
+   `mongodb+srv://roshambo_app:<pw>@roshambocluster0.ckjseml.mongodb.net/roshambo-dev?retryWrites=true&w=majority&appName=RoshamboCluster0`
+   (Note: the URI currently in `server/.env` uses a *different*, non-working user `jonlabrie_db_user` — that's the `bad auth`; switching to the `roshambo_app` string fixes it.)
 
 - [ ] **Step 3: Smoke-test the string before wiring anything (Claude, once user provides it)**
 
