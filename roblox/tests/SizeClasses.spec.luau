@@ -29,20 +29,6 @@ describe("SizeClasses.footprintFor", function()
     end)
 end)
 
-describe("SizeClasses.nativeSize", function()
-    test("a base pad's native size is S", function()
-        expect(SizeClasses.nativeSize(SizeClasses.footprintFor("S"))).toBe("S")
-    end)
-
-    test("a 2x-base pad's native size is L", function()
-        expect(SizeClasses.nativeSize(SizeClasses.footprintFor("L"))).toBe("L")
-    end)
-
-    test("a pad smaller than S has no native size", function()
-        expect(SizeClasses.nativeSize({ minX = -1, maxX = 1, minZ = -1, maxZ = 1 })).toBe(nil)
-    end)
-end)
-
 describe("SizeClasses.fitsWithin", function()
     test("rank orders S < M < L", function()
         expect(SizeClasses.rank.S).toBe(1)

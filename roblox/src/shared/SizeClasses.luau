@@ -4,7 +4,6 @@
 -- (applied via Model:ScaleTo); the destination is authored per-size prefabs, at
 -- which point scale -> 1 and each size's stored loadout points at its authored
 -- baseStyle, with NO change here. S = today's teahouse (base footprint); L = 2x S.
-local PadRegistry = require("./PadRegistry")
 
 local SizeClasses = {}
 
@@ -23,15 +22,6 @@ function SizeClasses.footprintFor(sizeClass: string): Footprint
     local s = SizeClasses.scale[sizeClass]
     local b = SizeClasses.BASE_FOOTPRINT
     return { minX = b.minX * s, maxX = b.maxX * s, minZ = b.minZ * s, maxZ = b.maxZ * s }
-end
-
-function SizeClasses.nativeSize(padFootprint: Footprint): string?
-    for _, size in SizeClasses.order do
-        if PadRegistry.fits(padFootprint, SizeClasses.footprintFor(size)) then
-            return size
-        end
-    end
-    return nil
 end
 
 return SizeClasses
