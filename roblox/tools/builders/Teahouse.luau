@@ -29,8 +29,12 @@ end
 -- deterministic pseudo-random in [0,1): keeps genmodels output stable (no math.random,
 -- which would fail the CI drift check) while giving each hut a repeatable wobble.
 local function rand(seed: number): number
-    local v = math.sin(seed * 12.9898) * 43758.5453
-    return v - math.floor(v)
+    -- Portable: integer hash, IEEE basic ops only (arch-identical). The old
+    -- fract(sin()*43758) hash diverged arm64 vs x86_64 and broke the CI drift check.
+    local n = math.floor(seed) % 2147483648
+    n = (n * 2654435761) % 2147483648
+    n = (1103515245 * n + 12345) % 2147483648
+    return n / 2147483648
 end
 
 local function blockedTea(x: number, z: number, a: number, L: any): boolean

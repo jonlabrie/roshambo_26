@@ -16,9 +16,15 @@ local MAPLE = { 0.55, 0.28, 0.20 } -- autumn red-bronze canopy
 local PINE = { 0.20, 0.34, 0.24 } -- dark green
 local CHERRY = { 0.80, 0.72, 0.74 } -- pale blossom
 
+-- Portable pseudo-random in [0,1): integer hash using only IEEE basic ops (bit-
+-- identical across CPU arch), replacing the old fract(sin()*43758) hash whose
+-- transcendental + amplification diverged arm64 vs x86_64 and broke the CI drift
+-- check. Seed is floored so trig-derived float inputs can't perturb the low bits.
 local function rand(seed: number): number
-    local v = math.sin(seed * 12.9898) * 43758.5453
-    return v - math.floor(v)
+    local n = math.floor(seed) % 2147483648
+    n = (n * 2654435761) % 2147483648
+    n = (1103515245 * n + 12345) % 2147483648
+    return n / 2147483648
 end
 
 -- a tree = trunk + 1-3 canopy blobs. Returns a Model named `name`.

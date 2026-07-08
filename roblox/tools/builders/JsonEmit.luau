@@ -19,6 +19,12 @@ function JsonEmit.encode(v: any): string
         if v ~= v or v == math.huge or v == -math.huge then
             error("JsonEmit: non-finite number")
         end
+        -- Snap near-zero transcendental residues (e.g. cos(pi/2) = 6.12e-17) to 0. Their
+        -- exact value is CPU-arch-dependent (arm64 vs x86_64 libm), which broke the CI
+        -- drift check; the threshold is far below any real geometry/rotation precision.
+        if v ~= 0 and math.abs(v) < 1e-9 then
+            v = 0
+        end
         if v % 1 == 0 and math.abs(v) < 2 ^ 53 then
             return string.format("%d", v)
         end
