@@ -17,7 +17,9 @@
                 "ProfileUpdate": { "$className": "RemoteEvent" },
                 "RevealTheater": { "$className": "RemoteEvent" },
                 "FateResolved": { "$className": "RemoteEvent" },
-                "BoardData": { "$className": "RemoteEvent" }
+                "BoardData": { "$className": "RemoteEvent" },
+                "SetPadPreference": { "$className": "RemoteEvent" },
+                "PreferenceState": { "$className": "RemoteEvent" }
             }
         },
         "Workspace": {

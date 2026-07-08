@@ -10,6 +10,7 @@
 return {
     ["T02"] = {
         id = "T02",
+        displayName = "Overlook",
         mountCF = { -142.2818, 173.0035, 70.2984, 0.9754, 0, 0.2204, 0, 1, 0, -0.2204, 0, 0.9754 },
         hand = "right",
         maxSize = "L",
@@ -17,6 +18,7 @@ return {
     },
     ["T06"] = {
         id = "T06",
+        displayName = "Mossy Prow",
         mountCF = { -381.7, 222.9114, 65, 0.6, 0, -0.8, 0, 1, 0, 0.8, 0, 0.6 },
         hand = "right",
         maxSize = "M",
@@ -24,6 +26,7 @@ return {
     },
     ["T04"] = {
         id = "T04",
+        displayName = "Creekside",
         mountCF = { -190.7751, 217.7481, 94.3078, 0.9634, 0, -0.268, 0, 1, 0, 0.268, 0, 0.9634 },
         hand = "right",
         maxSize = "S",
