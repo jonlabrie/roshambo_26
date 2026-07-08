@@ -93,6 +93,15 @@ describe("PadSiteFit.normalizeYaw", function()
             expect(out[i]).toBeCloseTo(lvl[i])
         end
     end)
+    test("renormalizes a grossly non-unit local-X (3,4) to a unit yaw axis", function()
+        -- fx=3, fz=4 -> len=5 -> ex=0.6, ez=0.8; proves the /len divide runs
+        local out = PadSiteFit.normalizeYaw({ 0, 0, 0, 3, 0, 0, 0, 1, 0, 4, 0, 0 })
+        expect(out[4]).toBeCloseTo(0.6) -- ex
+        expect(out[10]).toBeCloseTo(0.8) -- ez
+        expect(out[6]).toBeCloseTo(-0.8) -- -ez
+        expect(out[12]).toBeCloseTo(0.6) -- ex
+        expect(PadSiteFit.isLevel(out, 1e-9)).toBe(true)
+    end)
 end)
 
 describe("PadSiteFit.resolveMaxSize", function()
