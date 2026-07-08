@@ -45,11 +45,21 @@ end
 -- (and all their parts) are always replicated — otherwise client controllers that
 -- capture parts once at startup (e.g. WheelController's rig:GetChildren()) run
 -- before the parts stream in and silently capture nothing.
+-- Persist the arena-visible Models so distant spawn-watchers always have them.
+-- RoshamboStage holds the Rojo hero props; CanyonWorld/Arena holds the relocated
+-- place-only river/falls VFX + rocks (see the workspace-organization convention).
+-- The far canyon (CanyonWorld/Paths|Structures|Legacy) is intentionally NOT persisted
+-- and streams normally, matching pre-reorg behavior.
+local StagePersistence = require(shared:WaitForChild("StagePersistence"))
 local stage = workspace:WaitForChild("RoshamboStage")
-for _, child in stage:GetChildren() do
-    if child:IsA("Model") then
-        child.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
-    end
+local persistRoots = { stage }
+local canyonWorld = workspace:FindFirstChild("CanyonWorld")
+local arena = canyonWorld and canyonWorld:FindFirstChild("Arena")
+if arena then
+    table.insert(persistRoots, arena)
+end
+for _, model in StagePersistence.persistTargets(persistRoots) do
+    (model :: Model).ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 end
 
 local deps = {
