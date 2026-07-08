@@ -129,4 +129,12 @@ function NetworkClient.getTeahouses(self: any, robloxUserId: string): Result
     return self:_request("GET", `/api/v1/players/{robloxUserId}/teahouses`)
 end
 
+function NetworkClient.setPreferences(self: any, robloxUserId: string, padPreferences: { string }): Result
+    return self:_request(
+        "PUT",
+        `/api/v1/players/{robloxUserId}/preferences`,
+        { padPreferences = padPreferences }
+    )
+end
+
 return NetworkClient
