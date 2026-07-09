@@ -1,7 +1,8 @@
 --!strict
 -- buildBridge — gentle Japanese arch footbridges (taiko-bashi) in the deck-timber language.
--- Studio runnable (command bar / MCP execute_luau); builds ad-hoc Parts into Workspace.Bridges, one
--- per-bridge sub-model, idempotent. Endpoints are BAKED per bridge (A/B = the grade-spring point at each
+-- Studio runnable (command bar / MCP execute_luau); builds ad-hoc Parts into CanyonWorld/Structures/Bridges
+-- (shipped hand-built geometry — NEVER a stray top-level model; see the parent block at the bottom for why),
+-- one per-bridge sub-model, idempotent. Endpoints are BAKED per bridge (A/B = the grade-spring point at each
 -- landing) — draft markers are deleted in the final terrain, so NO build path may depend on them. To add a
 -- bridge: survey its two landing points once, then bake them here. PLACE-ONLY (not Rojo — the fully-curved
 -- geometry needs CFrame, which the pure-Lune Spec builders can't use) — SAVE THE PLACE after running.
@@ -12,7 +13,8 @@
 local ws = workspace
 
 -- A/B are baked grade-spring endpoints, surveyed from the approved prototype (NOT read from markers).
--- Optional per-bridge fields (Teahouse3Bridge introduced these, 2026-07-04):
+-- Optional per-bridge override fields (Bridge3 needs none; kept for future spans e.g. the up-canyon
+-- abutment bridge):
 --   rise = 0            -> FLAT span (the parabola degenerates to the straight lerp)
 --   footingA {pos,size} -> as-built override for the A footing (user-placed)
 --   noFootingB = true   -> skip the B footing (e.g. the deck lands on an engawa; stone would float)
@@ -25,26 +27,7 @@ local BRIDGES = {
         rise = 3.0,
         width = 6.5,
     },
-    -- Teahouse3Bridge (2026-07-04): flat span + stone pier, the pad-access bridge for Teahouse_03
-    -- (recipe §0.7 — access registers to the pad, replaced Teahouse3Stair/Landing, now parked in
-    -- ServerStorage.RetiredTeahouse3Access along with the engawa-corner kōran newel it displaced).
-    -- A = the line's crossing of NW2040Path's gorge edge at Step_21 (railing opening steps 20-22,
-    -- see buildBambooRailing RUNS); B = 0.4 past Teahouse_03's engawa outer edge, deck top tucked
-    -- 0.06 under the engawa lip (no z-fight, no gap). Footing + pier baked AS-BUILT (user-tuned).
-    {
-        name = "Teahouse3Bridge",
-        A = { -144.55, 187.55, 90.43 },
-        B = { -180.97, 189.86, 59.73 },
-        rise = 0,
-        width = 6.5,
-        footingA = { pos = { -144.59, 182.77, 90.40 }, size = { 7.50, 8.45, 4.00 } },
-        noFootingB = true,
-        pierParts = {
-            { name = "PierBase", pos = { -168.22, 175.86, 70.48 }, size = { 4.90, 2.00, 4.10 } },
-            { name = "PierShaft", pos = { -168.22, 182.05, 70.48 }, size = { 3.75, 12.39, 3.00 } },
-            { name = "PierCap", pos = { -168.22, 187.85, 70.48 }, size = { 5.60, 1.20, 3.45 } },
-        },
-    },
+    -- (Teahouse3Bridge removed 2026-07-09: T03 is served by a bored access tunnel; no bridge to it, ever.)
 }
 
 -- locked dims / colours
@@ -214,9 +197,20 @@ local function buildOne(parent: Instance, cfg): string
     return string.format("%s: span %.1f, rise %.1f", cfg.name, (B - A).Magnitude, RISE)
 end
 
-local parent = ws:FindFirstChild("Bridges") or Instance.new("Model")
-parent.Name = "Bridges"
-parent.Parent = ws
+-- Convention (2026-07-09): shipped hand-built geometry lives UNDER CanyonWorld, never as a stray
+-- top-level model. A top-level `workspace.Bridges` is exactly what the CanyonWorld/Sandbox cleanup
+-- sweeps — Bridge3 was lost that way once and had to be regenerated. Build into
+-- CanyonWorld/Structures/Bridges (see the roblox-rojo-vs-place-state memory / verifyWorkspaceConvention).
+local canyon = ws:FindFirstChild("CanyonWorld")
+assert(canyon, "CanyonWorld missing — run in the canonical place, not a bare/rojo-built place")
+local structures = canyon:FindFirstChild("Structures")
+assert(structures, "CanyonWorld.Structures missing — workspace convention not established")
+local parent = structures:FindFirstChild("Bridges")
+if not parent then
+    parent = Instance.new("Model")
+    parent.Name = "Bridges"
+    parent.Parent = structures
+end
 local report = {}
 for _, cfg in BRIDGES do
     report[#report + 1] = buildOne(parent, cfg)
