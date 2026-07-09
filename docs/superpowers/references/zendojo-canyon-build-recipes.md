@@ -76,6 +76,8 @@ show the full flagstone field — this scaling is intentional and matches the re
   (+0.15–0.33) and 8% slight bulges → ONE Chaikin pass** (two passes = smooth ovals, the classic mistake).
   **Rolled-edge profile:** bevel ring at top−0.07, crown ring inset 22% toward centroid at top, apex +0.012,
   skirt to top−0.32; SMOOTH per-vertex normals (flat facets read CNC-cut). Per-flag top jitter ±0.02.
+  **Flags sit `flagProud = 0.08` above the bed** (crown ~0.13 proud of the gravel, edges just clearing it,
+  skirt still embedded ~0.19 → no gap underneath); added to `topY` at mesh-build time (user-locked 2026-07-09).
   **Palette: grey g = 78–116 (mean ~96 — 25% darker than instinct), 35% warm variant (g+8, g, g−12), else
   cool (g, g+1, g−3); sides 52/52/49.** MeshPart: Slate, Color white, DoubleSided, **CanCollide FALSE**
   (players walk on beds/risers), CollisionFidelity Box, CFrame origin, world-space verts, publish
@@ -87,11 +89,26 @@ show the full flagstone field — this scaling is intentional and matches the re
   segments with end posts framing the opening — never leave a barrier across it.
 
 **Timber retaining walls** (the pocket/cutting treatment, replaces ishigaki for CUT faces; ishigaki §3 stays
-for under-path floating spans): stacked lagging boards `0.75 h × 0.4 t` (0.04 gaps), length/depth jitter,
-**step-timber color 72/60/48 ±7**; proud vertical posts `1.1 sq` in **teahouse EngawaPost ink 45/48/56**,
-ends + ~4-stud rhythm, no center post on short walls, NO top cap; height ≤ **11** (user cap), bays step with
-grade/rim; **register to the BUILT structure ±1.5–2 studs, never the excavation** (see memory
-`roblox-walls-register-to-structure`), then rough-BACKFILL behind (additive, ~0.7 below the top board).
+for under-path floating spans). Built by **`tools/studio/buildTimberRetainingWall.luau`** (Step_-native,
+Parts-only, idempotent) — recipe RE-EXTRACTED 2026-07-09 from the reference builds
+`CanyonWorld/Structures/RetainingWalls/TimberWall_WestTraverse` (+ `Pocket_E/U`) and `NWFallsWall`. A wall
+**retains — it is not a fence**; the load-bearing rules (all three were gotten wrong the first pass):
+- **Posts at EVEN spacing over the WHOLE run**: `nBays = round(runLen / ~6)`, `spacing = runLen/nBays`. Never
+  pick an interval then tack a short post on the end to absorb the remainder.
+- **Each bay is a LEVEL rectangle of full-width courses running post-centre to post-centre** — one continuous
+  board per course; boards NEVER end mid-bay (a board that stops between posts retains nothing). Bays STEP up
+  with the grade; the boundary post bridges the step.
+- **Board `len × 0.71 h × 0.40 t`**, course pitch **0.75** (0.04 gap), `len = spacing + 0.2` (laps the posts),
+  timber **72/60/48 ±8**, small depth jitter. Bay courses `= round((bayTop−bayFoot)/0.75)`.
+- **Post `1.1 sq`**, ink **45/48/56**, NO top cap; foot = grade at the post, top = tallest adjacent bay top
+  **+ ~1.3** (always proud of its boards).
+- **Top follows the CUT depth** (`hold` = terrain-behind − tread, capped ≤ **11**), probed at the step CENTRES
+  only and held flat at the run ends → post heights progress **smoothly** with the path. (A per-point terrain
+  probe produced one erratically short post that the rest "recovered" from — looks broken.)
+- **Register to the built path edge + standoff** (`offset` from centreline, never the excavation — see
+  `roblox-walls-register-to-structure`); foot embeds ~0.8. This is the POCKET treatment: it reads right where
+  earth packs behind it; on an OPEN shelf edge it becomes an exposed slatted screen (a low kerb + raw slope
+  above, or additive backfill, suits an open edge better).
 
 **Landing deck:** WoodPlanks slab, deck color 107/79/51, **flush black frame band** (0.6 wide, ink 30/26/20)
 around the perimeter, girders + short grounded posts; NO railings by default. Junction rule: stair treads
@@ -321,6 +338,11 @@ Studio (command bar / MCP `execute_luau`). They build into `Workspace.*` and **p
   `outModel`, `timberPrefix`, `SPACING`, `COBBLE_HW`, `BED_W`. (Workflow: drop markers, user shapes them, run.)
 - **`buildIshigakiWalls.luau`** — finds the floating spans (>`THRESH`) of the listed `CONFIG.paths` and builds
   a battered fitted-stone wall per span into `Workspace.RetainingWalls`. CONFIG: `paths`, `HW`, `THRESH`, `PAD`.
+- **`buildTimberRetainingWall.luau`** — timber-lagging wall for CUT faces (§1a "pocket" treatment): reads a
+  path's `Step_<i>` beds over `first..last`, even-spaced posts, level post-to-post board bays stepping with
+  grade, top following the probed cut depth. Parts-only, idempotent, into
+  `CanyonWorld/Structures/RetainingWalls/TimberWall_<model>_<first>_<last>`. CONFIG `walls`: `{ model, first,
+  last, edgeSign, offset, cap, seed }`. (Extracted 2026-07-09; see §1a for the load-bearing rules.)
 - **`buildChochinPole.luau`** — places hanging chōchin on bamboo posts along a path's uphill edge (staggered;
   up to 30% downhill where terrain allows); tags them so `LanternController`/`ChochinSway` drive them. CONFIG:
   `path`, `timberPrefix`, `interval`, `posJitter`, `uphillOffset`, `uphillSign`, `downhillFrac`, `dhMaxDrop`,

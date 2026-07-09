@@ -12,26 +12,21 @@
 -- Flags are CanCollide false — players walk on beds/risers.
 -- Spec: docs/superpowers/specs/2026-07-01-zendojo-nw1012-ishidan-stairway-design.md
 local CONFIG = {
-    outModel = "NW80FallsStair",
+    outModel = "FarWall5063Path",
     -- BAKED {x,y,z} centerline control points, FOOT FIRST (survey once, bake,
-    -- never read draft markers at build time):
-    -- NW_40->2A is a VALLEY (down from tunnel, up to falls); the builder needs
-    -- monotonic ascent, so it's TWO runs from the bench low (NW_52). This is the
-    -- main CLIMB: NW_52 (foot) -> Bridge2_A rim (head). Y = smoothed carve floor.
+    -- never read draft markers at build time). FarWall shelf promenade along the
+    -- North face: FarWall_50 (foot) -> FarWall_62 -> FarWall_63 (head/landing).
+    -- Y = smoothed monotonic carve floor (terrain is carved TO this stair).
     control = {
-        { -350.7, 201, 54.3 }, -- NW_52 foot (bench low)
-        { -369.1, 206, 47.0 }, -- NW_60
-        { -390.4, 210, 41.6 }, -- NW_62 (grade break -> landing)
-        { -410.3, 221, 42.0 }, -- NW_70 (turn-landing at the ~45 deg bend)
-        { -419.9, 228, 31.7 }, -- NW_75
-        { -425.9, 234, 22.8 }, -- NW_80 (grade break -> landing)
-        { -430.6, 245, -13.2 }, -- Bridge2_A head (rim)
+        { -82.4, 178.0, -72.4 }, -- FarWall_50 foot
+        { -116.5, 180.4, -79.7 }, -- FarWall_62
+        { -151.5, 182.0, -75.0 }, -- FarWall_63 head/landing (moved S 2026-07-09 for the landing turn)
     },
-    footY = 201,
-    headY = 245,
+    footY = 178.0,
+    headY = 182.0,
     riserTarget = 0.6,
-    landings = { { frac = 0.340, len = 3 }, { frac = 0.502, len = 5 }, { frac = 0.704, len = 3 } },
-    seed = 20260711,
+    landings = {}, -- gentle single flight; head landing deck built separately
+    seed = 20260709,
     buildRange = nil, -- {i0, i1} step indices; nil = all
     resampleSpacing = 2.0,
     -- publish a flag mesh every N FLAGS (NOT steps: deep treads pack 8-14 flags each and a
@@ -48,6 +43,7 @@ local CONFIG = {
     bedVariant = "ZenGravel1", -- fine decomposed-granite gravel (StudsPerTile 4)
     bedColor = Color3.fromRGB(150, 146, 138),
     flagSideColor = Color3.fromRGB(52, 52, 49),
+    flagProud = 0.08, -- flags sit this proud of the gravel bed (crown ~0.13 above; user-locked 2026-07-09)
 }
 
 ----------------------------------------------------------------------------
@@ -485,7 +481,7 @@ for _, e in dressed do
         bed.MaterialVariant = CONFIG.bedVariant
     end
     for _, f in e.flags do
-        local topY = s.tread + f.topJitter
+        local topY = s.tread + f.topJitter + (CONFIG.flagProud or 0)
         local col = f.warm and Color3.fromRGB(f.g + 8, f.g, f.g - 12) or Color3.fromRGB(f.g, f.g + 1, f.g - 3)
         local cTop, cSide = em:AddColor(col, 1), em:AddColor(CONFIG.flagSideColor, 1)
         local cW = frontV + crossV * f.centroid.u + dirV * f.centroid.v
