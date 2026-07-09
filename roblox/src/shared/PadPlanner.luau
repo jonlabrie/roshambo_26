@@ -50,15 +50,16 @@ function PadPlanner.planSupport(
         -- omit corners embedded in the slope (ground >= datum) or over a void (nil / deeper than MAXPOST).
         if groundY == nil or groundY >= top[2] or (top[2] - groundY) > MAXPOST then
             table.insert(omitted, p[1] :: string)
-        elseif blocked ~= nil and blocked(top[1], top[3], top[2], groundY) then
-            -- would land on a keep-out path: omit and cantilever over it
-            table.insert(omitted, p[1] :: string)
         else
-            local foot = groundY - EMBED
-            table.insert(posts, {
-                pos = { top[1], (top[2] + foot) / 2, top[3] },
-                height = top[2] - foot,
-            })
+            -- groundY is a number here. Also omit a post that would land on a keep-out path
+            -- (deck cantilevers over it) — same result as a void, so nest it to keep the two
+            -- omit-reasons in distinct if-statements.
+            if blocked ~= nil and blocked(top[1], top[3], top[2], groundY) then
+                table.insert(omitted, p[1] :: string)
+            else
+                local foot = groundY - EMBED
+                table.insert(posts, { pos = { top[1], (top[2] + foot) / 2, top[3] }, height = top[2] - foot })
+            end
         end
     end
     return { posts = posts, omitted = omitted }
