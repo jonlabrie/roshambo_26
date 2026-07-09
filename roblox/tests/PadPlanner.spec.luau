@@ -73,3 +73,55 @@ test("too-deep: ground more than MAXPOST(80) below the datum omits the post (voi
     expect(#s.posts).toBe(0)
     expect(#s.omitted).toBe(6)
 end)
+
+test("path keep-out: a post that would land on a tagged path is omitted (deck cantilevers)", function()
+    -- flat ground; `blocked` flags only the FR post (x=14.4, front z<0) as over a path
+    -- (BR shares maxX at x=14.4, so disambiguate by z to hit FR alone)
+    local s = PadPlanner.planSupport(FP, IDENT, function()
+        return 0
+    end, function(x, z, _topY, _groundY)
+        return x > 14 and z < 0
+    end)
+    expect(#s.posts).toBe(5)
+    expect(s.omitted).toEqual({ "FR" })
+end)
+
+test("path keep-out predicate is optional: nil -> no path omission", function()
+    local s = PadPlanner.planSupport(FP, IDENT, function()
+        return 0
+    end)
+    expect(#s.posts).toBe(6)
+    expect(#s.omitted).toBe(0)
+end)
+
+test(
+    "path keep-out is only consulted for otherwise-buildable posts (stacks with void, no double-count)",
+    function()
+        -- front 3 (FL/FR/MF) over void via nil ground; blocked returns true for everything.
+        -- The 3 buildable back posts get omitted by path; the front 3 by void -> 6 omitted, 0 posts.
+        local s = PadPlanner.planSupport(FP, IDENT, function(_x, z)
+            if z < -5 then
+                return nil
+            end
+            return 0
+        end, function()
+            return true
+        end)
+        expect(#s.posts).toBe(0)
+        expect(#s.omitted).toBe(6)
+    end
+)
+
+test("path keep-out receives the post top (x,z,y) and ground y", function()
+    -- assert the predicate is called with the FL post's world coords and Ys
+    local seen = nil
+    PadPlanner.planSupport(FP, IDENT, function()
+        return 0
+    end, function(x, z, topY, groundY)
+        if x == -6.4 and z == -10.4 then
+            seen = { x, z, topY, groundY }
+        end
+        return false
+    end)
+    expect(seen).toEqual({ -6.4, -10.4, 20, 0 })
+end)

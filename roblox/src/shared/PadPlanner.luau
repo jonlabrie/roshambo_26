@@ -21,10 +21,16 @@ local function xf(cf: { number }, lx: number, ly: number, lz: number): { number 
     }
 end
 
+-- `blocked(worldX, worldZ, topY, groundY)` (optional): true iff a post at that corner
+-- would land on a keep-out (a walkable AccessKeepOut path below the deck). Such a post is
+-- omitted and the deck cantilevers there, exactly like a post over a void. Injected so the
+-- module stays pure: the runtime implements it as a raycast against tagged path geometry;
+-- tests pass a fake. Nil => no path omission (terrain-only planning).
 function PadPlanner.planSupport(
     footprint: Footprint,
     mountCF: { number },
-    groundAt: (number, number) -> number?
+    groundAt: (number, number) -> number?,
+    blocked: ((number, number, number, number) -> boolean)?
 ): Support
     local cx = (footprint.minX + footprint.maxX) / 2
     local layout = {
@@ -43,6 +49,9 @@ function PadPlanner.planSupport(
         -- build a post only where terrain sits BELOW the datum within reach (normal);
         -- omit corners embedded in the slope (ground >= datum) or over a void (nil / deeper than MAXPOST).
         if groundY == nil or groundY >= top[2] or (top[2] - groundY) > MAXPOST then
+            table.insert(omitted, p[1] :: string)
+        elseif blocked ~= nil and blocked(top[1], top[3], top[2], groundY) then
+            -- would land on a keep-out path: omit and cantilever over it
             table.insert(omitted, p[1] :: string)
         else
             local foot = groundY - EMBED

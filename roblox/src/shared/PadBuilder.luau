@@ -11,11 +11,15 @@ export type PadSpec = { mountCF: { number }, hand: string, footprint: PadPlanner
 export type Ops = {
     raycastGround: (number, number) -> number?,
     buildPost: ({ number }, number) -> (),
+    -- optional: true iff a post at (x, z) between topY and groundY would land on a keep-out
+    -- path (AccessKeepOut). When provided, such posts are omitted and the deck cantilevers.
+    blockedByPath: ((number, number, number, number) -> boolean)?,
 }
 export type Mount = { cframe: { number }, hand: string, footprint: PadPlanner.Footprint }
 
 function PadBuilder.build(padSpec: PadSpec, ops: Ops): Mount
-    local support = PadPlanner.planSupport(padSpec.footprint, padSpec.mountCF, ops.raycastGround)
+    local support =
+        PadPlanner.planSupport(padSpec.footprint, padSpec.mountCF, ops.raycastGround, ops.blockedByPath)
     for _, post in support.posts do
         ops.buildPost(post.pos, post.height)
     end
