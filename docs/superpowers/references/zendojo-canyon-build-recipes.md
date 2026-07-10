@@ -397,6 +397,10 @@ Studio (command bar / MCP `execute_luau`). They build into `Workspace.*` and **p
   run seams. As-built: PathSteps/PathExtension/DescentPath into `Workspace.PathRailings`. (See §4; locked 2026-06-29.)
 - **`buildBridge.luau`** — gentle Japanese arch footbridges (see §7), one `Bridges.<name>` sub-model per bridge,
   idempotent. CONFIG: a `BRIDGES` list with **baked** `A`/`B` endpoints + `rise`/`width`. (See §7; 2026-06-29.)
+- **`buildSuspensionBridge.luau`** — the ~112-stud kazurabashi vine/rope setpiece (see §8): catenary cables +
+  suspenders + woven lattice + see-through slats over a static collision floor + stone anchor piers, into
+  `Bridges/SuspensionBridge`. Endpoints read live from the abutment caps; ropes use the `RopeHemp` variant.
+  (See §8; 2026-07-10, ships static — sway deferred.)
 - **`buildTeahouseChochin.luau`** — swaps each teahouse's old block lamp for the latest chōchin, hung from a
   small metal hook up at the beam (no rod/cord). Reads each teahouse's OLD `Lantern` (XZ + horizontal
   LookVector = glyph facing) + `Cord` top (hang Y), so it auto-adapts to each teahouse's position, rotation,
@@ -427,3 +431,34 @@ needs `CFrame.fromMatrix`, which the pure-Lune `Spec` can't do; place-only like 
   fall-walls** on this bridge (user opted out).
 - **Squared stone footings** (`Slate`, `WIDTH+1 × 3 × 4`) sunk at each landing so the ends don't read as floating.
 - As-built: `Bridge3` (span 23.6, rise 3.0, width 6.5) in `Workspace.Bridges`.
+
+## 8. Suspension bridge (kazurabashi) — `tools/studio/buildSuspensionBridge.luau`
+
+The valley setpiece: a ~112-stud vine/rope footbridge across the Far-Wall canyon, ~36 studs over the river
+(spec `2026-07-09-suspension-bridge-design.md`, plan `2026-07-09-suspension-bridge.md`). Parts-only + catenary
+math, place-only under `CanyonWorld/Structures/Bridges/SuspensionBridge`. SAVE THE PLACE.
+
+- **Endpoints read live** from the abutment caps (`Abutment_A_Cap`/`Abutment_B_Cap`, top face) — unusual vs the
+  bake-endpoints rule, but the abutments are permanent placed structures, not draft markers. (Gotcha: if the
+  abutment parts are missing/renamed the builder asserts — they were accidentally deleted mid-build once.)
+- **Deck = a parabolic catenary** `y(t) = lerp(seatA,seatB,t) − SAG·4t(1−t)`, **SAG 8**, **width 6** (edge
+  cables at ±3). XZ centreline = straight lerp cap→cap.
+- **Ropes = twisted-hemp cylinders**, `Material=Fabric` + place-only **`RopeHemp` MaterialVariant** (generated
+  via the Studio material generator, base Fabric, StudsPerTile 0.6 — there is NO native rope material). 4
+  catenary cables (2 deck-edge dia 0.5 + 2 hand dia 0.36 at +2.9), vertical suspenders every 4 studs, one
+  alternating-lean diagonal lattice rope per bay (the weave). **Chain the cables with `cableOverlap` (0.6 past
+  each end)** so joints read seamless.
+- **Deck slats:** timber cross-pieces (`6.4 × 0.35 × 0.69`, `Size.X` = cross-stream via `lookAt` with **no**
+  extra 90° yaw), pitch 1.05 → ~0.36 **see-through gaps** to the river, tinted, just proud of the catenary.
+- **STATIC collision floor + barriers** (direct root children, never grouped/animated): a continuous CanCollide
+  floor at slat-top level so players walk safely over the gaps, and **15-tall** invisible fall barriers on both
+  edges (5 was jumpable). Slats/cables are `CanCollide=false` decoration.
+- **Anchor piers:** dress each abutment as a stone body + **flush walkable timber cap** (dark band tucked UNDER
+  the lip, never proud) — the pier top must stay a CLEAR walk-through platform. Cables lash out to **4 low
+  mooring posts at the outward corners** (cross ±5, clear of the 6-wide walk). LESSON: a central deadman post /
+  raised cap block makes the pier unwalkable — keep the centre + outward exit clear.
+- **Sway DEFERRED (2026-07-10):** the visible parts group into `Seg_1..10` Models, but ambient sway was
+  abandoned — rigid cylinders in independently-moving segment groups visibly SEPARATE at the seams (overlap
+  only hides see-through gaps; the ends still pull apart). A seamless motion pass = **continuous per-frame
+  deform** (reposition all parts along one swayed curve — keeps the round ropes) **or Beam cables** (continuous
+  but flat ribbons). Ships static for now.
