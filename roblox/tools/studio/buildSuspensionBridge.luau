@@ -3,11 +3,12 @@
 -- footbridge across the Far-Wall canyon (spec 2026-07-09-suspension-bridge-design.md). Studio-runnable
 -- (Edit; command bar / MCP execute_luau). Parts-only + catenary math, idempotent.
 --
--- The VISIBLE rope/slat geometry is grouped into N_SEG span-segment Models (Seg_1..Seg_N), each tagged
--- "BridgeSway" and stamped a "SwayPhase" (0..1) attribute so BridgeSway.client.luau can pivot ~10 bones in a
--- travelling wave. The collision FLOOR + fall BARRIERS are static children of the root (never swayed).
+-- The visible rope/slat geometry is grouped into N_SEG span-segment Models (Seg_1..Seg_N) purely for
+-- organization; the collision FLOOR + fall BARRIERS are direct children of the root.
 -- Output: Workspace.CanyonWorld.Structures.Bridges.SuspensionBridge (place-only — SAVE THE PLACE).
-local CollectionService = game:GetService("CollectionService")
+-- NOTE: ambient sway was deferred 2026-07-10 — rigid cylinders in independently-moving segment groups
+-- visibly separate at the seams; a seamless approach (continuous per-frame deform, or Beam cables) is a
+-- future pass. The bridge ships STATIC.
 local ws = workspace
 
 local CONFIG = {
@@ -23,6 +24,7 @@ local CONFIG = {
     latticeDia = 0.10,
     suspEvery = 4.0,
     cableSeg = 1.5,
+    cableOverlap = 0.6, -- extend each cable cylinder past both ends so the chained rope reads seamless
     slatPitch = 1.05,
     slatLen = 6.4,
     slatH = 0.35, -- +25% (chunkier tread)
@@ -110,10 +112,6 @@ for i = 1, CONFIG.N_SEG do
     local m = Instance.new("Model")
     m.Name = "Seg_" .. i
     m.Parent = root
-    local ph = (i - 0.5) / CONFIG.N_SEG
-    m:SetAttribute("SwayPhase", ph)
-    m.WorldPivot = CFrame.new(deckPoint(ph))
-    CollectionService:AddTag(m, "BridgeSway")
     seg[i] = m
 end
 
@@ -124,9 +122,12 @@ for _, side in { 1, -1 } do
         local t0, t1 = i / n, (i + 1) / n
         local mid = (t0 + t1) / 2
         local eA, eB = edge(t0, side), edge(t1, side)
-        cyl(seg[segFor(mid)], "DeckCable", CONFIG.edgeDia, eA, eB, CONFIG.VINE)
+        local dir = eB - eA
+        dir = dir.Magnitude > 1e-4 and dir.Unit or Vector3.new(0, 0, 1)
+        local o = dir * CONFIG.cableOverlap
+        cyl(seg[segFor(mid)], "DeckCable", CONFIG.edgeDia, eA - o, eB + o, CONFIG.VINE)
         local up = Vector3.new(0, CONFIG.handH, 0)
-        cyl(seg[segFor(mid)], "HandCable", CONFIG.handDia, eA + up, eB + up, CONFIG.VINE)
+        cyl(seg[segFor(mid)], "HandCable", CONFIG.handDia, eA + up - o, eB + up + o, CONFIG.VINE)
     end
 end
 
