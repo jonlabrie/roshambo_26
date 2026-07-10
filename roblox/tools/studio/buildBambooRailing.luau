@@ -86,6 +86,27 @@ local RUNS = {
         noRelax = true,
         clampEnds = true,
     },
+    -- FarWall5063 shelf promenade (6 gentle ishidan steps; top Step_6 removed for the junction).
+    -- Open/drop edge = -Right (the +Right cut face holds TimberWall_FarWall5063Path_0_3). Chōchin on
+    -- the +Right wall side at Step_4 (past the wall) — see buildChochinPole/recipe.
+    {
+        name = "FarWall5063",
+        paths = { { path = "FarWall5063Path", i0 = 0, i1 = 5 } },
+        edgeSign = -1,
+        hw = 2.9,
+        noRelax = true,
+        clampEnds = true,
+    },
+    -- T11 spur off the junction (short 6-step spur to Teahouse_11): open/drop edge = +Right
+    -- (the -4..-6 side); the -Right wall side stays clear. Rail-only (no chōchin — too short).
+    {
+        name = "FarWall_T11Spur",
+        paths = { { path = "FarWall_T11Spur", i0 = 0, i1 = 5 } },
+        edgeSign = 1,
+        hw = 2.9,
+        noRelax = true,
+        clampEnds = true,
+    },
 }
 
 -- ===== locked constants (v2.1, 2026-07-02) =====

@@ -105,6 +105,9 @@ nudged between passes).
   the drop → `noRelax` runs the line straight through the tread-edge points; `clampEnds` extends it half a
   tread past the first/last CENTRE (along that step's travel) so it stops flush with the path — no overshoot.
   Long ishidan runs keep the relax (clean at seams). Drop/open edge = **−Right** on both Far-Wall shelves.
+  The same variant now also rails the short curved Far-Wall runs: **FarWall5063Path** (open −Right; the +Right
+  cut face holds its timber wall + one chōchin at Step 4 past the wall) and **FarWall_T11Spur** (open +Right,
+  rail-only) — both committed as `buildBambooRailing.luau` RUNS entries.
 - **Flat-shelf CHŌCHIN**: `buildChochinPole.luau`'s `buildOne(parent, name, base, up)` placed at explicit
   Step indices on the **+Right wall side** (opposite the rail), `up = +RightVector` (flattened), offset ~3.4
   from bed centre, **foot raycast-grounded to the bank** (the wall side sits ~1–2 studs below tread). Avoid
@@ -133,10 +136,21 @@ Parts-only, idempotent) — recipe RE-EXTRACTED 2026-07-09 from the reference bu
   earth packs behind it; on an OPEN shelf edge it becomes an exposed slatted screen (a low kerb + raw slope
   above, or additive backfill, suits an open edge better).
 
-**Landing deck:** WoodPlanks slab, deck color 107/79/51, **flush black frame band** (0.6 wide, ink 30/26/20)
-around the perimeter, girders + short grounded posts; NO railings by default. Junction rule: stair treads
-arrive FLUSH at the deck top; leave ~0.05 butt gaps (coplanar overlaps z-fight); non-90° turns fan the last
-~3 steps (winder-style) instead of wedge gaps.
+**Landing deck:** WoodPlanks slab, deck color 107/79/51, black frame band (0.6 wide, ink 30/26/20) around
+the perimeter — sit it **~0.1 PROUD of the deck on top AND on the outer sides** (raise the top, push the
+outer face past the deck edge); a band flush/coplanar with the deck boards z-fights (bit us on JunctionLanding
+2026-07-09). Girders + short grounded posts. Junction rule: stair treads arrive FLUSH at the deck top; leave
+~0.05 butt gaps (coplanar overlaps z-fight); non-90° turns fan the last ~3 steps (winder-style) instead of
+wedge gaps.
+
+**Deck balustrade** (optional formal railing on a landing/overlook edge — distinct from the bamboo PATH rail):
+`tools/studio/buildDeckBalustrade.luau`, the LOCKED FallsLanding style — newel posts (0.62 sq × 3.70) topped by
+a hanji result-lantern (1.0 × 1.5 Neon, **tagged `BlockLantern`** so LanternController drives it) + dark slate
+cap (1.2 × 0.18); dark top rail cap (0.60 × 0.30, ink 30/26/19) + deck-wood mid rail (0.42 × 0.25) + balusters
+(0.34 sq × 3.20, ~2.6 pitch); invisible barrier. Rail centreline inset ~0.4 so outer faces read flush; newels
+inset 0.31 from the corners. CONFIG `runs`: `{ model, deckPart, edgeDir = world {x,z} outward (builder picks the
+best-matching deck face), name, inset }`. Parents `Railing_<name>` under the deck model. (Extracted 2026-07-09
+from FallsLanding; approved on JunctionLanding's SE edge.)
 
 ## 1. Stepped-cobble path — SUPERSEDED for steps by §1a (kept for reference / un-converted paths)
 
@@ -363,6 +377,9 @@ Studio (command bar / MCP `execute_luau`). They build into `Workspace.*` and **p
   shelves (where `buildIshidanStairs` would collapse to one step). CONFIG is a `paths` list: `{ outModel,
   control (baked centerline), nSteps or treadTarget }` sharing the style block; parents under
   `CanyonWorld.Paths`. Baked: FarWall7282Path, FarWallBridge2Path. (See the flat-shelf variant note in §1a.)
+- **`buildDeckBalustrade.luau`** — formal timber post-and-baluster railing on a deck edge (FallsLanding style):
+  newels + hanji result-lanterns (tagged `BlockLantern`) + caps, rail cap/mid, balusters, barrier. CONFIG `runs`:
+  `{ model, deckPart, edgeDir (world {x,z}), name, inset }`; parents `Railing_<name>` under the deck. (See §1a.)
 - **`buildIshigakiWalls.luau`** — finds the floating spans (>`THRESH`) of the listed `CONFIG.paths` and builds
   a battered fitted-stone wall per span into `Workspace.RetainingWalls`. CONFIG: `paths`, `HW`, `THRESH`, `PAD`.
 - **`buildTimberRetainingWall.luau`** — timber-lagging wall for CUT faces (§1a "pocket" treatment): reads a
