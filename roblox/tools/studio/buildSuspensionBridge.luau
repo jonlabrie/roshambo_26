@@ -130,8 +130,32 @@ for _, side in { 1, -1 } do
     end
 end
 
+-- vertical suspenders (hand cable -> deck cable) every suspEvery studs of arc, each side
+local span = (deckPoint(1) - deckPoint(0)).Magnitude
+local nS = math.max(2, math.floor(span / CONFIG.suspEvery))
+for _, side in { 1, -1 } do
+    for i = 0, nS do
+        local t = i / nS
+        local e = edge(t, side)
+        cyl(seg[segFor(t)], "Susp", CONFIG.suspDia, e, e + Vector3.new(0, CONFIG.handH, 0), CONFIG.VINE)
+    end
+end
+
+-- one diagonal lattice rope per bay, alternating lean (the kazurabashi weave)
+for _, side in { 1, -1 } do
+    for i = 0, nS - 1 do
+        local t0, t1 = i / nS, (i + 1) / nS
+        local up = Vector3.new(0, CONFIG.handH, 0)
+        local lo, hi = edge(t0, side), edge(t1, side) + up
+        if i % 2 == 1 then
+            lo, hi = edge(t0, side) + up, edge(t1, side)
+        end
+        cyl(seg[segFor((t0 + t1) / 2)], "Lattice", CONFIG.latticeDia, lo, hi, CONFIG.LASH)
+    end
+end
+
 return string.format(
-    "SuspensionBridge: %d segments, %d parts (cables). endA.Y=%.1f mid.Y=%.1f endB.Y=%.1f",
+    "SuspensionBridge: %d segments, %d parts. endA.Y=%.1f mid.Y=%.1f endB.Y=%.1f",
     CONFIG.N_SEG,
     #root:GetDescendants() - CONFIG.N_SEG,
     deckPoint(0).Y,
