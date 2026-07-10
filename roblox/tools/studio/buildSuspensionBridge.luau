@@ -30,7 +30,7 @@ local CONFIG = {
     slatProud = 0.06,
     floorSeg = 2.0,
     floorH = 0.4,
-    barrierH = 5.0,
+    barrierH = 15.0, -- unjumpable (matches the canyon path-rail fall barriers; 5 was clearable)
     barrierT = 0.4,
     VINE = Color3.fromRGB(105, 86, 55),
     LASH = Color3.fromRGB(120, 100, 66),
@@ -183,6 +183,49 @@ for i = 0, nSlat do
     -- (No extra 90° yaw — that's only for the cylinder helper whose long axis is local X.)
     p.CFrame = CFrame.lookAt(Vector3.new(c.X, cy, c.Z), Vector3.new(c.X, cy, c.Z) + tr)
     p.Parent = seg[segFor(t)]
+end
+
+-- STATIC (never swayed): invisible collision floor following the catenary at the slat-top level, and
+-- invisible fall barriers along each edge. Direct children of root, NOT the sway segments.
+local nF = math.ceil(span / CONFIG.floorSeg)
+for i = 0, nF - 1 do
+    local t0, t1 = i / nF, (i + 1) / nF
+    local c = deckPoint((t0 + t1) / 2)
+    local tr = travel((t0 + t1) / 2)
+    local len = (deckPoint(t1) - deckPoint(t0)).Magnitude + 0.4
+    local top = c.Y + CONFIG.slatProud
+    local f = Instance.new("Part")
+    f.Name = "Floor_" .. i
+    f.Anchored = true
+    f.CanCollide = true
+    f.Transparency = 1
+    f.CastShadow = false
+    f.Size = Vector3.new(CONFIG.WIDTH, CONFIG.floorH, len)
+    f.CFrame = CFrame.lookAt(
+        Vector3.new(c.X, top - CONFIG.floorH / 2, c.Z),
+        Vector3.new(c.X, top - CONFIG.floorH / 2, c.Z) + tr
+    )
+    f.Parent = root
+end
+for _, side in { 1, -1 } do
+    for i = 0, nF - 1 do
+        local t0, t1 = i / nF, (i + 1) / nF
+        local ea, eb = edge(t0, side), edge(t1, side)
+        local ctr = (ea + eb) / 2
+        local tr = travel((t0 + t1) / 2)
+        local bar = Instance.new("Part")
+        bar.Name = "Barrier_" .. (side > 0 and "R" or "L") .. "_" .. i
+        bar.Anchored = true
+        bar.CanCollide = true
+        bar.Transparency = 1
+        bar.CastShadow = false
+        bar.Size = Vector3.new(CONFIG.barrierT, CONFIG.barrierH, (eb - ea).Magnitude + 0.4)
+        bar.CFrame = CFrame.lookAt(
+            Vector3.new(ctr.X, ctr.Y + CONFIG.barrierH / 2, ctr.Z),
+            Vector3.new(ctr.X, ctr.Y + CONFIG.barrierH / 2, ctr.Z) + tr
+        )
+        bar.Parent = root
+    end
 end
 
 return string.format(
