@@ -228,8 +228,82 @@ for _, side in { 1, -1 } do
     end
 end
 
+-- anchor piers: dress each abutment as a stone body + timber cap + a lashed deadman post behind it,
+-- and lash the four cable ends over the cap down to the deadman. Piers are static, under Bridges.
+local function findPart(name)
+    for _, d in ws:GetDescendants() do
+        if d.Name == name and d:IsA("BasePart") then
+            return d
+        end
+    end
+end
+local function dressPier(pierName, cap, blk)
+    local pier = bridges:FindFirstChild(pierName)
+    if pier then
+        pier:Destroy()
+    end
+    pier = Instance.new("Model")
+    pier.Name = pierName
+    pier.Parent = bridges
+    -- stone body encasing the abutment block
+    local body = Instance.new("Part")
+    body.Name = "StoneBody"
+    body.Anchored = true
+    body.Material = Enum.Material.Slate
+    body.Color = CONFIG.STONE
+    body.Size = blk.Size + Vector3.new(1, 0, 1)
+    body.CFrame = blk.CFrame
+    body.Parent = pier
+    -- timber cap (the flush walkable platform) + a dark band tucked UNDER its lip (never proud of the top)
+    local tc = Instance.new("Part")
+    tc.Name = "TimberCap"
+    tc.Anchored = true
+    tc.Material = Enum.Material.WoodPlanks
+    tc.Color = CONFIG.TIMBER
+    tc.Size = cap.Size
+    tc.CFrame = cap.CFrame
+    tc.Parent = pier
+    local band = Instance.new("Part")
+    band.Name = "CapBand"
+    band.Anchored = true
+    band.Material = Enum.Material.Wood
+    band.Color = CONFIG.DARK
+    band.Size = cap.Size + Vector3.new(0.5, -0.4, 0.5)
+    band.CFrame = cap.CFrame * CFrame.new(0, -0.55, 0)
+    band.Parent = pier
+    return pier
+end
+-- outward (away from midspan) and cross directions at each pier end
+local inwA = Vector3.new((B - A).X, 0, (B - A).Z).Unit
+local pierA = dressPier("PierA", findPart(CONFIG.capA), findPart("Abutment_A"))
+local pierB = dressPier("PierB", findPart(CONFIG.capB), findPart("Abutment_B"))
+local capTopA = capTop(CONFIG.capA)
+local capTopB = capTop(CONFIG.capB)
+-- low mooring posts at the two OUTWARD corners (cross ±5, out of the 6-wide walk) + cable lashings to them.
+-- The pier TOP stays a clear flush platform: you walk straight off the deck and onward, no central post.
+local POST_CROSS, POST_OUT, POST_H = 5.0, 3.2, 2.6
+for _, pd in { { pierA, 0, capTopA, -inwA }, { pierB, 1, capTopB, inwA } } do
+    local pier, tEnd, topCtr, outward = pd[1], pd[2], pd[3], pd[4]
+    local cr = cross(tEnd)
+    local up = Vector3.new(0, CONFIG.handH, 0)
+    for _, side in { 1, -1 } do
+        local base = topCtr + outward * POST_OUT + cr * (side * POST_CROSS)
+        local post = Instance.new("Part")
+        post.Name = "Mooring"
+        post.Anchored = true
+        post.Material = Enum.Material.Wood
+        post.Color = CONFIG.TIMBER
+        post.Size = Vector3.new(0.9, POST_H, 0.9)
+        post.CFrame = CFrame.new(base + Vector3.new(0, POST_H / 2, 0))
+        post.Parent = pier
+        local tie = base + Vector3.new(0, POST_H - 0.4, 0)
+        cyl(pier, "Lash", CONFIG.edgeDia, edge(tEnd, side), tie, CONFIG.LASH)
+        cyl(pier, "Lash", CONFIG.handDia, edge(tEnd, side) + up, tie, CONFIG.LASH)
+    end
+end
+
 return string.format(
-    "SuspensionBridge: %d segments, %d parts. endA.Y=%.1f mid.Y=%.1f endB.Y=%.1f",
+    "SuspensionBridge: %d segments, %d parts + piers. endA.Y=%.1f mid.Y=%.1f endB.Y=%.1f",
     CONFIG.N_SEG,
     #root:GetDescendants() - CONFIG.N_SEG,
     deckPoint(0).Y,
