@@ -25,8 +25,8 @@ local CONFIG = {
     cableSeg = 1.5,
     slatPitch = 1.05,
     slatLen = 6.4,
-    slatH = 0.28,
-    slatD = 0.55,
+    slatH = 0.35, -- +25% (chunkier tread)
+    slatD = 0.69, -- +25% along travel
     slatProud = 0.06,
     floorSeg = 2.0,
     floorH = 0.4,
@@ -152,6 +152,37 @@ for _, side in { 1, -1 } do
         end
         cyl(seg[segFor((t0 + t1) / 2)], "Lattice", CONFIG.latticeDia, lo, hi, CONFIG.LASH)
     end
+end
+
+-- deck slats: timber cross-pieces at slatPitch, see-through gaps, tinted, yaw to travel, sitting just
+-- proud of the deck catenary (top = deckPoint.Y + slatProud). Deterministic tint (integer LCG).
+local nSlat = math.floor(span / CONFIG.slatPitch)
+local rng = 20260709
+local function rnd()
+    rng = (1103515245 * rng + 12345) % 2 ^ 31
+    return rng / 2 ^ 31
+end
+for i = 0, nSlat do
+    local t = i / nSlat
+    local c = deckPoint(t)
+    local tr = travel(t)
+    local tint = math.floor((rnd() * 2 - 1) * 8 + 0.5)
+    local p = Instance.new("Part")
+    p.Name = "Slat_" .. i
+    p.Anchored = true
+    p.CanCollide = false
+    p.Material = Enum.Material.Wood
+    p.Color = Color3.fromRGB(
+        math.clamp(107 + tint, 0, 255),
+        math.clamp(79 + tint, 0, 255),
+        math.clamp(51 + tint, 0, 255)
+    )
+    p.Size = Vector3.new(CONFIG.slatLen, CONFIG.slatH, CONFIG.slatD)
+    local cy = c.Y + CONFIG.slatProud - CONFIG.slatH / 2
+    -- block slat: lookAt puts Size.X (slatLen) along Right = cross-stream, Size.Z (slatD) along travel.
+    -- (No extra 90° yaw — that's only for the cylinder helper whose long axis is local X.)
+    p.CFrame = CFrame.lookAt(Vector3.new(c.X, cy, c.Z), Vector3.new(c.X, cy, c.Z) + tr)
+    p.Parent = seg[segFor(t)]
 end
 
 return string.format(
