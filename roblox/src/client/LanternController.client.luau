@@ -4,8 +4,10 @@
 -- double-line motif + a glyph). On reveal every lantern smoothly fades to the new throw;
 -- ~10s before the next reveal they fade blank (the lull before the next strike). All
 -- lanterns read the same round events, so they pulse in unison up both gorge walls.
--- Block lanterns are found by name ("*Lantern") under the stage; round lanterns (chōchin) are
--- found by the CollectionService "RoundLantern" tag canyon-wide. Glyphs/events mirror BoardController.
+-- Both lantern kinds are discovered by CollectionService tag, workspace-wide and folder-agnostic:
+-- "BlockLantern" (square deck/newel lanterns — 4-face SurfaceGui) and "RoundLantern" (chōchin — one
+-- face on the paper barrel's glyph plate). A lantern displays because it is TAGGED, never because of
+-- its name or folder. Glyphs/events mirror BoardController.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -14,8 +16,6 @@ local TweenService = game:GetService("TweenService")
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local RevealTheater = remotes:WaitForChild("RevealTheater") :: RemoteEvent
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
-
-local stage = workspace:WaitForChild("RoshamboStage")
 
 local GLYPH = { R = "○", P = "─", S = "∧" }
 local INK = Color3.fromRGB(36, 30, 24) -- dark silhouette on the glowing warm paper
@@ -105,11 +105,14 @@ local function buildGlow(part: BasePart)
     img.Parent = bb
 end
 
--- build faces for every lantern, now and as they replicate/stream in (handles the
--- startup race where the Overlook model hasn't arrived when this script first runs).
-local built: { [BasePart]: boolean } = {}
-local function tryBuild(d: Instance)
-    if d:IsA("BasePart") and (d.Name :: string):match("Lantern$") and not built[d] then
+-- Block lanterns are discovered by the "BlockLantern" CollectionService tag, workspace-wide and
+-- folder-agnostic (symmetric with the round chōchin's "RoundLantern" tag) — so a lantern displays
+-- because it is TAGGED, never because of its name or which folder it happens to sit in. The tag is
+-- baked into the Rojo decks (Overlook/SwitchbackDeck via their builders) and set on place-only deck
+-- lanterns (FallsLanding, JunctionLanding, …). GetInstanceAddedSignal covers streamed/late arrivals.
+local built: { [Instance]: boolean } = {}
+local function buildBlockFace(d: Instance)
+    if d:IsA("BasePart") and not built[d] then
         built[d] = true
         for _, face in FACES do
             buildFace(d, face)
@@ -117,10 +120,10 @@ local function tryBuild(d: Instance)
         buildGlow(d)
     end
 end
-for _, d in stage:GetDescendants() do
-    tryBuild(d)
+for _, p in CollectionService:GetTagged("BlockLantern") do
+    buildBlockFace(p)
 end
-stage.DescendantAdded:Connect(tryBuild)
+CollectionService:GetInstanceAddedSignal("BlockLantern"):Connect(buildBlockFace)
 
 -- round lanterns (chōchin): the glyph is printed on the paper, not floating in front. The
 -- geometry supplies a thin transparent "GlyphPlate" sitting just proud of the barrel's front,

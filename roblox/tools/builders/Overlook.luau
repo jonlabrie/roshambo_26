@@ -128,6 +128,7 @@ local function hanjiLantern(
             CFrame = Spec.cframe({ x, cy, z }),
             Color = { 0.588, 0.5, 0.421 }, -- chōchin paper tone, dimmed ×0.75 (core dimmed to match → stays blended)
             Material = "Neon",
+            Tags = { "BlockLantern" }, -- LanternController drives every BlockLantern-tagged part (folder-agnostic)
             Transparency = 0.42, -- translucent paper so the inner glow reads through (chōchin recipe)
             children = {
                 {

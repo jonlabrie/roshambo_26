@@ -19,7 +19,7 @@ local X0, X1 = CX - DECK_W / 2, CX + DECK_W / 2 -- West, South edges
 local Z0, Z1 = CZ - DECK_D / 2, CZ + DECK_D / 2 -- North, East edges
 local TIMBER = { 0.42, 0.31, 0.20 }
 local CAP_DARK = { 0.118, 0.102, 0.078 } -- dark/black top rail (matches the arch bridge cap)
--- Hanji result-lantern recipe (matches the Overlook). The body MUST be named "*Lantern"
+-- Hanji result-lantern recipe (matches the Overlook). The body MUST be tagged "BlockLantern"
 -- so the runtime LanternController finds it and paints the World-Throw result SurfaceGui.
 local LANTERN_BODY = { 0.588, 0.5, 0.421 } -- chōchin paper tone, dimmed ×0.75 (core dimmed to match → stays blended)
 local LANTERN_LIGHT = { 1.0, 0.659, 0.376 } -- warm PointLight (matches the chōchin)
@@ -325,7 +325,7 @@ function SwitchbackDeck.build(palette: any, _layout: any): Spec.PartSpec
     stairRail(kids, "N", STAIR_Z - STAIR_W / 2 + RAIL_INSET, true, false)
 
     -- single hanji result-lantern atop the SE corner newel (the jutting view corner).
-    -- Name ends in "Lantern" so the runtime LanternController paints the World-Throw result on it.
+    -- Tagged "BlockLantern" so the runtime LanternController paints the World-Throw result on it.
     local lanternBaseY = DECK_TOP + NEWEL_H
     local lh = 1.5
     table.insert(kids, {
@@ -338,6 +338,7 @@ function SwitchbackDeck.build(palette: any, _layout: any): Spec.PartSpec
             CFrame = Spec.cframe({ xRail, lanternBaseY + lh / 2, zRail }),
             Color = LANTERN_BODY,
             Material = "Neon",
+            Tags = { "BlockLantern" }, -- LanternController drives every BlockLantern-tagged part (folder-agnostic)
             Transparency = 0.42, -- translucent paper so the inner glow reads through (chōchin recipe)
         },
         children = {
