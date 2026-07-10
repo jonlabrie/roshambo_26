@@ -88,6 +88,29 @@ show the full flagstone field — this scaling is intentional and matches the re
   preserve). Railing gaps for spur access (e.g. NW2040's teahouse opening) = build the run as two RUNS
   segments with end posts framing the opening — never leave a barrier across it.
 
+**Flat-shelf promenade variant** (`tools/studio/buildFlatShelfPath.luau`, 2026-07-09). A near-LEVEL curved
+shelf can't use `buildIshidanStairs` — the riser-driven layout collapses `rise/riserTarget ≈ 0` to one step.
+The flat builder keeps the IDENTICAL §1a dressing (risers/beds/flags, `flagProud 0.08`) but swaps in a
+**uniform-tread layout**: N equal treads along the arc (`nSteps` or `nSteps = round(arc/treadTarget)`, target
+~6 studs), tread tops interpolated from the centerline so a gentle grade rides as a smooth ramp
+(FarWallBridge2Path: +4.75 over 62). CONFIG is a `paths` list (baked centerline per path) sharing the style
+block; parents under `CanyonWorld.Paths`. Baked: **FarWall7282Path** (12 treads, dead-level) and
+**FarWallBridge2Path** (10 treads, ramps to the Bridge2_B abutment). **Lesson that forced this:** the first
+pass laid 6 long (~12-stud) treads; the RightVector jumps ~25° between them at the bend, so the railing edge
+zigzagged and floated posts. Halving the tread length (double the stones) smooths the curve — do that BEFORE
+fighting the railing. Survey-driven: re-read the `Sandbox.PathDraft` markers, re-bake, rebuild (markers get
+nudged between passes).
+- **Flat-shelf RAILING** (RUNS entries in `buildBambooRailing.luau` with `noRelax = true, clampEnds = true,
+  hw = bedW/2 = 2.9`): the v2.1 Laplacian relax BOWS the line off a short-tread curve and floats posts over
+  the drop → `noRelax` runs the line straight through the tread-edge points; `clampEnds` extends it half a
+  tread past the first/last CENTRE (along that step's travel) so it stops flush with the path — no overshoot.
+  Long ishidan runs keep the relax (clean at seams). Drop/open edge = **−Right** on both Far-Wall shelves.
+- **Flat-shelf CHŌCHIN**: `buildChochinPole.luau`'s `buildOne(parent, name, base, up)` placed at explicit
+  Step indices on the **+Right wall side** (opposite the rail), `up = +RightVector` (flattened), offset ~3.4
+  from bed centre, **foot raycast-grounded to the bank** (the wall side sits ~1–2 studs below tread). Avoid
+  cliff-bulge steps (probe first). Placed: FarWall7282Path Steps 3 & 9 (two); FarWallBridge2Path Step 6 (one).
+  Parent under `CanyonWorld.Paths.PathLanterns/Chochin_<path>`.
+
 **Timber retaining walls** (the pocket/cutting treatment, replaces ishigaki for CUT faces; ishigaki §3 stays
 for under-path floating spans). Built by **`tools/studio/buildTimberRetainingWall.luau`** (Step_-native,
 Parts-only, idempotent) — recipe RE-EXTRACTED 2026-07-09 from the reference builds
@@ -336,6 +359,10 @@ Studio (command bar / MCP `execute_luau`). They build into `Workspace.*` and **p
 - **`buildSteppedCobblePath.luau`** — drops a path from a `Workspace.PathDraft.<draft>` marker folder:
   Catmull-Rom spline → timber risers → flat per-tread cobbles + bed → published cobble mesh. CONFIG: `draft`,
   `outModel`, `timberPrefix`, `SPACING`, `COBBLE_HW`, `BED_W`. (Workflow: drop markers, user shapes them, run.)
+- **`buildFlatShelfPath.luau`** — §1a dressing on a UNIFORM-TREAD layout for near-level / gently-ramped curved
+  shelves (where `buildIshidanStairs` would collapse to one step). CONFIG is a `paths` list: `{ outModel,
+  control (baked centerline), nSteps or treadTarget }` sharing the style block; parents under
+  `CanyonWorld.Paths`. Baked: FarWall7282Path, FarWallBridge2Path. (See the flat-shelf variant note in §1a.)
 - **`buildIshigakiWalls.luau`** — finds the floating spans (>`THRESH`) of the listed `CONFIG.paths` and builds
   a battered fitted-stone wall per span into `Workspace.RetainingWalls`. CONFIG: `paths`, `HW`, `THRESH`, `PAD`.
 - **`buildTimberRetainingWall.luau`** — timber-lagging wall for CUT faces (§1a "pocket" treatment): reads a

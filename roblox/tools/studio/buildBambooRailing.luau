@@ -1,7 +1,8 @@
 --!strict
 -- buildBambooRailing — runs a continuous bamboo railing along a path's open-air edge.
--- Studio runnable (command bar / MCP execute_luau); builds ad-hoc Parts into Workspace.PathRailings
--- (one sub-Model "Rail_<name>" per run) and is idempotent (clears that sub-Model first).
+-- Studio runnable (command bar / MCP execute_luau); builds ad-hoc Parts into
+-- Workspace.CanyonWorld.Paths.PathRailings (one sub-Model "Rail_<name>" per run) and is idempotent
+-- (clears that sub-Model first). Paths are read from CanyonWorld.Paths (ws-root fallback for legacy).
 --
 -- The look (locked v2.1, user-approved 2026-07-02; deployed canyon-wide with the ishidan reskin):
 --   * bamboo tan 118/95/52.
@@ -64,6 +65,27 @@ local RUNS = {
     -- -Right holds NWFallsWall). Continuous runs; the BenchLanding's open canyon edge = the T07 access.
     { name = "NW40Descent", paths = { { path = "NW40Descent", i0 = 1, i1 = 17 } }, edgeSign = -1 },
     { name = "NW80FallsStair", paths = { { path = "NW80FallsStair", i0 = 1, i1 = 76 } }, edgeSign = 1 },
+    -- Far-Wall flat-shelf promenades (buildFlatShelfPath.luau): near-level curved shelves whose short
+    -- ~6-stud treads swing the RightVector fast through the bend. The v2.1 Laplacian relax BOWS the
+    -- line off that curve and floats posts over the drop, so these use noRelax (line runs straight
+    -- through the tread-edge points) + clampEnds (start/stop flush with the tread ends) + hw = bedW/2
+    -- (2.9 for the 5.8-wide beds). Drop/open edge is -Right on both; chochins go on the +Right wall.
+    {
+        name = "FarWall7282",
+        paths = { { path = "FarWall7282Path", i0 = 0, i1 = 11 } },
+        edgeSign = -1,
+        hw = 2.9,
+        noRelax = true,
+        clampEnds = true,
+    },
+    {
+        name = "FarWallBridge2",
+        paths = { { path = "FarWallBridge2Path", i0 = 0, i1 = 9 } },
+        edgeSign = -1,
+        hw = 2.9,
+        noRelax = true,
+        clampEnds = true,
+    },
 }
 
 -- ===== locked constants (v2.1, 2026-07-02) =====
@@ -180,10 +202,13 @@ local function buildOne(run): string
     -- ordered edge points across the run's stitched paths
     -- run.hw overrides the default edge offset for narrowed paths (NW1211 at -25% width, 2026-07-04)
     local hw = run.hw or HW
+    -- paths live under CanyonWorld.Paths (post-2026-07-08 reorg); fall back to ws root for any legacy.
+    local pathsRoot = ws.CanyonWorld.Paths
     local base: { Vector3 } = {}
+    local firstT: BasePart?, lastT: BasePart? = nil, nil
     for _, seg in run.paths do
-        local model = ws:FindFirstChild(seg.path)
-        assert(model, "missing Workspace." .. seg.path)
+        local model = pathsRoot:FindFirstChild(seg.path) or ws:FindFirstChild(seg.path)
+        assert(model, "missing path model " .. seg.path)
         for i = seg.i0, seg.i1 do
             local t = model:FindFirstChild("Step_" .. i) :: BasePart?
             if t then
@@ -191,15 +216,31 @@ local function buildOne(run): string
                 local rh = Vector3.new(r.X, 0, r.Z).Unit
                 base[#base + 1] = Vector3.new(t.Position.X, t.Position.Y + t.Size.Y / 2, t.Position.Z)
                     + rh * (hw * run.edgeSign)
+                firstT = firstT or t
+                lastT = t
             end
         end
     end
     assert(#base >= 2, "need >= 2 steps for " .. run.name)
-    local pts = relax(linResample(base, RESAMPLE), RELAX_PASSES)
+    -- clampEnds (flat-shelf variant): extend the line half a tread past the first/last step CENTRE
+    -- along that step's travel, so the rail starts/stops flush with the tread ends (no overshoot).
+    if run.clampEnds and firstT and lastT then
+        local lk0 = firstT.CFrame.LookVector
+        lk0 = Vector3.new(lk0.X, 0, lk0.Z).Unit
+        local lkN = lastT.CFrame.LookVector
+        lkN = Vector3.new(lkN.X, 0, lkN.Z).Unit
+        table.insert(base, 1, base[1] - lk0 * (firstT.Size.Z / 2))
+        base[#base + 1] = base[#base] + lkN * (lastT.Size.Z / 2)
+    end
+    -- noRelax (flat-shelf variant): run the line straight through the tread-edge points. The Laplacian
+    -- relax BOWS the line off a tight curve and floats posts over the drop — the short-tread shelves
+    -- need the true edge. Long ishidan runs keep the relax (clean at seams, no overshoot).
+    local pts = run.noRelax and linResample(base, RESAMPLE)
+        or relax(linResample(base, RESAMPLE), RELAX_PASSES)
 
-    local parent = ws:FindFirstChild("PathRailings") or Instance.new("Model")
+    local parent = pathsRoot:FindFirstChild("PathRailings") or Instance.new("Model")
     parent.Name = "PathRailings"
-    parent.Parent = ws
+    parent.Parent = pathsRoot
     local sub = parent:FindFirstChild("Rail_" .. run.name)
     if sub then
         sub:Destroy()
