@@ -462,3 +462,65 @@ math, place-only under `CanyonWorld/Structures/Bridges/SuspensionBridge`. SAVE T
   only hides see-through gaps; the ends still pull apart). A seamless motion pass = **continuous per-frame
   deform** (reposition all parts along one swayed curve — keeps the round ropes) **or Beam cables** (continuous
   but flat ribbons). Ships static for now.
+
+---
+
+## 9. ★ MOSSY TERRAIN — PBR material via TerrainDetail (2026-07-10, art pass)
+
+**"Lush green moss over dark wet stone."** The canyon terrain now reads like the reference (moss on flats,
+dark rock on the sheer faces) via a **custom PBR MaterialVariant applied as a terrain override**, NOT paint or
+color-tint. This replaced the flat, jagged basalt. **Consult before touching terrain material.**
+
+### The recipe (what's live)
+1. **Convert Basalt → Slate first.** Slate renders **noticeably smoother** than Basalt for the *same voxel
+   geometry* — basalt's built-in shading is harsh and accentuates every low-poly facet; slate's is soft. The
+   base material's shading **persists under the override**, so the choice of base material still matters.
+   (~380k canyon voxels converted Basalt→Slate, chunked `ReadVoxels`/`WriteVoxels`, `mats[x][y][z]==Basalt →
+   Slate`. The terrain is one bounded landmass ≈ x −450..450, z −300..300; basalt hides at low Y (~0) and the
+   rim (~y300) — sweep the full vertical extent or stragglers remain.)
+2. **`MaterialVariant`** under `MaterialService`: `BaseMaterial = Slate`, **`MaterialPattern = Organic`**
+   ⚠️ (Regular is parts-only and **silently won't apply to terrain** — this cost hours). Base maps = the dark
+   **rock** (default look). Name it `CanyonMossySlate`.
+3. **`TerrainDetail` children** (one per face) — the engine auto-blends by slope:
+   - `Face = Enum.TerrainFace.Top` → **moss** maps (shows on flat/upward faces)
+   - `Face = Enum.TerrainFace.Side` → **rock** maps (shows on steep/vertical faces)
+   - `Face = Enum.TerrainFace.Bottom` → rock
+   - Each has its own `ColorMap`/`NormalMap`/`RoughnessMap`/`StudsPerTile`. `StudsPerTile`: **moss Top = 18**
+     (big tiles hide distant tiling while keeping richness), **rock Side/Bottom = 12**.
+4. **Activate via the Material Manager UI** → select the variant → **"Set as Override"**. ⚠️ There is **NO
+   working script API** — `MaterialService:SetBaseMaterialOverride(...)` returns success but does **not**
+   render. This one step is manual (guide the user; it's 2 clicks).
+
+### ⚠️ GOTCHA — the override re-skins ALL parts of that base material, not just terrain
+Setting `CanyonMossySlate` as the Slate override re-skinned **260 Slate-material build parts** experience-wide:
+teahouse roofs/stonework (13 × 15 = 195), path **flagstones + treads** (`Flags_*`, `PathSteps`, stairs),
+`RoshamboStage` decks (Overlook, SwitchbackDeck, Shoro), bridge piers, BenchLanding. Same class of bug as the
+lantern architecture — **a global material override hits every part using that material.** ACCEPTED here
+(2026-07-10): the flagstones/treads/roofs read as cohesive dark wet stone, and teahouse roofs are slated to
+become swappable/upgradable anyway. **To decouple a build in future: switch its parts OFF the Slate material**
+(to a non-overridden material or its own explicit variant). Any *new* build that wants a plain-stone look must
+NOT use raw `Slate`.
+
+### Texture pipeline (CC0 PBR → Roblox, no manual upload)
+- **Source:** ambientCG (CC0). In use: **Moss004** (Top) + **Rock035** (Side/base). `curl` the `_1K-PNG.zip`
+  → `unzip` → Color / NormalGL / Roughness PNGs.
+- **Upload:** `mcp__Roblox_Studio__upload_image` only accepts **trusted URLs** (localhost/figma), NOT arbitrary
+  web URLs. Workaround: `python3 -m http.server 8765 --bind 127.0.0.1` in the texture dir, then `upload_image`
+  the `http://127.0.0.1:8765/...` URLs → returns `rbxassetid://…`.
+- **Tint / de-tile:** ImageMagick `convert <in> -modulate <bright>,<sat>,100 -brightness-contrast <b>x<c>`.
+  Moss tone that stuck: **mid** (`-modulate 84,89,100`, slight `-1x6`). Raw Moss004 = too bright/felt;
+  full-dark (`68,78`) = murky; **flattening macro contrast (`0x-40`) washes it out — don't.** Reduce distant
+  **tiling** with **bigger `StudsPerTile`**, not by flattening the texture.
+- **Live asset IDs:** moss color(mid) `87030981881332`, moss normal `127078857395019`, moss rough
+  `134190956157271`; rock color `136546694218828`, rock normal `92273231571806`, rock rough `115959935616314`.
+
+### Mood/lighting (Phase 1, all in `Lighting`)
+`Atmosphere` (Density ~0.34, **neutral grey** haze — let terrain/foliage carry the colour, not blue air),
+warm-neutral `Ambient`/`OutdoorAmbient` (not cool/blue), `ColorCorrection "MoodGrade"` (Contrast +0.08,
+Saturation +0.06, faint warm tint), `Bloom`, `SunRays`. ⚠️ `Lighting.Technology` **can't be set from the
+sandboxed `execute_luau` thread** (`lacking capability RobloxScript`) — set Future manually.
+
+### Still to do (art pass)
+Foliage scatter (ferns/plants/rocks) — hides the last of the flat-area facet chunk AND any residual tiling;
+Japanese maple/cherry accents; the raycast-to-surface scatter machinery from the earlier swatch works.
+See `plans/2026-07-10-zendojo-mossy-gorge-vertical-slice.md`.
