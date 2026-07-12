@@ -360,8 +360,8 @@ Players.PlayerAdded:Connect(function(player)
     end
 end)
 
--- D.2: lifecycle + vacant state — two pads; a joining owner claims one (lit), the
--- other stays dormant; release on leave. Replaces D.1's static single-owner block.
+-- D.6: lifecycle + vacant state across all 14 surveyed perches; a joining owner claims
+-- one (lit), the rest stay dormant; release on leave. (D.2 proved this on a 2-3 pad subset.)
 local StructureBuilder = require(shared:WaitForChild("StructureBuilder"))
 local PadBuilder = require(shared:WaitForChild("PadBuilder"))
 local StructureCatalog = require(shared:WaitForChild("StructureCatalog"))
@@ -389,9 +389,15 @@ local applier = TreatmentApplier.new({
     padOpsNew = PadOps.new,
 })
 
--- real perches, T02 (max L) registered first so the sole local joiner claims it with L
-for _, id in { "T02", "T06", "T04" } do
-    siteCoordinator:registerPad(id, PadSites[id])
+-- Register all 14 surveyed perches in stable T01..T14 order (PadSites is a keyed dict
+-- with no iteration order, so the id list is explicit). Each registers as a dormant
+-- vacant site; a joining owner claims the first fitting one (size-tier, then this order).
+for i = 1, 14 do
+    local id = string.format("T%02d", i)
+    local spec = PadSites[id]
+    if spec then
+        siteCoordinator:registerPad(id, spec)
+    end
 end
 for _, action in siteCoordinator:vacantActions() do
     applier:apply(action.padId, action.spec, action.treatment, action.scale, action.footprint)
