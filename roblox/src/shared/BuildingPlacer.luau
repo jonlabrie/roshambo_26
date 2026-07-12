@@ -26,4 +26,23 @@ function BuildingPlacer.placeCF(p: Placement): { number }
     return { dx, 0, dz, c, 0, s, 0, 1, 0, -s, 0, c }
 end
 
+type FP = { minX: number, maxX: number, minZ: number, maxZ: number }
+
+-- Rotate a footprint's half-extents by a 90-deg-multiple yaw. 0/180 keep (halfX,halfZ);
+-- 90/270 swap them. Footprints are centered on the building's own origin, so we track
+-- half-extents then re-center at the placement offset.
+function BuildingPlacer.fits(buildingFP: FP, deckFP: FP, p: Placement): boolean
+    local halfX = (buildingFP.maxX - buildingFP.minX) / 2
+    local halfZ = (buildingFP.maxZ - buildingFP.minZ) / 2
+    local yaw = BuildingPlacer.facingYaw(p.facing)
+    if yaw == 90 or yaw == 270 then
+        halfX, halfZ = halfZ, halfX
+    end
+    local dx, dz = p.offset[1], p.offset[2]
+    return (dx - halfX) >= deckFP.minX
+        and (dx + halfX) <= deckFP.maxX
+        and (dz - halfZ) >= deckFP.minZ
+        and (dz + halfZ) <= deckFP.maxZ
+end
+
 return BuildingPlacer
