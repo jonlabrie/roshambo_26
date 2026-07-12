@@ -20,10 +20,12 @@ test("claimed with loadout -> owner structure (passed through), lit", function()
     expect(t.lit).toBe(true)
 end)
 
-test("claimed without loadout -> dormant structure, lit (defensive)", function()
+test("claimed deck but no teahouse -> bare deck (no building), lit", function()
+    -- Piece-B ownership case: a player owns a deck but no teahouse. No forced dormant
+    -- building — the applier builds only the deck (teahouse/loadout nil).
     local t = VacantState.resolve("player1", nil, "dormant-structure")
     expect(t.kind).toBe("structure")
-    expect(t.loadout.colorScheme).toBe("scheme.dormant")
+    expect(t.loadout).toBeNil()
     expect(t.lit).toBe(true)
 end)
 

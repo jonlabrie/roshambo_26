@@ -16,8 +16,10 @@ end
 
 function VacantState.resolve(occupant: string?, ownerLoadout: any?, vacantForm: string?): Treatment
     if occupant ~= nil then
-        -- claimed: the owner's structure, lit (dormant fallback if a loadout is missing)
-        return { kind = "structure", loadout = ownerLoadout or dormant(), lit = true }
+        -- claimed: the owner's structure, lit. A nil loadout is a BARE DECK (Piece-B: the
+        -- player owns a deck but no teahouse) — no forced dormant building; the applier builds
+        -- only the deck when the loadout/teahouse is nil.
+        return { kind = "structure", loadout = ownerLoadout, lit = true }
     end
     if vacantForm == "pocket-garden" then
         -- valley: a garden mask (applier deferred to a later increment)

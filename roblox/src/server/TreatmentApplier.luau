@@ -140,7 +140,9 @@ function TreatmentApplier:apply(padId: string, spec: any, treatment: any, deckSi
         staging:Destroy()
         return -- keep whatever was there (F4: no crash, no orphan swap)
     end
-    if teahouse ~= nil then
+    -- build a building only when there's one to build; a nil teahouse or nil loadout is a
+    -- bare deck (Piece-B: owns a deck but no teahouse) — the deck stands alone.
+    if teahouse ~= nil and teahouse.loadout ~= nil then
         self:_buildBuilding(padId, spec, treatment, teahouse, deckSize, staging)
     end
     -- commit: drop the old site and adopt the freshly staged deck + building
