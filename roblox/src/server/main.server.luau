@@ -367,6 +367,8 @@ local PadBuilder = require(shared:WaitForChild("PadBuilder"))
 local StructureCatalog = require(shared:WaitForChild("StructureCatalog"))
 local PadRegistry = require(shared:WaitForChild("PadRegistry"))
 local SiteCoordinator = require(shared:WaitForChild("SiteCoordinator"))
+local BuildingPlacer = require(shared:WaitForChild("BuildingPlacer"))
+local SizeClasses = require(shared:WaitForChild("SizeClasses"))
 local StructureOps = require(script.Parent:WaitForChild("StructureOps"))
 local PadOps = require(script.Parent:WaitForChild("PadOps"))
 local PadSites = require(script.Parent:WaitForChild("PadSites"))
@@ -387,6 +389,8 @@ local applier = TreatmentApplier.new({
     catalog = StructureCatalog,
     structureOps = StructureOps,
     padOpsNew = PadOps.new,
+    buildingPlacer = BuildingPlacer,
+    sizeClasses = SizeClasses,
 })
 
 -- Register all 14 surveyed perches in stable T01..T14 order (PadSites is a keyed dict
@@ -400,7 +404,7 @@ for i = 1, 14 do
     end
 end
 for _, action in siteCoordinator:vacantActions() do
-    applier:apply(action.padId, action.spec, action.treatment, action.scale, action.footprint)
+    applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
 end
 
 Players.PlayerAdded:Connect(function(player)
@@ -419,12 +423,12 @@ Players.PlayerAdded:Connect(function(player)
             if not player:IsDescendantOf(Players) then
                 local rel = siteCoordinator:onLeave(uid)
                 if rel then
-                    applier:apply(rel.padId, rel.spec, rel.treatment, rel.scale, rel.footprint)
+                    applier:apply(rel.padId, rel.spec, rel.treatment, rel.deckSize, rel.teahouse)
                 end
                 playerPrefs[uid] = nil
                 return
             end
-            applier:apply(action.padId, action.spec, action.treatment, action.scale, action.footprint)
+            applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
             print(`[D.5] {player.UserId} claimed {action.padId} @ {tostring(action.sizeClass)}`)
         end
         if player:IsDescendantOf(Players) then
@@ -437,7 +441,7 @@ Players.PlayerRemoving:Connect(function(player)
     playerPrefs[tostring(player.UserId)] = nil
     local action = siteCoordinator:onLeave(tostring(player.UserId))
     if action then
-        applier:apply(action.padId, action.spec, action.treatment, action.scale, action.footprint)
+        applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
         print(`[D.4] {player.UserId} released {action.padId}`)
     end
 end)
