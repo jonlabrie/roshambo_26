@@ -35,4 +35,14 @@ function SizeClasses.footprintFor(sizeClass: string): Footprint
     return { minX = b.minX * s, maxX = b.maxX * s, minZ = b.minZ * s, maxZ = b.maxZ * s }
 end
 
+-- The DECK/pad extent (symmetric, centered on the mount) — distinct from the legacy
+-- post-only BASE_FOOTPRINT. S = 26 x 20. Scales each side by sqrt(area) via `scale`.
+SizeClasses.DECK_BASE = { minX = -13, maxX = 13, minZ = -10, maxZ = 10 } :: Footprint
+
+function SizeClasses.deckFootprint(deckSize: string): Footprint
+    local s = SizeClasses.scale[deckSize]
+    local b = SizeClasses.DECK_BASE
+    return { minX = b.minX * s, maxX = b.maxX * s, minZ = b.minZ * s, maxZ = b.maxZ * s }
+end
+
 return SizeClasses
