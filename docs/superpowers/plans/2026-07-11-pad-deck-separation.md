@@ -397,6 +397,10 @@ end,
 ```
 (Add `buildBeam(fromNode, toNode)` and `buildRailing(edge)` similarly — wood parts spanning the node coords / along the deck edges.)
 
+**Railing target dims** (tuned by the user 2026-07-12, applied to the interim prefab; match these in the procedural build): top rail (`RailCap`) top **≈ 2.25 studs above the deck** (i.e. lowered 0.5 from the old ~2.75); newel posts ~3.0 tall (0.45×0.45), balusters ~2.3 tall (0.15×0.15), a mid rail (`RailMid`, ~0.15 wide) roughly centered, cap-rail width **0.45** (long members keep their span, height 0.3). I.e. members are 25% thinner than the pre-2026-07-12 prefab and the rail is 0.5 lower.
+
+**Railing height is FIXED — do NOT scale it with `deckSize`** (avatar height is fixed, so a railing is a real-world-fixed ergonomic element). The deck *footprint* scales S/M/L (bigger platform, longer railing runs) but the railing's **height and member cross-sections stay constant** across sizes. This is a key reason to build railings procedurally in `PadBuilder` rather than let the old whole-teahouse `ScaleTo` inflate them. (Same principle applies to any avatar-ergonomic element — steps, doorway clearances — but the building itself does scale.)
+
 - [ ] **Step 2: Wire `PadBuilder.buildDeck`** to call, in order: `deckFootprint(deckSize)` → `ops.buildDeckSlab(fp)` → for each `PadFrame.beams(fp)` `ops.buildBeam(...)` → railings → `PadPlanner.planSupport(fp, mountCF12, ops.raycastGround, ops.blockedByPath)` → `ops.buildPost` per post (existing path).
 
 - [ ] **Step 3: Visual gate** — in Studio Play, temporarily register one site and call the new path (or once Phase 3 wires it, just Play). Confirm: symmetric slab centered on the mount, 5 beams under it forming the 2-long/3-short frame, railings on the edges, 6 posts dropping to terrain (embed/void/cantilever behaving as before). Eyeball on a flat pad and a sloped pad (e.g. T06).
