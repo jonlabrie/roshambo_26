@@ -14,7 +14,9 @@ export type Loadout = {
 }
 export type Mount = {
     cframe: { number },
-    hand: string,
+    -- which side (in addition to the front) opens as shoji: "right" is the prefab's native
+    -- build, "left" mirrors it. Replaces the old `hand` (pad/deck separation, Piece A).
+    openSide: string,
     footprint: { minX: number, maxX: number, minZ: number, maxZ: number },
 }
 export type Manifest =
@@ -26,7 +28,7 @@ export type Plan = {
     recolors: { Recolor },
     textures: { Texture },
     attachments: { Attachment },
-    mirror: boolean,
+    openSide: string,
     pivotCF: { number },
 }
 
@@ -102,7 +104,7 @@ function StructurePlanner.plan(loadout: Loadout, mount: Mount, manifest: Manifes
         recolors = resolveRecolors(loadout, manifest, catalog),
         textures = resolveTextures(loadout, manifest, catalog),
         attachments = resolveAttachments(loadout, manifest, catalog),
-        mirror = mount.hand == "left",
+        openSide = mount.openSide,
         pivotCF = mount.cframe,
     }
 end

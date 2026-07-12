@@ -67,7 +67,8 @@ function TreatmentApplier:apply(padId: string, spec: any, treatment: any, scale:
         end
         return -- garden treatment: applier deferred to a later increment
     end
-    local mount = { cframe = spec.mountCF, hand = spec.hand, footprint = footprint }
+    -- transitional: openSide comes from the pad's hand until Task 9/10 thread placement.openSide
+    local mount = { cframe = spec.mountCF, openSide = spec.hand, footprint = footprint }
     local ok, result = pcall(function()
         return self._structureBuilder.build(treatment.loadout, mount, self._catalog, self._structureOps)
     end)

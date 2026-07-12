@@ -31,11 +31,11 @@ local function fakeOps(log: { any })
     }
 end
 
-test("build drives ops in order: clone, mirror(if left), recolor, texture, attach, pivot", function()
+test("build drives ops in order: clone, mirror(if openSide left), recolor, texture, attach, pivot", function()
     local log: { any } = {}
     local mount = {
         cframe = { 1, 2, 3, 1, 0, 0, 0, 1, 0, 0, 0, 1 },
-        hand = "left",
+        openSide = "left",
         footprint = { minX = -13, maxX = 13, minZ = -10, maxZ = 10 },
     }
     local loadout = {
@@ -56,11 +56,11 @@ test("build drives ops in order: clone, mirror(if left), recolor, texture, attac
     })
 end)
 
-test("build skips mirror for a right-hand mount", function()
+test("build skips mirror for a right (native) openSide mount", function()
     local log: { any } = {}
     local mount = {
         cframe = { 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1 },
-        hand = "right",
+        openSide = "right",
         footprint = { minX = -13, maxX = 13, minZ = -10, maxZ = 10 },
     }
     Builder.build({ baseStyle = "teahouse-1story" }, mount, Catalog, fakeOps(log))

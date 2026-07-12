@@ -7,7 +7,7 @@ local Planner = require("../src/shared/StructurePlanner")
 local function baseMount(): any
     return {
         cframe = { 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1 },
-        hand = "right",
+        openSide = "right",
         footprint = { minX = -13, maxX = 13, minZ = -10, maxZ = 10 },
     }
 end
@@ -74,17 +74,18 @@ test("attachments: flags map to their mount; unknown mounts are skipped", functi
     expect(plan.attachments).toEqual({ { mount = "FlagMount_1", prefabId = "flag_clan" } })
 end)
 
-test("mirror: true only for a left-hand mount", function()
+test("openSide: threaded from the mount, replacing mirror (mirror field is gone)", function()
     local manifest = { roles = {}, shojiBays = {}, hasTatami = false, flagMounts = {} }
     local right = Planner.plan({ baseStyle = "teahouse-1story" }, baseMount(), manifest, Catalog)
     local leftMount = {
         cframe = { 5, 6, 7, 1, 0, 0, 0, 1, 0, 0, 0, 1 },
-        hand = "left",
+        openSide = "left",
         footprint = { minX = -13, maxX = 13, minZ = -10, maxZ = 10 },
     }
     local left = Planner.plan({ baseStyle = "teahouse-1story" }, leftMount, manifest, Catalog)
-    expect(right.mirror).toBe(false)
-    expect(left.mirror).toBe(true)
+    expect(right.openSide).toBe("right")
+    expect(left.openSide).toBe("left")
+    expect(right.mirror).toBeNil() -- the old whole-building mirror flag is gone
     expect(left.pivotCF).toEqual({ 5, 6, 7, 1, 0, 0, 0, 1, 0, 0, 0, 1 })
 end)
 
