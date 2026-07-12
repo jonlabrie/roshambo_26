@@ -5,12 +5,14 @@ local PadRegistry = require("../src/shared/PadRegistry")
 local SizeClasses = require("../src/shared/SizeClasses")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 
+local PLACEMENT = { offset = { 0, 0 }, facing = "N", openSide = "right" }
 local function spec(id: string, maxSize: string?)
     return {
         id = id,
         mountCF = { 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1 },
-        hand = "right",
         maxSize = maxSize or "L",
+        deckSize = maxSize or "L", -- Task 9 default = maxSize
+        placement = PLACEMENT,
         vacantForm = "dormant-structure",
     }
 end
@@ -26,13 +28,19 @@ local function coord(specs: { any })
 end
 
 describe("SiteCoordinator.onJoin", function()
-    test("an owner claims the first fitting site, lit, with size fields", function()
+    test("an owner claims the first fitting site, lit, with deck + teahouse fields", function()
         local c = coord({ spec("p1"), spec("p2") })
         local a = c:onJoin("player1", OWNED)
         expect(a ~= nil).toBe(true)
         expect((a :: any).padId).toBe("p1")
         expect((a :: any).treatment.lit).toBe(true)
         expect((a :: any).treatment.loadout).toBe(LOADOUT)
+        -- deck = the site's default deck (L); building = the owner's M teahouse on the site placement
+        expect((a :: any).deckSize).toBe("L")
+        expect((a :: any).teahouse.size).toBe("M")
+        expect((a :: any).teahouse.loadout).toBe(LOADOUT)
+        expect((a :: any).teahouse.placement).toBe(PLACEMENT)
+        -- transitional building-size fields (removed in Task 12)
         expect((a :: any).sizeClass).toBe("M")
         expect((a :: any).scale).toBeCloseTo(SizeClasses.scale.M)
         expect((a :: any).footprint.maxX).toBeCloseTo(SizeClasses.footprintFor("M").maxX)
@@ -126,13 +134,17 @@ describe("SiteCoordinator.onJoin preference", function()
 end)
 
 describe("SiteCoordinator.onLeave", function()
-    test("a holder releases dormant at the site's max size and frees it", function()
+    test("a holder releases to the S starter bundle and frees the site", function()
         local c = coord({ spec("L1", "L") })
         c:onJoin("player1", { L = LOADOUT })
         local a = c:onLeave("player1")
         expect((a :: any).treatment.lit).toBe(false)
         expect((a :: any).treatment.loadout.colorScheme).toBe("scheme.dormant")
-        expect((a :: any).scale).toBeCloseTo(SizeClasses.scale.L)
+        -- reverts to S deck + dormant S teahouse (NOT the perch max size)
+        expect((a :: any).deckSize).toBe("S")
+        expect((a :: any).teahouse.size).toBe("S")
+        expect((a :: any).teahouse.loadout.colorScheme).toBe("scheme.dormant")
+        expect((a :: any).scale).toBe(1.0)
         expect((c:onJoin("player2", { L = LOADOUT }) :: any).padId).toBe("L1")
     end)
 
@@ -143,11 +155,14 @@ describe("SiteCoordinator.onLeave", function()
 end)
 
 describe("SiteCoordinator.vacantActions", function()
-    test("one dormant action per site at the site's max-size scale", function()
+    test("one S-starter dormant action per site (S deck + dormant S teahouse), regardless of max", function()
         local c = coord({ spec("L1", "L"), spec("S1", "S") })
         local acts = c:vacantActions()
         expect(#acts).toBe(2)
-        expect(acts[1].scale).toBeCloseTo(SizeClasses.scale.L)
+        -- both are the S starter, even the L-max perch
+        expect(acts[1].deckSize).toBe("S")
+        expect(acts[1].teahouse.size).toBe("S")
+        expect(acts[1].scale).toBe(1.0)
         expect(acts[2].scale).toBe(1.0)
         expect(acts[1].treatment.lit).toBe(false)
     end)

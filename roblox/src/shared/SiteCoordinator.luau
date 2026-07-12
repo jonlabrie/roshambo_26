@@ -12,14 +12,25 @@ local SizeClasses = require("./SizeClasses")
 local SiteCoordinator = {}
 SiteCoordinator.__index = SiteCoordinator
 
+export type Teahouse = { size: string, loadout: any, placement: any }
 export type Action = {
     padId: string,
     spec: any,
     treatment: VacantState.Treatment,
+    -- pad/deck separation (Piece A): the pad size to build, and the optional building placed
+    -- on it. `teahouse` is nil for a garden (or a future bare deck).
+    deckSize: string?,
+    teahouse: Teahouse?,
+    -- transitional building-size fields (kept additive; removed in the Task 12 cleanup once
+    -- TreatmentApplier reads deckSize/teahouse instead).
     scale: number,
     sizeClass: string?,
     footprint: SizeClasses.Footprint?,
 }
+
+-- The starter bundle shown at every unoccupied/left cliff pad: an S deck + a dormant
+-- (darkened) S teahouse. NOT the perch maxSize — S fits any perch and advertises the upgrade.
+local STARTER = "S"
 
 function SiteCoordinator.new(registry: any)
     return setmetatable({
@@ -37,13 +48,33 @@ function SiteCoordinator:registerPad(id: string, spec: any): boolean
     return ok
 end
 
--- A vacant site renders its dormant shell at the site's own max size.
-local function dormantOf(spec: any): (number, SizeClasses.Footprint?)
-    local maxSize = spec and spec.maxSize
-    if maxSize == nil then
-        return 1, nil
+-- The vacant/left action: the S starter bundle (S deck + dormant S teahouse) for a cliff
+-- pad, or a bare garden action for a valley pad (applier deferred). `spec` may be nil.
+local function starterAction(padId: string, spec: any): Action
+    local treatment = VacantState.resolve(nil, nil, spec and spec.vacantForm)
+    if treatment.kind ~= "structure" then
+        -- valley/garden pad: no deck or building in Piece A
+        return {
+            padId = padId,
+            spec = spec,
+            treatment = treatment,
+            deckSize = nil,
+            teahouse = nil,
+            scale = 1.0,
+            sizeClass = nil,
+            footprint = nil,
+        }
     end
-    return SizeClasses.scale[maxSize], SizeClasses.footprintFor(maxSize)
+    return {
+        padId = padId,
+        spec = spec,
+        treatment = treatment,
+        deckSize = STARTER,
+        teahouse = { size = STARTER, loadout = treatment.loadout, placement = spec and spec.placement },
+        scale = SizeClasses.scale[STARTER],
+        sizeClass = STARTER,
+        footprint = SizeClasses.footprintFor(STARTER),
+    }
 end
 
 function SiteCoordinator:vacantActions(): { Action }
@@ -51,14 +82,7 @@ function SiteCoordinator:vacantActions(): { Action }
     for _, id in self._padIds do
         local rec = self._registry:get(id)
         if rec and rec.occupant == nil then
-            local scale, footprint = dormantOf(rec.spec)
-            table.insert(out, {
-                padId = id,
-                spec = rec.spec,
-                treatment = VacantState.resolve(nil, nil, rec.spec.vacantForm),
-                scale = scale,
-                footprint = footprint,
-            })
+            table.insert(out, starterAction(id, rec.spec))
         end
     end
     return out
@@ -110,10 +134,15 @@ function SiteCoordinator:onJoin(
                 if rec and rec.occupant == nil and SizeClasses.fitsWithin(size, rec.spec.maxSize) then
                     self._registry:claim(id, playerId)
                     self._held[playerId] = id
+                    -- deck = the site's default deck (bounded by maxSize); building = the
+                    -- owner's largest fitting teahouse, placed per the site's default placement.
+                    local deckSize = rec.spec.deckSize or rec.spec.maxSize
                     return {
                         padId = id,
                         spec = rec.spec,
                         treatment = VacantState.resolve(playerId, loadout, rec.spec.vacantForm),
+                        deckSize = deckSize,
+                        teahouse = { size = size, loadout = loadout, placement = rec.spec.placement },
                         scale = SizeClasses.scale[size],
                         sizeClass = size,
                         footprint = SizeClasses.footprintFor(size),
@@ -133,15 +162,7 @@ function SiteCoordinator:onLeave(playerId: string): Action?
     self._registry:release(padId)
     self._held[playerId] = nil
     local rec = self._registry:get(padId)
-    local spec = rec and rec.spec
-    local scale, footprint = dormantOf(spec)
-    return {
-        padId = padId,
-        spec = spec,
-        treatment = VacantState.resolve(nil, nil, spec and spec.vacantForm),
-        scale = scale,
-        footprint = footprint,
-    }
+    return starterAction(padId, rec and rec.spec)
 end
 
 return SiteCoordinator
