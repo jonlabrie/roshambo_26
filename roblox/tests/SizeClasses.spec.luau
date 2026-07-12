@@ -68,7 +68,9 @@ describe("SizeClasses.deckFootprint", function()
         expect(d.maxZ).toBeCloseTo(10)
     end)
     test("M and L decks scale each side by sqrt(area) and stay centered", function()
-        local function ctr(f) return (f.minX + f.maxX) / 2, (f.minZ + f.maxZ) / 2 end
+        local function ctr(f)
+            return (f.minX + f.maxX) / 2, (f.minZ + f.maxZ) / 2
+        end
         local m = SizeClasses.deckFootprint("M")
         local cx, cz = ctr(m)
         expect(cx).toBeCloseTo(0)
@@ -78,7 +80,9 @@ describe("SizeClasses.deckFootprint", function()
         expect(l.maxZ).toBeCloseTo(10 * math.sqrt(1.6))
     end)
     test("deck AREA scales by the size factor", function()
-        local function area(f) return (f.maxX - f.minX) * (f.maxZ - f.minZ) end
+        local function area(f)
+            return (f.maxX - f.minX) * (f.maxZ - f.minZ)
+        end
         local s = area(SizeClasses.deckFootprint("S"))
         expect(area(SizeClasses.deckFootprint("L")) / s).toBeCloseTo(1.6)
     end)
