@@ -18,15 +18,19 @@ Legend: `[x]` done · `[ ]` remaining.
 The materialization machinery (D.1–D.4) is **BUILT & proven on 1–2 pads** (SiteCoordinator + TreatmentApplier
 handle join→materialize→leave→dormant; SizeClasses; dynamic posts). Remaining is scale + retire + test:
 
-- [ ] **Re-survey the 14 pad locations in `Sandbox/PadRefs`** (`PadRef_T01–T14`) → Deck-anchored `mountCF`
-      + terrain-derived `maxSize` per site. **Clearance/spacing already user-verified** ✓ — so the D.4-backlog
-      spacing-collision pass is NOT needed; just read each site's current max.
-- [ ] **Regenerate `PadSites.luau`** from the current PadRef locations (the D.4 bake surveyed the old
-      `CanyonTeahouses.Teahouse_01–14`; the authoritative locations are now the PadRefs).
-- [ ] **Register all 14 as SITES** and wire the runtime to materialize across all 14 (scale the proven 1–2-pad
-      loop; large-first size-cap assignment via the registry).
-- [ ] **Retire the 14 legacy `CanyonTeahouses`** (freeze/remove; runtime-materialized teahouses replace them).
-      The old T05/T06 left-hand shoji/SideWall bug resolves itself on materialization (the MirrorX-tagged prefab).
+- [x] ~~Re-survey PadRefs / regenerate `PadSites.luau`~~ — **NOT NEEDED** (verified 2026-07-11). All 14
+      `PadRef_T01–T14` Pad datums match the baked `PadSites` mountCF exactly in yaw + Y, differing only by a
+      consistent hand-dependent local offset (−5.9 fwd / ±6.1 right, marker-center vs mountCF-anchor). Same
+      perches, not moved → `PadSites.luau` is authoritative as-is. (One minor: T11's marker is 2.4 studs
+      shallower in fwd — cosmetic, yaw/Y still match.)
+- [x] **Register all 14 as SITES** — done in `main.server.luau` (was hard-coded `T02,T06,T04`; now the
+      `for i=1,14` `T%02d` loop, stable order). The `vacantActions()→apply()` loop already materializes all
+      registered sites. 341 Lune tests green. **Pending Studio play visual gate** (Rojo-sync + Play → confirm
+      14 materialize on-perch).
+- [x] **Retire the legacy `CanyonTeahouses`** — 2026-07-11: moved (13 models, ~3053 parts) from
+      `CanyonWorld.Legacy` to `ServerStorage.RetiredLegacyTeahouses` (frozen, not deleted; reversible;
+      place-only, save the place). Play now renders only the materialized `TeahouseSites`. NOTE: 13 legacy
+      models vs 14 pad sites — count discrepancy from the original survey, not yet reconciled.
 - [ ] **Full-loop test** on the real perches (join/leave across servers) + per-site size tuning.
 
 *Risk:* per-site size tuning iteration; verifying dormant/lit swaps read right on every perch.
@@ -58,6 +62,11 @@ handle join→materialize→leave→dormant; SizeClasses; dynamic posts). Remain
       (size is currently a scale proxy on the one base prefab).
 - [ ] *(optional)* **Bridge sway** polish — deferred; continuous per-frame deform (keeps round ropes) or
       Beam cables.
+- [ ] **TBD — Bamboo impostor / low-poly LOD** — `RealisticBamboo` is high-poly; canyon-wide rollout needs a
+      billboard-cross impostor (pre-render → chroma-key to alpha → localhost `upload_image` → crossed textured
+      quads, static near-mesh/far-impostor split) or a Blender-decimated `_LOD` mesh. Prototype not yet built.
+      Foliage scatter is otherwise engine-optimized (RenderFidelity Automatic, shadows/collision/query off) —
+      see [[zendojo-foliage-scatter]].
 
 ---
 
