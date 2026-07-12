@@ -6,8 +6,9 @@ local PadFrame = {}
 local PH = 0.6 -- post half-width; outer face flush to the deck corner
 
 export type FP = { minX: number, maxX: number, minZ: number, maxZ: number }
+export type Node = { id: string, x: number, z: number }
 
-function PadFrame.nodes(fp: FP)
+function PadFrame.nodes(fp: FP): { Node }
     local cx = (fp.minX + fp.maxX) / 2
     return {
         { id = "FL", x = fp.minX + PH, z = fp.minZ + PH },
