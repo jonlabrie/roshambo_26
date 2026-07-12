@@ -122,11 +122,11 @@ Two **independent** inputs, not one `sizeClass`:
 
 **Which sizes drive it** (`SiteCoordinator` already selects the relevant class per join/leave/vacant;
 it now carries deckSize + optional teahouse rather than a single scale):
-- **Vacant** → deckSize = site `maxSize`, dormant (as `vacantActions` does today; teahouse per the
-  dormant treatment, e.g. a dormant starter or bare deck — exact dormant content is existing
-  `VacantState` policy, unchanged here).
+- **Vacant** → **deckSize = S + a dormant (darkened) S teahouse** — the starter bundle shown at every
+  unoccupied pad, advertising the upgrade. (Not the perch `maxSize`; S fits any perch.) This is the
+  concrete `VacantState` dormant content for Piece A.
 - **Claimed** → deckSize + teahouse from the owner, lit, with their placement.
-- **On leave** → back to `maxSize`, dormant.
+- **On leave** → back to the **S deck + dormant S teahouse** starter.
 
 ## Error handling
 
