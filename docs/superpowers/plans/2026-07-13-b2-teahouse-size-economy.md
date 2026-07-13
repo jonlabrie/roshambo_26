@@ -978,15 +978,31 @@ local function offerFor(siteId: string, occupied: boolean): (string?, string?)
         end
         return nil, nil
     end
-    -- owner: upgrades only on their OWN claimed site
+    -- owner: upgrades only on their OWN claimed site. ONE prompt alternates deck<->teahouse: if
+    -- the deck is bigger than the biggest owned teahouse, the next step is a teahouse (to fill the
+    -- deck); otherwise it's a bigger deck. Covers BOTH ladders through the single key.
     if siteId ~= state.claimedPadId then
         return nil, nil
     end
-    local nextDeck = SizeClasses.nextTier(state.maxDeckSize)
-    if nextDeck ~= nil then
-        return `deck:{nextDeck}`, `Upgrade deck → {nextDeck} — {priceOf(`deck:{nextDeck}`)} pts`
+    local maxTea: string? = nil
+    for _, s in state.teahouseSizes do
+        if maxTea == nil or SizeClasses.rank[s] > SizeClasses.rank[maxTea] then
+            maxTea = s
+        end
     end
-    return nil, nil -- (teahouse upgrades can share this prompt later; deck-first keeps B2 minimal)
+    local deckRank = if state.maxDeckSize ~= nil then SizeClasses.rank[state.maxDeckSize] else 0
+    local teaRank = if maxTea ~= nil then SizeClasses.rank[maxTea] else 0
+    if deckRank > teaRank then
+        local nt = SizeClasses.nextTier(maxTea) -- next teahouse tier, guaranteed <= deck here
+        if nt ~= nil then
+            return `teahouse:{nt}`, `Add {nt} teahouse — {priceOf(`teahouse:{nt}`)} pts`
+        end
+    end
+    local nd = SizeClasses.nextTier(state.maxDeckSize)
+    if nd ~= nil then
+        return `deck:{nd}`, `Upgrade deck → {nd} — {priceOf(`deck:{nd}`)} pts`
+    end
+    return nil, nil -- fully upgraded (L deck + L teahouse)
 end
 
 local function refresh()
@@ -1085,7 +1101,7 @@ Claude-Session: https://claude.ai/code/session_01V59ArCLfybKvRQMH6x4ZCQ"
 ## Notes for the executor
 
 - **Read before editing** `main.server.luau` (Task 7) and `SiteCoordinator.luau` (Task 5): locate anchors by surrounding code, not line number. Confirm the `PadRegistry` instance's local name and the exact `PlayerAdded` block before editing.
-- **Deck-first upgrade prompt (YAGNI for B2):** Task 8 offers the next **deck** tier on the owner's prompt; teahouse upgrades (`teahouse:S/M/L`) are purchasable via the same `RequestPurchase`/`postPurchase` path (server handles them), and a fuller upgrade chooser is B3's customization UI — do not build a multi-item menu here.
+- **Single-prompt alternating upgrade (YAGNI for B2):** Task 8's owner prompt alternates deck↔teahouse (buy a teahouse to fill your deck, else upgrade the deck), so BOTH ladders are reachable through one key — do NOT build a multi-item chooser menu (that richer UI is B3's customization work).
 - **Do not** commit `SecretsLocal.luau`/`server/.env`. The visual gate needs the branch pushed so the dev App Runner redeploys the new `/economy` + `/purchase` routes (Task 3 is server code — unlike B1's Roblox-only fixes, this DOES need a deploy before the Studio gate can pass).
 - Place-only geometry (the built decks/teahouses) persists only when the user saves the place; the economy state persists in Mongo via the routes.
 ```
