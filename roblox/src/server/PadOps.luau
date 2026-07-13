@@ -26,6 +26,10 @@ local CAP_TOP, CAP_H, CAP_W = 2.75, 0.3, 0.45 -- charcoal top rail: top 2.75 abo
 local MID_Y, MID_H, MID_W = 1.75, 0.2, 0.15 -- mid rail: 1.75 above deck, thin
 local NEWEL_H, NEWEL_W = 2.75, 0.45 -- corner posts rise from the deck to the cap top (flush, no projection)
 local BAL_H, BAL_W, BAL_CY = 2.8, 0.15, 1.2 -- balusters; center 1.2 above deck (top ~2.60), bottom ~-0.2
+-- invisible continuous fall-guard behind the visible railing: a SMOOTH vertical wall the avatar
+-- can't mantle. The spaced bars alone let it auto-climb up and over; a flat wall stops it. 3.5
+-- clears the auto-step (~2.5) with margin and stays well under the ~7-stud jump (leaping out still works).
+local BARRIER_H, BARRIER_T = 3.5, 0.3
 local BAL_GAP = 3.6 -- target clear spacing => ~3.76 center-to-center, matching the koran
 
 function PadOps.new(mountCF: CFrame, parent: Instance)
@@ -52,6 +56,7 @@ function PadOps.new(mountCF: CFrame, parent: Instance)
         p.Material = material
         p.CFrame = mountCF * CFrame.new(lx, ly, lz)
         p.Parent = parent
+        return p
     end
     return {
         raycastGround = function(x: number, z: number): number?
@@ -162,6 +167,40 @@ function PadOps.new(mountCF: CFrame, parent: Instance)
                     upright("Baluster", NEWEL_W + step * i, BAL_W, BAL_H, BAL_CY)
                 end
             end
+
+            -- invisible continuous fall-guard: full edge length (covers the corners), outer face
+            -- flush to the deck edge, deck to BARRIER_H. Collidable + invisible; the visible koran
+            -- still does the looks. A flat wall = nothing for the avatar to step onto.
+            local bx, bz = mx + edge.nx * (BARRIER_T / 2), mz + edge.nz * (BARRIER_T / 2)
+            local barrier
+            if alongX then
+                barrier = box(
+                    "RailBarrier",
+                    bx,
+                    BARRIER_H / 2,
+                    bz,
+                    length,
+                    BARRIER_H,
+                    BARRIER_T,
+                    CAP_COLOR,
+                    Enum.Material.Wood,
+                    true
+                )
+            else
+                barrier = box(
+                    "RailBarrier",
+                    bx,
+                    BARRIER_H / 2,
+                    bz,
+                    BARRIER_T,
+                    BARRIER_H,
+                    length,
+                    CAP_COLOR,
+                    Enum.Material.Wood,
+                    true
+                )
+            end
+            barrier.Transparency = 1
         end,
     }
 end
