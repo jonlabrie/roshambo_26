@@ -19,7 +19,9 @@
                 "FateResolved": { "$className": "RemoteEvent" },
                 "BoardData": { "$className": "RemoteEvent" },
                 "SetPadPreference": { "$className": "RemoteEvent" },
-                "PreferenceState": { "$className": "RemoteEvent" }
+                "PreferenceState": { "$className": "RemoteEvent" },
+                "SetBackDoor": { "$className": "RemoteEvent" },
+                "BackDoorState": { "$className": "RemoteEvent" }
             }
         },
         "Workspace": {

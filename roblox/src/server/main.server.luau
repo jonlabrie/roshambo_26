@@ -16,6 +16,8 @@ local ThemeManifest = require(shared:WaitForChild("ThemeManifest"))
 local ZenDojo = require(shared:WaitForChild("themes"):WaitForChild("ZenDojo"))
 local FateRegistry = require(shared:WaitForChild("FateRegistry"))
 local PreferenceEditor = require(shared:WaitForChild("PreferenceEditor"))
+local BackDoorEditor = require(shared:WaitForChild("BackDoorEditor"))
+local WallBays = require(shared:WaitForChild("WallBays"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local SubmitPick = remotes:WaitForChild("SubmitPick") :: RemoteEvent
@@ -28,6 +30,8 @@ local FateResolved = remotes:WaitForChild("FateResolved") :: RemoteEvent
 local BoardData = remotes:WaitForChild("BoardData") :: RemoteEvent
 local SetPadPreference = remotes:WaitForChild("SetPadPreference") :: RemoteEvent
 local PreferenceState = remotes:WaitForChild("PreferenceState") :: RemoteEvent
+local SetBackDoor = remotes:WaitForChild("SetBackDoor") :: RemoteEvent
+local BackDoorState = remotes:WaitForChild("BackDoorState") :: RemoteEvent
 local TweenService = game:GetService("TweenService")
 local TextService = game:GetService("TextService")
 
@@ -378,6 +382,10 @@ local TreatmentApplier = require(script.Parent:WaitForChild("TreatmentApplier"))
 local playerPrefs: { [string]: { string } } = {}
 local PREF_CAP = 32
 
+-- The teahouse each player currently occupies, for occupant-gated live edits (B1 back door):
+-- padId + the occupied SIZE + that size's loadout (the merge target for wallBays edits).
+local playerHouse: { [string]: { padId: string, size: string, loadout: any } } = {}
+
 local siteCoordinator = SiteCoordinator.new(PadRegistry.new())
 local sitesFolder = Instance.new("Folder")
 sitesFolder.Name = "TeahouseSites"
@@ -428,11 +436,25 @@ Players.PlayerAdded:Connect(function(player)
                     applier:apply(rel.padId, rel.spec, rel.treatment, rel.deckSize, rel.teahouse)
                 end
                 playerPrefs[uid] = nil
+                playerHouse[uid] = nil
                 return
             end
             applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
             local tsize = action.teahouse and action.teahouse.size or "bare"
             print(`[D.5] {player.UserId} claimed {action.padId} deck={action.deckSize} teahouse={tsize}`)
+            if action.teahouse ~= nil and action.teahouse.loadout ~= nil then
+                playerHouse[uid] = {
+                    padId = action.padId,
+                    size = action.teahouse.size,
+                    loadout = action.teahouse.loadout,
+                }
+                if player:IsDescendantOf(Players) then
+                    BackDoorState:FireClient(player, {
+                        padId = action.padId,
+                        backDoorIndex = BackDoorEditor.backDoorIndex(action.teahouse.loadout.wallBays),
+                    })
+                end
+            end
         end
         if player:IsDescendantOf(Players) then
             PreferenceState:FireClient(player, { padPreferences = playerPrefs[uid] })
@@ -442,6 +464,7 @@ end)
 
 Players.PlayerRemoving:Connect(function(player)
     playerPrefs[tostring(player.UserId)] = nil
+    playerHouse[tostring(player.UserId)] = nil
     local action = siteCoordinator:onLeave(tostring(player.UserId))
     if action then
         applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
@@ -472,6 +495,49 @@ SetPadPreference.OnServerEvent:Connect(function(player, siteId)
             changed = siteId,
             favorited = favorited,
             name = PadSites[siteId].displayName or siteId,
+        })
+    end
+end)
+
+SetBackDoor.OnServerEvent:Connect(function(player, payload)
+    local uid = tostring(player.UserId)
+    local house = playerHouse[uid]
+    if house == nil then
+        return -- not occupying a teahouse this session; ignore (occupant-only)
+    end
+    -- find the live, already-materialized structure to read its back-bay count + re-render
+    local siteFolder = sitesFolder:FindFirstChild("MaterializedSite_" .. house.padId)
+    local structure = siteFolder and siteFolder:FindFirstChild("Structure")
+    if structure == nil then
+        return -- streaming / rebuild race: nothing to re-render (F2/F4)
+    end
+    local manifest = StructureOps.readManifest(structure)
+    local backBayCount = 0
+    for _, bay in manifest.bays do
+        if bay.side == "back" then
+            backBayCount += 1
+        end
+    end
+    local bayIndex = if typeof(payload) == "table" then payload.bayIndex else nil
+    if typeof(bayIndex) ~= "number" or bayIndex < 1 or bayIndex > backBayCount then
+        return -- ill-typed / out-of-range request
+    end
+    local newWallBays = BackDoorEditor.setBackDoor(house.loadout.wallBays, bayIndex, backBayCount)
+    -- merge into a NEW copy of the occupied size's loadout (don't alias the stash pre-persist)
+    local newLoadout = table.clone(house.loadout)
+    newLoadout.wallBays = newWallBays
+    -- live, server-authoritative re-render (replicates to every client)
+    StructureOps.applyBays(structure, WallBays.resolve(manifest.bays, newWallBays))
+    house.loadout = newLoadout
+    -- best-effort persist: a failure keeps the live door this session (lost next join), no revert
+    local persisted = net:setTeahouse(uid, house.size, newLoadout)
+    if not persisted.ok then
+        warn(`[B1] setTeahouse failed for {uid}/{house.size}: {tostring(persisted.error)}`)
+    end
+    if player:IsDescendantOf(Players) then
+        BackDoorState:FireClient(player, {
+            padId = house.padId,
+            backDoorIndex = BackDoorEditor.backDoorIndex(newWallBays),
         })
     end
 end)
