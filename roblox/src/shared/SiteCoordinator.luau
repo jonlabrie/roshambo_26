@@ -1,11 +1,15 @@
 --!strict
 -- Per-server orchestration brain for sub-project D materialization. Turns player
 -- join/leave + startup into Actions by composing an injected PadRegistry (claim/
--- release) with VacantState (treatment) and SizeClasses (size-cap fit). Pure
--- (Lune-tested): no Roblox datatypes. A site carries a `maxSize`; onJoin claims the
--- first vacant site whose maxSize accommodates the player's largest owned size,
--- biggest-first. Within a size tier, a player's preferred site ids (passed to onJoin)
--- are scanned first. The Studio-side TreatmentApplier executes the Actions (scale + posts).
+-- release) with VacantState (treatment) and SizeClasses (built-size resolution). Pure
+-- (Lune-tested): no Roblox datatypes. Claim eligibility keys off DECK ownership
+-- (`economy.maxDeckSize ~= nil`), not teahouse ownership; a deck-only owner (empty
+-- `teahouses`) claims a bare deck. onJoin claims the first vacant site in preference
+-- order (a player's preferred site ids, passed to onJoin, are scanned first, then
+-- registration order); the built deckSize + optional teahouse are resolved via
+-- SizeClasses.resolveBuilt, which CAPS the deck/teahouse down to the perch's maxSize
+-- rather than gating the claim on a size mismatch. The Studio-side TreatmentApplier
+-- executes the Actions (scale + posts).
 local VacantState = require("./VacantState")
 local SizeClasses = require("./SizeClasses")
 
@@ -103,35 +107,39 @@ end
 
 function SiteCoordinator:onJoin(
     playerId: string,
-    ownedTeahouses: { [string]: any }?,
+    economy: { maxDeckSize: string?, teahouses: { [string]: any } }?,
     preferences: { string }?
 ): Action?
     if self._held[playerId] ~= nil then
         return nil
     end
-    if ownedTeahouses == nil then
-        return nil
+    if economy == nil or economy.maxDeckSize == nil then
+        return nil -- not an owner (owns no deck) -> no auto-claim
+    end
+    local teahouses = economy.teahouses or {}
+    local teaSizes: { string } = {}
+    for size in teahouses do
+        table.insert(teaSizes, size)
     end
     local order = self:_orderedSiteIds(preferences)
-    for _, size in SizeClasses.order do -- L, M, S (biggest first)
-        local loadout = ownedTeahouses[size]
-        if loadout ~= nil then
-            for _, id in order do -- preferred-first within this size tier
-                local rec = self._registry:get(id)
-                if rec and rec.occupant == nil and SizeClasses.fitsWithin(size, rec.spec.maxSize) then
-                    self._registry:claim(id, playerId)
-                    self._held[playerId] = id
-                    -- deck = the site's default deck (bounded by maxSize); building = the
-                    -- owner's largest fitting teahouse, placed per the site's default placement.
-                    local deckSize = rec.spec.deckSize or rec.spec.maxSize
-                    return {
-                        padId = id,
-                        spec = rec.spec,
-                        treatment = VacantState.resolve(playerId, loadout, rec.spec.vacantForm),
-                        deckSize = deckSize,
-                        teahouse = { size = size, loadout = loadout, placement = CENTERED },
-                    }
-                end
+    for _, id in order do
+        local rec = self._registry:get(id)
+        if rec and rec.occupant == nil then
+            local built = SizeClasses.resolveBuilt(economy.maxDeckSize, teaSizes, rec.spec.maxSize)
+            if built ~= nil then
+                self._registry:claim(id, playerId)
+                self._held[playerId] = id
+                local teaLoadout = if built.teahouseSize ~= nil then teahouses[built.teahouseSize] else nil
+                local teahouse = if built.teahouseSize ~= nil
+                    then { size = built.teahouseSize, loadout = teaLoadout, placement = CENTERED }
+                    else nil
+                return {
+                    padId = id,
+                    spec = rec.spec,
+                    treatment = VacantState.resolve(playerId, teaLoadout, rec.spec.vacantForm),
+                    deckSize = built.deckSize,
+                    teahouse = teahouse,
+                }
             end
         end
     end
