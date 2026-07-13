@@ -1,58 +1,58 @@
 --!strict
--- Capture the perfected canyon TeahousePrototype into the portable base prefab
+-- Capture the bay-structured `TeahousePrototype` into the portable base prefab
 -- `ServerStorage.StructurePrefabs.teahouse-1story` used by the Structure builder
--- (StructureBuilder / StructurePlanner in src/shared). Run via MCP execute_luau
--- (datamodel Edit) or paste into a Studio command bar. Idempotent: re-running
--- rebuilds the prefab from the current TeahousePrototype.
+-- (StructureBuilder / StructurePlanner / StructureOps in src). Run via MCP execute_luau
+-- (datamodel Edit) or paste into a Studio command bar. Idempotent: re-running rebuilds
+-- the prefab from the current TeahousePrototype.
 --
--- Source: bring an up-to-date teahouse into Workspace as `TeahousePrototype` (e.g.
--- clone one of ServerStorage.RetiredLegacyTeahouses.CanyonTeahouses.*, which carry the
--- current chochin lantern).
+-- Source: an SP1 modular teahouse in Workspace as `TeahousePrototype` (10 `Bay_<side>_<index>`
+-- models, each with `Solid` / `Shoji` / `Door` child models, on a floor-datumed building).
 --
--- BUILDING-ONLY (pad/deck separation, Piece A, 2026-07-12): the DECK is now the PAD's
--- job (PadBuilder builds the slab + engawa railings + beams + posts procedurally). This
--- capture therefore strips ALL deck/veranda geometry and floors the prefab at the building
--- floor so it seats on the procedural deck top (y = 0):
---   * strips deck understructure + veranda: EngawaPost, CrossBeam, Girder, Joist*, Perim*,
---     Deck slab, EngawaF/EngawaS boards, and the koran railing (Newel/Baluster/RailCap/RailMid)
---   * KEEPS the invisible EngawaBarrier/Barrier collision (fall protection) for now — moving
---     it to the pad is a later concern
---   * datum = the building floor = the wall base (SideWall/BackWall underside); only WallPost
---     dips below it (~0.5), embedding into the deck slab. pivot set there, front = veranda (-Z)
---   * Role_timber/wall/roof tags for recolor (building parts only; the deck's Role_cap parts
---     are gone)
---   * MirrorX tags on the building parts that negate-X for a left-hand build (SideWall, side
---     shoji+glow+mull) — the left-hand shoji/SideWall set. (Phase 3 replaces mirror with an
---     openSide shoji-wrap; kept here until then.)
---   * MirrorXRigid tag on the ChochinSwing sub-assembly (a grouped lantern) so the mirror
---     rigid-relocates it rather than reflecting it internally
---   * ShojiBay tag + Bay attribute (1..3) on the front shoji panels
---   * Tatami tag on the mat; FlagMount_1/FlagMount_2 attachments (rehomed to a WallPost, at
---     the preserved eave height — their old PerimF host is now stripped)
--- Prefab is place-only (save the place after); committing a .rbxmx is a follow-up.
+-- SP1 MODULAR BAYS (2026-07-12): the whole-building mirror is retired; "which side is open"
+-- is now a per-bay state (solid | shoji | door) resolved from the loadout `wallBays` map.
+-- The building is already deck-free (the pad/PadBuilder owns the deck) and floor-datumed
+-- (floor at local y = 0, seats on the procedural deck top), so this capture no longer strips
+-- a deck or re-datums — it clones the source and applies the manifest tags the runtime reads:
+--   * Bay tag + Side / Index / GrooveDepth attributes on every `Bay_<side>_<index>` model,
+--     so StructureOps.readManifest can enumerate bays and applyBays can address them.
+--   * Role_wall (Solid panels + Shoji paper), Role_roof (RoofF/RoofB/Gable), Role_timber
+--     (RafterTail) for recolor. The black shoji frame/kumiko and the timber track/posts are
+--     deliberately left untagged so they keep their authored colour across schemes.
+--   * ShojiBay tag + Bay attribute (1..3) on the FRONT bays' shoji paper (texturing hook;
+--     front-only for SP1).
+--   * Tatami tag on the mat fields.
+--   * FlagMount_1/FlagMount_2 attachments on a corner WallPost at eave height (dormant;
+--     kept for forward-compat with the flag attachment system).
+-- No MirrorX / MirrorXRigid tags (the mirror is gone). Prefab is place-only (save the place
+-- after running); committing a .rbxmx is a follow-up.
 
 local SS = game:GetService("ServerStorage")
 
--- deck / veranda geometry the pad now owns (prefix match; EngawaBarrier is NOT matched)
-local function isDeckPart(name: string): boolean
-    return name == "Deck"
-        or name == "EngawaF"
-        or name == "EngawaS"
-        or name:match("^EngawaPost") ~= nil
-        or name:match("^EngawaSupport") ~= nil
-        or name:match("^Perim") ~= nil
-        or name:match("^Joist") ~= nil
-        or name:match("^Girder") ~= nil
-        or name:match("^CrossBeam") ~= nil
-        or name:match("^Newel") ~= nil
-        or name:match("^Baluster") ~= nil
-        or name:match("^RailCap") ~= nil
-        or name:match("^RailMid") ~= nil
-end
+-- manifest recolor roles, by part name (asserted here so the prefab's roles are guaranteed by
+-- the tool regardless of what the source clone carried)
+local ROLE = {
+    Panel = "wall", -- solid bay infill
+    Shoji = "wall", -- shoji paper (legacy: shoji recolours with the wall role)
+    RoofF = "roof",
+    RoofB = "roof",
+    GableA = "roof",
+    GableB = "roof",
+    RafterTail = "timber",
+}
 
 local function capture()
     local src = workspace:FindFirstChild("TeahousePrototype")
     assert(src, "TeahousePrototype not found in workspace")
+
+    -- sanity: the source must be the SP1 bay-structured teahouse (10 Bay_<side>_<index> models)
+    local bays = {}
+    for _, c in src:GetChildren() do
+        if c:IsA("Model") and c.Name:match("^Bay_%a+_%d+$") then
+            table.insert(bays, c)
+        end
+    end
+    assert(#bays == 10, "expected 10 Bay_* models in TeahousePrototype, found " .. #bays)
+
     local folder = SS:FindFirstChild("StructurePrefabs") or Instance.new("Folder")
     folder.Name = "StructurePrefabs"
     folder.Parent = SS
@@ -63,87 +63,25 @@ local function capture()
 
     local m = src:Clone()
     m.Name = "teahouse-1story"
-
-    -- record the OLD frame-underside datum (Perim underside) in WORLD Y before stripping, so
-    -- the flag mounts keep their eave-front world height after the datum moves up to the floor.
-    -- World Y (not pivot-local) so it stays comparable to the post-strip datum even though the
-    -- default pivot (bbox centre) shifts when the deck parts are removed.
-    local oldFrameYWorld = math.huge
-    for _, p in m:GetDescendants() do
-        if p:IsA("BasePart") and p.Name:match("^Perim") then
-            oldFrameYWorld = math.min(oldFrameYWorld, p.Position.Y - p.Size.Y / 2)
-        end
-    end
-    assert(oldFrameYWorld < math.huge, "no Perim frame found in the source (unexpected prototype shape)")
-
-    -- 1) strip the pad's job: deck slab, veranda boards, understructure frame, koran railing, posts
-    for _, p in m:GetDescendants() do
-        if p:IsA("BasePart") and isDeckPart(p.Name) then
-            p:Destroy()
-        end
-    end
     m.Parent = folder
-
-    -- 2) datum = building floor = the wall base (SideWall/BackWall underside); author the model
-    --    pivot there, facing the veranda (-Z). Only WallPost may dip below (embeds into the slab).
     local piv = m:GetPivot()
-    local y0 = math.huge
+
+    -- datum sanity: the building floor (Solid panel base) must sit at local y = 0 so it seats on
+    -- the procedural deck top. The source is authored that way; this only guards against drift.
+    local floorY = math.huge
     for _, p in m:GetDescendants() do
-        if p:IsA("BasePart") and (p.Name == "SideWall" or p.Name == "BackWall") then
-            y0 = math.min(y0, piv:ToObjectSpace(p.CFrame).Position.Y - p.Size.Y / 2)
+        if p:IsA("BasePart") and p.Name == "Panel" then
+            floorY = math.min(floorY, piv:ToObjectSpace(p.CFrame).Position.Y - p.Size.Y / 2)
         end
     end
-    assert(y0 < math.huge, "no wall base (SideWall/BackWall) found for the floor datum")
+    assert(floorY < math.huge, "no Solid Panel found for the floor datum")
+    assert(math.abs(floorY) < 0.05, string.format("building floor not at y=0 (got %.3f)", floorY))
 
-    local BELOW_TOL = 0.6 -- wall posts embed into the deck slab; nothing else may sit below the floor
-    local below = {}
-    for _, p in m:GetDescendants() do
-        if p:IsA("BasePart") then
-            local lb = piv:ToObjectSpace(p.CFrame).Position.Y - p.Size.Y / 2
-            if lb < y0 - 0.01 and not (p.Name == "WallPost" and lb >= y0 - BELOW_TOL) then
-                table.insert(below, string.format("%s(%.2f)", p.Name, lb - y0))
-            end
-        end
-    end
-    assert(
-        #below == 0,
-        "parts below the building floor (not a wall-post embed): " .. table.concat(below, ",")
-    )
-
-    local posW = piv:PointToWorldSpace(Vector3.new(0, y0, 0))
-    local frontW = piv:VectorToWorldSpace(Vector3.new(0, 0, -1))
-    m.WorldPivot = CFrame.lookAt(posW, posW + frontW, Vector3.yAxis)
-    piv = m:GetPivot()
-
-    -- 3) manifest tags (building parts only — the deck's Role_cap/timber members are stripped)
-    local ROLE = {
-        RafterTail = "timber",
-        BackWall = "wall",
-        SideWall = "wall",
-        Shoji = "wall",
-        RoofF = "roof",
-        RoofB = "roof",
-        GableA = "roof",
-        GableB = "roof",
-    }
-    local MIRROR = {
-        SideWall = true, -- the left-hand SideWall; side shoji handled below. (Phase 3 -> openSide)
-    }
+    -- 1) roles + tatami by part name (idempotent)
     for _, p in m:GetDescendants() do
         if p:IsA("BasePart") then
             if ROLE[p.Name] then
                 p:AddTag("Role_" .. ROLE[p.Name])
-            end
-            local sideShoji = (p.Name == "Shoji" or p.Name == "ShojiGlow" or p.Name == "Mull")
-                and p.Size.Z > p.Size.X
-            if MIRROR[p.Name] or sideShoji then
-                p:AddTag("MirrorX")
-            end
-            if p.Name == "Shoji" and p.Size.X > p.Size.Z then
-                local lx = piv:ToObjectSpace(p.CFrame).Position.X
-                local bay = ({ [-6] = 1, [0] = 2, [6] = 3 })[math.floor(lx + 0.5)] or 0
-                p:AddTag("ShojiBay")
-                p:SetAttribute("Bay", bay)
             end
             if p.Name == "Tatami" then
                 p:AddTag("Tatami")
@@ -151,33 +89,55 @@ local function capture()
         end
     end
 
-    -- 3b) the chochin is a grouped sub-assembly (ChochinSwing) whose part names are not in
-    -- the MIRROR set; tag the whole model MirrorXRigid so the mirror relocates it rigidly
-    -- to the opposite corner (no internal reflection — a lantern must not be left/right flipped)
-    for _, d in m:GetDescendants() do
-        if d:IsA("Model") and d.Name == "ChochinSwing" then
-            d:AddTag("MirrorXRigid")
+    -- 2) tag every bay model so the runtime can enumerate + address it
+    for _, c in m:GetChildren() do
+        local side, idx = c.Name:match("^Bay_(%a+)_(%d+)$")
+        if c:IsA("Model") and side then
+            c:AddTag("Bay")
+            c:SetAttribute("Side", side)
+            c:SetAttribute("Index", tonumber(idx))
+            c:SetAttribute("GrooveDepth", c:GetAttribute("GrooveDepth") or 0)
         end
     end
 
-    -- 4) flag-mount attachments. Their old host PerimF is stripped; rehome to a WallPost and
-    -- preserve the eave-front world height (the datum rose from the frame underside to the floor,
-    -- so drop the local Y by that shift).
-    local host
-    for _, p in m:GetDescendants() do
-        if p:IsA("BasePart") and p.Name == "WallPost" then
-            host = p
+    -- 3) ShojiBay + Bay attribute on the FRONT bays' shoji paper (texturing hook; front-only)
+    for _, c in m:GetChildren() do
+        local idx = c.Name:match("^Bay_front_(%d+)$")
+        if c:IsA("Model") and idx then
+            local shoji = c:FindFirstChild("Shoji")
+            if shoji then
+                for _, p in shoji:GetChildren() do
+                    if p:IsA("BasePart") and p.Name == "Shoji" then
+                        p:AddTag("ShojiBay")
+                        p:SetAttribute("Bay", tonumber(idx))
+                    end
+                end
+            end
         end
     end
-    assert(host, "no WallPost host for flag mounts")
-    -- posW.Y is the new datum (wall base) in WORLD Y; oldFrameYWorld is the old datum in world Y.
-    -- Their difference is the datum rise, frame-independent, so the flag keeps its eave height.
-    local flagY = 12 - (posW.Y - oldFrameYWorld)
-    for name, lp in { FlagMount_1 = Vector3.new(-9, flagY, -13), FlagMount_2 = Vector3.new(15, flagY, -13) } do
-        local a = Instance.new("Attachment")
-        a.Name = name
-        a.WorldCFrame = piv * CFrame.new(lp)
-        a.Parent = host
+
+    -- 4) flag mounts (dormant): two attachments on a corner WallPost at eave height, kept for
+    --    forward-compat with the flag attachment system. Clear any inherited from the source
+    --    clone first so re-running does not accumulate duplicates.
+    for _, d in m:GetDescendants() do
+        if d:IsA("Attachment") and d.Name:match("^FlagMount") then
+            d:Destroy()
+        end
+    end
+    local host
+    for _, p in m:GetChildren() do
+        if p:IsA("BasePart") and p.Name == "WallPost" then
+            host = p
+            break
+        end
+    end
+    if host then
+        for name, lp in { FlagMount_1 = Vector3.new(-9, 11, -5.68), FlagMount_2 = Vector3.new(9, 11, -5.68) } do
+            local a = Instance.new("Attachment")
+            a.Name = name
+            a.WorldCFrame = piv * CFrame.new(lp)
+            a.Parent = host
+        end
     end
 
     return m
