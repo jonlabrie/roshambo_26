@@ -141,4 +141,12 @@ function NetworkClient.setTeahouse(self: any, robloxUserId: string, sizeClass: s
     return self:_request("PUT", `/api/v1/players/{robloxUserId}/teahouses/{sizeClass}`, { loadout = loadout })
 end
 
+function NetworkClient.getEconomy(self: any, robloxUserId: string): Result
+    return self:_request("GET", `/api/v1/players/{robloxUserId}/economy`)
+end
+
+function NetworkClient.postPurchase(self: any, robloxUserId: string, item: string): Result
+    return self:_request("POST", `/api/v1/players/{robloxUserId}/purchase`, { item = item })
+end
+
 return NetworkClient

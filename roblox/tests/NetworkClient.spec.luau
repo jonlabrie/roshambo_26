@@ -318,3 +318,48 @@ describe("NetworkClient.setTeahouse", function()
         expect(#f.calls).toBe(1)
     end)
 end)
+
+describe("NetworkClient.getEconomy + postPurchase", function()
+    test("getEconomy GETs the economy path and decodes it", function()
+        local f = makeDeps({
+            {
+                ok = true,
+                statusCode = 200,
+                body = '{"totalPoints":120,"maxDeckSize":"S","teahouseSizes":["S"],"catalog":{"deck":{"S":50}}}',
+            },
+        })
+        local net = NetworkClient.new(CONFIG, f.deps)
+        local res = net:getEconomy("9")
+        expect(res.ok).toBe(true)
+        expect(res.data.maxDeckSize).toBe("S")
+        expect(f.calls[1].url).toBe("http://x/api/v1/players/9/economy")
+        expect(f.calls[1].method).toBe("GET")
+    end)
+
+    test("postPurchase POSTs the item and returns the new state", function()
+        local f = makeDeps({
+            {
+                ok = true,
+                statusCode = 200,
+                body = '{"item":"deck:M","totalPoints":500,"maxDeckSize":"M","teahouseSizes":["S"]}',
+            },
+        })
+        local net = NetworkClient.new(CONFIG, f.deps)
+        local res = net:postPurchase("9", "deck:M")
+        expect(res.ok).toBe(true)
+        expect(res.data.maxDeckSize).toBe("M")
+        expect(f.calls[1].method).toBe("POST")
+        expect(f.calls[1].url).toBe("http://x/api/v1/players/9/purchase")
+        local sent = serde.decode("json", f.calls[1].body :: string)
+        expect(sent.item).toBe("deck:M")
+    end)
+
+    test("postPurchase surfaces a 400 fail-fast", function()
+        local f = makeDeps({ { ok = true, statusCode = 400, body = '{"error":"INSUFFICIENT_POINTS"}' } })
+        local net = NetworkClient.new(CONFIG, f.deps)
+        local res = net:postPurchase("9", "deck:M")
+        expect(res.ok).toBe(false)
+        expect(res.error).toBe("INSUFFICIENT_POINTS")
+        expect(#f.calls).toBe(1)
+    end)
+end)
