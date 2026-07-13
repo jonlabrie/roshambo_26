@@ -1,7 +1,7 @@
 --!strict
 -- Runtime `ops` adapter for A's StructureBuilder (injected in main.server.luau).
--- recolor/setTexture/mirrorX are productionized verbatim from the throwaway
--- tools/studio/materializeStructureDemo.luau; readManifest/clonePrefab/pivotTo are new.
+-- recolor/setTexture are productionized verbatim from the throwaway
+-- tools/studio/materializeStructureDemo.luau; readManifest/clonePrefab/pivotTo/applyBays are new.
 -- Roblox datatypes -> not Lune-testable; proven by the D.1 visual gate.
 local ServerStorage = game:GetService("ServerStorage")
 local CollectionService = game:GetService("CollectionService")
@@ -22,6 +22,7 @@ function StructureOps.readManifest(model: Model): any
     local shojiSet: { [number]: boolean } = {}
     local flagSet: { [string]: boolean } = {}
     local hasTatami = false
+    local bays: { { side: string, index: number } } = {}
     for _, d in model:GetDescendants() do
         for _, tag in CollectionService:GetTags(d) do
             local role = string.match(tag, "^Role_(.+)$")
@@ -31,6 +32,12 @@ function StructureOps.readManifest(model: Model): any
                 local bay = d:GetAttribute("Bay")
                 if typeof(bay) == "number" then
                     shojiSet[bay] = true
+                end
+            elseif tag == "Bay" then
+                local side = d:GetAttribute("Side")
+                local index = d:GetAttribute("Index")
+                if typeof(side) == "string" and typeof(index) == "number" then
+                    table.insert(bays, { side = side, index = index })
                 end
             elseif tag == "Tatami" then
                 hasTatami = true
@@ -49,22 +56,58 @@ function StructureOps.readManifest(model: Model): any
     for fm in flagSet do
         table.insert(flagMounts, fm)
     end
-    return { roles = roles, shojiBays = shojiBays, hasTatami = hasTatami, flagMounts = flagMounts }
+    return {
+        roles = roles,
+        shojiBays = shojiBays,
+        hasTatami = hasTatami,
+        flagMounts = flagMounts,
+        bays = bays,
+    }
 end
 
-function StructureOps.mirrorX(m: Model)
-    local piv = m:GetPivot()
-    for _, p in m:GetDescendants() do
-        if p:IsA("BasePart") and p:HasTag("MirrorX") then
-            local lc = piv:ToObjectSpace(p.CFrame)
-            local rot = lc - lc.Position
-            p.CFrame = piv * (CFrame.new(-lc.Position.X, lc.Position.Y, lc.Position.Z) * rot)
+-- Show each bay's chosen variant (Solid/Shoji/Door) and hide the other two. Variant models are
+-- named after their state (capitalised); each authored part carries a ShownTransparency attribute.
+-- Shown parts restore that transparency and collide iff visible (the neon ShojiGlow stays
+-- transparent + non-colliding); hidden parts go fully transparent + non-colliding so players
+-- cannot hit an invisible wall. A missing bay model / state / variant warns and is skipped so the
+-- bay keeps its authored default rather than being blanked (F2/F4).
+local STATE_VARIANT = { solid = "Solid", shoji = "Shoji", door = "Door" }
+function StructureOps.applyBays(model: Model, bays: { { side: string, index: number, state: string } })
+    local byName: { [string]: Model } = {}
+    for _, c in model:GetChildren() do
+        if c:IsA("Model") and c.Name:match("^Bay_%a+_%d+$") then
+            byName[c.Name] = c
         end
     end
-    for _, d in m:GetDescendants() do
-        if d:IsA("Model") and d:HasTag("MirrorXRigid") then
-            local lc = piv:ToObjectSpace(d:GetPivot())
-            d:PivotTo(piv * CFrame.new(-lc.Position.X, lc.Position.Y, lc.Position.Z) * (lc - lc.Position))
+    for _, b in bays do
+        local bayName = `Bay_{b.side}_{b.index}`
+        local bay = byName[bayName]
+        local shownName = STATE_VARIANT[b.state]
+        local shownModel = if bay and shownName then bay:FindFirstChild(shownName) else nil
+        if not bay then
+            warn(`[StructureOps] applyBays: no bay model '{bayName}'`)
+        elseif not shownName then
+            warn(`[StructureOps] applyBays: unknown state '{b.state}' for '{bayName}'`)
+        elseif not shownModel then
+            warn(`[StructureOps] applyBays: bay '{bayName}' missing '{shownName}' variant`)
+        else
+            for _, variant in bay:GetChildren() do
+                if variant:IsA("Model") then
+                    local vis = variant == shownModel
+                    for _, p in variant:GetDescendants() do
+                        if p:IsA("BasePart") then
+                            if vis then
+                                local st = p:GetAttribute("ShownTransparency")
+                                p.Transparency = if typeof(st) == "number" then st else 0
+                                p.CanCollide = p.Transparency < 1
+                            else
+                                p.Transparency = 1
+                                p.CanCollide = false
+                            end
+                        end
+                    end
+                end
+            end
         end
     end
 end
