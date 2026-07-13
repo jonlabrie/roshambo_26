@@ -17,9 +17,20 @@ local REMOVE_LABEL = "Remove this door"
 local prompts: { [number]: ProximityPrompt } = {} -- bayIndex -> its prompt
 local activeIndex: number? = nil
 
+-- One door slot: with no door, every bay offers "add"; once a door exists, only the door bay
+-- stays interactable (to remove it) and the other bays' prompts go quiet until it's removed.
 local function relabel()
+    local hasDoor = activeIndex ~= nil
     for i, prompt in prompts do
-        prompt.ActionText = if i == activeIndex then REMOVE_LABEL else MAKE_LABEL
+        if not hasDoor then
+            prompt.Enabled = true
+            prompt.ActionText = MAKE_LABEL
+        elseif i == activeIndex then
+            prompt.Enabled = true
+            prompt.ActionText = REMOVE_LABEL
+        else
+            prompt.Enabled = false
+        end
     end
 end
 
