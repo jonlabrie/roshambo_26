@@ -89,6 +89,9 @@ describe('validateWallBays', () => {
     it('rejects an over-length side list', () => {
         expect(validateWallBays({ back: Array(MAX_BAYS_PER_SIDE + 1).fill('solid') }).ok).toBe(false);
     });
+    it('accepts a side list of exactly MAX_BAYS_PER_SIDE', () => {
+        expect(validateWallBays({ back: Array(MAX_BAYS_PER_SIDE).fill('solid') }).ok).toBe(true);
+    });
 });
 
 describe('validateLoadout wallBays', () => {

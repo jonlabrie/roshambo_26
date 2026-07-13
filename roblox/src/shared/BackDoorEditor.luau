@@ -27,7 +27,7 @@ end
 -- Return a NEW map whose back wall has a single `door` at `index` (all other back bays `solid`),
 -- or NO back door when `index` is nil, out of 1..backBayCount, or equal to the bay that is ALREADY
 -- the door (toggle-off). Clearing drops the `back` key entirely so WallBays.resolve falls back to
--- the all-solid default. Other sides are deep-copied through unchanged; the input is not mutated.
+-- the all-solid default. Other sides are shallow-copied through unchanged (side lists hold only strings); the input is not mutated.
 function BackDoorEditor.setBackDoor(wallBays: Map?, index: number?, backBayCount: number): Map
     local out: Map = {}
     if wallBays ~= nil then

@@ -519,8 +519,8 @@ SetBackDoor.OnServerEvent:Connect(function(player, payload)
         end
     end
     local bayIndex = if typeof(payload) == "table" then payload.bayIndex else nil
-    if typeof(bayIndex) ~= "number" or bayIndex < 1 or bayIndex > backBayCount then
-        return -- ill-typed / out-of-range request
+    if typeof(bayIndex) ~= "number" or bayIndex % 1 ~= 0 or bayIndex < 1 or bayIndex > backBayCount then
+        return -- ill-typed / non-integer / out-of-range request
     end
     local newWallBays = BackDoorEditor.setBackDoor(house.loadout.wallBays, bayIndex, backBayCount)
     -- merge into a NEW copy of the occupied size's loadout (don't alias the stash pre-persist)
