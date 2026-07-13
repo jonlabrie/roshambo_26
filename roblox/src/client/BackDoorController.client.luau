@@ -62,7 +62,10 @@ local function bindBays(structure: Instance)
                     local prompt = Instance.new("ProximityPrompt")
                     prompt.ActionText = MAKE_LABEL
                     prompt.ObjectText = "Back wall"
-                    prompt.KeyboardKeyCode = Enum.KeyCode.E
+                    -- F, not the default E: the Favorite prompt (PerchPreferenceController) owns
+                    -- E on the same teahouse; sharing it would let one suppress the other (Roblox
+                    -- shows only the closest same-key prompt). Revisit if these merge into one menu.
+                    prompt.KeyboardKeyCode = Enum.KeyCode.F
                     prompt.MaxActivationDistance = 12
                     prompt.RequiresLineOfSight = false
                     prompt.Parent = anchor
