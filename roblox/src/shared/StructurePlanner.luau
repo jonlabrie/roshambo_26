@@ -2,6 +2,8 @@
 -- Pure planner for the structure builder. Turns a player loadout + a pad mount +
 -- the base prefab's slot manifest into a concrete Plan of Instance operations.
 -- No Roblox datatypes (Lune-tested); CFrames are 12-number arrays like Spec.cframe.
+local WallBays = require("./WallBays")
+
 local StructurePlanner = {}
 
 export type Color = { number }
@@ -11,16 +13,19 @@ export type Loadout = {
     shoji: { [number]: string }?,
     tatami: string?,
     flags: { { mount: string, item: string } }?,
+    wallBays: WallBays.Map?,
 }
 export type Mount = {
     cframe: { number },
-    -- which side (in addition to the front) opens as shoji: "right" is the prefab's native
-    -- build, "left" mirrors it. Replaces the old `hand` (pad/deck separation, Piece A).
-    openSide: string,
     footprint: { minX: number, maxX: number, minZ: number, maxZ: number },
 }
-export type Manifest =
-    { roles: { string }, shojiBays: { number }, hasTatami: boolean, flagMounts: { string } }
+export type Manifest = {
+    roles: { string },
+    shojiBays: { number },
+    hasTatami: boolean,
+    flagMounts: { string },
+    bays: { WallBays.Bay },
+}
 export type Recolor = { role: string, color: Color }
 export type Texture = { target: string, assetId: string }
 export type Attachment = { mount: string, prefabId: string }
@@ -28,7 +33,7 @@ export type Plan = {
     recolors: { Recolor },
     textures: { Texture },
     attachments: { Attachment },
-    openSide: string,
+    bays: { WallBays.ResolvedBay },
     pivotCF: { number },
 }
 
@@ -104,7 +109,7 @@ function StructurePlanner.plan(loadout: Loadout, mount: Mount, manifest: Manifes
         recolors = resolveRecolors(loadout, manifest, catalog),
         textures = resolveTextures(loadout, manifest, catalog),
         attachments = resolveAttachments(loadout, manifest, catalog),
-        openSide = mount.openSide,
+        bays = WallBays.resolve(manifest.bays, loadout.wallBays),
         pivotCF = mount.cframe,
     }
 end

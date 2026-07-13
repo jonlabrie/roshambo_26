@@ -7,14 +7,18 @@ local Planner = require("../src/shared/StructurePlanner")
 local function baseMount(): any
     return {
         cframe = { 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1 },
-        openSide = "right",
         footprint = { minX = -13, maxX = 13, minZ = -10, maxZ = 10 },
     }
 end
 
 test("recolors: emits one entry per manifest role present in the palette", function()
-    local manifest =
-        { roles = { "timber", "roof", "cap" }, shojiBays = {}, hasTatami = false, flagMounts = {} }
+    local manifest = {
+        roles = { "timber", "roof", "cap" },
+        shojiBays = {},
+        hasTatami = false,
+        flagMounts = {},
+        bays = {},
+    }
     local plan = Planner.plan(
         { baseStyle = "teahouse-1story", colorScheme = "scheme.ink" },
         baseMount(),
@@ -29,13 +33,13 @@ test("recolors: emits one entry per manifest role present in the palette", funct
 end)
 
 test("recolors: empty when no colorScheme in loadout", function()
-    local manifest = { roles = { "timber" }, shojiBays = {}, hasTatami = false, flagMounts = {} }
+    local manifest = { roles = { "timber" }, shojiBays = {}, hasTatami = false, flagMounts = {}, bays = {} }
     local plan = Planner.plan({ baseStyle = "teahouse-1story" }, baseMount(), manifest, Catalog)
     expect(plan.recolors).toEqual({})
 end)
 
 test("textures: per-bay shoji prints + tatami, only for bays the manifest exposes", function()
-    local manifest = { roles = {}, shojiBays = { 1, 2, 3 }, hasTatami = true, flagMounts = {} }
+    local manifest = { roles = {}, shojiBays = { 1, 2, 3 }, hasTatami = true, flagMounts = {}, bays = {} }
     local loadout = {
         baseStyle = "teahouse-1story",
         shoji = { [1] = "shoji.crane", [3] = "shoji.plain" },
@@ -50,7 +54,7 @@ test("textures: per-bay shoji prints + tatami, only for bays the manifest expose
 end)
 
 test("textures: tatami skipped when the base has no tatami surface", function()
-    local manifest = { roles = {}, shojiBays = {}, hasTatami = false, flagMounts = {} }
+    local manifest = { roles = {}, shojiBays = {}, hasTatami = false, flagMounts = {}, bays = {} }
     local plan = Planner.plan(
         { baseStyle = "teahouse-1story", tatami = "tatami.gold" },
         baseMount(),
@@ -61,8 +65,13 @@ test("textures: tatami skipped when the base has no tatami surface", function()
 end)
 
 test("attachments: flags map to their mount; unknown mounts are skipped", function()
-    local manifest =
-        { roles = {}, shojiBays = {}, hasTatami = false, flagMounts = { "FlagMount_1", "FlagMount_2" } }
+    local manifest = {
+        roles = {},
+        shojiBays = {},
+        hasTatami = false,
+        flagMounts = { "FlagMount_1", "FlagMount_2" },
+        bays = {},
+    }
     local loadout = {
         baseStyle = "teahouse-1story",
         flags = {
@@ -74,23 +83,31 @@ test("attachments: flags map to their mount; unknown mounts are skipped", functi
     expect(plan.attachments).toEqual({ { mount = "FlagMount_1", prefabId = "flag_clan" } })
 end)
 
-test("openSide: threaded from the mount, replacing mirror (mirror field is gone)", function()
-    local manifest = { roles = {}, shojiBays = {}, hasTatami = false, flagMounts = {} }
-    local right = Planner.plan({ baseStyle = "teahouse-1story" }, baseMount(), manifest, Catalog)
-    local leftMount = {
-        cframe = { 5, 6, 7, 1, 0, 0, 0, 1, 0, 0, 0, 1 },
-        openSide = "left",
-        footprint = { minX = -13, maxX = 13, minZ = -10, maxZ = 10 },
+test("bays: resolves the loadout wallBays against the manifest bays (default-fills the rest)", function()
+    local manifest = {
+        roles = {},
+        shojiBays = {},
+        hasTatami = false,
+        flagMounts = {},
+        bays = { { side = "front", index = 1 }, { side = "back", index = 1 } },
     }
-    local left = Planner.plan({ baseStyle = "teahouse-1story" }, leftMount, manifest, Catalog)
-    expect(right.openSide).toBe("right")
-    expect(left.openSide).toBe("left")
-    expect(right.mirror).toBeNil() -- the old whole-building mirror flag is gone
-    expect(left.pivotCF).toEqual({ 5, 6, 7, 1, 0, 0, 0, 1, 0, 0, 0, 1 })
+    local loadout = { baseStyle = "teahouse-1story", wallBays = { back = { "door" } } }
+    local plan = Planner.plan(loadout, baseMount(), manifest, Catalog)
+    local function stateOf(side, index)
+        for _, b in plan.bays do
+            if b.side == side and b.index == index then
+                return b.state
+            end
+        end
+        return nil
+    end
+    expect(stateOf("front", 1)).toBe("shoji") -- default
+    expect(stateOf("back", 1)).toBe("door") -- overridden
+    expect((plan :: any).openSide).toBeNil() -- the old field is gone
 end)
 
 test("textures: non-contiguous shojiBays index by bay value, not array position", function()
-    local manifest = { roles = {}, shojiBays = { 2, 4 }, hasTatami = false, flagMounts = {} }
+    local manifest = { roles = {}, shojiBays = { 2, 4 }, hasTatami = false, flagMounts = {}, bays = {} }
     local loadout = { baseStyle = "teahouse-1story", shoji = { [2] = "shoji.crane", [4] = "shoji.plain" } }
     local plan = Planner.plan(loadout, baseMount(), manifest, Catalog)
     expect(plan.textures).toEqual({

@@ -11,7 +11,13 @@ local function fakeOps(log: { any })
             return { tag = "MODEL" }
         end,
         readManifest = function(_m)
-            return { roles = { "cap" }, shojiBays = { 1 }, hasTatami = false, flagMounts = { "FlagMount_1" } }
+            return {
+                roles = { "cap" },
+                shojiBays = { 1 },
+                hasTatami = false,
+                flagMounts = { "FlagMount_1" },
+                bays = {},
+            }
         end,
         mirrorX = function(_m)
             table.insert(log, { op = "mirror" })
