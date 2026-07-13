@@ -28,11 +28,11 @@ export type DeckOps = Ops & {
 export type Mount = { cframe: { number }, footprint: PadPlanner.Footprint }
 
 -- Build the whole hand-agnostic pad for a deck size: symmetric slab, the 5-beam frame
--- (PadFrame), engawa railings on all 4 edges, and the 6 terrain-dropped posts. deckSize
--- sizes the FOOTPRINT (S/M/L via sqrt-area); railing height is FIXED in the ops (avatar
--- ergonomics), never scaled here. mountCF is the 12-number datum array (deck top = y=0).
--- Perimeter railing is built on all 4 edges for now; placement-driven openings (the open
--- engawa sides) arrive in Phase 3 when the building lands on the deck.
+-- (PadFrame), engawa railings on the front/left/right edges (the back is left open — see
+-- the edges list below), and the 6 terrain-dropped posts. deckSize sizes the FOOTPRINT
+-- (S/M/L via sqrt-area); railing height is FIXED in the ops (avatar ergonomics), never
+-- scaled here. mountCF is the 12-number datum array (deck top = y=0). Further
+-- placement-driven openings (open engawa sides) arrive when the building lands on the deck.
 function PadBuilder.buildDeck(deckSize: string, mountCF: { number }, ops: DeckOps): Mount
     local fp = SizeClasses.deckFootprint(deckSize)
     ops.buildDeckSlab(fp)
@@ -45,9 +45,11 @@ function PadBuilder.buildDeck(deckSize: string, mountCF: { number }, ops: DeckOp
         ops.buildBeam(nodes[beam.from], nodes[beam.to])
     end
 
+    -- Railings on front/left/right only; the back edge (against the cliff/access, where a back
+    -- door exits) is left OPEN so players can walk off the back onto the path. The structural
+    -- back BEAM (PadFrame) is unaffected. Revisit if back access ever wants a gated railing.
     local edges: { Edge } = {
         { x1 = fp.minX, z1 = fp.minZ, x2 = fp.maxX, z2 = fp.minZ, nx = 0, nz = 1 }, -- front (+Z inward)
-        { x1 = fp.minX, z1 = fp.maxZ, x2 = fp.maxX, z2 = fp.maxZ, nx = 0, nz = -1 }, -- back
         { x1 = fp.minX, z1 = fp.minZ, x2 = fp.minX, z2 = fp.maxZ, nx = 1, nz = 0 }, -- left (+X inward)
         { x1 = fp.maxX, z1 = fp.minZ, x2 = fp.maxX, z2 = fp.maxZ, nx = -1, nz = 0 }, -- right
     }
