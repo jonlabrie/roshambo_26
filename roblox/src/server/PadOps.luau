@@ -99,7 +99,8 @@ function PadOps.new(mountCF: CFrame, parent: Instance)
                 DECK_THK,
                 fp.maxZ - fp.minZ,
                 DECK_WOOD,
-                Enum.Material.WoodPlanks
+                Enum.Material.WoodPlanks,
+                true -- collidable: you stand ON the deck (esp. the cantilevered portion over the drop)
             )
         end,
         -- one beam between two (inset) frame nodes, hung just under the slab bottom. Axis-aligned.
