@@ -8,10 +8,8 @@ local PLACEMENT = { offset = { 0, 0 }, facing = "N" }
 local function spec(id: string, maxSize: string?)
     return {
         id = id,
-        mountCF = { 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1 },
         maxSize = maxSize or "L",
-        deckSize = maxSize or "L", -- Task 9 default = maxSize
-        placement = PLACEMENT,
+        deckSize = maxSize or "L",
         vacantForm = "dormant-structure",
     }
 end
@@ -38,7 +36,7 @@ describe("SiteCoordinator.onJoin", function()
         expect((a :: any).deckSize).toBe("L")
         expect((a :: any).teahouse.size).toBe("M")
         expect((a :: any).teahouse.loadout).toBe(LOADOUT)
-        expect((a :: any).teahouse.placement).toBe(PLACEMENT)
+        expect((a :: any).teahouse.placement).toEqual(PLACEMENT)
     end)
 
     test("a wanderer (nil map) claims nothing", function()

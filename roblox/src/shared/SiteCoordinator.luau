@@ -27,6 +27,10 @@ export type Action = {
 -- (darkened) S teahouse. NOT the perch maxSize — S fits any perch and advertises the upgrade.
 local STARTER = "S"
 
+-- The teahouse sits centered on the deck (walk-around default), inheriting the deck's view
+-- orientation. Where the player REpositions it, or adds a back door, is Piece B.
+local CENTERED = { offset = { 0, 0 }, facing = "N" }
+
 function SiteCoordinator.new(registry: any)
     return setmetatable({
         _registry = registry,
@@ -56,7 +60,7 @@ local function starterAction(padId: string, spec: any): Action
         spec = spec,
         treatment = treatment,
         deckSize = STARTER,
-        teahouse = { size = STARTER, loadout = treatment.loadout, placement = spec and spec.placement },
+        teahouse = { size = STARTER, loadout = treatment.loadout, placement = CENTERED },
     }
 end
 
@@ -125,7 +129,7 @@ function SiteCoordinator:onJoin(
                         spec = rec.spec,
                         treatment = VacantState.resolve(playerId, loadout, rec.spec.vacantForm),
                         deckSize = deckSize,
-                        teahouse = { size = size, loadout = loadout, placement = rec.spec.placement },
+                        teahouse = { size = size, loadout = loadout, placement = CENTERED },
                     }
                 end
             end
