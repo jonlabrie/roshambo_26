@@ -284,3 +284,37 @@ describe("NetworkClient.setPreferences", function()
         expect(#f.calls).toBe(1)
     end)
 end)
+
+describe("NetworkClient.setTeahouse", function()
+    test("PUTs the loadout to the per-size teahouse path and returns the echo", function()
+        local f = makeDeps({
+            {
+                ok = true,
+                statusCode = 200,
+                body = '{"sizeClass":"L","loadout":{"baseStyle":"teahouse-1story"}}',
+            },
+        })
+        local net = NetworkClient.new(CONFIG, f.deps)
+        local res = net:setTeahouse(
+            "9",
+            "L",
+            { baseStyle = "teahouse-1story", wallBays = { back = { "solid", "door", "solid" } } }
+        )
+        expect(res.ok).toBe(true)
+        expect(res.data.sizeClass).toBe("L")
+        expect(f.calls[1].method).toBe("PUT")
+        expect(f.calls[1].url).toBe("http://x/api/v1/players/9/teahouses/L")
+        local sent = serde.decode("json", f.calls[1].body :: string)
+        expect(sent.loadout.baseStyle).toBe("teahouse-1story")
+        expect(sent.loadout.wallBays.back[2]).toBe("door")
+    end)
+
+    test("surfaces a 400 fail-fast", function()
+        local f = makeDeps({ { ok = true, statusCode = 400, body = '{"error":"BAD_WALLBAYS"}' } })
+        local net = NetworkClient.new(CONFIG, f.deps)
+        local res = net:setTeahouse("9", "L", { baseStyle = "t" })
+        expect(res.ok).toBe(false)
+        expect(res.error).toBe("BAD_WALLBAYS")
+        expect(#f.calls).toBe(1)
+    end)
+end)

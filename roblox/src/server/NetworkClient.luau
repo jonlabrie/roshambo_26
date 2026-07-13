@@ -137,4 +137,8 @@ function NetworkClient.setPreferences(self: any, robloxUserId: string, padPrefer
     )
 end
 
+function NetworkClient.setTeahouse(self: any, robloxUserId: string, sizeClass: string, loadout: any): Result
+    return self:_request("PUT", `/api/v1/players/{robloxUserId}/teahouses/{sizeClass}`, { loadout = loadout })
+end
+
 return NetworkClient
