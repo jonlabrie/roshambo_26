@@ -17,6 +17,7 @@ export type Deps = {
     padOpsNew: (CFrame, Instance) -> any,
     buildingPlacer: any, -- pure placeCF/fits (BuildingPlacer)
     sizeClasses: any, -- pure scale/deckFootprint (SizeClasses)
+    deckPlacement: any, -- pure per-size deck-pivot lookup (DeckPlacement)
 }
 
 -- The building's own footprint at S (walls ~18.7 x 12.7), centered on its pivot. Scaled by the
@@ -34,6 +35,7 @@ function TreatmentApplier.new(deps: Deps)
         _padOpsNew = deps.padOpsNew,
         _buildingPlacer = deps.buildingPlacer,
         _sizeClasses = deps.sizeClasses,
+        _deckPlacement = deps.deckPlacement,
         _folders = {} :: { [string]: Folder },
     }, TreatmentApplier)
 end
@@ -71,7 +73,7 @@ end
 -- skip -> deck only). May throw on bad placement/build data; the caller fault-isolates it.
 function TreatmentApplier:_buildBuilding(
     padId: string,
-    spec: any,
+    deckCF12: { number },
     treatment: any,
     teahouse: any,
     deckSize: string,
@@ -93,7 +95,7 @@ function TreatmentApplier:_buildBuilding(
         return
     end
     -- world pivot = deck CFrame composed with the local placement transform (offset + facing)
-    local deckCF = CFrame.new(table.unpack(spec.mountCF))
+    local deckCF = CFrame.new(table.unpack(deckCF12))
     local placedCF = deckCF * CFrame.new(table.unpack(self._buildingPlacer.placeCF(placement)))
     local mount = { cframe = { placedCF:GetComponents() }, footprint = buildingFP }
     local model =
@@ -123,10 +125,15 @@ function TreatmentApplier:apply(padId: string, spec: any, treatment: any, deckSi
         end
         return
     end
+    local deckCF12 = self._deckPlacement.resolve(spec.deckPlacements, deckSize, spec.maxSize)
+    if deckCF12 == nil then
+        warn(`[D.6] {padId}: no deck placement for size {deckSize} (maxSize {spec.maxSize}); skipping`)
+        return
+    end
     local staging = Instance.new("Folder")
-    local mountCF = CFrame.new(table.unpack(spec.mountCF))
+    local mountCF = CFrame.new(table.unpack(deckCF12))
     local okDeck, deckErr = pcall(function()
-        self._padBuilder.buildDeck(deckSize, spec.mountCF, self._padOpsNew(mountCF, staging))
+        self._padBuilder.buildDeck(deckSize, deckCF12, self._padOpsNew(mountCF, staging))
     end)
     if not okDeck then
         warn(`[D.6] deck build failed for {padId}: {deckErr}`)
@@ -140,7 +147,7 @@ function TreatmentApplier:apply(padId: string, spec: any, treatment: any, deckSi
         -- placement or build must leave the staged deck standing, never abort the caller's
         -- vacantActions / PlayerRemoving loop (F2/F4).
         local okBuilding, buildingErr = pcall(function()
-            self:_buildBuilding(padId, spec, treatment, teahouse, deckSize, staging)
+            self:_buildBuilding(padId, deckCF12, treatment, teahouse, deckSize, staging)
         end)
         if not okBuilding then
             warn(`[D.6] building step failed for {padId}: {buildingErr}; deck only`)
