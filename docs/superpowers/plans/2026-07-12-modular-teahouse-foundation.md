@@ -415,3 +415,8 @@ Only one variant is shown at runtime (Task 7); author all three present, with `S
 - **SP3** authors M/L floorplans from the module (more bays + tokonoma/genkan/tea-nook), retiring the `ScaleTo` proxy.
 - **Per-side shoji texture** (extending `loadout.shoji` beyond the front) is deferred; SP1 keeps front-only texturing.
 - Committing the place-only prefab via a Rojo `ServerStorage` mount remains an open follow-up (pre-existing).
+
+## Post-implementation follow-ups (from the SP1 final review, 2026-07-13)
+
+- **`wallBays` server whitelist — deferred to Piece B (customization).** `server/src/loadout.ts`'s `LOADOUT_KEYS` does not include `wallBays`, so `validateLoadout` rejects any loadout carrying the map and `loadout.wallBays` is always `nil` at the Roblox runtime — SP1 therefore renders all-defaults (front shoji / rest solid) in production until the whitelist is extended. Wiring it *properly* means server-side validation of the map's structure (per-side lists of known states, index bounds), which is customization/economy concern, so it lands with Piece B rather than SP1. The Roblox foundation already honors the map whenever one is supplied.
+- **Invalid-map warning (Minor, accepted).** `WallBays.resolve` degrades an invalid map to defaults safely but emits no warning (a pure Lune module cannot call Roblox `warn`). If a diagnostic is wanted, have `resolve`/`validate` return a "fell back" signal that a Roblox-side caller (`StructureOps`/`TreatmentApplier`) logs. Low priority; the fallback is behaviorally safe.
