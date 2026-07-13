@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { validateLoadout, validateSizeClass, validatePadPreferences, MAX_CLASSES } from './loadout';
+import {
+    validateLoadout,
+    validateSizeClass,
+    validatePadPreferences,
+    validateWallBays,
+    MAX_CLASSES,
+    MAX_BAYS_PER_SIDE,
+} from './loadout';
 
 describe('validateLoadout', () => {
     it('accepts a well-formed loadout', () => {
@@ -57,5 +64,38 @@ describe('validatePadPreferences', () => {
     });
     it('rejects an entry longer than 32 chars', () => {
         expect(validatePadPreferences(['x'.repeat(33)]).ok).toBe(false);
+    });
+});
+
+describe('validateWallBays', () => {
+    it('accepts an empty map and valid dense side lists', () => {
+        expect(validateWallBays({}).ok).toBe(true);
+        expect(validateWallBays({ back: ['solid', 'door', 'solid'], front: ['shoji'] }).ok).toBe(true);
+    });
+    it('rejects non-objects', () => {
+        expect(validateWallBays(null).ok).toBe(false);
+        expect(validateWallBays(['solid']).ok).toBe(false);
+        expect(validateWallBays('back').ok).toBe(false);
+    });
+    it('rejects an unknown side key', () => {
+        expect(validateWallBays({ roof: ['solid'] }).ok).toBe(false);
+    });
+    it('rejects a non-array side value', () => {
+        expect(validateWallBays({ back: 'door' }).ok).toBe(false);
+    });
+    it('rejects an unknown bay state', () => {
+        expect(validateWallBays({ back: ['window'] }).ok).toBe(false);
+    });
+    it('rejects an over-length side list', () => {
+        expect(validateWallBays({ back: Array(MAX_BAYS_PER_SIDE + 1).fill('solid') }).ok).toBe(false);
+    });
+});
+
+describe('validateLoadout wallBays', () => {
+    it('accepts a loadout carrying a valid wallBays', () => {
+        expect(validateLoadout({ baseStyle: 't', wallBays: { back: ['solid', 'door', 'solid'] } }).ok).toBe(true);
+    });
+    it('rejects a loadout with an invalid wallBays', () => {
+        expect(validateLoadout({ baseStyle: 't', wallBays: { back: ['trapdoor'] } }).ok).toBe(false);
     });
 });

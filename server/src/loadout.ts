@@ -2,9 +2,31 @@ export const MAX_LOADOUT_BYTES = 4096;
 export const MAX_SIZECLASS_LEN = 16;
 export const MAX_CLASSES = 8;
 
-const LOADOUT_KEYS = new Set(['baseStyle', 'colorScheme', 'shoji', 'tatami', 'flags', 'wallArt']);
+const LOADOUT_KEYS = new Set(['baseStyle', 'colorScheme', 'shoji', 'tatami', 'flags', 'wallArt', 'wallBays']);
+
+export const KNOWN_SIDES = new Set(['front', 'back', 'left', 'right']);
+export const WALLBAY_STATES = new Set(['solid', 'shoji', 'door']);
+export const MAX_BAYS_PER_SIDE = 8;
 
 type Check = { ok: true } | { ok: false; error: string };
+
+export function validateWallBays(value: unknown): Check {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return { ok: false, error: 'BAD_WALLBAYS' };
+    }
+    for (const [side, states] of Object.entries(value as Record<string, unknown>)) {
+        if (!KNOWN_SIDES.has(side)) return { ok: false, error: 'BAD_WALLBAYS' };
+        if (!Array.isArray(states) || states.length > MAX_BAYS_PER_SIDE) {
+            return { ok: false, error: 'BAD_WALLBAYS' };
+        }
+        for (const s of states) {
+            if (typeof s !== 'string' || !WALLBAY_STATES.has(s)) {
+                return { ok: false, error: 'BAD_WALLBAYS' };
+            }
+        }
+    }
+    return { ok: true };
+}
 
 export function validateLoadout(loadout: unknown): Check {
     if (typeof loadout !== 'object' || loadout === null || Array.isArray(loadout)) {
@@ -16,6 +38,10 @@ export function validateLoadout(loadout: unknown): Check {
     }
     for (const k of Object.keys(obj)) {
         if (!LOADOUT_KEYS.has(k)) return { ok: false, error: 'UNKNOWN_KEY' };
+    }
+    if (obj.wallBays !== undefined) {
+        const wb = validateWallBays(obj.wallBays);
+        if (!wb.ok) return wb;
     }
     if (Buffer.byteLength(JSON.stringify(obj), 'utf8') > MAX_LOADOUT_BYTES) {
         return { ok: false, error: 'LOADOUT_TOO_LARGE' };
