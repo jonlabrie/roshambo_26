@@ -161,6 +161,7 @@ function TreatmentApplier:apply(padId: string, spec: any, treatment: any, deckSi
         c.Parent = folder
     end
     staging:Destroy()
+    folder:SetAttribute("Occupied", treatment.lit == true)
 end
 
 return TreatmentApplier

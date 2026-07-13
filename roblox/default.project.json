@@ -21,7 +21,9 @@
                 "SetPadPreference": { "$className": "RemoteEvent" },
                 "PreferenceState": { "$className": "RemoteEvent" },
                 "SetBackDoor": { "$className": "RemoteEvent" },
-                "BackDoorState": { "$className": "RemoteEvent" }
+                "BackDoorState": { "$className": "RemoteEvent" },
+                "RequestPurchase": { "$className": "RemoteEvent" },
+                "EconomyState": { "$className": "RemoteEvent" }
             }
         },
         "Workspace": {

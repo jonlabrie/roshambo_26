@@ -32,6 +32,8 @@ local SetPadPreference = remotes:WaitForChild("SetPadPreference") :: RemoteEvent
 local PreferenceState = remotes:WaitForChild("PreferenceState") :: RemoteEvent
 local SetBackDoor = remotes:WaitForChild("SetBackDoor") :: RemoteEvent
 local BackDoorState = remotes:WaitForChild("BackDoorState") :: RemoteEvent
+local RequestPurchase = remotes:WaitForChild("RequestPurchase") :: RemoteEvent
+local EconomyState = remotes:WaitForChild("EconomyState") :: RemoteEvent
 local TweenService = game:GetService("TweenService")
 local TextService = game:GetService("TextService")
 
@@ -386,6 +388,38 @@ local PREF_CAP = 32
 -- padId + the occupied SIZE + that size's loadout (the merge target for wallBays edits).
 local playerHouse: { [string]: { padId: string, size: string, loadout: any } } = {}
 
+-- economy per player (for purchase gating + the client's prompts/labels): the fetched balance,
+-- deck tier, owned teahouse loadouts, and the claimed pad (nil until they own+claim).
+local playerEconomy: {
+    [string]: {
+        totalPoints: number,
+        maxDeckSize: string?,
+        teahouses: { [string]: any },
+        claimedPadId: string?,
+    },
+} =
+    {}
+-- the price catalog is identical for everyone; stash the first one fetched so echoes carry it.
+local economyCatalog: any = nil
+
+local function echoEconomy(player: Player, uid: string)
+    local e = playerEconomy[uid]
+    if e == nil or not player:IsDescendantOf(Players) then
+        return
+    end
+    local teaSizes = {}
+    for size in e.teahouses do
+        table.insert(teaSizes, size)
+    end
+    EconomyState:FireClient(player, {
+        totalPoints = e.totalPoints,
+        maxDeckSize = e.maxDeckSize,
+        teahouseSizes = teaSizes,
+        claimedPadId = e.claimedPadId,
+        catalog = economyCatalog,
+    })
+end
+
 local siteCoordinator = SiteCoordinator.new(PadRegistry.new())
 local sitesFolder = Instance.new("Folder")
 sitesFolder.Name = "TeahouseSites"
@@ -419,15 +453,28 @@ end
 
 Players.PlayerAdded:Connect(function(player)
     task.spawn(function()
-        local res = net:getTeahouses(tostring(player.UserId))
-        -- a non-ok fetch reads as "owns nothing" (no pad this session, no retry)
-        local owned = if res.ok then res.data.teahouses or {} else nil
-        local prefs = if res.ok then res.data.padPreferences else nil
+        local res = net:getEconomy(tostring(player.UserId))
         local uid = tostring(player.UserId)
-        playerPrefs[uid] = prefs or {}
-        local action = siteCoordinator:onJoin(uid, owned, prefs)
+        local ecoData = if res.ok then res.data else nil
+        local prefs = (ecoData and ecoData.padPreferences) or {}
+        local teahouses = (ecoData and ecoData.teahouses) or {}
+        playerPrefs[uid] = prefs
+        if ecoData and ecoData.catalog then
+            economyCatalog = ecoData.catalog
+        end
+        playerEconomy[uid] = {
+            totalPoints = (ecoData and ecoData.totalPoints) or 0,
+            maxDeckSize = ecoData and ecoData.maxDeckSize or nil,
+            teahouses = teahouses,
+            claimedPadId = nil,
+        }
+        local action = siteCoordinator:onJoin(
+            uid,
+            { maxDeckSize = playerEconomy[uid].maxDeckSize, teahouses = teahouses },
+            prefs
+        )
         if action then
-            -- getTeahouses yields; if the player left mid-call, PlayerRemoving's onLeave
+            -- getEconomy yields; if the player left mid-call, PlayerRemoving's onLeave
             -- already ran as a no-op (nothing was held yet). Release the just-claimed pad
             -- so it doesn't leak lit for a departed player (and _held doesn't go stale).
             if not player:IsDescendantOf(Players) then
@@ -437,9 +484,11 @@ Players.PlayerAdded:Connect(function(player)
                 end
                 playerPrefs[uid] = nil
                 playerHouse[uid] = nil
+                playerEconomy[uid] = nil
                 return
             end
             applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
+            playerEconomy[uid].claimedPadId = action.padId
             local tsize = action.teahouse and action.teahouse.size or "bare"
             print(`[D.5] {player.UserId} claimed {action.padId} deck={action.deckSize} teahouse={tsize}`)
             if action.teahouse ~= nil and action.teahouse.loadout ~= nil then
@@ -459,12 +508,14 @@ Players.PlayerAdded:Connect(function(player)
         if player:IsDescendantOf(Players) then
             PreferenceState:FireClient(player, { padPreferences = playerPrefs[uid] })
         end
+        echoEconomy(player, uid)
     end)
 end)
 
 Players.PlayerRemoving:Connect(function(player)
     playerPrefs[tostring(player.UserId)] = nil
     playerHouse[tostring(player.UserId)] = nil
+    playerEconomy[tostring(player.UserId)] = nil
     local action = siteCoordinator:onLeave(tostring(player.UserId))
     if action then
         applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
@@ -540,6 +591,69 @@ SetBackDoor.OnServerEvent:Connect(function(player, payload)
             backDoorIndex = BackDoorEditor.backDoorIndex(newWallBays),
         })
     end
+end)
+
+RequestPurchase.OnServerEvent:Connect(function(player, payload)
+    local uid = tostring(player.UserId)
+    local e = playerEconomy[uid]
+    if e == nil then
+        return
+    end
+    local item = if typeof(payload) == "table" then payload.item else nil
+    if typeof(item) ~= "string" then
+        return
+    end
+    local res = net:postPurchase(uid, item)
+    if not res.ok then
+        warn(`[B2] purchase {item} failed for {uid}: {tostring(res.error)}`)
+        echoEconomy(player, uid) -- resync the client's labels/balance
+        return
+    end
+    -- adopt the authoritative new state
+    e.totalPoints = res.data.totalPoints
+    e.maxDeckSize = res.data.maxDeckSize
+    local kind, size = string.match(item, "^(%a+):(%a+)$")
+    if kind == "teahouse" and size then
+        e.teahouses[size] = { baseStyle = "teahouse-1story" }
+    end
+    -- buy-to-claim: a non-owner buying deck:S claims the pad named in the payload
+    if e.claimedPadId == nil and kind == "deck" then
+        local padId = if typeof(payload.padId) == "string" then payload.padId else nil
+        if padId and PadSites[padId] then
+            local action = siteCoordinator:onJoin(
+                uid,
+                { maxDeckSize = e.maxDeckSize, teahouses = e.teahouses },
+                { padId }
+            )
+            if action then
+                applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
+                e.claimedPadId = action.padId
+            end
+        end
+    elseif e.claimedPadId ~= nil then
+        -- upgrade: live-rebuild the claimed pad at the new sizes
+        local spec = PadSites[e.claimedPadId]
+        if spec then
+            local teaSizes = {}
+            for s in e.teahouses do
+                table.insert(teaSizes, s)
+            end
+            local built = SizeClasses.resolveBuilt(e.maxDeckSize, teaSizes, spec.maxSize)
+            if built then
+                local teaLoadout = if built.teahouseSize then e.teahouses[built.teahouseSize] else nil
+                local teahouse = if built.teahouseSize
+                    then {
+                        size = built.teahouseSize,
+                        loadout = teaLoadout,
+                        placement = { offset = { 0, 0 }, facing = "N" },
+                    }
+                    else nil
+                local treatment = { kind = "structure", loadout = teaLoadout, lit = true }
+                applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
+            end
+        end
+    end
+    echoEconomy(player, uid)
 end)
 
 print(`[ROSHAMBO] playable loop starting against {config.baseUrl}`)
