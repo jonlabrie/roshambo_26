@@ -45,4 +45,42 @@ function SizeClasses.deckFootprint(deckSize: string): Footprint
     return { minX = b.minX * s, maxX = b.maxX * s, minZ = b.minZ * s, maxZ = b.maxZ * s }
 end
 
+-- the lower-ranked of two sizes (S < M < L)
+function SizeClasses.minSize(a: string, b: string): string
+    return if SizeClasses.rank[a] <= SizeClasses.rank[b] then a else b
+end
+
+-- next tier up: nil -> "S", S -> "M", M -> "L", L -> nil
+function SizeClasses.nextTier(size: string?): string?
+    if size == nil then
+        return "S"
+    elseif size == "S" then
+        return "M"
+    elseif size == "M" then
+        return "L"
+    end
+    return nil
+end
+
+-- what materializes at a perch: deck capped by the perch, teahouse = biggest owned capped by
+-- the deck (nil = bare deck). Returns nil when the player owns no deck (not an owner).
+function SizeClasses.resolveBuilt(
+    maxDeckSize: string?,
+    teahouseSizes: { string },
+    perchMax: string
+): { deckSize: string, teahouseSize: string? }?
+    if maxDeckSize == nil then
+        return nil
+    end
+    local deckSize = SizeClasses.minSize(maxDeckSize, perchMax)
+    local maxTea: string? = nil
+    for _, s in teahouseSizes do
+        if maxTea == nil or SizeClasses.rank[s] > SizeClasses.rank[maxTea] then
+            maxTea = s
+        end
+    end
+    local teahouseSize: string? = if maxTea ~= nil then SizeClasses.minSize(maxTea, deckSize) else nil
+    return { deckSize = deckSize, teahouseSize = teahouseSize }
+end
+
 return SizeClasses

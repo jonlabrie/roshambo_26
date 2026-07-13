@@ -87,3 +87,40 @@ describe("SizeClasses.deckFootprint", function()
         expect(area(SizeClasses.deckFootprint("L")) / s).toBeCloseTo(1.6)
     end)
 end)
+
+describe("SizeClasses ladder helpers", function()
+    test("minSize returns the lower-ranked size", function()
+        expect(SizeClasses.minSize("S", "L")).toBe("S")
+        expect(SizeClasses.minSize("L", "M")).toBe("M")
+        expect(SizeClasses.minSize("M", "M")).toBe("M")
+    end)
+
+    test("nextTier walks S->M->L->nil, and nil->S", function()
+        expect(SizeClasses.nextTier(nil)).toBe("S")
+        expect(SizeClasses.nextTier("S")).toBe("M")
+        expect(SizeClasses.nextTier("M")).toBe("L")
+        expect(SizeClasses.nextTier("L") == nil).toBe(true)
+    end)
+
+    test("resolveBuilt: nil deck -> not an owner", function()
+        expect(SizeClasses.resolveBuilt(nil, {}, "L") == nil).toBe(true)
+    end)
+
+    test("resolveBuilt: deck capped by perch; teahouse capped by deck", function()
+        local r = SizeClasses.resolveBuilt("L", { "S", "M", "L" }, "M") -- perch caps at M
+        expect(r.deckSize).toBe("M")
+        expect(r.teahouseSize).toBe("M") -- own L teahouse but deck is M
+    end)
+
+    test("resolveBuilt: no teahouses -> bare deck (teahouseSize nil)", function()
+        local r = SizeClasses.resolveBuilt("S", {}, "L")
+        expect(r.deckSize).toBe("S")
+        expect(r.teahouseSize == nil).toBe(true)
+    end)
+
+    test("resolveBuilt: biggest owned teahouse within the deck", function()
+        local r = SizeClasses.resolveBuilt("L", { "S", "M" }, "L")
+        expect(r.deckSize).toBe("L")
+        expect(r.teahouseSize).toBe("M")
+    end)
+end)
