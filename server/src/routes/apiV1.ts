@@ -7,6 +7,7 @@ import { bankPot } from '../wallet';
 import User from '../models/User';
 import { Throw } from '../engine/GameRules';
 import { validateLoadout, validateSizeClass, validatePadPreferences } from '../loadout';
+import { validatePurchase, applyPurchase, PRICES, DEFAULT_TEAHOUSE_LOADOUT, Size, EconomyState } from '../economy';
 
 export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     const router = express.Router();
@@ -129,6 +130,57 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             (user.teahouses as Map<string, unknown>).set(sizeClass, loadout);
             await user.save();
             res.json({ sizeClass, loadout });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
+    const readEconomy = (user: { totalPoints: number; maxDeckSize: Size | null; teahouses?: Map<string, unknown> }): EconomyState => ({
+        totalPoints: user.totalPoints,
+        maxDeckSize: user.maxDeckSize,
+        teahouseSizes: (user.teahouses ? Array.from(user.teahouses.keys()) : []) as Size[],
+    });
+
+    router.get('/players/:robloxUserId/economy', async (req, res) => {
+        try {
+            const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
+            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            res.set('Cache-Control', 'no-store');
+            const st = readEconomy(user);
+            const teahouses = user.teahouses ? Object.fromEntries(user.teahouses as Map<string, unknown>) : {};
+            // superset: the single join fetch — balance + tiers + teahouse LOADOUTS (server needs
+            // them to build) + preferences + the price catalog for the client.
+            res.json({
+                totalPoints: st.totalPoints,
+                maxDeckSize: st.maxDeckSize,
+                teahouses,
+                teahouseSizes: st.teahouseSizes,
+                padPreferences: user.padPreferences ?? [],
+                catalog: PRICES,
+            });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
+    router.post('/players/:robloxUserId/purchase', async (req, res) => {
+        try {
+            const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
+            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            const item = req.body?.item;
+            if (typeof item !== 'string') { res.status(400).json({ error: 'BAD_ITEM' }); return; }
+            const before = readEconomy(user);
+            const chk = validatePurchase(before, item);
+            if (!chk.ok) { res.status(400).json({ error: chk.error }); return; }
+            const after = applyPurchase(before, item);
+            user.totalPoints = after.totalPoints;
+            user.maxDeckSize = after.maxDeckSize;
+            const [kind, size] = item.split(':') as [string, Size];
+            if (kind === 'teahouse') {
+                (user.teahouses as Map<string, unknown>).set(size, { ...DEFAULT_TEAHOUSE_LOADOUT });
+            }
+            await user.save();
+            res.json({ item, totalPoints: after.totalPoints, maxDeckSize: after.maxDeckSize, teahouseSizes: after.teahouseSizes });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
         }

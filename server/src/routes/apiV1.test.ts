@@ -298,4 +298,50 @@ describe('/api/v1', () => {
                 .put('/api/v1/players/roblox-1/preferences').send({ padPreferences: [] }).expect(401);
         });
     });
+
+    describe('/api/v1 economy + purchase', () => {
+        it('GET economy returns balance, tiers, and the catalog', async () => {
+            await User.create({ robloxId: '900001', totalPoints: 120, maxDeckSize: 'S', teahouses: { S: { baseStyle: 'teahouse-1story' } } });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const res = await request(app)
+                .get('/api/v1/players/900001/economy').set('X-API-Key', API_KEY).expect(200);
+            expect(res.body.totalPoints).toBe(120);
+            expect(res.body.maxDeckSize).toBe('S');
+            expect(res.body.teahouseSizes).toEqual(['S']);
+            expect(res.body.catalog.deck.M).toBe(500);
+        });
+
+        it('POST purchase deck:S grants the tier and deducts points', async () => {
+            await User.create({ robloxId: '900002', totalPoints: 60 });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const res = await request(app)
+                .post('/api/v1/players/900002/purchase').set('X-API-Key', API_KEY).send({ item: 'deck:S' }).expect(200);
+            expect(res.body.maxDeckSize).toBe('S');
+            expect(res.body.totalPoints).toBe(10);
+            const reread = await request(app)
+                .get('/api/v1/players/900002/economy').set('X-API-Key', API_KEY).expect(200);
+            expect(reread.body.maxDeckSize).toBe('S');
+        });
+
+        it('POST purchase teahouse:S grants the size key in the teahouses map', async () => {
+            await User.create({ robloxId: '900003', totalPoints: 100, maxDeckSize: 'S' });
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .post('/api/v1/players/900003/purchase').set('X-API-Key', API_KEY).send({ item: 'teahouse:S' }).expect(200);
+            expect(res.body.teahouseSizes).toEqual(['S']);
+        });
+
+        it('POST purchase rejects unaffordable / bad tier / bad item with 400', async () => {
+            const app = makeApp(makeEngine(), new ResultsStore());
+            await User.create({ robloxId: '900004', totalPoints: 0 });
+            await request(app)
+                .post('/api/v1/players/900004/purchase').set('X-API-Key', API_KEY).send({ item: 'deck:S' }).expect(400);
+            await User.create({ robloxId: '900005', totalPoints: 100000 });
+            const badTier = await request(app)
+                .post('/api/v1/players/900005/purchase').set('X-API-Key', API_KEY).send({ item: 'deck:M' }).expect(400);
+            expect(badTier.body.error).toBe('BAD_TIER_ORDER');
+            const badItem = await request(app)
+                .post('/api/v1/players/900005/purchase').set('X-API-Key', API_KEY).send({ item: 'nope:S' }).expect(400);
+            expect(badItem.body.error).toBe('BAD_ITEM');
+        });
+    });
 });
