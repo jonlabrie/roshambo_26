@@ -21,11 +21,6 @@ export type Action = {
     -- on it. `teahouse` is nil for a garden (or a future bare deck).
     deckSize: string?,
     teahouse: Teahouse?,
-    -- transitional building-size fields (kept additive; removed in the Task 12 cleanup once
-    -- TreatmentApplier reads deckSize/teahouse instead).
-    scale: number,
-    sizeClass: string?,
-    footprint: SizeClasses.Footprint?,
 }
 
 -- The starter bundle shown at every unoccupied/left cliff pad: an S deck + a dormant
@@ -54,16 +49,7 @@ local function starterAction(padId: string, spec: any): Action
     local treatment = VacantState.resolve(nil, nil, spec and spec.vacantForm)
     if treatment.kind ~= "structure" then
         -- valley/garden pad: no deck or building in Piece A
-        return {
-            padId = padId,
-            spec = spec,
-            treatment = treatment,
-            deckSize = nil,
-            teahouse = nil,
-            scale = 1.0,
-            sizeClass = nil,
-            footprint = nil,
-        }
+        return { padId = padId, spec = spec, treatment = treatment, deckSize = nil, teahouse = nil }
     end
     return {
         padId = padId,
@@ -71,9 +57,6 @@ local function starterAction(padId: string, spec: any): Action
         treatment = treatment,
         deckSize = STARTER,
         teahouse = { size = STARTER, loadout = treatment.loadout, placement = spec and spec.placement },
-        scale = SizeClasses.scale[STARTER],
-        sizeClass = STARTER,
-        footprint = SizeClasses.footprintFor(STARTER),
     }
 end
 
@@ -143,9 +126,6 @@ function SiteCoordinator:onJoin(
                         treatment = VacantState.resolve(playerId, loadout, rec.spec.vacantForm),
                         deckSize = deckSize,
                         teahouse = { size = size, loadout = loadout, placement = rec.spec.placement },
-                        scale = SizeClasses.scale[size],
-                        sizeClass = size,
-                        footprint = SizeClasses.footprintFor(size),
                     }
                 end
             end

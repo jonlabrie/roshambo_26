@@ -429,7 +429,8 @@ Players.PlayerAdded:Connect(function(player)
                 return
             end
             applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
-            print(`[D.5] {player.UserId} claimed {action.padId} @ {tostring(action.sizeClass)}`)
+            local tsize = action.teahouse and action.teahouse.size or "bare"
+            print(`[D.5] {player.UserId} claimed {action.padId} deck={action.deckSize} teahouse={tsize}`)
         end
         if player:IsDescendantOf(Players) then
             PreferenceState:FireClient(player, { padPreferences = playerPrefs[uid] })

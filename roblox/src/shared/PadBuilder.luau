@@ -1,15 +1,13 @@
 --!strict
--- Thin applier: plans the cliff support (PadPlanner) using the injected ground raycast,
--- builds each post via the injected ops, and returns the mount that A's StructureBuilder
--- consumes. ops is faked in tests (Lune) and implemented for real in the Studio demo /
--- runtime. Requiring the pure planners/size math is fine (all Lune-loadable).
+-- Builds the whole hand-agnostic pad (deck slab + beam frame + engawa rail + terrain-dropped
+-- posts) for a deck size, via injected ops (faked in Lune tests, real Roblox parts at runtime).
+-- Requiring the pure planners/size math is fine (all Lune-loadable).
 local PadPlanner = require("./PadPlanner")
 local PadFrame = require("./PadFrame")
 local SizeClasses = require("./SizeClasses")
 
 local PadBuilder = {}
 
-export type PadSpec = { mountCF: { number }, hand: string, footprint: PadPlanner.Footprint }
 export type Ops = {
     raycastGround: (number, number) -> number?,
     buildPost: ({ number }, number) -> (),
@@ -28,15 +26,6 @@ export type DeckOps = Ops & {
     buildRailing: (Edge) -> (),
 }
 export type Mount = { cframe: { number }, hand: string, footprint: PadPlanner.Footprint }
-
-function PadBuilder.build(padSpec: PadSpec, ops: Ops): Mount
-    local support =
-        PadPlanner.planSupport(padSpec.footprint, padSpec.mountCF, ops.raycastGround, ops.blockedByPath)
-    for _, post in support.posts do
-        ops.buildPost(post.pos, post.height)
-    end
-    return { cframe = padSpec.mountCF, hand = padSpec.hand, footprint = padSpec.footprint }
-end
 
 -- Build the whole hand-agnostic pad for a deck size: symmetric slab, the 5-beam frame
 -- (PadFrame), engawa railings on all 4 edges, and the 6 terrain-dropped posts. deckSize
