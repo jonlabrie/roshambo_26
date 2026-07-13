@@ -20,14 +20,18 @@ local BEAM_WOOD = Color3.fromRGB(92, 66, 42)
 -- dims/heights mirror the tuned teahouse-1story koran (measured 2026-07-12).
 local DECK_THK = 0.5 -- slab thickness; top at y=0 => center at -0.25
 local BEAM_H, BEAM_W = 0.9, 0.7 -- beam depth (Y) / width; top flush under the slab bottom
-local CAP_TOP, CAP_H, CAP_W = 2.25, 0.3, 0.45 -- charcoal top rail: top 2.25 above deck, 0.45 wide
-local MID_Y, MID_H, MID_W = 1.25, 0.2, 0.15 -- mid rail: 1.25 above deck, thin
-local NEWEL_H, NEWEL_W = 2.25, 0.45 -- corner posts rise from the deck to the cap top (flush, no projection)
-local BAL_H, BAL_W, BAL_CY = 2.3, 0.15, 0.95 -- balusters; center 0.95 above deck (top ~2.10)
+-- 2026-07-13: whole railing raised +0.5 (was too low) and made COLLIDABLE (was pure decoration
+-- — no fall-prevention). Now 0.5 taller than the teahouse-1story koran it was matched to.
+local CAP_TOP, CAP_H, CAP_W = 2.75, 0.3, 0.45 -- charcoal top rail: top 2.75 above deck, 0.45 wide
+local MID_Y, MID_H, MID_W = 1.75, 0.2, 0.15 -- mid rail: 1.75 above deck, thin
+local NEWEL_H, NEWEL_W = 2.75, 0.45 -- corner posts rise from the deck to the cap top (flush, no projection)
+local BAL_H, BAL_W, BAL_CY = 2.8, 0.15, 1.2 -- balusters; center 1.2 above deck (top ~2.60), bottom ~-0.2
 local BAL_GAP = 3.6 -- target clear spacing => ~3.76 center-to-center, matching the koran
 
 function PadOps.new(mountCF: CFrame, parent: Instance)
-    -- one anchored, non-colliding wood box at LOCAL (lx,ly,lz), size (sx,sy,sz)
+    -- one anchored wood box at LOCAL (lx,ly,lz), size (sx,sy,sz). Non-colliding by default
+    -- (deck slab/beams are decorative here); pass canCollide=true for railing members so they
+    -- physically block walk-off. CanQuery stays false either way (collision is physics, not raycast).
     local function box(
         name: string,
         lx: number,
@@ -37,11 +41,12 @@ function PadOps.new(mountCF: CFrame, parent: Instance)
         sy: number,
         sz: number,
         color: Color3,
-        material: Enum.Material
+        material: Enum.Material,
+        canCollide: boolean?
     )
         local p = Instance.new("Part")
         p.Name, p.Anchored, p.CanCollide, p.CastShadow, p.CanQuery, p.CanTouch =
-            name, true, false, false, false, false
+            name, true, canCollide == true, false, false, false
         p.Size = Vector3.new(sx, sy, sz)
         p.Color = color
         p.Material = material
@@ -129,9 +134,9 @@ function PadOps.new(mountCF: CFrame, parent: Instance)
                 local ox, oz = mx + edge.nx * (w / 2), mz + edge.nz * (w / 2) -- inset so outer face is flush
                 local span = math.max(0, length - 2 * NEWEL_W)
                 if alongX then
-                    box(name, ox, cy, oz, span, h, w, color, Enum.Material.Wood)
+                    box(name, ox, cy, oz, span, h, w, color, Enum.Material.Wood, true)
                 else
-                    box(name, ox, cy, oz, w, h, span, color, Enum.Material.Wood)
+                    box(name, ox, cy, oz, w, h, span, color, Enum.Material.Wood, true)
                 end
             end
             member("RailCap", CAP_TOP - CAP_H / 2, CAP_W, CAP_H, CAP_COLOR)
@@ -141,7 +146,7 @@ function PadOps.new(mountCF: CFrame, parent: Instance)
             local function upright(name: string, along: number, w: number, h: number, cy: number)
                 local px = edge.x1 + ux * along + edge.nx * (w / 2)
                 local pz = edge.z1 + uz * along + edge.nz * (w / 2)
-                box(name, px, cy, pz, w, h, w, RAIL_WOOD, Enum.Material.Wood)
+                box(name, px, cy, pz, w, h, w, RAIL_WOOD, Enum.Material.Wood, true)
             end
             if isSide then
                 upright("Newel", NEWEL_W / 2, NEWEL_W, NEWEL_H, CAP_TOP - NEWEL_H / 2)
