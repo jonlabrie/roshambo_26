@@ -603,6 +603,23 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
     if typeof(item) ~= "string" then
         return
     end
+    local kindPre = string.match(item, "^(%a+):")
+    -- buy-to-claim: a non-owner buying a deck:* claims the specific pad named in the payload.
+    -- Validate + reserve-check the pad BEFORE spending points, so a full/occupied pad doesn't
+    -- silently strand the player on a different pad (or no pad at all) after paying.
+    local isBuyToClaim = e.claimedPadId == nil and kindPre == "deck"
+    local claimPadId: string? = nil
+    if isBuyToClaim then
+        local padId = if typeof(payload) == "table" and typeof(payload.padId) == "string"
+            then payload.padId
+            else nil
+        if padId == nil or PadSites[padId] == nil or not siteCoordinator:isVacant(padId) then
+            warn(`[B2] buy-to-claim {item} for {uid} rejected: pad {tostring(padId)} unavailable`)
+            echoEconomy(player, uid) -- resync the client's labels/balance
+            return
+        end
+        claimPadId = padId
+    end
     local res = net:postPurchase(uid, item)
     if not res.ok then
         warn(`[B2] purchase {item} failed for {uid}: {tostring(res.error)}`)
@@ -616,19 +633,28 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
     if kind == "teahouse" and size then
         e.teahouses[size] = { baseStyle = "teahouse-1story" }
     end
-    -- buy-to-claim: a non-owner buying deck:S claims the pad named in the payload
-    if e.claimedPadId == nil and kind == "deck" then
-        local padId = if typeof(payload.padId) == "string" then payload.padId else nil
-        if padId and PadSites[padId] then
+    if isBuyToClaim and claimPadId then
+        -- postPurchase yielded; re-check vacancy, a claim could have raced in meanwhile.
+        if siteCoordinator:isVacant(claimPadId) then
             local action = siteCoordinator:onJoin(
                 uid,
                 { maxDeckSize = e.maxDeckSize, teahouses = e.teahouses },
-                { padId }
+                { claimPadId }
             )
-            if action then
+            if action ~= nil and action.padId == claimPadId then
                 applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
                 e.claimedPadId = action.padId
+            else
+                warn(
+                    `[B2] {uid} bought {item} but pad {claimPadId} could not be claimed this session`
+                        .. " (will be auto-placed on next join)"
+                )
             end
+        else
+            warn(
+                `[B2] {uid} bought {item} but pad {claimPadId} was claimed by another player mid-purchase`
+                    .. " (will be auto-placed on next join)"
+            )
         end
     elseif e.claimedPadId ~= nil then
         -- upgrade: live-rebuild the claimed pad at the new sizes

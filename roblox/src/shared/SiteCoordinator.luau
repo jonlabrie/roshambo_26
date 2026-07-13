@@ -157,4 +157,11 @@ function SiteCoordinator:onLeave(playerId: string): Action?
     return starterAction(padId, rec and rec.spec)
 end
 
+-- Whether a registered pad is currently unclaimed. Unregistered ids are reported as
+-- not vacant (nothing to claim there) rather than erroring.
+function SiteCoordinator:isVacant(padId: string): boolean
+    local rec = self._registry:get(padId)
+    return rec ~= nil and rec.occupant == nil
+end
+
 return SiteCoordinator
