@@ -25,7 +25,7 @@ export type DeckOps = Ops & {
     buildBeam: (PadFrame.Node, PadFrame.Node) -> (),
     buildRailing: (Edge) -> (),
 }
-export type Mount = { cframe: { number }, hand: string, footprint: PadPlanner.Footprint }
+export type Mount = { cframe: { number }, footprint: PadPlanner.Footprint }
 
 -- Build the whole hand-agnostic pad for a deck size: symmetric slab, the 5-beam frame
 -- (PadFrame), engawa railings on all 4 edges, and the 6 terrain-dropped posts. deckSize
@@ -59,7 +59,7 @@ function PadBuilder.buildDeck(deckSize: string, mountCF: { number }, ops: DeckOp
     for _, post in support.posts do
         ops.buildPost(post.pos, post.height)
     end
-    return { cframe = mountCF, hand = "agnostic", footprint = fp }
+    return { cframe = mountCF, footprint = fp }
 end
 
 return PadBuilder

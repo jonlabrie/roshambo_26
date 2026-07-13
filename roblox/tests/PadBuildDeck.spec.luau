@@ -69,6 +69,6 @@ describe("PadBuilder.buildDeck", function()
         expect(#calls.beams).toBe(5)
         expect(#calls.rails).toBe(4)
         expect(calls.posts).toBe(6)
-        expect(mount.hand).toBe("agnostic")
+        expect(mount.footprint.maxX).toBeCloseTo(13 * math.sqrt(1.6)) -- L deck footprint returned
     end)
 end)

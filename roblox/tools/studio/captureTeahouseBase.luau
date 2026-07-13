@@ -64,16 +64,17 @@ local function capture()
     local m = src:Clone()
     m.Name = "teahouse-1story"
 
-    -- record the OLD frame-underside datum (Perim underside) BEFORE stripping, so the flag
-    -- mounts can keep their eave-front world height after the datum moves up to the floor
-    local pivOld = m:GetPivot()
-    local oldFrameY = math.huge
+    -- record the OLD frame-underside datum (Perim underside) in WORLD Y before stripping, so
+    -- the flag mounts keep their eave-front world height after the datum moves up to the floor.
+    -- World Y (not pivot-local) so it stays comparable to the post-strip datum even though the
+    -- default pivot (bbox centre) shifts when the deck parts are removed.
+    local oldFrameYWorld = math.huge
     for _, p in m:GetDescendants() do
         if p:IsA("BasePart") and p.Name:match("^Perim") then
-            oldFrameY = math.min(oldFrameY, pivOld:ToObjectSpace(p.CFrame).Position.Y - p.Size.Y / 2)
+            oldFrameYWorld = math.min(oldFrameYWorld, p.Position.Y - p.Size.Y / 2)
         end
     end
-    assert(oldFrameY < math.huge, "no Perim frame found in the source (unexpected prototype shape)")
+    assert(oldFrameYWorld < math.huge, "no Perim frame found in the source (unexpected prototype shape)")
 
     -- 1) strip the pad's job: deck slab, veranda boards, understructure frame, koran railing, posts
     for _, p in m:GetDescendants() do
@@ -169,7 +170,9 @@ local function capture()
         end
     end
     assert(host, "no WallPost host for flag mounts")
-    local flagY = 12 - (y0 - oldFrameY)
+    -- posW.Y is the new datum (wall base) in WORLD Y; oldFrameYWorld is the old datum in world Y.
+    -- Their difference is the datum rise, frame-independent, so the flag keeps its eave height.
+    local flagY = 12 - (posW.Y - oldFrameYWorld)
     for name, lp in { FlagMount_1 = Vector3.new(-9, flagY, -13), FlagMount_2 = Vector3.new(15, flagY, -13) } do
         local a = Instance.new("Attachment")
         a.Name = name

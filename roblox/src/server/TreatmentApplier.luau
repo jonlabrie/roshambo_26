@@ -67,8 +67,8 @@ local function shutter(model: Model)
     end
 end
 
--- Build the placed building into `staging` when a teahouse is present and fits the deck.
--- Non-fatal: a build/fit failure logs and leaves the deck standing (F2/F4).
+-- Build the placed building into `staging` when it fits the deck (a non-fit is a graceful
+-- skip -> deck only). May throw on bad placement/build data; the caller fault-isolates it.
 function TreatmentApplier:_buildBuilding(
     padId: string,
     spec: any,
@@ -97,14 +97,8 @@ function TreatmentApplier:_buildBuilding(
     local placedCF = deckCF * CFrame.new(table.unpack(self._buildingPlacer.placeCF(placement)))
     local mount =
         { cframe = { placedCF:GetComponents() }, openSide = placement.openSide, footprint = buildingFP }
-    local ok, result = pcall(function()
-        return self._structureBuilder.build(teahouse.loadout, mount, self._catalog, self._structureOps)
-    end)
-    if not ok then
-        warn(`[D.6] building failed for {padId}: {result}`)
-        return -- deck stands; no building this pass
-    end
-    local model = result :: Model
+    local model =
+        self._structureBuilder.build(teahouse.loadout, mount, self._catalog, self._structureOps) :: Model
     model.Name = "Structure"
     if s ~= 1 then
         model:ScaleTo(s) -- scales the BUILDING about its (placed) pivot; the deck is unscaled
@@ -143,7 +137,15 @@ function TreatmentApplier:apply(padId: string, spec: any, treatment: any, deckSi
     -- build a building only when there's one to build; a nil teahouse or nil loadout is a
     -- bare deck (Piece-B: owns a deck but no teahouse) — the deck stands alone.
     if teahouse ~= nil and teahouse.loadout ~= nil then
-        self:_buildBuilding(padId, spec, treatment, teahouse, deckSize, staging)
+        -- fault-isolate the WHOLE building step (fit-check + placement math + build): a bad
+        -- placement or build must leave the staged deck standing, never abort the caller's
+        -- vacantActions / PlayerRemoving loop (F2/F4).
+        local okBuilding, buildingErr = pcall(function()
+            self:_buildBuilding(padId, spec, treatment, teahouse, deckSize, staging)
+        end)
+        if not okBuilding then
+            warn(`[D.6] building step failed for {padId}: {buildingErr}; deck only`)
+        end
     end
     -- commit: drop the old site and adopt the freshly staged deck + building
     for _, c in folder:GetChildren() do
