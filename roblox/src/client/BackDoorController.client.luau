@@ -34,7 +34,16 @@ local function relabel()
     end
 end
 
+-- Anchor the prompt to the bay's FIXED wall location — its Solid panel, which sits at the
+-- bay centre and never moves. Anchoring to "first BasePart found" grabs the Door variant's
+-- screen, which pockets AWAY from the bay when open, dragging the prompt off its own bay
+-- (end-bay prompts then collide at the wall centre).
 local function anchorPart(bay: Instance): BasePart?
+    local solid = bay:FindFirstChild("Solid")
+    local solidPart = solid and solid:FindFirstChildWhichIsA("BasePart", true)
+    if solidPart then
+        return solidPart
+    end
     if bay:IsA("Model") and bay.PrimaryPart then
         return bay.PrimaryPart
     end
