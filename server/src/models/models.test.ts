@@ -42,4 +42,11 @@ describe('schema additions', () => {
         const set = await User.create({ deviceId: 'devPrefs2', padPreferences: ['T06', 'T02'] });
         expect(set.padPreferences).toEqual(['T06', 'T02']);
     });
+
+    it('User.maxDeckSize defaults to null and round-trips a tier', async () => {
+        const fresh = await User.create({ deviceId: 'devDeckA' });
+        expect(fresh.maxDeckSize).toBeNull();
+        const set = await User.create({ deviceId: 'devDeckB', maxDeckSize: 'M' });
+        expect(set.maxDeckSize).toBe('M');
+    });
 });
