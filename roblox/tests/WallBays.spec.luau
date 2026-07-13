@@ -53,14 +53,17 @@ describe("WallBays.resolve", function()
         expect(stateOf(r, "front", 1)).toBe("shoji") -- default kept (not listed)
         expect(stateOf(r, "left", 1)).toBe("solid") -- default kept (side absent)
     end)
-    test("an invalid map is ignored wholesale -> all defaults (non-fatal)", function()
-        local r = WallBays.resolve(AVAIL, { back = { "trapdoor" } })
-        expect(stateOf(r, "back", 1)).toBe("solid")
+    test("an invalid map is ignored WHOLESALE -> a valid override elsewhere is discarded too", function()
+        local r = WallBays.resolve(AVAIL, { back = { "trapdoor" }, front = { [1] = "solid" } })
+        expect(stateOf(r, "back", 1)).toBe("solid") -- the bogus bay defaults
+        expect(stateOf(r, "front", 1)).toBe("shoji") -- a VALID override is ALSO discarded (whole map ignored)
     end)
-    test("a map entry with an unknown state falls back to that bay's default", function()
-        -- map is structurally valid elsewhere but one index is bogus at resolve time
-        local r =
-            WallBays.resolve(AVAIL, { front = { "shoji", "shoji" }, back = { "solid" }, left = { "solid" } })
-        expect(stateOf(r, "front", 1)).toBe("shoji")
-    end)
+    test(
+        "a valid map with a side present but this bay's index absent -> that bay keeps its default",
+        function()
+            local r = WallBays.resolve(AVAIL, { front = { [2] = "solid" } }) -- front index 1 absent
+            expect(stateOf(r, "front", 1)).toBe("shoji") -- default kept (index 1 not in map)
+            expect(stateOf(r, "front", 2)).toBe("solid") -- index 2 overridden
+        end
+    )
 end)
