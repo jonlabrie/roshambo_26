@@ -95,8 +95,7 @@ function TreatmentApplier:_buildBuilding(
     -- world pivot = deck CFrame composed with the local placement transform (offset + facing)
     local deckCF = CFrame.new(table.unpack(spec.mountCF))
     local placedCF = deckCF * CFrame.new(table.unpack(self._buildingPlacer.placeCF(placement)))
-    local mount =
-        { cframe = { placedCF:GetComponents() }, openSide = placement.openSide, footprint = buildingFP }
+    local mount = { cframe = { placedCF:GetComponents() }, footprint = buildingFP }
     local model =
         self._structureBuilder.build(teahouse.loadout, mount, self._catalog, self._structureOps) :: Model
     model.Name = "Structure"

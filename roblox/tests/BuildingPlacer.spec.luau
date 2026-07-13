@@ -14,7 +14,7 @@ end)
 
 describe("BuildingPlacer.placeCF", function()
     test("pure offset with facing N is identity rotation + translation", function()
-        local cf = BuildingPlacer.placeCF({ offset = { 3, -4 }, facing = "N", openSide = "left" })
+        local cf = BuildingPlacer.placeCF({ offset = { 3, -4 }, facing = "N" })
         expect(cf[1]).toBeCloseTo(3) -- x
         expect(cf[2]).toBeCloseTo(0) -- y
         expect(cf[3]).toBeCloseTo(-4) -- z
@@ -22,7 +22,7 @@ describe("BuildingPlacer.placeCF", function()
         expect(cf[12]).toBeCloseTo(1) -- R22
     end)
     test("facing E is a +90deg yaw (R13 = sin90 = 1)", function()
-        local cf = BuildingPlacer.placeCF({ offset = { 0, 0 }, facing = "E", openSide = "left" })
+        local cf = BuildingPlacer.placeCF({ offset = { 0, 0 }, facing = "E" })
         expect(cf[6]).toBeCloseTo(1) -- R02 = sin(90)
         expect(cf[10]).toBeCloseTo(-1) -- R20 = -sin(90)
     end)
@@ -32,29 +32,19 @@ describe("BuildingPlacer.fits", function()
     local deck = { minX = -13, maxX = 13, minZ = -10, maxZ = 10 } -- S deck 26x20
     local bldg = { minX = -9.35, maxX = 9.35, minZ = -6.35, maxZ = 6.35 } -- ~18.7x12.7 centered
     test("centered, facing N, fits", function()
-        expect(BuildingPlacer.fits(bldg, deck, { offset = { 0, 0 }, facing = "N", openSide = "left" })).toBe(
-            true
-        )
+        expect(BuildingPlacer.fits(bldg, deck, { offset = { 0, 0 }, facing = "N" })).toBe(true)
     end)
     test("tucked to a corner (leaving engawa) still fits", function()
-        expect(BuildingPlacer.fits(bldg, deck, { offset = { 3.6, 3.6 }, facing = "N", openSide = "left" })).toBe(
-            true
-        )
+        expect(BuildingPlacer.fits(bldg, deck, { offset = { 3.6, 3.6 }, facing = "N" })).toBe(true)
     end)
     test("overhanging the +X edge does not fit", function()
-        expect(BuildingPlacer.fits(bldg, deck, { offset = { 5, 0 }, facing = "N", openSide = "left" })).toBe(
-            false
-        )
+        expect(BuildingPlacer.fits(bldg, deck, { offset = { 5, 0 }, facing = "N" })).toBe(false)
     end)
     test("facing E swaps the building's X/Z extents; 18.7-wide across the 20-deep deck fits", function()
-        expect(BuildingPlacer.fits(bldg, deck, { offset = { 0, 0 }, facing = "E", openSide = "left" })).toBe(
-            true
-        )
+        expect(BuildingPlacer.fits(bldg, deck, { offset = { 0, 0 }, facing = "E" })).toBe(true)
     end)
     test("facing N with an 18.7-deep building on a 20-deep deck barely fits but not offset", function()
         local tall = { minX = -6.35, maxX = 6.35, minZ = -9.35, maxZ = 9.35 }
-        expect(BuildingPlacer.fits(tall, deck, { offset = { 0, 2 }, facing = "N", openSide = "left" })).toBe(
-            false
-        )
+        expect(BuildingPlacer.fits(tall, deck, { offset = { 0, 2 }, facing = "N" })).toBe(false)
     end)
 end)

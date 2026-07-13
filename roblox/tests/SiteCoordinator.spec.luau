@@ -4,7 +4,7 @@ local SiteCoordinator = require("../src/shared/SiteCoordinator")
 local PadRegistry = require("../src/shared/PadRegistry")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 
-local PLACEMENT = { offset = { 0, 0 }, facing = "N", openSide = "right" }
+local PLACEMENT = { offset = { 0, 0 }, facing = "N" }
 local function spec(id: string, maxSize: string?)
     return {
         id = id,
