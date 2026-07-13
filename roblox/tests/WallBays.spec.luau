@@ -35,6 +35,9 @@ describe("WallBays.validate", function()
     test("rejects an unknown state", function()
         expect(WallBays.validate({ back = { "window" } })).toBe(false)
     end)
+    test("rejects a side whose value is not a list (does not throw)", function()
+        expect(WallBays.validate({ front = "shoji" } :: any)).toBe(false)
+    end)
 end)
 
 describe("WallBays.resolve", function()
@@ -66,4 +69,9 @@ describe("WallBays.resolve", function()
             expect(stateOf(r, "front", 2)).toBe("solid") -- index 2 overridden
         end
     )
+    test("a structurally malformed map (non-list side value) degrades to defaults, non-fatal", function()
+        local r = WallBays.resolve(AVAIL, { front = "shoji" } :: any) -- side is a string, not a list
+        expect(stateOf(r, "front", 1)).toBe("shoji") -- default (map ignored, no throw)
+        expect(stateOf(r, "back", 1)).toBe("solid")
+    end)
 end)

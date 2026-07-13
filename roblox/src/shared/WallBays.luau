@@ -20,6 +20,11 @@ end
 -- prefab's actual bays in resolve, not here)
 function WallBays.validate(map: Map): boolean
     for _side, states in map do
+        -- a side's value must be a list of states; a malformed value (string/number/etc.)
+        -- makes the whole map invalid rather than throwing when resolve iterates it (F2/F4)
+        if type(states) ~= "table" then
+            return false
+        end
         for _, s in states do
             if not WallBays.STATES[s] then
                 return false
