@@ -19,8 +19,8 @@ local function fakeOps(log: { any })
                 bays = {},
             }
         end,
-        mirrorX = function(_m)
-            table.insert(log, { op = "mirror" })
+        applyBays = function(_m, _bays)
+            table.insert(log, { op = "applyBays" })
         end,
         recolor = function(_m, role: string, _c)
             table.insert(log, { op = "recolor", role = role })
@@ -37,11 +37,10 @@ local function fakeOps(log: { any })
     }
 end
 
-test("build drives ops in order: clone, mirror(if openSide left), recolor, texture, attach, pivot", function()
+test("build drives ops in order: clone, applyBays, recolor, texture, attach, pivot", function()
     local log: { any } = {}
     local mount = {
         cframe = { 1, 2, 3, 1, 0, 0, 0, 1, 0, 0, 0, 1 },
-        openSide = "left",
         footprint = { minX = -13, maxX = 13, minZ = -10, maxZ = 10 },
     }
     local loadout = {
@@ -54,21 +53,10 @@ test("build drives ops in order: clone, mirror(if openSide left), recolor, textu
     expect((model :: any).tag).toBe("MODEL")
     expect(log).toEqual({
         { op = "clone", style = "teahouse-1story" },
-        { op = "mirror" },
+        { op = "applyBays" },
         { op = "recolor", role = "cap" },
         { op = "texture", target = "ShojiBay:1" },
         { op = "attach", mount = "FlagMount_1" },
         { op = "pivot" },
     })
-end)
-
-test("build skips mirror for a right (native) openSide mount", function()
-    local log: { any } = {}
-    local mount = {
-        cframe = { 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1 },
-        openSide = "right",
-        footprint = { minX = -13, maxX = 13, minZ = -10, maxZ = 10 },
-    }
-    Builder.build({ baseStyle = "teahouse-1story" }, mount, Catalog, fakeOps(log))
-    expect(log).toEqual({ { op = "clone", style = "teahouse-1story" }, { op = "pivot" } })
 end)

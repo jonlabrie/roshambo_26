@@ -10,7 +10,7 @@ local StructureBuilder = {}
 export type Ops = {
     clonePrefab: (string) -> any,
     readManifest: (any) -> StructurePlanner.Manifest,
-    mirrorX: (any) -> (),
+    applyBays: (any, any) -> (),
     recolor: (any, string, { number }) -> (),
     setTexture: (any, string, string) -> (),
     attachPrefab: (any, string, string) -> (),
@@ -26,12 +26,7 @@ function StructureBuilder.build(
     local model = ops.clonePrefab(loadout.baseStyle)
     local manifest = ops.readManifest(model)
     local plan = StructurePlanner.plan(loadout, mount, manifest, catalog)
-    -- Option A shoji-wrap: the prefab is single-handed (native openSide = "right"); an
-    -- openSide of "left" mirrors the building so the open L-wrap lands on the left. (A fully
-    -- symmetric per-side prefab that needs no mirror is a later art task.)
-    if plan.openSide == "left" then
-        ops.mirrorX(model)
-    end
+    ops.applyBays(model, plan.bays)
     for _, r in plan.recolors do
         ops.recolor(model, r.role, r.color)
     end
