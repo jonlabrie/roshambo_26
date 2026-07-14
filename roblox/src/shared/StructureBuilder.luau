@@ -21,9 +21,10 @@ function StructureBuilder.build(
     loadout: StructurePlanner.Loadout,
     mount: StructurePlanner.Mount,
     catalog: any,
-    ops: Ops
+    ops: Ops,
+    prefabName: string
 ): any
-    local model = ops.clonePrefab(loadout.baseStyle)
+    local model = ops.clonePrefab(prefabName)
     local manifest = ops.readManifest(model)
     local plan = StructurePlanner.plan(loadout, mount, manifest, catalog)
     ops.applyBays(model, plan.bays)

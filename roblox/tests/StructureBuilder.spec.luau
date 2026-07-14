@@ -49,10 +49,10 @@ test("build drives ops in order: clone, applyBays, recolor, texture, attach, piv
         shoji = { [1] = "shoji.crane" },
         flags = { { mount = "FlagMount_1", item = "flag.clan" } },
     }
-    local model = Builder.build(loadout, mount, Catalog, fakeOps(log))
+    local model = Builder.build(loadout, mount, Catalog, fakeOps(log), "teahouse-1story-m")
     expect((model :: any).tag).toBe("MODEL")
     expect(log).toEqual({
-        { op = "clone", style = "teahouse-1story" },
+        { op = "clone", style = "teahouse-1story-m" },
         { op = "applyBays" },
         { op = "recolor", role = "cap" },
         { op = "texture", target = "ShojiBay:1" },
