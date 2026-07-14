@@ -135,12 +135,13 @@ end)
 
 describe("SizeClasses.buildingFootprint", function()
     local function wh(fp)
-        return math.floor((fp.maxX - fp.minX) * 100) / 100, math.floor((fp.maxZ - fp.minZ) * 100) / 100
+        return math.floor((fp.maxX - fp.minX) * 100 + 0.5) / 100,
+            math.floor((fp.maxZ - fp.minZ) * 100 + 0.5) / 100
     end
-    test("M is the reference ~18.7 x 12.7", function()
+    test("M is the reference ~18.4 x 12.4", function()
         local w, d = wh(SizeClasses.buildingFootprint("M"))
-        expect(w).toBe(18.7)
-        expect(d).toBe(12.7)
+        expect(w).toBe(18.4)
+        expect(d).toBe(12.4)
     end)
     test("S is smaller, L is larger (monotonic in both dims)", function()
         local sw, sd = wh(SizeClasses.buildingFootprint("S"))

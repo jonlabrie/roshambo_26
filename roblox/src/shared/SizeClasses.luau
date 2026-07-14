@@ -89,11 +89,11 @@ function SizeClasses.prefabName(baseStyle: string, size: string): string
     return `{baseStyle}-{string.lower(size)}`
 end
 
--- per-size WALL footprint (symmetric, centred). Retires the scaled BUILDING_BASE: sizes are now
--- distinct authored buildings. M is the reference (18.7 x 12.7); S/L scale by bay ratio
--- (S 2x1, M 3x2, L 4x3). Used for the non-fatal deck fit-check; refine from authored measurements.
-local BUILDING_HALF =
-    { S = { 6.25, 3.18 }, M = { 9.35, 6.35 }, L = { 12.45, 9.53 } } :: { [string]: { number } }
+-- per-size WALL footprint (symmetric, centred), MEASURED from the authored S/M/L prefabs' Solid
+-- wall panels (outer faces; roof eaves overhang the deck and are excluded). Retires the scaled
+-- BUILDING_BASE: sizes are now distinct authored buildings (S 2x1 12.4x6.4, M 3x2 18.4x12.4,
+-- L 4x3 24.4x18.4). Used for the non-fatal deck fit-check.
+local BUILDING_HALF = { S = { 6.2, 3.2 }, M = { 9.2, 6.2 }, L = { 12.2, 9.2 } } :: { [string]: { number } }
 function SizeClasses.buildingFootprint(size: string): Footprint
     local h = BUILDING_HALF[size]
     return { minX = -h[1], maxX = h[1], minZ = -h[2], maxZ = h[2] }

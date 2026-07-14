@@ -8,11 +8,11 @@ local CollectionService = game:GetService("CollectionService")
 
 local StructureOps = {}
 
-function StructureOps.clonePrefab(baseStyle: string): Model
+function StructureOps.clonePrefab(prefabName: string): Model
     local prefabs = ServerStorage:FindFirstChild("StructurePrefabs")
-    local prefab = prefabs and prefabs:FindFirstChild(baseStyle)
+    local prefab = prefabs and prefabs:FindFirstChild(prefabName)
     if not prefab then
-        error(`StructureOps.clonePrefab: no prefab named '{baseStyle}' under ServerStorage.StructurePrefabs`)
+        error(`StructureOps.clonePrefab: no prefab named '{prefabName}' under ServerStorage.StructurePrefabs`)
     end
     return prefab:Clone() :: Model
 end

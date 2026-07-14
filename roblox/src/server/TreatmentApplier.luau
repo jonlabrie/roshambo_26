@@ -16,7 +16,7 @@ export type Deps = {
     structureOps: any,
     padOpsNew: (CFrame, Instance) -> any,
     buildingPlacer: any, -- pure placeCF/fits (BuildingPlacer)
-    sizeClasses: any, -- pure scale/deckFootprint (SizeClasses)
+    sizeClasses: any, -- pure deckFootprint/buildingFootprint/prefabName (SizeClasses)
     deckPlacement: any, -- pure per-size deck-pivot lookup (DeckPlacement)
 }
 
