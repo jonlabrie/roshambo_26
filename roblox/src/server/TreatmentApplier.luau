@@ -57,7 +57,12 @@ local function shutter(model: Model)
             d.Enabled = false
         elseif d:IsA("BasePart") then
             if d.Name == "Shoji" then
-                d.Transparency = 0
+                -- darken only the SHOWN shoji into opaque unlit paper. Each Solid/Door bay still
+                -- contains a HIDDEN Shoji part (applyBays set it Transparency=1); do NOT resurrect
+                -- those, or dormant teahouses sprout phantom dark shoji "walls" on every bay.
+                if d.Transparency < 1 then
+                    d.Transparency = 0
+                end
             elseif d.Name == "ShojiGlow" then
                 d.Transparency = 1
             end
