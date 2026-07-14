@@ -83,4 +83,10 @@ function SizeClasses.resolveBuilt(
     return { deckSize = deckSize, teahouseSize = teahouseSize }
 end
 
+-- the per-size prefab name for a style: "teahouse-1story" + "M" -> "teahouse-1story-m".
+-- baseStyle stays the STYLE; size picks the authored prefab (scaling retired).
+function SizeClasses.prefabName(baseStyle: string, size: string): string
+    return `{baseStyle}-{string.lower(size)}`
+end
+
 return SizeClasses
