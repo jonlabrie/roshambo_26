@@ -20,6 +20,10 @@ local BEAM_WOOD = Color3.fromRGB(92, 66, 42)
 -- dims/heights mirror the tuned teahouse-1story koran (measured 2026-07-12).
 local DECK_THK = 0.5 -- slab thickness; top at y=0 => center at -0.25
 local BEAM_H, BEAM_W = 0.9, 0.7 -- beam depth (Y) / width; top flush under the slab bottom
+-- posts stop at the BEAM UNDERSIDE (the beams rest on them), not at the deck datum. The planner
+-- sizes each stilt foot->datum; drop its top by deck+beam thickness, less a 0.1 overlap so the
+-- post head buries into the beam bottom (no coplanar z-fight with the beam OR the deck slab).
+local POST_HEAD_INSET = DECK_THK + BEAM_H - 0.1
 -- 2026-07-13: whole railing raised +0.5 (was too low) and made COLLIDABLE (was pure decoration
 -- — no fall-prevention). Now 0.5 taller than the teahouse-1story koran it was matched to.
 local CAP_TOP, CAP_H, CAP_W = 2.75, 0.3, 0.45 -- charcoal top rail: top 2.75 above deck, 0.45 wide
@@ -84,12 +88,14 @@ function PadOps.new(mountCF: CFrame, parent: Instance)
         buildPost = function(pos: { number }, height: number)
             local p = Instance.new("Part")
             p.Name, p.Anchored, p.CanCollide, p.CastShadow = "PadPost", true, false, false
-            p.Size = Vector3.new(1.2, height, 1.2)
+            -- shorten the planner's foot->datum stilt so its TOP sits at the beam underside, and
+            -- lower the centre by half the drop so the FOOT (in the terrain) stays put.
+            p.Size = Vector3.new(1.2, math.max(0, height - POST_HEAD_INSET), 1.2)
             p.Color = BLACK
             p.Material = Enum.Material.Wood
             -- world position (planner-projected) with the mount's yaw, so the square post is
             -- square to the deck/beams above it rather than world-axis-aligned
-            p.CFrame = CFrame.new(pos[1], pos[2], pos[3]) * mountCF.Rotation
+            p.CFrame = CFrame.new(pos[1], pos[2] - POST_HEAD_INSET / 2, pos[3]) * mountCF.Rotation
             p.Parent = parent
         end,
         -- symmetric slab, top on the y=0 datum
