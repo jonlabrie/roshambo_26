@@ -20,11 +20,6 @@ export type Deps = {
     deckPlacement: any, -- pure per-size deck-pivot lookup (DeckPlacement)
 }
 
--- The building's own footprint at S (walls ~18.7 x 12.7), centered on its pivot. Scaled by the
--- teahouse size for the non-fatal fit-check against the deck. (teahouse.size <= deckSize is
--- already guaranteed upstream, so this is a safety net; refine when authored M/L prefabs land.)
-local BUILDING_BASE = { minX = -9.35, maxX = 9.35, minZ = -6.35, maxZ = 6.35 }
-
 function TreatmentApplier.new(deps: Deps)
     return setmetatable({
         _c = deps.container,
@@ -86,13 +81,7 @@ function TreatmentApplier:_buildBuilding(
 )
     local placement = teahouse.placement
     local deckFP = self._sizeClasses.deckFootprint(deckSize)
-    local s = self._sizeClasses.scale[teahouse.size]
-    local buildingFP = {
-        minX = BUILDING_BASE.minX * s,
-        maxX = BUILDING_BASE.maxX * s,
-        minZ = BUILDING_BASE.minZ * s,
-        maxZ = BUILDING_BASE.maxZ * s,
-    }
+    local buildingFP = self._sizeClasses.buildingFootprint(teahouse.size)
     if not self._buildingPlacer.fits(buildingFP, deckFP, placement) then
         warn(
             `[D.6] {padId}: {teahouse.size} building does not fit the {deckSize} deck at its placement; deck only`
@@ -103,12 +92,16 @@ function TreatmentApplier:_buildBuilding(
     local deckCF = CFrame.new(table.unpack(deckCF12))
     local placedCF = deckCF * CFrame.new(table.unpack(self._buildingPlacer.placeCF(placement)))
     local mount = { cframe = { placedCF:GetComponents() }, footprint = buildingFP }
-    local model =
-        self._structureBuilder.build(teahouse.loadout, mount, self._catalog, self._structureOps) :: Model
+    local prefabName = self._sizeClasses.prefabName(teahouse.loadout.baseStyle, teahouse.size)
+    local model = self._structureBuilder.build(
+        teahouse.loadout,
+        mount,
+        self._catalog,
+        self._structureOps,
+        prefabName
+    ) :: Model
     model.Name = "Structure"
-    if s ~= 1 then
-        model:ScaleTo(s) -- scales the BUILDING about its (placed) pivot; the deck is unscaled
-    end
+    -- (no ScaleTo: sizes are authored per-size prefabs, not a scaled base)
     if not treatment.lit then
         shutter(model)
     end
