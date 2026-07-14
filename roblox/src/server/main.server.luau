@@ -626,6 +626,13 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
         echoEconomy(player, uid) -- resync the client's labels/balance
         return
     end
+    -- the purchase HTTP call yielded; if the player left during it, do NOT claim/rebuild a pad
+    -- for a departed uid (PlayerRemoving already ran as a no-op for the not-yet-claimed case,
+    -- which would otherwise leak a scarce pad). Points are already persisted server-side.
+    if not player:IsDescendantOf(Players) then
+        playerEconomy[uid] = nil
+        return
+    end
     -- adopt the authoritative new state
     e.totalPoints = res.data.totalPoints
     e.maxDeckSize = res.data.maxDeckSize
