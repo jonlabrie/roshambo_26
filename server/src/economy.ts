@@ -48,3 +48,35 @@ export function applyPurchase(state: EconomyState, item: string): EconomyState {
     else next.teahouseSizes.push(size);
     return next;
 }
+
+export type DeckDisplay = Size | null;
+export type TeahouseDisplay = 'none' | Size | null;
+
+const isSize = (v: unknown): v is Size => v === 'S' || v === 'M' || v === 'L';
+const ownedMaxTeahouse = (state: EconomyState): Size | null =>
+  state.teahouseSizes.reduce<Size | null>((m, s) => (m === null || SIZE_RANK[s] > SIZE_RANK[m] ? s : m), null);
+
+export function validateDisplay(
+  state: EconomyState,
+  deckDisplay: unknown,
+  teahouseDisplay: unknown,
+): { ok: true; deckDisplay: DeckDisplay; teahouseDisplay: TeahouseDisplay } | { ok: false; error: string } {
+  // deck: null or a Size <= owned maxDeckSize; 'none' is NOT allowed for the deck
+  if (deckDisplay !== null && !isSize(deckDisplay)) return { ok: false, error: 'BAD_DISPLAY' };
+  if (isSize(deckDisplay)) {
+    if (state.maxDeckSize === null || SIZE_RANK[deckDisplay] > SIZE_RANK[state.maxDeckSize]) {
+      return { ok: false, error: 'DISPLAY_UNOWNED' };
+    }
+  }
+  // teahouse: null, 'none', or a Size <= owned max teahouse
+  if (teahouseDisplay !== null && teahouseDisplay !== 'none' && !isSize(teahouseDisplay)) {
+    return { ok: false, error: 'BAD_DISPLAY' };
+  }
+  if (isSize(teahouseDisplay)) {
+    const owned = ownedMaxTeahouse(state);
+    if (owned === null || SIZE_RANK[teahouseDisplay] > SIZE_RANK[owned]) {
+      return { ok: false, error: 'DISPLAY_UNOWNED' };
+    }
+  }
+  return { ok: true, deckDisplay: deckDisplay as DeckDisplay, teahouseDisplay: teahouseDisplay as TeahouseDisplay };
+}

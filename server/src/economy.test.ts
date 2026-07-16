@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validatePurchase, applyPurchase, PRICES, EconomyState } from './economy';
+import { validatePurchase, applyPurchase, PRICES, EconomyState, validateDisplay } from './economy';
 
 const fresh = (over: Partial<EconomyState> = {}): EconomyState =>
     ({ totalPoints: 100000, maxDeckSize: null, teahouseSizes: [], ...over });
@@ -56,4 +56,35 @@ describe('applyPurchase', () => {
         expect(s.teahouseSizes).toEqual(['S', 'M']);
         expect(s.totalPoints).toBe(1000 - PRICES.teahouse.M);
     });
+});
+
+describe('validateDisplay', () => {
+  const st = (over: Partial<EconomyState> = {}): EconomyState =>
+    ({ totalPoints: 0, maxDeckSize: 'L', teahouseSizes: ['S', 'M', 'L'], ...over });
+
+  it('accepts null/null (default = biggest owned)', () => {
+    expect(validateDisplay(st(), null, null)).toEqual({ ok: true, deckDisplay: null, teahouseDisplay: null });
+  });
+  it('accepts a deck display <= owned and a teahouse display <= owned', () => {
+    expect(validateDisplay(st(), 'M', 'S')).toEqual({ ok: true, deckDisplay: 'M', teahouseDisplay: 'S' });
+  });
+  it("accepts teahouse 'none'", () => {
+    expect(validateDisplay(st(), 'S', 'none')).toEqual({ ok: true, deckDisplay: 'S', teahouseDisplay: 'none' });
+  });
+  it('rejects a deck display larger than owned', () => {
+    expect(validateDisplay(st({ maxDeckSize: 'M' }), 'L', null)).toEqual({ ok: false, error: 'DISPLAY_UNOWNED' });
+  });
+  it('rejects a teahouse display larger than owned', () => {
+    expect(validateDisplay(st({ teahouseSizes: ['S'] }), null, 'M')).toEqual({ ok: false, error: 'DISPLAY_UNOWNED' });
+  });
+  it("rejects 'none' for the deck", () => {
+    expect(validateDisplay(st(), 'none' as unknown, null)).toEqual({ ok: false, error: 'BAD_DISPLAY' });
+  });
+  it('rejects garbage values', () => {
+    expect(validateDisplay(st(), 'XL' as unknown, null)).toEqual({ ok: false, error: 'BAD_DISPLAY' });
+    expect(validateDisplay(st(), null, 42 as unknown)).toEqual({ ok: false, error: 'BAD_DISPLAY' });
+  });
+  it('rejects a deck display when the player owns no deck', () => {
+    expect(validateDisplay(st({ maxDeckSize: null }), 'S', null)).toEqual({ ok: false, error: 'DISPLAY_UNOWNED' });
+  });
 });
