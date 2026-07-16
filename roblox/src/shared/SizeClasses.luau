@@ -67,19 +67,36 @@ end
 function SizeClasses.resolveBuilt(
     maxDeckSize: string?,
     teahouseSizes: { string },
-    perchMax: string
+    perchMax: string,
+    deckDisplay: string?,
+    teahouseDisplay: string?
 ): { deckSize: string, teahouseSize: string? }?
     if maxDeckSize == nil then
         return nil
     end
+    -- deck: owned max, capped by the perch, then by the display (clamp only ever shrinks)
     local deckSize = SizeClasses.minSize(maxDeckSize, perchMax)
+    if deckDisplay ~= nil then
+        deckSize = SizeClasses.minSize(deckSize, deckDisplay)
+    end
+    -- teahouse: 'none' display = bare deck
+    if teahouseDisplay == "none" then
+        return { deckSize = deckSize, teahouseSize = nil }
+    end
     local maxTea: string? = nil
     for _, s in teahouseSizes do
         if maxTea == nil or SizeClasses.rank[s] > SizeClasses.rank[maxTea] then
             maxTea = s
         end
     end
-    local teahouseSize: string? = if maxTea ~= nil then SizeClasses.minSize(maxTea, deckSize) else nil
+    if maxTea == nil then
+        return { deckSize = deckSize, teahouseSize = nil }
+    end
+    local teahouseSize = maxTea
+    if teahouseDisplay ~= nil then
+        teahouseSize = SizeClasses.minSize(teahouseSize, teahouseDisplay)
+    end
+    teahouseSize = SizeClasses.minSize(teahouseSize, deckSize) -- teahouse <= (displayed) deck
     return { deckSize = deckSize, teahouseSize = teahouseSize }
 end
 
