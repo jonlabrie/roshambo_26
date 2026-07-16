@@ -22,6 +22,8 @@ export interface IUser extends Document {
     teahouses: Map<string, unknown>;
     padPreferences: string[];
     maxDeckSize: 'S' | 'M' | 'L' | null;
+    deckDisplay: 'S' | 'M' | 'L' | null;
+    teahouseDisplay: 'none' | 'S' | 'M' | 'L' | null;
     updatedAt: Date;
 }
 
@@ -47,6 +49,8 @@ const UserSchema: Schema = new Schema({
     teahouses: { type: Map, of: Schema.Types.Mixed, default: {} },
     padPreferences: { type: [String], default: [] },
     maxDeckSize: { type: String, enum: ['S', 'M', 'L', null], default: null },
+    deckDisplay: { type: String, enum: ['S', 'M', 'L', null], default: null },
+    teahouseDisplay: { type: String, enum: ['none', 'S', 'M', 'L', null], default: null },
 }, { timestamps: true });
 
 export default mongoose.model<IUser>('User', UserSchema);

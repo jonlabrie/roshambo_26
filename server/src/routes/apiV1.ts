@@ -7,7 +7,7 @@ import { bankPot } from '../wallet';
 import User from '../models/User';
 import { Throw } from '../engine/GameRules';
 import { validateLoadout, validateSizeClass, validatePadPreferences } from '../loadout';
-import { validatePurchase, applyPurchase, PRICES, DEFAULT_TEAHOUSE_LOADOUT, Size, EconomyState } from '../economy';
+import { validatePurchase, applyPurchase, validateDisplay, PRICES, DEFAULT_TEAHOUSE_LOADOUT, Size, EconomyState } from '../economy';
 
 export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     const router = express.Router();
@@ -157,6 +157,8 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
                 teahouseSizes: st.teahouseSizes,
                 padPreferences: user.padPreferences ?? [],
                 catalog: PRICES,
+                deckDisplay: user.deckDisplay ?? null,
+                teahouseDisplay: user.teahouseDisplay ?? null,
             });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
@@ -181,6 +183,21 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             }
             await user.save();
             res.json({ item, totalPoints: after.totalPoints, maxDeckSize: after.maxDeckSize, teahouseSizes: after.teahouseSizes });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
+    router.post('/players/:robloxUserId/display', async (req, res) => {
+        try {
+            const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
+            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            const chk = validateDisplay(readEconomy(user), req.body?.deckDisplay ?? null, req.body?.teahouseDisplay ?? null);
+            if (!chk.ok) { res.status(400).json({ error: chk.error }); return; }
+            user.deckDisplay = chk.deckDisplay;
+            user.teahouseDisplay = chk.teahouseDisplay;
+            await user.save();
+            res.json({ deckDisplay: chk.deckDisplay, teahouseDisplay: chk.teahouseDisplay });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
         }

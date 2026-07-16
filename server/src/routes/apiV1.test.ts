@@ -343,5 +343,31 @@ describe('/api/v1', () => {
                 .post('/api/v1/players/900005/purchase').set('X-API-Key', API_KEY).send({ item: 'nope:S' }).expect(400);
             expect(badItem.body.error).toBe('BAD_ITEM');
         });
+
+        it('GET economy returns display fields (null by default)', async () => {
+            await User.create({ robloxId: '900006', totalPoints: 0, maxDeckSize: 'L', teahouses: { S: {}, M: {}, L: {} } });
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .get('/api/v1/players/900006/economy').set('X-API-Key', API_KEY).expect(200);
+            expect(res.body).toMatchObject({ deckDisplay: null, teahouseDisplay: null });
+        });
+
+        it('POST display persists valid caps and echoes them', async () => {
+            await User.create({ robloxId: '900007', totalPoints: 0, maxDeckSize: 'L', teahouses: { S: {}, M: {}, L: {} } });
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .post('/api/v1/players/900007/display').set('X-API-Key', API_KEY)
+                .send({ deckDisplay: 'M', teahouseDisplay: 'none' }).expect(200);
+            expect(res.body).toEqual({ deckDisplay: 'M', teahouseDisplay: 'none' });
+            const u = await User.findOne({ robloxId: '900007' });
+            expect(u?.deckDisplay).toBe('M');
+            expect(u?.teahouseDisplay).toBe('none');
+        });
+
+        it('POST display rejects an unowned size', async () => {
+            await User.create({ robloxId: '900008', totalPoints: 0, maxDeckSize: 'S' });
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .post('/api/v1/players/900008/display').set('X-API-Key', API_KEY)
+                .send({ deckDisplay: 'L' }).expect(400);
+            expect(res.body.error).toBe('DISPLAY_UNOWNED');
+        });
     });
 });
