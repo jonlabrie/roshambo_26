@@ -651,11 +651,12 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
     if isBuyToClaim and claimPadId then
         -- postPurchase yielded; re-check vacancy, a claim could have raced in meanwhile.
         if siteCoordinator:isVacant(claimPadId) then
-            local action = siteCoordinator:onJoin(
-                uid,
-                { maxDeckSize = e.maxDeckSize, teahouses = e.teahouses },
-                { claimPadId }
-            )
+            local action = siteCoordinator:onJoin(uid, {
+                maxDeckSize = e.maxDeckSize,
+                teahouses = e.teahouses,
+                deckDisplay = e.deckDisplay,
+                teahouseDisplay = e.teahouseDisplay,
+            }, { claimPadId })
             if action ~= nil and action.padId == claimPadId then
                 applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
                 e.claimedPadId = action.padId
