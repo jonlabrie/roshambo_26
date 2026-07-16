@@ -107,7 +107,12 @@ end
 
 function SiteCoordinator:onJoin(
     playerId: string,
-    economy: { maxDeckSize: string?, teahouses: { [string]: any } }?,
+    economy: {
+        maxDeckSize: string?,
+        teahouses: { [string]: any },
+        deckDisplay: string?,
+        teahouseDisplay: string?,
+    }?,
     preferences: { string }?
 ): Action?
     if self._held[playerId] ~= nil then
@@ -125,7 +130,13 @@ function SiteCoordinator:onJoin(
     for _, id in order do
         local rec = self._registry:get(id)
         if rec and rec.occupant == nil then
-            local built = SizeClasses.resolveBuilt(economy.maxDeckSize, teaSizes, rec.spec.maxSize)
+            local built = SizeClasses.resolveBuilt(
+                economy.maxDeckSize,
+                teaSizes,
+                rec.spec.maxSize,
+                economy.deckDisplay,
+                economy.teahouseDisplay
+            )
             if built ~= nil then
                 self._registry:claim(id, playerId)
                 self._held[playerId] = id

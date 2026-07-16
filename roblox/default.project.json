@@ -23,7 +23,8 @@
                 "SetBackDoor": { "$className": "RemoteEvent" },
                 "BackDoorState": { "$className": "RemoteEvent" },
                 "RequestPurchase": { "$className": "RemoteEvent" },
-                "EconomyState": { "$className": "RemoteEvent" }
+                "EconomyState": { "$className": "RemoteEvent" },
+                "SetDisplay": { "$className": "RemoteEvent" }
             }
         },
         "Workspace": {

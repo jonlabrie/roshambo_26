@@ -149,4 +149,16 @@ function NetworkClient.postPurchase(self: any, robloxUserId: string, item: strin
     return self:_request("POST", `/api/v1/players/{robloxUserId}/purchase`, { item = item })
 end
 
+function NetworkClient.postDisplay(
+    self: any,
+    robloxUserId: string,
+    deckDisplay: string?,
+    teahouseDisplay: string?
+): Result
+    return self:_request("POST", `/api/v1/players/{robloxUserId}/display`, {
+        deckDisplay = deckDisplay,
+        teahouseDisplay = teahouseDisplay,
+    })
+end
+
 return NetworkClient

@@ -34,6 +34,7 @@ local SetBackDoor = remotes:WaitForChild("SetBackDoor") :: RemoteEvent
 local BackDoorState = remotes:WaitForChild("BackDoorState") :: RemoteEvent
 local RequestPurchase = remotes:WaitForChild("RequestPurchase") :: RemoteEvent
 local EconomyState = remotes:WaitForChild("EconomyState") :: RemoteEvent
+local SetDisplay = remotes:WaitForChild("SetDisplay") :: RemoteEvent
 local TweenService = game:GetService("TweenService")
 local TextService = game:GetService("TextService")
 
@@ -396,6 +397,8 @@ local playerEconomy: {
         maxDeckSize: string?,
         teahouses: { [string]: any },
         claimedPadId: string?,
+        deckDisplay: string?,
+        teahouseDisplay: string?,
     },
 } =
     {}
@@ -417,6 +420,8 @@ local function echoEconomy(player: Player, uid: string)
         teahouseSizes = teaSizes,
         claimedPadId = e.claimedPadId,
         catalog = economyCatalog,
+        deckDisplay = e.deckDisplay,
+        teahouseDisplay = e.teahouseDisplay,
     })
 end
 
@@ -467,12 +472,15 @@ Players.PlayerAdded:Connect(function(player)
             maxDeckSize = ecoData and ecoData.maxDeckSize or nil,
             teahouses = teahouses,
             claimedPadId = nil,
+            deckDisplay = ecoData and ecoData.deckDisplay or nil,
+            teahouseDisplay = ecoData and ecoData.teahouseDisplay or nil,
         }
-        local action = siteCoordinator:onJoin(
-            uid,
-            { maxDeckSize = playerEconomy[uid].maxDeckSize, teahouses = teahouses },
-            prefs
-        )
+        local action = siteCoordinator:onJoin(uid, {
+            maxDeckSize = playerEconomy[uid].maxDeckSize,
+            teahouses = teahouses,
+            deckDisplay = playerEconomy[uid].deckDisplay,
+            teahouseDisplay = playerEconomy[uid].teahouseDisplay,
+        }, prefs)
         if action then
             -- getEconomy yields; if the player left mid-call, PlayerRemoving's onLeave
             -- already ran as a no-op (nothing was held yet). Release the just-claimed pad
@@ -671,7 +679,13 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
             for s in e.teahouses do
                 table.insert(teaSizes, s)
             end
-            local built = SizeClasses.resolveBuilt(e.maxDeckSize, teaSizes, spec.maxSize)
+            local built = SizeClasses.resolveBuilt(
+                e.maxDeckSize,
+                teaSizes,
+                spec.maxSize,
+                e.deckDisplay,
+                e.teahouseDisplay
+            )
             if built then
                 local teaLoadout = if built.teahouseSize then e.teahouses[built.teahouseSize] else nil
                 local teahouse = if built.teahouseSize
@@ -684,6 +698,51 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
                 local treatment = { kind = "structure", loadout = teaLoadout, lit = true }
                 applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
             end
+        end
+    end
+    echoEconomy(player, uid)
+end)
+
+SetDisplay.OnServerEvent:Connect(function(player, payload)
+    local uid = tostring(player.UserId)
+    local e = playerEconomy[uid]
+    if e == nil or e.claimedPadId == nil then
+        return -- must own+occupy a perch to set a display
+    end
+    local deckDisplay = if typeof(payload) == "table" then payload.deckDisplay else nil
+    local teahouseDisplay = if typeof(payload) == "table" then payload.teahouseDisplay else nil
+    -- server is authoritative: persist through the PWA API (it re-validates against ownership)
+    local res = net:postDisplay(uid, deckDisplay, teahouseDisplay)
+    if not res.ok then
+        warn(`[B3] postDisplay failed for {uid}: {tostring(res.error)}`)
+        echoEconomy(player, uid) -- resync
+        return
+    end
+    if not player:IsDescendantOf(Players) then
+        return -- left during the HTTP yield; nothing to rebuild
+    end
+    e.deckDisplay = res.data.deckDisplay
+    e.teahouseDisplay = res.data.teahouseDisplay
+    -- live rebuild the claimed pad at the new displayed sizes
+    local spec = PadSites[e.claimedPadId]
+    if spec then
+        local teaSizes = {}
+        for s in e.teahouses do
+            table.insert(teaSizes, s)
+        end
+        local built =
+            SizeClasses.resolveBuilt(e.maxDeckSize, teaSizes, spec.maxSize, e.deckDisplay, e.teahouseDisplay)
+        if built then
+            local teaLoadout = if built.teahouseSize then e.teahouses[built.teahouseSize] else nil
+            local teahouse = if built.teahouseSize
+                then {
+                    size = built.teahouseSize,
+                    loadout = teaLoadout,
+                    placement = { offset = { 0, 0 }, facing = "N" },
+                }
+                else nil
+            local treatment = { kind = "structure", loadout = teaLoadout, lit = true }
+            applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
         end
     end
     echoEconomy(player, uid)
