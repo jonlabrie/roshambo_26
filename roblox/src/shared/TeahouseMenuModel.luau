@@ -46,20 +46,22 @@ function TeahouseMenuModel.viewModel(state: any): any
         })
     end
 
-    -- teahouse ladder: owned per the set; next = smallest unowned in linear order; locked if its
-    -- rank exceeds the owned deck (teahouse <= deck)
+    -- teahouse ladder: owned per the set; next = one rung above the highest owned rank
+    -- (which is always contiguous). Locked if its rank exceeds the owned deck (teahouse <= deck).
+    -- Buyable rungs carry price and affordability; locked rungs do not.
     local teaLadder = {}
     local teaMaxRank = rankOf(teaMax)
     for _, size in SIZES do
         local r = SizeClasses.rank[size]
         local isNext = r == teaMaxRank + 1
         local locked = r > deckRank -- needs a >= deck
+        local buyable = isNext and not locked
         table.insert(teaLadder, {
             size = size,
             owned = owns[size] == true,
-            isNext = isNext and not locked,
-            price = if isNext then state.catalog.teahouse[size] else nil,
-            affordable = if isNext then points >= state.catalog.teahouse[size] else nil,
+            isNext = buyable,
+            price = if buyable then state.catalog.teahouse[size] else nil,
+            affordable = if buyable then points >= state.catalog.teahouse[size] else nil,
             locked = locked,
         })
     end
