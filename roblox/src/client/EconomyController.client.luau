@@ -1,24 +1,21 @@
 --!strict
--- Walk-up buy/upgrade prompts for the size economy (B2). Non-owner (no maxDeckSize): a
+-- Walk-up buy-to-claim prompt for the size economy (B2). Non-owner (no maxDeckSize): a
 -- "Buy S deck & claim" prompt on each VACANT materialized site (Occupied attribute false).
--- Owner: an upgrade prompt on their OWN claimed site, alternating deck<->teahouse so BOTH
--- ladders are reachable. Server-authoritative: fires RequestPurchase, relabels from the echoed
--- EconomyState, never applies the purchase. The server (TreatmentApplier) destroys+rebuilds a
--- site's children on every purchase, so this rebinds when the anchor is replaced, and listens to
--- ChildAdded/Occupied per site so other players' claims update our prompts too (like
--- PerchPreferenceController). Prices come from the echoed catalog. Key G (E=Favorite, F=door).
+-- Owners get no world prompt from this controller — their upgrade path lives in the
+-- TeahouseController HUD panel (B3). Server-authoritative: fires RequestPurchase, relabels
+-- from the echoed EconomyState, never applies the purchase. The server (TreatmentApplier)
+-- destroys+rebuilds a site's children on every purchase, so this rebinds when the anchor is
+-- replaced, and listens to ChildAdded/Occupied per site so other players' claims update our
+-- prompts too (like PerchPreferenceController). Prices come from the echoed catalog. Key G
+-- (E=Favorite, F=door).
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
-local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
-local SizeClasses = require(shared:WaitForChild("SizeClasses"))
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local RequestPurchase = remotes:WaitForChild("RequestPurchase") :: RemoteEvent
 local EconomyState = remotes:WaitForChild("EconomyState") :: RemoteEvent
 
 local state = {
     maxDeckSize = nil :: string?,
-    teahouseSizes = {} :: { string },
-    claimedPadId = nil :: string?,
     catalog = nil :: any,
     totalPoints = 0,
 }
@@ -32,38 +29,16 @@ local function priceOf(item: string): any
     return "?"
 end
 
--- (item, actionText) or (nil, nil) for what a site offers the local player right now
-local function offerFor(siteId: string, occupied: boolean): (string?, string?)
+-- (item, actionText) or (nil, nil) for what a site offers the local player right now.
+-- Owners (maxDeckSize ~= nil) get no world prompt here — upgrades are panel-only (B3).
+local function offerFor(_siteId: string, occupied: boolean): (string?, string?)
     if state.maxDeckSize == nil then
         -- non-owner: buy the S deck & claim a VACANT site
         if not occupied then
             return "deck:S", `Buy S deck & claim — {priceOf("deck:S")} pts`
         end
-        return nil, nil
     end
-    -- owner: upgrades only on their OWN claimed site; alternate deck<->teahouse
-    if siteId ~= state.claimedPadId then
-        return nil, nil
-    end
-    local maxTea: string? = nil
-    for _, s in state.teahouseSizes do
-        if maxTea == nil or SizeClasses.rank[s] > SizeClasses.rank[maxTea] then
-            maxTea = s
-        end
-    end
-    local deckRank = if state.maxDeckSize ~= nil then SizeClasses.rank[state.maxDeckSize] else 0
-    local teaRank = if maxTea ~= nil then SizeClasses.rank[maxTea] else 0
-    if deckRank > teaRank then
-        local nt = SizeClasses.nextTier(maxTea)
-        if nt ~= nil then
-            return `teahouse:{nt}`, `Add {nt} teahouse — {priceOf(`teahouse:{nt}`)} pts`
-        end
-    end
-    local nd = SizeClasses.nextTier(state.maxDeckSize)
-    if nd ~= nil then
-        return `deck:{nd}`, `Upgrade deck → {nd} — {priceOf(`deck:{nd}`)} pts`
-    end
-    return nil, nil -- fully upgraded (L deck + L teahouse)
+    return nil, nil
 end
 
 -- the deck part is present for any built pad (bare deck OR teahouse); fall back to any BasePart
@@ -152,8 +127,6 @@ EconomyState.OnClientEvent:Connect(function(payload)
     end
     state.totalPoints = payload.totalPoints or 0
     state.maxDeckSize = payload.maxDeckSize
-    state.teahouseSizes = payload.teahouseSizes or {}
-    state.claimedPadId = payload.claimedPadId
     if payload.catalog ~= nil then
         state.catalog = payload.catalog
     end
