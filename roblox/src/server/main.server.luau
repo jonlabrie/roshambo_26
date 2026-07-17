@@ -873,7 +873,7 @@ SetPlacement.OnServerEvent:Connect(function(player, payload)
     -- clamped value (never raw client numbers)
     local clamped = BuildingPlacer.clamp(
         SizeClasses.buildingFootprint(size),
-        SizeClasses.deckFootprint(built.deckSize),
+        SizeClasses.placementBounds(built.deckSize),
         { offset = { dx, dz }, facing = facing }
     )
     -- merge into a NEW copy of the built size's loadout (pre-persist clone discipline)

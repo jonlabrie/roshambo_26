@@ -5,6 +5,12 @@
 -- panel's Move button via EventBus.MoveTeahouse { padId }. While a move is active, the faded
 -- original's back-door ProximityPrompts are disabled (a mid-drag F press is otherwise a race
 -- with the pending SetPlacement) and restored on exit/commit.
+-- Dragging (stepDrag) is a math intersection of the camera's aim ray against the deck's own
+-- plane (mountCF's position/UpVector) — NOT a geometry raycast — so the building's own bulk
+-- can never occlude the far side of the deck and stall the ghost. Aiming past the deck's edge
+-- resolves to an out-of-bounds plane point, which BuildingPlacer.clamp (inside applyGhost)
+-- pulls back to the nearest in-bounds spot; aiming past a corner is therefore the intended way
+-- to park the ghost flush into that corner.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -54,7 +60,7 @@ local function makeGhost(structure: Model): Model
             d:Destroy() -- no interactables on the ghost (back-door prompts clone along)
         end
     end
-    g.Parent = workspace -- NOT the site folder: the drag raycast includes only the folder
+    g.Parent = workspace -- NOT the site folder: kept independent of whatever that folder does
     return g
 end
 
@@ -86,23 +92,28 @@ local function applyGhost()
     g:PivotTo(m * CFrame.new(table.unpack(BuildingPlacer.placeCF(current))))
 end
 
-local function stepDrag(folder: Instance)
+local function stepDrag()
     local camera = workspace.CurrentCamera
     if camera == nil then
         return
     end
     local pos = UserInputService:GetMouseLocation()
     local ray = camera:ViewportPointToRay(pos.X, pos.Y)
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Include
-    params.FilterDescendantsInstances = { folder }
-    local hit = workspace:Raycast(ray.Origin, ray.Direction * 500, params)
-    if hit then
-        local rel = (mountCF :: CFrame):PointToObjectSpace(hit.Position)
-        current = { offset = { math.round(rel.X), math.round(rel.Z) }, facing = current.facing }
-        applyGhost()
+    local m = mountCF :: CFrame
+    local planePoint = m.Position
+    local normal = m.UpVector
+    local denom = ray.Direction:Dot(normal)
+    if math.abs(denom) < 1e-4 then
+        return -- camera looking parallel to the deck plane: hold last position
     end
-    -- no hit: ghost holds its last valid position
+    local t = (planePoint - ray.Origin):Dot(normal) / denom
+    if t <= 0 then
+        return -- plane is behind the camera: hold last position
+    end
+    local hitPos = ray.Origin + ray.Direction * t
+    local rel = m:PointToObjectSpace(hitPos)
+    current = { offset = { math.round(rel.X), math.round(rel.Z) }, facing = current.facing }
+    applyGhost()
 end
 
 -- ===== Step 5 (declared ahead of buildHud, which references them): commit / exit =====
@@ -221,7 +232,7 @@ local function enter(payload: any)
     active = true
     mountCF = m
     buildingFP = SizeClasses.buildingFootprint(teaSize)
-    deckFP = SizeClasses.deckFootprint(deckSize)
+    deckFP = SizeClasses.placementBounds(deckSize) -- inset off the railings, not the raw deck edge
     original = structure :: Model
     local dx, dz, facing = facingFromPivot(structure :: Model)
     current = { offset = { math.round(dx), math.round(dz) }, facing = facing }
@@ -235,12 +246,7 @@ local function enter(payload: any)
     end
     applyGhost()
     buildHud() -- Step 4's HUD; store in `hud`
-    table.insert(
-        conns,
-        RunService.RenderStepped:Connect(function()
-            stepDrag(folder :: Instance)
-        end)
-    )
+    table.insert(conns, RunService.RenderStepped:Connect(stepDrag))
     table.insert(
         conns,
         UserInputService.InputBegan:Connect(function(input, gameProcessed)

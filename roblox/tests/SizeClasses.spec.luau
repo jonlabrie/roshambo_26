@@ -1,6 +1,7 @@
 --!strict
 local harness = require("./harness")
 local SizeClasses = require("../src/shared/SizeClasses")
+local BuildingPlacer = require("../src/shared/BuildingPlacer")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 
 describe("SizeClasses.footprintFor", function()
@@ -159,6 +160,41 @@ describe("SizeClasses.prefabName", function()
         expect(SizeClasses.prefabName("teahouse-1story", "S")).toBe("teahouse-1story-s")
         expect(SizeClasses.prefabName("teahouse-1story", "M")).toBe("teahouse-1story-m")
         expect(SizeClasses.prefabName("teahouse-1story", "L")).toBe("teahouse-1story-l")
+    end)
+end)
+
+describe("SizeClasses.placementBounds", function()
+    test("insets deckFootprint by RAIL_CLEARANCE on all four sides", function()
+        local d = SizeClasses.deckFootprint("S")
+        local b = SizeClasses.placementBounds("S")
+        local c = SizeClasses.RAIL_CLEARANCE
+        expect(b.minX).toBeCloseTo(d.minX + c)
+        expect(b.maxX).toBeCloseTo(d.maxX - c)
+        expect(b.minZ).toBeCloseTo(d.minZ + c)
+        expect(b.maxZ).toBeCloseTo(d.maxZ - c)
+    end)
+
+    test("M and L also inset by RAIL_CLEARANCE (bounds scale with deckFootprint, not with size)", function()
+        for _, size in { "M", "L" } do
+            local d = SizeClasses.deckFootprint(size)
+            local b = SizeClasses.placementBounds(size)
+            local c = SizeClasses.RAIL_CLEARANCE
+            expect(b.minX).toBeCloseTo(d.minX + c)
+            expect(b.maxX).toBeCloseTo(d.maxX - c)
+            expect(b.minZ).toBeCloseTo(d.minZ + c)
+            expect(b.maxZ).toBeCloseTo(d.maxZ - c)
+        end
+    end)
+
+    test("every authored building still fits centered in its same-size placement bounds", function()
+        for _, s in { "S", "M", "L" } do
+            local fits = BuildingPlacer.fits(
+                SizeClasses.buildingFootprint(s),
+                SizeClasses.placementBounds(s),
+                { offset = { 0, 0 }, facing = "N" }
+            )
+            expect(fits).toBe(true)
+        end
     end)
 end)
 

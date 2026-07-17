@@ -45,6 +45,23 @@ function SizeClasses.deckFootprint(deckSize: string): Footprint
     return { minX = b.minX * s, maxX = b.maxX * s, minZ = b.minZ * s, maxZ = b.maxZ * s }
 end
 
+-- The region a teahouse may be PLACED in (B4 move mode): the deck footprint inset on every
+-- side by the railing clearance, so a flush placement can't intersect the perimeter railings.
+-- Uniform inset (the open back edge has no railing, but keeping the building off the drop
+-- edge there is desirable anyway). Used by every placement clamp/fit site — drag, commit,
+-- and render — so a display-shrink re-clamp can't recreate the overlap.
+-- Derived from PadOps.luau's railing geometry: members seat with their OUTER face flush to
+-- the deck edge (the flush-outer-edges rule), so their inner face sits a full member-width
+-- inboard. The widest members are the cap rail and corner newel (CAP_W = NEWEL_W = 0.45
+-- studs), so 0.45 is the deepest any visible railing part reaches in from the edge. Add 0.5
+-- studs of visual clearance: 0.45 + 0.5 = 0.95, rounded to 1.0.
+SizeClasses.RAIL_CLEARANCE = 1.0
+function SizeClasses.placementBounds(deckSize: string): Footprint
+    local d = SizeClasses.deckFootprint(deckSize)
+    local c = SizeClasses.RAIL_CLEARANCE
+    return { minX = d.minX + c, maxX = d.maxX - c, minZ = d.minZ + c, maxZ = d.maxZ - c }
+end
+
 -- the lower-ranked of two sizes (S < M < L)
 function SizeClasses.minSize(a: string, b: string): string
     return if SizeClasses.rank[a] <= SizeClasses.rank[b] then a else b

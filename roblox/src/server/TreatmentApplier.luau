@@ -16,7 +16,7 @@ export type Deps = {
     structureOps: any,
     padOpsNew: (CFrame, Instance) -> any,
     buildingPlacer: any, -- pure placeCF/fits (BuildingPlacer)
-    sizeClasses: any, -- pure deckFootprint/buildingFootprint/prefabName (SizeClasses)
+    sizeClasses: any, -- pure deckFootprint/placementBounds/buildingFootprint/prefabName (SizeClasses)
     deckPlacement: any, -- pure per-size deck-pivot lookup (DeckPlacement)
 }
 
@@ -79,7 +79,10 @@ function TreatmentApplier:_buildBuilding(
     deckSize: string,
     staging: Instance
 )
-    local deckFP = self._sizeClasses.deckFootprint(deckSize)
+    -- placementBounds, not deckFootprint: the deck footprint's perimeter is occupied by the
+    -- railings (PadOps), so the building must clamp/fit inside the inset that keeps it clear
+    -- of them (B4 gate finding).
+    local deckFP = self._sizeClasses.placementBounds(deckSize)
     local buildingFP = self._sizeClasses.buildingFootprint(teahouse.size)
     -- B4: clamp the SAVED placement into this deck at render time (stored values never change;
     -- a display-shrunk deck slides the building minimally back into bounds). fits() stays only
