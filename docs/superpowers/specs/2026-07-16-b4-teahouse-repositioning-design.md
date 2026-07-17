@@ -11,7 +11,8 @@ it parks in and which wall faces the view.
 
 **Interaction (user decision):** an in-world **ghost drag** — a translucent copy of the building
 follows the player's aim across the deck, snaps to a 1-stud grid, **R rotates in 90° steps**
-(N→E→S→W), click commits, Esc cancels. Entry is a **"Move teahouse" button in the B3 panel**;
+(N→E→S→W), click commits, X cancels (Esc is reserved by the Roblox core menu). Entry is a
+**"Move teahouse" button in the B3 panel**;
 commit is a single click.
 
 ## Decisions (brainstorm)
@@ -103,7 +104,8 @@ machinery out of the already-large panel controller.
   ghost is therefore always in a committable spot — no invalid/red state exists. Aim off the
   deck → ghost holds the last valid position.
 - **Mode HUD:** a minimal pinned strip — Rotate ⟳ / Confirm ✓ / Cancel ✕ — with R / click /
-  Esc as desktop shortcuts. The buttons make the mode touch-usable on mobile with no extra
+  X as desktop shortcuts (Esc is reserved by the Roblox core menu; the ✕ button is the primary
+  cancel). The buttons make the mode touch-usable on mobile with no extra
   input handling.
 - **Commit:** fire `SetPlacement:FireServer({offset={dx,dz}, facing=f})` once, exit the mode
   immediately (restore transparency, destroy the ghost). The server rebuild arriving is the
