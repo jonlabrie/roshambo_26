@@ -123,6 +123,9 @@ describe('validatePlacement', () => {
         expect(validatePlacement({ offset: [33, 0], facing: 'N' }).ok).toBe(false);
         expect(validatePlacement({ offset: [0, -33], facing: 'N' }).ok).toBe(false);
     });
+    it('accepts offsets at exactly the ±MAX_PLACEMENT_OFFSET boundary', () => {
+        expect(validatePlacement({ offset: [32, -32], facing: 'N' })).toEqual({ ok: true });
+    });
     it('rejects bad facings and unknown keys', () => {
         expect(validatePlacement({ offset: [0, 0], facing: 'NE' }).ok).toBe(false);
         expect(validatePlacement({ offset: [0, 0], facing: 'N', extra: 1 }).ok).toBe(false);
