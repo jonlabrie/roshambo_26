@@ -32,6 +32,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local player = Players.LocalPlayer
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local MenuModel = require(shared:WaitForChild("TeahouseMenuModel"))
+local EventBus = require(script.Parent:WaitForChild("EventBus"))
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local RequestPurchase = remotes:WaitForChild("RequestPurchase") :: RemoteEvent
 local SetDisplay = remotes:WaitForChild("SetDisplay") :: RemoteEvent
@@ -54,6 +55,9 @@ local econ = {
 }
 local backDoorIndex: number? = nil
 local favoriteNames: { [string]: string } = {} -- item C: siteId -> real name, from PreferenceState
+-- B4 Task 5: mirrors vm.canMove from the latest render(), read by the Move-teahouse click handler
+-- (which fires after render() has moved on, so it can't read `vm` directly).
+local currentCanMove = false
 
 -- item G: the pair actually sent on the next SetDisplay fire. Reconciled from every
 -- EconomyState echo (server is authoritative); a click updates only its own dimension here, so a
@@ -337,6 +341,29 @@ local teaDisplayRow, teaDisplayWidgets =
 deckDisplayRow.Visible = false
 teaDisplayRow.Visible = false
 
+-- B4 Task 5: enters Move-teahouse mode for the claimed perch's standing building. Gated on
+-- vm.canMove (claimed + owns a teahouse + not display-hidden); hidden alongside the display rows
+-- above (same vm.ownsTeahouse group -- moving makes no sense before there's anything built, and
+-- this stays hidden pre-ready the same way they do, via this construction-time default).
+local moveButton = Instance.new("TextButton")
+moveButton.Name = "MoveButton"
+moveButton.LayoutOrder = 72
+moveButton.Size = UDim2.new(1, 0, 0, 32)
+moveButton.BackgroundColor3 = BG
+moveButton.BackgroundTransparency = 0.1
+moveButton.TextColor3 = DIM
+moveButton.Font = Enum.Font.Gotham
+moveButton.TextSize = 13
+moveButton.Text = "Move teahouse"
+moveButton.Active = false -- render() enables once vm.canMove is known
+moveButton.Visible = false
+moveButton.Parent = panel
+do
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = moveButton
+end
+
 -- item B: one hint line when either display is quietly capping below the biggest owned size.
 local shownSmallerHint = Instance.new("TextLabel")
 shownSmallerHint.Name = "ShownSmallerHint"
@@ -544,6 +571,12 @@ local function render()
     end
     shownSmallerHint.Visible = vm.deckShownSmaller or vm.teahouseShownSmaller
 
+    -- B4 Task 5: same enabled/disabled coloring as renderDisplayOptions' enabled/disabled branches.
+    currentCanMove = vm.canMove
+    moveButton.Visible = vm.ownsTeahouse
+    moveButton.Active = vm.canMove
+    moveButton.TextColor3 = if vm.canMove then TEXT else DIM
+
     renderFavorites(vm.favorites, favoriteNames)
 
     backDoorLabel.Text = if backDoorIndex ~= nil
@@ -596,4 +629,13 @@ end
 
 toggleButton.MouseButton1Click:Connect(function()
     setOpen(not open)
+end)
+
+-- B4 Task 5: Task 6 (not yet built) consumes EventBus.MoveTeahouse.Event to start move mode.
+moveButton.MouseButton1Click:Connect(function()
+    if not currentCanMove or econ.claimedPadId == nil then
+        return
+    end
+    setOpen(false) -- reuse the panel's existing open/close mechanism
+    EventBus.MoveTeahouse:Fire({ padId = econ.claimedPadId })
 end)
