@@ -877,6 +877,9 @@ SetPlacement.OnServerEvent:Connect(function(player, payload)
         { offset = { dx, dz }, facing = facing }
     )
     -- merge into a NEW copy of the built size's loadout (pre-persist clone discipline)
+    if e.teahouses[size] == nil then
+        return -- built size has no owned loadout (non-contiguous ownership; defensive)
+    end
     local newLoadout = table.clone(e.teahouses[size])
     newLoadout.placement = clamped
     local persisted = net:setTeahouse(uid, size, newLoadout)
