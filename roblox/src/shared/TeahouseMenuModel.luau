@@ -112,6 +112,10 @@ function TeahouseMenuModel.viewModel(state: any): any
         end
     end
 
+    -- B4: the Move-teahouse mode needs a standing building on a claimed perch. Perch caps only
+    -- shrink the built SIZE, never remove the building, so presence = owns one + not hidden.
+    local canMove = state.claimed == true and teaMax ~= nil and state.teahouseDisplay ~= "none"
+
     return {
         points = points,
         ownsDeck = ownsDeck,
@@ -123,6 +127,7 @@ function TeahouseMenuModel.viewModel(state: any): any
         teahouseDisplayOptions = teaOpts,
         deckShownSmaller = deckShownSmaller,
         teahouseShownSmaller = teahouseShownSmaller,
+        canMove = canMove,
         favorites = favorites,
     }
 end
