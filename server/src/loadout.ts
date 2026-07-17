@@ -2,7 +2,7 @@ export const MAX_LOADOUT_BYTES = 4096;
 export const MAX_SIZECLASS_LEN = 16;
 export const MAX_CLASSES = 8;
 
-const LOADOUT_KEYS = new Set(['baseStyle', 'colorScheme', 'shoji', 'tatami', 'flags', 'wallArt', 'wallBays']);
+const LOADOUT_KEYS = new Set(['baseStyle', 'colorScheme', 'shoji', 'tatami', 'flags', 'wallArt', 'wallBays', 'placement']);
 
 export const KNOWN_SIDES = new Set(['front', 'back', 'left', 'right']);
 export const WALLBAY_STATES = new Set(['solid', 'shoji', 'door']);
@@ -28,6 +28,31 @@ export function validateWallBays(value: unknown): Check {
     return { ok: true };
 }
 
+export const PLACEMENT_FACINGS = new Set(['N', 'E', 'S', 'W']);
+export const MAX_PLACEMENT_OFFSET = 32;
+
+export function validatePlacement(value: unknown): Check {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return { ok: false, error: 'BAD_PLACEMENT' };
+    }
+    const obj = value as Record<string, unknown>;
+    for (const k of Object.keys(obj)) {
+        if (k !== 'offset' && k !== 'facing') return { ok: false, error: 'BAD_PLACEMENT' };
+    }
+    if (!Array.isArray(obj.offset) || obj.offset.length !== 2) {
+        return { ok: false, error: 'BAD_PLACEMENT' };
+    }
+    for (const n of obj.offset) {
+        if (typeof n !== 'number' || !Number.isFinite(n) || Math.abs(n) > MAX_PLACEMENT_OFFSET) {
+            return { ok: false, error: 'BAD_PLACEMENT' };
+        }
+    }
+    if (typeof obj.facing !== 'string' || !PLACEMENT_FACINGS.has(obj.facing)) {
+        return { ok: false, error: 'BAD_PLACEMENT' };
+    }
+    return { ok: true };
+}
+
 export function validateLoadout(loadout: unknown): Check {
     if (typeof loadout !== 'object' || loadout === null || Array.isArray(loadout)) {
         return { ok: false, error: 'LOADOUT_NOT_OBJECT' };
@@ -42,6 +67,10 @@ export function validateLoadout(loadout: unknown): Check {
     if (obj.wallBays !== undefined) {
         const wb = validateWallBays(obj.wallBays);
         if (!wb.ok) return wb;
+    }
+    if (obj.placement !== undefined) {
+        const p = validatePlacement(obj.placement);
+        if (!p.ok) return p;
     }
     if (Buffer.byteLength(JSON.stringify(obj), 'utf8') > MAX_LOADOUT_BYTES) {
         return { ok: false, error: 'LOADOUT_TOO_LARGE' };

@@ -4,6 +4,7 @@ import {
     validateSizeClass,
     validatePadPreferences,
     validateWallBays,
+    validatePlacement,
     MAX_CLASSES,
     MAX_BAYS_PER_SIDE,
 } from './loadout';
@@ -100,5 +101,35 @@ describe('validateLoadout wallBays', () => {
     });
     it('rejects a loadout with an invalid wallBays', () => {
         expect(validateLoadout({ baseStyle: 't', wallBays: { back: ['trapdoor'] } }).ok).toBe(false);
+    });
+});
+
+describe('validatePlacement', () => {
+    it('accepts a valid placement', () => {
+        expect(validatePlacement({ offset: [3, -4.5], facing: 'E' })).toEqual({ ok: true });
+    });
+    it('rejects non-objects and arrays', () => {
+        expect(validatePlacement(null).ok).toBe(false);
+        expect(validatePlacement([1, 2]).ok).toBe(false);
+        expect(validatePlacement('N').ok).toBe(false);
+    });
+    it('rejects wrong offset arity', () => {
+        expect(validatePlacement({ offset: [1], facing: 'N' })).toEqual({ ok: false, error: 'BAD_PLACEMENT' });
+        expect(validatePlacement({ offset: [1, 2, 3], facing: 'N' })).toEqual({ ok: false, error: 'BAD_PLACEMENT' });
+    });
+    it('rejects non-finite and out-of-range offsets', () => {
+        expect(validatePlacement({ offset: [NaN, 0], facing: 'N' }).ok).toBe(false);
+        expect(validatePlacement({ offset: [Infinity, 0], facing: 'N' }).ok).toBe(false);
+        expect(validatePlacement({ offset: [33, 0], facing: 'N' }).ok).toBe(false);
+        expect(validatePlacement({ offset: [0, -33], facing: 'N' }).ok).toBe(false);
+    });
+    it('rejects bad facings and unknown keys', () => {
+        expect(validatePlacement({ offset: [0, 0], facing: 'NE' }).ok).toBe(false);
+        expect(validatePlacement({ offset: [0, 0], facing: 'N', extra: 1 }).ok).toBe(false);
+    });
+    it('validateLoadout accepts placement and still rejects unknown keys', () => {
+        expect(validateLoadout({ baseStyle: 'teahouse-1story', placement: { offset: [2, 2], facing: 'S' } })).toEqual({ ok: true });
+        expect(validateLoadout({ baseStyle: 'teahouse-1story', placement: { offset: [2], facing: 'S' } }).ok).toBe(false);
+        expect(validateLoadout({ baseStyle: 'teahouse-1story', teleporter: true }).ok).toBe(false);
     });
 });
