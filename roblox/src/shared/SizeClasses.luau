@@ -64,6 +64,11 @@ end
 
 -- what materializes at a perch: deck capped by the perch, teahouse = biggest owned capped by
 -- the deck (nil = bare deck). Returns nil when the player owns no deck (not an owner).
+-- Two optional display args (B3) let the owner voluntarily shrink what's built further: a
+-- clamp only ever shrinks, never grows past what's owned/perch-capped. deckDisplay caps the
+-- deck size (e.g. floor it to "S"); teahouseDisplay of "none" forces a bare deck (no teahouse
+-- built at all), otherwise it caps the teahouse size same as deckDisplay does the deck. Passing
+-- nil for both (pre-B3 callers) reproduces the original behavior: biggest owned, perch-capped.
 function SizeClasses.resolveBuilt(
     maxDeckSize: string?,
     teahouseSizes: { string },

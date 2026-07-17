@@ -660,6 +660,19 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
             if action ~= nil and action.padId == claimPadId then
                 applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
                 e.claimedPadId = action.padId
+                -- mirror the initial-join sync (below, ~line 502): a player who already owned a
+                -- teahouse loadout before ever claiming a pad (e.g. bought teahouse:* before
+                -- this deck:* claim) gets a live structure right now, so playerHouse must track
+                -- it too, or the back door would stay inert for the rest of this session.
+                if action.teahouse ~= nil and action.teahouse.loadout ~= nil then
+                    playerHouse[uid] = {
+                        padId = action.padId,
+                        size = action.teahouse.size,
+                        loadout = action.teahouse.loadout,
+                    }
+                else
+                    playerHouse[uid] = nil
+                end
             else
                 warn(
                     `[B2] {uid} bought {item} but pad {claimPadId} could not be claimed this session`
@@ -698,6 +711,18 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
                     else nil
                 local treatment = { kind = "structure", loadout = teaLoadout, lit = true }
                 applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
+                -- keep playerHouse in sync with the just-rebuilt structure (B3 final review):
+                -- a stale entry would validate SetBackDoor against the NEW structure's bay count
+                -- but persist the edit into the PREVIOUS size's loadout via net:setTeahouse.
+                if built.teahouseSize ~= nil then
+                    playerHouse[uid] = {
+                        padId = e.claimedPadId,
+                        size = built.teahouseSize,
+                        loadout = teaLoadout,
+                    }
+                else
+                    playerHouse[uid] = nil -- bare deck: no live loadout to edit
+                end
             end
         end
     end
@@ -744,6 +769,18 @@ SetDisplay.OnServerEvent:Connect(function(player, payload)
                 else nil
             local treatment = { kind = "structure", loadout = teaLoadout, lit = true }
             applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
+            -- keep playerHouse in sync with the just-rebuilt structure (B3 final review): a
+            -- stale entry would validate SetBackDoor against the NEW structure's bay count but
+            -- persist the edit into the PREVIOUS size's loadout (or a hidden bare-deck pad's).
+            if built.teahouseSize ~= nil then
+                playerHouse[uid] = {
+                    padId = e.claimedPadId,
+                    size = built.teahouseSize,
+                    loadout = teaLoadout,
+                }
+            else
+                playerHouse[uid] = nil -- teahouseDisplay == "none": bare deck, no live loadout
+            end
         end
     end
     echoEconomy(player, uid)

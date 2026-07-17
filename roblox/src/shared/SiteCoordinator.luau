@@ -8,8 +8,10 @@
 -- order (a player's preferred site ids, passed to onJoin, are scanned first, then
 -- registration order); the built deckSize + optional teahouse are resolved via
 -- SizeClasses.resolveBuilt, which CAPS the deck/teahouse down to the perch's maxSize
--- rather than gating the claim on a size mismatch. The Studio-side TreatmentApplier
--- executes the Actions (scale + posts).
+-- rather than gating the claim on a size mismatch. The passed economy may also carry
+-- `deckDisplay`/`teahouseDisplay` (B3), which resolveBuilt applies as a further, owner-chosen
+-- clamp that only ever shrinks what's built (never past what's owned or perch-capped). The
+-- Studio-side TreatmentApplier executes the Actions (scale + posts).
 local VacantState = require("./VacantState")
 local SizeClasses = require("./SizeClasses")
 
