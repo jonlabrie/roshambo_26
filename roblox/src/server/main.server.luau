@@ -891,12 +891,30 @@ SetPlacement.OnServerEvent:Connect(function(player, payload)
     if not player:IsDescendantOf(Players) then
         return -- left during the HTTP yield; nothing to rebuild
     end
-    -- both stashes (B3 gate lesson), then rebuild at the new placement
-    e.teahouses[size] = newLoadout
-    local teahouse = { size = size, loadout = newLoadout, placement = clamped }
-    local treatment = { kind = "structure", loadout = newLoadout, lit = true }
-    applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
-    playerHouse[uid] = { padId = e.claimedPadId, size = size, loadout = newLoadout }
+    if e.teahouses[size] == nil then
+        return -- stash vanished during the yield (defensive, mirrors the pre-yield guard)
+    end
+    -- post-yield: merge ONLY the placement onto the CURRENT stash (a SetBackDoor landing during
+    -- the yield must not be clobbered by our pre-yield snapshot — B4 final review)
+    local fresh = table.clone(e.teahouses[size])
+    fresh.placement = clamped
+    e.teahouses[size] = fresh
+    -- post-yield: a SetDisplay may have landed during the HTTP yield; recompute what is built
+    -- NOW and rebuild only if the size we just placed is still the one standing (its rebuild
+    -- already rendered the pre-move placement; ours must not stamp stale sizes over it)
+    local teaSizesNow = {}
+    for s in e.teahouses do
+        table.insert(teaSizesNow, s)
+    end
+    local builtNow =
+        SizeClasses.resolveBuilt(e.maxDeckSize, teaSizesNow, spec.maxSize, e.deckDisplay, e.teahouseDisplay)
+    if builtNow == nil or builtNow.teahouseSize ~= size then
+        return -- persisted + stash-merged; the standing build belongs to a newer state
+    end
+    local teahouse = { size = size, loadout = fresh, placement = clamped }
+    local treatment = { kind = "structure", loadout = fresh, lit = true }
+    applier:apply(e.claimedPadId, spec, treatment, builtNow.deckSize, teahouse)
+    playerHouse[uid] = { padId = e.claimedPadId, size = size, loadout = fresh }
     echoBackDoor(player, uid) -- geometry watch re-arms the F prompts on the new structure
 end)
 

@@ -2,7 +2,9 @@
 -- B4 move mode: a client-side translucent ghost of your teahouse follows the aim across the
 -- deck (1-stud snap, R rotates 90°), click/✓ commits one SetPlacement, X/✕ cancels. The ghost
 -- is local-only; the server re-validates with the same shared math and rebuilds. Entry is the
--- panel's Move button via EventBus.MoveTeahouse { padId }.
+-- panel's Move button via EventBus.MoveTeahouse { padId }. While a move is active, the faded
+-- original's back-door ProximityPrompts are disabled (a mid-drag F press is otherwise a race
+-- with the pending SetPlacement) and restored on exit/commit.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
@@ -32,6 +34,7 @@ local deckFP: any = nil
 local current = { offset = { 0, 0 }, facing = "N" }
 local conns: { RBXScriptConnection } = {}
 local hud: ScreenGui? = nil
+local disabledPrompts: { ProximityPrompt } = {}
 
 -- ===== Step 2: ghost + fade helpers =====
 
@@ -119,6 +122,12 @@ local function exit()
     end
     if original then
         fadeOriginal(original, 0)
+        for _, prompt in disabledPrompts do
+            if prompt.Parent ~= nil then
+                prompt.Enabled = true
+            end
+        end
+        disabledPrompts = {}
         original = nil
     end
     if hud then
@@ -218,6 +227,12 @@ local function enter(payload: any)
     current = { offset = { math.round(dx), math.round(dz) }, facing = facing }
     ghost = makeGhost(structure :: Model)
     fadeOriginal(structure :: Model, 0.7)
+    for _, d in (structure :: Model):GetDescendants() do
+        if d:IsA("ProximityPrompt") and d.Enabled then
+            d.Enabled = false
+            table.insert(disabledPrompts, d)
+        end
+    end
     applyGhost()
     buildHud() -- Step 4's HUD; store in `hud`
     table.insert(
