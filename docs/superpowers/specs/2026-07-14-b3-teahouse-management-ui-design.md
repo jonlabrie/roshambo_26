@@ -68,9 +68,12 @@ canvas for future decoration items.
 - **Deck display:** `S·M·L`, enabled up to owned `maxDeckSize`. **No "none"** — a deck is needed to
   stand on / anchor the claim. A displayed-S deck uses that size's *authored* deck placement, so it
   still touches its access point.
-- **Teahouse display:** `None·S·M·L`, enabled up to the owned teahouse **and** never larger than the
-  *displayed* deck (`teahouse ≤ deck` holds for displayed sizes, so a small deck also shrinks the
-  teahouse options).
+- **Teahouse display:** `None·S·M·L`, enabled up to the owned teahouse. *(Amended 2026-07-16, as
+  shipped: the two preferences are independent — the menu does not shrink teahouse options under a
+  small displayed deck. `teahouse ≤ displayed deck` is enforced on the **built result** by
+  `resolveBuilt`'s final clamp at every build site, so the world is always correct; a teahouse
+  preference larger than the displayed deck is preserved, and raising the deck display back restores
+  it.)*
 
 **Data + logic:**
 - Two persisted fields: `User.deckDisplay: 'S'|'M'|'L'|null` and
@@ -102,9 +105,10 @@ Reuses the B1/B2 spine; new pieces are small and mostly client-side.
 **Server (TS, `/api/v1`):**
 - `User.deckDisplay` + `User.teahouseDisplay` fields (schema, enum-validated, default `null`).
 - `GET /economy` superset adds both display fields.
-- `POST /economy/display` — validates the values against owned sizes (display ≤ owned; teahouse ≤
-  displayed deck; `'none'` allowed only for teahouse), persists, returns the updated economy.
-  Mirrors `POST /purchase`.
+- `POST /economy/display` — validates each value against owned sizes (display ≤ owned; `'none'`
+  allowed only for teahouse), persists, returns the updated economy. Mirrors `POST /purchase`.
+  *(Amended 2026-07-16: no cross-field `teahouse ≤ displayed deck` check at validation — the
+  invariant is enforced on the built result by `resolveBuilt`; see Display size above.)*
 
 **Roblox server (`main.server.luau`):** a `SetDisplay` RemoteEvent handler (occupant-gated, presence-
 guarded after the HTTP yield like `SetBackDoor`/the B2 purchase handler) → `net:postDisplay` → update
@@ -123,8 +127,7 @@ display fields. `NetworkClient` gains `postDisplay`.
 ## Testing & verification
 
 - **Server (Vitest):** `User` display fields default/validate; `POST /economy/display` persists +
-  rejects invalid (display > owned, teahouse > displayed deck, `'none'` on deck); `GET /economy`
-  returns the fields.
+  rejects invalid (display > owned, `'none'` on deck); `GET /economy` returns the fields.
 - **Luau (Lune):** `resolveBuilt` display caps (each dimension, `'none'`, clamp-to-owned,
   `teahouse ≤ displayed deck`, `null` = unchanged); `TeahouseMenuModel.viewModel` (owned marks, next
   price, affordability gating, teahouse-locked-by-deck, enabled display options, favorites list).
@@ -154,6 +157,7 @@ display fields. `NetworkClient` gains `postDisplay`.
   favorite-add.
 - **Favorite:** add-in-world (walk-up toggle), review/remove-in-HUD.
 - **Display size:** applies to **both** deck and teahouse, independently, as visual caps; deck floor
-  is `S`, teahouse floor is `None`; still `teahouse ≤ displayed deck`.
+  is `S`, teahouse floor is `None`; `teahouse ≤ displayed deck` holds on the built result (2026-07-16:
+  build-time clamp, not validation-time — see the Display size section).
 - **First deck:** buying `deck:S` stays a world buy-to-claim (it targets a specific pad); all later
   upgrades are buyable in the HUD panel.
