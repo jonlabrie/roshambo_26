@@ -9,6 +9,7 @@ local function state(over)
         totalPoints = 1000,
         maxDeckSize = nil,
         teahouseSizes = {},
+        claimed = true,
         deckDisplay = nil,
         teahouseDisplay = nil,
         padPreferences = {},
@@ -80,5 +81,104 @@ describe("TeahouseMenuModel.viewModel", function()
     test("favorites pass through", function()
         local vm = Model.viewModel(state({ padPreferences = { "T05", "T09" } }))
         expect(#vm.favorites).toBe(2)
+    end)
+end)
+
+describe("TeahouseMenuModel.viewModel: claimless-owner gating (item A)", function()
+    local function rung(ladder, size)
+        for _, r in ladder do
+            if r.size == size then
+                return r
+            end
+        end
+        return nil
+    end
+    local function opt(list, v)
+        for _, o in list do
+            if o.value == v then
+                return o
+            end
+        end
+        return nil
+    end
+
+    test("owner+unclaimed: no isNext anywhere, all display options disabled, needsClaim true", function()
+        local vm = Model.viewModel(state({
+            maxDeckSize = "M",
+            teahouseSizes = { "S" },
+            claimed = false,
+        }))
+        expect(vm.needsClaim).toBe(true)
+        for _, r in vm.deckLadder do
+            expect(r.isNext).toBe(false)
+        end
+        for _, r in vm.teahouseLadder do
+            expect(r.isNext).toBe(false)
+        end
+        for _, o in vm.deckDisplayOptions do
+            expect(o.enabled).toBe(false)
+        end
+        for _, o in vm.teahouseDisplayOptions do
+            expect(o.enabled).toBe(false)
+        end
+    end)
+
+    test("owner+claimed: unchanged from today", function()
+        local vm = Model.viewModel(state({ maxDeckSize = "M", claimed = true }))
+        expect(vm.needsClaim).toBe(false)
+        expect(rung(vm.deckLadder, "L").isNext).toBe(true)
+        expect(opt(vm.deckDisplayOptions, "S").enabled).toBe(true)
+    end)
+
+    test("non-owner: needsClaim false (their existing preview covers them)", function()
+        local vm = Model.viewModel(state({ claimed = false }))
+        expect(vm.needsClaim).toBe(false)
+    end)
+end)
+
+describe("TeahouseMenuModel.viewModel: shown-smaller hints (item B)", function()
+    test("deck display cap below owned -> true", function()
+        local vm = Model.viewModel(state({ maxDeckSize = "L", deckDisplay = "S" }))
+        expect(vm.deckShownSmaller).toBe(true)
+    end)
+    test("deck display cap equal to owned -> false", function()
+        local vm = Model.viewModel(state({ maxDeckSize = "L", deckDisplay = "L" }))
+        expect(vm.deckShownSmaller).toBe(false)
+    end)
+    test("deck display nil -> false", function()
+        local vm = Model.viewModel(state({ maxDeckSize = "L", deckDisplay = nil }))
+        expect(vm.deckShownSmaller).toBe(false)
+    end)
+    test("teahouse display 'none' with an owned teahouse -> true", function()
+        local vm = Model.viewModel(state({
+            maxDeckSize = "L",
+            teahouseSizes = { "S" },
+            teahouseDisplay = "none",
+        }))
+        expect(vm.teahouseShownSmaller).toBe(true)
+    end)
+    test("teahouse display cap below owned -> true", function()
+        local vm = Model.viewModel(state({
+            maxDeckSize = "L",
+            teahouseSizes = { "L" },
+            teahouseDisplay = "S",
+        }))
+        expect(vm.teahouseShownSmaller).toBe(true)
+    end)
+    test("teahouse display cap equal to owned -> false", function()
+        local vm = Model.viewModel(state({
+            maxDeckSize = "L",
+            teahouseSizes = { "L" },
+            teahouseDisplay = "L",
+        }))
+        expect(vm.teahouseShownSmaller).toBe(false)
+    end)
+    test("teahouse display nil -> false", function()
+        local vm = Model.viewModel(state({
+            maxDeckSize = "L",
+            teahouseSizes = { "L" },
+            teahouseDisplay = nil,
+        }))
+        expect(vm.teahouseShownSmaller).toBe(false)
     end)
 end)

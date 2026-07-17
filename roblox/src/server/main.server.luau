@@ -385,6 +385,18 @@ local TreatmentApplier = require(script.Parent:WaitForChild("TreatmentApplier"))
 local playerPrefs: { [string]: { string } } = {}
 local PREF_CAP = 32
 
+-- item C: PadSites.displayName is server-only, but the panel wants real names for favorites
+-- instead of "Perch <siteId>". Build a siteId -> displayName map alongside every padPreferences
+-- list this server sends, so the client never has to guess a name for an id it can't look up.
+local function namesFor(siteIds: { string }): { [string]: string }
+    local names = {}
+    for _, id in siteIds do
+        local spec = PadSites[id]
+        names[id] = (spec and spec.displayName) or id
+    end
+    return names
+end
+
 -- The teahouse each player currently occupies, for occupant-gated live edits (B1 back door):
 -- padId + the occupied SIZE + that size's loadout (the merge target for wallBays edits).
 local playerHouse: { [string]: { padId: string, size: string, loadout: any } } = {}
@@ -528,7 +540,10 @@ Players.PlayerAdded:Connect(function(player)
             end
         end
         if player:IsDescendantOf(Players) then
-            PreferenceState:FireClient(player, { padPreferences = playerPrefs[uid] })
+            PreferenceState:FireClient(
+                player,
+                { padPreferences = playerPrefs[uid], names = namesFor(playerPrefs[uid]) }
+            )
         end
         echoEconomy(player, uid)
     end)
@@ -558,13 +573,15 @@ SetPadPreference.OnServerEvent:Connect(function(player, siteId)
         warn(`[D.5] setPreferences failed for {uid}: {tostring(persisted.error)}`)
         playerPrefs[uid] = current
         if player:IsDescendantOf(Players) then
-            PreferenceState:FireClient(player, { padPreferences = current }) -- revert client, no toast
+            -- revert client, no toast
+            PreferenceState:FireClient(player, { padPreferences = current, names = namesFor(current) })
         end
         return
     end
     if player:IsDescendantOf(Players) then
         PreferenceState:FireClient(player, {
             padPreferences = newList,
+            names = namesFor(newList),
             changed = siteId,
             favorited = favorited,
             name = PadSites[siteId].displayName or siteId,
@@ -680,10 +697,14 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
             if action ~= nil and action.padId == claimPadId then
                 applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
                 e.claimedPadId = action.padId
-                -- mirror the initial-join sync (below, ~line 502): a player who already owned a
-                -- teahouse loadout before ever claiming a pad (e.g. bought teahouse:* before
-                -- this deck:* claim) gets a live structure right now, so playerHouse must track
-                -- it too, or the back door would stay inert for the rest of this session.
+                -- mirror the initial-join sync (below, ~line 502): the reachable case here is a
+                -- RETURNING owner whose auto-claim failed at join (pad scarcity -- every pad was
+                -- occupied), who already owns a teahouse loadout from a prior session and is now
+                -- buying a deck upgrade once a pad frees up. This claim builds their owned
+                -- teahouse for the first time this session, so playerHouse must track it too, or
+                -- the back door would stay inert for the rest of the session. (A brand-new player
+                -- can't reach this: validatePurchase enforces teahouse size <= owned deck size,
+                -- so a teahouse can never be bought before any deck.)
                 if action.teahouse ~= nil and action.teahouse.loadout ~= nil then
                     playerHouse[uid] = {
                         padId = action.padId,

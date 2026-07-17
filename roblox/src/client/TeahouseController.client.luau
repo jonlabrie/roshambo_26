@@ -9,9 +9,23 @@
 -- (EconomyController), not something this panel offers -- so when the player owns no deck yet,
 -- both ladders render greyed (no click wired) with a "claim a free perch" pointer instead.
 --
+-- Claimless owner (B3 gate wave, item A): a RETURNING owner whose auto-claim failed at join
+-- (every pad was occupied) has claimedPadId == nil even though they own a deck. The server
+-- dead-drops both a purchase (misclassified as buy-to-claim, no padId) and SetDisplay (gated on
+-- claim) for them, so MenuModel forces every rung/option unbuyable/disabled and sets
+-- vm.needsClaim -- the panel shows one hint line instead of dead buttons.
+--
+-- Shown-smaller (item B): after buying a bigger size while a smaller Display cap is still set,
+-- the world doesn't grow to match. MenuModel flags vm.deckShownSmaller / vm.teahouseShownSmaller
+-- when the display is capping below the biggest owned; the panel surfaces one hint line.
+--
 -- Display clicks: SetDisplay is a full-replace route server-side (an omitted field resets that
--- dimension to nil/"auto"), so every fire here sends BOTH deckDisplay and teahouseDisplay --
--- reading the one that didn't change off the live `econ` table at click time.
+-- dimension to nil/"auto"), so every fire here sends BOTH deckDisplay and teahouseDisplay. A
+-- client-side `desired` pair (item G) -- not the live `econ` echo -- is the source for both
+-- fields: reading off `econ` would let a click on one dimension re-send the OTHER dimension's
+-- stale pre-click value if its own round trip hasn't echoed back yet, silently reverting it.
+-- The no-op guard (item F) compares a click's value against `desired`, not the last echo, for
+-- the same reason.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -32,17 +46,27 @@ local econ = {
     maxDeckSize = nil :: string?,
     teahouseSizes = {} :: { string },
     claimedPadId = nil :: string?,
+    claimed = false, -- item A: econ.claimedPadId ~= nil, kept alongside it for MenuModel
     deckDisplay = nil :: string?,
     teahouseDisplay = nil :: string?,
     padPreferences = {} :: { string },
     catalog = { deck = {}, teahouse = {} } :: { deck: { [string]: number }, teahouse: { [string]: number } },
 }
 local backDoorIndex: number? = nil
+local favoriteNames: { [string]: string } = {} -- item C: siteId -> real name, from PreferenceState
 
--- catalog arrives async (first EconomyState echo); until then MenuModel.viewModel can't safely
--- price the next-tier rungs (nil price), so render() shows a loading line and skips the ladders.
+-- item G: the pair actually sent on the next SetDisplay fire. Reconciled from every
+-- EconomyState echo (server is authoritative); a click updates only its own dimension here, so a
+-- second click on the OTHER dimension before the first's round trip returns can't clobber it.
+local desired = { deckDisplay = nil :: string?, teahouseDisplay = nil :: string? }
+
+-- item E: true once the first EconomyState echo has arrived. render() also requires a populated
+-- catalog (belt-and-braces: an echo can in principle carry an empty catalog if this player's
+-- initial getEconomy call failed server-side before any catalog was ever fetched) so pricing
+-- never indexes a missing entry.
+local ready = false
 local function catalogReady(): boolean
-    return next(econ.catalog.deck) ~= nil
+    return ready and next(econ.catalog.deck) ~= nil
 end
 
 -- ===== palette (toast palette, per B1/B2 convention) =====
@@ -123,7 +147,7 @@ end
 
 local headerLabel = Instance.new("TextLabel")
 headerLabel.Name = "Header"
-headerLabel.LayoutOrder = 1
+headerLabel.LayoutOrder = 10
 headerLabel.Size = UDim2.new(1, 0, 0, 28)
 headerLabel.BackgroundTransparency = 1
 headerLabel.TextColor3 = TEXT
@@ -135,7 +159,7 @@ headerLabel.Parent = panel
 
 local claimNotice = Instance.new("TextLabel")
 claimNotice.Name = "ClaimNotice"
-claimNotice.LayoutOrder = 2
+claimNotice.LayoutOrder = 20
 claimNotice.Size = UDim2.new(1, 0, 0, 18)
 claimNotice.BackgroundTransparency = 1
 claimNotice.TextColor3 = GOLD
@@ -146,12 +170,47 @@ claimNotice.Text = "Claim a free perch to begin"
 claimNotice.Visible = false
 claimNotice.Parent = panel
 
+-- item A: shown instead of claimNotice for an OWNER whose auto-claim failed (pad scarcity) --
+-- see vm.needsClaim in TeahouseMenuModel.
+local needsClaimHint = Instance.new("TextLabel")
+needsClaimHint.Name = "NeedsClaimHint"
+needsClaimHint.LayoutOrder = 30
+needsClaimHint.Size = UDim2.new(1, 0, 0, 18)
+needsClaimHint.BackgroundTransparency = 1
+needsClaimHint.TextColor3 = GOLD
+needsClaimHint.Font = Enum.Font.Gotham
+needsClaimHint.TextSize = 13
+needsClaimHint.TextXAlignment = Enum.TextXAlignment.Left
+needsClaimHint.Text = "Claim a perch to build"
+needsClaimHint.Visible = false
+needsClaimHint.Parent = panel
+
+-- item E: the only thing shown pre-ready (see render()); hides the ladder rows below it rather
+-- than letting their default-visible bare S/M/L buttons show inert before data arrives.
+local loadingLabel = Instance.new("TextLabel")
+loadingLabel.Name = "LoadingLabel"
+loadingLabel.LayoutOrder = 35
+loadingLabel.Size = UDim2.new(1, 0, 0, 18)
+loadingLabel.BackgroundTransparency = 1
+loadingLabel.TextColor3 = DIM
+loadingLabel.Font = Enum.Font.Gotham
+loadingLabel.TextSize = 13
+loadingLabel.TextXAlignment = Enum.TextXAlignment.Left
+loadingLabel.Text = "Loading…"
+loadingLabel.Visible = false
+loadingLabel.Parent = panel
+
 type RungWidget = { button: TextButton, pendingItem: string? }
 
 -- One row of up-to-3 rung buttons (S/M/L) for a ladder ("deck" or "teahouse"). Returns a
--- size -> widget map so render() can update label/state per rung.
-local function buildLadderRow(order: number, title: string, kind: string): { [string]: RungWidget }
-    sectionLabel(order, title)
+-- size -> widget map, plus the section-label + row handles (item E hides both pre-ready) so
+-- render() can update label/state per rung.
+local function buildLadderRow(
+    order: number,
+    title: string,
+    kind: string
+): ({ [string]: RungWidget }, TextLabel, Frame)
+    local section = sectionLabel(order, title)
     local row = Instance.new("Frame")
     row.Name = kind .. "Row"
     row.LayoutOrder = order + 1
@@ -190,16 +249,17 @@ local function buildLadderRow(order: number, title: string, kind: string): { [st
             end
         end)
     end
-    return widgets
+    return widgets, section, row
 end
 
-local deckWidgets = buildLadderRow(3, "Deck", "deck")
-local teaWidgets = buildLadderRow(5, "Teahouse", "teahouse")
+local deckWidgets, deckSection, deckRow = buildLadderRow(40, "Deck", "deck")
+local teaWidgets, teaSection, teaRow = buildLadderRow(50, "Teahouse", "teahouse")
 
 type DisplayWidget = { button: TextButton, value: string }
 
--- One row of display-option buttons ("deck": S/M/L; "teahouse": none/S/M/L). `onPick(value)`
--- fires SetDisplay with both fields -- the caller supplies the other (unchanged) dimension.
+-- One row of display-option buttons ("deck": S/M/L; "teahouse": none/S/M/L). `onPick(value)` is
+-- called with the clicked value; the caller (pickDeckDisplay/pickTeahouseDisplay, item G) owns
+-- reading/updating the other (unchanged) dimension via `desired` and firing SetDisplay.
 local function buildDisplayRow(
     order: number,
     title: string,
@@ -249,29 +309,62 @@ local function buildDisplayRow(
     return row, widgets
 end
 
-local deckDisplayRow, deckDisplayWidgets = buildDisplayRow(7, "Deck shown", { "S", "M", "L" }, function(value)
-    SetDisplay:FireServer({ deckDisplay = value, teahouseDisplay = econ.teahouseDisplay })
-end)
-local teaDisplayRow, teaDisplayWidgets = buildDisplayRow(
-    9,
-    "Teahouse shown",
-    { "none", "S", "M", "L" },
-    function(value)
-        SetDisplay:FireServer({ deckDisplay = econ.deckDisplay, teahouseDisplay = value })
+-- item G: click handlers fire off `desired`, not the live `econ` echo -- see the comment atop
+-- this file. item F: each is a no-op when the clicked value already matches `desired` for that
+-- dimension, so re-selecting the current option skips the round trip + world rebuild entirely.
+local function pickDeckDisplay(value: string)
+    if value == desired.deckDisplay then
+        return
     end
-)
+    desired.deckDisplay = value
+    SetDisplay:FireServer({ deckDisplay = desired.deckDisplay, teahouseDisplay = desired.teahouseDisplay })
+end
+
+local function pickTeahouseDisplay(value: string)
+    if value == desired.teahouseDisplay then
+        return
+    end
+    desired.teahouseDisplay = value
+    SetDisplay:FireServer({ deckDisplay = desired.deckDisplay, teahouseDisplay = desired.teahouseDisplay })
+end
+
+local deckDisplayRow, deckDisplayWidgets =
+    buildDisplayRow(60, "Deck shown", { "S", "M", "L" }, pickDeckDisplay)
+local teaDisplayRow, teaDisplayWidgets =
+    buildDisplayRow(70, "Teahouse shown", { "none", "S", "M", "L" }, pickTeahouseDisplay)
 -- hidden until the first successful render() confirms ownsTeahouse (also covers the brief
 -- loading window before the first EconomyState echo carries a populated catalog)
 deckDisplayRow.Visible = false
 teaDisplayRow.Visible = false
 
-sectionLabel(11, "Favorites")
-local favoritesContainer = Instance.new("Frame")
+-- item B: one hint line when either display is quietly capping below the biggest owned size.
+local shownSmallerHint = Instance.new("TextLabel")
+shownSmallerHint.Name = "ShownSmallerHint"
+shownSmallerHint.LayoutOrder = 75
+shownSmallerHint.Size = UDim2.new(1, 0, 0, 18)
+shownSmallerHint.BackgroundTransparency = 1
+shownSmallerHint.TextColor3 = GOLD
+shownSmallerHint.Font = Enum.Font.Gotham
+shownSmallerHint.TextSize = 12
+shownSmallerHint.TextXAlignment = Enum.TextXAlignment.Left
+shownSmallerHint.TextWrapped = true
+shownSmallerHint.Text = "Displaying smaller than owned — change Display to show your biggest"
+shownSmallerHint.Visible = false
+shownSmallerHint.Parent = panel
+
+sectionLabel(80, "Favorites")
+-- item D: favorites can reach the 32-preference cap; a fixed-viewport ScrollingFrame keeps the
+-- panel's own size (340x520) intact instead of the list growing past it (AutomaticSize::Y did,
+-- unbounded, before this change). AutomaticCanvasSize handles the inner content height.
+local favoritesContainer = Instance.new("ScrollingFrame")
 favoritesContainer.Name = "Favorites"
-favoritesContainer.LayoutOrder = 12
-favoritesContainer.AutomaticSize = Enum.AutomaticSize.Y
-favoritesContainer.Size = UDim2.fromScale(1, 0)
+favoritesContainer.LayoutOrder = 81
+favoritesContainer.Size = UDim2.new(1, 0, 0, 140)
+favoritesContainer.CanvasSize = UDim2.new()
+favoritesContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
+favoritesContainer.ScrollBarThickness = 6
 favoritesContainer.BackgroundTransparency = 1
+favoritesContainer.BorderSizePixel = 0
 favoritesContainer.Parent = panel
 local favoritesLayout = Instance.new("UIListLayout")
 favoritesLayout.FillDirection = Enum.FillDirection.Vertical
@@ -281,7 +374,7 @@ favoritesLayout.Parent = favoritesContainer
 
 local backDoorLabel = Instance.new("TextLabel")
 backDoorLabel.Name = "BackDoor"
-backDoorLabel.LayoutOrder = 13
+backDoorLabel.LayoutOrder = 90
 backDoorLabel.Size = UDim2.new(1, 0, 0, 16)
 backDoorLabel.BackgroundTransparency = 1
 backDoorLabel.TextColor3 = DIM
@@ -354,7 +447,7 @@ local function renderDisplayOptions(widgets: { [string]: DisplayWidget }, option
     end
 end
 
-local function renderFavorites(favorites: { string })
+local function renderFavorites(favorites: { string }, names: { [string]: string })
     for _, child in favoritesContainer:GetChildren() do
         if child ~= favoritesLayout then
             child:Destroy()
@@ -389,7 +482,7 @@ local function renderFavorites(favorites: { string })
         label.Font = Enum.Font.Gotham
         label.TextSize = 13
         label.TextXAlignment = Enum.TextXAlignment.Left
-        label.Text = "Perch " .. siteId
+        label.Text = names[siteId] or siteId -- item C: real displayName, echoed from the server
         label.Parent = row
 
         local remove = Instance.new("TextButton")
@@ -414,10 +507,22 @@ local function renderFavorites(favorites: { string })
 end
 
 local function render()
+    -- item E: nothing to render safely until the first EconomyState echo lands; show one
+    -- loading line and hide the ladder rows instead of their default-visible bare S/M/L buttons.
     if not catalogReady() then
         headerLabel.Text = "Loading..."
+        loadingLabel.Visible = true
+        deckSection.Visible = false
+        deckRow.Visible = false
+        teaSection.Visible = false
+        teaRow.Visible = false
         return
     end
+    loadingLabel.Visible = false
+    deckSection.Visible = true
+    deckRow.Visible = true
+    teaSection.Visible = true
+    teaRow.Visible = true
 
     local vm = MenuModel.viewModel(econ)
 
@@ -427,6 +532,7 @@ local function render()
     headerLabel.Text = `{vm.points} pts  ·  {perchText}`
 
     claimNotice.Visible = not vm.ownsDeck
+    needsClaimHint.Visible = vm.needsClaim
     renderLadder(deckWidgets, vm.deckLadder, "deck", not vm.ownsDeck)
     renderLadder(teaWidgets, vm.teahouseLadder, "teahouse", false)
 
@@ -436,8 +542,9 @@ local function render()
         renderDisplayOptions(deckDisplayWidgets, vm.deckDisplayOptions)
         renderDisplayOptions(teaDisplayWidgets, vm.teahouseDisplayOptions)
     end
+    shownSmallerHint.Visible = vm.deckShownSmaller or vm.teahouseShownSmaller
 
-    renderFavorites(vm.favorites)
+    renderFavorites(vm.favorites, favoriteNames)
 
     backDoorLabel.Text = if backDoorIndex ~= nil
         then `Back door: bay {backDoorIndex}`
@@ -447,12 +554,18 @@ end
 -- ===== Step 4: echo wiring =====
 
 EconomyState.OnClientEvent:Connect(function(p)
+    ready = true
     econ.totalPoints = p.totalPoints
     econ.maxDeckSize = p.maxDeckSize
     econ.teahouseSizes = p.teahouseSizes or {}
     econ.claimedPadId = p.claimedPadId
+    econ.claimed = p.claimedPadId ~= nil
     econ.deckDisplay = p.deckDisplay
     econ.teahouseDisplay = p.teahouseDisplay
+    -- item G: the server is authoritative -- every echo (including the post-SetDisplay one)
+    -- reconciles `desired` back to what actually landed.
+    desired.deckDisplay = p.deckDisplay
+    desired.teahouseDisplay = p.teahouseDisplay
     if p.catalog then
         econ.catalog = p.catalog
     end
@@ -461,6 +574,7 @@ end)
 
 PreferenceState.OnClientEvent:Connect(function(p)
     econ.padPreferences = p.padPreferences or {}
+    favoriteNames = p.names or {} -- item C
     render()
 end)
 
