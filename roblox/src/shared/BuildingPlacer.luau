@@ -44,4 +44,29 @@ function BuildingPlacer.fits(buildingFP: FP, deckFP: FP, p: Placement): boolean
         and (dz + halfZ) <= deckFP.maxZ
 end
 
+-- Slide a placement the minimum distance so its rotation-aware footprint fits inside the deck
+-- (B4). Facing is preserved; a degenerate axis (building wider than the deck) centers on that
+-- axis. Returns a NEW placement — never mutates the input; callers may persist the result.
+function BuildingPlacer.clamp(buildingFP: FP, deckFP: FP, p: Placement): Placement
+    local halfX = (buildingFP.maxX - buildingFP.minX) / 2
+    local halfZ = (buildingFP.maxZ - buildingFP.minZ) / 2
+    local yaw = BuildingPlacer.facingYaw(p.facing)
+    if yaw == 90 or yaw == 270 then
+        halfX, halfZ = halfZ, halfX
+    end
+    local function axis(v: number, half: number, lo: number, hi: number): number
+        if half * 2 > (hi - lo) then
+            return (lo + hi) / 2
+        end
+        return math.clamp(v, lo + half, hi - half)
+    end
+    return {
+        offset = {
+            axis(p.offset[1], halfX, deckFP.minX, deckFP.maxX),
+            axis(p.offset[2], halfZ, deckFP.minZ, deckFP.maxZ),
+        },
+        facing = p.facing,
+    }
+end
+
 return BuildingPlacer

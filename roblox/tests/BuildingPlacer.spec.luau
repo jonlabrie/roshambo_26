@@ -48,3 +48,39 @@ describe("BuildingPlacer.fits", function()
         expect(BuildingPlacer.fits(tall, deck, { offset = { 0, 2 }, facing = "N" })).toBe(false)
     end)
 end)
+
+describe("BuildingPlacer.clamp", function()
+    -- building 12x6 (half 6x3) on a deck 26x20 (SizeClasses S-deck shape)
+    local B = { minX = -6, maxX = 6, minZ = -3, maxZ = 3 }
+    local D = { minX = -13, maxX = 13, minZ = -10, maxZ = 10 }
+
+    test("in-bounds placement is returned unchanged", function()
+        local p = BuildingPlacer.clamp(B, D, { offset = { 2, -4 }, facing = "N" })
+        expect(p.offset[1]).toBe(2)
+        expect(p.offset[2]).toBe(-4)
+        expect(p.facing).toBe("N")
+    end)
+    test("slides the minimum distance back into bounds per axis", function()
+        -- x max legal = 13 - 6 = 7; z min legal = -10 + 3 = -7
+        local p = BuildingPlacer.clamp(B, D, { offset = { 11, -9 }, facing = "N" })
+        expect(p.offset[1]).toBe(7)
+        expect(p.offset[2]).toBe(-7)
+    end)
+    test("rotated facings swap the half-extents", function()
+        -- facing E: halfX becomes 3, halfZ becomes 6 -> x legal to 10, z legal to 4
+        local p = BuildingPlacer.clamp(B, D, { offset = { 12, 9 }, facing = "E" })
+        expect(p.offset[1]).toBe(10)
+        expect(p.offset[2]).toBe(4)
+        expect(p.facing).toBe("E")
+    end)
+    test("clamped result always fits", function()
+        local p = BuildingPlacer.clamp(B, D, { offset = { 99, -99 }, facing = "W" })
+        expect(BuildingPlacer.fits(B, D, p)).toBe(true)
+    end)
+    test("degenerate axis (building wider than deck) centers that axis", function()
+        local wide = { minX = -30, maxX = 30, minZ = -3, maxZ = 3 }
+        local p = BuildingPlacer.clamp(wide, D, { offset = { 5, 2 }, facing = "N" })
+        expect(p.offset[1]).toBe(0) -- centered on the too-narrow axis
+        expect(p.offset[2]).toBe(2) -- other axis untouched (in bounds)
+    end)
+end)
