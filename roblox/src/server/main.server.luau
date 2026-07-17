@@ -425,6 +425,20 @@ local function echoEconomy(player: Player, uid: string)
     })
 end
 
+-- B3 gate fix: mid-session live rebuilds (buy-to-claim, upgrade, display change) destroy the
+-- old Structure (and its back-door prompts) and build a new one; re-fire BackDoorState so the
+-- client rebinds prompts to the NEW structure. No-op if playerHouse[uid] was just cleared (bare
+-- deck / no loadout this session) or the player already left mid-yield.
+local function echoBackDoor(player: Player, uid: string)
+    local house = playerHouse[uid]
+    if house ~= nil and player:IsDescendantOf(Players) then
+        BackDoorState:FireClient(player, {
+            padId = house.padId,
+            backDoorIndex = BackDoorEditor.backDoorIndex(house.loadout.wallBays),
+        })
+    end
+end
+
 local siteCoordinator = SiteCoordinator.new(PadRegistry.new())
 local sitesFolder = Instance.new("Folder")
 sitesFolder.Name = "TeahouseSites"
@@ -673,6 +687,7 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
                 else
                     playerHouse[uid] = nil
                 end
+                echoBackDoor(player, uid)
             else
                 warn(
                     `[B2] {uid} bought {item} but pad {claimPadId} could not be claimed this session`
@@ -723,6 +738,7 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
                 else
                     playerHouse[uid] = nil -- bare deck: no live loadout to edit
                 end
+                echoBackDoor(player, uid)
             end
         end
     end
@@ -781,6 +797,7 @@ SetDisplay.OnServerEvent:Connect(function(player, payload)
             else
                 playerHouse[uid] = nil -- teahouseDisplay == "none": bare deck, no live loadout
             end
+            echoBackDoor(player, uid)
         end
     end
     echoEconomy(player, uid)

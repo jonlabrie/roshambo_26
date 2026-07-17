@@ -5,6 +5,12 @@
 -- door re-renders SERVER-side; this only fires the request and relabels prompts from the echoed
 -- backDoorIndex. Only ever runs for the local player's own occupied teahouse (BackDoorState is
 -- fired to that player alone).
+-- BackDoorState fires not just on join and on a SetBackDoor edit echo, but also after any
+-- mid-session live rebuild (buy-to-claim, size upgrade, display change) — those rebuilds
+-- destroy the old Structure (and every prompt anchored inside it) and materialize a new one.
+-- bindBays therefore sweeps its `prompts` cache for destroyed/unparented entries before
+-- deduping, so a rebuild's re-fire re-creates prompts on the NEW structure instead of treating
+-- the dead ones as still bound.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
@@ -50,8 +56,17 @@ local function anchorPart(bay: Instance): BasePart?
     return bay:FindFirstChildWhichIsA("BasePart", true)
 end
 
--- Create one prompt per back bay (deduped), then relabel to the current active door.
+-- Create one prompt per back bay (deduped), then relabel to the current active door. Rebuilds
+-- destroy the previous Structure (and every prompt anchored inside it), so first sweep out any
+-- cached entries whose prompt no longer has a parent — otherwise the dedupe below would
+-- mistake those destroyed prompts for still-bound ones and skip re-creating them on the NEW
+-- structure's bays.
 local function bindBays(structure: Instance)
+    for i, prompt in prompts do
+        if prompt.Parent == nil then
+            prompts[i] = nil
+        end
+    end
     for _, child in structure:GetChildren() do
         local idxStr = child.Name:match("^Bay_back_(%d+)$")
         if idxStr then
