@@ -869,13 +869,14 @@ SetPlacement.OnServerEvent:Connect(function(player, payload)
         return -- bare deck / nothing built: nothing to move
     end
     local size = built.teahouseSize
+    local buildingFP = SizeClasses.buildingFootprint(size)
+    local boundsFP = SizeClasses.placementBounds(built.deckSize)
+    if not BuildingPlacer.canFitFacing(buildingFP, boundsFP, facing) then
+        return -- this facing cannot fit this built combination (UI never offers it)
+    end
     -- server-authoritative: clamp the request against the BUILT combination and persist the
     -- clamped value (never raw client numbers)
-    local clamped = BuildingPlacer.clamp(
-        SizeClasses.buildingFootprint(size),
-        SizeClasses.placementBounds(built.deckSize),
-        { offset = { dx, dz }, facing = facing }
-    )
+    local clamped = BuildingPlacer.clamp(buildingFP, boundsFP, { offset = { dx, dz }, facing = facing })
     -- merge into a NEW copy of the built size's loadout (pre-persist clone discipline)
     if e.teahouses[size] == nil then
         return -- built size has no owned loadout (non-contiguous ownership; defensive)

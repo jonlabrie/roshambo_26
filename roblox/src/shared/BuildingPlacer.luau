@@ -69,4 +69,18 @@ function BuildingPlacer.clamp(buildingFP: FP, deckFP: FP, p: Placement): Placeme
     }
 end
 
+-- Whether a building at this facing CAN fit inside the bounds at any offset (B4): the
+-- rotation-aware extents must not exceed the bounds' dimensions. clamp()'s degenerate-axis
+-- centering makes an un-fitting facing render outside the bounds, so callers must screen
+-- facings with this first (rotate UI skips them; the commit handler rejects them).
+function BuildingPlacer.canFitFacing(buildingFP: FP, boundsFP: FP, facing: string): boolean
+    local halfX = (buildingFP.maxX - buildingFP.minX) / 2
+    local halfZ = (buildingFP.maxZ - buildingFP.minZ) / 2
+    local yaw = BuildingPlacer.facingYaw(facing)
+    if yaw == 90 or yaw == 270 then
+        halfX, halfZ = halfZ, halfX
+    end
+    return halfX * 2 <= (boundsFP.maxX - boundsFP.minX) and halfZ * 2 <= (boundsFP.maxZ - boundsFP.minZ)
+end
+
 return BuildingPlacer

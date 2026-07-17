@@ -188,12 +188,17 @@ describe("SizeClasses.placementBounds", function()
 
     test("every authored building still fits centered in its same-size placement bounds", function()
         for _, s in { "S", "M", "L" } do
-            local fits = BuildingPlacer.fits(
-                SizeClasses.buildingFootprint(s),
-                SizeClasses.placementBounds(s),
-                { offset = { 0, 0 }, facing = "N" }
-            )
+            local buildingFP = SizeClasses.buildingFootprint(s)
+            local boundsFP = SizeClasses.placementBounds(s)
+            local fits = BuildingPlacer.fits(buildingFP, boundsFP, { offset = { 0, 0 }, facing = "N" })
             expect(fits).toBe(true)
+            for _, facing in { "N", "E", "S", "W" } do
+                -- L rotated to face E/W needs 24.4 studs across the L placement bounds' 23.30
+                -- depth -- the legitimately-impossible combination (this was the coverage gap
+                -- that let the B4 gate regression through); every other size/facing fits.
+                local expectedFit = not (s == "L" and (facing == "E" or facing == "W"))
+                expect(BuildingPlacer.canFitFacing(buildingFP, boundsFP, facing)).toBe(expectedFit)
+            end
         end
     end)
 end)

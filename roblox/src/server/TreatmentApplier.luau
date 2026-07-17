@@ -89,10 +89,21 @@ function TreatmentApplier:_buildBuilding(
     -- as a last-ditch guard for pathological data.
     local placement = self._buildingPlacer.clamp(buildingFP, deckFP, teahouse.placement)
     if not self._buildingPlacer.fits(buildingFP, deckFP, placement) then
-        warn(
-            `[D.6] {padId}: {teahouse.size} building does not fit the {deckSize} deck at its placement; deck only`
+        -- a persisted facing can stop fitting when the deck display shrinks (e.g. an L teahouse
+        -- facing E/W on its own L deck, post-shrink); teahouse <= deck guarantees the N facing
+        -- always fits, so fall back to it once (same offset, re-clamped) rather than vanishing
+        -- the building. Only if even THAT fails (pathological data) do we skip to deck-only.
+        placement = self._buildingPlacer.clamp(
+            buildingFP,
+            deckFP,
+            { offset = teahouse.placement.offset, facing = "N" }
         )
-        return
+        if not self._buildingPlacer.fits(buildingFP, deckFP, placement) then
+            warn(
+                `[D.6] {padId}: {teahouse.size} building does not fit the {deckSize} deck at its placement; deck only`
+            )
+            return
+        end
     end
     -- world pivot = deck CFrame composed with the local placement transform (offset + facing)
     local deckCF = CFrame.new(table.unpack(deckCF12))

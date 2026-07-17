@@ -92,6 +92,25 @@ local function applyGhost()
     g:PivotTo(m * CFrame.new(table.unpack(BuildingPlacer.placeCF(current))))
 end
 
+-- Advance to the next facing (wrapping) that the current building can actually fit in against
+-- the deck's placement bounds; a facing whose rotation-aware extents overflow the bounds (B4
+-- gate finding: L-on-L facing E/W) is skipped rather than offered. If no OTHER facing fits, this
+-- is a no-op (stays on the current facing). Shared by both the HUD button and the R key so they
+-- can't drift apart.
+local function rotate()
+    local idx = table.find(FACING_ORDER, current.facing) or 1
+    for _ = 1, #FACING_ORDER - 1 do
+        idx = (idx % #FACING_ORDER) + 1
+        local candidate = FACING_ORDER[idx]
+        if BuildingPlacer.canFitFacing(buildingFP, deckFP, candidate) then
+            current.facing = candidate
+            applyGhost()
+            return
+        end
+    end
+    -- no other facing fits: no-op
+end
+
 local function stepDrag()
     local camera = workspace.CurrentCamera
     if camera == nil then
@@ -200,11 +219,7 @@ local function buildHud()
         return button
     end
 
-    makeButton(1, "⟳ Rotate (R)", function()
-        local idx = table.find(FACING_ORDER, current.facing) or 1
-        current.facing = FACING_ORDER[(idx % 4) + 1]
-        applyGhost()
-    end)
+    makeButton(1, "⟳ Rotate (R)", rotate)
     makeButton(2, "✓ Place", commit)
     makeButton(3, "✕ Cancel (X)", exit)
 
@@ -254,9 +269,7 @@ local function enter(payload: any)
                 return
             end
             if input.KeyCode == Enum.KeyCode.R then
-                local idx = table.find(FACING_ORDER, current.facing) or 1
-                current.facing = FACING_ORDER[(idx % 4) + 1]
-                applyGhost()
+                rotate()
             elseif input.KeyCode == Enum.KeyCode.X then
                 exit()
             elseif input.UserInputType == Enum.UserInputType.MouseButton1 then

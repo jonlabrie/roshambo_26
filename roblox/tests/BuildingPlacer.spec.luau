@@ -84,3 +84,18 @@ describe("BuildingPlacer.clamp", function()
         expect(p.offset[2]).toBe(2) -- other axis untouched (in bounds)
     end)
 end)
+
+describe("BuildingPlacer.canFitFacing", function()
+    test("N and E both fit within a roomy bounds", function()
+        local bldg = { minX = -6, maxX = 6, minZ = -3, maxZ = 3 } -- 12x6
+        local bounds = { minX = -13, maxX = 13, minZ = -10, maxZ = 10 } -- 26x20
+        expect(BuildingPlacer.canFitFacing(bldg, bounds, "N")).toBe(true)
+        expect(BuildingPlacer.canFitFacing(bldg, bounds, "E")).toBe(true)
+    end)
+    test("the swap matters: a long-thin building fits N but not E in tight-depth bounds", function()
+        local bldg = { minX = -10, maxX = 10, minZ = -2, maxZ = 2 } -- 20 wide x 4 deep
+        local bounds = { minX = -11, maxX = 11, minZ = -3, maxZ = 3 } -- 22 wide x 6 deep
+        expect(BuildingPlacer.canFitFacing(bldg, bounds, "N")).toBe(true)
+        expect(BuildingPlacer.canFitFacing(bldg, bounds, "E")).toBe(false)
+    end)
+end)
