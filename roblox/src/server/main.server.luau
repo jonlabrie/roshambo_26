@@ -602,6 +602,12 @@ SetBackDoor.OnServerEvent:Connect(function(player, payload)
     -- live, server-authoritative re-render (replicates to every client)
     StructureOps.applyBays(structure, WallBays.resolve(manifest.bays, newWallBays))
     house.loadout = newLoadout
+    -- rebuild paths (RequestPurchase upgrade, SetDisplay, buy-to-claim) render from this stash,
+    -- not from playerHouse; keep it in sync or the next rebuild reverts this door.
+    local e = playerEconomy[uid]
+    if e ~= nil and e.teahouses ~= nil then
+        e.teahouses[house.size] = newLoadout
+    end
     -- best-effort persist: a failure keeps the live door this session (lost next join), no revert
     local persisted = net:setTeahouse(uid, house.size, newLoadout)
     if not persisted.ok then
