@@ -84,8 +84,8 @@ gui.Parent = player:WaitForChild("PlayerGui")
 
 local toggleButton = Instance.new("TextButton")
 toggleButton.Name = "Toggle"
-toggleButton.AnchorPoint = Vector2.new(1, 0)
-toggleButton.Position = UDim2.new(1, -12, 0, 12)
+toggleButton.AnchorPoint = Vector2.new(1, 1)
+toggleButton.Position = UDim2.new(1, -12, 1, -12)
 toggleButton.Size = UDim2.fromOffset(140, 40)
 toggleButton.BackgroundColor3 = BG
 toggleButton.BackgroundTransparency = 0.1
@@ -102,8 +102,8 @@ end
 
 local panel = Instance.new("Frame")
 panel.Name = "Panel"
-panel.AnchorPoint = Vector2.new(1, 0)
-panel.Position = UDim2.new(1, -12, 0, 60)
+panel.AnchorPoint = Vector2.new(1, 1)
+panel.Position = UDim2.new(1, -12, 1, -60)
 panel.Size = UDim2.fromOffset(340, 520)
 panel.BackgroundColor3 = BG
 panel.BackgroundTransparency = 0.05
