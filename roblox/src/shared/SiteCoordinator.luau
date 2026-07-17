@@ -66,7 +66,11 @@ local function starterAction(padId: string, spec: any): Action
         spec = spec,
         treatment = treatment,
         deckSize = STARTER,
-        teahouse = { size = STARTER, loadout = treatment.loadout, placement = CENTERED },
+        teahouse = {
+            size = STARTER,
+            loadout = treatment.loadout,
+            placement = (treatment.loadout and treatment.loadout.placement) or CENTERED,
+        },
     }
 end
 
@@ -144,7 +148,11 @@ function SiteCoordinator:onJoin(
                 self._held[playerId] = id
                 local teaLoadout = if built.teahouseSize ~= nil then teahouses[built.teahouseSize] else nil
                 local teahouse = if built.teahouseSize ~= nil
-                    then { size = built.teahouseSize, loadout = teaLoadout, placement = CENTERED }
+                    then {
+                        size = built.teahouseSize,
+                        loadout = teaLoadout,
+                        placement = (teaLoadout and teaLoadout.placement) or CENTERED,
+                    }
                     else nil
                 return {
                     padId = id,

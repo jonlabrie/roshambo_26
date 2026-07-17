@@ -79,9 +79,12 @@ function TreatmentApplier:_buildBuilding(
     deckSize: string,
     staging: Instance
 )
-    local placement = teahouse.placement
     local deckFP = self._sizeClasses.deckFootprint(deckSize)
     local buildingFP = self._sizeClasses.buildingFootprint(teahouse.size)
+    -- B4: clamp the SAVED placement into this deck at render time (stored values never change;
+    -- a display-shrunk deck slides the building minimally back into bounds). fits() stays only
+    -- as a last-ditch guard for pathological data.
+    local placement = self._buildingPlacer.clamp(buildingFP, deckFP, teahouse.placement)
     if not self._buildingPlacer.fits(buildingFP, deckFP, placement) then
         warn(
             `[D.6] {padId}: {teahouse.size} building does not fit the {deckSize} deck at its placement; deck only`
@@ -121,6 +124,9 @@ function TreatmentApplier:apply(padId: string, spec: any, treatment: any, deckSi
         for _, c in folder:GetChildren() do
             c:Destroy()
         end
+        folder:SetAttribute("MountCF", nil)
+        folder:SetAttribute("DeckSize", nil)
+        folder:SetAttribute("TeahouseSize", nil)
         return
     end
     local deckCF12 = self._deckPlacement.resolve(spec.deckPlacements, deckSize, spec.maxSize)
@@ -160,6 +166,13 @@ function TreatmentApplier:apply(padId: string, spec: any, treatment: any, deckSi
     end
     staging:Destroy()
     folder:SetAttribute("Occupied", treatment.lit == true)
+    -- B4: authoritative deck frame + built sizes for the client move mode (MoveController).
+    folder:SetAttribute("MountCF", mountCF)
+    folder:SetAttribute("DeckSize", deckSize)
+    folder:SetAttribute(
+        "TeahouseSize",
+        if teahouse ~= nil and teahouse.loadout ~= nil then teahouse.size else ""
+    )
 end
 
 return TreatmentApplier

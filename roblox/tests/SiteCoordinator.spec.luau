@@ -128,6 +128,19 @@ describe("SiteCoordinator.onJoin", function()
         expect(sc:onJoin("u1", { maxDeckSize = nil, teahouses = {} }, nil) == nil).toBe(true)
         expect(sc:onJoin("u1", nil, nil) == nil).toBe(true)
     end)
+
+    test("onJoin passes the loadout's saved placement through to the action", function()
+        -- build the same registry/coordinator the neighboring onJoin tests use, with a
+        -- teahouse loadout that carries a placement:
+        local c = coord({ spec("p1") })
+        local placed = { baseStyle = "teahouse-1story", placement = { offset = { 4, -2 }, facing = "E" } }
+        local action = c:onJoin("p1", {
+            maxDeckSize = "L",
+            teahouses = { L = placed },
+        })
+        expect((action :: any).teahouse.placement.offset[1]).toBe(4)
+        expect((action :: any).teahouse.placement.facing).toBe("E")
+    end)
 end)
 
 describe("SiteCoordinator.onJoin preference", function()

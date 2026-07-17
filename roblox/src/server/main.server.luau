@@ -35,6 +35,7 @@ local BackDoorState = remotes:WaitForChild("BackDoorState") :: RemoteEvent
 local RequestPurchase = remotes:WaitForChild("RequestPurchase") :: RemoteEvent
 local EconomyState = remotes:WaitForChild("EconomyState") :: RemoteEvent
 local SetDisplay = remotes:WaitForChild("SetDisplay") :: RemoteEvent
+local SetPlacement = remotes:WaitForChild("SetPlacement") :: RemoteEvent
 local TweenService = game:GetService("TweenService")
 local TextService = game:GetService("TextService")
 
@@ -401,6 +402,10 @@ end
 -- padId + the occupied SIZE + that size's loadout (the merge target for wallBays edits).
 local playerHouse: { [string]: { padId: string, size: string, loadout: any } } = {}
 
+-- B4: the default placement for a build path whose loadout carries none yet (uniform rule:
+-- every build site renders `loadout.placement or CENTERED_PLACEMENT`).
+local CENTERED_PLACEMENT = { offset = { 0, 0 }, facing = "N" }
+
 -- economy per player (for purchase gating + the client's prompts/labels): the fetched balance,
 -- deck tier, owned teahouse loadouts, and the claimed pad (nil until they own+claim).
 local playerEconomy: {
@@ -748,7 +753,7 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
                     then {
                         size = built.teahouseSize,
                         loadout = teaLoadout,
-                        placement = { offset = { 0, 0 }, facing = "N" },
+                        placement = (teaLoadout and teaLoadout.placement) or CENTERED_PLACEMENT,
                     }
                     else nil
                 local treatment = { kind = "structure", loadout = teaLoadout, lit = true }
@@ -807,7 +812,7 @@ SetDisplay.OnServerEvent:Connect(function(player, payload)
                 then {
                     size = built.teahouseSize,
                     loadout = teaLoadout,
-                    placement = { offset = { 0, 0 }, facing = "N" },
+                    placement = (teaLoadout and teaLoadout.placement) or CENTERED_PLACEMENT,
                 }
                 else nil
             local treatment = { kind = "structure", loadout = teaLoadout, lit = true }
@@ -828,6 +833,68 @@ SetDisplay.OnServerEvent:Connect(function(player, payload)
         end
     end
     echoEconomy(player, uid)
+end)
+
+SetPlacement.OnServerEvent:Connect(function(player, payload)
+    local uid = tostring(player.UserId)
+    local e = playerEconomy[uid]
+    if e == nil or e.claimedPadId == nil then
+        return -- occupant-only, same discipline as SetDisplay
+    end
+    if typeof(payload) ~= "table" or typeof(payload.offset) ~= "table" then
+        return
+    end
+    local dx, dz = payload.offset[1], payload.offset[2]
+    local facing = payload.facing
+    if typeof(dx) ~= "number" or dx ~= dx or math.abs(dx) == math.huge then
+        return
+    end
+    if typeof(dz) ~= "number" or dz ~= dz or math.abs(dz) == math.huge then
+        return
+    end
+    if facing ~= "N" and facing ~= "E" and facing ~= "S" and facing ~= "W" then
+        return
+    end
+    local spec = PadSites[e.claimedPadId]
+    if spec == nil then
+        return
+    end
+    local teaSizes = {}
+    for s in e.teahouses do
+        table.insert(teaSizes, s)
+    end
+    local built =
+        SizeClasses.resolveBuilt(e.maxDeckSize, teaSizes, spec.maxSize, e.deckDisplay, e.teahouseDisplay)
+    if built == nil or built.teahouseSize == nil then
+        return -- bare deck / nothing built: nothing to move
+    end
+    local size = built.teahouseSize
+    -- server-authoritative: clamp the request against the BUILT combination and persist the
+    -- clamped value (never raw client numbers)
+    local clamped = BuildingPlacer.clamp(
+        SizeClasses.buildingFootprint(size),
+        SizeClasses.deckFootprint(built.deckSize),
+        { offset = { dx, dz }, facing = facing }
+    )
+    -- merge into a NEW copy of the built size's loadout (pre-persist clone discipline)
+    local newLoadout = table.clone(e.teahouses[size])
+    newLoadout.placement = clamped
+    local persisted = net:setTeahouse(uid, size, newLoadout)
+    if not persisted.ok then
+        warn(`[B4] setTeahouse(placement) failed for {uid}/{size}: {tostring(persisted.error)}`)
+        echoEconomy(player, uid) -- resync
+        return
+    end
+    if not player:IsDescendantOf(Players) then
+        return -- left during the HTTP yield; nothing to rebuild
+    end
+    -- both stashes (B3 gate lesson), then rebuild at the new placement
+    e.teahouses[size] = newLoadout
+    local teahouse = { size = size, loadout = newLoadout, placement = clamped }
+    local treatment = { kind = "structure", loadout = newLoadout, lit = true }
+    applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
+    playerHouse[uid] = { padId = e.claimedPadId, size = size, loadout = newLoadout }
+    echoBackDoor(player, uid) -- geometry watch re-arms the F prompts on the new structure
 end)
 
 print(`[ROSHAMBO] playable loop starting against {config.baseUrl}`)
