@@ -3,16 +3,23 @@ export const SIZE_RANK: Record<Size, number> = { S: 1, M: 2, L: 3 };
 export const PRICES = {
     deck: { S: 50, M: 500, L: 3000 },
     teahouse: { S: 30, M: 300, L: 2000 },
+    portal: 500,
 } as const;
 export const DEFAULT_TEAHOUSE_LOADOUT = { baseStyle: 'teahouse-1story' };
 
-export type EconomyState = { totalPoints: number; maxDeckSize: Size | null; teahouseSizes: Size[] };
+export type EconomyState = { totalPoints: number; maxDeckSize: Size | null; teahouseSizes: Size[]; portalOwned?: boolean };
 type Check = { ok: true; cost: number } | { ok: false; error: string };
 
 // the tier that must be owned before buying `size` (null = nothing below S)
 const below = (size: Size): Size | null => (size === 'S' ? null : size === 'M' ? 'S' : 'M');
 
 export function validatePurchase(state: EconomyState, item: string): Check {
+    if (item === 'portal') {
+        if (state.maxDeckSize === null) return { ok: false, error: 'NEEDS_DECK' };
+        if (state.portalOwned) return { ok: false, error: 'ALREADY_OWNED' };
+        if (state.totalPoints < PRICES.portal) return { ok: false, error: 'INSUFFICIENT_POINTS' };
+        return { ok: true, cost: PRICES.portal };
+    }
     const [kind, size] = item.split(':') as [string, Size];
     if ((kind !== 'deck' && kind !== 'teahouse') || (size !== 'S' && size !== 'M' && size !== 'L')) {
         return { ok: false, error: 'BAD_ITEM' };
@@ -38,12 +45,17 @@ export function validatePurchase(state: EconomyState, item: string): Check {
 export function applyPurchase(state: EconomyState, item: string): EconomyState {
     const chk = validatePurchase(state, item);
     if (!chk.ok) throw new Error(`applyPurchase on invalid item: ${chk.error}`);
-    const [kind, size] = item.split(':') as [string, Size];
     const next: EconomyState = {
         totalPoints: state.totalPoints - chk.cost,
         maxDeckSize: state.maxDeckSize,
         teahouseSizes: [...state.teahouseSizes],
+        portalOwned: state.portalOwned ?? false,
     };
+    if (item === 'portal') {
+        next.portalOwned = true;
+        return next;
+    }
+    const [kind, size] = item.split(':') as [string, Size];
     if (kind === 'deck') next.maxDeckSize = size;
     else next.teahouseSizes.push(size);
     return next;

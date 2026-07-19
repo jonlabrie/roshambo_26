@@ -88,3 +88,26 @@ describe('validateDisplay', () => {
     expect(validateDisplay(st({ maxDeckSize: null }), 'S', null)).toEqual({ ok: false, error: 'DISPLAY_UNOWNED' });
   });
 });
+
+describe('portal purchase', () => {
+  const base = (over: Partial<EconomyState> = {}): EconomyState =>
+    ({ totalPoints: 1000, maxDeckSize: 'S', teahouseSizes: [], portalOwned: false, ...over });
+
+  it('accepts a portal when a deck is owned and affordable', () => {
+    expect(validatePurchase(base(), 'portal')).toEqual({ ok: true, cost: PRICES.portal });
+  });
+  it('rejects a portal with no deck', () => {
+    expect(validatePurchase(base({ maxDeckSize: null }), 'portal')).toEqual({ ok: false, error: 'NEEDS_DECK' });
+  });
+  it('rejects a portal already owned', () => {
+    expect(validatePurchase(base({ portalOwned: true }), 'portal')).toEqual({ ok: false, error: 'ALREADY_OWNED' });
+  });
+  it('rejects a portal when too poor', () => {
+    expect(validatePurchase(base({ totalPoints: 0 }), 'portal')).toEqual({ ok: false, error: 'INSUFFICIENT_POINTS' });
+  });
+  it('applyPurchase sets portalOwned and spends the cost', () => {
+    const after = applyPurchase(base({ totalPoints: 700 }), 'portal');
+    expect(after.portalOwned).toBe(true);
+    expect(after.totalPoints).toBe(700 - PRICES.portal);
+  });
+});
