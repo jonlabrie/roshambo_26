@@ -51,13 +51,20 @@ local econ = {
     deckDisplay = nil :: string?,
     teahouseDisplay = nil :: string?,
     padPreferences = {} :: { string },
-    catalog = { deck = {}, teahouse = {} } :: { deck: { [string]: number }, teahouse: { [string]: number } },
+    catalog = { deck = {}, teahouse = {}, portal = 0 } :: {
+        deck: { [string]: number },
+        teahouse: { [string]: number },
+        portal: number,
+    },
+    portalOwned = false,
 }
 local backDoorIndex: number? = nil
 local favoriteNames: { [string]: string } = {} -- item C: siteId -> real name, from PreferenceState
 -- B4 Task 5: mirrors vm.canMove from the latest render(), read by the Move-teahouse click handler
 -- (which fires after render() has moved on, so it can't read `vm` directly).
 local currentCanMove = false
+-- Task 5 (home portal): same mirror pattern, read by the portal-button click handler.
+local currentPortalCanBuy = false
 
 -- item G: the pair actually sent on the next SetDisplay fire. Reconciled from every
 -- EconomyState echo (server is authoritative); a click updates only its own dimension here, so a
@@ -364,6 +371,28 @@ do
     corner.Parent = moveButton
 end
 
+-- Task 5: one-time buy for a claimed deck-owner who doesn't already own a home portal. Gated on
+-- vm.ownsDeck (nothing to attach a portal to without a deck) -- same hidden-until-ready +
+-- owner-only-row idiom as moveButton above.
+local portalButton = Instance.new("TextButton")
+portalButton.Name = "PortalButton"
+portalButton.LayoutOrder = 73
+portalButton.Size = UDim2.new(1, 0, 0, 32)
+portalButton.BackgroundColor3 = BG
+portalButton.BackgroundTransparency = 0.1
+portalButton.TextColor3 = DIM
+portalButton.Font = Enum.Font.Gotham
+portalButton.TextSize = 13
+portalButton.Text = "Home Portal"
+portalButton.Active = false -- render() enables once vm.portal.canBuy is known
+portalButton.Visible = false
+portalButton.Parent = panel
+do
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = portalButton
+end
+
 -- item B: one hint line when either display is quietly capping below the biggest owned size.
 local shownSmallerHint = Instance.new("TextLabel")
 shownSmallerHint.Name = "ShownSmallerHint"
@@ -577,6 +606,13 @@ local function render()
     moveButton.Active = vm.canMove
     moveButton.TextColor3 = if vm.canMove then TEXT else DIM
 
+    -- Task 5: same enabled/disabled coloring idiom as moveButton above.
+    currentPortalCanBuy = vm.portal.canBuy
+    portalButton.Visible = vm.ownsDeck
+    portalButton.Active = vm.portal.canBuy
+    portalButton.Text = if vm.portal.owned then "Home Portal ✓" else `Home Portal — {vm.portal.price} pts`
+    portalButton.TextColor3 = if vm.portal.canBuy then TEXT else DIM
+
     renderFavorites(vm.favorites, favoriteNames)
 
     backDoorLabel.Text = if backDoorIndex ~= nil
@@ -602,6 +638,7 @@ EconomyState.OnClientEvent:Connect(function(p)
     if p.catalog then
         econ.catalog = p.catalog
     end
+    econ.portalOwned = p.portalOwned == true
     render()
 end)
 
@@ -638,4 +675,10 @@ moveButton.MouseButton1Click:Connect(function()
     end
     setOpen(false) -- reuse the panel's existing open/close mechanism
     EventBus.MoveTeahouse:Fire({ padId = econ.claimedPadId })
+end)
+
+portalButton.MouseButton1Click:Connect(function()
+    if currentPortalCanBuy then
+        RequestPurchase:FireServer({ item = "portal" })
+    end
 end)

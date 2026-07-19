@@ -116,6 +116,18 @@ function TeahouseMenuModel.viewModel(state: any): any
     -- shrink the built SIZE, never remove the building, so presence = owns one + not hidden.
     local canMove = state.claimed == true and teaMax ~= nil and state.teahouseDisplay ~= "none"
 
+    -- home portal: a one-time buy for a claimed deck-owner who doesn't already own it
+    local portalPrice = state.catalog.portal
+    local portalOwned = state.portalOwned == true
+    local portalAffordable = if portalPrice ~= nil then points >= portalPrice else false
+    local portalCanBuy = state.claimed == true and ownsDeck and not portalOwned and portalAffordable
+    local portal = {
+        owned = portalOwned,
+        price = portalPrice,
+        affordable = portalAffordable,
+        canBuy = portalCanBuy,
+    }
+
     return {
         points = points,
         ownsDeck = ownsDeck,
@@ -129,6 +141,7 @@ function TeahouseMenuModel.viewModel(state: any): any
         teahouseShownSmaller = teahouseShownSmaller,
         canMove = canMove,
         favorites = favorites,
+        portal = portal,
     }
 end
 

@@ -203,3 +203,40 @@ describe("TeahouseMenuModel.canMove", function()
         expect(vm.canMove).toBe(false)
     end)
 end)
+
+describe("TeahouseMenuModel.portal", function()
+    local CAT =
+        { deck = { S = 50, M = 500, L = 3000 }, teahouse = { S = 30, M = 300, L = 2000 }, portal = 500 }
+    test("claimed deck-owner who can afford and doesn't own it can buy", function()
+        local vm = Model.viewModel(
+            state({ maxDeckSize = "S", claimed = true, totalPoints = 500, portalOwned = false, catalog = CAT })
+        )
+        expect(vm.portal.owned).toBe(false)
+        expect(vm.portal.price).toBe(500)
+        expect(vm.portal.canBuy).toBe(true)
+    end)
+    test("already owned -> not buyable", function()
+        local vm = Model.viewModel(
+            state({ maxDeckSize = "S", claimed = true, totalPoints = 500, portalOwned = true, catalog = CAT })
+        )
+        expect(vm.portal.owned).toBe(true)
+        expect(vm.portal.canBuy).toBe(false)
+    end)
+    test("too poor -> not buyable", function()
+        local vm = Model.viewModel(
+            state({ maxDeckSize = "S", claimed = true, totalPoints = 0, portalOwned = false, catalog = CAT })
+        )
+        expect(vm.portal.affordable).toBe(false)
+        expect(vm.portal.canBuy).toBe(false)
+    end)
+    test("unclaimed -> not buyable", function()
+        local vm = Model.viewModel(state({
+            maxDeckSize = "S",
+            claimed = false,
+            totalPoints = 500,
+            portalOwned = false,
+            catalog = CAT,
+        }))
+        expect(vm.portal.canBuy).toBe(false)
+    end)
+end)
