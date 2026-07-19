@@ -8,6 +8,7 @@ local LocalizationService = game:GetService("LocalizationService")
 local NetworkClient = require(script.Parent:WaitForChild("NetworkClient"))
 local RoundCoordinator = require(script.Parent:WaitForChild("RoundCoordinator"))
 local ThrowBuffer = require(script.Parent:WaitForChild("ThrowBuffer"))
+local HandlerQueue = require(script.Parent:WaitForChild("HandlerQueue"))
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local RoundClock = require(shared:WaitForChild("RoundClock"))
 local GameRules = require(shared:WaitForChild("GameRules"))
@@ -300,8 +301,10 @@ SubmitPick.OnServerEvent:Connect(function(player, throwValue)
     end
 end)
 
+local handlerQueue = HandlerQueue.new(task.spawn)
+
 BankRequest.OnServerEvent:Connect(function(player)
-    task.spawn(function()
+    handlerQueue:run(tostring(player.UserId), function()
         local res = net:postBank(tostring(player.UserId))
         if res.ok then
             profiles:applyServer(tostring(player.UserId), {
@@ -558,6 +561,7 @@ Players.PlayerRemoving:Connect(function(player)
     playerPrefs[tostring(player.UserId)] = nil
     playerHouse[tostring(player.UserId)] = nil
     playerEconomy[tostring(player.UserId)] = nil
+    handlerQueue:clear(tostring(player.UserId))
     local action = siteCoordinator:onLeave(tostring(player.UserId))
     if action then
         applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
@@ -566,174 +570,254 @@ Players.PlayerRemoving:Connect(function(player)
 end)
 
 SetPadPreference.OnServerEvent:Connect(function(player, siteId)
-    if type(siteId) ~= "string" or PadSites[siteId] == nil then
-        return -- ignore ill-typed / unknown site ids
-    end
-    local uid = tostring(player.UserId)
-    local current = playerPrefs[uid] or {}
-    local newList, favorited = PreferenceEditor.togglePreference(current, siteId, PREF_CAP)
-    playerPrefs[uid] = newList
-    local persisted = net:setPreferences(uid, newList)
-    if not persisted.ok then
-        warn(`[D.5] setPreferences failed for {uid}: {tostring(persisted.error)}`)
-        playerPrefs[uid] = current
-        if player:IsDescendantOf(Players) then
-            -- revert client, no toast
-            PreferenceState:FireClient(player, { padPreferences = current, names = namesFor(current) })
+    handlerQueue:run(tostring(player.UserId), function()
+        if type(siteId) ~= "string" or PadSites[siteId] == nil then
+            return -- ignore ill-typed / unknown site ids
         end
-        return
-    end
-    if player:IsDescendantOf(Players) then
-        PreferenceState:FireClient(player, {
-            padPreferences = newList,
-            names = namesFor(newList),
-            changed = siteId,
-            favorited = favorited,
-            name = PadSites[siteId].displayName or siteId,
-        })
-    end
+        local uid = tostring(player.UserId)
+        local current = playerPrefs[uid] or {}
+        local newList, favorited = PreferenceEditor.togglePreference(current, siteId, PREF_CAP)
+        playerPrefs[uid] = newList
+        local persisted = net:setPreferences(uid, newList)
+        if not persisted.ok then
+            warn(`[D.5] setPreferences failed for {uid}: {tostring(persisted.error)}`)
+            playerPrefs[uid] = current
+            if player:IsDescendantOf(Players) then
+                -- revert client, no toast
+                PreferenceState:FireClient(player, { padPreferences = current, names = namesFor(current) })
+            end
+            return
+        end
+        if player:IsDescendantOf(Players) then
+            PreferenceState:FireClient(player, {
+                padPreferences = newList,
+                names = namesFor(newList),
+                changed = siteId,
+                favorited = favorited,
+                name = PadSites[siteId].displayName or siteId,
+            })
+        end
+    end)
 end)
 
 SetBackDoor.OnServerEvent:Connect(function(player, payload)
-    local uid = tostring(player.UserId)
-    local house = playerHouse[uid]
-    if house == nil then
-        return -- not occupying a teahouse this session; ignore (occupant-only)
-    end
-    -- find the live, already-materialized structure to read its back-bay count + re-render
-    local siteFolder = sitesFolder:FindFirstChild("MaterializedSite_" .. house.padId)
-    local structure = siteFolder and siteFolder:FindFirstChild("Structure")
-    if structure == nil then
-        return -- streaming / rebuild race: nothing to re-render (F2/F4)
-    end
-    local manifest = StructureOps.readManifest(structure)
-    local backBayCount = 0
-    for _, bay in manifest.bays do
-        if bay.side == "back" then
-            backBayCount += 1
+    handlerQueue:run(tostring(player.UserId), function()
+        local uid = tostring(player.UserId)
+        local house = playerHouse[uid]
+        if house == nil then
+            return -- not occupying a teahouse this session; ignore (occupant-only)
         end
-    end
-    local bayIndex = if typeof(payload) == "table" then payload.bayIndex else nil
-    if typeof(bayIndex) ~= "number" or bayIndex % 1 ~= 0 or bayIndex < 1 or bayIndex > backBayCount then
-        return -- ill-typed / non-integer / out-of-range request
-    end
-    local newWallBays = BackDoorEditor.setBackDoor(house.loadout.wallBays, bayIndex, backBayCount)
-    -- merge into a NEW copy of the occupied size's loadout (don't alias the stash pre-persist)
-    local newLoadout = table.clone(house.loadout)
-    newLoadout.wallBays = newWallBays
-    -- live, server-authoritative re-render (replicates to every client)
-    StructureOps.applyBays(structure, WallBays.resolve(manifest.bays, newWallBays))
-    house.loadout = newLoadout
-    -- rebuild paths (RequestPurchase upgrade, SetDisplay, buy-to-claim) render from this stash,
-    -- not from playerHouse; keep it in sync or the next rebuild reverts this door.
-    local e = playerEconomy[uid]
-    if e ~= nil and e.teahouses ~= nil then
-        e.teahouses[house.size] = newLoadout
-    end
-    -- best-effort persist: a failure keeps the live door this session (lost next join), no revert
-    local persisted = net:setTeahouse(uid, house.size, newLoadout)
-    if not persisted.ok then
-        warn(`[B1] setTeahouse failed for {uid}/{house.size}: {tostring(persisted.error)}`)
-    end
-    if player:IsDescendantOf(Players) then
-        BackDoorState:FireClient(player, {
-            padId = house.padId,
-            backDoorIndex = BackDoorEditor.backDoorIndex(newWallBays),
-        })
-    end
+        -- find the live, already-materialized structure to read its back-bay count + re-render
+        local siteFolder = sitesFolder:FindFirstChild("MaterializedSite_" .. house.padId)
+        local structure = siteFolder and siteFolder:FindFirstChild("Structure")
+        if structure == nil then
+            return -- streaming / rebuild race: nothing to re-render (F2/F4)
+        end
+        local manifest = StructureOps.readManifest(structure)
+        local backBayCount = 0
+        for _, bay in manifest.bays do
+            if bay.side == "back" then
+                backBayCount += 1
+            end
+        end
+        local bayIndex = if typeof(payload) == "table" then payload.bayIndex else nil
+        if typeof(bayIndex) ~= "number" or bayIndex % 1 ~= 0 or bayIndex < 1 or bayIndex > backBayCount then
+            return -- ill-typed / non-integer / out-of-range request
+        end
+        local newWallBays = BackDoorEditor.setBackDoor(house.loadout.wallBays, bayIndex, backBayCount)
+        -- merge into a NEW copy of the occupied size's loadout (don't alias the stash pre-persist)
+        local newLoadout = table.clone(house.loadout)
+        newLoadout.wallBays = newWallBays
+        -- live, server-authoritative re-render (replicates to every client)
+        StructureOps.applyBays(structure, WallBays.resolve(manifest.bays, newWallBays))
+        house.loadout = newLoadout
+        -- rebuild paths (RequestPurchase upgrade, SetDisplay, buy-to-claim) render from this stash,
+        -- not from playerHouse; keep it in sync or the next rebuild reverts this door.
+        local e = playerEconomy[uid]
+        if e ~= nil and e.teahouses ~= nil then
+            e.teahouses[house.size] = newLoadout
+        end
+        -- best-effort persist: a failure keeps the live door this session (lost next join), no revert
+        local persisted = net:setTeahouse(uid, house.size, newLoadout)
+        if not persisted.ok then
+            warn(`[B1] setTeahouse failed for {uid}/{house.size}: {tostring(persisted.error)}`)
+        end
+        if player:IsDescendantOf(Players) then
+            BackDoorState:FireClient(player, {
+                padId = house.padId,
+                backDoorIndex = BackDoorEditor.backDoorIndex(newWallBays),
+            })
+        end
+    end)
 end)
 
 RequestPurchase.OnServerEvent:Connect(function(player, payload)
-    local uid = tostring(player.UserId)
-    local e = playerEconomy[uid]
-    if e == nil then
-        return
-    end
-    local item = if typeof(payload) == "table" then payload.item else nil
-    if typeof(item) ~= "string" then
-        return
-    end
-    local kindPre = string.match(item, "^(%a+):")
-    -- buy-to-claim: a non-owner buying a deck:* claims the specific pad named in the payload.
-    -- Validate + reserve-check the pad BEFORE spending points, so a full/occupied pad doesn't
-    -- silently strand the player on a different pad (or no pad at all) after paying.
-    local isBuyToClaim = e.claimedPadId == nil and kindPre == "deck"
-    local claimPadId: string? = nil
-    if isBuyToClaim then
-        local padId = if typeof(payload) == "table" and typeof(payload.padId) == "string"
-            then payload.padId
-            else nil
-        if padId == nil or PadSites[padId] == nil or not siteCoordinator:isVacant(padId) then
-            warn(`[B2] buy-to-claim {item} for {uid} rejected: pad {tostring(padId)} unavailable`)
+    handlerQueue:run(tostring(player.UserId), function()
+        local uid = tostring(player.UserId)
+        local e = playerEconomy[uid]
+        if e == nil then
+            return
+        end
+        local item = if typeof(payload) == "table" then payload.item else nil
+        if typeof(item) ~= "string" then
+            return
+        end
+        local kindPre = string.match(item, "^(%a+):")
+        -- buy-to-claim: a non-owner buying a deck:* claims the specific pad named in the payload.
+        -- Validate + reserve-check the pad BEFORE spending points, so a full/occupied pad doesn't
+        -- silently strand the player on a different pad (or no pad at all) after paying.
+        local isBuyToClaim = e.claimedPadId == nil and kindPre == "deck"
+        local claimPadId: string? = nil
+        if isBuyToClaim then
+            local padId = if typeof(payload) == "table" and typeof(payload.padId) == "string"
+                then payload.padId
+                else nil
+            if padId == nil or PadSites[padId] == nil or not siteCoordinator:isVacant(padId) then
+                warn(`[B2] buy-to-claim {item} for {uid} rejected: pad {tostring(padId)} unavailable`)
+                echoEconomy(player, uid) -- resync the client's labels/balance
+                return
+            end
+            claimPadId = padId
+        end
+        local res = net:postPurchase(uid, item)
+        if not res.ok then
+            warn(`[B2] purchase {item} failed for {uid}: {tostring(res.error)}`)
             echoEconomy(player, uid) -- resync the client's labels/balance
             return
         end
-        claimPadId = padId
-    end
-    local res = net:postPurchase(uid, item)
-    if not res.ok then
-        warn(`[B2] purchase {item} failed for {uid}: {tostring(res.error)}`)
-        echoEconomy(player, uid) -- resync the client's labels/balance
-        return
-    end
-    -- the purchase HTTP call yielded; if the player left during it, do NOT claim/rebuild a pad
-    -- for a departed uid (PlayerRemoving already ran as a no-op for the not-yet-claimed case,
-    -- which would otherwise leak a scarce pad). Points are already persisted server-side.
-    if not player:IsDescendantOf(Players) then
-        playerEconomy[uid] = nil
-        return
-    end
-    -- adopt the authoritative new state
-    e.totalPoints = res.data.totalPoints
-    e.maxDeckSize = res.data.maxDeckSize
-    local kind, size = string.match(item, "^(%a+):(%a+)$")
-    if kind == "teahouse" and size then
-        e.teahouses[size] = { baseStyle = "teahouse-1story" }
-    end
-    if isBuyToClaim and claimPadId then
-        -- postPurchase yielded; re-check vacancy, a claim could have raced in meanwhile.
-        if siteCoordinator:isVacant(claimPadId) then
-            local action = siteCoordinator:onJoin(uid, {
-                maxDeckSize = e.maxDeckSize,
-                teahouses = e.teahouses,
-                deckDisplay = e.deckDisplay,
-                teahouseDisplay = e.teahouseDisplay,
-            }, { claimPadId })
-            if action ~= nil and action.padId == claimPadId then
-                applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
-                e.claimedPadId = action.padId
-                -- mirror the initial-join sync (below, ~line 502): the reachable case here is a
-                -- RETURNING owner whose auto-claim failed at join (pad scarcity -- every pad was
-                -- occupied), who already owns a teahouse loadout from a prior session and is now
-                -- buying a deck upgrade once a pad frees up. This claim builds their owned
-                -- teahouse for the first time this session, so playerHouse must track it too, or
-                -- the back door would stay inert for the rest of the session. (A brand-new player
-                -- can't reach this: validatePurchase enforces teahouse size <= owned deck size,
-                -- so a teahouse can never be bought before any deck.)
-                if action.teahouse ~= nil and action.teahouse.loadout ~= nil then
-                    playerHouse[uid] = {
-                        padId = action.padId,
-                        size = action.teahouse.size,
-                        loadout = action.teahouse.loadout,
-                    }
+        -- the purchase HTTP call yielded; if the player left during it, do NOT claim/rebuild a pad
+        -- for a departed uid (PlayerRemoving already ran as a no-op for the not-yet-claimed case,
+        -- which would otherwise leak a scarce pad). Points are already persisted server-side.
+        if not player:IsDescendantOf(Players) then
+            playerEconomy[uid] = nil
+            return
+        end
+        -- adopt the authoritative new state
+        e.totalPoints = res.data.totalPoints
+        e.maxDeckSize = res.data.maxDeckSize
+        local kind, size = string.match(item, "^(%a+):(%a+)$")
+        if kind == "teahouse" and size then
+            e.teahouses[size] = { baseStyle = "teahouse-1story" }
+        end
+        if isBuyToClaim and claimPadId then
+            -- postPurchase yielded; re-check vacancy, a claim could have raced in meanwhile.
+            if siteCoordinator:isVacant(claimPadId) then
+                local action = siteCoordinator:onJoin(uid, {
+                    maxDeckSize = e.maxDeckSize,
+                    teahouses = e.teahouses,
+                    deckDisplay = e.deckDisplay,
+                    teahouseDisplay = e.teahouseDisplay,
+                }, { claimPadId })
+                if action ~= nil and action.padId == claimPadId then
+                    applier:apply(
+                        action.padId,
+                        action.spec,
+                        action.treatment,
+                        action.deckSize,
+                        action.teahouse
+                    )
+                    e.claimedPadId = action.padId
+                    -- mirror the initial-join sync (below, ~line 502): the reachable case here is a
+                    -- RETURNING owner whose auto-claim failed at join (pad scarcity -- every pad was
+                    -- occupied), who already owns a teahouse loadout from a prior session and is now
+                    -- buying a deck upgrade once a pad frees up. This claim builds their owned
+                    -- teahouse for the first time this session, so playerHouse must track it too, or
+                    -- the back door would stay inert for the rest of the session. (A brand-new player
+                    -- can't reach this: validatePurchase enforces teahouse size <= owned deck size,
+                    -- so a teahouse can never be bought before any deck.)
+                    if action.teahouse ~= nil and action.teahouse.loadout ~= nil then
+                        playerHouse[uid] = {
+                            padId = action.padId,
+                            size = action.teahouse.size,
+                            loadout = action.teahouse.loadout,
+                        }
+                    else
+                        playerHouse[uid] = nil
+                    end
+                    echoBackDoor(player, uid)
                 else
-                    playerHouse[uid] = nil
+                    warn(
+                        `[B2] {uid} bought {item} but pad {claimPadId} could not be claimed this session`
+                            .. " (will be auto-placed on next join)"
+                    )
                 end
-                echoBackDoor(player, uid)
             else
                 warn(
-                    `[B2] {uid} bought {item} but pad {claimPadId} could not be claimed this session`
+                    `[B2] {uid} bought {item} but pad {claimPadId} was claimed by another player mid-purchase`
                         .. " (will be auto-placed on next join)"
                 )
             end
-        else
-            warn(
-                `[B2] {uid} bought {item} but pad {claimPadId} was claimed by another player mid-purchase`
-                    .. " (will be auto-placed on next join)"
-            )
+        elseif e.claimedPadId ~= nil then
+            -- upgrade: live-rebuild the claimed pad at the new sizes
+            local spec = PadSites[e.claimedPadId]
+            if spec then
+                local teaSizes = {}
+                for s in e.teahouses do
+                    table.insert(teaSizes, s)
+                end
+                local built = SizeClasses.resolveBuilt(
+                    e.maxDeckSize,
+                    teaSizes,
+                    spec.maxSize,
+                    e.deckDisplay,
+                    e.teahouseDisplay
+                )
+                if built then
+                    local teaLoadout = if built.teahouseSize then e.teahouses[built.teahouseSize] else nil
+                    local teahouse = if built.teahouseSize
+                        then {
+                            size = built.teahouseSize,
+                            loadout = teaLoadout,
+                            placement = (teaLoadout and teaLoadout.placement) or CENTERED_PLACEMENT,
+                        }
+                        else nil
+                    local treatment = { kind = "structure", loadout = teaLoadout, lit = true }
+                    applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
+                    -- keep playerHouse in sync with the just-rebuilt structure (B3 final review):
+                    -- a stale entry would validate SetBackDoor against the NEW structure's bay count
+                    -- but persist the edit into the PREVIOUS size's loadout via net:setTeahouse.
+                    if built.teahouseSize ~= nil then
+                        playerHouse[uid] = {
+                            padId = e.claimedPadId,
+                            size = built.teahouseSize,
+                            loadout = teaLoadout,
+                        }
+                    else
+                        playerHouse[uid] = nil -- bare deck: no live loadout to edit
+                    end
+                    echoBackDoor(player, uid)
+                end
+            end
         end
-    elseif e.claimedPadId ~= nil then
-        -- upgrade: live-rebuild the claimed pad at the new sizes
+        echoEconomy(player, uid)
+    end)
+end)
+
+SetDisplay.OnServerEvent:Connect(function(player, payload)
+    handlerQueue:run(tostring(player.UserId), function()
+        local uid = tostring(player.UserId)
+        local e = playerEconomy[uid]
+        if e == nil or e.claimedPadId == nil then
+            return -- must own+occupy a perch to set a display
+        end
+        local deckDisplay = if typeof(payload) == "table" then payload.deckDisplay else nil
+        local teahouseDisplay = if typeof(payload) == "table" then payload.teahouseDisplay else nil
+        if deckDisplay == e.deckDisplay and teahouseDisplay == e.teahouseDisplay then
+            return -- no-op: display already at the requested values (defends a modified client / redundant queued item)
+        end
+        -- server is authoritative: persist through the PWA API (it re-validates against ownership)
+        local res = net:postDisplay(uid, deckDisplay, teahouseDisplay)
+        if not res.ok then
+            warn(`[B3] postDisplay failed for {uid}: {tostring(res.error)}`)
+            echoEconomy(player, uid) -- resync
+            return
+        end
+        if not player:IsDescendantOf(Players) then
+            return -- left during the HTTP yield; nothing to rebuild
+        end
+        e.deckDisplay = res.data.deckDisplay
+        e.teahouseDisplay = res.data.teahouseDisplay
+        -- live rebuild the claimed pad at the new displayed sizes
         local spec = PadSites[e.claimedPadId]
         if spec then
             local teaSizes = {}
@@ -758,9 +842,9 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
                     else nil
                 local treatment = { kind = "structure", loadout = teaLoadout, lit = true }
                 applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
-                -- keep playerHouse in sync with the just-rebuilt structure (B3 final review):
-                -- a stale entry would validate SetBackDoor against the NEW structure's bay count
-                -- but persist the edit into the PREVIOUS size's loadout via net:setTeahouse.
+                -- keep playerHouse in sync with the just-rebuilt structure (B3 final review): a
+                -- stale entry would validate SetBackDoor against the NEW structure's bay count but
+                -- persist the edit into the PREVIOUS size's loadout (or a hidden bare-deck pad's).
                 if built.teahouseSize ~= nil then
                     playerHouse[uid] = {
                         padId = e.claimedPadId,
@@ -768,155 +852,113 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
                         loadout = teaLoadout,
                     }
                 else
-                    playerHouse[uid] = nil -- bare deck: no live loadout to edit
+                    playerHouse[uid] = nil -- teahouseDisplay == "none": bare deck, no live loadout
                 end
                 echoBackDoor(player, uid)
             end
         end
-    end
-    echoEconomy(player, uid)
+        echoEconomy(player, uid)
+    end)
 end)
 
-SetDisplay.OnServerEvent:Connect(function(player, payload)
-    local uid = tostring(player.UserId)
-    local e = playerEconomy[uid]
-    if e == nil or e.claimedPadId == nil then
-        return -- must own+occupy a perch to set a display
-    end
-    local deckDisplay = if typeof(payload) == "table" then payload.deckDisplay else nil
-    local teahouseDisplay = if typeof(payload) == "table" then payload.teahouseDisplay else nil
-    -- server is authoritative: persist through the PWA API (it re-validates against ownership)
-    local res = net:postDisplay(uid, deckDisplay, teahouseDisplay)
-    if not res.ok then
-        warn(`[B3] postDisplay failed for {uid}: {tostring(res.error)}`)
-        echoEconomy(player, uid) -- resync
-        return
-    end
-    if not player:IsDescendantOf(Players) then
-        return -- left during the HTTP yield; nothing to rebuild
-    end
-    e.deckDisplay = res.data.deckDisplay
-    e.teahouseDisplay = res.data.teahouseDisplay
-    -- live rebuild the claimed pad at the new displayed sizes
-    local spec = PadSites[e.claimedPadId]
-    if spec then
+SetPlacement.OnServerEvent:Connect(function(player, payload)
+    handlerQueue:run(tostring(player.UserId), function()
+        local uid = tostring(player.UserId)
+        local e = playerEconomy[uid]
+        if e == nil or e.claimedPadId == nil then
+            return -- occupant-only, same discipline as SetDisplay
+        end
+        if typeof(payload) ~= "table" or typeof(payload.offset) ~= "table" then
+            return
+        end
+        local dx, dz = payload.offset[1], payload.offset[2]
+        local facing = payload.facing
+        if typeof(dx) ~= "number" or dx ~= dx or math.abs(dx) == math.huge then
+            return
+        end
+        if typeof(dz) ~= "number" or dz ~= dz or math.abs(dz) == math.huge then
+            return
+        end
+        if facing ~= "N" and facing ~= "E" and facing ~= "S" and facing ~= "W" then
+            return
+        end
+        local spec = PadSites[e.claimedPadId]
+        if spec == nil then
+            return
+        end
         local teaSizes = {}
         for s in e.teahouses do
             table.insert(teaSizes, s)
         end
         local built =
             SizeClasses.resolveBuilt(e.maxDeckSize, teaSizes, spec.maxSize, e.deckDisplay, e.teahouseDisplay)
-        if built then
-            local teaLoadout = if built.teahouseSize then e.teahouses[built.teahouseSize] else nil
-            local teahouse = if built.teahouseSize
-                then {
-                    size = built.teahouseSize,
-                    loadout = teaLoadout,
-                    placement = (teaLoadout and teaLoadout.placement) or CENTERED_PLACEMENT,
-                }
-                else nil
-            local treatment = { kind = "structure", loadout = teaLoadout, lit = true }
-            applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
-            -- keep playerHouse in sync with the just-rebuilt structure (B3 final review): a
-            -- stale entry would validate SetBackDoor against the NEW structure's bay count but
-            -- persist the edit into the PREVIOUS size's loadout (or a hidden bare-deck pad's).
-            if built.teahouseSize ~= nil then
-                playerHouse[uid] = {
-                    padId = e.claimedPadId,
-                    size = built.teahouseSize,
-                    loadout = teaLoadout,
-                }
-            else
-                playerHouse[uid] = nil -- teahouseDisplay == "none": bare deck, no live loadout
-            end
-            echoBackDoor(player, uid)
+        if built == nil or built.teahouseSize == nil then
+            return -- bare deck / nothing built: nothing to move
         end
-    end
-    echoEconomy(player, uid)
-end)
-
-SetPlacement.OnServerEvent:Connect(function(player, payload)
-    local uid = tostring(player.UserId)
-    local e = playerEconomy[uid]
-    if e == nil or e.claimedPadId == nil then
-        return -- occupant-only, same discipline as SetDisplay
-    end
-    if typeof(payload) ~= "table" or typeof(payload.offset) ~= "table" then
-        return
-    end
-    local dx, dz = payload.offset[1], payload.offset[2]
-    local facing = payload.facing
-    if typeof(dx) ~= "number" or dx ~= dx or math.abs(dx) == math.huge then
-        return
-    end
-    if typeof(dz) ~= "number" or dz ~= dz or math.abs(dz) == math.huge then
-        return
-    end
-    if facing ~= "N" and facing ~= "E" and facing ~= "S" and facing ~= "W" then
-        return
-    end
-    local spec = PadSites[e.claimedPadId]
-    if spec == nil then
-        return
-    end
-    local teaSizes = {}
-    for s in e.teahouses do
-        table.insert(teaSizes, s)
-    end
-    local built =
-        SizeClasses.resolveBuilt(e.maxDeckSize, teaSizes, spec.maxSize, e.deckDisplay, e.teahouseDisplay)
-    if built == nil or built.teahouseSize == nil then
-        return -- bare deck / nothing built: nothing to move
-    end
-    local size = built.teahouseSize
-    local buildingFP = SizeClasses.buildingFootprint(size)
-    local boundsFP = SizeClasses.placementBounds(built.deckSize)
-    if not BuildingPlacer.canFitFacing(buildingFP, boundsFP, facing) then
-        return -- this facing cannot fit this built combination (UI never offers it)
-    end
-    -- server-authoritative: clamp the request against the BUILT combination and persist the
-    -- clamped value (never raw client numbers)
-    local clamped = BuildingPlacer.clamp(buildingFP, boundsFP, { offset = { dx, dz }, facing = facing })
-    -- merge into a NEW copy of the built size's loadout (pre-persist clone discipline)
-    if e.teahouses[size] == nil then
-        return -- built size has no owned loadout (non-contiguous ownership; defensive)
-    end
-    local newLoadout = table.clone(e.teahouses[size])
-    newLoadout.placement = clamped
-    local persisted = net:setTeahouse(uid, size, newLoadout)
-    if not persisted.ok then
-        warn(`[B4] setTeahouse(placement) failed for {uid}/{size}: {tostring(persisted.error)}`)
-        echoEconomy(player, uid) -- resync
-        return
-    end
-    if not player:IsDescendantOf(Players) then
-        return -- left during the HTTP yield; nothing to rebuild
-    end
-    if e.teahouses[size] == nil then
-        return -- stash vanished during the yield (defensive, mirrors the pre-yield guard)
-    end
-    -- post-yield: merge ONLY the placement onto the CURRENT stash (a SetBackDoor landing during
-    -- the yield must not be clobbered by our pre-yield snapshot — B4 final review)
-    local fresh = table.clone(e.teahouses[size])
-    fresh.placement = clamped
-    e.teahouses[size] = fresh
-    -- post-yield: a SetDisplay may have landed during the HTTP yield; recompute what is built
-    -- NOW and rebuild only if the size we just placed is still the one standing (its rebuild
-    -- already rendered the pre-move placement; ours must not stamp stale sizes over it)
-    local teaSizesNow = {}
-    for s in e.teahouses do
-        table.insert(teaSizesNow, s)
-    end
-    local builtNow =
-        SizeClasses.resolveBuilt(e.maxDeckSize, teaSizesNow, spec.maxSize, e.deckDisplay, e.teahouseDisplay)
-    if builtNow == nil or builtNow.teahouseSize ~= size then
-        return -- persisted + stash-merged; the standing build belongs to a newer state
-    end
-    local teahouse = { size = size, loadout = fresh, placement = clamped }
-    local treatment = { kind = "structure", loadout = fresh, lit = true }
-    applier:apply(e.claimedPadId, spec, treatment, builtNow.deckSize, teahouse)
-    playerHouse[uid] = { padId = e.claimedPadId, size = size, loadout = fresh }
-    echoBackDoor(player, uid) -- geometry watch re-arms the F prompts on the new structure
+        local size = built.teahouseSize
+        local buildingFP = SizeClasses.buildingFootprint(size)
+        local boundsFP = SizeClasses.placementBounds(built.deckSize)
+        if not BuildingPlacer.canFitFacing(buildingFP, boundsFP, facing) then
+            return -- this facing cannot fit this built combination (UI never offers it)
+        end
+        -- server-authoritative: clamp the request against the BUILT combination and persist the
+        -- clamped value (never raw client numbers)
+        local clamped = BuildingPlacer.clamp(buildingFP, boundsFP, { offset = { dx, dz }, facing = facing })
+        -- merge into a NEW copy of the built size's loadout (pre-persist clone discipline)
+        if e.teahouses[size] == nil then
+            return -- built size has no owned loadout (non-contiguous ownership; defensive)
+        end
+        local existingPlacement = e.teahouses[size].placement
+        if
+            existingPlacement ~= nil
+            and existingPlacement.facing == clamped.facing
+            and existingPlacement.offset[1] == clamped.offset[1]
+            and existingPlacement.offset[2] == clamped.offset[2]
+        then
+            return -- no-op: placement already at the clamped target
+        end
+        local newLoadout = table.clone(e.teahouses[size])
+        newLoadout.placement = clamped
+        local persisted = net:setTeahouse(uid, size, newLoadout)
+        if not persisted.ok then
+            warn(`[B4] setTeahouse(placement) failed for {uid}/{size}: {tostring(persisted.error)}`)
+            echoEconomy(player, uid) -- resync
+            return
+        end
+        if not player:IsDescendantOf(Players) then
+            return -- left during the HTTP yield; nothing to rebuild
+        end
+        if e.teahouses[size] == nil then
+            return -- stash vanished during the yield (defensive, mirrors the pre-yield guard)
+        end
+        -- post-yield: merge ONLY the placement onto the CURRENT stash (a SetBackDoor landing during
+        -- the yield must not be clobbered by our pre-yield snapshot — B4 final review)
+        local fresh = table.clone(e.teahouses[size])
+        fresh.placement = clamped
+        e.teahouses[size] = fresh
+        -- post-yield: a SetDisplay may have landed during the HTTP yield; recompute what is built
+        -- NOW and rebuild only if the size we just placed is still the one standing (its rebuild
+        -- already rendered the pre-move placement; ours must not stamp stale sizes over it)
+        local teaSizesNow = {}
+        for s in e.teahouses do
+            table.insert(teaSizesNow, s)
+        end
+        local builtNow = SizeClasses.resolveBuilt(
+            e.maxDeckSize,
+            teaSizesNow,
+            spec.maxSize,
+            e.deckDisplay,
+            e.teahouseDisplay
+        )
+        if builtNow == nil or builtNow.teahouseSize ~= size then
+            return -- persisted + stash-merged; the standing build belongs to a newer state
+        end
+        local teahouse = { size = size, loadout = fresh, placement = clamped }
+        local treatment = { kind = "structure", loadout = fresh, lit = true }
+        applier:apply(e.claimedPadId, spec, treatment, builtNow.deckSize, teahouse)
+        playerHouse[uid] = { padId = e.claimedPadId, size = size, loadout = fresh }
+        echoBackDoor(player, uid) -- geometry watch re-arms the F prompts on the new structure
+    end)
 end)
 
 print(`[ROSHAMBO] playable loop starting against {config.baseUrl}`)
