@@ -100,4 +100,23 @@ describe("HandlerQueue", function()
         workers[1]() -- worker runs but pending was cleared
         expect(log).toEqual({})
     end)
+
+    test("clear drops pending but a mid-flight thunk still completes", function()
+        local spawn, threads = coScheduler()
+        local q = HandlerQueue.new(spawn)
+        local log: { string } = {}
+        q:run("u", function()
+            table.insert(log, "A-start")
+            coroutine.yield() -- suspend mid-"HTTP"
+            table.insert(log, "A-end")
+        end)
+        q:run("u", function()
+            table.insert(log, "B")
+        end)
+        q:clear("u") -- A is suspended; B is pending
+        coroutine.resume(threads[1]) -- A resumes and finishes; B was dropped
+        expect(log[1]).toBe("A-start")
+        expect(log[2]).toBe("A-end")
+        expect(#log).toBe(2) -- B never ran
+    end)
 end)

@@ -4,7 +4,8 @@
 -- strictly one at a time — no mid-yield interleaving, no overlapping PUTs. The thread-spawn
 -- primitive is injected so the module is pure and Lune-testable. One worker drains a lane
 -- sequentially; a thunk's yield suspends the whole worker, so the next thunk cannot start until
--- the current one returns.
+-- the current one returns. A hung/retrying HTTP call blocks that uid's entire lane (bounded by
+-- transport timeout + NetworkClient retry); only that player's mutating handlers are affected.
 local HandlerQueue = {}
 HandlerQueue.__index = HandlerQueue
 
