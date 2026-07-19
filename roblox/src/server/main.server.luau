@@ -9,6 +9,7 @@ local NetworkClient = require(script.Parent:WaitForChild("NetworkClient"))
 local RoundCoordinator = require(script.Parent:WaitForChild("RoundCoordinator"))
 local ThrowBuffer = require(script.Parent:WaitForChild("ThrowBuffer"))
 local HandlerQueue = require(script.Parent:WaitForChild("HandlerQueue"))
+local PortalController = require(script.Parent:WaitForChild("PortalController"))
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local RoundClock = require(shared:WaitForChild("RoundClock"))
 local GameRules = require(shared:WaitForChild("GameRules"))
@@ -19,6 +20,7 @@ local FateRegistry = require(shared:WaitForChild("FateRegistry"))
 local PreferenceEditor = require(shared:WaitForChild("PreferenceEditor"))
 local BackDoorEditor = require(shared:WaitForChild("BackDoorEditor"))
 local WallBays = require(shared:WaitForChild("WallBays"))
+local PortalTarget = require(shared:WaitForChild("PortalTarget"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local SubmitPick = remotes:WaitForChild("SubmitPick") :: RemoteEvent
@@ -69,6 +71,14 @@ if arena then
 end
 for _, model in StagePersistence.persistTargets(persistRoots) do
     (model :: Model).ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+end
+
+-- Everyone arrives at ArenaSpawn: disable any other (place-only, e.g. leftover DevChannelSpawn)
+-- SpawnLocation, and make sure ArenaSpawn itself is enabled. Code-only + self-healing.
+for _, inst in workspace:GetDescendants() do
+    if inst:IsA("SpawnLocation") then
+        inst.Enabled = inst.Name == "ArenaSpawn"
+    end
 end
 
 local deps = {
@@ -968,6 +978,39 @@ SetPlacement.OnServerEvent:Connect(function(player, payload)
         echoBackDoor(player, uid) -- geometry watch re-arms the F prompts on the new structure
     end)
 end)
+
+local portalController = PortalController.new({
+    players = Players,
+    portalTarget = PortalTarget,
+    getEconomy = function(uid)
+        local e = playerEconomy[uid]
+        if e == nil then
+            return nil
+        end
+        return { portalOwned = e.portalOwned == true, claimedPadId = e.claimedPadId }
+    end,
+    deckCFForClaim = function(uid)
+        local e = playerEconomy[uid]
+        if e == nil or e.claimedPadId == nil then
+            return nil
+        end
+        local spec = PadSites[e.claimedPadId]
+        if spec == nil then
+            return nil
+        end
+        local teaSizes = {}
+        for s in e.teahouses do
+            table.insert(teaSizes, s)
+        end
+        local built =
+            SizeClasses.resolveBuilt(e.maxDeckSize, teaSizes, spec.maxSize, e.deckDisplay, e.teahouseDisplay)
+        if built == nil then
+            return nil
+        end
+        return spec.deckPlacements[built.deckSize], built.deckSize
+    end,
+})
+portalController:start()
 
 print(`[ROSHAMBO] playable loop starting against {config.baseUrl}`)
 task.spawn(function()
