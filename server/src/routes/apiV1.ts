@@ -135,10 +135,11 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
         }
     });
 
-    const readEconomy = (user: { totalPoints: number; maxDeckSize: Size | null; teahouses?: Map<string, unknown> }): EconomyState => ({
+    const readEconomy = (user: { totalPoints: number; maxDeckSize: Size | null; teahouses?: Map<string, unknown>; portalOwned?: boolean }): EconomyState => ({
         totalPoints: user.totalPoints,
         maxDeckSize: user.maxDeckSize,
         teahouseSizes: (user.teahouses ? Array.from(user.teahouses.keys()) : []) as Size[],
+        portalOwned: user.portalOwned ?? false,
     });
 
     router.get('/players/:robloxUserId/economy', async (req, res) => {
@@ -159,6 +160,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
                 catalog: PRICES,
                 deckDisplay: user.deckDisplay ?? null,
                 teahouseDisplay: user.teahouseDisplay ?? null,
+                portalOwned: st.portalOwned ?? false,
             });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
@@ -177,12 +179,13 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             const after = applyPurchase(before, item);
             user.totalPoints = after.totalPoints;
             user.maxDeckSize = after.maxDeckSize;
+            user.portalOwned = after.portalOwned ?? false;
             const [kind, size] = item.split(':') as [string, Size];
             if (kind === 'teahouse') {
                 (user.teahouses as Map<string, unknown>).set(size, { ...DEFAULT_TEAHOUSE_LOADOUT });
             }
             await user.save();
-            res.json({ item, totalPoints: after.totalPoints, maxDeckSize: after.maxDeckSize, teahouseSizes: after.teahouseSizes });
+            res.json({ item, totalPoints: after.totalPoints, maxDeckSize: after.maxDeckSize, teahouseSizes: after.teahouseSizes, portalOwned: after.portalOwned ?? false });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
         }

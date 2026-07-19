@@ -369,5 +369,23 @@ describe('/api/v1', () => {
                 .send({ deckDisplay: 'L' }).expect(400);
             expect(res.body.error).toBe('DISPLAY_UNOWNED');
         });
+
+        it('GET economy returns portalOwned (false by default)', async () => {
+            await User.create({ robloxId: 'p_portal1', totalPoints: 0, maxDeckSize: 'S' });
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .get('/api/v1/players/p_portal1/economy').set('X-API-Key', API_KEY).expect(200);
+            expect(res.body.portalOwned).toBe(false);
+            expect(res.body.catalog.portal).toBe(500);
+        });
+
+        it('POST purchase portal persists portalOwned and echoes it', async () => {
+            await User.create({ robloxId: 'p_portal2', totalPoints: 1000, maxDeckSize: 'S' });
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .post('/api/v1/players/p_portal2/purchase').set('X-API-Key', API_KEY)
+                .send({ item: 'portal' }).expect(200);
+            expect(res.body.portalOwned).toBe(true);
+            const u = await User.findOne({ robloxId: 'p_portal2' });
+            expect(u?.portalOwned).toBe(true);
+        });
     });
 });
