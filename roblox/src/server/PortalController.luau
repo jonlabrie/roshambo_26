@@ -16,7 +16,7 @@ export type Deps = {
 }
 
 function PortalController.new(deps: Deps)
-    return setmetatable({ _d = deps, _openThresholds = {} :: { [Instance]: boolean } }, PortalController)
+    return setmetatable({ _d = deps, _openThresholds = {} :: { [Instance]: Instance? } }, PortalController)
 end
 
 function PortalController:buildArena()
@@ -70,7 +70,7 @@ function PortalController:_openThreshold(control: Instance, _opener: Player)
     if not control:IsA("BasePart") then
         return
     end
-    if self._openThresholds[control] then
+    if self._openThresholds[control] ~= nil then
         return -- already open
     end
     local pt = self._d.portalTarget
@@ -83,7 +83,7 @@ function PortalController:_openThreshold(control: Instance, _opener: Player)
     threshold.Material = Enum.Material.ForceField
     threshold.CFrame = (control :: BasePart).CFrame * CFrame.new(0, 2, -2)
     threshold.Parent = workspace
-    self._openThresholds[control] = true
+    self._openThresholds[control] = threshold
     local conn
     conn = threshold.Touched:Connect(function(hit)
         local player = self._d.players:GetPlayerFromCharacter(hit.Parent)
@@ -96,10 +96,12 @@ function PortalController:_openThreshold(control: Instance, _opener: Player)
         end
         conn:Disconnect()
         threshold:Destroy()
-        self._openThresholds[control] = nil
+        if self._openThresholds[control] == threshold then
+            self._openThresholds[control] = nil
+        end
     end)
     task.delay(12, function()
-        if self._openThresholds[control] then
+        if self._openThresholds[control] == threshold then
             conn:Disconnect()
             threshold:Destroy()
             self._openThresholds[control] = nil
