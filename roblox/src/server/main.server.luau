@@ -1007,7 +1007,7 @@ local portalController = PortalController.new({
         if built == nil then
             return nil
         end
-        return spec.deckPlacements[built.deckSize], built.deckSize
+        return DeckPlacement.resolve(spec.deckPlacements, built.deckSize, spec.maxSize), built.deckSize
     end,
 })
 portalController:start()

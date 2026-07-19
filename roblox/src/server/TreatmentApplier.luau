@@ -196,7 +196,7 @@ function TreatmentApplier:apply(padId: string, spec: any, treatment: any, deckSi
             warn(`[D.6] building step failed for {padId}: {buildingErr}; deck only`)
         end
     end
-    if treatment.portalOwned == true then
+    if treatment.portalOwned == true and treatment.lit == true then
         local okPortal, portalErr = pcall(function()
             self:_buildPortalControl(padId, deckCF12, staging)
         end)
