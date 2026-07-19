@@ -130,7 +130,13 @@ end
 
 -- The home-portal deck control: a small tagged fixture on the deck railing (placeholder art).
 -- Built only for an owner's lit deck that has the portal; PortalController wires its prompt.
-function TreatmentApplier:_buildPortalControl(padId: string, deckCF12: { number }, staging: Instance)
+function TreatmentApplier:_buildPortalControl(
+    padId: string,
+    deckCF12: { number },
+    deckSize: string,
+    teaDx: number,
+    staging: Instance
+)
     local deckCF = CFrame.new(table.unpack(deckCF12))
     local control = Instance.new("Part")
     control.Name = "PortalControl"
@@ -139,8 +145,19 @@ function TreatmentApplier:_buildPortalControl(padId: string, deckCF12: { number 
     control.CanCollide = false
     control.Color = Color3.fromRGB(120, 90, 200)
     control.Material = Enum.Material.Neon
-    -- deck-relative railing spot (gate-tuned placeholder): front-right of the deck, on the surface
-    control.CFrame = deckCF * CFrame.new(6, 1.5, -6)
+    -- Against a side railing toward the back of the pad. Deck-local: -Z = front/view, +Z =
+    -- back/access (the open edge), ±X = the side railings. Auto-swap to the side away from the
+    -- teahouse: teaDx > 0 (building on the +X/right half) -> control LEFT, else -> control RIGHT.
+    -- Sized off the deck footprint so it hugs the railing at any deck size, a few studs in from the
+    -- open back edge. Gate-tunable.
+    local fp = self._sizeClasses.deckFootprint(deckSize)
+    local onLeft = teaDx > 0
+    local x = if onLeft then fp.minX + 1.5 else fp.maxX - 1.5
+    -- yaw 90deg so the doorway's wide face runs ALONG the side railing (flush, parallel), and
+    -- faces the deck interior (+X from the left railing, -X from the right) so you step in from
+    -- the deck side.
+    local yaw = if onLeft then math.rad(90) else math.rad(-90)
+    control.CFrame = deckCF * CFrame.new(x, 1.5, fp.maxZ - 4) * CFrame.Angles(0, yaw, 0)
     control:SetAttribute("padId", padId)
     control:AddTag("PortalControl")
     local prompt = Instance.new("ProximityPrompt")
@@ -197,8 +214,16 @@ function TreatmentApplier:apply(padId: string, spec: any, treatment: any, deckSi
         end
     end
     if treatment.portalOwned == true and treatment.lit == true then
+        -- the player may have dragged the teahouse (B4) onto the control's default side; put the
+        -- control on the emptier lateral half so it hugs a railing away from the building.
+        local teaDx = (
+            teahouse
+            and teahouse.placement
+            and teahouse.placement.offset
+            and teahouse.placement.offset[1]
+        ) or 0
         local okPortal, portalErr = pcall(function()
-            self:_buildPortalControl(padId, deckCF12, staging)
+            self:_buildPortalControl(padId, deckCF12, deckSize, teaDx, staging)
         end)
         if not okPortal then
             warn(`[HP] portal control build failed for {padId}: {portalErr}`)

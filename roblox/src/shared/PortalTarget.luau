@@ -15,10 +15,14 @@ PortalTarget.DECK_LANDING_LOCAL = {
     L = { 0, 3, -4 },
 } :: { [string]: { number } }
 
--- Where the Arena Portal structure builds, and where arrivals land beside it. Gate-tuned
--- placeholders near ArenaSpawn (dialed in during the visual gate).
-PortalTarget.ARENA_PORTAL_CF = { 0, 30, 40, 1, 0, 0, 0, 1, 0, 0, 0, 1 } :: { number }
-PortalTarget.ARENA_LANDING = { 0, 30, 46, 1, 0, 0, 0, 1, 0, 0, 0, 1 } :: { number }
+-- ARENA_PORTAL_CF: where the Arena Portal structure builds — against the lower overlook deck
+-- railing (user-surveyed HRP spot 2026-07-19). Rotation left identity (placeholder); align the flat
+-- face to the railing at the art pass.
+-- ARENA_LANDING: where teahouse->arena travellers arrive. This is the ArenaSpawn pad (center
+-- (30, 113.2, 8), 8x1x8) at standing height, NOT beside the portal — landing next to the portal
+-- drops you inside its Touched trigger and bounces you straight home. Facing matches the spawn pad.
+PortalTarget.ARENA_PORTAL_CF = { 79.923, 109.298, 9.276, 1, 0, 0, 0, 1, 0, 0, 0, 1 } :: { number }
+PortalTarget.ARENA_LANDING = { 30, 116.7, 8, 0, 0, 1, 0, 1, 0, -1, 0, 0 } :: { number }
 
 function PortalTarget.deckLanding(deckCF12: { number }, deckSize: string): { number }
     local o = PortalTarget.DECK_LANDING_LOCAL[deckSize] or PortalTarget.DECK_LANDING_LOCAL.L
