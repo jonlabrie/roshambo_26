@@ -419,6 +419,7 @@ local playerEconomy: {
         claimedPadId: string?,
         deckDisplay: string?,
         teahouseDisplay: string?,
+        portalOwned: boolean,
     },
 } =
     {}
@@ -442,6 +443,7 @@ local function echoEconomy(player: Player, uid: string)
         catalog = economyCatalog,
         deckDisplay = e.deckDisplay,
         teahouseDisplay = e.teahouseDisplay,
+        portalOwned = e.portalOwned,
     })
 end
 
@@ -508,6 +510,7 @@ Players.PlayerAdded:Connect(function(player)
             claimedPadId = nil,
             deckDisplay = ecoData and ecoData.deckDisplay or nil,
             teahouseDisplay = ecoData and ecoData.teahouseDisplay or nil,
+            portalOwned = (ecoData and ecoData.portalOwned) or false,
         }
         local action = siteCoordinator:onJoin(uid, {
             maxDeckSize = playerEconomy[uid].maxDeckSize,
@@ -529,6 +532,7 @@ Players.PlayerAdded:Connect(function(player)
                 playerEconomy[uid] = nil
                 return
             end
+            action.treatment.portalOwned = playerEconomy[uid].portalOwned
             applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
             playerEconomy[uid].claimedPadId = action.padId
             local tsize = action.teahouse and action.teahouse.size or "bare"
@@ -695,6 +699,7 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
         -- adopt the authoritative new state
         e.totalPoints = res.data.totalPoints
         e.maxDeckSize = res.data.maxDeckSize
+        e.portalOwned = res.data.portalOwned or false
         local kind, size = string.match(item, "^(%a+):(%a+)$")
         if kind == "teahouse" and size then
             e.teahouses[size] = { baseStyle = "teahouse-1story" }
@@ -709,6 +714,7 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
                     teahouseDisplay = e.teahouseDisplay,
                 }, { claimPadId })
                 if action ~= nil and action.padId == claimPadId then
+                    action.treatment.portalOwned = e.portalOwned
                     applier:apply(
                         action.padId,
                         action.spec,
@@ -771,7 +777,8 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
                             placement = (teaLoadout and teaLoadout.placement) or CENTERED_PLACEMENT,
                         }
                         else nil
-                    local treatment = { kind = "structure", loadout = teaLoadout, lit = true }
+                    local treatment =
+                        { kind = "structure", loadout = teaLoadout, lit = true, portalOwned = e.portalOwned }
                     applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
                     -- keep playerHouse in sync with the just-rebuilt structure (B3 final review):
                     -- a stale entry would validate SetBackDoor against the NEW structure's bay count
@@ -840,7 +847,8 @@ SetDisplay.OnServerEvent:Connect(function(player, payload)
                         placement = (teaLoadout and teaLoadout.placement) or CENTERED_PLACEMENT,
                     }
                     else nil
-                local treatment = { kind = "structure", loadout = teaLoadout, lit = true }
+                local treatment =
+                    { kind = "structure", loadout = teaLoadout, lit = true, portalOwned = e.portalOwned }
                 applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
                 -- keep playerHouse in sync with the just-rebuilt structure (B3 final review): a
                 -- stale entry would validate SetBackDoor against the NEW structure's bay count but
@@ -954,7 +962,7 @@ SetPlacement.OnServerEvent:Connect(function(player, payload)
             return -- persisted + stash-merged; the standing build belongs to a newer state
         end
         local teahouse = { size = size, loadout = fresh, placement = clamped }
-        local treatment = { kind = "structure", loadout = fresh, lit = true }
+        local treatment = { kind = "structure", loadout = fresh, lit = true, portalOwned = e.portalOwned }
         applier:apply(e.claimedPadId, spec, treatment, builtNow.deckSize, teahouse)
         playerHouse[uid] = { padId = e.claimedPadId, size = size, loadout = fresh }
         echoBackDoor(player, uid) -- geometry watch re-arms the F prompts on the new structure

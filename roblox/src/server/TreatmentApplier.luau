@@ -128,6 +128,31 @@ function TreatmentApplier:_buildBuilding(
     end
 end
 
+-- The home-portal deck control: a small tagged fixture on the deck railing (placeholder art).
+-- Built only for an owner's lit deck that has the portal; PortalController wires its prompt.
+function TreatmentApplier:_buildPortalControl(padId: string, deckCF12: { number }, staging: Instance)
+    local deckCF = CFrame.new(table.unpack(deckCF12))
+    local control = Instance.new("Part")
+    control.Name = "PortalControl"
+    control.Size = Vector3.new(1.5, 3, 0.5)
+    control.Anchored = true
+    control.CanCollide = false
+    control.Color = Color3.fromRGB(120, 90, 200)
+    control.Material = Enum.Material.Neon
+    -- deck-relative railing spot (gate-tuned placeholder): front-right of the deck, on the surface
+    control.CFrame = deckCF * CFrame.new(6, 1.5, -6)
+    control:SetAttribute("padId", padId)
+    control:AddTag("PortalControl")
+    local prompt = Instance.new("ProximityPrompt")
+    prompt.ActionText = "Open portal"
+    prompt.ObjectText = "To arena"
+    prompt.KeyboardKeyCode = Enum.KeyCode.G
+    prompt.MaxActivationDistance = 10
+    prompt.RequiresLineOfSight = false
+    prompt.Parent = control
+    control.Parent = staging
+end
+
 -- Rebuild a site from scratch: the hand-agnostic pad (deck slab + beams + engawa rail + posts)
 -- for `deckSize`, plus the optional building placed on it. Transactional: everything is staged
 -- off-tree and swapped in only on success, so a failure never blanks a live site (F2/F4).
@@ -169,6 +194,14 @@ function TreatmentApplier:apply(padId: string, spec: any, treatment: any, deckSi
         end)
         if not okBuilding then
             warn(`[D.6] building step failed for {padId}: {buildingErr}; deck only`)
+        end
+    end
+    if treatment.portalOwned == true then
+        local okPortal, portalErr = pcall(function()
+            self:_buildPortalControl(padId, deckCF12, staging)
+        end)
+        if not okPortal then
+            warn(`[HP] portal control build failed for {padId}: {portalErr}`)
         end
     end
     -- commit: drop the old site and adopt the freshly staged deck + building
