@@ -6,10 +6,10 @@ import { resolveUser } from '../identity';
 import { bankPot } from '../wallet';
 import User from '../models/User';
 import { Throw } from '../engine/GameRules';
-import { validateLoadout, validateSizeClass, validatePadPreferences, validateDecorations } from '../loadout';
+import { validateLoadout, validateSizeClass, validatePadPreferences, validateDecorations, validateAccess } from '../loadout';
 import {
     validatePurchase, applyPurchase, validateDisplay, PRICES, DEFAULT_TEAHOUSE_LOADOUT,
-    Size, EconomyState, appendDecoration,
+    Size, EconomyState, appendDecoration, DEFAULT_ACCESS,
 } from '../economy';
 
 export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
@@ -166,6 +166,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
                 teahouseDisplay: user.teahouseDisplay ?? null,
                 portalOwned: st.portalOwned ?? false,
                 deckDecorations: user.deckDecorations ?? [],
+                teahouseAccess: user.teahouseAccess ?? DEFAULT_ACCESS,
             });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
@@ -244,6 +245,21 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             user.deckDecorations = decorations;
             await user.save();
             res.json({ deckDecorations: user.deckDecorations });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
+    router.put('/players/:robloxUserId/access', async (req, res) => {
+        try {
+            const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
+            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            const access = req.body?.access;
+            const check = validateAccess(access);
+            if (!check.ok) { res.status(400).json({ error: check.error }); return; }
+            user.teahouseAccess = access;
+            await user.save();
+            res.json({ teahouseAccess: user.teahouseAccess });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
         }

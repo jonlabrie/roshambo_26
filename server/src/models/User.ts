@@ -26,6 +26,7 @@ export interface IUser extends Document {
     teahouseDisplay: 'none' | 'S' | 'M' | 'L' | null;
     portalOwned: boolean;
     deckDecorations: { id: number; propId: string; offset: [number, number]; facing: 'N' | 'E' | 'S' | 'W' }[];
+    teahouseAccess: { mode: 'public' | 'friends' | 'private'; invited: number[] };
     updatedAt: Date;
 }
 
@@ -55,6 +56,10 @@ const UserSchema: Schema = new Schema({
     teahouseDisplay: { type: String, enum: ['none', 'S', 'M', 'L', null], default: null },
     portalOwned: { type: Boolean, default: false },
     deckDecorations: { type: [Schema.Types.Mixed], default: [] },
+    teahouseAccess: {
+        type: { mode: { type: String, enum: ['public', 'friends', 'private'], default: 'public' }, invited: { type: [Number], default: [] } },
+        default: () => ({ mode: 'public', invited: [] }),
+    },
 }, { timestamps: true });
 
 export default mongoose.model<IUser>('User', UserSchema);
