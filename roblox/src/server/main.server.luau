@@ -37,6 +37,7 @@ local SetBackDoor = remotes:WaitForChild("SetBackDoor") :: RemoteEvent
 local BackDoorState = remotes:WaitForChild("BackDoorState") :: RemoteEvent
 local RequestPurchase = remotes:WaitForChild("RequestPurchase") :: RemoteEvent
 local EconomyState = remotes:WaitForChild("EconomyState") :: RemoteEvent
+local RequestSync = remotes:WaitForChild("RequestSync") :: RemoteEvent
 local SetDisplay = remotes:WaitForChild("SetDisplay") :: RemoteEvent
 local SetPlacement = remotes:WaitForChild("SetPlacement") :: RemoteEvent
 local SetDecorationPlacement = remotes:WaitForChild("SetDecorationPlacement") :: RemoteEvent
@@ -825,6 +826,30 @@ Players.PlayerAdded:Connect(function(player)
         pushAccessState(player, uid)
         recomputeAllAccess()
     end)
+end)
+
+-- Client-pull sync. The join handler pushes EconomyState/PreferenceState/etc. ONCE, but on a live
+-- server those one-shot pushes can fire before a client's listeners are connected (RemoteEvents do
+-- not queue for late listeners) -> the teahouse panel sits on "Loading...". Each client fires
+-- RequestSync on startup and retries until its EconomyState lands; we re-echo that player's full
+-- state (all guarded/idempotent). Light per-uid debounce so retries can't spin the server.
+local lastSync: { [string]: number } = {}
+RequestSync.OnServerEvent:Connect(function(player)
+    local uid = tostring(player.UserId)
+    local now = os.clock()
+    if lastSync[uid] ~= nil and now - lastSync[uid] < 0.4 then
+        return
+    end
+    lastSync[uid] = now
+    echoEconomy(player, uid)
+    if playerPrefs[uid] ~= nil then
+        PreferenceState:FireClient(
+            player,
+            { padPreferences = playerPrefs[uid], names = namesFor(playerPrefs[uid]) }
+        )
+    end
+    echoBackDoor(player, uid)
+    pushAccessState(player, uid)
 end)
 
 Players.PlayerRemoving:Connect(function(player)

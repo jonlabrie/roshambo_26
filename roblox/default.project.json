@@ -33,7 +33,8 @@
                 "InviteUser": { "$className": "RemoteEvent" },
                 "RevokeUser": { "$className": "RemoteEvent" },
                 "AccessState": { "$className": "RemoteEvent" },
-                "AccessBlocked": { "$className": "RemoteEvent" }
+                "AccessBlocked": { "$className": "RemoteEvent" },
+                "RequestSync": { "$className": "RemoteEvent" }
             }
         },
         "Workspace": {
