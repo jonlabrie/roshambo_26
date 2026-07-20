@@ -25,6 +25,7 @@ export interface IUser extends Document {
     deckDisplay: 'S' | 'M' | 'L' | null;
     teahouseDisplay: 'none' | 'S' | 'M' | 'L' | null;
     portalOwned: boolean;
+    deckDecorations: { id: number; propId: string; offset: [number, number]; facing: 'N' | 'E' | 'S' | 'W' }[];
     updatedAt: Date;
 }
 
@@ -53,6 +54,7 @@ const UserSchema: Schema = new Schema({
     deckDisplay: { type: String, enum: ['S', 'M', 'L', null], default: null },
     teahouseDisplay: { type: String, enum: ['none', 'S', 'M', 'L', null], default: null },
     portalOwned: { type: Boolean, default: false },
+    deckDecorations: { type: [Schema.Types.Mixed], default: [] },
 }, { timestamps: true });
 
 export default mongoose.model<IUser>('User', UserSchema);

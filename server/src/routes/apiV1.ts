@@ -6,8 +6,11 @@ import { resolveUser } from '../identity';
 import { bankPot } from '../wallet';
 import User from '../models/User';
 import { Throw } from '../engine/GameRules';
-import { validateLoadout, validateSizeClass, validatePadPreferences } from '../loadout';
-import { validatePurchase, applyPurchase, validateDisplay, PRICES, DEFAULT_TEAHOUSE_LOADOUT, Size, EconomyState } from '../economy';
+import { validateLoadout, validateSizeClass, validatePadPreferences, validateDecorations } from '../loadout';
+import {
+    validatePurchase, applyPurchase, validateDisplay, PRICES, DEFAULT_TEAHOUSE_LOADOUT,
+    Size, EconomyState, appendDecoration,
+} from '../economy';
 
 export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     const router = express.Router();
@@ -135,11 +138,12 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
         }
     });
 
-    const readEconomy = (user: { totalPoints: number; maxDeckSize: Size | null; teahouses?: Map<string, unknown>; portalOwned?: boolean }): EconomyState => ({
+    const readEconomy = (user: { totalPoints: number; maxDeckSize: Size | null; teahouses?: Map<string, unknown>; portalOwned?: boolean; deckDecorations?: unknown[] }): EconomyState => ({
         totalPoints: user.totalPoints,
         maxDeckSize: user.maxDeckSize,
         teahouseSizes: (user.teahouses ? Array.from(user.teahouses.keys()) : []) as Size[],
         portalOwned: user.portalOwned ?? false,
+        deckDecorationCount: user.deckDecorations?.length ?? 0,
     });
 
     router.get('/players/:robloxUserId/economy', async (req, res) => {
@@ -161,6 +165,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
                 deckDisplay: user.deckDisplay ?? null,
                 teahouseDisplay: user.teahouseDisplay ?? null,
                 portalOwned: st.portalOwned ?? false,
+                deckDecorations: user.deckDecorations ?? [],
             });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
@@ -180,6 +185,14 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             user.totalPoints = after.totalPoints;
             user.maxDeckSize = after.maxDeckSize;
             user.portalOwned = after.portalOwned ?? false;
+            if (item.startsWith('decoration:')) {
+                const propId = item.slice('decoration:'.length);
+                const { list, instance } = appendDecoration(user.deckDecorations ?? [], propId);
+                user.deckDecorations = list;
+                await user.save();
+                res.json({ item, totalPoints: after.totalPoints, decoration: instance, deckDecorations: list });
+                return;
+            }
             const [kind, size] = item.split(':') as [string, Size];
             if (kind === 'teahouse') {
                 (user.teahouses as Map<string, unknown>).set(size, { ...DEFAULT_TEAHOUSE_LOADOUT });
@@ -216,6 +229,21 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             user.padPreferences = padPreferences as string[];
             await user.save();
             res.json({ padPreferences: user.padPreferences });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
+    router.put('/players/:robloxUserId/decorations', async (req, res) => {
+        try {
+            const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
+            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            const decorations = req.body?.decorations;
+            const check = validateDecorations(decorations);
+            if (!check.ok) { res.status(400).json({ error: check.error }); return; }
+            user.deckDecorations = decorations;
+            await user.save();
+            res.json({ deckDecorations: user.deckDecorations });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
         }
