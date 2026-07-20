@@ -15,6 +15,7 @@ export type Deps = {
     portalTarget: any,
     getEconomy: (uid: string) -> { portalOwned: boolean, claimedPadId: string? }?,
     deckCFForClaim: (uid: string) -> ({ number }?, string?), -- (deckCF12, deckSize); nil,nil if no claim
+    canOpen: ((player: Player, control: Instance) -> boolean)?, -- access gate; nil = ungated (legacy)
 }
 
 function PortalController.new(deps: Deps)
@@ -63,7 +64,12 @@ function PortalController:_bindControl(control: Instance)
         return
     end
     prompt.Triggered:Connect(function(player)
-        -- anyone standing on the deck may open it (deck -> public arena is not privileged)
+        -- Prompts are distance-based, so a viewer blocked from this deck can reach the PortalControl
+        -- prompt THROUGH the perimeter wall. Gate by teahouse access so they can't use the deck's
+        -- portal. (Deck -> arena only exits to the public arena, so allowed guests still travel freely.)
+        if self._d.canOpen and not self._d.canOpen(player, control) then
+            return
+        end
         self:_openThreshold(control, player)
     end)
 end
@@ -147,6 +153,9 @@ function PortalController:_openThreshold(control: Instance, _opener: Player)
         local player = self._d.players:GetPlayerFromCharacter(hit.Parent)
         if player == nil or debounce[player] then
             return -- anyone on the deck may pass; per-player debounce guards multi-part touches
+        end
+        if self._d.canOpen and not self._d.canOpen(player, control) then
+            return -- blocked from this deck: can't ride an owner-opened portal from outside the wall
         end
         debounce[player] = true
         task.delay(1, function()

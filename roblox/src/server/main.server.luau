@@ -1537,8 +1537,35 @@ RevokeUser.OnServerEvent:Connect(function(player, payload)
     end)
 end)
 
+-- Gate the deck portal by teahouse access: a blocked viewer can reach a deck's PortalControl prompt
+-- through the perimeter wall (prompts are distance-based), but must not be able to use it. Find the
+-- pad's present owner (by claimedPadId) and apply canEnter; ungated when no present owner claims it.
+local function canOpenPortal(player: Player, control: Instance): boolean
+    local padId = control:GetAttribute("padId")
+    if typeof(padId) ~= "string" then
+        return true
+    end
+    for _, owner in Players:GetPlayers() do
+        local e = playerEconomy[tostring(owner.UserId)]
+        if e ~= nil and e.claimedPadId == padId and e.teahouseAccess ~= nil then
+            local friend = if e.teahouseAccess.mode == "friends"
+                then isFriend(player, owner.UserId)
+                else false
+            return AccessPolicy.canEnter(
+                e.teahouseAccess.mode,
+                e.teahouseAccess.invited,
+                player.UserId,
+                owner.UserId,
+                friend
+            )
+        end
+    end
+    return true
+end
+
 local portalController = PortalController.new({
     players = Players,
+    canOpen = canOpenPortal,
     portalTarget = PortalTarget,
     getEconomy = function(uid)
         local e = playerEconomy[uid]
