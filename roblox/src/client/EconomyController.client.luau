@@ -13,6 +13,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local RequestPurchase = remotes:WaitForChild("RequestPurchase") :: RemoteEvent
 local EconomyState = remotes:WaitForChild("EconomyState") :: RemoteEvent
+local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local state = {
     maxDeckSize = nil :: string?,
@@ -32,11 +33,14 @@ end
 -- (item, actionText) or (nil, nil) for what a site offers the local player right now.
 -- Owners (maxDeckSize ~= nil) get no world prompt here — upgrades are panel-only (B3).
 local function offerFor(_siteId: string, occupied: boolean): (string?, string?)
-    if state.maxDeckSize == nil then
-        -- non-owner: buy the S deck & claim a VACANT site
-        if not occupied then
-            return "deck:S", `Buy S deck & claim — {priceOf("deck:S")} pts`
+    if state.maxDeckSize == nil and not occupied then
+        -- non-owner on a vacant site. Show the shortfall in the label when unaffordable, so a new
+        -- player (starts at 0 pts, gateway deck costs 50) sees the goal instead of a silent dead-end.
+        local price = priceOf("deck:S")
+        if typeof(price) == "number" and state.totalPoints < price then
+            return "deck:S", `S deck & claim — earn {price - state.totalPoints} more pts`
         end
+        return "deck:S", `Buy S deck & claim — {priceOf("deck:S")} pts`
     end
     return nil, nil
 end
@@ -86,9 +90,19 @@ local function refreshSite(folder: Instance)
         prompt.Parent = anchor
         prompt.Triggered:Connect(function()
             local it = select(1, offerFor(siteId, folder:GetAttribute("Occupied") == true))
-            if it then
-                RequestPurchase:FireServer({ item = it, padId = siteId })
+            if it == nil then
+                return
             end
+            local price = priceOf(it)
+            if typeof(price) == "number" and state.totalPoints < price then
+                -- can't afford it yet: acknowledge the tap + teach how to earn, instead of silently
+                -- firing a purchase the server would reject.
+                EventBus.TickerMessage:Fire(
+                    `Earn {price - state.totalPoints} more pts to claim a teahouse — win a round and bank your pot`
+                )
+                return
+            end
+            RequestPurchase:FireServer({ item = it, padId = siteId })
         end)
         bound[siteId] = { prompt = prompt, anchor = anchor }
         b = bound[siteId]
