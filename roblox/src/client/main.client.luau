@@ -57,17 +57,39 @@ local HIST_TEXT = { R = 32, P = 22, S = 24 }
 -- smile) for scissors — the brand-facing variant of the happy/sad asymmetry.
 local BTN_GLYPH = { R = "○", P = "─", S = "∨" }
 
--- ===== bottom-left: persistent World-Throw history strip (below the buttons) =====
-local HIST_N = 10
-local HIST_TILE = 34
+-- 2026-07-20 mobile: the pick cluster hugs the TOP-RIGHT corner (bottom-left collides with the
+-- portrait movement joystick); the world-throw history sits centred right beneath it. Both live in a
+-- top-right-anchored container, so placement is resolution/scale-independent (no from-the-edge pixel
+-- math). Buttons are placed relative to the logo-triangle centroid (PICK_CX/PICK_CY in BTN_SPOT space).
+local PICK_BOX = 172 -- pick cluster box (~onyx diameter) = container width
+local PICK_CX, PICK_CY = 95, 147 -- BTN_SPOT centroid
+-- Own ScreenGui with IgnoreGuiInset so the picks reach the TRUE top-right corner (past the reserved
+-- topbar band), WITHOUT shifting the main HUD's bottom bar into the home-indicator safe area (which
+-- setting inset on the main gui would). The 14px top margin keeps a buffer from the edge / portrait notch.
+local pickGui = Instance.new("ScreenGui")
+pickGui.Name = "RoshamboPickHud"
+pickGui.ResetOnSpawn = false
+pickGui.IgnoreGuiInset = true
+pickGui.Parent = player:WaitForChild("PlayerGui")
+local hudRoot = Instance.new("Frame")
+hudRoot.Name = "PickHud"
+hudRoot.AnchorPoint = Vector2.new(1, 0) -- top-right corner of the screen
+hudRoot.Position = UDim2.new(1, -12, 0, 14)
+hudRoot.Size = UDim2.fromOffset(PICK_BOX, 240)
+hudRoot.BackgroundTransparency = 1
+hudRoot.Parent = pickGui
+
+-- ===== World-Throw history strip: centred right beneath the pick cluster (top-right) =====
+local HIST_N = 5 -- compact recent history that fits centred under the pick cluster
+local HIST_TILE = 30
 local HIST_GAP = 4
 local histStrip = Instance.new("Frame")
 histStrip.Name = "History"
-histStrip.AnchorPoint = Vector2.new(0, 1)
-histStrip.Position = UDim2.new(0, 12, 1, -6)
+histStrip.AnchorPoint = Vector2.new(0.5, 0) -- centred under the picks
+histStrip.Position = UDim2.new(0.5, 0, 0, PICK_BOX + 8)
 histStrip.Size = UDim2.fromOffset(HIST_N * (HIST_TILE + HIST_GAP) - HIST_GAP, HIST_TILE + 14)
 histStrip.BackgroundTransparency = 1
-histStrip.Parent = gui
+histStrip.Parent = hudRoot
 
 local histLabel = Instance.new("TextLabel")
 histLabel.Name = "Caption"
@@ -378,13 +400,13 @@ do
     local onyx = Instance.new("Frame")
     onyx.Name = "PickCluster"
     onyx.AnchorPoint = Vector2.new(0.5, 0.5)
-    onyx.Position = UDim2.new(0, cx, 1, -cy)
+    onyx.Position = UDim2.new(0.5, 0, 0, PICK_BOX / 2) -- top-centre of the container
     onyx.Size = UDim2.fromOffset(rad * 2, rad * 2)
     onyx.BackgroundColor3 = Color3.fromRGB(20, 19, 23) -- deep matte onyx (flat, non-glossy)
     onyx.BackgroundTransparency = 0.06
     onyx.BorderSizePixel = 0
     onyx.ZIndex = 0 -- behind the ivory buttons (default ZIndex 1)
-    onyx.Parent = gui
+    onyx.Parent = hudRoot
     local oCorner = Instance.new("UICorner")
     oCorner.CornerRadius = UDim.new(1, 0)
     oCorner.Parent = onyx
@@ -400,12 +422,12 @@ for _, value in THROWS do
     local b = Instance.new("TextButton")
     b.Name = value
     b.AnchorPoint = Vector2.new(0.5, 0.5)
-    b.Position = UDim2.new(0, spot.x, 1, -spot.y)
+    b.Position = UDim2.fromOffset(PICK_BOX / 2 + (spot.x - PICK_CX), PICK_BOX / 2 + (PICK_CY - spot.y))
     b.Size = UDim2.fromOffset(BTN_D, BTN_D)
     b.BackgroundColor3 = IVORY
     b.AutoButtonColor = false
     b.Text = ""
-    b.Parent = gui
+    b.Parent = hudRoot
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(1, 0) -- circle
     corner.Parent = b
