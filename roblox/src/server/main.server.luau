@@ -669,12 +669,15 @@ end
 -- transient message (bad name / already invited / list full) surfaced by the panel.
 local function pushAccessState(player: Player, uid: string, notice: string?)
     local e = playerEconomy[uid]
-    if e == nil or e.teahouseAccess == nil or not player:IsDescendantOf(Players) then
+    if e == nil or e.teahouseAccess == nil then
         return
     end
     local invited = {}
     for _, id in e.teahouseAccess.invited do
         table.insert(invited, { userId = id, name = resolveName(id) })
+    end
+    if not player:IsDescendantOf(Players) then
+        return
     end
     AccessState:FireClient(player, { mode = e.teahouseAccess.mode, invited = invited, notice = notice })
 end
@@ -1029,6 +1032,8 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
             end
         end
         echoEconomy(player, uid)
+        -- re-push access gates: a mid-session claim or size upgrade changes occupancy/deck geometry
+        recomputeAllAccess()
     end)
 end)
 
@@ -1103,6 +1108,8 @@ SetDisplay.OnServerEvent:Connect(function(player, payload)
             end
         end
         echoEconomy(player, uid)
+        -- re-push access gates: display resize changes deck footprint -> gate geometry
+        recomputeAllAccess()
     end)
 end)
 
