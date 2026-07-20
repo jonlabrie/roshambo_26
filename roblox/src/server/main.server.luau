@@ -1488,3 +1488,62 @@ task.spawn(function()
         task.wait(delay)
     end
 end)
+
+-- Access backstop: the authoritative half of enforcement. Every ACCESS_TICK seconds, for each
+-- occupied deck, teleport back any player standing on it who is not allowed in (canEnter=false).
+-- Catches side jump-ins, exploiters who nulled a local gate, and eviction when a mode flips /
+-- an invite is revoked. Owner + allowed guests are never moved. Uses deck-LOCAL bounds so it
+-- follows the deck's rotation.
+local ACCESS_TICK = 0.3
+task.spawn(function()
+    while true do
+        task.wait(ACCESS_TICK)
+        -- snapshot occupied decks once per tick
+        for _, owner in Players:GetPlayers() do
+            local ouid = tostring(owner.UserId)
+            local e = playerEconomy[ouid]
+            if e == nil or e.claimedPadId == nil or e.teahouseAccess == nil then
+                continue
+            end
+            local deckCF12, deckSize = deckCFForUid(ouid)
+            if deckCF12 == nil or deckSize == nil then
+                continue
+            end
+            local fp = SizeClasses.deckFootprint(deckSize)
+            local deckCF = CFrame.new(table.unpack(deckCF12))
+            local evictCF = CFrame.new(table.unpack(AccessGates.evictionPoint(deckCF12, deckSize)))
+            for _, viewer in Players:GetPlayers() do
+                if viewer == owner then
+                    continue -- owner is always allowed; never evict
+                end
+                local char = viewer.Character
+                local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+                if root == nil then
+                    continue
+                end
+                -- is the viewer standing within this deck's footprint (deck-local), within a height band?
+                local rel = deckCF:PointToObjectSpace(root.Position)
+                if rel.X < fp.minX or rel.X > fp.maxX or rel.Z < fp.minZ or rel.Z > fp.maxZ then
+                    continue
+                end
+                if rel.Y < -2 or rel.Y > AccessGates.GATE_H then
+                    continue -- far below/above the deck plane: not on this deck
+                end
+                local friend = if e.teahouseAccess.mode == "friends"
+                    then isFriend(viewer, owner.UserId)
+                    else false
+                if
+                    not AccessPolicy.canEnter(
+                        e.teahouseAccess.mode,
+                        e.teahouseAccess.invited,
+                        viewer.UserId,
+                        owner.UserId,
+                        friend
+                    )
+                then
+                    char:PivotTo(evictCF)
+                end
+            end
+        end
+    end
+end)
