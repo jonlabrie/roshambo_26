@@ -4,10 +4,28 @@ export const PRICES = {
     deck: { S: 50, M: 500, L: 3000 },
     teahouse: { S: 30, M: 300, L: 2000 },
     portal: 500,
+    decoration: { ishidoro: 40, tsukubai: 60, bonsai: 25, bench: 35 },
 } as const;
 export const DEFAULT_TEAHOUSE_LOADOUT = { baseStyle: 'teahouse-1story' };
 
-export type EconomyState = { totalPoints: number; maxDeckSize: Size | null; teahouseSizes: Size[]; portalOwned?: boolean };
+export const MAX_DECORATIONS = 24;
+export const DECORATION_PROPS: Set<string> = new Set(Object.keys(PRICES.decoration));
+
+export type DeckDecoration = { id: number; propId: string; offset: [number, number]; facing: 'N' | 'E' | 'S' | 'W' };
+
+export function nextDecorationId(decorations: DeckDecoration[]): number {
+    return decorations.reduce((m, d) => Math.max(m, d.id), 0) + 1;
+}
+
+export function appendDecoration(
+    decorations: DeckDecoration[],
+    propId: string,
+): { list: DeckDecoration[]; instance: DeckDecoration } {
+    const instance: DeckDecoration = { id: nextDecorationId(decorations), propId, offset: [0, 0], facing: 'N' };
+    return { list: [...decorations, instance], instance };
+}
+
+export type EconomyState = { totalPoints: number; maxDeckSize: Size | null; teahouseSizes: Size[]; portalOwned?: boolean; deckDecorationCount?: number };
 type Check = { ok: true; cost: number } | { ok: false; error: string };
 
 // the tier that must be owned before buying `size` (null = nothing below S)
@@ -19,6 +37,15 @@ export function validatePurchase(state: EconomyState, item: string): Check {
         if (state.portalOwned) return { ok: false, error: 'ALREADY_OWNED' };
         if (state.totalPoints < PRICES.portal) return { ok: false, error: 'INSUFFICIENT_POINTS' };
         return { ok: true, cost: PRICES.portal };
+    }
+    if (item.startsWith('decoration:')) {
+        const propId = item.slice('decoration:'.length);
+        if (state.maxDeckSize === null) return { ok: false, error: 'NEEDS_DECK' };
+        if (!DECORATION_PROPS.has(propId)) return { ok: false, error: 'BAD_ITEM' };
+        if ((state.deckDecorationCount ?? 0) >= MAX_DECORATIONS) return { ok: false, error: 'DECOR_CAP' };
+        const cost = (PRICES.decoration as Record<string, number>)[propId];
+        if (state.totalPoints < cost) return { ok: false, error: 'INSUFFICIENT_POINTS' };
+        return { ok: true, cost };
     }
     const [kind, size] = item.split(':') as [string, Size];
     if ((kind !== 'deck' && kind !== 'teahouse') || (size !== 'S' && size !== 'M' && size !== 'L')) {
@@ -54,6 +81,9 @@ export function applyPurchase(state: EconomyState, item: string): EconomyState {
     if (item === 'portal') {
         next.portalOwned = true;
         return next;
+    }
+    if (item.startsWith('decoration:')) {
+        return next; // cost already deducted above; decoration list is tracked outside EconomyState
     }
     const [kind, size] = item.split(':') as [string, Size];
     if (kind === 'deck') next.maxDeckSize = size;

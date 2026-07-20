@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { validatePurchase, applyPurchase, PRICES, EconomyState, validateDisplay } from './economy';
+import {
+  validatePurchase, applyPurchase, PRICES, EconomyState, validateDisplay,
+  MAX_DECORATIONS, DECORATION_PROPS, nextDecorationId, appendDecoration, DeckDecoration,
+} from './economy';
 
 const fresh = (over: Partial<EconomyState> = {}): EconomyState =>
     ({ totalPoints: 100000, maxDeckSize: null, teahouseSizes: [], ...over });
@@ -110,4 +113,58 @@ describe('portal purchase', () => {
     expect(after.portalOwned).toBe(true);
     expect(after.totalPoints).toBe(700 - PRICES.portal);
   });
+});
+
+describe('validatePurchase — decorations', () => {
+    it('rejects a decoration when no deck is owned', () => {
+        expect(validatePurchase(fresh(), 'decoration:bonsai')).toEqual({ ok: false, error: 'NEEDS_DECK' });
+    });
+    it('accepts a known decoration on a claimed deck and charges its price', () => {
+        expect(validatePurchase(fresh({ maxDeckSize: 'S' }), 'decoration:bonsai'))
+            .toEqual({ ok: true, cost: PRICES.decoration.bonsai });
+    });
+    it('rejects an unknown propId', () => {
+        expect(validatePurchase(fresh({ maxDeckSize: 'S' }), 'decoration:dragon'))
+            .toEqual({ ok: false, error: 'BAD_ITEM' });
+    });
+    it('rejects at the decoration cap', () => {
+        expect(validatePurchase(fresh({ maxDeckSize: 'S', deckDecorationCount: MAX_DECORATIONS }), 'decoration:bench'))
+            .toEqual({ ok: false, error: 'DECOR_CAP' });
+    });
+    it('rejects when unaffordable', () => {
+        expect(validatePurchase(fresh({ maxDeckSize: 'S', totalPoints: 0 }), 'decoration:tsukubai'))
+            .toEqual({ ok: false, error: 'INSUFFICIENT_POINTS' });
+    });
+    it('DECORATION_PROPS holds exactly the four launch props', () => {
+        expect([...DECORATION_PROPS].sort()).toEqual(['bench', 'bonsai', 'ishidoro', 'tsukubai']);
+    });
+});
+
+describe('applyPurchase — decorations charge points only', () => {
+    it('deducts the price and leaves tiers untouched', () => {
+        const s = applyPurchase(fresh({ totalPoints: 1000, maxDeckSize: 'S' }), 'decoration:ishidoro');
+        expect(s.totalPoints).toBe(1000 - PRICES.decoration.ishidoro);
+        expect(s.maxDeckSize).toBe('S');
+        expect(s.teahouseSizes).toEqual([]);
+    });
+});
+
+describe('decoration id authority', () => {
+    it('nextDecorationId starts at 1 on an empty list', () => {
+        expect(nextDecorationId([])).toBe(1);
+    });
+    it('nextDecorationId is max(id)+1, robust to gaps', () => {
+        const list: DeckDecoration[] = [
+            { id: 3, propId: 'bench', offset: [0, 0], facing: 'N' },
+            { id: 7, propId: 'bonsai', offset: [1, 2], facing: 'E' },
+        ];
+        expect(nextDecorationId(list)).toBe(8);
+    });
+    it('appendDecoration appends a centered N instance with the next id, without mutating input', () => {
+        const list: DeckDecoration[] = [{ id: 5, propId: 'bench', offset: [1, 1], facing: 'S' }];
+        const { list: next, instance } = appendDecoration(list, 'bonsai');
+        expect(instance).toEqual({ id: 6, propId: 'bonsai', offset: [0, 0], facing: 'N' });
+        expect(next).toHaveLength(2);
+        expect(list).toHaveLength(1); // input untouched
+    });
 });
