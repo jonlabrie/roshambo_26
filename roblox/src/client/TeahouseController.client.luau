@@ -40,6 +40,10 @@ local SetPadPreference = remotes:WaitForChild("SetPadPreference") :: RemoteEvent
 local EconomyState = remotes:WaitForChild("EconomyState") :: RemoteEvent
 local PreferenceState = remotes:WaitForChild("PreferenceState") :: RemoteEvent
 local BackDoorState = remotes:WaitForChild("BackDoorState") :: RemoteEvent
+local SetAccess = remotes:WaitForChild("SetAccess") :: RemoteEvent
+local InviteUser = remotes:WaitForChild("InviteUser") :: RemoteEvent
+local RevokeUser = remotes:WaitForChild("RevokeUser") :: RemoteEvent
+local AccessState = remotes:WaitForChild("AccessState") :: RemoteEvent
 
 -- latest merged state fed to MenuModel.viewModel
 local econ = {
@@ -61,6 +65,8 @@ local econ = {
     deckDecorations = {} :: { any },
 }
 local backDoorIndex: number? = nil
+local access = { mode = "public", invited = {} :: { { userId: number, name: string } } }
+local accessNotice: string? = nil
 local favoriteNames: { [string]: string } = {} -- item C: siteId -> real name, from PreferenceState
 -- B4 Task 5: mirrors vm.canMove from the latest render(), read by the Move-teahouse click handler
 -- (which fires after render() has moved on, so it can't read `vm` directly).
@@ -498,6 +504,125 @@ local function ensureDecorButtons(vm: any)
     end
 end
 
+sectionLabel(82, "Access")
+
+-- mode toggle row (public / friends / private)
+local accessModeRow = Instance.new("Frame")
+accessModeRow.Name = "AccessModeRow"
+accessModeRow.LayoutOrder = 83
+accessModeRow.Size = UDim2.new(1, 0, 0, 30)
+accessModeRow.BackgroundTransparency = 1
+accessModeRow.Parent = panel
+do
+    local l = Instance.new("UIListLayout")
+    l.FillDirection = Enum.FillDirection.Horizontal
+    l.Padding = UDim.new(0, 6)
+    l.SortOrder = Enum.SortOrder.LayoutOrder
+    l.Parent = accessModeRow
+end
+local accessModeButtons: { [string]: TextButton } = {}
+for i, mode in { "public", "friends", "private" } do
+    local button = Instance.new("TextButton")
+    button.Name = mode
+    button.LayoutOrder = i
+    button.Size = UDim2.fromOffset(100, 30)
+    button.BackgroundColor3 = BG
+    button.BackgroundTransparency = 0.1
+    button.TextColor3 = TEXT
+    button.Font = Enum.Font.Gotham
+    button.TextSize = 12
+    button.Text = mode:sub(1, 1):upper() .. mode:sub(2)
+    button.Parent = accessModeRow
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = button
+    button.MouseButton1Click:Connect(function()
+        SetAccess:FireServer({ mode = mode })
+    end)
+    accessModeButtons[mode] = button
+end
+
+-- invite field + button (shown only in private mode)
+local inviteRow = Instance.new("Frame")
+inviteRow.Name = "InviteRow"
+inviteRow.LayoutOrder = 84
+inviteRow.Size = UDim2.new(1, 0, 0, 30)
+inviteRow.BackgroundTransparency = 1
+inviteRow.Visible = false
+inviteRow.Parent = panel
+local inviteBox = Instance.new("TextBox")
+inviteBox.Name = "InviteBox"
+inviteBox.Size = UDim2.new(1, -70, 1, 0)
+inviteBox.BackgroundColor3 = BG
+inviteBox.BackgroundTransparency = 0.1
+inviteBox.TextColor3 = TEXT
+inviteBox.PlaceholderText = "username"
+inviteBox.Font = Enum.Font.Gotham
+inviteBox.TextSize = 12
+inviteBox.ClearTextOnFocus = false
+inviteBox.Text = ""
+inviteBox.Parent = inviteRow
+do
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6)
+    c.Parent = inviteBox
+end
+local inviteButton = Instance.new("TextButton")
+inviteButton.Name = "InviteButton"
+inviteButton.AnchorPoint = Vector2.new(1, 0)
+inviteButton.Position = UDim2.fromScale(1, 0)
+inviteButton.Size = UDim2.fromOffset(64, 30)
+inviteButton.BackgroundColor3 = BG
+inviteButton.BackgroundTransparency = 0.1
+inviteButton.TextColor3 = GOLD
+inviteButton.Font = Enum.Font.GothamBold
+inviteButton.TextSize = 12
+inviteButton.Text = "Invite"
+inviteButton.Parent = inviteRow
+do
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6)
+    c.Parent = inviteButton
+end
+inviteButton.MouseButton1Click:Connect(function()
+    local name = inviteBox.Text
+    if #name > 0 then
+        InviteUser:FireServer({ username = name })
+        inviteBox.Text = ""
+    end
+end)
+
+local noticeLabel = Instance.new("TextLabel")
+noticeLabel.Name = "AccessNotice"
+noticeLabel.LayoutOrder = 85
+noticeLabel.Size = UDim2.new(1, 0, 0, 16)
+noticeLabel.BackgroundTransparency = 1
+noticeLabel.TextColor3 = GOLD
+noticeLabel.Font = Enum.Font.Gotham
+noticeLabel.TextSize = 11
+noticeLabel.TextXAlignment = Enum.TextXAlignment.Left
+noticeLabel.Text = ""
+noticeLabel.Visible = false
+noticeLabel.Parent = panel
+
+-- invitee list (shown only in private mode)
+local inviteeContainer = Instance.new("ScrollingFrame")
+inviteeContainer.Name = "Invitees"
+inviteeContainer.LayoutOrder = 86
+inviteeContainer.Size = UDim2.new(1, 0, 0, 96)
+inviteeContainer.CanvasSize = UDim2.new()
+inviteeContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
+inviteeContainer.ScrollBarThickness = 6
+inviteeContainer.BackgroundTransparency = 1
+inviteeContainer.BorderSizePixel = 0
+inviteeContainer.Visible = false
+inviteeContainer.Parent = panel
+local inviteeLayout = Instance.new("UIListLayout")
+inviteeLayout.FillDirection = Enum.FillDirection.Vertical
+inviteeLayout.Padding = UDim.new(0, 4)
+inviteeLayout.SortOrder = Enum.SortOrder.LayoutOrder
+inviteeLayout.Parent = inviteeContainer
+
 -- ===== Step 3: render() =====
 
 local function styleOwned(w: RungWidget, size: string)
@@ -620,6 +745,62 @@ local function renderFavorites(favorites: { string }, names: { [string]: string 
     end
 end
 
+local function renderAccess()
+    for mode, button in accessModeButtons do
+        local selected = access.mode == mode
+        button.TextColor3 = if selected then GOLD else TEXT
+        button.BackgroundTransparency = if selected then 0 else 0.1
+    end
+    local isPrivate = access.mode == "private"
+    inviteRow.Visible = isPrivate
+    inviteeContainer.Visible = isPrivate
+    noticeLabel.Visible = accessNotice ~= nil
+    noticeLabel.Text = accessNotice or ""
+
+    for _, child in inviteeContainer:GetChildren() do
+        if child ~= inviteeLayout then
+            child:Destroy()
+        end
+    end
+    if isPrivate then
+        for i, entry in access.invited do
+            local row = Instance.new("Frame")
+            row.Name = "Invitee_" .. tostring(entry.userId)
+            row.LayoutOrder = i
+            row.Size = UDim2.new(1, 0, 0, 22)
+            row.BackgroundTransparency = 1
+            row.Parent = inviteeContainer
+            local label = Instance.new("TextLabel")
+            label.Size = UDim2.new(1, -28, 1, 0)
+            label.BackgroundTransparency = 1
+            label.TextColor3 = TEXT
+            label.Font = Enum.Font.Gotham
+            label.TextSize = 12
+            label.TextXAlignment = Enum.TextXAlignment.Left
+            label.Text = entry.name
+            label.Parent = row
+            local remove = Instance.new("TextButton")
+            remove.AnchorPoint = Vector2.new(1, 0)
+            remove.Position = UDim2.fromScale(1, 0)
+            remove.Size = UDim2.fromOffset(22, 22)
+            remove.BackgroundColor3 = BG
+            remove.BackgroundTransparency = 0.1
+            remove.TextColor3 = DANGER
+            remove.Font = Enum.Font.GothamBold
+            remove.TextSize = 14
+            remove.Text = "x"
+            remove.Parent = row
+            local c = Instance.new("UICorner")
+            c.CornerRadius = UDim.new(0, 4)
+            c.Parent = remove
+            local uid = entry.userId
+            remove.MouseButton1Click:Connect(function()
+                RevokeUser:FireServer({ userId = uid })
+            end)
+        end
+    end
+end
+
 local function render()
     -- item E: nothing to render safely until the first EconomyState echo lands; show one
     -- loading line and hide the ladder rows instead of their default-visible bare S/M/L buttons.
@@ -684,6 +865,14 @@ local function render()
     end
     decorContainer.Visible = vm.ownsDeck
 
+    renderAccess()
+    accessModeRow.Visible = vm.ownsDeck
+    if not vm.ownsDeck then
+        inviteRow.Visible = false
+        inviteeContainer.Visible = false
+        noticeLabel.Visible = false
+    end
+
     renderFavorites(vm.favorites, favoriteNames)
 
     backDoorLabel.Text = if backDoorIndex ~= nil
@@ -722,6 +911,16 @@ end)
 
 BackDoorState.OnClientEvent:Connect(function(p)
     backDoorIndex = p.backDoorIndex
+    render()
+end)
+
+AccessState.OnClientEvent:Connect(function(p)
+    if typeof(p) ~= "table" then
+        return
+    end
+    access.mode = p.mode or "public"
+    access.invited = p.invited or {}
+    accessNotice = p.notice
     render()
 end)
 
