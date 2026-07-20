@@ -83,4 +83,18 @@ function BuildingPlacer.canFitFacing(buildingFP: FP, boundsFP: FP, facing: strin
     return halfX * 2 <= (boundsFP.maxX - boundsFP.minX) and halfZ * 2 <= (boundsFP.maxZ - boundsFP.minZ)
 end
 
+-- Deck-local axis-aligned bounds of a centered footprint placed at p.offset with p.facing.
+-- 90/270 swap the half-extents (rotation-aware), matching fits()/clamp(). Used to test
+-- decoration-vs-teahouse overlap and to clamp decorations to the deck.
+function BuildingPlacer.footprintBounds(fp: FP, p: Placement): FP
+    local halfX = (fp.maxX - fp.minX) / 2
+    local halfZ = (fp.maxZ - fp.minZ) / 2
+    local yaw = BuildingPlacer.facingYaw(p.facing)
+    if yaw == 90 or yaw == 270 then
+        halfX, halfZ = halfZ, halfX
+    end
+    local dx, dz = p.offset[1], p.offset[2]
+    return { minX = dx - halfX, maxX = dx + halfX, minZ = dz - halfZ, maxZ = dz + halfZ }
+end
+
 return BuildingPlacer
