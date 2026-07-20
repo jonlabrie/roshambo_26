@@ -4,6 +4,7 @@
 -- enabled display options, favorites). No Roblox datatypes -> Lune-tested. Mirrors the B1/B2
 -- pure-editor pattern; the GUI controller only renders what this returns.
 local SizeClasses = require("./SizeClasses")
+local DecorationCatalog = require("./DecorationCatalog")
 
 local TeahouseMenuModel = {}
 local SIZES = { "S", "M", "L" } -- smallest-first for ladder rendering
@@ -128,6 +129,21 @@ function TeahouseMenuModel.viewModel(state: any): any
         canBuy = portalCanBuy,
     }
 
+    -- decorations: buy-per-placement props, buyable only on a claimed deck under the cap.
+    local decorCatalog = state.catalog.decoration or {}
+    local decorCount = #(state.deckDecorations or {})
+    local underCap = decorCount < DecorationCatalog.MAX_DECORATIONS
+    local decorations = {}
+    for _, propId in DecorationCatalog.ids() do
+        local price = decorCatalog[propId]
+        local affordable = if price ~= nil then points >= price else false
+        local canBuy = state.claimed == true and ownsDeck and underCap and affordable and price ~= nil
+        table.insert(
+            decorations,
+            { propId = propId, price = price, affordable = affordable, canBuy = canBuy }
+        )
+    end
+
     return {
         points = points,
         ownsDeck = ownsDeck,
@@ -142,6 +158,7 @@ function TeahouseMenuModel.viewModel(state: any): any
         canMove = canMove,
         favorites = favorites,
         portal = portal,
+        decorations = decorations,
     }
 end
 

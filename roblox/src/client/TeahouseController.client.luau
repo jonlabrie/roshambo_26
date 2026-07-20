@@ -51,12 +51,14 @@ local econ = {
     deckDisplay = nil :: string?,
     teahouseDisplay = nil :: string?,
     padPreferences = {} :: { string },
-    catalog = { deck = {}, teahouse = {}, portal = 0 } :: {
+    catalog = { deck = {}, teahouse = {}, portal = 0, decoration = {} } :: {
         deck: { [string]: number },
         teahouse: { [string]: number },
         portal: number,
+        decoration: { [string]: number },
     },
     portalOwned = false,
+    deckDecorations = {} :: { any },
 }
 local backDoorIndex: number? = nil
 local favoriteNames: { [string]: string } = {} -- item C: siteId -> real name, from PreferenceState
@@ -440,6 +442,62 @@ backDoorLabel.TextXAlignment = Enum.TextXAlignment.Left
 backDoorLabel.Text = "Back door: none set"
 backDoorLabel.Parent = panel
 
+local DECOR_LABELS = {
+    ishidoro = "Stone Lantern",
+    tsukubai = "Water Basin",
+    bonsai = "Potted Bonsai",
+    bench = "Wooden Bench",
+}
+
+sectionLabel(76, "Decorations")
+local decorContainer = Instance.new("Frame")
+decorContainer.Name = "Decorations"
+decorContainer.LayoutOrder = 77
+decorContainer.Size = UDim2.fromScale(1, 0)
+decorContainer.AutomaticSize = Enum.AutomaticSize.Y
+decorContainer.BackgroundTransparency = 1
+decorContainer.Parent = panel
+local decorLayout = Instance.new("UIListLayout")
+decorLayout.FillDirection = Enum.FillDirection.Vertical
+decorLayout.Padding = UDim.new(0, 4)
+decorLayout.SortOrder = Enum.SortOrder.LayoutOrder
+decorLayout.Parent = decorContainer
+
+-- propId -> its buy button, created once (catalog is fixed); render() updates label/enabled.
+local decorButtons: { [string]: TextButton } = {}
+
+-- Because the panel's construction order runs before the first echo, create the buttons lazily
+-- on the first render that has a catalog.
+local function ensureDecorButtons(vm: any)
+    if next(decorButtons) ~= nil then
+        return
+    end
+    for i, d in vm.decorations do
+        local button = Instance.new("TextButton")
+        button.Name = "Decor_" .. d.propId
+        button.LayoutOrder = i
+        button.Size = UDim2.new(1, 0, 0, 30)
+        button.BackgroundColor3 = BG
+        button.BackgroundTransparency = 0.1
+        button.TextColor3 = DIM
+        button.Font = Enum.Font.Gotham
+        button.TextSize = 12
+        button.TextXAlignment = Enum.TextXAlignment.Left
+        button.Active = false
+        button.Parent = decorContainer
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 6)
+        corner.Parent = button
+        local propId = d.propId
+        button.MouseButton1Click:Connect(function()
+            if button.Active then
+                RequestPurchase:FireServer({ item = "decoration:" .. propId })
+            end
+        end)
+        decorButtons[propId] = button
+    end
+end
+
 -- ===== Step 3: render() =====
 
 local function styleOwned(w: RungWidget, size: string)
@@ -613,6 +671,19 @@ local function render()
     portalButton.Text = if vm.portal.owned then "Home Portal ✓" else `Home Portal — {vm.portal.price} pts`
     portalButton.TextColor3 = if vm.portal.canBuy then TEXT else DIM
 
+    ensureDecorButtons(vm)
+    for _, d in vm.decorations do
+        local button = decorButtons[d.propId]
+        if button then
+            local label = DECOR_LABELS[d.propId] or d.propId
+            local priceText = if d.price ~= nil then `{d.price} pts` else "—"
+            button.Text = `  {label} — {priceText}`
+            button.Active = d.canBuy
+            button.TextColor3 = if d.canBuy then TEXT else DIM
+        end
+    end
+    decorContainer.Visible = vm.ownsDeck
+
     renderFavorites(vm.favorites, favoriteNames)
 
     backDoorLabel.Text = if backDoorIndex ~= nil
@@ -639,6 +710,7 @@ EconomyState.OnClientEvent:Connect(function(p)
         econ.catalog = p.catalog
     end
     econ.portalOwned = p.portalOwned == true
+    econ.deckDecorations = p.deckDecorations or {}
     render()
 end)
 

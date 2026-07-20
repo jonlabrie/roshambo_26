@@ -204,6 +204,83 @@ describe("TeahouseMenuModel.canMove", function()
     end)
 end)
 
+describe("TeahouseMenuModel.viewModel — decorations", function()
+    local DecorationCatalog = require("../src/shared/DecorationCatalog")
+
+    local function baseState(over)
+        local s = {
+            totalPoints = 1000,
+            maxDeckSize = "S",
+            teahouseSizes = {},
+            claimed = true,
+            claimedPadId = "T01",
+            deckDisplay = nil,
+            teahouseDisplay = nil,
+            padPreferences = {},
+            portalOwned = false,
+            deckDecorations = {},
+            catalog = {
+                deck = { S = 50, M = 500, L = 3000 },
+                teahouse = { S = 30, M = 300, L = 2000 },
+                portal = 500,
+                decoration = { ishidoro = 40, tsukubai = 60, bonsai = 25, bench = 35 },
+            },
+        }
+        for k, v in over or {} do
+            s[k] = v
+        end
+        return s
+    end
+
+    test("lists all catalog props in catalog order with price + affordability", function()
+        local vm = require("../src/shared/TeahouseMenuModel").viewModel(baseState())
+        expect(#vm.decorations).toBe(#DecorationCatalog.ids())
+        expect(vm.decorations[1].propId).toBe("ishidoro")
+        expect(vm.decorations[1].price).toBe(40)
+        expect(vm.decorations[1].affordable).toBe(true)
+        expect(vm.decorations[1].canBuy).toBe(true)
+    end)
+
+    test("unaffordable prop is not buyable", function()
+        local vm = require("../src/shared/TeahouseMenuModel").viewModel(baseState({ totalPoints = 10 }))
+        for _, d in vm.decorations do
+            expect(d.affordable).toBe(false)
+            expect(d.canBuy).toBe(false)
+        end
+    end)
+
+    test("no claim -> nothing buyable", function()
+        local vm = require("../src/shared/TeahouseMenuModel").viewModel(
+            baseState({ claimed = false, claimedPadId = nil })
+        )
+        for _, d in vm.decorations do
+            expect(d.canBuy).toBe(false)
+        end
+    end)
+
+    test("no deck -> nothing buyable", function()
+        -- table-constructor elision: { maxDeckSize = nil } never adds the key, so the merge
+        -- loop above can't null it out -- assign after construction instead.
+        local st = baseState()
+        st.maxDeckSize = nil
+        local vm = require("../src/shared/TeahouseMenuModel").viewModel(st)
+        for _, d in vm.decorations do
+            expect(d.canBuy).toBe(false)
+        end
+    end)
+
+    test("at the cap -> nothing buyable", function()
+        local full = {}
+        for i = 1, DecorationCatalog.MAX_DECORATIONS do
+            table.insert(full, { id = i, propId = "bonsai", offset = { 0, 0 }, facing = "N" })
+        end
+        local vm = require("../src/shared/TeahouseMenuModel").viewModel(baseState({ deckDecorations = full }))
+        for _, d in vm.decorations do
+            expect(d.canBuy).toBe(false)
+        end
+    end)
+end)
+
 describe("TeahouseMenuModel.portal", function()
     local CAT =
         { deck = { S = 50, M = 500, L = 3000 }, teahouse = { S = 30, M = 300, L = 2000 }, portal = 500 }
