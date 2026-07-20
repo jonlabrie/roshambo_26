@@ -23,6 +23,12 @@ return {
         water = { 0.20, 0.35, 0.43 },
         gravel = { 0.79, 0.76, 0.70 },
         timber = { 0.42, 0.31, 0.20 },
+        -- weathered temple palette (2026-07-20 Water Striker art pass; starting values)
+        cypressWeathered = { 0.56, 0.55, 0.51 }, -- sun-bleached aged hinoki posts/beams/brackets
+        bronzePatina = { 0.18, 0.25, 0.22 }, -- dark verdigris green-black bell
+        slateTile = { 0.13, 0.14, 0.16 }, -- near-black hip-roof tile
+        ironDark = { 0.16, 0.16, 0.18 }, -- hoop bands, collars, chains, gears
+        paddleWet = { 0.34, 0.35, 0.33 }, -- darkened wet lower paddles
     },
     lighting = {
         clockTime = 16.5,

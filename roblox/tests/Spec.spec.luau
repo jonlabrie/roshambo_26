@@ -52,3 +52,26 @@ describe("Spec.matMul", function()
         end
     end)
 end)
+
+describe("Spec.meshPart", function()
+    test("emits a MeshPart node with MeshId and cleared TextureID", function()
+        local m = Spec.meshPart("BellBody", {
+            MeshId = "rbxassetid://123",
+            Size = { 10, 13, 10 },
+            CFrame = Spec.cframe({ -2, 121, 0 }),
+            Material = "Metal",
+            MaterialVariant = "BronzePatina",
+        })
+        expect(m.className).toBe("MeshPart")
+        expect(m.name).toBe("BellBody")
+        expect(m.properties.MeshId).toBe("rbxassetid://123")
+        expect(m.properties.TextureID).toBe("")
+        expect(m.properties.Anchored).toBe(true)
+        expect(m.properties.MaterialVariant).toBe("BronzePatina")
+    end)
+    test("does not mutate the caller's props table", function()
+        local props: { [string]: any } = { MeshId = "rbxassetid://1", Size = { 1, 1, 1 } }
+        Spec.meshPart("A", props)
+        expect(props.TextureID).toBeNil()
+    end)
+end)

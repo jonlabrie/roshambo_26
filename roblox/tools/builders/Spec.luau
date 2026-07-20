@@ -33,6 +33,20 @@ function Spec.part(name: string, props: { [string]: any }): PartSpec
     return { name = name, className = "Part", properties = properties, children = kids }
 end
 
+-- Like Spec.part but emits a MeshPart referencing an uploaded MeshId. Forces
+-- Anchored and clears TextureID so the assigned MaterialVariant shows (a baked
+-- TextureID overrides the variant — see the texturing recipe).
+function Spec.meshPart(name: string, props: { [string]: any }): PartSpec
+    local kids = props.children
+    local properties: { [string]: any } = { Anchored = true, TextureID = "" }
+    for k, v in props do
+        if k ~= "children" then
+            properties[k] = v
+        end
+    end
+    return { name = name, className = "MeshPart", properties = properties, children = kids }
+end
+
 function Spec.model(name: string, children: { PartSpec }): PartSpec
     return { name = name, className = "Model", properties = {}, children = children }
 end
