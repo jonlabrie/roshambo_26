@@ -39,6 +39,9 @@ local RequestPurchase = remotes:WaitForChild("RequestPurchase") :: RemoteEvent
 local EconomyState = remotes:WaitForChild("EconomyState") :: RemoteEvent
 local SetDisplay = remotes:WaitForChild("SetDisplay") :: RemoteEvent
 local SetPlacement = remotes:WaitForChild("SetPlacement") :: RemoteEvent
+local SetDecorationPlacement = remotes:WaitForChild("SetDecorationPlacement") :: RemoteEvent
+local SetDecorationRemove = remotes:WaitForChild("SetDecorationRemove") :: RemoteEvent
+local DecorationPlaced = remotes:WaitForChild("DecorationPlaced") :: RemoteEvent
 local TweenService = game:GetService("TweenService")
 local TextService = game:GetService("TextService")
 
@@ -432,6 +435,7 @@ local playerEconomy: {
         deckDisplay: string?,
         teahouseDisplay: string?,
         portalOwned: boolean,
+        deckDecorations: { any },
     },
 } =
     {}
@@ -456,6 +460,7 @@ local function echoEconomy(player: Player, uid: string)
         deckDisplay = e.deckDisplay,
         teahouseDisplay = e.teahouseDisplay,
         portalOwned = e.portalOwned,
+        deckDecorations = e.deckDecorations,
     })
 end
 
@@ -492,6 +497,50 @@ local applier = TreatmentApplier.new({
     decorationCatalog = DecorationCatalog,
 })
 
+-- Rebuild the player's claimed pad at its currently-resolved sizes/placement, threading the
+-- current portal + decoration state, keeping playerHouse in sync. Used by the decoration
+-- buy/place/remove paths, which change decoration state and then re-render the standing pad.
+local function rebuildClaimedPad(uid: string)
+    local e = playerEconomy[uid]
+    if e == nil or e.claimedPadId == nil then
+        return
+    end
+    local spec = PadSites[e.claimedPadId]
+    if spec == nil then
+        return
+    end
+    local teaSizes = {}
+    for s in e.teahouses do
+        table.insert(teaSizes, s)
+    end
+    local built =
+        SizeClasses.resolveBuilt(e.maxDeckSize, teaSizes, spec.maxSize, e.deckDisplay, e.teahouseDisplay)
+    if built == nil then
+        return
+    end
+    local teaLoadout = if built.teahouseSize then e.teahouses[built.teahouseSize] else nil
+    local teahouse = if built.teahouseSize
+        then {
+            size = built.teahouseSize,
+            loadout = teaLoadout,
+            placement = (teaLoadout and teaLoadout.placement) or CENTERED_PLACEMENT,
+        }
+        else nil
+    local treatment = {
+        kind = "structure",
+        loadout = teaLoadout,
+        lit = true,
+        portalOwned = e.portalOwned,
+        deckDecorations = e.deckDecorations,
+    }
+    applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
+    if built.teahouseSize ~= nil then
+        playerHouse[uid] = { padId = e.claimedPadId, size = built.teahouseSize, loadout = teaLoadout }
+    else
+        playerHouse[uid] = nil
+    end
+end
+
 -- Register all 14 surveyed perches in stable T01..T14 order (PadSites is a keyed dict
 -- with no iteration order, so the id list is explicit). Each registers as a dormant
 -- vacant site; a joining owner claims the first fitting one (size-tier, then this order).
@@ -525,6 +574,7 @@ Players.PlayerAdded:Connect(function(player)
             deckDisplay = ecoData and ecoData.deckDisplay or nil,
             teahouseDisplay = ecoData and ecoData.teahouseDisplay or nil,
             portalOwned = (ecoData and ecoData.portalOwned) or false,
+            deckDecorations = (ecoData and ecoData.deckDecorations) or {},
         }
         local action = siteCoordinator:onJoin(uid, {
             maxDeckSize = playerEconomy[uid].maxDeckSize,
@@ -547,6 +597,7 @@ Players.PlayerAdded:Connect(function(player)
                 return
             end
             action.treatment.portalOwned = playerEconomy[uid].portalOwned
+            action.treatment.deckDecorations = playerEconomy[uid].deckDecorations
             applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
             playerEconomy[uid].claimedPadId = action.padId
             local tsize = action.teahouse and action.teahouse.size or "bare"
@@ -714,6 +765,20 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
         e.totalPoints = res.data.totalPoints
         e.maxDeckSize = res.data.maxDeckSize
         e.portalOwned = res.data.portalOwned or false
+        if string.sub(item, 1, 11) == "decoration:" then
+            -- the PWA is the id authority: adopt the returned list + the new instance's id, rebuild
+            -- the claimed pad so the prop renders, then tell the client to enter placement for it.
+            e.deckDecorations = res.data.deckDecorations or e.deckDecorations
+            if e.claimedPadId ~= nil then
+                rebuildClaimedPad(uid)
+                echoBackDoor(player, uid)
+            end
+            if player:IsDescendantOf(Players) and res.data.decoration ~= nil then
+                DecorationPlaced:FireClient(player, { id = res.data.decoration.id })
+            end
+            echoEconomy(player, uid)
+            return
+        end
         local kind, size = string.match(item, "^(%a+):(%a+)$")
         if kind == "teahouse" and size then
             e.teahouses[size] = { baseStyle = "teahouse-1story" }
@@ -729,6 +794,7 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
                 }, { claimPadId })
                 if action ~= nil and action.padId == claimPadId then
                     action.treatment.portalOwned = e.portalOwned
+                    action.treatment.deckDecorations = e.deckDecorations
                     applier:apply(
                         action.padId,
                         action.spec,
@@ -791,8 +857,13 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
                             placement = (teaLoadout and teaLoadout.placement) or CENTERED_PLACEMENT,
                         }
                         else nil
-                    local treatment =
-                        { kind = "structure", loadout = teaLoadout, lit = true, portalOwned = e.portalOwned }
+                    local treatment = {
+                        kind = "structure",
+                        loadout = teaLoadout,
+                        lit = true,
+                        portalOwned = e.portalOwned,
+                        deckDecorations = e.deckDecorations,
+                    }
                     applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
                     -- keep playerHouse in sync with the just-rebuilt structure (B3 final review):
                     -- a stale entry would validate SetBackDoor against the NEW structure's bay count
@@ -861,8 +932,13 @@ SetDisplay.OnServerEvent:Connect(function(player, payload)
                         placement = (teaLoadout and teaLoadout.placement) or CENTERED_PLACEMENT,
                     }
                     else nil
-                local treatment =
-                    { kind = "structure", loadout = teaLoadout, lit = true, portalOwned = e.portalOwned }
+                local treatment = {
+                    kind = "structure",
+                    loadout = teaLoadout,
+                    lit = true,
+                    portalOwned = e.portalOwned,
+                    deckDecorations = e.deckDecorations,
+                }
                 applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
                 -- keep playerHouse in sync with the just-rebuilt structure (B3 final review): a
                 -- stale entry would validate SetBackDoor against the NEW structure's bay count but
@@ -976,10 +1052,133 @@ SetPlacement.OnServerEvent:Connect(function(player, payload)
             return -- persisted + stash-merged; the standing build belongs to a newer state
         end
         local teahouse = { size = size, loadout = fresh, placement = clamped }
-        local treatment = { kind = "structure", loadout = fresh, lit = true, portalOwned = e.portalOwned }
+        local treatment = {
+            kind = "structure",
+            loadout = fresh,
+            lit = true,
+            portalOwned = e.portalOwned,
+            deckDecorations = e.deckDecorations,
+        }
         applier:apply(e.claimedPadId, spec, treatment, builtNow.deckSize, teahouse)
         playerHouse[uid] = { padId = e.claimedPadId, size = size, loadout = fresh }
         echoBackDoor(player, uid) -- geometry watch re-arms the F prompts on the new structure
+    end)
+end)
+
+SetDecorationPlacement.OnServerEvent:Connect(function(player, payload)
+    handlerQueue:run(tostring(player.UserId), function()
+        local uid = tostring(player.UserId)
+        local e = playerEconomy[uid]
+        if e == nil or e.claimedPadId == nil then
+            return -- occupant-only, same discipline as SetPlacement
+        end
+        if
+            typeof(payload) ~= "table"
+            or typeof(payload.id) ~= "number"
+            or typeof(payload.offset) ~= "table"
+        then
+            return
+        end
+        local id = payload.id
+        local dx, dz = payload.offset[1], payload.offset[2]
+        local facing = payload.facing
+        if typeof(dx) ~= "number" or dx ~= dx or math.abs(dx) == math.huge then
+            return
+        end
+        if typeof(dz) ~= "number" or dz ~= dz or math.abs(dz) == math.huge then
+            return
+        end
+        if facing ~= "N" and facing ~= "E" and facing ~= "S" and facing ~= "W" then
+            return
+        end
+        -- find the instance by id (stale client view -> no-op)
+        local idx: number? = nil
+        for i, d in e.deckDecorations do
+            if d.id == id then
+                idx = i
+                break
+            end
+        end
+        if idx == nil then
+            return
+        end
+        local propId = e.deckDecorations[idx].propId
+        local fp = DecorationCatalog.footprint(propId)
+        if fp == nil then
+            return
+        end
+        -- server-authoritative clamp against the CURRENT deck footprint (full deck; decorations may
+        -- sit to the very edge). Persist the clamped value, never raw client numbers.
+        local spec = PadSites[e.claimedPadId]
+        if spec == nil then
+            return
+        end
+        local teaSizes = {}
+        for s in e.teahouses do
+            table.insert(teaSizes, s)
+        end
+        local built =
+            SizeClasses.resolveBuilt(e.maxDeckSize, teaSizes, spec.maxSize, e.deckDisplay, e.teahouseDisplay)
+        if built == nil then
+            return
+        end
+        local deckFP = SizeClasses.deckFootprint(built.deckSize)
+        local clamped = BuildingPlacer.clamp(fp, deckFP, { offset = { dx, dz }, facing = facing })
+        -- build a NEW list (pre-persist clone discipline) with this instance updated
+        local newList = table.clone(e.deckDecorations)
+        newList[idx] = { id = id, propId = propId, offset = clamped.offset, facing = clamped.facing }
+        local persisted = net:setDecorations(uid, newList)
+        if not persisted.ok then
+            warn(`[DECOR] setDecorations(place) failed for {uid}: {tostring(persisted.error)}`)
+            echoEconomy(player, uid)
+            return
+        end
+        if not player:IsDescendantOf(Players) then
+            return
+        end
+        e.deckDecorations = newList
+        rebuildClaimedPad(uid)
+        echoBackDoor(player, uid) -- rebuild replaced the Structure; re-arm the F prompts (parity)
+        echoEconomy(player, uid)
+    end)
+end)
+
+SetDecorationRemove.OnServerEvent:Connect(function(player, payload)
+    handlerQueue:run(tostring(player.UserId), function()
+        local uid = tostring(player.UserId)
+        local e = playerEconomy[uid]
+        if e == nil or e.claimedPadId == nil then
+            return
+        end
+        local id = if typeof(payload) == "table" then payload.id else payload
+        if typeof(id) ~= "number" then
+            return
+        end
+        local newList = {}
+        local found = false
+        for _, d in e.deckDecorations do
+            if d.id == id then
+                found = true
+            else
+                table.insert(newList, d)
+            end
+        end
+        if not found then
+            return -- stale id: no-op
+        end
+        local persisted = net:setDecorations(uid, newList)
+        if not persisted.ok then
+            warn(`[DECOR] setDecorations(remove) failed for {uid}: {tostring(persisted.error)}`)
+            echoEconomy(player, uid)
+            return
+        end
+        if not player:IsDescendantOf(Players) then
+            return
+        end
+        e.deckDecorations = newList
+        rebuildClaimedPad(uid)
+        echoBackDoor(player, uid) -- rebuild replaced the Structure; re-arm the F prompts (parity)
+        echoEconomy(player, uid)
     end)
 end)
 

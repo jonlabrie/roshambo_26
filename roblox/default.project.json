@@ -25,7 +25,10 @@
                 "RequestPurchase": { "$className": "RemoteEvent" },
                 "EconomyState": { "$className": "RemoteEvent" },
                 "SetDisplay": { "$className": "RemoteEvent" },
-                "SetPlacement": { "$className": "RemoteEvent" }
+                "SetPlacement": { "$className": "RemoteEvent" },
+                "SetDecorationPlacement": { "$className": "RemoteEvent" },
+                "SetDecorationRemove": { "$className": "RemoteEvent" },
+                "DecorationPlaced": { "$className": "RemoteEvent" }
             }
         },
         "Workspace": {
