@@ -774,7 +774,10 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
                 echoBackDoor(player, uid)
             end
             if player:IsDescendantOf(Players) and res.data.decoration ~= nil then
-                DecorationPlaced:FireClient(player, { id = res.data.decoration.id })
+                DecorationPlaced:FireClient(
+                    player,
+                    { id = res.data.decoration.id, propId = res.data.decoration.propId }
+                )
             end
             echoEconomy(player, uid)
             return

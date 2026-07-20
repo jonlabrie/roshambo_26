@@ -15,7 +15,6 @@ local SetDecorationRemove = remotes:WaitForChild("SetDecorationRemove") :: Remot
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local myPadId: string? = nil
-local pendingAutoMoveId: number? = nil
 local bound: { [Instance]: boolean } = {} -- decoration Model -> prompts added
 
 local function anchorPart(model: Model): BasePart?
@@ -72,8 +71,7 @@ local function addPrompts(model: Model)
     end)
 end
 
--- Bind a tagged decoration IF it belongs to this client's claimed pad. Also fulfils a pending
--- auto-move (post-buy) when the matching instance appears.
+-- Bind a tagged decoration IF it belongs to this client's claimed pad.
 local function tryBind(inst: Instance)
     if not inst:IsA("Model") then
         return
@@ -83,14 +81,6 @@ local function tryBind(inst: Instance)
         return
     end
     addPrompts(inst)
-    local id = inst:GetAttribute("id")
-    if pendingAutoMoveId ~= nil and typeof(id) == "number" and id == pendingAutoMoveId then
-        local propId = propIdOf(inst)
-        if typeof(propId) == "string" then
-            pendingAutoMoveId = nil
-            EventBus.MoveDecoration:Fire({ padId = myPadId, id = id, propId = propId, part = inst })
-        end
-    end
 end
 
 local function rescanAll()
@@ -113,9 +103,17 @@ EconomyState.OnClientEvent:Connect(function(p)
 end)
 
 DecorationPlaced.OnClientEvent:Connect(function(p)
-    if typeof(p) == "table" and typeof(p.id) == "number" then
-        pendingAutoMoveId = p.id
-        rescanAll() -- the freshly-built prop may already be here; otherwise tryBind catches it
+    if
+        typeof(p) == "table"
+        and typeof(p.id) == "number"
+        and typeof(p.propId) == "string"
+        and myPadId ~= nil
+    then
+        -- Enter ghost-drag for the freshly-bought prop IMMEDIATELY, independent of whether its
+        -- default [0,0] render is visible: on a teahouse-owning deck the centered default is
+        -- auto-hidden, so the built instance would never appear and waiting for it would strand
+        -- the prop. enterDecoration tolerates a nil part and resolves the deck from padId.
+        EventBus.MoveDecoration:Fire({ padId = myPadId, id = p.id, propId = p.propId, part = nil })
     end
 end)
 

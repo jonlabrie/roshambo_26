@@ -253,11 +253,13 @@ local function startMove(descriptor: any)
         facing = descriptor.initialFacing,
     }
     ghost = descriptor.ghost
-    fadeOriginal(descriptor.original, 0.7)
-    for _, d in descriptor.original:GetDescendants() do
-        if d:IsA("ProximityPrompt") and d.Enabled then
-            d.Enabled = false
-            table.insert(disabledPrompts, d)
+    if descriptor.original ~= nil then
+        fadeOriginal(descriptor.original, 0.7)
+        for _, d in descriptor.original:GetDescendants() do
+            if d:IsA("ProximityPrompt") and d.Enabled then
+                d.Enabled = false
+                table.insert(disabledPrompts, d)
+            end
         end
     end
     applyGhost()
@@ -279,7 +281,9 @@ local function startMove(descriptor: any)
             end
         end)
     )
-    table.insert(conns, descriptor.original.Destroying:Connect(exit)) -- rebuild landed mid-mode
+    if descriptor.original ~= nil then
+        table.insert(conns, descriptor.original.Destroying:Connect(exit)) -- rebuild landed mid-mode
+    end
     local char = player.Character
     local humanoid = char and char:FindFirstChildOfClass("Humanoid")
     if humanoid then
@@ -334,19 +338,28 @@ local function enterTeahouse(payload: any)
 end
 
 -- Decoration entry: ghost a fresh catalog prop, bounds = full deck footprint (props may sit to the
--- edge), commit -> SetDecorationPlacement{ id }.
+-- edge), commit -> SetDecorationPlacement{ id }. payload.part is OPTIONAL: a freshly-bought prop
+-- (no built instance, e.g. auto-hidden under a centered teahouse) passes no part and starts the
+-- ghost at the stash default; an existing built prop's Move prompt passes a real part and starts
+-- the ghost at its current placement.
 local function enterDecoration(payload: any)
     if
         active
         or typeof(payload) ~= "table"
         or typeof(payload.id) ~= "number"
         or typeof(payload.propId) ~= "string"
-        or typeof(payload.part) ~= "Instance"
+        or typeof(payload.padId) ~= "string"
     then
         return
     end
-    local part = payload.part :: Model
-    local folder = part.Parent
+    local part = if typeof(payload.part) == "Instance" then payload.part :: Model else nil
+    local folder: Instance? = nil
+    if part ~= nil then
+        folder = part.Parent
+    else
+        local sites = workspace:FindFirstChild("TeahouseSites")
+        folder = sites and sites:FindFirstChild("MaterializedSite_" .. payload.padId)
+    end
     local m, deckSize = siteInfo(folder)
     local fp = DecorationCatalog.footprint(payload.propId)
     if m == nil or deckSize == nil or fp == nil then
@@ -356,7 +369,12 @@ local function enterDecoration(payload: any)
     if ghostModel == nil then
         return
     end
-    local dx, dz, facing = facingFromPivotOf(part, m)
+    -- an existing (visible) prop starts the ghost at its current placement; a freshly-bought prop
+    -- (no built part) starts at the stash default (deck centre) and the player drags it out.
+    local dx, dz, facing = 0, 0, "N"
+    if part ~= nil then
+        dx, dz, facing = facingFromPivotOf(part, m)
+    end
     startMove({
         original = part,
         ghost = ghostify(ghostModel),
