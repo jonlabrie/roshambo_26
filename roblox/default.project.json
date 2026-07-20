@@ -28,7 +28,12 @@
                 "SetPlacement": { "$className": "RemoteEvent" },
                 "SetDecorationPlacement": { "$className": "RemoteEvent" },
                 "SetDecorationRemove": { "$className": "RemoteEvent" },
-                "DecorationPlaced": { "$className": "RemoteEvent" }
+                "DecorationPlaced": { "$className": "RemoteEvent" },
+                "SetAccess": { "$className": "RemoteEvent" },
+                "InviteUser": { "$className": "RemoteEvent" },
+                "RevokeUser": { "$className": "RemoteEvent" },
+                "AccessState": { "$className": "RemoteEvent" },
+                "AccessBlocked": { "$className": "RemoteEvent" }
             }
         },
         "Workspace": {

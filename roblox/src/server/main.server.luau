@@ -42,6 +42,16 @@ local SetPlacement = remotes:WaitForChild("SetPlacement") :: RemoteEvent
 local SetDecorationPlacement = remotes:WaitForChild("SetDecorationPlacement") :: RemoteEvent
 local SetDecorationRemove = remotes:WaitForChild("SetDecorationRemove") :: RemoteEvent
 local DecorationPlaced = remotes:WaitForChild("DecorationPlaced") :: RemoteEvent
+-- SetAccess/InviteUser/RevokeUser handlers land in the next task (mutating handlers); the
+-- remotes are declared now so the panel can wire up against a stable contract.
+-- selene: allow(unused_variable)
+local SetAccess = remotes:WaitForChild("SetAccess") :: RemoteEvent
+-- selene: allow(unused_variable)
+local InviteUser = remotes:WaitForChild("InviteUser") :: RemoteEvent
+-- selene: allow(unused_variable)
+local RevokeUser = remotes:WaitForChild("RevokeUser") :: RemoteEvent
+local AccessState = remotes:WaitForChild("AccessState") :: RemoteEvent
+local AccessBlocked = remotes:WaitForChild("AccessBlocked") :: RemoteEvent
 local TweenService = game:GetService("TweenService")
 local TextService = game:GetService("TextService")
 
@@ -396,6 +406,8 @@ local SizeClasses = require(shared:WaitForChild("SizeClasses"))
 local DeckPlacement = require(shared:WaitForChild("DeckPlacement"))
 local DecorationLayout = require(shared:WaitForChild("DecorationLayout"))
 local DecorationCatalog = require(shared:WaitForChild("DecorationCatalog"))
+local AccessPolicy = require(shared:WaitForChild("AccessPolicy"))
+local AccessGates = require(shared:WaitForChild("AccessGates"))
 local StructureOps = require(script.Parent:WaitForChild("StructureOps"))
 local PadOps = require(script.Parent:WaitForChild("PadOps"))
 local PadSites = require(script.Parent:WaitForChild("PadSites"))
@@ -436,6 +448,7 @@ local playerEconomy: {
         teahouseDisplay: string?,
         portalOwned: boolean,
         deckDecorations: { any },
+        teahouseAccess: { mode: string, invited: { number } },
     },
 } =
     {}
@@ -541,6 +554,134 @@ local function rebuildClaimedPad(uid: string)
     end
 end
 
+-- (deckCF12, deckSize) for a claimed owner's currently-built deck, or nil,nil.
+local function deckCFForUid(uid: string): ({ number }?, string?)
+    local e = playerEconomy[uid]
+    if e == nil or e.claimedPadId == nil then
+        return nil, nil
+    end
+    local spec = PadSites[e.claimedPadId]
+    if spec == nil then
+        return nil, nil
+    end
+    local teaSizes = {}
+    for s in e.teahouses do
+        table.insert(teaSizes, s)
+    end
+    local built =
+        SizeClasses.resolveBuilt(e.maxDeckSize, teaSizes, spec.maxSize, e.deckDisplay, e.teahouseDisplay)
+    if built == nil then
+        return nil, nil
+    end
+    return DeckPlacement.resolve(spec.deckPlacements, built.deckSize, spec.maxSize), built.deckSize
+end
+
+-- friend cache keyed "viewerId:ownerId" (friendship is static within a session).
+local friendCache: { [string]: boolean } = {}
+local function isFriend(viewer: Player, ownerId: number): boolean
+    local key = `{viewer.UserId}:{ownerId}`
+    local cached = friendCache[key]
+    if cached ~= nil then
+        return cached
+    end
+    local ok, result = pcall(function()
+        return viewer:IsFriendsWith(ownerId)
+    end)
+    local val = ok and result == true
+    friendCache[key] = val
+    return val
+end
+
+-- The gate specs a blocked viewer needs at one occupied pad: the derived deck-back gate + any
+-- authored tunnel-mouth gates (PadSites[padId].accessGates, empty until the survey task).
+local function gatesForPad(padId: string, deckCF12: { number }, deckSize: string): { any }
+    local gates = { AccessGates.deckBackGate(deckCF12, deckSize) }
+    local spec = PadSites[padId]
+    local authored = spec and spec.accessGates
+    if authored then
+        for _, g in authored do
+            table.insert(gates, { cframe = g.cframe, size = g.size })
+        end
+    end
+    return gates
+end
+
+-- For each present player, push the set of occupied pads they are BLOCKED from (with gate specs).
+-- Invite lists never leave the server. Cheap: O(viewers x occupiedPads).
+local function recomputeAllAccess()
+    -- snapshot occupied pads (owner present + claimed), with each owner's access + built deck.
+    local occupied: {
+        {
+            padId: string,
+            ownerId: number,
+            mode: string,
+            invited: { number },
+            deckCF12: { number },
+            deckSize: string,
+        }
+    } =
+        {}
+    for _, owner in Players:GetPlayers() do
+        local ouid = tostring(owner.UserId)
+        local e = playerEconomy[ouid]
+        if e ~= nil and e.claimedPadId ~= nil and e.teahouseAccess ~= nil then
+            local deckCF12, deckSize = deckCFForUid(ouid)
+            if deckCF12 ~= nil and deckSize ~= nil then
+                table.insert(occupied, {
+                    padId = e.claimedPadId,
+                    ownerId = owner.UserId,
+                    mode = e.teahouseAccess.mode,
+                    invited = e.teahouseAccess.invited,
+                    deckCF12 = deckCF12,
+                    deckSize = deckSize,
+                })
+            end
+        end
+    end
+    for _, viewer in Players:GetPlayers() do
+        local blocked = {}
+        for _, pad in occupied do
+            local friend = if pad.mode == "friends" then isFriend(viewer, pad.ownerId) else false
+            if not AccessPolicy.canEnter(pad.mode, pad.invited, viewer.UserId, pad.ownerId, friend) then
+                table.insert(
+                    blocked,
+                    { padId = pad.padId, gates = gatesForPad(pad.padId, pad.deckCF12, pad.deckSize) }
+                )
+            end
+        end
+        AccessBlocked:FireClient(viewer, { blocked = blocked })
+    end
+end
+
+-- userId -> username cache (names are stable); resolution yields, so cache aggressively.
+local nameCache: { [number]: string } = {}
+local function resolveName(userId: number): string
+    local cached = nameCache[userId]
+    if cached ~= nil then
+        return cached
+    end
+    local ok, name = pcall(function()
+        return Players:GetNameFromUserIdAsync(userId)
+    end)
+    local resolved = if ok and type(name) == "string" then filterExternalName(name) else tostring(userId)
+    nameCache[userId] = resolved
+    return resolved
+end
+
+-- Echo the owner's own access state (mode + named invitees) to their panel. `notice` is an optional
+-- transient message (bad name / already invited / list full) surfaced by the panel.
+local function pushAccessState(player: Player, uid: string, notice: string?)
+    local e = playerEconomy[uid]
+    if e == nil or e.teahouseAccess == nil or not player:IsDescendantOf(Players) then
+        return
+    end
+    local invited = {}
+    for _, id in e.teahouseAccess.invited do
+        table.insert(invited, { userId = id, name = resolveName(id) })
+    end
+    AccessState:FireClient(player, { mode = e.teahouseAccess.mode, invited = invited, notice = notice })
+end
+
 -- Register all 14 surveyed perches in stable T01..T14 order (PadSites is a keyed dict
 -- with no iteration order, so the id list is explicit). Each registers as a dormant
 -- vacant site; a joining owner claims the first fitting one (size-tier, then this order).
@@ -575,6 +716,7 @@ Players.PlayerAdded:Connect(function(player)
             teahouseDisplay = ecoData and ecoData.teahouseDisplay or nil,
             portalOwned = (ecoData and ecoData.portalOwned) or false,
             deckDecorations = (ecoData and ecoData.deckDecorations) or {},
+            teahouseAccess = (ecoData and ecoData.teahouseAccess) or { mode = "public", invited = {} },
         }
         local action = siteCoordinator:onJoin(uid, {
             maxDeckSize = playerEconomy[uid].maxDeckSize,
@@ -623,6 +765,8 @@ Players.PlayerAdded:Connect(function(player)
             )
         end
         echoEconomy(player, uid)
+        pushAccessState(player, uid)
+        recomputeAllAccess()
     end)
 end)
 
@@ -631,6 +775,7 @@ Players.PlayerRemoving:Connect(function(player)
     playerHouse[tostring(player.UserId)] = nil
     playerEconomy[tostring(player.UserId)] = nil
     handlerQueue:clear(tostring(player.UserId))
+    recomputeAllAccess()
     local action = siteCoordinator:onLeave(tostring(player.UserId))
     if action then
         applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)

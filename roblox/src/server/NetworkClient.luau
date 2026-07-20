@@ -165,4 +165,8 @@ function NetworkClient.setDecorations(self: any, robloxUserId: string, decoratio
     return self:_request("PUT", `/api/v1/players/{robloxUserId}/decorations`, { decorations = decorations })
 end
 
+function NetworkClient.setAccess(self: any, robloxUserId: string, access: any): Result
+    return self:_request("PUT", `/api/v1/players/{robloxUserId}/access`, { access = access })
+end
+
 return NetworkClient
