@@ -4,7 +4,9 @@
 -- tag: whenever a Decoration Model whose padId attribute matches THIS client's claimed pad
 -- replicates in, it gets Move + Remove ProximityPrompts. Tag replication + GetInstanceAddedSignal
 -- make RemoteEvent/replication ordering irrelevant (same lesson as the back-door rebind). A buy
--- fires DecorationPlaced{ id }; when that instance is present + owned, we auto-enter ghost-drag.
+-- fires DecorationPlaced{ id, propId }; we enter ghost-drag IMMEDIATELY off the propId (part=nil),
+-- independent of the built instance — the freshly-bought prop's centred default can be auto-hidden
+-- under the teahouse, so waiting for its instance would strand it invisibly.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
