@@ -119,13 +119,22 @@ do
     corner.Parent = toggleButton
 end
 
-local panel = Instance.new("Frame")
+-- The panel is a ScrollingFrame with a fixed viewport (340x520) and an auto-growing canvas: as
+-- sections accumulate (sizes/display/move/portal/decorations/favorites/back-door/access) the content
+-- exceeds the viewport and the user scrolls. Was a plain Frame, which silently overflowed its bottom
+-- edge -> later sections (Access) rendered off-screen as detached buttons.
+local panel = Instance.new("ScrollingFrame")
 panel.Name = "Panel"
 panel.AnchorPoint = Vector2.new(1, 1)
 panel.Position = UDim2.new(1, -12, 1, -60)
-panel.Size = UDim2.fromOffset(340, 520)
+panel.Size = UDim2.fromOffset(340, 520) -- fixed viewport
+panel.CanvasSize = UDim2.new() -- AutomaticCanvasSize.Y grows the canvas to fit the UIListLayout
+panel.AutomaticCanvasSize = Enum.AutomaticSize.Y
+panel.ScrollingDirection = Enum.ScrollingDirection.Y
+panel.ScrollBarThickness = 8
 panel.BackgroundColor3 = BG
 panel.BackgroundTransparency = 0.05
+panel.BorderSizePixel = 0
 panel.Visible = false
 panel.Parent = gui
 do
@@ -417,16 +426,14 @@ shownSmallerHint.Visible = false
 shownSmallerHint.Parent = panel
 
 sectionLabel(80, "Favorites")
--- item D: favorites can reach the 32-preference cap; a fixed-viewport ScrollingFrame keeps the
--- panel's own size (340x520) intact instead of the list growing past it (AutomaticSize::Y did,
--- unbounded, before this change). AutomaticCanvasSize handles the inner content height.
-local favoritesContainer = Instance.new("ScrollingFrame")
+-- item D: favorites can reach the 32-preference cap. The panel itself now scrolls, so favorites
+-- grows inline (AutomaticSize.Y) and the whole panel scrolls to reach it -- a nested ScrollingFrame
+-- here would trap the scroll wheel over the list.
+local favoritesContainer = Instance.new("Frame")
 favoritesContainer.Name = "Favorites"
 favoritesContainer.LayoutOrder = 81
-favoritesContainer.Size = UDim2.new(1, 0, 0, 140)
-favoritesContainer.CanvasSize = UDim2.new()
-favoritesContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
-favoritesContainer.ScrollBarThickness = 6
+favoritesContainer.Size = UDim2.fromScale(1, 0)
+favoritesContainer.AutomaticSize = Enum.AutomaticSize.Y
 favoritesContainer.BackgroundTransparency = 1
 favoritesContainer.BorderSizePixel = 0
 favoritesContainer.Parent = panel
@@ -606,13 +613,11 @@ noticeLabel.Visible = false
 noticeLabel.Parent = panel
 
 -- invitee list (shown only in private mode)
-local inviteeContainer = Instance.new("ScrollingFrame")
+local inviteeContainer = Instance.new("Frame")
 inviteeContainer.Name = "Invitees"
 inviteeContainer.LayoutOrder = 86
-inviteeContainer.Size = UDim2.new(1, 0, 0, 96)
-inviteeContainer.CanvasSize = UDim2.new()
-inviteeContainer.AutomaticCanvasSize = Enum.AutomaticSize.Y
-inviteeContainer.ScrollBarThickness = 6
+inviteeContainer.Size = UDim2.fromScale(1, 0)
+inviteeContainer.AutomaticSize = Enum.AutomaticSize.Y
 inviteeContainer.BackgroundTransparency = 1
 inviteeContainer.BorderSizePixel = 0
 inviteeContainer.Visible = false
