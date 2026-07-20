@@ -18,6 +18,8 @@ export type Deps = {
     buildingPlacer: any, -- pure placeCF/fits (BuildingPlacer)
     sizeClasses: any, -- pure deckFootprint/placementBounds/buildingFootprint/prefabName (SizeClasses)
     deckPlacement: any, -- pure per-size deck-pivot lookup (DeckPlacement)
+    decorationLayout: any, -- pure DecorationLayout.resolve
+    decorationCatalog: any, -- DecorationCatalog (footprint pure; build is Roblox-only)
 }
 
 function TreatmentApplier.new(deps: Deps)
@@ -31,6 +33,8 @@ function TreatmentApplier.new(deps: Deps)
         _buildingPlacer = deps.buildingPlacer,
         _sizeClasses = deps.sizeClasses,
         _deckPlacement = deps.deckPlacement,
+        _decorationLayout = deps.decorationLayout,
+        _decorationCatalog = deps.decorationCatalog,
         _folders = {} :: { [string]: Folder },
     }, TreatmentApplier)
 end
@@ -102,7 +106,7 @@ function TreatmentApplier:_buildBuilding(
             warn(
                 `[D.6] {padId}: {teahouse.size} building does not fit the {deckSize} deck at its placement; deck only`
             )
-            return
+            return nil
         end
     end
     -- world pivot = deck CFrame composed with the local placement transform (offset + facing)
@@ -125,6 +129,41 @@ function TreatmentApplier:_buildBuilding(
     model.Parent = staging
     if model:IsA("Model") then
         model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
+    end
+    return placement
+end
+
+-- Build the owner's visible deck decorations onto the staged deck. teahouseFP is the built
+-- teahouse's deck-local AABB (nil for a bare deck) — DecorationLayout hides props under it. Each
+-- prop is a non-collidable Model tagged Decoration with id + padId attributes; DecorationController
+-- (client) puts owner-only Move/Remove prompts on them. May throw on bad build data; fault-isolated
+-- by the caller (a bad prop must never blank the deck).
+function TreatmentApplier:_buildDecorations(
+    padId: string,
+    deckCF12: { number },
+    deckSize: string,
+    teahouseFP: any,
+    decorations: { any },
+    staging: Instance
+)
+    local deckFP = self._sizeClasses.deckFootprint(deckSize)
+    local resolved = self._decorationLayout.resolve(deckFP, teahouseFP, decorations)
+    local deckCF = CFrame.new(table.unpack(deckCF12))
+    for _, r in resolved do
+        if not r.visible then
+            continue
+        end
+        local model = self._decorationCatalog.build(r.propId)
+        if model == nil then
+            continue
+        end
+        local placeCF = self._buildingPlacer.placeCF({ offset = r.offset, facing = r.facing })
+        model:PivotTo(deckCF * CFrame.new(table.unpack(placeCF)))
+        model.Name = "Decoration"
+        model:SetAttribute("id", r.id)
+        model:SetAttribute("padId", padId)
+        model:AddTag("Decoration")
+        model.Parent = staging
     end
 end
 
@@ -202,15 +241,34 @@ function TreatmentApplier:apply(padId: string, spec: any, treatment: any, deckSi
     end
     -- build a building only when there's one to build; a nil teahouse or nil loadout is a
     -- bare deck (Piece-B: owns a deck but no teahouse) — the deck stands alone.
+    local builtPlacement: any = nil
     if teahouse ~= nil and teahouse.loadout ~= nil then
         -- fault-isolate the WHOLE building step (fit-check + placement math + build): a bad
         -- placement or build must leave the staged deck standing, never abort the caller's
         -- vacantActions / PlayerRemoving loop (F2/F4).
-        local okBuilding, buildingErr = pcall(function()
-            self:_buildBuilding(padId, deckCF12, treatment, teahouse, deckSize, staging)
+        local okBuilding, placementOrErr = pcall(function()
+            return self:_buildBuilding(padId, deckCF12, treatment, teahouse, deckSize, staging)
         end)
-        if not okBuilding then
-            warn(`[D.6] building step failed for {padId}: {buildingErr}; deck only`)
+        if okBuilding then
+            builtPlacement = placementOrErr
+        else
+            warn(`[D.6] building step failed for {padId}: {placementOrErr}; deck only`)
+        end
+    end
+    -- decorations: owner's placed props, hidden under the built teahouse. teahouseFP is the built
+    -- teahouse's deck-local AABB (nil when deck-only). Fault-isolated: a bad prop never blanks the deck.
+    local decorations = treatment.deckDecorations
+    if treatment.lit == true and decorations ~= nil and #decorations > 0 then
+        local teahouseFP: any = nil
+        if builtPlacement ~= nil and teahouse ~= nil then
+            local buildingFP = self._sizeClasses.buildingFootprint(teahouse.size)
+            teahouseFP = self._buildingPlacer.footprintBounds(buildingFP, builtPlacement)
+        end
+        local okDecor, decorErr = pcall(function()
+            self:_buildDecorations(padId, deckCF12, deckSize, teahouseFP, decorations, staging)
+        end)
+        if not okDecor then
+            warn(`[DECOR] decoration step failed for {padId}: {decorErr}; deck without props`)
         end
     end
     if treatment.portalOwned == true and treatment.lit == true then

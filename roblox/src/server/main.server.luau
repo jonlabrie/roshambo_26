@@ -391,6 +391,8 @@ local SiteCoordinator = require(shared:WaitForChild("SiteCoordinator"))
 local BuildingPlacer = require(shared:WaitForChild("BuildingPlacer"))
 local SizeClasses = require(shared:WaitForChild("SizeClasses"))
 local DeckPlacement = require(shared:WaitForChild("DeckPlacement"))
+local DecorationLayout = require(shared:WaitForChild("DecorationLayout"))
+local DecorationCatalog = require(shared:WaitForChild("DecorationCatalog"))
 local StructureOps = require(script.Parent:WaitForChild("StructureOps"))
 local PadOps = require(script.Parent:WaitForChild("PadOps"))
 local PadSites = require(script.Parent:WaitForChild("PadSites"))
@@ -486,6 +488,8 @@ local applier = TreatmentApplier.new({
     buildingPlacer = BuildingPlacer,
     sizeClasses = SizeClasses,
     deckPlacement = DeckPlacement,
+    decorationLayout = DecorationLayout,
+    decorationCatalog = DecorationCatalog,
 })
 
 -- Register all 14 surveyed perches in stable T01..T14 order (PadSites is a keyed dict
