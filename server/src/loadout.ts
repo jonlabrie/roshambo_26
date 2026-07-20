@@ -1,4 +1,4 @@
-import { DECORATION_PROPS, MAX_DECORATIONS } from './economy';
+import { DECORATION_PROPS, MAX_DECORATIONS, ACCESS_MODES, MAX_INVITED } from './economy';
 
 export const MAX_LOADOUT_BYTES = 4096;
 export const MAX_SIZECLASS_LEN = 16;
@@ -140,6 +140,30 @@ export function validatePadPreferences(value: unknown): Check {
         if (typeof entry !== 'string' || entry.length === 0 || entry.length > MAX_PREFERENCE_LEN) {
             return { ok: false, error: 'BAD_REQUEST' };
         }
+    }
+    return { ok: true };
+}
+
+export function validateAccess(value: unknown): Check {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return { ok: false, error: 'BAD_ACCESS' };
+    }
+    const obj = value as Record<string, unknown>;
+    for (const k of Object.keys(obj)) {
+        if (k !== 'mode' && k !== 'invited') return { ok: false, error: 'BAD_ACCESS' };
+    }
+    if (typeof obj.mode !== 'string' || !ACCESS_MODES.has(obj.mode)) {
+        return { ok: false, error: 'BAD_ACCESS' };
+    }
+    if (!Array.isArray(obj.invited) || obj.invited.length > MAX_INVITED) {
+        return { ok: false, error: 'BAD_ACCESS' };
+    }
+    const seen = new Set<number>();
+    for (const id of obj.invited) {
+        if (typeof id !== 'number' || !Number.isInteger(id) || id < 1 || seen.has(id)) {
+            return { ok: false, error: 'BAD_ACCESS' };
+        }
+        seen.add(id);
     }
     return { ok: true };
 }

@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   validatePurchase, applyPurchase, PRICES, EconomyState, validateDisplay,
   MAX_DECORATIONS, DECORATION_PROPS, nextDecorationId, appendDecoration, DeckDecoration,
+  MAX_INVITED, ACCESS_MODES, DEFAULT_ACCESS,
 } from './economy';
 
 const fresh = (over: Partial<EconomyState> = {}): EconomyState =>
@@ -166,5 +167,17 @@ describe('decoration id authority', () => {
         expect(instance).toEqual({ id: 6, propId: 'bonsai', offset: [0, 0], facing: 'N' });
         expect(next).toHaveLength(2);
         expect(list).toHaveLength(1); // input untouched
+    });
+});
+
+describe('access constants', () => {
+    it('MAX_INVITED is 50', () => {
+        expect(MAX_INVITED).toBe(50);
+    });
+    it('ACCESS_MODES holds exactly the three modes', () => {
+        expect([...ACCESS_MODES].sort()).toEqual(['friends', 'private', 'public']);
+    });
+    it('DEFAULT_ACCESS is public with an empty list', () => {
+        expect(DEFAULT_ACCESS).toEqual({ mode: 'public', invited: [] });
     });
 });

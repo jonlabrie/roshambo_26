@@ -11,6 +11,12 @@ export const DEFAULT_TEAHOUSE_LOADOUT = { baseStyle: 'teahouse-1story' };
 export const MAX_DECORATIONS = 24;
 export const DECORATION_PROPS: Set<string> = new Set(Object.keys(PRICES.decoration));
 
+export const MAX_INVITED = 50;
+export type AccessMode = 'public' | 'friends' | 'private';
+export const ACCESS_MODES: Set<string> = new Set<string>(['public', 'friends', 'private']);
+export type TeahouseAccess = { mode: AccessMode; invited: number[] };
+export const DEFAULT_ACCESS: TeahouseAccess = { mode: 'public', invited: [] };
+
 export type DeckDecoration = { id: number; propId: string; offset: [number, number]; facing: 'N' | 'E' | 'S' | 'W' };
 
 export function nextDecorationId(decorations: DeckDecoration[]): number {

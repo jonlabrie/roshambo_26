@@ -6,6 +6,7 @@ import {
     validateWallBays,
     validatePlacement,
     validateDecorations,
+    validateAccess,
     MAX_CLASSES,
     MAX_BAYS_PER_SIDE,
 } from './loadout';
@@ -186,5 +187,42 @@ describe('validateDecorations', () => {
     it('rejects over the cap', () => {
         const many = Array.from({ length: 25 }, (_, i) => ({ id: i + 1, propId: 'bonsai', offset: [0, 0], facing: 'N' }));
         expect(validateDecorations(many)).toEqual({ ok: false, error: 'BAD_DECORATION' });
+    });
+});
+
+describe('validateAccess', () => {
+    it('accepts a well-formed public payload', () => {
+        expect(validateAccess({ mode: 'public', invited: [] })).toEqual({ ok: true });
+    });
+    it('accepts a private payload with invited ids', () => {
+        expect(validateAccess({ mode: 'private', invited: [1, 2, 3] })).toEqual({ ok: true });
+    });
+    it('accepts friends mode', () => {
+        expect(validateAccess({ mode: 'friends', invited: [] })).toEqual({ ok: true });
+    });
+    it('rejects a non-object', () => {
+        expect(validateAccess(null)).toEqual({ ok: false, error: 'BAD_ACCESS' });
+        expect(validateAccess([])).toEqual({ ok: false, error: 'BAD_ACCESS' });
+    });
+    it('rejects an unknown mode', () => {
+        expect(validateAccess({ mode: 'secret', invited: [] })).toEqual({ ok: false, error: 'BAD_ACCESS' });
+    });
+    it('rejects an extra key', () => {
+        expect(validateAccess({ mode: 'public', invited: [], evil: 1 })).toEqual({ ok: false, error: 'BAD_ACCESS' });
+    });
+    it('rejects a non-array invited', () => {
+        expect(validateAccess({ mode: 'public', invited: 'x' })).toEqual({ ok: false, error: 'BAD_ACCESS' });
+    });
+    it('rejects a non-positive or non-integer userId', () => {
+        expect(validateAccess({ mode: 'private', invited: [0] })).toEqual({ ok: false, error: 'BAD_ACCESS' });
+        expect(validateAccess({ mode: 'private', invited: [1.5] })).toEqual({ ok: false, error: 'BAD_ACCESS' });
+        expect(validateAccess({ mode: 'private', invited: [-4] })).toEqual({ ok: false, error: 'BAD_ACCESS' });
+    });
+    it('rejects duplicate ids', () => {
+        expect(validateAccess({ mode: 'private', invited: [7, 7] })).toEqual({ ok: false, error: 'BAD_ACCESS' });
+    });
+    it('rejects over the cap', () => {
+        const many = Array.from({ length: 51 }, (_, i) => i + 1);
+        expect(validateAccess({ mode: 'private', invited: many })).toEqual({ ok: false, error: 'BAD_ACCESS' });
     });
 });
