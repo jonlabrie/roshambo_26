@@ -763,11 +763,11 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
         end
         -- adopt the authoritative new state
         e.totalPoints = res.data.totalPoints
-        e.maxDeckSize = res.data.maxDeckSize
-        e.portalOwned = res.data.portalOwned or false
         if string.sub(item, 1, 11) == "decoration:" then
             -- the PWA is the id authority: adopt the returned list + the new instance's id, rebuild
             -- the claimed pad so the prop renders, then tell the client to enter placement for it.
+            -- (Decorations never change deck tier or portal ownership, so we DON'T touch
+            -- e.maxDeckSize/e.portalOwned here — the decoration /purchase response omits them.)
             e.deckDecorations = res.data.deckDecorations or e.deckDecorations
             if e.claimedPadId ~= nil then
                 rebuildClaimedPad(uid)
@@ -779,6 +779,8 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
             echoEconomy(player, uid)
             return
         end
+        e.maxDeckSize = res.data.maxDeckSize
+        e.portalOwned = res.data.portalOwned or false
         local kind, size = string.match(item, "^(%a+):(%a+)$")
         if kind == "teahouse" and size then
             e.teahouses[size] = { baseStyle = "teahouse-1story" }
