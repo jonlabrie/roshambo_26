@@ -42,13 +42,8 @@ local SetPlacement = remotes:WaitForChild("SetPlacement") :: RemoteEvent
 local SetDecorationPlacement = remotes:WaitForChild("SetDecorationPlacement") :: RemoteEvent
 local SetDecorationRemove = remotes:WaitForChild("SetDecorationRemove") :: RemoteEvent
 local DecorationPlaced = remotes:WaitForChild("DecorationPlaced") :: RemoteEvent
--- SetAccess/InviteUser/RevokeUser handlers land in the next task (mutating handlers); the
--- remotes are declared now so the panel can wire up against a stable contract.
--- selene: allow(unused_variable)
 local SetAccess = remotes:WaitForChild("SetAccess") :: RemoteEvent
--- selene: allow(unused_variable)
 local InviteUser = remotes:WaitForChild("InviteUser") :: RemoteEvent
--- selene: allow(unused_variable)
 local RevokeUser = remotes:WaitForChild("RevokeUser") :: RemoteEvent
 local AccessState = remotes:WaitForChild("AccessState") :: RemoteEvent
 local AccessBlocked = remotes:WaitForChild("AccessBlocked") :: RemoteEvent
@@ -415,6 +410,8 @@ local TreatmentApplier = require(script.Parent:WaitForChild("TreatmentApplier"))
 
 local playerPrefs: { [string]: { string } } = {}
 local PREF_CAP = 32
+local MAX_INVITED = 50 -- mirrors server/src/economy.ts MAX_INVITED
+local ACCESS_MODES = { public = true, friends = true, private = true }
 
 -- item C: PadSites.displayName is server-only, but the panel wants real names for favorites
 -- instead of "Perch <siteId>". Build a siteId -> displayName map alongside every padPreferences
@@ -1329,6 +1326,125 @@ SetDecorationRemove.OnServerEvent:Connect(function(player, payload)
         rebuildClaimedPad(uid)
         echoBackDoor(player, uid) -- rebuild replaced the Structure; re-arm the F prompts (parity)
         echoEconomy(player, uid)
+    end)
+end)
+
+SetAccess.OnServerEvent:Connect(function(player, payload)
+    handlerQueue:run(tostring(player.UserId), function()
+        local uid = tostring(player.UserId)
+        local e = playerEconomy[uid]
+        if e == nil or e.claimedPadId == nil or e.teahouseAccess == nil then
+            return -- owner-only, occupying a claimed pad
+        end
+        local mode = if typeof(payload) == "table" then payload.mode else nil
+        if typeof(mode) ~= "string" or not ACCESS_MODES[mode] then
+            return
+        end
+        if mode == e.teahouseAccess.mode then
+            return -- no-op
+        end
+        local newAccess = { mode = mode, invited = table.clone(e.teahouseAccess.invited) }
+        local persisted = net:setAccess(uid, newAccess)
+        if not persisted.ok then
+            warn(`[AC] setAccess(mode) failed for {uid}: {tostring(persisted.error)}`)
+            pushAccessState(player, uid)
+            return
+        end
+        if not player:IsDescendantOf(Players) then
+            return
+        end
+        e.teahouseAccess = newAccess
+        recomputeAllAccess()
+        pushAccessState(player, uid)
+    end)
+end)
+
+InviteUser.OnServerEvent:Connect(function(player, payload)
+    handlerQueue:run(tostring(player.UserId), function()
+        local uid = tostring(player.UserId)
+        local e = playerEconomy[uid]
+        if e == nil or e.claimedPadId == nil or e.teahouseAccess == nil then
+            return
+        end
+        local username = if typeof(payload) == "table" then payload.username else nil
+        if typeof(username) ~= "string" or #username == 0 or #username > 20 then
+            return
+        end
+        if #e.teahouseAccess.invited >= MAX_INVITED then
+            pushAccessState(player, uid, "Invite list is full")
+            return
+        end
+        local ok, resolved = pcall(function()
+            return Players:GetUserIdFromNameAsync(username)
+        end)
+        if not ok or typeof(resolved) ~= "number" then
+            pushAccessState(player, uid, `No player named "{username}"`)
+            return
+        end
+        if resolved == player.UserId then
+            pushAccessState(player, uid, "You always have access to your own teahouse")
+            return
+        end
+        for _, id in e.teahouseAccess.invited do
+            if id == resolved then
+                pushAccessState(player, uid, "Already invited")
+                return
+            end
+        end
+        local newInvited = table.clone(e.teahouseAccess.invited)
+        table.insert(newInvited, resolved)
+        local newAccess = { mode = e.teahouseAccess.mode, invited = newInvited }
+        local persisted = net:setAccess(uid, newAccess)
+        if not persisted.ok then
+            warn(`[AC] setAccess(invite) failed for {uid}: {tostring(persisted.error)}`)
+            pushAccessState(player, uid)
+            return
+        end
+        if not player:IsDescendantOf(Players) then
+            return
+        end
+        e.teahouseAccess = newAccess
+        recomputeAllAccess()
+        pushAccessState(player, uid, `Invited {resolveName(resolved)}`)
+    end)
+end)
+
+RevokeUser.OnServerEvent:Connect(function(player, payload)
+    handlerQueue:run(tostring(player.UserId), function()
+        local uid = tostring(player.UserId)
+        local e = playerEconomy[uid]
+        if e == nil or e.claimedPadId == nil or e.teahouseAccess == nil then
+            return
+        end
+        local userId = if typeof(payload) == "table" then payload.userId else nil
+        if typeof(userId) ~= "number" then
+            return
+        end
+        local newInvited = {}
+        local found = false
+        for _, id in e.teahouseAccess.invited do
+            if id == userId then
+                found = true
+            else
+                table.insert(newInvited, id)
+            end
+        end
+        if not found then
+            return -- stale id: no-op
+        end
+        local newAccess = { mode = e.teahouseAccess.mode, invited = newInvited }
+        local persisted = net:setAccess(uid, newAccess)
+        if not persisted.ok then
+            warn(`[AC] setAccess(revoke) failed for {uid}: {tostring(persisted.error)}`)
+            pushAccessState(player, uid)
+            return
+        end
+        if not player:IsDescendantOf(Players) then
+            return
+        end
+        e.teahouseAccess = newAccess
+        recomputeAllAccess()
+        pushAccessState(player, uid)
     end)
 end)
 
