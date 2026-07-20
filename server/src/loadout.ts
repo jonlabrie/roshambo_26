@@ -1,3 +1,5 @@
+import { DECORATION_PROPS, MAX_DECORATIONS } from './economy';
+
 export const MAX_LOADOUT_BYTES = 4096;
 export const MAX_SIZECLASS_LEN = 16;
 export const MAX_CLASSES = 8;
@@ -49,6 +51,42 @@ export function validatePlacement(value: unknown): Check {
     }
     if (typeof obj.facing !== 'string' || !PLACEMENT_FACINGS.has(obj.facing)) {
         return { ok: false, error: 'BAD_PLACEMENT' };
+    }
+    return { ok: true };
+}
+
+export function validateDecorations(value: unknown): Check {
+    if (!Array.isArray(value)) return { ok: false, error: 'BAD_DECORATION' };
+    if (value.length > MAX_DECORATIONS) return { ok: false, error: 'BAD_DECORATION' };
+    const seen = new Set<number>();
+    for (const entry of value) {
+        if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
+            return { ok: false, error: 'BAD_DECORATION' };
+        }
+        const obj = entry as Record<string, unknown>;
+        for (const k of Object.keys(obj)) {
+            if (k !== 'id' && k !== 'propId' && k !== 'offset' && k !== 'facing') {
+                return { ok: false, error: 'BAD_DECORATION' };
+            }
+        }
+        if (typeof obj.id !== 'number' || !Number.isInteger(obj.id) || obj.id < 1 || seen.has(obj.id)) {
+            return { ok: false, error: 'BAD_DECORATION' };
+        }
+        seen.add(obj.id);
+        if (typeof obj.propId !== 'string' || !DECORATION_PROPS.has(obj.propId)) {
+            return { ok: false, error: 'BAD_DECORATION' };
+        }
+        if (!Array.isArray(obj.offset) || obj.offset.length !== 2) {
+            return { ok: false, error: 'BAD_DECORATION' };
+        }
+        for (const n of obj.offset) {
+            if (typeof n !== 'number' || !Number.isFinite(n) || Math.abs(n) > MAX_PLACEMENT_OFFSET) {
+                return { ok: false, error: 'BAD_DECORATION' };
+            }
+        }
+        if (typeof obj.facing !== 'string' || !PLACEMENT_FACINGS.has(obj.facing)) {
+            return { ok: false, error: 'BAD_DECORATION' };
+        }
     }
     return { ok: true };
 }

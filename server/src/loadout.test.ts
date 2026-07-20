@@ -5,6 +5,7 @@ import {
     validatePadPreferences,
     validateWallBays,
     validatePlacement,
+    validateDecorations,
     MAX_CLASSES,
     MAX_BAYS_PER_SIDE,
 } from './loadout';
@@ -134,5 +135,56 @@ describe('validatePlacement', () => {
         expect(validateLoadout({ baseStyle: 'teahouse-1story', placement: { offset: [2, 2], facing: 'S' } })).toEqual({ ok: true });
         expect(validateLoadout({ baseStyle: 'teahouse-1story', placement: { offset: [2], facing: 'S' } }).ok).toBe(false);
         expect(validateLoadout({ baseStyle: 'teahouse-1story', teleporter: true }).ok).toBe(false);
+    });
+});
+
+describe('validateDecorations', () => {
+    const ok = (extra: unknown[] = []) => [
+        { id: 1, propId: 'bonsai', offset: [0, 0], facing: 'N' },
+        { id: 2, propId: 'bench', offset: [3, -4], facing: 'E' },
+        ...extra,
+    ];
+    it('accepts a well-formed list', () => {
+        expect(validateDecorations(ok())).toEqual({ ok: true });
+    });
+    it('accepts an empty list', () => {
+        expect(validateDecorations([])).toEqual({ ok: true });
+    });
+    it('rejects a non-array', () => {
+        expect(validateDecorations({})).toEqual({ ok: false, error: 'BAD_DECORATION' });
+    });
+    it('rejects an unknown propId', () => {
+        expect(validateDecorations([{ id: 1, propId: 'dragon', offset: [0, 0], facing: 'N' }]))
+            .toEqual({ ok: false, error: 'BAD_DECORATION' });
+    });
+    it('rejects a bad facing', () => {
+        expect(validateDecorations([{ id: 1, propId: 'bonsai', offset: [0, 0], facing: 'X' }]))
+            .toEqual({ ok: false, error: 'BAD_DECORATION' });
+    });
+    it('rejects a non-finite / out-of-range offset', () => {
+        expect(validateDecorations([{ id: 1, propId: 'bonsai', offset: [999, 0], facing: 'N' }]))
+            .toEqual({ ok: false, error: 'BAD_DECORATION' });
+        expect(validateDecorations([{ id: 1, propId: 'bonsai', offset: [0], facing: 'N' }]))
+            .toEqual({ ok: false, error: 'BAD_DECORATION' });
+    });
+    it('rejects a non-integer / non-positive id', () => {
+        expect(validateDecorations([{ id: 0, propId: 'bonsai', offset: [0, 0], facing: 'N' }]))
+            .toEqual({ ok: false, error: 'BAD_DECORATION' });
+        expect(validateDecorations([{ id: 1.5, propId: 'bonsai', offset: [0, 0], facing: 'N' }]))
+            .toEqual({ ok: false, error: 'BAD_DECORATION' });
+    });
+    it('rejects duplicate ids', () => {
+        expect(validateDecorations([
+            { id: 1, propId: 'bonsai', offset: [0, 0], facing: 'N' },
+            { id: 1, propId: 'bench', offset: [0, 0], facing: 'N' },
+        ])).toEqual({ ok: false, error: 'BAD_DECORATION' });
+    });
+    it('rejects an extra key on an entry', () => {
+        expect(validateDecorations([{ id: 1, propId: 'bonsai', offset: [0, 0], facing: 'N', evil: 1 }]))
+            .toEqual({ ok: false, error: 'BAD_DECORATION' });
+    });
+    it('rejects over the cap', () => {
+        const many = Array.from({ length: 25 }, (_, i) => ({ id: i + 1, propId: 'bonsai', offset: [0, 0], facing: 'N' }));
+        expect(validateDecorations(many)).toEqual({ ok: false, error: 'BAD_DECORATION' });
     });
 });
