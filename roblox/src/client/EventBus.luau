@@ -1,7 +1,7 @@
 --!strict
 -- Client-local BindableEvents so controllers stay decoupled.
 local bus: { [string]: BindableEvent } = {}
-local NAMES = { "Cue", "TickerMessage", "MoveTeahouse" }
+local NAMES = { "Cue", "TickerMessage", "MoveTeahouse", "MoveDecoration" }
 for _, name in NAMES do
     local e = Instance.new("BindableEvent")
     e.Name = name

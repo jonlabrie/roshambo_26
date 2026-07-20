@@ -22,6 +22,8 @@ local BuildingPlacer = require(shared:WaitForChild("BuildingPlacer"))
 local SizeClasses = require(shared:WaitForChild("SizeClasses"))
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local SetPlacement = remotes:WaitForChild("SetPlacement") :: RemoteEvent
+local SetDecorationPlacement = remotes:WaitForChild("SetDecorationPlacement") :: RemoteEvent
+local DecorationCatalog = require(shared:WaitForChild("DecorationCatalog"))
 
 local player = Players.LocalPlayer
 local FACING_ORDER = { "N", "E", "S", "W" }
@@ -38,16 +40,19 @@ local mountCF: CFrame? = nil
 local buildingFP: any = nil
 local deckFP: any = nil
 local current = { offset = { 0, 0 }, facing = "N" }
+local commitFn: ((offset: { number }, facing: string) -> ())? = nil
 local conns: { RBXScriptConnection } = {}
 local hud: ScreenGui? = nil
 local disabledPrompts: { ProximityPrompt } = {}
 
 -- ===== Step 2: ghost + fade helpers =====
 
-local function makeGhost(structure: Model): Model
-    local g = structure:Clone()
-    g.Name = "MoveGhost"
-    for _, d in g:GetDescendants() do
+-- Turn a caller-supplied model into a translucent, non-interactive ghost parented to workspace.
+-- The caller decides what the ghost IS (a Structure clone for a teahouse, a fresh catalog prop for
+-- a decoration); this only fades/anchors it and strips any interactables.
+local function ghostify(model: Model): Model
+    model.Name = "MoveGhost"
+    for _, d in model:GetDescendants() do
         if d:IsA("BasePart") then
             d.Anchored = true
             d.CanCollide = false
@@ -60,8 +65,8 @@ local function makeGhost(structure: Model): Model
             d:Destroy() -- no interactables on the ghost (back-door prompts clone along)
         end
     end
-    g.Parent = workspace -- NOT the site folder: kept independent of whatever that folder does
-    return g
+    model.Parent = workspace -- NOT the site folder: kept independent of whatever that folder does
+    return model
 end
 
 local function fadeOriginal(structure: Model, amount: number)
@@ -75,8 +80,8 @@ end
 -- ===== Step 3: placement math =====
 
 -- placeCF's yaw convention: N=0, E=90, S=180, W=270 (CCW, matches CFrame.Angles(0, rad(y), 0))
-local function facingFromPivot(structure: Model): (number, number, string)
-    local rel = (mountCF :: CFrame):ToObjectSpace(structure:GetPivot())
+local function facingFromPivotOf(structure: Model, mount: CFrame): (number, number, string)
+    local rel = mount:ToObjectSpace(structure:GetPivot())
     local _, ry, _ = rel:ToOrientation()
     local deg = (math.round(math.deg(ry) / 90) * 90) % 360
     local facing = if deg == 0 then "N" elseif deg == 90 then "E" elseif deg == 180 then "S" else "W"
@@ -164,13 +169,16 @@ local function exit()
         hud:Destroy()
         hud = nil
     end
+    commitFn = nil
 end
 
 local function commit()
     if not active then
         return
     end
-    SetPlacement:FireServer({ offset = { current.offset[1], current.offset[2] }, facing = current.facing })
+    if commitFn then
+        commitFn(current.offset, current.facing)
+    end
     exit() -- the server rebuild arriving is the confirmation
 end
 
@@ -226,34 +234,27 @@ local function buildHud()
     hud = gui
 end
 
--- ===== Step 5: enter =====
+-- ===== Step 5: generic core + entries =====
 
-local function enter(payload: any)
-    if active or typeof(payload) ~= "table" or typeof(payload.padId) ~= "string" then
+-- descriptor: { original: Model, ghost: Model (already ghostified), footprint, deckFP, mountCF,
+--   initialOffset: {n,n}, initialFacing: string, commit: (offset, facing) -> () }
+local function startMove(descriptor: any)
+    if active then
         return
-    end
-    local sites = workspace:FindFirstChild("TeahouseSites")
-    local folder = sites and sites:FindFirstChild("MaterializedSite_" .. payload.padId)
-    local structure = folder and folder:FindFirstChild("Structure")
-    local m = folder and folder:GetAttribute("MountCF")
-    local deckSize = folder and folder:GetAttribute("DeckSize")
-    local teaSize = folder and folder:GetAttribute("TeahouseSize")
-    if structure == nil or typeof(m) ~= "CFrame" or typeof(deckSize) ~= "string" then
-        return
-    end
-    if typeof(teaSize) ~= "string" or teaSize == "" then
-        return -- bare deck: nothing to move (canMove should have gated this)
     end
     active = true
-    mountCF = m
-    buildingFP = SizeClasses.buildingFootprint(teaSize)
-    deckFP = SizeClasses.placementBounds(deckSize) -- inset off the railings, not the raw deck edge
-    original = structure :: Model
-    local dx, dz, facing = facingFromPivot(structure :: Model)
-    current = { offset = { math.round(dx), math.round(dz) }, facing = facing }
-    ghost = makeGhost(structure :: Model)
-    fadeOriginal(structure :: Model, 0.7)
-    for _, d in (structure :: Model):GetDescendants() do
+    mountCF = descriptor.mountCF
+    buildingFP = descriptor.footprint
+    deckFP = descriptor.deckFP
+    original = descriptor.original
+    commitFn = descriptor.commit
+    current = {
+        offset = { descriptor.initialOffset[1], descriptor.initialOffset[2] },
+        facing = descriptor.initialFacing,
+    }
+    ghost = descriptor.ghost
+    fadeOriginal(descriptor.original, 0.7)
+    for _, d in descriptor.original:GetDescendants() do
         if d:IsA("ProximityPrompt") and d.Enabled then
             d.Enabled = false
             table.insert(disabledPrompts, d)
@@ -278,7 +279,7 @@ local function enter(payload: any)
             end
         end)
     )
-    table.insert(conns, (structure :: Model).Destroying:Connect(exit)) -- rebuild landed mid-mode
+    table.insert(conns, descriptor.original.Destroying:Connect(exit)) -- rebuild landed mid-mode
     local char = player.Character
     local humanoid = char and char:FindFirstChildOfClass("Humanoid")
     if humanoid then
@@ -287,4 +288,92 @@ local function enter(payload: any)
     table.insert(conns, player.CharacterAdded:Connect(exit))
 end
 
-EventBus.MoveTeahouse.Event:Connect(enter)
+-- Resolve a claimed site's deck frame + deck size from a MaterializedSite folder.
+local function siteInfo(folder: Instance?): (CFrame?, string?)
+    if folder == nil then
+        return nil, nil
+    end
+    local m = folder:GetAttribute("MountCF")
+    local deckSize = folder:GetAttribute("DeckSize")
+    if typeof(m) ~= "CFrame" or typeof(deckSize) ~= "string" then
+        return nil, nil
+    end
+    return m, deckSize
+end
+
+-- Teahouse entry (behavior-equivalent to the pre-generalization enter): ghost the Structure clone,
+-- bounds = placementBounds (off the railings), commit -> SetPlacement.
+local function enterTeahouse(payload: any)
+    if active or typeof(payload) ~= "table" or typeof(payload.padId) ~= "string" then
+        return
+    end
+    local sites = workspace:FindFirstChild("TeahouseSites")
+    local folder = sites and sites:FindFirstChild("MaterializedSite_" .. payload.padId)
+    local structure = folder and folder:FindFirstChild("Structure")
+    local m, deckSize = siteInfo(folder)
+    local teaSize = folder and folder:GetAttribute("TeahouseSize")
+    if structure == nil or m == nil or deckSize == nil then
+        return
+    end
+    if typeof(teaSize) ~= "string" or teaSize == "" then
+        return -- bare deck: nothing to move
+    end
+    local dx, dz, facing = facingFromPivotOf(structure :: Model, m)
+    startMove({
+        original = structure,
+        ghost = ghostify((structure :: Model):Clone()),
+        footprint = SizeClasses.buildingFootprint(teaSize),
+        deckFP = SizeClasses.placementBounds(deckSize),
+        mountCF = m,
+        initialOffset = { math.round(dx), math.round(dz) },
+        initialFacing = facing,
+        commit = function(offset, f)
+            SetPlacement:FireServer({ offset = { offset[1], offset[2] }, facing = f })
+        end,
+    })
+end
+
+-- Decoration entry: ghost a fresh catalog prop, bounds = full deck footprint (props may sit to the
+-- edge), commit -> SetDecorationPlacement{ id }.
+local function enterDecoration(payload: any)
+    if
+        active
+        or typeof(payload) ~= "table"
+        or typeof(payload.id) ~= "number"
+        or typeof(payload.propId) ~= "string"
+        or typeof(payload.part) ~= "Instance"
+    then
+        return
+    end
+    local part = payload.part :: Model
+    local folder = part.Parent
+    local m, deckSize = siteInfo(folder)
+    local fp = DecorationCatalog.footprint(payload.propId)
+    if m == nil or deckSize == nil or fp == nil then
+        return
+    end
+    local ghostModel = DecorationCatalog.build(payload.propId)
+    if ghostModel == nil then
+        return
+    end
+    local dx, dz, facing = facingFromPivotOf(part, m)
+    startMove({
+        original = part,
+        ghost = ghostify(ghostModel),
+        footprint = fp,
+        deckFP = SizeClasses.deckFootprint(deckSize),
+        mountCF = m,
+        initialOffset = { math.round(dx), math.round(dz) },
+        initialFacing = facing,
+        commit = function(offset, f)
+            SetDecorationPlacement:FireServer({
+                id = payload.id,
+                offset = { offset[1], offset[2] },
+                facing = f,
+            })
+        end,
+    })
+end
+
+EventBus.MoveTeahouse.Event:Connect(enterTeahouse)
+EventBus.MoveDecoration.Event:Connect(enterDecoration)
