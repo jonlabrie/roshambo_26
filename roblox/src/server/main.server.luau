@@ -589,10 +589,11 @@ local function isFriend(viewer: Player, ownerId: number): boolean
     return val
 end
 
--- The gate specs a blocked viewer needs at one occupied pad: the derived deck-back gate + any
--- authored tunnel-mouth gates (PadSites[padId].accessGates, empty until the survey task).
+-- The gate specs a blocked viewer needs at one occupied pad: the full sealing perimeter (four walls
+-- around the deck) + any authored tunnel-mouth gates (PadSites[padId].accessGates, empty until the
+-- survey task). The client reveals/solidifies them only within AccessGates.revealRadius of the deck.
 local function gatesForPad(padId: string, deckCF12: { number }, deckSize: string): { any }
-    local gates = { AccessGates.deckBackGate(deckCF12, deckSize) }
+    local gates = AccessGates.deckPerimeter(deckCF12, deckSize)
     local spec = PadSites[padId]
     local authored = spec and spec.accessGates
     if authored then
@@ -601,6 +602,59 @@ local function gatesForPad(padId: string, deckCF12: { number }, deckSize: string
         end
     end
     return gates
+end
+
+-- Public/private mode BEACON: a small Neon orb at each occupied deck's canyon-facing front edge,
+-- coloured by the owner's mode (green public / amber friends / red private). Unlike the per-viewer
+-- privacy walls this is a shared world signal (server-created, replicated to everyone), so players
+-- can read a teahouse's openness from the valley floor. No per-orb light -- Neon emission alone reads
+-- from distance (mobile-perf rule). Kept in sync with the occupied set each recompute.
+local NAV_COLORS: { [string]: Color3 } = {
+    public = Color3.fromRGB(60, 210, 90), -- green
+    friends = Color3.fromRGB(255, 226, 170), -- warm chōchin cream (blue read too close to green at distance)
+    private = Color3.fromRGB(220, 45, 45), -- red
+}
+local navFolder = Instance.new("Folder")
+navFolder.Name = "AccessNavLights"
+navFolder.Parent = workspace
+
+local function syncNavLights(occupied: { any })
+    local seen: { [string]: boolean } = {}
+    for _, pad in occupied do
+        seen[pad.padId] = true
+        local color = NAV_COLORS[pad.mode] or NAV_COLORS.public
+        local specs = AccessGates.navLights(pad.deckCF12, pad.deckSize)
+        local padFolder = navFolder:FindFirstChild(pad.padId)
+        if padFolder == nil then
+            padFolder = Instance.new("Folder")
+            padFolder.Name = pad.padId
+            padFolder.Parent = navFolder
+        end
+        local parts: { BasePart } = {}
+        for _, c in padFolder:GetChildren() do
+            if c:IsA("BasePart") then
+                table.insert(parts, c)
+            end
+        end
+        for i, spec in specs do
+            local lp = parts[i]
+            if lp == nil then
+                lp = Instance.new("Part")
+                lp.Anchored, lp.CanCollide, lp.CanQuery, lp.CanTouch, lp.CastShadow =
+                    true, false, false, false, false
+                lp.Material = Enum.Material.Neon
+                lp.Parent = padFolder
+            end
+            lp.Color = color
+            lp.Size = Vector3.new(spec.size[1], spec.size[2], spec.size[3])
+            lp.CFrame = CFrame.new(table.unpack(spec.cframe))
+        end
+    end
+    for _, child in navFolder:GetChildren() do
+        if not seen[child.Name] then
+            child:Destroy()
+        end
+    end
 end
 
 -- For each present player, push the set of occupied pads they are BLOCKED from (with gate specs).
@@ -635,15 +689,18 @@ local function recomputeAllAccess()
             end
         end
     end
+    syncNavLights(occupied)
     for _, viewer in Players:GetPlayers() do
         local blocked = {}
         for _, pad in occupied do
             local friend = if pad.mode == "friends" then isFriend(viewer, pad.ownerId) else false
             if not AccessPolicy.canEnter(pad.mode, pad.invited, viewer.UserId, pad.ownerId, friend) then
-                table.insert(
-                    blocked,
-                    { padId = pad.padId, gates = gatesForPad(pad.padId, pad.deckCF12, pad.deckSize) }
-                )
+                table.insert(blocked, {
+                    padId = pad.padId,
+                    gates = gatesForPad(pad.padId, pad.deckCF12, pad.deckSize),
+                    center = { pad.deckCF12[1], pad.deckCF12[2], pad.deckCF12[3] },
+                    revealRadius = AccessGates.revealRadius(pad.deckSize),
+                })
             end
         end
         AccessBlocked:FireClient(viewer, { blocked = blocked })
