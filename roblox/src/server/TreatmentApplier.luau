@@ -162,6 +162,7 @@ function TreatmentApplier:_buildDecorations(
         model.Name = "Decoration"
         model:SetAttribute("id", r.id)
         model:SetAttribute("padId", padId)
+        model:SetAttribute("propId", r.propId)
         model:AddTag("Decoration")
         model.Parent = staging
     end
