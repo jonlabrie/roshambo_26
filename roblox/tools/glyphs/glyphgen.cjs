@@ -13,7 +13,7 @@ const OW = 0.028 * box; // outline weight
 const CORE = 0.09 * box; // core line thickness
 const outPS = CORE + 2 * OW; // paper/scissors outline
 const outR = CORE + 2 * OW * 0.7; // rock outline (70%)
-const R = 0.23 * box; // ring radius (RING_FRAME 0.46 / 2)
+const R = 0.23 * box * 1.2; // ring radius (+20% — rock read smaller than paper/scissors)
 const C = box / 2;
 
 // distance helpers
@@ -36,7 +36,8 @@ function fieldPoly(pts, px, py, w) {
   return d - w / 2;
 }
 
-const PAPER = [[76.8, 256], [435.2, 256]];
+// paper 10% shorter: BAR_LEN 0.70 → 0.63 → half 0.315*512 = 161.28, centred at 256
+const PAPER = [[94.72, 256], [417.28, 256]];
 const SCISS = [[102.4, 345.6], [256, 192], [409.6, 345.6]];
 
 function render(fieldFn) {

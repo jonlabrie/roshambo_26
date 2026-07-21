@@ -10,8 +10,8 @@ local Glyphs = {}
 export type Layers = { core: string, outline: string }
 
 Glyphs.IMAGE = {
-    R = { core = "rbxassetid://136434628991867", outline = "rbxassetid://115980003300543" },
-    P = { core = "rbxassetid://110118985579185", outline = "rbxassetid://138179191212780" },
+    R = { core = "rbxassetid://114994259059574", outline = "rbxassetid://140343170738928" }, -- +20% (2026-07-21)
+    P = { core = "rbxassetid://99397686079954", outline = "rbxassetid://138541026420460" }, -- 10% shorter (2026-07-21)
     S = { core = "rbxassetid://101645881657743", outline = "rbxassetid://100753938615553" },
 } :: { [string]: Layers }
 
