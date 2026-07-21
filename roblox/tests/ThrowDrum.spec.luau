@@ -5,57 +5,72 @@ local L = require("../tools/builders/ArenaLayout")
 local ZenDojo = require("../src/shared/themes/ZenDojo")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 
-describe("ThrowDrum builder", function()
-    test("has a Drum hub and 6 faces", function()
+local function childNames(spec)
+    local names = {}
+    for _, c in spec.children :: any do
+        names[c.name] = true
+    end
+    return names
+end
+
+describe("ThrowDrum mawari-dōrō builder", function()
+    test("hub + 12 facets + 4 shade posts + cap/finial/base/lamp", function()
         local spec = ThrowDrum.build(ZenDojo.palette, L)
-        local names = {}
-        for _, c in spec.children :: any do
-            names[c.name] = true
-        end
+        local names = childNames(spec)
         expect(names["Drum"]).toBe(true)
-        expect(names["Shaft"]).toBe(true)
-        for k = 0, 5 do
+        for k = 0, 11 do
             expect(names["Face" .. k]).toBe(true)
         end
-        -- 12 spokes (6 per end) form the open internal structure
-        local spokes = 0
+        for i = 1, 4 do
+            expect(names["Post" .. i]).toBe(true)
+        end
+        expect(names["RoofCap"]).toBe(true)
+        expect(names["Finial"]).toBe(true)
+        expect(names["Base"]).toBe(true)
+        expect(names["Lamp"]).toBe(true)
+    end)
+
+    test("exactly 12 facets, no leftover horizontal-drum parts", function()
+        local spec = ThrowDrum.build(ZenDojo.palette, L)
+        local faces, shafts, spokes = 0, 0, 0
         for _, c in spec.children :: any do
-            if (c.name :: string):match("^Spoke%d+$") then
+            if (c.name :: string):match("^Face%d+$") then
+                faces += 1
+            elseif c.name == "Shaft" then
+                shafts += 1
+            elseif (c.name :: string):match("^Spoke%d+$") then
                 spokes += 1
             end
         end
-        expect(spokes).toBe(12)
+        expect(faces).toBe(12)
+        expect(shafts).toBe(0) -- vertical lantern: no horizontal axle
+        expect(spokes).toBe(0)
     end)
-    test("opposite faces carry the same symbol (R/P/S/R/P/S)", function()
-        -- faces 0,3 share; 1,4 share; 2,5 share — verified by builder construction.
-        local spec = ThrowDrum.build(ZenDojo.palette, L)
-        local faces = 0
-        for _, c in spec.children :: any do
-            if (c.name :: string):match("^Face%d$") then
-                faces += 1
-            end
-        end
-        expect(faces).toBe(6)
-        for k = 0, 2 do
-            expect(ThrowDrum.SYMBOL_FOR_FACE[k]).toBe(ThrowDrum.SYMBOL_FOR_FACE[k + 3])
-        end
-    end)
-end)
 
-describe("ThrowDrum centred over the roof", function()
-    test("the drum hub sits at the layout's throwDrum position (centred over the roof)", function()
+    test("facets carry R,P,S repeated ×4 (k % 3)", function()
+        local expected = { [0] = "R", [1] = "P", [2] = "S" }
+        for k = 0, 11 do
+            expect(ThrowDrum.SYMBOL_FOR_FACE[k]).toBe(expected[k % 3])
+        end
+    end)
+
+    test("hub sits at the layout throwDrum position (centred over the roof)", function()
         local spec = ThrowDrum.build(ZenDojo.palette, L)
         for _, c in spec.children :: any do
-            if c.name == "ThrowDrum" or c.name == "Drum" then
-                expect(math.abs(c.properties.CFrame[1] - L.throwDrum.pos[1]) < 1).toBe(true)
-                expect(math.abs(c.properties.CFrame[3] - L.throwDrum.pos[3]) < 1).toBe(true)
+            if c.name == "Drum" then
+                expect(math.abs(c.properties.CFrame[1] - L.throwDrum.pos[1]) < 0.01).toBe(true)
+                expect(math.abs(c.properties.CFrame[2] - L.throwDrum.pos[2]) < 0.01).toBe(true)
+                expect(math.abs(c.properties.CFrame[3] - L.throwDrum.pos[3]) < 0.01).toBe(true)
             end
         end
     end)
-    test("no self-supporting legs (the A-frame yoke carries it) — no part named Leg/Post", function()
+
+    test("facets use the CypressWeathered variant", function()
         local spec = ThrowDrum.build(ZenDojo.palette, L)
         for _, c in spec.children :: any do
-            expect(c.name:match("Leg") == nil and c.name:match("Post") == nil).toBe(true)
+            if (c.name :: string):match("^Face%d+$") then
+                expect(c.properties.MaterialVariant).toBe("CypressWeathered")
+            end
         end
     end)
 end)

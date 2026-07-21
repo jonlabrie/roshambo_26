@@ -1,130 +1,152 @@
 --!strict
--- Hexagonal World-Throw drum on a HORIZONTAL axis (world X = E/W) atop the
--- shōrō. 6 flat timber faces carry gold R/P/S/R/P/S so opposite faces (k and
--- k+3) match → the front (−Z) and back (+Z) windows always read the same
--- symbol. A miya-style housing hides the other 4 faces. The DrumController
--- spins the invisible `Drum` hub (its local X is the spin axis) and attaches
--- the symbol SurfaceGuis to the faces at runtime (the face frame rotates with
--- the drum, so orientation is a runtime concern — see DrumController).
+-- Mawari-dōrō revolving lantern crowning the shōrō (replaces the horizontal hex drum).
+-- A squat 12-facet inner drum rotates on a VERTICAL axis behind a fixed 4-window outer
+-- shade. Facets carry R,P,S ×4, so all four windows (90° apart) show the same symbol and a
+-- 30° step advances all four. Glyphs are attached at runtime by DrumController (Glyphs.render
+-- on a SurfaceGui, LightInfluence 0). The interior Lamp makes it glow at night; the opaque
+-- cypress goes dark so only the always-bright glyph reads (day gold-on-cypress, night lit).
+-- The DrumController spins the invisible `Drum` hub about its LOCAL Y.
 local Spec = require("./Spec")
 
 local ThrowDrum = {}
 
--- face index → glyph; index%3 picks the symbol (0=R ○, 1=P ─, 2=S ∧) and
--- k, k+3 share it. Exposed for tests (k and k+3 must match).
-ThrowDrum.SYMBOL_FOR_FACE = { [0] = "○", [1] = "─", [2] = "∧", [3] = "○", [4] = "─", [5] = "∧" }
-
--- Orient a rim slab so its Roblox FRONT face (−Z) points radially OUTWARD at
--- hexagon angle a — i.e. the labelled "front" of the panel is the side that
--- shows (where the glyph SurfaceGui goes). = rotX(-a) then 180° about local Y;
--- this keeps the slab's vertical axis (∧ stays up) and only mirrors along the
--- drum axis, which is invisible for the symmetric ○ ─ ∧.
-local function faceRot(a: number): { number }
-    local c, s = math.cos(a), math.sin(a)
-    return { -1, 0, 0, 0, c, -s, 0, -s, -c }
+-- face index → glyph; k % 3 picks R/P/S. Exposed for tests + the controller.
+ThrowDrum.SYMBOL_FOR_FACE = {} :: { [number]: string }
+do
+    local sym = { [0] = "R", [1] = "P", [2] = "S" }
+    for k = 0, 11 do
+        ThrowDrum.SYMBOL_FOR_FACE[k] = sym[k % 3]
+    end
 end
 
 function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSpec
     local d = L.throwDrum
     local px, py, pz = d.pos[1], d.pos[2], d.pos[3]
-    local length, r, faces = d.length, d.radius, d.faces
-    local timber = palette.timber
+    local r, h, faces = d.radius, d.height, d.faces
+    local cyp = palette.cypressWeathered
+    local slate = palette.slateTile
+    local gold = palette.gold
     local ink = palette.ink
-    -- The drum rides the bell-engine's vertical shaft (off-origin), so yaw it about
-    -- its OWN centre (px,py,pz), not the world origin: yaw 90 swings the prism axis
-    -- (local X) onto world Z so the showing faces present up/downriver (±X). The
-    -- DrumController captures every spinning part as an offset from the hub, so this
-    -- rotation is transparent to it.
-    local yaw = d.yaw or 0
-    local function place(pos: { number }, rot: { number }?): { number }
-        local off = Spec.rotY({ pos[1] - px, pos[2] - py, pos[3] - pz }, yaw)
-        return Spec.cframe(
-            { px + off[1], py + off[2], pz + off[3] },
-            Spec.matMul(Spec.rotYMat(yaw), rot or Spec.ROT.IDENTITY)
-        )
-    end
 
-    local step = (2 * math.pi) / faces -- 60° per face
-    local apothem = r * math.cos(math.pi / faces) -- center→edge-midpoint (face sits here)
-    local side = 2 * r * math.sin(math.pi / faces) -- hexagon edge length (= r for a hexagon)
-    local faceW = side * 1.04 -- slight overlap so faces meet cleanly at the vertices
+    local step = (2 * math.pi) / faces -- 30°
+    local apothem = r * math.cos(math.pi / faces) -- centre→facet midpoint
+    local side = 2 * r * math.sin(math.pi / faces) -- facet chord
+    local faceW = side * 1.02 -- slight overlap so facets meet at the vertices
 
-    -- Top-level children: hub + shaft + 12 spokes + 6 rim faces, plus Housing.
     local top: { Spec.PartSpec } = {}
 
-    -- invisible rotation hub: its local X is the spin axis the controller turns
+    -- Invisible vertical-axis hub: its LOCAL Y is the spin axis the controller turns.
     table.insert(
         top,
         Spec.part("Drum", {
-            Size = { length, 2 * r, 2 * r },
-            CFrame = place({ px, py, pz }),
+            Size = { 2 * r, h, 2 * r },
+            CFrame = Spec.cframe({ px, py, pz }),
             Transparency = 1,
             CanCollide = false,
             Color = ink,
         })
     )
 
-    -- central shaft = the bearing/axle along local X; protrudes 1 stud past each
-    -- end face to read as the bearing the housing holds. (Round + symmetric, so
-    -- the controller leaves it static — spinning it is invisible.)
-    table.insert(
-        top,
-        Spec.part("Shaft", {
-            Size = { length + 2, 1.2, 1.2 },
-            Shape = "Cylinder",
-            CFrame = place({ px, py, pz }),
-            Color = ink,
-            Material = "Metal",
-        })
-    )
-
-    -- 6 spokes per end (12 total) radiating from the shaft to the hexagon's corners —
-    -- the open internal structure that supports the rim faces. The SOUTH end (ei == 1,
-    -- which the 90° yaw maps to +Z) extends its spokes to southR so they reach down
-    -- near the roof as PINS for the drive paddles to flick (the down-spoke is the catch).
-    local southR = d.southSpokeR or r
-    local spoke = 0
-    for ei, ex in { -length / 2 + 0.3, length / 2 - 0.3 } do
-        local sr = if ei == 1 then southR else r
-        for k = 0, faces - 1 do
-            local v = (k + 0.5) * step -- vertex angle (between two faces)
-            local vy = py + sr * math.sin(v)
-            local vz = pz + sr * math.cos(v)
-            local sp, slen, srot = Spec.segment({ px + ex, py, pz }, { px + ex, vy, vz })
-            spoke += 1
-            table.insert(
-                top,
-                Spec.part(`Spoke{spoke}`, {
-                    Size = { slen, 0.4, 0.4 },
-                    CFrame = place(sp, srot),
-                    Color = ink,
-                    Material = "WoodPlanks",
-                })
-            )
-        end
-    end
-
-    -- 6 timber faces tiling a closed hexagon at the apothem. Face k is at angle
-    -- k*60° from +Z (so face 0 faces +Z/back, face 3 faces −Z/front at θ=0).
+    -- 12 cypress facet panels around +Y. Face 0 faces the FRONT (-Z) window; face k is
+    -- yawed k*30° about +Y. Slab Front (-Z) points radially outward (the showing side,
+    -- where DrumController puts the glyph SurfaceGui).
     for k = 0, faces - 1 do
-        local a = k * step
-        local fy = py + apothem * math.sin(a)
-        local fz = pz + apothem * math.cos(a)
+        local adeg = k * (360 / faces)
+        local a = math.rad(adeg)
+        local fx = px - apothem * math.sin(a)
+        local fz = pz - apothem * math.cos(a)
         table.insert(
             top,
             Spec.part(`Face{k}`, {
-                Size = { length, faceW, 0.5 },
-                -- faceRot(a): the slab's FRONT (−Z) faces radially outward, so the
-                -- glyph SurfaceGui (on Front) is the showing side.
-                CFrame = place({ px, fy, fz }, faceRot(a)),
-                Color = timber,
+                Size = { faceW, h, 0.5 },
+                CFrame = Spec.cframe({ fx, py, fz }, Spec.yaw(adeg)),
+                Color = cyp,
                 Material = "Wood",
+                MaterialVariant = "CypressWeathered",
             })
         )
     end
 
-    -- No housing: the open hex prism reads clearly on its own. A roof matching
-    -- the kōsatsu signboards may be added over it later (T23 design pass).
+    -- Fixed outer shade: 4 corner posts at the 45° diagonals (between the N/E/S/W windows),
+    -- standing just outside the facet ring. The gaps between posts ARE the four windows.
+    local postR = r + 1.2
+    local postH = h + 2
+    for i = 1, 4 do
+        local a = math.rad(45 + (i - 1) * 90)
+        table.insert(
+            top,
+            Spec.part(`Post{i}`, {
+                Size = { 1.4, postH, 1.4 },
+                CFrame = Spec.cframe({ px + postR * math.sin(a), py, pz + postR * math.cos(a) }),
+                Color = cyp,
+                Material = "Wood",
+                MaterialVariant = "CypressWeathered",
+            })
+        )
+    end
+
+    -- Base ring the lantern seats on (bronze-banded cypress collar just under the facets).
+    table.insert(
+        top,
+        Spec.part("Base", {
+            Size = { 2 * (r + 1.6), 1.4, 2 * (r + 1.6) },
+            Shape = "Cylinder",
+            CFrame = Spec.cframe({ px, py - h / 2 - 0.7, pz }, Spec.ROT.CYL_VERTICAL),
+            Color = cyp,
+            Material = "Wood",
+            MaterialVariant = "CypressWeathered",
+        })
+    )
+
+    -- Kasa cap (FIRST PASS — a wide low kawara disc; live-tuned into a miniature hip roof
+    -- later, see the live gate). Sits on the post tops, overhanging the windows for shade.
+    local capY = py + postH / 2 + 0.8
+    table.insert(
+        top,
+        Spec.part("RoofCap", {
+            Size = { 2 * (postR + 2.5), 1.6, 2 * (postR + 2.5) },
+            Shape = "Cylinder",
+            CFrame = Spec.cframe({ px, capY, pz }, Spec.ROT.CYL_VERTICAL),
+            Color = slate,
+            Material = "Slate",
+            MaterialVariant = "SlateTile",
+        })
+    )
+
+    -- Gilt hōju finial on the cap (a gold ball). Plain gold Metal — NOT the dark IronDark
+    -- variant (which would kill the gilt read); there is no gold MaterialVariant in the palette.
+    table.insert(
+        top,
+        Spec.part("Finial", {
+            Size = { 2.2, 2.2, 2.2 },
+            Shape = "Ball",
+            CFrame = Spec.cframe({ px, capY + 1.8, pz }),
+            Color = gold,
+            Material = "Metal",
+        })
+    )
+
+    -- Interior lamp: warm point light for the night bloom; hosted on a tiny invisible part
+    -- at the hub centre (the controller does not spin it — symmetric, invisible).
+    table.insert(
+        top,
+        Spec.part("Lamp", {
+            Size = { 0.6, 0.6, 0.6 },
+            CFrame = Spec.cframe({ px, py, pz }),
+            Transparency = 1,
+            CanCollide = false,
+            Color = gold,
+            children = {
+                {
+                    name = "LampLight",
+                    className = "PointLight",
+                    -- Color is a {r,g,b} ARRAY (not Color3.new) — matches how every builder
+                    -- emits light children (see StoneLantern "Glow"); keeps the builder Lune-safe.
+                    properties = { Color = gold, Brightness = 2, Range = 18 },
+                },
+            },
+        })
+    )
 
     return Spec.model("ThrowDrum", top)
 end

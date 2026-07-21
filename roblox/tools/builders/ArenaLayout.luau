@@ -163,11 +163,11 @@ local ArenaLayout = {
     koiPond = { pos = { -130, 0, -115 }, radius = 14 },
     jumbotron = { pos = { 0, 96, 0 }, size = { 168, 96, 1 } }, -- hung sports-arena high; tall rows for big legible tiles
     heroTile = { pos = { 0, 18, 0 }, size = { 5, 6.5, 0.8 } },
-    -- Hexagonal World-Throw drum atop the shōrō (ridge ~y22; y24 clears the
-    -- y28 top tier enough to read). Horizontal axis = world X (E/W).
-    -- southSpokeR: the +Z (south) end spokes extend to this radius so they hang down as
-    -- PINS near the roof (148 - 12 = y136) for the drive paddles to flick.
-    throwDrum = { pos = { -2, 148, 0 }, length = 11, radius = 7, faces = 6, yaw = 90, southSpokeR = 11.5 }, -- centred over the roof; faces up/downriver (±X)
+    -- Mawari-dōrō revolving lantern (vertical axis) crowning the shōrō. radius from the
+    -- 12-facet glyph legibility ("Beacon", ~56% of the 39-stud roof); height is squat.
+    -- `length` is a LEGACY compat field consumed ONLY by BellDrive's yoke sizing
+    -- (BellDrive.luau:156) until the T8 drive reconnect — the new vertical builder ignores it.
+    throwDrum = { pos = { -2, 148, 0 }, length = 11, radius = 11, height = 9, faces = 12, windows = 4 },
     -- ===== Bell engine drive train (exposed on the open frame) =====
     -- One water input → two outputs. The wheel's Z-axle is the MAIN SHAFT; it runs
     -- South down the WEST (upriver) side of the bell+tower (clearing both), then a

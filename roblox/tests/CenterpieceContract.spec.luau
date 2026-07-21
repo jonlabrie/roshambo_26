@@ -51,11 +51,25 @@ describe("centerpiece mechanism contract", function()
             "Chain4",
         })
     end)
-    test("ThrowDrum keeps the hub, 6 faces, and 12 spokes", function()
+    test("ThrowDrum keeps the hub and 12 facets (no spokes)", function()
         local spec = ThrowDrum.build(ZenDojo.palette, L)
         local names = nameSet(spec)
-        requireAll(names, { "Drum", "Face0", "Face1", "Face2", "Face3", "Face4", "Face5" })
-        expect(countMatching(spec, "^Spoke%d+$")).toBe(12)
+        requireAll(names, {
+            "Drum",
+            "Face0",
+            "Face1",
+            "Face2",
+            "Face3",
+            "Face4",
+            "Face5",
+            "Face6",
+            "Face7",
+            "Face8",
+            "Face9",
+            "Face10",
+            "Face11",
+        })
+        expect(countMatching(spec, "^Spoke%d+$")).toBe(0)
     end)
     test("Waterwheel keeps Wheel1, its 8 paddles, and the ratchet", function()
         local spec = Waterwheel.build(ZenDojo.palette, L)
