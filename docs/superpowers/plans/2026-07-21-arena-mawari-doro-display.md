@@ -377,11 +377,34 @@ In `roblox/tools/builders/ArenaLayout.luau`, replace the `throwDrum = { ... }` l
 ```lua
     -- Mawari-dōrō revolving lantern (vertical axis) crowning the shōrō. radius from the
     -- 12-facet glyph legibility ("Beacon", ~56% of the 39-stud roof); height is squat.
-    -- All four windows (90° apart) read the same symbol; the drive-linkage reconnect is T8.
-    throwDrum = { pos = { -2, 148, 0 }, radius = 11, height = 9, faces = 12, windows = 4 },
+    -- `length` is a LEGACY compat field consumed ONLY by BellDrive's yoke sizing
+    -- (BellDrive.luau:156, `L.throwDrum.length / 2 + 1`) until the T8 drive reconnect —
+    -- the new vertical builder ignores it. All four windows read the same symbol.
+    throwDrum = { pos = { -2, 148, 0 }, length = 11, radius = 11, height = 9, faces = 12, windows = 4 },
 ```
 
-(Also delete any now-unused `throwDrum.southSpokeR`/`yaw`/`length` references — they are only used by the old builder, rewritten below. Leave `bellDrive` untouched; its pin-wheel parts still exist and the controller still animates them.)
+**KEEP `length`** — it has a live non-test consumer (`BellDrive.build` sizes the drum-yoke A-frames off `throwDrum.length`); removing it crashes `genmodels`. Drop only the truly-dead `yaw`/`southSpokeR`. Leave `BellDrive.luau` **untouched** — its yoke geometry now straddles a vertical lantern (a known visual mismatch, deferred to T8 with the rest of the drive reconnect; flag it at the Task 4 live gate). Two stale tests must be updated (the plan originally missed them):
+
+- `roblox/tests/ArenaLayout.spec.luau:158-160` — replace the obsolete "yaw 90" test:
+```lua
+    test("throw drum is a 12-facet vertical lantern with 4 windows", function()
+        expect(L.throwDrum.faces).toBe(12)
+        expect(L.throwDrum.windows).toBe(4)
+    end)
+```
+- `roblox/tests/CenterpieceContract.spec.luau:54-59` — the ThrowDrum lock now reflects the 12-facet, spoke-less contract the DrumController animates:
+```lua
+    test("ThrowDrum keeps the hub and 12 facets (no spokes)", function()
+        local spec = ThrowDrum.build(ZenDojo.palette, L)
+        local names = nameSet(spec)
+        requireAll(names, {
+            "Drum",
+            "Face0", "Face1", "Face2", "Face3", "Face4", "Face5",
+            "Face6", "Face7", "Face8", "Face9", "Face10", "Face11",
+        })
+        expect(countMatching(spec, "^Spoke%d+$")).toBe(0)
+    end)
+```
 
 - [ ] **Step 2: Rewrite the test (new parts contract)**
 
