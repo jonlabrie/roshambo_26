@@ -147,44 +147,9 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             Material = "Wood",
         })
     )
-    -- Bearing yoke: an A-frame at EACH end of the drum axle. Two beams rise from the
-    -- roof eaves at ~45° to meet at the axle, carrying the centred drum above the roof.
-    -- Built from the drum's own centre (L.throwDrum) + the pavilion roof, so the
-    -- support follows the drum. A-frames sit just OUTBOARD of the drum ends so they
-    -- never cross the drum body; the drum's axle bears at the two apexes.
-    local axle = L.throwDrum.pos
-    local halfLen = L.throwDrum.length / 2 + 1
-    local roofY = L.pavilion.pos[2] + L.pavilion.roofHeight
-    local roofHalf = L.pavilion.postSpacing / 2 + 3.5 -- feet just INSIDE the eave (roof edge is at +4) so they don't overhang
-    -- selene: allow(shadowing)
-    local n = 0
-    for _, ze in { axle[3] - halfLen, axle[3] + halfLen } do
-        for _, fx in { L.pavilion.pos[1] - roofHalf, L.pavilion.pos[1] + roofHalf } do
-            n += 1
-            local p, len, rot = Spec.segment({ fx, roofY, ze }, { axle[1], axle[2], ze })
-            table.insert(
-                children,
-                Spec.part(`DrumYoke{n}`, {
-                    Size = { len, 0.9, 0.9 },
-                    Shape = "Cylinder",
-                    CFrame = Spec.cframe(p, rot),
-                    Color = timber,
-                    Material = "Wood",
-                })
-            )
-        end
-    end
-    for i, ze in { axle[3] - halfLen, axle[3] + halfLen } do
-        table.insert(
-            children,
-            Spec.part(`DrumBearing{i}`, {
-                Size = { 1.6, 1.6, 1.6 },
-                CFrame = Spec.cframe({ axle[1], axle[2], ze }),
-                Color = iron,
-                Material = "Metal",
-            })
-        )
-    end
+    -- (The old horizontal-drum bearing yoke + drum bearings were removed with the
+    -- mawari-dōrō redesign — the vertical lantern carries itself on its own corner posts,
+    -- so BellDrive no longer references L.throwDrum at all.)
 
     -- DRUM DRIVE (pin-wheel): a flat gear caps the kick shaft (DriveGearA, spins about
     -- Y) and meshes a flat 2-paddle gear (DriveGearB). On a kick the paddles sweep

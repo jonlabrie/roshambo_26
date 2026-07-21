@@ -67,17 +67,47 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
         )
     end
 
-    -- Fixed outer shade: 4 corner posts at the 45° diagonals (between the N/E/S/W windows),
-    -- standing just outside the facet ring. The gaps between posts ARE the four windows.
-    local postR = r + 1.2
-    local postH = h + 2
+    -- ── Fixed outer shade ──────────────────────────────────────────────────────
+    -- 8 solid cypress panels hug the drum curve — one tangent over each OFF-cardinal facet,
+    -- following the 12-gon like the facet it covers. The 4 cardinal directions stay open as
+    -- WINDOWS, each framing the single facet currently there → all four windows read the same
+    -- symbol (the drum spins so a matching facet lands at each cardinal). Riding close to the
+    -- facet ring keeps neighbours from peeking (no parallax gap). 4 slim corner posts stand
+    -- proud at the diagonals for the andon read. Panels/posts are STATIC (only Faces spin).
+    local shadeR = r + 0.8 -- panels ride just outside the spinning facet ring, following its curve
+    local shadeH = h + 0.4
+    local panelW = faceW * 1.08 -- ≈ a facet chord, overlapping neighbours so the wall is closed
+    local shadeDirs = { 30, 60, 120, 150, 210, 240, 300, 330 } -- the 8 off-cardinal facet angles
+    for i, adeg in shadeDirs do
+        local a = math.rad(adeg)
+        table.insert(
+            top,
+            Spec.part(`ShadePanel{i}`, {
+                Size = { panelW, shadeH, 0.6 },
+                CFrame = Spec.cframe(
+                    { px - shadeR * math.sin(a), py, pz - shadeR * math.cos(a) },
+                    Spec.yaw(adeg)
+                ),
+                Color = cyp,
+                Material = "Wood",
+                MaterialVariant = "CypressWeathered",
+            })
+        )
+    end
+    local postR = r + 2.0 -- corner posts stand proud of the panels, at the 4 diagonals
+    local postH = h + 5 -- extended 2 studs downward so they reach the tower roof as legs
+    local postCY = py - 1 -- top stays put (py + (h+3)/2); the extra 2 studs hang below
     for i = 1, 4 do
         local a = math.rad(45 + (i - 1) * 90)
         table.insert(
             top,
             Spec.part(`Post{i}`, {
-                Size = { 1.4, postH, 1.4 },
-                CFrame = Spec.cframe({ px + postR * math.sin(a), py, pz + postR * math.cos(a) }),
+                Size = { 1.2, postH, 1.2 },
+                -- yaw 45° → diamond profile (a corner faces outward)
+                CFrame = Spec.cframe(
+                    { px - postR * math.sin(a), postCY, pz - postR * math.cos(a) },
+                    Spec.yaw(45)
+                ),
                 Color = cyp,
                 Material = "Wood",
                 MaterialVariant = "CypressWeathered",
@@ -85,33 +115,110 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
         )
     end
 
-    -- Base ring the lantern seats on (bronze-banded cypress collar just under the facets).
+    -- Base disc the lantern seats on (flat cypress collar just under the facets). For a
+    -- Cylinder the AXIS is the first Size dim, so a flat disc is {thickness, dia, dia} laid
+    -- flat by CYL_VERTICAL (axis→Y). (Getting this order wrong makes a tall vertical fin.)
     table.insert(
         top,
         Spec.part("Base", {
-            Size = { 2 * (r + 1.6), 1.4, 2 * (r + 1.6) },
+            Size = { 0.47, 2 * (r + 1.6), 2 * (r + 1.6) }, -- 1/3 the old thickness
             Shape = "Cylinder",
-            CFrame = Spec.cframe({ px, py - h / 2 - 0.7, pz }, Spec.ROT.CYL_VERTICAL),
+            CFrame = Spec.cframe({ px, py - h / 2 - 0.4, pz }, Spec.ROT.CYL_VERTICAL),
             Color = cyp,
             Material = "Wood",
             MaterialVariant = "CypressWeathered",
         })
     )
 
-    -- Kasa cap (FIRST PASS — a wide low kawara disc; live-tuned into a miniature hip roof
-    -- later, see the live gate). Sits on the post tops, overhanging the windows for shade.
-    local capY = py + postH / 2 + 0.8
-    table.insert(
-        top,
-        Spec.part("RoofCap", {
-            Size = { 2 * (postR + 2.5), 1.6, 2 * (postR + 2.5) },
-            Shape = "Cylinder",
-            CFrame = Spec.cframe({ px, capY, pz }, Spec.ROT.CYL_VERTICAL),
-            Color = slate,
-            Material = "Slate",
-            MaterialVariant = "SlateTile",
+    -- ── Miniature hip roof (Shoro's recipe, shrunk; 4 wedge faces + 4 hip stringers, NO
+    -- rafter fan at this size). Square pyramid, axis-aligned so eave midpoints overhang the
+    -- 4 windows and the hip corners sit over the 4 diagonal posts.
+    local RErf = r + 3 -- eave half-side; overhangs the corner posts (r+2) so they tuck under
+    local eaveWY = py + 4.8 -- eave meets the post tops (~py+5.1) at the post radius
+    local apexRise = 4.5
+    local apexWY = eaveWY + apexRise
+    local roofT = 0.5
+    local function vsub(a, b): { number }
+        return { a[1] - b[1], a[2] - b[2], a[3] - b[3] }
+    end
+    local function vdot(a, b): number
+        return a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
+    end
+    local function vcross(a, b): { number }
+        return { a[2] * b[3] - a[3] * b[2], a[3] * b[1] - a[1] * b[3], a[1] * b[2] - a[2] * b[1] }
+    end
+    local function vunit(a): { number }
+        local l = math.sqrt(vdot(a, a))
+        return { a[1] / l, a[2] / l, a[3] / l }
+    end
+    local function vmid(a, b): { number }
+        return { (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, (a[3] + b[3]) / 2 }
+    end
+    local function rotAxes(vx, vy, vz): { number }
+        return { vx[1], vy[1], vz[1], vx[2], vy[2], vz[2], vx[3], vy[3], vz[3] }
+    end
+    local rcorners = {}
+    for _, q in { { 1, 1 }, { -1, 1 }, { -1, -1 }, { 1, -1 } } do
+        rcorners[#rcorners + 1] = { px + q[1] * RErf, eaveWY, pz + q[2] * RErf }
+    end
+    local apex = { px, apexWY, pz }
+    -- one triangular face → two WedgeParts (canonical right-angle split + handedness)
+    local function triFace(name: string, a: { number }, b: { number }, c: { number })
+        local ab, ac, bc = vsub(b, a), vsub(c, a), vsub(c, b)
+        local abd, acd, bcd = vdot(ab, ab), vdot(ac, ac), vdot(bc, bc)
+        if abd > acd and abd > bcd then
+            a, c = c, a
+        elseif acd > bcd and acd > abd then
+            a, b = b, a
+        end
+        ab, ac, bc = vsub(b, a), vsub(c, a), vsub(c, b)
+        local right = vunit(vcross(ac, ab))
+        local up = vunit(vcross(bc, right))
+        local back = vunit(bc)
+        local height = math.abs(vdot(ab, up))
+        local nb, nr = { -back[1], -back[2], -back[3] }, { -right[1], -right[2], -right[3] }
+        table.insert(top, {
+            name = `{name}_1`,
+            className = "WedgePart",
+            properties = {
+                Anchored = true,
+                Size = { roofT, height, math.abs(vdot(ab, back)) },
+                CFrame = Spec.cframe(vmid(a, b), rotAxes(right, up, back)),
+                Color = slate,
+                Material = "Slate",
+                MaterialVariant = "SlateTile",
+            },
         })
-    )
+        table.insert(top, {
+            name = `{name}_2`,
+            className = "WedgePart",
+            properties = {
+                Anchored = true,
+                Size = { roofT, height, math.abs(vdot(ac, back)) },
+                CFrame = Spec.cframe(vmid(a, c), rotAxes(nr, up, nb)),
+                Color = slate,
+                Material = "Slate",
+                MaterialVariant = "SlateTile",
+            },
+        })
+    end
+    for i = 1, 4 do
+        triFace(`RoofFace{i}`, apex, rcorners[i], rcorners[i % 4 + 1])
+    end
+    for i, fc in rcorners do
+        local sp, slen, srot = Spec.segment(apex, fc)
+        table.insert(
+            top,
+            Spec.part(`HipStringer{i}`, {
+                Size = { slen, 0.7, 0.7 },
+                CFrame = Spec.cframe(sp, srot),
+                Color = cyp,
+                Material = "Wood",
+                MaterialVariant = "CypressWeathered",
+            })
+        )
+    end
+    local capY = apexWY -- the finial sits on the ridge apex
 
     -- Gilt hōju finial on the cap (a gold ball). Plain gold Metal — NOT the dark IronDark
     -- variant (which would kill the gilt read); there is no gold MaterialVariant in the palette.
@@ -142,7 +249,10 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
                     className = "PointLight",
                     -- Color is a {r,g,b} ARRAY (not Color3.new) — matches how every builder
                     -- emits light children (see StoneLantern "Glow"); keeps the builder Lune-safe.
-                    properties = { Color = gold, Brightness = 2, Range = 18 },
+                    -- dim + short-range so the warm light doesn't spill onto the exterior in
+                    -- daylight (a subtle interior night accent through the windows). Facets are
+                    -- opaque cypress (no translucency) — the earlier warmth was this lamp spilling.
+                    properties = { Color = gold, Brightness = 0.7, Range = 10 },
                 },
             },
         })

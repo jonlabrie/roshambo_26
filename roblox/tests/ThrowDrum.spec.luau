@@ -14,17 +14,21 @@ local function childNames(spec)
 end
 
 describe("ThrowDrum mawari-dōrō builder", function()
-    test("hub + 12 facets + 4 shade posts + cap/finial/base/lamp", function()
+    test("hub + 12 facets + 8 shade panels + 4 posts + hip roof/finial/base/lamp", function()
         local spec = ThrowDrum.build(ZenDojo.palette, L)
         local names = childNames(spec)
         expect(names["Drum"]).toBe(true)
         for k = 0, 11 do
             expect(names["Face" .. k]).toBe(true)
         end
+        for i = 1, 8 do
+            expect(names["ShadePanel" .. i]).toBe(true) -- curve-hugging infill over the off-cardinal facets
+        end
         for i = 1, 4 do
             expect(names["Post" .. i]).toBe(true)
         end
-        expect(names["RoofCap"]).toBe(true)
+        expect(names["RoofFace1_1"]).toBe(true) -- miniature hip roof (Shoro wedge recipe)
+        expect(names["HipStringer1"]).toBe(true)
         expect(names["Finial"]).toBe(true)
         expect(names["Base"]).toBe(true)
         expect(names["Lamp"]).toBe(true)

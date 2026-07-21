@@ -91,12 +91,6 @@ describe("centerpiece mechanism contract", function()
             "DriveGearB",
             "DrivePaddle",
             "DriveGearBShaft",
-            "DrumYoke1",
-            "DrumYoke2",
-            "DrumYoke3",
-            "DrumYoke4",
-            "DrumBearing1",
-            "DrumBearing2",
         })
         expect(countMatching(spec, "^Cam") >= 1).toBe(true)
     end)

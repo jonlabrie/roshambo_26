@@ -19,10 +19,6 @@ describe("BellDrive builder", function()
             expect(n[want]).toBe(true)
         end
     end)
-    test("two drum-yoke arms carry the drum", function()
-        local n = names(BellDrive.build(ZenDojo.palette, L))
-        expect(n["DrumYoke1"] and n["DrumYoke2"]).toBe(true)
-    end)
     test("the gears are placed at the layout centres", function()
         local spec = BellDrive.build(ZenDojo.palette, L)
         for _, c in spec.children :: any do

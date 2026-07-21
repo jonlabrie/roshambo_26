@@ -167,7 +167,7 @@ local ArenaLayout = {
     -- 12-facet glyph legibility ("Beacon", ~56% of the 39-stud roof); height is squat.
     -- `length` is a LEGACY compat field consumed ONLY by BellDrive's yoke sizing
     -- (BellDrive.luau:156) until the T8 drive reconnect — the new vertical builder ignores it.
-    throwDrum = { pos = { -2, 148, 0 }, length = 11, radius = 11, height = 9, faces = 12, windows = 4 },
+    throwDrum = { pos = { -2, 144, 0 }, radius = 11, height = 7.25, faces = 12, windows = 4 },
     -- ===== Bell engine drive train (exposed on the open frame) =====
     -- One water input → two outputs. The wheel's Z-axle is the MAIN SHAFT; it runs
     -- South down the WEST (upriver) side of the bell+tower (clearing both), then a

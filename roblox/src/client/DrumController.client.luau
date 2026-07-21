@@ -26,6 +26,7 @@ local hub = drum.CFrame
 
 local FACES = 12
 local GOLD = Color3.fromRGB(212, 176, 102)
+local INK_OUTLINE = Color3.fromRGB(20, 17, 16) -- black keyline (more authentic than the PWA's white on cypress)
 
 -- SYMBOL_FOR_FACE (k % 3). Mirrors ThrowDrum.SYMBOL_FOR_FACE without requiring the builder
 -- (builders live under tools/ and are not replicated to clients).
@@ -46,14 +47,18 @@ for k = 0, FACES - 1 do
     local face = rig:WaitForChild("Face" .. k) :: BasePart
     table.insert(spinParts, face)
     table.insert(spinOffsets, hub:ToObjectSpace(face.CFrame))
-    -- attach the always-bright approved glyph on the facet's outward (Front, -Z) side
+    -- attach the always-bright approved glyph on the facet's outward (Front, -Z) side.
+    -- Match the canvas aspect to the facet (a 4:5 panel) so the ○ ring stays round rather
+    -- than being stretched into an oval by a square canvas on a non-square face.
+    local fs = face.Size -- {faceW, h, thickness}
+    local cw = math.max(1, math.round(200 * fs.X / fs.Y))
     local gui = Instance.new("SurfaceGui")
     gui.Face = Enum.NormalId.Front
     gui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
-    gui.CanvasSize = Vector2.new(200, 200)
+    gui.CanvasSize = Vector2.new(cw, 200)
     gui.LightInfluence = 0
     gui.Parent = face
-    Glyphs.render(gui, SYMBOL_FOR_FACE[k], GOLD, 200)
+    Glyphs.render(gui, SYMBOL_FOR_FACE[k], GOLD, INK_OUTLINE)
 end
 
 -- MOTION (strike-keyed), preserved from the hex drum but on the VERTICAL axis.
