@@ -50,8 +50,10 @@ local ArenaLayout = {
         inFallTopY = 150, -- in-fall crest
     },
     pavilion = { pos = { -2, 112, 0 }, postSpacing = 18, roofHeight = 22, yaw = 0 },
-    -- bonshō bell: hangs centred above the clearing floor (radius/height unchanged).
-    bell = { pos = { -2, 121, 0 }, height = 13.5, radius = 5.1 },
+    -- bonshō bell: hangs centred above the clearing floor. Raised +2.7 (2026-07-20) so
+    -- the BellBeam rests atop the ring beams and the bell clears the deck better; the
+    -- shu-moku striker (y118) realignment to this height is the deferred drive-chain pass.
+    bell = { pos = { -2, 123.7, 0 }, height = 13.5, radius = 5.1 },
     -- shu-moku striker, re-staged on the clearing axis (yaw 0; draws toward +Z, swings
     -- into the bell's +Z face). Y values lifted to the clearing floor (~112+).
     shuMoku = {

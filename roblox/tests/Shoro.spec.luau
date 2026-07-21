@@ -36,3 +36,48 @@ describe("Shoro builder", function()
         expect(found).toBe(true)
     end)
 end)
+
+describe("Shoro art pass", function()
+    test("posts wear the weathered cypress variant", function()
+        local spec = Shoro.build(ZenDojo.palette, L)
+        for _, c in spec.children :: any do
+            if c.name:match("^Post%d$") then
+                expect(c.properties.MaterialVariant).toBe("CypressWeathered")
+            end
+        end
+    end)
+    test("emits a stepped tokyō bracket stack over each of the 4 posts", function()
+        local spec = Shoro.build(ZenDojo.palette, L)
+        local n = 0
+        for _, c in spec.children :: any do
+            if c.name:match("^Bracket%d+_%d+$") then
+                n += 1
+            end
+        end
+        expect(n >= 8).toBe(true) -- >= 2 courses per post
+    end)
+    test("emits the procedural hip roof: 8 face wedges, 4 hip stringers, a rafter fan", function()
+        local spec = Shoro.build(ZenDojo.palette, L)
+        local faces, stringers, rafters = 0, 0, 0
+        for _, c in spec.children :: any do
+            if c.name:match("^RoofFace%d_%d$") then
+                faces += 1
+                expect(c.className).toBe("WedgePart")
+                expect(c.properties.MaterialVariant).toBe("SlateTile")
+            end
+            if c.name:match("^HipStringer%d$") then
+                stringers += 1
+            end
+            if c.name:match("^Rafter%d+$") then
+                rafters += 1
+            end
+        end
+        expect(faces).toBe(8) -- 4 triangular faces × 2 wedges
+        expect(stringers).toBe(4)
+        expect(rafters >= 40).toBe(true)
+        -- the old flat wedges / finial are gone
+        for _, c in spec.children :: any do
+            expect(c.name:match("^RoofWedge%d$")).toBeNil()
+        end
+    end)
+end)

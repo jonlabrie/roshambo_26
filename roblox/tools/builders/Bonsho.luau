@@ -32,10 +32,11 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
         )
     end
     -- BellHanger: an iron strap from the crown lug up to the shōrō BellBeam underside,
-    -- so the bell visibly HANGS from the crossbeam. beamBottomY mirrors Shoro.BellBeam
-    -- (placed at roofHeight-1.8, height 1.8 → underside = base + roofHeight - 2.7).
+    -- so the bell visibly HANGS from the crossbeam. beamBottomY mirrors Shoro.BellBeam,
+    -- which now rests ATOP the ring beams (centre roofHeight+0.9, height 1.8 →
+    -- underside = base + roofHeight).
     local crownTopY = by + h / 2 + 1.9
-    local beamBottomY = L.pavilion.pos[2] + L.pavilion.roofHeight - 2.7
+    local beamBottomY = L.pavilion.pos[2] + L.pavilion.roofHeight
     table.insert(
         children,
         Spec.part("BellHanger", {
