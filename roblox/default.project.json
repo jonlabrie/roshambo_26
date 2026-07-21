@@ -42,6 +42,7 @@
             "RoshamboStage": {
                 "$className": "Folder",
                 "BonshoRig": { "$path": "assets/BonshoRig.model.json" },
+                "BonshoBell": { "$path": "assets/meshes/BonshoBell.rbxm" },
                 "Shoro": { "$path": "assets/Shoro.model.json" },
                 "Waterwheel": { "$path": "assets/Waterwheel.model.json" },
                 "BellDrive": { "$path": "assets/BellDrive.model.json" },

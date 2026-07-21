@@ -6,45 +6,31 @@ local Spec = require("./Spec")
 
 local Bonsho = {}
 
+-- The visible cast-bronze meshes ship as assets/meshes/BonshoBell.rbxmx
+-- (→ RoshamboStage.BonshoBell) because Rojo cannot load mesh geometry from a MeshId
+-- set in JSON — a JSON MeshPart renders at native (unscaled) size. Asset ids for the
+-- record: BellBody=124216263682136, Ryuzu=93544424620557, LotusBoss=128610662938981.
+-- This builder emits only the primitives + the mechanism-contract parts.
 function Bonsho.build(palette: { [string]: { number } }, L: any)
-    local bronze = { 0.36, 0.30, 0.22 }
+    local bronze = palette.bronzePatina
     local bx, by, bz = L.bell.pos[1], L.bell.pos[2], L.bell.pos[3]
     local h, r = L.bell.height, L.bell.radius
-    local profile = { 1.0, 0.93, 0.88, 0.86, 0.78 }
-    local sectionH = h / #profile
     local children = {}
-    for i, f in profile do
-        local d = 2 * r * f
+    -- Two raised obi band-rings around the lower body: thin discs ~0.05 proud of the
+    -- skirt (a shoulder band was dropped at the gate — it sat on the taper and read proud).
+    for i, dy in { -1, -4.5 } do
         table.insert(
             children,
-            Spec.part(`BellSection{i}`, {
-                Size = { sectionH, d, d },
+            Spec.part(`Band{i}`, {
+                Size = { 0.3, 2 * r + 0.1, 2 * r + 0.1 },
                 Shape = "Cylinder",
-                CFrame = Spec.cframe({ bx, by - h / 2 + sectionH * (i - 0.5), bz }, Spec.ROT.CYL_VERTICAL),
+                CFrame = Spec.cframe({ bx, by + dy, bz }, Spec.ROT.CYL_VERTICAL),
                 Color = bronze,
                 Material = "Metal",
+                MaterialVariant = "BronzePatina",
             })
         )
     end
-    table.insert(
-        children,
-        Spec.part("BellDome", {
-            Size = { 2 * r * 0.7, 1.6, 2 * r * 0.7 },
-            Shape = "Ball",
-            CFrame = Spec.cframe({ bx, by + h / 2, bz }),
-            Color = bronze,
-            Material = "Metal",
-        })
-    )
-    table.insert(
-        children,
-        Spec.part("CrownLug", {
-            Size = { 1.2, 1.4, 1.2 },
-            CFrame = Spec.cframe({ bx, by + h / 2 + 1.2, bz }),
-            Color = bronze,
-            Material = "Metal",
-        })
-    )
     -- BellHanger: an iron strap from the crown lug up to the shōrō BellBeam underside,
     -- so the bell visibly HANGS from the crossbeam. beamBottomY mirrors Shoro.BellBeam
     -- (placed at roofHeight-1.8, height 1.8 → underside = base + roofHeight - 2.7).
@@ -56,23 +42,6 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
             Size = { 0.5, (beamBottomY - crownTopY) + 1.0, 0.5 }, -- overlaps 0.5 into the lug + the beam
             CFrame = Spec.cframe({ bx, (crownTopY + beamBottomY) / 2, bz }),
             Color = { 0.22, 0.22, 0.25 },
-            Material = "Metal",
-        })
-    )
-    -- The tsuki-za strike boss sits at the LOG's height, not a fraction of the
-    -- bell — so it stays aligned with the shu-moku through any bell resize.
-    -- strike boss on the bell's SW face, aligned with the rotated shu-moku log
-    -- (bell is centered at x=0,z=0, so rotate about world-Y through the origin).
-    local strikeY = L.shuMoku.restPos[2]
-    local bossPos = Spec.rotY({ bx, strikeY, bz + r + 0.2 }, L.shuMoku.yaw)
-    local bossRot = Spec.matMul(Spec.rotYMat(L.shuMoku.yaw), Spec.ROT.CYL_ALONG_Z)
-    table.insert(
-        children,
-        Spec.part("LotusBoss", {
-            Size = { 0.6, 1.8, 1.8 },
-            Shape = "Cylinder",
-            CFrame = Spec.cframe(bossPos, bossRot),
-            Color = palette.gold,
             Material = "Metal",
         })
     )

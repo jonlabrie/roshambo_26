@@ -8,6 +8,7 @@ local WorkspaceConvention = {}
 -- RoshamboStage must contain EXACTLY these (no hand-built place-only content).
 WorkspaceConvention.DECLARED_STAGE_CHILDREN = {
     "BonshoRig",
+    "BonshoBell", -- the cast-bronze bell meshes (assets/meshes/BonshoBell.rbxm)
     "Shoro",
     "Waterwheel",
     "BellDrive",

@@ -28,7 +28,7 @@ return {
         -- tools/studio/setupCenterpieceMaterials.luau): near-neutral where the map already
         -- carries the color, a green tint for the (colorless steel) bell. Gate-tunable.
         cypressWeathered = { 0.85, 0.84, 0.81 }, -- light neutral over gray Wood059 (aged hinoki)
-        bronzePatina = { 0.23, 0.31, 0.27 }, -- deep green over steel Metal058C (patinated bell)
+        bronzePatina = { 0.157, 0.196, 0.176 }, -- dark metal + subtle green patina (bell; locked at gate)
         slateTile = { 0.90, 0.90, 0.88 }, -- near-neutral over dark kawara RoofingTiles013A
         ironDark = { 0.50, 0.50, 0.53 }, -- mid over dark Metal046B (bands/collars/gears)
         paddleWet = { 0.85, 0.85, 0.82 }, -- near-neutral over olive Wood065 (wet mossy paddles)

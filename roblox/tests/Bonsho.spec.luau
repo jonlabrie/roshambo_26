@@ -36,24 +36,19 @@ describe("Bonsho builder", function()
             end
         end
     end)
-    test("the strike boss sits on the bell's +Z face", function()
+    test("emits two obi band-rings; the cast-bronze meshes ship via .rbxmx (not the builder)", function()
         local spec = Bonsho.build(ZenDojo.palette, L)
+        local names = {}
         for _, c in spec.children :: any do
-            if c.name == "LotusBoss" then
-                expect(c.properties.CFrame[3] > 0).toBe(true) -- the face the striker swings into
-            end
+            names[c.name] = true
         end
-    end)
-    test("bell sections widen toward the skirt", function()
-        local spec = Bonsho.build(ZenDojo.palette, L)
-        local radii = {}
-        for _, c in spec.children :: any do
-            local i = c.name:match("^BellSection(%d)$")
-            if i then
-                radii[tonumber(i) :: number] = c.properties.Size[2]
-            end
-        end
-        expect(radii[1] > radii[3]).toBe(true)
+        -- BellBody/Ryuzu/LotusBoss live in assets/meshes/BonshoBell.rbxmx (Rojo can't load
+        -- mesh geometry from a MeshId in JSON), so the builder must NOT emit them.
+        expect(names["BellBody"]).toBeNil()
+        expect(names["BellSection1"]).toBeNil()
+        expect(names["LotusBoss"]).toBeNil()
+        expect(names["Band1"]).toBe(true)
+        expect(names["Band2"]).toBe(true)
     end)
 end)
 
