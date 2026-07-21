@@ -23,12 +23,15 @@ return {
         water = { 0.20, 0.35, 0.43 },
         gravel = { 0.79, 0.76, 0.70 },
         timber = { 0.42, 0.31, 0.20 },
-        -- weathered temple palette (2026-07-20 Water Striker art pass; starting values)
-        cypressWeathered = { 0.56, 0.55, 0.51 }, -- sun-bleached aged hinoki posts/beams/brackets
-        bronzePatina = { 0.18, 0.25, 0.22 }, -- dark verdigris green-black bell
-        slateTile = { 0.13, 0.14, 0.16 }, -- near-black hip-roof tile
-        ironDark = { 0.16, 0.16, 0.18 }, -- hoop bands, collars, chains, gears
-        paddleWet = { 0.34, 0.35, 0.33 }, -- darkened wet lower paddles
+        -- weathered temple palette (2026-07-20 Water Striker art pass). These are Color
+        -- TINTS multiplied over the ambientCG PBR MaterialVariants (see
+        -- tools/studio/setupCenterpieceMaterials.luau): near-neutral where the map already
+        -- carries the color, a green tint for the (colorless steel) bell. Gate-tunable.
+        cypressWeathered = { 0.85, 0.84, 0.81 }, -- light neutral over gray Wood059 (aged hinoki)
+        bronzePatina = { 0.23, 0.31, 0.27 }, -- deep green over steel Metal058C (patinated bell)
+        slateTile = { 0.90, 0.90, 0.88 }, -- near-neutral over dark kawara RoofingTiles013A
+        ironDark = { 0.50, 0.50, 0.53 }, -- mid over dark Metal046B (bands/collars/gears)
+        paddleWet = { 0.85, 0.85, 0.82 }, -- near-neutral over olive Wood065 (wet mossy paddles)
     },
     lighting = {
         clockTime = 16.5,
