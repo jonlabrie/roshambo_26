@@ -591,7 +591,8 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
         })
     )
 
-    -- Gilt hōju finial on the cap (a small sphere + a short spike stub, one part each).
+    -- Gilt hōju finial on the cap (a gold ball). Plain gold Metal — NOT the dark IronDark
+    -- variant (which would kill the gilt read); there is no gold MaterialVariant in the palette.
     table.insert(
         top,
         Spec.part("Finial", {
@@ -600,7 +601,6 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
             CFrame = Spec.cframe({ px, capY + 1.8, pz }),
             Color = gold,
             Material = "Metal",
-            MaterialVariant = "IronDark",
         })
     )
 
@@ -618,11 +618,9 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
                 {
                     name = "LampLight",
                     className = "PointLight",
-                    properties = {
-                        Color = Color3.new(gold[1], gold[2], gold[3]),
-                        Brightness = 2,
-                        Range = 18,
-                    },
+                    -- Color is a {r,g,b} ARRAY (not Color3.new) — matches how every builder
+                    -- emits light children (see StoneLantern "Glow"); keeps the builder Lune-safe.
+                    properties = { Color = gold, Brightness = 2, Range = 18 },
                 },
             },
         })
@@ -633,8 +631,6 @@ end
 
 return ThrowDrum
 ```
-
-> Note: the `Lamp`'s child `PointLight` uses `Color3.new` — this file is a **builder** run under Lune by `genmodels`, not a Lune *test*. `genmodels` provides `Color3`; the `ThrowDrum.spec` tests only inspect the returned table's `name`/`properties.CFrame`/`MaterialVariant`, never the `PointLight` child, so the pure tests stay Lune-safe. If `genmodels` errors on `Color3.new`, emit the child light color as a plain property table instead (match how existing builders emit light children — grep `PointLight` in `tools/builders`).
 
 - [ ] **Step 5: Run test to verify it passes**
 
