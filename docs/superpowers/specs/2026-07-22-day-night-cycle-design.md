@@ -7,7 +7,7 @@
 
 ## Summary
 
-A **server-authoritative, continuous, night-dominant** day/night cycle for the ZenDojo arena. The server owns one shared clock; every client derives the same cycle phase locally and renders Lighting from it, then publishes a single normalized **`nightFactor` ∈ [0,1]** on the client EventBus. Visual systems (glyph gilt↔glow, waterfall foam/turbulence dimming, and later fireflies/lanterns/fireworks) subscribe to that one number and interpolate their own look — so the whole arena transforms in lockstep as dusk falls, at near-zero cost.
+A **server-authoritative, continuous, night-dominant, globally-synced** day/night cycle for the ZenDojo arena. The cycle is anchored to a fixed point on Roblox's globally-synced clock, so **every client in every server instance derives the same cycle phase** at the same real moment; each client renders Lighting from it locally, then publishes a single normalized **`nightFactor` ∈ [0,1]** on the client EventBus. Visual systems (glyph gilt↔glow, waterfall foam/turbulence dimming, and later fireflies/lanterns/fireworks) subscribe to that one number and interpolate their own look — so the whole arena transforms in lockstep as dusk falls, at near-zero cost.
 
 This is **foundation infrastructure.** It ships the cycle + the `nightFactor` contract. The subscribers (glyphs, falls, …) are separate follow-on specs that bind to the contract defined here.
 
@@ -17,7 +17,7 @@ The arena is a **night-first world**: fireworks, the glowing revolving lantern, 
 
 ## Goals / non-goals
 
-**Goals:** one shared clock for all players; a continuous loop with a long night; a single clean signal (`nightFactor`) other systems bind to; a pure, Lune-tested phase→look mapping; zero per-frame network traffic.
+**Goals:** one **global** clock shared by every player across every server instance; a continuous loop with a long night + generous dusk; a single clean signal (`nightFactor`) other systems bind to; a pure, Lune-tested phase→look mapping; zero per-frame network traffic.
 
 **Non-goals:** gameplay effects (purely visual/ambient — the World Throw is unaffected); per-player time; weather; a settings UI. The cycle does not gate or alter round logic.
 
@@ -32,8 +32,10 @@ Lune-safe: no `Instance`/`Color3`/`Enum` at module scope or in its functions; co
   |-------|-----------|-------|---------------|
   | dawn  | `[0.00, 0.10)` | 10% | ramps **1 → 0** (smoothstep) |
   | day   | `[0.10, 0.28)` | 18% | `0` |
-  | dusk  | `[0.28, 0.45)` | 17% | ramps **0 → 1** (smoothstep) |
-  | night | `[0.45, 1.00)` | 55% | `1` |
+  | dusk  | `[0.28, 0.53)` | 25% | ramps **0 → 1** (smoothstep) |
+  | night | `[0.53, 1.00)` | 47% | `1` |
+
+  Dusk is deliberately generous (25%) — the long amber "magic hour" is when fireflies emerge and fireworks read best, so it earns its share from night.
 - **`DayNight.phaseAt(t) -> { nightFactor: number, phase: string }`** — pure; `phase ∈ {"dawn","day","dusk","night"}`; `nightFactor` smoothstepped across dawn/dusk so it is continuous and monotonic within each transition.
 - **`DayNight.lightingAt(t) -> LightingState`** — pure; returns plain data the client applies to `Lighting`: `{ clockTime, brightness, outdoorAmbient={r,g,b}, ambient={r,g,b}, fogEnd, fogColor={r,g,b}, ccTint={r,g,b}, ccBrightness }`. `clockTime` is mapped through the phase bands (not linear in `t`) so the built-in sun/moon position matches the night-dominant schedule.
 
@@ -48,7 +50,7 @@ All Roblox types (`Lighting`, `workspace`, `RunService`, `EventBus`, `Color3.new
 
 ### 3. Server (`main.server.luau`) — owns the truth
 
-At startup, publish the cycle config **once** as attributes on a `Configuration` instance in `ReplicatedStorage` (e.g. `ReplicatedStorage.DayNightConfig`): `CycleEpoch` (= `workspace:GetServerTimeNow()` at boot, or a fixed value so restarts don't jump), `CycleLength` (seconds, starting **1200** = 20 min), `PhaseOffset` (starting fraction; lets us boot the world into night). The server streams **nothing** afterward — clients read these attributes + the shared `GetServerTimeNow()` clock and derive `t` themselves. Server-authoritative because the server solely owns epoch/length/offset; perfectly synced because `GetServerTimeNow()` is a shared server clock.
+At startup the server publishes the cycle config **once** as attributes on `ReplicatedStorage.DayNightConfig`: `CycleEpoch` — a **fixed absolute constant** (a chosen reference moment in synced Unix seconds, the same value baked into every server, **not** the server's boot time), `CycleLength` (seconds, starting **1200** = 20 min), `PhaseOffset` (fraction, for aesthetic alignment of the global clock). Clients compute `t = ((workspace:GetServerTimeNow() − epoch) / length + offset) % 1`. Because `GetServerTimeNow()` is Roblox's **globally-synced Unix clock** (identical on every server and client) and the epoch is a fixed constant, **all players in all server instances see the same time-of-day at the same real moment** — one global cycle. The server streams nothing afterward. Server-authoritative (it owns the published constants); global and perfectly synced (shared clock + fixed epoch); server restarts and cross-server hops never jump the time.
 
 ## The contract (design once — everything binds to this)
 
@@ -82,7 +84,7 @@ Late subscribers get the current value immediately: the controller caches the la
 ## Testing
 
 - **Pure/deterministic (Lune, `DayNight.spec.luau`):** `phaseAt(t)` returns the right `phase` in each band; `nightFactor` is exactly `1` in night, `0` in day, monotonic across dawn (1→0) and dusk (0→1), and continuous at every band boundary (no jump); proportions sum to 1. `lightingAt(t)` returns in-range values and a `clockTime` that moves monotonically through each band. Table-driven over sampled `t`.
-- **Runtime (Play-gated):** all clients derive the same `t` from `GetServerTimeNow()` (compare two clients); Lighting visibly cycles; `EventBus.DayNight` fires with a moving `nightFactor`; a late-joining subscriber receives the current value. Full loop shortened via a small `CycleLength` for the gate, then restored.
+- **Runtime (Play-gated):** clients derive the same `t` from `GetServerTimeNow()` + the fixed epoch — verify **two separate server instances agree** on `t` at the same wall-clock moment (the global-sync guarantee), not just two clients in one server; Lighting visibly cycles; `EventBus.DayNight` fires with a moving `nightFactor`; a late-joining subscriber receives the current value. Full loop shortened via a small `CycleLength` for the gate, then restored.
 
 ## Scope boundary
 
@@ -90,8 +92,7 @@ Ships the cycle + the `nightFactor` contract **only**. It takes over `Lighting` 
 
 ## Open decisions (resolve at spec review / gate)
 
-- Exact `CycleLength` and phase proportions (starting 20 min / 55% night) — dial in Play.
-- Boot phase (`PhaseOffset`) — start the world at night, dawn, or day?
-- `CycleEpoch` fixed vs per-boot (does a server restart reset the time-of-day, or continue from a fixed origin?).
+- Exact `CycleLength` and phase proportions (starting 20 min / 47% night / 25% dusk) — dial in Play.
+- The fixed `CycleEpoch` anchor + `PhaseOffset` — pick them so the global cycle sits at a pleasing phase at launch (and, if we want, loosely tracks real-world evening). Resolved that the cycle is **global and fixed**, not per-boot — so there is no per-server "boot phase" or restart-reset behavior to decide.
 - Whether to drive `Atmosphere` (haze/density) in addition to legacy `FogEnd`, and moon/stars handling.
 - Throttle rates (Lighting write Hz, `nightFactor` ε).
