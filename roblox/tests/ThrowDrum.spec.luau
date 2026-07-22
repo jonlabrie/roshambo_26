@@ -22,7 +22,11 @@ describe("ThrowDrum mawari-dōrō builder", function()
             expect(names["Face" .. k]).toBe(true)
         end
         for i = 1, 8 do
-            expect(names["ShadePanel" .. i]).toBe(true) -- curve-hugging infill over the off-cardinal facets
+            -- each off-cardinal facet is a framed opening (4 cypress bars) filled by a ranma carving
+            expect(names["FrameL" .. i]).toBe(true)
+            expect(names["FrameR" .. i]).toBe(true)
+            expect(names["FrameT" .. i]).toBe(true)
+            expect(names["FrameB" .. i]).toBe(true)
         end
         for i = 1, 4 do
             expect(names["Post" .. i]).toBe(true)

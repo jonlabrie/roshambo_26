@@ -1,5 +1,6 @@
-// Dependency-free PNG I/O (Node built-ins only): decode/encode 8-bit RGB/RGBA,
-// non-interlaced, filter types 0-4. Sufficient for Marigold normal/shading maps.
+// Dependency-free PNG I/O (Node built-ins only): decode 8/16-bit RGB/RGBA/gray/palette
+// (16-bit → high byte), encode 8-bit RGBA; non-interlaced, filter types 0-4. Sufficient for
+// Marigold normal/shading maps and ambientCG PBR scans (some ship 16-bit normals).
 const zlib = require("zlib");
 
 function crc32(buf) {
@@ -36,12 +37,13 @@ function decode(buf) {
     }
     off += 12 + len;
   }
-  if (bitDepth !== 8) throw new Error("only 8-bit supported, got " + bitDepth);
+  if (bitDepth !== 8 && bitDepth !== 16) throw new Error("only 8/16-bit supported, got " + bitDepth);
   if (interlace !== 0) throw new Error("interlaced PNG not supported");
   const channels = colorType === 6 ? 4 : colorType === 2 ? 3 : colorType === 0 ? 1 : colorType === 3 ? 1 : null;
   if (channels === null) throw new Error("unsupported colorType " + colorType);
   const raw = zlib.inflateSync(Buffer.concat(idat));
-  const bpp = channels; // bytes per pixel (8-bit)
+  const sb = bitDepth === 16 ? 2 : 1; // sample bytes
+  const bpp = channels * sb; // bytes per pixel (used by the unfilter step)
   const stride = width * bpp;
   const out = Buffer.alloc(height * stride);
   let pos = 0;
@@ -72,14 +74,15 @@ function decode(buf) {
       row[x] = v & 0xff;
     }
   }
-  // Expand to RGBA
+  // Expand to 8-bit RGBA (for 16-bit, keep the high byte of each sample)
   const rgba = Buffer.alloc(width * height * 4);
   for (let i = 0; i < width * height; i++) {
+    const base = i * bpp; // high byte of channel c is at base + c*sb
     let r, g, b, al;
-    if (colorType === 6) { r = out[i * 4]; g = out[i * 4 + 1]; b = out[i * 4 + 2]; al = out[i * 4 + 3]; }
-    else if (colorType === 2) { r = out[i * 3]; g = out[i * 3 + 1]; b = out[i * 3 + 2]; al = 255; }
-    else if (colorType === 0) { r = g = b = out[i]; al = 255; }
-    else { const p = out[i]; r = palette[p * 3]; g = palette[p * 3 + 1]; b = palette[p * 3 + 2]; al = 255; }
+    if (colorType === 6) { r = out[base]; g = out[base + sb]; b = out[base + 2 * sb]; al = out[base + 3 * sb]; }
+    else if (colorType === 2) { r = out[base]; g = out[base + sb]; b = out[base + 2 * sb]; al = 255; }
+    else if (colorType === 0) { r = g = b = out[base]; al = 255; }
+    else { const p = out[base]; r = palette[p * 3]; g = palette[p * 3 + 1]; b = palette[p * 3 + 2]; al = 255; }
     rgba[i * 4] = r; rgba[i * 4 + 1] = g; rgba[i * 4 + 2] = b; rgba[i * 4 + 3] = al;
   }
   return { width, height, data: rgba };

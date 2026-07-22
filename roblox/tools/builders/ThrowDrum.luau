@@ -68,31 +68,51 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
     end
 
     -- ── Fixed outer shade ──────────────────────────────────────────────────────
-    -- 8 solid cypress panels hug the drum curve — one tangent over each OFF-cardinal facet,
-    -- following the 12-gon like the facet it covers. The 4 cardinal directions stay open as
-    -- WINDOWS, each framing the single facet currently there → all four windows read the same
-    -- symbol (the drum spins so a matching facet lands at each cardinal). Riding close to the
-    -- facet ring keeps neighbours from peeking (no parallax gap). 4 slim corner posts stand
-    -- proud at the diagonals for the andon read. Panels/posts are STATIC (only Faces spin).
-    local shadeR = r + 0.8 -- panels ride just outside the spinning facet ring, following its curve
+    -- The 4 cardinal directions stay open as WINDOWS, each framing the single facet currently
+    -- there → all four windows read the same symbol (the drum spins so a matching facet lands at
+    -- each cardinal). The 8 OFF-cardinal facets each get a FRAMED OPENING (not a solid slab): a
+    -- recessed cypress frame (4 bars) whose open centre is filled by a pierced dragon-king ranma
+    -- carving (committed .rbxm — assets/meshes/RanmaCarvings.rbxm, from DragonKings +
+    -- tools/studio/buildRanmaCarvings.luau). The sukashibori cut-throughs open to the interior so
+    -- the lit inner drum reads through at night. Frame outer footprint matches the old panel
+    -- (panelW × shadeH) so the wall still closes to neighbours; the carving laps the frame inner
+    -- edges. FrameL/R are vertical members (CypressVertical grain), FrameT/B horizontal. 4 slim
+    -- corner posts stand proud at the diagonals for the andon read. Frame/posts STATIC (Faces spin).
+    local shadeR = r + 0.8 -- frame rides just outside the spinning facet ring, following its curve
     local shadeH = h + 0.4
     local panelW = faceW * 1.08 -- ≈ a facet chord, overlapping neighbours so the wall is closed
+    local carveW, carveH = 5.494, 7.268 -- carving size (DragonKings.ASPECT 0.756, fit to the panel)
+    local openW = carveW - 0.30 -- opening a touch smaller so the carving laps the frame inner edge
+    local openH = carveH - 0.30
+    local barV = (panelW - openW) / 2 -- vertical bar tangential width
+    local barH = (shadeH - openH) / 2 -- horizontal bar height
+    local barT = 0.6 -- radial thickness (frame stands proud; carving recesses into the well)
+    local duV = openW / 2 + barV / 2 -- vertical-bar tangential offset from centre
+    local dvH = openH / 2 + barH / 2 -- horizontal-bar vertical offset from centre
     local shadeDirs = { 30, 60, 120, 150, 210, 240, 300, 330 } -- the 8 off-cardinal facet angles
     for i, adeg in shadeDirs do
         local a = math.rad(adeg)
-        table.insert(
-            top,
-            Spec.part(`ShadePanel{i}`, {
-                Size = { panelW, shadeH, 0.6 },
-                CFrame = Spec.cframe(
-                    { px - shadeR * math.sin(a), py, pz - shadeR * math.cos(a) },
-                    Spec.yaw(adeg)
-                ),
-                Color = cyp,
-                Material = "Wood",
-                MaterialVariant = "CypressWeathered",
-            })
-        )
+        local ox, oz = -math.sin(a), -math.cos(a) -- outward (x,z)
+        local tx, tz = math.cos(a), -math.sin(a) -- tangent (x,z), horizontal
+        local ccx, ccz = px + ox * shadeR, pz + oz * shadeR -- panel-plane centre
+        local rot = Spec.yaw(adeg)
+        local function bar(name: string, du: number, dv: number, sw: number, sh: number, variant: string)
+            table.insert(
+                top,
+                Spec.part(name, {
+                    Size = { sw, sh, barT },
+                    CFrame = Spec.cframe({ ccx + tx * du, py + dv, ccz + tz * du }, rot),
+                    Color = cyp,
+                    Material = "Wood",
+                    MaterialVariant = variant,
+                })
+            )
+        end
+        -- verticals use CypressVertical (grain runs UP the bar); horizontals keep CypressWeathered
+        bar(`FrameL{i}`, -duV, 0, barV, shadeH, "CypressVertical") -- left vertical (full height, covers corners)
+        bar(`FrameR{i}`, duV, 0, barV, shadeH, "CypressVertical") -- right vertical
+        bar(`FrameT{i}`, 0, dvH, openW, barH, "CypressWeathered") -- top horizontal (spans the opening)
+        bar(`FrameB{i}`, 0, -dvH, openW, barH, "CypressWeathered") -- bottom horizontal
     end
     local postR = r + 2.0 -- corner posts stand proud of the panels, at the 4 diagonals
     local postH = h + 6.65 -- legs drop ~1 stud further to land atop the Shoro Bracket_3 heads (2026-07-22)
@@ -165,7 +185,16 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
     end
     local apex = { px, apexWY, pz }
     -- one triangular face → two WedgeParts (canonical right-angle split + handedness)
-    local function triFace(name: string, a: { number }, b: { number }, c: { number }, col: { number }, matName: string, variant: string, thick: number)
+    local function triFace(
+        name: string,
+        a: { number },
+        b: { number },
+        c: { number },
+        col: { number },
+        matName: string,
+        variant: string,
+        thick: number
+    )
         local ab, ac, bc = vsub(b, a), vsub(c, a), vsub(c, b)
         local abd, acd, bcd = vdot(ab, ab), vdot(ac, ac), vdot(bc, bc)
         if abd > acd and abd > bcd then
@@ -218,7 +247,16 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
         sCorners[i] = { c[1], c[2] - soffitDrop, c[3] }
     end
     for i = 1, 4 do
-        triFace(`RoofSoffit{i}`, sApex, sCorners[i], sCorners[i % 4 + 1], cyp, "Wood", "CypressWeathered", soffitT)
+        triFace(
+            `RoofSoffit{i}`,
+            sApex,
+            sCorners[i],
+            sCorners[i % 4 + 1],
+            cyp,
+            "Wood",
+            "CypressWeathered",
+            soffitT
+        )
     end
     for i, fc in rcorners do
         local sp, slen, srot = Spec.segment(apex, fc)

@@ -14,6 +14,7 @@ WorkspaceConvention.DECLARED_STAGE_CHILDREN = {
     "Waterwheel",
     "BellDrive",
     "ThrowDrum",
+    "RanmaCarvings", -- the 8 pierced dragon-king ranma carvings (assets/meshes/RanmaCarvings.rbxm)
     "Overlook",
     "SwitchbackDeck",
     "ArenaSpawn",

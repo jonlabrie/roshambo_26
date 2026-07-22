@@ -48,6 +48,7 @@
                 "Waterwheel": { "$path": "assets/Waterwheel.model.json" },
                 "BellDrive": { "$path": "assets/BellDrive.model.json" },
                 "ThrowDrum": { "$path": "assets/ThrowDrum.model.json" },
+                "RanmaCarvings": { "$path": "assets/meshes/RanmaCarvings.rbxm" },
                 "Overlook": { "$path": "assets/Overlook.model.json" },
                 "SwitchbackDeck": { "$path": "assets/SwitchbackDeck.model.json" },
                 "ArenaSpawn": {

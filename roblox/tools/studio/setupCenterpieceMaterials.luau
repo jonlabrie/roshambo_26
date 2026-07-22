@@ -17,11 +17,20 @@ local SPECS = {
     {
         name = "CypressWeathered", -- posts/beams/brackets/rafters/drum faces/wheel
         base = Enum.Material.Wood,
-        tile = 3.0,
+        tile = 10.0, -- in-place tuned to 10 (was 3.0; the 3.0 tiled too densely on the big members)
         color = "rbxassetid://96689185606096", -- Wood059 desaturated to gray (unrotated: grain runs vertically on the round logs)
         normal = "rbxassetid://127741157162851",
         metal = "",
         rough = "rbxassetid://82147307124298",
+    },
+    {
+        name = "CypressVertical", -- FLAT vertical members (ranma frame verticals): same Wood059
+        base = Enum.Material.Wood, -- gray, but the source maps are ROTATED 90° so the world-space
+        tile = 10.0, -- (matches CypressWeathered) grain runs UP the tall bars instead of across a
+        color = "rbxassetid://116981498078199", -- flat vertical face). Round logs already read vertical,
+        normal = "rbxassetid://74665893433549", -- so they stay CypressWeathered; only flat verticals use this.
+        metal = "",
+        rough = "rbxassetid://87803454128649",
     },
     {
         name = "BronzePatina", -- the bell (tinted deep green by the part Color)
