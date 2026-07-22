@@ -5,6 +5,19 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local LocalizationService = game:GetService("LocalizationService")
 
+-- Day/Night cycle: publish the fixed, global cycle constants once at boot as attributes on a
+-- replicated Configuration. Clients derive t locally from workspace:GetServerTimeNow() (Roblox's
+-- globally-synced Unix clock) + this FIXED epoch, so every player in every server instance sees the
+-- same time-of-day at the same real moment. The server streams nothing afterward. (Foundation only;
+-- the glyph/waterfall subscribers bind to EventBus.DayNight — see the day/night design spec.)
+local DAY_NIGHT_EPOCH = 1735689600 -- fixed absolute anchor (2025-01-01T00:00:00Z, synced Unix seconds)
+local dayNightConfig = Instance.new("Configuration")
+dayNightConfig.Name = "DayNightConfig"
+dayNightConfig:SetAttribute("CycleEpoch", DAY_NIGHT_EPOCH)
+dayNightConfig:SetAttribute("CycleLength", 1200) -- seconds per full loop (20 min); gate-tuned
+dayNightConfig:SetAttribute("PhaseOffset", 0) -- fraction, aligns the global clock; gate-tuned
+dayNightConfig.Parent = ReplicatedStorage
+
 local NetworkClient = require(script.Parent:WaitForChild("NetworkClient"))
 local RoundCoordinator = require(script.Parent:WaitForChild("RoundCoordinator"))
 local ThrowBuffer = require(script.Parent:WaitForChild("ThrowBuffer"))
