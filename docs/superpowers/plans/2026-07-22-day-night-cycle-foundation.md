@@ -8,6 +8,8 @@
 
 **Tech Stack:** Luau, Rojo, Lune (headless test harness at `roblox/tests/`), the milestone-4a client `EventBus` (`BindableEvent` table).
 
+> **CORRECTION applied during execution (2026-07-22):** the controller drives the day/night **timing only** (`Lighting.ClockTime`) + the `nightFactor` signal + global sync. It does **NOT** touch light levels (`Brightness`/`Ambient`/`Fog`/`ColorCorrection`) — that dimmed the whole scene (chōchin, glyphs) and was removed. So the pure core is `phaseAt(t)` + **`clockTimeAt(t)`** (no `lightingAt`/mood table), and `DayNightController` sets only `ClockTime`. `CycleLength` default is **600s (10 min)**. Task code below that references `lightingAt`/mood is superseded by this note.
+
 ## Global Constraints
 
 - **Lune-safe core:** `DayNight.luau` must not reference `Instance`, `Color3`, `Enum`, `workspace`, `game`, or any Roblox global at module scope or in any function. Colors are `{r, g, b}` arrays (0–1); everything else is numbers/strings/tables. (It runs under both Lune tests and the Roblox client.)

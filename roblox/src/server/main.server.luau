@@ -14,7 +14,7 @@ local DAY_NIGHT_EPOCH = 1735689600 -- fixed absolute anchor (2025-01-01T00:00:00
 local dayNightConfig = Instance.new("Configuration")
 dayNightConfig.Name = "DayNightConfig"
 dayNightConfig:SetAttribute("CycleEpoch", DAY_NIGHT_EPOCH)
-dayNightConfig:SetAttribute("CycleLength", 1200) -- seconds per full loop (20 min); gate-tuned
+dayNightConfig:SetAttribute("CycleLength", 600) -- seconds per full loop (10 min); the manual timing knob
 dayNightConfig:SetAttribute("PhaseOffset", 0) -- fraction, aligns the global clock; gate-tuned
 dayNightConfig.Parent = ReplicatedStorage
 

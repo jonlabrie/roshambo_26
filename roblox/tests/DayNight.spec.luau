@@ -73,32 +73,22 @@ describe("DayNight pure core", function()
         expect(DayNight.phaseAt(-0.81).phase).toBe("day") -- -0.81 % 1 = 0.19
     end)
 
-    test("lightingAt returns in-range values", function()
-        for _, t in MID do
-            local L = DayNight.lightingAt(t)
-            expect(L.brightness >= 0 and L.brightness <= 3).toBe(true)
-            expect(L.fogEnd > 0).toBe(true)
-            for _, ch in L.outdoorAmbient do
-                expect(ch >= 0 and ch <= 1).toBe(true)
-            end
-            for _, ch in L.fogColor do
-                expect(ch >= 0 and ch <= 1).toBe(true)
-            end
-        end
-    end)
-
-    test("lightingAt clockTime is monotonic increasing across the loop (5→29)", function()
+    test("clockTimeAt is monotonic increasing across the loop, 5 → 29", function()
         local prev = -1
         for i = 0, 40 do
-            local ct = DayNight.lightingAt((i / 41)).clockTime
+            local ct = DayNight.clockTimeAt(i / 41)
             expect(ct >= prev - 1e-6).toBe(true)
             prev = ct
         end
-        expect(DayNight.lightingAt(0).clockTime).toBeCloseTo(5)
-        expect(DayNight.lightingAt(0.999).clockTime < 29.01).toBe(true)
+        expect(DayNight.clockTimeAt(0)).toBeCloseTo(5) -- sunrise at the loop start
+        expect(DayNight.clockTimeAt(0.999) < 29.01).toBe(true)
     end)
 
-    test("day is brighter than night", function()
-        expect(DayNight.lightingAt(MID.day).brightness > DayNight.lightingAt(MID.night).brightness).toBe(true)
+    test("clockTimeAt keeps the sun UP only through the day band", function()
+        -- day band maps to clock 8..16 (daylight); dawn/dusk/night sit at ≤8 or ≥16 (sun low/down)
+        expect(DayNight.clockTimeAt(MID.day) >= 8 and DayNight.clockTimeAt(MID.day) <= 16).toBe(true)
+        expect(DayNight.clockTimeAt(MID.dawn) <= 8).toBe(true)
+        expect(DayNight.clockTimeAt(MID.dusk) >= 16).toBe(true)
+        expect(DayNight.clockTimeAt(MID.night) >= 19).toBe(true)
     end)
 end)

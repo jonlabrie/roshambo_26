@@ -11,6 +11,15 @@ A **server-authoritative, continuous, night-dominant, globally-synced** day/nigh
 
 This is **foundation infrastructure.** It ships the cycle + the `nightFactor` contract. The subscribers (glyphs, falls, …) are separate follow-on specs that bind to the contract defined here.
 
+## CORRECTION (2026-07-22, applied during implementation)
+
+The system does **three things only**, and **does NOT touch the scene's light levels**:
+1. **Controls the day/night TIMING** — sets `Lighting.ClockTime` on the night-dominant schedule (driving Roblox's own sun/moon). It never modifies `Brightness`, `Ambient`/`OutdoorAmbient`, `Fog*`, or `ColorCorrection` — so chōchin, glyphs, waterfalls, and everything else keep their natural brightness. (An earlier draft had the controller override those Lighting props to darken night; that dimmed the whole scene and was removed.)
+2. **Publishes the `nightFactor` signal** for subscribers (glyph gilt↔glow, waterfall glow, …).
+3. **Synchronizes globally** across all Roshambo server instances (fixed epoch + `GetServerTimeNow()`).
+
+Accordingly, the pure core exposes `phaseAt(t)` (the signal) + `clockTimeAt(t)` (the schedule) — there is **no `lightingAt`/mood table**, and the "Lighting targets (mood)" section below is superseded by "ClockTime only." `CycleLength` defaults to **600s (10 min)**.
+
 ## Why night-dominant
 
 The arena is a **night-first world**: fireworks, the glowing revolving lantern, chōchin, fireflies, and the water features are the main stage, and all read best after dark. Day is a short, bright interlude that shows off the gilt glyphs and the garden in sunlight and makes nightfall feel earned. So night is the *primary* state by design, not the exception.
