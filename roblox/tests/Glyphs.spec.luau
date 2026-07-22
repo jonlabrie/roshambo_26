@@ -21,3 +21,27 @@ describe("Glyphs image map", function()
         end
     end)
 end)
+
+describe("Glyphs day/night palette + renderDayNight", function()
+    test("PALETTE exposes gold/ink/amber/amberHalo as 0-255 rgb arrays", function()
+        for _, key in { "gold", "ink", "amber", "amberHalo" } do
+            local c = Glyphs.PALETTE[key]
+            expect(c ~= nil).toBe(true)
+            expect(#c).toBe(3)
+            for _, ch in c do
+                expect(ch >= 0 and ch <= 255).toBe(true)
+            end
+        end
+    end)
+
+    test("day gold and night amber are distinct", function()
+        expect(
+            Glyphs.PALETTE.gold[1] ~= Glyphs.PALETTE.amber[1]
+                or Glyphs.PALETTE.gold[3] ~= Glyphs.PALETTE.amber[3]
+        ).toBe(true)
+    end)
+
+    test("renderDayNight is a function", function()
+        expect(type(Glyphs.renderDayNight)).toBe("function")
+    end)
+end)
