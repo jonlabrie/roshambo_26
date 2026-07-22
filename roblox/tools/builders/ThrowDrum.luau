@@ -95,18 +95,20 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
         )
     end
     local postR = r + 2.0 -- corner posts stand proud of the panels, at the 4 diagonals
-    local postH = h + 5 -- extended 2 studs downward so they reach the tower roof as legs
-    local postCY = py - 1 -- top stays put (py + (h+3)/2); the extra 2 studs hang below
+    local postH = h + 6.65 -- legs drop ~1 stud further to land atop the Shoro Bracket_3 heads (2026-07-22)
+    local postCY = py - 1.825 -- top stays put; the extra length hangs below
     for i = 1, 4 do
         local a = math.rad(45 + (i - 1) * 90)
         table.insert(
             top,
             Spec.part(`Post{i}`, {
-                Size = { 1.2, postH, 1.2 },
-                -- yaw 45° → diamond profile (a corner faces outward)
+                -- round cypress log (Cylinder axis = first Size dim), slimmer than the 2.4 main posts,
+                -- so the legs read as a continuation of the tower's round corner posts below
+                Size = { postH, 1.6, 1.6 },
+                Shape = "Cylinder",
                 CFrame = Spec.cframe(
                     { px - postR * math.sin(a), postCY, pz - postR * math.cos(a) },
-                    Spec.yaw(45)
+                    Spec.ROT.CYL_VERTICAL
                 ),
                 Color = cyp,
                 Material = "Wood",
@@ -163,7 +165,7 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
     end
     local apex = { px, apexWY, pz }
     -- one triangular face → two WedgeParts (canonical right-angle split + handedness)
-    local function triFace(name: string, a: { number }, b: { number }, c: { number })
+    local function triFace(name: string, a: { number }, b: { number }, c: { number }, col: { number }, matName: string, variant: string, thick: number)
         local ab, ac, bc = vsub(b, a), vsub(c, a), vsub(c, b)
         local abd, acd, bcd = vdot(ab, ab), vdot(ac, ac), vdot(bc, bc)
         if abd > acd and abd > bcd then
@@ -182,11 +184,11 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
             className = "WedgePart",
             properties = {
                 Anchored = true,
-                Size = { roofT, height, math.abs(vdot(ab, back)) },
+                Size = { thick, height, math.abs(vdot(ab, back)) },
                 CFrame = Spec.cframe(vmid(a, b), rotAxes(right, up, back)),
-                Color = slate,
-                Material = "Slate",
-                MaterialVariant = "SlateTile",
+                Color = col,
+                Material = matName,
+                MaterialVariant = variant,
             },
         })
         table.insert(top, {
@@ -194,19 +196,40 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
             className = "WedgePart",
             properties = {
                 Anchored = true,
-                Size = { roofT, height, math.abs(vdot(ac, back)) },
+                Size = { thick, height, math.abs(vdot(ac, back)) },
                 CFrame = Spec.cframe(vmid(a, c), rotAxes(nr, up, nb)),
-                Color = slate,
-                Material = "Slate",
-                MaterialVariant = "SlateTile",
+                Color = col,
+                Material = matName,
+                MaterialVariant = variant,
             },
         })
     end
     for i = 1, 4 do
-        triFace(`RoofFace{i}`, apex, rcorners[i], rcorners[i % 4 + 1])
+        triFace(`RoofFace{i}`, apex, rcorners[i], rcorners[i % 4 + 1], slate, "Slate", "SlateTile", roofT)
+    end
+    -- cypress soffit: a thin second face shell just under the tiles, so the roof reads
+    -- slate on top and cypress underneath (a part is single-material). Thin + raised so
+    -- the eave EDGE reads cypress rather than a chunky lip. (2026-07-22)
+    local soffitT = 0.2
+    local soffitDrop = 0.35
+    local sApex = { apex[1], apex[2] - soffitDrop, apex[3] }
+    local sCorners = {}
+    for i, c in rcorners do
+        sCorners[i] = { c[1], c[2] - soffitDrop, c[3] }
+    end
+    for i = 1, 4 do
+        triFace(`RoofSoffit{i}`, sApex, sCorners[i], sCorners[i % 4 + 1], cyp, "Wood", "CypressWeathered", soffitT)
     end
     for i, fc in rcorners do
         local sp, slen, srot = Spec.segment(apex, fc)
+        -- shorten the stringer 0.5 stud at the roof-corner (eave) end, apex end fixed:
+        -- trim the length and pull the centre back toward the apex by half the trim (2026-07-22)
+        local dir = vunit(vsub(fc, apex))
+        slen = slen - 0.5
+        sp = { sp[1] - dir[1] * 0.25, sp[2] - dir[2] * 0.25, sp[3] - dir[3] * 0.25 }
+        -- drop the stringer 0.75 stud so it tucks under the roof faces instead of
+        -- poking up through the tiles (gate-tuned 2026-07-22)
+        sp = { sp[1], sp[2] - 0.75, sp[3] }
         table.insert(
             top,
             Spec.part(`HipStringer{i}`, {
@@ -218,21 +241,6 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
             })
         )
     end
-    local capY = apexWY -- the finial sits on the ridge apex
-
-    -- Gilt hōju finial on the cap (a gold ball). Plain gold Metal — NOT the dark IronDark
-    -- variant (which would kill the gilt read); there is no gold MaterialVariant in the palette.
-    table.insert(
-        top,
-        Spec.part("Finial", {
-            Size = { 2.2, 2.2, 2.2 },
-            Shape = "Ball",
-            CFrame = Spec.cframe({ px, capY + 1.8, pz }),
-            Color = gold,
-            Material = "Metal",
-        })
-    )
-
     -- Interior lamp: warm point light for the night bloom; hosted on a tiny invisible part
     -- at the hub centre (the controller does not spin it — symmetric, invisible).
     table.insert(

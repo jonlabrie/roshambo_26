@@ -14,7 +14,7 @@ local function childNames(spec)
 end
 
 describe("ThrowDrum mawari-dōrō builder", function()
-    test("hub + 12 facets + 8 shade panels + 4 posts + hip roof/finial/base/lamp", function()
+    test("hub + 12 facets + 8 shade panels + 4 posts + slate roof/cypress soffit/base/lamp", function()
         local spec = ThrowDrum.build(ZenDojo.palette, L)
         local names = childNames(spec)
         expect(names["Drum"]).toBe(true)
@@ -28,8 +28,8 @@ describe("ThrowDrum mawari-dōrō builder", function()
             expect(names["Post" .. i]).toBe(true)
         end
         expect(names["RoofFace1_1"]).toBe(true) -- miniature hip roof (Shoro wedge recipe)
+        expect(names["RoofSoffit1_1"]).toBe(true) -- cypress underside shell beneath the slate tiles
         expect(names["HipStringer1"]).toBe(true)
-        expect(names["Finial"]).toBe(true)
         expect(names["Base"]).toBe(true)
         expect(names["Lamp"]).toBe(true)
     end)

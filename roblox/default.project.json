@@ -44,6 +44,7 @@
                 "BonshoRig": { "$path": "assets/BonshoRig.model.json" },
                 "BonshoBell": { "$path": "assets/meshes/BonshoBell.rbxm" },
                 "Shoro": { "$path": "assets/Shoro.model.json" },
+                "ShoroRoof": { "$path": "assets/meshes/ShoroRoof.rbxm" },
                 "Waterwheel": { "$path": "assets/Waterwheel.model.json" },
                 "BellDrive": { "$path": "assets/BellDrive.model.json" },
                 "ThrowDrum": { "$path": "assets/ThrowDrum.model.json" },

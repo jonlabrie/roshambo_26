@@ -56,14 +56,12 @@ describe("Shoro art pass", function()
         end
         expect(n >= 8).toBe(true) -- >= 2 courses per post
     end)
-    test("emits the procedural hip roof: 8 face wedges, 4 hip stringers, a rafter fan", function()
+    test("emits the cypress roof frame only; slate faces moved to the ShoroRoof mesh", function()
         local spec = Shoro.build(ZenDojo.palette, L)
         local faces, stringers, rafters = 0, 0, 0
         for _, c in spec.children :: any do
             if c.name:match("^RoofFace%d_%d$") then
                 faces += 1
-                expect(c.className).toBe("WedgePart")
-                expect(c.properties.MaterialVariant).toBe("SlateTile")
             end
             if c.name:match("^HipStringer%d$") then
                 stringers += 1
@@ -72,7 +70,9 @@ describe("Shoro art pass", function()
                 rafters += 1
             end
         end
-        expect(faces).toBe(8) -- 4 triangular faces × 2 wedges
+        -- Slate faces are now the committed mesh assets/meshes/ShoroRoof.rbxm, not procedural
+        -- wedges (they tiled the kawara cross-grain across a hip). The frame stays procedural.
+        expect(faces).toBe(0)
         expect(stringers).toBe(4)
         expect(rafters >= 40).toBe(true)
         -- the old flat wedges / finial are gone

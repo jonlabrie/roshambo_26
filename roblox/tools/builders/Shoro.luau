@@ -91,6 +91,17 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
         end
     end
 
+    -- Inner skirt ring beams: the truncated hip is OPEN at the top, so a second square of
+    -- ring beams sits atop the Bracket_3 heads to carry the rafters' inner ends and the
+    -- roof's upper (inner) edge — same section as the eave ring beams. (2026-07-22)
+    local skirtBeamY = roofY + 1.6 -- atop the Bracket{i}_3 heads (top ≈ roofY + 1.0)
+    for i, z in { s, -s } do
+        table.insert(children, timberPart(`SkirtBeamX{i}`, { 2 * s + 2.4, 1.2, 1.4 }, place({ 0, skirtBeamY, z })))
+    end
+    for i, x in { s, -s } do
+        table.insert(children, timberPart(`SkirtBeamZ{i}`, { 1.4, 1.2, 2 * s + 2.4 }, place({ x, skirtBeamY, 0 })))
+    end
+
     -- Projecting carved beam-noses (kibana) where the ring beams cross the corner posts.
     for i, c in corners do
         table.insert(
@@ -104,9 +115,13 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
     -- split), 4 hip stringers apex→corner, and a rafter fan per face. Dimensions match
     -- the hand-tuned build. Built in world coords about the pavilion centre.
     local cx, cz = base[1], base[3]
-    local eaveWY = base[2] + roofY - 0.5 -- eave seats on the tokyō brackets atop the posts (world y)
-    local RErf = 19.5 -- eave half-side
-    local apexRise = 6.5
+    local roofLift = 0.5 -- lift the roof + rafter/stringer frame ½ stud to seat it on the skirt beams (2026-07-22)
+    local eaveWY = base[2] + roofY - 0.5 + roofLift -- eave seats on the tokyō brackets atop the posts (world y)
+    -- 20% smaller roof so the crown lantern reads better from below (gate-tuned 2026-07-22).
+    -- Faces, hip stringers and the rafter fan all derive from RErf/apexRise, so they scale too.
+    local roofScale = 0.9
+    local RErf = 19.5 * roofScale -- eave half-side
+    local apexRise = 6.5 * roofScale
     local apexWY = eaveWY + apexRise
     local roofT = 0.5 -- face thickness
     local faceLift = 1.0 -- faces sit this far above the timber frame
@@ -147,55 +162,39 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
     local apex = { cx, apexWY, cz }
     local fApex = { cx, apexWY - faceLift, cz }
 
-    -- one triangular face → two WedgeParts (canonical right-angle split + handedness)
-    local function triFace(name: string, a: { number }, b: { number }, c: { number })
-        local ab, ac, bc = vsub(b, a), vsub(c, a), vsub(c, b)
-        local abd, acd, bcd = vdot(ab, ab), vdot(ac, ac), vdot(bc, bc)
-        if abd > acd and abd > bcd then
-            a, c = c, a
-        elseif acd > bcd and acd > abd then
-            a, b = b, a
-        end
-        ab, ac, bc = vsub(b, a), vsub(c, a), vsub(c, b)
-        local right = vunit(vcross(ac, ab))
-        local up = vunit(vcross(bc, right))
-        local back = vunit(bc)
-        local height = math.abs(vdot(ab, up))
-        local nb, nr = { -back[1], -back[2], -back[3] }, { -right[1], -right[2], -right[3] }
-        table.insert(children, {
-            name = `{name}_1`,
-            className = "WedgePart",
-            properties = {
-                Anchored = true,
-                Size = { roofT, height, math.abs(vdot(ab, back)) },
-                CFrame = Spec.cframe(vmid(a, b), rotAxes(right, up, back)),
-                Color = palette.slateTile,
-                Material = "Slate",
-                MaterialVariant = "SlateTile",
-            },
-        })
-        table.insert(children, {
-            name = `{name}_2`,
-            className = "WedgePart",
-            properties = {
-                Anchored = true,
-                Size = { roofT, height, math.abs(vdot(ac, back)) },
-                CFrame = Spec.cframe(vmid(a, c), rotAxes(nr, up, nb)),
-                Color = palette.slateTile,
-                Material = "Slate",
-                MaterialVariant = "SlateTile",
-            },
-        })
-    end
+    -- Eave SKIRT (truncated hip): the roof is OPEN above the ring-beam line so the crown
+    -- lantern rises through it. Inner corners sit `skirtT` of the way up each hip (0 = apex,
+    -- 1 = eave corner); the pyramid cap above them is removed. Faces become trapezoids,
+    -- hips + rafters stop at the inner edge. (2026-07-22)
+    -- inner-edge radius: +0.5 past 0.55·RErf so the opening clears the lantern legs (2026-07-22)
+    local RInner = 0.55 * RErf + 0.5
+    local skirtT = RInner / RErf -- fraction up each hip (keeps the inner edge ON the slope)
+    local inner, finner = {}, {}
     for i = 1, 4 do
-        triFace(`RoofFace{i}`, apex, corners[i], corners[i % 4 + 1])
+        inner[i] = {
+            apex[1] + skirtT * (corners[i][1] - apex[1]),
+            apex[2] + skirtT * (corners[i][2] - apex[2]),
+            apex[3] + skirtT * (corners[i][3] - apex[3]),
+        }
+        finner[i] = {
+            fApex[1] + skirtT * (fcorners[i][1] - fApex[1]),
+            fApex[2] + skirtT * (fcorners[i][2] - fApex[2]),
+            fApex[3] + skirtT * (fcorners[i][3] - fApex[3]),
+        }
     end
 
-    -- hip stringers: frame apex → each frame corner, outer end trimmed 1
+    -- Slate roof faces are now the committed mesh `assets/meshes/ShoroRoof.rbxm`
+    -- (SurfaceAppearance + up-slope UVs, referenced under RoshamboStage): procedural
+    -- WedgeParts/Parts tiled the kawara inconsistently across a hip, so the surface moved
+    -- to a single mesh. The cypress frame below (hip stringers + rafters) stays procedural.
+    -- The mesh corners derive from the same eaveWY/RErf/RInner/skirtT used here — if any of
+    -- those change, rebuild the mesh via `tools/studio/buildShoroRoofMesh.luau`. (2026-07-22)
+
+    -- hip stringers: inner frame corner → eave frame corner (the skirt hip), outer end trimmed 1
     for i, fc in fcorners do
-        local dir = vunit(vsub(fc, fApex))
+        local dir = vunit(vsub(fc, finner[i]))
         local trimmed = { fc[1] - dir[1], fc[2] - dir[2], fc[3] - dir[3] }
-        local sp, slen, srot = Spec.segment(fApex, trimmed)
+        local sp, slen, srot = Spec.segment(finner[i], trimmed)
         table.insert(
             children,
             Spec.part(`HipStringer{i}`, {
@@ -217,7 +216,7 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
         local fyaw = yaw + 90 * k -- pavilion yaw + this face's quarter turn
         local x = -RErf + 1.5
         while x <= RErf - 1.5 do
-            local zt = math.abs(x)
+            local zt = math.max(math.abs(x), RInner) -- stop at the skirt inner edge, not the removed apex
             local yHip = frameEaveY + (frameApexY - frameEaveY) * (RErf - zt) / RErf
             local pa = Spec.rotY({ x, 0, RErf }, fyaw) -- +Z-face eave point, rotated to face k
             local pb = Spec.rotY({ x, 0, zt }, fyaw) -- its up-slope (hip) end

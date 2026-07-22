@@ -10,6 +10,7 @@ WorkspaceConvention.DECLARED_STAGE_CHILDREN = {
     "BonshoRig",
     "BonshoBell", -- the cast-bronze bell meshes (assets/meshes/BonshoBell.rbxm)
     "Shoro",
+    "ShoroRoof", -- the slate eave-skirt roof mesh (assets/meshes/ShoroRoof.rbxm)
     "Waterwheel",
     "BellDrive",
     "ThrowDrum",
