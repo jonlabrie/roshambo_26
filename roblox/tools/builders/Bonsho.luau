@@ -65,8 +65,9 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
             Size = { L.shuMoku.length, 2 * L.shuMoku.radius, 2 * L.shuMoku.radius },
             Shape = "Cylinder",
             CFrame = Spec.cframe(sp, logRot),
-            Color = palette.timber,
+            Color = palette.cypressWeathered,
             Material = "Wood",
+            MaterialVariant = "CypressWeathered",
         })
     )
     -- DRAW dowel: a horizontal peg through the log's tail that the BellDrive cam
@@ -79,8 +80,9 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
             Size = { drl, 0.5, 0.5 },
             Shape = "Cylinder",
             CFrame = Spec.cframe(drp, drr),
-            Color = palette.timber,
+            Color = palette.cypressWeathered,
             Material = "Wood",
+            MaterialVariant = "CypressWeathered",
         })
     )
     -- KICK dowel: an east-flank peg; the forward swing kicks the BellDrive
@@ -93,8 +95,9 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
             Size = { kdl, 0.5, 0.5 },
             Shape = "Cylinder",
             CFrame = Spec.cframe(kdp, kdr),
-            Color = palette.timber,
+            Color = palette.cypressWeathered,
             Material = "Wood",
+            MaterialVariant = "CypressWeathered",
         })
     )
     -- Tower-hung suspension: a cypress hanger beam spans the two +Z pavilion posts,
@@ -131,7 +134,8 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
         )
     end
     for i = 1, 4 do
-        local e = Spec.rotY({ sm.chainTops[i][1], sm.chainTops[i][2] - 0.35, sm.chainTops[i][3] }, yaw)
+        -- eyes mount just below the spreader underside; ropes lead off from them
+        local e = Spec.rotY({ sm.chainTops[i][1], sm.chainTops[i][2] + 0.1, sm.chainTops[i][3] }, yaw)
         table.insert(
             children,
             Spec.part(`RopeEye{i}`, {
@@ -152,7 +156,7 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
         table.insert(
             children,
             Spec.part(`Chain{i}`, {
-                Size = { len, 0.35, 0.35 },
+                Size = { len, 0.22, 0.22 },
                 Shape = "Cylinder",
                 CFrame = Spec.cframe(pos, rot),
                 Color = hemp,

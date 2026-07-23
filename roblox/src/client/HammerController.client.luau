@@ -53,10 +53,10 @@ local BACK = Vector3.new(0, 0, 1) -- draw direction = South (+Z)
 -- Rope tops are FIXED on the tower spreaders; bottoms ride the log. World coords
 -- mirror ArenaLayout.shuMoku (no yaw): chainTops y132, chainBottomsRest y121.3.
 local chainTops = {
-    Vector3.new(2, 132, 7.5),
-    Vector3.new(2, 132, 11.5),
-    Vector3.new(-6, 132, 7.5),
-    Vector3.new(-6, 132, 11.5),
+    Vector3.new(2, 130.25, 7.5),
+    Vector3.new(2, 130.25, 11.5),
+    Vector3.new(-6, 130.25, 7.5),
+    Vector3.new(-6, 130.25, 11.5),
 }
 local chainBottomsRest = {
     Vector3.new(-1.2, 121.3, 7.5),
@@ -155,7 +155,7 @@ local function updateSuspension()
         local botW = delta * chainBottomsRest[i]
         local cf, len = segCF(chainTops[i], botW)
         chain.CFrame = cf
-        chain.Size = Vector3.new(len, 0.35, 0.35) -- hemp-rope cross-section (matches the builder)
+        chain.Size = Vector3.new(len, 0.22, 0.22) -- hemp-rope cross-section (matches the builder)
     end
     for i, d in dowels do
         d.CFrame = delta * dowelRest[i]

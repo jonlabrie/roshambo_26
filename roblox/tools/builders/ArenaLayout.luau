@@ -66,7 +66,9 @@ local ArenaLayout = {
         drawStuds = 6,
         yaw = 0,
         hangerY = 132, -- hanger-beam centreline, just under the ring beams (~134)
-        chainTops = { { 2, 132, 7.5 }, { 2, 132, 11.5 }, { -6, 132, 7.5 }, { -6, 132, 11.5 } },
+        -- rope tops hang from the spreader UNDERSIDES (spreaders sit flush under the
+        -- beam: centre 130.9, bottom 130.4), not from inside the beam
+        chainTops = { { 2, 130.25, 7.5 }, { 2, 130.25, 11.5 }, { -6, 130.25, 7.5 }, { -6, 130.25, 11.5 } },
         chainBottomsRest = {
             { -1.2, 121.3, 7.5 },
             { -1.2, 121.3, 11.5 },

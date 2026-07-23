@@ -86,7 +86,7 @@ describe("Shu-moku striker assembly (tower-hung, boss-height)", function()
             local ch = byName["Chain" .. i].properties
             expect(ch.Material).toBe("Fabric")
             expect(ch.MaterialVariant).toBe("HempRope")
-            expect(ch.Size[2]).toBeCloseTo(0.35, 0.001)
+            expect(ch.Size[2]).toBeCloseTo(0.22, 0.001)
             expect(ch.Size[1] > 9).toBe(true) -- long tower drop, not the old 6-stud gantry chain
         end
     end)
