@@ -42,7 +42,7 @@ Roblox client (`roblox/`, requires [Rokit](https://github.com/rojo-rbx/rokit) â€
 lune run tests/run          # headless Luau tests (bespoke harness; Jest-Lua can't run under Lune)
 rojo serve                  # live-sync into an open Studio place (Rojo plugin -> Connect)
 rojo build -o build.rbxl    # build a place file
-stylua --check src tests && selene src   # format + lint
+stylua --check src tests tools && selene src tools   # format + lint (MATCH CI's scope â€” selene fails on warnings)
 ```
 
 Node version is pinned via `.nvmrc` (24.x).
