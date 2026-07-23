@@ -62,7 +62,7 @@ describe("BellDrive drive train (jack shaft + toothed bevels)", function()
     end)
 end)
 
-describe("Hero snail cam (analytic flank)", function()
+describe("Snail cam geometry (mesh flank envelope)", function()
     local CamProfile = require("../src/shared/CamProfile")
     local spec = BellDrive.build(ZenDojo.palette, L)
     local d = L.bellDrive
@@ -73,36 +73,30 @@ describe("Hero snail cam (analytic flank)", function()
         dowelR = 0.25,
         dropDeg = d.camDropDeg,
     }
-    test("flank planks reach the analytic lobe and no further", function()
-        local maxReach = 0
-        local edges = 0
-        for _, c in spec.children :: any do
-            if c.name:match("^CamEdge%d+$") then
-                edges += 1
-                local dy = c.properties.CFrame[2] - d.cam[2]
-                local dz = c.properties.CFrame[3] - d.cam[3]
-                local reach = math.sqrt(dy * dy + dz * dz) + c.properties.Size[1] / 2
-                if reach > maxReach then
-                    maxReach = reach
-                end
-            end
-        end
-        local lobe = select(1, CamProfile.contact(1, G))
-        expect(edges >= 30).toBe(true)
-        expect(math.abs(maxReach - lobe) <= 0.3).toBe(true)
+    local lobe = select(1, CamProfile.contact(1, G))
+    test("the sweep clears the BELL FACE (the hero-cam regression)", function()
+        -- bell: centre z=0, radius 5.1 → face at z≈5.1 near the strike height
+        expect(d.cam[3] - lobe >= 5.1 + 0.4).toBe(true)
     end)
-    test("the lobe clears the clearing floor", function()
-        local lobe = select(1, CamProfile.contact(1, G))
+    test("the sweep clears the clearing floor", function()
         expect(d.cam[2] - lobe >= 112 + 1.5).toBe(true)
     end)
-    test("hub and cliff exist", function()
-        local found = { Cam = false, CamDrop = false }
+    test("the cam plane sits WEST of the log and its tail ring", function()
+        local logWest = L.shuMoku.restPos[1] - L.shuMoku.radius -- the log's near flank
+        local ringWest = L.shuMoku.restPos[1] - 1.95 / 2 -- tail ring reaches further
+        expect(d.cam[1] + d.camWidth / 2 <= math.min(logWest, ringWest) - 0.1).toBe(true)
+        -- and the draw dowel spans past the far side of the cam plane
+        expect(L.shuMoku.drawDowel.to[1] <= d.cam[1] - d.camWidth / 2 - 0.2).toBe(true)
+    end)
+    test("the hub (the ^Cam contract part) is emitted; the plank flank is gone", function()
+        local hub = false
         for _, c in spec.children :: any do
-            if found[c.name] ~= nil then
-                found[c.name] = true
+            if c.name == "Cam" then
+                hub = true
             end
+            expect(c.name:match("^CamEdge")).toBeNil()
+            expect(c.name:match("^CamStrap")).toBeNil()
         end
-        expect(found.Cam).toBe(true)
-        expect(found.CamDrop).toBe(true)
+        expect(hub).toBe(true)
     end)
 end)

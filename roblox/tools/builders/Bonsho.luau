@@ -196,7 +196,7 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
         })
     )
     logRing("ShuMokuD_Band1", sm.restPos[3] - 0.6, 1.75, 0.35, "IronDark", palette.ink)
-    logRing("ShuMokuD_Band2", sm.restPos[3] + 1.4, 1.75, 0.35, "IronDark", palette.ink)
+    logRing("ShuMokuD_Band2", sm.restPos[3] + 1.0, 1.75, 0.35, "IronDark", palette.ink)
     -- whipping = WOUND CORD: three thin stacked rings with visible gaps per station
     -- (geometry sells the wrap; one fat textured collar reads flat). HempRopeFine is
     -- the same Rope001 maps at a small StudsPerTile so the weave suits little parts.

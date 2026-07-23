@@ -177,77 +177,16 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             })
         )
     end
-    -- HERO SNAIL CAM: flank generated analytically from the dowel's draw path
-    -- (CamProfile) — the radius under the dowel equals the contact radius at every
-    -- draw fraction, so the face visibly carries the dowel through the whole draw.
-    -- All parts named ^Cam so HammerController spins them about the cam axle.
-    local CamProfile = require("../../src/shared/CamProfile")
-    local G = {
-        gapZ = L.shuMoku.drawDowel.from[3] - d.cam[3],
-        draw = L.shuMoku.drawStuds,
-        rise = d.camDowelRise,
-        dowelR = 0.25,
-        dropDeg = d.camDropDeg,
-    }
-    local thick = d.camWidth
-    local hubR = d.camHubR
-    local ccx, ccy, ccz = d.cam[1], d.cam[2], d.cam[3]
-    local function plankRot(theta: number): { number }
-        local c, s = math.cos(theta), math.sin(theta)
-        return { 0, 0, 1, c, -s, 0, s, c, 0 } -- columns: X=(0,c,s) Y=(0,-s,c) Z=(1,0,0)
-    end
+    -- SNAIL CAM: the smooth flank ships as a CLIENT-BUILT EditableMesh (CamMesh via
+    -- HammerController — EditableMesh parts don't replicate and Rojo JSON can't carry
+    -- mesh geometry). The builder emits only the visible HUB disc, which doubles as
+    -- the ^Cam contract part the controller spins and the Edit-time position reference.
     table.insert(
         children,
         Spec.part("Cam", {
-            Size = { thick, hubR * 2, hubR * 2 },
+            Size = { d.camWidth, d.camHubR * 2, d.camHubR * 2 },
             Shape = "Cylinder",
             CFrame = Spec.cframe(d.cam),
-            Color = palette.cypressWeathered,
-            Material = "Wood",
-            MaterialVariant = "CypressWeathered",
-        })
-    )
-    local SAMPLES = 44
-    local flank = CamProfile.samples(G, SAMPLES)
-    local lobe = flank[#flank].r
-    for i, s in flank do
-        local theta = math.rad(s.deg)
-        local midR = (hubR + s.r) / 2
-        table.insert(
-            children,
-            Spec.part(`CamEdge{i}`, {
-                Size = { (s.r - hubR) + 0.2, (2 * math.pi * lobe / SAMPLES) * 1.15, thick },
-                CFrame = Spec.cframe(
-                    { ccx, ccy + math.cos(theta) * midR, ccz + math.sin(theta) * midR },
-                    plankRot(theta)
-                ),
-                Color = palette.cypressWeathered,
-                Material = "Wood",
-                MaterialVariant = "CypressWeathered",
-            })
-        )
-        if i % 4 == 1 then -- iron strap accents along the spiral rim
-            table.insert(
-                children,
-                Spec.part(`CamStrap{i}`, {
-                    Size = { 0.25, 0.5, thick + 0.1 },
-                    CFrame = Spec.cframe(
-                        { ccx, ccy + math.cos(theta) * (s.r - 0.2), ccz + math.sin(theta) * (s.r - 0.2) },
-                        plankRot(theta)
-                    ),
-                    Color = palette.ink,
-                    Material = "Metal",
-                    MaterialVariant = "IronDark",
-                })
-            )
-        end
-    end
-    -- The CLIFF: a radial wall from hub to lobe at local angle ~0 (the release face).
-    table.insert(
-        children,
-        Spec.part("CamDrop", {
-            Size = { (lobe - hubR) + 0.2, 0.5, thick },
-            CFrame = Spec.cframe({ ccx, ccy + (hubR + lobe) / 2, ccz }, plankRot(0)),
             Color = palette.cypressWeathered,
             Material = "Wood",
             MaterialVariant = "CypressWeathered",

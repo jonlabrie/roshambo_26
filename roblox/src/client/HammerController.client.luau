@@ -100,10 +100,10 @@ local bell = stage:WaitForChild("BellDrive")
 -- ramp (p = elapsed/period). Round length isn't in the payload, so we measure it
 -- (ACTIVE→ACTIVE) and set ω = 2π/period; this default holds round 1.
 local camOmega = 2 * math.pi / 22 -- rad/s (≈ once per 22s until measured)
-local CAM_AXLE_YZ = Vector2.new(120.7, 8) -- E-W cam shaft: world-X axis through (y120.7, z8); MIRRORS ArenaLayout.bellDrive.camShaft
+local CAM_AXLE_YZ = Vector2.new(120.7, 11) -- E-W cam shaft: world-X axis through (y120.7, z11); MIRRORS ArenaLayout.bellDrive.camShaft
 local MAIN_AXLE_XY = Vector2.new(-15, 116) -- N-S main shaft: world-Z axis through (x-15, y116)
-local JACK_AXLE_XZ = Vector2.new(-15, 8) -- vertical jack shaft: world-Y axis through (x-15, z8)
-local JACK_DIR = -1 -- the bevel corner reverses handedness (flip live via "JackDir" if the mesh reads wrong)
+local JACK_AXLE_XZ = Vector2.new(-15, 11) -- vertical jack shaft: world-Y axis through (x-15, z11)
+local JACK_DIR = 1 -- bevel-corner handedness (gate-flipped from -1; live via "JackDir")
 local REDUCTION = 2 -- driver gear turns this much faster than the cam (integer → wraps seamlessly each round)
 local CAM_PHASE_DEG = 0 -- fine-tune offset for the high point at the strike (0 = peak exactly on the dowel)
 
@@ -168,6 +168,56 @@ local function captureSpinners()
     end
 end
 captureSpinners()
+
+-- SMOOTH CAM FLANK: a client-built EditableMesh (CamMesh geometry) — EditableMesh
+-- parts don't replicate server→client and Rojo JSON can't carry mesh geometry, so
+-- each client assembles its own and it joins the cam spin group directly (inserted
+-- by hand, NOT via captureSpinners: a late re-capture would re-baseline every
+-- spinner's rest pose mid-rotation). Falls back silently to the bare hub if the
+-- EditableMesh APIs are unavailable.
+task.spawn(function()
+    local ok, err = pcall(function()
+        local CamMesh = require(shared:WaitForChild("CamMesh")) :: any
+        local camHub = bell:WaitForChild("Cam") :: BasePart
+        -- geometry mirrors ArenaLayout.bellDrive/shuMoku (build-time constants;
+        -- draw also mirrors DRAW_STUDS, declared later in this file)
+        local G = { gapZ = 2.2, draw = 3.0, rise = 0.45, dowelR = 0.25, dropDeg = 12 }
+        local mesh = CamMesh.build(G, 64, 0.7)
+        local AssetService = game:GetService("AssetService")
+        local em = AssetService:CreateEditableMesh()
+        local vids = table.create(#mesh.verts)
+        local nids = table.create(#mesh.normals)
+        for i, v in mesh.verts do
+            vids[i] = em:AddVertex(Vector3.new(v[1], v[2], v[3]))
+            nids[i] = em:AddNormal(Vector3.new(mesh.normals[i][1], mesh.normals[i][2], mesh.normals[i][3]))
+        end
+        for _, t in mesh.tris do
+            local f = em:AddTriangle(vids[t[1]], vids[t[2]], vids[t[3]])
+            em:SetFaceNormals(f, { nids[t[1]], nids[t[2]], nids[t[3]] })
+        end
+        local part = AssetService:CreateMeshPartAsync(Content.fromObject(em))
+        part.Name = "CamMeshFlank" -- ^Cam by name, but inserted into the spin group by hand
+        part.Anchored = true
+        part.CanCollide = false
+        part.CanQuery = false
+        part.CanTouch = false
+        part.CastShadow = false
+        part.Material = Enum.Material.Wood
+        part.MaterialVariant = "CypressWeathered"
+        part.Color = Color3.new(
+            ZenDojo.palette.cypressWeathered[1],
+            ZenDojo.palette.cypressWeathered[2],
+            ZenDojo.palette.cypressWeathered[3]
+        )
+        local restCF = CFrame.new(camHub.Position) -- axle-centred, local axes = world (mesh built about the axle)
+        part.CFrame = restCF
+        part.Parent = bell
+        table.insert(camSpinners, { part = part, restCF = restCF, pivotCF = CFrame.new(camHub.Position) })
+    end)
+    if not ok then
+        warn("[HammerController] cam mesh flank unavailable, hub only:", err)
+    end
+end)
 
 -- Recompute the 4 chains and reposition the dowels from the log's CURRENT CFrame.
 local function updateSuspension()
@@ -303,7 +353,7 @@ end)
 -- still climbing when the strike interrupts it — so there is NO dwell/pause at the top.
 -- p ramps 0→1 across the whole round period; the strike (gongStrike) always fires before
 -- the round ends, so p is mid-climb at release and the swing takes over seamlessly.
-local DRAW_STUDS = 4.06 -- South draw at p=1 (tuned so the dowel rests on the cam high point at the strike)
+local DRAW_STUDS = 3.0 -- South draw at p=1; MIRRORS ArenaLayout.shuMoku.drawStuds (the cam flank is generated from it — keep DrawStuds attr ≤ it)
 RunService.Heartbeat:Connect(function()
     -- DRAW HOLD (tuning): while the "DrawHold" attribute is set, pin the log at FULL draw
     -- (p=1, the top of its travel) and ignore the strike — so we can park the dowel at its
@@ -321,7 +371,7 @@ RunService.Heartbeat:Connect(function()
     end
     local studs = stage:GetAttribute("DrawStuds") or DRAW_STUDS -- live-tunable draw length
     local drawZ = p * studs
-    local riseY = p * p * 0.9 -- slight pendulum rise on the suspension arc
+    local riseY = p * p * 0.45 -- pendulum rise on the arc; MIRRORS ArenaLayout.bellDrive.camDowelRise
     arm.CFrame = CFrame.new(BACK * drawZ + Vector3.new(0, riseY, 0)) * restCFrame
 end)
 
