@@ -115,7 +115,8 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
     end
     faceCogWheel("FaceWheelMain", d.faceWheelMain, d.faceWheelMainR, d.faceWheelMainCogs, "Z", 1)
     faceCogWheel("CamFaceWheel", d.camFaceWheel, d.camFaceWheelR, d.camFaceWheelCogs, "X", -1)
-    -- CamFaceWheel dressing: three through-spokes proud of the west face + iron hub
+    -- CamFaceWheel dressing: three through-spokes proud of the EAST face (gate: on
+    -- the west they swept through the lantern's top flange — tolerances are tight)
     for s = 1, 3 do
         local a = (s - 1) * math.pi / 3 + math.pi / 6
         table.insert(
@@ -123,7 +124,7 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             Spec.part(`CamFaceWheelSpoke{s}`, {
                 Size = { 0.25, 0.5, d.camFaceWheelR * 2 - 0.6 },
                 CFrame = Spec.cframe(
-                    { d.camFaceWheel[1] - 0.3, d.camFaceWheel[2], d.camFaceWheel[3] },
+                    { d.camFaceWheel[1] + 0.3, d.camFaceWheel[2], d.camFaceWheel[3] },
                     rotXm(a)
                 ),
                 Color = palette.cypressWeathered,
