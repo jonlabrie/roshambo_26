@@ -102,8 +102,9 @@ local bell = stage:WaitForChild("BellDrive")
 local camOmega = 2 * math.pi / 22 -- rad/s (≈ once per 22s until measured)
 local CAM_AXLE_YZ = Vector2.new(120.7, 11) -- E-W cam shaft: world-X axis through (y120.7, z11); MIRRORS ArenaLayout.bellDrive.camShaft
 local MAIN_AXLE_XY = Vector2.new(-15, 116) -- N-S main shaft: world-Z axis through (x-15, y116)
-local JACK_AXLE_XZ = Vector2.new(-15, 11) -- vertical jack shaft: world-Y axis through (x-15, z11)
-local JACK_DIR = 1 -- bevel-corner handedness (gate-flipped from -1; live via "JackDir")
+local JACK_AXLE_XZ = Vector2.new(-15, 9.3) -- vertical lantern arbor: world-Y axis through (x-15, z9.3); MIRRORS ArenaLayout.bellDrive.lantern
+local JACK_DIR = 1 -- gear-corner handedness (gate-flipped from -1; live via "JackDir")
+local LANTERN_RATIO = 12 / 9 -- cogsMain/staves: the lantern spins this much faster than the main shaft
 local REDUCTION = 2 -- driver gear turns this much faster than the cam (integer → wraps seamlessly each round)
 local CAM_PHASE_DEG = -5 -- fine-tune offset for the high point at the strike (gate-tuned
 -- live 2026-07-23: -5 lands the cliff on the release; each -7 ≈ +0.5s at the ~25s round).
@@ -154,18 +155,18 @@ local function captureSpinners()
     table.clear(driverSpinners)
     table.clear(jackSpinners)
     for _, part in bell:GetChildren() do
-        if part:IsA("BasePart") and (part.Name:match("^Cam") or part.Name:match("^BevelCamB")) then
+        if part:IsA("BasePart") and part.Name:match("^Cam") then
             addCamPart(part.Name)
         end
-        if part:IsA("BasePart") and (part.Name:match("^JackShaftF") or part.Name:match("^BevelJack")) then
-            addJackPart(part.Name)
+        if part:IsA("BasePart") and (part.Name:match("^JackShaftF") or part.Name:match("^JackLantern")) then
+            addJackPart(part.Name) -- NOT bare ^Jack: JackFrame*/JackBand* are static
         end
     end
     -- MainShaft (the invisible proxy) plus its MainShaftF* octagon flats — the visible
     -- faceted prism whose turning reads (a smooth cylinder's rotation was invisible) —
     -- plus the toothed bevel at the jack corner.
     for _, part in bell:GetChildren() do
-        if part:IsA("BasePart") and (part.Name:match("^MainShaft") or part.Name:match("^BevelMainA")) then
+        if part:IsA("BasePart") and (part.Name:match("^MainShaft") or part.Name:match("^FaceWheelMain")) then
             addDriverPart(part.Name)
         end
     end
@@ -423,7 +424,7 @@ RunService.Heartbeat:Connect(function()
     end
     -- Jack shaft: 1:1 off the main shaft through the corner bevel, spun about world Y.
     local jackDir = (stage:GetAttribute("JackDir") :: number) or JACK_DIR
-    local jrot = CFrame.Angles(0, jackDir * driverDir * camNet * REDUCTION, 0)
+    local jrot = CFrame.Angles(0, jackDir * driverDir * camNet * REDUCTION * LANTERN_RATIO, 0)
     for _, s in jackSpinners do
         s.part.CFrame = s.pivotCF * jrot * s.pivotCF:Inverse() * s.restCF
     end
