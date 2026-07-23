@@ -72,7 +72,15 @@ end
 local DRUM_KICK = 4 -- rad/s during the constant spin (live-tunable via "DrumKick" attr)
 local SPIN_SEC = 1.0
 local GLIDE_SEC = 2.0
-local KICK_DUR = 0.5
+-- PADDLE CHOREOGRAPHY (2026-07-23): the strike smacks the paddle 90° so it rests
+-- PARALLEL to the log, out of the dowel's path; once the drawing dowel has crawled
+-- south past the paddle's sweep, the spindle slowly carries it the remaining 270°
+-- (same direction — one clean turn per round) back to perpendicular, cocked for the
+-- next strike. The fiction: all of it is driven by the throw drum overhead.
+local KICK_FLICK_DUR = 0.4
+local KICK_RETURN_DUR = 4.0
+local PADDLE_Z = 6.42 -- MIRRORS ArenaLayout.bellDrive.paddle z
+local PADDLE_CLEAR = 1.6 -- the dowel must be this far south before the return sweep starts
 
 local theta = 0
 local omega = 0
@@ -97,10 +105,15 @@ local function addKick(name: string, px: number, pz: number, sign: number)
         )
     end
 end
-addKick("VertShaft", 1, 6.25, -1) -- pivots MIRROR ArenaLayout.bellDrive.vertBase (x, z)
-addKick("VertPaddle", 1, 6.25, -1)
+addKick("VertShaft", 1, 6.42, -1) -- pivots MIRROR ArenaLayout.bellDrive.vertBase (x, z)
+addKick("VertPaddle", 1, 6.42, -1)
+local kickAngle = 0 -- current settled rotation
+local kickBase = 0 -- segment start angle
+local kickTarget = 0 -- segment end angle
+local kickDur = KICK_FLICK_DUR
 local kickT0 = -1
-local kickBase = 0
+local kickState = "perp" -- "perp" | "flick" | "parallel" | "return"
+local kickDowelPart = stage:WaitForChild("BonshoRig"):WaitForChild("ShuMokuDowel") :: BasePart
 local function applyKick(angle: number)
     for _, k in kickParts do
         local piv = CFrame.new(k.px, k.restY, k.pz)
@@ -155,14 +168,23 @@ RunService.Heartbeat:Connect(function(_dt)
         applyTheta()
     end
     if kickT0 >= 0 then
-        local prog = (os.clock() - kickT0) / KICK_DUR
+        local prog = math.clamp((os.clock() - kickT0) / kickDur, 0, 1)
+        local eased = if kickState == "flick"
+            then 1 - (1 - prog) * (1 - prog) -- smacked: fast, easing out
+            else prog * prog * (3 - 2 * prog) -- driven: smooth slow crawl
+        applyKick(kickBase + (kickTarget - kickBase) * eased)
         if prog >= 1 then
-            applyKick(kickBase + math.pi)
-            kickBase += math.pi
+            kickAngle = kickTarget
             kickT0 = -1
-        else
-            applyKick(kickBase + math.pi * (1 - (1 - prog) * (1 - prog)))
+            kickState = if kickState == "flick" then "parallel" else "perp"
         end
+    elseif kickState == "parallel" and kickDowelPart.Position.Z > PADDLE_Z + PADDLE_CLEAR then
+        -- the drawing dowel is safely past the paddle's sweep: crawl back to perpendicular
+        kickState = "return"
+        kickBase = kickAngle
+        kickTarget = kickAngle + 3 * math.pi / 2
+        kickDur = KICK_RETURN_DUR
+        kickT0 = os.clock()
     end
 end)
 
@@ -195,6 +217,11 @@ EventBus.Cue.Event:Connect(function(cue)
         spinUntil = os.clock() + SPIN_SEC
         strikeT0 = os.clock()
         mode = "spin"
+        -- the dowel smacks the paddle: fast 90° to rest PARALLEL to the log
+        kickState = "flick"
+        kickBase = kickAngle
+        kickTarget = kickAngle + math.pi / 2
+        kickDur = KICK_FLICK_DUR
         kickT0 = os.clock()
     end
 end)

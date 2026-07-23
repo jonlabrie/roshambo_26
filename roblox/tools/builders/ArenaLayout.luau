@@ -227,10 +227,10 @@ local ArenaLayout = {
         -- run is hidden by the roof, so no gearing is modelled; the old pin-wheel gear
         -- cluster was removed 2026-07-23). Shifted 0.25 South so the kick dowel isn't
         -- coincident with the shaft at rest.
-        vertBase = { 1, 112, 6.25 },
-        vertTop = { 1, 141.6, 6.25 }, -- ~4 studs up into the lantern's base
+        vertBase = { 1, 112, 6.42 },
+        vertTop = { 1, 141.6, 6.42 }, -- ~4 studs up into the lantern's base
         vertR = 0.23, -- slim drive rod (~1/3 the old diameter)
-        paddle = { 1, 120.7, 6.25 }, -- at the kick dowel's height
+        paddle = { 1, 120.7, 6.42 }, -- at the kick dowel's height; z MIRRORED by DrumController (pivot + choreography)
         paddleLen = 2.4, -- kicked by the shu-moku's east-flank dowel
         -- shaft bearings (trestle post + saddle): two on the main-shaft run (wheel→bevel),
         -- one at the bevel corner, one just behind the cam on the E-W shaft. {x, z} on

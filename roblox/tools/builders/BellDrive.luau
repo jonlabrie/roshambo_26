@@ -309,8 +309,9 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
         Spec.part("VertPaddle", {
             Size = { d.paddleLen, 1.4, 0.5 },
             CFrame = Spec.cframe(d.paddle),
-            Color = timber,
+            Color = palette.cypressWeathered,
             Material = "Wood",
+            MaterialVariant = "CypressWeathered",
         })
     )
     -- (The old pin-wheel gear cluster at the shaft top was REMOVED 2026-07-23:
