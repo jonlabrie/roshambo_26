@@ -1,8 +1,10 @@
 --!strict
--- Exposed bell-engine drive train: the wheel's axle extended into the house as the
--- MAIN SHAFT, a visible gear-down (small DriverGear meshing a big slow CamGear), the
--- CamShaft + Cam that draws/trips the shu-moku, and the VertShaft (with VertPaddle the
--- shu-moku's dowel kicks) carrying the drum on a two-arm DrumYoke. Part names are the
+-- Exposed bell-engine drive train, water-mill style: the wheel's axle extended into
+-- the house as the MAIN SHAFT; a FaceWheelMain whose through-cogs comb a vertical
+-- LANTERN PINION (flanges + staves on the octagonal arbor), whose staves are combed
+-- in turn by the big CamFaceWheel on the raised E-W cam shaft (12/24 cogs = the 2:1
+-- reduction; the stave count cancels); the smooth mesh Cam that draws/trips the
+-- shu-moku; and the VertShaft/VertPaddle kick chain. Part names are the
 -- HammerController/DrumController contract — do not rename without retargeting them.
 local Spec = require("./Spec")
 
@@ -49,19 +51,33 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             })
         )
     end
-    -- Toothed bevel gear helper: a disc plus peg teeth around the rim, axis-aligned.
-    -- axis: "X" | "Y" | "Z" (the gear's rotation axis). Teeth are cylinders whose long
-    -- axis matches the gear axis, so they read as bevel pegs from every side.
     local AXIS_ROT: { [string]: { number } } = {
         X = Spec.ROT.IDENTITY,
         Y = Spec.ROT.CYL_VERTICAL,
         Z = Spec.ROT.CYL_ALONG_Z,
     }
-    local function bevelGear(name: string, pos: { number }, r: number, teeth: number, axis: string)
+    -- Face-cog wheel (water-mill reference): a cypress disc whose rectangular cogs
+    -- are mortised THROUGH the rim — bodies protrude toward the lantern cage,
+    -- tails proud on the back face (individually replaceable; slight deterministic
+    -- length jitter for the hand-hammered read). axis = rotation axis; towards =
+    -- ±1 along it, the side the cogs work.
+    local cogSeed = 4241
+    local function cogJig(spread: number): number
+        cogSeed = (1103515245 * cogSeed + 12345) % 2147483648
+        return (cogSeed / 2147483648 - 0.5) * 2 * spread
+    end
+    local function faceCogWheel(
+        name: string,
+        pos: { number },
+        r: number,
+        nCogs: number,
+        axis: string,
+        towards: number
+    )
         table.insert(
             children,
             Spec.part(name, {
-                Size = { 0.5, r * 2, r * 2 },
+                Size = { 0.4, r * 2, r * 2 },
                 Shape = "Cylinder",
                 CFrame = Spec.cframe(pos, AXIS_ROT[axis]),
                 Color = palette.cypressWeathered,
@@ -69,33 +85,65 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
                 MaterialVariant = "CypressWeathered",
             })
         )
-        for t = 1, teeth do
-            local a = (t - 1) * 2 * math.pi / teeth
-            local u, v = math.cos(a) * (r + 0.1), math.sin(a) * (r + 0.1)
-            local off = if axis == "Z" then { u, v, 0 } elseif axis == "Y" then { u, 0, v } else { 0, u, v }
+        for k = 1, nCogs do
+            local a = (k - 1) * 2 * math.pi / nCogs
+            local ringR = r - 0.25
+            local u, v = math.cos(a) * ringR, math.sin(a) * ringR
+            local len = 1.2 + cogJig(0.06)
+            local bias = towards * (len / 2 - 0.4) -- protrude ~0.6 toward the cage, tail ~0.2 behind
+            local off, size
+            if axis == "Z" then
+                off = { u, v, bias }
+                size = { 0.35, 0.35, len }
+            else -- "X"
+                off = { bias, u, v }
+                size = { len, 0.35, 0.35 }
+            end
             table.insert(
                 children,
-                Spec.part(`{name}_T{t}`, {
-                    Size = { 0.7, 0.3, 0.3 },
-                    Shape = "Cylinder",
-                    CFrame = Spec.cframe(
-                        { pos[1] + off[1], pos[2] + off[2], pos[3] + off[3] },
-                        AXIS_ROT[axis]
-                    ),
-                    Color = iron,
-                    Material = "Metal",
-                    MaterialVariant = "IronDark",
+                Spec.part(`{name}_C{k}`, {
+                    Size = size,
+                    CFrame = Spec.cframe({ pos[1] + off[1], pos[2] + off[2], pos[3] + off[3] }),
+                    Color = palette.cypressWeathered,
+                    Material = "Wood",
+                    MaterialVariant = "CypressWeathered",
                 })
             )
         end
     end
-    bevelGear("BevelMainA", d.bevelMainA, d.bevelR1, 10, "Z")
-    bevelGear("BevelJackA", d.bevelJackA, d.bevelR1, 10, "Y")
-    bevelGear("BevelJackB", d.bevelJackB, d.bevelR1, 10, "Y")
-    bevelGear("BevelCamB", d.bevelCamB, d.bevelR2, 20, "X")
-    -- Vertical octagonal JACK SHAFT (spun about Y by HammerController's jack group).
+    faceCogWheel("FaceWheelMain", d.faceWheelMain, d.faceWheelMainR, d.faceWheelMainCogs, "Z", -1)
+    faceCogWheel("CamFaceWheel", d.camFaceWheel, d.camFaceWheelR, d.camFaceWheelCogs, "X", -1)
+    -- CamFaceWheel dressing: three through-spokes proud of the west face + iron hub
+    for s = 1, 3 do
+        local a = (s - 1) * math.pi / 3 + math.pi / 6
+        table.insert(
+            children,
+            Spec.part(`CamFaceWheelSpoke{s}`, {
+                Size = { 0.25, 0.5, d.camFaceWheelR * 2 - 0.6 },
+                CFrame = Spec.cframe(
+                    { d.camFaceWheel[1] - 0.3, d.camFaceWheel[2], d.camFaceWheel[3] },
+                    rotXm(a)
+                ),
+                Color = palette.cypressWeathered,
+                Material = "Wood",
+                MaterialVariant = "CypressWeathered",
+            })
+        )
+    end
+    table.insert(
+        children,
+        Spec.part("CamFaceWheelHub", {
+            Size = { 0.6, 1.8, 1.8 },
+            Shape = "Cylinder",
+            CFrame = Spec.cframe(d.camFaceWheel),
+            Color = iron,
+            Material = "Metal",
+            MaterialVariant = "IronDark",
+        })
+    )
+    -- Vertical octagonal LANTERN ARBOR (spun about Y by HammerController's jack group).
     local jk = d.jack
-    local jlen = jk.yTop - jk.yBottom + 0.4
+    local jlen = jk.yTop - jk.yBottom
     for k = 1, 4 do
         table.insert(
             children,
@@ -111,12 +159,47 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             })
         )
     end
-    -- Jack corner frame: a cypress post west of the shaft with an arm + static bands.
+    -- LANTERN PINION: two flange discs + a cage of staves both face wheels comb.
+    local lt = d.lantern
+    for i, fy in { lt.yBottom, lt.yTop } do
+        table.insert(
+            children,
+            Spec.part(`JackLanternFlange{i}`, {
+                Size = { 0.35, lt.flangeR * 2, lt.flangeR * 2 },
+                Shape = "Cylinder",
+                CFrame = Spec.cframe({ lt.x, fy, lt.z }, Spec.ROT.CYL_VERTICAL),
+                Color = palette.cypressWeathered,
+                Material = "Wood",
+                MaterialVariant = "CypressWeathered",
+            })
+        )
+    end
+    local staveLen = lt.yTop - lt.yBottom - 0.35
+    for s = 1, lt.staves do
+        local a = (s - 0.5) * 2 * math.pi / lt.staves -- half-pitch offset off the mesh azimuths
+        table.insert(
+            children,
+            Spec.part(`JackLanternStave{s}`, {
+                Size = { staveLen, 0.28, 0.28 },
+                CFrame = Spec.cframe({
+                    lt.x + math.cos(a) * lt.staveRingR,
+                    (lt.yBottom + lt.yTop) / 2,
+                    lt.z + math.sin(a) * lt.staveRingR,
+                }, Spec.ROT.CYL_VERTICAL),
+                Shape = "Cylinder",
+                Color = palette.cypressWeathered,
+                Material = "Wood",
+                MaterialVariant = "CypressWeathered",
+            })
+        )
+    end
+    -- Corner frame: a post clear of the stave sweep, an arm over the cage, a band
+    -- on the arbor's top stub (the lantern HANGS from the frame, mill-style).
     table.insert(
         children,
         Spec.part("JackFramePost", {
-            Size = { 0.9, 9.9, 0.9 },
-            CFrame = Spec.cframe({ -16.4, 115.0, jk.z }),
+            Size = { 0.9, 13.9, 0.9 },
+            CFrame = Spec.cframe({ -16.6, 118.45, jk.z }),
             Color = palette.cypressWeathered,
             Material = "Wood",
             MaterialVariant = "CypressWeathered",
@@ -125,26 +208,24 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
     table.insert(
         children,
         Spec.part("JackFrameArm", {
-            Size = { 1.9, 0.5, 0.9 },
-            CFrame = Spec.cframe({ -15.65, 119.9, jk.z }),
+            Size = { 2.1, 0.5, 0.9 },
+            CFrame = Spec.cframe({ -15.75, 125.05, jk.z }),
             Color = palette.cypressWeathered,
             Material = "Wood",
             MaterialVariant = "CypressWeathered",
         })
     )
-    for i, by in { 117.0, 119.9 } do
-        table.insert(
-            children,
-            Spec.part(`JackBand{i}`, {
-                Size = { 0.4, 1.2, 1.2 },
-                Shape = "Cylinder",
-                CFrame = Spec.cframe({ jk.x, by, jk.z }, Spec.ROT.CYL_VERTICAL),
-                Color = iron,
-                Material = "Metal",
-                MaterialVariant = "IronDark",
-            })
-        )
-    end
+    table.insert(
+        children,
+        Spec.part("JackBand1", {
+            Size = { 0.4, 1.2, 1.2 },
+            Shape = "Cylinder",
+            CFrame = Spec.cframe({ jk.x, 124.65, jk.z }, Spec.ROT.CYL_VERTICAL),
+            Color = iron,
+            Material = "Metal",
+            MaterialVariant = "IronDark",
+        })
+    )
     -- CAM SHAFT: invisible contract proxy + visible octagonal prism (^Cam names →
     -- HammerController's cam group spins them with the cam).
     local cs = d.camShaft

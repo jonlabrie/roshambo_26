@@ -182,15 +182,27 @@ local ArenaLayout = {
         shaftFrom = { -15, 116, -19 }, -- = wheel centre (nudged South toward the bank)
         shaftTo = { -15, 116, 11 },
         shaftR = 0.6,
-        -- Vertical JACK SHAFT routes power up to the cam shaft:
-        -- main (axis Z, y116) → bevel 1:1 → jack (axis Y) → bevel 1:2 → cam (axis X, y120.7)
-        jack = { x = -15, z = 11, yBottom = 116, yTop = 120.7 },
-        bevelMainA = { -15, 116, 9.85 }, -- on the main shaft (axis Z); rim kisses the jack-bottom bevel
-        bevelJackA = { -15, 117.45, 11 }, -- jack bottom (axis Y); pegs interleave the main gear's
-        bevelJackB = { -15, 119.45, 11 }, -- jack top (axis Y)
-        bevelCamB = { -13.8, 120.7, 11 }, -- on the cam shaft (axis X); the 1:2 stage
-        bevelR1 = 1.2,
-        bevelR2 = 2.4, -- bevelR2/bevelR1 MIRRORS HammerController REDUCTION = 2
+        -- Vertical LANTERN ARBOR (the "single vertical gear"): OFF the cam shaft's
+        -- z=11 line and STARTING ABOVE the main shaft — the old jack intersected both.
+        jack = { x = -15, z = 9.3, yBottom = 117.0, yTop = 124.9 },
+        -- Water-mill gearing (reference photo): two face-cog wheels comb one lantern.
+        -- lantern rate = main × cogsMain/staves; cam = lantern × staves/cogsCam →
+        -- cam/main = 12/24 (staves cancel) = HammerController REDUCTION = 2.
+        faceWheelMain = { -15, 116, 10.65 }, -- disc plane clear of the stave sweep (z ≤ 10.34)
+        faceWheelMainR = 1.6,
+        faceWheelMainCogs = 12,
+        camFaceWheel = { -13.65, 120.7, 11 }, -- disc plane clear of the stave sweep (x ≥ -13.96)
+        camFaceWheelR = 3.2,
+        camFaceWheelCogs = 24, -- /faceWheelMainCogs MIRRORS HammerController REDUCTION = 2
+        lantern = {
+            x = -15,
+            z = 9.3,
+            staves = 9,
+            staveRingR = 0.9,
+            flangeR = 1.15,
+            yBottom = 117.2,
+            yTop = 124.2,
+        },
         -- E-W CAM SHAFT at dowel height (octagonal; spun with the cam via ^Cam names).
         -- Pokes a stub THROUGH the cam (a flush end would be face-coplanar with the
         -- mesh flank and z-fight); still well clear of the log (flank at x=-2.8).
@@ -235,7 +247,7 @@ local ArenaLayout = {
         bearings = {
             { x = -15, z = -6, y = 116, axis = "Z", baseY = 110 },
             { x = -15, z = 2, y = 116, axis = "Z", baseY = 110 },
-            { x = -15, z = 9.0, y = 116, axis = "Z", baseY = 110 },
+            { x = -15, z = 6.5, y = 116, axis = "Z", baseY = 110 }, -- out of the lantern cage
             { x = -6, z = 11, y = 120.7, axis = "X", baseY = 111.5 },
         },
         -- The drum's bearing yoke (A-frames) is built from throwDrum.pos + the pavilion

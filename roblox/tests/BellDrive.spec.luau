@@ -5,30 +5,35 @@ local L = require("../tools/builders/ArenaLayout")
 local ZenDojo = require("../src/shared/themes/ZenDojo")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 
-describe("BellDrive drive train (jack shaft + toothed bevels)", function()
+describe("BellDrive drive train (face-cog wheels + lantern pinion)", function()
     local spec = BellDrive.build(ZenDojo.palette, L)
+    local d = L.bellDrive
     local byName = {}
-    local counts = {}
+    local cogs = { FaceWheelMain = 0, CamFaceWheel = 0 }
+    local staves = 0
     for _, c in spec.children :: any do
         byName[c.name] = c
-        local stem = c.name:match("^(Bevel%a+)_T%d+$")
-        if stem then
-            counts[stem] = (counts[stem] or 0) + 1
+        local stem = c.name:match("^(%a+)_C%d+$")
+        if stem and cogs[stem] ~= nil then
+            cogs[stem] += 1
+        end
+        if c.name:match("^JackLanternStave%d+$") then
+            staves += 1
         end
     end
-    test("the train exists by name; the old placeholder gears are gone", function()
+    test("the train exists by name; the peg bevels are gone", function()
         for _, want in
             {
                 "MainShaft",
                 "JackShaftF1",
                 "JackShaftF4",
-                "BevelMainA",
-                "BevelJackA",
-                "BevelJackB",
-                "BevelCamB",
+                "FaceWheelMain",
+                "CamFaceWheel",
+                "CamFaceWheelHub",
+                "JackLanternFlange1",
+                "JackLanternFlange2",
                 "CamShaft",
                 "CamShaftF1",
-                "CamShaftF4",
                 "JackFramePost",
                 "VertShaft",
                 "VertPaddle",
@@ -36,29 +41,30 @@ describe("BellDrive drive train (jack shaft + toothed bevels)", function()
         do
             expect(byName[want] ~= nil).toBe(true)
         end
-        expect(byName["DriverGear"]).toBeNil()
-        expect(byName["CamGear"]).toBeNil()
+        for name in byName do
+            expect(name:match("^Bevel")).toBeNil()
+        end
     end)
-    test("tooth counts state the reduction: 10/10 then 10/20", function()
-        expect(counts.BevelMainA).toBe(10)
-        expect(counts.BevelJackA).toBe(10)
-        expect(counts.BevelJackB).toBe(10)
-        expect(counts.BevelCamB).toBe(20)
-        expect(L.bellDrive.bevelR2 / L.bellDrive.bevelR1).toBeCloseTo(2, 0.001) -- REDUCTION mirror
+    test("cog and stave counts state the ratio: 12 combs in, 24 combs out", function()
+        expect(cogs.FaceWheelMain).toBe(d.faceWheelMainCogs)
+        expect(cogs.CamFaceWheel).toBe(d.camFaceWheelCogs)
+        expect(d.camFaceWheelCogs / d.faceWheelMainCogs).toBeCloseTo(2, 0.001) -- REDUCTION mirror
+        expect(staves).toBe(d.lantern.staves)
     end)
-    test("the cam shaft proxy rides the cam axle line and is invisible", function()
-        local cs = byName["CamShaft"].properties
-        expect(cs.Transparency).toBe(1)
-        expect(cs.CFrame[2]).toBeCloseTo(L.bellDrive.camShaft.y, 0.001)
-        expect(cs.CFrame[3]).toBeCloseTo(L.bellDrive.camShaft.z, 0.001)
+    test("the arbor and cage clear both horizontal shafts (the intersection bugs)", function()
+        expect(math.abs(d.camShaft.z - d.lantern.z) >= d.lantern.staveRingR + d.camShaft.r + 0.2).toBe(true)
+        expect(d.jack.yBottom - 0.2 >= d.shaftFrom[2] + 0.52).toBe(true) -- arbor bottom above the main-shaft octagon
+        expect(math.abs(d.bearings[3].z - d.lantern.z) >= 1.5).toBe(true) -- pillow out of the cage
     end)
-    test("the kick paddle meets the raised dowel", function()
+    test("the wheel discs stay clear of the stave sweep", function()
+        local sweepZ = d.lantern.z + d.lantern.staveRingR + 0.14 -- staves' far reach toward the main wheel
+        expect(d.faceWheelMain[3] - 0.2 >= sweepZ + 0.1).toBe(true)
+        local sweepX = d.lantern.x + d.lantern.staveRingR + 0.14 -- toward the cam wheel
+        expect(d.camFaceWheel[1] - 0.2 >= sweepX + 0.1).toBe(true)
+    end)
+    test("the kick paddle and pillow blocks are unchanged", function()
         expect(byName["VertPaddle"].properties.CFrame[2]).toBeCloseTo(120.7, 0.001)
-    end)
-    test("the tall cam-shaft pillow block sits under the cam shaft", function()
         expect(byName["BearingSaddle4"].properties.CFrame[2]).toBeCloseTo(120.7, 0.001)
-        expect(byName["BearingPost4"] ~= nil).toBe(true)
-        expect(byName["BearingPlate4"] ~= nil).toBe(true)
     end)
 end)
 
