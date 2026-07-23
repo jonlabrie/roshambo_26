@@ -100,8 +100,10 @@ local bell = stage:WaitForChild("BellDrive")
 -- ramp (p = elapsed/period). Round length isn't in the payload, so we measure it
 -- (ACTIVE→ACTIVE) and set ω = 2π/period; this default holds round 1.
 local camOmega = 2 * math.pi / 22 -- rad/s (≈ once per 22s until measured)
-local CAM_AXLE_YZ = Vector2.new(116, 11) -- E-W cam shaft: world-X axis through (y116, z11)
+local CAM_AXLE_YZ = Vector2.new(120.7, 8) -- E-W cam shaft: world-X axis through (y120.7, z8); MIRRORS ArenaLayout.bellDrive.camShaft
 local MAIN_AXLE_XY = Vector2.new(-15, 116) -- N-S main shaft: world-Z axis through (x-15, y116)
+local JACK_AXLE_XZ = Vector2.new(-15, 8) -- vertical jack shaft: world-Y axis through (x-15, z8)
+local JACK_DIR = -1 -- the bevel corner reverses handedness (flip live via "JackDir" if the mesh reads wrong)
 local REDUCTION = 2 -- driver gear turns this much faster than the cam (integer → wraps seamlessly each round)
 local CAM_PHASE_DEG = 0 -- fine-tune offset for the high point at the strike (0 = peak exactly on the dowel)
 
@@ -109,6 +111,7 @@ local CAM_PHASE_DEG = 0 -- fine-tune offset for the high point at the strike (0 
 -- rest pose about the world axle line through pivotCF each frame.
 local camSpinners = {} -- rotate with the cam (about X), free-running at CAM_OMEGA
 local driverSpinners = {} -- the fast driver gear + main shaft (about Z), counter + at the reduction
+local jackSpinners = {} -- the vertical jack shaft + its bevels (about Y), at the driver rate
 local function addCamPart(name: string)
     local part = bell and bell:FindFirstChild(name)
     if part and part:IsA("BasePart") then
@@ -129,6 +132,16 @@ local function addDriverPart(name: string)
         })
     end
 end
+local function addJackPart(name: string)
+    local part = bell and bell:FindFirstChild(name)
+    if part and part:IsA("BasePart") then
+        table.insert(jackSpinners, {
+            part = part,
+            restCF = part.CFrame,
+            pivotCF = CFrame.new(JACK_AXLE_XZ.X, part.Position.Y, JACK_AXLE_XZ.Y),
+        })
+    end
+end
 -- Capture every cam-shaft part (the snail cam's base + spiral planks + drop wall, and
 -- the cam gear; all named ^Cam) plus the driver gear + main shaft. Wrapped so it can be
 -- RE-RUN lazily: the BellDrive model's ~148 parts replicate progressively in Play, so a
@@ -136,16 +149,20 @@ end
 local function captureSpinners()
     table.clear(camSpinners)
     table.clear(driverSpinners)
+    table.clear(jackSpinners)
     for _, part in bell:GetChildren() do
-        if part:IsA("BasePart") and part.Name:match("^Cam") then
+        if part:IsA("BasePart") and (part.Name:match("^Cam") or part.Name:match("^BevelCamB")) then
             addCamPart(part.Name)
         end
+        if part:IsA("BasePart") and (part.Name:match("^JackShaftF") or part.Name:match("^BevelJack")) then
+            addJackPart(part.Name)
+        end
     end
-    addDriverPart("DriverGear")
     -- MainShaft (the invisible proxy) plus its MainShaftF* octagon flats — the visible
-    -- faceted prism whose turning reads (a smooth cylinder's rotation was invisible).
+    -- faceted prism whose turning reads (a smooth cylinder's rotation was invisible) —
+    -- plus the toothed bevel at the jack corner.
     for _, part in bell:GetChildren() do
-        if part:IsA("BasePart") and part.Name:match("^MainShaft") then
+        if part:IsA("BasePart") and (part.Name:match("^MainShaft") or part.Name:match("^BevelMainA")) then
             addDriverPart(part.Name)
         end
     end
@@ -208,7 +225,7 @@ EventBus.Cue.Event:Connect(function(cue)
         -- about the axle (+ a small fine-tune offset). It free-runs from here until the next.
         local dp = dowels[1].Position
         local fineDeg = (stage:GetAttribute("CamPhaseDeg") :: number) or CAM_PHASE_DEG
-        anchorNet = math.atan2(dp.Z - 11, dp.Y - 116) + math.rad(fineDeg)
+        anchorNet = math.atan2(dp.Z - CAM_AXLE_YZ.Y, dp.Y - CAM_AXLE_YZ.X) + math.rad(fineDeg)
         anchorAt = os.clock()
         -- Stage 1: swing forward (toward the bell = -BACK) to overshoot into it.
         local swing = TweenService:Create(
@@ -340,6 +357,12 @@ RunService.Heartbeat:Connect(function()
     local drot = CFrame.Angles(0, 0, driverDir * camNet * REDUCTION)
     for _, s in driverSpinners do
         s.part.CFrame = s.pivotCF * drot * s.pivotCF:Inverse() * s.restCF
+    end
+    -- Jack shaft: 1:1 off the main shaft through the corner bevel, spun about world Y.
+    local jackDir = (stage:GetAttribute("JackDir") :: number) or JACK_DIR
+    local jrot = CFrame.Angles(0, jackDir * driverDir * camNet * REDUCTION, 0)
+    for _, s in jackSpinners do
+        s.part.CFrame = s.pivotCF * jrot * s.pivotCF:Inverse() * s.restCF
     end
     stage:SetAttribute("DriveOmega", driverDir * CAM_DIR * camOmega * REDUCTION) -- rad/s about Z, for the wheel
 end)
