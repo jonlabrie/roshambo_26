@@ -22,13 +22,18 @@
 
 local Lighting = game:GetService("Lighting")
 local StarterPlayer = game:GetService("StarterPlayer")
-local sps = StarterPlayer:FindFirstChildOfClass("StarterPlayerScripts") or StarterPlayer:WaitForChild("StarterPlayerScripts")
+local sps = StarterPlayer:FindFirstChildOfClass("StarterPlayerScripts")
+    or StarterPlayer:WaitForChild("StarterPlayerScripts")
 
 -- idempotent clean
 local oldLS = sps:FindFirstChild("FireworkLauncher")
-if oldLS then oldLS:Destroy() end
+if oldLS then
+    oldLS:Destroy()
+end
 local oldBloom = Lighting:FindFirstChild("FireworkBloom")
-if oldBloom then oldBloom:Destroy() end
+if oldBloom then
+    oldBloom:Destroy()
+end
 
 -- ONE global Bloom (gentle) makes LightEmission sparks glow at fixed cost; no per-shell lights.
 local bloom = Instance.new("BloomEffect")
@@ -162,4 +167,6 @@ end)
 ]==]
 ls.Parent = sps
 
-print("[FireworkBench] LocalScript placed in StarterPlayerScripts + Bloom in Lighting. Press Play (F5) to watch; publish to view on device.")
+print(
+    "[FireworkBench] LocalScript placed in StarterPlayerScripts + Bloom in Lighting. Press Play (F5) to watch; publish to view on device."
+)

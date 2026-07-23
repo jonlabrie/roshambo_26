@@ -96,10 +96,16 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
     -- roof's upper (inner) edge — same section as the eave ring beams. (2026-07-22)
     local skirtBeamY = roofY + 1.6 -- atop the Bracket{i}_3 heads (top ≈ roofY + 1.0)
     for i, z in { s, -s } do
-        table.insert(children, timberPart(`SkirtBeamX{i}`, { 2 * s + 2.4, 1.2, 1.4 }, place({ 0, skirtBeamY, z })))
+        table.insert(
+            children,
+            timberPart(`SkirtBeamX{i}`, { 2 * s + 2.4, 1.2, 1.4 }, place({ 0, skirtBeamY, z }))
+        )
     end
     for i, x in { s, -s } do
-        table.insert(children, timberPart(`SkirtBeamZ{i}`, { 1.4, 1.2, 2 * s + 2.4 }, place({ x, skirtBeamY, 0 })))
+        table.insert(
+            children,
+            timberPart(`SkirtBeamZ{i}`, { 1.4, 1.2, 2 * s + 2.4 }, place({ x, skirtBeamY, 0 }))
+        )
     end
 
     -- Projecting carved beam-noses (kibana) where the ring beams cross the corner posts.
