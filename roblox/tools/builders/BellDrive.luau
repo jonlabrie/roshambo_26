@@ -202,7 +202,7 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
         children,
         Spec.part("JackHangerArm", {
             Size = { 2.55, 0.5, 0.7 }, -- runs EAST along the cam-shaft line, pillow post → arbor
-            CFrame = Spec.cframe({ -15.875, 119.6, jk.z }),
+            CFrame = Spec.cframe({ -15.875, 119.1, jk.z }),
             Color = palette.cypressWeathered,
             Material = "Wood",
             MaterialVariant = "CypressWeathered",
@@ -213,7 +213,7 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
         Spec.part("JackBand1", {
             Size = { 0.4, 1.2, 1.2 },
             Shape = "Cylinder",
-            CFrame = Spec.cframe({ jk.x, 119.3, jk.z }, Spec.ROT.CYL_VERTICAL),
+            CFrame = Spec.cframe({ jk.x, 118.9, jk.z }, Spec.ROT.CYL_VERTICAL),
             Color = iron,
             Material = "Metal",
             MaterialVariant = "IronDark",

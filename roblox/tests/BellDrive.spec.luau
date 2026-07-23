@@ -55,7 +55,8 @@ describe("BellDrive drive train (face-cog wheels + lantern pinion)", function()
     test("the arbor and cage clear both horizontal shafts (the intersection bugs)", function()
         -- the cage sits BELOW the cam shaft at the plan crossing: vertical clearance
         expect(d.camShaft.y - 0.5 >= d.jack.yTop + 0.3).toBe(true)
-        expect(d.jack.yBottom - 0.2 >= d.shaftFrom[2] + 0.52).toBe(true) -- arbor bottom above the main-shaft octagon
+        -- the main shaft ENDS buried in its gear, short of the cage (nothing runs under it)
+        expect(d.shaftTo[3] + 0.1 <= d.lantern.z - d.lantern.flangeR).toBe(true)
         expect(math.abs(d.bearings[3].z - d.lantern.z) >= 1.5).toBe(true) -- pillow out of the cage
     end)
     test("the wheel discs stay clear of the stave sweep (either side)", function()

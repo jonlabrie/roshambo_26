@@ -180,11 +180,11 @@ local ArenaLayout = {
     bellDrive = {
         -- MAIN SHAFT: along Z (N–S) from the wheel, ending at the SW jack corner.
         shaftFrom = { -15, 116, -19 }, -- = wheel centre (nudged South toward the bank)
-        shaftTo = { -15, 116, 11.75 }, -- runs on under the cage and THROUGH the corner pillow post (stub past it)
+        shaftTo = { -15, 116, 9.8 }, -- ends BURIED in the main face wheel (gate: nothing proud of the gear face)
         shaftR = 0.6,
         -- Vertical LANTERN ARBOR (the "single vertical gear"): OFF the cam shaft's
         -- z=11 line and STARTING ABOVE the main shaft — the old jack intersected both.
-        jack = { x = -15, z = 11, yBottom = 116.75, yTop = 119.85 }, -- ON the shafts' plan crossing, cage below the cam shaft
+        jack = { x = -15, z = 11, yBottom = 116.25, yTop = 119.35 }, -- ON the shafts' plan crossing, cage below the cam shaft
         -- Water-mill gearing (reference photo): two face-cog wheels comb one SHORT
         -- lantern (gate: the tall cage caught the cam wheel's upper quadrant too —
         -- the compact cage takes the cam wheel's LOWER arc, y≈117.9-119.2, only).
@@ -201,9 +201,9 @@ local ArenaLayout = {
             z = 11, -- in line with BOTH gears: at the shafts' plan crossing
             staves = 9,
             staveRingR = 0.9,
-            flangeR = 1.15,
-            yBottom = 116.75, -- dropped 0.45 at the gate: centres the main-wheel mesh in the cage
-            yTop = 118.95, -- cam wheel's lower arc (y≈117.9-119.2) still combs the cage top
+            flangeR = 1.05, -- slimmed with the second drop so the flanges clear the main wheel's face
+            yBottom = 116.25, -- dropped 0.45 + 0.5 across two gate rounds
+            yTop = 118.45,
         },
         -- E-W CAM SHAFT at dowel height (octagonal; spun with the cam via ^Cam names).
         -- Pokes a stub THROUGH the cam (a flush end would be face-coplanar with the
