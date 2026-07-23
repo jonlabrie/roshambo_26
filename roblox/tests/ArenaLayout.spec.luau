@@ -132,14 +132,14 @@ describe("ArenaLayout bell engine", function()
         expect(d.shaftTo[3] > d.shaftFrom[3]).toBe(true) -- extends South (+Z) from the wheel toward the bell
         expect(d.shaftFrom[1] < -12).toBe(true) -- West of the bell (edge -8.8) and the west tower posts (-11)
     end)
-    test("a bevel turns the Z drive onto an E-W cam shaft pointed East at the shu-moku", function()
+    test("a jack-shaft corner turns the Z drive onto an E-W cam shaft at dowel height", function()
         local d = L.bellDrive
-        expect(d.camShaftFrom[2]).toBe(d.camShaftTo[2]) -- constant Y
-        expect(d.camShaftFrom[3]).toBe(d.camShaftTo[3]) -- constant Z → runs along X (E-W)
-        expect(d.camShaftTo[1] - d.camShaftFrom[1] > 5).toBe(true) -- a real E-W run, pointing East
-        expect(d.camShaftFrom[3] > 5.5).toBe(true) -- South of the bell (z-span ±5), clear of it
-        expect(math.abs(d.camShaftFrom[3] - L.shuMoku.restPos[3]) < 4).toBe(true) -- aimed at the shu-moku
-        expect(d.camR > d.driverR * 1.7).toBe(true) -- cam gear clearly the bigger reduction gear (gate-tuned ~1.9:1)
+        expect(d.camShaft.toX - d.camShaft.fromX > 5).toBe(true) -- a real E-W run, pointing East
+        expect(d.camShaft.z > 5.5).toBe(true) -- South of the bell (z-span ±5), clear of it
+        expect(d.camShaft.y).toBeCloseTo(L.shuMoku.restPos[2], 0.001) -- cam axle at the dowel height
+        expect(d.jack.yBottom).toBeCloseTo(d.shaftFrom[2], 0.001) -- jack climbs main → cam height
+        expect(d.jack.yTop).toBeCloseTo(d.camShaft.y, 0.001)
+        expect(d.bevelR2 / d.bevelR1).toBeCloseTo(2, 0.001) -- the 1:2 stage (REDUCTION mirror)
     end)
     test("kick shaft carries the paddle at the shu-moku swing level (decoupled from the drum)", function()
         local d = L.bellDrive

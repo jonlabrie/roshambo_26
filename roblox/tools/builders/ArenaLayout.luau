@@ -63,7 +63,7 @@ local ArenaLayout = {
         restPos = { -2, 120.7, 9 },
         length = 7,
         radius = 0.8,
-        drawStuds = 6,
+        drawStuds = 4.06, -- MIRRORS HammerController DRAW_STUDS (the cam flank is generated from this)
         yaw = 0,
         hangerY = 132, -- hanger-beam centreline, just under the ring beams (~134)
         -- rope tops hang from the spreader UNDERSIDES (spreaders sit flush under the
@@ -175,28 +175,29 @@ local ArenaLayout = {
     -- releasing it (gong). The swing's east-flank dowel kicks the vertical-shaft
     -- paddle → spins the drum. Starting coords; tuned at the staging gate.
     bellDrive = {
-        -- MAIN SHAFT: along Z (N–S), West of the bell+posts, raised to the wheel axle.
+        -- MAIN SHAFT: along Z (N–S) from the wheel, ending at the SW jack corner.
         shaftFrom = { -15, 116, -19 }, -- = wheel centre (nudged South toward the bank)
-        shaftTo = { -15, 116, 11 },
+        shaftTo = { -15, 116, 8 },
         shaftR = 0.6,
-        -- BEVEL gear-down at the SW corner: small DriverGear (axle Z) on the main shaft
-        -- meshes the big slow CamGear (axle X) on the cam shaft → the once-per-round
-        -- reduction, turned through 90°.
-        driverGear = { -15, 116, 9.4 },
-        driverR = 1.6,
-        camGear = { -13.4, 116, 11 },
-        camR = 3.0, -- shrunk so the rim clears the ground (was 3.6)
-        -- E–W CAM SHAFT: along X at the shu-moku tail (z=11, between the tower posts at
-        -- z=9 and the gantry at z=13; South of the bell), pointed East at the log.
-        camShaftFrom = { -15, 116, 11 },
-        camShaftTo = { -3.5, 116, 11 }, -- extended East ~0.5 so the cam reaches into the draw dowel's plane
-        camShaftR = 0.6,
-        -- snail draw cam on the X cam shaft (turns about X at `cam` once per round).
-        -- ~30% smaller; the draw is faked in the controller, so cam size is visual —
-        -- contact with the dowel is tuned at the gate. Sits within the dowel span (x[-4..-1.5]).
-        cam = { -3.5, 116, 11 },
-        camHubR = 1.4, -- cam body (hub / base-circle) radius
-        camLobeR = 3.85, -- snail peak reaches this far from the axle — the draw throw
+        -- Vertical JACK SHAFT routes power up to the cam shaft:
+        -- main (axis Z, y116) → bevel 1:1 → jack (axis Y) → bevel 1:2 → cam (axis X, y120.7)
+        jack = { x = -15, z = 8, yBottom = 116, yTop = 120.7 },
+        bevelMainA = { -15, 116, 6.9 }, -- on the main shaft (axis Z); rim kisses the jack-bottom bevel
+        bevelJackA = { -15, 117.2, 8 }, -- jack bottom (axis Y)
+        bevelJackB = { -15, 119.5, 8 }, -- jack top (axis Y)
+        bevelCamB = { -13.8, 120.7, 8 }, -- on the cam shaft (axis X); the 1:2 stage
+        bevelR1 = 1.2,
+        bevelR2 = 2.4, -- bevelR2/bevelR1 MIRRORS HammerController REDUCTION = 2
+        -- E-W CAM SHAFT at dowel height (octagonal; spun with the cam via ^Cam names).
+        camShaft = { y = 120.7, z = 8, fromX = -15, toX = -1.5, r = 0.5 },
+        -- HERO SNAIL CAM: axle at dowel height, 3 studs north of the dowel's rest
+        -- plane; the flank is generated analytically by CamProfile from the dowel's
+        -- draw path, so the face carries the dowel through the whole draw.
+        cam = { -2.75, 120.7, 8 },
+        camWidth = 1.6,
+        camHubR = 2.0, -- hub disc; flank planks span hub→contact radius
+        camDropDeg = 12, -- the cliff (release face) width
+        camDowelRise = 0.9, -- MIRRORS HammerController riseY = p²·0.9
         -- KICK shaft + paddle (drum kick), just East/South of the shu-moku, by the kick
         -- dowel's tip (x=1, z=6) and clear of the bell (z>5.1) and posts. Capped UNDER
         -- the roof — it no longer runs up through the drum (drum is centred elsewhere);
@@ -204,7 +205,7 @@ local ArenaLayout = {
         vertBase = { 1, 112, 6 },
         vertTop = { 1, 137.6, 6 }, -- reaches up into DriveGearA (y137.5) so the shaft meets the gear
         vertR = 0.23, -- slim drive rod (~1/3 the old diameter)
-        paddle = { 1, 118, 6 },
+        paddle = { 1, 120.7, 6 }, -- raised to the kick dowel's height (striker task output)
         paddleLen = 2.4, -- kicked by the shu-moku's east-flank dowel
         -- Drum drive (pin-wheel): a flat gear caps the kick shaft (DriveGearA, spins
         -- about Y); it meshes an EQUAL-radius flat gear (DriveGearB) — equal so A's
@@ -219,8 +220,14 @@ local ArenaLayout = {
         -- shaft bearings (trestle post + saddle): two on the main-shaft run (wheel→bevel),
         -- one at the bevel corner, one just behind the cam on the E-W shaft. {x, z} on
         -- the shaft line at shaft height; posts drop to bearingBaseY.
-        bearings = { { -15, -6 }, { -15, 2 }, { -15, 11 }, { -5.5, 11 } },
-        bearingBaseY = 110,
+        -- Pillow blocks, generalized: axis "Z" = main-run (shaft y116); axis "X" =
+        -- the tall post under the raised cam shaft. baseY per entry (bank vs clearing).
+        bearings = {
+            { x = -15, z = -6, y = 116, axis = "Z", baseY = 110 },
+            { x = -15, z = 2, y = 116, axis = "Z", baseY = 110 },
+            { x = -15, z = 6.5, y = 116, axis = "Z", baseY = 110 },
+            { x = -5, z = 8, y = 120.7, axis = "X", baseY = 111.5 },
+        },
         -- The drum's bearing yoke (A-frames) is built from throwDrum.pos + the pavilion
         -- roof, so the support follows the drum wherever it's centred.
     },

@@ -49,41 +49,134 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             })
         )
     end
-    -- BEVEL gear-down: the small DriverGear sits on the Z main shaft (axle along Z);
-    -- the big slow CamGear sits on the E-W cam shaft (axle along X = cylinder default).
-    -- Modelled as discs at 90° — a placeholder bevel; the controller turns both.
+    -- Toothed bevel gear helper: a disc plus peg teeth around the rim, axis-aligned.
+    -- axis: "X" | "Y" | "Z" (the gear's rotation axis). Teeth are cylinders whose long
+    -- axis matches the gear axis, so they read as bevel pegs from every side.
+    local AXIS_ROT: { [string]: { number } } = {
+        X = Spec.ROT.IDENTITY,
+        Y = Spec.ROT.CYL_VERTICAL,
+        Z = Spec.ROT.CYL_ALONG_Z,
+    }
+    local function bevelGear(name: string, pos: { number }, r: number, teeth: number, axis: string)
+        table.insert(
+            children,
+            Spec.part(name, {
+                Size = { 0.5, r * 2, r * 2 },
+                Shape = "Cylinder",
+                CFrame = Spec.cframe(pos, AXIS_ROT[axis]),
+                Color = palette.cypressWeathered,
+                Material = "Wood",
+                MaterialVariant = "CypressWeathered",
+            })
+        )
+        for t = 1, teeth do
+            local a = (t - 1) * 2 * math.pi / teeth
+            local u, v = math.cos(a) * (r + 0.1), math.sin(a) * (r + 0.1)
+            local off = if axis == "Z" then { u, v, 0 } elseif axis == "Y" then { u, 0, v } else { 0, u, v }
+            table.insert(
+                children,
+                Spec.part(`{name}_T{t}`, {
+                    Size = { 0.7, 0.3, 0.3 },
+                    Shape = "Cylinder",
+                    CFrame = Spec.cframe(
+                        { pos[1] + off[1], pos[2] + off[2], pos[3] + off[3] },
+                        AXIS_ROT[axis]
+                    ),
+                    Color = iron,
+                    Material = "Metal",
+                    MaterialVariant = "IronDark",
+                })
+            )
+        end
+    end
+    bevelGear("BevelMainA", d.bevelMainA, d.bevelR1, 10, "Z")
+    bevelGear("BevelJackA", d.bevelJackA, d.bevelR1, 10, "Y")
+    bevelGear("BevelJackB", d.bevelJackB, d.bevelR1, 10, "Y")
+    bevelGear("BevelCamB", d.bevelCamB, d.bevelR2, 20, "X")
+    -- Vertical octagonal JACK SHAFT (spun about Y by HammerController's jack group).
+    local jk = d.jack
+    local jlen = jk.yTop - jk.yBottom + 0.4
+    for k = 1, 4 do
+        table.insert(
+            children,
+            Spec.part(`JackShaftF{k}`, {
+                Size = { jlen, 0.7, 0.29 },
+                CFrame = Spec.cframe(
+                    { jk.x, (jk.yBottom + jk.yTop) / 2, jk.z },
+                    Spec.matMul(Spec.ROT.CYL_VERTICAL, rotXm((k - 1) * math.pi / 4))
+                ),
+                Color = palette.cypressWeathered,
+                Material = "Wood",
+                MaterialVariant = "CypressWeathered",
+            })
+        )
+    end
+    -- Jack corner frame: a cypress post west of the shaft with an arm + static bands.
     table.insert(
         children,
-        Spec.part("DriverGear", {
-            Size = { 0.8, d.driverR * 2, d.driverR * 2 },
-            Shape = "Cylinder",
-            CFrame = Spec.cframe(d.driverGear, Spec.ROT.CYL_ALONG_Z),
-            Color = timber,
-            Material = "WoodPlanks",
+        Spec.part("JackFramePost", {
+            Size = { 0.9, 9.9, 0.9 },
+            CFrame = Spec.cframe({ -16.4, 115.0, jk.z }),
+            Color = palette.cypressWeathered,
+            Material = "Wood",
+            MaterialVariant = "CypressWeathered",
         })
     )
     table.insert(
         children,
-        Spec.part("CamGear", {
-            Size = { 0.8, d.camR * 2, d.camR * 2 },
-            Shape = "Cylinder",
-            CFrame = Spec.cframe(d.camGear), -- axle along X (cylinder's default long axis)
-            Color = timber,
-            Material = "WoodPlanks",
+        Spec.part("JackFrameArm", {
+            Size = { 1.9, 0.5, 0.9 },
+            CFrame = Spec.cframe({ -15.65, 119.9, jk.z }),
+            Color = palette.cypressWeathered,
+            Material = "Wood",
+            MaterialVariant = "CypressWeathered",
         })
     )
-    -- E-W cam shaft (along X) + the cam lug that draws the shu-moku's draw dowel.
-    local cp, clen, crot = Spec.segment(d.camShaftFrom, d.camShaftTo)
+    for i, by in { 117.0, 119.9 } do
+        table.insert(
+            children,
+            Spec.part(`JackBand{i}`, {
+                Size = { 0.4, 1.2, 1.2 },
+                Shape = "Cylinder",
+                CFrame = Spec.cframe({ jk.x, by, jk.z }, Spec.ROT.CYL_VERTICAL),
+                Color = iron,
+                Material = "Metal",
+                MaterialVariant = "IronDark",
+            })
+        )
+    end
+    -- CAM SHAFT: invisible contract proxy + visible octagonal prism (^Cam names →
+    -- HammerController's cam group spins them with the cam).
+    local cs = d.camShaft
+    local csLen = cs.toX - cs.fromX
+    local csMid = { (cs.fromX + cs.toX) / 2, cs.y, cs.z }
     table.insert(
         children,
         Spec.part("CamShaft", {
-            Size = { clen, d.camShaftR * 2, d.camShaftR * 2 },
+            Size = { csLen, cs.r * 2, cs.r * 2 },
             Shape = "Cylinder",
-            CFrame = Spec.cframe(cp, crot),
+            CFrame = Spec.cframe(csMid),
             Color = iron,
             Material = "Metal",
+            Transparency = 1,
+            CanCollide = false,
+            CanQuery = false,
+            CanTouch = false,
+            CastShadow = false,
         })
     )
+    for k = 1, 4 do
+        table.insert(
+            children,
+            Spec.part(`CamShaftF{k}`, {
+                Size = { csLen, 0.85, 0.36 },
+                CFrame = Spec.cframe(csMid, rotXm((k - 1) * math.pi / 4)),
+                Color = palette.cypressWeathered,
+                Material = "Wood",
+                MaterialVariant = "CypressWeathered",
+            })
+        )
+    end
     -- SNAIL draw cam, profile in the Y-Z plane on the X cam shaft. The rising FLANK is
     -- shaped to the shu-moku draw dowel's MEASURED path, so the dowel rides the edge up
     -- without intersecting; at the peak it reaches the SHARP DROP WALL and falls off, so the
@@ -226,25 +319,18 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             Material = "Wood",
         })
     )
-    -- Shaft bearings: a cypress pier topping out just under the shaft, capped by an
-    -- IronDark BAND enclosing the shaft — along the main-shaft run, at the bevel corner,
-    -- and just behind the cam on the E-W shaft (that band turns 90° to the cam axis).
-    -- Main-shaft bearings also get a spinning IronDark collar just inboard (the "inner
-    -- bearing"; ^MainShaft prefix → HammerController turns it with the drive).
-    local shaftY = d.shaftFrom[2]
+    -- Pillow blocks (generalized): cypress post → square plate → static IronDark ring
+    -- → wider spinning collar. axis "Z" collars spin with the main shaft (^MainShaft
+    -- names); the axis "X" collar spins with the cam (^Cam name). Per-entry y/baseY.
     for i, b in d.bearings do
-        local x, z = b[1], b[2]
-        local onMain = x == d.shaftFrom[1] -- else it rides the E-W cam shaft
-        local bandRot = if onMain then srot else nil
-        -- post top sits right beneath the bearing's square base plate (bearing bottom
-        -- at shaft height − OD/2, then the plate thickness)
         local PLATE_T = 0.2
-        local pierTop = shaftY - 1.55 / 2 - PLATE_T
+        local pierTop = b.y - 1.55 / 2 - PLATE_T
+        local bandRot = if b.axis == "Z" then Spec.ROT.CYL_ALONG_Z else Spec.ROT.IDENTITY
         table.insert(
             children,
             Spec.part(`BearingPost{i}`, {
-                Size = { 0.9, pierTop - d.bearingBaseY, 0.9 },
-                CFrame = Spec.cframe({ x, (pierTop + d.bearingBaseY) / 2, z }),
+                Size = { 0.9, pierTop - b.baseY, 0.9 },
+                CFrame = Spec.cframe({ b.x, (pierTop + b.baseY) / 2, b.z }),
                 Color = palette.cypressWeathered,
                 Material = "Wood",
                 MaterialVariant = "CypressWeathered",
@@ -254,7 +340,7 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             children,
             Spec.part(`BearingPlate{i}`, {
                 Size = { 0.9, PLATE_T, 0.9 },
-                CFrame = Spec.cframe({ x, pierTop + PLATE_T / 2, z }),
+                CFrame = Spec.cframe({ b.x, pierTop + PLATE_T / 2, b.z }),
                 Color = iron,
                 Material = "Metal",
                 MaterialVariant = "IronDark",
@@ -265,27 +351,24 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             Spec.part(`BearingSaddle{i}`, {
                 Size = { 0.5, 1.55, 1.55 },
                 Shape = "Cylinder",
-                CFrame = Spec.cframe({ x, shaftY, z }, bandRot),
+                CFrame = Spec.cframe({ b.x, b.y, b.z }, bandRot),
                 Color = iron,
                 Material = "Metal",
                 MaterialVariant = "IronDark",
             })
         )
-        if onMain then
-            -- spinning inner collar CENTERED in the bearing, slightly wider so its rims
-            -- protrude on both sides (^MainShaft prefix → turns with the drive)
-            table.insert(
-                children,
-                Spec.part(`MainShaftCollar{i}`, {
-                    Size = { 0.72, 1.24, 1.24 },
-                    Shape = "Cylinder",
-                    CFrame = Spec.cframe({ x, shaftY, z }, srot),
-                    Color = iron,
-                    Material = "Metal",
-                    MaterialVariant = "IronDark",
-                })
-            )
-        end
+        local collarName = if b.axis == "Z" then `MainShaftCollar{i}` else `CamCollar{i}`
+        table.insert(
+            children,
+            Spec.part(collarName, {
+                Size = { 0.72, 1.24, 1.24 },
+                Shape = "Cylinder",
+                CFrame = Spec.cframe({ b.x, b.y, b.z }, bandRot),
+                Color = iron,
+                Material = "Metal",
+                MaterialVariant = "IronDark",
+            })
+        )
     end
     return Spec.model("BellDrive", children)
 end

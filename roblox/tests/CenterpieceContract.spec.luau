@@ -85,8 +85,11 @@ describe("centerpiece mechanism contract", function()
         local names = nameSet(spec)
         requireAll(names, {
             "CamShaft",
-            "CamGear",
-            "DriverGear",
+            "BevelMainA",
+            "BevelJackA",
+            "BevelJackB",
+            "BevelCamB",
+            "JackShaftF1",
             "MainShaft",
             "VertShaft",
             "VertPaddle",
