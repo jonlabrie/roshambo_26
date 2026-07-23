@@ -81,7 +81,7 @@ local ArenaLayout = {
         -- cam sits well outboard so the hanger ropes clear its sweep).
         drawDowel = { from = { -1.5, 120.7, 13.2 }, to = { -5.6, 120.7, 13.2 } },
         -- KICK dowel: short east-flank peg that kicks the vertical-shaft paddle.
-        kickDowel = { from = { -1.5, 120.7, 6 }, to = { 0.75, 120.7, 6 } },
+        kickDowel = { from = { -1.5, 120.7, 6 }, to = { 0.58, 120.7, 6 } }, -- tip gate-shaved ~2in
     },
     -- Natural creek down the SW-ish drive line (replaced the kakehi flume).
     creek = {
