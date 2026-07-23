@@ -50,19 +50,19 @@ local chains = {
 -- (The cam now draws the log — the old wheel→log drive rope is gone.)
 local BACK = Vector3.new(0, 0, 1) -- draw direction = South (+Z)
 
--- Chain rail tops are FIXED; bottoms ride the log. World coords mirror
--- ArenaLayout.shuMoku (no yaw): chainTops y127, chainBottomsRest y118.6.
+-- Rope tops are FIXED on the tower spreaders; bottoms ride the log. World coords
+-- mirror ArenaLayout.shuMoku (no yaw): chainTops y132, chainBottomsRest y121.3.
 local chainTops = {
-    Vector3.new(2, 124.5, 7.5),
-    Vector3.new(2, 124.5, 11.5),
-    Vector3.new(-6, 124.5, 7.5),
-    Vector3.new(-6, 124.5, 11.5),
+    Vector3.new(2, 132, 7.5),
+    Vector3.new(2, 132, 11.5),
+    Vector3.new(-6, 132, 7.5),
+    Vector3.new(-6, 132, 11.5),
 }
 local chainBottomsRest = {
-    Vector3.new(-1.2, 118.6, 7.5),
-    Vector3.new(-1.2, 118.6, 11.5),
-    Vector3.new(-2.8, 118.6, 7.5),
-    Vector3.new(-2.8, 118.6, 11.5),
+    Vector3.new(-1.2, 121.3, 7.5),
+    Vector3.new(-1.2, 121.3, 11.5),
+    Vector3.new(-2.8, 121.3, 7.5),
+    Vector3.new(-2.8, 121.3, 11.5),
 }
 
 -- The dowels are rigid to the log (the cam catches the draw dowel; the swing kicks the
@@ -71,6 +71,13 @@ local chainBottomsRest = {
 local dowels = {
     rig:WaitForChild("ShuMokuDrawDowel") :: BasePart,
     rig:WaitForChild("ShuMokuDowel") :: BasePart,
+    -- full-dress fittings (2026-07-23): rigid to the log exactly like the dowels
+    rig:WaitForChild("ShuMokuD_Nose") :: BasePart,
+    rig:WaitForChild("ShuMokuD_Band1") :: BasePart,
+    rig:WaitForChild("ShuMokuD_Band2") :: BasePart,
+    rig:WaitForChild("ShuMokuD_Whip1") :: BasePart,
+    rig:WaitForChild("ShuMokuD_Whip2") :: BasePart,
+    rig:WaitForChild("ShuMokuD_TailRing") :: BasePart,
 }
 local dowelRest = {}
 for i, d in dowels do
@@ -148,7 +155,7 @@ local function updateSuspension()
         local botW = delta * chainBottomsRest[i]
         local cf, len = segCF(chainTops[i], botW)
         chain.CFrame = cf
-        chain.Size = Vector3.new(len, 0.25, 0.25)
+        chain.Size = Vector3.new(len, 0.35, 0.35) -- hemp-rope cross-section (matches the builder)
     end
     for i, d in dowels do
         d.CFrame = delta * dowelRest[i]
