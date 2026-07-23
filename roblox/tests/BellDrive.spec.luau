@@ -34,7 +34,8 @@ describe("BellDrive drive train (face-cog wheels + lantern pinion)", function()
                 "JackLanternFlange2",
                 "CamShaft",
                 "CamShaftF1",
-                "JackFramePost",
+                "JackHangerArm",
+                "BearingPost5",
                 "VertShaft",
                 "VertPaddle",
             }
@@ -65,9 +66,18 @@ describe("BellDrive drive train (face-cog wheels + lantern pinion)", function()
         expect(d.lantern.yTop < d.camFaceWheel[2]).toBe(true) -- cage tops out below the cam axle
         expect(d.jack.yTop >= d.lantern.yTop + 0.5).toBe(true) -- arbor carries the cage
     end)
-    test("the kick paddle and pillow blocks are unchanged", function()
+    test("the kick paddle and pillow blocks hold their stations", function()
         expect(byName["VertPaddle"].properties.CFrame[2]).toBeCloseTo(120.7, 0.001)
         expect(byName["BearingSaddle4"].properties.CFrame[2]).toBeCloseTo(120.7, 0.001)
+        -- the corner pillow carries the cam shaft's gear end
+        expect(byName["BearingSaddle5"].properties.CFrame[2]).toBeCloseTo(120.7, 0.001)
+        expect(byName["BearingSaddle5"].properties.CFrame[1]).toBeCloseTo(-15, 0.001)
+    end)
+    test("the corner pillow clears the cage staves and the cam wheel's cog tips", function()
+        local p5 = d.bearings[5]
+        expect(math.abs(p5.z - d.lantern.z) >= d.lantern.staveRingR + 0.45 + 0.3).toBe(true)
+        -- cog tips (max jitter) stay east of the post's east face
+        expect(p5.x + 0.45 <= d.camFaceWheel[1] - 0.2 - 1.26 / 2 - 0.05).toBe(true)
     end)
 end)
 

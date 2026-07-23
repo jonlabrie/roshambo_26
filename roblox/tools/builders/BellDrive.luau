@@ -195,23 +195,14 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             })
         )
     end
-    -- Corner frame: a post clear of the stave sweep, an arm over the cage, a band
-    -- on the arbor's top stub (the lantern HANGS from the frame, mill-style).
+    -- The lantern HANGS from a short arm off the corner pillow post (bearings[5],
+    -- which also carries the cam shaft's gear-end bearing on top — one member,
+    -- two jobs). Iron band clamps the arbor's top stub under the arm.
     table.insert(
         children,
-        Spec.part("JackFramePost", {
-            Size = { 0.9, 9.0, 0.9 },
-            CFrame = Spec.cframe({ -16.6, 116.0, jk.z }),
-            Color = palette.cypressWeathered,
-            Material = "Wood",
-            MaterialVariant = "CypressWeathered",
-        })
-    )
-    table.insert(
-        children,
-        Spec.part("JackFrameArm", {
-            Size = { 2.1, 0.5, 0.9 },
-            CFrame = Spec.cframe({ -15.75, 120.55, jk.z }),
+        Spec.part("JackHangerArm", {
+            Size = { 0.7, 0.5, 1.6 },
+            CFrame = Spec.cframe({ jk.x, 119.6, 10.0 }),
             Color = palette.cypressWeathered,
             Material = "Wood",
             MaterialVariant = "CypressWeathered",
@@ -222,7 +213,7 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
         Spec.part("JackBand1", {
             Size = { 0.4, 1.2, 1.2 },
             Shape = "Cylinder",
-            CFrame = Spec.cframe({ jk.x, 119.9, jk.z }, Spec.ROT.CYL_VERTICAL),
+            CFrame = Spec.cframe({ jk.x, 119.3, jk.z }, Spec.ROT.CYL_VERTICAL),
             Color = iron,
             Material = "Metal",
             MaterialVariant = "IronDark",
