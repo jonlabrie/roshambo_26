@@ -138,7 +138,7 @@ describe("ArenaLayout bell engine", function()
         expect(d.camShaft.z > 5.5).toBe(true) -- South of the bell (z-span ±5), clear of it
         expect(d.camShaft.y).toBeCloseTo(L.shuMoku.restPos[2], 0.001) -- cam axle at the dowel height
         expect(d.jack.yBottom > d.shaftFrom[2]).toBe(true) -- arbor starts ABOVE the main shaft
-        expect(d.jack.yTop > d.camShaft.y).toBe(true) -- and carries the cage past the cam wheel's mesh
+        expect(d.jack.yTop >= d.lantern.yTop + 0.5).toBe(true) -- and carries the short cage
         expect(d.camFaceWheelCogs / d.faceWheelMainCogs).toBeCloseTo(2, 0.001) -- the reduction, in cogs
     end)
     test("kick shaft carries the paddle at the shu-moku swing level (decoupled from the drum)", function()

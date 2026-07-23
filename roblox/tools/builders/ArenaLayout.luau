@@ -180,15 +180,17 @@ local ArenaLayout = {
     bellDrive = {
         -- MAIN SHAFT: along Z (N–S) from the wheel, ending at the SW jack corner.
         shaftFrom = { -15, 116, -19 }, -- = wheel centre (nudged South toward the bank)
-        shaftTo = { -15, 116, 11 },
+        shaftTo = { -15, 116, 9.0 }, -- ends just past the main face wheel (north of the cage)
         shaftR = 0.6,
         -- Vertical LANTERN ARBOR (the "single vertical gear"): OFF the cam shaft's
         -- z=11 line and STARTING ABOVE the main shaft — the old jack intersected both.
-        jack = { x = -15, z = 9.3, yBottom = 117.0, yTop = 124.9 },
-        -- Water-mill gearing (reference photo): two face-cog wheels comb one lantern.
+        jack = { x = -15, z = 9.3, yBottom = 117.0, yTop = 120.3 },
+        -- Water-mill gearing (reference photo): two face-cog wheels comb one SHORT
+        -- lantern (gate: the tall cage caught the cam wheel's upper quadrant too —
+        -- the compact cage takes the cam wheel's LOWER arc, y≈117.9-119.2, only).
         -- lantern rate = main × cogsMain/staves; cam = lantern × staves/cogsCam →
         -- cam/main = 12/24 (staves cancel) = HammerController REDUCTION = 2.
-        faceWheelMain = { -15, 116, 10.65 }, -- disc plane clear of the stave sweep (z ≤ 10.34)
+        faceWheelMain = { -15, 116, 7.95 }, -- NORTH of the cage (gate: south read backwards); disc clear of the stave sweep
         faceWheelMainR = 1.6,
         faceWheelMainCogs = 12,
         camFaceWheel = { -13.65, 120.7, 11 }, -- disc plane clear of the stave sweep (x ≥ -13.96)
@@ -201,7 +203,7 @@ local ArenaLayout = {
             staveRingR = 0.9,
             flangeR = 1.15,
             yBottom = 117.2,
-            yTop = 124.2,
+            yTop = 119.4,
         },
         -- E-W CAM SHAFT at dowel height (octagonal; spun with the cam via ^Cam names).
         -- Pokes a stub THROUGH the cam (a flush end would be face-coplanar with the

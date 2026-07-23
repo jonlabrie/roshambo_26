@@ -91,19 +91,21 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             local u, v = math.cos(a) * ringR, math.sin(a) * ringR
             local len = 1.2 + cogJig(0.06)
             local bias = towards * (len / 2 - 0.4) -- protrude ~0.6 toward the cage, tail ~0.2 behind
-            local off, size
+            local off
             if axis == "Z" then
                 off = { u, v, bias }
-                size = { 0.35, 0.35, len }
             else -- "X"
                 off = { bias, u, v }
-                size = { len, 0.35, 0.35 }
             end
             table.insert(
                 children,
                 Spec.part(`{name}_C{k}`, {
-                    Size = size,
-                    CFrame = Spec.cframe({ pos[1] + off[1], pos[2] + off[2], pos[3] + off[3] }),
+                    Size = { len, 0.35, 0.35 },
+                    Shape = "Cylinder", -- ROUND pegs (gate: squared cogs read wrong)
+                    CFrame = Spec.cframe(
+                        { pos[1] + off[1], pos[2] + off[2], pos[3] + off[3] },
+                        AXIS_ROT[axis]
+                    ),
                     Color = palette.cypressWeathered,
                     Material = "Wood",
                     MaterialVariant = "CypressWeathered",
@@ -111,7 +113,7 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             )
         end
     end
-    faceCogWheel("FaceWheelMain", d.faceWheelMain, d.faceWheelMainR, d.faceWheelMainCogs, "Z", -1)
+    faceCogWheel("FaceWheelMain", d.faceWheelMain, d.faceWheelMainR, d.faceWheelMainCogs, "Z", 1)
     faceCogWheel("CamFaceWheel", d.camFaceWheel, d.camFaceWheelR, d.camFaceWheelCogs, "X", -1)
     -- CamFaceWheel dressing: three through-spokes proud of the west face + iron hub
     for s = 1, 3 do
@@ -198,8 +200,8 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
     table.insert(
         children,
         Spec.part("JackFramePost", {
-            Size = { 0.9, 13.9, 0.9 },
-            CFrame = Spec.cframe({ -16.6, 118.45, jk.z }),
+            Size = { 0.9, 9.0, 0.9 },
+            CFrame = Spec.cframe({ -16.6, 116.0, jk.z }),
             Color = palette.cypressWeathered,
             Material = "Wood",
             MaterialVariant = "CypressWeathered",
@@ -209,7 +211,7 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
         children,
         Spec.part("JackFrameArm", {
             Size = { 2.1, 0.5, 0.9 },
-            CFrame = Spec.cframe({ -15.75, 125.05, jk.z }),
+            CFrame = Spec.cframe({ -15.75, 120.55, jk.z }),
             Color = palette.cypressWeathered,
             Material = "Wood",
             MaterialVariant = "CypressWeathered",
@@ -220,7 +222,7 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
         Spec.part("JackBand1", {
             Size = { 0.4, 1.2, 1.2 },
             Shape = "Cylinder",
-            CFrame = Spec.cframe({ jk.x, 124.65, jk.z }, Spec.ROT.CYL_VERTICAL),
+            CFrame = Spec.cframe({ jk.x, 119.9, jk.z }, Spec.ROT.CYL_VERTICAL),
             Color = iron,
             Material = "Metal",
             MaterialVariant = "IronDark",
