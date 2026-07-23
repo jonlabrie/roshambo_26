@@ -35,6 +35,8 @@ describe("BellDrive drive train (face-cog wheels + lantern pinion)", function()
                 "CamShaft",
                 "CamShaftF1",
                 "JackHangerArm",
+                "JackFootArm",
+                "JackStep",
                 "BearingPost5",
                 "VertShaft",
                 "VertPaddle",
@@ -79,8 +81,8 @@ describe("BellDrive drive train (face-cog wheels + lantern pinion)", function()
         local p5 = d.bearings[5]
         -- post sits WEST of the cage on the shaft line: X clearance to the stave sweep
         expect(d.lantern.x - (d.lantern.staveRingR + 0.14) >= p5.x + 0.45 + 0.2).toBe(true)
-        -- cog tips (max jitter) stay east of the post's east face
-        expect(p5.x + 0.45 <= d.camFaceWheel[1] - 0.2 - 1.26 / 2 - 0.05).toBe(true)
+        -- cog tips (max jitter, len ~1.06) stay east of the post's east face
+        expect(p5.x + 0.45 <= d.camFaceWheel[1] - 0.13 - 1.06 / 2 - 0.05).toBe(true)
     end)
 end)
 

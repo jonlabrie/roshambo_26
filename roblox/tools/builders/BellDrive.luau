@@ -89,7 +89,7 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             local a = (k - 1) * 2 * math.pi / nCogs
             local ringR = r - 0.25
             local u, v = math.cos(a) * ringR, math.sin(a) * ringR
-            local len = 1.2 + cogJig(0.06)
+            local len = 1.0 + cogJig(0.06) -- gate-shaved ~2in: protrude 0.4, tails still 0.2 proud
             local bias = towards * (len / 2 - 0.4) -- protrude ~0.6 toward the cage, tail ~0.2 behind
             local off
             if axis == "Z" then
@@ -214,6 +214,29 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             Size = { 0.4, 1.2, 1.2 },
             Shape = "Cylinder",
             CFrame = Spec.cframe({ jk.x, 118.9, jk.z }, Spec.ROT.CYL_VERTICAL),
+            Color = iron,
+            Material = "Metal",
+            MaterialVariant = "IronDark",
+        })
+    )
+    -- Lower support (gate): a foot arm off the pillow post under the cage, carrying
+    -- an iron STEP cup the arbor bottom rides in — the lantern's bottom bearing.
+    table.insert(
+        children,
+        Spec.part("JackFootArm", {
+            Size = { 2.55, 0.5, 0.7 },
+            CFrame = Spec.cframe({ -15.875, 115.725, jk.z }),
+            Color = palette.cypressWeathered,
+            Material = "Wood",
+            MaterialVariant = "CypressWeathered",
+        })
+    )
+    table.insert(
+        children,
+        Spec.part("JackStep", {
+            Size = { 0.55, 0.9, 0.9 },
+            Shape = "Cylinder",
+            CFrame = Spec.cframe({ jk.x, 116.0, jk.z }, Spec.ROT.CYL_VERTICAL),
             Color = iron,
             Material = "Metal",
             MaterialVariant = "IronDark",
