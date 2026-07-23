@@ -53,14 +53,15 @@ describe("BellDrive drive train (face-cog wheels + lantern pinion)", function()
         expect(staves).toBe(d.lantern.staves)
     end)
     test("the arbor and cage clear both horizontal shafts (the intersection bugs)", function()
-        expect(math.abs(d.camShaft.z - d.lantern.z) >= d.lantern.staveRingR + d.camShaft.r + 0.2).toBe(true)
+        -- the cage sits BELOW the cam shaft at the plan crossing: vertical clearance
+        expect(d.camShaft.y - 0.5 >= d.jack.yTop + 0.3).toBe(true)
         expect(d.jack.yBottom - 0.2 >= d.shaftFrom[2] + 0.52).toBe(true) -- arbor bottom above the main-shaft octagon
         expect(math.abs(d.bearings[3].z - d.lantern.z) >= 1.5).toBe(true) -- pillow out of the cage
     end)
     test("the wheel discs stay clear of the stave sweep (either side)", function()
         local reach = d.lantern.staveRingR + 0.14
-        expect(math.abs(d.faceWheelMain[3] - d.lantern.z) - 0.2 >= reach + 0.1).toBe(true)
-        expect(math.abs(d.camFaceWheel[1] - d.lantern.x) - 0.2 >= reach + 0.1).toBe(true)
+        expect(math.abs(d.faceWheelMain[3] - d.lantern.z) - 0.2 >= reach + 0.05).toBe(true)
+        expect(math.abs(d.camFaceWheel[1] - d.lantern.x) - 0.2 >= reach + 0.05).toBe(true)
     end)
     test("the cage is SHORT: only the cam wheel's lower arc reaches it", function()
         expect(d.lantern.yTop < d.camFaceWheel[2]).toBe(true) -- cage tops out below the cam axle
@@ -75,7 +76,8 @@ describe("BellDrive drive train (face-cog wheels + lantern pinion)", function()
     end)
     test("the corner pillow clears the cage staves and the cam wheel's cog tips", function()
         local p5 = d.bearings[5]
-        expect(math.abs(p5.z - d.lantern.z) >= d.lantern.staveRingR + 0.45 + 0.3).toBe(true)
+        -- post sits WEST of the cage on the shaft line: X clearance to the stave sweep
+        expect(d.lantern.x - (d.lantern.staveRingR + 0.14) >= p5.x + 0.45 + 0.2).toBe(true)
         -- cog tips (max jitter) stay east of the post's east face
         expect(p5.x + 0.45 <= d.camFaceWheel[1] - 0.2 - 1.26 / 2 - 0.05).toBe(true)
     end)

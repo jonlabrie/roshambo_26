@@ -201,8 +201,8 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
     table.insert(
         children,
         Spec.part("JackHangerArm", {
-            Size = { 0.7, 0.5, 1.6 },
-            CFrame = Spec.cframe({ jk.x, 119.6, 10.0 }),
+            Size = { 2.55, 0.5, 0.7 }, -- runs EAST along the cam-shaft line, pillow post → arbor
+            CFrame = Spec.cframe({ -15.875, 119.6, jk.z }),
             Color = palette.cypressWeathered,
             Material = "Wood",
             MaterialVariant = "CypressWeathered",
