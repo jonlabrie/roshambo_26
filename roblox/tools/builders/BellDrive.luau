@@ -382,7 +382,7 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
                 CFrame = Spec.cframe({ b.x, (pierTop + b.baseY) / 2, b.z }),
                 Color = palette.cypressWeathered,
                 Material = "Wood",
-                MaterialVariant = "CypressWeathered",
+                MaterialVariant = "CypressVertical", -- rotated maps: grain runs UP flat vertical posts
             })
         )
         table.insert(
