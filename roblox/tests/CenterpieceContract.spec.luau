@@ -49,6 +49,9 @@ describe("centerpiece mechanism contract", function()
             "Chain2",
             "Chain3",
             "Chain4",
+            "HangerBeam",
+            "Spreader1",
+            "Spreader2",
         })
     end)
     test("ThrowDrum keeps the hub and 12 facets (no spokes)", function()

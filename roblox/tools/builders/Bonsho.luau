@@ -97,62 +97,54 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
             Material = "Wood",
         })
     )
-    -- Gantry: two side rails (along the yaw-rotated Z axis at ±railX, y = railY) on four
-    -- posts. railX/railZ are half-widths about the shu-moku's CENTRELINE (cx), so the
-    -- gantry straddles the log instead of the world origin.
+    -- Tower-hung suspension: a cypress hanger beam spans the two +Z pavilion posts,
+    -- two spreader arms bridge the chain planes (post plane z=+9 sits between them),
+    -- and iron eyes take the four hemp-rope drops. The freestanding gantry is gone.
     local sm = L.shuMoku
-    local cx = sm.restPos[1] -- shu-moku centreline X (gantry + chains centre here)
     local yaw = sm.yaw
-    local railLen = sm.railZ[2] - sm.railZ[1] + 1
-    local railMidZ = (sm.railZ[1] + sm.railZ[2]) / 2
-    local railRot = Spec.matMul(Spec.rotYMat(yaw), Spec.ROT.IDENTITY)
-    local y2 = L.clearing.floorY -- gantry posts rise from the clearing floor
-    for i, rx in { sm.railX, -sm.railX } do
-        local p = Spec.rotY({ cx + rx, sm.railY, railMidZ }, yaw)
+    local px = L.pavilion.postSpacing / 2
+    local hemp = { 0.76, 0.66, 0.47 }
+    local beamP = Spec.rotY({ L.pavilion.pos[1], sm.hangerY, L.pavilion.pos[3] + px }, yaw)
+    table.insert(
+        children,
+        Spec.part("HangerBeam", {
+            Size = { 2 * px + 2.4, 1.2, 1.4 },
+            CFrame = Spec.cframe(beamP, Spec.rotYMat(yaw)),
+            Color = palette.cypressWeathered,
+            Material = "Wood",
+            MaterialVariant = "CypressWeathered",
+        })
+    )
+    local spreadZ = (sm.chainTops[1][3] + sm.chainTops[2][3]) / 2 -- chain-plane midpoint
+    local spreadLen = sm.chainTops[2][3] - sm.chainTops[1][3] + 2 -- spans both planes + overhang
+    for i, sx in { sm.chainTops[1][1], sm.chainTops[3][1] } do
+        local p = Spec.rotY({ sx, sm.hangerY - 1.1, spreadZ }, yaw)
         table.insert(
             children,
-            Spec.part(`Rail{i}`, {
-                Size = { 0.8, 0.8, railLen },
-                CFrame = Spec.cframe(p, railRot),
-                Color = palette.timber,
+            Spec.part(`Spreader{i}`, {
+                Size = { 1.0, 1.0, spreadLen },
+                CFrame = Spec.cframe(p, Spec.rotYMat(yaw)),
+                Color = palette.cypressWeathered,
                 Material = "Wood",
+                MaterialVariant = "CypressWeathered",
             })
         )
     end
-    local postSpots = {
-        { cx + sm.railX, sm.railZ[1] },
-        { cx - sm.railX, sm.railZ[1] },
-        { cx + sm.railX, sm.railZ[2] },
-        { cx - sm.railX, sm.railZ[2] },
-    }
-    for i, spot in postSpots do
-        local p = Spec.rotY({ spot[1], (sm.railY + y2) / 2, spot[2] }, yaw)
+    for i = 1, 4 do
+        local e = Spec.rotY({ sm.chainTops[i][1], sm.chainTops[i][2] - 0.35, sm.chainTops[i][3] }, yaw)
         table.insert(
             children,
-            Spec.part(`GantryPost{i}`, {
-                Size = { 0.8, sm.railY - y2, 0.8 },
-                CFrame = Spec.cframe(p),
-                Color = palette.timber,
-                Material = "Wood",
+            Spec.part(`RopeEye{i}`, {
+                Size = { 0.5, 0.55, 0.55 },
+                Shape = "Cylinder",
+                CFrame = Spec.cframe(e),
+                Color = palette.ink,
+                Material = "Metal",
+                MaterialVariant = "IronDark",
             })
         )
     end
-    -- Cross-braces (along X) tying the two rails together at the top of each post pair,
-    -- so the gantry reads as a rigid frame.
-    -- selene: allow(shadowing)
-    for i, bz in { sm.railZ[1], sm.railZ[2] } do
-        local p = Spec.rotY({ cx, sm.railY, bz }, yaw)
-        table.insert(
-            children,
-            Spec.part(`GantryBrace{i}`, {
-                Size = { 2 * sm.railX, 0.8, 0.8 },
-                CFrame = Spec.cframe(p, railRot),
-                Color = palette.timber,
-                Material = "Wood",
-            })
-        )
-    end
-    -- 4 angled chains: fixed rail tops down to the log's rest attach points (rotated).
+    -- 4 hemp-rope hangers: fixed spreader eyes down to the log's rest attach points.
     for i = 1, 4 do
         local top = Spec.rotY(sm.chainTops[i], yaw)
         local bot = Spec.rotY(sm.chainBottomsRest[i], yaw)
@@ -160,14 +152,50 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
         table.insert(
             children,
             Spec.part(`Chain{i}`, {
-                Size = { len, 0.25, 0.25 },
+                Size = { len, 0.35, 0.35 },
                 Shape = "Cylinder",
                 CFrame = Spec.cframe(pos, rot),
-                Color = { 0.25, 0.25, 0.28 },
-                Material = "Metal",
+                Color = hemp,
+                Material = "Fabric",
+                MaterialVariant = "HempRope",
             })
         )
     end
+    -- Full-dress fittings, rigid to the log (HammerController re-applies the log's
+    -- delta each frame): domed bronze nose at the striking (-Z) end, iron bands,
+    -- hemp whipping at the rope stations, iron tail ring where the draw leads off.
+    local cx2, cy2 = sm.restPos[1], sm.restPos[2]
+    local function logRing(name: string, z: number, od: number, w: number, variant: string, color: { number })
+        local p = Spec.rotY({ cx2, cy2, z }, yaw)
+        table.insert(
+            children,
+            Spec.part(name, {
+                Size = { w, od, od },
+                Shape = "Cylinder",
+                CFrame = Spec.cframe(p, logRot),
+                Color = color,
+                Material = if variant == "HempRope" then "Fabric" else "Metal",
+                MaterialVariant = variant,
+            })
+        )
+    end
+    local noseP = Spec.rotY({ cx2, cy2, sm.restPos[3] - sm.length / 2 + 0.15 }, yaw)
+    table.insert(
+        children,
+        Spec.part("ShuMokuD_Nose", {
+            Size = { 1.7, 1.7, 1.7 },
+            Shape = "Ball",
+            CFrame = Spec.cframe(noseP),
+            Color = palette.bronzePatina,
+            Material = "Metal",
+            MaterialVariant = "BronzePatina",
+        })
+    )
+    logRing("ShuMokuD_Band1", sm.restPos[3] - 0.6, 1.75, 0.35, "IronDark", palette.ink)
+    logRing("ShuMokuD_Band2", sm.restPos[3] + 1.4, 1.75, 0.35, "IronDark", palette.ink)
+    logRing("ShuMokuD_Whip1", sm.chainBottomsRest[1][3], 1.8, 0.6, "HempRope", hemp)
+    logRing("ShuMokuD_Whip2", sm.chainBottomsRest[2][3], 1.8, 0.6, "HempRope", hemp)
+    logRing("ShuMokuD_TailRing", sm.restPos[3] + sm.length / 2 - 0.15, 1.95, 0.3, "IronDark", palette.ink)
     return Spec.model("BonshoRig", children)
 end
 

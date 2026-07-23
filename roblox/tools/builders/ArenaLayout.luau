@@ -54,33 +54,29 @@ local ArenaLayout = {
     -- the BellBeam rests atop the ring beams and the bell clears the deck better; the
     -- shu-moku striker (y118) realignment to this height is the deferred drive-chain pass.
     bell = { pos = { -2, 123.7, 0 }, height = 13.5, radius = 5.1 },
-    -- shu-moku striker, re-staged on the clearing axis (yaw 0; draws toward +Z, swings
-    -- into the bell's +Z face). Y values lifted to the clearing floor (~112+).
+    -- shu-moku striker, tower-hung (2026-07-23): strikes the tsuki-za boss at y120.7
+    -- (bell raised +2.7 in T5; the old y118 hit ~1 stud above the mouth rim). Ropes
+    -- drop from spreader arms on a hanger beam spanning the two +Z pavilion posts
+    -- (z=+9 sits between the chain planes 7.5/11.5). The cam/draw realignment to this
+    -- height is the NEXT task; the dowels simply rise with the log.
     shuMoku = {
-        restPos = { -2, 118, 9 },
+        restPos = { -2, 120.7, 9 },
         length = 7,
         radius = 0.8,
         drawStuds = 6,
         yaw = 0,
-        railX = 4, -- wider arm spacing so the dowels clear the gantry legs through the swing (was 3)
-        railY = 124.5, -- gantry post height (raised 20% from 122.5 so the chains hang cleaner); top frame braced
-        railZ = { 6, 13 }, -- shortened to the shu-moku's actual cam-driven draw (was {5,20})
-        -- chain attach points, centred on the shu-moku centreline (x=-2): rail tops at
-        -- x=-2±4 = {2,-6} (match railX), y=railY; log attach points at x=-2±0.8 = {-1.2,-2.8}.
-        chainTops = { { 2, 124.5, 7.5 }, { 2, 124.5, 11.5 }, { -6, 124.5, 7.5 }, { -6, 124.5, 11.5 } },
+        hangerY = 132, -- hanger-beam centreline, just under the ring beams (~134)
+        chainTops = { { 2, 132, 7.5 }, { 2, 132, 11.5 }, { -6, 132, 7.5 }, { -6, 132, 11.5 } },
         chainBottomsRest = {
-            { -1.2, 118.6, 7.5 },
-            { -1.2, 118.6, 11.5 },
-            { -2.8, 118.6, 7.5 },
-            { -2.8, 118.6, 11.5 },
+            { -1.2, 121.3, 7.5 },
+            { -1.2, 121.3, 11.5 },
+            { -2.8, 121.3, 7.5 },
+            { -2.8, 121.3, 11.5 },
         },
-        ropeBottomRest = { -2, 118, 13 },
-        -- DRAW dowel: a SHORT horizontal peg out the log's tail (z≈11) reaching West to
-        -- the BellDrive cam (x=-4); short enough to clear the west gantry leg (x=-6).
-        drawDowel = { from = { -1.5, 118, 11 }, to = { -4, 118, 11 } },
-        -- KICK dowel: a SHORT east-flank peg (to x=1) that kicks the vertical-shaft
-        -- paddle; short enough to clear the east gantry leg (x=2).
-        kickDowel = { from = { -1.5, 118, 6 }, to = { 0.75, 118, 6 } }, -- tip pulled back to clear the vertical drive shaft (x=1)
+        -- DRAW dowel: short peg out the log's tail reaching West to the BellDrive cam.
+        drawDowel = { from = { -1.5, 120.7, 11 }, to = { -4, 120.7, 11 } },
+        -- KICK dowel: short east-flank peg that kicks the vertical-shaft paddle.
+        kickDowel = { from = { -1.5, 120.7, 6 }, to = { 0.75, 120.7, 6 } },
     },
     -- Natural creek down the SW-ish drive line (replaced the kakehi flume).
     creek = {

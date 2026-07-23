@@ -52,23 +52,54 @@ describe("Bonsho builder", function()
     end)
 end)
 
-describe("Bonsho dowel + gantry", function()
-    test("emits a ShuMokuDowel peg", function()
-        local spec = Bonsho.build(ZenDojo.palette, L)
-        local found = false
-        for _, c in spec.children :: any do
-            if c.name == "ShuMokuDowel" then
-                found = true
-            end
-        end
-        expect(found).toBe(true)
+describe("Shu-moku striker assembly (tower-hung, boss-height)", function()
+    local STRIKE_Y = 120.7 -- tsuki-za LotusBoss centre, measured in place
+    local spec = Bonsho.build(ZenDojo.palette, L)
+    local byName = {}
+    for _, c in spec.children :: any do
+        byName[c.name] = c
+    end
+    test("the log rests at the boss strike height and the dowels ride with it", function()
+        expect(math.abs(byName["ShuMoku"].properties.CFrame[2] - STRIKE_Y) <= 0.1).toBe(true)
+        expect(math.abs(byName["ShuMokuDrawDowel"].properties.CFrame[2] - STRIKE_Y) <= 0.1).toBe(true)
+        expect(math.abs(byName["ShuMokuDowel"].properties.CFrame[2] - STRIKE_Y) <= 0.1).toBe(true)
     end)
-    test("gantry rail is no longer than the shu-moku draw needs (<= 9 studs)", function()
-        local spec = Bonsho.build(ZenDojo.palette, L)
+    test("the freestanding gantry is gone; the tower suspension exists", function()
         for _, c in spec.children :: any do
-            if c.name:match("^Rail%d$") then
-                expect(c.properties.Size[3] <= 9).toBe(true)
-            end
+            expect(c.name:match("^Rail%d$")).toBeNil()
+            expect(c.name:match("^GantryPost")).toBeNil()
+            expect(c.name:match("^GantryBrace")).toBeNil()
+        end
+        expect(byName["HangerBeam"] ~= nil).toBe(true)
+        expect(byName["Spreader1"] ~= nil).toBe(true)
+        expect(byName["Spreader2"] ~= nil).toBe(true)
+        for i = 1, 4 do
+            expect(byName["RopeEye" .. i] ~= nil).toBe(true)
+        end
+        -- the hanger beam spans the two +Z pavilion posts, just under the ring beams
+        local hb = byName["HangerBeam"].properties
+        expect(hb.CFrame[2]).toBeCloseTo(L.shuMoku.hangerY, 0.001)
+        expect(hb.Size[1] >= L.pavilion.postSpacing).toBe(true)
+    end)
+    test("the four hangers are hemp ropes dropping from the spreaders to the log", function()
+        for i = 1, 4 do
+            local ch = byName["Chain" .. i].properties
+            expect(ch.Material).toBe("Fabric")
+            expect(ch.MaterialVariant).toBe("HempRope")
+            expect(ch.Size[2]).toBeCloseTo(0.35, 0.001)
+            expect(ch.Size[1] > 9).toBe(true) -- long tower drop, not the old 6-stud gantry chain
+        end
+    end)
+    test("the log is fully dressed: nose cap, bands, whipping, tail ring", function()
+        expect(byName["ShuMokuD_Nose"].properties.MaterialVariant).toBe("BronzePatina")
+        expect(byName["ShuMokuD_Band1"].properties.MaterialVariant).toBe("IronDark")
+        expect(byName["ShuMokuD_Band2"].properties.MaterialVariant).toBe("IronDark")
+        expect(byName["ShuMokuD_Whip1"].properties.MaterialVariant).toBe("HempRope")
+        expect(byName["ShuMokuD_Whip2"].properties.MaterialVariant).toBe("HempRope")
+        expect(byName["ShuMokuD_TailRing"].properties.MaterialVariant).toBe("IronDark")
+        -- dress rings sit on the log's centreline height
+        for _, n in { "ShuMokuD_Band1", "ShuMokuD_Whip1", "ShuMokuD_TailRing" } do
+            expect(math.abs(byName[n].properties.CFrame[2] - STRIKE_Y) <= 0.1).toBe(true)
         end
     end)
 end)
