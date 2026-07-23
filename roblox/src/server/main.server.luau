@@ -13,9 +13,20 @@ local LocalizationService = game:GetService("LocalizationService")
 local DAY_NIGHT_EPOCH = 1735689600 -- fixed absolute anchor (2025-01-01T00:00:00Z, synced Unix seconds)
 local dayNightConfig = Instance.new("Configuration")
 dayNightConfig.Name = "DayNightConfig"
-dayNightConfig:SetAttribute("CycleEpoch", DAY_NIGHT_EPOCH)
-dayNightConfig:SetAttribute("CycleLength", 600) -- seconds per full loop (10 min); the manual timing knob
-dayNightConfig:SetAttribute("PhaseOffset", 0) -- fraction, aligns the global clock; gate-tuned
+-- DEV KNOB: a "DayNightLockT" number attribute on Workspace (place-state, set in Edit,
+-- never in git) freezes the cycle at that t for every Play session — 0.19 = mid-day,
+-- 0.75 = deep night (phases run dawn 10 / day 18 / dusk 25 / night 47 %). Remove the
+-- attribute to restore the live cycle.
+local lockT = workspace:GetAttribute("DayNightLockT")
+if typeof(lockT) == "number" then
+    dayNightConfig:SetAttribute("CycleEpoch", workspace:GetServerTimeNow())
+    dayNightConfig:SetAttribute("CycleLength", 1e9)
+    dayNightConfig:SetAttribute("PhaseOffset", lockT)
+else
+    dayNightConfig:SetAttribute("CycleEpoch", DAY_NIGHT_EPOCH)
+    dayNightConfig:SetAttribute("CycleLength", 600) -- seconds per full loop (10 min); the manual timing knob
+    dayNightConfig:SetAttribute("PhaseOffset", 0) -- fraction, aligns the global clock; gate-tuned
+end
 dayNightConfig.Parent = ReplicatedStorage
 
 local NetworkClient = require(script.Parent:WaitForChild("NetworkClient"))
