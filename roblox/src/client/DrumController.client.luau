@@ -97,11 +97,8 @@ local function addKick(name: string, px: number, pz: number, sign: number)
         )
     end
 end
-addKick("VertShaft", 1, 6, -1)
-addKick("VertPaddle", 1, 6, -1)
-addKick("DriveGearA", 1, 6, -1)
-addKick("DriveGearB", -1.18, 7, 1)
-addKick("DrivePaddle", -1.18, 7, 1)
+addKick("VertShaft", 1, 6.25, -1) -- pivots MIRROR ArenaLayout.bellDrive.vertBase (x, z)
+addKick("VertPaddle", 1, 6.25, -1)
 local kickT0 = -1
 local kickBase = 0
 local function applyKick(angle: number)

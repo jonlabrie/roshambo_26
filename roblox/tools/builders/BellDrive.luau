@@ -313,61 +313,10 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             Material = "Wood",
         })
     )
-    -- (The old horizontal-drum bearing yoke + drum bearings were removed with the
-    -- mawari-dōrō redesign — the vertical lantern carries itself on its own corner posts,
-    -- so BellDrive no longer references L.throwDrum at all.)
-
-    -- DRUM DRIVE (pin-wheel): a flat gear caps the kick shaft (DriveGearA, spins about
-    -- Y) and meshes a flat 2-paddle gear (DriveGearB). On a kick the paddles sweep
-    -- horizontally and flick the drum's hanging south spoke (the controller animates it).
-    table.insert(
-        children,
-        Spec.part("DriveGearA", {
-            Size = { 0.5, d.driveGearAR * 2, d.driveGearAR * 2 },
-            Shape = "Cylinder",
-            CFrame = Spec.cframe(d.driveGearA, Spec.ROT.CYL_VERTICAL),
-            Color = iron,
-            Material = "Metal",
-        })
-    )
-    table.insert(
-        children,
-        Spec.part("DriveGearB", {
-            Size = { 0.5, d.driveGearBR * 2, d.driveGearBR * 2 },
-            Shape = "Cylinder",
-            CFrame = Spec.cframe(d.driveGearB, Spec.ROT.CYL_VERTICAL),
-            Color = iron,
-            Material = "Metal",
-        })
-    )
-    -- short stub axle UNDER gear B, down to the roof, so the gear has visible support
-    -- (gear A is carried by the kick shaft; B needs its own bearing).
-    table.insert(
-        children,
-        Spec.part("DriveGearBShaft", {
-            Size = { 3, 0.5, 0.5 }, -- vertical stub (CYL_VERTICAL); from the roof up to the gear
-            Shape = "Cylinder",
-            CFrame = Spec.cframe(
-                { d.driveGearB[1], d.driveGearB[2] - 1.5, d.driveGearB[3] },
-                Spec.ROT.CYL_VERTICAL
-            ),
-            Color = iron,
-            Material = "Metal",
-        })
-    )
-    -- A single paddle BEAM laid ON TOP of B (resting on the gear, so its two ends sweep
-    -- just clear above gear A). The ends are the paddles that flick the drum's hanging
-    -- south spoke as B turns. Length spans both rims + the reach.
-    local beamLen = (d.driveGearBR + d.paddleReach) * 2
-    table.insert(
-        children,
-        Spec.part("DrivePaddle", {
-            Size = { beamLen, 0.5, 0.5 }, -- along X, centred on B, seated on the gear top
-            CFrame = Spec.cframe({ d.driveGearB[1], d.driveGearB[2] + 0.5, d.driveGearB[3] }),
-            Color = timber,
-            Material = "Wood",
-        })
-    )
+    -- (The old pin-wheel gear cluster at the shaft top was REMOVED 2026-07-23:
+    -- the mawari-dōrō sits at the crown and the upper mechanism is hidden by the
+    -- roof, so the kick shaft now simply runs UP INTO the lantern's underside as
+    -- its spindle — the honest mawari-dōrō read; the gears were unearned clutter.)
     -- Pillow blocks (generalized): cypress post → square plate → static IronDark ring
     -- → wider spinning collar. axis "Z" collars spin with the main shaft (^MainShaft
     -- names); the axis "X" collar spins with the cam (^Cam name). Per-entry y/baseY.

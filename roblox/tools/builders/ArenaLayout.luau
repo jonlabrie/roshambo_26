@@ -222,25 +222,16 @@ local ArenaLayout = {
         camDropDeg = 12, -- the cliff (release face) width
         camDowelRise = 0.45, -- MIRRORS HammerController riseY = p²·0.45 (3-stud draw arc)
         camClearance = 0.5, -- MIRRORS the controller's CamMesh G.clearance
-        -- KICK shaft + paddle (drum kick), just East/South of the shu-moku, by the kick
-        -- dowel's tip (x=1, z=6) and clear of the bell (z>5.1) and posts. Capped UNDER
-        -- the roof — it no longer runs up through the drum (drum is centred elsewhere);
-        -- how it drives the centred drum is the next staging question.
-        vertBase = { 1, 112, 6 },
-        vertTop = { 1, 137.6, 6 }, -- reaches up into DriveGearA (y137.5) so the shaft meets the gear
+        -- KICK shaft + paddle (drum kick): the shaft is the mawari-dōrō's SPINDLE —
+        -- it runs from the ground straight up INTO the lantern's underside (the upper
+        -- run is hidden by the roof, so no gearing is modelled; the old pin-wheel gear
+        -- cluster was removed 2026-07-23). Shifted 0.25 South so the kick dowel isn't
+        -- coincident with the shaft at rest.
+        vertBase = { 1, 112, 6.25 },
+        vertTop = { 1, 141.6, 6.25 }, -- ~4 studs up into the lantern's base
         vertR = 0.23, -- slim drive rod (~1/3 the old diameter)
-        paddle = { 1, 120.7, 6 }, -- raised to the kick dowel's height (striker task output)
+        paddle = { 1, 120.7, 6.25 }, -- at the kick dowel's height
         paddleLen = 2.4, -- kicked by the shu-moku's east-flank dowel
-        -- Drum drive (pin-wheel): a flat gear caps the kick shaft (DriveGearA, spins
-        -- about Y); it meshes an EQUAL-radius flat gear (DriveGearB) — equal so A's
-        -- ½-turn = B's ½-turn. B carries two paddles sticking OUTWARD (horizontal, on its
-        -- E/W sides); a kick sweeps them across the drum's hanging south spoke → spin.
-        -- Starting coords — the mesh + paddle reach are tuned at the gate.
-        driveGearA = { 1, 137.5, 6 },
-        driveGearAR = 1.2,
-        driveGearB = { -1.18, 137.5, 7 }, -- 2.4 from A → 1:1 mesh at radius 1.2
-        driveGearBR = 1.2,
-        paddleReach = 1.6, -- horizontal paddle-arm length out past B's rim (±X)
         -- shaft bearings (trestle post + saddle): two on the main-shaft run (wheel→bevel),
         -- one at the bevel corner, one just behind the cam on the E-W shaft. {x, z} on
         -- the shaft line at shaft height; posts drop to bearingBaseY.
