@@ -189,7 +189,7 @@ function Waterwheel.build(palette: { [string]: { number } }, L: any)
                         Spec.matMul(rot, rotX(a + RAKE))
                     ),
                     Color = palette.paddleWet,
-                    Material = "Wood",
+                    Material = "WoodPlanks", -- MUST match MossyPaddle's BaseMaterial or the variant is inert
                     MaterialVariant = "MossyPaddle",
                 })
             )

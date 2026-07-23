@@ -68,6 +68,15 @@ local SPECS = {
         metal = "",
         rough = "rbxassetid://126607739624439",
     },
+    {
+        name = "HempRope", -- shu-moku hanger ropes + whipping collars
+        base = Enum.Material.Fabric,
+        tile = 1.0, -- tune at the live gate; world-space projection (rotate maps 90° like CypressVertical if the strands read sideways on the vertical drops)
+        color = "rbxassetid://96470016324117", -- ambientCG Rope001 (uploaded 2026-07-23)
+        normal = "rbxassetid://108776054419159", -- NormalGL
+        metal = "rbxassetid://103690182987939",
+        rough = "rbxassetid://140223765351870",
+    },
 }
 
 for _, s in SPECS do
