@@ -61,3 +61,48 @@ describe("BellDrive drive train (jack shaft + toothed bevels)", function()
         expect(byName["BearingPlate4"] ~= nil).toBe(true)
     end)
 end)
+
+describe("Hero snail cam (analytic flank)", function()
+    local CamProfile = require("../src/shared/CamProfile")
+    local spec = BellDrive.build(ZenDojo.palette, L)
+    local d = L.bellDrive
+    local G = {
+        gapZ = L.shuMoku.drawDowel.from[3] - d.cam[3],
+        draw = L.shuMoku.drawStuds,
+        rise = d.camDowelRise,
+        dowelR = 0.25,
+        dropDeg = d.camDropDeg,
+    }
+    test("flank planks reach the analytic lobe and no further", function()
+        local maxReach = 0
+        local edges = 0
+        for _, c in spec.children :: any do
+            if c.name:match("^CamEdge%d+$") then
+                edges += 1
+                local dy = c.properties.CFrame[2] - d.cam[2]
+                local dz = c.properties.CFrame[3] - d.cam[3]
+                local reach = math.sqrt(dy * dy + dz * dz) + c.properties.Size[1] / 2
+                if reach > maxReach then
+                    maxReach = reach
+                end
+            end
+        end
+        local lobe = select(1, CamProfile.contact(1, G))
+        expect(edges >= 30).toBe(true)
+        expect(math.abs(maxReach - lobe) <= 0.3).toBe(true)
+    end)
+    test("the lobe clears the clearing floor", function()
+        local lobe = select(1, CamProfile.contact(1, G))
+        expect(d.cam[2] - lobe >= 112 + 1.5).toBe(true)
+    end)
+    test("hub and cliff exist", function()
+        local found = { Cam = false, CamDrop = false }
+        for _, c in spec.children :: any do
+            if found[c.name] ~= nil then
+                found[c.name] = true
+            end
+        end
+        expect(found.Cam).toBe(true)
+        expect(found.CamDrop).toBe(true)
+    end)
+end)
