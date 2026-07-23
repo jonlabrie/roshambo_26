@@ -178,7 +178,7 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
                 Shape = "Cylinder",
                 CFrame = Spec.cframe(p, logRot),
                 Color = color,
-                Material = if variant == "HempRope" then "Fabric" else "Metal",
+                Material = if variant == "HempRope" or variant == "HempRopeFine" then "Fabric" else "Metal",
                 MaterialVariant = variant,
             })
         )
@@ -197,9 +197,17 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
     )
     logRing("ShuMokuD_Band1", sm.restPos[3] - 0.6, 1.75, 0.35, "IronDark", palette.ink)
     logRing("ShuMokuD_Band2", sm.restPos[3] + 1.4, 1.75, 0.35, "IronDark", palette.ink)
-    logRing("ShuMokuD_Whip1", sm.chainBottomsRest[1][3], 1.8, 0.6, "HempRope", hemp)
-    logRing("ShuMokuD_Whip2", sm.chainBottomsRest[2][3], 1.8, 0.6, "HempRope", hemp)
-    logRing("ShuMokuD_TailRing", sm.restPos[3] + sm.length / 2 - 0.15, 1.95, 0.3, "IronDark", palette.ink)
+    -- whipping = WOUND CORD: three thin stacked rings with visible gaps per station
+    -- (geometry sells the wrap; one fat textured collar reads flat). HempRopeFine is
+    -- the same Rope001 maps at a small StudsPerTile so the weave suits little parts.
+    for wi, wz in { sm.chainBottomsRest[1][3], sm.chainBottomsRest[2][3] } do
+        logRing(`ShuMokuD_Whip{wi}`, wz, 1.8, 0.2, "HempRopeFine", hemp)
+        logRing(`ShuMokuD_Whip{wi}b`, wz - 0.22, 1.78, 0.2, "HempRopeFine", hemp)
+        logRing(`ShuMokuD_Whip{wi}c`, wz + 0.22, 1.76, 0.2, "HempRopeFine", hemp)
+    end
+    -- tail ring overhangs the log butt by 0.1 (a ferrule cap): the butt plane sits
+    -- INSIDE the solid ring, so no coincident faces to z-fight
+    logRing("ShuMokuD_TailRing", sm.restPos[3] + sm.length / 2 - 0.05, 1.95, 0.3, "IronDark", palette.ink)
     return Spec.model("BonshoRig", children)
 end
 

@@ -94,8 +94,9 @@ describe("Shu-moku striker assembly (tower-hung, boss-height)", function()
         expect(byName["ShuMokuD_Nose"].properties.MaterialVariant).toBe("BronzePatina")
         expect(byName["ShuMokuD_Band1"].properties.MaterialVariant).toBe("IronDark")
         expect(byName["ShuMokuD_Band2"].properties.MaterialVariant).toBe("IronDark")
-        expect(byName["ShuMokuD_Whip1"].properties.MaterialVariant).toBe("HempRope")
-        expect(byName["ShuMokuD_Whip2"].properties.MaterialVariant).toBe("HempRope")
+        for _, wn in { "Whip1", "Whip1b", "Whip1c", "Whip2", "Whip2b", "Whip2c" } do
+            expect(byName["ShuMokuD_" .. wn].properties.MaterialVariant).toBe("HempRopeFine")
+        end
         expect(byName["ShuMokuD_TailRing"].properties.MaterialVariant).toBe("IronDark")
         -- dress rings sit on the log's centreline height
         for _, n in { "ShuMokuD_Band1", "ShuMokuD_Whip1", "ShuMokuD_TailRing" } do

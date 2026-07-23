@@ -76,7 +76,11 @@ local dowels = {
     rig:WaitForChild("ShuMokuD_Band1") :: BasePart,
     rig:WaitForChild("ShuMokuD_Band2") :: BasePart,
     rig:WaitForChild("ShuMokuD_Whip1") :: BasePart,
+    rig:WaitForChild("ShuMokuD_Whip1b") :: BasePart,
+    rig:WaitForChild("ShuMokuD_Whip1c") :: BasePart,
     rig:WaitForChild("ShuMokuD_Whip2") :: BasePart,
+    rig:WaitForChild("ShuMokuD_Whip2b") :: BasePart,
+    rig:WaitForChild("ShuMokuD_Whip2c") :: BasePart,
     rig:WaitForChild("ShuMokuD_TailRing") :: BasePart,
 }
 local dowelRest = {}
