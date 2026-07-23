@@ -31,15 +31,20 @@ spins at `LANTERN_RATIO = 12/9` × the driver rate.
 
 | Thing | Value |
 |---|---|
-| Lantern arbor (jack) | `x=-15, z=9.3`, arbor y 116 → **124.9** (octagonal JackShaftF, as today) |
-| Lantern flanges | r 1.15 × 0.35 discs at y **116.6** and **124.2** |
-| Staves | **9** dowels, Size `{7.25, 0.28, 0.28}` vertical, ring radius **0.9**, centred y 120.4 |
-| FaceWheelMain | on the main shaft, disc r **1.6** × 0.4, plane z **10.35**; **12** cogs |
-| Main cogs | Size `{0.35, 0.35, 1.2}`, ring radius 1.35, centred z 10.15 (protrude 0.6 toward the cage, tail 0.2 behind) |
-| CamFaceWheel | on the cam shaft, disc r **3.2** × 0.4, plane x **−14.35**; **24** cogs; 6 spoke accents + iron hub band |
-| Cam cogs | Size `{1.2, 0.35, 0.35}`, ring radius 2.95, centred x −14.6 (protrude 0.65 toward the cage, tail 0.15 behind) |
-| Meshes | main wheel combs the cage at y≈117.6 (bottom); cam wheel at y≈123.1 (top quadrant) |
-| Clearances | staves ↔ cam shaft ≥ 0.3; cog length variance ±0.06 (deterministic LCG) for the hand-hammered read |
+| Lantern arbor (jack) | `x=-15, z=9.3`, arbor y **117.0 → 124.9** (bottom CLEARS the main shaft — the old arbor pierced it, same bug class as the shaft crossing) |
+| Lantern flanges | r 1.15 × 0.35 discs at y **117.2** and **124.2** |
+| Staves | **9** dowels, Size `{6.65, 0.28, 0.28}` vertical, ring radius **0.9**, centred y 120.7, half-pitch phase offset |
+| FaceWheelMain | on the main shaft, disc r **1.6** × 0.4, plane z **10.65** (disc clear of the stave sweep, z ≤ 10.34); **12** cogs |
+| Main cogs | Size `{0.35, 0.35, ~1.2}`, ring radius 1.35, centred z 10.45 (protrude toward the cage, tail proud behind) |
+| CamFaceWheel | on the cam shaft, disc r **3.2** × 0.4, plane x **−13.65** (disc clear of the stave sweep, x ≥ −13.96); **24** cogs; 3 through-spoke accents + iron hub band |
+| Cam cogs | Size `{~1.2, 0.35, 0.35}`, ring radius 2.95, centred x −13.85 (protrude toward the cage, tail proud behind) |
+| Meshes | main wheel combs the cage at y≈117.6 (bottom); cam wheel at y≈123.5 (top quadrant) |
+| BearingPost3 | back to z=6.5 (its z=9.0 spot is inside the new cage) |
+| Clearances | staves ↔ cam shaft ≥ 0.3; arbor bottom ↔ main shaft ≥ 0.28; cog length variance ±0.06 (deterministic LCG) for the hand-hammered read |
+
+*(Values corrected at plan-writing: wheel planes pulled off the stave sweep,
+arbor lifted off the main shaft, bearing re-sited — three latent collisions
+caught on paper.)*
 
 ## Components
 
