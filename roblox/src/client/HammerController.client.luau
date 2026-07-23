@@ -131,7 +131,13 @@ local function captureSpinners()
         end
     end
     addDriverPart("DriverGear")
-    addDriverPart("MainShaft") -- turns with the wheel (symmetric cylinder → rotation invisible, but correct)
+    -- MainShaft (the invisible proxy) plus its MainShaftF* octagon flats — the visible
+    -- faceted prism whose turning reads (a smooth cylinder's rotation was invisible).
+    for _, part in bell:GetChildren() do
+        if part:IsA("BasePart") and part.Name:match("^MainShaft") then
+            addDriverPart(part.Name)
+        end
+    end
 end
 captureSpinners()
 

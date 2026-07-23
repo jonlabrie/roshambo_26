@@ -99,7 +99,7 @@ local ArenaLayout = {
     -- current; lower paddles dip into the water (undershot); supports on the riverbed.
     waterwheel = {
         radius = 9, -- bigger: lifts the axle/main shaft above ground while paddles stay in the water
-        width = 2.4, -- twice as thick (was 1.2) — a beefier mill wheel
+        width = 2.88, -- face-to-face span (+20% over the 2.4 disc era — a beefier mill wheel)
         overshot = false,
         yaw = 90, -- axle along Z; disc faces the +Z gathering, paddles catch the +X current
         driveYaw = 0, -- drive line toward the bell (RatchetDrum offsets along it)

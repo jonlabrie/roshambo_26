@@ -13,7 +13,10 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
     local timber, iron = palette.timber, palette.ink
     local children = {}
 
-    -- main shaft (the wheel's Z-axle into the house)
+    -- main shaft (the wheel's Z-axle into the house). The named MainShaft is an
+    -- INVISIBLE spin proxy (contract name; HammerController turns it) — the visible
+    -- shaft is an octagonal cypress prism (4 boxes, 8 flats, matching the wheel's
+    -- Wheel1T_SH profile) so the shaft's rotation actually reads.
     local sp, slen, srot = Spec.segment(d.shaftFrom, d.shaftTo)
     table.insert(
         children,
@@ -23,8 +26,29 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             CFrame = Spec.cframe(sp, srot),
             Color = iron,
             Material = "Metal",
+            Transparency = 1,
+            CanCollide = false,
+            CanQuery = false,
+            CanTouch = false,
+            CastShadow = false,
         })
     )
+    local function rotXm(a: number): { number }
+        local co, si = math.cos(a), math.sin(a)
+        return { 1, 0, 0, 0, co, -si, 0, si, co }
+    end
+    for k = 1, 4 do
+        table.insert(
+            children,
+            Spec.part(`MainShaftF{k}`, {
+                Size = { slen, 1.0, 0.42 },
+                CFrame = Spec.cframe(sp, Spec.matMul(srot, rotXm((k - 1) * math.pi / 4))),
+                Color = palette.cypressWeathered,
+                Material = "Wood",
+                MaterialVariant = "CypressWeathered",
+            })
+        )
+    end
     -- BEVEL gear-down: the small DriverGear sits on the Z main shaft (axle along Z);
     -- the big slow CamGear sits on the E-W cam shaft (axle along X = cylinder default).
     -- Modelled as discs at 90° — a placeholder bevel; the controller turns both.
@@ -202,29 +226,66 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             Material = "Wood",
         })
     )
-    -- Shaft bearings: a trestle post up to an iron saddle where the shaft rides — along
-    -- the main-shaft run, at the bevel corner, and just behind the cam on the E-W shaft.
+    -- Shaft bearings: a cypress pier topping out just under the shaft, capped by an
+    -- IronDark BAND enclosing the shaft — along the main-shaft run, at the bevel corner,
+    -- and just behind the cam on the E-W shaft (that band turns 90° to the cam axis).
+    -- Main-shaft bearings also get a spinning IronDark collar just inboard (the "inner
+    -- bearing"; ^MainShaft prefix → HammerController turns it with the drive).
     local shaftY = d.shaftFrom[2]
     for i, b in d.bearings do
         local x, z = b[1], b[2]
+        local onMain = x == d.shaftFrom[1] -- else it rides the E-W cam shaft
+        local bandRot = if onMain then srot else nil
+        -- post top sits right beneath the bearing's square base plate (bearing bottom
+        -- at shaft height − OD/2, then the plate thickness)
+        local PLATE_T = 0.2
+        local pierTop = shaftY - 1.55 / 2 - PLATE_T
         table.insert(
             children,
             Spec.part(`BearingPost{i}`, {
-                Size = { 0.9, shaftY - d.bearingBaseY, 0.9 },
-                CFrame = Spec.cframe({ x, (shaftY + d.bearingBaseY) / 2, z }),
-                Color = timber,
+                Size = { 0.9, pierTop - d.bearingBaseY, 0.9 },
+                CFrame = Spec.cframe({ x, (pierTop + d.bearingBaseY) / 2, z }),
+                Color = palette.cypressWeathered,
                 Material = "Wood",
+                MaterialVariant = "CypressWeathered",
+            })
+        )
+        table.insert(
+            children,
+            Spec.part(`BearingPlate{i}`, {
+                Size = { 0.9, PLATE_T, 0.9 },
+                CFrame = Spec.cframe({ x, pierTop + PLATE_T / 2, z }),
+                Color = iron,
+                Material = "Metal",
+                MaterialVariant = "IronDark",
             })
         )
         table.insert(
             children,
             Spec.part(`BearingSaddle{i}`, {
-                Size = { 1.3, 0.8, 1.3 },
-                CFrame = Spec.cframe({ x, shaftY, z }),
+                Size = { 0.5, 1.55, 1.55 },
+                Shape = "Cylinder",
+                CFrame = Spec.cframe({ x, shaftY, z }, bandRot),
                 Color = iron,
                 Material = "Metal",
+                MaterialVariant = "IronDark",
             })
         )
+        if onMain then
+            -- spinning inner collar CENTERED in the bearing, slightly wider so its rims
+            -- protrude on both sides (^MainShaft prefix → turns with the drive)
+            table.insert(
+                children,
+                Spec.part(`MainShaftCollar{i}`, {
+                    Size = { 0.72, 1.24, 1.24 },
+                    Shape = "Cylinder",
+                    CFrame = Spec.cframe({ x, shaftY, z }, srot),
+                    Color = iron,
+                    Material = "Metal",
+                    MaterialVariant = "IronDark",
+                })
+            )
+        end
     end
     return Spec.model("BellDrive", children)
 end
