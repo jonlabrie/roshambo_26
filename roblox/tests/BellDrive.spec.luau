@@ -70,9 +70,9 @@ describe("BellDrive drive train (face-cog wheels + lantern pinion)", function()
     test("the kick paddle and pillow blocks hold their stations", function()
         expect(byName["VertPaddle"].properties.CFrame[2]).toBeCloseTo(120.7, 0.001)
         expect(byName["BearingSaddle4"].properties.CFrame[2]).toBeCloseTo(120.7, 0.001)
-        -- the corner pillow carries the cam shaft's gear end
+        -- the corner pillow carries the cam shaft's gear end, west of the lantern
         expect(byName["BearingSaddle5"].properties.CFrame[2]).toBeCloseTo(120.7, 0.001)
-        expect(byName["BearingSaddle5"].properties.CFrame[1]).toBeCloseTo(-15, 0.001)
+        expect(byName["BearingSaddle5"].properties.CFrame[1]).toBeCloseTo(d.bearings[5].x, 0.001)
     end)
     test("the corner pillow clears the cage staves and the cam wheel's cog tips", function()
         local p5 = d.bearings[5]
