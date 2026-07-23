@@ -9,13 +9,23 @@
 -- angles measured in the cam's rotation sense; the flank trails the cliff.
 local CamProfile = {}
 
-export type Geom = { gapZ: number, draw: number, rise: number, dowelR: number, dropDeg: number }
+export type Geom = {
+    gapZ: number,
+    draw: number,
+    rise: number,
+    dowelR: number,
+    dropDeg: number,
+    clearance: number?, -- face generated this much shy of the dowel (the cam free-runs
+    -- strike-anchored while the draw ramp is ACTIVE-anchored, so the cam leads the
+    -- dowel by a fraction of the growth; clearance keeps the dowel riding just above
+    -- the face instead of burying — the old hand-measured cam's TIGHTEN, inverted)
+}
 
 -- Contact radius + azimuth (degrees, from the rest direction toward the rise) at p.
 function CamProfile.contact(p: number, g: Geom): (number, number)
     local dz = g.gapZ + g.draw * p
     local dy = g.rise * p * p
-    return math.sqrt(dz * dz + dy * dy) - g.dowelR, math.deg(math.atan2(dy, dz))
+    return math.sqrt(dz * dz + dy * dy) - g.dowelR - (g.clearance or 0), math.deg(math.atan2(dy, dz))
 end
 
 -- n+1 flank samples from rest (p=0, local angle just behind a full turn) to the

@@ -72,11 +72,19 @@ describe("Snail cam geometry (mesh flank envelope)", function()
         rise = d.camDowelRise,
         dowelR = 0.25,
         dropDeg = d.camDropDeg,
+        clearance = d.camClearance,
     }
     local lobe = select(1, CamProfile.contact(1, G))
     test("the sweep clears the BELL FACE (the hero-cam regression)", function()
         -- bell: centre z=0, radius 5.1 → face at z≈5.1 near the strike height
         expect(d.cam[3] - lobe >= 5.1 + 0.4).toBe(true)
+    end)
+    test("the west hanger ropes clear the sweep (east face outboard of x -4.55)", function()
+        -- rope line: spreader top (x=-6) to log attach (x=-2.8) crosses the cam's
+        -- x-band; at x ≥ -4.55 the line dips inside the lobe at some draw phase
+        expect(d.cam[1] + d.camWidth / 2 <= -4.55).toBe(true)
+        -- and the dowel still spans past the cam's west face
+        expect(L.shuMoku.drawDowel.to[1] <= d.cam[1] - d.camWidth / 2 - 0.2).toBe(true)
     end)
     test("the sweep clears the clearing floor", function()
         expect(d.cam[2] - lobe >= 112 + 1.5).toBe(true)
@@ -85,8 +93,6 @@ describe("Snail cam geometry (mesh flank envelope)", function()
         local logWest = L.shuMoku.restPos[1] - L.shuMoku.radius -- the log's near flank
         local ringWest = L.shuMoku.restPos[1] - 1.95 / 2 -- tail ring reaches further
         expect(d.cam[1] + d.camWidth / 2 <= math.min(logWest, ringWest) - 0.1).toBe(true)
-        -- and the draw dowel spans past the far side of the cam plane
-        expect(L.shuMoku.drawDowel.to[1] <= d.cam[1] - d.camWidth / 2 - 0.2).toBe(true)
     end)
     test("the hub (the ^Cam contract part) is emitted; the plank flank is gone", function()
         local hub = false
