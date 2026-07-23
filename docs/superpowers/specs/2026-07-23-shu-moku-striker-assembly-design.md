@@ -69,7 +69,10 @@ below the boss.
 - **Dress parts follow the log:** extend the existing `dowels` capture list to a
   prefix loop (`^ShuMokuD_` plus the two dowels) so all dress parts re-apply the
   arm delta each frame.
-- Draw-rope styling: `DriveRope` gets Fabric + HempRope too (visual only).
+- ~~Draw-rope styling: `DriveRope` gets Fabric + HempRope too~~ **Erratum
+  (2026-07-23, plan-writing):** there is no runtime `DriveRope` — the cam draws
+  the log directly (the old wheel→log rope was removed with the coupled cam).
+  Likewise layout `ropeBottomRest` has no consumers and is deleted with the rails.
 
 ### Materials (place-state, `tools/studio/setupCenterpieceMaterials.luau`)
 - New **`HempRope`** MaterialVariant, BaseMaterial **Fabric**: Color/NormalGL/
