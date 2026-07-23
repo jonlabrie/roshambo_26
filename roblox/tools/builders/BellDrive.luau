@@ -12,7 +12,7 @@ local BellDrive = {}
 
 function BellDrive.build(palette: { [string]: { number } }, L: any)
     local d = L.bellDrive
-    local timber, iron = palette.timber, palette.ink
+    local iron = palette.ink
     local children = {}
 
     -- main shaft (the wheel's Z-axle into the house). The named MainShaft is an

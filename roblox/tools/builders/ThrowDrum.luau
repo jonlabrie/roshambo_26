@@ -28,7 +28,6 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
     local gold = palette.gold
     local ink = palette.ink
 
-    local step = (2 * math.pi) / faces -- 30°
     local apothem = r * math.cos(math.pi / faces) -- centre→facet midpoint
     local side = 2 * r * math.sin(math.pi / faces) -- facet chord
     local faceW = side * 1.02 -- slight overlap so facets meet at the vertices

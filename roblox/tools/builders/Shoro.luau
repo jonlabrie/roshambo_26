@@ -129,7 +129,6 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
     local RErf = 19.5 * roofScale -- eave half-side
     local apexRise = 6.5 * roofScale
     local apexWY = eaveWY + apexRise
-    local roofT = 0.5 -- face thickness
     local faceLift = 1.0 -- faces sit this far above the timber frame
 
     -- little vector helpers (plain tables; math.sqrt is arch-portable, unlike trig-hash)
@@ -139,27 +138,18 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
     local function vdot(a, b): number
         return a[1] * b[1] + a[2] * b[2] + a[3] * b[3]
     end
-    local function vcross(a, b): { number }
-        return { a[2] * b[3] - a[3] * b[2], a[3] * b[1] - a[1] * b[3], a[1] * b[2] - a[2] * b[1] }
-    end
     local function vunit(a): { number }
         local l = math.sqrt(vdot(a, a))
         return { a[1] / l, a[2] / l, a[3] / l }
-    end
-    local function vmid(a, b): { number }
-        return { (a[1] + b[1]) / 2, (a[2] + b[2]) / 2, (a[3] + b[3]) / 2 }
     end
     -- world point from a pavilion-local (x, y, z): rotate x/z by the pavilion yaw
     local function lw(x: number, y: number, z: number): { number }
         local p = Spec.rotY({ x, 0, z }, yaw)
         return { cx + p[1], y, cz + p[3] }
     end
-    -- row-major CFrame rotation from local axes (columns X,Y,Z)
-    local function rotAxes(vx, vy, vz): { number }
-        return { vx[1], vy[1], vz[1], vx[2], vy[2], vz[2], vx[3], vy[3], vz[3] }
-    end
 
     -- eave corners + apex of the visible face pyramid
+    -- selene: allow(shadowing)
     local corners, fcorners = {}, {}
     for _, q in { { 1, 1 }, { -1, 1 }, { -1, -1 }, { 1, -1 } } do
         corners[#corners + 1] = lw(q[1] * RErf, eaveWY, q[2] * RErf)
