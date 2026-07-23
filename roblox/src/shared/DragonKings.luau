@@ -23,8 +23,8 @@ DragonKings.ASSETS = {
     },
     Sagara = {
         name = "Sagara",
-        normal = "rbxassetid://77729938570674",
-        pierced = "rbxassetid://71943018632708",
+        normal = "rbxassetid://82854469289249", -- v2 (head regen 2026-07-22)
+        pierced = "rbxassetid://126874855515512",
     },
     Vasuki = {
         name = "Vasuki",
@@ -43,8 +43,8 @@ DragonKings.ASSETS = {
     },
     Manasvin = {
         name = "Manasvin",
-        normal = "rbxassetid://94420035152886",
-        pierced = "rbxassetid://97118099261938",
+        normal = "rbxassetid://84953931626839", -- v2 (head regen 2026-07-22)
+        pierced = "rbxassetid://117439303532703",
     },
     Utpalaka = {
         name = "Utpalaka",
