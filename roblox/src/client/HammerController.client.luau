@@ -105,9 +105,10 @@ local MAIN_AXLE_XY = Vector2.new(-15, 116) -- N-S main shaft: world-Z axis throu
 local JACK_AXLE_XZ = Vector2.new(-15, 11) -- vertical jack shaft: world-Y axis through (x-15, z11)
 local JACK_DIR = 1 -- bevel-corner handedness (gate-flipped from -1; live via "JackDir")
 local REDUCTION = 2 -- driver gear turns this much faster than the cam (integer → wraps seamlessly each round)
-local CAM_PHASE_DEG = -7 -- fine-tune offset for the high point at the strike; -7 ≈ the cliff
--- arriving 0.5s later at the ~25s round rate (gate: log hung at full draw after the cliff
--- passed). Live-tunable via the stage "CamPhaseDeg" attribute — dial it in Play.
+local CAM_PHASE_DEG = -5 -- fine-tune offset for the high point at the strike (gate-tuned
+-- live 2026-07-23: -5 lands the cliff on the release; each -7 ≈ +0.5s at the ~25s round).
+-- Live-tunable via the stage "CamPhaseDeg" attribute. Slight round-to-round drift remains
+-- (camOmega is measured once vs real round jitter) — bounded by the per-strike re-anchor.
 
 -- Each spinner: { part, restCF, pivotCF, axis } where axis ∈ {"X","Z"}; we rotate the
 -- rest pose about the world axle line through pivotCF each frame.
