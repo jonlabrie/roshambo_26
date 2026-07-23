@@ -22,9 +22,9 @@ describe("Glyphs image map", function()
     end)
 end)
 
-describe("Glyphs day/night palette + renderDayNight", function()
-    test("PALETTE exposes gold/ink/amber/amberHalo as 0-255 rgb arrays", function()
-        for _, key in { "gold", "ink", "amber", "amberHalo" } do
+describe("Glyphs day/night palette + API", function()
+    test("PALETTE exposes gold/ink as 0-255 rgb arrays", function()
+        for _, key in { "gold", "ink" } do
             local c = Glyphs.PALETTE[key]
             expect(c ~= nil).toBe(true)
             expect(#c).toBe(3)
@@ -34,14 +34,19 @@ describe("Glyphs day/night palette + renderDayNight", function()
         end
     end)
 
-    test("day gold and night amber are distinct", function()
-        expect(
-            Glyphs.PALETTE.gold[1] ~= Glyphs.PALETTE.amber[1]
-                or Glyphs.PALETTE.gold[3] ~= Glyphs.PALETTE.amber[3]
-        ).toBe(true)
+    test("NIGHT has a valid 0-255 Neon color + a mesh id per symbol", function()
+        local c = Glyphs.NIGHT.color
+        expect(#c).toBe(3)
+        for _, ch in c do
+            expect(ch >= 0 and ch <= 255).toBe(true)
+        end
+        for _, sym in { "R", "P", "S" } do
+            expect(Glyphs.NIGHT.mesh[sym]:match("^rbxassetid://%d+$") ~= nil).toBe(true)
+        end
     end)
 
-    test("renderDayNight is a function", function()
-        expect(type(Glyphs.renderDayNight)).toBe("function")
+    test("renderDay + buildNightNeon are functions", function()
+        expect(type(Glyphs.renderDay)).toBe("function")
+        expect(type(Glyphs.buildNightNeon)).toBe("function")
     end)
 end)

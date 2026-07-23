@@ -25,8 +25,6 @@ local drum = rig:WaitForChild("Drum") :: BasePart
 local hub = drum.CFrame
 
 local FACES = 12
-local GOLD = Color3.fromRGB(212, 176, 102)
-local INK_OUTLINE = Color3.fromRGB(20, 17, 16) -- black keyline (more authentic than the PWA's white on cypress)
 
 -- SYMBOL_FOR_FACE (k % 3). Mirrors ThrowDrum.SYMBOL_FOR_FACE without requiring the builder
 -- (builders live under tools/ and are not replicated to clients).
@@ -39,17 +37,18 @@ do
 end
 
 -- Capture each facet's offset from the hub so we can re-place it under any hub rotation.
--- Only the 12 facets spin (the shade posts/cap/base/lamp are static). The glyph SurfaceGui
--- is parented to each facet, so it rides along automatically.
+-- Only the 12 facets spin (the shade posts/cap/base/lamp are static). The DAY glyph is a
+-- SurfaceGui parented to each facet (rides along automatically). The NIGHT glyph is separate Neon
+-- geometry (a SurfaceGui can't bloom) — those parts are captured into the spin set below so they
+-- ride the drum the same way the facets do. Both crossfade with nightFactor (GlyphDayNight).
 local spinParts: { BasePart } = {}
 local spinOffsets: { CFrame } = {}
 for k = 0, FACES - 1 do
     local face = rig:WaitForChild("Face" .. k) :: BasePart
     table.insert(spinParts, face)
     table.insert(spinOffsets, hub:ToObjectSpace(face.CFrame))
-    -- attach the always-bright approved glyph on the facet's outward (Front, -Z) side.
-    -- Match the canvas aspect to the facet (a 4:5 panel) so the ○ ring stays round rather
-    -- than being stretched into an oval by a square canvas on a non-square face.
+    -- DAY: the approved gilt-gold glyph on the facet's outward (Front, -Z) side. Match the canvas
+    -- aspect to the facet (a 4:5 panel) so the ○ ring stays round rather than stretched to an oval.
     local fs = face.Size -- {faceW, h, thickness}
     local cw = math.max(1, math.round(200 * fs.X / fs.Y))
     local gui = Instance.new("SurfaceGui")
@@ -58,7 +57,13 @@ for k = 0, FACES - 1 do
     gui.CanvasSize = Vector2.new(cw, 200)
     gui.LightInfluence = 0
     gui.Parent = face
-    Glyphs.render(gui, SYMBOL_FOR_FACE[k], GOLD, INK_OUTLINE)
+    Glyphs.renderDay(gui, SYMBOL_FOR_FACE[k])
+    -- NIGHT: Neon geometry on the same facet; capture each part into the spin set so it turns with
+    -- the drum (parenting to the anchored face alone would NOT carry it under our CFrame-driven spin).
+    for _, np in Glyphs.buildNightNeon(face, SYMBOL_FOR_FACE[k]) do
+        table.insert(spinParts, np)
+        table.insert(spinOffsets, hub:ToObjectSpace(np.CFrame))
+    end
 end
 
 -- MOTION (strike-keyed), preserved from the hex drum but on the VERTICAL axis.
