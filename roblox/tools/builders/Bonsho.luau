@@ -183,13 +183,16 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
             })
         )
     end
-    local noseP = Spec.rotY({ cx2, cy2, sm.restPos[3] - sm.length / 2 + 0.15 }, yaw)
+    -- Bronze BINDING BAND behind the striking face (gate: a protruding ball cap
+    -- embedded in the tsuki-za at rest — and real shu-moku strike BARE WOOD; the
+    -- band sits 0.03 behind the log's end face so the wood tip stays proud).
+    local noseP = Spec.rotY({ cx2, cy2, sm.restPos[3] - sm.length / 2 + 0.28 }, yaw)
     table.insert(
         children,
         Spec.part("ShuMokuD_Nose", {
-            Size = { 1.7, 1.7, 1.7 },
-            Shape = "Ball",
-            CFrame = Spec.cframe(noseP),
+            Size = { 0.5, 1.9, 1.9 },
+            Shape = "Cylinder",
+            CFrame = Spec.cframe(noseP, logRot),
             Color = palette.bronzePatina,
             Material = "Metal",
             MaterialVariant = "BronzePatina",
