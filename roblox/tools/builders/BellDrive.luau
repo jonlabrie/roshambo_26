@@ -184,7 +184,9 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
     table.insert(
         children,
         Spec.part("Cam", {
-            Size = { d.camWidth, d.camHubR * 2, d.camHubR * 2 },
+            -- PROUD of the mesh flank (±0.125 per side): the mesh is solid to its core,
+            -- so a hub at the same width would be face-coplanar with it and z-fight
+            Size = { d.camWidth + 0.25, d.camHubR * 2, d.camHubR * 2 },
             Shape = "Cylinder",
             CFrame = Spec.cframe(d.cam),
             Color = palette.cypressWeathered,
