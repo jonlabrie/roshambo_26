@@ -385,6 +385,16 @@ end)
 -- PROFILE, not by coupling. CAM_DIR flips the spin direction.
 local CAM_DIR = 1
 local DRIVER_DIR = 1 -- sign of the driver gear + main shaft about Z (live-tunable "DriverDir")
+-- Publish the live-tunable knobs so they're visible/editable on RoshamboStage in the
+-- Explorer during Play — a read-only GetAttribute never materialises in the panel
+-- (only already-set attributes show; DriveOmega shows because we publish it).
+for attr, default in
+    { CamPhaseDeg = CAM_PHASE_DEG, DrawStuds = DRAW_STUDS, JackDir = JACK_DIR, DriverDir = DRIVER_DIR } :: { [string]: number }
+do
+    if stage:GetAttribute(attr) == nil then
+        stage:SetAttribute(attr, default)
+    end
+end
 RunService.Heartbeat:Connect(function()
     if #camSpinners == 0 then
         captureSpinners() -- parts hadn't replicated at init; keep trying until they do
