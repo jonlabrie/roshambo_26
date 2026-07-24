@@ -419,6 +419,13 @@ RunService.Heartbeat:Connect(function()
         strike(r.prevStrikeAt)
     end
     lastMetroNow = nowSt
+    -- Self-timed backstop: RoundUpdate("ACTIVE") normally clears `striking`, but a
+    -- dropped broadcast must not freeze the machine (spec: it never stops). Clear once
+    -- the next round's ramp is underway — drawP has wrapped low — never mid-REVEAL
+    -- (releasing early would slam the log back to near-full draw before the wrap).
+    if striking and anchorAt and nowSt - anchorAt > 2 and r.drawP < 0.5 then
+        striking = false
+    end
     -- Free-run at constant speed FROM the last release anchor (so the high point is on the
     -- dowel at each strike, by construction).
     local camNet
