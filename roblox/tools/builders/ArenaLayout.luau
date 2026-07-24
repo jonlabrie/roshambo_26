@@ -193,7 +193,7 @@ local ArenaLayout = {
         faceWheelMain = { -15, 116, 9.65 }, -- NORTH of the cage (gate: south read backwards); disc clear of the stave sweep
         faceWheelMainR = 1.6,
         faceWheelMainCogs = 12,
-        faceWheelMainPhaseDeg = -5, -- cog-ring azimuth: retard so cogs comb the stave GAPS (gate-tuned live 2026-07-23)
+        faceWheelMainPhaseDeg = -7, -- cog-ring azimuth: retard so cogs comb the stave GAPS (gate-tuned live 2026-07-23)
         camFaceWheel = { -13.65, 120.7, 11 }, -- disc plane clear of the stave sweep (x ≥ -13.96)
         camFaceWheelR = 3.2,
         camFaceWheelCogs = 24, -- /faceWheelMainCogs MIRRORS HammerController REDUCTION = 2
@@ -238,9 +238,13 @@ local ArenaLayout = {
         -- the shaft line at shaft height; posts drop to bearingBaseY.
         -- Pillow blocks, generalized: axis "Z" = main-run (shaft y116); axis "X" =
         -- the tall post under the raised cam shaft. baseY per entry (bank vs clearing).
+        -- Shoro-style slate plinths under all bearing posts: probed grade is a uniform
+        -- ~113.0 at the five stations, top rides 0.6 proud; blocks root down to baseY.
+        bearingPlinthTop = 113.6,
         bearings = {
             { x = -15, z = -6, y = 116, axis = "Z", baseY = 110 },
-            { x = -15, z = 2, y = 116, axis = "Z", baseY = 110 },
+            -- (the mid-run pillow at z=2 was CUT at the plinth gate 2026-07-23:
+            -- two pillows carry the short main run fine and it read as clutter)
             { x = -15, z = 6.5, y = 116, axis = "Z", baseY = 110 }, -- out of the lantern cage
             { x = -6, z = 11, y = 120.7, axis = "X", baseY = 111.5 },
             -- corner pillow: at the cam shaft's GEAR end, west of the lantern; the

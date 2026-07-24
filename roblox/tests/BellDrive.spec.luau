@@ -37,7 +37,7 @@ describe("BellDrive drive train (face-cog wheels + lantern pinion)", function()
                 "JackHangerArm",
                 "JackFootArm",
                 "JackStep",
-                "BearingPost5",
+                "BearingPost4",
                 "VertShaft",
                 "VertPaddle",
             }
@@ -67,7 +67,7 @@ describe("BellDrive drive train (face-cog wheels + lantern pinion)", function()
         expect(d.camShaft.y - 0.5 >= d.jack.yTop + 0.3).toBe(true)
         -- the main shaft ENDS buried in its gear, short of the cage (nothing runs under it)
         expect(d.shaftTo[3] + 0.1 <= d.lantern.z - d.lantern.flangeR).toBe(true)
-        expect(math.abs(d.bearings[3].z - d.lantern.z) >= 1.5).toBe(true) -- pillow out of the cage
+        expect(math.abs(d.bearings[2].z - d.lantern.z) >= 1.5).toBe(true) -- pillow out of the cage
     end)
     test("the wheel discs stay clear of the stave sweep (either side)", function()
         local reach = d.lantern.staveRingR + 0.14
@@ -80,13 +80,32 @@ describe("BellDrive drive train (face-cog wheels + lantern pinion)", function()
     end)
     test("the kick paddle and pillow blocks hold their stations", function()
         expect(byName["VertPaddle"].properties.CFrame[2]).toBeCloseTo(120.7, 0.001)
-        expect(byName["BearingSaddle4"].properties.CFrame[2]).toBeCloseTo(120.7, 0.001)
+        expect(byName["BearingSaddle3"].properties.CFrame[2]).toBeCloseTo(120.7, 0.001)
         -- the corner pillow carries the cam shaft's gear end, west of the lantern
-        expect(byName["BearingSaddle5"].properties.CFrame[2]).toBeCloseTo(120.7, 0.001)
-        expect(byName["BearingSaddle5"].properties.CFrame[1]).toBeCloseTo(d.bearings[5].x, 0.001)
+        expect(byName["BearingSaddle4"].properties.CFrame[2]).toBeCloseTo(120.7, 0.001)
+        expect(byName["BearingSaddle4"].properties.CFrame[1]).toBeCloseTo(d.bearings[4].x, 0.001)
+    end)
+    test("every bearing post foots on a proud slate plinth (the Shoro read)", function()
+        for i, b in d.bearings :: any do
+            local plinth = byName[`BearingPlinth{i}`]
+            local post = byName[`BearingPost{i}`]
+            expect(plinth ~= nil).toBe(true)
+            expect(plinth.properties.Material).toBe("Slate")
+            -- proud of the 0.9 post on every face, rooted at baseY, top at the shared line
+            expect(plinth.properties.Size[1] > 0.9).toBe(true)
+            expect(plinth.properties.Size[3] > 0.9).toBe(true)
+            local top = plinth.properties.CFrame[2] + plinth.properties.Size[2] / 2
+            expect(top).toBeCloseTo(d.bearingPlinthTop, 0.001)
+            expect(plinth.properties.CFrame[2] - plinth.properties.Size[2] / 2).toBeCloseTo(b.baseY, 0.001)
+            -- the post stands ON the plinth, not through it
+            expect(post.properties.CFrame[2] - post.properties.Size[2] / 2).toBeCloseTo(
+                d.bearingPlinthTop,
+                0.001
+            )
+        end
     end)
     test("the corner pillow clears the cage staves and the cam wheel's cog tips", function()
-        local p5 = d.bearings[5]
+        local p5 = d.bearings[4]
         -- post sits WEST of the cage on the shaft line: X clearance to the stave sweep
         expect(d.lantern.x - (d.lantern.staveRingR + 0.14) >= p5.x + 0.45 + 0.2).toBe(true)
         -- cog tips (max jitter, len ~1.06) stay east of the post's east face

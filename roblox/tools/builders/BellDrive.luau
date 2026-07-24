@@ -334,11 +334,23 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
         local PLATE_T = 0.2
         local pierTop = b.y - 1.55 / 2 - PLATE_T
         local bandRot = if b.axis == "Z" then Spec.ROT.CYL_ALONG_Z else Spec.ROT.IDENTITY
+        -- dressed-slate plinth footing (the Shoro post read): proud of the post's
+        -- faces, top 0.6 above grade, rooted below it to the bearing's baseY
+        local plinthTop = d.bearingPlinthTop
+        table.insert(
+            children,
+            Spec.part(`BearingPlinth{i}`, {
+                Size = { 1.4, plinthTop - b.baseY, 1.4 },
+                CFrame = Spec.cframe({ b.x, (plinthTop + b.baseY) / 2, b.z }),
+                Color = palette.gravel,
+                Material = "Slate",
+            })
+        )
         table.insert(
             children,
             Spec.part(`BearingPost{i}`, {
-                Size = { 0.9, pierTop - b.baseY, 0.9 },
-                CFrame = Spec.cframe({ b.x, (pierTop + b.baseY) / 2, b.z }),
+                Size = { 0.9, pierTop - plinthTop, 0.9 },
+                CFrame = Spec.cframe({ b.x, (pierTop + plinthTop) / 2, b.z }),
                 Color = palette.cypressWeathered,
                 Material = "Wood",
                 MaterialVariant = "CypressVertical", -- rotated maps: grain runs UP flat vertical posts
