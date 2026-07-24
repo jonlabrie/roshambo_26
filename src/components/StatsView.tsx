@@ -2,10 +2,11 @@ import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Trophy, Zap, Volume2, VolumeX } from 'lucide-react'
 import { cn } from '../lib/utils'
+import type { AuthUser, ServerStats, LeaderboardEntry } from '../types'
 
 interface StatsViewProps {
     onBack: () => void
-    serverStats: any
+    serverStats: ServerStats | null
     getStats: (timeframe: 'hour' | 'day' | 'week' | 'all') => void
     initialTab?: 'PROFILE' | 'GLOBAL'
     playerStats: {
@@ -19,7 +20,7 @@ interface StatsViewProps {
     onLoginRequest: () => void
     onLogout: () => void
     onStoreRequest: () => void
-    user: any
+    user: AuthUser | null
     audioEnabled: boolean
     setAudioEnabled: (enabled: boolean) => void
     audioVolume: number
@@ -233,7 +234,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
                     <Trophy className="w-3 h-3 text-yellow-500" />
                 </div>
                 <div className="space-y-2">
-                    {serverStats?.topPoints?.slice(0, 3).map((user: any, i: number) => (
+                    {serverStats?.topPoints?.slice(0, 3).map((user: LeaderboardEntry, i: number) => (
                         <LeaderboardRow
                             key={user.deviceId || i}
                             rank={i + 1}
@@ -243,7 +244,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
                         />
                     ))}
                 </div>
-                {serverStats?.topPoints?.length > 3 && (
+                {(serverStats?.topPoints?.length ?? 0) > 3 && (
                     <button
                         onClick={() => toggleSubView('POINTS')}
                         className="w-full py-3 text-[10px] font-black uppercase text-blue-400 hover:text-blue-300 tracking-widest border border-blue-500/20 rounded-xl hover:bg-blue-500/5 transition-all mt-2"
@@ -260,7 +261,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
                     <Zap className="w-3 h-3 text-blue-500" />
                 </div>
                 <div className="space-y-2">
-                    {serverStats?.biggestWins?.slice(0, 3).map((win: any, i: number) => (
+                    {serverStats?.biggestWins?.slice(0, 3).map((win: LeaderboardEntry, i: number) => (
                         <LeaderboardRow
                             key={win._id || i}
                             rank={i + 1}
@@ -275,7 +276,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
                         </div>
                     )}
                 </div>
-                {serverStats?.biggestWins?.length > 3 && (
+                {(serverStats?.biggestWins?.length ?? 0) > 3 && (
                     <button
                         onClick={() => toggleSubView('WINS')}
                         className="w-full py-3 text-[10px] font-black uppercase text-blue-400 hover:text-blue-300 tracking-widest border border-blue-500/20 rounded-xl hover:bg-blue-500/5 transition-all mt-2"
@@ -299,7 +300,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
                     <h3 className="text-[12px] font-black text-white uppercase tracking-[0.3em]">{title}</h3>
                 </div>
                 <div className="space-y-2 pb-20">
-                    {list?.map((item: any, i: number) => (
+                    {list?.map((item: LeaderboardEntry, i: number) => (
                         <LeaderboardRow
                             key={type === 'POINTS' ? (item.deviceId || i) : (item._id || i)}
                             rank={i + 1}

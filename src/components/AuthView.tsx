@@ -2,10 +2,11 @@ import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Mail, Lock, LogIn, Chrome, Cloud, Facebook, Instagram } from 'lucide-react'
 import { cn } from '../lib/utils'
+import type { AuthUser } from '../types'
 
 interface AuthViewProps {
     onBack: () => void
-    onAuthSuccess: (token: string, user: any) => void
+    onAuthSuccess: (token: string, user: AuthUser) => void
     initialMode?: 'LOGIN' | 'SIGNUP'
 }
 

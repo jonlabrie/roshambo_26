@@ -2,10 +2,11 @@ import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, ShoppingBag, Check, User, Wallet } from 'lucide-react'
 import { cn } from '../lib/utils'
+import type { Character } from '../types'
 
 interface StoreViewProps {
     onBack: () => void
-    catalog: any[]
+    catalog: Character[]
     inventory: string[]
     equippedId: string
     totalPoints: number

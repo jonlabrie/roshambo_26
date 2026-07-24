@@ -1,21 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { io, Socket } from 'socket.io-client'
+import type { Throw, Result, RoundData, ServerRound, PersonalRoundResult, Character, AuthUser, ServerStats } from '../types'
 
-export type Throw = 'R' | 'P' | 'S' | null
-export type Result = 'WIN' | 'LOSS' | 'SAFE' | null
+export type { Throw, Result, RoundData } from '../types'
 export type GameState = 'ACTIVE' | 'REVEAL'
 
 // Use your local IP for mobile access on the same network
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || ''
-
-interface RoundData {
-    id: string
-    worldThrow: Throw
-    distribution: { R: number; P: number; S: number }
-    totalPlayers: number
-    playerResult?: Result
-    pointsDelta?: number
-}
 
 export function useGameLoop() {
     const [timeLeft, setTimeLeft] = useState(0)
@@ -33,12 +24,12 @@ export function useGameLoop() {
     const [lastRound, setLastRound] = useState<RoundData | null>(null)
     const [history, setHistory] = useState<RoundData[]>([])
     const [showResult, setShowResult] = useState(false)
-    const [stats, setStats] = useState<any>(null)
-    const [user, setUser] = useState<any>(null)
+    const [stats, setStats] = useState<ServerStats | null>(null)
+    const [user, setUser] = useState<AuthUser | null>(null)
     const [token, setToken] = useState<string | null>(localStorage.getItem('roshambo_auth_token'))
     const [inventory, setInventory] = useState<string[]>(['default'])
     const [equippedId, setEquippedId] = useState<string>('default')
-    const [catalog, setCatalog] = useState<any[]>([])
+    const [catalog, setCatalog] = useState<Character[]>([])
     const [actionMessage, setActionMessage] = useState<string | null>(null)
 
     // Audio Settings
@@ -125,7 +116,7 @@ export function useGameLoop() {
         }
     }
 
-    const login = (newToken: string, newUser: any) => {
+    const login = (newToken: string, newUser: AuthUser) => {
         localStorage.setItem('roshambo_auth_token', newToken)
         setToken(newToken)
         setUser(newUser)
@@ -164,7 +155,7 @@ export function useGameLoop() {
     // Emit throw when locked
     useEffect(() => {
         if (isLocked && playerThrow && socketRef.current && deviceIdRef.current) {
-            const payload: any = {
+            const payload: { deviceId: string; throw: Throw; token?: string } = {
                 deviceId: deviceIdRef.current,
                 throw: playerThrow
             }
@@ -192,7 +183,8 @@ export function useGameLoop() {
 
         try {
             if (!audioCtxRef.current) {
-                const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext
+                const AudioContextClass = window.AudioContext
+                    || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
                 if (!AudioContextClass) return
                 audioCtxRef.current = new AudioContextClass()
             }
@@ -276,7 +268,7 @@ export function useGameLoop() {
         }
     }, [])
 
-    const handleServerReveal = useCallback((serverRound: any) => {
+    const handleServerReveal = useCallback((serverRound: ServerRound) => {
         // Trigger SFX
         playGongSound()
 
@@ -381,7 +373,7 @@ export function useGameLoop() {
 
                     setHistory(prev => {
                         return prev.map(globalRound => {
-                            const personal = data.history.find((h: any) => h.roundId === globalRound.id)
+                            const personal = data.history.find((h: PersonalRoundResult) => h.roundId === globalRound.id)
                             if (personal) {
                                 return {
                                     ...globalRound,
@@ -403,7 +395,7 @@ export function useGameLoop() {
             setTimeLeft(data.timeLeft)
             setRoundCount(data.roundCount)
 
-            const globalHistory = data.history.map((h: any) => ({
+            const globalHistory = data.history.map((h: ServerRound) => ({
                 id: h.id,
                 worldThrow: h.worldThrow,
                 distribution: h.distribution || { R: 33, P: 33, S: 33 },
@@ -439,7 +431,7 @@ export function useGameLoop() {
         return () => {
             socket.disconnect()
         }
-    }, [handleServerReveal])
+    }, [handleServerReveal, token])
 
     // Removal of local interpolation to ensure server is absolute source of truth
     useEffect(() => {

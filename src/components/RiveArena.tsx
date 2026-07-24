@@ -3,6 +3,7 @@ import { useRive, Layout, Fit, Alignment } from '@rive-app/react-canvas'
 import { motion, AnimatePresence } from 'framer-motion'
 import { SymbolIcon } from './Symbols'
 import { cn } from '../lib/utils'
+import type { RoundData, Character } from '../types'
 
 interface RiveStateProps {
     src: string
@@ -56,9 +57,9 @@ interface RiveArenaProps {
     playerThrow: 'R' | 'P' | 'S' | null
     isLocked: boolean
     showResult: boolean
-    lastRound: any
+    lastRound: RoundData | null
     playerName: string
-    character: any
+    character: Character | undefined
     actionMessage: string | null
 }
 
@@ -185,12 +186,12 @@ export const RiveArena: React.FC<RiveArenaProps> = ({
                             className={cn(
                                 "mt-4 text-[20px] font-black tracking-widest uppercase tabular-nums drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]",
                                 !lastRound.playerResult ? "text-slate-500" :
-                                    lastRound.pointsDelta > 0 ? "text-green-400" : "text-red-400"
+                                    (lastRound.pointsDelta ?? 0) > 0 ? "text-green-400" : "text-red-400"
                             )}
                         >
                             {!lastRound.playerResult ? 'NO THROW' :
-                                lastRound.pointsDelta > 0 ? `+${lastRound.pointsDelta} PTS` :
-                                    lastRound.pointsDelta < 0 ? `${Math.abs(lastRound.pointsDelta)} Staked Points Lost` :
+                                (lastRound.pointsDelta ?? 0) > 0 ? `+${lastRound.pointsDelta} PTS` :
+                                    (lastRound.pointsDelta ?? 0) < 0 ? `${Math.abs(lastRound.pointsDelta ?? 0)} Staked Points Lost` :
                                         '0 PTS'}
                         </motion.span>
                     </motion.div>
