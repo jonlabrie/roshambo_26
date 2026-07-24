@@ -92,6 +92,8 @@ local glideD = 0
 local landTheta = 0
 local strikeT0 = -1
 local latestWorldThrow: string? = nil
+local lastLandedThrow: string? = nil
+local STALL_MAX = 6 -- s past min spin to wait for the reveal before settling anyway
 
 -- PIN-WHEEL parts that flick on the strike (BellDrive) — unchanged; ambient machinery.
 local bell = stage:WaitForChild("BellDrive")
@@ -144,8 +146,11 @@ applyTheta()
 RunService.Heartbeat:Connect(function(_dt)
     if mode == "spin" then
         theta -= omega * _dt
-        if os.clock() >= spinUntil then
-            local throw = latestWorldThrow or "R"
+        local haveThrow = latestWorldThrow ~= nil
+        if os.clock() >= spinUntil and (haveThrow or os.clock() >= spinUntil + STALL_MAX) then
+            local throw = latestWorldThrow or lastLandedThrow or "R"
+            lastLandedThrow = throw
+            latestWorldThrow = nil
             landTheta = landTargetFor(throw, omega * GLIDE_SEC / 2)
             glideP0 = theta
             glideD = theta - landTheta
@@ -208,11 +213,6 @@ end)
 
 EventBus.Cue.Event:Connect(function(cue)
     if cue.kind == "gongHit" then
-        local throw = latestWorldThrow
-        if not throw then
-            return
-        end
-        latestWorldThrow = throw
         omega = (stage:GetAttribute("DrumKick") :: number) or DRUM_KICK
         spinUntil = os.clock() + SPIN_SEC
         strikeT0 = os.clock()

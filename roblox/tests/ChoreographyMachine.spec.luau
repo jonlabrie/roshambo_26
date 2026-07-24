@@ -47,7 +47,7 @@ describe("ChoreographyMachine.revealCues", function()
                 table.insert(kinds, c.kind)
             end
         end
-        expect(kinds).toEqual({ "drumrollStop", "gongStrike", "basinErupt", "heroTileLand" })
+        expect(kinds).toEqual({ "drumrollStop", "basinErupt", "heroTileLand" })
     end)
 
     test("each participant gets one consequence cue with the selected effect", function()

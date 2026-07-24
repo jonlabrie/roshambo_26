@@ -28,9 +28,8 @@ function ChoreographyMachine.revealCues(reveal: any, opts: Opts): { Cue }
     local cues: { { atMs: number, idx: number, kind: string, userId: string?, effect: string?, worldThrow: string? } } =
         {
             { atMs = 0, idx = 1, kind = "drumrollStop" },
-            { atMs = 0, idx = 2, kind = "gongStrike" },
-            { atMs = 0, idx = 3, kind = "basinErupt" },
-            { atMs = 0, idx = 4, kind = "heroTileLand", worldThrow = reveal.worldThrow },
+            { atMs = 0, idx = 2, kind = "basinErupt" },
+            { atMs = 0, idx = 3, kind = "heroTileLand", worldThrow = reveal.worldThrow },
         }
 
     local userIds: { string } = {}
