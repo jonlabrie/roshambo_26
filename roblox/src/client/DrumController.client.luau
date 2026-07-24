@@ -199,10 +199,12 @@ end)
 
 RoundUpdate.OnClientEvent:Connect(function(info)
     if info.phase == "ACTIVE" and mode ~= "hold" and strikeT0 >= 0 then
-        if os.clock() - strikeT0 > SPIN_SEC + GLIDE_SEC + 1 then
+        -- Guard fires only beyond the worst legitimate spin + stall + glide (10s)
+        if os.clock() - strikeT0 > SPIN_SEC + STALL_MAX + GLIDE_SEC + 1 then
             if latestWorldThrow then
                 landTheta = landTargetFor(latestWorldThrow, 0)
             end
+            latestWorldThrow = nil -- consume on use
             theta = landTheta
             omega = 0
             mode = "hold"
