@@ -13,6 +13,31 @@ local WATER = Color3.new(ZenDojo.palette.water[1], ZenDojo.palette.water[2], Zen
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local RoundUpdate = remotes:WaitForChild("RoundUpdate") :: RemoteEvent
 
+local RoundMetronome = require(shared:WaitForChild("RoundMetronome"))
+
+-- The published round schedule (RoundScheduleConfig) drives ALL timing; see the
+-- round-metronome spec. StrikeAtServerTime is written last on the server, so one
+-- changed-signal on it pulls a coherent schedule.
+local metronome = RoundMetronome.new()
+local scheduleConfig = ReplicatedStorage:WaitForChild("RoundScheduleConfig")
+local function pullSchedule()
+    local strikeAt = scheduleConfig:GetAttribute("StrikeAtServerTime")
+    local periodSec = scheduleConfig:GetAttribute("PeriodSec")
+    if typeof(strikeAt) ~= "number" or typeof(periodSec) ~= "number" then
+        return
+    end
+    metronome:setSchedule({
+        roundId = scheduleConfig:GetAttribute("RoundId") :: string?,
+        strikeAt = strikeAt,
+        periodSec = periodSec,
+        activeSec = (scheduleConfig:GetAttribute("ActiveSec") :: number?) or 20,
+        tallySec = (scheduleConfig:GetAttribute("TallySec") :: number?) or 2,
+        revealSec = (scheduleConfig:GetAttribute("RevealSec") :: number?) or 3,
+    }, workspace:GetServerTimeNow())
+end
+scheduleConfig:GetAttributeChangedSignal("StrikeAtServerTime"):Connect(pullSchedule)
+pullSchedule()
+
 local stage = workspace:WaitForChild("RoshamboStage")
 local rig = stage:WaitForChild("BonshoRig")
 local arm = rig:WaitForChild("ShuMoku") :: BasePart
@@ -90,16 +115,13 @@ end
 
 -- ===== Bell-engine drive train (cam + gear-down) =====
 -- The river wheel's main shaft → face wheel → lantern pinion → E-W cam shaft →
--- snail cam that draws the shu-moku. The log's draw ramp and the cam run off
--- SEPARATE anchors of the same nominal round clock (draw: the ACTIVE arrival;
--- cam: re-pinned with its high point on the dowel at each strike, free-running
--- at camOmega between) — selling the linkage as causal (theatre, not physics).
+-- snail cam that draws the shu-moku. The log's draw ramp and the cam are BOTH
+-- read straight off the RoundMetronome (the published RoundScheduleConfig) each
+-- frame — no measured/frozen rate, no separate anchors: drawP and omega come
+-- from the same metronome:read() call, and the cam is re-pinned at every
+-- scheduled strike instant — selling the linkage as causal (theatre, not physics).
 -- Axle geometry mirrors ArenaLayout.bellDrive.
 local bell = stage:WaitForChild("BellDrive")
--- camOmega is the measured round rate: it times the DRAW ramp (p = elapsed/period)
--- AND spins the cam + gear train. Round length isn't in the payload, so we measure
--- it (ACTIVE→ACTIVE) once and freeze the rate; this default holds round 1.
-local camOmega = 2 * math.pi / 22 -- rad/s (≈ once per 22s until measured)
 local CAM_AXLE_YZ = Vector2.new(120.7, 11) -- E-W cam shaft: world-X axis through (y120.7, z11); MIRRORS ArenaLayout.bellDrive.camShaft
 local MAIN_AXLE_XY = Vector2.new(-15, 116) -- N-S main shaft: world-Z axis through (x-15, y116)
 local JACK_AXLE_XZ = Vector2.new(-15, 11) -- vertical lantern arbor: world-Y axis through (x-15, z11), the shafts' plan crossing; MIRRORS ArenaLayout.bellDrive.lantern
@@ -108,12 +130,12 @@ local LANTERN_RATIO = 12 / 9 -- cogsMain/staves: the lantern spins this much fas
 local REDUCTION = 2 -- driver gear turns this much faster than the cam (integer → wraps seamlessly each round)
 local CAM_PHASE_DEG = -5 -- fine-tune offset for the high point at the strike (gate-tuned
 -- live 2026-07-23: -5 lands the cliff on the release; each -7 ≈ +0.5s at the ~25s round).
--- Live-tunable via the stage "CamPhaseDeg" attribute. Slight round-to-round drift remains
--- (camOmega is measured once vs real round jitter) — bounded by the per-strike re-anchor.
+-- Live-tunable via the stage "CamPhaseDeg" attribute. The metronome's slew keeps schedule
+-- refinements from stepping the cam; only a hard re-anchor (restart/new period) snaps it.
 
 -- Each spinner: { part, restCF, pivotCF, axis } where axis ∈ {"X","Z"}; we rotate the
 -- rest pose about the world axle line through pivotCF each frame.
-local camSpinners = {} -- rotate with the cam (about X), free-running at CAM_OMEGA
+local camSpinners = {} -- rotate with the cam (about X), free-running at the metronome's omega
 local driverSpinners = {} -- the fast driver gear + main shaft (about Z), counter + at the reduction
 local jackSpinners = {} -- the vertical jack shaft + its bevels (about Y), at the driver rate
 local function addCamPart(name: string)
@@ -238,125 +260,108 @@ local function updateSuspension()
 end
 
 local striking = false
-local prevRoundId: any = nil -- to detect each new round and measure its period
-local lastActiveAt: number? = nil -- start of the CURRENT round's ACTIVE (draw ramp anchor)
-local omegaLocked = false -- freeze the rate after one good sample (constant ω between strikes)
 -- The cam is anchored to the RELEASE (strike) event, not ACTIVE: at each strike we set its
--- orientation so the high point is exactly on the dowel, then it free-runs at camOmega until
--- the next strike. This makes the high point meet the dowel at EVERY release regardless of
--- the independent network jitter between the ACTIVE and reveal events. anchorNet = cam net
--- rotation pinned at the last strike; anchorAt = when.
+-- orientation so the high point is exactly on the dowel, then it free-runs at the metronome's
+-- omega until the next strike. This makes the high point meet the dowel at EVERY release
+-- regardless of network jitter — the strike itself is self-timed off the metronome's schedule,
+-- not off any server event. anchorNet = cam net rotation pinned at the last strike; anchorAt =
+-- the SCHEDULED strike instant (metronome prevStrikeAt), not the frame time it was noticed.
 local anchorNet: number? = nil
 local anchorAt: number? = nil
+local lastMetroNow: number? = nil
 
 RoundUpdate.OnClientEvent:Connect(function(info)
     if info.phase == "ACTIVE" then
-        striking = false
-        if info.roundId ~= prevRoundId then
-            prevRoundId = info.roundId
-            local nowc = os.clock()
-            -- Measure the period ONCE (ACTIVE→ACTIVE), then FREEZE the rate. Re-measuring
-            -- every round let tiny period jitter wobble the cam's accumulated angle by the
-            -- strike (~±10°). A constant ω + the per-round re-anchor below = stable strike
-            -- orientation (no wobble) AND no long-term drift.
-            if lastActiveAt and not omegaLocked then
-                local period = nowc - lastActiveAt
-                if period > 5 and period < 120 then -- ignore restarts / outliers
-                    camOmega = 2 * math.pi / period
-                    omegaLocked = true
-                end
-            end
-            lastActiveAt = nowc
-        end
+        striking = false -- new round: the draw ramp owns the log again
     end
 end)
 
-EventBus.Cue.Event:Connect(function(cue)
-    if cue.kind == "gongStrike" then
-        striking = true
-        -- Pin the cam so its high point is on the dowel at THIS release. The high point
-        -- points along the cam's net rotation, so set net = the dowel's current world-angle
-        -- about the axle (+ a small fine-tune offset). It free-runs from here until the next.
-        local dp = dowels[1].Position
-        local fineDeg = (stage:GetAttribute("CamPhaseDeg") :: number) or CAM_PHASE_DEG
-        anchorNet = math.atan2(dp.Z - CAM_AXLE_YZ.Y, dp.Y - CAM_AXLE_YZ.X) + math.rad(fineDeg)
-        anchorAt = os.clock()
-        -- Stage 1: swing forward (toward the bell = -BACK) to overshoot into it.
-        local swing = TweenService:Create(
-            arm,
-            TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-            { CFrame = CFrame.new(-BACK * 0.8) * restCFrame }
-        )
-        swing.Completed:Connect(function()
-            -- Contact moment (the actual strike): the dowel kicks the pin-wheel HERE, not at
-            -- the swing's start — fire a "gongHit" cue so the drum spins on contact, not early.
-            EventBus.Cue:Fire({ kind = "gongHit" })
-            -- Contact moment: flash + basin ring fire here, not at cue time.
-            local light = Instance.new("PointLight")
-            light.Brightness = 6
-            light.Range = 18
-            light.Parent = gong
-            TweenService:Create(light, TweenInfo.new(0.25), { Brightness = 0 }):Play()
-            task.delay(0.3, function()
-                light:Destroy()
-            end)
-            for i = 1, 3 do
-                task.delay((i - 1) * 0.22, function()
-                    local ring = Instance.new("Part")
-                    ring.Shape = Enum.PartType.Cylinder
-                    ring.Anchored = true
-                    ring.CanCollide = false
-                    ring.Transparency = 0.35 + (i - 1) * 0.15
-                    ring.Color = WATER
-                    ring.Size = Vector3.new(0.25, 2, 2)
-                    ring.CFrame = CFrame.new(gong.Position.X, gong.Position.Y, gong.Position.Z)
-                        * CFrame.Angles(0, 0, math.rad(90))
-                    ring.Parent = workspace
-                    TweenService
-                        :Create(ring, TweenInfo.new(1.4, Enum.EasingStyle.Sine), {
-                            Size = Vector3.new(0.25, 30 - i * 4, 30 - i * 4),
-                            Transparency = 1,
-                        })
-                        :Play()
-                    task.delay(1.5, function()
-                        ring:Destroy()
-                    end)
-                end)
-            end
-            local splash = Instance.new("ParticleEmitter")
-            splash.Color = ColorSequence.new(WATER)
-            splash.Lifetime = NumberRange.new(0.5, 0.9)
-            splash.Speed = NumberRange.new(9, 14)
-            splash.SpreadAngle = Vector2.new(70, 70)
-            splash.Rate = 0
-            splash.Parent = gong
-            splash:Emit(36)
-            task.delay(1.2, function()
-                splash:Destroy()
-            end)
-            -- Stage 2: recoil back toward the wheel (+BACK), then settle to rest.
-            local recoil = TweenService:Create(
-                arm,
-                TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                { CFrame = CFrame.new(BACK * 1.1 + Vector3.new(0, 0.15, 0)) * restCFrame }
-            )
-            recoil.Completed:Connect(function()
-                TweenService:Create(
-                    arm,
-                    TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
-                    { CFrame = restCFrame }
-                ):Play()
-            end)
-            recoil:Play()
+-- The strike is SELF-TIMED from the metronome (spec: strike on schedule; late
+-- reveal data is absorbed by the drum, never by the bell). `atTime` is the
+-- scheduled strike instant: the cam anchors there, not at frame time.
+local function strike(atTime: number)
+    striking = true
+    -- Pin the cam so its high point is on the dowel at THIS release. The high point
+    -- points along the cam's net rotation, so set net = the dowel's current world-angle
+    -- about the axle (+ a small fine-tune offset). It free-runs from here until the next.
+    local dp = dowels[1].Position
+    local fineDeg = (stage:GetAttribute("CamPhaseDeg") :: number) or CAM_PHASE_DEG
+    anchorNet = math.atan2(dp.Z - CAM_AXLE_YZ.Y, dp.Y - CAM_AXLE_YZ.X) + math.rad(fineDeg)
+    anchorAt = atTime
+    -- Stage 1: swing forward (toward the bell = -BACK) to overshoot into it.
+    local swing = TweenService:Create(
+        arm,
+        TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        { CFrame = CFrame.new(-BACK * 0.8) * restCFrame }
+    )
+    swing.Completed:Connect(function()
+        -- Contact moment (the actual strike): the dowel kicks the pin-wheel HERE, not at
+        -- the swing's start — fire a "gongHit" cue so the drum spins on contact, not early.
+        EventBus.Cue:Fire({ kind = "gongHit" })
+        -- Contact moment: flash + basin ring fire here, not at cue time.
+        local light = Instance.new("PointLight")
+        light.Brightness = 6
+        light.Range = 18
+        light.Parent = gong
+        TweenService:Create(light, TweenInfo.new(0.25), { Brightness = 0 }):Play()
+        task.delay(0.3, function()
+            light:Destroy()
         end)
-        swing:Play()
-    end
-end)
+        for i = 1, 3 do
+            task.delay((i - 1) * 0.22, function()
+                local ring = Instance.new("Part")
+                ring.Shape = Enum.PartType.Cylinder
+                ring.Anchored = true
+                ring.CanCollide = false
+                ring.Transparency = 0.35 + (i - 1) * 0.15
+                ring.Color = WATER
+                ring.Size = Vector3.new(0.25, 2, 2)
+                ring.CFrame = CFrame.new(gong.Position.X, gong.Position.Y, gong.Position.Z)
+                    * CFrame.Angles(0, 0, math.rad(90))
+                ring.Parent = workspace
+                TweenService:Create(ring, TweenInfo.new(1.4, Enum.EasingStyle.Sine), {
+                    Size = Vector3.new(0.25, 30 - i * 4, 30 - i * 4),
+                    Transparency = 1,
+                }):Play()
+                task.delay(1.5, function()
+                    ring:Destroy()
+                end)
+            end)
+        end
+        local splash = Instance.new("ParticleEmitter")
+        splash.Color = ColorSequence.new(WATER)
+        splash.Lifetime = NumberRange.new(0.5, 0.9)
+        splash.Speed = NumberRange.new(9, 14)
+        splash.SpreadAngle = Vector2.new(70, 70)
+        splash.Rate = 0
+        splash.Parent = gong
+        splash:Emit(36)
+        task.delay(1.2, function()
+            splash:Destroy()
+        end)
+        -- Stage 2: recoil back toward the wheel (+BACK), then settle to rest.
+        local recoil = TweenService:Create(
+            arm,
+            TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+            { CFrame = CFrame.new(BACK * 1.1 + Vector3.new(0, 0.15, 0)) * restCFrame }
+        )
+        recoil.Completed:Connect(function()
+            TweenService:Create(
+                arm,
+                TweenInfo.new(0.5, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut),
+                { CFrame = restCFrame }
+            ):Play()
+        end)
+        recoil:Play()
+    end)
+    swing:Play()
+end
 
--- The shu-moku draws CONTINUOUSLY over the round (clock-anchored, like the cam) and is
--- still climbing when the strike interrupts it — so there is NO dwell/pause at the top.
--- p ramps 0→1 across the whole round period; the strike (gongStrike) always fires before
--- the round ends, so p is mid-climb at release and the swing takes over seamlessly.
+-- The shu-moku draws CONTINUOUSLY over the round (metronome-anchored, like the cam) and is
+-- still climbing when the self-timed strike interrupts it — so there is NO dwell/pause at
+-- the top. p (drawP from the metronome) ramps 0→1 across the whole round period, and the
+-- strike always fires before the round ends, so p is mid-climb at release and the swing
+-- takes over seamlessly.
 local DRAW_STUDS = 3.0 -- South draw at p=1; MIRRORS ArenaLayout.shuMoku.drawStuds (the cam flank is generated from it — keep DrawStuds attr ≤ it)
 RunService.Heartbeat:Connect(function()
     -- DRAW HOLD (tuning): while the "DrawHold" attribute is set, pin the log at FULL draw
@@ -370,8 +375,11 @@ RunService.Heartbeat:Connect(function()
     if hold then
         p = 1
     else
-        local period = if camOmega > 0 then 2 * math.pi / camOmega else 22
-        p = math.clamp((os.clock() - (lastActiveAt or os.clock())) / period, 0, 1)
+        local r = metronome:read(workspace:GetServerTimeNow())
+        if not r then
+            return -- no schedule yet: hold rest pose
+        end
+        p = r.drawP
     end
     local studs = stage:GetAttribute("DrawStuds") or DRAW_STUDS -- live-tunable draw length
     local drawZ = p * studs
@@ -379,13 +387,13 @@ RunService.Heartbeat:Connect(function()
     arm.CFrame = CFrame.new(BACK * drawZ + Vector3.new(0, riseY, 0)) * restCFrame
 end)
 
--- CONSTANT-SPEED cam. The cam turns continuously at the round rate (camOmega = 2π/period),
--- RE-PINNED at each strike so the high point is on the dowel at every release (anchoring
--- to ACTIVE wobbled ±10° round-to-round with the network jitter between the ACTIVE and
--- reveal events); before the first strike it free-runs from ACTIVE as a fallback. The ONLY
--- timing constraint is the high point at release — set by CAM_PHASE (live-tunable via the
--- "CamPhaseDeg" attribute, degrees). Everything else is sold by the cam PROFILE, not by
--- coupling. CAM_DIR flips the spin direction.
+-- CONSTANT-SPEED cam. The cam turns continuously at the metronome's rate (omega = 2π/period),
+-- RE-PINNED at each strike so the high point is on the dowel at every release — the strike
+-- is now self-timed off the metronome's schedule (no ACTIVE/reveal event jitter to inherit);
+-- before this client's first strike it free-runs phase-locked to the strike instants as a
+-- fallback. The ONLY timing constraint is the high point at release — set by CAM_PHASE
+-- (live-tunable via the "CamPhaseDeg" attribute, degrees). Everything else is sold by the cam
+-- PROFILE, not by coupling. CAM_DIR flips the spin direction.
 local CAM_DIR = 1
 local DRIVER_DIR = 1 -- sign of the driver gear + main shaft about Z (live-tunable "DriverDir")
 -- Publish the live-tunable knobs so they're visible/editable on RoshamboStage in the
@@ -402,13 +410,24 @@ RunService.Heartbeat:Connect(function()
     if #camSpinners == 0 then
         captureSpinners() -- parts hadn't replicated at init; keep trying until they do
     end
+    local nowSt = workspace:GetServerTimeNow()
+    local r = metronome:read(nowSt)
+    if r == nil then
+        return
+    end
+    if lastMetroNow and not striking and metronome:strikesBetween(lastMetroNow, nowSt) > 0 then
+        strike(r.prevStrikeAt)
+    end
+    lastMetroNow = nowSt
     -- Free-run at constant speed FROM the last release anchor (so the high point is on the
-    -- dowel at each strike, by construction). Before the first strike, free-run from ACTIVE.
+    -- dowel at each strike, by construction).
     local camNet
     if anchorNet and anchorAt then
-        camNet = anchorNet + CAM_DIR * camOmega * (os.clock() - anchorAt)
+        camNet = anchorNet + CAM_DIR * r.omega * (nowSt - anchorAt)
     else
-        camNet = CAM_DIR * camOmega * (os.clock() - (lastActiveAt or os.clock()))
+        -- before this client's first strike: constant-speed free-run, phase-locked
+        -- to the strike instants (high point lands near the dowel from round one)
+        camNet = CAM_DIR * r.camAngle
     end
     local rot = CFrame.Angles(camNet, 0, 0)
     for _, s in camSpinners do
@@ -429,7 +448,7 @@ RunService.Heartbeat:Connect(function()
     for _, s in jackSpinners do
         s.part.CFrame = s.pivotCF * jrot * s.pivotCF:Inverse() * s.restCF
     end
-    stage:SetAttribute("DriveOmega", driverDir * CAM_DIR * camOmega * REDUCTION) -- rad/s about Z, for the wheel
+    stage:SetAttribute("DriveOmega", driverDir * CAM_DIR * r.omega * REDUCTION) -- rad/s about Z, for the wheel
 end)
 
 -- Chains + drive rope FOLLOW the log every frame, whether the log is posed by
