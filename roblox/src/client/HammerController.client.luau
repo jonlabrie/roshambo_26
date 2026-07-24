@@ -89,16 +89,16 @@ for i, d in dowels do
 end
 
 -- ===== Bell-engine drive train (cam + gear-down) =====
--- The river wheel's main shaft → bevel gear-down → E-W cam shaft → single-lobe cam
--- that draws the shu-moku. We rotate these parts off the SAME draw value `p` the log
--- uses, so the cam visibly creeps the log back through ACTIVE and the gear pair
--- counter-rotates at the reduction — selling the linkage as causal (theatre, not
--- physics). Axle geometry mirrors ArenaLayout.bellDrive.
+-- The river wheel's main shaft → face wheel → lantern pinion → E-W cam shaft →
+-- snail cam that draws the shu-moku. The log's draw ramp and the cam run off
+-- SEPARATE anchors of the same nominal round clock (draw: the ACTIVE arrival;
+-- cam: re-pinned with its high point on the dowel at each strike, free-running
+-- at camOmega between) — selling the linkage as causal (theatre, not physics).
+-- Axle geometry mirrors ArenaLayout.bellDrive.
 local bell = stage:WaitForChild("BellDrive")
--- The cam is mechanically COUPLED to the draw (see the coupled-cam heartbeat below); it
--- no longer free-runs. camOmega is the measured round rate, kept only to time the DRAW
--- ramp (p = elapsed/period). Round length isn't in the payload, so we measure it
--- (ACTIVE→ACTIVE) and set ω = 2π/period; this default holds round 1.
+-- camOmega is the measured round rate: it times the DRAW ramp (p = elapsed/period)
+-- AND spins the cam + gear train. Round length isn't in the payload, so we measure
+-- it (ACTIVE→ACTIVE) once and freeze the rate; this default holds round 1.
 local camOmega = 2 * math.pi / 22 -- rad/s (≈ once per 22s until measured)
 local CAM_AXLE_YZ = Vector2.new(120.7, 11) -- E-W cam shaft: world-X axis through (y120.7, z11); MIRRORS ArenaLayout.bellDrive.camShaft
 local MAIN_AXLE_XY = Vector2.new(-15, 116) -- N-S main shaft: world-Z axis through (x-15, y116)
@@ -380,11 +380,12 @@ RunService.Heartbeat:Connect(function()
 end)
 
 -- CONSTANT-SPEED cam. The cam turns continuously at the round rate (camOmega = 2π/period),
--- anchored to the CURRENT round's ACTIVE so it re-zeroes each round (no accumulated drift)
--- and reaches the SAME orientation at the strike every round. The ONLY timing constraint is
--- that the high point is on the dowel at the moment of release (the strike) — set by CAM_PHASE
--- (live-tunable via the "CamPhaseDeg" attribute, degrees). Everything else is sold by the cam
--- PROFILE, not by coupling. CAM_DIR flips the spin direction.
+-- RE-PINNED at each strike so the high point is on the dowel at every release (anchoring
+-- to ACTIVE wobbled ±10° round-to-round with the network jitter between the ACTIVE and
+-- reveal events); before the first strike it free-runs from ACTIVE as a fallback. The ONLY
+-- timing constraint is the high point at release — set by CAM_PHASE (live-tunable via the
+-- "CamPhaseDeg" attribute, degrees). Everything else is sold by the cam PROFILE, not by
+-- coupling. CAM_DIR flips the spin direction.
 local CAM_DIR = 1
 local DRIVER_DIR = 1 -- sign of the driver gear + main shaft about Z (live-tunable "DriverDir")
 -- Publish the live-tunable knobs so they're visible/editable on RoshamboStage in the
