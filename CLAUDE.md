@@ -31,7 +31,9 @@ npm start          # node dist/index.js
 npm test           # vitest (also: npm run test:watch)
 ```
 
-Full local stack (server + frontend on :8080, backed by MongoDB Atlas — no local database):
+**Studio/PWA dev needs no local server**: the cloud dev backend (App Runner service `roshambo_server_dev`, see `README_DEPLOY.md` §0a) **auto-deploys every push** to the working branch (`m4b-zendojo-art-pass`) and is what `roblox/src/server/SecretsLocal.luau` points at — a push takes a few minutes to go live, and it changes the running dev backend immediately.
+
+Full local stack (server + frontend on :8080, backed by MongoDB Atlas — no local database), only for testing un-pushed server code:
 ```bash
 docker-compose up --build
 ```
