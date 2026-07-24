@@ -207,7 +207,9 @@ task.spawn(function()
         local camHub = bell:WaitForChild("Cam") :: BasePart
         -- geometry mirrors ArenaLayout.bellDrive/shuMoku (build-time constants;
         -- draw also mirrors DRAW_STUDS, declared later in this file)
-        local G = { gapZ = 2.2, draw = 3.0, rise = 0.45, dowelR = 0.25, dropDeg = 12, clearance = 0.5 }
+        -- clearance 0.5 -> 0.1: the metronome killed the cam-vs-draw drift the old
+        -- allowance covered; a hair remains for sub-second schedule slew.
+        local G = { gapZ = 2.2, draw = 3.0, rise = 0.45, dowelR = 0.25, dropDeg = 12, clearance = 0.1 }
         local mesh = CamMesh.build(G, 64, 0.35) -- halfWidth = camWidth/2
         local AssetService = game:GetService("AssetService")
         local em = AssetService:CreateEditableMesh()
