@@ -50,6 +50,12 @@ describe('/api/v1', () => {
             expect(res.body.phaseEndsAt).toBeGreaterThan(res.body.serverTime);
             expect(res.body.phaseEndsAt - res.body.serverTime).toBe(20000);
         });
+
+        it('states its phase durations (round-metronome schedule source)', async () => {
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .get('/api/v1/state').set('X-API-Key', API_KEY).expect(200);
+            expect(res.body.durations).toEqual({ activeMs: 20000, tallyMs: 2000, revealMs: 3000 });
+        });
     });
 
     describe('GET /rounds/:id/result', () => {

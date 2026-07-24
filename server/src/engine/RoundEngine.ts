@@ -59,6 +59,14 @@ export class RoundEngine extends EventEmitter {
         };
     }
 
+    durationsMs(): { activeMs: number; tallyMs: number; revealMs: number } {
+        return {
+            activeMs: this.cfg.activeSeconds * 1000,
+            tallyMs: this.cfg.tallySeconds * 1000,
+            revealMs: this.cfg.revealSeconds * 1000,
+        };
+    }
+
     submitThrow(key: string, entry: ThrowEntry): { accepted: boolean; reason?: string } {
         if (this.phase !== 'ACTIVE') return { accepted: false, reason: 'PICKS_CLOSED' };
         const existing = this.throws.get(key);

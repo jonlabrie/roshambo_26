@@ -30,6 +30,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             phase: snap.phase,
             phaseEndsAt: now + snap.secondsLeft * 1000,
             serverTime: now,
+            durations: engine.durationsMs(),
             roundCount: snap.roundCount,
             tape: store.tape(10),
         });
