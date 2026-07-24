@@ -19,6 +19,11 @@ export interface EngineConfig {
     revealSeconds: number;
     pickWorldThrow: (roundCount: number, counts: Record<Throw, number>) => Throw;
     makeRoundId: () => string;
+    // Optional wall clock. When provided, each phase transition is stamped so
+    // /state can report an EXACT phaseEndsAt: the integer-second countdown
+    // otherwise quantizes it with a 0-1s sawtooth that made the published
+    // round schedule wander (clients slewed after it every round).
+    nowMs?: () => number;
 }
 
 export interface EngineSnapshot {
@@ -26,6 +31,7 @@ export interface EngineSnapshot {
     phase: Phase;
     secondsLeft: number;
     roundCount: number;
+    phaseEndsAtMs?: number;
 }
 
 export interface RoundClosedEvent {
@@ -43,11 +49,18 @@ export class RoundEngine extends EventEmitter {
     private throws = new Map<string, ThrowEntry>();
     private ticking = false;
 
+    private phaseEndsAtMs?: number;
+
     constructor(private cfg: EngineConfig, initialRoundCount = 0) {
         super();
         this.secondsLeft = cfg.activeSeconds;
         this.roundCount = initialRoundCount;
         this.roundId = cfg.makeRoundId();
+        this.stampPhaseEnd(cfg.activeSeconds);
+    }
+
+    private stampPhaseEnd(durationSeconds: number): void {
+        if (this.cfg.nowMs) this.phaseEndsAtMs = this.cfg.nowMs() + durationSeconds * 1000;
     }
 
     snapshot(): EngineSnapshot {
@@ -56,6 +69,7 @@ export class RoundEngine extends EventEmitter {
             phase: this.phase,
             secondsLeft: this.secondsLeft,
             roundCount: this.roundCount,
+            phaseEndsAtMs: this.phaseEndsAtMs,
         };
     }
 
@@ -95,6 +109,7 @@ export class RoundEngine extends EventEmitter {
                 const worldThrow = this.cfg.pickWorldThrow(this.roundCount, counts);
                 this.phase = 'TALLY';
                 this.secondsLeft = this.cfg.tallySeconds;
+                this.stampPhaseEnd(this.cfg.tallySeconds);
                 const event: RoundClosedEvent = {
                     roundId: this.roundId, worldThrow, counts, throws: new Map(this.throws),
                 };
@@ -102,6 +117,7 @@ export class RoundEngine extends EventEmitter {
             } else if (this.phase === 'TALLY') {
                 this.phase = 'REVEAL';
                 this.secondsLeft = this.cfg.revealSeconds;
+                this.stampPhaseEnd(this.cfg.revealSeconds);
                 this.emit('revealStarted', { roundId: this.roundId });
             } else {
                 this.roundCount++;
@@ -109,6 +125,7 @@ export class RoundEngine extends EventEmitter {
                 this.throws.clear();
                 this.phase = 'ACTIVE';
                 this.secondsLeft = this.cfg.activeSeconds;
+                this.stampPhaseEnd(this.cfg.activeSeconds);
                 this.emit('roundStarted', this.snapshot());
             }
         }

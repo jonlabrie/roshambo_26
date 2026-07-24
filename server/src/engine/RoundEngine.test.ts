@@ -183,3 +183,21 @@ describe('RoundEngine.submitThrow', () => {
         expect(closed.mock.calls[0][0].counts).toEqual({ R: 0, P: 1, S: 0 });
     });
 });
+
+describe('RoundEngine exact phase clock', () => {
+    it('stamps phaseEndsAtMs from the injected clock at construction and each transition', () => {
+        let t = 100_000;
+        const engine = makeEngine({ nowMs: () => t });
+        // construction: ACTIVE for 3s from t=100000
+        expect(engine.snapshot().phaseEndsAtMs).toBe(103_000);
+        t = 101_000; engine.tick();
+        t = 102_000; engine.tick();
+        t = 103_250; engine.tick(); // transition tick lands 250ms late (interval jitter)
+        // TALLY stamped from the ACTUAL transition moment, not the quantized schedule
+        expect(engine.snapshot().phase).toBe('TALLY');
+        expect(engine.snapshot().phaseEndsAtMs).toBe(103_250 + 2_000);
+    });
+    it('omits phaseEndsAtMs without an injected clock (quantized fallback stays)', () => {
+        expect(makeEngine().snapshot().phaseEndsAtMs).toBeUndefined();
+    });
+});

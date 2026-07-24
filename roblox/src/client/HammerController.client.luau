@@ -442,14 +442,18 @@ RunService.Heartbeat:Connect(function()
     if striking and anchorAt and nowSt - anchorAt > 2 and r.drawP < 0.5 then
         striking = false
     end
-    -- Free-run at constant speed FROM the last release anchor (so the high point is on the
-    -- dowel at each strike, by construction).
+    -- Turn WITH the metronome's own camAngle (0 at each strike), offset by the
+    -- geometric anchor pinned at the last release. Deriving rotation from the
+    -- SAME timeline the draw ramp reads means schedule slew moves cam and dowel
+    -- TOGETHER — a wall-clock anchor here let them drift apart for a round
+    -- whenever the published strike wandered (gate finding), self-healing only
+    -- at the next re-pin.
     local camNet
-    if anchorNet and anchorAt then
-        camNet = anchorNet + CAM_DIR * r.omega * (nowSt - anchorAt)
+    if anchorNet then
+        camNet = anchorNet + CAM_DIR * r.camAngle
     else
-        -- before this client's first strike: constant-speed free-run, phase-locked
-        -- to the strike instants (high point lands near the dowel from round one)
+        -- before this client's first strike: the cliff tracks the strike instants
+        -- directly (high point lands near the dowel from round one)
         camNet = CAM_DIR * r.camAngle
     end
     local rot = CFrame.Angles(camNet, 0, 0)

@@ -28,7 +28,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
         res.json({
             roundId: snap.roundId,
             phase: snap.phase,
-            phaseEndsAt: now + snap.secondsLeft * 1000,
+            phaseEndsAt: snap.phaseEndsAtMs ?? now + snap.secondsLeft * 1000,
             serverTime: now,
             durations: engine.durationsMs(),
             roundCount: snap.roundCount,

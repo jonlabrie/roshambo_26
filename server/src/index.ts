@@ -44,6 +44,7 @@ function makeEngine(initialRoundCount: number): RoundEngine {
         pickWorldThrow: roundCount =>
             TEST_MODE ? THROWS[roundCount % 3] : THROWS[Math.floor(Math.random() * 3)],
         makeRoundId: () => Math.random().toString(36).substring(2, 9),
+        nowMs: () => Date.now(),
     }, initialRoundCount);
 }
 
