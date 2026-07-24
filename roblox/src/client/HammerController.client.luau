@@ -207,11 +207,21 @@ task.spawn(function()
         local camHub = bell:WaitForChild("Cam") :: BasePart
         -- geometry mirrors ArenaLayout.bellDrive/shuMoku (build-time constants;
         -- draw also mirrors DRAW_STUDS, declared later in this file)
-        -- clearance 0.35 = 0.1 slew hair + 0.25 dowel-radius shave (gate-measured:
-        -- the analytic path assumes contact out to full draw p=1, but the metronome
-        -- strike lands at drawP=(active+tally)/period ~= 0.88, so the flank ran
-        -- proud by ~one dowel radius and buried the face to the dowel's center).
-        local G = { gapZ = 2.2, draw = 3.0, rise = 0.45, dowelR = 0.25, dropDeg = 12, clearance = 0.35 }
+        -- strikeP maps the flank onto the metronome timeline (the strike lands at
+        -- drawP=(active+tally)/period, not full draw) — derived from the live
+        -- schedule so a round-length change rebuilds the right cam on next join.
+        local strikeP = ((scheduleConfig:GetAttribute("ActiveSec") :: number?) or 20)
+            + ((scheduleConfig:GetAttribute("TallySec") :: number?) or 2)
+        strikeP /= (scheduleConfig:GetAttribute("PeriodSec") :: number?) or 25
+        local G = {
+            gapZ = 2.2,
+            draw = 3.0,
+            rise = 0.45,
+            dowelR = 0.25,
+            dropDeg = 12,
+            clearance = 0.1,
+            strikeP = strikeP,
+        }
         local mesh = CamMesh.build(G, 64, 0.35) -- halfWidth = camWidth/2
         local AssetService = game:GetService("AssetService")
         local em = AssetService:CreateEditableMesh()

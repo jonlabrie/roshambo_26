@@ -124,8 +124,27 @@ describe("Snail cam geometry (mesh flank envelope)", function()
         dowelR = 0.25,
         dropDeg = d.camDropDeg,
         clearance = d.camClearance,
+        strikeP = d.camStrikeP,
     }
     local lobe = select(1, CamProfile.contact(1, G))
+    test("the flank tracks the METRONOME draw: cliff at strike-draw, base arc at rest", function()
+        -- the strike lands at drawP = (active+tally)/period, not full draw; the
+        -- cliff radius must match the dowel's ACTUAL position at the release
+        local sp = d.camStrikeP
+        local dz = G.gapZ + G.draw * sp
+        local dy = G.rise * sp * sp
+        expect(lobe).toBeCloseTo(math.sqrt(dz * dz + dy * dy) - G.dowelR - G.clearance, 0.001)
+        -- flank points that sweep the dowel while the log rests/strikes carry the
+        -- rest radius (a base arc spanning p = 0 .. 1-strikeP)
+        local restR = select(1, CamProfile.contact(0, G))
+        expect(select(1, CamProfile.contact(1 - sp, G))).toBeCloseTo(restR, 0.001)
+        -- and mid-draw: the point meeting the dowel at draw f carries EXACTLY f's radius
+        local f = 0.5
+        local r = select(1, CamProfile.contact(f + (1 - sp), G))
+        local fdz = G.gapZ + G.draw * f
+        local fdy = G.rise * f * f
+        expect(r).toBeCloseTo(math.sqrt(fdz * fdz + fdy * fdy) - G.dowelR - G.clearance, 0.001)
+    end)
     test("the sweep clears the BELL FACE (the hero-cam regression)", function()
         -- bell: centre z=0, radius 5.1 → face at z≈5.1 near the strike height
         expect(d.cam[3] - lobe >= 5.1 + 0.4).toBe(true)

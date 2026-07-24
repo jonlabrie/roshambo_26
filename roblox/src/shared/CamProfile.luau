@@ -15,16 +15,21 @@ export type Geom = {
     rise: number,
     dowelR: number,
     dropDeg: number,
-    clearance: number?, -- face generated this much shy of the dowel (the cam free-runs
-    -- strike-anchored while the draw ramp is ACTIVE-anchored, so the cam leads the
-    -- dowel by a fraction of the growth; clearance keeps the dowel riding just above
-    -- the face instead of burying — the old hand-measured cam's TIGHTEN, inverted)
+    clearance: number?, -- face generated this much shy of the dowel's surface
+    strikeP: number?, -- fraction of the round at which the strike lands
+    -- ((active+tally)/period; default 1 = legacy full-draw contact). The cam turns
+    -- one revolution per round with the cliff on the dowel at the strike, so the
+    -- flank point at parameter p sweeps the contact azimuth when the dowel's draw
+    -- fraction is q = p - (1-strikeP): points before that (p < 1-strikeP) meet a
+    -- RESTING dowel (base arc), and the cliff (p=1) meets the dowel at its actual
+    -- strike draw — uniform clearance through the whole draw by construction.
 }
 
 -- Contact radius + azimuth (degrees, from the rest direction toward the rise) at p.
 function CamProfile.contact(p: number, g: Geom): (number, number)
-    local dz = g.gapZ + g.draw * p
-    local dy = g.rise * p * p
+    local q = math.max(0, p - (1 - (g.strikeP or 1)))
+    local dz = g.gapZ + g.draw * q
+    local dy = g.rise * q * q
     return math.sqrt(dz * dz + dy * dy) - g.dowelR - (g.clearance or 0), math.deg(math.atan2(dy, dz))
 end
 
