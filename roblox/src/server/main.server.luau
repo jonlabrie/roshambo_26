@@ -29,6 +29,12 @@ else
 end
 dayNightConfig.Parent = ReplicatedStorage
 
+-- Round schedule for the client metronome (round-metronome spec): absolute times
+-- on the GetServerTimeNow timeline, refreshed by RoundCoordinator's onSchedule.
+local roundScheduleConfig = Instance.new("Configuration")
+roundScheduleConfig.Name = "RoundScheduleConfig"
+roundScheduleConfig.Parent = ReplicatedStorage
+
 local NetworkClient = require(script.Parent:WaitForChild("NetworkClient"))
 local RoundCoordinator = require(script.Parent:WaitForChild("RoundCoordinator"))
 local ThrowBuffer = require(script.Parent:WaitForChild("ThrowBuffer"))
@@ -275,6 +281,19 @@ local coordinator = RoundCoordinator.new({
                     end
                 end
             end
+        end,
+        onSchedule = function(s)
+            -- local epoch ms -> GetServerTimeNow seconds: both clocks are "now" here,
+            -- so carry the delta across.
+            local strikeSt = workspace:GetServerTimeNow() + (s.strikeAtMs - deps.now()) / 1000
+            roundScheduleConfig:SetAttribute("RoundId", s.roundId)
+            roundScheduleConfig:SetAttribute("RoundCount", s.roundCount)
+            roundScheduleConfig:SetAttribute("PeriodSec", s.periodMs / 1000)
+            roundScheduleConfig:SetAttribute("ActiveSec", s.activeMs / 1000)
+            roundScheduleConfig:SetAttribute("TallySec", s.tallyMs / 1000)
+            roundScheduleConfig:SetAttribute("RevealSec", s.revealMs / 1000)
+            -- StrikeAtServerTime LAST: clients pull the whole schedule on its change.
+            roundScheduleConfig:SetAttribute("StrikeAtServerTime", strikeSt)
         end,
         onReconciled = function(rows)
             for _, row in rows do
