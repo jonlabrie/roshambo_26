@@ -482,3 +482,118 @@ describe("RoundCoordinator v3 payload extensions", function()
         expect(reveals[1].results["9"]).toBeNil()
     end)
 end)
+
+describe("RoundCoordinator schedule publish (round metronome)", function()
+    local DUR = { activeMs = 20000, tallyMs = 2000, revealMs = 3000 }
+    local function makeScheduleRig(states: { any })
+        local schedules: { any } = {}
+        local idx = 0
+        local coordinator
+        local deps = {
+            net = {
+                getState = function(_self): any
+                    idx = math.min(idx + 1, #states)
+                    return states[idx]
+                end,
+                getRoundResult = function(): any
+                    return { ok = false, status = 404 }
+                end,
+                postThrows = function(): any
+                    return { ok = true, data = { accepted = 0, rejected = {} } }
+                end,
+                getInstanceResults = function(): any
+                    return { ok = false, status = 404 }
+                end,
+            },
+            -- fixed 500ms offset: local = server - 500
+            clock = {
+                addSample = function() end,
+                hasSync = function()
+                    return true
+                end,
+                toLocalTime = function(_self, serverMs: number)
+                    return serverMs - 500
+                end,
+            },
+            buffer = ThrowBuffer.new(),
+            rules = GameRules,
+            log = function() end,
+            random = function()
+                return 0
+            end,
+            now = function()
+                return 0
+            end,
+            instanceId = "spec",
+            callbacks = {
+                onSchedule = function(s)
+                    table.insert(schedules, s)
+                end,
+            },
+        }
+        coordinator = RoundCoordinator.new(deps)
+        return coordinator, schedules
+    end
+    local function stateOk(over: any)
+        local s = {
+            ok = true,
+            rttMs = 40,
+            localReceiveMs = 0,
+            data = {
+                roundId = "r1",
+                phase = "ACTIVE",
+                phaseEndsAt = 100000,
+                serverTime = 90000,
+                roundCount = 7,
+                tape = {},
+                durations = DUR,
+            },
+        }
+        for k, v in over do
+            s.data[k] = v
+        end
+        return s
+    end
+
+    test("ACTIVE publishes strike = phase end + tally (in local ms)", function()
+        local c, schedules = makeScheduleRig({ stateOk({}) })
+        c:pollOnce()
+        expect(#schedules).toBe(1)
+        -- toLocalTime(100000) = 99500; + tallyMs 2000
+        expect(schedules[1].strikeAtMs).toBe(101500)
+        expect(schedules[1].periodMs).toBe(25000)
+        expect(schedules[1].roundId).toBe("r1")
+        expect(schedules[1].roundCount).toBe(7)
+        expect(schedules[1].activeMs).toBe(20000)
+    end)
+
+    test("TALLY strike = phase end; REVEAL strike = next round's", function()
+        local c, schedules = makeScheduleRig({ stateOk({ phase = "TALLY" }), stateOk({ phase = "REVEAL" }) })
+        c:pollOnce()
+        c:pollOnce()
+        expect(#schedules).toBe(2)
+        expect(schedules[1].strikeAtMs).toBe(99500) -- TALLY ends at the strike
+        expect(schedules[2].strikeAtMs).toBe(99500 + 22000) -- REVEAL end + active + tally
+    end)
+
+    test("re-publishes only past the 150ms wobble gate", function()
+        local c, schedules = makeScheduleRig({
+            stateOk({}),
+            stateOk({ phaseEndsAt = 100100 }), -- strike moves 100ms: suppressed
+            stateOk({ phaseEndsAt = 100300 }), -- 300ms from published: republished
+        })
+        c:pollOnce()
+        c:pollOnce()
+        c:pollOnce()
+        expect(#schedules).toBe(2)
+        expect(schedules[2].strikeAtMs).toBe(101800)
+    end)
+
+    test("silent without durations or clock sync", function()
+        local noDur = stateOk({})
+        noDur.data.durations = nil
+        local c, schedules = makeScheduleRig({ noDur })
+        c:pollOnce()
+        expect(#schedules).toBe(0)
+    end)
+end)

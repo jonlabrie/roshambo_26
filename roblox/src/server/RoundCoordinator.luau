@@ -14,6 +14,7 @@ export type Callbacks = {
     onRound: ((info: any) -> ())?,
     onReveal: ((reveal: any) -> ())?,
     onReconciled: ((rows: any) -> ())?,
+    onSchedule: ((sched: any) -> ())?,
 }
 
 export type Deps = {
@@ -43,6 +44,8 @@ function RoundCoordinator.new(deps: Deps)
         _picksClosed = false,
         _pendingReconcileRoundId = nil :: string?,
         _whiffed = {} :: { [string]: boolean },
+        _publishedStrikeMs = nil :: number?,
+        _publishedRoundId = nil :: string?,
     }, RoundCoordinator)
 end
 
@@ -220,6 +223,41 @@ function RoundCoordinator.pollOnce(self: any): number
                 secondsToLockout = secondsToLockout,
                 tape = state.tape,
             })
+        end
+    end
+
+    -- Publish the round's absolute schedule (round-metronome spec): the strike is
+    -- reveal start = activeEnd + tally. Republish on roundId change or when sync
+    -- refinement moves the strike > 150ms; clients slew, so small edits are cheap.
+    local dur = state.durations
+    if dur and d.clock:hasSync() then
+        local endLocal = d.clock:toLocalTime(state.phaseEndsAt)
+        local strikeAtMs
+        if state.phase == "ACTIVE" then
+            strikeAtMs = endLocal + dur.tallyMs
+        elseif state.phase == "TALLY" then
+            strikeAtMs = endLocal
+        else -- REVEAL: the NEXT round's strike
+            strikeAtMs = endLocal + dur.activeMs + dur.tallyMs
+        end
+        if
+            self._publishedStrikeMs == nil
+            or self._publishedRoundId ~= state.roundId
+            or math.abs(strikeAtMs - self._publishedStrikeMs) > 150
+        then
+            self._publishedStrikeMs = strikeAtMs
+            self._publishedRoundId = state.roundId
+            if d.callbacks and d.callbacks.onSchedule then
+                d.callbacks.onSchedule({
+                    roundId = state.roundId,
+                    roundCount = state.roundCount,
+                    strikeAtMs = strikeAtMs,
+                    periodMs = dur.activeMs + dur.tallyMs + dur.revealMs,
+                    activeMs = dur.activeMs,
+                    tallyMs = dur.tallyMs,
+                    revealMs = dur.revealMs,
+                })
+            end
         end
     end
 
