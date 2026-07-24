@@ -10,8 +10,9 @@ describe("CamMesh (smooth snail extrusion)", function()
     local mesh = CamMesh.build(G, 64, 0.7)
     test("vertex/normal/triangle bookkeeping is consistent", function()
         expect(#mesh.verts).toBe(#mesh.normals)
-        expect(#mesh.verts).toBe(2 + 2 * 66) -- 2 centres + top/bottom rings of 65 samples + cliff foot
-        expect(#mesh.tris).toBe(4 * 66) -- fan top + fan bottom + 2 wall tris per segment
+        -- 2 centres + top/bottom rings of (9 base-arc + 64 locus) samples + cliff foot
+        expect(#mesh.verts).toBe(2 + 2 * 74)
+        expect(#mesh.tris).toBe(4 * 74) -- fan top + fan bottom + 2 wall tris per segment
         for _, t in mesh.tris do
             for _, i in t do
                 expect(i >= 1 and i <= #mesh.verts).toBe(true)

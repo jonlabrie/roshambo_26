@@ -128,8 +128,10 @@ local JACK_AXLE_XZ = Vector2.new(-15, 11) -- vertical lantern arbor: world-Y axi
 local JACK_DIR = 1 -- gear-corner handedness (gate-flipped from -1; live via "JackDir")
 local LANTERN_RATIO = 12 / 9 -- cogsMain/staves: the lantern spins this much faster than the main shaft
 local REDUCTION = 2 -- driver gear turns this much faster than the cam (integer → wraps seamlessly each round)
-local CAM_PHASE_DEG = -5 -- fine-tune offset for the high point at the strike (gate-tuned
--- live 2026-07-23: -5 lands the cliff on the release; each -7 ≈ +0.5s at the ~25s round).
+local CAM_PHASE_DEG = 0 -- fine-tune offset for the high point at the strike. The flank
+-- is built as the EXACT contact locus with the cliff at the anchor azimuth (CamProfile),
+-- so 0 is correct by construction — the old -5 compensated the legacy blend's ~5° cliff
+-- offset and is obsolete (a saved stage attribute overrides this default: keep it 0).
 -- Live-tunable via the stage "CamPhaseDeg" attribute. The metronome's slew keeps schedule
 -- refinements from stepping the cam; only a hard re-anchor (restart/new period) snaps it.
 

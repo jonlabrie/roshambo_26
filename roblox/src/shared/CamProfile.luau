@@ -17,31 +17,54 @@ export type Geom = {
     dropDeg: number,
     clearance: number?, -- face generated this much shy of the dowel's surface
     strikeP: number?, -- fraction of the round at which the strike lands
-    -- ((active+tally)/period; default 1 = legacy full-draw contact). The cam turns
-    -- one revolution per round with the cliff on the dowel at the strike, so the
-    -- flank point at parameter p sweeps the contact azimuth when the dowel's draw
-    -- fraction is q = p - (1-strikeP): points before that (p < 1-strikeP) meet a
-    -- RESTING dowel (base arc), and the cliff (p=1) meets the dowel at its actual
-    -- strike draw — uniform clearance through the whole draw by construction.
+    -- ((active+tally)/period; default 1). samples() builds the EXACT contact
+    -- locus for the metronome kinematics — see below.
 }
 
--- Contact radius + azimuth (degrees, from the rest direction toward the rise) at p.
-function CamProfile.contact(p: number, g: Geom): (number, number)
-    local q = math.max(0, p - (1 - (g.strikeP or 1)))
-    local dz = g.gapZ + g.draw * q
-    local dy = g.rise * q * q
+-- Dowel contact radius + azimuth (degrees, from the rest direction toward the
+-- rise) at draw fraction f — the DOWEL's state, not a flank parameter.
+function CamProfile.contact(f: number, g: Geom): (number, number)
+    local dz = g.gapZ + g.draw * f
+    local dy = g.rise * f * f
     return math.sqrt(dz * dz + dy * dy) - g.dowelR - (g.clearance or 0), math.deg(math.atan2(dy, dz))
 end
 
--- n+1 flank samples from rest (p=0, local angle just behind a full turn) to the
--- release (p=1, local angle = the tilted contact azimuth, right at the cliff).
--- The blend (1−p)·(360−dropDeg) + az·p is monotonic because the draw dominates.
+-- The flank as the EXACT runtime contact locus. Kinematics: the cam turns one
+-- revolution per round; the controller pins the cliff (local angle 0) on the
+-- dowel's azimuth at each strike (CamPhaseDeg's correct value is therefore 0).
+-- Between strikes the dowel, drawing with fraction f in [0, strikeP], meets the
+-- flank at local angle lambda(f) = 360·(strikeP − f) + az(f) − az(strikeP) —
+-- so we EMIT the dowel's own (lambda, radius) at each f: contact is uniform at
+-- `clearance` through the whole draw by construction, no angular model to drift.
+-- Points that sweep the dowel while the log rests/swings (lambda beyond
+-- lambda(0), up to the drop wall at 360 − dropDeg) form a rest-radius base arc.
+-- Output: descending local angle, first = base-arc start, last = the cliff (0).
 function CamProfile.samples(g: Geom, n: number): { { deg: number, r: number } }
+    local sp = g.strikeP or 1
+    local restR = CamProfile.contact(0, g)
+    local _, azStrike = CamProfile.contact(sp, g)
+    local lambda0 = 360 * sp - azStrike -- az(0) = 0: where the draw locus begins
+    local top = 360 - g.dropDeg
     local out = {}
-    for i = 0, n do
-        local p = i / n
-        local r, az = CamProfile.contact(p, g)
-        table.insert(out, { deg = (1 - p) * (360 - g.dropDeg) + az * p, r = r })
+    -- uniform DESCENDING angles top -> 0 (strictly monotone for any strikeP);
+    -- rest radius beyond the locus start, else invert lambda(f) per point
+    local total = n + 8
+    for i = 0, total do
+        local lam = top * (1 - i / total)
+        local r
+        if lam >= lambda0 then
+            r = restR
+        else
+            -- invert lambda(f) = 360(sp - f) + az(f) - azStrike; the az term is
+            -- tiny, so three fixed-point passes land well inside mesh tolerance
+            local f = sp - lam / 360
+            for _ = 1, 3 do
+                local _, az = CamProfile.contact(math.clamp(f, 0, sp), g)
+                f = sp - (lam - az + azStrike) / 360
+            end
+            r = CamProfile.contact(math.clamp(f, 0, sp), g)
+        end
+        table.insert(out, { deg = lam, r = r })
     end
     return out
 end

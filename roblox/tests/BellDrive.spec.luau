@@ -126,24 +126,35 @@ describe("Snail cam geometry (mesh flank envelope)", function()
         clearance = d.camClearance,
         strikeP = d.camStrikeP,
     }
-    local lobe = select(1, CamProfile.contact(1, G))
-    test("the flank tracks the METRONOME draw: cliff at strike-draw, base arc at rest", function()
-        -- the strike lands at drawP = (active+tally)/period, not full draw; the
-        -- cliff radius must match the dowel's ACTUAL position at the release
+    local lobe = select(1, CamProfile.contact(d.camStrikeP, G))
+    test("the flank IS the runtime contact locus: cliff at 0, base arc, exact radii", function()
+        -- samples() emits the dowel's cam-local position for each draw fraction f:
+        -- lambda(f) = 360(sp-f) + az(f) - az(sp), r(f) = dowel radius at f. The
+        -- cliff (f=sp) lands at lambda 0 exactly — CamPhaseDeg's correct value is 0.
         local sp = d.camStrikeP
-        local dz = G.gapZ + G.draw * sp
-        local dy = G.rise * sp * sp
-        expect(lobe).toBeCloseTo(math.sqrt(dz * dz + dy * dy) - G.dowelR - G.clearance, 0.001)
-        -- flank points that sweep the dowel while the log rests/strikes carry the
-        -- rest radius (a base arc spanning p = 0 .. 1-strikeP)
-        local restR = select(1, CamProfile.contact(0, G))
-        expect(select(1, CamProfile.contact(1 - sp, G))).toBeCloseTo(restR, 0.001)
-        -- and mid-draw: the point meeting the dowel at draw f carries EXACTLY f's radius
-        local f = 0.5
-        local r = select(1, CamProfile.contact(f + (1 - sp), G))
-        local fdz = G.gapZ + G.draw * f
-        local fdy = G.rise * f * f
-        expect(r).toBeCloseTo(math.sqrt(fdz * fdz + fdy * fdy) - G.dowelR - G.clearance, 0.001)
+        local pts = CamProfile.samples(G, 64)
+        local first, last = pts[1], pts[#pts]
+        expect(first.deg).toBeCloseTo(360 - G.dropDeg, 0.001) -- base arc starts behind the drop wall
+        expect(first.r).toBeCloseTo(select(1, CamProfile.contact(0, G)), 0.001) -- at rest radius
+        expect(last.deg).toBeCloseTo(0, 0.001) -- the cliff at the anchor azimuth
+        expect(last.r).toBeCloseTo(select(1, CamProfile.contact(sp, G)), 0.001) -- at strike draw
+        -- monotone descending angles (CamMesh polygon requirement)
+        for i = 2, #pts do
+            expect(pts[i].deg < pts[i - 1].deg).toBe(true)
+        end
+        -- mid-draw locus: find the sample for f = sp/2 and check its exact (deg, r)
+        local f = sp / 2
+        local rf, azf = CamProfile.contact(f, G)
+        local _, azsp = CamProfile.contact(sp, G)
+        local wantDeg = 360 * (sp - f) + azf - azsp
+        local best
+        for _, p in pts do
+            if best == nil or math.abs(p.deg - wantDeg) < math.abs(best.deg - wantDeg) then
+                best = p
+            end
+        end
+        expect(math.abs(best.deg - wantDeg) < 4).toBe(true) -- within one sample step
+        expect(best.r).toBeCloseTo(rf, 0.05) -- radius tracks the dowel through mid-draw
     end)
     test("the sweep clears the BELL FACE (the hero-cam regression)", function()
         -- bell: centre z=0, radius 5.1 → face at z≈5.1 near the strike height
