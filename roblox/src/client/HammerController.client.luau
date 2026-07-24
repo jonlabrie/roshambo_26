@@ -221,7 +221,7 @@ task.spawn(function()
             rise = 0.45,
             dowelR = 0.25,
             dropDeg = 12,
-            clearance = 0.1,
+            clearance = 0.03, -- visual touch; slew wobble at worst grazes the round dowel
             strikeP = strikeP,
         }
         local mesh = CamMesh.build(G, 64, 0.35) -- halfWidth = camWidth/2
