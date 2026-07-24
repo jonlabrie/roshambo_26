@@ -72,7 +72,8 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
         r: number,
         nCogs: number,
         axis: string,
-        towards: number
+        towards: number,
+        phaseDeg: number
     )
         table.insert(
             children,
@@ -86,7 +87,7 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             })
         )
         for k = 1, nCogs do
-            local a = (k - 1) * 2 * math.pi / nCogs
+            local a = math.rad(phaseDeg) + (k - 1) * 2 * math.pi / nCogs
             local ringR = r - 0.25
             local u, v = math.cos(a) * ringR, math.sin(a) * ringR
             local len = 1.0 + cogJig(0.06) -- gate-shaved ~2in: protrude 0.4, tails still 0.2 proud
@@ -113,8 +114,16 @@ function BellDrive.build(palette: { [string]: { number } }, L: any)
             )
         end
     end
-    faceCogWheel("FaceWheelMain", d.faceWheelMain, d.faceWheelMainR, d.faceWheelMainCogs, "Z", 1)
-    faceCogWheel("CamFaceWheel", d.camFaceWheel, d.camFaceWheelR, d.camFaceWheelCogs, "X", -1)
+    faceCogWheel(
+        "FaceWheelMain",
+        d.faceWheelMain,
+        d.faceWheelMainR,
+        d.faceWheelMainCogs,
+        "Z",
+        1,
+        d.faceWheelMainPhaseDeg
+    )
+    faceCogWheel("CamFaceWheel", d.camFaceWheel, d.camFaceWheelR, d.camFaceWheelCogs, "X", -1, 0)
     -- CamFaceWheel dressing: three through-spokes proud of the EAST face (gate: on
     -- the west they swept through the lantern's top flange — tolerances are tight)
     for s = 1, 3 do

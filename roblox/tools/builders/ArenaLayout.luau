@@ -193,6 +193,7 @@ local ArenaLayout = {
         faceWheelMain = { -15, 116, 9.65 }, -- NORTH of the cage (gate: south read backwards); disc clear of the stave sweep
         faceWheelMainR = 1.6,
         faceWheelMainCogs = 12,
+        faceWheelMainPhaseDeg = -5, -- cog-ring azimuth: retard so cogs comb the stave GAPS (gate-tuned live 2026-07-23)
         camFaceWheel = { -13.65, 120.7, 11 }, -- disc plane clear of the stave sweep (x ≥ -13.96)
         camFaceWheelR = 3.2,
         camFaceWheelCogs = 24, -- /faceWheelMainCogs MIRRORS HammerController REDUCTION = 2

@@ -54,6 +54,14 @@ describe("BellDrive drive train (face-cog wheels + lantern pinion)", function()
         expect(d.camFaceWheelCogs / d.faceWheelMainCogs).toBeCloseTo(2, 0.001) -- REDUCTION mirror
         expect(staves).toBe(d.lantern.staves)
     end)
+    test("the main face wheel's cogs carry the gate-tuned mesh phase", function()
+        -- cogs land on the stave gaps, not the staves (gate-tuned live 2026-07-23)
+        local phase = math.rad(d.faceWheelMainPhaseDeg)
+        local ringR = d.faceWheelMainR - 0.25
+        local cf = byName.FaceWheelMain_C1.properties.CFrame
+        expect(cf[1]).toBeCloseTo(d.faceWheelMain[1] + math.cos(phase) * ringR, 0.001)
+        expect(cf[2]).toBeCloseTo(d.faceWheelMain[2] + math.sin(phase) * ringR, 0.001)
+    end)
     test("the arbor and cage clear both horizontal shafts (the intersection bugs)", function()
         -- the cage sits BELOW the cam shaft at the plan crossing: vertical clearance
         expect(d.camShaft.y - 0.5 >= d.jack.yTop + 0.3).toBe(true)
