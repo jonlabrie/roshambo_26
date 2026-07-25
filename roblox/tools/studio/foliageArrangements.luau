@@ -267,10 +267,11 @@ local function stamp(arr: Arrangement, ax: number, az: number, labelled: boolean
         post.Material = Enum.Material.Neon
         post.Parent = group
         local bb = Instance.new("BillboardGui")
-        bb.Size = UDim2.fromOffset(220, 36)
+        -- Scale (studs-relative), NOT Offset (pixels) — pixel labels never shrink with
+        -- distance and clutter the valley view from the square.
+        bb.Size = UDim2.fromScale(16, 2.6)
         bb.StudsOffset = Vector3.new(0, 6, 0)
-        bb.AlwaysOnTop = true
-        bb.MaxDistance = 250
+        bb.MaxDistance = 120
         bb.Parent = post
         local txt = Instance.new("TextLabel")
         txt.Size = UDim2.fromScale(1, 1)
