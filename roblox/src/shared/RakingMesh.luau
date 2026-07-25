@@ -17,6 +17,8 @@ export type Geom = {
     maxR: number,
     pitch: number?, -- crest-to-crest spacing (radial)
     amplitude: number?, -- crest height above the valleys
+    soft: number?, -- 0 = hard-faceted V crests, 1 = fully smooth; the happy medium
+    -- lives between (band-edge normals blend toward their neighbour band's)
 }
 
 export type Sample = { r: number, h: number }
@@ -51,22 +53,43 @@ end
 
 function RakingMesh.build(g: Geom, segments: number): Mesh
     local prof = RakingMesh.profile(g)
+    local soft = g.soft or 0
     local verts: { { number } } = {}
     local normals: { { number } } = {}
     local tris: { Tri } = {}
+    -- per-band flat normals in the radial plane: {nr, ny}
+    local bandN: { { number } } = {}
     for b = 1, #prof - 1 do
         local a, c = prof[b], prof[b + 1]
         local dr, dh = c.r - a.r, c.h - a.h
         local len = math.sqrt(dr * dr + dh * dh)
-        local nr, ny = -dh / len, dr / len -- the band's flat outward-up normal
+        table.insert(bandN, { -dh / len, dr / len })
+    end
+    -- edge normal = band normal blended `soft` of the way toward the smoothed
+    -- (neighbour-averaged) normal at that profile sample
+    local function edgeN(b: number, sampleBand: number): (number, number)
+        local own = bandN[b]
+        local nb = bandN[sampleBand] or own
+        local sr, sy = own[1] + nb[1], own[2] + nb[2]
+        local sl = math.sqrt(sr * sr + sy * sy)
+        sr, sy = sr / sl, sy / sl
+        local r = own[1] + (sr - own[1]) * soft
+        local y = own[2] + (sy - own[2]) * soft
+        local l = math.sqrt(r * r + y * y)
+        return r / l, y / l
+    end
+    for b = 1, #prof - 1 do
+        local a, c = prof[b], prof[b + 1]
+        local inR, inY = edgeN(b, b - 1) -- inner edge blends toward the previous band
+        local outR, outY = edgeN(b, b + 1) -- outer edge blends toward the next band
         local base = #verts
         for s = 0, segments - 1 do
             local th = (s / segments) * 2 * math.pi
             local cs, sn = math.cos(th), math.sin(th)
             table.insert(verts, { cs * a.r, a.h, sn * a.r })
-            table.insert(normals, { cs * nr, ny, sn * nr })
+            table.insert(normals, { cs * inR, inY, sn * inR })
             table.insert(verts, { cs * c.r, c.h, sn * c.r })
-            table.insert(normals, { cs * nr, ny, sn * nr })
+            table.insert(normals, { cs * outR, outY, sn * outR })
         end
         for s = 0, segments - 1 do
             local s2 = (s + 1) % segments
