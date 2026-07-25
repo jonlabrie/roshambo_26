@@ -74,7 +74,7 @@ local function buildRings(island: BasePart)
                 local dx = math.abs(island.Position.X - f.Position.X)
                 local dz = math.abs(island.Position.Z - f.Position.Z)
                 if dx <= f.Size.X / 2 and dz <= f.Size.Z / 2 then
-                    ringY = f.Position.Y + f.Size.Y / 2 - 0.05 -- sunk slightly: crests ride ~0.1 proud
+                    ringY = f.Position.Y + f.Size.Y / 2 + 0.01 -- valleys must stay ABOVE the slab: sinking lets the field's furrows poke through = moire
                     break
                 end
             end
