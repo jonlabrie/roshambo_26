@@ -131,7 +131,7 @@ local ArenaLayout = {
         -- and the wheel run west. Guards enclose the machine — the ritual heart
         -- is approached by eye.
         panels = {
-            main = { -16, -10, 34, 28 },
+            main = { -21, -10, 34, 18 }, -- gate-tuned: +5 west (shaft run + corner pillow in), -10 south
         },
         corridors = {
             eastCorridor = { 34, -10, 54, 38 }, -- kerb face -> Overlook west face
