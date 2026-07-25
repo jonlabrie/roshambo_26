@@ -21,7 +21,15 @@ local RING_BAND = 3.2 -- ripple field extends this far beyond the island footpri
 
 local SAND = Color3.new(0.87, 0.85, 0.79) -- matches the Field slabs
 
+-- re-tagging an island in Studio refreshes its rings instead of stacking duplicates
+local built: { [BasePart]: BasePart } = {}
+
 local function buildRings(island: BasePart)
+    local old = built[island]
+    if old then
+        old:Destroy()
+        built[island] = nil
+    end
     local footprintR = math.max(island.Size.X, island.Size.Z) / 2
     local g = {
         footprintR = footprintR,
@@ -55,6 +63,7 @@ local function buildRings(island: BasePart)
         local fieldTopY = 112.15 -- floorY + slabProud; MIRRORS ArenaLayout.karesansui
         part.CFrame = CFrame.new(island.Position.X, fieldTopY, island.Position.Z)
         part.Parent = garden
+        built[island] = part
     end)
     if not ok then
         warn(`[KARESANSUI] rings skipped for {island:GetFullName()}: {err}`)
