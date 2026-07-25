@@ -1,110 +1,84 @@
 --!strict
--- Concentric ripple-ridge geometry for the raked-sand rings around zen-garden
--- boulder islands. PURE: emits a vertex/normal/triangle description; the runtime
--- (a client controller) assembles it into an EditableMesh (EditableMesh isn't
--- available under Lune, and server-created EditableMesh parts don't replicate —
--- see the glyph/river lessons).
+-- Solid scalloped ripple disc for the karesansui boulder islands (v2). PURE:
+-- emits a vertex/normal/triangle description; KaresansuiController assembles it
+-- into an EditableMesh client-side (the CamMesh pattern).
 --
--- Local frame: XZ plane (Y up), centred on the island. Each concentric ring is a
--- triangular ridge cross-section — inner foot at y=0, crest at y=amplitude, outer
--- foot at y=0 — swept around `segments` points.
-
+-- v1 emitted separate ridge rings with gaps — the field's linear furrow texture
+-- showed through and produced moire against the circles (gate finding). v2 is a
+-- CONTINUOUS annular surface (vinyl-record scallops): valley at the stone edge,
+-- alternating crests every pitch/2 radially, ending on a valley at the rim — the
+-- field is fully covered under the disc. Bands are FLAT-SHADED (duplicated verts,
+-- one hard normal per band) so every crest is a crisp V like the field's furrows.
+-- Local space, centred on the island, XZ plane, valleys at y=0.
 local RakingMesh = {}
 
 export type Geom = {
     footprintR: number,
     maxR: number,
-    pitch: number?,
-    amplitude: number?,
-    ridgeW: number?,
+    pitch: number?, -- crest-to-crest spacing (radial)
+    amplitude: number?, -- crest height above the valleys
 }
 
-export type Tri = { number } -- {i1, i2, i3} 1-based into verts
+export type Sample = { r: number, h: number }
+
+export type Tri = { number }
 export type Mesh = {
-    verts: { { number } }, -- {x, y, z} local-space positions
-    normals: { { number } }, -- one per vert
+    verts: { { number } },
+    normals: { { number } },
     tris: { Tri },
 }
 
-local DEFAULT_PITCH = 0.8
-local DEFAULT_AMPLITUDE = 0.15
-local DEFAULT_RIDGE_W = 0.5
-
--- Ring center radii: first at footprintR + pitch/2, stepping by pitch, kept while
--- the ridge's outer foot still fits inside maxR.
-function RakingMesh.ringRadii(g: Geom): { number }
-    local pitch = g.pitch or DEFAULT_PITCH
-    local ridgeW = g.ridgeW or DEFAULT_RIDGE_W
-    local radii: { number } = {}
-    local r = g.footprintR + pitch / 2
-    while r + ridgeW / 2 <= g.maxR do
-        table.insert(radii, r)
-        r += pitch
+-- Radial cross-section: samples every pitch/2 from the stone edge outward,
+-- heights alternating valley (0) / crest (amplitude); trimmed to end on a valley.
+function RakingMesh.profile(g: Geom): { Sample }
+    local pitch = g.pitch or 0.35
+    local amp = g.amplitude or 0.12
+    local out: { Sample } = {}
+    local k = 0
+    while true do
+        local r = g.footprintR + k * pitch / 2
+        if r > g.maxR + 1e-9 then
+            break
+        end
+        table.insert(out, { r = r, h = if k % 2 == 1 then amp else 0 })
+        k += 1
     end
-    return radii
+    if #out % 2 == 0 then
+        table.remove(out) -- odd count = valley at both ends
+    end
+    return out
 end
 
 function RakingMesh.build(g: Geom, segments: number): Mesh
-    local amplitude = g.amplitude or DEFAULT_AMPLITUDE
-    local ridgeW = g.ridgeW or DEFAULT_RIDGE_W
-    local radii = RakingMesh.ringRadii(g)
-
+    local prof = RakingMesh.profile(g)
     local verts: { { number } } = {}
     local normals: { { number } } = {}
     local tris: { Tri } = {}
-
-    -- ridge-face normal blend: unit vectors tilted between radial-out and up
-    local hyp = math.sqrt(amplitude ^ 2 + (ridgeW / 2) ^ 2)
-    local a = amplitude / hyp
-    local b = (ridgeW / 2) / hyp
-
-    -- per ring: 3 circles (inner foot, crest, outer foot), `segments` verts each,
-    -- laid out contiguously so ring base index + circle offset + segment gives
-    -- the vert index.
-    for _, r in radii do
-        for k = 1, segments do
-            local theta = (k - 1) * 2 * math.pi / segments
-            local cosT, sinT = math.cos(theta), math.sin(theta)
-
-            -- inner foot
-            table.insert(verts, { (r - ridgeW / 2) * cosT, 0, (r - ridgeW / 2) * sinT })
-            table.insert(normals, { -cosT * a, b, -sinT * a })
-
-            -- crest
-            table.insert(verts, { r * cosT, amplitude, r * sinT })
-            table.insert(normals, { 0, 1, 0 })
-
-            -- outer foot
-            table.insert(verts, { (r + ridgeW / 2) * cosT, 0, (r + ridgeW / 2) * sinT })
-            table.insert(normals, { cosT * a, b, sinT * a })
+    for b = 1, #prof - 1 do
+        local a, c = prof[b], prof[b + 1]
+        local dr, dh = c.r - a.r, c.h - a.h
+        local len = math.sqrt(dr * dr + dh * dh)
+        local nr, ny = -dh / len, dr / len -- the band's flat outward-up normal
+        local base = #verts
+        for s = 0, segments - 1 do
+            local th = (s / segments) * 2 * math.pi
+            local cs, sn = math.cos(th), math.sin(th)
+            table.insert(verts, { cs * a.r, a.h, sn * a.r })
+            table.insert(normals, { cs * nr, ny, sn * nr })
+            table.insert(verts, { cs * c.r, c.h, sn * c.r })
+            table.insert(normals, { cs * nr, ny, sn * nr })
+        end
+        for s = 0, segments - 1 do
+            local s2 = (s + 1) % segments
+            local i0 = base + s * 2 + 1
+            local o0 = base + s * 2 + 2
+            local i1 = base + s2 * 2 + 1
+            local o1 = base + s2 * 2 + 2
+            -- wound so faces point up/outward (verified: +Y cross components)
+            table.insert(tris, { i0, o1, o0 })
+            table.insert(tris, { i0, i1, o1 })
         end
     end
-
-    local function innerIdx(ring: number, k: number): number
-        return (ring - 1) * segments * 3 + (k - 1) * 3 + 1
-    end
-    local function crestIdx(ring: number, k: number): number
-        return (ring - 1) * segments * 3 + (k - 1) * 3 + 2
-    end
-    local function outerIdx(ring: number, k: number): number
-        return (ring - 1) * segments * 3 + (k - 1) * 3 + 3
-    end
-
-    for ring = 1, #radii do
-        for k = 1, segments do
-            local k2 = (k % segments) + 1
-
-            -- inner -> crest strip (faces up/inward-facing-out): wind so normal
-            -- points +Y-ish, matching the inner-foot/crest normals above.
-            table.insert(tris, { innerIdx(ring, k), innerIdx(ring, k2), crestIdx(ring, k2) })
-            table.insert(tris, { innerIdx(ring, k), crestIdx(ring, k2), crestIdx(ring, k) })
-
-            -- crest -> outer strip
-            table.insert(tris, { crestIdx(ring, k), outerIdx(ring, k2), outerIdx(ring, k) })
-            table.insert(tris, { crestIdx(ring, k), crestIdx(ring, k2), outerIdx(ring, k2) })
-        end
-    end
-
     return { verts = verts, normals = normals, tris = tris }
 end
 

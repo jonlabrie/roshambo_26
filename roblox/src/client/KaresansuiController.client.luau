@@ -13,10 +13,9 @@ local RakingMesh = require(shared:WaitForChild("RakingMesh"))
 local stage = workspace:WaitForChild("RoshamboStage")
 local garden = stage:WaitForChild("Karesansui")
 
-local SEGMENTS = 48
+local SEGMENTS = 96 -- solid disc: fine segments keep the circles round up close
 local PITCH = 0.35 -- ring spacing (gate-tuned tighter than the field rows)
 local AMPLITUDE = 0.15
-local RIDGE_W = 0.28 -- slimmer ridges read finer against the 0.52 field pitch
 local RING_BAND = 3.2 -- ripple field extends this far beyond the island footprint
 local FOOT_TUCK = 0.7 -- rings start under the stone's overhang: the axis-aligned
 -- footprint overestimates rotated/irregular rocks, and rings should touch the stone
@@ -39,7 +38,6 @@ local function buildRings(island: BasePart)
         maxR = footprintR + RING_BAND,
         pitch = PITCH,
         amplitude = AMPLITUDE,
-        ridgeW = RIDGE_W,
     }
     local ok, err = pcall(function()
         local m = RakingMesh.build(g, SEGMENTS)

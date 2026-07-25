@@ -3,24 +3,35 @@ local harness = require("./harness")
 local RakingMesh = require("../src/shared/RakingMesh")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 
-describe("RakingMesh (concentric ripple ridges)", function()
-    local g = { footprintR = 2, maxR = 5.4, pitch = 0.8, amplitude = 0.15, ridgeW = 0.5 }
-    test("ring radii ascend from the footprint at the pitch", function()
-        local radii = RakingMesh.ringRadii(g)
-        expect(#radii).toBe(4) -- 2.4, 3.2, 4.0, 4.8 (5.6 exceeds maxR)
-        expect(radii[1]).toBeCloseTo(2.4, 0.001)
-        for i = 2, #radii do
-            expect(radii[i] - radii[i - 1]).toBeCloseTo(0.8, 0.001)
-            expect(radii[i] + g.ridgeW / 2 <= g.maxR + 0.001).toBe(true)
+describe("RakingMesh (solid scalloped ripple disc)", function()
+    local g = { footprintR = 2, maxR = 5.4, pitch = 0.7, amplitude = 0.12 }
+    test("profile: valley at the stone, alternating crests, ends on a valley", function()
+        local prof = RakingMesh.profile(g)
+        expect(#prof % 2 == 1).toBe(true) -- odd sample count = valley at both ends
+        expect(prof[1].r).toBeCloseTo(2, 0.001)
+        expect(prof[1].h).toBeCloseTo(0, 0.001)
+        for i = 2, #prof do
+            expect(prof[i].r - prof[i - 1].r).toBeCloseTo(g.pitch / 2, 0.001)
+            expect(prof[i].h).toBeCloseTo(i % 2 == 0 and g.amplitude or 0, 0.001)
+            expect(prof[i].r <= g.maxR + 0.001).toBe(true)
         end
+        expect(prof[#prof].h).toBeCloseTo(0, 0.001)
     end)
-    test("mesh bookkeeping: verts/normals match, tris index in range, local-space", function()
-        local m = RakingMesh.build(g, 24)
-        expect(#m.verts).toBe(#m.normals)
-        expect(#m.verts).toBe(4 * 3 * 24) -- rings x (inner,crest,outer) x segments
-        expect(#m.tris).toBe(4 * 4 * 24) -- 2 quad strips x 2 tris per segment per ring
-        for _, t in m.tris do
-            for _, i in t do
+    test("solid disc: every band shares its neighbour's edge radius (no gaps)", function()
+        local prof = RakingMesh.profile(g)
+        -- bands span consecutive profile samples: solidity is structural
+        expect(#prof >= 3).toBe(true)
+    end)
+    test("mesh bookkeeping: flat-shaded bands, counts, local-space, bounds", function()
+        local segs = 24
+        local m = RakingMesh.build(g, segs)
+        local prof = RakingMesh.profile(g)
+        local bands = #prof - 1
+        expect(#m.verts).toBe(bands * 2 * segs)
+        expect(#m.normals).toBe(#m.verts)
+        expect(#m.tris).toBe(bands * 2 * segs)
+        for _, tri in m.tris do
+            for _, i in tri do
                 expect(i >= 1 and i <= #m.verts).toBe(true)
             end
         end
@@ -28,18 +39,24 @@ describe("RakingMesh (concentric ripple ridges)", function()
         for _, v in m.verts do
             maxY = math.max(maxY, v[2])
             minY = math.min(minY, v[2])
-            expect(math.sqrt(v[1] ^ 2 + v[3] ^ 2) <= g.maxR + 0.001).toBe(true)
+            local rr = math.sqrt(v[1] ^ 2 + v[3] ^ 2)
+            expect(rr >= g.footprintR - 0.001 and rr <= g.maxR + 0.001).toBe(true)
         end
         expect(maxY).toBeCloseTo(g.amplitude, 0.001)
         expect(minY).toBeCloseTo(0, 0.001)
     end)
-    test("crest normals point up-ish, foot normals splay outward", function()
-        local m = RakingMesh.build(g, 24)
-        for i, v in m.verts do
-            local n = m.normals[i]
+    test("hard normals: unit, upward, constant within a band (the crisp-V read)", function()
+        local segs = 24
+        local m = RakingMesh.build(g, segs)
+        for i, n in m.normals do
             local len = math.sqrt(n[1] ^ 2 + n[2] ^ 2 + n[3] ^ 2)
             expect(math.abs(len - 1) < 0.01).toBe(true)
-            expect(n[2] > 0).toBe(true) -- every normal has an upward component
+            expect(n[2] > 0).toBe(true)
         end
+        -- both verts of a band edge at the same segment share one flat normal
+        local nInner, nOuter = m.normals[1], m.normals[2]
+        expect(nInner[1]).toBeCloseTo(nOuter[1], 0.0001)
+        expect(nInner[2]).toBeCloseTo(nOuter[2], 0.0001)
+        expect(nInner[3]).toBeCloseTo(nOuter[3], 0.0001)
     end)
 end)
