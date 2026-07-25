@@ -117,21 +117,21 @@ local ArenaLayout = {
     -- square's MAIN STREETS (crowd-width, inviolable — no kerb/slab/guard may enter);
     -- the merchant row later builds against the SAME shopCorridor reservation.
     karesansui = {
-        -- per-panel TRUE grade (probed 2026-07-24: east flat 113.0; south slopes
-        -- 111.8..113.1 — a flat bed sits proud of its HIGHEST ground)
-        floorY = { east = 113.0, south = 113.1 },
+        -- TRUE grade across the garden (probed 2026-07-24: 111.8..113.07 — a flat
+        -- bed sits proud of its HIGHEST ground)
+        floorY = { main = 113.1 },
         kerbW = 0.8, -- dressed-slate frame (bearing-plinth vocabulary)
         kerbProud = 0.5,
         kerbH = 2.0, -- rooted below grade through the south panel's dip
         slabProud = 0.15, -- raked field rides proud of the terrace like flags-of-bed
         guardH = 3.5, -- EngawaBarrier low guard: blocks walking, never traps jumpers
-        -- TRUE L WRAPPING THE PAVILION (gate 2 correction: the tower rises OUT of
-        -- the garden; gravel runs to ~3 studs off the post lines, under the eaves —
-        -- the roof's eave shadow is NOT ground). The limbs meet at a shared kerb
-        -- spine at x10 (an internal division band; raking direction breaks there).
+        -- ONE GARDEN CONTAINING THE MACHINE (gate 2 correction, take 2): the
+        -- pavilion posts, bearing plinths, and tower all rise OUT of the raked
+        -- field; the kerb meets the corridors east/south, the river bank north,
+        -- and the wheel run west. Guards enclose the machine — the ritual heart
+        -- is approached by eye.
         panels = {
-            east = { 10, -6, 34, 28 }, -- post line -> east corridor, bank lane -> shop corridor
-            south = { -12, 12, 10, 28 }, -- tight to the south posts, west of the spine
+            main = { -16, -10, 34, 28 },
         },
         corridors = {
             eastCorridor = { 34, -10, 54, 38 }, -- kerb face -> Overlook west face

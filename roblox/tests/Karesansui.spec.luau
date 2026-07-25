@@ -21,7 +21,7 @@ describe("Karesansui garden (kerb + field + guard)", function()
     end
     test("every panel emits kerb x4, field, guard x4 — and nothing else", function()
         local count = 0
-        for _, panel in { "East", "South" } do
+        for _, panel in { "Main" } do
             for _, side in { "N", "S", "E", "W" } do
                 expect(byName[`Kerb{panel}{side}`] ~= nil).toBe(true)
                 expect(byName[`Guard{panel}{side}`] ~= nil).toBe(true)
@@ -40,8 +40,8 @@ describe("Karesansui garden (kerb + field + guard)", function()
         end
     end)
     test("fields sit inside their kerbs, proud of the terrace", function()
-        for i, panel in { "East", "South" } do
-            local key = if panel == "East" then "east" else "south"
+        for _, panel in { "Main" } do
+            local key = "main"
             local p = K.panels[key]
             local f = rectOf(byName[`Field{panel}`])
             expect(f[1] >= p[1]).toBe(true)
@@ -50,11 +50,11 @@ describe("Karesansui garden (kerb + field + guard)", function()
             expect(f[4] <= p[4]).toBe(true)
             local cf = byName[`Field{panel}`].properties.CFrame
             local sz = byName[`Field{panel}`].properties.Size
-            expect(cf[2] + sz[2] / 2).toBeCloseTo(K.floorY[key] + K.slabProud, 0.001)
+            expect(cf[2] + sz[2] / 2).toBeCloseTo(K.floorY.main + K.slabProud, 0.001)
         end
     end)
     test("guards: invisible, 3.5 tall, EngawaBarrier group, on the kerb lines", function()
-        for _, panel in { "East", "South" } do
+        for _, panel in { "Main" } do
             for _, side in { "N", "S", "E", "W" } do
                 local g = byName[`Guard{panel}{side}`]
                 expect(g.properties.Transparency).toBe(1)
@@ -65,14 +65,14 @@ describe("Karesansui garden (kerb + field + guard)", function()
         end
     end)
     test("kerb wears the plinth vocabulary: Slate, gravel palette, proud", function()
-        local k = byName.KerbEastN
+        local k = byName.KerbMainN
         expect(k.properties.Material).toBe("Slate")
         local top = k.properties.CFrame[2] + k.properties.Size[2] / 2
-        expect(top).toBeCloseTo(K.floorY.east + K.kerbProud, 0.001)
+        expect(top).toBeCloseTo(K.floorY.main + K.kerbProud, 0.001)
     end)
     test("field variants follow the panel's long axis", function()
-        for _, panel in { "East", "South" } do
-            local key = if panel == "East" then "east" else "south"
+        for _, panel in { "Main" } do
+            local key = "main"
             local p = K.panels[key]
             local want = if (p[4] - p[2]) >= (p[3] - p[1]) then "RakedSandNS" else "RakedSandEW"
             expect(byName[`Field{panel}`].properties.MaterialVariant).toBe(want)

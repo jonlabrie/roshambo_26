@@ -204,38 +204,33 @@ describe("karesansui garden layout (spec 2026-07-24)", function()
     local function overlaps(a: { number }, b: { number }): boolean
         return a[1] < b[3] and b[1] < a[3] and a[2] < b[4] and b[2] < a[4]
     end
-    test("panels and corridors exist with sane extents", function()
-        for _, name in { "east", "south" } do
-            local r = K.panels[name]
-            expect(r[3] > r[1]).toBe(true)
-            expect(r[4] > r[2]).toBe(true)
-        end
+    test("one garden with sane extents; corridors stay plaza-width", function()
+        local r = K.panels.main
+        expect(r[3] > r[1]).toBe(true)
+        expect(r[4] > r[2]).toBe(true)
         for _, name in { "shopCorridor", "eastCorridor" } do
             local c = K.corridors[name]
             local w = math.min(c[3] - c[1], c[4] - c[2])
             expect(w >= 16).toBe(true) -- plaza-width main streets
         end
     end)
-    test("no panel touches a corridor (the plaza is the point)", function()
-        for _, p in K.panels :: any do
-            for _, c in K.corridors :: any do
-                expect(overlaps(p, c)).toBe(false)
-            end
+    test("the garden never touches a corridor (the plaza is the point)", function()
+        for _, c in K.corridors :: any do
+            expect(overlaps(K.panels.main, c)).toBe(false)
         end
     end)
-    test("panels clear the machine ground: pavilion posts and the plinth line", function()
+    test("the machine stands IN the garden: posts and plinths inside the rect", function()
+        local r = K.panels.main
         local px, pz = L.pavilion.pos[1], L.pavilion.pos[3]
         local s = L.pavilion.postSpacing / 2
         for _, cx in { px - s, px + s } do
             for _, cz in { pz - s, pz + s } do
-                for _, p in K.panels :: any do
-                    local inside = cx > p[1] and cx < p[3] and cz > p[2] and cz < p[4]
-                    expect(inside).toBe(false)
-                end
+                expect(cx > r[1] and cx < r[3] and cz > r[2] and cz < r[4]).toBe(true)
             end
         end
-        for _, p in K.panels :: any do
-            expect(p[1] > -15 + 2).toBe(true) -- east of the bearing-plinth line
+        -- the main-run bearing plinths (x -15, z -6 / 6.5) rise out of the raking
+        for _, z in { -6, 6.5 } do
+            expect(-15 > r[1] and -15 < r[3] and z > r[2] and z < r[4]).toBe(true)
         end
     end)
     test("frame constants match the spec", function()

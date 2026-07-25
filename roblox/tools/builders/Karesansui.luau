@@ -62,8 +62,7 @@ function Karesansui.build(palette: any, L: any): Spec.PartSpec
         )
     end
 
-    panel("East", K.panels.east, K.floorY.east)
-    panel("South", K.panels.south, K.floorY.south)
+    panel("Main", K.panels.main, K.floorY.main)
     return Spec.model("Karesansui", children)
 end
 
