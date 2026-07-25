@@ -121,8 +121,8 @@ local ArenaLayout = {
         -- bed sits proud of its HIGHEST ground)
         floorY = { main = 113.1 },
         kerbW = 0.8, -- dressed-slate frame (bearing-plinth vocabulary)
-        kerbProud = 0.5,
-        kerbH = 2.0, -- rooted below grade through the south panel's dip
+        kerbProud = 1.0, -- gate-tuned up from 0.5 (raised-bed read)
+        kerbH = 2.5, -- rooted below grade through the dips at the taller stand
         slabProud = 0.15, -- raked field rides proud of the terrace like flags-of-bed
         guardH = 3.5, -- EngawaBarrier low guard: blocks walking, never traps jumpers
         -- ONE GARDEN CONTAINING THE MACHINE (gate 2 correction, take 2): the
