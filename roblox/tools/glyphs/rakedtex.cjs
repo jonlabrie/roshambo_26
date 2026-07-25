@@ -31,16 +31,15 @@ function wrap(i) {
 }
 
 // normal map: central differences of height with WRAPPED sampling (tileable seams),
-// Y-up tangent convention: R<-nx, G<-ny (up), B<-nz; encode (n*0.5+0.5)*255 into RGB.
+// standard tangent-space convention: R<-X slope, G<-Y slope (image V axis), B<-out-of-
+// surface Z; flat areas read ~(128,128,255) lilac-blue. encode (n*0.5+0.5)*255 into RGB.
 const S = 2.0; // groove strength
 function normalAt(hFn, x, y) {
-  const hxm = hFn(wrap(x - 1), y);
-  const hxp = hFn(wrap(x + 1), y);
-  const hym = hFn(x, wrap(y - 1));
-  const hyp = hFn(x, wrap(y + 1));
-  let nx = (hxm - hxp) * S;
-  let nz = (hym - hyp) * S;
-  let ny = 1;
+  const dhdx = (hFn(wrap(x + 1), y) - hFn(wrap(x - 1), y)) / 2;
+  const dhdy = (hFn(x, wrap(y + 1)) - hFn(x, wrap(y - 1))) / 2;
+  let nx = -dhdx * S;
+  let ny = -dhdy * S;
+  let nz = 1;
   const len = Math.hypot(nx, ny, nz) || 1;
   nx /= len; ny /= len; nz /= len;
   return [nx, ny, nz];
