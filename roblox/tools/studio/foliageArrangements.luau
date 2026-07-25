@@ -149,21 +149,23 @@ local ARRANGEMENTS: { Arrangement } = {
     },
 }
 
--- tuning-display anchors (up-valley benches, probed 2026-07-25; NOT deployment sites)
+-- Tuning-display anchors: spread 70-90 studs apart, alternating banks up the valley so
+-- each arrangement can be browsed on its own (terrain-probed 2026-07-25; the x≈-240..-400
+-- channel centre is water — anchors stay on the ±z benches). NOT deployment sites.
 local SITES: { { number } } = {
-    { -108, 24 },
-    { -134, 24 },
-    { -160, 24 },
-    { -186, 24 },
-    { -212, 24 },
-    { -238, 30 },
-    { -264, 24 },
-    { -290, 24 },
-    { -316, 24 },
-    { -116, -26 },
-    { -148, -26 },
-    { -180, -26 },
-    { -196, -26 },
+    { -120, 34 },
+    { -160, -34 },
+    { -200, 36 },
+    { -240, -36 },
+    { -280, 40 },
+    { -320, -40 },
+    { -360, 42 },
+    { -400, -44 },
+    { -440, 46 },
+    { -150, 62 },
+    { -230, 66 },
+    { -310, 70 },
+    { -390, 74 },
 }
 
 local function lcg(state: number): (number, number)
