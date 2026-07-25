@@ -20,20 +20,22 @@ local MODE = "place" -- "place" | "bake"
 -- south flank); eastCorridor {34,-10,54,38}; garden {-21,-12,34,18}; stair slope
 -- climbs the south-west wall.
 local CONFIG: { { species: string, x: number, z: number, scale: number, yawDeg: number? } } = {
-    -- red maples: over the merchant-row upslope + falls shoulder
-    { species = "MapleRed", x = -30, z = 52, scale = 1.1 },
-    { species = "MapleRed", x = -2, z = 56, scale = 1.0 },
+    -- red maples: over the merchant-row upslope + falls south bank (coords
+    -- terrain-probed 2026-07-25: pool water owns x<-40 for z -34..-4; south
+    -- bank starts z≈8; upslope plantable band z 44-50)
+    { species = "MapleRed", x = -26, z = 48, scale = 1.1 },
+    { species = "MapleRed", x = -6, z = 50, scale = 1.0 },
     { species = "MapleRed", x = 26, z = 54, scale = 1.2 },
-    { species = "MapleRed", x = -66, z = -18, scale = 1.15 }, -- falls south shoulder
+    { species = "MapleRed", x = -66, z = 10, scale = 1.15 }, -- falls south bank
     { species = "MapleRed", x = -70, z = 16, scale = 1.0 },
-    -- gold maples: water's edge by the falls pool + wheel stream
-    { species = "MapleGold", x = -56, z = -2, scale = 1.1 },
+    -- gold maples: pool south + west banks
+    { species = "MapleGold", x = -52, z = 8, scale = 1.1 },
     { species = "MapleGold", x = -48, z = 12, scale = 0.95 },
-    { species = "MapleGold", x = -60, z = -30, scale = 1.0 },
+    { species = "MapleGold", x = -68, z = 4, scale = 1.0 }, -- leans over west bank
     -- niwaki pines: corridor mouth + garden corners (stamp once PineNiwaki lands)
     { species = "PineNiwaki", x = -20, z = 30, scale = 1.0 },
     { species = "PineNiwaki", x = 36, z = 20, scale = 0.9 },
-    { species = "PineNiwaki", x = -24, z = -14, scale = 0.95 },
+    { species = "PineNiwaki", x = -26, z = 24, scale = 0.95 },
     -- blush accents: high on the SW stair slope (valley-palette seed)
     { species = "BlushAccent", x = -44, z = 66, scale = 1.0 },
     { species = "BlushAccent", x = -70, z = 48, scale = 0.9 },
