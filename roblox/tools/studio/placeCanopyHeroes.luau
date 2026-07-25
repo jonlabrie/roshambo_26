@@ -133,7 +133,10 @@ local function bake()
     for _, clone in heroes:GetChildren() do
         local p = clone:GetPivot().Position
         local species = clone:GetAttribute("Species")
-        local scale = clone:GetAttribute("BaseScale") or 1
+        -- read the LIVE scale (user may hand-resize with the Scale tool), not the stamped attr
+        local scale = clone:IsA("Model") and math.floor(clone:GetScale() * 100 + 0.5) / 100
+            or clone:GetAttribute("BaseScale")
+            or 1
         local _, yaw, _ = clone:GetPivot():ToEulerAnglesYXZ()
         table.insert(
             lines,
