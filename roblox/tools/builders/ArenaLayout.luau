@@ -125,9 +125,13 @@ local ArenaLayout = {
         kerbH = 2.0, -- rooted below grade through the south panel's dip
         slabProud = 0.15, -- raked field rides proud of the terrace like flags-of-bed
         guardH = 3.5, -- EngawaBarrier low guard: blocks walking, never traps jumpers
+        -- TRUE L WRAPPING THE PAVILION (gate 2 correction: the tower rises OUT of
+        -- the garden; gravel runs to ~3 studs off the post lines, under the eaves —
+        -- the roof's eave shadow is NOT ground). The limbs meet at a shared kerb
+        -- spine at x10 (an internal division band; raking direction breaks there).
         panels = {
-            east = { 18, -6, 34, 2 }, -- fronts the tower; bell sightline crosses at z0
-            south = { -12, 20, 10, 28 }, -- fronts the pavilion's south face
+            east = { 10, -6, 34, 28 }, -- post line -> east corridor, bank lane -> shop corridor
+            south = { -12, 12, 10, 28 }, -- tight to the south posts, west of the spine
         },
         corridors = {
             eastCorridor = { 34, -10, 54, 38 }, -- kerb face -> Overlook west face
