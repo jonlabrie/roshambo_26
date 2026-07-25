@@ -17,6 +17,7 @@ WorkspaceConvention.DECLARED_STAGE_CHILDREN = {
     "RanmaCarvings", -- the 8 pierced dragon-king ranma carvings (assets/meshes/RanmaCarvings.rbxm)
     "Overlook",
     "SwitchbackDeck",
+    "Karesansui",
     "ArenaSpawn",
 }
 

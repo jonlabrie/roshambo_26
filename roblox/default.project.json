@@ -51,6 +51,7 @@
                 "RanmaCarvings": { "$path": "assets/meshes/RanmaCarvings.rbxm" },
                 "Overlook": { "$path": "assets/Overlook.model.json" },
                 "SwitchbackDeck": { "$path": "assets/SwitchbackDeck.model.json" },
+                "Karesansui": { "$path": "assets/Karesansui.model.json" },
                 "ArenaSpawn": {
                     "$className": "SpawnLocation",
                     "$properties": { "Anchored": true, "Size": [8, 1, 8], "CFrame": [30, 113.2, 8, 0, 0, 1, 0, 1, 0, -1, 0, 0], "Neutral": true }
