@@ -40,8 +40,10 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
         table.insert(
             children,
             Spec.part(`Plinth{i}`, {
-                Size = { 2.4, 1.2, 2.4 },
-                CFrame = place({ c[1], 0.6, c[2] }),
+                -- +0.5 taller (2026-07-24): the karesansui field raised the effective
+                -- grade ~1.2 over the build datum; plinths must show above the raking
+                Size = { 2.4, 1.7, 2.4 },
+                CFrame = place({ c[1], 0.85, c[2] }),
                 Color = palette.gravel,
                 Material = "Slate",
             })
@@ -50,9 +52,9 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
         table.insert(
             children,
             Spec.part(`Post{i}`, {
-                Size = { roofY - 1.2, 2.4, 2.4 },
+                Size = { roofY - 1.7, 2.4, 2.4 },
                 Shape = "Cylinder",
-                CFrame = place({ c[1], 1.2 + (roofY - 1.2) / 2, c[2] }, Spec.ROT.CYL_VERTICAL),
+                CFrame = place({ c[1], 1.7 + (roofY - 1.7) / 2, c[2] }, Spec.ROT.CYL_VERTICAL),
                 Color = cypress,
                 Material = "Wood",
                 MaterialVariant = "CypressWeathered",
