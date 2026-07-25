@@ -16,7 +16,7 @@ local garden = stage:WaitForChild("Karesansui")
 local SEGMENTS = 96 -- solid disc: fine segments keep the circles round up close
 local PITCH = 0.35 -- ring spacing (gate-tuned tighter than the field rows)
 local AMPLITUDE = 0.15
-local SOFT = 0.35 -- crest softness: 0 hard-faceted V, 1 fully smooth (gate knob)
+local SOFT = 0.5 -- crest softness: 0 hard-faceted V, 1 fully smooth (gate knob)
 local RING_BAND = 3.2 -- ripple field extends this far beyond the island footprint
 local FOOT_TUCK = 0.7 -- rings start under the stone's overhang: the axis-aligned
 -- footprint overestimates rotated/irregular rocks, and rings should touch the stone
@@ -74,7 +74,7 @@ local function buildRings(island: BasePart)
                 local dx = math.abs(island.Position.X - f.Position.X)
                 local dz = math.abs(island.Position.Z - f.Position.Z)
                 if dx <= f.Size.X / 2 and dz <= f.Size.Z / 2 then
-                    ringY = f.Position.Y + f.Size.Y / 2 + 0.01
+                    ringY = f.Position.Y + f.Size.Y / 2 - 0.05 -- sunk slightly: crests ride ~0.1 proud
                     break
                 end
             end
