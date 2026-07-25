@@ -164,6 +164,7 @@ bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
 bpy.ops.export_scene.fbx(
     filepath=OUT_FBX,
+    global_scale=0.01,  # Blender exports cm; Roblox reads 1 unit = 1 stud
     use_selection=True,
     path_mode="COPY",
     embed_textures=True,
