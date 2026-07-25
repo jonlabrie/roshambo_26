@@ -14,9 +14,9 @@ local stage = workspace:WaitForChild("RoshamboStage")
 local garden = stage:WaitForChild("Karesansui")
 
 local SEGMENTS = 48
-local PITCH = 0.45 -- ring spacing; a touch tighter than the field rows (gate-tuned)
+local PITCH = 0.35 -- ring spacing (gate-tuned tighter than the field rows)
 local AMPLITUDE = 0.15
-local RIDGE_W = 0.35 -- slimmer ridges read finer against the 0.52 field pitch
+local RIDGE_W = 0.28 -- slimmer ridges read finer against the 0.52 field pitch
 local RING_BAND = 3.2 -- ripple field extends this far beyond the island footprint
 local FOOT_TUCK = 0.7 -- rings start under the stone's overhang: the axis-aligned
 -- footprint overestimates rotated/irregular rocks, and rings should touch the stone
@@ -30,7 +30,10 @@ local function buildRings(island: BasePart)
         old:Destroy()
         built[island] = nil
     end
-    local footprintR = math.max(island.Size.X, island.Size.Z) / 2 * FOOT_TUCK
+    -- per-stone override: set a RingFootprintR number attribute on an island to
+    -- pin its inner ring radius exactly (elongated rocks defeat the axis-aligned guess)
+    local footprintR = (island:GetAttribute("RingFootprintR") :: number?)
+        or math.max(island.Size.X, island.Size.Z) / 2 * FOOT_TUCK
     local g = {
         footprintR = footprintR,
         maxR = footprintR + RING_BAND,
@@ -60,8 +63,9 @@ local function buildRings(island: BasePart)
         part.Material = Enum.Material.Sand
         part.MaterialVariant = "RakedGravelRings" -- gravel color/roughness, NO normal
         -- map (the rings' real ridges do the relief); triplanar, so it matches the
-        -- field's material in world space. White lets the ColorMap show true.
-        part.Color = Color3.new(1, 1, 1)
+        -- field's material in world space. Tint MUST match the Field slabs' part
+        -- color — part color multiplies the ColorMap, and the field is tinted.
+        part.Color = Color3.new(0.87, 0.85, 0.79)
         -- rings lie flat on the field slab the island stands in — read the slab's
         -- actual top so per-panel floor heights need no mirrored constant here
         local ringY: number? = nil
