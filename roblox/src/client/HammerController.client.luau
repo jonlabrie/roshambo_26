@@ -314,36 +314,8 @@ local function strike(atTime: number)
         -- Contact moment (the actual strike): the dowel kicks the pin-wheel HERE, not at
         -- the swing's start — fire a "gongHit" cue so the drum spins on contact, not early.
         EventBus.Cue:Fire({ kind = "gongHit" })
-        -- Contact moment: flash + basin ring fire here, not at cue time.
-        local light = Instance.new("PointLight")
-        light.Brightness = 6
-        light.Range = 18
-        light.Parent = gong
-        TweenService:Create(light, TweenInfo.new(0.25), { Brightness = 0 }):Play()
-        task.delay(0.3, function()
-            light:Destroy()
-        end)
-        for i = 1, 3 do
-            task.delay((i - 1) * 0.22, function()
-                local ring = Instance.new("Part")
-                ring.Shape = Enum.PartType.Cylinder
-                ring.Anchored = true
-                ring.CanCollide = false
-                ring.Transparency = 0.35 + (i - 1) * 0.15
-                ring.Color = WATER
-                ring.Size = Vector3.new(0.25, 2, 2)
-                ring.CFrame = CFrame.new(gong.Position.X, gong.Position.Y, gong.Position.Z)
-                    * CFrame.Angles(0, 0, math.rad(90))
-                ring.Parent = workspace
-                TweenService:Create(ring, TweenInfo.new(1.4, Enum.EasingStyle.Sine), {
-                    Size = Vector3.new(0.25, 30 - i * 4, 30 - i * 4),
-                    Transparency = 1,
-                }):Play()
-                task.delay(1.5, function()
-                    ring:Destroy()
-                end)
-            end)
-        end
+        -- (strike flash + expanding energy rings CUT 2026-07-24: the recorded
+        -- bell sound carries the moment; the water splash below stays for now)
         local splash = Instance.new("ParticleEmitter")
         splash.Color = ColorSequence.new(WATER)
         splash.Lifetime = NumberRange.new(0.5, 0.9)
