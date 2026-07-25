@@ -8,7 +8,6 @@ local TweenService = game:GetService("TweenService")
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local ZenDojo = require(shared:WaitForChild("themes"):WaitForChild("ZenDojo"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
-local WATER = Color3.new(ZenDojo.palette.water[1], ZenDojo.palette.water[2], ZenDojo.palette.water[3])
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local RoundUpdate = remotes:WaitForChild("RoundUpdate") :: RemoteEvent
@@ -41,7 +40,6 @@ pullSchedule()
 local stage = workspace:WaitForChild("RoshamboStage")
 local rig = stage:WaitForChild("BonshoRig")
 local arm = rig:WaitForChild("ShuMoku") :: BasePart
-local gong = rig:WaitForChild("Bonsho") :: BasePart
 local restCFrame = arm.CFrame -- rest pose: log hanging at the front of its swing
 -- Offsets are applied in WORLD space (pre-multiply: `CFrame.new(v) * rest`) so
 -- the draw/swing/recoil go straight back/forward regardless of each part's rest
@@ -314,19 +312,8 @@ local function strike(atTime: number)
         -- Contact moment (the actual strike): the dowel kicks the pin-wheel HERE, not at
         -- the swing's start — fire a "gongHit" cue so the drum spins on contact, not early.
         EventBus.Cue:Fire({ kind = "gongHit" })
-        -- (strike flash + expanding energy rings CUT 2026-07-24: the recorded
-        -- bell sound carries the moment; the water splash below stays for now)
-        local splash = Instance.new("ParticleEmitter")
-        splash.Color = ColorSequence.new(WATER)
-        splash.Lifetime = NumberRange.new(0.5, 0.9)
-        splash.Speed = NumberRange.new(9, 14)
-        splash.SpreadAngle = Vector2.new(70, 70)
-        splash.Rate = 0
-        splash.Parent = gong
-        splash:Emit(36)
-        task.delay(1.2, function()
-            splash:Destroy()
-        end)
+        -- (ALL strike VFX cut 2026-07-24 — flash, energy rings, water splash: the
+        -- recorded bell sound alone carries the moment)
         -- Stage 2: recoil back toward the wheel (+BACK), then settle to rest.
         local recoil = TweenService:Create(
             arm,
