@@ -10,11 +10,10 @@ local Karesansui = {}
 function Karesansui.build(palette: any, L: any): Spec.PartSpec
     local K = L.karesansui
     local children: { Spec.PartSpec } = {}
-    local kerbH = 1.2 -- rooted below grade; top = floorY + kerbProud
-    local kerbTopY = K.floorY + K.kerbProud
-    local slabTopY = K.floorY + K.slabProud
 
-    local function panel(name: string, r: { number })
+    local function panel(name: string, r: { number }, floorY: number)
+        local kerbTopY = floorY + K.kerbProud
+        local slabTopY = floorY + K.slabProud
         local x1, z1, x2, z2 = r[1], r[2], r[3], r[4]
         local w = K.kerbW
         -- kerb: N/S beams span the full width; E/W beams inset between them (mitre-read)
@@ -28,8 +27,8 @@ function Karesansui.build(palette: any, L: any): Spec.PartSpec
             table.insert(
                 children,
                 Spec.part(`Kerb{name}{side}`, {
-                    Size = { b[3], kerbH, b[4] },
-                    CFrame = Spec.cframe({ b[1], kerbTopY - kerbH / 2, b[2] }),
+                    Size = { b[3], K.kerbH, b[4] },
+                    CFrame = Spec.cframe({ b[1], kerbTopY - K.kerbH / 2, b[2] }),
                     Color = palette.gravel,
                     Material = "Slate",
                 })
@@ -63,8 +62,8 @@ function Karesansui.build(palette: any, L: any): Spec.PartSpec
         )
     end
 
-    panel("East", K.panels.east)
-    panel("South", K.panels.south)
+    panel("East", K.panels.east, K.floorY.east)
+    panel("South", K.panels.south, K.floorY.south)
     return Spec.model("Karesansui", children)
 end
 

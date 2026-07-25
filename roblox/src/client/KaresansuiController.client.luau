@@ -59,9 +59,21 @@ local function buildRings(island: BasePart)
         part.CastShadow = false
         part.Material = Enum.Material.Sand
         part.Color = SAND
-        -- rings lie flat on the field, proud like the flags (island pos, field top Y)
-        local fieldTopY = 112.15 -- floorY + slabProud; MIRRORS ArenaLayout.karesansui
-        part.CFrame = CFrame.new(island.Position.X, fieldTopY, island.Position.Z)
+        -- rings lie flat on the field slab the island stands in — read the slab's
+        -- actual top so per-panel floor heights need no mirrored constant here
+        local ringY: number? = nil
+        for _, f in garden:GetChildren() do
+            if f:IsA("BasePart") and f.Name:match("^Field") then
+                local dx = math.abs(island.Position.X - f.Position.X)
+                local dz = math.abs(island.Position.Z - f.Position.Z)
+                if dx <= f.Size.X / 2 and dz <= f.Size.Z / 2 then
+                    ringY = f.Position.Y + f.Size.Y / 2 + 0.01
+                    break
+                end
+            end
+        end
+        assert(ringY, "island stands on no Field slab — tag only rocks inside the garden panels")
+        part.CFrame = CFrame.new(island.Position.X, ringY, island.Position.Z)
         part.Parent = garden
         built[island] = part
     end)

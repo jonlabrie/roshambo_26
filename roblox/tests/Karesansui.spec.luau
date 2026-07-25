@@ -50,7 +50,7 @@ describe("Karesansui garden (kerb + field + guard)", function()
             expect(f[4] <= p[4]).toBe(true)
             local cf = byName[`Field{panel}`].properties.CFrame
             local sz = byName[`Field{panel}`].properties.Size
-            expect(cf[2] + sz[2] / 2).toBeCloseTo(K.floorY + K.slabProud, 0.001)
+            expect(cf[2] + sz[2] / 2).toBeCloseTo(K.floorY[key] + K.slabProud, 0.001)
         end
     end)
     test("guards: invisible, 3.5 tall, EngawaBarrier group, on the kerb lines", function()
@@ -68,7 +68,7 @@ describe("Karesansui garden (kerb + field + guard)", function()
         local k = byName.KerbEastN
         expect(k.properties.Material).toBe("Slate")
         local top = k.properties.CFrame[2] + k.properties.Size[2] / 2
-        expect(top).toBeCloseTo(K.floorY + K.kerbProud, 0.001)
+        expect(top).toBeCloseTo(K.floorY.east + K.kerbProud, 0.001)
     end)
     test("field variants follow the panel's long axis", function()
         for _, panel in { "East", "South" } do
