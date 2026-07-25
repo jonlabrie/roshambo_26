@@ -109,6 +109,29 @@ local ArenaLayout = {
         driver = 1,
         ropeAnchor = { -15, 116, -15 },
     },
+    -- ===== Karesansui garden (spec 2026-07-24): framed VIEWED garden, plaza-first =====
+    -- SURVEYED rects {x1, z1, x2, z2} on the terrace floor (Studio survey 2026-07-24:
+    -- Shoro eave envelope reaches x16/z18; Overlook west face x54; ArenaSpawn pad
+    -- x26..34 z4..12 stays in open plaza; river bank lane north of z-6; floor spans
+    -- to z~40 south). Never derive these from placed parts. Corridors are the
+    -- square's MAIN STREETS (crowd-width, inviolable — no kerb/slab/guard may enter);
+    -- the merchant row later builds against the SAME shopCorridor reservation.
+    karesansui = {
+        floorY = 112,
+        kerbW = 0.8, -- dressed-slate frame (bearing-plinth vocabulary)
+        kerbProud = 0.5,
+        kerbH = 1.2, -- rooted below grade
+        slabProud = 0.15, -- raked field rides proud of the terrace like flags-of-bed
+        guardH = 3.5, -- EngawaBarrier low guard: blocks walking, never traps jumpers
+        panels = {
+            east = { 18, -6, 34, 2 }, -- fronts the tower; bell sightline crosses at z0
+            south = { -12, 20, 10, 28 }, -- fronts the pavilion's south face
+        },
+        corridors = {
+            eastCorridor = { 34, -10, 54, 38 }, -- kerb face -> Overlook west face
+            shopCorridor = { -20, 28, 34, 44 }, -- promenade; shops back onto the south upslope
+        },
+    },
     -- (sōzu removed — the throw-lockout beat moves to sound/UI; see the bell-engine spec.)
     promontories = {
         { name = "Record", pos = { 0, 16, 134 } }, -- north (opposite entrance)
