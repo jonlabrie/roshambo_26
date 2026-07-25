@@ -14,7 +14,7 @@ local stage = workspace:WaitForChild("RoshamboStage")
 local garden = stage:WaitForChild("Karesansui")
 
 local SEGMENTS = 48
-local PITCH = 0.8 -- matches the field texture's groove pitch
+local PITCH = 0.52 -- matches the field texture's groove pitch (SPT 5.2, gate-tuned)
 local AMPLITUDE = 0.15
 local RIDGE_W = 0.5
 local RING_BAND = 3.2 -- ripple field extends this far beyond the island footprint
