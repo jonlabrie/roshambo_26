@@ -23,7 +23,7 @@ print = functools.partial(print, flush=True)
 argv = sys.argv[sys.argv.index("--") + 1:]
 FBX, TREE, TARGET_FOL_TRIS, HEIGHT_STUDS, OUT_FBX = argv[0], argv[1], int(argv[2]), float(argv[3]), argv[4]
 FOLIAGE_KEY = "13012023 4"
-TRUNK_TRIS = 4000
+TRUNK_TRIS = 1800
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.import_scene.fbx(filepath=FBX)
@@ -162,6 +162,9 @@ trunk.select_set(True); foliage.select_set(True)
 bpy.context.view_layer.objects.active = trunk
 bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
+base_name = os.path.splitext(os.path.basename(OUT_FBX))[0]
+trunk.name = base_name + "_Trunk"
+foliage.name = base_name + "_Foliage"
 bpy.ops.export_scene.fbx(
     filepath=OUT_FBX,
     global_scale=0.01,  # Blender exports cm; Roblox reads 1 unit = 1 stud
