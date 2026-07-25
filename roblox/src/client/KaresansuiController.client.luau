@@ -14,12 +14,12 @@ local stage = workspace:WaitForChild("RoshamboStage")
 local garden = stage:WaitForChild("Karesansui")
 
 local SEGMENTS = 48
-local PITCH = 0.52 -- matches the field texture's groove pitch (SPT 5.2, gate-tuned)
+local PITCH = 0.45 -- ring spacing; a touch tighter than the field rows (gate-tuned)
 local AMPLITUDE = 0.15
-local RIDGE_W = 0.5
+local RIDGE_W = 0.35 -- slimmer ridges read finer against the 0.52 field pitch
 local RING_BAND = 3.2 -- ripple field extends this far beyond the island footprint
-
-local SAND = Color3.new(0.87, 0.85, 0.79) -- matches the Field slabs
+local FOOT_TUCK = 0.7 -- rings start under the stone's overhang: the axis-aligned
+-- footprint overestimates rotated/irregular rocks, and rings should touch the stone
 
 -- re-tagging an island in Studio refreshes its rings instead of stacking duplicates
 local built: { [BasePart]: BasePart } = {}
@@ -30,7 +30,7 @@ local function buildRings(island: BasePart)
         old:Destroy()
         built[island] = nil
     end
-    local footprintR = math.max(island.Size.X, island.Size.Z) / 2
+    local footprintR = math.max(island.Size.X, island.Size.Z) / 2 * FOOT_TUCK
     local g = {
         footprintR = footprintR,
         maxR = footprintR + RING_BAND,
@@ -58,7 +58,10 @@ local function buildRings(island: BasePart)
         part.CanTouch = false
         part.CastShadow = false
         part.Material = Enum.Material.Sand
-        part.Color = SAND
+        part.MaterialVariant = "RakedGravelRings" -- gravel color/roughness, NO normal
+        -- map (the rings' real ridges do the relief); triplanar, so it matches the
+        -- field's material in world space. White lets the ColorMap show true.
+        part.Color = Color3.new(1, 1, 1)
         -- rings lie flat on the field slab the island stands in — read the slab's
         -- actual top so per-panel floor heights need no mirrored constant here
         local ringY: number? = nil
