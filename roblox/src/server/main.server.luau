@@ -13,15 +13,24 @@ local LocalizationService = game:GetService("LocalizationService")
 local DAY_NIGHT_EPOCH = 1735689600 -- fixed absolute anchor (2025-01-01T00:00:00Z, synced Unix seconds)
 local dayNightConfig = Instance.new("Configuration")
 dayNightConfig.Name = "DayNightConfig"
--- DEV KNOB: a "DayNightLockT" number attribute on Workspace (place-state, set in Edit,
--- never in git) freezes the cycle at that t for every Play session — 0.19 = mid-day,
--- 0.75 = deep night (phases run dawn 10 / day 18 / dusk 25 / night 47 %). Remove the
--- attribute to restore the live cycle.
+-- DEV KNOBS (Workspace number attributes, place-state, set in Edit — CLEAR BEFORE
+-- PUBLISH or the published game loses the shared global clock):
+--   "DayNightLockT"  freezes the cycle at that t every Play session — 0.19 = mid-day,
+--                    0.75 = deep night (phases run dawn 10 / day 18 / dusk 25 / night 47 %).
+--   "DayNightStartT" anchors the cycle at that t at session start, then runs LIVE —
+--                    e.g. 0.953 ≈ 4 AM pre-dawn. Lock wins if both are set.
+-- Remove the attribute(s) to restore the epoch-anchored global cycle.
 local lockT = workspace:GetAttribute("DayNightLockT")
+local startT = workspace:GetAttribute("DayNightStartT")
 if typeof(lockT) == "number" then
     dayNightConfig:SetAttribute("CycleEpoch", workspace:GetServerTimeNow())
     dayNightConfig:SetAttribute("CycleLength", 1e9)
     dayNightConfig:SetAttribute("PhaseOffset", lockT)
+elseif typeof(startT) == "number" then
+    local LEN = 600
+    dayNightConfig:SetAttribute("CycleEpoch", workspace:GetServerTimeNow() - startT * LEN)
+    dayNightConfig:SetAttribute("CycleLength", LEN)
+    dayNightConfig:SetAttribute("PhaseOffset", 0)
 else
     dayNightConfig:SetAttribute("CycleEpoch", DAY_NIGHT_EPOCH)
     dayNightConfig:SetAttribute("CycleLength", 600) -- seconds per full loop (10 min); the manual timing knob
