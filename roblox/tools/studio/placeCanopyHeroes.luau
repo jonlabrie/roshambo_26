@@ -32,10 +32,13 @@ local CONFIG: { { species: string, x: number, z: number, scale: number, yawDeg: 
     { species = "MapleGold", x = -52, z = 8, scale = 1.1 },
     { species = "MapleGold", x = -48, z = 12, scale = 0.95 },
     { species = "MapleGold", x = -68, z = 4, scale = 1.0 }, -- leans over west bank
-    -- niwaki pines: corridor mouth + garden corners (stamp once PineNiwaki lands)
-    { species = "PineNiwaki", x = -20, z = 30, scale = 1.0 },
-    { species = "PineNiwaki", x = 36, z = 20, scale = 0.9 },
-    { species = "PineNiwaki", x = -26, z = 24, scale = 0.95 },
+    -- niwaki pines (TurboSquid 2017007 set, user-cast 2026-07-25): mediums at the
+    -- corridor mouths, small at the garden's west corner, talls as distance reads
+    { species = "PineNiwakiB", x = -20, z = 30, scale = 1.0 },
+    { species = "PineNiwakiC", x = 36, z = 20, scale = 1.0 },
+    { species = "PineNiwakiA", x = -26, z = 24, scale = 1.0 },
+    { species = "PineNiwakiE", x = 10, z = -17, scale = 1.0 }, -- north bank, across the river
+    { species = "PineNiwakiF", x = -52, z = 56, scale = 1.0 }, -- SW upslope, reads from the square
     -- blush accents: high on the SW stair slope (valley-palette seed)
     { species = "BlushAccent", x = -44, z = 66, scale = 1.0 },
     { species = "BlushAccent", x = -70, z = 48, scale = 0.9 },
