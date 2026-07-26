@@ -46,6 +46,14 @@ HEIGHT_STUDS, OUT_FBX = float(argv[5]), argv[6]
 # vendor's own UVs are untouched, so every card still carries a real needle spray (this
 # is why clump-BAKING was abandoned — see bake_clump_tree.py's blobby output).
 SPRAY_SCALE = float(argv[7]) if len(argv) > 7 else 1.0
+# Optional 9th arg: how far to snap each card toward the nearest surviving trunk vertex
+# (1.0 = touch it, 0 = off). See the snap block below for why this is needed.
+SNAP = float(argv[8]) if len(argv) > 8 else 1.0
+# Optional 10th arg: 1 = keep ALL trunk islands (the ~4,250 fine twigs the sprays
+# actually hang on) and let DECIMATE thin the whole thing. 0 = cull to the big islands
+# first, which is right for sources whose twigs are modelled thick (the niwaki) but
+# orphans the foliage on sources like the sugi.
+TRUNK_KEEP_ALL = (len(argv) > 9 and argv[9] == "1")
 MIN_ISLAND, MAX_TRUNK_ISLANDS = 200, 10
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -115,9 +123,14 @@ def islands_of(obj):
 bm, comps = islands_of(trunk)
 comps.sort(key=len, reverse=True)
 keep = set()
-for comp in comps[:MAX_TRUNK_ISLANDS]:
-    if len(comp) >= MIN_ISLAND or not keep:
+if TRUNK_KEEP_ALL:
+    for comp in comps:
         keep.update(f.index for f in comp)
+else:
+    for comp in comps[:MAX_TRUNK_ISLANDS]:
+        if len(comp) >= MIN_ISLAND or not keep:
+            keep.update(f.index for f in comp)
+print(f"TRUNK islands={len(comps)} kept={'ALL' if TRUNK_KEEP_ALL else len(keep)}")
 bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.index not in keep], context="FACES")
 bm.to_mesh(trunk.data)
 bm.free()
@@ -130,6 +143,7 @@ bpy.ops.object.modifier_apply(modifier=dec.name)
 # tree axis = trunk centre in XZ; spray scaling anchors to whichever card vertex is
 # nearest this axis (see below)
 _tv = [trunk.matrix_world @ v.co for v in trunk.data.vertices]
+TRUNK_PTS = [v.co.copy() for v in trunk.data.vertices]
 AXIS_X = sum(v.x for v in _tv) / max(len(_tv), 1)
 AXIS_Z = sum(v.z for v in _tv) / max(len(_tv), 1)
 
@@ -176,8 +190,22 @@ if SPRAY_SCALE != 1.0:
             d2 = dx * dx + dz * dz
             if best is None or d2 < best:
                 best, anchor = d2, v.co.copy()
+        # SNAP TO SURVIVING BRANCH. The source hangs its sprays on ~4,250 tiny twig
+        # islands; the trunk budget can only keep the one big island (trunk + major
+        # branches), so every spray is left orphaned a stud or so out in space.
+        # Translate each card so its inner vertex meets the nearest surviving trunk
+        # vertex — foliage then sits on geometry the player can actually see.
+        shift = mathutils.Vector((0, 0, 0))
+        if TRUNK_PTS:
+            tgt, bd = None, None
+            for tp in TRUNK_PTS:
+                d2 = (tp - anchor).length_squared
+                if bd is None or d2 < bd:
+                    bd, tgt = d2, tp
+            if tgt is not None:
+                shift = (tgt - anchor) * SNAP
         for v in comp_v:
-            v.co = anchor + (v.co - anchor) * SPRAY_SCALE
+            v.co = (anchor + (v.co - anchor) * SPRAY_SCALE) + shift
         grown += 1
     print(f"SPRAY-SCALE x{SPRAY_SCALE} on {grown} surviving cards")
 bm.to_mesh(foliage.data)
