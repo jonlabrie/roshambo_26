@@ -415,6 +415,17 @@ bpy.ops.object.modifier_apply(modifier=dec.name)
 
 print(f"RESULT foliage_tris={tri_count(foliage)} trunk_tris={tri_count(trunk)} clumps={len(clumps)}")
 
+# STRIP VERTEX COLOURS. These vendor meshes carry a black colour attribute
+# (RGB 0,0,0). Roblox MULTIPLIES vertex colours into a MeshPart's TextureID, so the
+# trunk rendered pure BLACK no matter which texture was assigned — including textures
+# known-good on other meshes. (SurfaceAppearance OVERRIDES vertex colour instead of
+# multiplying, which is why the foliage was unaffected and why the trunk looked merely
+# white back when it still had a SurfaceAppearance.)
+for _o in (trunk, foliage):
+    for _ca in list(_o.data.color_attributes):
+        _o.data.color_attributes.remove(_ca)
+    print(f"VCOL stripped from {_o.name}")
+
 # ---- scale + export ---------------------------------------------------------
 # Scale by transforming MESH DATA directly, never object scale: bpy.ops.transform_apply
 # is context/selection sensitive and silently left the trunk carrying an 0.01 object

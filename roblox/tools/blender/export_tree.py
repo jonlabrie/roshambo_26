@@ -254,6 +254,17 @@ for _m in trunk.data.materials:
             _nt.links.new(_alb.outputs["Color"], _p.inputs["Base Color"])
         print(f"TRUNK-TEX kept {_alb.image.name}, dropped {len(_texs) - 1} non-albedo maps")
 
+# STRIP VERTEX COLOURS. These vendor meshes carry a black colour attribute
+# (RGB 0,0,0). Roblox MULTIPLIES vertex colours into a MeshPart's TextureID, so the
+# trunk rendered pure BLACK no matter which texture was assigned — including textures
+# known-good on other meshes. (SurfaceAppearance OVERRIDES vertex colour instead of
+# multiplying, which is why the foliage was unaffected and why the trunk looked merely
+# white back when it still had a SurfaceAppearance.)
+for _o in (trunk, foliage):
+    for _ca in list(_o.data.color_attributes):
+        _o.data.color_attributes.remove(_ca)
+    print(f"VCOL stripped from {_o.name}")
+
 # scale to target stud height, then name meshes per output file (Asset Manager legibility)
 pts = [o.matrix_world @ mathutils.Vector(c) for o in (trunk, foliage) for c in o.bound_box]
 zmin, zmax = min(p.z for p in pts), max(p.z for p in pts)
