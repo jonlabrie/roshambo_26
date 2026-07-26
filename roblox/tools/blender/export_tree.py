@@ -54,6 +54,10 @@ SNAP = float(argv[8]) if len(argv) > 8 else 1.0
 # first, which is right for sources whose twigs are modelled thick (the niwaki) but
 # orphans the foliage on sources like the sugi.
 TRUNK_KEEP_ALL = (len(argv) > 9 and argv[9] == "1")
+# Optional 11th arg: RELAX — per-card random displacement (source units, deterministic
+# LCG). Snapping pulls many cards onto the same few surviving trunk vertices, which
+# reads as tight pom-poms; a little jitter loosens the cluster back into foliage.
+RELAX = float(argv[10]) if len(argv) > 10 else 0.0
 MIN_ISLAND, MAX_TRUNK_ISLANDS = 200, 10
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -163,7 +167,7 @@ for comp in comps:
     else:
         doomed.extend(comp)
 bmesh.ops.delete(bm, geom=doomed, context="FACES")
-if SPRAY_SCALE != 1.0:
+if SPRAY_SCALE != 1.0 or RELAX > 0.0:
     bm.faces.ensure_lookup_table()
     seen2, grown = set(), 0
     for f in bm.faces:
@@ -204,6 +208,12 @@ if SPRAY_SCALE != 1.0:
                     bd, tgt = d2, tp
             if tgt is not None:
                 shift = (tgt - anchor) * SNAP
+        if RELAX > 0.0:
+            jitter = mathutils.Vector((0, 0, 0))
+            for _ax in range(3):
+                state = (1103515245 * state + 12345) % 2147483648
+                jitter[_ax] = (state / 2147483648 * 2 - 1) * RELAX
+            shift = shift + jitter
         for v in comp_v:
             v.co = (anchor + (v.co - anchor) * SPRAY_SCALE) + shift
         grown += 1
