@@ -21,7 +21,14 @@
 #       <src.fbx> <object name> <foliage material key> <foliage_tris> <trunk_tris> \
 #       <height_studs> <out.fbx>
 #
-# In Studio: File -> Import 3D (NOT "as package"); then set the foliage MeshPart's
+# IN STUDIO after import, on the FOLIAGE MeshPart:
+#   * SurfaceAppearance.AlphaMode = Transparency
+#   * MeshPart.DoubleSided = TRUE  <-- easy to miss and costly: foliage cards are
+#     single-sided planes, so with the Roblox default (false) every back-facing card is
+#     CULLED and the canopy silently loses a large share of its cards from any given
+#     viewpoint. Costs no triangles.
+#
+# (original note) File -> Import 3D (NOT "as package"); then set the foliage MeshPart's
 # SurfaceAppearance.AlphaMode = Transparency.
 
 import bpy, bmesh, sys, math, os, glob, functools
@@ -34,6 +41,11 @@ argv = sys.argv[sys.argv.index("--") + 1:]
 FBX, OBJ, FOLIAGE_KEY = argv[0], argv[1], argv[2]
 FOLIAGE_TRIS, TRUNK_TRIS = int(argv[3]), int(argv[4])
 HEIGHT_STUDS, OUT_FBX = float(argv[5]), argv[6]
+# Optional 8th arg: scale each SURVIVING card about its own centroid. Thinning removes
+# cards; enlarging the survivors refills the canopy without adding triangles. The
+# vendor's own UVs are untouched, so every card still carries a real needle spray (this
+# is why clump-BAKING was abandoned — see bake_clump_tree.py's blobby output).
+SPRAY_SCALE = float(argv[7]) if len(argv) > 7 else 1.0
 MIN_ISLAND, MAX_TRUNK_ISLANDS = 200, 10
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -117,8 +129,11 @@ bpy.ops.object.modifier_apply(modifier=dec.name)
 
 # FOLIAGE: thin whole cards to the target tri budget (deterministic LCG)
 bm, comps = islands_of(foliage)
-per_island = max(1, round(sum(len(c) for c in comps) * 2 / len(comps)))
-frac = min(1.0, (FOLIAGE_TRIS // per_island) / len(comps))
+# measure ACTUAL triangles per island (a face may be a quad or a tri); the old
+# estimate assumed 2 tris per face for every island and undershot the budget by ~2x.
+_tris = sum(len(f.verts) - 2 for c in comps for f in c)
+per_island = max(1.0, _tris / len(comps))
+frac = min(1.0, (FOLIAGE_TRIS / per_island) / len(comps))
 state = 12345
 doomed, kept = [], 0
 for comp in comps:
@@ -128,6 +143,30 @@ for comp in comps:
     else:
         doomed.extend(comp)
 bmesh.ops.delete(bm, geom=doomed, context="FACES")
+if SPRAY_SCALE != 1.0:
+    bm.faces.ensure_lookup_table()
+    seen2, grown = set(), 0
+    for f in bm.faces:
+        if f.index in seen2:
+            continue
+        stack, comp_v = [f], set()
+        seen2.add(f.index)
+        while stack:
+            cur = stack.pop()
+            comp_v.update(cur.verts)
+            for e in cur.edges:
+                for nf in e.link_faces:
+                    if nf.index not in seen2:
+                        seen2.add(nf.index)
+                        stack.append(nf)
+        ctr = mathutils.Vector((0, 0, 0))
+        for v in comp_v:
+            ctr += v.co
+        ctr /= max(len(comp_v), 1)
+        for v in comp_v:
+            v.co = ctr + (v.co - ctr) * SPRAY_SCALE
+        grown += 1
+    print(f"SPRAY-SCALE x{SPRAY_SCALE} on {grown} surviving cards")
 bm.to_mesh(foliage.data)
 bm.free()
 print(f"RESULT foliage_tris={tri_count(foliage)} trunk_tris={tri_count(trunk)} (kept {kept}/{len(comps)} cards)")
@@ -192,8 +231,24 @@ bpy.context.view_layer.objects.active = trunk
 bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
 
 base_name = os.path.splitext(os.path.basename(OUT_FBX))[0]
+# FBX-imported objects carry hidden importer state that survives transform_apply: the
+# exporter writes them at 0.01, which global_scale multiplies AGAIN (imports 100x small).
+# Rehosting the meshes in FRESHLY CREATED objects reliably exports at unit scale.
+_fresh = []
+for _o in (trunk, foliage):
+    _n = bpy.data.objects.new(_o.name + "_X", _o.data.copy())
+    bpy.context.scene.collection.objects.link(_n)
+    _fresh.append(_n)
+for _o in (trunk, foliage):
+    bpy.data.objects.remove(_o, do_unlink=True)
+trunk, foliage = _fresh
+bpy.context.view_layer.update()
 trunk.name = base_name + "_Trunk"
 foliage.name = base_name + "_Foliage"
+bpy.ops.object.select_all(action="DESELECT")
+trunk.select_set(True)
+foliage.select_set(True)
+bpy.context.view_layer.objects.active = trunk
 
 bpy.ops.export_scene.fbx(
     filepath=OUT_FBX,

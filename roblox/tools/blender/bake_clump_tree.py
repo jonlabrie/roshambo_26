@@ -23,7 +23,14 @@
 #
 #   clump_cells — target clump count (grid resolution is derived from it).
 #
-# In Studio: File -> Import 3D, then set the foliage SurfaceAppearance.AlphaMode =
+# IN STUDIO after import, on the FOLIAGE MeshPart:
+#   * SurfaceAppearance.AlphaMode = Transparency
+#   * MeshPart.DoubleSided = TRUE  <-- easy to miss and costly: foliage cards are
+#     single-sided planes, so with the Roblox default (false) every back-facing card is
+#     CULLED and the canopy silently loses a large share of its cards from any given
+#     viewpoint. Costs no triangles.
+#
+# (original note) File -> Import 3D, then set the foliage SurfaceAppearance.AlphaMode =
 # Transparency (the atlas carries alpha in its ColorMap).
 
 import bpy, bmesh, sys, math, os, glob, functools
