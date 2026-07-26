@@ -43,6 +43,8 @@ local ARRANGEMENTS: { Arrangement } = {
         trees = {
             { species = "PineNiwakiA", dx = -5, dz = 0, scale = 1.0 },
             { species = "PineNiwakiC", dx = 5.5, dz = 1.5, scale = 0.85 },
+            -- tall third set BACK off the gate axis: the dominant of the group
+            { species = "PineNiwakiE", dx = -2, dz = 9, scale = 1.0, yawDeg = 215 },
         },
     },
     {
