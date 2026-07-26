@@ -58,6 +58,11 @@ TRUNK_KEEP_ALL = (len(argv) > 9 and argv[9] == "1")
 # LCG). Snapping pulls many cards onto the same few surviving trunk vertices, which
 # reads as tight pom-poms; a little jitter loosens the cluster back into foliage.
 RELAX = float(argv[10]) if len(argv) > 10 else 0.0
+# Optional 12th arg: ORPHAN_MAX — after snapping, DELETE any card still further than
+# this (source units) from surviving trunk geometry. These are sprays that hung on the
+# longest culled twigs; no snap can reach them, so they read as foliage floating in
+# space. 0 = keep everything.
+ORPHAN_MAX = float(argv[11]) if len(argv) > 11 else 0.0
 MIN_ISLAND, MAX_TRUNK_ISLANDS = 200, 10
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -170,14 +175,16 @@ bmesh.ops.delete(bm, geom=doomed, context="FACES")
 if SPRAY_SCALE != 1.0 or RELAX > 0.0:
     bm.faces.ensure_lookup_table()
     seen2, grown = set(), 0
+    orphan_faces = []
     for f in bm.faces:
         if f.index in seen2:
             continue
-        stack, comp_v = [f], set()
+        stack, comp_v, comp_f = [f], set(), []
         seen2.add(f.index)
         while stack:
             cur = stack.pop()
             comp_v.update(cur.verts)
+            comp_f.append(cur)
             for e in cur.edges:
                 for nf in e.link_faces:
                     if nf.index not in seen2:
@@ -200,6 +207,7 @@ if SPRAY_SCALE != 1.0 or RELAX > 0.0:
         # Translate each card so its inner vertex meets the nearest surviving trunk
         # vertex — foliage then sits on geometry the player can actually see.
         shift = mathutils.Vector((0, 0, 0))
+        residual = 0.0
         if TRUNK_PTS:
             tgt, bd = None, None
             for tp in TRUNK_PTS:
@@ -208,6 +216,10 @@ if SPRAY_SCALE != 1.0 or RELAX > 0.0:
                     bd, tgt = d2, tp
             if tgt is not None:
                 shift = (tgt - anchor) * SNAP
+                residual = (bd ** 0.5) * (1.0 - SNAP)
+        if ORPHAN_MAX > 0.0 and residual > ORPHAN_MAX:
+            orphan_faces.extend(comp_f)
+            continue
         if RELAX > 0.0:
             jitter = mathutils.Vector((0, 0, 0))
             for _ax in range(3):
@@ -217,6 +229,9 @@ if SPRAY_SCALE != 1.0 or RELAX > 0.0:
         for v in comp_v:
             v.co = (anchor + (v.co - anchor) * SPRAY_SCALE) + shift
         grown += 1
+    if orphan_faces:
+        bmesh.ops.delete(bm, geom=orphan_faces, context="FACES")
+        print(f"ORPHANS culled: {len(orphan_faces)} faces beyond {ORPHAN_MAX} of any branch")
     print(f"SPRAY-SCALE x{SPRAY_SCALE} on {grown} surviving cards")
 bm.to_mesh(foliage.data)
 bm.free()
