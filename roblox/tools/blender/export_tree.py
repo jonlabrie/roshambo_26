@@ -127,6 +127,12 @@ dec = trunk.modifiers.new("dec", "DECIMATE")
 dec.ratio = min(1.0, TRUNK_TRIS / max(tri_count(trunk), 1))
 bpy.ops.object.modifier_apply(modifier=dec.name)
 
+# tree axis = trunk centre in XZ; spray scaling anchors to whichever card vertex is
+# nearest this axis (see below)
+_tv = [trunk.matrix_world @ v.co for v in trunk.data.vertices]
+AXIS_X = sum(v.x for v in _tv) / max(len(_tv), 1)
+AXIS_Z = sum(v.z for v in _tv) / max(len(_tv), 1)
+
 # FOLIAGE: thin whole cards to the target tri budget (deterministic LCG)
 bm, comps = islands_of(foliage)
 # measure ACTUAL triangles per island (a face may be a quad or a tri); the old
@@ -159,12 +165,19 @@ if SPRAY_SCALE != 1.0:
                     if nf.index not in seen2:
                         seen2.add(nf.index)
                         stack.append(nf)
-        ctr = mathutils.Vector((0, 0, 0))
+        # Anchor at the card's INNER end — the vertex closest to the tree's vertical
+        # axis, i.e. where the spray meets its branch. Scaling about the centroid
+        # (the obvious choice) grows the card in BOTH directions, pulling its
+        # attachment end away from the branch tip and leaving foliage visibly
+        # floating in space.
+        anchor, best = None, None
         for v in comp_v:
-            ctr += v.co
-        ctr /= max(len(comp_v), 1)
+            dx, dz = v.co.x - AXIS_X, v.co.z - AXIS_Z
+            d2 = dx * dx + dz * dz
+            if best is None or d2 < best:
+                best, anchor = d2, v.co.copy()
         for v in comp_v:
-            v.co = ctr + (v.co - ctr) * SPRAY_SCALE
+            v.co = anchor + (v.co - anchor) * SPRAY_SCALE
         grown += 1
     print(f"SPRAY-SCALE x{SPRAY_SCALE} on {grown} surviving cards")
 bm.to_mesh(foliage.data)
@@ -217,6 +230,29 @@ if diff_node and opac_path:
     print(f"TEXTURE {combined.filepath_raw} {w}x{h}")
 else:
     print("WARN no diffuse/opacity pair found — foliage will import opaque")
+
+# TRUNK MATERIAL: vendors wire albedo + normal + roughness; Roblox's importer picks
+# one for SurfaceAppearance.ColorMap and picked a GRAYSCALE map (trunk imported
+# bone-white). Keep only the albedo image so the choice is unambiguous.
+for _m in trunk.data.materials:
+    if not (_m and _m.use_nodes):
+        continue
+    _nt = _m.node_tree
+    _texs = [n for n in _nt.nodes if n.type == "TEX_IMAGE" and n.image]
+    # match on FILEPATH: the importer names images "Map #123456", so image.name
+    # never contains "alb"/"nrm"/"rough" — only the filepath does.
+    def _isalb(n):
+        return "alb" in os.path.basename(n.image.filepath).lower()
+
+    _alb = next((n for n in _texs if _isalb(n)), None)
+    if _alb:
+        for n in _texs:
+            if n is not _alb:
+                _nt.nodes.remove(n)
+        _p = next((n for n in _nt.nodes if n.type == "BSDF_PRINCIPLED"), None)
+        if _p:
+            _nt.links.new(_alb.outputs["Color"], _p.inputs["Base Color"])
+        print(f"TRUNK-TEX kept {_alb.image.name}, dropped {len(_texs) - 1} non-albedo maps")
 
 # scale to target stud height, then name meshes per output file (Asset Manager legibility)
 pts = [o.matrix_world @ mathutils.Vector(c) for o in (trunk, foliage) for c in o.bound_box]
