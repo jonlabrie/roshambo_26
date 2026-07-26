@@ -75,10 +75,34 @@ for o in list(bpy.data.objects):
         bpy.ops.object.join()
 if foliage is None or trunk is None:
     raise SystemExit(f"ABORT: could not split on key {FOLIAGE_KEY!r}")
+# Blender invalidates Python object references across bpy.data.objects.remove() — the
+# bake loop removes temp objects, which silently corrupted `trunk` (it started reporting
+# a 0.012 scale and exported 100x small). Work by NAME and re-fetch after every removal.
+trunk.name = "TRUNK_WORK"
+foliage.name = "FOLIAGE_WORK"
+
+
+# Bake each object's transform into its MESH now, while the transforms are still
+# trustworthy, and zero the object matrices. From here everything (clustering, card
+# building, trunk culling, final scaling) works in ONE shared space, so a spurious
+# object scale appearing later cannot corrupt geometry or separate the two meshes.
+for _o in (trunk, foliage):
+    _o.data.transform(_o.matrix_world)
+    _o.matrix_world = mathutils.Matrix.Identity(4)
+    _o.data.update()
+
+
+def T():
+    return bpy.data.objects["TRUNK_WORK"]
+
+
+def F():
+    return bpy.data.objects["FOLIAGE_WORK"]
 
 
 def tri_count(o):
     return sum(len(p.vertices) - 2 for p in o.data.polygons)
+
 
 
 # ---- textures: repoint to the vendor's sibling maps folder ------------------
@@ -241,6 +265,8 @@ for vi, clump in enumerate(picks):
     bpy.data.objects.remove(tmp_obj, do_unlink=True)
     print(f"BAKED tile{vi} ({len(clump['idxs'])} sprays, r={rad:.2f})")
 
+trunk, foliage = T(), F()  # re-fetch: the bake loop removed temp objects
+
 # assemble 2x2 atlas
 atlas = np.zeros((TILE * 2, TILE * 2, 4), dtype=np.float32)
 for vi, path in enumerate(tiles):
@@ -250,12 +276,38 @@ for vi, path in enumerate(tiles):
     t = px.reshape(TILE, TILE, 4)
     r, c = vi // 2, vi % 2
     atlas[r * TILE:(r + 1) * TILE, c * TILE:(c + 1) * TILE] = t
+# ALPHA BLEED: transparent pixels come out of the render as BLACK rgb. Bilinear
+# filtering then samples that black at cutout edges and paints dark halos (and whole
+# dark cards at distance/mip levels). Flood the colour of opaque neighbours outward into
+# the transparent region so every sampled texel carries plausible foliage colour.
+rgb, a = atlas[:, :, :3], atlas[:, :, 3]
+mask = a > 0.02
+for _ in range(6):
+    if mask.all():
+        break
+    src_rgb = np.where(mask[:, :, None], rgb, 0.0)
+    src_w = mask.astype(np.float32)
+    acc = np.zeros_like(src_rgb)
+    accw = np.zeros_like(src_w)
+    for dy, dx in ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1)):
+        acc += np.roll(np.roll(src_rgb, dy, axis=0), dx, axis=1)
+        accw += np.roll(np.roll(src_w, dy, axis=0), dx, axis=1)
+    grow = (~mask) & (accw > 0)
+    rgb[grow] = (acc[grow] / accw[grow][:, None])
+    mask = mask | grow
+atlas[:, :, :3] = rgb  # alpha channel untouched: silhouettes unchanged
+print(f"ALPHA-BLEED filled {int((~(a > 0.02)).sum())} transparent texels with neighbour colour")
+
 atlas_img = bpy.data.images.new(base_name + "_clumps", TILE * 2, TILE * 2, alpha=True)
 atlas_img.pixels.foreach_set(atlas.reshape(-1))
 atlas_path = os.path.join(out_dir, base_name + "_clumps.png")
 atlas_img.filepath_raw = atlas_path
 atlas_img.file_format = "PNG"
-atlas_img.save()
+atlas_img.alpha_mode = "STRAIGHT"
+scene.render.image_settings.file_format = "PNG"
+scene.render.image_settings.color_mode = "RGBA"
+scene.render.image_settings.color_depth = "8"
+atlas_img.save_render(filepath=atlas_path, scene=scene)
 print(f"ATLAS {atlas_path} {TILE * 2}x{TILE * 2}")
 
 # ---- rebuild canopy as crossed quads ---------------------------------------
@@ -314,7 +366,9 @@ for attr, val in (("blend_method", "CLIP"), ("surface_render_method", "DITHERED"
     except Exception:
         pass
 card_mesh.materials.append(card_mat)
-bpy.data.objects.remove(foliage, do_unlink=True)
+bpy.data.objects.remove(bpy.data.objects["FOLIAGE_WORK"], do_unlink=True)
+trunk = T()  # re-fetch after the removal
+card_obj.name = "FOLIAGE_WORK"
 foliage = card_obj
 foliage.hide_render = False
 trunk.hide_render = False
@@ -355,20 +409,64 @@ bpy.ops.object.modifier_apply(modifier=dec.name)
 print(f"RESULT foliage_tris={tri_count(foliage)} trunk_tris={tri_count(trunk)} clumps={len(clumps)}")
 
 # ---- scale + export ---------------------------------------------------------
-pts = [o.matrix_world @ mathutils.Vector(c) for o in (trunk, foliage) for c in o.bound_box]
+# Scale by transforming MESH DATA directly, never object scale: bpy.ops.transform_apply
+# is context/selection sensitive and silently left the trunk carrying an 0.01 object
+# scale, which the exporter's global_scale then multiplied AGAIN (trunk imported 100x
+# too small). Direct mesh transform + identity object matrix is deterministic.
+# MESH DATA is authoritative: both meshes are built in the same source space (the
+# trunk's LOCAL coords stay correct even when Blender leaves a spurious object scale on
+# it — baking matrix_world in would import the trunk 100x small). Discard object
+# transforms, then scale the mesh data itself.
+pts = []
+for o in (trunk, foliage):
+    pts += [v.co for v in o.data.vertices]
 zmin, zmax = min(p.z for p in pts), max(p.z for p in pts)
 s = HEIGHT_STUDS / (zmax - zmin)
 for o in (trunk, foliage):
-    o.scale = (s, s, s)
+    # reset every transform component explicitly, then force a depsgraph update: the FBX
+    # exporter evaluates objects through the depsgraph, so without this it still writes
+    # the trunk's stale spurious scale (exported 100x small even with a clean matrix).
+    o.delta_location = (0.0, 0.0, 0.0)
+    o.delta_rotation_euler = (0.0, 0.0, 0.0)
+    o.delta_scale = (1.0, 1.0, 1.0)
+    o.location = (0.0, 0.0, 0.0)
+    o.rotation_euler = (0.0, 0.0, 0.0)
+    o.scale = (1.0, 1.0, 1.0)
+    o.matrix_world = mathutils.Matrix.Identity(4)
+    o.data.transform(mathutils.Matrix.Scale(s, 4))
+    o.data.update()
+bpy.context.view_layer.update()
+
+# Rehost both meshes in FRESHLY CREATED objects. The FBX-imported trunk carries hidden
+# importer state that survives clearing location/rotation/scale/deltas and a depsgraph
+# update — the exporter kept writing it 100x small — while the newly-built card object
+# always exported correctly. A new object wrapping a copy of the mesh data (UVs and
+# materials included) reliably exports at unit scale.
+fresh = []
+for o in (trunk, foliage):
+    no = bpy.data.objects.new(o.name + "_X", o.data.copy())
+    bpy.context.scene.collection.objects.link(no)
+    fresh.append(no)
+for o in (trunk, foliage):
+    bpy.data.objects.remove(o, do_unlink=True)
+trunk, foliage = fresh
+trunk.name = base_name + "_Trunk"
+foliage.name = base_name + "_Foliage"
+bpy.context.view_layer.update()
+trunk.name = base_name + "_Trunk"
+foliage.name = base_name + "_Foliage"
+for o in (trunk, foliage):
+    zs = [v.co.z for v in o.data.vertices]
+    xs = [v.co.x for v in o.data.vertices]
+    ys = [v.co.y for v in o.data.vertices]
+    tr = tuple(round(v, 3) for v in o.matrix_world.to_translation())
+    print(f"PRE-EXPORT {o.name}: loc={tr} x[{min(xs):.2f},{max(xs):.2f}] y[{min(ys):.2f},{max(ys):.2f}] z[{min(zs):.2f},{max(zs):.2f}]")
 bpy.ops.object.select_all(action="DESELECT")
 trunk.select_set(True)
 foliage.select_set(True)
 bpy.context.view_layer.objects.active = trunk
-bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-trunk.name = base_name + "_Trunk"
-foliage.name = base_name + "_Foliage"
-cam.hide_render = True
-bpy.data.objects.remove(cam, do_unlink=True)
+if "BakeCam" in bpy.data.objects:
+    bpy.data.objects.remove(bpy.data.objects["BakeCam"], do_unlink=True)
 
 bpy.ops.export_scene.fbx(
     filepath=OUT_FBX,
@@ -378,3 +476,6 @@ bpy.ops.export_scene.fbx(
     global_scale=0.01,
 )
 print("WROTE", OUT_FBX)
+print(f"ATLAS PNG kept beside the FBX: {atlas_path}")
+print("  If Studio's import shows opaque cards, set the foliage SurfaceAppearance's")
+print("  ColorMap to this PNG by hand and AlphaMode=Transparency.")
