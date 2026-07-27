@@ -183,6 +183,48 @@ def tri_count(o):
     return sum(len(p.vertices) - 2 for p in o.data.polygons)
 
 
+# Roblox renders a MeshPart at full detail only up to 20,000 triangles; above
+# that it silently decimates ("exceeds 20K, will be decimated upon rendering").
+# Budgets land a few triangles over surprisingly easily (40,000 foliage split two
+# ways = 20,046 each), so trim whole cards off any part that crosses the line.
+ROBLOX_MESH_CAP = 19900
+
+
+def trim_to_cap(ob, cap=ROBLOX_MESH_CAP):
+    n = tri_count(ob)
+    if n <= cap:
+        return n
+    tb = bmesh.new()
+    tb.from_mesh(ob.data)
+    tb.faces.ensure_lookup_table()
+    seen, comps = set(), []
+    for f in tb.faces:
+        if f.index in seen:
+            continue
+        stack, comp = [f], []
+        seen.add(f.index)
+        while stack:
+            cur = stack.pop()
+            comp.append(cur.index)
+            for e in cur.edges:
+                for nf in e.link_faces:
+                    if nf.index not in seen:
+                        seen.add(nf.index)
+                        stack.append(nf)
+        comps.append(comp)
+    doomed, over = set(), n - cap
+    for comp in comps:                      # drop whole islands, smallest impact first
+        if over <= 0:
+            break
+        doomed.update(comp)
+        over -= len(comp)
+    bmesh.ops.delete(tb, geom=[f for f in tb.faces if f.index in doomed], context="FACES")
+    tb.to_mesh(ob.data)
+    tb.free()
+    print(f"CAP {ob.name}: {n} -> {tri_count(ob)} tris (Roblox decimates above 20k)")
+    return tri_count(ob)
+
+
 def islands_of(obj):
     bm = bmesh.new()
     bm.from_mesh(obj.data)
@@ -629,6 +671,9 @@ if FOLIAGE_PARTS > 1:
     foliage = foliage_objs[0]
     print(f"FOLIAGE SPLIT into {FOLIAGE_PARTS} meshes: "
           + ", ".join(str(sum(len(p.vertices)-2 for p in o.data.polygons)) for o in foliage_objs))
+
+for _o in trunk_objs + foliage_objs:
+    trim_to_cap(_o)
 
 base_name = os.path.splitext(os.path.basename(OUT_FBX))[0]
 # FBX-imported objects carry hidden importer state that survives transform_apply: the
