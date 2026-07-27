@@ -64,6 +64,10 @@ print = functools.partial(print, flush=True)
 
 argv = sys.argv[sys.argv.index("--") + 1:]
 FBX, OBJ, FOLIAGE_KEY = argv[0], argv[1], argv[2]
+# comma-separated keys: XfrogPlants names its canopy materials inconsistently
+# (hinoki splits Leaf + Needle, the cherry uses Flower1/FLower1/Flower2), so one
+# key cannot cover the library. Matching is case-insensitive substring.
+FOLIAGE_KEYS = [k.strip().lower() for k in FOLIAGE_KEY.split(",") if k.strip()]
 FOLIAGE_TRIS, TRUNK_TRIS = int(argv[3]), int(argv[4])
 HEIGHT_STUDS, OUT_FBX = float(argv[5]), argv[6]
 # Optional 8th arg: scale each SURVIVING card about its own centroid. Thinning removes
@@ -78,7 +82,20 @@ SNAP = float(argv[8]) if len(argv) > 8 else 1.0
 # actually hang on) and let DECIMATE thin the whole thing. 0 = cull to the big islands
 # first, which is right for sources whose twigs are modelled thick (the niwaki) but
 # orphans the foliage on sources like the sugi.
-TRUNK_KEEP_ALL = (len(argv) > 9 and argv[9] == "1")
+#   0 = cull to the big islands, then decimate (sources with thick modelled twigs)
+#   1 = SMART WOOD: decimate the main island, keep whole twigs to budget (sources
+#       whose twigs are tiny slivers that decimation would shred — the sugi)
+#   2 = keep EVERY island and decimate them all uniformly. DON'T USE on sources
+#       with a smooth bole: a global decimate robs the trunk cylinder to pay for
+#       hundreds of little branch tubes and the trunk disappears entirely.
+#   3 = PROPORTIONAL: split the main island (the bole) from the branch islands and
+#       decimate each with its OWN budget, so they never compete. The right mode
+#       for the XfrogPlants libraries.
+TRUNK_KEEP_ALL = (len(argv) > 9 and argv[9] in ("1", "2", "3"))
+TRUNK_UNIFORM = (len(argv) > 9 and argv[9] == "2")
+TRUNK_PROPORTIONAL = (len(argv) > 9 and argv[9] == "3")
+# share of the wood budget reserved for the bole in mode 3
+BOLE_SHARE = 0.35
 # Optional 11th arg: RELAX — per-card random displacement (source units, deterministic
 # LCG). Snapping pulls many cards onto the same few surviving trunk vertices, which
 # reads as tight pom-poms; a little jitter loosens the cluster back into foliage.
@@ -100,7 +117,16 @@ TRUNK_PARTS = int(argv[13]) if len(argv) > 13 else 1
 MIN_ISLAND, MAX_TRUNK_ISLANDS = 200, 10
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
-bpy.ops.import_scene.fbx(filepath=FBX)
+# source may be .fbx (TurboSquid game packs) or .obj (XfrogPlants libraries)
+if FBX.lower().endswith(".obj"):
+    # XfrogPlants OBJs are Z-UP (tallest extent is Z, base sits on Z=0), but the
+    # importer assumes Y-up by default and would lay every tree on its side.
+    try:
+        bpy.ops.wm.obj_import(filepath=FBX, forward_axis="Y", up_axis="Z")
+    except AttributeError:  # Blender < 3.3
+        bpy.ops.import_scene.obj(filepath=FBX, axis_forward="Y", axis_up="Z")
+else:
+    bpy.ops.import_scene.fbx(filepath=FBX)
 
 tree = bpy.data.objects[OBJ]
 wm = tree.matrix_world.copy()
@@ -113,17 +139,19 @@ bpy.ops.object.select_all(action="DESELECT")
 tree.select_set(True)
 bpy.context.view_layer.objects.active = tree
 bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-if max(tree.dimensions) > 200:
+if max(tree.dimensions) > 2000:
+    # everything is rescaled to HEIGHT_STUDS below; this only catches a source
+    # authored in the wrong unit entirely (mm, or cm read as m).
     raise SystemExit(f"ABORT: {max(tree.dimensions):.0f} units after apply — unexpected source scale")
 
 bpy.ops.object.mode_set(mode="EDIT")
 bpy.ops.mesh.separate(type="MATERIAL")
 bpy.ops.object.mode_set(mode="OBJECT")
 
-foliage, trunk = None, None
+fol_objs, trunk = [], None
 for o in list(bpy.data.objects):
-    if any(m and FOLIAGE_KEY.lower() in m.name.lower() for m in o.data.materials):
-        foliage = o
+    if any(m and any(k in m.name.lower() for k in FOLIAGE_KEYS) for m in o.data.materials):
+        fol_objs.append(o)
     elif trunk is None:
         trunk = o
     else:
@@ -132,6 +160,16 @@ for o in list(bpy.data.objects):
         o.select_set(True)
         bpy.context.view_layer.objects.active = trunk
         bpy.ops.object.join()
+# a source may split its canopy across several materials (Needle1/Needle2/...);
+# join them all or the extras vanish from the export
+foliage = fol_objs[0] if fol_objs else None
+if len(fol_objs) > 1:
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in fol_objs:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = foliage
+    bpy.ops.object.join()
+    print(f"FOLIAGE: joined {len(fol_objs)} foliage materials into one mesh")
 if foliage is None or trunk is None:
     raise SystemExit(f"ABORT: could not split trunk/foliage on key {FOLIAGE_KEY!r}")
 foliage_objs = [foliage]   # becomes N meshes if FOLIAGE_PARTS > 1 (see the split below)
@@ -181,7 +219,56 @@ bm.to_mesh(trunk.data)
 bm.free()
 bpy.ops.object.select_all(action="DESELECT")
 bpy.context.view_layer.objects.active = trunk
-if TRUNK_KEEP_ALL and TRUNK_TRIS > 0:
+if TRUNK_PROPORTIONAL and TRUNK_TRIS > 0:
+    pb = bmesh.new(); pb.from_mesh(trunk.data); pb.faces.ensure_lookup_table()
+    seen, isl = set(), []
+    for f in pb.faces:
+        if f.index in seen:
+            continue
+        stack, comp = [f], []
+        seen.add(f.index)
+        while stack:
+            cur = stack.pop(); comp.append(cur.index)
+            for e in cur.edges:
+                for nf in e.link_faces:
+                    if nf.index not in seen:
+                        seen.add(nf.index); stack.append(nf)
+        isl.append(comp)
+    isl.sort(key=len, reverse=True)
+    main = set(isl[0])
+    pb.free()
+    # branches -> their own mesh
+    br_mesh = bpy.data.meshes.new("branches")
+    bb = bmesh.new(); bb.from_mesh(trunk.data); bb.faces.ensure_lookup_table()
+    bmesh.ops.delete(bb, geom=[f for f in bb.faces if f.index in main], context="FACES")
+    bb.to_mesh(br_mesh); bb.free()
+    # bole stays on `trunk`
+    bm_b = bmesh.new(); bm_b.from_mesh(trunk.data); bm_b.faces.ensure_lookup_table()
+    bmesh.ops.delete(bm_b, geom=[f for f in bm_b.faces if f.index not in main], context="FACES")
+    bm_b.to_mesh(trunk.data); bm_b.free()
+    br = bpy.data.objects.new("branches", br_mesh)
+    bpy.context.scene.collection.objects.link(br)
+    for m in trunk.data.materials:
+        br_mesh.materials.append(m)
+    bole_budget = max(600, int(TRUNK_TRIS * BOLE_SHARE))
+    for ob, budget in ((trunk, bole_budget), (br, TRUNK_TRIS - bole_budget)):
+        if budget < tri_count(ob) and tri_count(ob) > 0:
+            bpy.context.view_layer.objects.active = ob
+            d = ob.modifiers.new("dec", "DECIMATE")
+            d.ratio = min(1.0, budget / max(tri_count(ob), 1))
+            bpy.ops.object.modifier_apply(modifier=d.name)
+    print(f"PROPORTIONAL WOOD: bole {tri_count(trunk)} tris, branches {tri_count(br)} tris"
+          f" ({len(isl) - 1} branch islands kept)")
+    bpy.ops.object.select_all(action="DESELECT")
+    trunk.select_set(True); br.select_set(True)
+    bpy.context.view_layer.objects.active = trunk
+    bpy.ops.object.join()
+elif TRUNK_UNIFORM and TRUNK_TRIS > 0:
+    dec = trunk.modifiers.new("dec", "DECIMATE")
+    dec.ratio = min(1.0, TRUNK_TRIS / max(tri_count(trunk), 1))
+    bpy.ops.object.modifier_apply(modifier=dec.name)
+    print(f"UNIFORM WOOD: all islands kept, decimated to {tri_count(trunk)} tris")
+elif TRUNK_KEEP_ALL and TRUNK_TRIS > 0:
     # SMART WOOD REDUCTION. The main island (trunk + major branches) is smooth solid
     # geometry and decimates cleanly; the twigs are ~6-face slivers that decimation
     # shreds into visible shards. So decimate ONLY the island, and keep twigs WHOLE,
@@ -377,9 +464,13 @@ fol_mat = foliage.data.materials[0]
 diff_node = next((n for n in fol_mat.node_tree.nodes if n.type == "TEX_IMAGE" and n.image
                   and "opa" not in n.image.name.lower()), None)
 opac_path = next((v for k, v in tex_by_name.items()
-                  if "opa" in k and FOLIAGE_KEY.split("_")[0].lower() in k), None)
+                  if "opa" in k and FOLIAGE_KEYS[0].split("_")[0] in k), None)
 if opac_path is None:
     opac_path = next((v for k, v in tex_by_name.items() if "opa" in k), None)
+if opac_path is None and diff_node is not None and diff_node.image:
+    # XfrogPlants convention: diffuse JA05ned.tif -> alpha JA05ned_a.tif
+    _stem, _ext = os.path.splitext(os.path.basename(diff_node.image.filepath))
+    opac_path = tex_by_name.get((_stem + "_a" + _ext).lower())
 if diff_node and opac_path:
     diff_img = diff_node.image
     opac_img = bpy.data.images.load(opac_path)
@@ -391,7 +482,14 @@ if diff_node and opac_path:
     opac = np.empty(w * h * 4, dtype=np.float32)
     opac_img.pixels.foreach_get(opac)
     rgba = diff.reshape(-1, 4).copy()
-    rgba[:, 3] = opac.reshape(-1, 4)[:, 0]
+    mask = opac.reshape(-1, 4)[:, 0]
+    lum = rgba[:, :3].mean(axis=1)
+    bg, leaf = lum < 0.08, lum > 0.12
+    if bg.any() and leaf.any() and mask[bg].mean() > mask[leaf].mean():
+        # inverted matte (white = transparent) — the XfrogPlants convention
+        mask = 1.0 - mask
+        print("ALPHA: inverted matte detected (white = background), flipping")
+    rgba[:, 3] = mask
     name = os.path.splitext(os.path.basename(OUT_FBX))[0]
     combined = bpy.data.images.new(name + "_leaves", w, h, alpha=True)
     combined.pixels.foreach_set(rgba.reshape(-1))

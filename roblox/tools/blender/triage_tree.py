@@ -165,11 +165,15 @@ def main():
         name = os.path.relpath(t, args[0]) if os.path.isdir(args[0]) else r["file"]
         name = name.replace("/", "|")[-33:]
         if fol:
-            f0 = max(fol, key=lambda m: m["tris"])
+            # a canopy may span several materials; sum them or the tree reads as
+            # half its real size (XfrogPlants fir = Needle1 + Needle2)
+            tris = sum(m["tris"] for m in fol)
+            cards = sum(m["islands"] for m in fol)
+            cover = sum(m["coverage_full"] for m in fol)
+            frac = min(1.0, budget / max(tris, 1))
             print(
-                f"{name:<34}{r['tris']:>9,}{f0['tris']:>9,}{f0['islands']:>8,}"
-                f"{f0['pct_cards_kept']:>6.0f}%{f0['coverage_full']:>12.2f}"
-                f"{f0['coverage_at_budget']:>14.2f}"
+                f"{name:<34}{r['tris']:>9,}{tris:>9,}{cards:>8,}"
+                f"{100 * frac:>6.0f}%{cover:>12.2f}{frac * cover:>14.2f}"
             )
         else:
             print(f"{name:<34}{r['tris']:>9,}{'-':>9}{'-':>8}{'-':>7}{'-':>12}{'-':>14}")
