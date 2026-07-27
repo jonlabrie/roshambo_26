@@ -40,6 +40,10 @@ export type Recipe = {
     -- if set, the plant must be WITHIN this distance of water (shore-hugging
     -- margin flora); nil = plant regardless of distance from water
     nearWater: number?,
+    -- how far to stand off built geometry (paths, structures). Tested against the
+    -- real geometry, NOT a bounding box: a curving path's bbox covers six times
+    -- the ground the path occupies, which sterilises whole hillsides.
+    pathMargin: number?,
     -- spacing only applies BETWEEN plants of the same layer, so knee-high ground
     -- cover at 4-stud spacing does not veto a tree 12 studs away. Default
     -- "canopy"; margin flora sets "ground".
@@ -157,6 +161,18 @@ local function pickSpecies(
     return last.name, last.scale or 1
 end
 
+local function nearestSample(samples: { Sample }, x: number, z: number): Sample?
+    local bestD, best = math.huge, nil
+    for _, s in samples do
+        local dx, dz = s.x - x, s.z - z
+        local d = dx * dx + dz * dz
+        if d < bestD then
+            bestD, best = d, s
+        end
+    end
+    return best
+end
+
 local function nearestY(samples: { Sample }, x: number, z: number): number
     local bestD = math.huge
     local bestY = 0
@@ -228,7 +244,8 @@ function ZoneScatter.plan(
     zones: { Zone },
     samples: { Sample },
     recipes: { [string]: Recipe },
-    water: WaterIndex?
+    water: WaterIndex?,
+    built: WaterIndex?
 ): ({ Placement }, { MistAnchor })
     local ordered = table.clone(samples)
     table.sort(ordered, function(a, b)
@@ -271,6 +288,10 @@ function ZoneScatter.plan(
         end
         local nearWater = recipe.nearWater
         if nearWater ~= nil and not waterWithin(water, s.x, s.z, nearWater) then
+            return false
+        end
+        local pathMargin = recipe.pathMargin
+        if pathMargin ~= nil and waterWithin(built, s.x, s.z, pathMargin) then
             return false
         end
         return true
@@ -331,8 +352,16 @@ function ZoneScatter.plan(
                 local radius = CLUMP_RADIUS_MIN + roll(zone) * (CLUMP_RADIUS_MAX - CLUMP_RADIUS_MIN)
                 local cx = s.x + math.cos(ang) * radius
                 local cz = s.z + math.sin(ang) * radius
-                local cy = nearestY(ordered, cx, cz)
-                if resolveZone(zones, cx, cz, cy) == zone then
+                -- clump children must pass the SAME site gates as any other
+                -- placement, or they land on paths, in water margins and on
+                -- steep ground that the parent's rules excluded
+                local cs = nearestSample(ordered, cx, cz)
+                local cy = if cs then cs.y else 0
+                local probe: Sample = { x = cx, z = cz, y = cy, steep = if cs then cs.steep else 0 }
+                local czone = resolveZone(zones, cx, cz, cy, function(candidate)
+                    return accepts(candidate, probe)
+                end)
+                if czone == zone then
                     table.insert(out, {
                         x = cx,
                         z = cz,

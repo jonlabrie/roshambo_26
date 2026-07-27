@@ -15,6 +15,7 @@ export type Recipe = {
     innerClear: number?,
     nearWater: number?,
     layer: string?,
+    pathMargin: number?,
 }
 local Recipes: { [string]: Recipe } = {
     -- CANOPY layer: the tall structure. Baked SEPARATELY from PreserveUnder
@@ -35,6 +36,7 @@ local Recipes: { [string]: Recipe } = {
         maxSteep = 0.55,
         waterMargin = 3,
         scaleJitter = 0.15,
+        pathMargin = 7,
     },
     -- UNDERSTORY layer: young trees, dense at eye level. This is what makes the
     -- forest read "medium-heavy" where players actually walk — adults are bare
@@ -54,6 +56,7 @@ local Recipes: { [string]: Recipe } = {
         waterMargin = 3,
         scaleJitter = 0.22,
         layer = "understory",
+        pathMargin = 4,
     },
     WallFringe = {
         pool = {
@@ -73,7 +76,10 @@ local Recipes: { [string]: Recipe } = {
         maxSteep = 0.9,
         waterMargin = 4,
         scaleJitter = 0.35,
-        heightScale = 1.0,
+        pathMargin = 5,
+        -- halved 2026-07-27: the fringe conifers still read far too big
+        -- against the canyon (placed heights were 30/66/93 min/median/max)
+        heightScale = 0.5,
     },
     WaterMargin = {
         pool = {
@@ -107,6 +113,7 @@ local Recipes: { [string]: Recipe } = {
         maxSteep = 0.55,
         waterMargin = 4,
         scaleJitter = 0.15,
+        pathMargin = 6,
         innerClear = 0.5,
     },
 }

@@ -39,9 +39,8 @@ type Recipe = {
     heightScale: number?,
     innerClear: number?,
     nearWater: number?,
-    -- spacing applies only between plants of the same layer (ground cover must
-    -- not veto trees). Default "canopy".
     layer: string?,
+    pathMargin: number?,
 }
 local RECIPES: { [string]: Recipe } = {
     -- CANOPY layer: the tall structure. Baked SEPARATELY from PreserveUnder
@@ -62,6 +61,7 @@ local RECIPES: { [string]: Recipe } = {
         maxSteep = 0.55,
         waterMargin = 3,
         scaleJitter = 0.15,
+        pathMargin = 7,
     },
     -- UNDERSTORY layer: young trees, dense at eye level. This is what makes the
     -- forest read "medium-heavy" where players actually walk — adults are bare
@@ -81,6 +81,7 @@ local RECIPES: { [string]: Recipe } = {
         waterMargin = 3,
         scaleJitter = 0.22,
         layer = "understory",
+        pathMargin = 4,
     },
     WallFringe = {
         pool = {
@@ -100,7 +101,10 @@ local RECIPES: { [string]: Recipe } = {
         maxSteep = 0.9,
         waterMargin = 4,
         scaleJitter = 0.35,
-        heightScale = 1.0,
+        pathMargin = 5,
+        -- halved 2026-07-27: the fringe conifers still read far too big
+        -- against the canyon (placed heights were 30/66/93 min/median/max)
+        heightScale = 0.5,
     },
     WaterMargin = {
         pool = {
@@ -132,6 +136,7 @@ local RECIPES: { [string]: Recipe } = {
         maxSteep = 0.55,
         waterMargin = 4,
         scaleJitter = 0.15,
+        pathMargin = 6,
         innerClear = 0.5,
     },
 }
@@ -256,6 +261,18 @@ local function pickSpecies(pool: { Species }, r: number): (string, number)
     return last.name, last.scale or 1
 end
 
+local function nearestSample(samples: { Sample }, x: number, z: number): Sample?
+    local bestD, best = math.huge, nil
+    for _, s in samples do
+        local dx, dz = s.x - x, s.z - z
+        local d = dx * dx + dz * dz
+        if d < bestD then
+            bestD, best = d, s
+        end
+    end
+    return best
+end
+
 local function nearestY(samples: { Sample }, x: number, z: number): number
     local bestD, bestY = math.huge, 0
     for _, s in samples do
@@ -322,7 +339,8 @@ local function plan(
     zones: { Zone },
     samples: { Sample },
     recipes: { [string]: Recipe },
-    water: WaterIndex?
+    water: WaterIndex?,
+    built: WaterIndex?
 ): ({ Placement }, { MistAnchor })
     local ordered = table.clone(samples)
     table.sort(ordered, function(a, b)
@@ -361,6 +379,10 @@ local function plan(
         end
         local nearWater = recipe.nearWater
         if nearWater ~= nil and not waterWithin(water, s.x, s.z, nearWater) then
+            return false
+        end
+        local pathMargin = recipe.pathMargin
+        if pathMargin ~= nil and waterWithin(built, s.x, s.z, pathMargin) then
             return false
         end
         return true
@@ -413,8 +435,16 @@ local function plan(
                 local radius = CLUMP_RADIUS_MIN + roll(zone) * (CLUMP_RADIUS_MAX - CLUMP_RADIUS_MIN)
                 local cx = s.x + math.cos(ang) * radius
                 local cz = s.z + math.sin(ang) * radius
-                local cy = nearestY(ordered, cx, cz)
-                if resolveZone(zones, cx, cz, cy) == zone then
+                -- clump children must pass the SAME site gates as any other
+                -- placement, or they land on paths, in water margins and on
+                -- steep ground that the parent's rules excluded
+                local cs = nearestSample(ordered, cx, cz)
+                local cy = if cs then cs.y else 0
+                local probe: Sample = { x = cx, z = cz, y = cy, steep = if cs then cs.steep else 0 }
+                local czone = resolveZone(zones, cx, cz, cy, function(candidate)
+                    return accepts(candidate, probe)
+                end)
+                if czone == zone then
                     table.insert(out, {
                         x = cx,
                         z = cz,
@@ -585,6 +615,41 @@ local function readWaterCells(): { { number } }
     return cells
 end
 
+-- Point-sample the REAL built geometry (paths, stairs, decks, structures) so
+-- planting stands off what is actually there. Bounding boxes are useless here:
+-- a path that curves across a hillside has a bbox covering the whole hillside.
+local function readBuiltCells(): { { number } }
+    local cells: { { number } } = {}
+    local roots = {}
+    local cw = workspace:FindFirstChild("CanyonWorld")
+    if cw then
+        for _, n in { "Paths", "Structures" } do
+            local f = cw:FindFirstChild(n)
+            if f then
+                table.insert(roots, f)
+            end
+        end
+    end
+    for _, root in roots do
+        for _, d in root:GetDescendants() do
+            if d:IsA("BasePart") then
+                local cf, size = d.CFrame, d.Size
+                -- a few points along the part's long axis, so long thin treads
+                -- are represented by more than their centre
+                local steps = math.clamp(math.floor(math.max(size.X, size.Z) / 6), 1, 8)
+                for i = 0, steps do
+                    local t = if steps == 0 then 0.5 else i / steps
+                    local off = (t - 0.5) * (if size.X >= size.Z then size.X else size.Z)
+                    local dir = if size.X >= size.Z then cf.RightVector else cf.LookVector
+                    local pt = cf.Position + dir * off
+                    table.insert(cells, { pt.X, pt.Z })
+                end
+            end
+        end
+    end
+    return cells
+end
+
 local function preserveFolder(): Folder
     local foliage = workspace.CanyonWorld:FindFirstChild("Foliage")
     if not foliage then
@@ -658,8 +723,19 @@ local function bake(placements: { Placement }, mode: string)
         end
         local pivot = clone:GetPivot()
         clone:PivotTo(CFrame.new(p.x, pivot.Position.Y, p.z) * CFrame.Angles(0, p.yaw, 0))
+        -- PLANTING DEPTH: XfrogPlants model a root flare at the base, so seating
+        -- the bounding box on the ground leaves roots splayed across the surface.
+        -- Each template carries a PlantDepth attribute (studs at template scale,
+        -- set by hand on the Sandbox.PlantDepthRig — cherries need ~15-20% of
+        -- height, conifers ~8%, and a sapling with no flare needs none), scaled
+        -- here by the clone's own scale.
+        local depth = template:GetAttribute("PlantDepth")
+        if typeof(depth) ~= "number" then
+            depth = 0.3
+        end
+        depth *= clone:GetScale()
         local box, size = clone:GetBoundingBox()
-        clone:PivotTo(clone:GetPivot() + Vector3.new(0, p.y - 0.3 - (box.Position.Y - size.Y / 2), 0))
+        clone:PivotTo(clone:GetPivot() + Vector3.new(0, p.y - depth - (box.Position.Y - size.Y / 2), 0))
         flagClone(clone, p.species:find("SugiMid") ~= nil)
         clone.Parent = folder
         placed += 1
@@ -732,7 +808,8 @@ return function(opts: {
     end
     local samples = sampleTerrain(zones)
     local cells = readWaterCells()
-    local placements, anchors = plan(zones, samples, recipes, indexWater(cells))
+    local builtCells = readBuiltCells()
+    local placements, anchors = plan(zones, samples, recipes, indexWater(cells), indexWater(builtCells))
 
     local perZone: { [string]: number } = {}
     for _, p in placements do
@@ -744,7 +821,7 @@ return function(opts: {
     end
     table.sort(lines)
     local summary =
-        `[preserve] {mode}: zones={#zones} samples={#samples} water={#cells} placements={#placements} mist={#anchors} | {table.concat(
+        `[preserve] {mode}: zones={#zones} samples={#samples} water={#cells} built={#builtCells} placements={#placements} mist={#anchors} | {table.concat(
             lines,
             "  "
         )}`
