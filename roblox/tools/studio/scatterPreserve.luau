@@ -75,7 +75,8 @@ local RECIPES: { [string]: Recipe } = {
         maxSteep = 0.9,
         waterMargin = 4,
         scaleJitter = 0.2,
-        heightScale = 1.15,
+        -- 0.92: user dialled the fringe redwoods back 20% (2026-07-27 gate)
+        heightScale = 0.92,
     },
     WaterMargin = {
         pool = {
@@ -124,6 +125,9 @@ type Zone = {
     seed: number,
     mist: boolean?,
     still: boolean?,
+    -- optional height band (zones are 2D unless the part sets Vertical=true)
+    yMin: number?,
+    yMax: number?,
 }
 type Placement = {
     x: number,
@@ -152,7 +156,7 @@ local function seedState(seed: number): number
     return (seed * 2654435761) % 2147483648 + 1
 end
 
-local function contains(zone: Zone, x: number, z: number): boolean
+local function containsXZ(zone: Zone, x: number, z: number): boolean
     local b = zone.bounds
     if zone.shape == "circle" then
         local dx, dz = x - b[1], z - b[2]
@@ -161,18 +165,39 @@ local function contains(zone: Zone, x: number, z: number): boolean
     return x >= b[1] and z >= b[2] and x <= b[3] and z <= b[4]
 end
 
+local function contains(zone: Zone, x: number, z: number, y: number?): boolean
+    if not containsXZ(zone, x, z) then
+        return false
+    end
+    if y ~= nil then
+        if zone.yMin ~= nil and y < zone.yMin then
+            return false
+        end
+        if zone.yMax ~= nil and y > zone.yMax then
+            return false
+        end
+    end
+    return true
+end
+
 -- KeepOut vetoes regardless of layer order; otherwise zones are tried LAST-first
 -- and the first whose recipe accepts the sample wins, so a layered zone claims
 -- only the ground its recipe wants (shore margin over forest body).
-local function resolveZone(zones: { Zone }, x: number, z: number, accepts: ((Zone) -> boolean)?): Zone?
+local function resolveZone(
+    zones: { Zone },
+    x: number,
+    z: number,
+    y: number?,
+    accepts: ((Zone) -> boolean)?
+): Zone?
     for _, zone in zones do
-        if zone.recipe == "KeepOut" and contains(zone, x, z) then
+        if zone.recipe == "KeepOut" and contains(zone, x, z, y) then
             return nil
         end
     end
     for i = #zones, 1, -1 do
         local zone = zones[i]
-        if zone.recipe ~= "KeepOut" and contains(zone, x, z) then
+        if zone.recipe ~= "KeepOut" and contains(zone, x, z, y) then
             if accepts == nil or accepts(zone) then
                 return zone
             end
@@ -319,7 +344,7 @@ local function plan(
     end
 
     for _, s in ordered do
-        local zone = resolveZone(zones, s.x, s.z, function(candidate)
+        local zone = resolveZone(zones, s.x, s.z, s.y, function(candidate)
             return accepts(candidate, s)
         end)
         if zone == nil then
@@ -365,11 +390,12 @@ local function plan(
                 local radius = CLUMP_RADIUS_MIN + roll(zone) * (CLUMP_RADIUS_MAX - CLUMP_RADIUS_MIN)
                 local cx = s.x + math.cos(ang) * radius
                 local cz = s.z + math.sin(ang) * radius
-                if resolveZone(zones, cx, cz) == zone then
+                local cy = nearestY(ordered, cx, cz)
+                if resolveZone(zones, cx, cz, cy) == zone then
                     table.insert(out, {
                         x = cx,
                         z = cz,
-                        y = nearestY(ordered, cx, cz),
+                        y = cy,
                         species = species,
                         yaw = roll(zone) * 2 * math.pi,
                         scale = (1 + (roll(zone) * 2 - 1) * recipe.scaleJitter) * heightScale,
@@ -394,7 +420,7 @@ local function plan(
             state, rz = lcg(state)
             local x = x1 + rx * (x2 - x1)
             local z = z1 + rz * (z2 - z1)
-            if contains(zone, x, z) then
+            if containsXZ(zone, x, z) then
                 local tooClose = false
                 for _, a in anchors do
                     local dx, dz = x - a.x, z - a.z
@@ -467,6 +493,11 @@ local function readZones(): { Zone }
             end
             local density = part:GetAttribute("DensityScale")
             local seed = part:GetAttribute("Seed")
+            local yMin, yMax = nil, nil
+            if part:GetAttribute("Vertical") == true then
+                yMin = pos.Y - size.Y / 2
+                yMax = pos.Y + size.Y / 2
+            end
             table.insert(zones, {
                 name = part.Name,
                 shape = shape,
@@ -476,6 +507,8 @@ local function readZones(): { Zone }
                 seed = typeof(seed) == "number" and seed or nameSeed(part.Name),
                 mist = part:GetAttribute("Mist") == true,
                 still = part:GetAttribute("Still") == true,
+                yMin = yMin,
+                yMax = yMax,
             })
         end
     end

@@ -49,7 +49,8 @@ local Recipes: { [string]: Recipe } = {
         maxSteep = 0.9,
         waterMargin = 4,
         scaleJitter = 0.2,
-        heightScale = 1.15,
+        -- 0.92: user dialled the fringe redwoods back 20% (2026-07-27 gate)
+        heightScale = 0.92,
     },
     WaterMargin = {
         pool = {

@@ -370,4 +370,39 @@ describe("ZoneScatter", function()
         end
         expect(treeCount).toBe(#baseline)
     end)
+    test("a banded keep-out spares ground outside its height range", function()
+        -- samples at two elevations under the same footprint
+        local mixed: { ZoneScatter.Sample } = {}
+        for x = 0, 100, 4 do
+            for z = 0, 100, 4 do
+                table.insert(mixed, { x = x, z = z, y = (x < 50) and 20 or 200, steep = 0 })
+            end
+        end
+        local zones: { ZoneScatter.Zone } = {
+            {
+                name = "KO",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "KeepOut",
+                densityScale = 1,
+                seed = 1,
+                yMin = 190,
+                yMax = 210,
+            },
+            {
+                name = "A",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "PreserveCore",
+                densityScale = 1,
+                seed = 7,
+            },
+        }
+        local out = ZoneScatter.plan(zones, mixed, recipes)
+        expect(#out > 0).toBe(true)
+        for _, p in out do
+            -- only the low ground (y = 20) survives; the banded keep-out took the rest
+            expect(p.y).toBe(20)
+        end
+    end)
 end)
