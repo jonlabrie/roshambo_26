@@ -48,8 +48,9 @@ local RECIPES: { [string]: Recipe } = {
             { name = "FirM", weight = 15 },
             { name = "CedarS", weight = 10 },
         },
-        spacingMin = 14,
-        spacingMax = 22,
+        -- 10-15 gates the approved walk-among density (2026-07-27 gate)
+        spacingMin = 10,
+        spacingMax = 15,
         clumpChance = 0.18,
         clumpSize = 3,
         maxSteep = 0.55,
