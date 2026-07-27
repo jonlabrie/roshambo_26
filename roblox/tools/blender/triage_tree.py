@@ -7,9 +7,14 @@
 # hundred LARGE leaf cards survives the same cut intact.
 #
 # So for each model this reports, per material:
-#   tris, islands (connected components = individual cards/sprays),
-#   median tris per island, and the SURVIVAL ESTIMATE: what fraction of cards a
-#   given foliage budget can keep (cards are dropped whole by the exporter).
+#   tris, islands (connected components = individual cards/sprays), median tris
+#   per island, and — the column that actually predicts the look — COVERAGE:
+#   summed card area normalised by tree height squared, so species of different
+#   sizes compare directly, both at full detail and at the given budget.
+#
+# Percent-of-cards-kept is a TRAP (learned 2026-07-27): a sparse tree keeps 100%
+# of its cards precisely because it has few, and still looks thin. Retained
+# coverage is the number to read.
 #
 # Pure Python + Wavefront OBJ parsing — no Blender, no numpy. Fast enough to sweep
 # a whole library.
@@ -25,12 +30,13 @@ import statistics
 
 
 def parse_obj(path):
-    """-> {material: [face_vertex_index_tuples]} (1-based indices resolved to 0-based)."""
-    groups, current, nverts = {}, "default", 0
+    """-> ({material: [face_vertex_index_tuples]}, [vertex_xyz]) (indices 0-based)."""
+    groups, current, coords = {}, "default", []
     with open(path, "r", errors="ignore") as fh:
         for line in fh:
             if line.startswith("v "):
-                nverts += 1
+                p = line.split()
+                coords.append((float(p[1]), float(p[2]), float(p[3])))
             elif line.startswith("usemtl "):
                 current = line.split(None, 1)[1].strip()
                 groups.setdefault(current, [])
@@ -40,10 +46,10 @@ def parse_obj(path):
                     v = tok.split("/")[0]
                     if v:
                         i = int(v)
-                        idx.append(i - 1 if i > 0 else nverts + i)
+                        idx.append(i - 1 if i > 0 else len(coords) + i)
                 if len(idx) >= 3:
                     groups.setdefault(current, []).append(tuple(idx))
-    return groups, nverts
+    return groups, coords
 
 
 class DSU:
@@ -64,25 +70,42 @@ class DSU:
             self.p[ra] = rb
 
 
-def islands(faces):
-    """Connected components over shared vertices -> list of tri counts per island."""
+def islands(faces, coords=None):
+    """Connected components over shared vertices.
+
+    -> list of tri counts per island, and (when coords are given) a parallel list
+    of card extents (largest bounding-box dimension) for the coverage metric.
+    """
     dsu = DSU()
     for f in faces:
         first = f[0]
         for v in f[1:]:
             dsu.union(first, v)
-    tally = {}
+    tally, verts_of = {}, {}
     for f in faces:
         root = dsu.find(f[0])
         tally[root] = tally.get(root, 0) + (len(f) - 2)
-    return sorted(tally.values(), reverse=True)
+        if coords is not None:
+            verts_of.setdefault(root, []).extend(f)
+    if coords is None:
+        return sorted(tally.values(), reverse=True), None
+    sizes, extents = [], []
+    for root, tris in tally.items():
+        vs = verts_of[root]
+        ext = max(
+            max(coords[i][a] for i in vs) - min(coords[i][a] for i in vs) for a in range(3)
+        )
+        sizes.append(tris)
+        extents.append(ext)
+    return sizes, extents
 
 
 FOLIAGE_HINTS = ("leaf", "leaves", "needle", "frond", "blossom", "flower", "petal")
 
 
 def triage(path, budget):
-    groups, nverts = parse_obj(path)
+    groups, coords = parse_obj(path)
+    height = (max(c[2] for c in coords) - min(c[2] for c in coords)) if coords else 1.0
     total = sum(len(f) - 2 for fs in groups.values() for f in fs)
     rows = []
     for mat, faces in sorted(groups.items()):
@@ -90,20 +113,19 @@ def triage(path, budget):
         is_foliage = any(h in mat.lower() for h in FOLIAGE_HINTS)
         row = {"material": mat, "tris": tris, "foliage": is_foliage}
         if is_foliage and faces:
-            sizes = islands(faces)
+            sizes, extents = islands(faces, coords)
             row["islands"] = len(sizes)
             row["median_tris_per_card"] = statistics.median(sizes)
-            # exporter drops whole cards to fit: how many survive the budget?
-            keep, used = 0, 0
-            for s in sizes:
-                if used + s > budget:
-                    break
-                used += s
-                keep += 1
-            row["cards_kept_at_budget"] = keep
-            row["pct_cards_kept"] = round(100.0 * keep / len(sizes), 1)
+            # the exporter thins cards at RANDOM (deterministic LCG), not
+            # largest-first, so the kept fraction applies evenly to coverage.
+            frac = min(1.0, budget / max(tris, 1))
+            row["pct_cards_kept"] = round(100.0 * frac, 1)
+            area = sum(e * e for e in extents)
+            row["coverage_full"] = area / (height * height)
+            row["coverage_at_budget"] = frac * area / (height * height)
+            row["median_card_over_height"] = statistics.median(extents) / height
         rows.append(row)
-    return {"file": os.path.basename(path), "verts": nverts, "tris": total, "materials": rows}
+    return {"file": os.path.basename(path), "verts": len(coords), "tris": total, "materials": rows}
 
 
 def main():
@@ -127,7 +149,10 @@ def main():
             targets.append(a)
 
     print(f"budget={budget} tris of foliage; {len(targets)} model(s)\n")
-    header = f"{'model':<34}{'tris':>9}{'foliage':>9}{'cards':>8}{'med/card':>10}{'kept@budget':>13}"
+    header = (
+        f"{'model':<34}{'tris':>9}{'foliage':>9}{'cards':>8}"
+        f"{'kept':>7}{'cover.full':>12}{'cover@budget':>14}"
+    )
     print(header)
     print("-" * len(header))
     for t in sorted(targets):
@@ -143,10 +168,11 @@ def main():
             f0 = max(fol, key=lambda m: m["tris"])
             print(
                 f"{name:<34}{r['tris']:>9,}{f0['tris']:>9,}{f0['islands']:>8,}"
-                f"{f0['median_tris_per_card']:>10.0f}{f0['pct_cards_kept']:>12.1f}%"
+                f"{f0['pct_cards_kept']:>6.0f}%{f0['coverage_full']:>12.2f}"
+                f"{f0['coverage_at_budget']:>14.2f}"
             )
         else:
-            print(f"{name:<34}{r['tris']:>9,}{'-':>9}{'-':>8}{'-':>10}{'-':>13}")
+            print(f"{name:<34}{r['tris']:>9,}{'-':>9}{'-':>8}{'-':>7}{'-':>12}{'-':>14}")
 
 
 if __name__ == "__main__":
