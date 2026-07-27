@@ -24,7 +24,9 @@ export type Zone = {
     yMax: number?,
 }
 export type Recipe = {
-    pool: { { name: string, weight: number } },
+    -- per-species `scale` normalises source assets of wildly different native
+    -- size (the toolbox redwoods import at ~100 studs against 22-30-stud sugi)
+    pool: { { name: string, weight: number, scale: number? } },
     spacingMin: number,
     spacingMax: number,
     clumpChance: number,
@@ -136,7 +138,10 @@ local function inInnerClear(zone: Zone, frac: number, x: number, z: number): boo
     return math.abs(x - cx) < hw and math.abs(z - cz) < hh
 end
 
-local function pickSpecies(pool: { { name: string, weight: number } }, roll: number): string
+local function pickSpecies(
+    pool: { { name: string, weight: number, scale: number? } },
+    roll: number
+): (string, number)
     local total = 0
     for _, s in pool do
         total += s.weight
@@ -145,10 +150,11 @@ local function pickSpecies(pool: { { name: string, weight: number } }, roll: num
     for _, s in pool do
         at -= s.weight
         if at <= 0 then
-            return s.name
+            return s.name, s.scale or 1
         end
     end
-    return pool[#pool].name
+    local last = pool[#pool]
+    return last.name, last.scale or 1
 end
 
 local function nearestY(samples: { Sample }, x: number, z: number): number
@@ -305,14 +311,14 @@ function ZoneScatter.plan(
         end
 
         local heightScale = recipe.heightScale or 1
-        local species = pickSpecies(recipe.pool, roll(zone))
+        local species, speciesScale = pickSpecies(recipe.pool, roll(zone))
         table.insert(out, {
             x = s.x,
             z = s.z,
             y = s.y,
             species = species,
             yaw = roll(zone) * 2 * math.pi,
-            scale = (1 + (roll(zone) * 2 - 1) * recipe.scaleJitter) * heightScale,
+            scale = (1 + (roll(zone) * 2 - 1) * recipe.scaleJitter) * heightScale * speciesScale,
             zone = zone.name,
             layer = layer,
         })
@@ -333,7 +339,7 @@ function ZoneScatter.plan(
                         y = cy,
                         species = species,
                         yaw = roll(zone) * 2 * math.pi,
-                        scale = (1 + (roll(zone) * 2 - 1) * recipe.scaleJitter) * heightScale,
+                        scale = (1 + (roll(zone) * 2 - 1) * recipe.scaleJitter) * heightScale * speciesScale,
                         zone = zone.name,
                         layer = layer,
                     })

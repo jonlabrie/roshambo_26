@@ -26,7 +26,7 @@ local SAMPLE_PITCH = 4 -- terrain probe grid, studs
 local PROBE_TOP = 400
 
 -- ── recipes (MIRROR of tools/studio/foliageZoneRecipes.luau) ────────────────
-type Species = { name: string, weight: number }
+type Species = { name: string, weight: number, scale: number? }
 type Recipe = {
     pool: { Species },
     spacingMin: number,
@@ -52,9 +52,9 @@ local RECIPES: { [string]: Recipe } = {
             { name = "FirM", weight = 15 },
             { name = "CedarS", weight = 10 },
         },
-        -- 10-15 gates the approved walk-among density (2026-07-27 gate)
-        spacingMin = 10,
-        spacingMax = 15,
+        -- 5-8 after pad keep-outs (user: "twice as many, at least")
+        spacingMin = 5,
+        spacingMax = 8,
         clumpChance = 0.18,
         clumpSize = 3,
         maxSteep = 0.55,
@@ -63,10 +63,14 @@ local RECIPES: { [string]: Recipe } = {
     },
     WallFringe = {
         pool = {
-            { name = "ConiferA", weight = 30 },
-            { name = "ConiferB", weight = 30 },
-            { name = "ConiferC", weight = 25 },
-            { name = "CedarM", weight = 15 },
+            -- per-species scale tames the toolbox giants (ConiferA 98 studs,
+            -- ConiferB 107, ConiferC 71 native) toward the 45-70 band while
+            -- CedarM keeps its own 45; scaleJitter 0.35 then spreads each
+            -- species so the wall reads as a mixed-age stand, not a hedge.
+            { name = "ConiferA", weight = 30, scale = 0.7 },
+            { name = "ConiferB", weight = 30, scale = 0.62 },
+            { name = "ConiferC", weight = 25, scale = 0.9 },
+            { name = "CedarM", weight = 15, scale = 1.0 },
         },
         spacingMin = 10,
         spacingMax = 16,
@@ -74,9 +78,8 @@ local RECIPES: { [string]: Recipe } = {
         clumpSize = 0,
         maxSteep = 0.9,
         waterMargin = 4,
-        scaleJitter = 0.2,
-        -- 0.92: user dialled the fringe redwoods back 20% (2026-07-27 gate)
-        heightScale = 0.92,
+        scaleJitter = 0.35,
+        heightScale = 1.0,
     },
     WaterMargin = {
         pool = {
@@ -218,7 +221,7 @@ local function inInnerClear(zone: Zone, frac: number, x: number, z: number): boo
     return math.abs(x - cx) < hw and math.abs(z - cz) < hh
 end
 
-local function pickSpecies(pool: { Species }, r: number): string
+local function pickSpecies(pool: { Species }, r: number): (string, number)
     local total = 0
     for _, s in pool do
         total += s.weight
@@ -227,10 +230,11 @@ local function pickSpecies(pool: { Species }, r: number): string
     for _, s in pool do
         at -= s.weight
         if at <= 0 then
-            return s.name
+            return s.name, s.scale or 1
         end
     end
-    return pool[#pool].name
+    local last = pool[#pool]
+    return last.name, last.scale or 1
 end
 
 local function nearestY(samples: { Sample }, x: number, z: number): number
@@ -373,14 +377,14 @@ local function plan(
             continue
         end
         local heightScale = recipe.heightScale or 1
-        local species = pickSpecies(recipe.pool, roll(zone))
+        local species, speciesScale = pickSpecies(recipe.pool, roll(zone))
         table.insert(out, {
             x = s.x,
             z = s.z,
             y = s.y,
             species = species,
             yaw = roll(zone) * 2 * math.pi,
-            scale = (1 + (roll(zone) * 2 - 1) * recipe.scaleJitter) * heightScale,
+            scale = (1 + (roll(zone) * 2 - 1) * recipe.scaleJitter) * heightScale * speciesScale,
             zone = zone.name,
             layer = layer,
         })
@@ -398,7 +402,7 @@ local function plan(
                         y = cy,
                         species = species,
                         yaw = roll(zone) * 2 * math.pi,
-                        scale = (1 + (roll(zone) * 2 - 1) * recipe.scaleJitter) * heightScale,
+                        scale = (1 + (roll(zone) * 2 - 1) * recipe.scaleJitter) * heightScale * speciesScale,
                         zone = zone.name,
                         layer = layer,
                     })

@@ -1,7 +1,7 @@
 --!strict
 -- Zone recipes for the forest preserve (spec 2026-07-27-forest-preserve-foliage-design).
 -- Data only: the ZoneScatter planner interprets these. Tune values live at the gates.
-export type Species = { name: string, weight: number }
+export type Species = { name: string, weight: number, scale: number? }
 export type Recipe = {
     pool: { Species },
     spacingMin: number,
@@ -25,10 +25,10 @@ local Recipes: { [string]: Recipe } = {
             { name = "FirM", weight = 15 },
             { name = "CedarS", weight = 10 },
         },
-        -- 10-15 gates the "walk among the trees" density the user approved
-        -- 2026-07-27 (104 trees per 120x120 patch; 14-22 read too open).
-        spacingMin = 10,
-        spacingMax = 15,
+        -- 5-8: the teahouse-pad keep-outs cost the floor a lot of ground, so
+        -- the user asked for 2x again on top of the 10-15 gate (Core 68 -> 150).
+        spacingMin = 5,
+        spacingMax = 8,
         clumpChance = 0.18,
         clumpSize = 3,
         maxSteep = 0.55,
@@ -37,10 +37,14 @@ local Recipes: { [string]: Recipe } = {
     },
     WallFringe = {
         pool = {
-            { name = "ConiferA", weight = 30 },
-            { name = "ConiferB", weight = 30 },
-            { name = "ConiferC", weight = 25 },
-            { name = "CedarM", weight = 15 },
+            -- per-species scale tames the toolbox giants (ConiferA 98 studs,
+            -- ConiferB 107, ConiferC 71 native) toward the 45-70 band while
+            -- CedarM keeps its own 45; scaleJitter 0.35 then spreads each
+            -- species so the wall reads as a mixed-age stand, not a hedge.
+            { name = "ConiferA", weight = 30, scale = 0.7 },
+            { name = "ConiferB", weight = 30, scale = 0.62 },
+            { name = "ConiferC", weight = 25, scale = 0.9 },
+            { name = "CedarM", weight = 15, scale = 1.0 },
         },
         spacingMin = 10,
         spacingMax = 16,
@@ -48,9 +52,8 @@ local Recipes: { [string]: Recipe } = {
         clumpSize = 0,
         maxSteep = 0.9,
         waterMargin = 4,
-        scaleJitter = 0.2,
-        -- 0.92: user dialled the fringe redwoods back 20% (2026-07-27 gate)
-        heightScale = 0.92,
+        scaleJitter = 0.35,
+        heightScale = 1.0,
     },
     WaterMargin = {
         pool = {
