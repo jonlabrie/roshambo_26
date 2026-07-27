@@ -44,22 +44,43 @@ type Recipe = {
     layer: string?,
 }
 local RECIPES: { [string]: Recipe } = {
+    -- CANOPY layer: the tall structure. Baked SEPARATELY from PreserveUnder
+    -- (the planner assigns one zone per sample, so co-located layers need their
+    -- own bake) — hence the loose spacing here and the tight spacing there.
     PreserveCore = {
         pool = {
-            { name = "SugiMidA", weight = 25 },
-            { name = "SugiMidB", weight = 25 },
-            { name = "SugiMidC", weight = 25 },
-            { name = "FirM", weight = 15 },
-            { name = "CedarS", weight = 10 },
+            { name = "XfHinoki", weight = 20 }, -- authentic backbone, adult 26
+            { name = "XfHinokiM", weight = 25 },
+            { name = "XfSpruceM", weight = 25 }, -- density workhorse
+            { name = "XfFirM", weight = 20 },
+            { name = "XfSugi25", weight = 10 }, -- signature species, hero cost
         },
-        -- 5-8 after pad keep-outs (user: "twice as many, at least")
-        spacingMin = 5,
-        spacingMax = 8,
+        spacingMin = 14,
+        spacingMax = 20,
         clumpChance = 0.18,
         clumpSize = 3,
         maxSteep = 0.55,
         waterMargin = 3,
         scaleJitter = 0.15,
+    },
+    -- UNDERSTORY layer: young trees, dense at eye level. This is what makes the
+    -- forest read "medium-heavy" where players actually walk — adults are bare
+    -- at head height. Cheap: 4-12k tris each vs 22-41k for the canopy.
+    PreserveUnder = {
+        pool = {
+            { name = "XfHinokiYr", weight = 30 },
+            { name = "XfSpruceYr", weight = 30 },
+            { name = "XfFirYr", weight = 25 },
+            { name = "XfSugiYr", weight = 15 },
+        },
+        spacingMin = 6,
+        spacingMax = 10,
+        clumpChance = 0.35,
+        clumpSize = 3,
+        maxSteep = 0.6,
+        waterMargin = 3,
+        scaleJitter = 0.22,
+        layer = "understory",
     },
     WallFringe = {
         pool = {
@@ -100,11 +121,9 @@ local RECIPES: { [string]: Recipe } = {
     },
     FutureClearing = {
         pool = {
-            { name = "SugiMidA", weight = 25 },
-            { name = "SugiMidB", weight = 25 },
-            { name = "SugiMidC", weight = 25 },
-            { name = "FirM", weight = 15 },
-            { name = "CedarS", weight = 10 },
+            { name = "XfHinokiM", weight = 35 },
+            { name = "XfFirM", weight = 35 },
+            { name = "XfHinokiYr", weight = 30 },
         },
         spacingMin = 20,
         spacingMax = 30,

@@ -65,8 +65,11 @@ print = functools.partial(print, flush=True)
 argv = sys.argv[sys.argv.index("--") + 1:]
 FBX, OBJ, FOLIAGE_KEY = argv[0], argv[1], argv[2]
 # comma-separated keys: XfrogPlants names its canopy materials inconsistently
-# (hinoki splits Leaf + Needle, the cherry uses Flower1/FLower1/Flower2), so one
-# key cannot cover the library. Matching is case-insensitive substring.
+# (hinoki splits Leaf + Needle; Yoshino cherry uses Flower1/FLower1/Flower2;
+# Kanzan cherry uses Blossom AND Flower), so one key cannot cover the library.
+# Matching is case-insensitive substring. SAFE DEFAULT for the whole library:
+#   "needle,leaf,flower,blossom,frond"
+# An unmatched canopy material is silently dropped, so always pass the full list.
 FOLIAGE_KEYS = [k.strip().lower() for k in FOLIAGE_KEY.split(",") if k.strip()]
 FOLIAGE_TRIS, TRUNK_TRIS = int(argv[3]), int(argv[4])
 HEIGHT_STUDS, OUT_FBX = float(argv[5]), argv[6]
