@@ -654,6 +654,57 @@ for _o in trunk_objs + foliage_objs:
     _o.select_set(True)
 bpy.context.view_layer.objects.active = trunk
 
+# ROBLOX TEXTURE FORMATS: the importer accepts PNG/JPG/TGA/BMP and REJECTS TIFF
+# ("unsupported format") — XfrogPlants ships every bark map as .tif, so re-save
+# anything exotic as PNG next to the output and repoint the material at it.
+for _o in trunk_objs + foliage_objs:
+    for _m in _o.data.materials:
+        if not (_m and _m.use_nodes):
+            continue
+        for _n in _m.node_tree.nodes:
+            if _n.type != "TEX_IMAGE" or not _n.image:
+                continue
+            _ext = os.path.splitext(_n.image.filepath)[1].lower()
+            if _ext in (".png", ".jpg", ".jpeg", ".tga", ".bmp"):
+                continue
+            _stem = os.path.splitext(os.path.basename(_n.image.filepath))[0]
+            _png = os.path.join(out_dir, _stem + ".png")
+            # the datablock is lazily loaded and usually has no pixels to save, so
+            # re-load the file from disk before converting
+            _src = bpy.path.abspath(_n.image.filepath)
+            if not os.path.exists(_src):
+                _src = tex_by_name.get(os.path.basename(_n.image.filepath).lower(), _src)
+            if not os.path.exists(_src):
+                print(f"WARN cannot find {_stem}{_ext} to convert — trunk may fail to import")
+                continue
+            # Blender will not decode these TIFFs in background mode ("does not
+            # have any image data"), so convert with the OS tool and load the PNG.
+            _ok = False
+            try:
+                import subprocess
+
+                subprocess.run(
+                    ["sips", "-s", "format", "png", _src, "--out", _png],
+                    check=True, capture_output=True,
+                )
+                _ok = os.path.exists(_png)
+            except Exception as _exc:  # not macOS, or sips missing
+                print(f"WARN sips conversion failed for {_stem}{_ext}: {_exc}")
+            if not _ok:
+                try:
+                    _fresh = bpy.data.images.load(_src)
+                    _ = _fresh.pixels[0]  # force the lazy load
+                    _fresh.filepath_raw = _png
+                    _fresh.file_format = "PNG"
+                    _fresh.save()
+                    _ok = True
+                except Exception as _exc:
+                    print(f"WARN could not convert {_stem}{_ext}: {_exc}")
+            if not _ok:
+                continue
+            _n.image = bpy.data.images.load(_png)
+            print(f"TEXCONV {_stem}{_ext} -> PNG (Roblox rejects TIFF)")
+
 bpy.ops.export_scene.fbx(
     filepath=OUT_FBX,
     use_selection=True,
