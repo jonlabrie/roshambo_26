@@ -38,6 +38,7 @@ type Recipe = {
     scaleJitter: number,
     heightScale: number?,
     innerClear: number?,
+    nearWater: number?,
 }
 local RECIPES: { [string]: Recipe } = {
     PreserveCore = {
@@ -86,6 +87,8 @@ local RECIPES: { [string]: Recipe } = {
         maxSteep = 0.7,
         waterMargin = 0,
         scaleJitter = 0.25,
+        -- hug the real shoreline from Sandbox.WaterMap.WaterMarkers
+        nearWater = 12,
     },
     FutureClearing = {
         pool = {
@@ -205,6 +208,48 @@ local function nearestY(samples: { Sample }, x: number, z: number): number
     return bestY
 end
 
+-- Water proximity (MIRROR of ZoneScatter). Cells come from the place's real
+-- water map (Sandbox.WaterMap.WaterMarkers, grid-4 raycast-true water), bucketed
+-- so per-sample lookups stay cheap.
+local WATER_BUCKET = 16
+type WaterIndex = { [string]: { { number } } }
+
+local function indexWater(cells: { { number } }): WaterIndex
+    local index: WaterIndex = {}
+    for _, c in cells do
+        local key = `{math.floor(c[1] / WATER_BUCKET)},{math.floor(c[2] / WATER_BUCKET)}`
+        local bucket = index[key]
+        if bucket == nil then
+            bucket = {}
+            index[key] = bucket
+        end
+        table.insert(bucket, c)
+    end
+    return index
+end
+
+local function waterWithin(index: WaterIndex?, x: number, z: number, dist: number): boolean
+    if index == nil or dist <= 0 then
+        return false
+    end
+    local reach = math.ceil(dist / WATER_BUCKET)
+    local bx, bz = math.floor(x / WATER_BUCKET), math.floor(z / WATER_BUCKET)
+    for gx = bx - reach, bx + reach do
+        for gz = bz - reach, bz + reach do
+            local bucket = index[`{gx},{gz}`]
+            if bucket ~= nil then
+                for _, c in bucket do
+                    local dx, dz = x - c[1], z - c[2]
+                    if dx * dx + dz * dz <= dist * dist then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
 local function zoneBBox(zone: Zone): (number, number, number, number)
     local b = zone.bounds
     if zone.shape == "circle" then
@@ -216,7 +261,8 @@ end
 local function plan(
     zones: { Zone },
     samples: { Sample },
-    recipes: { [string]: Recipe }
+    recipes: { [string]: Recipe },
+    water: WaterIndex?
 ): ({ Placement }, { MistAnchor })
     local ordered = table.clone(samples)
     table.sort(ordered, function(a, b)
@@ -252,6 +298,13 @@ local function plan(
         end
         local innerClear = recipe.innerClear
         if innerClear ~= nil and inInnerClear(zone, innerClear, s.x, s.z) then
+            continue
+        end
+        if waterWithin(water, s.x, s.z, recipe.waterMargin) then
+            continue
+        end
+        local nearWater = recipe.nearWater
+        if nearWater ~= nil and not waterWithin(water, s.x, s.z, nearWater) then
             continue
         end
         if roll(zone) >= zone.densityScale then
@@ -432,6 +485,23 @@ local function sampleTerrain(zones: { Zone }): { Sample }
     return samples
 end
 
+local function readWaterCells(): { { number } }
+    local cells: { { number } } = {}
+    local sandbox = workspace:FindFirstChild("Sandbox")
+    local map = sandbox and sandbox:FindFirstChild("WaterMap")
+    local markers = map and map:FindFirstChild("WaterMarkers")
+    if not markers then
+        warn("[preserve] no Sandbox.WaterMap.WaterMarkers — water rules inert")
+        return cells
+    end
+    for _, m in markers:GetChildren() do
+        if m:IsA("BasePart") then
+            table.insert(cells, { m.Position.X, m.Position.Z })
+        end
+    end
+    return cells
+end
+
 local function preserveFolder(): Folder
     local foliage = workspace.CanyonWorld:FindFirstChild("Foliage")
     if not foliage then
@@ -578,7 +648,8 @@ return function(opts: {
         return "[preserve] no zones"
     end
     local samples = sampleTerrain(zones)
-    local placements, anchors = plan(zones, samples, recipes)
+    local cells = readWaterCells()
+    local placements, anchors = plan(zones, samples, recipes, indexWater(cells))
 
     local perZone: { [string]: number } = {}
     for _, p in placements do
@@ -590,7 +661,7 @@ return function(opts: {
     end
     table.sort(lines)
     local summary =
-        `[preserve] {mode}: zones={#zones} samples={#samples} placements={#placements} mist={#anchors} | {table.concat(
+        `[preserve] {mode}: zones={#zones} samples={#samples} water={#cells} placements={#placements} mist={#anchors} | {table.concat(
             lines,
             "  "
         )}`

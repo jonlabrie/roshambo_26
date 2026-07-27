@@ -181,4 +181,72 @@ describe("ZoneScatter", function()
         end
         expect(clumped > #out / 2).toBe(true)
     end)
+    test("waterMargin keeps plantings off the shore", function()
+        local shy = table.clone(CORE)
+        shy.waterMargin = 15
+        local zones: { ZoneScatter.Zone } = {
+            {
+                name = "A",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "Shy",
+                densityScale = 1,
+                seed = 7,
+            },
+        }
+        -- a pond cell at the grid centre
+        local water = ZoneScatter.indexWater({ { 50, 50 } })
+        local out = ZoneScatter.plan(zones, flatSamples(), { Shy = shy }, water)
+        expect(#out > 0).toBe(true)
+        for _, p in out do
+            local dx, dz = p.x - 50, p.z - 50
+            expect(dx * dx + dz * dz > 15 * 15).toBe(true)
+        end
+    end)
+
+    test("nearWater confines margin flora to the shoreline", function()
+        local margin = table.clone(CORE)
+        margin.waterMargin = 0
+        margin.nearWater = 12
+        margin.spacingMin = 4
+        margin.spacingMax = 6
+        local zones: { ZoneScatter.Zone } = {
+            {
+                name = "M",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "Margin",
+                densityScale = 1,
+                seed = 7,
+            },
+        }
+        local water = ZoneScatter.indexWater({ { 50, 50 }, { 50, 62 } })
+        local out = ZoneScatter.plan(zones, flatSamples(), { Margin = margin }, water)
+        expect(#out > 0).toBe(true)
+        for _, p in out do
+            local nearest = math.huge
+            for _, c in { { 50, 50 }, { 50, 62 } } do
+                local dx, dz = p.x - c[1], p.z - c[2]
+                nearest = math.min(nearest, dx * dx + dz * dz)
+            end
+            expect(nearest <= 12 * 12).toBe(true)
+        end
+    end)
+
+    test("no water index = water rules are inert", function()
+        local shy = table.clone(CORE)
+        shy.waterMargin = 50
+        local zones: { ZoneScatter.Zone } = {
+            {
+                name = "A",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "Shy",
+                densityScale = 1,
+                seed = 7,
+            },
+        }
+        local out = ZoneScatter.plan(zones, flatSamples(), { Shy = shy })
+        expect(#out > 0).toBe(true)
+    end)
 end)

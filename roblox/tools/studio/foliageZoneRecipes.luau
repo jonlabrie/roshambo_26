@@ -62,6 +62,9 @@ local Recipes: { [string]: Recipe } = {
         maxSteep = 0.7,
         waterMargin = 0,
         scaleJitter = 0.25,
+        -- hug the real (meandering) shoreline from Sandbox.WaterMap.WaterMarkers
+        -- rather than carpeting the zone; 12 studs of bank either side.
+        nearWater = 12,
     },
     FutureClearing = {
         pool = {

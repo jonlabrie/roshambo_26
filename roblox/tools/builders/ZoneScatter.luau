@@ -24,11 +24,15 @@ export type Recipe = {
     spacingMax: number,
     clumpChance: number,
     clumpSize: number,
+    -- keep this far AWAY from water (trees off the shore)
     maxSteep: number,
     waterMargin: number,
     scaleJitter: number,
     heightScale: number?,
     innerClear: number?,
+    -- if set, the plant must be WITHIN this distance of water (shore-hugging
+    -- margin flora); nil = plant regardless of distance from water
+    nearWater: number?,
 }
 export type Placement = {
     x: number,
@@ -122,6 +126,51 @@ local function nearestY(samples: { Sample }, x: number, z: number): number
     return bestY
 end
 
+-- Water proximity. The place carries a real water map (Sandbox.WaterMap.
+-- WaterMarkers — grid-4 raycast-true water cells), so shorelines meander
+-- correctly instead of being approximated by a straight ribbon. Cells are
+-- bucketed on a coarse grid: a per-sample scan of every cell is O(samples x
+-- cells) and the preserve has hundreds of each.
+local WATER_BUCKET = 16
+
+export type WaterIndex = { [string]: { { number } } }
+
+function ZoneScatter.indexWater(cells: { { number } }): WaterIndex
+    local index: WaterIndex = {}
+    for _, c in cells do
+        local key = `{math.floor(c[1] / WATER_BUCKET)},{math.floor(c[2] / WATER_BUCKET)}`
+        local bucket = index[key]
+        if bucket == nil then
+            bucket = {}
+            index[key] = bucket
+        end
+        table.insert(bucket, c)
+    end
+    return index
+end
+
+local function waterWithin(index: WaterIndex?, x: number, z: number, dist: number): boolean
+    if index == nil or dist <= 0 then
+        return false
+    end
+    local reach = math.ceil(dist / WATER_BUCKET)
+    local bx, bz = math.floor(x / WATER_BUCKET), math.floor(z / WATER_BUCKET)
+    for gx = bx - reach, bx + reach do
+        for gz = bz - reach, bz + reach do
+            local bucket = index[`{gx},{gz}`]
+            if bucket ~= nil then
+                for _, c in bucket do
+                    local dx, dz = x - c[1], z - c[2]
+                    if dx * dx + dz * dz <= dist * dist then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+    return false
+end
+
 local function zoneBBox(zone: Zone): (number, number, number, number)
     local b = zone.bounds
     if zone.shape == "circle" then
@@ -133,7 +182,8 @@ end
 function ZoneScatter.plan(
     zones: { Zone },
     samples: { Sample },
-    recipes: { [string]: Recipe }
+    recipes: { [string]: Recipe },
+    water: WaterIndex?
 ): ({ Placement }, { MistAnchor })
     local ordered = table.clone(samples)
     table.sort(ordered, function(a, b)
@@ -170,6 +220,14 @@ function ZoneScatter.plan(
         end
         local innerClear = recipe.innerClear
         if innerClear ~= nil and inInnerClear(zone, innerClear, s.x, s.z) then
+            continue
+        end
+        -- water: trees stand back from the shore; margin flora must hug it
+        if waterWithin(water, s.x, s.z, recipe.waterMargin) then
+            continue
+        end
+        local nearWater = recipe.nearWater
+        if nearWater ~= nil and not waterWithin(water, s.x, s.z, nearWater) then
             continue
         end
 
