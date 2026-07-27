@@ -117,6 +117,13 @@ FOLIAGE_PARTS = int(argv[12]) if len(argv) > 12 else 1
 # decimation — the twigs are what the sprays actually hang on, so keeping them removes
 # the need for snapping/orphan-culling entirely.
 TRUNK_PARTS = int(argv[13]) if len(argv) > 13 else 1
+# Optional 15th arg: SKIRT — delete foliage cards whose centre sits below this
+# FRACTION of the tree's height. XfrogPlants models open-grown specimens that are
+# foliated to the ground, so a forest of them has no clear trunk band and the
+# player is permanently walking face-first into needles. Real stand-grown trees
+# self-prune their lower branches; this reproduces that, and removes triangles
+# rather than adding them. 0 = keep the full skirt (right for brush/understory).
+SKIRT = float(argv[14]) if len(argv) > 14 else 0.0
 MIN_ISLAND, MAX_TRUNK_ISLANDS = 200, 10
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -262,6 +269,49 @@ print(f"TRUNK islands={len(comps)} kept={'ALL' if TRUNK_KEEP_ALL else len(keep)}
 bmesh.ops.delete(bm, geom=[f for f in bm.faces if f.index not in keep], context="FACES")
 bm.to_mesh(trunk.data)
 bm.free()
+
+# SELF-PRUNING: if the canopy skirt is being trimmed, the BRANCHES that carried
+# it must go too, or the tree keeps a fringe of bare dead limbs below the foliage.
+# The main bole island is always kept.
+if SKIRT > 0.0:
+    sb = bmesh.new()
+    sb.from_mesh(trunk.data)
+    sb.faces.ensure_lookup_table()
+    seenS, islS = set(), []
+    for f in sb.faces:
+        if f.index in seenS:
+            continue
+        stack, comp = [f], []
+        seenS.add(f.index)
+        while stack:
+            cur = stack.pop()
+            comp.append(cur)
+            for e in cur.edges:
+                for nf in e.link_faces:
+                    if nf.index not in seenS:
+                        seenS.add(nf.index)
+                        stack.append(nf)
+        islS.append(comp)
+    islS.sort(key=len, reverse=True)
+    zsS = [v.co.z for f in sb.faces for v in f.verts]
+    if zsS:
+        cutS = min(zsS) + SKIRT * (max(zsS) - min(zsS))
+        prunable = islS[1:]  # never the bole
+        doomedS, pruned = [], 0
+        for comp in prunable:
+            # STRICT: prune any limb that intrudes below the skirt line at all.
+            # Centre- or tip-based rules leave bare wood hanging in the cleared
+            # band, and a spike floating at the player's eyeline wrecks a tree
+            # that otherwise reads beautifully. Dead wood is fine; dead wood
+            # suspended in mid-air is not.
+            if min(v.co.z for c in comp for v in c.verts) < cutS:
+                doomedS.extend(comp)
+                pruned += 1
+        if doomedS:
+            bmesh.ops.delete(sb, geom=doomedS, context="FACES")
+        print(f"SELF-PRUNE: dropped {pruned} branch islands below the skirt")
+    sb.to_mesh(trunk.data)
+    sb.free()
 bpy.ops.object.select_all(action="DESELECT")
 bpy.context.view_layer.objects.active = trunk
 if TRUNK_PROPORTIONAL and TRUNK_TRIS > 0:
@@ -400,6 +450,97 @@ elif TRUNK_TRIS > 0:
 else:
     print(f"TRUNK kept undecimated at {tri_count(trunk)} tris")
 
+# FLOATING-WOOD CULL. Xfrog models every branch as its own unwelded island that
+# merely TOUCHES the trunk surface. Decimation shrinks the bole a little, so those
+# inner ends end up starting in mid-air — bare limbs hanging in space, which is
+# exactly what wrecks an otherwise good tree at the player's eyeline. Drop any
+# wood island that no longer reaches other wood.
+if True:
+    wb = bmesh.new()
+    wb.from_mesh(trunk.data)
+    wb.verts.ensure_lookup_table()
+    wb.faces.ensure_lookup_table()
+    seenW, islW = set(), []
+    for f in wb.faces:
+        if f.index in seenW:
+            continue
+        stack, comp = [f], []
+        seenW.add(f.index)
+        while stack:
+            cur = stack.pop()
+            comp.append(cur)
+            for e in cur.edges:
+                for nf in e.link_faces:
+                    if nf.index not in seenW:
+                        seenW.add(nf.index)
+                        stack.append(nf)
+        islW.append(comp)
+    islW.sort(key=len, reverse=True)
+    if len(islW) > 1:
+        zsW = [v.co.z for v in wb.verts]
+        # Tolerance for "this limb touches that one". Too tight and real branch
+        # junctions read as breaks, so reachability-from-the-bole strands whole
+        # healthy limbs (0.006 cost 663 of them and left the tree gaunt). Genuine
+        # floaters sit well clear, so a generous value still catches them.
+        reach = 0.012 * (max(zsW) - min(zsW))
+        cellW = max(reach, 1e-4)
+        # bucket every vertex with the island it belongs to, so an island can be
+        # tested against OTHER wood only (twigs legitimately hang off big limbs)
+        gridW = {}
+        for idx, comp in enumerate(islW):
+            for c in comp:
+                for v in c.verts:
+                    k = (int(v.co.x // cellW), int(v.co.y // cellW), int(v.co.z // cellW))
+                    gridW.setdefault(k, []).append((idx, v.co.copy()))
+
+        # Build island adjacency once, then keep only what is REACHABLE FROM THE
+        # BOLE. Testing "touches any other island" is not enough: a cluster of
+        # adrift limbs touching each other passes it while anchored to nothing,
+        # which leaves outliers hanging far off the centreline.
+        adj = {i: set() for i in range(len(islW))}
+        for idx, comp in enumerate(islW):
+            for c in comp:
+                for v in c.verts:
+                    k = (int(v.co.x // cellW), int(v.co.y // cellW), int(v.co.z // cellW))
+                    for dx in (-1, 0, 1):
+                        for dy in (-1, 0, 1):
+                            for dz in (-1, 0, 1):
+                                for oidx, ov in gridW.get((k[0] + dx, k[1] + dy, k[2] + dz), ()):
+                                    if oidx != idx and (ov - v.co).length <= reach:
+                                        adj[idx].add(oidx)
+                                        adj[oidx].add(idx)
+        reachable, queue = {0}, [0]          # island 0 is the bole
+        while queue:
+            cur = queue.pop()
+            for nb in adj[cur]:
+                if nb not in reachable:
+                    reachable.add(nb)
+                    queue.append(nb)
+
+        # Debris: decimation leaves 3-face slivers that pass every connectivity
+        # and foliage test because they ARE attached and DO sit near cards — yet
+        # they read as chips of wood hanging in the air, and they cluster around
+        # the skirt line where the eye is. Nothing that small is a branch.
+        # 0 = keep them. Tried 8: it removed 1,582 slivers and stranded 2,122
+        # cards, gutting the canopy — those fragments are the twig tips the
+        # needles hang on, i.e. load-bearing, not debris. Left as a knob because
+        # a source with genuinely detached chips would want it.
+        MIN_LIMB_FACES = 0
+        doomedW, floated, debris = [], 0, 0
+        for idx in range(1, len(islW)):
+            if idx not in reachable:
+                doomedW.extend(islW[idx])
+                floated += 1
+            elif len(islW[idx]) < MIN_LIMB_FACES:
+                doomedW.extend(islW[idx])
+                debris += 1
+        print(f"DEBRIS: dropped {debris} slivers under {MIN_LIMB_FACES} faces")
+        if doomedW:
+            bmesh.ops.delete(wb, geom=doomedW, context="FACES")
+        print(f"FLOATING WOOD: dropped {floated} limbs not reaching other wood")
+    wb.to_mesh(trunk.data)
+    wb.free()
+
 # tree axis = trunk centre in XZ; spray scaling anchors to whichever card vertex is
 # nearest this axis (see below)
 _tv = [trunk.matrix_world @ v.co for v in trunk.data.vertices]
@@ -484,6 +625,149 @@ if SPRAY_SCALE != 1.0 or RELAX > 0.0:
         bmesh.ops.delete(bm, geom=orphan_faces, context="FACES")
         print(f"ORPHANS culled: {len(orphan_faces)} faces beyond {ORPHAN_MAX} of any branch")
     print(f"SPRAY-SCALE x{SPRAY_SCALE} on {grown} surviving cards")
+if SKIRT > 0.0:
+    bm.faces.ensure_lookup_table()
+    zs = [v.co.z for f in bm.faces for v in f.verts]
+    if zs:
+        z_lo, z_hi = min(zs), max(zs)
+        # the trunk defines the tree's height; foliage may not reach the base
+        t_lo = min((v.co.z for v in trunk.data.vertices), default=z_lo)
+        t_hi = max((v.co.z for v in trunk.data.vertices), default=z_hi)
+        cut = t_lo + SKIRT * (t_hi - t_lo)
+        seen3, doomed3, kept3 = set(), [], 0
+        for f in bm.faces:
+            if f.index in seen3:
+                continue
+            stack, comp = [f], []
+            seen3.add(f.index)
+            while stack:
+                cur = stack.pop()
+                comp.append(cur)
+                for e in cur.edges:
+                    for nf in e.link_faces:
+                        if nf.index not in seen3:
+                            seen3.add(nf.index)
+                            stack.append(nf)
+            centre = sum(v.co.z for c in comp for v in c.verts) / max(
+                sum(len(c.verts) for c in comp), 1
+            )
+            if centre < cut:
+                doomed3.extend(comp)
+            else:
+                kept3 += 1
+        if doomed3:
+            bmesh.ops.delete(bm, geom=doomed3, context="FACES")
+        print(f"SKIRT {SKIRT}: bare to {cut - t_lo:.1f} units, {kept3} cards kept")
+
+if SKIRT > 0.0 and TRUNK_PTS:
+    # ORPHAN CULL. Branch pruning is strict (any limb dipping below the skirt
+    # goes) but card removal is centre-based, so cards carried by a pruned limb
+    # can survive with no wood beneath them — foliage hanging in mid-air, which
+    # reads far worse than an untrimmed tree. Drop any card left stranded from
+    # surviving wood. Trunk points are bucketed; a brute-force scan is
+    # cards x trunk-verts and takes minutes.
+    bm.faces.ensure_lookup_table()
+    _z = [v.co.z for f in bm.faces for v in f.verts]
+    _reach = 0.04 * (max(_z) - min(_z)) if _z else 0.0
+    if _reach > 0:
+        _cell = _reach
+        _grid = {}
+        for _tp in TRUNK_PTS:
+            _k = (int(_tp.x // _cell), int(_tp.y // _cell), int(_tp.z // _cell))
+            _grid.setdefault(_k, []).append(_tp)
+
+        def _stranded(pt):
+            _k = (int(pt.x // _cell), int(pt.y // _cell), int(pt.z // _cell))
+            for _dx in (-1, 0, 1):
+                for _dy in (-1, 0, 1):
+                    for _dz in (-1, 0, 1):
+                        for _tp in _grid.get((_k[0] + _dx, _k[1] + _dy, _k[2] + _dz), ()):
+                            if (_tp - pt).length <= _reach:
+                                return False
+            return True
+
+        seen4, doomed4, culled4 = set(), [], 0
+        for f in bm.faces:
+            if f.index in seen4:
+                continue
+            stack, comp = [f], []
+            seen4.add(f.index)
+            while stack:
+                cur = stack.pop()
+                comp.append(cur)
+                for e in cur.edges:
+                    for nf in e.link_faces:
+                        if nf.index not in seen4:
+                            seen4.add(nf.index)
+                            stack.append(nf)
+            vs = [v.co for c in comp for v in c.verts]
+            anchor_pt = min(vs, key=lambda c: c.z)   # the card's attachment end
+            if _stranded(anchor_pt):
+                doomed4.extend(comp)
+                culled4 += 1
+        if doomed4:
+            bmesh.ops.delete(bm, geom=doomed4, context="FACES")
+        print(f"ORPHAN CULL: dropped {culled4} cards stranded from surviving wood")
+
+# BARE-LIMB CULL (must run AFTER the card trim + orphan cull, since it depends
+# on which foliage actually survived). A limb still anchored to the tree but
+# stripped of every card reads as a spike jutting into open air — the "outliers
+# far out from the trunk" that survive every connectivity test because they are,
+# in fact, connected. Above the skirt, wood without foliage is not wanted.
+if SKIRT > 0.0:
+    fol_pts = [v.co.copy() for v in foliage.data.vertices]
+    if fol_pts:
+        lb = bmesh.new()
+        lb.from_mesh(trunk.data)
+        lb.faces.ensure_lookup_table()
+        seenB, islB = set(), []
+        for f in lb.faces:
+            if f.index in seenB:
+                continue
+            stack, comp = [f], []
+            seenB.add(f.index)
+            while stack:
+                cur = stack.pop()
+                comp.append(cur)
+                for e in cur.edges:
+                    for nf in e.link_faces:
+                        if nf.index not in seenB:
+                            seenB.add(nf.index)
+                            stack.append(nf)
+            islB.append(comp)
+        islB.sort(key=len, reverse=True)
+        zsB = [v.co.z for f in lb.faces for v in f.verts]
+        span = max(zsB) - min(zsB)
+        near = 0.05 * span
+        cellB = near
+        gridB = {}
+        for fp in fol_pts:
+            k = (int(fp.x // cellB), int(fp.y // cellB), int(fp.z // cellB))
+            gridB.setdefault(k, []).append(fp)
+
+        def has_foliage(comp):
+            for c in comp:
+                for v in c.verts:
+                    k = (int(v.co.x // cellB), int(v.co.y // cellB), int(v.co.z // cellB))
+                    for dx in (-1, 0, 1):
+                        for dy in (-1, 0, 1):
+                            for dz in (-1, 0, 1):
+                                for fp in gridB.get((k[0] + dx, k[1] + dy, k[2] + dz), ()):
+                                    if (fp - v.co).length <= near:
+                                        return True
+            return False
+
+        doomedB, bare_n = [], 0
+        for idx in range(1, len(islB)):
+            if not has_foliage(islB[idx]):
+                doomedB.extend(islB[idx])
+                bare_n += 1
+        if doomedB:
+            bmesh.ops.delete(lb, geom=doomedB, context="FACES")
+        print(f"BARE LIMBS: dropped {bare_n} limbs left with no foliage")
+        lb.to_mesh(trunk.data)
+        lb.free()
+
 bm.to_mesh(foliage.data)
 bm.free()
 print(f"RESULT foliage_tris={tri_count(foliage)} trunk_tris={tri_count(trunk)} (kept {kept}/{len(comps)} cards)")
