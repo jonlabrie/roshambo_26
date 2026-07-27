@@ -46,6 +46,12 @@
 #     single-sided planes, so with the Roblox default (false) every back-facing card is
 #     CULLED and the canopy silently loses a large share of its cards from any given
 #     viewpoint. Costs no triangles.
+#     CAVEAT (2026-07-26): DoubleSided also enables Roblox's quality-gated foliage
+#     TRANSMISSION shading — sun/moon behind the canopy glows through the ColorMap.
+#     Great on dense/dark foliage (sugi needles); on PALE foliage it blows out white
+#     (the sakura incident — transmission ignores SurfaceAppearance.Color tint, and
+#     the only effective off-switch is DoubleSided=false). Dense/dark: use TRUE.
+#     Pale/pastel: leave FALSE.
 #
 # (original note) File -> Import 3D (NOT "as package"); then set the foliage MeshPart's
 # SurfaceAppearance.AlphaMode = Transparency.

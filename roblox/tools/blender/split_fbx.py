@@ -18,8 +18,25 @@ for o in [x for x in bpy.data.objects if x.type == "MESH"]:
     bpy.ops.export_scene.fbx(filepath=os.path.join(OUT_DIR, o.name + ".fbx"),
                              use_selection=True, path_mode="COPY",
                              embed_textures=True, global_scale=1.0)
-# Roblox reassembly: offset = (dx, dz_blender, dy_blender) from the anchor part
-man["_note"] = ("Roblox offset from anchor = (dx, d(blender z), d(blender y)). "
-                "Blender is Z-up; Roblox is Y-up.")
+# Roblox reassembly: the FBX importer's Y-up conversion NEGATES X — verified by vertex
+# fingerprint against the imported asset (EditableMesh), which matched
+# (-x, z, y) to 7e-5 studs while (x, z, y) missed by 2.6 studs. (x, z, y) is an
+# improper mirror, not a rotation; assuming it displaced every part in X by 2*dx and
+# produced the 2026-07-26 "severed branch" registration seam.
+# So: RobloxOffset = (-d(blender x), d(blender z), d(blender y)) * 100 (m -> studs at
+# the 0.01 export scale). roblox_offset_from_first below is exactly that, ready to use:
+# part.Position = firstPart.Position + Vector3.new(unpack(offset)).
+names = [k for k in man if not k.startswith("_")]
+first = man[names[0]]["centre_blender_xyz"]
+for k in names:
+    c = man[k]["centre_blender_xyz"]
+    man[k]["roblox_offset_from_first"] = [
+        round(-(c[0] - first[0]) * 100, 4),
+        round((c[2] - first[2]) * 100, 4),
+        round((c[1] - first[1]) * 100, 4),
+    ]
+man["_note"] = ("Roblox offset from the FIRST part = (-d(blender x), d(blender z), "
+                "d(blender y)) * 100 studs — see roblox_offset_from_first. The importer "
+                "negates X in its Y-up conversion; do NOT use (+dx, dz, dy).")
 open(os.path.join(OUT_DIR, "manifest.json"), "w").write(json.dumps(man, indent=1))
 print("MANIFEST", os.path.join(OUT_DIR, "manifest.json"))
