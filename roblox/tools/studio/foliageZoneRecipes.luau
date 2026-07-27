@@ -13,6 +13,8 @@ export type Recipe = {
     scaleJitter: number,
     heightScale: number?,
     innerClear: number?,
+    nearWater: number?,
+    layer: string?,
 }
 local Recipes: { [string]: Recipe } = {
     PreserveCore = {
@@ -30,7 +32,7 @@ local Recipes: { [string]: Recipe } = {
         clumpChance = 0.18,
         clumpSize = 3,
         maxSteep = 0.55,
-        waterMargin = 4,
+        waterMargin = 3,
         scaleJitter = 0.15,
     },
     WallFringe = {
@@ -63,8 +65,10 @@ local Recipes: { [string]: Recipe } = {
         waterMargin = 0,
         scaleJitter = 0.25,
         -- hug the real (meandering) shoreline from Sandbox.WaterMap.WaterMarkers
-        -- rather than carpeting the zone; 12 studs of bank either side.
-        nearWater = 12,
+        -- rather than carpeting the zone; 8 studs of bank either side.
+        nearWater = 8,
+        -- ground cover spaces against other ground cover only, never against trees
+        layer = "ground",
     },
     FutureClearing = {
         pool = {

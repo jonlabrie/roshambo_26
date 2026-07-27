@@ -33,6 +33,10 @@ export type Recipe = {
     -- if set, the plant must be WITHIN this distance of water (shore-hugging
     -- margin flora); nil = plant regardless of distance from water
     nearWater: number?,
+    -- spacing only applies BETWEEN plants of the same layer, so knee-high ground
+    -- cover at 4-stud spacing does not veto a tree 12 studs away. Default
+    -- "canopy"; margin flora sets "ground".
+    layer: string?,
 }
 export type Placement = {
     x: number,
@@ -42,6 +46,7 @@ export type Placement = {
     yaw: number,
     scale: number,
     zone: string,
+    layer: string,
 }
 export type MistAnchor = { x: number, z: number, y: number, zone: string }
 
@@ -69,19 +74,27 @@ local function contains(zone: Zone, x: number, z: number): boolean
     return x >= b[1] and z >= b[2] and x <= b[3] and z <= b[4]
 end
 
--- KeepOut excludes outright; otherwise the LAST matching non-KeepOut zone wins
--- so users can layer small patches over big base zones.
-local function resolveZone(zones: { Zone }, x: number, z: number): Zone?
-    local chosen: Zone? = nil
+-- KeepOut excludes outright. Otherwise zones are tried LAST-first, and the first
+-- one whose recipe actually accepts the sample wins — so a zone layered over a
+-- base zone claims only the ground its recipe wants (e.g. a shore-hugging margin
+-- over the forest body: the margin takes bank samples, the forest keeps the
+-- rest) instead of shadowing the base everywhere it overlaps.
+local function resolveZone(zones: { Zone }, x: number, z: number, accepts: ((Zone) -> boolean)?): Zone?
+    -- keep-outs veto regardless of layer order, so they are checked first
     for _, zone in zones do
-        if contains(zone, x, z) then
-            if zone.recipe == "KeepOut" then
-                return nil
-            end
-            chosen = zone
+        if zone.recipe == "KeepOut" and contains(zone, x, z) then
+            return nil
         end
     end
-    return chosen
+    for i = #zones, 1, -1 do
+        local zone = zones[i]
+        if zone.recipe ~= "KeepOut" and contains(zone, x, z) then
+            if accepts == nil or accepts(zone) then
+                return zone
+            end
+        end
+    end
+    return nil
 end
 
 -- Inside the reserved inner fraction of the zone (future dock/clearing floor).
@@ -206,28 +219,40 @@ function ZoneScatter.plan(
         return r
     end
 
+    -- site gates: everything that depends only on the sample and the recipe, so
+    -- a layered zone that rejects a sample falls through to the zone beneath it
+    local function accepts(zone: Zone, s: Sample): boolean
+        local recipe = recipes[zone.recipe]
+        if recipe == nil then
+            return false
+        end
+        if s.steep > recipe.maxSteep then
+            return false
+        end
+        local innerClear = recipe.innerClear
+        if innerClear ~= nil and inInnerClear(zone, innerClear, s.x, s.z) then
+            return false
+        end
+        -- water: trees stand back from the shore; margin flora must hug it
+        if waterWithin(water, s.x, s.z, recipe.waterMargin) then
+            return false
+        end
+        local nearWater = recipe.nearWater
+        if nearWater ~= nil and not waterWithin(water, s.x, s.z, nearWater) then
+            return false
+        end
+        return true
+    end
+
     for _, s in ordered do
-        local zone = resolveZone(zones, s.x, s.z)
+        local zone = resolveZone(zones, s.x, s.z, function(candidate)
+            return accepts(candidate, s)
+        end)
         if zone == nil then
             continue
         end
         local recipe = recipes[zone.recipe]
         if recipe == nil then
-            continue
-        end
-        if s.steep > recipe.maxSteep then
-            continue
-        end
-        local innerClear = recipe.innerClear
-        if innerClear ~= nil and inInnerClear(zone, innerClear, s.x, s.z) then
-            continue
-        end
-        -- water: trees stand back from the shore; margin flora must hug it
-        if waterWithin(water, s.x, s.z, recipe.waterMargin) then
-            continue
-        end
-        local nearWater = recipe.nearWater
-        if nearWater ~= nil and not waterWithin(water, s.x, s.z, nearWater) then
             continue
         end
 
@@ -237,13 +262,16 @@ function ZoneScatter.plan(
         end
 
         -- greedy min-spacing against every accepted placement
+        local layer = recipe.layer or "canopy"
         local minD = recipe.spacingMin + roll(zone) * (recipe.spacingMax - recipe.spacingMin)
         local tooClose = false
         for _, p in out do
-            local dx, dz = s.x - p.x, s.z - p.z
-            if dx * dx + dz * dz <= minD * minD then
-                tooClose = true
-                break
+            if p.layer == layer then
+                local dx, dz = s.x - p.x, s.z - p.z
+                if dx * dx + dz * dz <= minD * minD then
+                    tooClose = true
+                    break
+                end
             end
         end
         if tooClose then
@@ -260,6 +288,7 @@ function ZoneScatter.plan(
             yaw = roll(zone) * 2 * math.pi,
             scale = (1 + (roll(zone) * 2 - 1) * recipe.scaleJitter) * heightScale,
             zone = zone.name,
+            layer = layer,
         })
 
         -- clump: extra same-species trees at 4-7 studs, spacing waived within
@@ -279,6 +308,7 @@ function ZoneScatter.plan(
                         yaw = roll(zone) * 2 * math.pi,
                         scale = (1 + (roll(zone) * 2 - 1) * recipe.scaleJitter) * heightScale,
                         zone = zone.name,
+                        layer = layer,
                     })
                 end
             end

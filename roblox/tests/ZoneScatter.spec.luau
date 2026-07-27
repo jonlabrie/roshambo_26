@@ -249,4 +249,125 @@ describe("ZoneScatter", function()
         local out = ZoneScatter.plan(zones, flatSamples(), { Shy = shy })
         expect(#out > 0).toBe(true)
     end)
+    test("a layered zone that rejects a sample falls through to the one beneath", function()
+        local core = table.clone(CORE)
+        core.waterMargin = 10
+        local margin = table.clone(CORE)
+        margin.waterMargin = 0
+        margin.nearWater = 10
+        margin.pool = { { name = "Reed", weight = 1 } }
+        margin.spacingMin = 5
+        margin.spacingMax = 6
+        -- Margin is layered LAST over an identical Core footprint: it must claim
+        -- only the shoreline, leaving the rest of the ground to Core.
+        local zones: { ZoneScatter.Zone } = {
+            {
+                name = "Core",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "Core",
+                densityScale = 1,
+                seed = 3,
+            },
+            {
+                name = "Margin",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "Margin",
+                densityScale = 1,
+                seed = 4,
+            },
+        }
+        local water = ZoneScatter.indexWater({ { 50, 50 } })
+        local out = ZoneScatter.plan(zones, flatSamples(), { Core = core, Margin = margin }, water)
+        local core_n, margin_n = 0, 0
+        for _, p in out do
+            if p.zone == "Core" then
+                core_n += 1
+                local dx, dz = p.x - 50, p.z - 50
+                expect(dx * dx + dz * dz > 10 * 10).toBe(true)
+            else
+                margin_n += 1
+                local dx, dz = p.x - 50, p.z - 50
+                expect(dx * dx + dz * dz <= 10 * 10).toBe(true)
+            end
+        end
+        expect(core_n > 0).toBe(true)
+        expect(margin_n > 0).toBe(true)
+    end)
+
+    test("a keep-out layered UNDER other zones still vetoes", function()
+        local zones: { ZoneScatter.Zone } = {
+            {
+                name = "KO",
+                shape = "circle",
+                bounds = { 50, 50, 25 },
+                recipe = "KeepOut",
+                densityScale = 1,
+                seed = 1,
+            },
+            {
+                name = "A",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "PreserveCore",
+                densityScale = 1,
+                seed = 7,
+            },
+        }
+        local out = ZoneScatter.plan(zones, flatSamples(), recipes)
+        expect(#out > 0).toBe(true)
+        for _, p in out do
+            local dx, dz = p.x - 50, p.z - 50
+            expect(dx * dx + dz * dz > 25 * 25).toBe(true)
+        end
+    end)
+    test("ground cover does not veto trees (per-layer spacing)", function()
+        local trees = table.clone(CORE)
+        trees.spacingMin = 12
+        trees.spacingMax = 12
+        local grass = table.clone(CORE)
+        grass.spacingMin = 4
+        grass.spacingMax = 4
+        grass.layer = "ground"
+        grass.pool = { { name = "Reed", weight = 1 } }
+        local treesOnly: { ZoneScatter.Zone } = {
+            {
+                name = "T",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "Trees",
+                densityScale = 1,
+                seed = 5,
+            },
+        }
+        local baseline = ZoneScatter.plan(treesOnly, flatSamples(), { Trees = trees })
+        -- same tree zone, with a dense ground-cover zone layered UNDER it
+        local withGrass: { ZoneScatter.Zone } = {
+            {
+                name = "G",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "Grass",
+                densityScale = 1,
+                seed = 6,
+            },
+            {
+                name = "T",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "Trees",
+                densityScale = 1,
+                seed = 5,
+            },
+        }
+        local mixed = ZoneScatter.plan(withGrass, flatSamples(), { Trees = trees, Grass = grass })
+        local treeCount = 0
+        for _, p in mixed do
+            if p.zone == "T" then
+                treeCount += 1
+            end
+        end
+        expect(treeCount).toBe(#baseline)
+    end)
 end)

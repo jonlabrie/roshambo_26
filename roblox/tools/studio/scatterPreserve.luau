@@ -39,6 +39,9 @@ type Recipe = {
     heightScale: number?,
     innerClear: number?,
     nearWater: number?,
+    -- spacing applies only between plants of the same layer (ground cover must
+    -- not veto trees). Default "canopy".
+    layer: string?,
 }
 local RECIPES: { [string]: Recipe } = {
     PreserveCore = {
@@ -55,7 +58,7 @@ local RECIPES: { [string]: Recipe } = {
         clumpChance = 0.18,
         clumpSize = 3,
         maxSteep = 0.55,
-        waterMargin = 4,
+        waterMargin = 3,
         scaleJitter = 0.15,
     },
     WallFringe = {
@@ -88,7 +91,8 @@ local RECIPES: { [string]: Recipe } = {
         waterMargin = 0,
         scaleJitter = 0.25,
         -- hug the real shoreline from Sandbox.WaterMap.WaterMarkers
-        nearWater = 12,
+        nearWater = 8,
+        layer = "ground",
     },
     FutureClearing = {
         pool = {
@@ -129,6 +133,7 @@ type Placement = {
     yaw: number,
     scale: number,
     zone: string,
+    layer: string,
 }
 type MistAnchor = { x: number, z: number, y: number, zone: string }
 
@@ -156,17 +161,24 @@ local function contains(zone: Zone, x: number, z: number): boolean
     return x >= b[1] and z >= b[2] and x <= b[3] and z <= b[4]
 end
 
-local function resolveZone(zones: { Zone }, x: number, z: number): Zone?
-    local chosen: Zone? = nil
+-- KeepOut vetoes regardless of layer order; otherwise zones are tried LAST-first
+-- and the first whose recipe accepts the sample wins, so a layered zone claims
+-- only the ground its recipe wants (shore margin over forest body).
+local function resolveZone(zones: { Zone }, x: number, z: number, accepts: ((Zone) -> boolean)?): Zone?
     for _, zone in zones do
-        if contains(zone, x, z) then
-            if zone.recipe == "KeepOut" then
-                return nil
-            end
-            chosen = zone
+        if zone.recipe == "KeepOut" and contains(zone, x, z) then
+            return nil
         end
     end
-    return chosen
+    for i = #zones, 1, -1 do
+        local zone = zones[i]
+        if zone.recipe ~= "KeepOut" and contains(zone, x, z) then
+            if accepts == nil or accepts(zone) then
+                return zone
+            end
+        end
+    end
+    return nil
 end
 
 local function inInnerClear(zone: Zone, frac: number, x: number, z: number): boolean
@@ -284,8 +296,32 @@ local function plan(
         return r
     end
 
+    local function accepts(zone: Zone, s: Sample): boolean
+        local recipe = recipes[zone.recipe]
+        if recipe == nil then
+            return false
+        end
+        if s.steep > recipe.maxSteep then
+            return false
+        end
+        local innerClear = recipe.innerClear
+        if innerClear ~= nil and inInnerClear(zone, innerClear, s.x, s.z) then
+            return false
+        end
+        if waterWithin(water, s.x, s.z, recipe.waterMargin) then
+            return false
+        end
+        local nearWater = recipe.nearWater
+        if nearWater ~= nil and not waterWithin(water, s.x, s.z, nearWater) then
+            return false
+        end
+        return true
+    end
+
     for _, s in ordered do
-        local zone = resolveZone(zones, s.x, s.z)
+        local zone = resolveZone(zones, s.x, s.z, function(candidate)
+            return accepts(candidate, s)
+        end)
         if zone == nil then
             continue
         end
@@ -293,30 +329,19 @@ local function plan(
         if recipe == nil then
             continue
         end
-        if s.steep > recipe.maxSteep then
-            continue
-        end
-        local innerClear = recipe.innerClear
-        if innerClear ~= nil and inInnerClear(zone, innerClear, s.x, s.z) then
-            continue
-        end
-        if waterWithin(water, s.x, s.z, recipe.waterMargin) then
-            continue
-        end
-        local nearWater = recipe.nearWater
-        if nearWater ~= nil and not waterWithin(water, s.x, s.z, nearWater) then
-            continue
-        end
         if roll(zone) >= zone.densityScale then
             continue
         end
+        local layer = recipe.layer or "canopy"
         local minD = recipe.spacingMin + roll(zone) * (recipe.spacingMax - recipe.spacingMin)
         local tooClose = false
         for _, p in out do
-            local dx, dz = s.x - p.x, s.z - p.z
-            if dx * dx + dz * dz <= minD * minD then
-                tooClose = true
-                break
+            if p.layer == layer then
+                local dx, dz = s.x - p.x, s.z - p.z
+                if dx * dx + dz * dz <= minD * minD then
+                    tooClose = true
+                    break
+                end
             end
         end
         if tooClose then
@@ -332,6 +357,7 @@ local function plan(
             yaw = roll(zone) * 2 * math.pi,
             scale = (1 + (roll(zone) * 2 - 1) * recipe.scaleJitter) * heightScale,
             zone = zone.name,
+            layer = layer,
         })
         if roll(zone) < recipe.clumpChance and recipe.clumpSize >= 2 then
             for _ = 1, recipe.clumpSize - 1 do
@@ -348,6 +374,7 @@ local function plan(
                         yaw = roll(zone) * 2 * math.pi,
                         scale = (1 + (roll(zone) * 2 - 1) * recipe.scaleJitter) * heightScale,
                         zone = zone.name,
+                        layer = layer,
                     })
                 end
             end
