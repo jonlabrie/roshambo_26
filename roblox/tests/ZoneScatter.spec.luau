@@ -1,0 +1,184 @@
+--!strict
+local harness = require("./harness")
+local describe, test, expect = harness.describe, harness.test, harness.expect
+local ZoneScatter = require("../tools/builders/ZoneScatter")
+
+-- helpers: a flat 100x100 grid of samples, 4-stud pitch
+local function flatSamples(): { ZoneScatter.Sample }
+    local s = {}
+    for x = 0, 100, 4 do
+        for z = 0, 100, 4 do
+            table.insert(s, { x = x, z = z, y = 50, steep = 0 })
+        end
+    end
+    return s
+end
+
+local CORE: ZoneScatter.Recipe = {
+    pool = { { name = "SugiMidA", weight = 1 } },
+    spacingMin = 10,
+    spacingMax = 14,
+    clumpChance = 0,
+    clumpSize = 0,
+    maxSteep = 0.6,
+    waterMargin = 0,
+    scaleJitter = 0.1,
+}
+local recipes: { [string]: ZoneScatter.Recipe } = {
+    PreserveCore = CORE,
+    FutureClearing = (function()
+        local r = table.clone(CORE)
+        r.innerClear = 0.5
+        return r
+    end)(),
+}
+
+describe("ZoneScatter", function()
+    test("deterministic: same input twice = identical output", function()
+        local zones: { ZoneScatter.Zone } = {
+            {
+                name = "A",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "PreserveCore",
+                densityScale = 1,
+                seed = 7,
+            },
+        }
+        local a = ZoneScatter.plan(zones, flatSamples(), recipes)
+        local b = ZoneScatter.plan(zones, flatSamples(), recipes)
+        expect(#a).toBe(#b)
+        for i, p in a do
+            expect(p.x).toBe(b[i].x)
+            expect(p.species).toBe(b[i].species)
+            expect(p.yaw).toBe(b[i].yaw)
+        end
+    end)
+    test("spacing respected", function()
+        local zones: { ZoneScatter.Zone } = {
+            {
+                name = "A",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "PreserveCore",
+                densityScale = 1,
+                seed = 7,
+            },
+        }
+        local out = ZoneScatter.plan(zones, flatSamples(), recipes)
+        expect(#out > 5).toBe(true)
+        for i = 1, #out do
+            for j = i + 1, #out do
+                local dx, dz = out[i].x - out[j].x, out[i].z - out[j].z
+                expect(dx * dx + dz * dz >= 10 * 10 - 1e-6).toBe(true)
+            end
+        end
+    end)
+    test("KeepOut wins over overlapping zone", function()
+        local zones: { ZoneScatter.Zone } = {
+            {
+                name = "A",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "PreserveCore",
+                densityScale = 1,
+                seed = 7,
+            },
+            {
+                name = "KO",
+                shape = "circle",
+                bounds = { 50, 50, 30 },
+                recipe = "KeepOut",
+                densityScale = 1,
+                seed = 1,
+            },
+        }
+        local out = ZoneScatter.plan(zones, flatSamples(), recipes)
+        for _, p in out do
+            local dx, dz = p.x - 50, p.z - 50
+            expect(dx * dx + dz * dz > 30 * 30).toBe(true)
+        end
+    end)
+    test("FutureClearing inner half is empty", function()
+        local zones: { ZoneScatter.Zone } = {
+            {
+                name = "C",
+                shape = "circle",
+                bounds = { 50, 50, 40 },
+                recipe = "FutureClearing",
+                densityScale = 1,
+                seed = 7,
+            },
+        }
+        local out = ZoneScatter.plan(zones, flatSamples(), recipes)
+        for _, p in out do
+            local dx, dz = p.x - 50, p.z - 50
+            expect(dx * dx + dz * dz >= 20 * 20).toBe(true)
+        end
+    end)
+    test("mist anchors only from mist zones, wide-spaced", function()
+        local zones: { ZoneScatter.Zone } = {
+            {
+                name = "A",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "PreserveCore",
+                densityScale = 1,
+                seed = 7,
+                mist = true,
+            },
+        }
+        local _, anchors = ZoneScatter.plan(zones, flatSamples(), recipes)
+        expect(#anchors >= 2).toBe(true)
+        for i = 1, #anchors do
+            for j = i + 1, #anchors do
+                local dx, dz = anchors[i].x - anchors[j].x, anchors[i].z - anchors[j].z
+                expect(dx * dx + dz * dz >= 30 * 30 - 1e-6).toBe(true)
+            end
+        end
+    end)
+    test("no mist zones = no anchors", function()
+        local zones: { ZoneScatter.Zone } = {
+            {
+                name = "A",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "PreserveCore",
+                densityScale = 1,
+                seed = 7,
+            },
+        }
+        local _, anchors = ZoneScatter.plan(zones, flatSamples(), recipes)
+        expect(#anchors).toBe(0)
+    end)
+    test("clumps place clumpSize trees inside spacingMin when triggered", function()
+        local clumpy = table.clone(CORE)
+        clumpy.clumpChance = 1
+        clumpy.clumpSize = 3
+        local zones: { ZoneScatter.Zone } = {
+            {
+                name = "A",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "Clumpy",
+                densityScale = 1,
+                seed = 7,
+            },
+        }
+        local out = ZoneScatter.plan(zones, flatSamples(), { Clumpy = clumpy })
+        -- with clumpChance=1 every accepted dart becomes a clump: count neighbours within 8
+        local clumped = 0
+        for i = 1, #out do
+            for j = 1, #out do
+                if i ~= j then
+                    local dx, dz = out[i].x - out[j].x, out[i].z - out[j].z
+                    if dx * dx + dz * dz < 8 * 8 then
+                        clumped += 1
+                        break
+                    end
+                end
+            end
+        end
+        expect(clumped > #out / 2).toBe(true)
+    end)
+end)
