@@ -217,9 +217,13 @@ placement** (Rojo serve is one-way; read their move, bake it).
   **balusters `0.34` run up to the cap (no gap)** + **newels `0.62×0.62 × 3.7`**. **Open** on the cliff edge
   and the path-entry edge.
 - **Result-lantern (block style):** ONE hanji lantern on the jutting view corner. `Neon` body, warm
-  `0.635/0.49/0.28`, name **ends in `Lantern`** + dark `palette.ink` cap + warm `PointLight` (1.0/0.76/0.46,
-  bri 0.68, range 9). The block `LanternController` finds `*Lantern` under `Workspace.RoshamboStage` and
-  paints the 4-face result SurfaceGui — so block result-lanterns must live under RoshamboStage.
+  `0.635/0.49/0.28` + dark `palette.ink` cap + warm `PointLight` (1.0/0.76/0.46, bri 0.68, range 9).
+  ⚠️ **CORRECTED 2026-07-28 — discovery is by CollectionService TAG, not by name or parent.**
+  `LanternController.client.luau` tags: **`"BlockLantern"`** (square deck/newel lanterns, 4-face
+  result SurfaceGui) and **`"RoundLantern"`** (chōchin — a thin `GlyphPlate` proud of the barrel).
+  Both are workspace-wide and folder-agnostic. The older rule here — "name ends in `Lantern`" and
+  "must live under `Workspace.RoshamboStage`" — is **no longer true** and cost a wrong design call.
+  **Either form can carry a round result**: pick block or chōchin on looks, not capability.
 
 **Deck→path stair (Overlook connecting-stair recipe):**
 - **Slate treads**, **Size `{2, 0.5, width}`** = 2 deep **along travel**, `width` across. ⚠️ `{width,0.5,2}`

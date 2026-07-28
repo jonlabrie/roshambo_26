@@ -108,14 +108,22 @@ Outer faces flush with the slab edge is the standing rule for every canyon build
 
 ### The lantern
 
-**One block-style result-lantern at the water end**, per recipe §2: `Neon` body, warm
-`0.635/0.49/0.28`, dark `palette.ink` cap, warm `PointLight` (1.0/0.76/0.46, brightness
-0.68, range 9).
+**One chōchin on a pole at the water end**, per recipe §4 / `buildChochinPole.luau` —
+matching the lanterns already threading the canyon paths, so the dock speaks the same
+language as everything around it.
 
-It **is** a round display. Its name must end in `Lantern` and it must live under
-`Workspace.RoshamboStage`, so `LanternController` finds it and paints the four-face result
-SurfaceGui. That is why it is the block hanji form and not a round paper chōchin: a
-cylinder cannot carry a four-sided display cleanly.
+It **is** a round display. `LanternController.client.luau` discovers lanterns by
+**CollectionService tag**, workspace-wide and folder-agnostic:
+
+| tag | form | display |
+| --- | --- | --- |
+| `BlockLantern` | square deck/newel lantern | 4-face SurfaceGui |
+| `RoundLantern` | chōchin | thin `GlyphPlate` proud of the barrel |
+
+So the chōchin carries the round result via its `GlyphPlate`, tagged `RoundLantern`. There
+is **no naming convention and no parenting requirement** — the `*Lantern` name and the
+"must live under `RoshamboStage`" rule in recipe §2 were stale and have been corrected in
+that document. Either form can show a result; the choice is aesthetic.
 
 This makes the dock somewhere you can stand *through* a round and see the result, rather
 than scenery you visit between them. It is also the socket the fireflies will later circle.
