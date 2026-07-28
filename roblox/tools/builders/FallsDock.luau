@@ -21,10 +21,18 @@ local DOCK_CZ = -15.45
 local DOCK_YAW_DEG = 110.99
 
 -- ===== dimensions (spec + build recipes §2) =====
+-- User units: 1 stud = 1 foot, 1 inch = 1/12 stud.
+local IN = 1 / 12
 local DECK_W, DECK_D = 6, 8 -- X across, Z along (long axis aimed at the falls)
-local SLAB_T = 0.6
 local DECK_TOP = 190.2 -- ~1.5 studs above the pool 2 surface (y ≈ 188.7)
-local SLAB_BOTTOM = DECK_TOP - SLAB_T
+
+-- The deck is BUILT, not moulded: a 2x6 box frame on the outside with 2x4 boards laid
+-- across it, an inch of daylight between them. From above you read boards and gaps;
+-- from the water you read the frame. A single slab looked like finished flooring.
+local FRAME_T, FRAME_H = 2 * IN, 6 * IN -- 2x6 on edge
+local BOARD_T, BOARD_W = 2 * IN, 4 * IN -- 2x4 laid flat
+local BOARD_GAP = 1 * IN -- target; the real gap is the span remainder spread evenly
+local SLAB_BOTTOM = DECK_TOP - FRAME_H -- frame underside; girders and posts meet here
 
 local POST_W = 1.125
 local GIRDER_H, GIRDER_W = 1.2, 0.825
@@ -62,15 +70,46 @@ local POSTS = {
 function FallsDock.build(_palette: any, _layout: any): any
     local children = {}
 
-    table.insert(
-        children,
-        Spec.part("Slab", {
-            Size = { DECK_W, SLAB_T, DECK_D },
-            CFrame = Spec.cframe({ 0, DECK_TOP - SLAB_T / 2, 0 }),
-            Material = "WoodPlanks",
-            Color = TIMBER,
-        })
-    )
+    -- ----- 2x6 box frame, outer faces flush with the 6 x 8 footprint -----
+    local frameY = DECK_TOP - FRAME_H / 2
+    local innerW = DECK_W - 2 * FRAME_T -- the end members butt between the side ones
+    for _, f in
+        {
+            { "FrameWest", -(DECK_W / 2 - FRAME_T / 2), 0, FRAME_T, DECK_D },
+            { "FrameEast", DECK_W / 2 - FRAME_T / 2, 0, FRAME_T, DECK_D },
+            { "FrameShore", 0, DECK_D / 2 - FRAME_T / 2, innerW, FRAME_T },
+            { "FrameWater", 0, -(DECK_D / 2 - FRAME_T / 2), innerW, FRAME_T },
+        }
+    do
+        table.insert(
+            children,
+            Spec.part(f[1] :: string, {
+                Size = { f[4], FRAME_H, f[5] },
+                CFrame = Spec.cframe({ f[2], frameY, f[3] }),
+                Material = "Wood",
+                Color = TIMBER,
+            })
+        )
+    end
+
+    -- ----- 2x4 decking, laid across the short axis, tops flush with the frame -----
+    -- A whole number of boards rarely divides the span at exactly one inch, so the
+    -- board width is held exact and the remainder is spread evenly across the gaps.
+    local innerD = DECK_D - 2 * FRAME_T
+    local nBoards = math.floor((innerD + BOARD_GAP) / (BOARD_W + BOARD_GAP))
+    local pitch = innerD / nBoards
+    local z0 = -innerD / 2 + pitch / 2
+    for i = 1, nBoards do
+        table.insert(
+            children,
+            Spec.part(`Board_{i}`, {
+                Size = { innerW, BOARD_T, BOARD_W },
+                CFrame = Spec.cframe({ 0, DECK_TOP - BOARD_T / 2, z0 + (i - 1) * pitch }),
+                Material = "Wood",
+                Color = TIMBER,
+            })
+        )
+    end
 
     for i, p in POSTS do
         local px, pz = flush(p[1], X0, X1), flush(p[2], Z0, Z1)

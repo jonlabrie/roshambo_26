@@ -44,21 +44,81 @@ describe("FallsDock", function()
         expect(model.name).toBe("FallsDock")
     end)
 
-    test("slab is 6 x 8 x 0.6 WoodPlanks", function()
-        local slab = find(model, "Slab")
-        expect(slab ~= nil).toBe(true)
-        assert(slab ~= nil)
-        expect(slab.properties.Size[1]).toBe(6)
-        expect(slab.properties.Size[2]).toBe(0.6)
-        expect(slab.properties.Size[3]).toBe(8)
-        expect(slab.properties.Material).toBe("WoodPlanks")
+    -- The deck is built, not moulded: a 2x6 box frame with 2x4 boards laid across it
+    -- and an inch of daylight between them. User units: 1 stud = 1 foot, 1 inch = 1/12.
+    local IN = 1 / 12
+
+    test("the deck is boards and a frame, not a slab", function()
+        expect(find(model, "Slab")).toBe(nil)
+        expect(countPrefix(model, "Frame")).toBe(4)
+        expect(countPrefix(model, "Board_") > 12).toBe(true)
     end)
 
-    test("slab is seated at the baked marker position", function()
-        local slab = find(model, "Slab")
-        assert(slab ~= nil)
-        expect(math.abs(slab.properties.CFrame[1] - CX) < 0.01).toBe(true)
-        expect(math.abs(slab.properties.CFrame[3] - CZ) < 0.01).toBe(true)
+    test("frame members are 2x6 lumber", function()
+        for _, c in model.children do
+            if (c.name :: string):sub(1, 5) == "Frame" then
+                local s = c.properties.Size
+                local thin = math.min(s[1], s[3])
+                expect(math.abs(thin - 2 * IN) < 1e-6).toBe(true) -- 2 inches thick
+                expect(math.abs(s[2] - 6 * IN) < 1e-6).toBe(true) -- 6 inches tall, on edge
+            end
+        end
+    end)
+
+    test("frame outer faces are flush with the 6 x 8 footprint", function()
+        local halfW, halfD = 3, 4
+        for _, c in model.children do
+            if (c.name :: string):sub(1, 5) == "Frame" then
+                local lx, lz = toLocal(c.properties.CFrame)
+                local s = c.properties.Size
+                expect(math.abs(lx) + s[1] / 2 <= halfW + 1e-6).toBe(true)
+                expect(math.abs(lz) + s[3] / 2 <= halfD + 1e-6).toBe(true)
+            end
+        end
+    end)
+
+    test("boards are 2x4 laid flat, with about an inch between them", function()
+        local zs = {}
+        for _, c in model.children do
+            if (c.name :: string):sub(1, 6) == "Board_" then
+                local s = c.properties.Size
+                expect(math.abs(s[2] - 2 * IN) < 1e-6).toBe(true) -- 2 inches thick
+                expect(math.abs(s[3] - 4 * IN) < 1e-6).toBe(true) -- 4 inches wide
+                local _, lz = toLocal(c.properties.CFrame)
+                table.insert(zs, lz)
+            end
+        end
+        table.sort(zs)
+        for i = 2, #zs do
+            local gap = (zs[i] - zs[i - 1]) - 4 * IN
+            -- a whole number of boards rarely divides the span at exactly 1 inch, so
+            -- the remainder is spread evenly: assert it stays within a quarter inch
+            expect(math.abs(gap - 1 * IN) < 0.25 * IN).toBe(true)
+        end
+    end)
+
+    test("board tops are flush with the frame top", function()
+        local top = nil
+        for _, c in model.children do
+            local n = c.name :: string
+            if n:sub(1, 6) == "Board_" or n:sub(1, 5) == "Frame" then
+                local t = c.properties.CFrame[2] + c.properties.Size[2] / 2
+                if top == nil then
+                    top = t
+                end
+                expect(math.abs(t - (top :: number)) < 1e-6).toBe(true)
+            end
+        end
+    end)
+
+    test("the deck is seated at the baked marker position", function()
+        local frame = find(model, "FrameWest")
+        assert(frame ~= nil)
+        local lx, lz = toLocal(frame.properties.CFrame)
+        -- the west frame member sits on the deck's own -X edge, so undoing the seat
+        -- and yaw should put it there and nowhere else
+        expect(math.abs(lx - -(3 - 1 * IN)) < 1e-6).toBe(true)
+        expect(math.abs(lz) < 1e-6).toBe(true)
     end)
 
     test("has six posts, all 1.125 square", function()
@@ -73,11 +133,8 @@ describe("FallsDock", function()
 
     -- The standing rule for every canyon build: a post's OUTER face is flush with
     -- the slab edge, so no post juts past the deck when seen from the water.
-    test("post outer faces sit flush inside the slab footprint", function()
-        local slab = find(model, "Slab")
-        assert(slab ~= nil)
-        local halfW = slab.properties.Size[1] / 2
-        local halfD = slab.properties.Size[3] / 2
+    test("post outer faces sit flush inside the deck footprint", function()
+        local halfW, halfD = 3, 4 -- the 6 x 8 deck
         for _, c in model.children do
             if (c.name :: string):sub(1, 5) == "Post_" then
                 local lx, lz = toLocal(c.properties.CFrame)
@@ -97,10 +154,10 @@ describe("FallsDock", function()
         end
     end)
 
-    test("girder tops meet the slab underside", function()
-        local slab = find(model, "Slab")
-        assert(slab ~= nil)
-        local slabBottom = slab.properties.CFrame[2] - slab.properties.Size[2] / 2
+    test("girder tops meet the frame underside", function()
+        local frame = find(model, "FrameWest")
+        assert(frame ~= nil)
+        local slabBottom = frame.properties.CFrame[2] - frame.properties.Size[2] / 2
         for _, name in { "GirderLongA", "GirderLongB", "GirderCross" } do
             local g = find(model, name)
             expect(g ~= nil).toBe(true)
