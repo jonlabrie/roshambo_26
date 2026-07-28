@@ -16,6 +16,7 @@ local Footpath = require("./builders/Footpath")
 local Foliage = require("./builders/Foliage")
 local Overlook = require("./builders/Overlook")
 local SwitchbackDeck = require("./builders/SwitchbackDeck")
+local FallsDock = require("./builders/FallsDock")
 local Karesansui = require("./builders/Karesansui")
 local ArenaLayout = require("./builders/ArenaLayout")
 local ZenDojo = require("../src/shared/themes/ZenDojo")
@@ -47,6 +48,7 @@ local OUTPUTS: { [string]: any } = {
     ["Foliage"] = Foliage.build(ZenDojo.palette, ArenaLayout),
     ["Overlook"] = Overlook.build(ZenDojo.palette, ArenaLayout),
     ["SwitchbackDeck"] = SwitchbackDeck.build(ZenDojo.palette, ArenaLayout),
+    ["FallsDock"] = FallsDock.build(ZenDojo.palette, ArenaLayout),
     ["Karesansui"] = Karesansui.build(ZenDojo.palette, ArenaLayout),
 }
 
