@@ -168,6 +168,20 @@ describe("FallsDock", function()
         end
     end)
 
+    -- The walking surface matches the shōrō / waterwheel joinery; the posts and
+    -- girders stay dark timber because they stand in the water, not on the deck.
+    test("frame and boards are weathered cypress, posts and girders are not", function()
+        for _, c in model.children do
+            local n = c.name :: string
+            local mv = c.properties.MaterialVariant
+            if n:sub(1, 5) == "Frame" or n:sub(1, 6) == "Board_" then
+                expect(mv).toBe("CypressWeathered")
+            elseif n:sub(1, 5) == "Post_" or n:sub(1, 6) == "Girder" then
+                expect(mv).toBe(nil)
+            end
+        end
+    end)
+
     -- The spec forbids a railing. This test exists so a later reader who "fixes"
     -- the missing kōran against recipe section 2 gets a red test instead of a merge.
     test("has no railing parts", function()

@@ -67,8 +67,12 @@ local POSTS = {
     { X1, Z1, 189.60 }, -- shore end, up the bank (deck meets grade here)
 }
 
-function FallsDock.build(_palette: any, _layout: any): any
+function FallsDock.build(palette: any, _layout: any): any
     local children = {}
+    -- The walking surface — frame and boards — is the same weathered grey cypress as the
+    -- shōrō, the waterwheel and the bell drive, so the dock reads as resort joinery. The
+    -- posts and girders stay dark timber: they stand in the water and belong to the bank.
+    local cypress = palette.cypressWeathered
 
     -- ----- 2x6 box frame, outer faces flush with the 6 x 8 footprint -----
     local frameY = DECK_TOP - FRAME_H / 2
@@ -87,7 +91,8 @@ function FallsDock.build(_palette: any, _layout: any): any
                 Size = { f[4], FRAME_H, f[5] },
                 CFrame = Spec.cframe({ f[2], frameY, f[3] }),
                 Material = "Wood",
-                Color = TIMBER,
+                MaterialVariant = "CypressWeathered",
+                Color = cypress,
             })
         )
     end
@@ -106,7 +111,8 @@ function FallsDock.build(_palette: any, _layout: any): any
                 Size = { innerW, BOARD_T, BOARD_W },
                 CFrame = Spec.cframe({ 0, DECK_TOP - BOARD_T / 2, z0 + (i - 1) * pitch }),
                 Material = "Wood",
-                Color = TIMBER,
+                MaterialVariant = "CypressWeathered",
+                Color = cypress,
             })
         )
     end
