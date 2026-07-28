@@ -99,6 +99,13 @@ TRUNK_UNIFORM = (len(argv) > 9 and argv[9] == "2")
 TRUNK_PROPORTIONAL = (len(argv) > 9 and argv[9] == "3")
 # share of the wood budget reserved for the bole in mode 3
 BOLE_SHARE = 0.35
+# ...and for the root flare, which gets its own line item so the branch geometry
+# cannot set its decimation ratio (see the three-way split below)
+# 0.05, not 0.15: judged side by side at 1.5 studs, a 500-tri flare and a 1,500-tri
+# one are indistinguishable ("I'd say they were identical if you didn't tell me
+# otherwise"), and PlantDepth buries the lower half of it anyway. Saves ~1,000 tris
+# per canopy tree. Raise it for a hero tree standing alone beside a path.
+ROOT_SHARE = 0.05
 # Optional 11th arg: RELAX — per-card random displacement (source units, deterministic
 # LCG). Snapping pulls many cards onto the same few surviving trunk vertices, which
 # reads as tight pom-poms; a little jitter loosens the cluster back into foliage.
@@ -125,6 +132,29 @@ TRUNK_PARTS = int(argv[13]) if len(argv) > 13 else 1
 # rather than adding them. 0 = keep the full skirt (right for brush/understory).
 SKIRT = float(argv[14]) if len(argv) > 14 else 0.0
 MIN_ISLAND, MAX_TRUNK_ISLANDS = 200, 10
+
+# ROOT FLARE PROTECTION. XfrogPlants models the buttresses at the trunk base as
+# their own islands, separate from the bole and entirely below the skirt line, so
+# BOTH island-culling rules destroyed every one of them and left a bare dowel
+# stuck in the ground (measured: base-width/height fell from ~0.16 to ~0.04):
+#   - SELF-PRUNE deleted them for dipping below the skirt (the trimmed A/M models)
+#   - FLOATING WOOD deleted them once a small wood budget shrank the bole enough
+#     to break contact, which is why the brush models lost theirs at SKIRT=0 too
+# Identifying them needs BOTH tests. A top-height test alone also keeps 41-68 low
+# branch stubs per tree; a starts-at-the-ground test alone keeps low limbs that
+# sweep down to the soil. Measured on the conifer trunks: islands that start at
+# the ground top out at 0.10-0.14 of tree height, real stubs at 0.15+.
+ROOT_BASE_MAX = 0.05   # island must start within this fraction of height of the base
+ROOT_TOP_MAX = 0.18    # ...and stay entirely below this fraction
+
+
+def is_root_island(comp, z_lo, z_span):
+    """True for the basal buttress islands that both rules must leave alone."""
+    if z_span <= 0:
+        return False
+    czs = [v.co.z for c in comp for v in c.verts]
+    return ((min(czs) - z_lo) < ROOT_BASE_MAX * z_span
+            and (max(czs) - z_lo) < ROOT_TOP_MAX * z_span)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 # source may be .fbx (TurboSquid game packs) or .obj (XfrogPlants libraries)
@@ -297,8 +327,14 @@ if SKIRT > 0.0:
     if zsS:
         cutS = min(zsS) + SKIRT * (max(zsS) - min(zsS))
         prunable = islS[1:]  # never the bole
-        doomedS, pruned = [], 0
+        spanS = max(zsS) - min(zsS)
+        doomedS, pruned, rootsS = [], 0, 0
         for comp in prunable:
+            # the root flare lives entirely below the skirt line, so the strict
+            # rule below would delete all of it — see ROOT_BASE_MAX above
+            if is_root_island(comp, min(zsS), spanS):
+                rootsS += 1
+                continue
             # STRICT: prune any limb that intrudes below the skirt line at all.
             # Centre- or tip-based rules leave bare wood hanging in the cleared
             # band, and a spike floating at the player's eyeline wrecks a tree
@@ -309,7 +345,8 @@ if SKIRT > 0.0:
                 pruned += 1
         if doomedS:
             bmesh.ops.delete(sb, geom=doomedS, context="FACES")
-        print(f"SELF-PRUNE: dropped {pruned} branch islands below the skirt")
+        print(f"SELF-PRUNE: dropped {pruned} branch islands below the skirt, "
+              f"kept {rootsS} root-flare islands")
     sb.to_mesh(trunk.data)
     sb.free()
 bpy.ops.object.select_all(action="DESELECT")
@@ -323,39 +360,77 @@ if TRUNK_PROPORTIONAL and TRUNK_TRIS > 0:
         stack, comp = [f], []
         seen.add(f.index)
         while stack:
-            cur = stack.pop(); comp.append(cur.index)
+            cur = stack.pop(); comp.append(cur)
             for e in cur.edges:
                 for nf in e.link_faces:
                     if nf.index not in seen:
                         seen.add(nf.index); stack.append(nf)
         isl.append(comp)
     isl.sort(key=len, reverse=True)
-    main = set(isl[0])
+    main = set(f.index for f in isl[0])
+    # THREE-WAY SPLIT, not two. Surviving the island culls is not enough: the root
+    # buttresses used to land in the branch mesh and be decimated with it, and on a
+    # source with heavy branch geometry (the fir: 18,460-face bole, ~870 branch
+    # islands) the ratio is severe enough to collapse a 25-face buttress to a
+    # sliver. That is why the fir still exported a bare stick with the culls fixed.
+    # The whole flare is ~300 faces, so exempting it from decimation costs nothing.
+    zsP = [v.co.z for f in pb.faces for v in f.verts]
+    zP_lo, zP_span = (min(zsP), max(zsP) - min(zsP)) if zsP else (0.0, 0.0)
+    roots, nroot = set(), 0
+    for comp in isl[1:]:
+        if is_root_island(comp, zP_lo, zP_span):
+            roots.update(f.index for f in comp)
+            nroot += 1
     pb.free()
-    # branches -> their own mesh
-    br_mesh = bpy.data.meshes.new("branches")
-    bb = bmesh.new(); bb.from_mesh(trunk.data); bb.faces.ensure_lookup_table()
-    bmesh.ops.delete(bb, geom=[f for f in bb.faces if f.index in main], context="FACES")
-    bb.to_mesh(br_mesh); bb.free()
+
+    def carve(keep_pred, name):
+        """copy of trunk.data holding only the faces keep_pred accepts"""
+        me = bpy.data.meshes.new(name)
+        b = bmesh.new(); b.from_mesh(trunk.data); b.faces.ensure_lookup_table()
+        bmesh.ops.delete(b, geom=[f for f in b.faces if not keep_pred(f.index)],
+                         context="FACES")
+        b.to_mesh(me); b.free()
+        ob = bpy.data.objects.new(name, me)
+        bpy.context.scene.collection.objects.link(ob)
+        for m in trunk.data.materials:
+            me.materials.append(m)
+        return ob
+
+    br = carve(lambda i: i not in main and i not in roots, "branches")
+    rt = carve(lambda i: i in roots, "rootflare") if roots else None
     # bole stays on `trunk`
     bm_b = bmesh.new(); bm_b.from_mesh(trunk.data); bm_b.faces.ensure_lookup_table()
     bmesh.ops.delete(bm_b, geom=[f for f in bm_b.faces if f.index not in main], context="FACES")
     bm_b.to_mesh(trunk.data); bm_b.free()
-    br = bpy.data.objects.new("branches", br_mesh)
-    bpy.context.scene.collection.objects.link(br)
-    for m in trunk.data.materials:
-        br_mesh.materials.append(m)
+
+    # The flare needs its OWN budget, not exemption: at full detail it is 5-6k tris,
+    # which on a 4-stud brush model with a 900-tri wood budget is absurd. Sharing the
+    # branch budget is what destroyed it, because the branch ratio is set by geometry
+    # the flare has nothing to do with. Its own line item keeps the silhouette at a
+    # fraction of the cost.
+    # The root budget is ADDITIVE, not a slice of TRUNK_TRIS. Taking it out of the
+    # branch allocation cost the sugi 2,700 branch tris, and because its 38,780
+    # cards hang on fine twigs, starving the twigs stranded the cards and the
+    # orphan/bare-limb culls then deleted them — canopy fell from 21.5k tris to
+    # 12k. The flare is ~1.5-2.7k on a fixed schedule; the canopy is what the
+    # player actually sees.
     bole_budget = max(600, int(TRUNK_TRIS * BOLE_SHARE))
-    for ob, budget in ((trunk, bole_budget), (br, TRUNK_TRIS - bole_budget)):
-        if budget < tri_count(ob) and tri_count(ob) > 0:
+    root_budget = max(250, int(TRUNK_TRIS * ROOT_SHARE))
+    branch_budget = max(200, TRUNK_TRIS - bole_budget)
+    for ob, budget in ((trunk, bole_budget), (br, branch_budget),
+                       (rt, root_budget) if rt else (None, 0)):
+        if ob is not None and budget < tri_count(ob) and tri_count(ob) > 0:
             bpy.context.view_layer.objects.active = ob
             d = ob.modifiers.new("dec", "DECIMATE")
             d.ratio = min(1.0, budget / max(tri_count(ob), 1))
             bpy.ops.object.modifier_apply(modifier=d.name)
     print(f"PROPORTIONAL WOOD: bole {tri_count(trunk)} tris, branches {tri_count(br)} tris"
-          f" ({len(isl) - 1} branch islands kept)")
+          f" ({len(isl) - 1} branch islands kept), root flare {tri_count(rt) if rt else 0}"
+          f" tris from {nroot} islands")
     bpy.ops.object.select_all(action="DESELECT")
     trunk.select_set(True); br.select_set(True)
+    if rt:
+        rt.select_set(True)
     bpy.context.view_layer.objects.active = trunk
     bpy.ops.object.join()
 elif TRUNK_UNIFORM and TRUNK_TRIS > 0:
@@ -526,8 +601,15 @@ if True:
         # needles hang on, i.e. load-bearing, not debris. Left as a knob because
         # a source with genuinely detached chips would want it.
         MIN_LIMB_FACES = 0
-        doomedW, floated, debris = [], 0, 0
+        spanW = max(zsW) - min(zsW)
+        doomedW, floated, debris, rootsW = [], 0, 0, 0
         for idx in range(1, len(islW)):
+            # a small wood budget decimates the bole until the root buttresses no
+            # longer touch it; without this they read as "adrift" and are culled,
+            # which is how the SKIRT=0 brush models still lost their flares
+            if is_root_island(islW[idx], min(zsW), spanW):
+                rootsW += 1
+                continue
             if idx not in reachable:
                 doomedW.extend(islW[idx])
                 floated += 1
@@ -537,7 +619,8 @@ if True:
         print(f"DEBRIS: dropped {debris} slivers under {MIN_LIMB_FACES} faces")
         if doomedW:
             bmesh.ops.delete(wb, geom=doomedW, context="FACES")
-        print(f"FLOATING WOOD: dropped {floated} limbs not reaching other wood")
+        print(f"FLOATING WOOD: dropped {floated} limbs not reaching other wood, "
+              f"kept {rootsW} root-flare islands")
     wb.to_mesh(trunk.data)
     wb.free()
 
@@ -757,14 +840,21 @@ if SKIRT > 0.0:
                                         return True
             return False
 
-        doomedB, bare_n = [], 0
+        doomedB, bare_n, rootsB = [], 0, 0
+        zB_lo = min(zsB)
         for idx in range(1, len(islB)):
+            # the root flare carries no cards BY DEFINITION, so this rule deletes
+            # all of it — the last of the three culls that had to learn about it
+            if is_root_island(islB[idx], zB_lo, span):
+                rootsB += 1
+                continue
             if not has_foliage(islB[idx]):
                 doomedB.extend(islB[idx])
                 bare_n += 1
         if doomedB:
             bmesh.ops.delete(lb, geom=doomedB, context="FACES")
-        print(f"BARE LIMBS: dropped {bare_n} limbs left with no foliage")
+        print(f"BARE LIMBS: dropped {bare_n} limbs left with no foliage, "
+              f"kept {rootsB} root-flare islands")
         lb.to_mesh(trunk.data)
         lb.free()
 

@@ -4,3 +4,10 @@ dist/
 .env
 npm-debug.log
 .superpowers/
+
+# python build junk (a .pyc was committed by mistake in 3bdb40e)
+__pycache__/
+*.pyc
+
+# local macOS alias to the reference asset folder
+/roshambo_reference
