@@ -17,17 +17,27 @@ export type Recipe = {
     layer: string?,
     pathMargin: number?,
 }
+-- THE FOUR BANDS (the user's structure, and the point of the whole system):
+--   0-2 studs   ground cover — grass and weeds. DOES NOT EXIST YET; the same gap
+--               leaves the waterline bare. See the WaterMargin pool below.
+--   2-5 studs   young growth below the eyeline — PreserveBrush.
+--   5-7 studs   DELIBERATELY EMPTY. This is the sightline band; a player's eye is
+--               at ~5. Nothing may be planted whose foliage occupies it.
+--   7+ studs    canopy — PreserveCore, drawn only from SKIRT-trimmed models.
+-- "A forest that feels heavy, but has decent sightlines through the trees."
 local Recipes: { [string]: Recipe } = {
-    -- CANOPY layer: the tall structure. Baked SEPARATELY from PreserveUnder
+    -- CANOPY layer: the tall structure. Baked SEPARATELY from PreserveBrush
     -- (the planner assigns one zone per sample, so co-located layers need their
     -- own bake) — hence the loose spacing here and the tight spacing there.
+    -- ONLY trimmed models (…T / …MT) belong here: an untrimmed XfrogPlants tree is
+    -- foliated to the ground and wipes out the sightline band on its own.
     PreserveCore = {
         pool = {
-            { name = "XfHinoki", weight = 20 }, -- authentic backbone, adult 26
-            { name = "XfHinokiM", weight = 25 },
-            { name = "XfSpruceM", weight = 25 }, -- density workhorse
-            { name = "XfFirM", weight = 20 },
-            { name = "XfSugi25", weight = 10 }, -- signature species, hero cost
+            { name = "XfHinokiT", weight = 15 }, -- authentic backbone, adult 26
+            { name = "XfHinokiMT", weight = 25 },
+            { name = "XfSpruceMT", weight = 25 }, -- density workhorse
+            { name = "XfFirMT", weight = 25 },
+            { name = "XfSugi25T", weight = 10 }, -- signature species, hero cost (~39k tris)
         },
         spacingMin = 14,
         spacingMax = 20,
@@ -38,15 +48,18 @@ local Recipes: { [string]: Recipe } = {
         scaleJitter = 0.15,
         pathMargin = 7,
     },
-    -- UNDERSTORY layer: young trees, dense at eye level. This is what makes the
-    -- forest read "medium-heavy" where players actually walk — adults are bare
-    -- at head height. Cheap: 4-12k tris each vs 22-41k for the canopy.
-    PreserveUnder = {
+    -- BRUSH band (2-5 studs): young growth at knee-to-chest height. This is what
+    -- makes the forest read heavy where players actually walk, WITHOUT intruding
+    -- on the sightline band — the trimmed canopy above is bare at head height by
+    -- design. Cheap: 2.6-7k tris each against 17-39k for the canopy.
+    -- The pool is the 4-stud …Yb models; scaleJitter is capped so the tallest
+    -- possible draw (4.3 x 1.15 = 4.9) still clears the 5-stud eyeline.
+    PreserveBrush = {
         pool = {
-            { name = "XfHinokiYr", weight = 30 },
-            { name = "XfSpruceYr", weight = 30 },
-            { name = "XfFirYr", weight = 25 },
-            { name = "XfSugiYr", weight = 15 },
+            { name = "XfHinokiYb", weight = 30 },
+            { name = "XfSpruceYb", weight = 30 },
+            { name = "XfFirYb", weight = 25 },
+            { name = "XfSugiYb", weight = 15 },
         },
         spacingMin = 6,
         spacingMax = 10,
@@ -54,7 +67,7 @@ local Recipes: { [string]: Recipe } = {
         clumpSize = 3,
         maxSteep = 0.6,
         waterMargin = 3,
-        scaleJitter = 0.22,
+        scaleJitter = 0.15,
         layer = "understory",
         pathMargin = 4,
     },
@@ -102,9 +115,9 @@ local Recipes: { [string]: Recipe } = {
     },
     FutureClearing = {
         pool = {
-            { name = "XfHinokiM", weight = 35 },
-            { name = "XfFirM", weight = 35 },
-            { name = "XfHinokiYr", weight = 30 },
+            { name = "XfHinokiMT", weight = 35 },
+            { name = "XfFirMT", weight = 35 },
+            { name = "XfHinokiYb", weight = 30 },
         },
         spacingMin = 20,
         spacingMax = 30,
