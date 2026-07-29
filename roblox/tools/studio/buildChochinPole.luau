@@ -11,9 +11,20 @@ local CollectionService = game:GetService("CollectionService")
 local ws = workspace
 
 local CONFIG = {
-    path = "PathSteps", -- Workspace model holding the timbers (the path centerline + grade)
-    timberPrefix = "Timber", -- timber part name prefix (Timber_0, Timber_1, ...)
-    interval = 6, -- base timbers between poles
+    -- River path chapter 1: three composed lanterns rather than a rhythm — bottom south,
+    -- middle north, top south, alternating up the flight (user-gated 2026-07-29). The
+    -- contract part on an ishidan stair is Step_<i>, not Timber_<i>.
+    -- offset 3.4 stands them ON the tread, 0.6 inboard of the 8.0-wide bed's edge: the
+    -- south side has only 1.0 of clear ground between tread edge and the retaining wall
+    -- face at 5.0, and the north side would otherwise foul the bamboo rail at 4.0.
+    path = "RiverSquareStair",
+    timberPrefix = "Step",
+    placements = {
+        { step = 2, side = "south", offset = 3.4 },
+        { step = 20, side = "north", offset = 3.4 },
+        { step = 39, side = "south", offset = 3.4 },
+    },
+    interval = 6, -- base timbers between poles (ignored when `placements` is set)
     posJitter = 0.35, -- ±fraction of a timber gap to stagger each pole along the path (~5-10% spacing)
     uphillOffset = 4.5, -- studs from the timber toward the cliff (uphill) edge
     uphillSign = 1, -- which RightVector end is uphill/cliff: +1 PathSteps; -1 DescentPath (prefix "DescTimber")
@@ -253,8 +264,11 @@ local function buildOne(parent: Instance, name: string, base: Vector3, up: Vecto
 end
 
 -- ===== deploy along the path =====
-local pathModel = ws:FindFirstChild(CONFIG.path)
-assert(pathModel, "missing Workspace." .. CONFIG.path)
+-- Paths live under CanyonWorld.Paths since the 2026-07-08 reorg; fall back to the ws root
+-- for anything legacy. This tool predated the move and only ever looked at the root.
+local pathsRoot = ws:FindFirstChild("CanyonWorld") and ws.CanyonWorld:FindFirstChild("Paths")
+local pathModel = (pathsRoot and pathsRoot:FindFirstChild(CONFIG.path)) or ws:FindFirstChild(CONFIG.path)
+assert(pathModel, "missing path model " .. CONFIG.path .. " (looked in CanyonWorld.Paths and Workspace)")
 local root = ws:FindFirstChild(CONFIG.outModel) or Instance.new("Model")
 root.Name = CONFIG.outModel
 root.Parent = ws
@@ -288,6 +302,37 @@ rp.FilterDescendantsInstances = { root } -- never raycast-hit any deployed lante
 local function horizUp(t: BasePart): Vector3
     local u = t.CFrame.RightVector
     return Vector3.new(u.X, 0, u.Z).Unit * CONFIG.uphillSign
+end
+
+-- EXPLICIT PLACEMENT MODE. When CONFIG.placements is set, the interval/stagger/downhill
+-- machinery is bypassed entirely and only the listed poles are built. Used where the
+-- lanterns are composed rather than rhythmic -- the Square stairway carries three,
+-- alternating sides up the flight, which no interval rule would produce.
+-- `side` is in canyon terms: +RightVector is NORTH on that stair, -RightVector SOUTH.
+if CONFIG.placements then
+    local byIndex = {}
+    for _, e in ipairs(timbers) do
+        byIndex[e.i] = e.p
+    end
+    local placed = {}
+    for _, spec in ipairs(CONFIG.placements) do
+        local t = byIndex[spec.step]
+        if not t then
+            table.insert(placed, ("step %d MISSING"):format(spec.step))
+        else
+            local r = t.CFrame.RightVector
+            local north = Vector3.new(r.X, 0, r.Z).Unit
+            local dir = spec.side == "north" and north or -north
+            local base = t.Position + dir * spec.offset
+            buildOne(parent, ("ChochinPole_%d_%s"):format(spec.step, spec.side), base, dir)
+            table.insert(placed, ("step %d %s at %.1f"):format(spec.step, spec.side, spec.offset))
+        end
+    end
+    return ("placed %d chochin on %s (explicit): %s"):format(
+        #CONFIG.placements,
+        CONFIG.path,
+        table.concat(placed, ", ")
+    )
 end
 
 -- cap downhill poles at `downhillFrac` of the total to be placed (up to 30% by default)
