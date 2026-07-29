@@ -83,6 +83,37 @@ local PRESETS = {
             offset = Vector3.new(0, 0, 1),
         },
     },
+    RiverT07Spur = {
+        -- The fork to teahouse pad T07 -- the one pad with no tunnel access. A
+        -- NARROW trail (2.0 vs the main line's 3.5) from the bridge's south
+        -- abutment up the platform's west flank to the rear (SW) corner, line
+        -- user-dragged 2026-07-30. The first pitch measures 0.46 and takes 4
+        -- grey-cypress log steps (steps.untilS); the rest is 0.12-0.26 trail.
+        -- All six M-size pad posts clear this line by >= 6.2 studs (L by ~4.3),
+        -- verified against SizeClasses.deckFootprint before building.
+        outModel = "RiverT07Spur",
+        seed = 20260801,
+        width = 2.0,
+        matRadius = 2.9, -- must stay above 2.83 or the ribbon drops voxels
+        stoneSpacing = 12.0,
+        seamAllow = { "RiverPoolShore", "RiverCrossing" },
+        control = {
+            { -293.4, 180.8, 13.8 }, -- inside the pool-shore bench: the fork
+            { -300.1, 184.3, 17.7 },
+            { -309.6, 185.5, 21.0 },
+            { -312.1, 187.0, 27.9 },
+            { -310.8, 188.1, 35.8 },
+            { -305.0, 190.4, 42.6 }, -- the platform's rear (SW) corner
+        },
+        smoothRadius = 1, -- keep the stepped fork pitch honest, as on the falls steps
+        steps = {
+            riser = 0.9,
+            proud = 0.3,
+            logDiameter = 1.0,
+            stakes = true,
+            untilS = 8.5, -- logs only on the fork pitch; the rest is plain trail
+        },
+    },
     RiverPoolShore = {
         outModel = "RiverPoolShore",
         seed = 20260731,
@@ -99,7 +130,7 @@ local PRESETS = {
     },
 }
 
-local ACTIVE = "RiverPoolShore"
+local ACTIVE = "RiverT07Spur"
 
 local CONFIG = {
     outModel = PRESETS[ACTIVE].outModel,
@@ -108,7 +139,7 @@ local CONFIG = {
     seamAllow = PRESETS[ACTIVE].seamAllow or {},
     steps = PRESETS[ACTIVE].steps, -- nil on plain trail chapters
 
-    width = 3.5, -- the tread: a footpath, HALF the first attempt's 7.0 (user-gated)
+    width = PRESETS[ACTIVE].width or 3.5, -- footpath (user-gated); spurs override narrower
     spacing = 2.0, -- resample step
     smoothRadius = PRESETS[ACTIVE].smoothRadius or 3, -- +/- N samples of benching window
 
@@ -122,12 +153,12 @@ local CONFIG = {
     -- the ribbon breaks up -- and Slate showed through at anchors where the surface
     -- rendered from a cell below the painted window. 3.2 covers every nearest
     -- voxel; the top two occupied cells of each in-band column get painted.
-    matRadius = 3.2,
+    matRadius = PRESETS[ACTIVE].matRadius or 3.2,
 
     anchorSpacing = 3.0, -- Step_<i> anchors, for the dressing builders
 
     stone = {
-        spacing = 9.0,
+        spacing = PRESETS[ACTIVE].stoneSpacing or 9.0,
         jitter = 0.35,
         lateralFrac = 0.85,
         minScale = 0.5,
@@ -671,6 +702,15 @@ local logs = 0
 if CONFIG.steps then
     local st = CONFIG.steps
     local risers = riserPositions(tread, st.riser)
+    if st.untilS then
+        local kept = {}
+        for _, rs in ipairs(risers) do
+            if rs.s <= st.untilS then
+                table.insert(kept, rs)
+            end
+        end
+        risers = kept
+    end
     local state = ((CONFIG.seed + 7) % 2147483646) + 1
     local r
     for i, rs in ipairs(risers) do
