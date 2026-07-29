@@ -61,6 +61,10 @@ local RUSTIC_RAIL_H = 2.2 -- log handrail centre height above the deck
 local RUSTIC_RAIL_D = 0.36 -- handrail log diameter (user-gated: 20% down from 0.45)
 local RUSTIC_POST_D = 0.5
 local RUSTIC_RAIL_OVERHANG = 0.45 -- rail runs past the end posts' far face by ~2 inches
+-- Low INVISIBLE fall-guard above each rail line, per the deck fall-prevention decision:
+-- 3.5 from the deck stops the casual willy-nilly hop, while a deliberate jump-and-climb
+-- still clears it -- players must work for the swim.
+local RUSTIC_GUARD_H = 3.5
 -- rustic deck: cross boards on curved stringers, not a solid curved slab. 2x8 lumber
 -- at 1 stud = 1 foot: 2 in = 0.17 thick, 8 in = 0.67 wide.
 local BOARD_T = 0.17
@@ -207,6 +211,23 @@ local function buildOne(parent: Instance, cfg): string
                 )
                 seg.Shape = Enum.PartType.Cylinder
                 seg.MaterialVariant = "CypressWeathered"
+            end
+            -- invisible guard panels riding the same curve as the rail
+            for i = 0, N - 1 do
+                local g0 = curve(i / N) + off + Vector3.new(0, RUSTIC_GUARD_H / 2, 0)
+                local g1 = curve((i + 1) / N) + off + Vector3.new(0, RUSTIC_GUARD_H / 2, 0)
+                local gx = (g1 - g0).Unit
+                local guard = part(
+                    sub,
+                    "Guard" .. sfx .. "_" .. i,
+                    Vector3.new((g1 - g0).Magnitude + 0.05, RUSTIC_GUARD_H, 0.2),
+                    CFrame.fromMatrix((g0 + g1) / 2, gx, Vector3.yAxis),
+                    CYPRESS,
+                    Enum.Material.Wood
+                )
+                guard.Transparency = 1
+                guard.CanQuery = false
+                guard.CanTouch = false
             end
             -- round posts: ends + thirds
             for _, t in { 0, 1 / 3, 2 / 3, 1 } do
