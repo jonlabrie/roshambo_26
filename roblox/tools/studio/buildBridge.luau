@@ -28,6 +28,21 @@ local BRIDGES = {
         width = 6.5,
     },
     -- (Teahouse3Bridge removed 2026-07-09: T03 is served by a bored access tunnel; no bridge to it, ever.)
+    {
+        -- The river-path trail crossing at the upper pool's west end (chapter data:
+        -- tools/builders/RiverPathChapters.luau BRIDGES[1] -- keep A/B in sync).
+        -- STYLE "rustic" (user-gated 2026-07-30): the koran railing belongs to the
+        -- Square's formal register; 290 studs west the trail wants its own vocabulary
+        -- -- a low arch with a single round log handrail on posts, everything in the
+        -- dock's weathered grey cypress (Wood + CypressWeathered, 216/214/206), the
+        -- same treatment as the falls-steps logs. Stone footings stay.
+        name = "RiverCrossing",
+        A = { -291.7, 178.6, 10.8 },
+        B = { -297.9, 180.4, -11.6 },
+        rise = 2.0,
+        width = 4.5,
+        style = "rustic",
+    },
 }
 
 -- locked dims / colours
@@ -38,6 +53,11 @@ local NEWEL_W, NEWEL_H, BAL_W, NBAL = 0.62, 3.7, 0.34, 12
 local TIMBER = Color3.fromRGB(107, 79, 51) -- deck + rail timber (matches the decks)
 local CAP_DARK = Color3.fromRGB(30, 26, 20) -- dark/black top rail
 local STONE = Color3.fromRGB(96, 94, 88)
+-- rustic style: the dock's weathered grey cypress (Wood + CypressWeathered variant)
+local CYPRESS = Color3.fromRGB(216, 214, 206)
+local RUSTIC_RAIL_H = 2.2 -- log handrail centre height above the deck
+local RUSTIC_RAIL_D = 0.45 -- handrail log diameter
+local RUSTIC_POST_D = 0.5
 
 local function part(
     parent: Instance,
@@ -78,24 +98,74 @@ local function buildOne(parent: Instance, cfg): string
         return Vector3.new(base.X, base.Y + RISE * 4 * t * (1 - t), base.Z) -- deck-top follows a parabola
     end
 
+    local rustic = cfg.style == "rustic"
+
     -- deck planks (top surface follows the curve)
     for i = 0, N - 1 do
         local p0, p1 = curve(i / N), curve((i + 1) / N)
         local mid = (p0 + p1) / 2
         local xA = (p1 - p0).Unit
         local yA = xA:Cross(zAxis).Unit
-        part(
+        local deck = part(
             sub,
             "Deck_" .. i,
             Vector3.new((p1 - p0).Magnitude + 0.1, THICK, WIDTH),
             CFrame.fromMatrix(mid - yA * (THICK / 2), xA, yA),
-            TIMBER,
-            Enum.Material.WoodPlanks
+            rustic and CYPRESS or TIMBER,
+            rustic and Enum.Material.Wood or Enum.Material.WoodPlanks
         )
+        if rustic then
+            deck.MaterialVariant = "CypressWeathered"
+        end
+    end
+
+    -- rustic: a single round log handrail on posts, both sides -- the falls-steps
+    -- vocabulary stretched across water. No koran, no balusters, no dark cap.
+    if rustic then
+        for _, s in { 1, -1 } do
+            local sfx = if s > 0 then "P" else "N"
+            local off = zAxis * (s * OFF)
+            for i = 0, N - 1 do
+                local c0 = curve(i / N) + off + Vector3.new(0, RUSTIC_RAIL_H, 0)
+                local c1 = curve((i + 1) / N) + off + Vector3.new(0, RUSTIC_RAIL_H, 0)
+                local cx = (c1 - c0).Unit
+                local seg = part(
+                    sub,
+                    "LogRail" .. sfx .. "_" .. i,
+                    Vector3.new((c1 - c0).Magnitude + 0.08, RUSTIC_RAIL_D, RUSTIC_RAIL_D),
+                    CFrame.fromMatrix((c0 + c1) / 2, cx, cx:Cross(zAxis).Unit),
+                    CYPRESS,
+                    Enum.Material.Wood
+                )
+                seg.Shape = Enum.PartType.Cylinder
+                seg.MaterialVariant = "CypressWeathered"
+            end
+            -- round posts: ends + thirds
+            for _, t in { 0, 1 / 3, 2 / 3, 1 } do
+                local base = curve(t) + off
+                local post = part(
+                    sub,
+                    ("LogPost%s_%d"):format(sfx, math.floor(t * 3 + 0.5)),
+                    Vector3.new(RUSTIC_RAIL_H + 0.4, RUSTIC_POST_D, RUSTIC_POST_D),
+                    CFrame.fromMatrix(
+                        base + Vector3.new(0, (RUSTIC_RAIL_H + 0.4) / 2 - 0.4, 0),
+                        zAxis,
+                        Vector3.yAxis
+                    ) * CFrame.Angles(0, 0, math.rad(90)),
+                    CYPRESS,
+                    Enum.Material.Wood
+                )
+                post.Shape = Enum.PartType.Cylinder
+                post.MaterialVariant = "CypressWeathered"
+            end
+        end
     end
 
     -- curved KŌRAN railing, both sides
     for _, s in { 1, -1 } do
+        if rustic then
+            break
+        end
         local sfx = if s > 0 then "P" else "N"
         local off = zAxis * (s * OFF)
         for i = 0, N - 1 do
