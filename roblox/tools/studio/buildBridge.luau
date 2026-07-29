@@ -42,6 +42,8 @@ local BRIDGES = {
         rise = 2.0,
         width = 4.5,
         style = "rustic",
+        -- as-built: the end boards sit below the abutment grade (user-gated removal)
+        omitBoards = { 0, 1, 29, 30, 31 },
     },
 }
 
@@ -135,7 +137,14 @@ local function buildOne(parent: Instance, cfg): string
         -- cross boards along the arc, a visible seam between each
         local span = (B - A).Magnitude
         local nBoards = math.max(2, math.floor(span / BOARD_PITCH + 0.5))
+        local omit = {}
+        for _, i in (cfg.omitBoards or {}) :: { number } do
+            omit[i] = true
+        end
         for i = 0, nBoards - 1 do
+            if omit[i] then
+                continue
+            end
             local t = (i + 0.5) / nBoards
             local p = curve(t)
             local ahead = curve(math.min(1, t + 0.02))
