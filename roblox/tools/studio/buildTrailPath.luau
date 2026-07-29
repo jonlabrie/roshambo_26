@@ -49,9 +49,41 @@ local PRESETS = {
             { -205.0, 164.5, 34.0 },
         },
     },
+    RiverFallsSteps = {
+        outModel = "RiverFallsSteps",
+        seed = 20260730,
+        seamAllow = { "RiverTraverse" },
+        control = {
+            { -205.0, 164.5, 34.0 },
+            { -213.5, 167.4, 34.9 },
+            { -218.1, 169.3, 35.1 },
+            { -223.5, 172.3, 35.8 }, -- foot of the landing
+            { -228.0, 173.0, 35.9 }, -- head of the landing
+            { -234.0, 175.0, 36.0 },
+        },
+        -- Marutakaidan: half-buried log risers retaining an earth ramp. Stretched
+        -- proportion (riser 0.9 vs the locked ishidan 0.6) is DELIBERATE and lives
+        -- here on the preset, not in the recipe -- chunky log-and-earth steps read
+        -- as mountain trailwork, not as a second formal flight (user-gated).
+        -- The terrain itself stays a smooth ramp (4-stud voxels cannot hold a
+        -- 0.9-stud step); the logs supply the stepping, exactly as real
+        -- log-and-earth stairs do.
+        -- radius 1: the default +/-6-stud window smears the 4.5-stud landing into
+        -- uniform grade and the logs march straight across it -- measured 2.8-3.1
+        -- gaps where the rest should be. The ground here already runs within 0.7
+        -- of the line, so the tight window costs nothing.
+        smoothRadius = 1,
+        steps = {
+            riser = 0.9,
+            proud = 0.3, -- log top above the tread it retains
+            logDiameter = 1.1,
+            stakes = true, -- two pinning stakes on each log's downhill face
+        },
+    },
     RiverPoolShore = {
         outModel = "RiverPoolShore",
         seed = 20260731,
+        seamAllow = { "RiverFallsSteps" },
         control = {
             { -234.0, 175.0, 36.0 },
             { -246.0, 177.8, 36.0 },
@@ -61,17 +93,18 @@ local PRESETS = {
     },
 }
 
-local ACTIVE = "RiverTraverse"
+local ACTIVE = "RiverFallsSteps"
 
 local CONFIG = {
     outModel = PRESETS[ACTIVE].outModel,
     control = PRESETS[ACTIVE].control,
     seed = PRESETS[ACTIVE].seed,
     seamAllow = PRESETS[ACTIVE].seamAllow or {},
+    steps = PRESETS[ACTIVE].steps, -- nil on plain trail chapters
 
     width = 3.5, -- the tread: a footpath, HALF the first attempt's 7.0 (user-gated)
     spacing = 2.0, -- resample step
-    smoothRadius = 3, -- +/- 3 samples = +/- 6 studs of benching window
+    smoothRadius = PRESETS[ACTIVE].smoothRadius or 3, -- +/- N samples of benching window
 
     cutHeight = 10, -- how far above the tread to clear
     fillDepth = 5, -- how far below the tread to fill
@@ -213,6 +246,30 @@ local function at(samples, s)
         s = s,
     },
         lo
+end
+
+-- One log per `riserHeight` of cumulative rise, plus a lead log at the foot (a flight
+-- opens on timber). Levels key to the tread RETAINED BEHIND each log -- the timber is
+-- the front, downhill riser of its step. Spacing follows the profile, so the natural
+-- flat becomes a logless landing with no special-casing.
+local function riserPositions(samples, riserHeight)
+    local out = {}
+    local footY = samples[1].y
+    table.insert(out, { s = samples[1].s, level = footY })
+    local nextLevel = footY + riserHeight
+    for i = 2, #samples do
+        local a, b = samples[i - 1], samples[i]
+        while b.y >= nextLevel - 1e-9 do
+            local span = b.y - a.y
+            local t = span > 1e-9 and (nextLevel - a.y) / span or 0
+            table.insert(out, {
+                s = a.s + (b.s - a.s) * math.clamp(t, 0, 1),
+                level = nextLevel,
+            })
+            nextLevel += riserHeight
+        end
+    end
+    return out
 end
 
 local function stoneSites(totalLength, opts, seed)
@@ -600,9 +657,72 @@ if #sources > 0 then
     end
 end
 
+--------------------------------------------------------------------------------
+-- Log risers, on a stepped chapter only.
+--------------------------------------------------------------------------------
+
+local logs = 0
+if CONFIG.steps then
+    local st = CONFIG.steps
+    local risers = riserPositions(tread, st.riser)
+    local state = ((CONFIG.seed + 7) % 2147483646) + 1
+    local r
+    for i, rs in ipairs(risers) do
+        local p, idx = at(tread, rs.s)
+        local f = fr[math.min(#fr, math.max(1, idx))]
+        state, r = lcg(state)
+        local len = CONFIG.width + 0.6 + r * 0.5 -- slight overhang, jittered
+        state, r = lcg(state)
+        local yaw = (r * 2 - 1) * math.rad(4)
+        state, r = lcg(state)
+        -- worn dark path timber (recipe section 1a family), tone-jittered
+        local tone = 0.9 + r * 0.2
+        local log = Instance.new("Part")
+        log.Name = ("Log_%d"):format(i)
+        log.Shape = Enum.PartType.Cylinder -- cylinder axis is X = cross-trail
+        log.Size = Vector3.new(len, st.logDiameter, st.logDiameter)
+        log.Anchored = true
+        log.CanCollide = true -- players step on the logs, like ishidan risers
+        log.Material = Enum.Material.Wood
+        log.Color = Color3.fromRGB(math.floor(74 * tone), math.floor(52 * tone), math.floor(32 * tone))
+        local centre = Vector3.new(p.x, rs.level + st.proud - st.logDiameter / 2, p.z)
+        log.CFrame = CFrame.fromMatrix(centre, Vector3.new(f.rx, 0, f.rz), Vector3.new(0, 1, 0))
+            * CFrame.Angles(0, yaw, 0)
+        log.Parent = model
+        logs += 1
+
+        if st.stakes then
+            -- two pinning stakes against the downhill face; travel runs east->west
+            -- uphill, so downhill is -forward
+            for _, lat in ipairs({ -0.3, 0.3 }) do
+                state, r = lcg(state)
+                local sh = 1.1 + r * 0.4
+                local stake = Instance.new("Part")
+                stake.Name = ("Stake_%d%s"):format(i, lat < 0 and "a" or "b")
+                stake.Shape = Enum.PartType.Cylinder
+                stake.Size = Vector3.new(sh, 0.28, 0.28)
+                stake.Anchored = true
+                stake.CanCollide = false
+                stake.CanQuery = false
+                stake.CanTouch = false
+                stake.Material = Enum.Material.Wood
+                stake.Color = Color3.fromRGB(66, 47, 29)
+                local sp = Vector3.new(
+                    p.x - f.fx * (st.logDiameter / 2 + 0.1) + f.rx * (lat * CONFIG.width),
+                    rs.level + st.proud + 0.15 - sh / 2,
+                    p.z - f.fz * (st.logDiameter / 2 + 0.1) + f.rz * (lat * CONFIG.width)
+                )
+                -- cylinder axis X -> rotate to stand vertical
+                stake.CFrame = CFrame.new(sp) * CFrame.Angles(0, 0, math.rad(90))
+                stake.Parent = model
+            end
+        end
+    end
+end
+
 model.Parent = paths
 
-return ("%s\n  backup ServerStorage.%s (corner %d,%d,%d)\n  %d columns sculpted, %d Step_ anchors, %d stones (%d skipped, no ground)"):format(
+return ("%s\n  backup ServerStorage.%s (corner %d,%d,%d)\n  %d columns sculpted, %d Step_ anchors, %d logs, %d stones (%d skipped, no ground)"):format(
     report,
     backupName,
     corner.X,
@@ -610,6 +730,7 @@ return ("%s\n  backup ServerStorage.%s (corner %d,%d,%d)\n  %d columns sculpted,
     corner.Z,
     columns,
     anchors,
+    logs,
     placed,
     skipped
 )
