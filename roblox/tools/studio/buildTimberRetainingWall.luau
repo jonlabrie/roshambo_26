@@ -38,13 +38,24 @@ local CONFIG = {
             -- -Right. The bed is 8.0 wide rather than the network's 5.8, and the measured
             -- face rises between +4 and +6 from the centreline, so offset 5.0 stands the
             -- wall at the face with a 1.0 standoff off the built tread edge.
+            --
+            -- GATED 2026-07-29. The full 0..41 run built nine posts and read badly: it
+            -- ran the whole flight when the bank only needs holding through the middle.
+            -- first/last trimmed to drop the end bays at both ends, and:
+            --   proudTop 0.30 (not the locked 1.3) -- the tall post tops were the main
+            --     complaint. If this reads better elsewhere the LOCKED value wants
+            --     revisiting rather than every wall overriding it.
+            --   extraCourses -- the probe reads the cut at each bay's midpoint, and these
+            --     three came out a course shy of the bank behind them.
             model = "RiverSquareStair",
-            first = 0,
-            last = 41,
+            first = 5,
+            last = 32,
             edgeSign = -1,
             offset = 5.0,
             cap = 10,
             seed = 20260729,
+            proudTop = 0.30,
+            extraCourses = { [1] = 1, [3] = 1, [4] = 1 },
         },
     },
     -- locked style:
@@ -206,7 +217,11 @@ local function buildWall(cfg)
         local top = mid.topY
         local foot = mid.footY
         bayTop[bi], bayFoot[bi] = top, foot
-        local courses = math.max(1, math.floor((top - foot) / CONFIG.coursePitch + 0.5))
+        -- cfg.extraCourses[bi] adds courses above what the probed cut depth calls for.
+        -- The probe reads the cut at the bay MIDPOINT, so a bay whose bank rises toward
+        -- one post comes out a course short; this is the hand-correction for that.
+        local extra = (cfg.extraCourses and cfg.extraCourses[bi]) or 0
+        local courses = math.max(1, math.floor((top - foot) / CONFIG.coursePitch + 0.5)) + extra
         local blen = (a1 - a0) + CONFIG.boardOverlap
         for c = 0, courses - 1 do
             local yc = foot + (c + 0.5) * CONFIG.coursePitch
@@ -237,13 +252,14 @@ local function buildWall(cfg)
     for pi = 1, nBays + 1 do
         local s = at(postArc[pi])
         local topRef = -1e9
-        if bayTop[pi - 1] then
-            topRef = math.max(topRef, bayTop[pi - 1])
+        for _, adj in ipairs({ pi - 1, pi }) do
+            if bayTop[adj] then
+                -- count any extra courses, or a post ends up buried by its own boards
+                local extra = (cfg.extraCourses and cfg.extraCourses[adj]) or 0
+                topRef = math.max(topRef, bayTop[adj] + extra * CONFIG.coursePitch)
+            end
         end
-        if bayTop[pi] then
-            topRef = math.max(topRef, bayTop[pi])
-        end
-        local top = topRef + CONFIG.postProudTop
+        local top = topRef + (cfg.proudTop or CONFIG.postProudTop)
         local foot = s.footY
         local h = math.max(top - foot, 1)
         local ctr = s.edge - s.cross * (cfg.edgeSign * CONFIG.postProud)
