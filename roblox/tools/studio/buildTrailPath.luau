@@ -117,6 +117,34 @@ local PRESETS = {
         -- NO steps (user-gated): the 0.33 fork pitch walks fine at single-file
         -- width; the spur reads as a bare desire path end to end.
     },
+    RiverUpperClimb = {
+        -- The wild west end: bridge abutment to NW80FallsStair, re-registered
+        -- stair -> trail (user-gated, chapter data in RiverPathChapters). A GAME
+        -- TRAIL -- single-file, mostly Grass, the least-built thing on the route.
+        -- Log steps only at its two bites (steps.ranges): the bridge-exit shelf
+        -- and the final approach up to the falls stair.
+        outModel = "RiverUpperClimb",
+        seed = 20260802,
+        width = 1.5,
+        matRadius = 2.9,
+        stoneSpacing = 14.0,
+        seamAllow = { "RiverCrossing", "NW80FallsStair" },
+        control = {
+            { -297.9, 180.4, -11.6 },
+            { -326.4, 188.0, -25.2 },
+            { -362.0, 200.8, -40.2 },
+            { -376.9, 205.8, -15.4 },
+        },
+        smoothRadius = 2,
+        steps = {
+            riser = 0.9,
+            proud = 0.3,
+            logDiameter = 1.0,
+            stakes = true,
+            -- arc windows (studs from the east end); total arc ~99
+            ranges = { { 0, 11 }, { 88, 100 } },
+        },
+    },
     RiverPoolShore = {
         outModel = "RiverPoolShore",
         seed = 20260731,
@@ -133,7 +161,7 @@ local PRESETS = {
     },
 }
 
-local ACTIVE = "RiverT07Spur"
+local ACTIVE = "RiverUpperClimb"
 
 local CONFIG = {
     outModel = PRESETS[ACTIVE].outModel,
@@ -178,7 +206,7 @@ local CONFIG = {
     stoneLibrary = "TrailStoneLibrary",
     stoneModels = { "Stone_A_LP", "Stone_B_LP", "Stone_C_LP", "Stone_D_LP", "Stone_E_LP" },
 
-    probeOnly = true,
+    probeOnly = false,
 }
 
 local Terrain = workspace.Terrain
@@ -712,11 +740,15 @@ local logs = 0
 if CONFIG.steps then
     local st = CONFIG.steps
     local risers = riserPositions(tread, st.riser)
-    if st.untilS then
+    if st.untilS or st.ranges then
+        local ranges = st.ranges or { { 0, st.untilS } }
         local kept = {}
         for _, rs in ipairs(risers) do
-            if rs.s <= st.untilS then
-                table.insert(kept, rs)
+            for _, rg in ipairs(ranges) do
+                if rs.s >= rg[1] and rs.s <= rg[2] then
+                    table.insert(kept, rs)
+                    break
+                end
             end
         end
         risers = kept
