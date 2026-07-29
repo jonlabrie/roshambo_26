@@ -20,10 +20,9 @@
 -- tools/builders/RiverPathChapters.luau (Studio cannot require repo modules) -- keep all
 -- three in sync. TrailProfile is Lune-tested; this copy is not, so fix bugs THERE first.
 --
--- Recipe section 5: fill boxes must be >= 4 studs in EVERY dimension or the voxel
--- resolution (4 studs) edits nothing at all. boxLen 6 at spacing 2 means each box
--- overlaps its neighbours threefold, which is intentional -- it is what makes the bench
--- continuous instead of scalloped.
+-- Terrain edits go through ReadVoxels/WriteVoxels with explicit per-voxel occupancy,
+-- NOT FillBlock -- see the comment at the sculpt for why (two FillBlock attempts left
+-- the tread 1-3 studs high).
 --
 -- Terrain:CopyRegion takes a Region3int16 in VOXEL coordinates (1 unit = 4 studs), not a
 -- Region3. The corner is stored as attributes so PasteRegion can restore it.
@@ -35,6 +34,9 @@ local PRESETS = {
     RiverTraverse = {
         outModel = "RiverTraverse",
         seed = 20260729,
+        -- the trail STARTS on this stair's top tread; hitting it at the seam is the
+        -- join working, not an obstruction
+        seamAllow = { "RiverSquareStair" },
         control = {
             { -89.8, 139.9, 27.9 }, -- head of RiverSquareStair (built tread, not ground)
             { -106.0, 142.7, 22.0 },
@@ -65,6 +67,7 @@ local CONFIG = {
     outModel = PRESETS[ACTIVE].outModel,
     control = PRESETS[ACTIVE].control,
     seed = PRESETS[ACTIVE].seed,
+    seamAllow = PRESETS[ACTIVE].seamAllow or {},
 
     width = 7.0, -- the tread; narrower than the 8.0 Square stair, wider than the 5.8 network
     spacing = 2.0, -- resample step
@@ -72,7 +75,7 @@ local CONFIG = {
 
     cutHeight = 10, -- how far above the tread to clear
     fillDepth = 5, -- how far below the tread to fill
-    boxLen = 6, -- along-trail length of each terrain box (>= 4, and overlapping)
+    shoulder = 3.0, -- blend width from the tread edge back to the existing hillside
     treadMaterial = Enum.Material.Ground,
 
     anchorSpacing = 3.0, -- Step_<i> anchors, for the dressing builders
@@ -246,7 +249,23 @@ for _, p in ipairs(tread) do
     local hit = workspace:Raycast(Vector3.new(p.x, p.y + 60, p.z), Vector3.new(0, -260, 0))
     if hit then
         if hit.Instance ~= Terrain then
-            parts[hit.Instance:GetFullName()] = true
+            local allowed = false
+            local node = hit.Instance
+            while node and node ~= workspace do
+                for _, name in ipairs(CONFIG.seamAllow) do
+                    if node.Name == name then
+                        allowed = true
+                        break
+                    end
+                end
+                if allowed then
+                    break
+                end
+                node = node.Parent
+            end
+            if not allowed then
+                parts[hit.Instance:GetFullName()] = true
+            end
         else
             local d = hit.Position.Y - p.y
             if d > 0.4 then
@@ -323,27 +342,118 @@ backup:SetAttribute("CornerY", corner.Y)
 backup:SetAttribute("CornerZ", corner.Z)
 backup.Parent = SS
 
--- Cut first, then fill: the two boxes do not overlap (one sits entirely above the tread
--- plane, the other entirely below), so the order is not load-bearing -- but filling last
--- means the tread's top voxels finish as treadMaterial even where we cut into Slate.
-local boxes = 0
-for i, p in ipairs(tread) do
-    local f = fr[i]
-    local pos = Vector3.new(p.x, p.y, p.z)
-    local cf = CFrame.fromMatrix(pos, Vector3.new(f.rx, 0, f.rz), Vector3.new(0, 1, 0))
+-- VOXEL WRITE, NOT FillBlock. Two FillBlock attempts left the tread 1 to 3 studs HIGH:
+-- overlapping horizontal boxes on a slope each put their floor at their own tread
+-- height, and even pitched, two-passed boxes inherit FillBlock's sloppy partial-voxel
+-- occupancy (+1.2 systematic bias, a 2-stud lip at the stair-head seam). The tunnel-bore
+-- lesson applies -- the voxel grid is the reliable interface. So: ReadVoxels, sculpt the
+-- columns, WriteVoxels.
+--
+-- Per column inside the corridor: surface = tread height at the nearest arc position.
+-- In the shoulder (halfW..halfW+shoulder) the target blends smoothly back to the
+-- EXISTING surface, so the bench sits in the hillside instead of on a plinth. Occupancy
+-- is exact: 1 below, the fractional remainder in the surface voxel, 0 above (up to
+-- cutHeight -- higher terrain such as the south bank's brow is out of scope).
 
-    Terrain:FillBlock(
-        cf + Vector3.new(0, CONFIG.cutHeight / 2, 0),
-        Vector3.new(CONFIG.width, CONFIG.cutHeight, CONFIG.boxLen),
-        Enum.Material.Air
-    )
-    Terrain:FillBlock(
-        cf - Vector3.new(0, CONFIG.fillDepth / 2, 0),
-        Vector3.new(CONFIG.width, CONFIG.fillDepth, CONFIG.boxLen),
-        CONFIG.treadMaterial
-    )
-    boxes += 2
+local halfW = CONFIG.width / 2
+local shoulder = CONFIG.shoulder
+
+-- region: the tread's bounding box (minv/maxv from the backup pass) padded by the
+-- corridor and the cut/fill depths
+local padXZ = halfW + shoulder + 4
+local region = Region3.new(
+    Vector3.new(minv.X - padXZ, minv.Y - CONFIG.fillDepth - 8, minv.Z - padXZ),
+    Vector3.new(maxv.X + padXZ, maxv.Y + CONFIG.cutHeight + 4, maxv.Z + padXZ)
+):ExpandToGrid(4)
+
+local materials, occupancies = Terrain:ReadVoxels(region, 4)
+local size = materials.Size
+local origin = region.CFrame.Position - region.Size / 2
+
+-- nearest point on the tread polyline for a horizontal position; returns distance and
+-- the tread height there
+local function nearestTread(x, z)
+    local bestD2, bestY = 1e18, nil
+    for i = 2, #tread do
+        local a, b = tread[i - 1], tread[i]
+        local abx, abz = b.x - a.x, b.z - a.z
+        local L2 = abx * abx + abz * abz
+        local t = 0
+        if L2 > 1e-9 then
+            t = math.clamp(((x - a.x) * abx + (z - a.z) * abz) / L2, 0, 1)
+        end
+        local px, pz = a.x + abx * t, a.z + abz * t
+        local d2 = (x - px) ^ 2 + (z - pz) ^ 2
+        if d2 < bestD2 then
+            bestD2 = d2
+            bestY = a.y + (b.y - a.y) * t
+        end
+    end
+    return math.sqrt(bestD2), bestY
 end
+
+-- existing surface height of a column, from its occupancy stack
+local function columnSurface(cx, cz)
+    for cy = size.Y, 1, -1 do
+        local occ = occupancies[cx][cy][cz]
+        if occ > 0 then
+            return origin.Y + (cy - 1) * 4 + occ * 4
+        end
+    end
+    return origin.Y
+end
+
+local columns = 0
+for cx = 1, size.X do
+    for cz = 1, size.Z do
+        local wx = origin.X + (cx - 0.5) * 4
+        local wz = origin.Z + (cz - 0.5) * 4
+        local dist, treadY = nearestTread(wx, wz)
+        if dist <= halfW + shoulder and treadY then
+            local target
+            if dist <= halfW then
+                target = treadY
+            else
+                -- smoothstep back to the existing surface across the shoulder
+                local t = (dist - halfW) / shoulder
+                t = t * t * (3 - 2 * t)
+                target = treadY + (columnSurface(cx, cz) - treadY) * t
+            end
+            local isTread = dist <= halfW
+            for cy = 1, size.Y do
+                local bottom = origin.Y + (cy - 1) * 4
+                -- SURFACE_K compensates smooth terrain's "puffiness": the mesher
+                -- renders the isosurface ~half a voxel ABOVE the linear occupancy
+                -- line (measured dead uniform at +1.88 across 44 anchors). Applied
+                -- to the WHOLE column, not just the surface cell, so the two cells
+                -- straddling the target share the shift and any target height stays
+                -- reachable.
+                local SURFACE_K = 0.47
+                local frac = math.clamp((target - bottom) / 4 - SURFACE_K, 0, 1)
+                local above = bottom + 4 > treadY + CONFIG.cutHeight
+                local below = bottom < treadY - CONFIG.fillDepth
+                if not above and not below then
+                    occupancies[cx][cy][cz] = frac
+                    if frac > 0 then
+                        -- the walking surface (and the voxel under it), or newly
+                        -- filled ground below a shoulder blend
+                        if
+                            (isTread and target - bottom <= 6)
+                            or materials[cx][cy][cz] == Enum.Material.Air
+                        then
+                            materials[cx][cy][cz] = CONFIG.treadMaterial
+                        end
+                    else
+                        materials[cx][cy][cz] = Enum.Material.Air
+                    end
+                end
+            end
+            columns += 1
+        end
+    end
+end
+
+Terrain:WriteVoxels(region, 4, materials, occupancies)
 
 --------------------------------------------------------------------------------
 -- Anchors and the stone trace.
@@ -430,13 +540,13 @@ end
 
 model.Parent = paths
 
-return ("%s\n  backup ServerStorage.%s (corner %d,%d,%d)\n  %d terrain boxes, %d Step_ anchors, %d stones (%d skipped, no ground)"):format(
+return ("%s\n  backup ServerStorage.%s (corner %d,%d,%d)\n  %d columns sculpted, %d Step_ anchors, %d stones (%d skipped, no ground)"):format(
     report,
     backupName,
     corner.X,
     corner.Y,
     corner.Z,
-    boxes,
+    columns,
     anchors,
     placed,
     skipped
