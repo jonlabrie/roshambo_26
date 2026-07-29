@@ -56,8 +56,17 @@ local STONE = Color3.fromRGB(96, 94, 88)
 -- rustic style: the dock's weathered grey cypress (Wood + CypressWeathered variant)
 local CYPRESS = Color3.fromRGB(216, 214, 206)
 local RUSTIC_RAIL_H = 2.2 -- log handrail centre height above the deck
-local RUSTIC_RAIL_D = 0.45 -- handrail log diameter
+local RUSTIC_RAIL_D = 0.36 -- handrail log diameter (user-gated: 20% down from 0.45)
 local RUSTIC_POST_D = 0.5
+local RUSTIC_RAIL_OVERHANG = 0.45 -- rail runs past the end posts' far face by ~2 inches
+-- rustic deck: cross boards on curved stringers, not a solid curved slab. 2x8 lumber
+-- at 1 stud = 1 foot: 2 in = 0.17 thick, 8 in = 0.67 wide.
+local BOARD_T = 0.17
+local BOARD_W = 0.67
+local BOARD_PITCH = 0.74 -- board width + a visible seam
+local STRINGER_H = 0.7
+local STRINGER_W = 0.45
+local STRINGER_INSET = 1.1 -- stringer centreline in from each deck edge
 
 local function part(
     parent: Instance,
@@ -100,22 +109,64 @@ local function buildOne(parent: Instance, cfg): string
 
     local rustic = cfg.style == "rustic"
 
-    -- deck planks (top surface follows the curve)
-    for i = 0, N - 1 do
-        local p0, p1 = curve(i / N), curve((i + 1) / N)
-        local mid = (p0 + p1) / 2
-        local xA = (p1 - p0).Unit
-        local yA = xA:Cross(zAxis).Unit
-        local deck = part(
-            sub,
-            "Deck_" .. i,
-            Vector3.new((p1 - p0).Magnitude + 0.1, THICK, WIDTH),
-            CFrame.fromMatrix(mid - yA * (THICK / 2), xA, yA),
-            rustic and CYPRESS or TIMBER,
-            rustic and Enum.Material.Wood or Enum.Material.WoodPlanks
-        )
-        if rustic then
-            deck.MaterialVariant = "CypressWeathered"
+    if rustic then
+        -- Rustic deck: two curved STRINGERS under CROSS BOARDS -- honest bridge
+        -- carpentry, not a solid curved slab (user-gated). The boards' tops follow
+        -- the parabola; the stringers hang beneath, tops flush to the board
+        -- undersides.
+        for _, s in { 1, -1 } do
+            local off = zAxis * (s * (WIDTH / 2 - STRINGER_INSET))
+            for i = 0, N - 1 do
+                local p0, p1 = curve(i / N) + off, curve((i + 1) / N) + off
+                local mid = (p0 + p1) / 2
+                local xA = (p1 - p0).Unit
+                local yA = xA:Cross(zAxis).Unit
+                local st = part(
+                    sub,
+                    ("Stringer%s_%d"):format(if s > 0 then "P" else "N", i),
+                    Vector3.new((p1 - p0).Magnitude + 0.12, STRINGER_H, STRINGER_W),
+                    CFrame.fromMatrix(mid - yA * (BOARD_T + STRINGER_H / 2), xA, yA),
+                    CYPRESS,
+                    Enum.Material.Wood
+                )
+                st.MaterialVariant = "CypressWeathered"
+            end
+        end
+        -- cross boards along the arc, a visible seam between each
+        local span = (B - A).Magnitude
+        local nBoards = math.max(2, math.floor(span / BOARD_PITCH + 0.5))
+        for i = 0, nBoards - 1 do
+            local t = (i + 0.5) / nBoards
+            local p = curve(t)
+            local ahead = curve(math.min(1, t + 0.02))
+            local behind = curve(math.max(0, t - 0.02))
+            local xA = (ahead - behind).Unit
+            local yA = xA:Cross(zAxis).Unit
+            local board = part(
+                sub,
+                "Board_" .. i,
+                Vector3.new(BOARD_W, BOARD_T, WIDTH),
+                CFrame.fromMatrix(p - yA * (BOARD_T / 2), xA, yA),
+                CYPRESS,
+                Enum.Material.Wood
+            )
+            board.MaterialVariant = "CypressWeathered"
+        end
+    else
+        -- deck planks (top surface follows the curve)
+        for i = 0, N - 1 do
+            local p0, p1 = curve(i / N), curve((i + 1) / N)
+            local mid = (p0 + p1) / 2
+            local xA = (p1 - p0).Unit
+            local yA = xA:Cross(zAxis).Unit
+            part(
+                sub,
+                "Deck_" .. i,
+                Vector3.new((p1 - p0).Magnitude + 0.1, THICK, WIDTH),
+                CFrame.fromMatrix(mid - yA * (THICK / 2), xA, yA),
+                TIMBER,
+                Enum.Material.WoodPlanks
+            )
         end
     end
 
@@ -129,6 +180,14 @@ local function buildOne(parent: Instance, cfg): string
                 local c0 = curve(i / N) + off + Vector3.new(0, RUSTIC_RAIL_H, 0)
                 local c1 = curve((i + 1) / N) + off + Vector3.new(0, RUSTIC_RAIL_H, 0)
                 local cx = (c1 - c0).Unit
+                -- the rail runs PAST the end posts (a couple of inches beyond the
+                -- far face), not into their centres -- user-gated
+                if i == 0 then
+                    c0 -= cx * RUSTIC_RAIL_OVERHANG
+                end
+                if i == N - 1 then
+                    c1 += cx * RUSTIC_RAIL_OVERHANG
+                end
                 local seg = part(
                     sub,
                     "LogRail" .. sfx .. "_" .. i,
