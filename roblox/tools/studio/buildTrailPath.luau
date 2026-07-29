@@ -113,14 +113,9 @@ local PRESETS = {
             { -310.8, 188.1, 35.8 },
             { -305.0, 190.4, 42.6 }, -- the platform's rear (SW) corner
         },
-        smoothRadius = 1, -- keep the stepped fork pitch honest, as on the falls steps
-        steps = {
-            riser = 0.9,
-            proud = 0.3,
-            logDiameter = 1.0,
-            stakes = true,
-            untilS = 10, -- logs cover the steep shelf only; the rest is plain trail
-        },
+        smoothRadius = 1,
+        -- NO steps (user-gated): the 0.33 fork pitch walks fine at single-file
+        -- width; the spur reads as a bare desire path end to end.
     },
     RiverPoolShore = {
         outModel = "RiverPoolShore",
