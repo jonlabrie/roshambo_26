@@ -675,8 +675,9 @@ if CONFIG.steps then
         state, r = lcg(state)
         local yaw = (r * 2 - 1) * math.rad(4)
         state, r = lcg(state)
-        -- worn dark path timber (recipe section 1a family), tone-jittered
-        local tone = 0.9 + r * 0.2
+        -- weathered grey cypress, matching the dock (and the coming bridge) --
+        -- user-gated away from the dark 74/52/32 path-timber family
+        local tone = 0.94 + r * 0.12
         local log = Instance.new("Part")
         log.Name = ("Log_%d"):format(i)
         log.Shape = Enum.PartType.Cylinder -- cylinder axis is X = cross-trail
@@ -684,7 +685,8 @@ if CONFIG.steps then
         log.Anchored = true
         log.CanCollide = true -- players step on the logs, like ishidan risers
         log.Material = Enum.Material.Wood
-        log.Color = Color3.fromRGB(math.floor(74 * tone), math.floor(52 * tone), math.floor(32 * tone))
+        log.MaterialVariant = "CypressWeathered"
+        log.Color = Color3.fromRGB(math.floor(216 * tone), math.floor(214 * tone), math.floor(206 * tone))
         local centre = Vector3.new(p.x, rs.level + st.proud - st.logDiameter / 2, p.z)
         log.CFrame = CFrame.fromMatrix(centre, Vector3.new(f.rx, 0, f.rz), Vector3.new(0, 1, 0))
             * CFrame.Angles(0, yaw, 0)
@@ -706,10 +708,14 @@ if CONFIG.steps then
                 stake.CanQuery = false
                 stake.CanTouch = false
                 stake.Material = Enum.Material.Wood
-                stake.Color = Color3.fromRGB(66, 47, 29)
+                stake.MaterialVariant = "CypressWeathered"
+                stake.Color = Color3.fromRGB(201, 199, 192)
+                -- stake top just clears the CENTRELINE of the log it pins (user-gated
+                -- down from log-top + 0.15, which read too tall)
+                local stakeTop = rs.level + st.proud - st.logDiameter / 2 + 0.15
                 local sp = Vector3.new(
                     p.x - f.fx * (st.logDiameter / 2 + 0.1) + f.rx * (lat * CONFIG.width),
-                    rs.level + st.proud + 0.15 - sh / 2,
+                    stakeTop - sh / 2,
                     p.z - f.fz * (st.logDiameter / 2 + 0.1) + f.rz * (lat * CONFIG.width)
                 )
                 -- cylinder axis X -> rotate to stand vertical
