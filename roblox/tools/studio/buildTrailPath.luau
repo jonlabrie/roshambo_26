@@ -78,6 +78,9 @@ local PRESETS = {
             proud = 0.3, -- log top above the tread it retains
             logDiameter = 1.1,
             stakes = true, -- two pinning stakes on each log's downhill face
+            -- world-space shift on logs+stakes only (terrain bench unmoved):
+            -- 1 stud south, away from the water (user-gated 2026-07-30)
+            offset = Vector3.new(0, 0, 1),
         },
     },
     RiverPoolShore = {
@@ -687,7 +690,8 @@ if CONFIG.steps then
         log.Material = Enum.Material.Wood
         log.MaterialVariant = "CypressWeathered"
         log.Color = Color3.fromRGB(math.floor(216 * tone), math.floor(214 * tone), math.floor(206 * tone))
-        local centre = Vector3.new(p.x, rs.level + st.proud - st.logDiameter / 2, p.z)
+        local off = st.offset or Vector3.zero
+        local centre = Vector3.new(p.x, rs.level + st.proud - st.logDiameter / 2, p.z) + off
         log.CFrame = CFrame.fromMatrix(centre, Vector3.new(f.rx, 0, f.rz), Vector3.new(0, 1, 0))
             * CFrame.Angles(0, yaw, 0)
         log.Parent = model
@@ -717,7 +721,7 @@ if CONFIG.steps then
                     p.x - f.fx * (st.logDiameter / 2 + 0.1) + f.rx * (lat * CONFIG.width),
                     stakeTop - sh / 2,
                     p.z - f.fz * (st.logDiameter / 2 + 0.1) + f.rz * (lat * CONFIG.width)
-                )
+                ) + off
                 -- cylinder axis X -> rotate to stand vertical
                 stake.CFrame = CFrame.new(sp) * CFrame.Angles(0, 0, math.rad(90))
                 stake.Parent = model
