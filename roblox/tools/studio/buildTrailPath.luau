@@ -93,12 +93,15 @@ local PRESETS = {
         -- verified against SizeClasses.deckFootprint before building.
         outModel = "RiverT07Spur",
         seed = 20260801,
-        width = 2.0,
+        width = 1.5, -- single-file (user-gated narrower twice: 2.0 -> 1.5)
         matRadius = 2.9, -- must stay above 2.83 or the ribbon drops voxels
         stoneSpacing = 12.0,
         seamAllow = { "RiverPoolShore", "RiverCrossing" },
+        -- Line v2 (user-relocated fork further EAST off the pool shore proper;
+        -- the abutment start was rejected). The steep bite is a 6-stud shelf at
+        -- x -287..-293 (local grade to 0.86) carrying most of the rise.
         control = {
-            { -293.4, 180.8, 13.8 }, -- inside the pool-shore bench: the fork
+            { -285.4, 179.5, 16.9 }, -- the fork, on the pool-shore bench edge
             { -300.1, 184.3, 17.7 },
             { -309.6, 185.5, 21.0 },
             { -312.1, 187.0, 27.9 },
@@ -111,7 +114,7 @@ local PRESETS = {
             proud = 0.3,
             logDiameter = 1.0,
             stakes = true,
-            untilS = 8.5, -- logs only on the fork pitch; the rest is plain trail
+            untilS = 10, -- logs cover the steep shelf only; the rest is plain trail
         },
     },
     RiverPoolShore = {
