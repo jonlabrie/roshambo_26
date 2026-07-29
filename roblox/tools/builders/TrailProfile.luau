@@ -220,6 +220,40 @@ function TrailProfile.stoneSites(totalLength: number, opts: StoneOpts, seed: num
     return out
 end
 
+export type Riser = {
+    s: number, -- arc position of the log's centre
+    level: number, -- the tread level RETAINED BEHIND the log (recipe: the timber is
+    -- the FRONT, downhill riser of its step -- key to the level it retains, never
+    -- the one below it)
+}
+
+-- Log positions for a stepped pitch: one riser wherever the smoothed tread profile
+-- crosses another `riserHeight` of cumulative rise, plus a lead log AT the start
+-- (recipe: a flight opens on a timber, not on bare tread). Positions are interpolated
+-- between samples, so riser spacing follows the profile -- tight on the steep pitches,
+-- sparse across a natural landing. That is what turns the landing in the W05 chapter
+-- into a rest without any special-casing.
+function TrailProfile.riserPositions(samples: { Sample }, riserHeight: number): { Riser }
+    assert(riserHeight > 0, "riserHeight must be positive")
+    local out: { Riser } = {}
+    local footY = samples[1].y
+    table.insert(out, { s = samples[1].s, level = footY }) -- the lead log
+    local nextLevel = footY + riserHeight
+    for i = 2, #samples do
+        local a, b = samples[i - 1], samples[i]
+        while b.y >= nextLevel - 1e-9 do
+            local span = b.y - a.y
+            local t = span > 1e-9 and (nextLevel - a.y) / span or 0
+            table.insert(out, {
+                s = a.s + (b.s - a.s) * math.clamp(t, 0, 1),
+                level = nextLevel,
+            })
+            nextLevel += riserHeight
+        end
+    end
+    return out
+end
+
 -- Interpolate a position on the resampled line at arc distance `s`.
 function TrailProfile.at(samples: { Sample }, s: number): Sample
     local n = #samples

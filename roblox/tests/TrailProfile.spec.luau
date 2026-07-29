@@ -283,6 +283,70 @@ describe("TrailProfile.lcg", function()
     end)
 end)
 
+describe("TrailProfile.riserPositions", function()
+    test("opens on a lead log at the foot -- a flight starts on timber", function()
+        local s = TrailProfile.resample({ { 0, 100, 0 }, { -30, 110, 0 } }, 2)
+        local risers = TrailProfile.riserPositions(s, 0.9)
+        expect(risers[1].s).toBeCloseTo(0, 1e-9)
+        expect(risers[1].level).toBeCloseTo(100, 1e-9)
+    end)
+
+    test("places one log per riserHeight of cumulative rise", function()
+        local s = TrailProfile.resample({ { 0, 100, 0 }, { -30, 110, 0 } }, 2)
+        local risers = TrailProfile.riserPositions(s, 0.9)
+        -- 10 of rise at 0.9 = 11 crossings + the lead = 12
+        expect(#risers).toBe(12)
+        for i = 2, #risers do
+            expect(risers[i].level - risers[i - 1].level).toBeCloseTo(0.9, 1e-6)
+        end
+    end)
+
+    test("logs sit closer on steep pitches and apart on gentle ones", function()
+        -- steep (0.45) then gentle (0.1): same rise, different spacing
+        local s = TrailProfile.resample({ { 0, 100, 0 }, { -10, 104.5, 0 }, { -55, 109, 0 } }, 1)
+        local risers = TrailProfile.riserPositions(s, 0.9)
+        local steepGap = risers[3].s - risers[2].s
+        local gentleGap = risers[#risers].s - risers[#risers - 1].s
+        expect(steepGap < gentleGap).toBe(true)
+        expect(steepGap).toBeCloseTo(2.0, 0.35)
+        expect(gentleGap).toBeCloseTo(9.0, 1.5)
+    end)
+
+    test("a landing gets no logs -- spacing does the resting, not special cases", function()
+        -- climb, dead flat for 12, climb again
+        local s =
+            TrailProfile.resample({ { 0, 100, 0 }, { -6, 102, 0 }, { -18, 102, 0 }, { -24, 104, 0 } }, 1)
+        local risers = TrailProfile.riserPositions(s, 0.9)
+        -- no riser's s falls strictly inside the flat stretch (arc 6..18)
+        for _, r in risers do
+            expect(r.s <= 6.05 or r.s >= 17.95).toBe(true)
+        end
+    end)
+
+    test("levels are keyed to the tread RETAINED BEHIND each log, monotonic", function()
+        local s = TrailProfile.resample({ { 0, 100, 0 }, { -40, 112, 0 } }, 2)
+        local risers = TrailProfile.riserPositions(s, 0.9)
+        for i = 2, #risers do
+            expect(risers[i].level > risers[i - 1].level).toBe(true)
+            expect(risers[i].s > risers[i - 1].s).toBe(true)
+        end
+    end)
+
+    test("the baked W05 chapter yields a two-flight run of about a dozen logs", function()
+        local c
+        for _, ch in RiverPathChapters.CHAPTERS do
+            if ch.outModel == "RiverFallsSteps" then
+                c = ch
+            end
+        end
+        local s = TrailProfile.smooth(TrailProfile.resample((c :: any).control, 2), 3)
+        local risers = TrailProfile.riserPositions(s, 0.9)
+        -- 10.5 studs of rise at 0.9 -> 11-13 logs including the lead
+        expect(#risers >= 11).toBe(true)
+        expect(#risers <= 13).toBe(true)
+    end)
+end)
+
 describe("the baked trail chapters", function()
     test("the traverse benches to a tread no steeper than TRAIL_MAX_GRADE", function()
         local c = chapter("RiverTraverse")
