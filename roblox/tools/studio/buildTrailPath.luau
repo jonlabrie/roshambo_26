@@ -323,6 +323,42 @@ local report = ("%s: %d samples over %.1f studs, benched max grade %.3f\n"):form
     worstFill
 )
 
+-- Foliage in the corridor. The centreline raycast cannot see a sapling standing a
+-- stud off-centre -- on the traverse, four young sugi ended up planted in the tread
+-- and had to be cleared by hand afterwards. Report-only: foliage NEAR a trail is
+-- expected and wanted; foliage IN it is a per-instance user decision.
+local folWarn = {}
+local fol = workspace.CanyonWorld:FindFirstChild("Foliage")
+if fol then
+    local function nearestS(x, z)
+        local best = 1e9
+        for i = 2, #tread do
+            local a, b = tread[i - 1], tread[i]
+            local abx, abz = b.x - a.x, b.z - a.z
+            local L2 = abx * abx + abz * abz
+            local t = L2 > 1e-9 and math.clamp(((x - a.x) * abx + (z - a.z) * abz) / L2, 0, 1) or 0
+            best = math.min(best, math.sqrt((x - a.x - abx * t) ^ 2 + (z - a.z - abz * t) ^ 2))
+        end
+        return best
+    end
+    for _, c in ipairs(fol:GetDescendants()) do
+        local isInstance = (c:IsA("Model") and c:FindFirstChildWhichIsA("BasePart", true))
+            or (c:IsA("MeshPart") and not (c.Parent and c.Parent:IsA("Model")))
+        if isInstance then
+            local pv = c:IsA("Model") and c:GetPivot().Position or c.Position
+            local d = nearestS(pv.X, pv.Z)
+            if d < CONFIG.width / 2 + 1 then
+                table.insert(folWarn, ("    %s at (%.1f, %.1f)  d %.1f"):format(c.Name, pv.X, pv.Z, d))
+            end
+        end
+    end
+end
+if #folWarn > 0 then
+    report = report
+        .. ("\n  FOLIAGE IN THE CORRIDOR (%d) -- clear or accept per instance:\n"):format(#folWarn)
+        .. table.concat(folWarn, "\n")
+end
+
 if CONFIG.probeOnly then
     return report .. "\n  probeOnly -- nothing changed. Set probeOnly = false to build."
 end
