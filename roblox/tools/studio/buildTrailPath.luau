@@ -86,7 +86,10 @@ local PRESETS = {
     RiverPoolShore = {
         outModel = "RiverPoolShore",
         seed = 20260731,
-        seamAllow = { "RiverFallsSteps" },
+        -- SuspensionBridge: the high fireworks bridge crosses 36 studs OVERHEAD at
+        -- x -247 -- the probe's top-down raycast finds its deck before the ground,
+        -- but walking beneath it is a feature of this stretch, not an obstruction.
+        seamAllow = { "RiverFallsSteps", "SuspensionBridge" },
         control = {
             { -234.0, 175.0, 36.0 },
             { -246.0, 177.8, 36.0 },
@@ -96,7 +99,7 @@ local PRESETS = {
     },
 }
 
-local ACTIVE = "RiverFallsSteps"
+local ACTIVE = "RiverPoolShore"
 
 local CONFIG = {
     outModel = PRESETS[ACTIVE].outModel,
