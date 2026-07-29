@@ -206,7 +206,7 @@ local CONFIG = {
     stoneLibrary = "TrailStoneLibrary",
     stoneModels = { "Stone_A_LP", "Stone_B_LP", "Stone_C_LP", "Stone_D_LP", "Stone_E_LP" },
 
-    probeOnly = false,
+    probeOnly = true,
 }
 
 local Terrain = workspace.Terrain
