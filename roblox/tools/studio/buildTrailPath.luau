@@ -96,6 +96,11 @@ local PRESETS = {
         width = 1.5, -- single-file (user-gated narrower twice: 2.0 -> 1.5)
         matRadius = 2.9, -- must stay above 2.83 or the ribbon drops voxels
         stoneSpacing = 12.0,
+        -- as-built: stone 1 landed mid-flight between the fork logs; relocated by
+        -- hand to (-291.5, 178.8, 12.6) and omitted here so a rebuild does not
+        -- re-drop it in the steps (the hand-set copy is place-state, like all
+        -- hand dressing)
+        omitStones = { 1 },
         seamAllow = { "RiverPoolShore", "RiverCrossing" },
         -- Line v2 (user-relocated fork further EAST off the pool shore proper;
         -- the abutment start was rejected). The steep bite is a 6-stud shelf at
@@ -666,9 +671,16 @@ if #sources > 0 then
     rpTerrain.FilterDescendantsInstances = { Terrain }
 
     local sites = stoneSites(total, CONFIG.stone, CONFIG.seed)
+    local omitStones = {}
+    for _, i in ipairs(PRESETS[ACTIVE].omitStones or {}) do
+        omitStones[i] = true
+    end
     local state = (CONFIG.seed % 2147483646) + 1
     local r
     for i, site in ipairs(sites) do
+        if omitStones[i] then
+            continue
+        end
         local p, idx = at(tread, site.s)
         local f = fr[math.min(#fr, math.max(1, idx))]
         local x = p.x + f.rx * site.lateral
