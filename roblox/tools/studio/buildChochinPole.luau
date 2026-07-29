@@ -14,25 +14,35 @@ local CONFIG = {
     -- River path chapter 1: three composed lanterns rather than a rhythm — bottom south,
     -- middle north, top south, alternating up the flight (user-gated 2026-07-29). The
     -- contract part on an ishidan stair is Step_<i>, not Timber_<i>.
-    -- offset 3.4 stands them ON the tread, 0.6 inboard of the 8.0-wide bed's edge: the
-    -- south side has only 1.0 of clear ground between tread edge and the retaining wall
-    -- face at 5.0, and the north side would otherwise foul the bamboo rail at 4.0.
+    -- Offsets come from `standoff` (added to the bed's own half-width), not absolutes.
+    -- The two south poles take the network's 1.6 -> 5.6 on this 8.0-wide bed. The middle
+    -- one stands OUTSIDE the bamboo rail, which needs 2.0 -> 6.0: at 5.6 it clears the
+    -- rail by only 0.16 against its own 0.19 radius, so it would graze.
     path = "RiverSquareStair",
     timberPrefix = "Step",
     placements = {
-        { step = 2, side = "south", offset = 3.4 },
-        { step = 20, side = "north", offset = 3.4 },
-        { step = 39, side = "south", offset = 3.4 },
+        { step = 2, side = "south" },
+        { step = 20, side = "north", standoff = 2.0 },
+        { step = 39, side = "south" },
     },
     interval = 6, -- base timbers between poles (ignored when `placements` is set)
     posJitter = 0.35, -- ±fraction of a timber gap to stagger each pole along the path (~5-10% spacing)
     uphillOffset = 4.5, -- studs from the timber toward the cliff (uphill) edge
+    -- ⚠️ uphillOffset above is an ABSOLUTE and only correct for the network's 5.8-wide
+    -- beds, where it works out as half-width 2.9 + 1.6 of standoff. On a wider path it
+    -- silently pulls the lanterns inboard. `placements` uses STANDOFF instead, added to
+    -- each bed's measured half-width, which is width-independent.
     uphillSign = 1, -- which RightVector end is uphill/cliff: +1 PathSteps; -1 DescentPath (prefix "DescTimber")
     downhillFrac = 0.30, -- up to this FRACTION of the placed poles may sit on the DOWNHILL side, terrain permitting
     dhMaxDrop = 8, -- downhill pole placed only if terrain is within this many studs below the path
     seed = 20260629, -- deterministic stagger (same place each run)
     outModel = "PathLanterns", -- Workspace output model (poles go in a per-path sub-model under it)
 }
+
+-- The network's lantern standoff, measured OUTBOARD FROM THE TREAD EDGE rather than from
+-- the centreline: CONFIG.uphillOffset 4.5 minus a 5.8-wide bed's 2.9 half-width. Stated
+-- this way it holds on any path width; stated as 4.5 it silently fails on wider ones.
+local STANDOFF = 1.6
 
 -- ===== locked colours / materials =====
 local WOOD = Color3.fromRGB(70, 55, 32) -- dark bamboo post/arm/brace
@@ -323,9 +333,25 @@ if CONFIG.placements then
             local r = t.CFrame.RightVector
             local north = Vector3.new(r.X, 0, r.Z).Unit
             local dir = spec.side == "north" and north or -north
-            local base = t.Position + dir * spec.offset
+            -- Offset is derived from the bed's OWN half-width plus a standoff, never
+            -- hardcoded. CONFIG.uphillOffset of 4.5 is really 2.9 + 1.6 -- a 5.8-wide
+            -- bed's half-width plus the network standoff -- so reusing 4.5 on a wider
+            -- path silently moves the lanterns inboard. On this 8.0-wide stair it would
+            -- put them 0.5 outboard instead of 1.6, which is how they ended up standing
+            -- on the treads. Local X is cross-stream by the Step_ contract.
+            local halfW = t.Size.X / 2
+            local off = spec.offset or (halfW + (spec.standoff or STANDOFF))
+            local base = t.Position + dir * off
+            -- foot it on the ground it actually stands on, not at the bed's height
+            local hit =
+                workspace:Raycast(base + Vector3.new(0, 6, 0), Vector3.new(0, -(CONFIG.dhMaxDrop + 6), 0), rp)
+            local footNote = ""
+            if hit then
+                base = Vector3.new(base.X, hit.Position.Y, base.Z)
+                footNote = (", footed %+.1f vs bed"):format(hit.Position.Y - t.Position.Y)
+            end
             buildOne(parent, ("ChochinPole_%d_%s"):format(spec.step, spec.side), base, dir)
-            table.insert(placed, ("step %d %s at %.1f"):format(spec.step, spec.side, spec.offset))
+            table.insert(placed, ("step %d %s at %.1f%s"):format(spec.step, spec.side, off, footNote))
         end
     end
     return ("placed %d chochin on %s (explicit): %s"):format(
