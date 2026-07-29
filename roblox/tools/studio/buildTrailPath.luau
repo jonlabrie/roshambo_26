@@ -141,8 +141,11 @@ local PRESETS = {
             proud = 0.3,
             logDiameter = 1.0,
             stakes = true,
-            -- arc windows (studs from the east end); total arc ~99
-            ranges = { { 0, 11 }, { 88, 100 } },
+            -- arc windows (studs from the east end); total arc ~99. The final
+            -- approach to NW80FallsStair took 2 logs and lost them (user-gated):
+            -- the falls stair is stonework and its own arrival, so trailwork
+            -- stopping short of it reads better than stepping up to it.
+            ranges = { { 0, 11 } },
         },
     },
     RiverPoolShore = {
