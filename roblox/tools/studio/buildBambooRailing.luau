@@ -65,6 +65,17 @@ local RUNS = {
     -- -Right holds NWFallsWall). Continuous runs; the BenchLanding's open canyon edge = the T07 access.
     { name = "NW40Descent", paths = { { path = "NW40Descent", i0 = 1, i1 = 17 } }, edgeSign = -1 },
     { name = "NW80FallsStair", paths = { { path = "NW80FallsStair", i0 = 1, i1 = 76 } }, edgeSign = 1 },
+    -- River path chapter 1: the Square stairway. Wider than the rest of the network
+    -- (bed 8.0, not 5.8), so hw = 4.0 rather than the 3.0 default -- otherwise the rail
+    -- floats a stud inboard of the tread edge. +Right is NORTH here, which is the side
+    -- the ground falls away on (-1.5 to -2.5 below tread); the -Right south side is the
+    -- cut bank (+4.2 to +8.2 above) and takes the timber retaining wall, not a rail.
+    {
+        name = "RiverSquareStair",
+        paths = { { path = "RiverSquareStair", i0 = 0, i1 = 41 } },
+        edgeSign = 1,
+        hw = 4.0,
+    },
     -- Far-Wall flat-shelf promenades (buildFlatShelfPath.luau): near-level curved shelves whose short
     -- ~6-stud treads swing the RightVector fast through the bend. The v2.1 Laplacian relax BOWS the
     -- line off that curve and floats posts over the drop, so these use noRelax (line runs straight
@@ -229,7 +240,12 @@ local function buildOne(run): string
     local firstT: BasePart?, lastT: BasePart? = nil, nil
     for _, seg in run.paths do
         local model = pathsRoot:FindFirstChild(seg.path) or ws:FindFirstChild(seg.path)
-        assert(model, "missing path model " .. seg.path)
+        -- Skip, do not assert. RUNS is a growing ledger of every railed stretch, and a
+        -- model that has been renamed or retired (NW1211Path, 2026-07-29) would otherwise
+        -- abort the whole deploy and silently drop every run listed after it.
+        if not model then
+            return ("%s: SKIPPED — path model %q is not in this place"):format(run.name, seg.path)
+        end
         for i = seg.i0, seg.i1 do
             local t = model:FindFirstChild("Step_" .. i) :: BasePart?
             if t then
