@@ -30,7 +30,12 @@ export type Bridge = {
 local RiverPathChapters = {}
 
 -- The build stops here; NW80FallsStair (centre x -392) carries the falls headwall.
-RiverPathChapters.WEST_TERMINUS = -377
+RiverPathChapters.WEST_TERMINUS = -376.9
+
+-- Every chapter is a stair. The route starts at the Square's western edge and climbs
+-- 93 studs to the falls; there is no level ground on it worth a flat-shelf layout. The
+-- flat/stair machinery below is kept because the threshold is what proves that claim,
+-- and because a future re-route could introduce a terrace.
 
 -- THE FLAT/STAIR CROSSOVER IS 0.10, NOT CanyonPath.STEP_GRADE (0.27).
 --
@@ -60,22 +65,16 @@ local BRIDGES: { Bridge } = {
 
 local CHAPTERS: { Chapter } = {
     {
-        name = "Square terrace",
-        kind = "flat",
-        outModel = "RiverTerracePath",
-        control = {
-            { 60.0, 111.8, -8.0 },
-            { 0.0, 114.0, -8.0 },
-            { -56.3, 116.8, 16.6 },
-        },
-    },
-    {
-        -- 23.1 studs of rise in 27.9 of run. The threshold out of the Square.
-        name = "First riser",
+        -- The stairway out of the Square, over the hill that is the primary obstacle to
+        -- entering the western canyon. Grade 0.75 against NW1012South's proven 0.77, so
+        -- this is squarely the case the ishidan builder exists for. Tread works out at
+        -- 0.81, leaving 0.18 of usable flag depth -- under flagMinDepth 0.4 -- so it
+        -- carries NO flagstones and reads timber-dominant, exactly like NW1012South.
+        name = "Square stair",
         kind = "stair",
-        outModel = "RiverFirstRiser",
+        outModel = "RiverSquareStair",
         control = {
-            { -56.3, 116.8, 16.6 },
+            { -51.9, 115.6, 16.5 },
             { -83.8, 139.9, 11.8 },
         },
     },

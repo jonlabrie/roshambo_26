@@ -2,7 +2,7 @@
 -- dressed as "worn dark timber backed by worn flagstone" (user-locked 2026-07-02).
 -- MIRROR of tools/builders/IshidanStairs.luau (Lune-tested) — keep in sync.
 -- Run in Studio (command bar / MCP execute_luau, Edit datamodel). Idempotent:
--- destroys and rebuilds Workspace.<CONFIG.outModel>.
+-- destroys and rebuilds Workspace.CanyonWorld.Paths.<CONFIG.outModel>.
 --
 -- Emits per step: Riser_<i>[a|b] worn-timber beam Parts (top = tread),
 -- Step_<i> fine-gravel bed Part (the downstream contract for ishigaki/railing/
@@ -11,22 +11,56 @@
 -- EditableMesh chunks of <= CONFIG.chunkSteps steps (Studio triangle limit).
 -- Flags are CanCollide false — players walk on beds/risers.
 -- Spec: docs/superpowers/specs/2026-07-01-zendojo-nw1012-ishidan-stairway-design.md
-local CONFIG = {
-    outModel = "FarWall5063Path",
-    -- BAKED {x,y,z} centerline control points, FOOT FIRST (survey once, bake,
-    -- never read draft markers at build time). FarWall shelf promenade along the
-    -- North face: FarWall_50 (foot) -> FarWall_62 -> FarWall_63 (head/landing).
-    -- Y = smoothed monotonic carve floor (terrain is carved TO this stair).
-    control = {
-        { -82.4, 178.0, -72.4 }, -- FarWall_50 foot
-        { -116.5, 180.4, -79.7 }, -- FarWall_62
-        { -151.5, 182.0, -75.0 }, -- FarWall_63 head/landing (moved S 2026-07-09 for the landing turn)
+-- Each entry is one buildable stretch: BAKED {x,y,z} centerline control points, FOOT
+-- FIRST (survey once, bake, never read draft markers at build time). Y = smoothed
+-- monotonic carve floor (terrain is carved TO this stair, not the stair to the terrain).
+-- Set ACTIVE and run. Keeping them all here means every built stretch stays reproducible
+-- from the committed file, instead of only whichever was built last.
+local PRESETS = {
+    -- FarWall shelf promenade along the North face: FarWall_50 (foot) -> _62 -> _63.
+    FarWall5063Path = {
+        outModel = "FarWall5063Path",
+        control = {
+            { -82.4, 178.0, -72.4 }, -- FarWall_50 foot
+            { -116.5, 180.4, -79.7 }, -- FarWall_62
+            { -151.5, 182.0, -75.0 }, -- FarWall_63 head/landing (moved S 2026-07-09 for the landing turn)
+        },
+        footY = 178.0,
+        headY = 182.0,
+        landings = {}, -- gentle single flight; head landing deck built separately
+        seed = 20260709,
     },
-    footY = 178.0,
-    headY = 182.0,
+
+    -- The stairway out of the Square, over the hill guarding the western canyon.
+    -- MIRRORS tools/builders/RiverPathChapters.luau chapter 1 -- keep in sync.
+    -- foot/head are GROUND at the markers, not the marker centres: the draft balls are
+    -- 4 studs across, so a ball resting on the surface reads 2 studs high.
+    -- Grade 0.75 (NW1012South is 0.77). Tread lands at 0.81, leaving 0.18 of usable flag
+    -- depth against flagMinDepth 0.4 -- so this stretch carries NO flagstones and reads
+    -- timber-dominant, exactly like NW1012South.
+    RiverSquareStair = {
+        outModel = "RiverSquareStair",
+        control = {
+            { -51.9, 113.6, 16.5 }, -- River_03, foot, at the Square's western edge
+            { -83.8, 137.3, 11.8 }, -- River_04, head, atop the hill
+        },
+        footY = 113.6,
+        headY = 137.3,
+        landings = {}, -- one continuous flight; the hill is the event
+        seed = 20260729,
+    },
+}
+
+local ACTIVE = "RiverSquareStair"
+
+local CONFIG = {
+    outModel = PRESETS[ACTIVE].outModel,
+    control = PRESETS[ACTIVE].control,
+    footY = PRESETS[ACTIVE].footY,
+    headY = PRESETS[ACTIVE].headY,
     riserTarget = 0.6,
-    landings = {}, -- gentle single flight; head landing deck built separately
-    seed = 20260709,
+    landings = PRESETS[ACTIVE].landings,
+    seed = PRESETS[ACTIVE].seed,
     buildRange = nil, -- {i0, i1} step indices; nil = all
     resampleSpacing = 2.0,
     -- publish a flag mesh every N FLAGS (NOT steps: deep treads pack 8-14 flags each and a
@@ -383,13 +417,18 @@ local AssetService = game:GetService("AssetService")
 
 assert(#CONFIG.control >= 2, "CONFIG.control is empty — paste a baked centerline first")
 
-local old = workspace:FindFirstChild(CONFIG.outModel)
+-- Parent under CanyonWorld.Paths, NEVER Workspace root -- the sweep convention
+-- (spec 2026-07-08-roblox-workspace-organization). buildFlatShelfPath has always done
+-- this; this builder predated the reorg and was still dropping models at the root, where
+-- verifyWorkspaceConvention would fail them at publish time.
+local paths = workspace.CanyonWorld.Paths
+local old = paths:FindFirstChild(CONFIG.outModel)
 if old then
     old:Destroy()
 end
 local model = Instance.new("Model")
 model.Name = CONFIG.outModel
-model.Parent = workspace
+model.Parent = paths
 
 local polyline = resample(CONFIG.control, CONFIG.resampleSpacing)
 local layoutR = layout(polyline, {

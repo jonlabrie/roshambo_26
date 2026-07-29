@@ -4,8 +4,8 @@ local RiverPathChapters = require("../tools/builders/RiverPathChapters")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 
 describe("RiverPathChapters.CHAPTERS", function()
-    test("has four chapters: one terrace and three climbs", function()
-        expect(#RiverPathChapters.CHAPTERS).toBe(4)
+    test("has three chapters, all of them climbs", function()
+        expect(#RiverPathChapters.CHAPTERS).toBe(3)
         local flat, stair = 0, 0
         for _, c in RiverPathChapters.CHAPTERS do
             if c.kind == "flat" then
@@ -14,8 +14,21 @@ describe("RiverPathChapters.CHAPTERS", function()
                 stair += 1
             end
         end
-        expect(flat).toBe(1)
+        expect(flat).toBe(0)
         expect(stair).toBe(3)
+    end)
+
+    test("the route starts at the Square's western edge", function()
+        local first = RiverPathChapters.CHAPTERS[1]
+        expect(first.outModel).toBe("RiverSquareStair")
+        expect(first.control[1][1]).toBeCloseTo(-51.9, 1.0)
+    end)
+
+    test("the Square stair matches NW1012South's proven grade", function()
+        local c = RiverPathChapters.CHAPTERS[1].control
+        local g = RiverPathChapters.grade(c[1], c[#c])
+        -- NW1012South, built and walked, runs at 0.77
+        expect(g).toBeCloseTo(0.77, 0.08)
     end)
 
     test("every chapter has at least two control points", function()
@@ -127,9 +140,9 @@ describe("RiverPathChapters.BRIDGES", function()
 
     test("its abutments join Mid climb to Upper climb", function()
         local list = RiverPathChapters.CHAPTERS
-        local midControl = list[3].control
+        local midControl = list[2].control
         local midEnd = midControl[#midControl]
-        local upperStart = list[4].control[1]
+        local upperStart = list[3].control[1]
         local br = RiverPathChapters.bridgeBetween(midEnd, upperStart)
         expect(br).toBeTruthy()
         expect((br :: any).name).toBe("RiverCrossing")
