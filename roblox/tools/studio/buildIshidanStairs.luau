@@ -35,19 +35,25 @@ local PRESETS = {
     -- MIRRORS tools/builders/RiverPathChapters.luau chapter 1 -- keep in sync.
     -- foot/head are GROUND at the markers, not the marker centres: the draft balls are
     -- 4 studs across, so a ball resting on the surface reads 2 studs high.
-    -- Grade 0.75 (NW1012South is 0.77). Tread lands at 0.81, leaving 0.18 of usable flag
-    -- depth against flagMinDepth 0.4 -- so this stretch carries NO flagstones and reads
-    -- timber-dominant, exactly like NW1012South.
+    --
+    -- Grade 0.551 over 45.9 of run (user re-drew it gentler on 2026-07-29). Tread lands
+    -- at 1.09, leaving 0.46 of usable flag depth -- clear of flagMinDepth 0.4 -- so this
+    -- flight SHOWS its flagstone field, unlike NW1012South which is too steep for them.
+    -- 2R+T is 2.29, above the 2.0-2.1 target; the locked riserTarget 0.6 is kept because
+    -- pulling comfort back to 2.05 needs 0.54, which drops the tread under 1.0 and loses
+    -- the flags. WIDER than the rest of the network at the user's request: bed 5.8 -> 8.0
+    -- and the other widths scaled on the same ratios.
     RiverSquareStair = {
         outModel = "RiverSquareStair",
         control = {
-            { -51.9, 113.6, 16.5 }, -- River_03, foot, at the Square's western edge
-            { -83.8, 137.3, 11.8 }, -- River_04, head, atop the hill
+            { -44.0, 114.6, 30.4 }, -- River_03, foot, at the Square's western edge
+            { -89.8, 139.9, 27.9 }, -- River_04, head, atop the hill
         },
-        footY = 113.6,
-        headY = 137.3,
+        footY = 114.6,
+        headY = 139.9,
         landings = {}, -- one continuous flight; the hill is the event
         seed = 20260729,
+        widths = { riserWidth = 8.8, bedW = 8.0, flagHW = 3.7 },
     },
 }
 
@@ -66,13 +72,17 @@ local CONFIG = {
     -- publish a flag mesh every N FLAGS (NOT steps: deep treads pack 8-14 flags each and a
     -- step-count chunk blows Studio's triangle limit — bit us twice on 2026-07-02)
     chunkFlags = 40,
-    -- style constants (the locked recipe — change only with a user gate):
-    riserWidth = 6.4,
+    -- style constants (the locked recipe — change only with a user gate).
+    -- A preset may override the three WIDTHS via `widths = { ... }`; everything else is
+    -- fixed. RiverSquareStair is wider than the rest of the network at the user's
+    -- request (2026-07-29), scaled on the built ratios: bed 5.8 -> 8.0, riser 6.4 -> 8.8
+    -- (bed x 1.103), flag half-width 2.7 -> 3.7 (bed x 0.466).
+    riserWidth = (PRESETS[ACTIVE].widths and PRESETS[ACTIVE].widths.riserWidth) or 6.4,
     riserDepth = 0.45,
     splitFrac = 0.35,
-    flagHW = 2.7,
+    flagHW = (PRESETS[ACTIVE].widths and PRESETS[ACTIVE].widths.flagHW) or 2.7,
     flagMinDepth = 0.4,
-    bedW = 5.8,
+    bedW = (PRESETS[ACTIVE].widths and PRESETS[ACTIVE].widths.bedW) or 5.8,
     bedH = 1.2,
     bedVariant = "ZenGravel1", -- fine decomposed-granite gravel (StudsPerTile 4)
     bedColor = Color3.fromRGB(150, 146, 138),

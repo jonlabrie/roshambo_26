@@ -66,16 +66,24 @@ local BRIDGES: { Bridge } = {
 local CHAPTERS: { Chapter } = {
     {
         -- The stairway out of the Square, over the hill that is the primary obstacle to
-        -- entering the western canyon. Grade 0.75 against NW1012South's proven 0.77, so
-        -- this is squarely the case the ishidan builder exists for. Tread works out at
-        -- 0.81, leaving 0.18 of usable flag depth -- under flagMinDepth 0.4 -- so it
-        -- carries NO flagstones and reads timber-dominant, exactly like NW1012South.
+        -- entering the western canyon. The user re-drew it gentler and wider on
+        -- 2026-07-29: grade 0.551 over 45.9 of run, against a first attempt at 0.75.
+        --
+        -- Tread lands at 1.09, leaving 0.46 of usable flag depth -- clear of
+        -- flagMinDepth 0.4 -- so unlike NW1012South this flight SHOWS its flagstone
+        -- field. 2R+T is 2.29, above the 2.0-2.1 comfort target; pulling it back would
+        -- need riserTarget 0.54, which drops the tread under 1.0 and loses the flagstones
+        -- again. Locked riserTarget 0.6 kept and the trade accepted (user-gated).
+        --
+        -- The hill sits SOUTH of the run (up to 15.8 studs of bank at 12 studs out) and
+        -- the ground falls away NORTH (up to 6.9). Widening cuts into the south bank,
+        -- which takes a timber retaining wall; the north edge is open and takes the rail.
         name = "Square stair",
         kind = "stair",
         outModel = "RiverSquareStair",
         control = {
-            { -51.9, 115.6, 16.5 },
-            { -83.8, 139.9, 11.8 },
+            { -44.0, 114.6, 30.4 },
+            { -89.8, 139.9, 27.9 },
         },
     },
     {
@@ -85,7 +93,7 @@ local CHAPTERS: { Chapter } = {
         kind = "stair",
         outModel = "RiverMidClimb",
         control = {
-            { -83.8, 139.9, 11.8 },
+            { -89.8, 139.9, 27.9 },
             { -144.2, 155.7, 8.3 },
             { -179.6, 160.1, 11.7 },
             { -222.9, 174.4, 32.8 },

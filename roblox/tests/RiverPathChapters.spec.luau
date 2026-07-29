@@ -21,14 +21,27 @@ describe("RiverPathChapters.CHAPTERS", function()
     test("the route starts at the Square's western edge", function()
         local first = RiverPathChapters.CHAPTERS[1]
         expect(first.outModel).toBe("RiverSquareStair")
-        expect(first.control[1][1]).toBeCloseTo(-51.9, 1.0)
+        expect(first.control[1][1]).toBeCloseTo(-44.0, 1.0)
     end)
 
-    test("the Square stair matches NW1012South's proven grade", function()
+    test("the Square stair is a climbable stair, not a cliff or a ramp", function()
         local c = RiverPathChapters.CHAPTERS[1].control
         local g = RiverPathChapters.grade(c[1], c[#c])
-        -- NW1012South, built and walked, runs at 0.77
-        expect(g).toBeCloseTo(0.77, 0.08)
+        -- Steeper than the flat-shelf crossover, gentler than NW1012South's proven 0.77.
+        expect(g > RiverPathChapters.FLAT_MAX_GRADE).toBe(true)
+        expect(g < 0.77).toBe(true)
+    end)
+
+    test("the Square stair is gentle enough to carry flagstones", function()
+        -- At riserTarget 0.6 the tread is run/steps; flags need pitch - 0.55 - 0.08
+        -- to clear flagMinDepth 0.4. This is what distinguishes it from NW1012South,
+        -- which is too steep and carries none.
+        local c = RiverPathChapters.CHAPTERS[1].control
+        local run = math.sqrt((c[2][1] - c[1][1]) ^ 2 + (c[2][3] - c[1][3]) ^ 2)
+        local rise = c[2][2] - c[1][2]
+        local steps = math.floor(rise / 0.6)
+        local usable = run / steps - 0.63
+        expect(usable > 0.4).toBe(true)
     end)
 
     test("every chapter has at least two control points", function()
