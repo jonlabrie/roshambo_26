@@ -45,8 +45,10 @@ local CONFIG = {
             --   proudTop 0.30 (not the locked 1.3) -- the tall post tops were the main
             --     complaint. If this reads better elsewhere the LOCKED value wants
             --     revisiting rather than every wall overriding it.
-            --   extraCourses -- the probe reads the cut at each bay's midpoint, and these
-            --     three came out a course shy of the bank behind them.
+            --   extraCourses -- the probe reads the cut at each bay's MIDPOINT, so where
+            --     the bank changes sharply between bays the wall top comes out lumpy.
+            --     Bays 1-3 read 4/3/4 courses against bays 4-5's 7/6; +2 each brings the
+            --     lower half up to 6/5/6 and evens the run (user-gated 2026-07-29).
             model = "RiverSquareStair",
             first = 5,
             last = 32,
@@ -55,7 +57,7 @@ local CONFIG = {
             cap = 10,
             seed = 20260729,
             proudTop = 0.30,
-            extraCourses = { [1] = 1, [3] = 1, [4] = 1 },
+            extraCourses = { [1] = 3, [2] = 2, [3] = 3, [4] = 1 },
         },
     },
     -- locked style:
