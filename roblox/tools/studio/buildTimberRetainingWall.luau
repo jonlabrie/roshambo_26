@@ -32,6 +32,20 @@ local CONFIG = {
             cap = 11,
             seed = 20260709,
         },
+        {
+            -- River path chapter 1: the Square stairway's SOUTH cut face. +Right is north
+            -- here (the drop side, which carries the bamboo rail), so the cut bank is
+            -- -Right. The bed is 8.0 wide rather than the network's 5.8, and the measured
+            -- face rises between +4 and +6 from the centreline, so offset 5.0 stands the
+            -- wall at the face with a 1.0 standoff off the built tread edge.
+            model = "RiverSquareStair",
+            first = 0,
+            last = 41,
+            edgeSign = -1,
+            offset = 5.0,
+            cap = 10,
+            seed = 20260729,
+        },
     },
     -- locked style:
     boardH = 0.71,
