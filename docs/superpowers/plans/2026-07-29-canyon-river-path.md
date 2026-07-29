@@ -8,6 +8,66 @@
 
 **Tech Stack:** Luau; Lune for headless tests; Rojo for the repo↔Studio sync of `src/`; Roblox Studio MCP (`execute_luau`, Edit datamodel) for all world building; stylua + selene for CI.
 
+## Revision 2026-07-29 — after the user's line was baked (Tasks 1–3 complete, `cc4b70d`)
+
+The dragged route differs enough from the surveyed profile to change the structure. **Tasks 4–9 below are superseded by this revision; their steps still apply, but the chapter list and kinds are as follows.**
+
+**Three corrections came out of baking the real line:**
+
+1. **The flat/stair threshold was wrong.** This plan classified chapters with `CanyonPath.STEP_GRADE` (0.27). That constant answers "steps or ramp" for a different builder. The crossover that matters is set by our own locked recipe: `buildFlatShelfPath` lays uniform treads at `treadTarget = 6.0`, so grade **0.10** already produces the 0.6-stud rise `buildIshidanStairs` targets. Above it a flat-shelf tread becomes a riser taller than the recipe allows — at the route's 0.26 stretch, a 19-inch step. The only flat-shelf path ever built (`FarWallBridge2Path`) runs at 0.077. `RiverPathChapters.FLAT_MAX_GRADE = 0.10` now carries this.
+2. **By the honest threshold only the Square terrace is flat.** Five chapters become **four**: one terrace and three climbs.
+3. **The route crosses the river.** The user placed a crossing between Mid climb and Upper climb — 23.3 studs bank to bank, water under the middle half, Slate abutments. Bridges were listed out of scope; a bridge task is added.
+
+| # | chapter | x span | mean grade | build |
+| --- | --- | --- | --- | --- |
+| 1 | Square terrace | +60 … −56.3 | 0.04 | `buildFlatShelfPath` |
+| 2 | First riser | −56.3 … −83.8 | 0.83 | `buildIshidanStairs` |
+| 3 | Mid climb | −83.8 … −291.7 | 0.19 | `buildIshidanStairs`, landings incl. the bench |
+| — | **RiverCrossing** | −291.7 … −297.9 | — | `buildBridge` (**new task, was out of scope**) |
+| 4 | Upper climb | −297.9 … −376.9 | 0.27 | `buildIshidanStairs` |
+
+**The bench is now a landing, not a chapter.** Mid climb's last segment (x −259 → −292) is dead level at grade −0.003 — the natural flat survived the re-route, inside a chapter rather than as one. A landing on a stair *is* a rest and a vantage, and `{ frac, len }` gives it natively. The seat rock and eastward view move there.
+
+**Task mapping:** old Task 4 → chapter 1. Old Task 5 → chapter 2 (still carries the `PRESETS` refactor and the Workspace-root parenting fix). Old Task 6 → chapter 3, now x −83.8 … −291.7 with landings at its gentler pitches and at the bench. **Old Task 7 (bench shelf) is replaced by the bridge task below.** Old Task 8 → chapter 4.
+
+### Task 7′ (replaces Task 7): the river crossing
+
+**Files:** Modify `roblox/tools/studio/buildBridge.luau` (`BRIDGES` list).
+
+**Interfaces:** Consumes `RiverPathChapters.BRIDGES[1]` — `a = { -291.7, 181.1, 10.8 }` (east abutment, end of Mid climb), `b = { -297.9, 182.3, -11.6 }` (west abutment, start of Upper climb). Produces `Bridges.RiverCrossing`.
+
+- [ ] **Step 1:** Add a `BRIDGES` entry with those baked A/B endpoints, `width` matching the path's `bedW` of 5.8 so the crossing reads continuous with the treads either side, and a `rise` chosen against the 23.3-stud span — recipe §7 governs the taiko-bashi profile; read it before picking a value rather than guessing an arch.
+- [ ] **Step 2:** Run `buildBridge.luau` in Edit, then verify the abutments actually meet the chapters:
+
+```luau
+local b = workspace:FindFirstChild("Bridges")
+b = b and b:FindFirstChild("RiverCrossing")
+if not b then return "MISSING Bridges.RiverCrossing" end
+local mid = workspace.CanyonWorld.Paths:FindFirstChild("RiverMidClimb")
+local up = workspace.CanyonWorld.Paths:FindFirstChild("RiverUpperClimb")
+local function westmostBed(m)
+    local best, p = 1e9, nil
+    for _, c in ipairs(m and m:GetChildren() or {}) do
+        if c.Name:match("^Step_") and c.Position.X < best then best, p = c.Position.X, c.Position end
+    end
+    return p
+end
+local function eastmostBed(m)
+    local best, p = -1e9, nil
+    for _, c in ipairs(m and m:GetChildren() or {}) do
+        if c.Name:match("^Step_") and c.Position.X > best then best, p = c.Position.X, c.Position end
+    end
+    return p
+end
+local cf, size = b:GetBoundingBox()
+return ("bridge span %.1f x %.1f  midWest %s  upperEast %s"):format(
+    size.X, size.Z, tostring(westmostBed(mid)), tostring(eastmostBed(up)))
+```
+
+- [ ] **Step 3: USER GATE — walk the crossing.** **STOP.**
+
+---
+
 ## Global Constraints
 
 - **Place-only.** Paths, walls, railings and lanterns are ad-hoc `Workspace` content persisted by the saved place, **not** by Rojo (recipe §0.5). Ship by publishing/saving the place, **never `rojo build`** — CI fails if a `.rbxl(x)` is committed.
