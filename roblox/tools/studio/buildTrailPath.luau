@@ -69,7 +69,7 @@ local CONFIG = {
     seed = PRESETS[ACTIVE].seed,
     seamAllow = PRESETS[ACTIVE].seamAllow or {},
 
-    width = 7.0, -- the tread; narrower than the 8.0 Square stair, wider than the 5.8 network
+    width = 3.5, -- the tread: a footpath, HALF the first attempt's 7.0 (user-gated)
     spacing = 2.0, -- resample step
     smoothRadius = 3, -- +/- 3 samples = +/- 6 studs of benching window
 
@@ -77,6 +77,13 @@ local CONFIG = {
     fillDepth = 5, -- how far below the tread to fill
     shoulder = 3.0, -- blend width from the tread edge back to the existing hillside
     treadMaterial = Enum.Material.Ground,
+    -- The dirt ribbon is painted from its OWN radius, decoupled from the occupancy
+    -- corridor. Painting only inside halfW left gaps: voxel centres sit up to
+    -- half a diagonal (2.83) off the line, so any band under that drops voxels and
+    -- the ribbon breaks up -- and Slate showed through at anchors where the surface
+    -- rendered from a cell below the painted window. 3.2 covers every nearest
+    -- voxel; the top two occupied cells of each in-band column get painted.
+    matRadius = 3.2,
 
     anchorSpacing = 3.0, -- Step_<i> anchors, for the dressing builders
 
@@ -89,9 +96,14 @@ local CONFIG = {
         sinkMin = 0.35,
         sinkMax = 0.65,
     },
-    -- small, flat-ish entries from ServerStorage.RockLibrary (2.5 - 5.4 studs before
-    -- scaling). The big slabs read as boulders, not as trail stones.
-    stoneModels = { "Rock_03", "Rock_05", "Rock_08", "Rock_10", "Rock_11", "Rock_19" },
+    -- ServerStorage.TrailStoneLibrary: the Moss Kit's five Stone_?_LP meshes,
+    -- normalized to 2.8 - 4.5 studs, carrying their own SurfaceAppearance
+    -- (Color 114668285678660 / Normal 120822971297448 / Roughness 124428479825701).
+    -- The first attempt used bare RockLibrary meshes and they read as plastic
+    -- (Material=Plastic + a baked washed-out TextureID). Clones inherit the
+    -- SurfaceAppearance, so the builder applies NO material overrides here.
+    stoneLibrary = "TrailStoneLibrary",
+    stoneModels = { "Stone_A_LP", "Stone_B_LP", "Stone_C_LP", "Stone_D_LP", "Stone_E_LP" },
 
     probeOnly = true,
 }
@@ -409,42 +421,56 @@ for cx = 1, size.X do
         local wx = origin.X + (cx - 0.5) * 4
         local wz = origin.Z + (cz - 0.5) * 4
         local dist, treadY = nearestTread(wx, wz)
-        if dist <= halfW + shoulder and treadY then
-            local target
-            if dist <= halfW then
-                target = treadY
-            else
-                -- smoothstep back to the existing surface across the shoulder
-                local t = (dist - halfW) / shoulder
-                t = t * t * (3 - 2 * t)
-                target = treadY + (columnSurface(cx, cz) - treadY) * t
-            end
-            local isTread = dist <= halfW
-            for cy = 1, size.Y do
-                local bottom = origin.Y + (cy - 1) * 4
-                -- SURFACE_K compensates smooth terrain's "puffiness": the mesher
-                -- renders the isosurface ~half a voxel ABOVE the linear occupancy
-                -- line (measured dead uniform at +1.88 across 44 anchors). Applied
-                -- to the WHOLE column, not just the surface cell, so the two cells
-                -- straddling the target share the shift and any target height stays
-                -- reachable.
-                local SURFACE_K = 0.47
-                local frac = math.clamp((target - bottom) / 4 - SURFACE_K, 0, 1)
-                local above = bottom + 4 > treadY + CONFIG.cutHeight
-                local below = bottom < treadY - CONFIG.fillDepth
-                if not above and not below then
-                    occupancies[cx][cy][cz] = frac
-                    if frac > 0 then
-                        -- the walking surface (and the voxel under it), or newly
-                        -- filled ground below a shoulder blend
-                        if
-                            (isTread and target - bottom <= 6)
-                            or materials[cx][cy][cz] == Enum.Material.Air
-                        then
-                            materials[cx][cy][cz] = CONFIG.treadMaterial
+        local reach = math.max(halfW + shoulder, CONFIG.matRadius)
+        if dist <= reach and treadY then
+            -- occupancy: only inside the bench corridor
+            if dist <= halfW + shoulder then
+                local target
+                if dist <= halfW then
+                    target = treadY
+                else
+                    -- smoothstep back to the existing surface across the shoulder
+                    local t = (dist - halfW) / shoulder
+                    t = t * t * (3 - 2 * t)
+                    target = treadY + (columnSurface(cx, cz) - treadY) * t
+                end
+                for cy = 1, size.Y do
+                    local bottom = origin.Y + (cy - 1) * 4
+                    -- SURFACE_K compensates smooth terrain's "puffiness": the mesher
+                    -- renders the isosurface ~half a voxel ABOVE the linear
+                    -- occupancy line (measured dead uniform at +1.88 across 44
+                    -- anchors). Applied to the WHOLE column, not just the surface
+                    -- cell, so the two cells straddling the target share the shift
+                    -- and any target height stays reachable.
+                    local SURFACE_K = 0.47
+                    local frac = math.clamp((target - bottom) / 4 - SURFACE_K, 0, 1)
+                    local above = bottom + 4 > treadY + CONFIG.cutHeight
+                    local below = bottom < treadY - CONFIG.fillDepth
+                    if not above and not below then
+                        occupancies[cx][cy][cz] = frac
+                        if frac > 0 then
+                            if materials[cx][cy][cz] == Enum.Material.Air then
+                                -- newly filled ground
+                                materials[cx][cy][cz] = CONFIG.treadMaterial
+                            end
+                        else
+                            materials[cx][cy][cz] = Enum.Material.Air
                         end
-                    else
-                        materials[cx][cy][cz] = Enum.Material.Air
+                    end
+                end
+            end
+            -- the dirt ribbon: paint the top TWO occupied cells of every in-band
+            -- column, AFTER the occupancy pass so the painted cells are the ones
+            -- that actually render
+            if dist <= CONFIG.matRadius then
+                local painted = 0
+                for cy = size.Y, 1, -1 do
+                    if occupancies[cx][cy][cz] > 0.05 then
+                        materials[cx][cy][cz] = CONFIG.treadMaterial
+                        painted += 1
+                        if painted >= 2 then
+                            break
+                        end
                     end
                 end
             end
@@ -488,7 +514,7 @@ for k = 0, nAnchor do
     anchors += 1
 end
 
-local lib = SS:FindFirstChild("RockLibrary")
+local lib = SS:FindFirstChild(CONFIG.stoneLibrary)
 local sources = {}
 if lib then
     for _, name in ipairs(CONFIG.stoneModels) do
