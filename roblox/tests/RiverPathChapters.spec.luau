@@ -17,8 +17,8 @@ describe("RiverPathChapters.CHAPTERS", function()
             end
         end
         expect(flat).toBe(0)
-        expect(trail).toBe(2)
-        expect(stair).toBe(3)
+        expect(trail).toBe(3)
+        expect(stair).toBe(2)
     end)
 
     test("the route starts at the Square's western edge", function()

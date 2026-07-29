@@ -49,10 +49,12 @@ RiverPathChapters.WEST_TERMINUS = -376.9
 RiverPathChapters.FLAT_MAX_GRADE = 0.10
 
 -- A benched earth-and-gravel tread will not hold much past 1:3, and a walking surface of
--- loose material becomes unpleasant well before its angle of repose. 0.32 is also where
--- this particular route separates: the traverse tops out at 0.310 and the falls climb
--- starts at 0.339, with nothing in between.
-RiverPathChapters.TRAIL_MAX_GRADE = 0.32
+-- loose material becomes unpleasant well before its angle of repose. Originally 0.32 --
+-- where the Mid climb separates (traverse 0.310, falls climb 0.339) -- raised to 0.34
+-- when the Upper climb re-registered as a trail (user-gated): its sustained middle
+-- measures 0.331, and the wild west end earns the steeper game-trail tread over more
+-- construction. Anything past this is a stepped pitch, not a trail.
+RiverPathChapters.TRAIL_MAX_GRADE = 0.34
 
 -- Trails undulate; the descent check exists to catch a marker dragged BELOW its eastern
 -- neighbour by mistake, not to forbid a dip. The pool shore genuinely loses 0.6 studs
@@ -152,13 +154,15 @@ local CHAPTERS: { Chapter } = {
         },
     },
     {
-        -- NOT YET SURVEYED OR GATED (plan task R8). Declared "stair" because that is
-        -- what it was before the trail register existed, and a stair is admissible at
-        -- any grade. Its steepest segment measures 0.331, a whisker over
-        -- TRAIL_MAX_GRADE -- so if this chapter is later re-registered as a trail, that
-        -- pitch is the thing to look at first.
+        -- Re-registered "stair" -> "trail" 2026-07-30 (user-gated, with the
+        -- TRAIL_MAX_GRADE bump to 0.34 for its 0.331 sustained middle). A GAME
+        -- TRAIL: single-file 1.5 width, mostly Grass underfoot -- the only chapter
+        -- not on Slate -- with grey-cypress log steps only at its two bites (the
+        -- bridge-exit shelf, local 0.63-0.68, and the final approach to
+        -- NW80FallsStair, local 0.69-0.97). Dock approach clears the 15-stud garden
+        -- radius at 16.3.
         name = "Upper climb",
-        kind = "stair",
+        kind = "trail",
         outModel = "RiverUpperClimb",
         control = {
             { -297.9, 180.4, -11.6 },
