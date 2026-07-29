@@ -32,14 +32,14 @@ local SILLS = {
 }
 -- cascades (hand-placed endpoints): {name, topX,topY,topZ, botX,botY,botZ, w0,w1, c0,c1}
 local CASCADES = {
-    { "ClearingFall", 73, 106, -35, 99, 86, -20, 6, 9, 2.0, -1.0 }, -- clearing east pool → head pool
-    { "BowtieCascade", 124, 84, -15, 148, 61, 6, 5, 8, 0.5, -1.0 }, -- head → run pool (SE)
-    { "RunCascade", 173, 59, 8, 184, 47, 9, 4, 6, 4.0, -2.0 }, -- run → lip pool (E)
-    { "PlungeCascade", 192, 47, -3, 197, 21, -14, 6, 9, 4.0, -2.0 }, -- lip → lower pool (N plunge)
+    { "W13_SquareFall", 73, 106, -35, 99, 86, -20, 6, 9, 2.0, -1.0 }, -- clearing east pool → head pool
+    { "W14_BowtieCascade", 124, 84, -15, 148, 61, 6, 5, 8, 0.5, -1.0 }, -- head → run pool (SE)
+    { "W15_RunCascade", 173, 59, 8, 184, 47, 9, 4, 6, 4.0, -2.0 }, -- run → lip pool (E)
+    { "W16_PlungeCascade", 192, 47, -3, 197, 21, -14, 6, 9, 4.0, -2.0 }, -- lip → lower pool (N plunge)
 }
 -- mist banks at the fall bases: {name, x,y,z, size, rate}
 local MISTS = {
-    { "ClearingFallMist", 99, 88, -20, 9, 16 },
+    { "W13_SquareFallMist", 99, 88, -20, 9, 16 },
     { "BowtieMist", 150, 60, 2, 6, 9 },
     { "PlungeMist", 197, 20, -15, 12, 22 },
 }

@@ -4,8 +4,8 @@
 -- no Blender/FBX/import round-trip) reads as a believable rushing-rapids surface — so we can
 -- decide between Path A (Blender hero mesh, user-authored) and Path B (procedural, mine).
 --
--- One contained reach only: the lower braided run from the Step150 pool lip down to the
--- ClearingInfall head (x-168..-83, y151->133, ~90 studs, ~11 deg with a steeper LowerStep
+-- One contained reach only: the lower braided run from the W08_MidStep pool lip down to the
+-- W12_ClearingFall head (x-168..-83, y151->133, ~90 studs, ~11 deg with a steeper W10_LowerStep
 -- sub-drop). Coordinates lifted from upcanyonFalls.luau's FALLS table so the ribbon sits in
 -- the real bed.
 --
@@ -14,7 +14,7 @@
 --                             vertical ripple, double-sided, Glass + tint. (Blender-free.)
 --   2. Along-flow beams      : thin faint Beams threaded down the centerline, native
 --                             TextureSpeed scroll = surface current (no per-frame script).
---   3. Whitewater drop beam  : the proven dual-beam fall recipe over the LowerStep sub-drop.
+--   3. Whitewater drop beam  : the proven dual-beam fall recipe over the W10_LowerStep sub-drop.
 --   4. Placeholder boulders  : Part spheres (Rock) IN the channel so water has something to
 --                             break around. *** These stand in for USER-SUPPLIED rock MESH
 --                             assets — that is the one piece Path B still needs from you. ***
@@ -243,7 +243,7 @@ for i, c in CTRL do
     prevAtt = a
 end
 
--- ---- whitewater drop beam over the LowerStep sub-drop (proven recipe) ----
+-- ---- whitewater drop beam over the W10_LowerStep sub-drop (proven recipe) ----
 do
     local a0 = attAt(Vector3.new(-132, 148, -3), "DropTop")
     local a1 = attAt(Vector3.new(-126, 143, -3), "DropBot")
@@ -280,7 +280,7 @@ for i, bd in BOULDERS do
     b.Color = Color3.fromRGB(78, 82, 80)
     b.Parent = root
 
-    -- foam at the downstream (toward ClearingInfall, ~ +x/-z) base of the boulder
+    -- foam at the downstream (toward W12_ClearingFall, ~ +x/-z) base of the boulder
     local mp = Instance.new("Part")
     mp.Name = "BoulderFoam" .. i
     mp.Anchored, mp.CanCollide, mp.Transparency = true, false, 1

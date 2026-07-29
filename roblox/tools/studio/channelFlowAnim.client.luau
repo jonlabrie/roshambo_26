@@ -18,7 +18,7 @@ local Workspace = game:GetService("Workspace")
 
 local MESH = "rbxassetid://101344850099792" -- ZenChannelRibbon v2 (lowered ends, lifted center)
 local FLOW_TILES_PER_SEC = 0.30 -- +20% from 0.25
-local STATIC_PATH = { "RoshamboStage", "OutfallChannelPOC", "ChannelRibbon" }
+local STATIC_PATH = { "CanyonWorld", "Water", "W03_OutfallRun", "ChannelRibbon" }
 
 -- WaitForChild, not FindFirstChild: this is a client script and the stage geometry
 -- replicates from the server asynchronously. FindFirstChild returns nil if the script
