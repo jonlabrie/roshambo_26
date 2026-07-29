@@ -137,16 +137,18 @@ local PRESETS = {
         },
         smoothRadius = 2,
         -- The trail's END, marked by a landmark rather than signage: one Moss Kit
-        -- Stone_A at 2.1x (~9.4 studs long), buried 32%, seated 4.6 off the tread
-        -- on the downhill side, 2 studs short of the last anchor. A walked path
-        -- ends at a rock; a sign would import resort formality into the wildest
-        -- chapter (user-gated). Collidable -- it is meant to be leaned on.
+        -- Stone_A at 2.1x (~9.4 studs long), seated 4.6 off the tread on the
+        -- downhill side, 2 studs short of the last anchor. A walked path ends at a
+        -- rock; a sign would import resort formality into the wildest chapter
+        -- (user-gated). Collidable -- it is meant to be leaned on.
+        -- sink 0.18 (raised from 0.32, user-gated): stands 5.2 proud of the tread
+        -- and still lands all 7 footprint samples on ground.
         terminusRock = {
             source = "Stone_A_LP",
             scale = 2.1,
             lateral = 4.5,
             backOff = 2.0,
-            sink = 0.32,
+            sink = 0.18,
             yaw = 207,
             roll = 4,
         },
