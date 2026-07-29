@@ -4,17 +4,20 @@ local RiverPathChapters = require("../tools/builders/RiverPathChapters")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 
 describe("RiverPathChapters.CHAPTERS", function()
-    test("has three chapters, all of them climbs", function()
-        expect(#RiverPathChapters.CHAPTERS).toBe(3)
-        local flat, stair = 0, 0
+    test("has five chapters in three registers", function()
+        expect(#RiverPathChapters.CHAPTERS).toBe(5)
+        local flat, trail, stair = 0, 0, 0
         for _, c in RiverPathChapters.CHAPTERS do
             if c.kind == "flat" then
                 flat += 1
+            elseif c.kind == "trail" then
+                trail += 1
             elseif c.kind == "stair" then
                 stair += 1
             end
         end
         expect(flat).toBe(0)
+        expect(trail).toBe(2)
         expect(stair).toBe(3)
     end)
 
@@ -94,9 +97,12 @@ describe("RiverPathChapters.CHAPTERS", function()
         expect(last[1] > -392).toBe(true)
     end)
 
-    test("each chapter's declared kind matches its measured grade", function()
+    test("every chapter's terrain admits its declared kind", function()
         for _, c in RiverPathChapters.CHAPTERS do
-            expect(RiverPathChapters.kindFor(c.control)).toBe(c.kind)
+            local ok, why = RiverPathChapters.admits(c.kind, c.control)
+            -- surface WHICH chapter failed and why; a bare false tells the next person nothing
+            expect(("%s: %s"):format(c.name, why or "ok")).toBe(("%s: ok"):format(c.name))
+            expect(ok).toBe(true)
         end
     end)
 
@@ -107,6 +113,50 @@ describe("RiverPathChapters.CHAPTERS", function()
             seen[c.outModel] = true
             expect(c.outModel:sub(1, 5)).toBe("River")
         end
+    end)
+end)
+
+describe("the trail register", function()
+    -- The whole point of chapter 2: the care gradient governs the path's OWN
+    -- construction, not just what grows beside it. Formal stonework near the Square,
+    -- dirt trail out west. If someone re-registers the traverse as a stair, this fails.
+    test("the traverse and the pool shore are trails, not stonework", function()
+        local byName: { [string]: string } = {}
+        for _, c in RiverPathChapters.CHAPTERS do
+            byName[c.outModel] = c.kind
+        end
+        expect(byName.RiverTraverse).toBe("trail")
+        expect(byName.RiverPoolShore).toBe("trail")
+    end)
+
+    test("the falls climb is the ONLY stepped thing between the Square and the bridge", function()
+        local stairs = {}
+        for _, c in RiverPathChapters.CHAPTERS do
+            local x = c.control[1][1]
+            if c.kind == "stair" and x < -89.0 and x > -297.0 then
+                table.insert(stairs, c.outModel)
+            end
+        end
+        expect(table.concat(stairs, ",")).toBe("RiverFallsSteps")
+    end)
+
+    test("the falls climb carries a landing, not one unbroken flight", function()
+        -- A pitch gentle enough to walk, sitting between two that are not, is a landing.
+        local c
+        for _, ch in RiverPathChapters.CHAPTERS do
+            if ch.outModel == "RiverFallsSteps" then
+                c = ch
+            end
+        end
+        expect(c).toBeTruthy()
+        local control = (c :: any).control
+        local gentle = 0
+        for i = 2, #control do
+            if RiverPathChapters.grade(control[i - 1], control[i]) < 0.2 then
+                gentle += 1
+            end
+        end
+        expect(gentle).toBe(1)
     end)
 end)
 
@@ -121,28 +171,61 @@ describe("RiverPathChapters.FLAT_MAX_GRADE", function()
     test("is well below CanyonPath.STEP_GRADE, which asks a different question", function()
         expect(RiverPathChapters.FLAT_MAX_GRADE < 0.27).toBe(true)
     end)
+
+    test("the three thresholds are ordered flat < trail", function()
+        expect(RiverPathChapters.FLAT_MAX_GRADE < RiverPathChapters.TRAIL_MAX_GRADE).toBe(true)
+    end)
 end)
 
-describe("RiverPathChapters.kindFor", function()
-    test("a level run is flat", function()
-        expect(RiverPathChapters.kindFor({ { 0, 100, 0 }, { -100, 101, 0 } })).toBe("flat")
+describe("RiverPathChapters.admits", function()
+    local LEVEL = { { 0, 100, 0 }, { -100, 105, 0 } } -- 0.05
+    local WALKABLE = { { 0, 100, 0 }, { -100, 125, 0 } } -- 0.25
+    local STEEP = { { 0, 100, 0 }, { -20, 125, 0 } } -- 1.25
+
+    test("a loose tread is refused above TRAIL_MAX_GRADE", function()
+        local ok, why = RiverPathChapters.admits("trail", STEEP)
+        expect(ok).toBe(false)
+        expect(type(why)).toBe("string")
     end)
 
-    test("a steep run is stair", function()
-        expect(RiverPathChapters.kindFor({ { 0, 100, 0 }, { -20, 125, 0 } })).toBe("stair")
+    test("a walkable grade admits a trail", function()
+        expect(RiverPathChapters.admits("trail", WALKABLE)).toBe(true)
     end)
 
-    test("a 0.26 grade is a stair even though STEP_GRADE would call it a ramp", function()
-        -- 26 studs of rise over 100 of run: a 1.56-stud tread at treadTarget 6.0.
-        expect(RiverPathChapters.kindFor({ { 0, 100, 0 }, { -100, 126, 0 } })).toBe("stair")
+    test("a stair is admissible at ANY grade above flat -- the limit is one-directional", function()
+        expect(RiverPathChapters.admits("stair", WALKABLE)).toBe(true)
+        expect(RiverPathChapters.admits("stair", STEEP)).toBe(true)
     end)
 
-    test("one steep pair among gentle ones makes the whole chapter a stair", function()
-        expect(RiverPathChapters.kindFor({
+    test("a stair on level ground is refused -- it would build zero risers", function()
+        expect(RiverPathChapters.admits("stair", LEVEL)).toBe(false)
+    end)
+
+    test("a flat shelf is refused above FLAT_MAX_GRADE", function()
+        expect(RiverPathChapters.admits("flat", WALKABLE)).toBe(false)
+        expect(RiverPathChapters.admits("flat", LEVEL)).toBe(true)
+    end)
+
+    test("an unknown kind is refused rather than silently passing", function()
+        expect(RiverPathChapters.admits("cobble", WALKABLE)).toBe(false)
+    end)
+
+    test("one steep pair among gentle ones disqualifies a trail", function()
+        expect(RiverPathChapters.admits("trail", {
             { 0, 100, 0 },
             { -50, 101, 0 },
             { -70, 126, 0 },
-        })).toBe("stair")
+        })).toBe(false)
+    end)
+end)
+
+describe("RiverPathChapters.maxGrade", function()
+    test("reports the steepest pair, not the average", function()
+        expect(RiverPathChapters.maxGrade({
+            { 0, 100, 0 },
+            { -100, 100, 0 },
+            { -110, 105, 0 },
+        })).toBeCloseTo(0.5, 0.001)
     end)
 end)
 
@@ -151,12 +234,12 @@ describe("RiverPathChapters.BRIDGES", function()
         expect(#RiverPathChapters.BRIDGES).toBe(1)
     end)
 
-    test("its abutments join Mid climb to Upper climb", function()
+    test("its abutments join the Pool shore to the Upper climb", function()
         local list = RiverPathChapters.CHAPTERS
-        local midControl = list[2].control
-        local midEnd = midControl[#midControl]
-        local upperStart = list[3].control[1]
-        local br = RiverPathChapters.bridgeBetween(midEnd, upperStart)
+        local shoreControl = list[4].control
+        local shoreEnd = shoreControl[#shoreControl]
+        local upperStart = list[5].control[1]
+        local br = RiverPathChapters.bridgeBetween(shoreEnd, upperStart)
         expect(br).toBeTruthy()
         expect((br :: any).name).toBe("RiverCrossing")
     end)
@@ -179,7 +262,7 @@ end)
 describe("RiverPathChapters.validate", function()
     test("the baked data validates", function()
         local ok, errs = RiverPathChapters.validate()
-        expect(#errs).toBe(0)
+        expect(table.concat(errs, " | ")).toBe("")
         expect(ok).toBe(true)
     end)
 end)

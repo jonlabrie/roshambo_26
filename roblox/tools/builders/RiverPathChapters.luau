@@ -1,17 +1,15 @@
 --!strict
 -- The river path's chapter definitions: the valley-floor stroll route from the Square
--- (x +60) west to x -377, where it meets the existing NW80FallsStair.
+-- west to x -377, where it meets the existing NW80FallsStair.
 --
--- BAKED from the user's dragged Workspace.PathDraft.River markers (2026-07-29). The
--- earlier seed data was a straight z = -8 survey line; the real route meanders, crosses
--- the river once, and runs 490 studs for 97 of climb.
---
--- Chapter boundaries sit on the route's own pitch breaks, so no chapter mixes a terrace
--- with a climb -- the two are built by different layout engines (uniform tread vs
--- uniform riser) and mixing them produces risers the locked recipe does not allow.
+-- BAKED from the user's dragged Workspace.PathDraft.River markers. Control Y values are
+-- RAYCAST GROUND, not marker centres -- a 4-stud draft ball resting on the ground reads
+-- 2 studs high, and baking marker Y floats every chapter by that much. The one exception
+-- is the joint at x -89.8, which is the BUILT head of RiverSquareStair (139.9), not the
+-- ground under it (138.8): the trail starts on the stair's top tread.
 --
 -- Spec: docs/superpowers/specs/2026-07-29-canyon-garden-floor-design.md section 5.
--- MIRRORED into tools/studio/buildFlatShelfPath.luau, buildIshidanStairs.luau and
+-- MIRRORED into tools/studio/buildIshidanStairs.luau, buildTrailPath.luau and
 -- buildBridge.luau (Studio cannot require repo modules) -- keep the control points in sync.
 
 export type Chapter = {
@@ -32,11 +30,13 @@ local RiverPathChapters = {}
 -- The build stops here; NW80FallsStair (centre x -392) carries the falls headwall.
 RiverPathChapters.WEST_TERMINUS = -376.9
 
--- Every chapter is a stair. The route starts at the Square's western edge and climbs
--- 93 studs to the falls; there is no level ground on it worth a flat-shelf layout. The
--- flat/stair machinery below is kept because the threshold is what proves that claim,
--- and because a future re-route could introduce a terrace.
-
+-- THREE SURFACE KINDS, and the thresholds below are ONE-DIRECTIONAL LIMITS, not a
+-- classifier. Which kind a chapter gets is an AUTHORED, user-gated decision about
+-- register -- formal stonework near the Square, dirt trail out west (spec section 5a).
+-- The numbers here exist only to catch a chapter whose declared kind its terrain cannot
+-- physically support. A "stair" is admissible at any grade above flat, because a stair is
+-- always a workable answer; a "trail" is not, because a loose surface has a real limit.
+--
 -- THE FLAT/STAIR CROSSOVER IS 0.10, NOT CanyonPath.STEP_GRADE (0.27).
 --
 -- STEP_GRADE answers a different question -- "steps or ramp" for the old CanyonPath
@@ -48,26 +48,32 @@ RiverPathChapters.WEST_TERMINUS = -376.9
 -- (FarWallBridge2Path) runs at 0.077.
 RiverPathChapters.FLAT_MAX_GRADE = 0.10
 
--- Marker positions carry drag noise; anything under this is not a real descent. The
--- ishidan builder derives uniform risers from footY/headY, not from per-marker Y, so
--- inch-scale wobble between markers has no effect on what gets built.
-RiverPathChapters.DESCENT_TOLERANCE = 0.25
+-- A benched earth-and-gravel tread will not hold much past 1:3, and a walking surface of
+-- loose material becomes unpleasant well before its angle of repose. 0.32 is also where
+-- this particular route separates: the traverse tops out at 0.310 and the falls climb
+-- starts at 0.339, with nothing in between.
+RiverPathChapters.TRAIL_MAX_GRADE = 0.32
 
--- The route crosses the river once, between chapters MidClimb and UpperClimb. Water sits
--- under the middle half of the span; both abutments are on Slate.
+-- Trails undulate; the descent check exists to catch a marker dragged BELOW its eastern
+-- neighbour by mistake, not to forbid a dip. The pool shore genuinely loses 0.6 studs
+-- over 37 as it rounds the upper pool, and that is correct.
+RiverPathChapters.DESCENT_TOLERANCE = 1.0
+
+-- The route crosses the river once, at the upper pool's narrow west end, between the
+-- Pool shore and the Upper climb. Water sits under the middle half; both abutments are
+-- on Slate.
 local BRIDGES: { Bridge } = {
     {
         name = "RiverCrossing",
-        a = { -291.7, 181.1, 10.8 }, -- east abutment, end of MidClimb
-        b = { -297.9, 182.3, -11.6 }, -- west abutment, start of UpperClimb
+        a = { -291.7, 178.6, 10.8 }, -- east abutment, end of Pool shore
+        b = { -297.9, 180.4, -11.6 }, -- west abutment, start of Upper climb
     },
 }
 
 local CHAPTERS: { Chapter } = {
     {
         -- The stairway out of the Square, over the hill that is the primary obstacle to
-        -- entering the western canyon. The user re-drew it gentler and wider on
-        -- 2026-07-29: grade 0.551 over 45.9 of run, against a first attempt at 0.75.
+        -- entering the western canyon. Grade 0.551 over 45.9 of run.
         --
         -- Tread lands at 1.09, leaving 0.46 of usable flag depth -- clear of
         -- flagMinDepth 0.4 -- so unlike NW1012South this flight SHOWS its flagstone
@@ -75,9 +81,8 @@ local CHAPTERS: { Chapter } = {
         -- need riserTarget 0.54, which drops the tread under 1.0 and loses the flagstones
         -- again. Locked riserTarget 0.6 kept and the trade accepted (user-gated).
         --
-        -- The hill sits SOUTH of the run (up to 15.8 studs of bank at 12 studs out) and
-        -- the ground falls away NORTH (up to 6.9). Widening cuts into the south bank,
-        -- which takes a timber retaining wall; the north edge is open and takes the rail.
+        -- AS-BUILT 2026-07-29. Do not re-bake these from markers: the draft balls have
+        -- since been dragged and no longer describe what stands in the world.
         name = "Square stair",
         kind = "stair",
         outModel = "RiverSquareStair",
@@ -87,29 +92,79 @@ local CHAPTERS: { Chapter } = {
         },
     },
     {
-        -- The long middle. Its last segment (x -259 -> -292) is dead level at grade
-        -- -0.003: that is the bench, and it gets a landing rather than a chapter.
-        name = "Mid climb",
-        kind = "stair",
-        outModel = "RiverMidClimb",
+        -- The side-hill traverse above the river. The hillside itself rises about 0.20
+        -- westward and there is no gentler line available: swinging south climbs into
+        -- the canyon wall (0.32 locally), swinging north runs into the water. So the
+        -- grade is the terrain's own, evened out rather than eased -- 0.135 to 0.310.
+        --
+        -- Dirt trail, not stonework: 200 studs west of the Square the resort's formal
+        -- vocabulary overreaches the care gradient (spec section 5a).
+        name = "River traverse",
+        kind = "trail",
+        outModel = "RiverTraverse",
         control = {
-            { -89.8, 139.9, 27.9 },
-            { -144.2, 155.7, 8.3 },
-            { -179.6, 160.1, 11.7 },
-            { -222.9, 174.4, 32.8 },
-            { -259.3, 181.2, 29.4 },
-            { -291.7, 181.1, 10.8 },
+            { -89.8, 139.9, 27.9 }, -- head of RiverSquareStair (built tread, not ground)
+            { -106.0, 142.7, 22.0 },
+            { -121.9, 145.8, 8.7 },
+            { -140.0, 151.5, 12.0 },
+            { -160.0, 155.9, 4.8 },
+            { -174.0, 158.6, 17.0 },
+            { -188.0, 161.4, 23.0 },
+            { -197.0, 163.3, 30.0 },
+            { -205.0, 164.5, 34.0 },
         },
     },
     {
+        -- The climb beside W05, the canyon's largest fall (~16 studs, centred at
+        -- x -220, z +17). The one pitch on the route that genuinely needs steps, and a
+        -- staged site in its own right, so it earns the formality.
+        --
+        -- The 0.156 segment at x -223.5 -> -228.0 is a NATURAL FLAT, not noise: it
+        -- becomes the landing between the two flights, and it faces the fall.
+        --
+        -- Stretched marutakaidan proportion -- riser 0.9, tread ~2.4 -- NOT the locked
+        -- riserTarget 0.6. That override is deliberate and lives on the preset, not in
+        -- the recipe: chunky log-and-earth steps read as mountain trailwork rather than
+        -- as a second ishidan flight (user-gated).
+        name = "W05 falls steps",
+        kind = "stair",
+        outModel = "RiverFallsSteps",
+        control = {
+            { -205.0, 164.5, 34.0 },
+            { -213.5, 167.4, 34.9 },
+            { -218.1, 169.3, 35.1 },
+            { -223.5, 172.3, 35.8 }, -- foot of the landing
+            { -228.0, 173.0, 35.9 }, -- head of the landing
+            { -234.0, 175.0, 36.0 },
+        },
+    },
+    {
+        -- Rounding the south shore of the big upper pool (surface 174.8), which the
+        -- trail holds 2 to 5 studs above. Levels off entirely past x -246.
+        name = "Pool shore",
+        kind = "trail",
+        outModel = "RiverPoolShore",
+        control = {
+            { -234.0, 175.0, 36.0 },
+            { -246.0, 177.8, 36.0 },
+            { -259.3, 179.2, 29.4 },
+            { -291.7, 178.6, 10.8 },
+        },
+    },
+    {
+        -- NOT YET SURVEYED OR GATED (plan task R8). Declared "stair" because that is
+        -- what it was before the trail register existed, and a stair is admissible at
+        -- any grade. Its steepest segment measures 0.331, a whisker over
+        -- TRAIL_MAX_GRADE -- so if this chapter is later re-registered as a trail, that
+        -- pitch is the thing to look at first.
         name = "Upper climb",
         kind = "stair",
         outModel = "RiverUpperClimb",
         control = {
-            { -297.9, 182.3, -11.6 },
-            { -326.4, 190.0, -25.2 },
-            { -362.0, 202.9, -40.2 },
-            { -376.9, 208.9, -15.4 },
+            { -297.9, 180.4, -11.6 },
+            { -326.4, 188.0, -25.2 },
+            { -362.0, 200.8, -40.2 },
+            { -376.9, 205.8, -15.4 },
         },
     },
 }
@@ -127,19 +182,45 @@ end
 
 RiverPathChapters.grade = grade
 
--- A chapter is a stair if ANY consecutive pair exceeds FLAT_MAX_GRADE. Averaging over
--- the whole chapter would smuggle a short steep pitch into a flat-shelf layout, where
--- the uniform-tread engine renders it as an unclimbable lip.
-function RiverPathChapters.kindFor(control: { { number } }): string
+-- The steepest consecutive pair in a chapter. Averaging over the whole chapter would
+-- smuggle a short steep pitch into a gentle layout, where it renders as an unclimbable
+-- lip.
+function RiverPathChapters.maxGrade(control: { { number } }): number
+    local worst = 0
     for i = 2, #control do
-        if grade(control[i - 1], control[i]) > RiverPathChapters.FLAT_MAX_GRADE then
-            return "stair"
-        end
+        worst = math.max(worst, grade(control[i - 1], control[i]))
     end
-    return "flat"
+    return worst
 end
 
--- Returns the bridge joining chapter `ci - 1` to chapter `ci`, or nil if they should be
+-- Can this terrain carry a chapter of this kind? One-directional: see the threshold
+-- comments above. Returns false plus a human-readable reason.
+function RiverPathChapters.admits(kind: string, control: { { number } }): (boolean, string?)
+    local worst = RiverPathChapters.maxGrade(control)
+    if kind == "flat" then
+        if worst > RiverPathChapters.FLAT_MAX_GRADE then
+            return false,
+                ("grade %.3f exceeds FLAT_MAX_GRADE %.2f"):format(worst, RiverPathChapters.FLAT_MAX_GRADE)
+        end
+    elseif kind == "trail" then
+        if worst > RiverPathChapters.TRAIL_MAX_GRADE then
+            return false,
+                ("grade %.3f exceeds TRAIL_MAX_GRADE %.2f -- a loose tread will not hold"):format(
+                    worst,
+                    RiverPathChapters.TRAIL_MAX_GRADE
+                )
+        end
+    elseif kind == "stair" then
+        if worst <= RiverPathChapters.FLAT_MAX_GRADE then
+            return false, ("grade %.3f is flat enough that a stair would build zero risers"):format(worst)
+        end
+    else
+        return false, ("unknown kind %q -- expected flat, trail or stair"):format(kind)
+    end
+    return true, nil
+end
+
+-- Returns the bridge joining `prevEnd` to `nextStart`, or nil if they should be
 -- directly contiguous.
 function RiverPathChapters.bridgeBetween(prevEnd: { number }, nextStart: { number }): Bridge?
     for _, br in BRIDGES do
@@ -167,9 +248,9 @@ function RiverPathChapters.validate(): (boolean, { string })
                 table.insert(errs, ("%s: control %d descends"):format(c.name, i))
             end
         end
-        local measured = RiverPathChapters.kindFor(c.control)
-        if measured ~= c.kind then
-            table.insert(errs, ("%s: declared %q but measures %q"):format(c.name, c.kind, measured))
+        local ok, why = RiverPathChapters.admits(c.kind, c.control)
+        if not ok then
+            table.insert(errs, ("%s: declared %q but %s"):format(c.name, c.kind, why or "?"))
         end
         if ci > 1 then
             local prevControl = list[ci - 1].control
