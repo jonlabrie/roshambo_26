@@ -136,6 +136,20 @@ local PRESETS = {
             { -376.9, 205.8, -15.4 },
         },
         smoothRadius = 2,
+        -- The trail's END, marked by a landmark rather than signage: one Moss Kit
+        -- Stone_A at 2.1x (~9.4 studs long), buried 32%, seated 4.6 off the tread
+        -- on the downhill side, 2 studs short of the last anchor. A walked path
+        -- ends at a rock; a sign would import resort formality into the wildest
+        -- chapter (user-gated). Collidable -- it is meant to be leaned on.
+        terminusRock = {
+            source = "Stone_A_LP",
+            scale = 2.1,
+            lateral = 4.5,
+            backOff = 2.0,
+            sink = 0.32,
+            yaw = 207,
+            roll = 4,
+        },
         steps = {
             riser = 0.9,
             proud = 0.3,
@@ -738,6 +752,35 @@ end
 --------------------------------------------------------------------------------
 -- Log risers, on a stepped chapter only.
 --------------------------------------------------------------------------------
+
+-- the terminus landmark, if this chapter has one
+local tr = PRESETS[ACTIVE].terminusRock
+if tr then
+    local trLib = SS:FindFirstChild(CONFIG.stoneLibrary)
+    local src = trLib and trLib:FindFirstChild(tr.source)
+    if src then
+        local rpT = RaycastParams.new()
+        rpT.FilterType = Enum.RaycastFilterType.Include
+        rpT.FilterDescendantsInstances = { Terrain }
+        local endS = math.max(0, total - tr.backOff)
+        local p, idx = at(tread, endS)
+        local f = fr[math.min(#fr, math.max(1, idx))]
+        local px = p.x + f.rx * tr.lateral
+        local pz = p.z + f.rz * tr.lateral
+        local hit = workspace:Raycast(Vector3.new(px, p.y + 40, pz), Vector3.new(0, -90, 0), rpT)
+        if hit then
+            local rock = src:Clone()
+            rock.Name = "TerminusRock"
+            rock.Size = src.Size * tr.scale
+            rock.Anchored = true
+            rock.CanCollide = true -- a landmark you can lean on
+            rock.RenderFidelity = Enum.RenderFidelity.Automatic
+            rock.CFrame = CFrame.new(Vector3.new(px, hit.Position.Y - rock.Size.Y * tr.sink, pz))
+                * CFrame.Angles(0, math.rad(tr.yaw), math.rad(tr.roll))
+            rock.Parent = model
+        end
+    end
+end
 
 local logs = 0
 if CONFIG.steps then
