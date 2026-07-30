@@ -166,8 +166,8 @@ local function buildSwing(model: Instance, hangX: number, hangZ: number, armY: n
     img.Parent = bb
     local light = Instance.new("PointLight")
     light.Color = Color3.fromRGB(255, 168, 96)
-    light.Brightness = 0.3
-    light.Range = 9
+    light.Brightness = 1.1
+    light.Range = 10
     light.Shadows = false
     light.Parent = body
 

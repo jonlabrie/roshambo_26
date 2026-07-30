@@ -247,8 +247,8 @@ local function buildOne(parent: Instance, name: string, base: Vector3, up: Vecto
     end
     local light = Instance.new("PointLight")
     light.Color = Color3.fromRGB(255, 168, 96)
-    light.Brightness = 0.3 -- less spill (amount)
-    light.Range = 9 -- less spill (distance)
+    light.Brightness = 1.1 -- raised 2026-07-30: 0.3 was invisible against the ambient floor
+    light.Range = 10
     light.Shadows = false
     light.Parent = body
 
