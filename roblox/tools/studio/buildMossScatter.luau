@@ -27,11 +27,25 @@
 -- stones. A single factor (not per-family targets) deliberately PRESERVES the kit's
 -- own size variation, which is most of what makes a scatter look unplanned.
 --
--- Care level comes from real path geometry, same model as cullWaterMargin.luau:
---   reach(x) = clamp(8 + 20*(x+430)/470, 8, 28)
---   GARDEN = within 35% of reach    TENDED = within reach    else PRESERVE
--- Moss goes in GARDEN and TENDED only: ground cover has to exist inside `reach`, which
--- is a ribbon, not the canyon.
+-- ⚠️ THE CARE GRADIENT DOES NOT GOVERN MOSS. The first pass restricted the scatter to
+-- GARDEN and TENDED, citing the spec's "ground cover only has to exist inside `reach`".
+-- That line is a BUDGET argument about not solving canyon-wide ground cover, and
+-- treating it as an ecological rule was a category error (user caught it):
+--
+--   The gradient governs what PEOPLE DO -- clearing understory, planting iris, pulling
+--   weeds. Moss is the least cultivated plant imaginable. It grows where nobody tends:
+--   wet rock, shade, undisturbed ground. The weed rule is "the same mass reads as wild
+--   where untended and as neglect where tended"; moss is the inverse, reading as damp
+--   and age everywhere, and the PRESERVE is where it most belongs. Excluding it there
+--   left out 863 of the 1426 water-margin cells -- more than garden and tended
+--   combined, at a median 38 studs from any tread.
+--
+-- So density is keyed to WATER (already required) and to TRAMPLING: feet wear moss off
+-- a tread's immediate edge, which is a reason for less moss right against a path, not
+-- none in the wild. That falls out of one uniform spacing plus a trample rule, and it
+-- gives a pleasing non-monotonic result for free -- dense in the garden (Japanese
+-- gardens genuinely cultivate moss), dense in the preserve (nobody disturbs it), thinner
+-- on the trodden verges between.
 
 local CONFIG = {
     importName = "Moss_ScatterElements_prepped", -- the model the user's FBX import made
@@ -46,7 +60,9 @@ local CONFIG = {
     -- family weights. Moss_B is the sporophyte ("flowering") form and reads as an
     -- accent, so it stays a minority; the flat mats do the ground-cover work.
     mix = { Moss_A = 34, Moos_C = 20, Moss_D = 22, Moss_E = 9, Moss_B = 15 },
-    minSpacing = { GARDEN = 3.0, TENDED = 5.0 }, -- tighter where tended
+    spacing = 4.5, -- uniform: moss answers to damp, not to tending
+    trampleRadius = 3.0, -- within this of a tread, feet keep it down
+    trampleSpacing = 9.0, -- so it thins out there rather than vanishing
     waterProximity = 14, -- only within this far of water: it is a WATER margin
     scanStep = 4,
     bounds = { x0 = -440, x1 = 230, z0 = -95, z1 = 95 },
@@ -205,7 +221,7 @@ for x = B.x0, B.x1, CONFIG.scanStep do
         local gy, mat, nrm = ground(x, z)
         if gy and mat ~= Enum.Material.Water then
             local level = careLevel(x, z)
-            if level ~= "PRESERVE" then
+            do
                 -- is water within reach? sample a ring rather than a full disc
                 local wet = false
                 for a = 0, 315, 45 do
@@ -227,7 +243,15 @@ for x = B.x0, B.x1, CONFIG.scanStep do
                     state, r = lcg(state)
                     local jz = (r * 2 - 1) * CONFIG.scanStep * 0.45
                     state, r = lcg(state)
-                    table.insert(cands, { x = x + jx, z = z + jz, y = gy, n = nrm, level = level, key = r })
+                    table.insert(cands, {
+                        x = x + jx,
+                        z = z + jz,
+                        y = gy,
+                        n = nrm,
+                        level = level,
+                        trampled = nearestPath(x, z) <= CONFIG.trampleRadius,
+                        key = r,
+                    })
                 end
             end
         end
@@ -241,7 +265,7 @@ end)
 local placedPts = {}
 local chosen = {}
 for _, c in ipairs(cands) do
-    local S = CONFIG.minSpacing[c.level]
+    local S = c.trampled and CONFIG.trampleSpacing or CONFIG.spacing
     local ok = true
     for _, p in ipairs(placedPts) do
         if (p.x - c.x) ^ 2 + (p.z - c.z) ^ 2 < S * S then
@@ -255,18 +279,24 @@ for _, c in ipairs(cands) do
     end
 end
 
-local counts = { GARDEN = 0, TENDED = 0 }
+local counts = { GARDEN = 0, TENDED = 0, PRESERVE = 0 }
+local trampled = 0
 for _, c in ipairs(chosen) do
     counts[c.level] += 1
+    if c.trampled then
+        trampled += 1
+    end
 end
 
-local report = ("%s\npath anchors %d; candidates %d -> chosen %d (GARDEN %d, TENDED %d)"):format(
+local report = ("%s\npath anchors %d; candidates %d -> chosen %d (GARDEN %d, TENDED %d, PRESERVE %d; %d on trodden verges)"):format(
     libMsg,
     anchors,
     #cands,
     #chosen,
     counts.GARDEN,
-    counts.TENDED
+    counts.TENDED,
+    counts.PRESERVE,
+    trampled
 )
 
 if CONFIG.dryRun then
