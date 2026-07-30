@@ -19,10 +19,20 @@
 #
 # Sibling tool: triage_tree.py judges whether an asset is worth importing at all
 # (card structure, not triangle count, decides whether budget reduction survives).
-# This one prepares an asset already judged worth it. The planned Phase 2 addition
-# here is leaf-carding: replace solid-modelled blades with 2-tri cards using the
-# vendor's own diffuse+opacity maps — the Iris ensata needs it badly (median 152
-# faces per blade, ~70x overspend), and it belongs in this file, not a new one.
+# This one prepares an asset already judged worth it.
+#
+# PHASE 2 (2026-07-30) — delivered as RIBBONING, not carding. The plan was to replace
+# solid blades with 2-tri cards cut out by the vendor's opacity map. That is impossible
+# for the Iris ensata: its four leaf materials have NO alpha at all (Leaves01..04 are
+# all `ALPHA <- unlinked, value=1.00`), so the blade silhouette exists ONLY as geometry
+# and there is nothing to cut a card against. The three materials that DO carry opacity
+# are flower materials, two of them misleadingly named "Leaves02/03_<hash>".
+#
+# Carding is the right tool for a COMPOUND leaf, where one flat card replaces a whole
+# spray of leaflets. An iris blade is a single sword, and for that a RIBBON is better:
+# resample the blade to a flat strip that follows its own curve and taper, 2 verts per
+# cross-section instead of 8. The silhouette stays geometric, so no alpha is needed.
+# Measured on variant 001: 53 blades, 7047 faces -> 795, 8.9x.
 #
 # Usage (headless):
 #   blender --background <in.blend> --python prep_foliage.py -- \
@@ -33,6 +43,17 @@
 #   --out      export the prepped objects to FBX
 #   --scale    uniform scale applied before export (the moss kit is 2-19 cm; at
 #              1 stud = 1 foot it needs ~4-8x to read at Roblox scale)
+#   --ribbon   ribbon the blades (see PHASE 2 above) BEFORE any doubling, since
+#              ribbons are open sheets and Roblox backface-culls them
+#   --blade-mats  material-name prefix identifying blade geometry (default Leaves0).
+#              ⚠️ match the PLAIN names only — the flower materials in this kit are
+#              called "Leaves02_<hash>", and ribboning a flower would destroy it.
+#
+# ⚠️ EXPORT SCALE IS UNVERIFIED ON THIS PATH. A Blender FBX lands in Roblox at
+# exactly 100x (Blender writes centimetres, Roblox reads the raw numbers as studs);
+# the verified fix is apply_unit_scale=True WITH global_scale=0.01. The export below
+# uses FBX_SCALE_ALL instead, which was never checked against an actual import.
+# Measure the first import rather than trusting it.
 #
 # On macOS: /Applications/Blender.app/Contents/MacOS/Blender
 
@@ -130,18 +151,206 @@ def double_faces(obj):
     return len(new_faces)
 
 
+def _blade_components(bm, slot_ids):
+    """Connected components over faces carrying the blade materials — one per blade."""
+    seen = set()
+    comps = []
+    for f in bm.faces:
+        if f.material_index not in slot_ids or f.index in seen:
+            continue
+        stack, comp = [f], []
+        seen.add(f.index)
+        while stack:
+            cur = stack.pop()
+            comp.append(cur)
+            for e in cur.edges:
+                for nb in e.link_faces:
+                    if nb.index not in seen and nb.material_index in slot_ids:
+                        seen.add(nb.index)
+                        stack.append(nb)
+        comps.append(comp)
+    return comps
+
+
+# Slice positions along a blade, base(0) -> tip(1). DELIBERATELY NON-UNIFORM: even
+# spacing spends resolution on the blade's uniform middle and leaves none where the
+# shape actually changes. Measured on the iris, a blade loses ~94% of its width inside
+# the final 10%, and evenly-spaced rails put NOTHING in that band — every ribbon came
+# out blunt. Clustering toward the tip fixed it at the same triangle count.
+BLADE_FRACS = (0.0, 0.22, 0.42, 0.60, 0.75, 0.86, 0.94, 0.985)
+
+
+def ribbon_blades(obj, mat_prefix="Leaves0"):
+    """Replace solid-modelled blades with flat ribbons following their own curve.
+
+    Returns (faces_before, faces_after, blade_count). No-op if no material matches.
+    """
+    import numpy as np
+    from mathutils import Vector, kdtree
+
+    slots = [m.name if m else "" for m in obj.data.materials]
+    # PLAIN names only: "Leaves02_<hash>" is a FLOWER material in this kit
+    slot_ids = {i for i, n in enumerate(slots) if n.startswith(mat_prefix) and "_" not in n}
+    if not slot_ids:
+        return 0, 0, 0
+
+    bm = bmesh.new()
+    bm.from_mesh(obj.data)
+    bm.faces.ensure_lookup_table()
+    uv_layer = bm.loops.layers.uv.active
+    blade_faces = [f for f in bm.faces if f.material_index in slot_ids]
+    if not blade_faces or uv_layer is None:
+        bm.free()
+        return 0, 0, 0
+    before = len(blade_faces)
+
+    # The PLANT ROOT — centroid of the lowest 5% of blade verts. Used to tell a blade's
+    # TIP from its BASE. Comparing end WIDTHS does NOT work: a blade emerges from a
+    # sheath, so it is narrow at the base as well as the tip and the test is a coin flip.
+    all_co = np.array([v.co[:] for v in {l.vert for f in blade_faces for l in f.loops}])
+    root = all_co[all_co[:, 2] <= np.percentile(all_co[:, 2], 5)].mean(axis=0)
+
+    made_faces = []
+    comps = _blade_components(bm, slot_ids)
+    for comp in comps:
+        seen_uv = {}
+        for f in comp:
+            for l in f.loops:
+                # hold the VERT REFERENCE, not its index: creating verts below
+                # invalidates bm.verts[] lookup for every later blade
+                seen_uv.setdefault(l.vert, l[uv_layer].uv.copy())
+        verts = list(seen_uv.keys())
+        if len(verts) < 8:
+            continue
+        uvs = [seen_uv[v] for v in verts]
+        P = np.array([v.co[:] for v in verts])
+        mid = P.mean(axis=0)
+        _, _, vt = np.linalg.svd(P - mid, full_matrices=False)
+        along, across = vt[0], vt[1]
+        t = (P - mid) @ along
+        lo, hi = t.min(), t.max()
+        if hi - lo < 1e-9:
+            continue
+
+        kd = kdtree.KDTree(len(verts))
+        for k, v in enumerate(verts):
+            kd.insert(v.co, k)
+        kd.balance()
+
+        p_lo, p_hi = P[int(np.argmin(t))], P[int(np.argmax(t))]
+        tip_at_hi = np.linalg.norm(p_hi - root) > np.linalg.norm(p_lo - root)
+        tip_co = Vector(p_hi if tip_at_hi else p_lo)
+        tb = (t - lo) / (hi - lo)
+        if not tip_at_hi:
+            tb = 1.0 - tb
+
+        raw = []
+        for fr in BLADE_FRACS:
+            half = 0.10 if fr < 0.7 else 0.035  # narrow window near the tip
+            sel = np.abs(tb - fr) <= half
+            if sel.sum() < 3:
+                sel = np.argsort(np.abs(tb - fr))[:4]
+            pts = P[sel]
+            c = pts.mean(axis=0)  # the blade's OWN centreline here, not a straight PCA line
+            u = (pts - c) @ across
+            # percentiles, NOT min/max: a sheathed base wraps the stem, and one stray
+            # fold setting the width threw whole blades out sideways as wedges
+            raw.append([c, float(np.percentile(u, 96)), float(np.percentile(u, 4))])
+
+        # Every blade comes to a point BY DEFINITION, so enforce it rather than hoping
+        # the sampling recovers it: past the widest slice, width may never increase.
+        spans = np.array([h - l for (_, h, l) in raw])
+        med = float(np.median(spans))
+        widest = int(np.argmax(spans))
+        for i in range(len(raw)):
+            c, hq, lq = raw[i]
+            span = hq - lq
+            cap = med * 1.6
+            if i > widest:
+                cap = min(cap, raw[i - 1][1] - raw[i - 1][2])
+            if span > cap and span > 1e-9:
+                k2 = cap / span
+                m = (hq + lq) * 0.5
+                raw[i][1] = m + (hq - m) * k2
+                raw[i][2] = m + (lq - m) * k2
+
+        # Keep EVERY rail. BLADE_FRACS deliberately stops at 0.985, not 1.0, so the last
+        # rail is the narrow one that forms the tip and the tip vertex sits beyond it. (An
+        # earlier version ran rails to t=hi — the tip's own position — which made the final
+        # triangle degenerate and left the blade ending on a rail of finite width. The fix
+        # then was to drop that rail; with fractional slices it must be kept.)
+        rails = [(Vector(c + across * hq), Vector(c + across * lq)) for (c, hq, lq) in raw]
+        pairs = [(bm.verts.new(l), bm.verts.new(r)) for (l, r) in rails]
+        v_tip = bm.verts.new(tip_co)
+        mi = comp[0].material_index
+
+        def _emit(tri):
+            try:
+                nf = bm.faces.new(tri)
+            except ValueError:
+                return
+            nf.material_index = mi
+            for loop in nf.loops:
+                _, k, _ = kd.find(loop.vert.co)
+                loop[uv_layer].uv = uvs[k]  # vendor UVs, so the texture still reads
+            made_faces.append(nf)
+
+        for i in range(len(pairs) - 1):
+            (l0, r0), (l1, r1) = pairs[i], pairs[i + 1]
+            _emit((l0, r0, r1))
+            _emit((l0, r1, l1))
+        l_last, r_last = pairs[-1]
+        _emit((l_last, r_last, v_tip))
+
+    bmesh.ops.delete(bm, geom=blade_faces, context="FACES")
+
+    # DOUBLE THE RIBBONS HERE, not in the object-level pass. A ribbon is an open sheet and
+    # Roblox backface-culls, but `decide` measures the WHOLE object's boundary ratio — and
+    # an object still holding solid flowers and stems never crosses the threshold (measured
+    # 0.20 against a 0.35 default), so the doubling pass skips it and the ribbons would
+    # half-vanish. Only here is it known that these particular faces are one-sided.
+    #
+    # ⚠️ It MUST be duplicate+reverse, not faces.new() with the winding flipped: bmesh
+    # refuses a second face on the same three verts whatever the winding, so the naive
+    # version silently emits nothing and the count is the only thing that betrays it.
+    if made_faces:
+        res = bmesh.ops.duplicate(bm, geom=made_faces)
+        backs = [g for g in res["geom"] if isinstance(g, bmesh.types.BMFace)]
+        if backs:
+            bmesh.ops.reverse_faces(bm, faces=backs)
+        made_faces = made_faces + backs
+
+    bm.to_mesh(obj.data)
+    obj.data.update()
+    bm.free()
+    return before, len(made_faces), len(comps)
+
+
 def main():
     args = argv_after_dashdash()
     report_only = "--report" in args
     ratio = flag(args, "--ratio", 0.35, float)
     out = flag(args, "--out", None)
     scale = flag(args, "--scale", 1.0, float)
+    do_ribbon = "--ribbon" in args
+    blade_mats = flag(args, "--blade-mats", "Leaves0")
 
     meshes = [o for o in bpy.data.objects if o.type == "MESH" and len(o.data.polygons) > 0]
     # the kits ship a leftover default Cube; it is a closed solid so `decide`
     # skips it anyway, but do not export it
     meshes = [o for o in meshes if o.name != "Cube"]
     meshes.sort(key=lambda o: o.name)
+
+    # RIBBON FIRST, then double: ribbons are open sheets, so they must be present
+    # before `decide` measures the boundary ratio, or they will not get doubled.
+    ribbon_rows = []
+    if do_ribbon and not report_only:
+        for o in meshes:
+            b, a, n = ribbon_blades(o, blade_mats)
+            if n:
+                ribbon_rows.append(
+                    {"name": o.name, "blades": n, "blade_faces_before": b, "blade_faces_after": a}
+                )
 
     rows = []
     doubled_total = 0
@@ -170,6 +379,7 @@ def main():
                 "objects": len(rows),
                 "ratio_threshold": ratio,
                 "report_only": report_only,
+                "ribboned": ribbon_rows,
                 "faces_added": doubled_total,
                 "to_double": sum(1 for r in rows if r["action"] == "DOUBLE"),
                 "skipped": sum(1 for r in rows if r["action"] == "skip"),
