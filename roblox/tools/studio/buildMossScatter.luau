@@ -58,7 +58,14 @@ local CONFIG = {
     -- notice. 30x puts it near 3.3. This deliberately breaks the "one factor preserves
     -- the kit's natural variation" rule, so it is scoped to the two upright families
     -- only; the mats that do the ground-cover work keep the shared 20x.
-    familyScale = { Moss_B = 1.5, Moss_E = 1.35 },
+    -- Moss_B pushed 1.5 -> 2.5 (about 4.9 studs, chest-high on an avatar) and Moss_E
+    -- 1.35 -> 1.8. The user still could not find the tall ones after doubling their
+    -- count AND fixing the burial bugs, which is the tell that the problem was never
+    -- count or seating: 3-stud wiry stalks read as ground TEXTURE at play distance, not
+    -- as silhouette. Silhouette needs height. Well past life size for a sporophyte, and
+    -- accepted -- they read as tufts of tall wiry growth, which is what the margin
+    -- wants from them.
+    familyScale = { Moss_B = 2.5, Moss_E = 1.8 },
     maps = {
         -- TONED to match the terrain's existing moss (user: "a little brighter/
         -- lime-greener than a lot of the existing assets"). Measured, not eyeballed:
