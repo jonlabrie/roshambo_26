@@ -60,6 +60,8 @@
 #   --patch    card the petals: replace solid petals with small CURVED grids. Selects
 #              materials BY LINKED ALPHA, not by name — a card needs an opacity map to
 #              cut its silhouette, and this kit names flower materials "Leaves02_<hash>"
+#   --no-double  skip the doubling pass entirely and rely on MeshPart.DoubleSided at
+#              import. RECOMMENDED — see the header.
 #   --tube     rebuild the stems as low-poly tubes following their own centreline.
 #              NOT ribboned: a stem is genuinely cylindrical and seen from every side
 #   --blade-mats  material-name prefix identifying blade geometry (default Leaves0).
@@ -603,14 +605,17 @@ def main():
     # undoes that AND misfires: uncapped stem tubes push the object's boundary ratio past
     # the threshold, so `decide` reads the whole plant as open cards and doubles
     # everything. Measured: variant 001 came out at 2388 instead of 1194.
-    rebuilt = do_ribbon or do_patch or do_tube
+    # --no-double is the RECOMMENDED posture now that MeshPart.DoubleSided is known to
+    # exist (see the header). Doubling remains available for assets where the flag cannot
+    # be relied on.
+    rebuilt = do_ribbon or do_patch or do_tube or ("--no-double" in args)
     rows = []
     doubled_total = 0
     for o in meshes:
         st = mesh_stats(o)
         should, why = decide(st, ratio)
         if rebuilt:
-            should, why = False, "rebuilt single-sided on purpose; use MeshPart.DoubleSided"
+            should, why = False, "left single-sided on purpose; use MeshPart.DoubleSided"
         added = 0
         if should and not report_only:
             added = double_faces(o)
