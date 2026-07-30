@@ -64,6 +64,8 @@
 #              import. RECOMMENDED — see the header.
 #   --tube     rebuild the stems as low-poly tubes following their own centreline.
 #              NOT ribboned: a stem is genuinely cylindrical and seen from every side
+#   --tri-limit  Roblox per-mesh TRIANGLE limit (default 20000). Any object above it is
+#              separated BY MATERIAL. Note triangles != faces: quads count double.
 #   --blade-mats  material-name prefix identifying blade geometry (default Leaves0).
 #              ⚠️ match the PLAIN names only — the flower materials in this kit are
 #              called "Leaves02_<hash>", and ribboning a flower would destroy it.
@@ -621,6 +623,50 @@ def bypass_mix_shaders():
     return fixed
 
 
+def tri_count(obj):
+    """TRIANGLES, not faces. The patcher and tuber emit QUADS, which triangulate to two
+    each — counting faces understates the real cost by ~25% and Roblox's limit is on
+    triangles."""
+    n = 0
+    for p in obj.data.polygons:
+        v = len(p.vertices)
+        n += 1 if v == 3 else (2 if v == 4 else v - 2)
+    return n
+
+
+def split_over_limit(obj, limit):
+    """Separate an object BY MATERIAL if it exceeds Roblox's per-mesh triangle limit.
+
+    Follows the Sugi precedent already in the place: a tree there is Trunk1/Trunk2/
+    Foliage1/Foliage2, split by material type and then halved again. The iris needs only
+    the first step — the largest per-material piece of the worst variant is 14,595.
+
+    Splitting by material has two side benefits: each piece is single-material, which is
+    the shape Blender's FBX exporter reliably carries textures for; and DoubleSided can
+    then be set per piece at import (ribbons and petals need it, closed stem tubes do not).
+
+    Returns a list of the resulting objects (just [obj] if it was already under).
+    """
+    if tri_count(obj) <= limit:
+        return [obj]
+    before = set(bpy.context.scene.objects)
+    bpy.ops.object.select_all(action="DESELECT")
+    obj.select_set(True)
+    bpy.context.view_layer.objects.active = obj
+    bpy.ops.object.mode_set(mode="EDIT")
+    bpy.ops.mesh.select_all(action="SELECT")
+    bpy.ops.mesh.separate(type="MATERIAL")
+    bpy.ops.object.mode_set(mode="OBJECT")
+    pieces = [obj] + [o for o in bpy.context.scene.objects if o not in before]
+    # name each piece after the material it carries, so the import is legible
+    stem = obj.name
+    for pc in pieces:
+        mats = [m.name for m in pc.data.materials if m]
+        if mats:
+            pc.name = "%s_%s" % (stem, mats[0])
+    return pieces
+
+
 def main():
     args = argv_after_dashdash()
     report_only = "--report" in args
@@ -630,6 +676,7 @@ def main():
     do_ribbon = "--ribbon" in args
     do_patch = "--patch" in args
     do_tube = "--tube" in args
+    tri_limit = flag(args, "--tri-limit", 20000, int)
     blade_mats = flag(args, "--blade-mats", "Leaves0")
     stem_mats = flag(args, "--stem-mats", "Stem")
 
@@ -680,6 +727,18 @@ def main():
     # exist (see the header). Doubling remains available for assets where the flag cannot
     # be relied on.
     rebuilt = do_ribbon or do_patch or do_tube or ("--no-double" in args)
+    split_rows = []
+    if (do_ribbon or do_patch or do_tube) and not report_only:
+        for o in list(meshes):
+            n0 = tri_count(o)
+            pieces = split_over_limit(o, tri_limit)
+            if len(pieces) > 1:
+                split_rows.append({"name": o.name, "tris": n0,
+                                   "pieces": [{"name": p.name, "tris": tri_count(p)} for p in pieces]})
+        meshes = [o for o in bpy.data.objects if o.type == "MESH" and len(o.data.polygons) > 0]
+        meshes = [o for o in meshes if o.name != "Cube"]
+        meshes.sort(key=lambda o: o.name)
+
     rows = []
     doubled_total = 0
     for o in meshes:
@@ -696,6 +755,7 @@ def main():
                 "name": o.name,
                 "faces_before": st["faces"],
                 "faces_after": st["faces"] + added,
+                "triangles": tri_count(o),
                 "boundary_ratio": st["boundary_ratio"],
                 "action": ("DOUBLE" if should else "skip"),
                 "reason": why,
@@ -711,6 +771,8 @@ def main():
                 "report_only": report_only,
                 "textures_repaired": tex_fixed,
                 "mix_shaders_bypassed": mix_bypassed,
+                "split_over_limit": split_rows,
+                "tri_limit": tri_limit,
                 "textures_unresolved": tex_missing,
                 "ribboned": ribbon_rows,
                 "patched": patch_rows,
