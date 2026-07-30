@@ -68,11 +68,11 @@
 #              ⚠️ match the PLAIN names only — the flower materials in this kit are
 #              called "Leaves02_<hash>", and ribboning a flower would destroy it.
 #
-# ⚠️ EXPORT SCALE IS UNVERIFIED ON THIS PATH. A Blender FBX lands in Roblox at
-# exactly 100x (Blender writes centimetres, Roblox reads the raw numbers as studs);
-# the verified fix is apply_unit_scale=True WITH global_scale=0.01. The export below
-# uses FBX_SCALE_ALL instead, which was never checked against an actual import.
-# Measure the first import rather than trusting it.
+# EXPORT SCALE: a Blender FBX lands in Roblox at exactly 100x (Blender writes
+# centimetres, Roblox reads the raw numbers as studs). The export below uses
+# apply_unit_scale=True WITH global_scale=0.01, which nets to 1 unit = 1 stud and is
+# VERIFIED — the yamadoro imported at exactly 3.000 studs. Use --scale to size the asset
+# in studs before export.
 #
 # On macOS: /Applications/Blender.app/Contents/MacOS/Blender
 
@@ -587,6 +587,40 @@ def repair_texture_paths():
     return fixed, missing
 
 
+def bypass_mix_shaders():
+    """Wire each material's Principled BSDF straight to its output, past any Mix Shader.
+
+    ⚠️ THIS IS WHY MULTI-MATERIAL FBX EXPORTS LOSE THEIR TEXTURES. Blender's exporter only
+    finds textures it can trace back from a Principled BSDF connected to the Material
+    Output. Behind a Mix Shader it finds nothing and writes NO maps for that material — and
+    the Roblox import then fails with "can't read the color or normal maps".
+
+    On the Iris ensata, 7 of 9 materials output through a Mix Shader of
+    Fac=INVERT, A=Principled, B=Principled — the vendor's two-sided trick, switching BSDF
+    by backface. Only "Stems" was wired directly, and it was the ONLY material whose maps
+    exported. (That also produced a false lead: Stems is slot 0, so the symptom reads as
+    "only the first material exports". It is not — it is "only the non-Mix material".
+    Removing empty slots changes nothing.)
+
+    Losing the two-sided trick costs nothing here: Roblox has MeshPart.DoubleSided.
+    """
+    fixed = []
+    for m in bpy.data.materials:
+        if not m.node_tree:
+            continue
+        nt = m.node_tree
+        out = next((n for n in nt.nodes if n.type == "OUTPUT_MATERIAL"), None)
+        if not (out and out.inputs["Surface"].is_linked):
+            continue
+        if out.inputs["Surface"].links[0].from_node.type != "MIX_SHADER":
+            continue
+        bsdf = next((n for n in nt.nodes if n.type == "BSDF_PRINCIPLED"), None)
+        if bsdf:
+            nt.links.new(bsdf.outputs["BSDF"], out.inputs["Surface"])
+            fixed.append(m.name)
+    return fixed
+
+
 def main():
     args = argv_after_dashdash()
     report_only = "--report" in args
@@ -600,6 +634,7 @@ def main():
     stem_mats = flag(args, "--stem-mats", "Stem")
 
     tex_fixed, tex_missing = repair_texture_paths()
+    mix_bypassed = bypass_mix_shaders()
 
     meshes = [o for o in bpy.data.objects if o.type == "MESH" and len(o.data.polygons) > 0]
     # the kits ship a leftover default Cube; it is a closed solid so `decide`
@@ -675,6 +710,7 @@ def main():
                 "ratio_threshold": ratio,
                 "report_only": report_only,
                 "textures_repaired": tex_fixed,
+                "mix_shaders_bypassed": mix_bypassed,
                 "textures_unresolved": tex_missing,
                 "ribboned": ribbon_rows,
                 "patched": patch_rows,
@@ -705,10 +741,13 @@ def main():
     bpy.ops.export_scene.fbx(
         filepath=out,
         use_selection=True,
-        # Roblox reads metres; bake the scale in rather than leaving a unit surprise
-        global_scale=1.0,
+        # VERIFIED against a real Roblox import (the yamadoro landed at exactly 3.000 studs):
+        # Blender writes FBX in centimetres and Roblox reads the raw numbers as studs, so
+        # apply_unit_scale with global_scale=0.01 nets out to 1 Blender unit = 1 stud.
+        # FBX_SCALE_ALL was used here previously and was never checked against an import.
+        global_scale=0.01,
         apply_unit_scale=True,
-        apply_scale_options="FBX_SCALE_ALL",
+        apply_scale_options="FBX_SCALE_NONE",
         object_types={"MESH"},
         use_mesh_modifiers=True,
         mesh_smooth_type="FACE",
