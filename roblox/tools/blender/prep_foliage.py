@@ -2,15 +2,27 @@
 #
 # WHY THIS EXISTS. Vendor foliage is modelled as SINGLE-SIDED CARDS and relies on
 # the DCC renderer drawing both faces — Blender does that by default, and its
-# materials even ship with `use_backface_culling = False` to say so. Roblox does
-# NOT: MeshParts are backface-culled and there is no double-sided flag. So a raw
-# import half-vanishes as you walk past it, which reads as "the import broke"
-# rather than as a geometry problem. Found on the Moss Asset Kit 2026-07-30:
-# Moss_B_A had 243 boundary edges against 82 manifold and ZERO flipped twin pairs.
+# materials even ship with `use_backface_culling = False` to say so. Roblox
+# backface-culls, so a raw import half-vanishes as you walk past it, which reads
+# as "the import broke" rather than as a geometry problem. Found on the Moss Asset
+# Kit 2026-07-30: Moss_B_A had 243 boundary edges against 82 manifold and ZERO
+# flipped twin pairs.
 #
-# So this doubles the faces — duplicate the shell, reverse the copy's winding —
-# which is cheap for card geometry (a 122-tri moss tuft becomes 244; one iris
-# ensata is 11,827) and is the only thing that actually fixes it.
+# ⚠️⚠️ THE DOUBLING BELOW IS THE WRONG FIX, AND THIS FILE USED TO SAY SO WRONGLY.
+# It claimed Roblox "has no double-sided flag". **MeshPart.DoubleSided EXISTS**
+# (verified engine 0.732.0: writable at runtime and on a fresh MeshPart), and the
+# place was already relying on it — 800 MeshParts under CanyonWorld.Foliage.
+# WaterFoliage have it set. Meanwhile MossScatter's 825 clumps carry DOUBLED
+# GEOMETRY and not one has the flag, because they were prepped on the false claim.
+#
+# **Set MeshPart.DoubleSided = true at import.** It costs only the lost backface
+# culling; doubling costs 2x triangles, 2x verts and 2x memory for the same result.
+# There is no case here where duplicating shells wins. `--ribbon` therefore leaves
+# its ribbons single-sided by design.
+#
+# double_faces() is kept for assets where the flag cannot be relied on, and because
+# the moss shipped that way. Prefer the flag. (The moss is still carrying twice the
+# triangles it needs — re-prepping it is optional cleanup, not urgent.)
 #
 # ⚠️ IT MUST NOT DOUBLE CLOSED SOLIDS. Reversing a copy of a watertight mesh buries
 # a second inverted shell inside it: invisible, and pure cost. So the decision is
@@ -43,8 +55,8 @@
 #   --out      export the prepped objects to FBX
 #   --scale    uniform scale applied before export (the moss kit is 2-19 cm; at
 #              1 stud = 1 foot it needs ~4-8x to read at Roblox scale)
-#   --ribbon   ribbon the blades (see PHASE 2 above) BEFORE any doubling, since
-#              ribbons are open sheets and Roblox backface-culls them
+#   --ribbon   ribbon the blades (see PHASE 2 above). Leaves them SINGLE-SIDED —
+#              set MeshPart.DoubleSided at import, do not duplicate the shell
 #   --blade-mats  material-name prefix identifying blade geometry (default Leaves0).
 #              ⚠️ match the PLAIN names only — the flower materials in this kit are
 #              called "Leaves02_<hash>", and ribboning a flower would destroy it.
@@ -304,22 +316,9 @@ def ribbon_blades(obj, mat_prefix="Leaves0"):
 
     bmesh.ops.delete(bm, geom=blade_faces, context="FACES")
 
-    # DOUBLE THE RIBBONS HERE, not in the object-level pass. A ribbon is an open sheet and
-    # Roblox backface-culls, but `decide` measures the WHOLE object's boundary ratio — and
-    # an object still holding solid flowers and stems never crosses the threshold (measured
-    # 0.20 against a 0.35 default), so the doubling pass skips it and the ribbons would
-    # half-vanish. Only here is it known that these particular faces are one-sided.
-    #
-    # ⚠️ It MUST be duplicate+reverse, not faces.new() with the winding flipped: bmesh
-    # refuses a second face on the same three verts whatever the winding, so the naive
-    # version silently emits nothing and the count is the only thing that betrays it.
-    if made_faces:
-        res = bmesh.ops.duplicate(bm, geom=made_faces)
-        backs = [g for g in res["geom"] if isinstance(g, bmesh.types.BMFace)]
-        if backs:
-            bmesh.ops.reverse_faces(bm, faces=backs)
-        made_faces = made_faces + backs
-
+    # RIBBONS ARE LEFT SINGLE-SIDED ON PURPOSE. Set MeshPart.DoubleSided = true at import
+    # instead — see the ⚠️ at the top of this file. Duplicating the shell would cost 2x
+    # triangles, verts and memory for the same result the flag gives free.
     bm.to_mesh(obj.data)
     obj.data.update()
     bm.free()
