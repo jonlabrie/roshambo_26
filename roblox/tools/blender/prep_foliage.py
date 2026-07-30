@@ -64,8 +64,10 @@
 #              import. RECOMMENDED — see the header.
 #   --tube     rebuild the stems as low-poly tubes following their own centreline.
 #              NOT ribboned: a stem is genuinely cylindrical and seen from every side
-#   --tri-limit  Roblox per-mesh TRIANGLE limit (default 20000). Any object above it is
-#              separated BY MATERIAL. Note triangles != faces: quads count double.
+#   --tri-limit  Roblox per-mesh TRIANGLE limit (default 20000), used only to WARN.
+#              Objects are separated by material unconditionally: a MeshPart takes one
+#              SurfaceAppearance, so a multi-material mesh imports with no texture at all.
+#              Note triangles != faces: quads count double.
 #   --blade-mats  material-name prefix identifying blade geometry (default Leaves0).
 #              ⚠️ match the PLAIN names only — the flower materials in this kit are
 #              called "Leaves02_<hash>", and ribboning a flower would destroy it.
@@ -634,8 +636,15 @@ def tri_count(obj):
     return n
 
 
-def split_over_limit(obj, limit):
-    """Separate an object BY MATERIAL if it exceeds Roblox's per-mesh triangle limit.
+def split_by_material(obj, limit):
+    """Separate an object BY MATERIAL. ALWAYS — not only when it is over the limit.
+
+    ⚠️ A Roblox MeshPart takes exactly ONE SurfaceAppearance and cannot carry per-face
+    materials, so a multi-material mesh imports with NO TEXTURE AT ALL even when every map
+    is present in the .fbm. Observed directly: the four variants split for the triangle
+    limit came in with colour, and the eight left whole came in grey.
+
+    It also keeps meshes under the limit, which is how this started.
 
     Follows the Sugi precedent already in the place: a tree there is Trunk1/Trunk2/
     Foliage1/Foliage2, split by material type and then halved again. The iris needs only
@@ -647,7 +656,8 @@ def split_over_limit(obj, limit):
 
     Returns a list of the resulting objects (just [obj] if it was already under).
     """
-    if tri_count(obj) <= limit:
+    used = {p.material_index for p in obj.data.polygons}
+    if len(used) <= 1:
         return [obj]
     before = set(bpy.context.scene.objects)
     bpy.ops.object.select_all(action="DESELECT")
@@ -664,6 +674,10 @@ def split_over_limit(obj, limit):
         mats = [m.name for m in pc.data.materials if m]
         if mats:
             pc.name = "%s_%s" % (stem, mats[0])
+        # a single-material piece can still exceed the limit; the Sugi answer is to halve
+        # it again. The iris never needs it - worst piece is 14,595 - so just report.
+        if tri_count(pc) > limit:
+            print("WARNING: %s is %d triangles, over the %d limit" % (pc.name, tri_count(pc), limit))
     return pieces
 
 
@@ -731,7 +745,7 @@ def main():
     if (do_ribbon or do_patch or do_tube) and not report_only:
         for o in list(meshes):
             n0 = tri_count(o)
-            pieces = split_over_limit(o, tri_limit)
+            pieces = split_by_material(o, tri_limit)
             if len(pieces) > 1:
                 split_rows.append({"name": o.name, "tris": n0,
                                    "pieces": [{"name": p.name, "tris": tri_count(p)} for p in pieces]})
