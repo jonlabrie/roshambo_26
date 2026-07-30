@@ -25,6 +25,17 @@ export type Bridge = {
     b: { number },
 }
 
+-- A spur leaves the main route and DEAD-ENDS somewhere useful. It is not a chapter:
+-- chapters chain end-to-end from the Square to the falls and the tests enforce that;
+-- a spur joins the route at `joinsAt` (a point inside some chapter's span) and stops.
+export type Spur = {
+    name: string,
+    kind: string,
+    outModel: string,
+    joinsAt: string, -- outModel of the chapter it forks from
+    control: { { number } },
+}
+
 local RiverPathChapters = {}
 
 -- The build stops here; NW80FallsStair (centre x -392) carries the falls headwall.
@@ -69,6 +80,33 @@ local BRIDGES: { Bridge } = {
         name = "RiverCrossing",
         a = { -291.7, 178.6, 10.8 }, -- east abutment, end of Pool shore
         b = { -297.9, 180.4, -11.6 }, -- west abutment, start of Upper climb
+    },
+}
+
+-- Access spurs off the main route.
+local SPURS: { Spur } = {
+    {
+        -- Teahouse pad T07 is the only pad with no tunnel access, so the trail
+        -- provides it: a single-file fork off the pool shore, up the platform's west
+        -- flank to its rear (SW) corner. Narrower than anything else on the route
+        -- (1.5 vs 3.5) and deliberately unstepped -- a bare desire path.
+        --
+        -- Verified before building: all six M-size pad posts clear this line by
+        -- >= 6.2 studs (L by ~4.3) against SizeClasses.deckFootprint. If a future
+        -- line runs tighter, PadPlanner already omits a blocked post and cantilevers
+        -- (PadOps.blockedByPath, keyed on the AccessKeepOut tag).
+        name = "T07 access spur",
+        kind = "trail",
+        outModel = "RiverT07Spur",
+        joinsAt = "RiverPoolShore",
+        control = {
+            { -285.4, 179.5, 16.9 },
+            { -300.1, 184.3, 17.7 },
+            { -309.6, 185.5, 21.0 },
+            { -312.1, 187.0, 27.9 },
+            { -310.8, 188.1, 35.8 },
+            { -305.0, 190.4, 42.6 },
+        },
     },
 }
 
@@ -175,6 +213,7 @@ local CHAPTERS: { Chapter } = {
 
 RiverPathChapters.CHAPTERS = CHAPTERS
 RiverPathChapters.BRIDGES = BRIDGES
+RiverPathChapters.SPURS = SPURS
 
 local function grade(a: { number }, b: { number }): number
     local run = math.sqrt((b[1] - a[1]) ^ 2 + (b[3] - a[3]) ^ 2)
@@ -286,6 +325,37 @@ function RiverPathChapters.validate(): (boolean, { string })
     for _, br in BRIDGES do
         if br.a[1] <= br.b[1] then
             table.insert(errs, ("bridge %s: abutment a must lie east of b"):format(br.name))
+        end
+    end
+    for _, sp in SPURS do
+        local ok, why = RiverPathChapters.admits(sp.kind, sp.control)
+        if not ok then
+            table.insert(errs, ("spur %s: declared %q but %s"):format(sp.name, sp.kind, why or "?"))
+        end
+        local host = nil
+        for _, c in CHAPTERS do
+            if c.outModel == sp.joinsAt then
+                host = c
+            end
+        end
+        if host == nil then
+            table.insert(errs, ("spur %s: joinsAt %q is not a chapter"):format(sp.name, sp.joinsAt))
+        else
+            -- the fork must actually touch its host chapter's span
+            local x = sp.control[1][1]
+            local lo, hi = host.control[#host.control][1], host.control[1][1]
+            if x < lo - 1.0 or x > hi + 1.0 then
+                table.insert(
+                    errs,
+                    ("spur %s: forks at x %.1f, outside %s (%.1f..%.1f)"):format(
+                        sp.name,
+                        x,
+                        sp.joinsAt,
+                        lo,
+                        hi
+                    )
+                )
+            end
         end
     end
     return #errs == 0, errs

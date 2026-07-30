@@ -259,6 +259,74 @@ describe("RiverPathChapters.BRIDGES", function()
     end)
 end)
 
+describe("RiverPathChapters.SPURS", function()
+    test("the T07 access spur exists and is a trail", function()
+        expect(#RiverPathChapters.SPURS).toBe(1)
+        local sp = RiverPathChapters.SPURS[1]
+        expect(sp.outModel).toBe("RiverT07Spur")
+        expect(sp.kind).toBe("trail")
+    end)
+
+    test("a spur forks from a real chapter, inside its span", function()
+        for _, sp in RiverPathChapters.SPURS do
+            local host = nil
+            for _, c in RiverPathChapters.CHAPTERS do
+                if c.outModel == sp.joinsAt then
+                    host = c
+                end
+            end
+            expect(("%s host"):format(sp.name)).toBe(("%s host"):format(sp.name))
+            expect(host).toBeTruthy()
+            local x = sp.control[1][1]
+            local lo = (host :: any).control[#(host :: any).control][1]
+            local hi = (host :: any).control[1][1]
+            expect(x >= lo - 1.0 and x <= hi + 1.0).toBe(true)
+        end
+    end)
+
+    test("a spur DEAD-ENDS -- it is not held to the chapters' west terminus", function()
+        for _, sp in RiverPathChapters.SPURS do
+            local last = sp.control[#sp.control]
+            expect(math.abs(last[1] - RiverPathChapters.WEST_TERMINUS) > 1.0).toBe(true)
+        end
+    end)
+
+    -- A spur is NOT held to the chapters' monotonic-westward rule. The T07 spur
+    -- doubles back east (x -312.1 -> -310.8 -> -305.0) as it wraps the platform
+    -- toward the SW corner, which is the whole point of it. Only the through route
+    -- must march west.
+    test("a spur may double back -- only the main route runs strictly westward", function()
+        local doublesBack = false
+        for _, sp in RiverPathChapters.SPURS do
+            for i = 2, #sp.control do
+                if sp.control[i][1] > sp.control[i - 1][1] then
+                    doublesBack = true
+                end
+            end
+        end
+        expect(doublesBack).toBe(true)
+    end)
+
+    test("a spur's segments are contiguous and sanely spaced", function()
+        for _, sp in RiverPathChapters.SPURS do
+            for i = 2, #sp.control do
+                local a, b = sp.control[i - 1], sp.control[i]
+                local run = math.sqrt((b[1] - a[1]) ^ 2 + (b[3] - a[3]) ^ 2)
+                expect(run > 2.0).toBe(true)
+                expect(run < 40.0).toBe(true)
+            end
+        end
+    end)
+
+    test("a spur's terrain admits its declared kind", function()
+        for _, sp in RiverPathChapters.SPURS do
+            local ok, why = RiverPathChapters.admits(sp.kind, sp.control)
+            expect(("%s: %s"):format(sp.name, why or "ok")).toBe(("%s: ok"):format(sp.name))
+            expect(ok).toBe(true)
+        end
+    end)
+end)
+
 describe("RiverPathChapters.validate", function()
     test("the baked data validates", function()
         local ok, errs = RiverPathChapters.validate()
