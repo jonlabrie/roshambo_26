@@ -136,21 +136,35 @@ local PRESETS = {
             { -376.9, 205.8, -15.4 },
         },
         smoothRadius = 2,
-        -- The trail's END, marked by a landmark rather than signage: one Moss Kit
-        -- Stone_A at 2.1x (~9.4 studs long), seated 4.6 off the tread on the
-        -- downhill side, 2 studs short of the last anchor. A walked path ends at a
-        -- rock; a sign would import resort formality into the wildest chapter
-        -- (user-gated). Collidable -- it is meant to be leaned on.
-        -- sink 0.18 (raised from 0.32, user-gated): stands 5.2 proud of the tread
-        -- and still lands all 7 footprint samples on ground.
+        -- The trail's END, marked by a landmark rather than signage: a Moss Kit
+        -- Stone_A grown to ~10 x 8 x 12 studs, half-buried beside the last anchor.
+        -- A walked path ends at a rock; a sign would import resort formality into
+        -- the wildest chapter (user-gated). Collidable -- meant to be leaned on.
+        --
+        -- AS-BUILT TRANSFORM, baked from the user's hand placement (the
+        -- buildBridge footingA pattern). My parametric version -- uniform scale on
+        -- a lateral/backOff/sink frame -- CANNOT reproduce this: the user scaled it
+        -- NON-UNIFORMLY (X 3.83 vs Y 2.48, Z 2.60), so the rock is stretched broad
+        -- across the trail rather than simply enlarged. Do not "restore" the
+        -- parametric form; it would rebuild a different rock. Verified as placed:
+        -- all 7 footprint samples on ground, top 4.2 above the end anchor's tread.
         terminusRock = {
             source = "Stone_A_LP",
-            scale = 2.1,
-            lateral = 4.5,
-            backOff = 2.0,
-            sink = 0.18,
-            yaw = 207,
-            roll = 4,
+            size = { 10.3714, 8.2691, 11.6970 },
+            cframe = {
+                -377.3139,
+                205.6744,
+                -19.7123,
+                -0.869747,
+                0.062153,
+                -0.489569,
+                0.069699,
+                0.997564,
+                0.002821,
+                0.488552,
+                -0.031669,
+                -0.871960,
+            },
         },
         steps = {
             riser = 0.9,
@@ -761,26 +775,14 @@ if tr then
     local trLib = SS:FindFirstChild(CONFIG.stoneLibrary)
     local src = trLib and trLib:FindFirstChild(tr.source)
     if src then
-        local rpT = RaycastParams.new()
-        rpT.FilterType = Enum.RaycastFilterType.Include
-        rpT.FilterDescendantsInstances = { Terrain }
-        local endS = math.max(0, total - tr.backOff)
-        local p, idx = at(tread, endS)
-        local f = fr[math.min(#fr, math.max(1, idx))]
-        local px = p.x + f.rx * tr.lateral
-        local pz = p.z + f.rz * tr.lateral
-        local hit = workspace:Raycast(Vector3.new(px, p.y + 40, pz), Vector3.new(0, -90, 0), rpT)
-        if hit then
-            local rock = src:Clone()
-            rock.Name = "TerminusRock"
-            rock.Size = src.Size * tr.scale
-            rock.Anchored = true
-            rock.CanCollide = true -- a landmark you can lean on
-            rock.RenderFidelity = Enum.RenderFidelity.Automatic
-            rock.CFrame = CFrame.new(Vector3.new(px, hit.Position.Y - rock.Size.Y * tr.sink, pz))
-                * CFrame.Angles(0, math.rad(tr.yaw), math.rad(tr.roll))
-            rock.Parent = model
-        end
+        local rock = src:Clone()
+        rock.Name = "TerminusRock"
+        rock.Size = Vector3.new(tr.size[1], tr.size[2], tr.size[3])
+        rock.Anchored = true
+        rock.CanCollide = true -- a landmark you can lean on
+        rock.RenderFidelity = Enum.RenderFidelity.Automatic
+        rock.CFrame = CFrame.new(table.unpack(tr.cframe))
+        rock.Parent = model
     end
 end
 
