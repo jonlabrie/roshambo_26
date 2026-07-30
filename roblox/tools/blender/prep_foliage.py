@@ -553,6 +553,40 @@ def tube_stems(obj, mat_prefix="Stem"):
     return before, len(made), len(comps)
 
 
+def repair_texture_paths():
+    """Re-point images whose filepath does not resolve at a file of the same name beside
+    the .blend.
+
+    Bought assets routinely ship absolute paths to the SELLER'S OWN MACHINE. The Iris
+    ensata blend points every one of its 12 maps at
+    "//../../AppData/Local/Temp/RH_M2B_TEMP/../../../../Desktop/FBX/..." — a Windows temp
+    directory that has never existed here. Blender renders those as magenta, and worse,
+    an FBX exported with path_mode="COPY" silently carries NOTHING, so the import fails
+    with "can't read the color or normal maps".
+
+    Checked by resolving the path, not by im.has_data — has_data is lazy and reads False
+    for a perfectly good image until something touches its pixels.
+    """
+    blend_dir = os.path.dirname(bpy.data.filepath)
+    fixed, missing = [], []
+    for im in bpy.data.images:
+        if im.source != "FILE":
+            continue
+        if os.path.exists(bpy.path.abspath(im.filepath)):
+            continue
+        base = os.path.basename(im.filepath.replace("\\", "/"))
+        for cand in (os.path.join(blend_dir, base), os.path.join(blend_dir, im.name)):
+            if os.path.exists(cand):
+                im.filepath = cand
+                im.reload()
+                _ = im.size[:]  # force the load
+                fixed.append(im.name)
+                break
+        else:
+            missing.append(im.name)
+    return fixed, missing
+
+
 def main():
     args = argv_after_dashdash()
     report_only = "--report" in args
@@ -564,6 +598,8 @@ def main():
     do_tube = "--tube" in args
     blade_mats = flag(args, "--blade-mats", "Leaves0")
     stem_mats = flag(args, "--stem-mats", "Stem")
+
+    tex_fixed, tex_missing = repair_texture_paths()
 
     meshes = [o for o in bpy.data.objects if o.type == "MESH" and len(o.data.polygons) > 0]
     # the kits ship a leftover default Cube; it is a closed solid so `decide`
@@ -638,6 +674,8 @@ def main():
                 "objects": len(rows),
                 "ratio_threshold": ratio,
                 "report_only": report_only,
+                "textures_repaired": tex_fixed,
+                "textures_unresolved": tex_missing,
                 "ribboned": ribbon_rows,
                 "patched": patch_rows,
                 "tubed": tube_rows,
