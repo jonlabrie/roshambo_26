@@ -53,16 +53,24 @@ local CONFIG = {
     outFolder = "MossScatter",
     scale = 20.0,
     maps = {
-        ColorMap = "rbxassetid://82048465547389", -- RGBA, 70% cutout alpha
+        -- TONED to match the terrain's existing moss (user: "a little brighter/
+        -- lime-greener than a lot of the existing assets"). Measured, not eyeballed:
+        -- the kit's opaque average was 171,174,100 at hue 62 deg (yellow-green) while
+        -- the terrain's Moss004 sits at 123,152,85 at hue 86 deg (true green) and 13%
+        -- darker. A per-channel LINEAR factor of 0.491/0.743/0.718 -- derived by
+        -- dividing the two measured averages, so no hand-tuned tint -- lands the kit
+        -- at 124,152,85 against the target's 124,152,86. Cutout alpha untouched.
+        -- Untoned original: rbxassetid://82048465547389
+        ColorMap = "rbxassetid://101486813346396", -- RGBA, 70% cutout alpha, toned
         NormalMap = "rbxassetid://118508585188229",
         RoughnessMap = "rbxassetid://117526121500161",
     },
     -- family weights. Moss_B is the sporophyte ("flowering") form and reads as an
     -- accent, so it stays a minority; the flat mats do the ground-cover work.
     mix = { Moss_A = 34, Moos_C = 20, Moss_D = 22, Moss_E = 9, Moss_B = 15 },
-    spacing = 4.5, -- uniform: moss answers to damp, not to tending
+    spacing = 3.0, -- uniform: moss answers to damp, not to tending (user: "a lot more")
     trampleRadius = 3.0, -- within this of a tread, feet keep it down
-    trampleSpacing = 9.0, -- so it thins out there rather than vanishing
+    trampleSpacing = 6.5, -- so it thins out there rather than vanishing
     waterProximity = 14, -- only within this far of water: it is a WATER margin
     scanStep = 4,
     bounds = { x0 = -440, x1 = 230, z0 = -95, z1 = 95 },
