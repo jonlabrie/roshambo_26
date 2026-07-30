@@ -74,7 +74,10 @@ local CONFIG = {
     },
     -- family weights. Moss_B is the sporophyte ("flowering") form and reads as an
     -- accent, so it stays a minority; the flat mats do the ground-cover work.
-    mix = { Moss_A = 34, Moos_C = 20, Moss_D = 22, Moss_E = 9, Moss_B = 15 },
+    -- Moss_B DOUBLED (15 -> 38 of the total, so ~15% -> ~31%) because the user still
+    -- struggled to spot it even after the burial bugs were fixed. It is the accent the
+    -- whole species choice rests on; if it is not findable it is not doing its job.
+    mix = { Moss_A = 34, Moos_C = 20, Moss_D = 22, Moss_E = 9, Moss_B = 38 },
     -- Density is GRADED BY WATER DISTANCE, not a binary in-band gate: moss answers to
     -- damp, so it packs at the waterline and loosens away from it (user: "plenty more
     -- moss, especially close to the waterlines").
@@ -103,6 +106,30 @@ local CONFIG = {
 
 local SS = game:GetService("ServerStorage")
 local Terrain = workspace.Terrain
+
+--------------------------------------------------------------------------------
+-- MIRROR of tools/builders/CanyonKeepOuts.luau (Lune-tested; Studio cannot require
+-- repo modules). Keep in sync -- and fix bugs THERE first.
+--
+-- The untouchable places. Materials are exact and self-maintaining; volumes are for
+-- ground whose material is ordinary but whose CONTENT is not. 90 clumps had landed on
+-- the Square's raked sand and 30 inside the karesansui before this existed.
+--------------------------------------------------------------------------------
+local KEEPOUT_MATERIALS = { [Enum.Material.Sand] = true }
+local KEEPOUT_ZONES = {
+    { name = "Karesansui", x0 = -25, x1 = 38, z0 = -16, z1 = 22 },
+}
+local function keptOut(x, z, material)
+    if material and KEEPOUT_MATERIALS[material] then
+        return true, "Sand"
+    end
+    for _, zn in ipairs(KEEPOUT_ZONES) do
+        if x >= zn.x0 and x <= zn.x1 and z >= zn.z0 and z <= zn.z1 then
+            return true, zn.name
+        end
+    end
+    return false, nil
+end
 
 local function lcg(s)
     local n = (s * 16807) % 2147483647
@@ -240,6 +267,7 @@ end
 
 local B = CONFIG.bounds
 local cands = {}
+local refused = {}
 local state = (CONFIG.seed % 2147483646) + 1
 local r
 for x = B.x0, B.x1, CONFIG.scanStep do
@@ -280,7 +308,11 @@ for x = B.x0, B.x1, CONFIG.scanStep do
                     -- buried and floating. Same species of error as the foliage
                     -- footing defect: reason about a point, then move it.
                     local jy, jmat, jn = ground(x + jx, z + jz)
-                    if jy and jmat ~= Enum.Material.Water then
+                    local blocked, byWhat = keptOut(x + jx, z + jz, jmat)
+                    if blocked then
+                        refused[byWhat] = (refused[byWhat] or 0) + 1
+                    end
+                    if jy and jmat ~= Enum.Material.Water and not blocked then
                         table.insert(cands, {
                             x = x + jx,
                             z = z + jz,
@@ -342,6 +374,15 @@ local report = ("%s\npath anchors %d; candidates %d -> chosen %d (GARDEN %d, TEN
     counts.PRESERVE,
     trampled
 )
+
+local rl = {}
+for k, v in pairs(refused) do
+    table.insert(rl, ("%s x%d"):format(k, v))
+end
+table.sort(rl)
+if #rl > 0 then
+    report = report .. ("\nkeep-outs refused: %s"):format(table.concat(rl, ", "))
+end
 
 if CONFIG.dryRun then
     return report .. "\ndryRun -- nothing placed. Set dryRun = false to scatter."
