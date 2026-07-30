@@ -52,6 +52,13 @@ local CONFIG = {
     libraryName = "MossLibrary",
     outFolder = "MossScatter",
     scale = 20.0,
+    -- The UPRIGHT families get a boost on top of the shared factor (user-gated). At
+    -- 20x a Moss_B sporophyte tuft stands 2.23 studs -- knee-high on an avatar and
+    -- easy to miss among a thousand mats -- and its whole value is being an accent you
+    -- notice. 30x puts it near 3.3. This deliberately breaks the "one factor preserves
+    -- the kit's natural variation" rule, so it is scoped to the two upright families
+    -- only; the mats that do the ground-cover work keep the shared 20x.
+    familyScale = { Moss_B = 1.5, Moss_E = 1.35 },
     maps = {
         -- TONED to match the terrain's existing moss (user: "a little brighter/
         -- lime-greener than a lot of the existing assets"). Measured, not eyeballed:
@@ -68,13 +75,24 @@ local CONFIG = {
     -- family weights. Moss_B is the sporophyte ("flowering") form and reads as an
     -- accent, so it stays a minority; the flat mats do the ground-cover work.
     mix = { Moss_A = 34, Moos_C = 20, Moss_D = 22, Moss_E = 9, Moss_B = 15 },
-    spacing = 3.0, -- uniform: moss answers to damp, not to tending (user: "a lot more")
+    -- Density is GRADED BY WATER DISTANCE, not a binary in-band gate: moss answers to
+    -- damp, so it packs at the waterline and loosens away from it (user: "plenty more
+    -- moss, especially close to the waterlines").
+    spacingNear = 2.0, -- at the water's edge
+    spacingFar = 4.0, -- at waterProximity
     trampleRadius = 3.0, -- within this of a tread, feet keep it down
-    trampleSpacing = 6.5, -- so it thins out there rather than vanishing
+    trampleSpacing = 5.5, -- so it thins out there rather than vanishing
     waterProximity = 14, -- only within this far of water: it is a WATER margin
     scanStep = 4,
     bounds = { x0 = -440, x1 = 230, z0 = -95, z1 = 95 },
-    sink = { 0.15, 0.35 }, -- fraction of height buried
+    -- ABSOLUTE studs bedded into the ground, NOT a fraction of height. It was a
+    -- fraction, which is right for a flat mat (Size.Y ~0.8, so 0.1-0.3 studs) but
+    -- badly wrong for an upright tuft: at Size.Y 2.23 the same rule buried up to 0.78
+    -- studs -- a third of it, and exactly the base the stalks spring from. Combined
+    -- with normalFollow tilting it downslope, the sporophytes ended up shorter and
+    -- flatter than designed, which is why the user could not find them. A cushion beds
+    -- in by a small fixed amount whatever its height.
+    sink = { 0.10, 0.30 },
     -- How far a clump leans toward the GROUND NORMAL rather than world up. Not a
     -- fixed angle cap: a cushion on a bank genuinely follows the bank, so the range
     -- is "mostly follow the ground, with variation".
@@ -231,35 +249,49 @@ for x = B.x0, B.x1, CONFIG.scanStep do
             local level = careLevel(x, z)
             do
                 -- is water within reach? sample a ring rather than a full disc
-                local wet = false
-                for a = 0, 315, 45 do
-                    local ra = math.rad(a)
-                    for d = 4, CONFIG.waterProximity, 5 do
+                -- nearest water, not merely "is there water": the distance drives density
+                local wetDist = nil
+                for d = 2, CONFIG.waterProximity, 2 do
+                    for a = 0, 315, 45 do
+                        local ra = math.rad(a)
                         local _, m2 = ground(x + math.cos(ra) * d, z + math.sin(ra) * d)
                         if m2 == Enum.Material.Water then
-                            wet = true
+                            wetDist = d
                             break
                         end
                     end
-                    if wet then
+                    if wetDist then
                         break
                     end
                 end
+                local wet = wetDist ~= nil
                 if wet then
                     state, r = lcg(state)
                     local jx = (r * 2 - 1) * CONFIG.scanStep * 0.45
                     state, r = lcg(state)
                     local jz = (r * 2 - 1) * CONFIG.scanStep * 0.45
                     state, r = lcg(state)
-                    table.insert(cands, {
-                        x = x + jx,
-                        z = z + jz,
-                        y = gy,
-                        n = nrm,
-                        level = level,
-                        trampled = nearestPath(x, z) <= CONFIG.trampleRadius,
-                        key = r,
-                    })
+                    -- ⚠️ RE-SAMPLE THE GROUND AT THE JITTERED POINT. Jittering the
+                    -- position while keeping the height sampled at the grid centre
+                    -- buries clumps on the downhill side and floats them on the
+                    -- uphill: a 1.8-stud lateral move changes ground height by a stud
+                    -- or more on a bank. Measured before the fix, Moss_A averaged
+                    -- 0.01 studs above ground with outliers at 13.9 -- simultaneously
+                    -- buried and floating. Same species of error as the foliage
+                    -- footing defect: reason about a point, then move it.
+                    local jy, jmat, jn = ground(x + jx, z + jz)
+                    if jy and jmat ~= Enum.Material.Water then
+                        table.insert(cands, {
+                            x = x + jx,
+                            z = z + jz,
+                            y = jy,
+                            n = jn or nrm,
+                            level = level,
+                            wetDist = wetDist,
+                            trampled = nearestPath(x + jx, z + jz) <= CONFIG.trampleRadius,
+                            key = r,
+                        })
+                    end
                 end
             end
         end
@@ -273,7 +305,11 @@ end)
 local placedPts = {}
 local chosen = {}
 for _, c in ipairs(cands) do
-    local S = c.trampled and CONFIG.trampleSpacing or CONFIG.spacing
+    local t = math.clamp((c.wetDist or CONFIG.waterProximity) / CONFIG.waterProximity, 0, 1)
+    local S = CONFIG.spacingNear + (CONFIG.spacingFar - CONFIG.spacingNear) * t
+    if c.trampled then
+        S = math.max(S, CONFIG.trampleSpacing)
+    end
     local ok = true
     for _, p in ipairs(placedPts) do
         if (p.x - c.x) ^ 2 + (p.z - c.z) ^ 2 < S * S then
@@ -342,6 +378,10 @@ for i, c in ipairs(chosen) do
     local src = pool[math.floor(r * #pool) + 1]
     local m = src:Clone()
     m.Name = ("Moss_%d"):format(i)
+    local boost = CONFIG.familyScale[fam]
+    if boost then
+        m.Size = m.Size * boost
+    end
     state, r = lcg(state)
     local sink = CONFIG.sink[1] + (CONFIG.sink[2] - CONFIG.sink[1]) * r
     state, r = lcg(state)
@@ -356,7 +396,13 @@ for i, c in ipairs(chosen) do
     if right.Magnitude < 1e-3 then
         right = blended:Cross(Vector3.new(1, 0, 0))
     end
-    m.CFrame = CFrame.fromMatrix(Vector3.new(c.x, c.y - m.Size.Y * sink, c.z), right.Unit, blended)
+    -- ⚠️ SEAT THE BOTTOM OF THE BOX, NOT ITS CENTRE. Placing the centre at ground
+    -- level buries the whole lower half of every clump -- measured, a 2.96-stud
+    -- Moss_B tuft showed only 0.89 studs, which is why the upright families looked
+    -- absent. `sink` is now what its name says: ABSOLUTE studs bedded in, applied to
+    -- the base. (It also used to be multiplied by Size.Y, so tall tufts were bedded
+    -- 3x deeper than mats -- the opposite of what an upright plant wants.)
+    m.CFrame = CFrame.fromMatrix(Vector3.new(c.x, c.y + m.Size.Y / 2 - sink, c.z), right.Unit, blended)
         * CFrame.Angles(0, yaw, 0)
     m.Parent = parent
     placed += 1
