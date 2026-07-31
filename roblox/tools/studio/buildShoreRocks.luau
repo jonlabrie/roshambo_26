@@ -523,28 +523,42 @@ local function collectExistingRocks(): { { x: number, z: number } }
     return rocks
 end
 
--- ── RockLibrary tiers ────────────────────────────────────────────────────────────────
-local function tiersFromLibrary(): { [string]: { MeshPart } }
-    local tiers: { [string]: { MeshPart } } = { anchor = {}, attendant = {}, wader = {} }
-    local lib = ServerStorage:FindFirstChild("RockLibrary")
-    if not lib then
-        warn("[shoreRocks] no ServerStorage.RockLibrary")
-        return tiers
-    end
-    local sorted: { MeshPart } = {}
-    for _, m in lib:GetChildren() do
-        if m:IsA("MeshPart") then
-            table.insert(sorted, m)
+-- ── rock tiers (RockLibrary + the Moss Kit trail stones) ─────────────────────────────
+-- dress=true marks raw RockLibrary imports (Plastic + store TextureID -> ZenCanyonRock
+-- recipe at clone time); the TrailStoneLibrary Moss Kit stones carry their own
+-- SurfaceAppearance PBR and must keep it. Kit stones are inserted TWICE so five of
+-- them still earn a real share of the small-tier picks against 49 library rocks.
+type TierEntry = { mesh: MeshPart, dress: boolean }
+
+local function tiersFromLibrary(): { [string]: { TierEntry } }
+    local tiers: { [string]: { TierEntry } } = { anchor = {}, attendant = {}, wader = {} }
+    local sorted: { TierEntry } = {}
+    local sources = {
+        { name = "RockLibrary", dress = true, copies = 1 },
+        { name = "TrailStoneLibrary", dress = false, copies = 2 },
+    }
+    for _, src in sources do
+        local lib = ServerStorage:FindFirstChild(src.name)
+        if not lib then
+            warn(`[shoreRocks] no ServerStorage.{src.name}`)
+            continue
+        end
+        for _, m in lib:GetChildren() do
+            if m:IsA("MeshPart") then
+                for _ = 1, src.copies do
+                    table.insert(sorted, { mesh = m, dress = src.dress })
+                end
+            end
         end
     end
     table.sort(sorted, function(a, b)
-        return a.Name < b.Name
+        return a.mesh.Name < b.mesh.Name
     end)
-    for _, m in sorted do
-        local long = math.max(m.Size.X, m.Size.Z)
+    for _, e in sorted do
+        local long = math.max(e.mesh.Size.X, e.mesh.Size.Z)
         for role, band in TIERS do
             if long >= band.min and long <= band.max then
-                table.insert(tiers[role], m)
+                table.insert(tiers[role], e)
             end
         end
     end
@@ -578,21 +592,27 @@ local function wipeRockFolder()
     end
 end
 
--- real solid rocks, per the existing W## falls-rock convention: collidable, shadowed,
--- and DRESSED — the RockLibrary templates are raw imports (Plastic + the store's baked
--- TextureID); the canyon recipe is clear-the-TextureID + world-space ZenCanyonRock
--- MaterialVariant (a SurfaceAppearance or baked texture smears/washes on these packs)
-local function flagRockClone(part: BasePart)
+-- real solid rocks, per the existing W## falls-rock convention: collidable, shadowed.
+-- dress=true (RockLibrary raw imports): clear the store's baked TextureID and apply
+-- the canonical river-rock look — the base-Rock ZenCanyonRock MaterialVariant
+-- (ColorMap rbxassetid://132831870698274; its Basalt-based namesake was retired
+-- 2026-07-31 as ZenCanyonRock_RETIRED, 0 users). dress=false (Moss Kit trail
+-- stones): they carry their own SurfaceAppearance PBR — leave the look alone.
+local function flagRockClone(part: BasePart, dress: boolean)
     part.Anchored = true
     part.CanCollide = true
     part.CastShadow = true
     part.CanQuery = true
     part.CanTouch = false
-    part.Material = Enum.Material.Rock
-    part.MaterialVariant = "ZenCanyonRock"
+    if dress then
+        part.Material = Enum.Material.Rock
+        part.MaterialVariant = "ZenCanyonRock"
+    end
     if part:IsA("MeshPart") then
         part.RenderFidelity = Enum.RenderFidelity.Automatic
-        part.TextureID = ""
+        if dress then
+            part.TextureID = ""
+        end
     end
 end
 
@@ -647,7 +667,8 @@ local function bake(
         end
         local r
         state, r = lcg(state)
-        local template = pool[math.floor(r * #pool) + 1]
+        local entry = pool[math.floor(r * #pool) + 1]
+        local template = entry.mesh
 
         local hit = workspace:Raycast(Vector3.new(p.x, 400, p.z), Vector3.new(0, -900, 0), rp)
         if not hit then
@@ -669,7 +690,7 @@ local function bake(
         local sink = clone.Size.Y * (SINK_FRACTION[p.role] or 0.25)
         clone.CFrame = CFrame.new(p.x, hit.Position.Y - sink + clone.Size.Y / 2, p.z)
             * CFrame.Angles(0, p.yaw, 0)
-        flagRockClone(clone)
+        flagRockClone(clone, entry.dress)
         clone.Parent = folder
         placed += 1
         perRole[p.role] = (perRole[p.role] or 0) + 1
