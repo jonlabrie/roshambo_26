@@ -626,3 +626,242 @@ describe("ZoneScatter care-banded density", function()
         end
     end)
 end)
+
+describe("ZoneScatter grove pre-pass", function()
+    local GROVE_POOL = {
+        { name = "SugiMidA", weight = 1 },
+        { name = "MapleA", weight = 1 },
+        { name = "PineA", weight = 1 },
+    }
+
+    local function groveRecipe(): ZoneScatter.Recipe
+        local r = table.clone(CORE)
+        r.pool = GROVE_POOL
+        r.grove = {
+            spacing = 30,
+            radiusMin = 3,
+            radiusMax = 7,
+            membersMin = 3,
+            membersMax = 6,
+            memberSpacing = 3,
+            dominantScale = 1.6,
+            anchorDarts = 60,
+            maxGroves = 4,
+        }
+        return r
+    end
+
+    local function groveZones(): { ZoneScatter.Zone }
+        return {
+            {
+                name = "Grove",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "Grove",
+                densityScale = 1,
+                seed = 11,
+            },
+        }
+    end
+
+    -- single-linkage clustering: link any two placements within `linkDist`,
+    -- transitively. Simplest robust way to test "grove structure" without
+    -- assuming the planner's own internal bookkeeping.
+    local function clusterPlacements(
+        placements: { ZoneScatter.Placement },
+        linkDist: number
+    ): { { ZoneScatter.Placement } }
+        local clusters: { { ZoneScatter.Placement } } = {}
+        for _, p in placements do
+            local merged: { ZoneScatter.Placement } = { p }
+            local kept: { { ZoneScatter.Placement } } = {}
+            for _, cluster in clusters do
+                local linked = false
+                for _, q in cluster do
+                    local dx, dz = p.x - q.x, p.z - q.z
+                    if dx * dx + dz * dz <= linkDist * linkDist then
+                        linked = true
+                        break
+                    end
+                end
+                if linked then
+                    for _, q in cluster do
+                        table.insert(merged, q)
+                    end
+                else
+                    table.insert(kept, cluster)
+                end
+            end
+            table.insert(kept, merged)
+            clusters = kept
+        end
+        return clusters
+    end
+
+    test("deterministic: same grove input twice = identical output", function()
+        local recipe = groveRecipe()
+        local out1 = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = recipe })
+        local out2 = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = recipe })
+        expect(#out1).toBe(#out2)
+        for i, p in out1 do
+            expect(p.x).toBe(out2[i].x)
+            expect(p.z).toBe(out2[i].z)
+            expect(p.species).toBe(out2[i].species)
+            expect(p.scale).toBe(out2[i].scale)
+        end
+    end)
+
+    test("clustering: groves form <= maxGroves clusters, each within [1, membersMax]", function()
+        local recipe = groveRecipe()
+        local out = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = recipe })
+        expect(#out > 0).toBe(true)
+        local clusters = clusterPlacements(out, recipe.grove.radiusMax * 2)
+        expect(#clusters <= recipe.grove.maxGroves).toBe(true)
+        for _, c in clusters do
+            expect(#c >= 1).toBe(true)
+            expect(#c <= recipe.grove.membersMax).toBe(true)
+        end
+    end)
+
+    test("meadows: with spacing 50, cluster centroids stay spacing*0.8 apart", function()
+        local recipe = groveRecipe()
+        recipe.grove.spacing = 50
+        recipe.grove.maxGroves = 3
+        recipe.grove.anchorDarts = 300
+        local out = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = recipe })
+        local clusters = clusterPlacements(out, recipe.grove.radiusMax * 2)
+        expect(#clusters >= 2).toBe(true)
+        local centroids = {}
+        for _, c in clusters do
+            local sx, sz = 0, 0
+            for _, p in c do
+                sx += p.x
+                sz += p.z
+            end
+            table.insert(centroids, { sx / #c, sz / #c })
+        end
+        for i = 1, #centroids do
+            for j = i + 1, #centroids do
+                local dx, dz = centroids[i][1] - centroids[j][1], centroids[i][2] - centroids[j][2]
+                expect(dx * dx + dz * dz >= (recipe.grove.spacing * 0.8) ^ 2).toBe(true)
+            end
+        end
+    end)
+
+    test("species coherence: each cluster has <= 2 distinct species", function()
+        local recipe = groveRecipe()
+        local out = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = recipe })
+        local clusters = clusterPlacements(out, recipe.grove.radiusMax * 2)
+        expect(#clusters > 0).toBe(true)
+        for _, c in clusters do
+            local species: { [string]: boolean } = {}
+            for _, p in c do
+                species[p.species] = true
+            end
+            local n = 0
+            for _ in species do
+                n += 1
+            end
+            expect(n <= 2).toBe(true)
+        end
+    end)
+
+    test("elder: cluster max scale reflects dominantScale and beats the median", function()
+        local recipe = groveRecipe()
+        local out = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = recipe })
+        local clusters = clusterPlacements(out, recipe.grove.radiusMax * 2)
+        expect(#clusters > 0).toBe(true)
+        local sawMultiMember = false
+        for _, c in clusters do
+            local scales = {}
+            for _, p in c do
+                table.insert(scales, p.scale)
+            end
+            table.sort(scales)
+            local maxScale = scales[#scales]
+            expect(maxScale >= recipe.grove.dominantScale * (1 - recipe.scaleJitter)).toBe(true)
+            if #scales > 1 then
+                sawMultiMember = true
+                local median
+                local n = #scales
+                if n % 2 == 1 then
+                    median = scales[(n + 1) / 2]
+                else
+                    median = (scales[n / 2] + scales[n / 2 + 1]) / 2
+                end
+                expect(maxScale > median).toBe(true)
+            end
+        end
+        expect(sawMultiMember).toBe(true)
+    end)
+
+    test("gates hold: keepOut vetoes grove anchors and members alike", function()
+        local recipe = groveRecipe()
+        recipe.grove.spacing = 15
+        recipe.grove.anchorDarts = 200
+        recipe.grove.maxGroves = 6
+        local out = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = recipe }, nil, nil, {
+            keepOut = function(x, _z, _m)
+                return x > 50
+            end,
+        })
+        expect(#out > 0).toBe(true)
+        for _, p in out do
+            expect(p.x <= 50).toBe(true)
+        end
+    end)
+
+    test("groveAffinity plants understory only near grove placements", function()
+        local canopy = groveRecipe()
+        local understory = table.clone(CORE)
+        understory.layer = "understory"
+        understory.pool = { { name = "FernA", weight = 1 } }
+        understory.spacingMin = 2
+        understory.spacingMax = 3
+        understory.groveAffinity = { radius = 20, inside = 1, outside = 0 }
+        local zones: { ZoneScatter.Zone } = {
+            {
+                name = "Grove",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "Grove",
+                densityScale = 1,
+                seed = 11,
+            },
+            {
+                name = "Under",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "Under",
+                densityScale = 1,
+                seed = 12,
+            },
+        }
+        local out = ZoneScatter.plan(zones, flatSamples(), { Grove = canopy, Under = understory })
+        local canopyPlacements = {}
+        local understoryPlacements = {}
+        for _, p in out do
+            if p.zone == "Grove" then
+                table.insert(canopyPlacements, p)
+            elseif p.zone == "Under" then
+                table.insert(understoryPlacements, p)
+            end
+        end
+        expect(#canopyPlacements > 0).toBe(true)
+        expect(#understoryPlacements > 0).toBe(true)
+        for _, u in understoryPlacements do
+            local nearest = math.huge
+            for _, c in canopyPlacements do
+                local dx, dz = u.x - c.x, u.z - c.z
+                nearest = math.min(nearest, dx * dx + dz * dz)
+            end
+            expect(nearest <= 20 * 20).toBe(true)
+        end
+    end)
+
+    test("a grove-recipe zone does not plant via the per-sample path", function()
+        local recipe = groveRecipe()
+        local out = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = recipe })
+        expect(#out <= recipe.grove.maxGroves * recipe.grove.membersMax).toBe(true)
+    end)
+end)
