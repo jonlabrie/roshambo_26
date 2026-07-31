@@ -91,9 +91,11 @@ local Recipes: { [string]: Recipe } = {
         maxSteep = 0.55,
         waterMargin = 3,
         scaleJitter = 0.15,
-        pathMargin = 7,
+        -- gate-tuned 2026-07-31 (previously per-bake overrides): looser path
+        -- standoff + footing tolerance let the canopy actually take the slopes
+        pathMargin = 5,
         footingRadius = 2.5,
-        footingMaxDrop = 4,
+        footingMaxDrop = 6,
         -- grove pre-pass fix (2026-07-30): the per-sample gate (steep/footing/
         -- spacing) was rejecting canopy so uniformly that the forest read as a
         -- thin, even scatter instead of a wood — real trees cluster. Anchors
@@ -314,7 +316,9 @@ local Recipes: { [string]: Recipe } = {
         maxSteep = 0.55,
         waterMargin = 4,
         scaleJitter = 0.15,
-        pathMargin = 6,
+        -- gate-tuned 2026-07-31 (previously per-bake overrides)
+        pathMargin = 4,
+        footingMaxDrop = 6,
         innerClear = 0.5,
     },
 }
