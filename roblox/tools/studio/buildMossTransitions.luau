@@ -201,10 +201,12 @@ local function perimeterSeeds(x: number, z: number, y: number, radius: number, k
     end
 end
 
--- stone: the 35 ^Stone_ trail-stone BaseParts, plus any Model whose name reads as a
--- rock (covers CanyonWorld.Arena's rock models and any RockLibrary-sourced clones,
--- wherever under CanyonWorld they were scattered — e.g. greenCanyon's "Mid Rock 3" /
--- "Militia Rock 1" style names).
+-- stone: every ^Stone_ BasePart (the 35 trail stones + the 2026-07-31 Stone_Shore_*
+-- pool-waterline rocks), plus each INDIVIDUAL child BasePart of any Model whose name
+-- reads as a rock (the W##_*_Rocks falls/run groups, Reach/Channel rocks). Never the
+-- container's own bounding box: a rock-group model spans a whole falls run, and a
+-- perimeter ring around that bbox seeds moss in a giant circle through open water
+-- (caught 2026-07-31 while scoping the pass).
 local function collectStoneSeeds(): { Seed }
     local seeds: { Seed } = {}
     local cw = workspace:FindFirstChild("CanyonWorld")
@@ -213,11 +215,16 @@ local function collectStoneSeeds(): { Seed }
         return seeds
     end
     for _, d in cw:GetDescendants() do
-        local isStonePart = d:IsA("BasePart") and d.Name:match("^Stone_") ~= nil
-        local isRockModel = d:IsA("Model") and d.Name:lower():find("rock") ~= nil
-        if isStonePart or isRockModel then
-            local x, z, y, radius = pvFooting(d :: PVInstance)
-            perimeterSeeds(x, z, y, radius, "stone", seeds)
+        if d:IsA("BasePart") then
+            local isStonePart = d.Name:match("^Stone_") ~= nil
+            local parent = d.Parent
+            local inRockModel = parent ~= nil
+                and parent:IsA("Model")
+                and parent.Name:lower():find("rock") ~= nil
+            if isStonePart or inRockModel then
+                local x, z, y, radius = pvFooting(d :: PVInstance)
+                perimeterSeeds(x, z, y, radius, "stone", seeds)
+            end
         end
     end
     return seeds
