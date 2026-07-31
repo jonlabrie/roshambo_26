@@ -578,15 +578,21 @@ local function wipeRockFolder()
     end
 end
 
--- real solid rocks, per the existing W## falls-rock convention: collidable, shadowed
+-- real solid rocks, per the existing W## falls-rock convention: collidable, shadowed,
+-- and DRESSED — the RockLibrary templates are raw imports (Plastic + the store's baked
+-- TextureID); the canyon recipe is clear-the-TextureID + world-space ZenCanyonRock
+-- MaterialVariant (a SurfaceAppearance or baked texture smears/washes on these packs)
 local function flagRockClone(part: BasePart)
     part.Anchored = true
     part.CanCollide = true
     part.CastShadow = true
     part.CanQuery = true
     part.CanTouch = false
+    part.Material = Enum.Material.Rock
+    part.MaterialVariant = "ZenCanyonRock"
     if part:IsA("MeshPart") then
         part.RenderFidelity = Enum.RenderFidelity.Automatic
+        part.TextureID = ""
     end
 end
 
