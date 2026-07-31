@@ -124,7 +124,7 @@ local RECIPES: { [string]: Recipe } = {
         -- elders sell the grove read. gate feedback (2026-07-31, again):
         -- fewer, fuller stands; slots retry for ground.
         grove = {
-            spacing = 55,
+            spacing = 45,
             radiusMin = 8,
             radiusMax = 20,
             membersMin = 5,
@@ -132,7 +132,7 @@ local RECIPES: { [string]: Recipe } = {
             memberSpacing = 7,
             dominantScale = 1.25,
             anchorDarts = 300,
-            maxGroves = 6,
+            maxGroves = 12,
             memberTries = 6,
             saplings = {
                 chance = 0.25,

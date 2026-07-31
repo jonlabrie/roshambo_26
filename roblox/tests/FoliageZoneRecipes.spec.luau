@@ -172,7 +172,7 @@ describe("grove pre-pass", function()
     test("PreserveCore reshaped to fewer, fuller groves with member retries", function()
         local grove = Recipes.PreserveCore.grove
         assert(grove ~= nil)
-        expect(grove.maxGroves).toBe(6)
+        expect(grove.maxGroves).toBe(12)
         expect(grove.membersMin).toBe(5)
         expect(grove.radiusMax).toBe(20)
         expect(grove.memberTries).toBe(6)
