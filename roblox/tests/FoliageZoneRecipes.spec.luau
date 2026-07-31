@@ -185,6 +185,18 @@ describe("grove pre-pass", function()
         expect(grove.memberTries).toBe(6)
         expect(grove.memberTries ~= nil and grove.memberTries > 0).toBe(true)
     end)
+    -- free-mix (2026-07-31): the sugi hero stand should read as genuinely
+    -- mixed, so it opts OUT of the coherent dominant/attendant pairing that
+    -- every other grove uses by default.
+    test("SugiStand free-mixes; PreserveCore stays coherent", function()
+        expect(Recipes.SugiStand.grove ~= nil).toBe(true)
+        local sugiGrove = Recipes.SugiStand.grove
+        assert(sugiGrove ~= nil)
+        expect(sugiGrove.coherent).toBe(false)
+        local coreGrove = Recipes.PreserveCore.grove
+        assert(coreGrove ~= nil)
+        expect(coreGrove.coherent == nil or coreGrove.coherent == true).toBe(true)
+    end)
 end)
 
 describe("waterline ecology", function()

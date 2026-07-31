@@ -52,6 +52,11 @@ export type GroveConfig = {
     -- the old single-shot behavior). Real terrain rejects a lot of single
     -- darts; retries let a slot fight for open ground instead of just dying.
     memberTries: number?,
+    -- optional: false = FREE-MIX. Every placement (elder included) draws its
+    -- species independently from the full pool instead of the dominant/
+    -- attendant pair, for a "hero stand" that's genuinely mixed. Default/nil
+    -- = true = the ordinary coherent dominant/attendant grove.
+    coherent: boolean?,
 }
 export type GroveAffinity = { radius: number, inside: number, outside: number }
 -- THE FOUR BANDS (the user's structure, and the point of the whole system):
@@ -247,6 +252,8 @@ local Recipes: { [string]: Recipe } = {
             anchorDarts = 200,
             maxGroves = 1,
             memberTries = 8,
+            -- free-mix: hero stand draws all six sculpted variants
+            coherent = false,
             saplings = {
                 chance = 0.35,
                 map = {

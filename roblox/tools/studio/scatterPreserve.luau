@@ -79,6 +79,11 @@ type GroveConfig = {
     -- the old single-shot behavior). Real terrain rejects a lot of single
     -- darts; retries let a slot fight for open ground instead of just dying.
     memberTries: number?,
+    -- optional: false = FREE-MIX. Every placement (elder included) draws its
+    -- species independently from the full pool instead of the dominant/
+    -- attendant pair, for a "hero stand" that's genuinely mixed. Default/nil
+    -- = true = the ordinary coherent dominant/attendant grove.
+    coherent: boolean?,
 }
 type GroveAffinity = { radius: number, inside: number, outside: number }
 -- THE FOUR BANDS (the user's structure, and the point of the whole system):
@@ -274,6 +279,8 @@ local RECIPES: { [string]: Recipe } = {
             anchorDarts = 200,
             maxGroves = 1,
             memberTries = 8,
+            -- free-mix: hero stand draws all six sculpted variants
+            coherent = false,
             saplings = {
                 chance = 0.35,
                 map = {
@@ -703,20 +710,33 @@ local function plan(
             end
             table.insert(zoneAnchors, { ax, az })
 
-            -- dominant + attendant species for this grove; excluding the
-            -- dominant entry from the attendant roll degenerates to the same
-            -- species when the pool only has one entry
-            local domSpecies, domScale = pickSpecies(recipe.pool, groveRoll(zone))
-            local attPool: { Species } = {}
-            for _, sp in recipe.pool do
-                if sp.name ~= domSpecies then
-                    table.insert(attPool, sp)
+            -- COHERENT (default: coherent ~= false): dominant + attendant
+            -- species for this grove; excluding the dominant entry from the
+            -- attendant roll degenerates to the same species when the pool
+            -- only has one entry.
+            -- FREE-MIX (coherent == false): every placement, elder included,
+            -- draws independently from the full pool — a "hero stand" rather
+            -- than a coherent clump. The dominant/attendant rolls never enter
+            -- the stream in this mode: draw only what's used.
+            local coherent = grove.coherent ~= false
+            local domSpecies, domScale, attSpecies, attScale
+            local elderSpecies, elderScale
+            if coherent then
+                domSpecies, domScale = pickSpecies(recipe.pool, groveRoll(zone))
+                local attPool: { Species } = {}
+                for _, sp in recipe.pool do
+                    if sp.name ~= domSpecies then
+                        table.insert(attPool, sp)
+                    end
                 end
+                if #attPool == 0 then
+                    attPool = recipe.pool
+                end
+                attSpecies, attScale = pickSpecies(attPool, groveRoll(zone))
+                elderSpecies, elderScale = domSpecies, domScale
+            else
+                elderSpecies, elderScale = pickSpecies(recipe.pool, groveRoll(zone))
             end
-            if #attPool == 0 then
-                attPool = recipe.pool
-            end
-            local attSpecies, attScale = pickSpecies(attPool, groveRoll(zone))
 
             local memberCount = grove.membersMin
                 + math.floor(groveRoll(zone) * (grove.membersMax - grove.membersMin + 1))
@@ -726,11 +746,11 @@ local function plan(
                 x = ax,
                 z = az,
                 y = gs.y,
-                species = domSpecies,
+                species = elderSpecies,
                 yaw = groveRoll(zone) * 2 * math.pi,
                 scale = (1 + (groveRoll(zone) * 2 - 1) * recipe.scaleJitter)
                     * heightScale
-                    * domScale
+                    * elderScale
                     * grove.dominantScale,
                 zone = zone.name,
                 layer = layer,
@@ -780,10 +800,14 @@ local function plan(
                         continue
                     end
                     local mSpecies, mScale
-                    if groveRoll(zone) < GROVE_ATTENDANT_THRESHOLD then
-                        mSpecies, mScale = domSpecies, domScale
+                    if coherent then
+                        if groveRoll(zone) < GROVE_ATTENDANT_THRESHOLD then
+                            mSpecies, mScale = domSpecies, domScale
+                        else
+                            mSpecies, mScale = attSpecies, attScale
+                        end
                     else
-                        mSpecies, mScale = attSpecies, attScale
+                        mSpecies, mScale = pickSpecies(recipe.pool, groveRoll(zone))
                     end
                     -- sapling roll: always drawn on a successful attempt,
                     -- whether or not this recipe configures `saplings`, so
