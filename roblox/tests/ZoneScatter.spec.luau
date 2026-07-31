@@ -1039,4 +1039,70 @@ describe("ZoneScatter grove pre-pass", function()
             end
         )
     end)
+
+    describe("free-mix groves (coherent = false)", function()
+        local SIX_POOL = {
+            { name = "SpA", weight = 1 },
+            { name = "SpB", weight = 1 },
+            { name = "SpC", weight = 1 },
+            { name = "SpD", weight = 1 },
+            { name = "SpE", weight = 1 },
+            { name = "SpF", weight = 1 },
+        }
+
+        local function freeMixRecipe(): ZoneScatter.Recipe
+            local r = table.clone(CORE)
+            r.pool = SIX_POOL
+            r.grove = {
+                spacing = 30,
+                radiusMin = 3,
+                radiusMax = 7,
+                membersMin = 5,
+                membersMax = 8,
+                memberSpacing = 3,
+                dominantScale = 1.6,
+                anchorDarts = 60,
+                maxGroves = 4,
+                memberTries = 4,
+                coherent = false,
+            }
+            return r
+        end
+
+        test("coherent unset behaves byte-identically to before (coherent = true explicit)", function()
+            local explicitTrue = groveRecipe()
+            explicitTrue.grove.coherent = true
+            local unset = groveRecipe()
+            local outA = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = explicitTrue })
+            local outB = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = unset })
+            expect(#outA).toBe(#outB)
+            for i, p in outA do
+                expect(p.x).toBe(outB[i].x)
+                expect(p.z).toBe(outB[i].z)
+                expect(p.species).toBe(outB[i].species)
+                expect(p.scale).toBe(outB[i].scale)
+                expect(p.yaw).toBe(outB[i].yaw)
+            end
+        end)
+
+        test("coherent=false with a 6-species pool yields >=3 distinct species in one grove", function()
+            local recipe = freeMixRecipe()
+            local out = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = recipe })
+            expect(#out > 0).toBe(true)
+            local clusters = clusterPlacements(out, recipe.grove.radiusMax * 2)
+            local bestDistinct = 0
+            for _, c in clusters do
+                local species: { [string]: boolean } = {}
+                for _, p in c do
+                    species[p.species] = true
+                end
+                local n = 0
+                for _ in species do
+                    n += 1
+                end
+                bestDistinct = math.max(bestDistinct, n)
+            end
+            expect(bestDistinct >= 3).toBe(true)
+        end)
+    end)
 end)
