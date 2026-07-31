@@ -181,7 +181,12 @@ local BAKE_SEED_OFFSET = 700000 -- keeps the bake-time species-within-family str
 -- ── seed generation: one function per kind ───────────────────────────────────────────
 
 local function pvFooting(pv: PVInstance): (number, number, number, number)
-    local cf, size = pv:GetBoundingBox()
+    local cf: CFrame, size: Vector3
+    if pv:IsA("BasePart") then
+        cf, size = pv.CFrame, pv.Size
+    else
+        cf, size = (pv :: Model):GetBoundingBox()
+    end
     local radius = math.max(size.X, size.Z) / 2
     return cf.Position.X, cf.Position.Z, cf.Position.Y - size.Y / 2, radius
 end
