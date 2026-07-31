@@ -72,6 +72,7 @@ describe("recipes name only species that exist", function()
     -- the kit as of Task 1-3 + the reed/weed exemplars Task 11 clones in
     local KNOWN = {
         ReedClump = true,
+        TallWeeds = true,
         WeedStalks = true,
         FernClump = true, -- drop this line if the Task 4 verdict was park
         XfHinokiT = true,
