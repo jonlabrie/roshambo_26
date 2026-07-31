@@ -510,12 +510,15 @@ local function collectExistingRocks(): { { x: number, z: number } }
     end
     for _, d in cw:GetDescendants() do
         if d:IsA("BasePart") then
+            -- our own previous bake matches ^Stone_ too; standoff from it would
+            -- push every re-bake away from the last one's spots (self-interference)
+            local isOwnOutput = d.Name:match("^Stone_Shore_") ~= nil
             local isStone = d.Name:match("^Stone_") ~= nil
             local parent = d.Parent
             local inRockModel = parent ~= nil
                 and parent:IsA("Model")
                 and parent.Name:lower():find("rock") ~= nil
-            if isStone or inRockModel then
+            if (isStone or inRockModel) and not isOwnOutput then
                 table.insert(rocks, { x = d.Position.X, z = d.Position.Z })
             end
         end
