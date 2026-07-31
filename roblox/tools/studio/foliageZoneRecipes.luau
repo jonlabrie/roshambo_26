@@ -249,11 +249,11 @@ local Recipes: { [string]: Recipe } = {
             radiusMax = 16,
             membersMin = 7,
             membersMax = 10,
-            memberSpacing = 5,
+            memberSpacing = 4.5,
             dominantScale = 1.2,
             anchorDarts = 200,
             maxGroves = 1,
-            memberTries = 8,
+            memberTries = 16,
             -- free-mix: hero stand draws all six sculpted variants
             coherent = false,
             saplings = {
