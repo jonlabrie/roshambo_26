@@ -112,10 +112,9 @@ local Recipes: { [string]: Recipe } = {
     },
     WaterMargin = {
         pool = {
-            { name = "MuhlyGrass", weight = 45 },
-            { name = "ReedClump", weight = 30 },
-            { name = "WeedStalks", weight = 15 },
-            { name = "FernClump", weight = 10 },
+            { name = "ReedClump", weight = 45 },
+            { name = "WeedStalks", weight = 30 },
+            { name = "FernClump", weight = 25 },
         },
         spacingMin = 4,
         spacingMax = 8,

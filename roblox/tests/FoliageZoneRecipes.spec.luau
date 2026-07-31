@@ -71,7 +71,6 @@ end)
 describe("recipes name only species that exist", function()
     -- the kit as of Task 1-3 + the reed/weed exemplars Task 11 clones in
     local KNOWN = {
-        MuhlyGrass = true,
         ReedClump = true,
         WeedStalks = true,
         FernClump = true, -- drop this line if the Task 4 verdict was park
@@ -103,7 +102,7 @@ describe("waterline ecology", function()
         expect(Recipes.WaterMargin.maxSteep <= 0.4).toBe(true)
     end)
     test("reeds wade, muhly keeps damp feet only", function()
-        expect(Recipes.WaterMargin.pool[1].name).toBe("MuhlyGrass")
+        expect(Recipes.WaterMargin.pool[1].name).toBe("ReedClump")
         expect(Recipes.WaterMargin.submergeMax ~= nil).toBe(true)
     end)
 end)
