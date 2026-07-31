@@ -7,7 +7,7 @@
 -- and Sample shape as CanopyScatter.
 local ZoneScatter = {}
 
-export type Sample = { x: number, z: number, y: number, steep: number, depth: number? }
+export type Sample = { x: number, z: number, y: number, steep: number, depth: number?, material: string? }
 export type Zone = {
     name: string, -- bake folder name
     shape: "rect" | "circle",
@@ -326,6 +326,9 @@ function ZoneScatter.plan(
     -- site gates: everything that depends only on the sample and the recipe, so
     -- a layered zone that rejects a sample falls through to the zone beneath it
     local function accepts(zone: Zone, s: Sample): boolean
+        if o.keepOut ~= nil and o.keepOut(s.x, s.z, s.material) then
+            return false
+        end
         local recipe = recipes[zone.recipe]
         if recipe == nil then
             return false
@@ -426,7 +429,14 @@ function ZoneScatter.plan(
                 -- steep ground that the parent's rules excluded
                 local cs = nearestSample(ordered, cx, cz)
                 local cy = if cs then cs.y else 0
-                local probe: Sample = { x = cx, z = cz, y = cy, steep = if cs then cs.steep else 0 }
+                local probe: Sample = {
+                    x = cx,
+                    z = cz,
+                    y = cy,
+                    steep = if cs then cs.steep else 0,
+                    depth = cs and cs.depth or nil,
+                    material = cs and cs.material or nil,
+                }
                 local czone = resolveZone(zones, cx, cz, cy, function(candidate)
                     return accepts(candidate, probe)
                 end)

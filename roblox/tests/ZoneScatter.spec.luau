@@ -543,3 +543,60 @@ describe("ZoneScatter submersion", function()
         end
     end)
 end)
+
+describe("ZoneScatter keep-out gate", function()
+    local CanyonKeepOuts = require("../tools/builders/CanyonKeepOuts")
+    local zones: { ZoneScatter.Zone } = {
+        {
+            name = "A",
+            shape = "rect",
+            bounds = { 0, 0, 100, 100 },
+            recipe = "R",
+            densityScale = 1,
+            seed = 7,
+        },
+    }
+
+    test("an injected keep-out vetoes ground and clump children alike", function()
+        local clumpy = table.clone(CORE)
+        clumpy.clumpChance = 1
+        clumpy.clumpSize = 3
+        local placements = ZoneScatter.plan(zones, flatSamples(), { R = clumpy }, nil, nil, {
+            keepOut = function(x, _z, _m)
+                return x > 50
+            end,
+        })
+        expect(#placements > 0).toBe(true)
+        for _, p in placements do
+            expect(p.x <= 50).toBe(true)
+        end
+    end)
+
+    test("CanyonKeepOuts slots straight in as the callback", function()
+        -- samples over the karesansui zone (x -25..38, z -16..22) get vetoed
+        local samples = {}
+        for x = -40, 60, 4 do
+            for z = -30, 40, 4 do
+                table.insert(samples, { x = x, z = z, y = 0, steep = 0 })
+            end
+        end
+        local wide: { ZoneScatter.Zone } = {
+            {
+                name = "W",
+                shape = "rect",
+                bounds = { -40, -30, 60, 40 },
+                recipe = "R",
+                densityScale = 1,
+                seed = 3,
+            },
+        }
+        local placements = ZoneScatter.plan(wide, samples, { R = CORE }, nil, nil, {
+            keepOut = function(x, z, m)
+                return (CanyonKeepOuts.blocks(x, z, m))
+            end,
+        })
+        for _, p in placements do
+            expect(CanyonKeepOuts.zoneAt(p.x, p.z)).toBe(nil)
+        end
+    end)
+end)
