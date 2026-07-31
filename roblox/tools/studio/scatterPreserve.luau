@@ -746,6 +746,15 @@ local function readZones(): { Zone }
             })
         end
     end
+    -- Overlapping-zone priority is LAST-first in the planner, and GetChildren
+    -- order reshuffles across Studio sessions (it silently flipped Margin vs
+    -- CoreUnder bank claims between two identical bakes). Sort by name so
+    -- priority is stable and intentional: alphabetically-last wins, which puts
+    -- Margin above the Core/Fringe body — the spec's "margin takes the bank
+    -- samples, the forest keeps the rest".
+    table.sort(zones, function(a, b)
+        return a.name < b.name
+    end)
     return zones
 end
 
