@@ -166,73 +166,8 @@ def compose_atlas(front_png, side_png, top_png, out_png):
         bpy.data.images.remove(img)
 
 
-def build_clump(name, aspect_front, aspect_side, occ_front, occ_side, occ_top, atlas_png):
-    """Three crossed vertical planes + two horizontal top caps, all shelled.
-
-    Verticals carry the front/side bakes (one coherent single-plant silhouette
-    at ground level); the caps carry the top-down bake for the canyon's many
-    high vantage points, where crossed verticals read as a star. Every quad is
-    duplicated as a front/back shell pair (no DoubleSided flag, no transmission
-    path, no backface normal-flip), and every vertex carries an up-biased
-    stable normal so lighting barely shifts with camera/sun angle. 20 tris.
-
-    occ_* are the (width, height) fractions of each square tile the plant actually
-    occupies (centred); UVs map each card to exactly that sub-rect.
-    """
-    h = HEIGHT_STUDS
-    mesh = bpy.data.meshes.new(name)
-    verts, faces, uvs = [], [], []
-    # v6's proven layout: three crossed planes, one coherent single-plant
-    # silhouette from every angle. (v7/v8's many-small-cards fan showed the whole
-    # plant image N times at varied scale/offset — ghost-copy chaos, reverted.)
-    widths = [h * aspect_front, h * aspect_side, h * aspect_front]
-    occs = [occ_front, occ_side, occ_front]
-    sides = [False, True, False]
-    for i in range(3):
-        ang = math.radians(60 * i)
-        dx, dy = math.cos(ang), math.sin(ang)
-        fx, fz = occs[i]
-        use_side = sides[i]
-        w = widths[i] / 2
-        ch = h
-        base = len(verts)
-        verts += [
-            (-w * dx, -w * dy, 0.0),
-            (w * dx, w * dy, 0.0),
-            (w * dx, w * dy, ch),
-            (-w * dx, -w * dy, ch),
-        ]
-        faces.append((base, base + 1, base + 2, base + 3))
-        uc = 0.75 if use_side else 0.25
-        u0, u1 = uc - 0.25 * fx, uc + 0.25 * fx  # tiles span half the atlas
-        v0, v1 = 0.75 - 0.25 * fz, 0.75 + 0.25 * fz  # vertical tiles: upper row
-        uvs.append([(u0, v0), (u1, v0), (u1, v1), (u0, v1)])
-        # back shell: same card, reversed winding, so BOTH sides exist as real
-        # geometry with OUR normals — Roblox's DoubleSided backface normal-flip
-        # (which would shade bent/up normals dark from behind) never engages,
-        # and DoubleSided stays FALSE (also avoids the pale-foliage
-        # transmission blowout path entirely)
-        b2 = len(verts)
-        verts += [verts[base], verts[base + 3], verts[base + 2], verts[base + 1]]
-        faces.append((b2, b2 + 1, b2 + 2, b2 + 3))
-        uvs.append([(u0, v0), (u0, v1), (u1, v1), (u1, v0)])
-
-    # TOP CAPS: the canyon is full of high vantage points, and vertical crossed
-    # cards read as a star from above. Two horizontal cards at plume height carry
-    # the baked top-down view; verticals still carry ground-level views.
-    ftx, fty = occ_top
-    for zc, s in ((h * 0.60, 1.0), (h * 0.78, 0.85)):
-        wx, wy = h * aspect_front * 0.5 * s, h * aspect_side * 0.5 * s
-        u0, u1 = 0.25 - 0.25 * ftx * s, 0.25 + 0.25 * ftx * s
-        v0, v1 = 0.25 - 0.25 * fty * s, 0.25 + 0.25 * fty * s
-        base = len(verts)
-        verts += [(-wx, -wy, zc), (wx, -wy, zc), (wx, wy, zc), (-wx, wy, zc)]
-        faces.append((base, base + 1, base + 2, base + 3))
-        uvs.append([(u0, v0), (u1, v0), (u1, v1), (u0, v1)])
-        b2 = len(verts)
-        verts += [verts[base], verts[base + 3], verts[base + 2], verts[base + 1]]
-        faces.append((b2, b2 + 1, b2 + 2, b2 + 3))
-        uvs.append([(u0, v0), (u0, v1), (u1, v1), (u1, v0)])
+def _finish_mesh(mesh_name, verts, faces, uvs, mat, h):
+    mesh = bpy.data.meshes.new(mesh_name)
     mesh.from_pydata(verts, [], faces)
     uv_layer = mesh.uv_layers.new(name="UVMap")
     li = 0
@@ -241,10 +176,8 @@ def build_clump(name, aspect_front, aspect_side, occ_front, occ_side, occ_top, a
             uv_layer.data[li].uv = corner_uv
             li += 1
     mesh.update()
-
-    # UP-BIASED normals on every vertex of BOTH shells: every face of every card
-    # takes near-identical lighting from any camera/sun angle (the lighting-stable
-    # grass trick). 70% up + 30% outward keeps a whisper of volume shading.
+    # UP-BIASED stable normals (70% up + 30% outward from a point below the
+    # core): every face takes near-identical lighting from any camera/sun angle
     import mathutils
 
     core = mathutils.Vector((0.0, 0.0, -h * 0.25))
@@ -255,9 +188,82 @@ def build_clump(name, aspect_front, aspect_side, occ_front, occ_side, occ_top, a
         stable.append((up * 0.7 + out * 0.3).normalized())
     try:
         mesh.normals_split_custom_set_from_vertices(stable)
-        print(f"  stable normals OK ({len(stable)} verts)")
+        print(f"  stable normals OK ({mesh_name}: {len(stable)} verts)")
     except Exception as e:
-        print(f"  stable normals FAILED ({e}) — cards will shade flat")
+        print(f"  stable normals FAILED ({mesh_name}: {e}) — cards will shade flat")
+    mesh.materials.append(mat)
+    obj = bpy.data.objects.new(mesh_name, mesh)
+    scene.collection.objects.link(obj)
+    return obj
+
+
+def build_clump(name, aspect_front, aspect_side, occ_front, occ_side, occ_top, atlas_png):
+    """Crossed vertical planes + horizontal top caps, as TWO separate meshes.
+
+    <name>_Vert (three crossed planes: the ground-level silhouette) and
+    <name>_Caps (two plume-height horizontal cards: the overlook view) import
+    as two MeshParts in one Model, so the client angle-fade controller can
+    drive their LocalTransparencyModifier independently — caps fade in as the
+    camera rises, keeping the eye-level profile clean (top caps otherwise cut
+    through it) while killing the star read from above.
+
+    Every quad is duplicated as a front/back shell pair (no DoubleSided flag,
+    no transmission path, no backface normal-flip). occ_* are the (width,
+    height) fractions of each square tile the plant actually occupies
+    (centred); UVs map each card to exactly that sub-rect.
+    """
+    h = HEIGHT_STUDS
+
+    def quad(verts, faces, uvs, corners, uvquad):
+        base = len(verts)
+        verts += corners
+        faces.append((base, base + 1, base + 2, base + 3))
+        uvs.append(list(uvquad))
+        b2 = len(verts)
+        verts += [corners[0], corners[3], corners[2], corners[1]]
+        faces.append((b2, b2 + 1, b2 + 2, b2 + 3))
+        uvs.append([uvquad[0], uvquad[3], uvquad[2], uvquad[1]])
+
+    # verticals: v6's proven crossed-plane layout, one coherent silhouette
+    vv, vf, vu = [], [], []
+    widths = [h * aspect_front, h * aspect_side, h * aspect_front]
+    occs = [occ_front, occ_side, occ_front]
+    sides = [False, True, False]
+    for i in range(3):
+        ang = math.radians(60 * i)
+        dx, dy = math.cos(ang), math.sin(ang)
+        fx, fz = occs[i]
+        w = widths[i] / 2
+        uc = 0.75 if sides[i] else 0.25
+        u0, u1 = uc - 0.25 * fx, uc + 0.25 * fx  # tiles span half the atlas
+        v0, v1 = 0.75 - 0.25 * fz, 0.75 + 0.25 * fz  # vertical tiles: upper row
+        quad(
+            vv,
+            vf,
+            vu,
+            [
+                (-w * dx, -w * dy, 0.0),
+                (w * dx, w * dy, 0.0),
+                (w * dx, w * dy, h),
+                (-w * dx, -w * dy, h),
+            ],
+            [(u0, v0), (u1, v0), (u1, v1), (u0, v1)],
+        )
+
+    # caps: the top-down bake at plume height, for the canyon's overlooks
+    cv, cf, cu = [], [], []
+    ftx, fty = occ_top
+    for zc, s in ((h * 0.60, 1.0), (h * 0.78, 0.85)):
+        wx, wy = h * aspect_front * 0.5 * s, h * aspect_side * 0.5 * s
+        u0, u1 = 0.25 - 0.25 * ftx * s, 0.25 + 0.25 * ftx * s
+        v0, v1 = 0.25 - 0.25 * fty * s, 0.25 + 0.25 * fty * s
+        quad(
+            cv,
+            cf,
+            cu,
+            [(-wx, -wy, zc), (wx, -wy, zc), (wx, wy, zc), (-wx, wy, zc)],
+            [(u0, v0), (u1, v0), (u1, v1), (u0, v1)],
+        )
 
     mat = bpy.data.materials.new(name + "_mat")
     mat.use_nodes = True
@@ -267,11 +273,11 @@ def build_clump(name, aspect_front, aspect_side, occ_front, occ_side, occ_top, a
     mat.node_tree.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
     mat.node_tree.links.new(tex.outputs["Alpha"], bsdf.inputs["Alpha"])
     mat.blend_method = "CLIP" if hasattr(mat, "blend_method") else None
-    mesh.materials.append(mat)
 
-    obj = bpy.data.objects.new(name, mesh)
-    scene.collection.objects.link(obj)
-    return obj
+    return [
+        _finish_mesh(name + "_Vert", vv, vf, vu, mat, h),
+        _finish_mesh(name + "_Caps", cv, cf, cu, mat, h),
+    ]
 
 
 for src_obj in meshes:
@@ -293,11 +299,12 @@ for src_obj in meshes:
     occ_side = render_view(src_obj, "side", side_png)
     occ_top = render_view(src_obj, "top", top_png)
     compose_atlas(front_png, side_png, top_png, atlas_png)
-    clump = build_clump(short, sx / sz, sy / sz, occ_front, occ_side, occ_top, atlas_png)
+    clumps = build_clump(short, sx / sz, sy / sz, occ_front, occ_side, occ_top, atlas_png)
 
     bpy.ops.object.select_all(action="DESELECT")
-    clump.select_set(True)
-    bpy.context.view_layer.objects.active = clump
+    for o in clumps:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = clumps[0]
     out_fbx = os.path.join(OUT_DIR, f"{short}.fbx")
     bpy.ops.export_scene.fbx(
         filepath=out_fbx,
@@ -306,7 +313,8 @@ for src_obj in meshes:
         path_mode="COPY",
         embed_textures=True,
     )
-    bpy.data.objects.remove(clump, do_unlink=True)
+    for o in clumps:
+        bpy.data.objects.remove(o, do_unlink=True)
     os.remove(front_png)
     os.remove(side_png)
     os.remove(top_png)
