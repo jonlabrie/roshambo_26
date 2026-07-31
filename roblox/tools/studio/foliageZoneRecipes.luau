@@ -16,6 +16,10 @@ export type Recipe = {
     nearWater: number?,
     layer: string?,
     pathMargin: number?,
+    footingRadius: number?,
+    footingMaxDrop: number?,
+    submergeMax: number?,
+    careDensity: { [string]: number }?,
 }
 -- THE FOUR BANDS (the user's structure, and the point of the whole system):
 --   0-2 studs   ground cover — grass and weeds. DOES NOT EXIST YET; the same gap
@@ -25,6 +29,9 @@ export type Recipe = {
 --               at ~5. Nothing may be planted whose foliage occupies it.
 --   7+ studs    canopy — PreserveCore, drawn only from SKIRT-trimmed models.
 -- "A forest that feels heavy, but has decent sightlines through the trees."
+--
+-- Deciduous accents and bamboo appear in NO recipe pool in this file: they are
+-- a hand-placed composition layer, not scattered by ZoneScatter.
 local Recipes: { [string]: Recipe } = {
     -- CANOPY layer: the tall structure. Baked SEPARATELY from PreserveBrush
     -- (the planner assigns one zone per sample, so co-located layers need their
@@ -47,6 +54,8 @@ local Recipes: { [string]: Recipe } = {
         waterMargin = 3,
         scaleJitter = 0.15,
         pathMargin = 7,
+        footingRadius = 2.5,
+        footingMaxDrop = 4,
     },
     -- BRUSH band (2-5 studs): young growth at knee-to-chest height. This is what
     -- makes the forest read heavy where players actually walk, WITHOUT intruding
@@ -70,17 +79,21 @@ local Recipes: { [string]: Recipe } = {
         scaleJitter = 0.15,
         layer = "understory",
         pathMargin = 4,
+        footingRadius = 1.5,
+        footingMaxDrop = 3,
+        -- clearing the floor is most of what tending a wood actually is:
+        -- understory thins hard in tended yards, less so in a plain garden
+        careDensity = { GARDEN = 0.25, TENDED = 0.6 },
     },
     WallFringe = {
         pool = {
-            -- per-species scale tames the toolbox giants (ConiferA 98 studs,
-            -- ConiferB 107, ConiferC 71 native) toward the 45-70 band while
-            -- CedarM keeps its own 45; scaleJitter 0.35 then spreads each
-            -- species so the wall reads as a mixed-age stand, not a hedge.
-            { name = "ConiferA", weight = 30, scale = 0.7 },
-            { name = "ConiferB", weight = 30, scale = 0.62 },
-            { name = "ConiferC", weight = 25, scale = 0.9 },
-            { name = "CedarM", weight = 15, scale = 1.0 },
+            -- the Xfrog untrimmed adults, foliated to the ground on purpose:
+            -- the fringe backs onto the canyon wall, not a sightline a player
+            -- walks through, so a full-height stand is correct here.
+            { name = "XfHinokiM", weight = 30 },
+            { name = "XfSpruceM", weight = 30 },
+            { name = "XfFirM", weight = 25 },
+            { name = "XfSugi40", weight = 15 },
         },
         spacingMin = 10,
         spacingMax = 16,
@@ -93,18 +106,23 @@ local Recipes: { [string]: Recipe } = {
         -- halved 2026-07-27: the fringe conifers still read far too big
         -- against the canyon (placed heights were 30/66/93 min/median/max)
         heightScale = 0.5,
+        -- walls are steep; sparser footing is accepted here
+        footingRadius = 3,
+        footingMaxDrop = 6,
     },
     WaterMargin = {
         pool = {
-            { name = "MuhlyGrass", weight = 50 },
+            { name = "MuhlyGrass", weight = 45 },
             { name = "ReedClump", weight = 30 },
-            { name = "FernClump", weight = 20 },
+            { name = "WeedStalks", weight = 15 },
+            { name = "FernClump", weight = 10 },
         },
         spacingMin = 4,
         spacingMax = 8,
         clumpChance = 0.3,
         clumpSize = 3,
-        maxSteep = 0.7,
+        -- weeds on steep hillsides just look bad (user)
+        maxSteep = 0.35,
         waterMargin = 0,
         scaleJitter = 0.25,
         -- hug the real (meandering) shoreline from Sandbox.WaterMap.WaterMarkers
@@ -112,6 +130,10 @@ local Recipes: { [string]: Recipe } = {
         nearWater = 8,
         -- ground cover spaces against other ground cover only, never against trees
         layer = "ground",
+        footingRadius = 1,
+        footingMaxDrop = 2,
+        -- partial submersion is a feature: reeds and grass can wade
+        submergeMax = 1.0,
     },
     FutureClearing = {
         pool = {
