@@ -13,9 +13,14 @@
 -- bake reads whatever is there. Bakes land in CanyonWorld.Foliage.Preserve.<Zone>
 -- (PLACE-ONLY — save the place to keep them).
 --
--- The planner below MIRRORS tools/builders/ZoneScatter.luau and the recipe table
--- MIRRORS tools/studio/foliageZoneRecipes.luau — Studio cannot require from disk,
--- so KEEP ALL THREE IN SYNC (same convention as CanopyScatter/placeCanopyHeroes).
+-- ⚠️ SYNC WARNING: Studio cannot require from disk, so FOUR sources are
+-- mirrored inline below — KEEP ALL IN SYNC (same convention as
+-- CanopyScatter/placeCanopyHeroes, and buildMossTransitions' own keep-out
+-- mirror):
+--   * the planner (types, lcg, gates, plan)     MIRRORS tools/builders/ZoneScatter.luau
+--   * the recipe table (RECIPES)                MIRRORS tools/studio/foliageZoneRecipes.luau
+--   * the keep-outs (KEEPOUT_MATERIALS/ZONES)   MIRROR  tools/builders/CanyonKeepOuts.luau
+--   * the care model (careReach/careModelBand)  MIRRORS tools/builders/CareModel.luau
 -- Determinism: integer LCG only, seeded per zone, so a re-bake reproduces the
 -- identical forest and gate iteration is parameter edits, not lost state.
 local ServerStorage = game:GetService("ServerStorage")
@@ -41,6 +46,10 @@ type Recipe = {
     nearWater: number?,
     layer: string?,
     pathMargin: number?,
+    footingRadius: number?,
+    footingMaxDrop: number?,
+    submergeMax: number?,
+    careDensity: { [string]: number }?,
 }
 -- THE FOUR BANDS (the user's structure, and the point of the whole system):
 --   0-2 studs   ground cover — grass and weeds. DOES NOT EXIST YET; the same gap
@@ -50,6 +59,9 @@ type Recipe = {
 --               at ~5. Nothing may be planted whose foliage occupies it.
 --   7+ studs    canopy — PreserveCore, drawn only from SKIRT-trimmed models.
 -- "A forest that feels heavy, but has decent sightlines through the trees."
+--
+-- Deciduous accents and bamboo appear in NO recipe pool in this file: they are
+-- a hand-placed composition layer, not scattered by the planner below.
 local RECIPES: { [string]: Recipe } = {
     -- CANOPY layer: the tall structure. Baked SEPARATELY from PreserveBrush
     -- (the planner assigns one zone per sample, so co-located layers need their
@@ -72,6 +84,8 @@ local RECIPES: { [string]: Recipe } = {
         waterMargin = 3,
         scaleJitter = 0.15,
         pathMargin = 7,
+        footingRadius = 2.5,
+        footingMaxDrop = 4,
     },
     -- BRUSH band (2-5 studs): young growth at knee-to-chest height. This is what
     -- makes the forest read heavy where players actually walk, WITHOUT intruding
@@ -95,17 +109,21 @@ local RECIPES: { [string]: Recipe } = {
         scaleJitter = 0.15,
         layer = "understory",
         pathMargin = 4,
+        footingRadius = 1.5,
+        footingMaxDrop = 3,
+        -- clearing the floor is most of what tending a wood actually is:
+        -- understory thins hard in tended yards, less so in a plain garden
+        careDensity = { GARDEN = 0.25, TENDED = 0.6 },
     },
     WallFringe = {
         pool = {
-            -- per-species scale tames the toolbox giants (ConiferA 98 studs,
-            -- ConiferB 107, ConiferC 71 native) toward the 45-70 band while
-            -- CedarM keeps its own 45; scaleJitter 0.35 then spreads each
-            -- species so the wall reads as a mixed-age stand, not a hedge.
-            { name = "ConiferA", weight = 30, scale = 0.7 },
-            { name = "ConiferB", weight = 30, scale = 0.62 },
-            { name = "ConiferC", weight = 25, scale = 0.9 },
-            { name = "CedarM", weight = 15, scale = 1.0 },
+            -- the Xfrog untrimmed adults, foliated to the ground on purpose:
+            -- the fringe backs onto the canyon wall, not a sightline a player
+            -- walks through, so a full-height stand is correct here.
+            { name = "XfHinokiM", weight = 30 },
+            { name = "XfSpruceM", weight = 30 },
+            { name = "XfFirM", weight = 25 },
+            { name = "XfSugi40", weight = 15 },
         },
         spacingMin = 10,
         spacingMax = 16,
@@ -118,18 +136,23 @@ local RECIPES: { [string]: Recipe } = {
         -- halved 2026-07-27: the fringe conifers still read far too big
         -- against the canyon (placed heights were 30/66/93 min/median/max)
         heightScale = 0.5,
+        -- walls are steep; sparser footing is accepted here
+        footingRadius = 3,
+        footingMaxDrop = 6,
     },
     WaterMargin = {
         pool = {
-            { name = "MuhlyGrass", weight = 50 },
+            { name = "MuhlyGrass", weight = 45 },
             { name = "ReedClump", weight = 30 },
-            { name = "FernClump", weight = 20 },
+            { name = "WeedStalks", weight = 15 },
+            { name = "FernClump", weight = 10 },
         },
         spacingMin = 4,
         spacingMax = 8,
         clumpChance = 0.3,
         clumpSize = 3,
-        maxSteep = 0.7,
+        -- weeds on steep hillsides just look bad (user)
+        maxSteep = 0.35,
         waterMargin = 0,
         scaleJitter = 0.25,
         -- hug the real (meandering) shoreline from Sandbox.WaterMap.WaterMarkers
@@ -137,6 +160,10 @@ local RECIPES: { [string]: Recipe } = {
         nearWater = 8,
         -- ground cover spaces against other ground cover only, never against trees
         layer = "ground",
+        footingRadius = 1,
+        footingMaxDrop = 2,
+        -- partial submersion is a feature: reeds and grass can wade
+        submergeMax = 1.0,
     },
     FutureClearing = {
         pool = {
@@ -157,7 +184,7 @@ local RECIPES: { [string]: Recipe } = {
 }
 
 -- ── planner (MIRROR of tools/builders/ZoneScatter.luau) ─────────────────────
-type Sample = { x: number, z: number, y: number, steep: number }
+type Sample = { x: number, z: number, y: number, steep: number, depth: number?, material: string? }
 type Zone = {
     name: string,
     shape: string,
@@ -302,7 +329,8 @@ end
 
 -- Water proximity (MIRROR of ZoneScatter). Cells come from the place's real
 -- water map (Sandbox.WaterMap.WaterMarkers, grid-4 raycast-true water), bucketed
--- so per-sample lookups stay cheap.
+-- so per-sample lookups stay cheap. The care-distance index (below) reuses the
+-- same bucket size and index shape.
 local WATER_BUCKET = 16
 type WaterIndex = { [string]: { { number } } }
 
@@ -342,6 +370,48 @@ local function waterWithin(index: WaterIndex?, x: number, z: number, dist: numbe
     return false
 end
 
+type SampleIndex = { [string]: Sample }
+type PlanOptions = {
+    pitch: number?,
+    keepOut: ((number, number, string?) -> boolean)?,
+    careBand: ((number, number) -> string)?,
+}
+
+local function sampleKey(x: number, z: number, pitch: number): string
+    return `{math.floor(x / pitch + 0.5)},{math.floor(z / pitch + 0.5)}`
+end
+
+local function indexSamples(samples: { Sample }, pitch: number): SampleIndex
+    local index: SampleIndex = {}
+    for _, s in samples do
+        index[sampleKey(s.x, s.z, pitch)] = s
+    end
+    return index
+end
+
+-- Max drop in studs from (x,z,y) to the ground at 8 compass probes `radius` out.
+-- nil = a probe found NO sample (void: water, off-grid, past a lip) — callers
+-- treat that as the WORST footing, never as level ground.
+local function footingDrop(
+    index: SampleIndex,
+    pitch: number,
+    x: number,
+    z: number,
+    y: number,
+    radius: number
+): number?
+    local worst = 0
+    for i = 0, 7 do
+        local ang = i * math.pi / 4
+        local probe = index[sampleKey(x + math.cos(ang) * radius, z + math.sin(ang) * radius, pitch)]
+        if probe == nil then
+            return nil
+        end
+        worst = math.max(worst, y - probe.y)
+    end
+    return worst
+end
+
 local function zoneBBox(zone: Zone): (number, number, number, number)
     local b = zone.bounds
     if zone.shape == "circle" then
@@ -355,8 +425,13 @@ local function plan(
     samples: { Sample },
     recipes: { [string]: Recipe },
     water: WaterIndex?,
-    built: WaterIndex?
+    built: WaterIndex?,
+    opts: PlanOptions?
 ): ({ Placement }, { MistAnchor })
+    local o: PlanOptions = opts or {}
+    local pitch = o.pitch or 4
+    local sampleIndex = indexSamples(samples, pitch)
+
     local ordered = table.clone(samples)
     table.sort(ordered, function(a, b)
         if a.x ~= b.x then
@@ -377,7 +452,12 @@ local function plan(
         return r
     end
 
+    -- site gates: everything that depends only on the sample and the recipe, so
+    -- a layered zone that rejects a sample falls through to the zone beneath it
     local function accepts(zone: Zone, s: Sample): boolean
+        if o.keepOut ~= nil and o.keepOut(s.x, s.z, s.material) then
+            return false
+        end
         local recipe = recipes[zone.recipe]
         if recipe == nil then
             return false
@@ -385,10 +465,25 @@ local function plan(
         if s.steep > recipe.maxSteep then
             return false
         end
+        local fr = recipe.footingRadius
+        if fr ~= nil then
+            local drop = footingDrop(sampleIndex, pitch, s.x, s.z, s.y, fr)
+            if drop == nil or drop > (recipe.footingMaxDrop or 4) then
+                return false
+            end
+        end
+        local depth = s.depth or 0
+        if depth > 0 then
+            local submergeMax = recipe.submergeMax
+            if submergeMax == nil or depth > submergeMax then
+                return false
+            end
+        end
         local innerClear = recipe.innerClear
         if innerClear ~= nil and inInnerClear(zone, innerClear, s.x, s.z) then
             return false
         end
+        -- water: trees stand back from the shore; margin flora must hug it
         if waterWithin(water, s.x, s.z, recipe.waterMargin) then
             return false
         end
@@ -414,9 +509,20 @@ local function plan(
         if recipe == nil then
             continue
         end
-        if roll(zone) >= zone.densityScale then
+
+        -- density thinning before spacing so DensityScale thins uniformly;
+        -- the care band scales it further where recipes opt in
+        local density = zone.densityScale
+        if o.careBand ~= nil and recipe.careDensity ~= nil then
+            local mul = recipe.careDensity[o.careBand(s.x, s.z)]
+            if mul ~= nil then
+                density *= mul
+            end
+        end
+        if roll(zone) >= density then
             continue
         end
+
         local layer = recipe.layer or "canopy"
         local minD = recipe.spacingMin + roll(zone) * (recipe.spacingMax - recipe.spacingMin)
         local tooClose = false
@@ -444,6 +550,8 @@ local function plan(
             zone = zone.name,
             layer = layer,
         })
+        -- clump: extra same-species trees at 4-7 studs, spacing waived within
+        -- the clump but zone membership and keep-outs still hold
         if roll(zone) < recipe.clumpChance and recipe.clumpSize >= 2 then
             for _ = 1, recipe.clumpSize - 1 do
                 local ang = roll(zone) * 2 * math.pi
@@ -455,7 +563,14 @@ local function plan(
                 -- steep ground that the parent's rules excluded
                 local cs = nearestSample(ordered, cx, cz)
                 local cy = if cs then cs.y else 0
-                local probe: Sample = { x = cx, z = cz, y = cy, steep = if cs then cs.steep else 0 }
+                local probe: Sample = {
+                    x = cx,
+                    z = cz,
+                    y = cy,
+                    steep = if cs then cs.steep else 0,
+                    depth = cs and cs.depth or nil,
+                    material = cs and cs.material or nil,
+                }
                 local czone = resolveZone(zones, cx, cz, cy, function(candidate)
                     return accepts(candidate, probe)
                 end)
@@ -504,6 +619,57 @@ local function plan(
         end
     end
     return out, anchors
+end
+
+-- ── keep-outs (MIRROR of tools/builders/CanyonKeepOuts.luau) ────────────────
+-- Materials are NAMES (matching Sample.material, itself Enum.Material.Name),
+-- same reason CanyonKeepOuts stores them that way: Studio maps the Enum, not
+-- the pure module.
+local KEEPOUT_MATERIALS = { "Sand" }
+local KEEPOUT_ZONES = {
+    -- RoshamboStage.Karesansui measures x -21..34 by z -12..18. The margin
+    -- keeps a clump's SPREAD off the raked field, not merely its pivot.
+    {
+        name = "Karesansui",
+        x0 = -25,
+        x1 = 38,
+        z0 = -16,
+        z1 = 22,
+        why = "the raked gravel field is the artwork",
+    },
+}
+
+local function keepOutBlocks(x: number, z: number, materialName: string?): boolean
+    if materialName ~= nil then
+        for _, m in KEEPOUT_MATERIALS do
+            if m == materialName then
+                return true
+            end
+        end
+    end
+    for _, zn in KEEPOUT_ZONES do
+        if x >= zn.x0 and x <= zn.x1 and z >= zn.z0 and z <= zn.z1 then
+            return true
+        end
+    end
+    return false
+end
+
+-- ── care model (MIRROR of tools/builders/CareModel.luau) ────────────────────
+local CARE_GARDEN_FRACTION = 0.35
+
+local function careReach(x: number): number
+    return math.clamp(8 + 20 * (x + 430) / 470, 8, 28)
+end
+
+local function careModelBand(x: number, distToCare: number): string
+    local r = careReach(x)
+    if distToCare <= CARE_GARDEN_FRACTION * r then
+        return "GARDEN"
+    elseif distToCare <= r then
+        return "TENDED"
+    end
+    return "PRESERVE"
 end
 
 -- ── Studio shell ───────────────────────────────────────────────────────────
@@ -583,10 +749,19 @@ local function readZones(): { Zone }
     return zones
 end
 
+-- Two raycasts per sample: an IgnoreWater ground pass (the real terrain, even
+-- under water) and a water-surface pass, so a shallow-water cell becomes a
+-- Sample with `depth` set instead of being skipped outright — WaterMargin
+-- recipes need those cells to plant reeds that wade.
 local function sampleTerrain(zones: { Zone }): { Sample }
-    local rp = RaycastParams.new()
-    rp.FilterType = Enum.RaycastFilterType.Include
-    rp.FilterDescendantsInstances = { workspace.Terrain }
+    local rpGround = RaycastParams.new()
+    rpGround.FilterType = Enum.RaycastFilterType.Include
+    rpGround.FilterDescendantsInstances = { workspace.Terrain }
+    rpGround.IgnoreWater = true
+    local rpWater = RaycastParams.new()
+    rpWater.FilterType = Enum.RaycastFilterType.Include
+    rpWater.FilterDescendantsInstances = { workspace.Terrain }
+    rpWater.IgnoreWater = false
     local x1, z1, x2, z2 = math.huge, math.huge, -math.huge, -math.huge
     for _, zone in zones do
         local a, b, c, d = zoneBBox(zone)
@@ -599,13 +774,21 @@ local function sampleTerrain(zones: { Zone }): { Sample }
     end
     for x = x1, x2, SAMPLE_PITCH do
         for z = z1, z2, SAMPLE_PITCH do
-            local hit = workspace:Raycast(Vector3.new(x, PROBE_TOP, z), Vector3.new(0, -900, 0), rp)
-            if hit and hit.Material ~= Enum.Material.Water then
+            local origin = Vector3.new(x, PROBE_TOP, z)
+            local ground = workspace:Raycast(origin, Vector3.new(0, -900, 0), rpGround)
+            if ground then
+                local surface = workspace:Raycast(origin, Vector3.new(0, -900, 0), rpWater)
+                local depth = 0
+                if surface and surface.Material == Enum.Material.Water then
+                    depth = surface.Position.Y - ground.Position.Y
+                end
                 table.insert(samples, {
                     x = x,
                     z = z,
-                    y = hit.Position.Y,
-                    steep = 1 - math.clamp(hit.Normal.Y, 0, 1),
+                    y = ground.Position.Y,
+                    steep = 1 - math.clamp(ground.Normal.Y, 0, 1),
+                    depth = depth,
+                    material = ground.Material.Name,
                 })
             end
         end
@@ -663,6 +846,65 @@ local function readBuiltCells(): { { number } }
         end
     end
     return cells
+end
+
+-- Care-source ring around the falls dock: the garden-floor spec grants
+-- FallsDock a 15-stud garden radius that overrides the longitude formula for
+-- everything nearby (see tools/studio/placeFallsPoolIris.luau's siting notes)
+-- — a staffed deck reads as tended regardless of how far west it sits.
+-- Implemented as more "care cells" (same bucketed index as readBuiltCells'
+-- path/structure points) rather than a special-cased branch, so
+-- nearestCareDist treats the dock identically to a path.
+local FALLS_DOCK_GARDEN_RADIUS = 15
+
+local function fallsDockCells(): { { number } }
+    local cells: { { number } } = {}
+    local stage = workspace:FindFirstChild("RoshamboStage")
+    local dock = stage and stage:FindFirstChild("FallsDock")
+    if not dock or not dock:IsA("Model") then
+        warn("[preserve] no RoshamboStage.FallsDock — care override inert")
+        return cells
+    end
+    local cf = (dock :: Model):GetBoundingBox()
+    local cx, cz = cf.Position.X, cf.Position.Z
+    local count = math.clamp(6 + math.floor(FALLS_DOCK_GARDEN_RADIUS), 6, 10)
+    for i = 0, count - 1 do
+        local ang = (i / count) * 2 * math.pi
+        table.insert(cells, {
+            cx + math.cos(ang) * FALLS_DOCK_GARDEN_RADIUS,
+            cz + math.sin(ang) * FALLS_DOCK_GARDEN_RADIUS,
+        })
+    end
+    return cells
+end
+
+-- Nearest distance (studs) from (x,z) to any care cell, by expanding ring over
+-- the same WATER_BUCKET grid as waterWithin. Unlike waterWithin (a threshold
+-- test), the care model needs the actual distance, so this walks buckets
+-- outward ring by ring until it finds one, then checks one extra ring so a
+-- closer point hiding in a diagonal-adjacent bucket can't be missed.
+local function nearestCareDist(index: WaterIndex, x: number, z: number): number
+    for ring = 0, 8 do -- 8 buckets * 16 studs = beyond any reach
+        local best = math.huge
+        local bx, bz = math.floor(x / WATER_BUCKET), math.floor(z / WATER_BUCKET)
+        for gx = bx - ring, bx + ring do
+            for gz = bz - ring, bz + ring do
+                if math.max(math.abs(gx - bx), math.abs(gz - bz)) == ring then
+                    local bucket = index[`{gx},{gz}`]
+                    if bucket then
+                        for _, c in bucket do
+                            local dx, dz = x - c[1], z - c[2]
+                            best = math.min(best, dx * dx + dz * dz)
+                        end
+                    end
+                end
+            end
+        end
+        if best < math.huge and ring >= 1 then -- one extra ring so a closer diagonal can't hide
+            return math.sqrt(best)
+        end
+    end
+    return math.huge
 end
 
 local function preserveFolder(): Folder
@@ -824,7 +1066,23 @@ return function(opts: {
     local samples = sampleTerrain(zones)
     local cells = readWaterCells()
     local builtCells = readBuiltCells()
-    local placements, anchors = plan(zones, samples, recipes, indexWater(cells), indexWater(builtCells))
+
+    -- care distance: built geometry (paths/structures) plus the falls-dock
+    -- garden-radius ring, indexed the same way as the water/built lookups
+    local careCells = table.clone(builtCells)
+    for _, c in fallsDockCells() do
+        table.insert(careCells, c)
+    end
+    local careIndex = indexWater(careCells)
+    local function careBand(x: number, z: number): string
+        return careModelBand(x, nearestCareDist(careIndex, x, z))
+    end
+
+    local placements, anchors = plan(zones, samples, recipes, indexWater(cells), indexWater(builtCells), {
+        pitch = SAMPLE_PITCH,
+        keepOut = keepOutBlocks,
+        careBand = careBand,
+    })
 
     local perZone: { [string]: number } = {}
     for _, p in placements do
