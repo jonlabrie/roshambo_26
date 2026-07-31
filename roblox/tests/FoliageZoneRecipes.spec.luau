@@ -118,9 +118,10 @@ describe("grove pre-pass", function()
     end)
     -- only PreserveCore should carry a grove; every other recipe still scatters
     -- per-sample, so an accidental grove elsewhere silently changes its planter.
-    test("no other recipe carries a grove", function()
+    test("only the canopy recipes carry groves", function()
+        local groved = { PreserveCore = true, SugiStand = true }
         for name, recipe in Recipes do
-            if name ~= "PreserveCore" then
+            if not groved[name] then
                 expect(recipe.grove == nil).toBe(true)
             end
         end

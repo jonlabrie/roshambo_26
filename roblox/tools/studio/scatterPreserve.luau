@@ -240,6 +240,36 @@ local RECIPES: { [string]: Recipe } = {
         -- partial submersion is a feature: reeds and grass can wade
         submergeMax = 1.0,
     },
+    -- ONE dense dark stand at a user-marked spot: sugi is the shrine-grove
+    -- species and grows exactly this way. Zone: Sandbox.FoliageZones.Grove_Sugi.
+    SugiStand = {
+        pool = {
+            { name = "XfSugi25T", weight = 100 },
+        },
+        spacingMin = 5,
+        spacingMax = 8,
+        clumpChance = 0,
+        clumpSize = 0,
+        maxSteep = 0.55,
+        waterMargin = 3,
+        scaleJitter = 0.15,
+        pathMargin = 4,
+        footingRadius = 2.5,
+        footingMaxDrop = 6,
+        grove = {
+            spacing = 30,
+            radiusMin = 4,
+            radiusMax = 12,
+            membersMin = 5,
+            membersMax = 8,
+            memberSpacing = 5,
+            dominantScale = 1.2,
+            anchorDarts = 200,
+            maxGroves = 1,
+            memberTries = 8,
+            saplings = { chance = 0.35, map = { XfSugi25T = "XfSugiYb" } },
+        },
+    },
     FutureClearing = {
         pool = {
             { name = "XfHinokiMT", weight = 35 },
