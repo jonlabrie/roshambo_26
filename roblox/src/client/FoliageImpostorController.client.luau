@@ -1,10 +1,15 @@
 --!strict
 -- Angle-fade for card-impostor foliage. Clump Models tagged "GrassImpostor"
--- carry a *_Caps MeshPart (top-down bake at plume height) and *_Vert planes.
--- Verticals always show; the caps' LocalTransparencyModifier follows the
--- camera's elevation over each clump (ImpostorFade), so eye-level views keep a
--- clean profile and overlooks see a rosette instead of a star. Client-only:
--- LocalTransparencyModifier never replicates.
+-- carry a <Name>_Caps MeshPart (top-down bake at plume height) and <Name>_Vert
+-- planes. Verticals always show; the caps' LocalTransparencyModifier follows
+-- the camera's elevation over each clump (ImpostorFade), so eye-level views
+-- keep a clean profile and overlooks see a rosette instead of a star.
+--
+-- STREAMING: parts stream in and out under StreamingEnabled, so NOTHING about
+-- a clump's contents is cached at tag time — the update loop resolves the caps
+-- part live each tick (FindFirstChild by naming convention, O(1)) and anchors
+-- on the cap's own position. Caching descendants at registration is how the
+-- first version silently did nothing: models tag-replicate before their parts.
 --
 -- Live-tune: Workspace attributes ImpostorCapFadeLo / ImpostorCapFadeHi
 -- (degrees; defaults from ImpostorFade.DEFAULT).
@@ -16,32 +21,17 @@ local ImpostorFade = require(ReplicatedStorage:WaitForChild("RoshamboShared"):Wa
 
 local TAG = "GrassImpostor"
 local UPDATE_INTERVAL = 0.1
-local ANCHOR_UP = 2 -- studs above the clump pivot: mid-plume, where the caps sit
 
-type ClumpInfo = { caps: { BasePart }, anchor: Vector3 }
-local clumps: { [Model]: ClumpInfo } = {}
+local tagged: { [Model]: boolean } = {}
 
 local function register(inst: Instance)
-    local model = inst :: Model
-    if not model:IsA("Model") then
-        return
-    end
-    local caps: { BasePart } = {}
-    for _, d in model:GetDescendants() do
-        if d:IsA("BasePart") and d.Name:find("_Caps") then
-            table.insert(caps, d)
-        end
-    end
-    if #caps > 0 then
-        clumps[model] = {
-            caps = caps,
-            anchor = model:GetPivot().Position + Vector3.new(0, ANCHOR_UP, 0),
-        }
+    if inst:IsA("Model") then
+        tagged[inst] = true
     end
 end
 
 local function unregister(inst: Instance)
-    clumps[inst :: Model] = nil
+    tagged[inst :: Model] = nil
 end
 
 for _, inst in CollectionService:GetTagged(TAG) do
@@ -72,16 +62,24 @@ RunService.Heartbeat:Connect(function(dt: number)
     end
     local camPos = cam.CFrame.Position
     local cfg = config()
-    for model, info in clumps do
+    local dead: { Model }? = nil
+    for model in tagged do
         if model.Parent == nil then
-            clumps[model] = nil
+            dead = dead or {}
+            table.insert(dead :: { Model }, model)
             continue
         end
-        local d = camPos - info.anchor
+        local cap = model:FindFirstChild(model.Name .. "_Caps")
+        if cap == nil or not cap:IsA("BasePart") then
+            continue -- parts not streamed in yet; next tick will see them
+        end
+        local d = camPos - cap.Position
         local run = math.sqrt(d.X * d.X + d.Z * d.Z)
-        local t = ImpostorFade.capTransparency(ImpostorFade.elevation(d.Y, run), cfg)
-        for _, p in info.caps do
-            p.LocalTransparencyModifier = t
+        cap.LocalTransparencyModifier = ImpostorFade.capTransparency(ImpostorFade.elevation(d.Y, run), cfg)
+    end
+    if dead then
+        for _, m in dead do
+            tagged[m] = nil
         end
     end
 end)
