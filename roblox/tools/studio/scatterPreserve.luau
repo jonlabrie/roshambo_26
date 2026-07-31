@@ -190,10 +190,14 @@ local RECIPES: { [string]: Recipe } = {
     },
     WaterMargin = {
         pool = {
-            { name = "ReedClump", weight = 30 },
-            { name = "TallWeeds", weight = 30 },
+            { name = "ReedClump", weight = 28 },
+            { name = "TallWeeds", weight = 27 },
             { name = "WeedStalks", weight = 20 },
-            { name = "FernClump", weight = 20 },
+            { name = "FernClump", weight = 15 },
+            -- sparse iris = the waterline's jewel accent; the hand-composed
+            -- falls-pool planting remains separate and untouched.
+            { name = "IrisA", weight = 5 },
+            { name = "IrisB", weight = 5 },
         },
         spacingMin = 4,
         spacingMax = 8,
@@ -301,6 +305,19 @@ local function contains(zone: Zone, x: number, z: number, y: number?): boolean
     return true
 end
 
+-- true if any KeepOut zone claims (x, z, y) — regardless of layer order, a
+-- pad is a pad. Shared by resolveZone (the per-sample path) and the grove
+-- pre-pass, so a dart or a grove member is vetoed exactly like an ordinary
+-- sample would be.
+local function keepOutAt(zones: { Zone }, x: number, z: number, y: number?): boolean
+    for _, zone in zones do
+        if zone.recipe == "KeepOut" and contains(zone, x, z, y) then
+            return true
+        end
+    end
+    return false
+end
+
 -- KeepOut vetoes regardless of layer order; otherwise zones are tried LAST-first
 -- and the first whose recipe accepts the sample wins, so a layered zone claims
 -- only the ground its recipe wants (shore margin over forest body).
@@ -311,10 +328,8 @@ local function resolveZone(
     y: number?,
     accepts: ((Zone) -> boolean)?
 ): Zone?
-    for _, zone in zones do
-        if zone.recipe == "KeepOut" and contains(zone, x, z, y) then
-            return nil
-        end
+    if keepOutAt(zones, x, z, y) then
+        return nil
     end
     for i = #zones, 1, -1 do
         local zone = zones[i]
@@ -595,6 +610,11 @@ local function plan(
             if not contains(zone, ax, az, gs.y) then
                 continue
             end
+            -- pads are sacred: a KeepOut zone vetoes an anchor exactly like it
+            -- vetoes an ordinary per-sample placement, regardless of layer order
+            if keepOutAt(zones, ax, az, gs.y) then
+                continue
+            end
             local anchorProbe: Sample =
                 { x = ax, z = az, y = gs.y, steep = gs.steep, depth = gs.depth, material = gs.material }
             if not accepts(zone, anchorProbe) then
@@ -653,6 +673,10 @@ local function plan(
                 local mz = az + math.sin(ang) * rad
                 local mgs = sampleIndex[sampleKey(mx, mz, pitch)]
                 if mgs == nil then
+                    continue
+                end
+                -- pads are sacred: same KeepOut veto as an anchor dart
+                if keepOutAt(zones, mx, mz, mgs.y) then
                     continue
                 end
                 local memberProbe: Sample = {

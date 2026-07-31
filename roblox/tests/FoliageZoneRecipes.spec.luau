@@ -75,6 +75,8 @@ describe("recipes name only species that exist", function()
         TallWeeds = true,
         WeedStalks = true,
         FernClump = true, -- drop this line if the Task 4 verdict was park
+        IrisA = true,
+        IrisB = true,
         XfHinokiT = true,
         XfHinokiMT = true,
         XfSpruceMT = true,

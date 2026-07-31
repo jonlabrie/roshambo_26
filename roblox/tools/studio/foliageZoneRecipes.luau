@@ -163,10 +163,14 @@ local Recipes: { [string]: Recipe } = {
     },
     WaterMargin = {
         pool = {
-            { name = "ReedClump", weight = 30 },
-            { name = "TallWeeds", weight = 30 },
+            { name = "ReedClump", weight = 28 },
+            { name = "TallWeeds", weight = 27 },
             { name = "WeedStalks", weight = 20 },
-            { name = "FernClump", weight = 20 },
+            { name = "FernClump", weight = 15 },
+            -- sparse iris = the waterline's jewel accent; the hand-composed
+            -- falls-pool planting remains separate and untouched.
+            { name = "IrisA", weight = 5 },
+            { name = "IrisB", weight = 5 },
         },
         spacingMin = 4,
         spacingMax = 8,
