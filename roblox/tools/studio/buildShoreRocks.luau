@@ -30,7 +30,7 @@
 --
 -- KEEP-OUTS: karesansui sand rectangle (CanyonKeepOuts mirror), the COMPOSED falls-pool
 -- site (dock + hero iris — hands off, per the standing water-margin rule), and every
--- Sandbox.FoliageZones part whose Recipe attribute is "KeepOut" (pads etc.), checked in
+-- ServerStorage.FoliageZones part whose Recipe attribute is "KeepOut" (pads etc.), checked in
 -- the part's object space so rotated pads mask correctly.
 local ServerStorage = game:GetService("ServerStorage")
 
@@ -440,8 +440,12 @@ local KEEPOUT_RECTS = {
 
 local function keepOutParts(): { BasePart }
     local parts: { BasePart } = {}
-    local sandbox = workspace:FindFirstChild("Sandbox")
-    local fz = sandbox and sandbox:FindFirstChild("FoliageZones")
+    -- zones live in ServerStorage (moved 2026-07-31); Sandbox fallback for older places
+    local fz: Instance? = ServerStorage:FindFirstChild("FoliageZones")
+    if not fz then
+        local sandbox = workspace:FindFirstChild("Sandbox")
+        fz = sandbox and sandbox:FindFirstChild("FoliageZones")
+    end
     if fz then
         for _, p in fz:GetChildren() do
             if p:IsA("BasePart") and p:GetAttribute("Recipe") == "KeepOut" then

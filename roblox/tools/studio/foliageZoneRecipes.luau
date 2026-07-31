@@ -221,7 +221,7 @@ local Recipes: { [string]: Recipe } = {
         submergeMax = 1.0,
     },
     -- ONE dense dark stand at a user-marked spot: sugi is the shrine-grove
-    -- species and grows exactly this way. Zone: Sandbox.FoliageZones.Grove_Sugi.
+    -- species and grows exactly this way. Zone: ServerStorage.FoliageZones.Grove_Sugi.
     SugiStand = {
         pool = {
             -- the TurboSquid hero set: open, wind-formed, scrub-pine vertical
@@ -273,7 +273,7 @@ local Recipes: { [string]: Recipe } = {
     },
     -- User-placed maple grove (2026-07-31 mark at -351, -48): jewel accent as a
     -- deliberate composed moment, free-mix over both maple sizes. Zone:
-    -- Sandbox.FoliageZones.Grove_Maple.
+    -- ServerStorage.FoliageZones.Grove_Maple.
     MapleStand = {
         pool = {
             { name = "XfMapleA", weight = 40 },

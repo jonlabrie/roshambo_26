@@ -7,7 +7,7 @@
 -- MODE="wipe"  removes the filtered zones' folders.
 -- MODE="mist"  wipes + stamps ONLY Preserve.Mist (safe after trees are curated).
 --
--- Zones are USER-EDITABLE parts in Workspace.Sandbox.FoliageZones: box or
+-- Zones are USER-EDITABLE parts in ServerStorage.FoliageZones: box or
 -- cylinder, attributes Recipe (string), DensityScale (number?), Seed (number?),
 -- Mist (bool?), Still (bool?). Drag/resize/duplicate/delete them freely; the
 -- bake reads whatever is there. Bakes land in CanyonWorld.Foliage.Preserve.<Zone>
@@ -263,7 +263,7 @@ local RECIPES: { [string]: Recipe } = {
         submergeMax = 1.0,
     },
     -- ONE dense dark stand at a user-marked spot: sugi is the shrine-grove
-    -- species and grows exactly this way. Zone: Sandbox.FoliageZones.Grove_Sugi.
+    -- species and grows exactly this way. Zone: ServerStorage.FoliageZones.Grove_Sugi.
     SugiStand = {
         pool = {
             -- the TurboSquid hero set: open, wind-formed, scrub-pine vertical
@@ -315,7 +315,7 @@ local RECIPES: { [string]: Recipe } = {
     },
     -- User-placed maple grove (2026-07-31 mark at -351, -48): jewel accent as a
     -- deliberate composed moment, free-mix over both maple sizes. Zone:
-    -- Sandbox.FoliageZones.Grove_Maple.
+    -- ServerStorage.FoliageZones.Grove_Maple.
     MapleStand = {
         pool = {
             { name = "XfMapleA", weight = 40 },
@@ -1187,11 +1187,16 @@ local function wanted(name: string): boolean
 end
 
 local function readZones(): { Zone }
-    local sandbox = workspace:FindFirstChild("Sandbox")
-    local folder = sandbox and sandbox:FindFirstChild("FoliageZones")
+    -- home is ServerStorage (moved 2026-07-31: zone parts in Workspace hover-
+    -- highlighted in Edit — visual clutter); Sandbox fallback for older places
+    local folder: Instance? = game:GetService("ServerStorage"):FindFirstChild("FoliageZones")
+    if not folder then
+        local sandbox = workspace:FindFirstChild("Sandbox")
+        folder = sandbox and sandbox:FindFirstChild("FoliageZones")
+    end
     local zones: { Zone } = {}
     if not folder then
-        warn("[preserve] no Workspace.Sandbox.FoliageZones — nothing to do")
+        warn("[preserve] no ServerStorage.FoliageZones — nothing to do")
         return zones
     end
     for _, part in folder:GetChildren() do
