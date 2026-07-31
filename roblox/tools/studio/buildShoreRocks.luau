@@ -52,7 +52,7 @@ export type Params = {
     attendantsMin: number,
     attendantsMax: number,
     wadersMax: number, -- 0..wadersMax waders per cluster, rolled uniformly
-    waderReach: number, -- how far a wader steps toward open water
+    waderReach: number, -- max wader step toward open water (floor is memberSpacing)
     scaleMin: number,
     scaleMax: number,
 }
@@ -369,7 +369,11 @@ local function plan(
             local jitterRoll = roll()
             local yaw = roll() * 2 * math.pi
             local scaleRoll = roll()
-            local step = stepRoll * params.waderReach
+            -- the step FLOOR is memberSpacing: a shorter step lands the wader inside
+            -- its own anchor's spacing bubble and farFromOutput rejects it every time
+            -- (the original 0-based roll silently zeroed waders out of whole plans)
+            local step = params.memberSpacing
+                + stepRoll * math.max(params.waderReach - params.memberSpacing, 0)
             local jitter = (jitterRoll * 2 - 1) * 2
             -- water-inward direction is the opposite of the land direction;
             -- both are axis-aligned unit vectors, so the perpendicular is too
@@ -409,7 +413,9 @@ local PARAMS: Params = {
     attendantsMin = 2,
     attendantsMax = 4,
     wadersMax = 2,
-    waderReach = 4,
+    -- 6, not the planner-test 4: the step floor is memberSpacing (2.5), so reach 4
+    -- left waders barely off the bank — 6 puts them visibly out in the water
+    waderReach = 6,
     scaleMin = 0.85,
     scaleMax = 1.25,
 }
@@ -587,7 +593,8 @@ end
 -- ── bake ─────────────────────────────────────────────────────────────────────────────
 local function bake(
     placements: { RockPlacement },
-    cells: { WaterCell }
+    cells: { WaterCell },
+    params: Params
 ): (number, number, { [string]: number })
     local terrain = workspace.Terrain
     local rp = RaycastParams.new()
@@ -596,13 +603,13 @@ local function bake(
     rp.IgnoreWater = true -- waders measure the BED, not the surface
     local folder = rockFolder()
     local tiers = tiersFromLibrary()
-    local waterIndex = buildIndex(cells, PARAMS.cell)
+    local waterIndex = buildIndex(cells, params.cell)
 
     -- water y nearest to (x, z) within ~2 cells, or nil if none (shouldn't happen for
     -- planner output, which stays within the edge band)
     local function nearbyWaterY(x: number, z: number): number?
-        local cx = math.floor(x / PARAMS.cell + 0.5)
-        local cz = math.floor(z / PARAMS.cell + 0.5)
+        local cx = math.floor(x / params.cell + 0.5)
+        local cz = math.floor(z / params.cell + 0.5)
         local bestDist, bestY = math.huge, nil :: number?
         for gx = cx - 2, cx + 2 do
             for gz = cz - 2, cz + 2 do
@@ -621,7 +628,7 @@ local function bake(
         return bestY
     end
 
-    local state = ((PARAMS.seed + BAKE_SEED_OFFSET) * 2654435761) % 2147483648 + 1
+    local state = ((params.seed + BAKE_SEED_OFFSET) * 2654435761) % 2147483648 + 1
     local placed = 0
     local refused = 0
     local perRole: { [string]: number } = {}
@@ -670,8 +677,18 @@ end
 --   local run = require(game.ServerStorage.ShoreRocksTool)
 --   return run({ mode = "plan" })
 --   return run({ mode = "bake" })
-return function(opts: { mode: string? }?): string
+--   return run({ mode = "plan", overrides = { lipSpacing = 25 } })  -- gate tuning
+return function(opts: { mode: string?, overrides: { [string]: number }? }?): string
     local mode = (opts and opts.mode) or MODE
+    local params = table.clone(PARAMS)
+    if opts and opts.overrides then
+        for k, v in opts.overrides do
+            if (PARAMS :: { [string]: number })[k] == nil then
+                return `[shoreRocks] unknown override "{k}" — check the Params fields`
+            end
+            (params :: { [string]: number })[k] = v
+        end
+    end
 
     if mode == "wipe" then
         wipeRockFolder()
@@ -681,7 +698,7 @@ return function(opts: { mode: string? }?): string
     local cells = collectWaterCells()
     local existing = collectExistingRocks()
     local keepOut = makeKeepOut()
-    local placements = plan(cells, PARAMS, keepOut, existing)
+    local placements = plan(cells, params, keepOut, existing)
 
     local anchors = 0
     local lipAnchors = 0
@@ -703,7 +720,7 @@ return function(opts: { mode: string? }?): string
 
     if mode == "bake" then
         wipeRockFolder()
-        local placed, refused, baked = bake(placements, cells)
+        local placed, refused, baked = bake(placements, cells, params)
         local lines = {
             `stamped {placed} rocks into CanyonWorld.Foliage.ShoreRocks `
                 .. `(anchor={baked.anchor or 0} attendant={baked.attendant or 0} wader={baked.wader or 0})`,

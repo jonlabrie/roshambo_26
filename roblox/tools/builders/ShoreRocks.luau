@@ -23,7 +23,7 @@ export type Params = {
     attendantsMin: number,
     attendantsMax: number,
     wadersMax: number, -- 0..wadersMax waders per cluster, rolled uniformly
-    waderReach: number, -- how far a wader steps toward open water
+    waderReach: number, -- max wader step toward open water (floor is memberSpacing)
     scaleMin: number,
     scaleMax: number,
 }
@@ -340,7 +340,11 @@ local function plan(
             local jitterRoll = roll()
             local yaw = roll() * 2 * math.pi
             local scaleRoll = roll()
-            local step = stepRoll * params.waderReach
+            -- the step FLOOR is memberSpacing: a shorter step lands the wader inside
+            -- its own anchor's spacing bubble and farFromOutput rejects it every time
+            -- (the original 0-based roll silently zeroed waders out of whole plans)
+            local step = params.memberSpacing
+                + stepRoll * math.max(params.waderReach - params.memberSpacing, 0)
             local jitter = (jitterRoll * 2 - 1) * 2
             -- water-inward direction is the opposite of the land direction;
             -- both are axis-aligned unit vectors, so the perpendicular is too

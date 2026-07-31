@@ -206,4 +206,38 @@ describe("ShoreRocks.plan", function()
         -- assertion above is vacuous; guard so the test still means something
         expect(sawWader).toBeTruthy()
     end)
+
+    -- regression (2026-07-31, found on the first real-world plan): the wader step
+    -- used to roll in [0, waderReach], which lands most waders inside their own
+    -- anchor's memberSpacing bubble where farFromOutput rejects them — whole plans
+    -- silently zeroed their waders. The step floor is now memberSpacing, so a
+    -- healthy majority of rolled waders must survive to the output.
+    test("waders are not starved by their own anchor's spacing bubble", function()
+        local rolled = 0
+        local survived = 0
+        for seed = 1, 12 do
+            local p = table.clone(PARAMS)
+            p.seed = seed
+            -- rolled count is what the planner *attempted*: reconstruct it by
+            -- rerunning with a huge reach so self-rejection cannot happen
+            local generous = table.clone(p)
+            generous.waderReach = 40
+            for _, pl in ShoreRocks.plan(flatPool(), generous) do
+                if pl.role == "wader" then
+                    rolled += 1
+                end
+            end
+            for _, pl in ShoreRocks.plan(flatPool(), p) do
+                if pl.role == "wader" then
+                    survived += 1
+                end
+            end
+        end
+        expect(rolled > 0).toBeTruthy()
+        -- with the [0, reach] step the survival rate on this grid was under half;
+        -- with the memberSpacing floor waders only die to attendant collisions.
+        -- (the generous-reach proxy is itself slightly noisy — a far-stepping
+        -- wader can collide with the OTHER cluster — hence 0.6, not higher)
+        expect(survived >= rolled * 0.6).toBeTruthy()
+    end)
 end)
