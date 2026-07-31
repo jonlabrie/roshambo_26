@@ -48,6 +48,10 @@ export type Recipe = {
     -- cover at 4-stud spacing does not veto a tree 12 studs away. Default
     -- "canopy"; margin flora sets "ground".
     layer: string?,
+    -- footing: reject sites whose ground drops away underfoot (a trunk seated
+    -- over a cliff lip). radius = how far out to probe; nil = no footing check.
+    footingRadius: number?,
+    footingMaxDrop: number?,
 }
 export type Placement = {
     x: number,
@@ -232,6 +236,48 @@ local function waterWithin(index: WaterIndex?, x: number, z: number, dist: numbe
     return false
 end
 
+export type SampleIndex = { [string]: Sample }
+export type PlanOptions = {
+    pitch: number?,
+    keepOut: ((number, number, string?) -> boolean)?,
+    careBand: ((number, number) -> string)?,
+}
+
+local function sampleKey(x: number, z: number, pitch: number): string
+    return `{math.floor(x / pitch + 0.5)},{math.floor(z / pitch + 0.5)}`
+end
+
+function ZoneScatter.indexSamples(samples: { Sample }, pitch: number): SampleIndex
+    local index: SampleIndex = {}
+    for _, s in samples do
+        index[sampleKey(s.x, s.z, pitch)] = s
+    end
+    return index
+end
+
+-- Max drop in studs from (x,z,y) to the ground at 8 compass probes `radius` out.
+-- nil = a probe found NO sample (void: water, off-grid, past a lip) — callers
+-- treat that as the WORST footing, never as level ground.
+function ZoneScatter.footingDrop(
+    index: SampleIndex,
+    pitch: number,
+    x: number,
+    z: number,
+    y: number,
+    radius: number
+): number?
+    local worst = 0
+    for i = 0, 7 do
+        local ang = i * math.pi / 4
+        local probe = index[sampleKey(x + math.cos(ang) * radius, z + math.sin(ang) * radius, pitch)]
+        if probe == nil then
+            return nil
+        end
+        worst = math.max(worst, y - probe.y)
+    end
+    return worst
+end
+
 local function zoneBBox(zone: Zone): (number, number, number, number)
     local b = zone.bounds
     if zone.shape == "circle" then
@@ -245,8 +291,13 @@ function ZoneScatter.plan(
     samples: { Sample },
     recipes: { [string]: Recipe },
     water: WaterIndex?,
-    built: WaterIndex?
+    built: WaterIndex?,
+    opts: PlanOptions?
 ): ({ Placement }, { MistAnchor })
+    local o: PlanOptions = opts or {}
+    local pitch = o.pitch or 4
+    local sampleIndex = ZoneScatter.indexSamples(samples, pitch)
+
     local ordered = table.clone(samples)
     table.sort(ordered, function(a, b)
         if a.x ~= b.x then
@@ -277,6 +328,13 @@ function ZoneScatter.plan(
         end
         if s.steep > recipe.maxSteep then
             return false
+        end
+        local fr = recipe.footingRadius
+        if fr ~= nil then
+            local drop = ZoneScatter.footingDrop(sampleIndex, pitch, s.x, s.z, s.y, fr)
+            if drop == nil or drop > (recipe.footingMaxDrop or 4) then
+                return false
+            end
         end
         local innerClear = recipe.innerClear
         if innerClear ~= nil and inInnerClear(zone, innerClear, s.x, s.z) then

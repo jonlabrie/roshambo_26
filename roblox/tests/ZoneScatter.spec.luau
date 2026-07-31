@@ -406,3 +406,83 @@ describe("ZoneScatter", function()
         end
     end)
 end)
+
+describe("ZoneScatter.footingDrop", function()
+    local function grid(yFn: (number, number) -> number?): { ZoneScatter.Sample }
+        local s = {}
+        for x = 0, 100, 4 do
+            for z = 0, 100, 4 do
+                local y = yFn(x, z)
+                if y ~= nil then
+                    table.insert(s, { x = x, z = z, y = y, steep = 0 })
+                end
+            end
+        end
+        return s
+    end
+
+    test("flat ground drops nothing", function()
+        local idx = ZoneScatter.indexSamples(
+            grid(function()
+                return 50
+            end),
+            4
+        )
+        expect(ZoneScatter.footingDrop(idx, 4, 48, 48, 50, 4)).toBe(0)
+    end)
+
+    test("a cliff lip reports the drop", function()
+        local idx = ZoneScatter.indexSamples(
+            grid(function(x)
+                return if x >= 52 then 10 else 50
+            end),
+            4
+        )
+        local drop = ZoneScatter.footingDrop(idx, 4, 48, 48, 50, 4)
+        expect(drop).toBe(40)
+    end)
+
+    test("a missing probe (void/water) is nil, not level ground", function()
+        local idx = ZoneScatter.indexSamples(
+            grid(function(x)
+                return if x >= 52 then nil else 50
+            end),
+            4
+        )
+        expect(ZoneScatter.footingDrop(idx, 4, 48, 48, 50, 4)).toBe(nil)
+    end)
+end)
+
+describe("ZoneScatter.plan footing gate", function()
+    test("placements never straddle the cliff", function()
+        local samples = {}
+        for x = 0, 100, 4 do
+            for z = 0, 100, 4 do
+                table.insert(samples, { x = x, z = z, y = if x >= 52 then 10 else 50, steep = 0 })
+            end
+        end
+        local footed = table.clone(CORE)
+        footed.footingRadius = 4
+        footed.footingMaxDrop = 4
+        local zones: { ZoneScatter.Zone } = {
+            {
+                name = "A",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "Footed",
+                densityScale = 1,
+                seed = 7,
+            },
+        }
+        local placements = ZoneScatter.plan(zones, samples, { Footed = footed }, nil, nil, { pitch = 4 })
+        expect(#placements > 0).toBe(true)
+        for _, p in placements do
+            -- x=48 looks straight across the 40-stud drop to x=52, which exceeds
+            -- footingMaxDrop (4) within footingRadius (4): that column can never
+            -- seat a placement. The low side of the cliff (x>=52) is solid
+            -- ground underfoot for a plant standing on it, so it stays open —
+            -- footingDrop flags a trunk over a void, not one merely near a wall.
+            expect(p.x ~= 48).toBe(true)
+        end
+    end)
+end)
