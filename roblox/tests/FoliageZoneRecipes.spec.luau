@@ -144,6 +144,29 @@ describe("grove pre-pass", function()
         end
         expect(small).toBe(3)
     end)
+    -- gate feedback (2026-07-31): bigger groves with youngsters among the
+    -- elders sell the grove read. The sapling swap map must only key on real
+    -- canopy pool species and only target real Yb sapling models.
+    test("PreserveCore groves fit 10 members and swap saplings from real species", function()
+        local grove = Recipes.PreserveCore.grove
+        assert(grove ~= nil)
+        expect(grove.membersMax).toBe(10)
+        local saplings = grove.saplings
+        expect(saplings ~= nil).toBe(true)
+        assert(saplings ~= nil)
+        expect(saplings.chance > 0 and saplings.chance < 1).toBe(true)
+        local coreNames: { [string]: boolean } = {}
+        for _, sp in Recipes.PreserveCore.pool do
+            coreNames[sp.name] = true
+        end
+        local mapped = 0
+        for from, to in saplings.map do
+            mapped += 1
+            expect(coreNames[from] == true).toBe(true) -- key must be a real canopy species
+            expect(to:find("Yb") ~= nil).toBe(true) -- target must be a sapling model
+        end
+        expect(mapped > 0).toBe(true)
+    end)
 end)
 
 describe("waterline ecology", function()

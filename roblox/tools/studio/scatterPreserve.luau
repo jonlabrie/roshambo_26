@@ -70,6 +70,11 @@ type GroveConfig = {
     dominantScale: number, -- the elder's extra scale multiplier
     anchorDarts: number, -- dart-throw attempts per zone
     maxGroves: number,
+    -- optional: a MEMBER (never the elder) whose rolled species has a map
+    -- entry may be swapped for a young/sapling model name, chance-gated.
+    -- Scale/jitter/heightScale are unchanged — young models are naturally
+    -- small, this only substitutes the placed name.
+    saplings: { chance: number, map: { [string]: string } }?,
 }
 type GroveAffinity = { radius: number, inside: number, outside: number }
 -- THE FOUR BANDS (the user's structure, and the point of the whole system):
@@ -110,17 +115,29 @@ local RECIPES: { [string]: Recipe } = {
         -- grove pre-pass fix (2026-07-30): the per-sample gate (steep/footing/
         -- spacing) was rejecting canopy so uniformly that the forest read as a
         -- thin, even scatter instead of a wood — real trees cluster. Anchors
-        -- dart-thrown at 55-stud spacing each grow a 3-8 member clump.
+        -- dart-thrown at 55-stud spacing each grow a 3-10 member clump.
+        -- gate feedback (2026-07-31): bigger groves with youngsters among the
+        -- elders sell the grove read.
         grove = {
             spacing = 55,
             radiusMin = 8,
             radiusMax = 16,
             membersMin = 3,
-            membersMax = 8,
+            membersMax = 10,
             memberSpacing = 7,
             dominantScale = 1.25,
             anchorDarts = 300,
             maxGroves = 12,
+            saplings = {
+                chance = 0.25,
+                map = {
+                    XfHinokiT = "XfHinokiYb",
+                    XfHinokiMT = "XfHinokiYb",
+                    XfSpruceMT = "XfSpruceYb",
+                    XfFirMT = "XfFirYb",
+                    XfSugi25T = "XfSugiYb",
+                },
+            },
         },
     },
     -- BRUSH band (2-5 studs): young growth at knee-to-chest height. This is what
@@ -709,6 +726,18 @@ local function plan(
                 else
                     mSpecies, mScale = attSpecies, attScale
                 end
+                -- sapling roll: always drawn, whether or not this recipe
+                -- configures `saplings`, so the stream's shape never depends
+                -- on an optional feature being toggled — only the
+                -- INTERPRETATION of the draw does. Elders never roll this.
+                local saplingRoll = groveRoll(zone)
+                local saplings = grove.saplings
+                if saplings ~= nil and saplingRoll < saplings.chance then
+                    local young = saplings.map[mSpecies]
+                    if young ~= nil then
+                        mSpecies = young
+                    end
+                end
                 table.insert(out, {
                     x = mx,
                     z = mz,
@@ -1216,6 +1245,17 @@ local function bake(placements: { Placement }, mode: string)
     local folders: { [string]: Folder } = {}
     local missing: { [string]: number } = {}
     local placed = 0
+    -- SLOPE-ADAPTIVE BED-IN (2026-07-31 gate feedback): a tree seated only by
+    -- its calibrated PlantDepth still shows a naked, downhill root ball on a
+    -- slope — the depth is right for flat ground but the uphill side of the
+    -- root flare pokes out. Same raycast style as sampleTerrain
+    -- (Include=Terrain, IgnoreWater=true). NOTE this makes bake() non-pure in
+    -- the sense that it raycasts live terrain, but terrain doesn't change
+    -- between bakes so a re-bake still reproduces the same result.
+    local rpBed = RaycastParams.new()
+    rpBed.FilterType = Enum.RaycastFilterType.Include
+    rpBed.FilterDescendantsInstances = { workspace.Terrain }
+    rpBed.IgnoreWater = true
     for _, p in placements do
         local template = kit:FindFirstChild(p.species)
         if not template or not template:IsA("Model") then
@@ -1249,6 +1289,23 @@ local function bake(placements: { Placement }, mode: string)
             depth = 0.3
         end
         depth *= clone:GetScale()
+        -- slope-adaptive sink so downhill roots bury (2026-07-31 gate): probe
+        -- 4 compass points 1.5 studs out and add half their vertical spread
+        -- (capped at 2.5) as extra depth. Flat ground: extra ~= 0, calibrated
+        -- depths untouched.
+        local minY, maxY = math.huge, -math.huge
+        for i = 0, 3 do
+            local ang = i * math.pi / 2
+            local origin = Vector3.new(p.x + math.cos(ang) * 1.5, p.y + 50, p.z + math.sin(ang) * 1.5)
+            local hit = workspace:Raycast(origin, Vector3.new(0, -200, 0), rpBed)
+            if hit then
+                minY = math.min(minY, hit.Position.Y)
+                maxY = math.max(maxY, hit.Position.Y)
+            end
+        end
+        if maxY > -math.huge and minY < math.huge then
+            depth += math.clamp((maxY - minY) / 2, 0, 2.5)
+        end
         local box, size = clone:GetBoundingBox()
         clone:PivotTo(clone:GetPivot() + Vector3.new(0, p.y - depth - (box.Position.Y - size.Y / 2), 0))
         flagClone(clone, p.species:find("SugiMid") ~= nil)
