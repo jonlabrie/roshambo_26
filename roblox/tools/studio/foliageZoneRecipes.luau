@@ -217,7 +217,14 @@ local Recipes: { [string]: Recipe } = {
     -- species and grows exactly this way. Zone: Sandbox.FoliageZones.Grove_Sugi.
     SugiStand = {
         pool = {
-            { name = "XfSugi25T", weight = 100 },
+            -- the TurboSquid hero set: open, wind-formed, scrub-pine vertical
+            -- character (user's pick over Xfrog's plantation-conical JA06)
+            { name = "SugiHero_SugiSmart", weight = 20 },
+            { name = "SugiHero_SugiB", weight = 16 },
+            { name = "SugiHero_SugiC", weight = 16 },
+            { name = "SugiHero_SugiD", weight = 16 },
+            { name = "SugiHero_SugiE", weight = 16 },
+            { name = "SugiHero_SugiF", weight = 16 },
         },
         spacingMin = 5,
         spacingMax = 8,
@@ -240,7 +247,17 @@ local Recipes: { [string]: Recipe } = {
             anchorDarts = 200,
             maxGroves = 1,
             memberTries = 8,
-            saplings = { chance = 0.35, map = { XfSugi25T = "XfSugiYb" } },
+            saplings = {
+                chance = 0.35,
+                map = {
+                    SugiHero_SugiSmart = "XfSugiYb",
+                    SugiHero_SugiB = "XfSugiYb",
+                    SugiHero_SugiC = "XfSugiYb",
+                    SugiHero_SugiD = "XfSugiYb",
+                    SugiHero_SugiE = "XfSugiYb",
+                    SugiHero_SugiF = "XfSugiYb",
+                },
+            },
         },
     },
     FutureClearing = {
