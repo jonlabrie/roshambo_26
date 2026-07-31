@@ -311,6 +311,38 @@ local RECIPES: { [string]: Recipe } = {
             },
         },
     },
+    -- User-placed maple grove (2026-07-31 mark at -351, -48): jewel accent as a
+    -- deliberate composed moment, free-mix over both maple sizes. Zone:
+    -- Sandbox.FoliageZones.Grove_Maple.
+    MapleStand = {
+        pool = {
+            { name = "XfMapleA", weight = 40 },
+            { name = "XfMapleM", weight = 60 },
+        },
+        spacingMin = 5,
+        spacingMax = 8,
+        clumpChance = 0,
+        clumpSize = 0,
+        maxSteep = 0.55,
+        waterMargin = 3,
+        scaleJitter = 0.15,
+        pathMargin = 4,
+        footingRadius = 2.5,
+        footingMaxDrop = 6,
+        grove = {
+            spacing = 30,
+            radiusMin = 4,
+            radiusMax = 16,
+            membersMin = 5,
+            membersMax = 8,
+            memberSpacing = 5.5,
+            dominantScale = 1.2,
+            anchorDarts = 200,
+            maxGroves = 1,
+            memberTries = 16,
+            coherent = false,
+        },
+    },
     FutureClearing = {
         pool = {
             { name = "XfHinokiMT", weight = 35 },

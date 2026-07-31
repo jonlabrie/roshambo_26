@@ -82,6 +82,8 @@ describe("recipes name only species that exist", function()
         XfSpruceMT = true,
         XfFirMT = true,
         XfSugi25T = true,
+        XfMapleA = true,
+        XfMapleM = true,
         SugiHero_SugiSmart = true,
         SugiHero_SugiB = true,
         SugiHero_SugiC = true,
@@ -125,7 +127,7 @@ describe("grove pre-pass", function()
     -- only PreserveCore should carry a grove; every other recipe still scatters
     -- per-sample, so an accidental grove elsewhere silently changes its planter.
     test("only the canopy recipes carry groves", function()
-        local groved = { PreserveCore = true, SugiStand = true }
+        local groved = { PreserveCore = true, SugiStand = true, MapleStand = true }
         for name, recipe in Recipes do
             if not groved[name] then
                 expect(recipe.grove == nil).toBe(true)
