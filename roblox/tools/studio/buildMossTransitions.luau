@@ -174,9 +174,10 @@ local PARAMS: Params = {
 }
 
 local SINK = 0.15 -- ABSOLUTE studs, never multiplied by size
--- gate feedback (2026-07-31): the kit's albedo reads too bright/green against the
--- CanyonMossySlate terrain moss; Color multiplies the SurfaceAppearance maps, so a
--- muted olive tint pulls the clumps down toward the terrain. Tuned live at the gate.
+-- gate feedback (2026-07-31): the kit's albedo reads too bright against the
+-- CanyonMossySlate terrain moss. These meshes use AlphaMode=Transparency, where
+-- part.Color is IGNORED — the tint must go on SurfaceAppearance.Color (user-approved
+-- value, tuned live at the gate).
 local MOSS_TINT = Color3.fromRGB(150, 152, 128)
 local BAKE_SEED_OFFSET = 700000 -- keeps the bake-time species-within-family stream
 -- distinct from the planner's own seed state, same pattern as scatterPreserve's
@@ -433,7 +434,10 @@ local function flagMossClone(part: BasePart)
     part.CanQuery = false
     part.CanTouch = false
     part.CanCollide = false
-    part.Color = MOSS_TINT
+    local sa = part:FindFirstChildOfClass("SurfaceAppearance")
+    if sa then
+        sa.Color = MOSS_TINT
+    end
     if part:IsA("MeshPart") then
         part.RenderFidelity = Enum.RenderFidelity.Automatic
     end
