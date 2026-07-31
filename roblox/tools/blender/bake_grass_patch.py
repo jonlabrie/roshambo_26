@@ -24,12 +24,20 @@
 #     the sakura lesson); flip only if card culling reads broken at the gate.
 
 import bpy, sys, os, math, functools
+import numpy as np
 
 print = functools.partial(print, flush=True)
 
 argv = sys.argv[sys.argv.index("--") + 1 :]
 SRC, OUT_DIR, HEIGHT_STUDS = argv[0], argv[1], float(argv[2])
 TILE = int(argv[3]) if len(argv) > 3 else 512
+# post-bake grade: BRIGHTNESS lifts the whole image (dense self-shadowed bases bake
+# near-black); ALPHA_GAIN fights mip erosion of wispy edges at distance; PINK_BOOST
+# multiplies R (and slightly B) only where a pixel already leans red — plumes pink up,
+# green stems stay green.
+BRIGHTNESS = float(argv[4]) if len(argv) > 4 else 1.0
+ALPHA_GAIN = float(argv[5]) if len(argv) > 5 else 1.0
+PINK_BOOST = float(argv[6]) if len(argv) > 6 else 1.0
 
 os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -54,6 +62,18 @@ sun = bpy.data.objects.new("bake_sun", bpy.data.lights.new("bake_sun", "SUN"))
 scene.collection.objects.link(sun)
 sun.data.energy = 3.0
 sun.rotation_euler = (math.radians(60), 0, math.radians(30))
+
+# fill + ambient so dense plant bases don't bake to self-shadowed black
+fill = bpy.data.objects.new("bake_fill", bpy.data.lights.new("bake_fill", "SUN"))
+scene.collection.objects.link(fill)
+fill.data.energy = 1.5
+fill.rotation_euler = (math.radians(75), 0, math.radians(210))
+world = bpy.data.worlds.new("bake_world")
+scene.world = world
+world.use_nodes = True
+bg = world.node_tree.nodes["Background"]
+bg.inputs[0].default_value = (1, 1, 1, 1)
+bg.inputs[1].default_value = 0.6
 
 cam = bpy.data.objects.new("bake_cam", bpy.data.cameras.new("bake_cam"))
 scene.collection.objects.link(cam)
@@ -83,21 +103,31 @@ def render_view(obj, direction, path):
     bpy.ops.render.render(write_still=True)
 
 
+def grade(px):
+    """Brightness lift + selective pink boost + alpha gain, in place (Nx4 array)."""
+    rgb = px[:, :3]
+    a = px[:, 3:4]
+    rgb *= BRIGHTNESS
+    if PINK_BOOST > 1.0:
+        # plume pixels lean red; stems lean green — boost only the former
+        reddish = rgb[:, 0] > rgb[:, 1] * 1.02
+        rgb[reddish, 0] *= PINK_BOOST
+        rgb[reddish, 2] *= 1.0 + (PINK_BOOST - 1.0) * 0.55
+    np.clip(rgb, 0.0, 1.0, out=rgb)
+    np.clip(a * ALPHA_GAIN, 0.0, 1.0, out=a)
+
+
 def compose_atlas(front_png, side_png, out_png):
-    """Two square tiles -> one 2:1 atlas (front left, side right)."""
+    """Two square tiles -> one 2:1 atlas (front left, side right), graded."""
     a = bpy.data.images.load(front_png)
     b = bpy.data.images.load(side_png)
     atlas = bpy.data.images.new("atlas", TILE * 2, TILE, alpha=True)
-    pa = list(a.pixels)
-    pb = list(b.pixels)
-    out = [0.0] * (TILE * 2 * TILE * 4)
-    for row in range(TILE):
-        arow = pa[row * TILE * 4 : (row + 1) * TILE * 4]
-        brow = pb[row * TILE * 4 : (row + 1) * TILE * 4]
-        base = row * TILE * 2 * 4
-        out[base : base + TILE * 4] = arow
-        out[base + TILE * 4 : base + TILE * 8] = brow
-    atlas.pixels = out
+    pa = np.array(a.pixels[:], dtype=np.float32).reshape(TILE, TILE, 4)
+    pb = np.array(b.pixels[:], dtype=np.float32).reshape(TILE, TILE, 4)
+    for tile_px in (pa, pb):
+        grade(tile_px.reshape(-1, 4))
+    out = np.concatenate([pa, pb], axis=1)
+    atlas.pixels = out.ravel().tolist()
     atlas.filepath_raw = out_png
     atlas.file_format = "PNG"
     atlas.save()
