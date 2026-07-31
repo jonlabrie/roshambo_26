@@ -811,6 +811,36 @@ describe("ZoneScatter grove pre-pass", function()
         end
     end)
 
+    test("gates hold: grove pre-pass honors KeepOut zones - pads are sacred too", function()
+        local recipe = groveRecipe()
+        recipe.grove.spacing = 15
+        recipe.grove.anchorDarts = 300
+        recipe.grove.maxGroves = 8
+        local zones: { ZoneScatter.Zone } = {
+            {
+                name = "Grove",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "Grove",
+                densityScale = 1,
+                seed = 11,
+            },
+            {
+                name = "KO_Pad",
+                shape = "rect",
+                bounds = { 50, 0, 100, 100 },
+                recipe = "KeepOut",
+                densityScale = 1,
+                seed = 1,
+            },
+        }
+        local out = ZoneScatter.plan(zones, flatSamples(), { Grove = recipe })
+        expect(#out > 0).toBe(true)
+        for _, p in out do
+            expect(p.x < 50).toBe(true)
+        end
+    end)
+
     test("groveAffinity plants understory only near grove placements", function()
         local canopy = groveRecipe()
         local understory = table.clone(CORE)
