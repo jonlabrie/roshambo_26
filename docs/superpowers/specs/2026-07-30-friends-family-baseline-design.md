@@ -119,7 +119,30 @@ Teahouses come in three sizes but the shoji are static panels. Make them real:
 - All three prefabs already carry tagged Bay models (S=6, M=10, L=14) and the
   `wallBays`/`applyBays` spine is live — this extends that system, not a new one.
 
-### 6. Statistics — aggregates, the Overlook Statistics room, HUD-local view
+### 6. Rewards & flex — earnable, visible accomplishment
+
+Players need a visual way to flex seniority and accomplishment. Bare bones, earned
+through play only — no purchases.
+
+- **Earn rules, server-side, from stats already persisted**: a small milestone set —
+  best streak (3/5/7), total wins, lifetime points banked, seniority (days since first
+  throw). Awarded at settlement time, stored on the User; no new aggregation needed.
+- **Teahouse flag**: a banner pole on your deck flying your best-earned emblem — an
+  auto-earned decoration riding the existing decoration/treatment spine (banners were
+  already on the deferred decoration list).
+- **Avatar ribbon/sash**: an in-world worn accessory attached to the character
+  server-side, visible to everyone — a simple band whose color/trim tier tracks your top
+  milestone. Not layered clothing.
+- **Emblem art** via the glyph SDF pipeline (`glyphgen.cjs`) — tiered variants of a small
+  emblem set.
+- **Out at this bar:** badge-browsing UI (the maximal HUD may list earned badges as
+  text), Roblox platform badges, purchasable cosmetics (the mask shop 面屋 later),
+  familiars.
+
+*Ordered before statistics: more kid-visible than leaderboards, needs no stats backend,
+and flags/sashes are already flying when the Statistics room opens.*
+
+### 7. Statistics — aggregates, the Overlook Statistics room, HUD-local view
 
 Split by kind (decided): **personal** stats live in the maximal HUD; **global/social**
 stats get a physical place where geeks collect.
@@ -136,7 +159,7 @@ stats get a physical place where geeks collect.
 and the game demos fine before leaderboards exist. If the serious-gamer visit comes
 early, promote this item.*
 
-### 7. World finish & hygiene
+### 8. World finish & hygiene
 
 - Perch teahouse placed at the lantern-stair summit (placement decision, existing
   builders).
