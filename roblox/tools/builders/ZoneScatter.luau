@@ -56,6 +56,10 @@ export type Recipe = {
     -- 0 < depth <= submergeMax (studs of water over the ground point). Most
     -- flora is dry-only; shore reeds and the like opt in.
     submergeMax: number?,
+    -- per-band multiplier on the zone's densityScale (e.g. GARDEN = 0 clears a
+    -- tended front yard of wild growth). Applied only when the caller supplies
+    -- PlanOptions.careBand; a recipe with no careDensity is unaffected.
+    careDensity: { [string]: number }?,
 }
 export type Placement = {
     x: number,
@@ -381,8 +385,16 @@ function ZoneScatter.plan(
             continue
         end
 
-        -- density thinning before spacing so DensityScale thins uniformly
-        if roll(zone) >= zone.densityScale then
+        -- density thinning before spacing so DensityScale thins uniformly;
+        -- the care band scales it further where recipes opt in
+        local density = zone.densityScale
+        if o.careBand ~= nil and recipe.careDensity ~= nil then
+            local mul = recipe.careDensity[o.careBand(s.x, s.z)]
+            if mul ~= nil then
+                density *= mul
+            end
+        end
+        if roll(zone) >= density then
             continue
         end
 

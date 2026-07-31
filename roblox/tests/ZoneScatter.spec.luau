@@ -600,3 +600,29 @@ describe("ZoneScatter keep-out gate", function()
         end
     end)
 end)
+
+describe("ZoneScatter care-banded density", function()
+    test("a zero GARDEN multiplier clears the tended front yard", function()
+        local weedy = table.clone(CORE)
+        weedy.careDensity = { GARDEN = 0 }
+        local zones: { ZoneScatter.Zone } = {
+            {
+                name = "A",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "R",
+                densityScale = 1,
+                seed = 7,
+            },
+        }
+        local placements = ZoneScatter.plan(zones, flatSamples(), { R = weedy }, nil, nil, {
+            careBand = function(x, _z)
+                return if x < 50 then "GARDEN" else "PRESERVE"
+            end,
+        })
+        expect(#placements > 0).toBe(true)
+        for _, p in placements do
+            expect(p.x >= 50).toBe(true)
+        end
+    end)
+end)
