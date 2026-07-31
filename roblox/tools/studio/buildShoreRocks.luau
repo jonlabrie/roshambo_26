@@ -611,6 +611,9 @@ local function flagRockClone(part: BasePart, dress: boolean)
     part.CastShadow = true
     part.CanQuery = true
     part.CanTouch = false
+    -- Color multiplies the variant/SurfaceAppearance maps: a non-white template
+    -- color renders the stone darker than its neighbours (user-caught 2026-07-31)
+    part.Color = Color3.fromRGB(255, 255, 255)
     if dress then
         part.Material = Enum.Material.Rock
         part.MaterialVariant = "ZenCanyonRock"
