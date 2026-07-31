@@ -167,6 +167,17 @@ describe("grove pre-pass", function()
         end
         expect(mapped > 0).toBe(true)
     end)
+    -- gate feedback (2026-07-31, again): fewer, fuller stands; slots retry
+    -- for ground instead of dying on the first rejected dart.
+    test("PreserveCore reshaped to fewer, fuller groves with member retries", function()
+        local grove = Recipes.PreserveCore.grove
+        assert(grove ~= nil)
+        expect(grove.maxGroves).toBe(6)
+        expect(grove.membersMin).toBe(5)
+        expect(grove.radiusMax).toBe(20)
+        expect(grove.memberTries).toBe(6)
+        expect(grove.memberTries ~= nil and grove.memberTries > 0).toBe(true)
+    end)
 end)
 
 describe("waterline ecology", function()

@@ -48,6 +48,10 @@ export type GroveConfig = {
     -- Scale/jitter/heightScale are unchanged — young models are naturally
     -- small, this only substitutes the placed name.
     saplings: { chance: number, map: { [string]: string } }?,
+    -- optional: attempts per member SLOT before it's abandoned (default 1,
+    -- the old single-shot behavior). Real terrain rejects a lot of single
+    -- darts; retries let a slot fight for open ground instead of just dying.
+    memberTries: number?,
 }
 export type GroveAffinity = { radius: number, inside: number, outside: number }
 -- THE FOUR BANDS (the user's structure, and the point of the whole system):
@@ -88,19 +92,21 @@ local Recipes: { [string]: Recipe } = {
         -- grove pre-pass fix (2026-07-30): the per-sample gate (steep/footing/
         -- spacing) was rejecting canopy so uniformly that the forest read as a
         -- thin, even scatter instead of a wood — real trees cluster. Anchors
-        -- dart-thrown at 55-stud spacing each grow a 3-10 member clump.
+        -- dart-thrown at 55-stud spacing each grow a 5-10 member clump.
         -- gate feedback (2026-07-31): bigger groves with youngsters among the
-        -- elders sell the grove read.
+        -- elders sell the grove read. gate feedback (2026-07-31, again):
+        -- fewer, fuller stands; slots retry for ground.
         grove = {
             spacing = 55,
             radiusMin = 8,
-            radiusMax = 16,
-            membersMin = 3,
+            radiusMax = 20,
+            membersMin = 5,
             membersMax = 10,
             memberSpacing = 7,
             dominantScale = 1.25,
             anchorDarts = 300,
-            maxGroves = 12,
+            maxGroves = 6,
+            memberTries = 6,
             saplings = {
                 chance = 0.25,
                 map = {

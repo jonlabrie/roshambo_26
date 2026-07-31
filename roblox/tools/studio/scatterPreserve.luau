@@ -75,6 +75,10 @@ type GroveConfig = {
     -- Scale/jitter/heightScale are unchanged — young models are naturally
     -- small, this only substitutes the placed name.
     saplings: { chance: number, map: { [string]: string } }?,
+    -- optional: attempts per member SLOT before it's abandoned (default 1,
+    -- the old single-shot behavior). Real terrain rejects a lot of single
+    -- darts; retries let a slot fight for open ground instead of just dying.
+    memberTries: number?,
 }
 type GroveAffinity = { radius: number, inside: number, outside: number }
 -- THE FOUR BANDS (the user's structure, and the point of the whole system):
@@ -115,19 +119,21 @@ local RECIPES: { [string]: Recipe } = {
         -- grove pre-pass fix (2026-07-30): the per-sample gate (steep/footing/
         -- spacing) was rejecting canopy so uniformly that the forest read as a
         -- thin, even scatter instead of a wood — real trees cluster. Anchors
-        -- dart-thrown at 55-stud spacing each grow a 3-10 member clump.
+        -- dart-thrown at 55-stud spacing each grow a 5-10 member clump.
         -- gate feedback (2026-07-31): bigger groves with youngsters among the
-        -- elders sell the grove read.
+        -- elders sell the grove read. gate feedback (2026-07-31, again):
+        -- fewer, fuller stands; slots retry for ground.
         grove = {
             spacing = 55,
             radiusMin = 8,
-            radiusMax = 16,
-            membersMin = 3,
+            radiusMax = 20,
+            membersMin = 5,
             membersMax = 10,
             memberSpacing = 7,
             dominantScale = 1.25,
             anchorDarts = 300,
-            maxGroves = 12,
+            maxGroves = 6,
+            memberTries = 6,
             saplings = {
                 chance = 0.25,
                 map = {
@@ -683,71 +689,80 @@ local function plan(
                 layer = layer,
             })
 
+            local memberTries = grove.memberTries or 1
             for _ = 2, memberCount do
-                local ang = groveRoll(zone) * 2 * math.pi
-                local rad = grove.radiusMin + groveRoll(zone) * (grove.radiusMax - grove.radiusMin)
-                local mx = ax + math.cos(ang) * rad
-                local mz = az + math.sin(ang) * rad
-                local mgs = sampleIndex[sampleKey(mx, mz, pitch)]
-                if mgs == nil then
-                    continue
-                end
-                -- pads are sacred: same KeepOut veto as an anchor dart
-                if keepOutAt(zones, mx, mz, mgs.y) then
-                    continue
-                end
-                local memberProbe: Sample = {
-                    x = mx,
-                    z = mz,
-                    y = mgs.y,
-                    steep = mgs.steep,
-                    depth = mgs.depth,
-                    material = mgs.material,
-                }
-                if not accepts(zone, memberProbe) then
-                    continue
-                end
-                local memberTooClose = false
-                for _, p in out do
-                    if p.layer == layer then
-                        local dx, dz = mx - p.x, mz - p.z
-                        if dx * dx + dz * dz <= grove.memberSpacing * grove.memberSpacing then
-                            memberTooClose = true
-                            break
+                -- each slot gets up to `memberTries` fresh dart attempts;
+                -- the first that clears every gate places and the slot stops
+                -- retrying. A slot that succeeds on try 1 draws exactly the
+                -- rolls it always did (memberTries=1 default = old stream).
+                for _ = 1, memberTries do
+                    local ang = groveRoll(zone) * 2 * math.pi
+                    local rad = grove.radiusMin + groveRoll(zone) * (grove.radiusMax - grove.radiusMin)
+                    local mx = ax + math.cos(ang) * rad
+                    local mz = az + math.sin(ang) * rad
+                    local mgs = sampleIndex[sampleKey(mx, mz, pitch)]
+                    if mgs == nil then
+                        continue
+                    end
+                    -- pads are sacred: same KeepOut veto as an anchor dart
+                    if keepOutAt(zones, mx, mz, mgs.y) then
+                        continue
+                    end
+                    local memberProbe: Sample = {
+                        x = mx,
+                        z = mz,
+                        y = mgs.y,
+                        steep = mgs.steep,
+                        depth = mgs.depth,
+                        material = mgs.material,
+                    }
+                    if not accepts(zone, memberProbe) then
+                        continue
+                    end
+                    local memberTooClose = false
+                    for _, p in out do
+                        if p.layer == layer then
+                            local dx, dz = mx - p.x, mz - p.z
+                            if dx * dx + dz * dz <= grove.memberSpacing * grove.memberSpacing then
+                                memberTooClose = true
+                                break
+                            end
                         end
                     end
-                end
-                if memberTooClose then
-                    continue
-                end
-                local mSpecies, mScale
-                if groveRoll(zone) < GROVE_ATTENDANT_THRESHOLD then
-                    mSpecies, mScale = domSpecies, domScale
-                else
-                    mSpecies, mScale = attSpecies, attScale
-                end
-                -- sapling roll: always drawn, whether or not this recipe
-                -- configures `saplings`, so the stream's shape never depends
-                -- on an optional feature being toggled — only the
-                -- INTERPRETATION of the draw does. Elders never roll this.
-                local saplingRoll = groveRoll(zone)
-                local saplings = grove.saplings
-                if saplings ~= nil and saplingRoll < saplings.chance then
-                    local young = saplings.map[mSpecies]
-                    if young ~= nil then
-                        mSpecies = young
+                    if memberTooClose then
+                        continue
                     end
+                    local mSpecies, mScale
+                    if groveRoll(zone) < GROVE_ATTENDANT_THRESHOLD then
+                        mSpecies, mScale = domSpecies, domScale
+                    else
+                        mSpecies, mScale = attSpecies, attScale
+                    end
+                    -- sapling roll: always drawn on a successful attempt,
+                    -- whether or not this recipe configures `saplings`, so
+                    -- the stream's shape never depends on an optional
+                    -- feature being toggled — only the INTERPRETATION of the
+                    -- draw does. Elders never roll this.
+                    local saplingRoll = groveRoll(zone)
+                    local saplings = grove.saplings
+                    if saplings ~= nil and saplingRoll < saplings.chance then
+                        local young = saplings.map[mSpecies]
+                        if young ~= nil then
+                            mSpecies = young
+                        end
+                    end
+                    table.insert(out, {
+                        x = mx,
+                        z = mz,
+                        y = mgs.y,
+                        species = mSpecies,
+                        yaw = groveRoll(zone) * 2 * math.pi,
+                        scale = (1 + (groveRoll(zone) * 2 - 1) * recipe.scaleJitter) * heightScale * mScale,
+                        zone = zone.name,
+                        layer = layer,
+                    })
+                    break
                 end
-                table.insert(out, {
-                    x = mx,
-                    z = mz,
-                    y = mgs.y,
-                    species = mSpecies,
-                    yaw = groveRoll(zone) * 2 * math.pi,
-                    scale = (1 + (groveRoll(zone) * 2 - 1) * recipe.scaleJitter) * heightScale * mScale,
-                    zone = zone.name,
-                    layer = layer,
-                })
             end
         end
         for _, a in zoneAnchors do
