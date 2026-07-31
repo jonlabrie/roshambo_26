@@ -20,7 +20,31 @@ export type Recipe = {
     footingMaxDrop: number?,
     submergeMax: number?,
     careDensity: { [string]: number }?,
+    -- if set, this recipe's zone runs a grove PRE-PASS instead of the ordinary
+    -- per-sample scatter (ZoneScatter.luau): the random-scatter gate rejected
+    -- too much of the canopy on its own (footing/steep/spacing all compound
+    -- against any single sample), so canopy reads sparse everywhere instead of
+    -- clustering the way a real stand of trees does. Groves dart-throw anchors
+    -- and grow a species-coherent clump (oversized elder + attendants) around
+    -- each one, with real meadow gaps between groves.
+    grove: GroveConfig?,
+    -- if set (on a DIFFERENT recipe, typically an understory layer), the
+    -- effective density near any grove anchor is multiplied by `inside`
+    -- instead of `outside`, so ground cover thickens around the groves.
+    groveAffinity: GroveAffinity?,
 }
+export type GroveConfig = {
+    spacing: number, -- min distance between grove ANCHORS (meadows live between)
+    radiusMin: number,
+    radiusMax: number, -- member distance from the anchor
+    membersMin: number,
+    membersMax: number, -- trees per grove INCLUDING the elder
+    memberSpacing: number, -- min distance between members of the same layer
+    dominantScale: number, -- the elder's extra scale multiplier
+    anchorDarts: number, -- dart-throw attempts per zone
+    maxGroves: number,
+}
+export type GroveAffinity = { radius: number, inside: number, outside: number }
 -- THE FOUR BANDS (the user's structure, and the point of the whole system):
 --   0-2 studs   ground cover — grass and weeds. DOES NOT EXIST YET; the same gap
 --               leaves the waterline bare. See the WaterMargin pool below.
@@ -56,6 +80,21 @@ local Recipes: { [string]: Recipe } = {
         pathMargin = 7,
         footingRadius = 2.5,
         footingMaxDrop = 4,
+        -- grove pre-pass fix (2026-07-30): the per-sample gate (steep/footing/
+        -- spacing) was rejecting canopy so uniformly that the forest read as a
+        -- thin, even scatter instead of a wood — real trees cluster. Anchors
+        -- dart-thrown at 55-stud spacing each grow a 3-8 member clump.
+        grove = {
+            spacing = 55,
+            radiusMin = 8,
+            radiusMax = 16,
+            membersMin = 3,
+            membersMax = 8,
+            memberSpacing = 7,
+            dominantScale = 1.25,
+            anchorDarts = 300,
+            maxGroves = 12,
+        },
     },
     -- BRUSH band (2-5 studs): young growth at knee-to-chest height. This is what
     -- makes the forest read heavy where players actually walk, WITHOUT intruding
@@ -69,6 +108,14 @@ local Recipes: { [string]: Recipe } = {
             { name = "XfSpruceYb", weight = 30 },
             { name = "XfFirYb", weight = 25 },
             { name = "XfSugiYb", weight = 15 },
+            -- small tiers (2026-07-30): the brush band read uniformly ~4 studs
+            -- tall (same models, jitter alone) — flat and unconvincing height
+            -- variety. Discrete small-scale entries at 0.65x give a real short
+            -- tier within the 2-5 stud band instead of widening jitter (which
+            -- would risk poking through the 5-stud sightline).
+            { name = "XfHinokiYb", weight = 15, scale = 0.65 },
+            { name = "XfSpruceYb", weight = 15, scale = 0.65 },
+            { name = "XfFirYb", weight = 10, scale = 0.65 },
         },
         spacingMin = 6,
         spacingMax = 10,
@@ -84,6 +131,10 @@ local Recipes: { [string]: Recipe } = {
         -- clearing the floor is most of what tending a wood actually is:
         -- understory thins hard in tended yards, less so in a plain garden
         careDensity = { GARDEN = 0.25, TENDED = 0.6 },
+        -- groveAffinity (2026-07-30): thickens brush around PreserveCore's
+        -- grove clumps (real understory grows densest under a stand) instead
+        -- of scattering uniformly across the whole zone.
+        groveAffinity = { radius = 22, inside = 1, outside = 0.25 },
     },
     WallFringe = {
         pool = {

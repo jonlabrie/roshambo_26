@@ -98,6 +98,52 @@ describe("recipes name only species that exist", function()
     end
 end)
 
+-- 2026-07-30: PreserveCore runs a grove pre-pass instead of pure per-sample
+-- scatter (the random-scatter gate rejected too much canopy to ever cluster).
+describe("grove pre-pass", function()
+    test("PreserveCore runs a grove with sane member/anchor bounds", function()
+        local grove = Recipes.PreserveCore.grove
+        expect(grove ~= nil).toBe(true)
+        assert(grove ~= nil)
+        expect(grove.spacing > 0).toBe(true)
+        expect(grove.radiusMax >= grove.radiusMin).toBe(true)
+        expect(grove.membersMax >= grove.membersMin).toBe(true)
+        expect(grove.membersMin >= 2).toBe(true) -- elder + at least one attendant
+        expect(grove.memberSpacing > 0).toBe(true)
+        expect(grove.dominantScale > 1).toBe(true) -- the elder must read oversized
+        expect(grove.anchorDarts > 0).toBe(true)
+        expect(grove.maxGroves > 0).toBe(true)
+    end)
+    -- only PreserveCore should carry a grove; every other recipe still scatters
+    -- per-sample, so an accidental grove elsewhere silently changes its planter.
+    test("no other recipe carries a grove", function()
+        for name, recipe in Recipes do
+            if name ~= "PreserveCore" then
+                expect(recipe.grove == nil).toBe(true)
+            end
+        end
+    end)
+    test("PreserveBrush thickens near grove anchors via groveAffinity", function()
+        local aff = Recipes.PreserveBrush.groveAffinity
+        expect(aff ~= nil).toBe(true)
+        assert(aff ~= nil)
+        expect(aff.radius > 0).toBe(true)
+        expect(aff.inside > aff.outside).toBe(true)
+    end)
+    -- small tiers (2026-07-30 brush fix): discrete short-scale entries give the
+    -- 2-5 stud band real height variety instead of a uniform ~4-stud carpet.
+    test("PreserveBrush pool includes small-scale tiers", function()
+        local small = 0
+        for _, sp in Recipes.PreserveBrush.pool do
+            if sp.scale ~= nil and sp.scale < 1 then
+                small += 1
+                expect(sp.weight > 0).toBe(true)
+            end
+        end
+        expect(small).toBe(3)
+    end)
+end)
+
 describe("waterline ecology", function()
     test("margin flora refuses steep hillsides", function()
         expect(Recipes.WaterMargin.maxSteep <= 0.4).toBe(true)

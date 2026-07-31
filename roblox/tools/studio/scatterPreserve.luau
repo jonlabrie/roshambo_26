@@ -50,7 +50,28 @@ type Recipe = {
     footingMaxDrop: number?,
     submergeMax: number?,
     careDensity: { [string]: number }?,
+    -- if set, this recipe's zone runs a grove PRE-PASS instead of the ordinary
+    -- per-sample scatter: dart-thrown anchors each grow a small species-coherent
+    -- clump (an oversized elder + dominant/attendant members), with real meadow
+    -- gaps between groves. The zone is excluded from per-sample resolution.
+    grove: GroveConfig?,
+    -- if set (on a DIFFERENT recipe, typically an understory layer), the
+    -- effective density near any grove anchor is multiplied by `inside`
+    -- instead of `outside`, so ground cover thickens around the groves.
+    groveAffinity: GroveAffinity?,
 }
+type GroveConfig = {
+    spacing: number, -- min distance between grove ANCHORS (meadows live between)
+    radiusMin: number,
+    radiusMax: number, -- member distance from the anchor
+    membersMin: number,
+    membersMax: number, -- trees per grove INCLUDING the elder
+    memberSpacing: number, -- min distance between members of the same layer
+    dominantScale: number, -- the elder's extra scale multiplier
+    anchorDarts: number, -- dart-throw attempts per zone
+    maxGroves: number,
+}
+type GroveAffinity = { radius: number, inside: number, outside: number }
 -- THE FOUR BANDS (the user's structure, and the point of the whole system):
 --   0-2 studs   ground cover — grass and weeds. DOES NOT EXIST YET; the same gap
 --               leaves the waterline bare. See the WaterMargin pool below.
@@ -86,6 +107,21 @@ local RECIPES: { [string]: Recipe } = {
         pathMargin = 7,
         footingRadius = 2.5,
         footingMaxDrop = 4,
+        -- grove pre-pass fix (2026-07-30): the per-sample gate (steep/footing/
+        -- spacing) was rejecting canopy so uniformly that the forest read as a
+        -- thin, even scatter instead of a wood — real trees cluster. Anchors
+        -- dart-thrown at 55-stud spacing each grow a 3-8 member clump.
+        grove = {
+            spacing = 55,
+            radiusMin = 8,
+            radiusMax = 16,
+            membersMin = 3,
+            membersMax = 8,
+            memberSpacing = 7,
+            dominantScale = 1.25,
+            anchorDarts = 300,
+            maxGroves = 12,
+        },
     },
     -- BRUSH band (2-5 studs): young growth at knee-to-chest height. This is what
     -- makes the forest read heavy where players actually walk, WITHOUT intruding
@@ -99,6 +135,14 @@ local RECIPES: { [string]: Recipe } = {
             { name = "XfSpruceYb", weight = 30 },
             { name = "XfFirYb", weight = 25 },
             { name = "XfSugiYb", weight = 15 },
+            -- small tiers (2026-07-30): the brush band read uniformly ~4 studs
+            -- tall (same models, jitter alone) — flat and unconvincing height
+            -- variety. Discrete small-scale entries at 0.65x give a real short
+            -- tier within the 2-5 stud band instead of widening jitter (which
+            -- would risk poking through the 5-stud sightline).
+            { name = "XfHinokiYb", weight = 15, scale = 0.65 },
+            { name = "XfSpruceYb", weight = 15, scale = 0.65 },
+            { name = "XfFirYb", weight = 10, scale = 0.65 },
         },
         spacingMin = 6,
         spacingMax = 10,
@@ -114,6 +158,10 @@ local RECIPES: { [string]: Recipe } = {
         -- clearing the floor is most of what tending a wood actually is:
         -- understory thins hard in tended yards, less so in a plain garden
         careDensity = { GARDEN = 0.25, TENDED = 0.6 },
+        -- groveAffinity (2026-07-30): thickens brush around PreserveCore's
+        -- grove clumps (real understory grows densest under a stand) instead
+        -- of scattering uniformly across the whole zone.
+        groveAffinity = { radius = 22, inside = 1, outside = 0.25 },
     },
     WallFringe = {
         pool = {
@@ -215,6 +263,10 @@ local MIST_SEED_OFFSET = 500000
 local MIST_DARTS = 128
 local CLUMP_RADIUS_MIN = 4
 local CLUMP_RADIUS_MAX = 7
+local GROVE_SEED_OFFSET = 900000
+-- member species: roll below this fraction plants the dominant, else the
+-- attendant, so groves read as one species with a minority accent
+local GROVE_ATTENDANT_THRESHOLD = 0.6
 
 local function lcg(state: number): (number, number)
     state = (1103515245 * state + 12345) % 2147483648
@@ -452,6 +504,15 @@ local function plan(
         return r
     end
 
+    -- separate LCG stream for the grove pre-pass, so adding/removing a grove
+    -- recipe never perturbs the ordinary per-sample roll sequence of other zones
+    local groveStates: { [Zone]: number } = {}
+    local function groveRoll(zone: Zone): number
+        local state, r = lcg(groveStates[zone])
+        groveStates[zone] = state
+        return r
+    end
+
     -- site gates: everything that depends only on the sample and the recipe, so
     -- a layered zone that rejects a sample falls through to the zone beneath it
     local function accepts(zone: Zone, s: Sample): boolean
@@ -498,8 +559,160 @@ local function plan(
         return true
     end
 
+    -- grove pre-pass: species-coherent clumps with real meadow gaps, for zones
+    -- whose recipe requests them. Runs BEFORE the per-sample loop so grove
+    -- placements are already in `out` and spacing-checked against by ordinary
+    -- per-sample zones layered above or below (same array, same rules).
+    local groveAnchors: { { number } } = {}
+    for _, zone in zones do
+        local recipe = recipes[zone.recipe]
+        if recipe == nil or recipe.grove == nil then
+            continue
+        end
+        local grove = recipe.grove :: GroveConfig
+        local layer = recipe.layer or "canopy"
+        local heightScale = recipe.heightScale or 1
+        groveStates[zone] = seedState(zone.seed + GROVE_SEED_OFFSET)
+
+        local x1, z1, x2, z2 = zoneBBox(zone)
+        local zoneAnchors: { { number } } = {}
+        for _ = 1, grove.anchorDarts do
+            if #zoneAnchors >= grove.maxGroves then
+                break
+            end
+            local ax = x1 + groveRoll(zone) * (x2 - x1)
+            local az = z1 + groveRoll(zone) * (z2 - z1)
+            if not containsXZ(zone, ax, az) then
+                continue
+            end
+            -- exact grid cell only: a dart with no sample under it (off-grid,
+            -- a hole in the survey) is rejected outright, never nudged onto a
+            -- neighbour like clump children do
+            local gs = sampleIndex[sampleKey(ax, az, pitch)]
+            if gs == nil then
+                continue
+            end
+            if not contains(zone, ax, az, gs.y) then
+                continue
+            end
+            local anchorProbe: Sample =
+                { x = ax, z = az, y = gs.y, steep = gs.steep, depth = gs.depth, material = gs.material }
+            if not accepts(zone, anchorProbe) then
+                continue
+            end
+            local tooClose = false
+            for _, a in zoneAnchors do
+                local dx, dz = ax - a[1], az - a[2]
+                if dx * dx + dz * dz <= grove.spacing * grove.spacing then
+                    tooClose = true
+                    break
+                end
+            end
+            if tooClose then
+                continue
+            end
+            table.insert(zoneAnchors, { ax, az })
+
+            -- dominant + attendant species for this grove; excluding the
+            -- dominant entry from the attendant roll degenerates to the same
+            -- species when the pool only has one entry
+            local domSpecies, domScale = pickSpecies(recipe.pool, groveRoll(zone))
+            local attPool: { Species } = {}
+            for _, sp in recipe.pool do
+                if sp.name ~= domSpecies then
+                    table.insert(attPool, sp)
+                end
+            end
+            if #attPool == 0 then
+                attPool = recipe.pool
+            end
+            local attSpecies, attScale = pickSpecies(attPool, groveRoll(zone))
+
+            local memberCount = grove.membersMin
+                + math.floor(groveRoll(zone) * (grove.membersMax - grove.membersMin + 1))
+
+            -- the elder plants dead-centre on the anchor, oversized
+            table.insert(out, {
+                x = ax,
+                z = az,
+                y = gs.y,
+                species = domSpecies,
+                yaw = groveRoll(zone) * 2 * math.pi,
+                scale = (1 + (groveRoll(zone) * 2 - 1) * recipe.scaleJitter)
+                    * heightScale
+                    * domScale
+                    * grove.dominantScale,
+                zone = zone.name,
+                layer = layer,
+            })
+
+            for _ = 2, memberCount do
+                local ang = groveRoll(zone) * 2 * math.pi
+                local rad = grove.radiusMin + groveRoll(zone) * (grove.radiusMax - grove.radiusMin)
+                local mx = ax + math.cos(ang) * rad
+                local mz = az + math.sin(ang) * rad
+                local mgs = sampleIndex[sampleKey(mx, mz, pitch)]
+                if mgs == nil then
+                    continue
+                end
+                local memberProbe: Sample = {
+                    x = mx,
+                    z = mz,
+                    y = mgs.y,
+                    steep = mgs.steep,
+                    depth = mgs.depth,
+                    material = mgs.material,
+                }
+                if not accepts(zone, memberProbe) then
+                    continue
+                end
+                local memberTooClose = false
+                for _, p in out do
+                    if p.layer == layer then
+                        local dx, dz = mx - p.x, mz - p.z
+                        if dx * dx + dz * dz <= grove.memberSpacing * grove.memberSpacing then
+                            memberTooClose = true
+                            break
+                        end
+                    end
+                end
+                if memberTooClose then
+                    continue
+                end
+                local mSpecies, mScale
+                if groveRoll(zone) < GROVE_ATTENDANT_THRESHOLD then
+                    mSpecies, mScale = domSpecies, domScale
+                else
+                    mSpecies, mScale = attSpecies, attScale
+                end
+                table.insert(out, {
+                    x = mx,
+                    z = mz,
+                    y = mgs.y,
+                    species = mSpecies,
+                    yaw = groveRoll(zone) * 2 * math.pi,
+                    scale = (1 + (groveRoll(zone) * 2 - 1) * recipe.scaleJitter) * heightScale * mScale,
+                    zone = zone.name,
+                    layer = layer,
+                })
+            end
+        end
+        for _, a in zoneAnchors do
+            table.insert(groveAnchors, a)
+        end
+    end
+    local groveIndex = indexWater(groveAnchors)
+
     for _, s in ordered do
         local zone = resolveZone(zones, s.x, s.z, s.y, function(candidate)
+            -- grove-recipe zones already planted in the pre-pass; excluding
+            -- them here (rather than filtering `zones`) lets their samples
+            -- fall through to whatever zone is layered beneath, exactly like
+            -- a recipe that simply rejects the sample
+            local crecipe = recipes[candidate.recipe]
+            if crecipe ~= nil and crecipe.grove ~= nil then
+                return false
+            end
             return accepts(candidate, s)
         end)
         if zone == nil then
@@ -511,12 +724,21 @@ local function plan(
         end
 
         -- density thinning before spacing so DensityScale thins uniformly;
-        -- the care band scales it further where recipes opt in
+        -- the care band scales it further where recipes opt in, and
+        -- groveAffinity thickens (or clears) ground cover near grove anchors
         local density = zone.densityScale
         if o.careBand ~= nil and recipe.careDensity ~= nil then
             local mul = recipe.careDensity[o.careBand(s.x, s.z)]
             if mul ~= nil then
                 density *= mul
+            end
+        end
+        if recipe.groveAffinity ~= nil then
+            local aff = recipe.groveAffinity :: GroveAffinity
+            if waterWithin(groveIndex, s.x, s.z, aff.radius) then
+                density *= aff.inside
+            else
+                density *= aff.outside
             end
         end
         if roll(zone) >= density then
