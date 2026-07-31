@@ -229,6 +229,18 @@ end
 local FOOTING_TERRAIN_TOL = 0.75
 local FOOTING_STEP = 4
 
+-- True world-space AABB bottom Y for an oriented box: cf.Position.Y - size.Y/2 is only
+-- correct at zero pitch/roll. This is the standard OBB->AABB projection (sum of the
+-- absolute rotation-matrix column entries times each half-size) so a pitched ramp or
+-- angled stair tread — plausible under CanyonWorld.Paths/Structures — measures its real
+-- bottom, not a rotation-naive guess.
+local function worldAabbBottomY(cf: CFrame, size: Vector3): number
+    local halfY = math.abs(cf.RightVector.Y) * size.X / 2
+        + math.abs(cf.UpVector.Y) * size.Y / 2
+        + math.abs(cf.LookVector.Y) * size.Z / 2
+    return cf.Position.Y - halfY
+end
+
 local function collectFootingSeeds(): { Seed }
     local seeds: { Seed } = {}
     local cw = workspace:FindFirstChild("CanyonWorld")
@@ -257,7 +269,7 @@ local function collectFootingSeeds(): { Seed }
                     rp
                 )
                 if hit then
-                    local bottomY = cf.Position.Y - size.Y / 2
+                    local bottomY = worldAabbBottomY(cf, size)
                     if math.abs(bottomY - hit.Position.Y) <= FOOTING_TERRAIN_TOL then
                         local long = math.max(size.X, size.Z)
                         local short = math.min(size.X, size.Z)
