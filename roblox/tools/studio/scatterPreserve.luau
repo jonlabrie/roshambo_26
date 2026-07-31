@@ -62,22 +62,37 @@ type Recipe = {
 }
 type GroveConfig = {
     spacing: number, -- min distance between grove ANCHORS (meadows live between)
+    -- DEPRECATED / unused by the exhaustive placer below: candidate-to-anchor
+    -- proximity is now governed entirely by radiusMax (ceiling) and
+    -- memberSpacing (floor between placed members), so a separate minimum
+    -- radius from the anchor is redundant. Kept in the type so existing
+    -- recipe literals don't need to drop the field; never read.
     radiusMin: number,
-    radiusMax: number, -- member distance from the anchor
+    -- member distance from the anchor. Also the support radius: a candidate's
+    -- "support" is how many other candidates sit within radiusMax of it, the
+    -- density measure anchors are chosen by.
+    radiusMax: number,
     membersMin: number,
     membersMax: number, -- trees per grove INCLUDING the elder
     memberSpacing: number, -- min distance between members of the same layer
     dominantScale: number, -- the elder's extra scale multiplier
-    anchorDarts: number, -- dart-throw attempts per zone
+    -- DEPRECATED / unused: the grove pre-pass no longer dart-throws (a
+    -- single-dart-per-slot design left legal ground unused while stands
+    -- starved — confirmed in-world). Placement is now exhaustive: every
+    -- terrain sample that clears the site gates is a placement CANDIDATE.
+    -- Kept in the type so existing recipe literals don't need to drop the
+    -- field; never read.
+    anchorDarts: number,
     maxGroves: number,
     -- optional: a MEMBER (never the elder) whose rolled species has a map
     -- entry may be swapped for a young/sapling model name, chance-gated.
     -- Scale/jitter/heightScale are unchanged — young models are naturally
     -- small, this only substitutes the placed name.
     saplings: { chance: number, map: { [string]: string } }?,
-    -- optional: attempts per member SLOT before it's abandoned (default 1,
-    -- the old single-shot behavior). Real terrain rejects a lot of single
-    -- darts; retries let a slot fight for open ground instead of just dying.
+    -- DEPRECATED / unused: retries existed to give a single dart another
+    -- shot at hostile ground. The exhaustive placer has no darts to retry —
+    -- it already considers every legal candidate. Kept in the type so
+    -- existing recipe literals don't need to drop the field; never read.
     memberTries: number?,
     -- optional: false = FREE-MIX. Every placement (elder included) draws its
     -- species independently from the full pool instead of the dominant/
@@ -350,6 +365,10 @@ local GROVE_SEED_OFFSET = 900000
 -- member species: roll below this fraction plants the dominant, else the
 -- attendant, so groves read as one species with a minority accent
 local GROVE_ATTENDANT_THRESHOLD = 0.6
+-- every grove placement (elder included) is a literal terrain grid point
+-- until jittered by up to this many studs per axis, so a grove doesn't read
+-- as trees standing on a lattice
+local GROVE_JITTER_MAX = 1.2
 
 local function lcg(state: number): (number, number)
     state = (1103515245 * state + 12345) % 2147483648
@@ -657,6 +676,13 @@ local function plan(
     -- whose recipe requests them. Runs BEFORE the per-sample loop so grove
     -- placements are already in `out` and spacing-checked against by ordinary
     -- per-sample zones layered above or below (same array, same rules).
+    --
+    -- EXHAUSTIVE, not dart-thrown: a single-dart-per-slot design left legal
+    -- ground unused while stands starved (confirmed in-world — a grove
+    -- anchored at the zone edge because the centre's one dart happened to
+    -- fail pathMargin). Every terrain sample that clears the site gates is a
+    -- placement CANDIDATE; anchors and members are chosen from that pool by
+    -- support/proximity, not by hoping a random throw lands well.
     local groveAnchors: { { number } } = {}
     for _, zone in zones do
         local recipe = recipes[zone.recipe]
@@ -677,13 +703,56 @@ local function plan(
         local coherent = grove.coherent ~= false
 
         local x1, z1, x2, z2 = zoneBBox(zone)
+        local cx, cz = (x1 + x2) / 2, (z1 + z2) / 2
         local zoneAnchors: { { number } } = {}
 
-        -- plants one grove (elder + members) at an anchor that already
-        -- cleared every site gate. Shared by both dart-selection strategies
-        -- below so accepting an anchor always means the same thing.
-        local function placeGrove(ax: number, az: number, gs: Sample)
-            table.insert(zoneAnchors, { ax, az })
+        -- CANDIDATES: every grid sample inside the zone (containsXZ + y-band,
+        -- exactly what resolveZone checks) that clears the recipe's site
+        -- gates and isn't vetoed by a KeepOut. `ordered` is already sorted
+        -- (x then z), so this list — and every tie-break below that walks it
+        -- in order — is deterministic.
+        local candidates: { Sample } = {}
+        for _, s in ordered do
+            if contains(zone, s.x, s.z, s.y) and not keepOutAt(zones, s.x, s.z, s.y) and accepts(zone, s) then
+                table.insert(candidates, s)
+            end
+        end
+
+        -- support = how many OTHER remaining candidates sit within radiusMax
+        -- of `c` — a live count against the CURRENT (shrinking) pool, so an
+        -- already-claimed grove's ground doesn't inflate a later grove's odds
+        local function supportOf(c: Sample): number
+            local n = 0
+            for _, other in candidates do
+                if other ~= c then
+                    local dx, dz = other.x - c.x, other.z - c.z
+                    if dx * dx + dz * dz <= grove.radiusMax * grove.radiusMax then
+                        n += 1
+                    end
+                end
+            end
+            return n
+        end
+
+        local function removeCandidate(target: Sample)
+            for i, c in candidates do
+                if c == target then
+                    table.remove(candidates, i)
+                    return
+                end
+            end
+        end
+
+        local function jitter(): number
+            return (groveRoll(zone) * 2 - 1) * GROVE_JITTER_MAX
+        end
+
+        -- plants one grove (elder + members) at an anchor candidate that
+        -- already cleared every site gate and (for multi-grove zones) the
+        -- inter-anchor spacing check.
+        local function placeGrove(anchor: Sample, memberTarget: number)
+            removeCandidate(anchor)
+            table.insert(zoneAnchors, { anchor.x, anchor.z })
 
             local domSpecies, domScale, attSpecies, attScale
             local elderSpecies, elderScale
@@ -704,14 +773,19 @@ local function plan(
                 elderSpecies, elderScale = pickSpecies(recipe.pool, groveRoll(zone))
             end
 
-            local memberCount = grove.membersMin
-                + math.floor(groveRoll(zone) * (grove.membersMax - grove.membersMin + 1))
+            -- every already-placed member of THIS grove (elder included),
+            -- for the memberSpacing check below — scoped to the grove, not
+            -- the whole `out` array, so a tight legal patch isn't sterilised
+            -- by an unrelated grove's members standing nearby
+            local groveMembers: { Sample } = { anchor }
 
-            -- the elder plants dead-centre on the anchor, oversized
+            -- the elder plants at the anchor, oversized, jittered off the
+            -- exact grid point like every other placement below
+            local ejx, ejz = jitter(), jitter()
             table.insert(out, {
-                x = ax,
-                z = az,
-                y = gs.y,
+                x = anchor.x + ejx,
+                z = anchor.z + ejz,
+                y = anchor.y,
                 species = elderSpecies,
                 yaw = groveRoll(zone) * 2 * math.pi,
                 scale = (1 + (groveRoll(zone) * 2 - 1) * recipe.scaleJitter)
@@ -722,171 +796,145 @@ local function plan(
                 layer = layer,
             })
 
-            local memberTries = grove.memberTries or 1
-            for _ = 2, memberCount do
-                -- each slot gets up to `memberTries` fresh dart attempts;
-                -- the first that clears every gate places and the slot stops
-                -- retrying. A slot that succeeds on try 1 draws exactly the
-                -- rolls it always did (memberTries=1 default = old stream).
-                for _ = 1, memberTries do
-                    local ang = groveRoll(zone) * 2 * math.pi
-                    local rad = grove.radiusMin + groveRoll(zone) * (grove.radiusMax - grove.radiusMin)
-                    local mx = ax + math.cos(ang) * rad
-                    local mz = az + math.sin(ang) * rad
-                    local mgs = sampleIndex[sampleKey(mx, mz, pitch)]
-                    if mgs == nil then
-                        continue
-                    end
-                    -- pads are sacred: same KeepOut veto as an anchor dart
-                    if keepOutAt(zones, mx, mz, mgs.y) then
-                        continue
-                    end
-                    local memberProbe: Sample = {
-                        x = mx,
-                        z = mz,
-                        y = mgs.y,
-                        steep = mgs.steep,
-                        depth = mgs.depth,
-                        material = mgs.material,
-                    }
-                    if not accepts(zone, memberProbe) then
-                        continue
-                    end
-                    local memberTooClose = false
-                    for _, p in out do
-                        if p.layer == layer then
-                            local dx, dz = mx - p.x, mz - p.z
-                            if dx * dx + dz * dz <= grove.memberSpacing * grove.memberSpacing then
-                                memberTooClose = true
+            local placedCount = 1
+            while placedCount < memberTarget do
+                -- greedily take the unused candidate NEAREST the anchor
+                -- (within radiusMax) that clears memberSpacing from every
+                -- already-placed member of this grove
+                local best: Sample? = nil
+                local bestD = math.huge
+                for _, c in candidates do
+                    local dx, dz = c.x - anchor.x, c.z - anchor.z
+                    local d = dx * dx + dz * dz
+                    if d <= grove.radiusMax * grove.radiusMax and d < bestD then
+                        local tooClose = false
+                        for _, p in groveMembers do
+                            local mdx, mdz = c.x - p.x, c.z - p.z
+                            if mdx * mdx + mdz * mdz <= grove.memberSpacing * grove.memberSpacing then
+                                tooClose = true
                                 break
                             end
                         end
-                    end
-                    if memberTooClose then
-                        continue
-                    end
-                    local mSpecies, mScale
-                    if coherent then
-                        if groveRoll(zone) < GROVE_ATTENDANT_THRESHOLD then
-                            mSpecies, mScale = domSpecies, domScale
-                        else
-                            mSpecies, mScale = attSpecies, attScale
-                        end
-                    else
-                        mSpecies, mScale = pickSpecies(recipe.pool, groveRoll(zone))
-                    end
-                    -- sapling roll: always drawn on a successful attempt,
-                    -- whether or not this recipe configures `saplings`, so
-                    -- the stream's shape never depends on an optional
-                    -- feature being toggled — only the INTERPRETATION of the
-                    -- draw does. Elders never roll this.
-                    local saplingRoll = groveRoll(zone)
-                    local saplings = grove.saplings
-                    if saplings ~= nil and saplingRoll < saplings.chance then
-                        local young = saplings.map[mSpecies]
-                        if young ~= nil then
-                            mSpecies = young
+                        if not tooClose then
+                            best, bestD = c, d
                         end
                     end
-                    table.insert(out, {
-                        x = mx,
-                        z = mz,
-                        y = mgs.y,
-                        species = mSpecies,
-                        yaw = groveRoll(zone) * 2 * math.pi,
-                        scale = (1 + (groveRoll(zone) * 2 - 1) * recipe.scaleJitter) * heightScale * mScale,
-                        zone = zone.name,
-                        layer = layer,
-                    })
+                end
+                if best == nil then
+                    -- no legal candidate left near this anchor: the grove
+                    -- ends short of its target rather than fabricating ground
                     break
                 end
+                removeCandidate(best)
+                table.insert(groveMembers, best)
+
+                local mSpecies, mScale
+                if coherent then
+                    if groveRoll(zone) < GROVE_ATTENDANT_THRESHOLD then
+                        mSpecies, mScale = domSpecies, domScale
+                    else
+                        mSpecies, mScale = attSpecies, attScale
+                    end
+                else
+                    mSpecies, mScale = pickSpecies(recipe.pool, groveRoll(zone))
+                end
+                -- sapling roll: always drawn, whether or not this recipe
+                -- configures `saplings`, so the stream's shape never depends
+                -- on an optional feature being toggled — only the
+                -- INTERPRETATION of the draw does. Elders never roll this.
+                local saplingRoll = groveRoll(zone)
+                local saplings = grove.saplings
+                if saplings ~= nil and saplingRoll < saplings.chance then
+                    local young = saplings.map[mSpecies]
+                    if young ~= nil then
+                        mSpecies = young
+                    end
+                end
+                local mjx, mjz = jitter(), jitter()
+                table.insert(out, {
+                    x = best.x + mjx,
+                    z = best.z + mjz,
+                    y = best.y,
+                    species = mSpecies,
+                    yaw = groveRoll(zone) * 2 * math.pi,
+                    scale = (1 + (groveRoll(zone) * 2 - 1) * recipe.scaleJitter) * heightScale * mScale,
+                    zone = zone.name,
+                    layer = layer,
+                })
+                placedCount += 1
             end
         end
 
-        if grove.maxGroves == 1 then
-            -- CENTER-SEEKING: a single-grove zone represents a user-placed
-            -- stand, not wild growth — the first passing dart could land
-            -- hard against a zone edge (e.g. the true centre failing
-            -- pathMargin). Evaluate EVERY dart, drawing rolls exactly as the
-            -- multi-grove path does regardless of acceptance, and keep the
-            -- passing candidate closest to the zone's centroid.
-            local cx, cz = (x1 + x2) / 2, (z1 + z2) / 2
-            local bestAx: number?, bestAz: number?, bestGs: Sample?, bestD = nil, nil, nil, math.huge
-            for _ = 1, grove.anchorDarts do
-                local ax = x1 + groveRoll(zone) * (x2 - x1)
-                local az = z1 + groveRoll(zone) * (z2 - z1)
-                if not containsXZ(zone, ax, az) then
-                    continue
-                end
-                local gs = sampleIndex[sampleKey(ax, az, pitch)]
-                if gs == nil then
-                    continue
-                end
-                if not contains(zone, ax, az, gs.y) then
-                    continue
-                end
-                if keepOutAt(zones, ax, az, gs.y) then
-                    continue
-                end
-                local anchorProbe: Sample =
-                    { x = ax, z = az, y = gs.y, steep = gs.steep, depth = gs.depth, material = gs.material }
-                if not accepts(zone, anchorProbe) then
-                    continue
-                end
-                local dx, dz = ax - cx, az - cz
-                local d = dx * dx + dz * dz
-                if d < bestD then
-                    bestAx, bestAz, bestGs, bestD = ax, az, gs, d
-                end
-            end
-            if bestAx ~= nil and bestAz ~= nil and bestGs ~= nil then
-                placeGrove(bestAx, bestAz, bestGs)
-            end
-        else
-            -- multi-grove: unchanged first-accept + inter-anchor spacing
-            for _ = 1, grove.anchorDarts do
-                if #zoneAnchors >= grove.maxGroves then
-                    break
-                end
-                local ax = x1 + groveRoll(zone) * (x2 - x1)
-                local az = z1 + groveRoll(zone) * (z2 - z1)
-                if not containsXZ(zone, ax, az) then
-                    continue
-                end
-                -- exact grid cell only: a dart with no sample under it
-                -- (off-grid, a hole in the survey) is rejected outright,
-                -- never nudged onto a neighbour like clump children do
-                local gs = sampleIndex[sampleKey(ax, az, pitch)]
-                if gs == nil then
-                    continue
-                end
-                if not contains(zone, ax, az, gs.y) then
-                    continue
-                end
-                -- pads are sacred: a KeepOut zone vetoes an anchor exactly
-                -- like it vetoes an ordinary per-sample placement, regardless
-                -- of layer order
-                if keepOutAt(zones, ax, az, gs.y) then
-                    continue
-                end
-                local anchorProbe: Sample =
-                    { x = ax, z = az, y = gs.y, steep = gs.steep, depth = gs.depth, material = gs.material }
-                if not accepts(zone, anchorProbe) then
-                    continue
-                end
-                local tooClose = false
-                for _, a in zoneAnchors do
-                    local dx, dz = ax - a[1], az - a[2]
-                    if dx * dx + dz * dz <= grove.spacing * grove.spacing then
-                        tooClose = true
-                        break
+        while #zoneAnchors < grove.maxGroves and #candidates > 0 do
+            -- TARGET: how many members (elder included) THIS grove wants.
+            -- Rolled before the anchor is chosen, matching the brief's
+            -- ordering — single-grove zones need it for anchor eligibility;
+            -- multi-grove zones just carry it forward to the member pass.
+            local memberTarget = grove.membersMin
+                + math.floor(groveRoll(zone) * (grove.membersMax - grove.membersMin + 1))
+
+            local anchor: Sample? = nil
+            if grove.maxGroves == 1 then
+                -- ANCHOR (single-grove): among candidates with enough support
+                -- to reach the FULL target (support >= memberTarget - 1),
+                -- take the one nearest the zone centroid — a user-placed
+                -- stand should sit where it was drawn, not wherever a dart
+                -- happened to land. No such candidate exists (legal ground is
+                -- too sparse for a full grove anywhere) → fall back to
+                -- whichever candidate has the most support.
+                local bestEligible: Sample? = nil
+                local bestEligibleD = math.huge
+                local bestAny: Sample? = nil
+                local bestAnySupport = -1
+                for _, c in candidates do
+                    local support = supportOf(c)
+                    if support > bestAnySupport then
+                        bestAny, bestAnySupport = c, support
+                    end
+                    if support >= memberTarget - 1 then
+                        local dx, dz = c.x - cx, c.z - cz
+                        local d = dx * dx + dz * dz
+                        if d < bestEligibleD then
+                            bestEligible, bestEligibleD = c, d
+                        end
                     end
                 end
-                if tooClose then
-                    continue
+                anchor = if bestEligible ~= nil then bestEligible else bestAny
+            else
+                -- ANCHOR (multi-grove): repeat greedily — among candidates
+                -- that clear `grove.spacing` from every prior anchor, take
+                -- the one with the most support. Stop (no anchor this round)
+                -- once even the best candidate can't support a minimally
+                -- viable grove (support < membersMin - 1); meadows are real
+                -- gaps, not an accident of running out of darts.
+                local best: Sample? = nil
+                local bestSupport = -1
+                for _, c in candidates do
+                    local farEnough = true
+                    for _, a in zoneAnchors do
+                        local dx, dz = c.x - a[1], c.z - a[2]
+                        if dx * dx + dz * dz <= grove.spacing * grove.spacing then
+                            farEnough = false
+                            break
+                        end
+                    end
+                    if farEnough then
+                        local support = supportOf(c)
+                        if support > bestSupport then
+                            best, bestSupport = c, support
+                        end
+                    end
                 end
-                placeGrove(ax, az, gs)
+                if best == nil or bestSupport < grove.membersMin - 1 then
+                    break
+                end
+                anchor = best
             end
+
+            if anchor == nil then
+                break
+            end
+            placeGrove(anchor, memberTarget)
         end
 
         for _, a in zoneAnchors do
