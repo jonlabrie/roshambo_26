@@ -80,6 +80,11 @@ export type GroveConfig = {
     dominantScale: number, -- the elder's extra scale multiplier
     anchorDarts: number, -- dart-throw attempts per zone
     maxGroves: number,
+    -- optional: a MEMBER (never the elder) whose rolled species has a map
+    -- entry may be swapped for a young/sapling model name, chance-gated.
+    -- Scale/jitter/heightScale are unchanged — young models are naturally
+    -- small, this only substitutes the placed name.
+    saplings: { chance: number, map: { [string]: string } }?,
 }
 export type GroveAffinity = { radius: number, inside: number, outside: number }
 export type Placement = {
@@ -552,6 +557,18 @@ function ZoneScatter.plan(
                     mSpecies, mScale = domSpecies, domScale
                 else
                     mSpecies, mScale = attSpecies, attScale
+                end
+                -- sapling roll: always drawn, whether or not this recipe
+                -- configures `saplings`, so the stream's shape never depends
+                -- on an optional feature being toggled — only the
+                -- INTERPRETATION of the draw does. Elders never roll this.
+                local saplingRoll = groveRoll(zone)
+                local saplings = grove.saplings
+                if saplings ~= nil and saplingRoll < saplings.chance then
+                    local young = saplings.map[mSpecies]
+                    if young ~= nil then
+                        mSpecies = young
+                    end
                 end
                 table.insert(out, {
                     x = mx,

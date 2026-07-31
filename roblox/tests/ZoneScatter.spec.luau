@@ -894,4 +894,84 @@ describe("ZoneScatter grove pre-pass", function()
         local out = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = recipe })
         expect(#out <= recipe.grove.maxGroves * recipe.grove.membersMax).toBe(true)
     end)
+
+    describe("grove saplings", function()
+        local FULL_MAP = { SugiMidA = "SugiMidA_Yb", MapleA = "MapleA_Yb", PineA = "PineA_Yb" }
+
+        -- elder = the max-scale placement in each cluster (established by the
+        -- "elder" test above: it's boosted by dominantScale and strictly
+        -- beats the cluster median when there's more than one member)
+        local function elderOf(cluster: { ZoneScatter.Placement }): ZoneScatter.Placement
+            local best = cluster[1]
+            for _, p in cluster do
+                if p.scale > best.scale then
+                    best = p
+                end
+            end
+            return best
+        end
+
+        test("chance=1 + full map: every non-elder member is a mapped young species", function()
+            local recipe = groveRecipe()
+            recipe.grove.saplings = { chance = 1, map = FULL_MAP }
+            local out = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = recipe })
+            expect(#out > 0).toBe(true)
+            local clusters = clusterPlacements(out, recipe.grove.radiusMax * 2)
+            local sawMember = false
+            for _, c in clusters do
+                local elder = elderOf(c)
+                expect(elder.species:match("_Yb$")).toBe(nil)
+                for _, p in c do
+                    if p ~= elder then
+                        sawMember = true
+                        expect(p.species:match("_Yb$") ~= nil).toBe(true)
+                    end
+                end
+            end
+            expect(sawMember).toBe(true)
+        end)
+
+        test(
+            "chance=0: byte-identical to a run without saplings config (stream-ordering discipline)",
+            function()
+                local withSaplings = groveRecipe()
+                withSaplings.grove.saplings = { chance = 0, map = FULL_MAP }
+                local without = groveRecipe()
+                local outA = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = withSaplings })
+                local outB = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = without })
+                expect(#outA).toBe(#outB)
+                for i, p in outA do
+                    expect(p.x).toBe(outB[i].x)
+                    expect(p.z).toBe(outB[i].z)
+                    expect(p.species).toBe(outB[i].species)
+                    expect(p.scale).toBe(outB[i].scale)
+                    expect(p.yaw).toBe(outB[i].yaw)
+                end
+            end
+        )
+
+        test("an unmapped species stays adult even at chance=1", function()
+            local recipe = groveRecipe()
+            recipe.grove.saplings = { chance = 1, map = { PineA = "PineA_Yb" } }
+            local out = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = recipe })
+            expect(#out > 0).toBe(true)
+            local clusters = clusterPlacements(out, recipe.grove.radiusMax * 2)
+            local sawMember = false
+            for _, c in clusters do
+                local elder = elderOf(c)
+                for _, p in c do
+                    if p ~= elder then
+                        sawMember = true
+                        -- PineA is always mapped away (chance=1, mapped); the
+                        -- other two species have no map entry and stay adult
+                        expect(p.species ~= "PineA").toBe(true)
+                        expect(p.species == "SugiMidA" or p.species == "MapleA" or p.species == "PineA_Yb").toBe(
+                            true
+                        )
+                    end
+                end
+            end
+            expect(sawMember).toBe(true)
+        end)
+    end)
 end)
