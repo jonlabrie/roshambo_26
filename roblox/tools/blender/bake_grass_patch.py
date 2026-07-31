@@ -98,10 +98,18 @@ def render_view(obj, direction, path):
     hi = Vector((max(v.x for v in bb), max(v.y for v in bb), max(v.z for v in bb)))
     ctr = (lo + hi) / 2
     size = hi - lo
+    dist = max(size.x, size.y, size.z) * 2 + 1
+    if direction == "top":
+        span = max(size.x, size.y) * 1.02
+        cam.data.ortho_scale = span
+        cam.location = (ctr.x, ctr.y, hi.z + dist)
+        cam.rotation_euler = (0, 0, 0)  # looking -Z; image right=+X, up=+Y
+        scene.render.filepath = path
+        bpy.ops.render.render(write_still=True)
+        return size.x / span, size.y / span
     horiz = size.x if direction == "front" else size.y
     span = max(size.z, horiz) * 1.02
     cam.data.ortho_scale = span
-    dist = max(size.x, size.y) * 2 + 1
     if direction == "front":
         cam.location = (ctr.x, lo.y - dist, ctr.z)
         cam.rotation_euler = (math.radians(90), 0, 0)
@@ -130,70 +138,101 @@ def grade(px):
     np.clip(a * ALPHA_GAIN, 0.0, 1.0, out=a)
 
 
-def compose_atlas(front_png, side_png, out_png):
-    """Two square tiles -> one 2:1 atlas (front left, side right), graded."""
+def compose_atlas(front_png, side_png, top_png, out_png):
+    """Three square tiles -> one 2x2 atlas, graded.
+
+    Layout (u, v origins): front (0, .5) | side (.5, .5) / top (0, 0) | spare.
+    Blender image rows run bottom-to-top, so the v=.5-1 tiles are the TOP half
+    = rows TILE..2*TILE.
+    """
     a = bpy.data.images.load(front_png)
     b = bpy.data.images.load(side_png)
-    atlas = bpy.data.images.new("atlas", TILE * 2, TILE, alpha=True)
+    c = bpy.data.images.load(top_png)
+    atlas = bpy.data.images.new("atlas", TILE * 2, TILE * 2, alpha=True)
     pa = np.array(a.pixels[:], dtype=np.float32).reshape(TILE, TILE, 4)
     pb = np.array(b.pixels[:], dtype=np.float32).reshape(TILE, TILE, 4)
-    for tile_px in (pa, pb):
+    pc = np.array(c.pixels[:], dtype=np.float32).reshape(TILE, TILE, 4)
+    for tile_px in (pa, pb, pc):
         grade(tile_px.reshape(-1, 4))
-    out = np.concatenate([pa, pb], axis=1)
+    out = np.zeros((TILE * 2, TILE * 2, 4), dtype=np.float32)
+    out[TILE:, :TILE] = pa  # front: upper-left (v .5-1)
+    out[TILE:, TILE:] = pb  # side: upper-right
+    out[:TILE, :TILE] = pc  # top: lower-left (v 0-.5)
     atlas.pixels = out.ravel().tolist()
     atlas.filepath_raw = out_png
     atlas.file_format = "PNG"
     atlas.save()
-    for img in (a, b, atlas):
+    for img in (a, b, c, atlas):
         bpy.data.images.remove(img)
 
 
-def build_clump(name, aspect_front, aspect_side, occ_front, occ_side, atlas_png):
-    """A fan of MANY small cards, not 3 big crossed quads.
+def build_clump(name, aspect_front, aspect_side, occ_front, occ_side, occ_top, atlas_png):
+    """Three crossed vertical planes + two horizontal top caps, all shelled.
 
-    Big flat quads each take one uniform lighting value, so the whole clump pops
-    light/dark as the camera/sun angle changes (the v6 in-Play tinting bug). Ten
-    smaller cards at jittered yaw/tilt break the clump into varied facets, and
-    custom normals BENT OUTWARD from the clump core make lighting roll smoothly
-    across it (the standard foliage-billboard trick). ~20 tris per clump.
+    Verticals carry the front/side bakes (one coherent single-plant silhouette
+    at ground level); the caps carry the top-down bake for the canyon's many
+    high vantage points, where crossed verticals read as a star. Every quad is
+    duplicated as a front/back shell pair (no DoubleSided flag, no transmission
+    path, no backface normal-flip), and every vertex carries an up-biased
+    stable normal so lighting barely shifts with camera/sun angle. 20 tris.
 
     occ_* are the (width, height) fractions of each square tile the plant actually
     occupies (centred); UVs map each card to exactly that sub-rect.
     """
-    import random
-
     h = HEIGHT_STUDS
-    rng = random.Random(sum(ord(c) for c in name))  # deterministic per variant
-    N = 10
     mesh = bpy.data.meshes.new(name)
     verts, faces, uvs = [], [], []
-    for i in range(N):
-        use_side = i % 3 == 2
-        aspect = aspect_side if use_side else aspect_front
-        fx, fz = occ_side if use_side else occ_front
-        frac = 0.95 if i == 0 else rng.uniform(0.62, 0.8)
-        ch = h * frac
-        cw = ch * aspect
-        ang = rng.uniform(0, 2 * math.pi)
-        rad = 0.0 if i == 0 else rng.uniform(0.08, 0.2) * h * aspect_front
-        cx, cy = math.cos(ang) * rad, math.sin(ang) * rad
-        yaw = rng.uniform(0, math.pi)
-        dx, dy = math.cos(yaw), math.sin(yaw)
-        nxd, nyd = -dy, dx  # card's horizontal normal direction
-        lean = math.sin(math.radians(rng.uniform(-9, 9))) * ch
-        w = cw / 2
+    # v6's proven layout: three crossed planes, one coherent single-plant
+    # silhouette from every angle. (v7/v8's many-small-cards fan showed the whole
+    # plant image N times at varied scale/offset — ghost-copy chaos, reverted.)
+    widths = [h * aspect_front, h * aspect_side, h * aspect_front]
+    occs = [occ_front, occ_side, occ_front]
+    sides = [False, True, False]
+    for i in range(3):
+        ang = math.radians(60 * i)
+        dx, dy = math.cos(ang), math.sin(ang)
+        fx, fz = occs[i]
+        use_side = sides[i]
+        w = widths[i] / 2
+        ch = h
         base = len(verts)
         verts += [
-            (cx - w * dx, cy - w * dy, 0.0),
-            (cx + w * dx, cy + w * dy, 0.0),
-            (cx + w * dx + nxd * lean, cy + w * dy + nyd * lean, ch),
-            (cx - w * dx + nxd * lean, cy - w * dy + nyd * lean, ch),
+            (-w * dx, -w * dy, 0.0),
+            (w * dx, w * dy, 0.0),
+            (w * dx, w * dy, ch),
+            (-w * dx, -w * dy, ch),
         ]
         faces.append((base, base + 1, base + 2, base + 3))
         uc = 0.75 if use_side else 0.25
-        u0, u1 = uc - 0.25 * fx, uc + 0.25 * fx  # tile is half the atlas wide
-        v0, v1 = 0.5 - 0.5 * fz, 0.5 + 0.5 * fz
+        u0, u1 = uc - 0.25 * fx, uc + 0.25 * fx  # tiles span half the atlas
+        v0, v1 = 0.75 - 0.25 * fz, 0.75 + 0.25 * fz  # vertical tiles: upper row
         uvs.append([(u0, v0), (u1, v0), (u1, v1), (u0, v1)])
+        # back shell: same card, reversed winding, so BOTH sides exist as real
+        # geometry with OUR normals — Roblox's DoubleSided backface normal-flip
+        # (which would shade bent/up normals dark from behind) never engages,
+        # and DoubleSided stays FALSE (also avoids the pale-foliage
+        # transmission blowout path entirely)
+        b2 = len(verts)
+        verts += [verts[base], verts[base + 3], verts[base + 2], verts[base + 1]]
+        faces.append((b2, b2 + 1, b2 + 2, b2 + 3))
+        uvs.append([(u0, v0), (u0, v1), (u1, v1), (u1, v0)])
+
+    # TOP CAPS: the canyon is full of high vantage points, and vertical crossed
+    # cards read as a star from above. Two horizontal cards at plume height carry
+    # the baked top-down view; verticals still carry ground-level views.
+    ftx, fty = occ_top
+    for zc, s in ((h * 0.60, 1.0), (h * 0.78, 0.85)):
+        wx, wy = h * aspect_front * 0.5 * s, h * aspect_side * 0.5 * s
+        u0, u1 = 0.25 - 0.25 * ftx * s, 0.25 + 0.25 * ftx * s
+        v0, v1 = 0.25 - 0.25 * fty * s, 0.25 + 0.25 * fty * s
+        base = len(verts)
+        verts += [(-wx, -wy, zc), (wx, -wy, zc), (wx, wy, zc), (-wx, wy, zc)]
+        faces.append((base, base + 1, base + 2, base + 3))
+        uvs.append([(u0, v0), (u1, v0), (u1, v1), (u0, v1)])
+        b2 = len(verts)
+        verts += [verts[base], verts[base + 3], verts[base + 2], verts[base + 1]]
+        faces.append((b2, b2 + 1, b2 + 2, b2 + 3))
+        uvs.append([(u0, v0), (u0, v1), (u1, v1), (u1, v0)])
     mesh.from_pydata(verts, [], faces)
     uv_layer = mesh.uv_layers.new(name="UVMap")
     li = 0
@@ -203,20 +242,22 @@ def build_clump(name, aspect_front, aspect_side, occ_front, occ_side, atlas_png)
             li += 1
     mesh.update()
 
-    # bend normals outward from a point below the clump core so shading rolls
-    # smoothly across the cards instead of flipping per flat plane
+    # UP-BIASED normals on every vertex of BOTH shells: every face of every card
+    # takes near-identical lighting from any camera/sun angle (the lighting-stable
+    # grass trick). 70% up + 30% outward keeps a whisper of volume shading.
     import mathutils
 
     core = mathutils.Vector((0.0, 0.0, -h * 0.25))
-    bent = []
+    up = mathutils.Vector((0.0, 0.0, 1.0))
+    stable = []
     for v in mesh.vertices:
-        n = (mathutils.Vector(v.co) - core).normalized()
-        bent.append(n)
+        out = (mathutils.Vector(v.co) - core).normalized()
+        stable.append((up * 0.7 + out * 0.3).normalized())
     try:
-        mesh.normals_split_custom_set_from_vertices(bent)
-        print(f"  bent normals OK ({len(bent)} verts)")
+        mesh.normals_split_custom_set_from_vertices(stable)
+        print(f"  stable normals OK ({len(stable)} verts)")
     except Exception as e:
-        print(f"  bent normals FAILED ({e}) — cards will shade flat")
+        print(f"  stable normals FAILED ({e}) — cards will shade flat")
 
     mat = bpy.data.materials.new(name + "_mat")
     mat.use_nodes = True
@@ -246,11 +287,13 @@ for src_obj in meshes:
     sz = max(v.z for v in bb) - min(v.z for v in bb)
     front_png = os.path.join(OUT_DIR, f"{short}_front.png")
     side_png = os.path.join(OUT_DIR, f"{short}_side.png")
+    top_png = os.path.join(OUT_DIR, f"{short}_top.png")
     atlas_png = os.path.join(OUT_DIR, f"{short}_atlas.png")
     occ_front = render_view(src_obj, "front", front_png)
     occ_side = render_view(src_obj, "side", side_png)
-    compose_atlas(front_png, side_png, atlas_png)
-    clump = build_clump(short, sx / sz, sy / sz, occ_front, occ_side, atlas_png)
+    occ_top = render_view(src_obj, "top", top_png)
+    compose_atlas(front_png, side_png, top_png, atlas_png)
+    clump = build_clump(short, sx / sz, sy / sz, occ_front, occ_side, occ_top, atlas_png)
 
     bpy.ops.object.select_all(action="DESELECT")
     clump.select_set(True)
@@ -266,6 +309,7 @@ for src_obj in meshes:
     bpy.data.objects.remove(clump, do_unlink=True)
     os.remove(front_png)
     os.remove(side_png)
+    os.remove(top_png)
     print(f"WROTE {out_fbx} (atlas {atlas_png}, aspects f={sx/sz:.2f} s={sy/sz:.2f})")
 
 print("DONE")
