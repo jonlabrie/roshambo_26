@@ -20,8 +20,8 @@ export type Config = {
 ImpostorFade.DEFAULT = {
     capFadeLo = 25,
     capFadeHi = 45,
-    edgeLo = 0.15,
-    edgeHi = 0.45,
+    edgeLo = 0.25,
+    edgeHi = 0.7,
     vertFadeLo = 60,
     vertFadeHi = 80,
 } :: Config

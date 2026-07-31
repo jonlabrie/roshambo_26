@@ -40,13 +40,22 @@ end
 CollectionService:GetInstanceAddedSignal(TAG):Connect(register)
 CollectionService:GetInstanceRemovedSignal(TAG):Connect(unregister)
 
+local function num(attr: string, default: number): number
+    local v = workspace:GetAttribute(attr)
+    return if typeof(v) == "number" then v else default
+end
+
+-- every band live-tunable from Workspace attributes; defaults from the module
 local function config(): ImpostorFade.Config
-    local lo = workspace:GetAttribute("ImpostorCapFadeLo")
-    local hi = workspace:GetAttribute("ImpostorCapFadeHi")
-    if typeof(lo) == "number" and typeof(hi) == "number" then
-        return { capFadeLo = lo, capFadeHi = hi }
-    end
-    return ImpostorFade.DEFAULT
+    local d = ImpostorFade.DEFAULT
+    return {
+        capFadeLo = num("ImpostorCapFadeLo", d.capFadeLo),
+        capFadeHi = num("ImpostorCapFadeHi", d.capFadeHi),
+        edgeLo = num("ImpostorEdgeLo", d.edgeLo),
+        edgeHi = num("ImpostorEdgeHi", d.edgeHi),
+        vertFadeLo = num("ImpostorVertFadeLo", d.vertFadeLo),
+        vertFadeHi = num("ImpostorVertFadeHi", d.vertFadeHi),
+    }
 end
 
 local acc = 0
