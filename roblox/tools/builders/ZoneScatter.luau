@@ -7,7 +7,7 @@
 -- and Sample shape as CanopyScatter.
 local ZoneScatter = {}
 
-export type Sample = { x: number, z: number, y: number, steep: number }
+export type Sample = { x: number, z: number, y: number, steep: number, depth: number? }
 export type Zone = {
     name: string, -- bake folder name
     shape: "rect" | "circle",
@@ -52,6 +52,10 @@ export type Recipe = {
     -- over a cliff lip). radius = how far out to probe; nil = no footing check.
     footingRadius: number?,
     footingMaxDrop: number?,
+    -- submersion: nil rejects any wet sample outright; a number accepts
+    -- 0 < depth <= submergeMax (studs of water over the ground point). Most
+    -- flora is dry-only; shore reeds and the like opt in.
+    submergeMax: number?,
 }
 export type Placement = {
     x: number,
@@ -333,6 +337,13 @@ function ZoneScatter.plan(
         if fr ~= nil then
             local drop = ZoneScatter.footingDrop(sampleIndex, pitch, s.x, s.z, s.y, fr)
             if drop == nil or drop > (recipe.footingMaxDrop or 4) then
+                return false
+            end
+        end
+        local depth = s.depth or 0
+        if depth > 0 then
+            local submergeMax = recipe.submergeMax
+            if submergeMax == nil or depth > submergeMax then
                 return false
             end
         end

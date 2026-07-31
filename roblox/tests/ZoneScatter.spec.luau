@@ -486,3 +486,60 @@ describe("ZoneScatter.plan footing gate", function()
         end
     end)
 end)
+
+describe("ZoneScatter submersion", function()
+    local function shoreSamples(): { ZoneScatter.Sample }
+        -- x<=48 dry bank y=50; x>=52 shallow water: ground 49, half a stud deep
+        local s = {}
+        for x = 0, 100, 4 do
+            for z = 0, 100, 4 do
+                if x >= 52 then
+                    table.insert(s, { x = x, z = z, y = 49, steep = 0, depth = 0.5 })
+                else
+                    table.insert(s, { x = x, z = z, y = 50, steep = 0 })
+                end
+            end
+        end
+        return s
+    end
+    local zones: { ZoneScatter.Zone } = {
+        {
+            name = "A",
+            shape = "rect",
+            bounds = { 0, 0, 100, 100 },
+            recipe = "R",
+            densityScale = 1,
+            seed = 7,
+        },
+    }
+
+    test("a dry recipe never plants in water", function()
+        local placements = ZoneScatter.plan(zones, shoreSamples(), { R = CORE })
+        expect(#placements > 0).toBe(true)
+        for _, p in placements do
+            expect(p.x <= 48).toBe(true)
+        end
+    end)
+
+    test("a wet-footed recipe wades in, to its depth limit", function()
+        local reed = table.clone(CORE)
+        reed.submergeMax = 1.0
+        local placements = ZoneScatter.plan(zones, shoreSamples(), { R = reed })
+        local wet = 0
+        for _, p in placements do
+            if p.x >= 52 then
+                wet += 1
+            end
+        end
+        expect(wet > 0).toBe(true)
+    end)
+
+    test("too deep is still too deep", function()
+        local reed = table.clone(CORE)
+        reed.submergeMax = 0.3 -- shallower than the 0.5 water
+        local placements = ZoneScatter.plan(zones, shoreSamples(), { R = reed })
+        for _, p in placements do
+            expect(p.x <= 48).toBe(true)
+        end
+    end)
+end)
