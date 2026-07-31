@@ -1105,4 +1105,153 @@ describe("ZoneScatter grove pre-pass", function()
             expect(bestDistinct >= 3).toBe(true)
         end)
     end)
+
+    describe("single-grove anchors seek the centre (maxGroves = 1)", function()
+        local function centeredRecipe(anchorDarts: number): ZoneScatter.Recipe
+            local r = groveRecipe()
+            r.grove.maxGroves = 1
+            r.grove.anchorDarts = anchorDarts
+            return r
+        end
+
+        test("determinism regression: maxGroves > 1 zones stay byte-identical", function()
+            local recipe = groveRecipe()
+            local out = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = recipe })
+            -- golden snapshot captured from the pre-fix implementation
+            -- (commit 0b2cf5d) for this exact recipe/zone/seed, full double
+            -- precision (%.17g) so it round-trips bit-for-bit
+            local expected = {
+                {
+                    x = 1.2346982955932617,
+                    z = 92.163255438208580,
+                    species = "SugiMidA",
+                    scale = 1.7588677978515628,
+                    yaw = 5.2194705604250187,
+                },
+                {
+                    x = -0.08185510676064478,
+                    z = 86.284560266947281,
+                    species = "SugiMidA",
+                    scale = 0.98641753196716309,
+                    yaw = 3.2061842552664106,
+                },
+                {
+                    x = 2.8687478443025176,
+                    z = 87.642541163367142,
+                    species = "SugiMidA",
+                    scale = 0.93968098759651186,
+                    yaw = 1.3189545815353374,
+                },
+                {
+                    x = 74.703937768936157,
+                    z = 89.552903175354004,
+                    species = "PineA",
+                    scale = 1.6144324493408204,
+                    yaw = 1.7374684326942562,
+                },
+                {
+                    x = 69.868044392854657,
+                    z = 86.282060875885549,
+                    species = "PineA",
+                    scale = 0.91513485908508296,
+                    yaw = 4.7408230520007617,
+                },
+                {
+                    x = 72.085464873038603,
+                    z = 93.204768603195973,
+                    species = "PineA",
+                    scale = 0.91170778870582581,
+                    yaw = 0.31361817760450245,
+                },
+                {
+                    x = 61.059373617172241,
+                    z = 36.700940132141113,
+                    species = "MapleA",
+                    scale = 1.4612857055664064,
+                    yaw = 5.0101052150608689,
+                },
+                {
+                    x = 58.612682371768976,
+                    z = 39.918320698658135,
+                    species = "MapleA",
+                    scale = 1.0794261574745179,
+                    yaw = 0.76949453518749766,
+                },
+                {
+                    x = 58.577735208831612,
+                    z = 34.234497119970726,
+                    species = "SugiMidA",
+                    scale = 1.0823550939559936,
+                    yaw = 2.8994116916320647,
+                },
+                {
+                    x = 95.068109035491943,
+                    z = 33.988177776336670,
+                    species = "SugiMidA",
+                    scale = 1.5973931121826173,
+                    yaw = 2.890103132190343,
+                },
+                {
+                    x = 90.800794487797347,
+                    z = 30.949440638379119,
+                    species = "MapleA",
+                    scale = 1.0008147716522218,
+                    yaw = 2.4148258125136888,
+                },
+                {
+                    x = 96.528623745456031,
+                    z = 38.219954660589799,
+                    species = "SugiMidA",
+                    scale = 1.097284060716629,
+                    yaw = 1.123839415851227,
+                },
+            }
+            expect(#out).toBe(#expected)
+            for i, p in out do
+                expect(p.x).toBe(expected[i].x)
+                expect(p.z).toBe(expected[i].z)
+                expect(p.species).toBe(expected[i].species)
+                expect(p.scale).toBe(expected[i].scale)
+                expect(p.yaw).toBe(expected[i].yaw)
+            end
+        end)
+
+        test("open centre: single-grove anchor lands within 8 studs of the zone centroid", function()
+            local recipe = centeredRecipe(500)
+            local out = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = recipe })
+            expect(#out > 0).toBe(true)
+            local elder = out[1]
+            local dx, dz = elder.x - 50, elder.z - 50
+            expect(dx * dx + dz * dz <= 8 * 8).toBe(true)
+        end)
+
+        test("blocked centre: single-grove anchor hugs the keep-out boundary, not the far edge", function()
+            local recipe = centeredRecipe(500)
+            local zones: { ZoneScatter.Zone } = {
+                {
+                    name = "Grove",
+                    shape = "rect",
+                    bounds = { 0, 0, 100, 100 },
+                    recipe = "Grove",
+                    densityScale = 1,
+                    seed = 11,
+                },
+                {
+                    name = "KO_Centre",
+                    shape = "circle",
+                    bounds = { 50, 50, 15 },
+                    recipe = "KeepOut",
+                    densityScale = 1,
+                    seed = 1,
+                },
+            }
+            local out = ZoneScatter.plan(zones, flatSamples(), { Grove = recipe })
+            expect(#out > 0).toBe(true)
+            local elder = out[1]
+            local dx, dz = elder.x - 50, elder.z - 50
+            local d2 = dx * dx + dz * dz
+            expect(d2 >= 15 * 15).toBe(true)
+            expect(d2 < 25 * 25).toBe(true)
+        end)
+    end)
 end)
