@@ -1,6 +1,7 @@
 --!strict
 -- buildChochinPole — places hanging paper chōchin on bamboo posts along a path's UPHILL edge.
--- Studio runnable (command bar / MCP execute_luau); builds ad-hoc Parts into Workspace.PathLanterns
+-- Studio runnable (command bar / MCP execute_luau); builds ad-hoc Parts into
+-- CanyonWorld.Paths.PathLanterns (Workspace root only if CanyonWorld is absent)
 -- and tags them so the committed controllers drive them:
 --   * each barrel's two GlyphPlates are tagged "RoundLantern" -> LanternController paints the
 --     World-Throw glyph (world-space SurfaceGui, perpendicular to the crosspiece, 20% transparent).
@@ -36,7 +37,7 @@ local CONFIG = {
     downhillFrac = 0.30, -- up to this FRACTION of the placed poles may sit on the DOWNHILL side, terrain permitting
     dhMaxDrop = 8, -- downhill pole placed only if terrain is within this many studs below the path
     seed = 20260629, -- deterministic stagger (same place each run)
-    outModel = "PathLanterns", -- Workspace output model (poles go in a per-path sub-model under it)
+    outModel = "PathLanterns", -- output model under CanyonWorld.Paths (per-path sub-model beneath it)
 }
 
 -- The network's lantern standoff, measured OUTBOARD FROM THE TREAD EDGE rather than from
@@ -279,9 +280,17 @@ end
 local pathsRoot = ws:FindFirstChild("CanyonWorld") and ws.CanyonWorld:FindFirstChild("Paths")
 local pathModel = (pathsRoot and pathsRoot:FindFirstChild(CONFIG.path)) or ws:FindFirstChild(CONFIG.path)
 assert(pathModel, "missing path model " .. CONFIG.path .. " (looked in CanyonWorld.Paths and Workspace)")
-local root = ws:FindFirstChild(CONFIG.outModel) or Instance.new("Model")
-root.Name = CONFIG.outModel
-root.Parent = ws
+-- ⚠️ OUTPUT GOES INTO CanyonWorld.Paths, not Workspace root. This tool predated the
+-- 2026-07-08 reorg: it already looked for the PATH in CanyonWorld.Paths but still parented
+-- its OUTPUT to the root, which is how a stray Workspace.PathLanterns holding
+-- Chochin_RiverSquareStair came to exist and sit there unnoticed until 2026-07-30.
+local lanternParent = pathsRoot or ws
+local root = lanternParent:FindFirstChild(CONFIG.outModel) or ws:FindFirstChild(CONFIG.outModel)
+if not root then
+    root = Instance.new("Model")
+    root.Name = CONFIG.outModel
+end
+root.Parent = lanternParent
 -- one sub-model per path so re-running one path never disturbs another path's lanterns (idempotent).
 -- (NOTE: PathSteps' first deploy predates this and lives loose under the root; a future PathSteps
 --  re-run lands in Chochin_PathSteps — sweep the loose ChochinPole_* then.)
