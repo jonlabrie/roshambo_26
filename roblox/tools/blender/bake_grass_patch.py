@@ -224,12 +224,16 @@ def build_clump(name, aspect_front, aspect_side, occ_front, occ_side, occ_top, a
         faces.append((b2, b2 + 1, b2 + 2, b2 + 3))
         uvs.append([uvquad[0], uvquad[3], uvquad[2], uvquad[1]])
 
-    # verticals: v6's proven crossed-plane layout, one coherent silhouette
-    vv, vf, vu = [], [], []
+    # verticals: v6's proven crossed-plane layout, one coherent silhouette.
+    # Each plane is its OWN mesh (<name>_Vert1/2/3) so the client can fade a
+    # plane out as the camera sweeps across its edge (per-plane LTM); the fixed
+    # 0/60/120-degree layout is what ImpostorFade.planeNormal(i) assumes.
+    plane_sets = []
     widths = [h * aspect_front, h * aspect_side, h * aspect_front]
     occs = [occ_front, occ_side, occ_front]
     sides = [False, True, False]
     for i in range(3):
+        vv, vf, vu = [], [], []
         ang = math.radians(60 * i)
         dx, dy = math.cos(ang), math.sin(ang)
         fx, fz = occs[i]
@@ -249,6 +253,7 @@ def build_clump(name, aspect_front, aspect_side, occ_front, occ_side, occ_top, a
             ],
             [(u0, v0), (u1, v0), (u1, v1), (u0, v1)],
         )
+        plane_sets.append((vv, vf, vu))
 
     # caps: the top-down bake at plume height, for the canyon's overlooks
     cv, cf, cu = [], [], []
@@ -274,10 +279,11 @@ def build_clump(name, aspect_front, aspect_side, occ_front, occ_side, occ_top, a
     mat.node_tree.links.new(tex.outputs["Alpha"], bsdf.inputs["Alpha"])
     mat.blend_method = "CLIP" if hasattr(mat, "blend_method") else None
 
-    return [
-        _finish_mesh(name + "_Vert", vv, vf, vu, mat, h),
-        _finish_mesh(name + "_Caps", cv, cf, cu, mat, h),
-    ]
+    out = []
+    for i, (vv, vf, vu) in enumerate(plane_sets):
+        out.append(_finish_mesh(f"{name}_Vert{i + 1}", vv, vf, vu, mat, h))
+    out.append(_finish_mesh(name + "_Caps", cv, cf, cu, mat, h))
+    return out
 
 
 for src_obj in meshes:

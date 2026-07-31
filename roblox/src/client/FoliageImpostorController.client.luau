@@ -75,7 +75,19 @@ RunService.Heartbeat:Connect(function(dt: number)
         end
         local d = camPos - cap.Position
         local run = math.sqrt(d.X * d.X + d.Z * d.Z)
-        cap.LocalTransparencyModifier = ImpostorFade.capTransparency(ImpostorFade.elevation(d.Y, run), cfg)
+        local elev = ImpostorFade.elevation(d.Y, run)
+        cap.LocalTransparencyModifier = ImpostorFade.capTransparency(elev, cfg)
+        -- per-plane edge fade: a vertical plane hides as the camera sweeps
+        -- across its edge; its 60°-offset partners carry the silhouette
+        for i = 1, 3 do
+            local vert = model:FindFirstChild(model.Name .. "_Vert" .. i)
+            if vert and vert:IsA("BasePart") then
+                local n = ImpostorFade.planeNormal(i)
+                local wn = vert.CFrame:VectorToWorldSpace(Vector3.new(n.x, 0, n.z))
+                local absDot = if run > 0.01 then math.abs((wn.X * d.X + wn.Z * d.Z) / run) else 1
+                vert.LocalTransparencyModifier = ImpostorFade.vertTransparency(absDot, elev, cfg)
+            end
+        end
     end
     if dead then
         for _, m in dead do

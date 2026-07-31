@@ -51,3 +51,58 @@ describe("ImpostorFade.capTransparency", function()
         expect(ImpostorFade.capTransparency(31, cfg)).toBe(0)
     end)
 end)
+
+describe("ImpostorFade.edgeTransparency", function()
+    test("edge-on card is hidden", function()
+        expect(ImpostorFade.edgeTransparency(0)).toBe(1)
+        expect(ImpostorFade.edgeTransparency(ImpostorFade.DEFAULT.edgeLo)).toBe(1)
+    end)
+
+    test("camera-facing card is fully shown", function()
+        expect(ImpostorFade.edgeTransparency(ImpostorFade.DEFAULT.edgeHi)).toBe(0)
+        expect(ImpostorFade.edgeTransparency(1)).toBe(0)
+    end)
+
+    test("ramp midpoint is half faded", function()
+        local mid = (ImpostorFade.DEFAULT.edgeLo + ImpostorFade.DEFAULT.edgeHi) / 2
+        expect(math.abs(ImpostorFade.edgeTransparency(mid) - 0.5) < 1e-6).toBe(true)
+    end)
+end)
+
+describe("ImpostorFade.vertTransparency", function()
+    test("facing card at eye level is fully shown", function()
+        expect(ImpostorFade.vertTransparency(1, 0)).toBe(0)
+    end)
+
+    test("edge-on wins even at eye level", function()
+        expect(ImpostorFade.vertTransparency(0, 0)).toBe(1)
+    end)
+
+    test("steep elevation fades even a facing card", function()
+        expect(ImpostorFade.vertTransparency(1, ImpostorFade.DEFAULT.vertFadeHi)).toBe(1)
+        local mid = (ImpostorFade.DEFAULT.vertFadeLo + ImpostorFade.DEFAULT.vertFadeHi) / 2
+        expect(math.abs(ImpostorFade.vertTransparency(1, mid) - 0.5) < 1e-6).toBe(true)
+    end)
+
+    test("the stronger of the two fades governs", function()
+        local mid = (ImpostorFade.DEFAULT.vertFadeLo + ImpostorFade.DEFAULT.vertFadeHi) / 2
+        local edgeMid = (ImpostorFade.DEFAULT.edgeLo + ImpostorFade.DEFAULT.edgeHi) / 2
+        local t = ImpostorFade.vertTransparency(edgeMid, mid)
+        expect(math.abs(t - 0.5) < 1e-6).toBe(true)
+    end)
+end)
+
+describe("ImpostorFade.planeNormal", function()
+    test("plane 1 spans X so its normal points along Z", function()
+        local n = ImpostorFade.planeNormal(1)
+        expect(math.abs(n.x) < 1e-6).toBe(true)
+        expect(math.abs(math.abs(n.z) - 1) < 1e-6).toBe(true)
+    end)
+
+    test("all three normals are unit length and 60 degrees apart", function()
+        local a = ImpostorFade.planeNormal(1)
+        local b = ImpostorFade.planeNormal(2)
+        local dot = a.x * b.x + a.z * b.z
+        expect(math.abs(math.abs(dot) - 0.5) < 1e-6).toBe(true)
+    end)
+end)
