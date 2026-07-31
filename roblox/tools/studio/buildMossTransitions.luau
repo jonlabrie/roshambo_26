@@ -174,6 +174,10 @@ local PARAMS: Params = {
 }
 
 local SINK = 0.15 -- ABSOLUTE studs, never multiplied by size
+-- gate feedback (2026-07-31): the kit's albedo reads too bright/green against the
+-- CanyonMossySlate terrain moss; Color multiplies the SurfaceAppearance maps, so a
+-- muted olive tint pulls the clumps down toward the terrain. Tuned live at the gate.
+local MOSS_TINT = Color3.fromRGB(150, 152, 128)
 local BAKE_SEED_OFFSET = 700000 -- keeps the bake-time species-within-family stream
 -- distinct from the planner's own seed state, same pattern as scatterPreserve's
 -- MIST_SEED_OFFSET
@@ -429,6 +433,7 @@ local function flagMossClone(part: BasePart)
     part.CanQuery = false
     part.CanTouch = false
     part.CanCollide = false
+    part.Color = MOSS_TINT
     if part:IsA("MeshPart") then
         part.RenderFidelity = Enum.RenderFidelity.Automatic
     end
@@ -441,9 +446,16 @@ local function bake(
     params: Params
 ): (number, number, { [string]: number })
     local terrain = workspace.Terrain
+    -- gate feedback (2026-07-31): moss is a TERRAIN dweller — the ray hits all
+    -- queryable world geometry and any spot whose top surface is NOT terrain is
+    -- refused. That keeps moss off paths, decks, structures, and rock tops in one
+    -- rule (footing darts used to land ON the very paths they were seeded beside;
+    -- the old terrain-only ray then seated them at terrain height INSIDE the
+    -- geometry). Scattered foliage clones are CanQuery=false, so they never block.
     local rp = RaycastParams.new()
-    rp.FilterType = Enum.RaycastFilterType.Include
-    rp.FilterDescendantsInstances = { terrain }
+    rp.FilterType = Enum.RaycastFilterType.Exclude
+    rp.FilterDescendantsInstances = {}
+    rp.IgnoreWater = true
     local folder = mossFolder()
 
     local state = seedState(params.seed + BAKE_SEED_OFFSET)
@@ -463,7 +475,7 @@ local function bake(
 
         -- FRESH raycast at bake time — the seed's own y is planning-time only
         local hit = workspace:Raycast(Vector3.new(p.x, 400, p.z), Vector3.new(0, -900, 0), rp)
-        if not hit or keptOut(p.x, p.z, hit.Material) then
+        if not hit or hit.Instance ~= terrain or keptOut(p.x, p.z, hit.Material) then
             refused += 1
             continue
         end
