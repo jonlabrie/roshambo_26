@@ -38,6 +38,7 @@ TILE = int(argv[3]) if len(argv) > 3 else 512
 BRIGHTNESS = float(argv[4]) if len(argv) > 4 else 1.0
 ALPHA_GAIN = float(argv[5]) if len(argv) > 5 else 1.0
 PINK_BOOST = float(argv[6]) if len(argv) > 6 else 1.0
+STEM_DARKEN = float(argv[7]) if len(argv) > 7 else 1.0  # <1 darkens green-leaning pixels
 
 os.makedirs(OUT_DIR, exist_ok=True)
 
@@ -82,7 +83,14 @@ scene.camera = cam
 
 
 def render_view(obj, direction, path):
-    """Ortho render of obj's bbox from a horizontal direction ('front' -Y or 'side' -X)."""
+    """Ortho render of obj's bbox from a horizontal direction ('front' -Y or 'side' -X).
+
+    The render is a SQUARE tile covering a square (span x span) world region, so the
+    plant occupies only a centred sub-rectangle of the image. Returns that occupancy
+    as (width_fraction, height_fraction) — build_clump maps the quad UVs to exactly
+    this sub-rect. Mapping the full tile onto an aspect-ratio quad double-applies the
+    aspect (the v1 squish/stretch bug).
+    """
     from mathutils import Vector
 
     bb = [obj.matrix_world @ Vector(c) for c in obj.bound_box]
@@ -90,8 +98,9 @@ def render_view(obj, direction, path):
     hi = Vector((max(v.x for v in bb), max(v.y for v in bb), max(v.z for v in bb)))
     ctr = (lo + hi) / 2
     size = hi - lo
-    span = max(size.z, size.x if direction == "front" else size.y)
-    cam.data.ortho_scale = span * 1.02
+    horiz = size.x if direction == "front" else size.y
+    span = max(size.z, horiz) * 1.02
+    cam.data.ortho_scale = span
     dist = max(size.x, size.y) * 2 + 1
     if direction == "front":
         cam.location = (ctr.x, lo.y - dist, ctr.z)
@@ -101,6 +110,7 @@ def render_view(obj, direction, path):
         cam.rotation_euler = (math.radians(90), 0, math.radians(-90))
     scene.render.filepath = path
     bpy.ops.render.render(write_still=True)
+    return horiz / span, size.z / span
 
 
 def grade(px):
@@ -113,6 +123,9 @@ def grade(px):
         reddish = rgb[:, 0] > rgb[:, 1] * 1.02
         rgb[reddish, 0] *= PINK_BOOST
         rgb[reddish, 2] *= 1.0 + (PINK_BOOST - 1.0) * 0.55
+    if STEM_DARKEN < 1.0:
+        greenish = rgb[:, 1] > rgb[:, 0] * 1.02
+        rgb[greenish] *= STEM_DARKEN
     np.clip(rgb, 0.0, 1.0, out=rgb)
     np.clip(a * ALPHA_GAIN, 0.0, 1.0, out=a)
 
@@ -135,27 +148,52 @@ def compose_atlas(front_png, side_png, out_png):
         bpy.data.images.remove(img)
 
 
-def build_clump(name, aspect_front, aspect_side, atlas_png):
-    """Three crossed vertical quads, 60° apart: planes 0/2 use the front tile, 1 the side."""
+def build_clump(name, aspect_front, aspect_side, occ_front, occ_side, atlas_png):
+    """A fan of MANY small cards, not 3 big crossed quads.
+
+    Big flat quads each take one uniform lighting value, so the whole clump pops
+    light/dark as the camera/sun angle changes (the v6 in-Play tinting bug). Ten
+    smaller cards at jittered yaw/tilt break the clump into varied facets, and
+    custom normals BENT OUTWARD from the clump core make lighting roll smoothly
+    across it (the standard foliage-billboard trick). ~20 tris per clump.
+
+    occ_* are the (width, height) fractions of each square tile the plant actually
+    occupies (centred); UVs map each card to exactly that sub-rect.
+    """
+    import random
+
     h = HEIGHT_STUDS
+    rng = random.Random(sum(ord(c) for c in name))  # deterministic per variant
+    N = 10
     mesh = bpy.data.meshes.new(name)
     verts, faces, uvs = [], [], []
-    widths = [h * aspect_front, h * aspect_side, h * aspect_front]
-    tiles = [(0.0, 0.5), (0.5, 1.0), (0.0, 0.5)]  # atlas u-range per plane
-    for i in range(3):
-        ang = math.radians(60 * i)
-        dx, dy = math.cos(ang), math.sin(ang)
-        w = widths[i] / 2
+    for i in range(N):
+        use_side = i % 3 == 2
+        aspect = aspect_side if use_side else aspect_front
+        fx, fz = occ_side if use_side else occ_front
+        frac = 0.95 if i == 0 else rng.uniform(0.62, 0.8)
+        ch = h * frac
+        cw = ch * aspect
+        ang = rng.uniform(0, 2 * math.pi)
+        rad = 0.0 if i == 0 else rng.uniform(0.08, 0.2) * h * aspect_front
+        cx, cy = math.cos(ang) * rad, math.sin(ang) * rad
+        yaw = rng.uniform(0, math.pi)
+        dx, dy = math.cos(yaw), math.sin(yaw)
+        nxd, nyd = -dy, dx  # card's horizontal normal direction
+        lean = math.sin(math.radians(rng.uniform(-9, 9))) * ch
+        w = cw / 2
         base = len(verts)
         verts += [
-            (-w * dx, -w * dy, 0.0),
-            (w * dx, w * dy, 0.0),
-            (w * dx, w * dy, h),
-            (-w * dx, -w * dy, h),
+            (cx - w * dx, cy - w * dy, 0.0),
+            (cx + w * dx, cy + w * dy, 0.0),
+            (cx + w * dx + nxd * lean, cy + w * dy + nyd * lean, ch),
+            (cx - w * dx + nxd * lean, cy - w * dy + nyd * lean, ch),
         ]
         faces.append((base, base + 1, base + 2, base + 3))
-        u0, u1 = tiles[i]
-        uvs.append([(u0, 0.0), (u1, 0.0), (u1, 1.0), (u0, 1.0)])
+        uc = 0.75 if use_side else 0.25
+        u0, u1 = uc - 0.25 * fx, uc + 0.25 * fx  # tile is half the atlas wide
+        v0, v1 = 0.5 - 0.5 * fz, 0.5 + 0.5 * fz
+        uvs.append([(u0, v0), (u1, v0), (u1, v1), (u0, v1)])
     mesh.from_pydata(verts, [], faces)
     uv_layer = mesh.uv_layers.new(name="UVMap")
     li = 0
@@ -164,6 +202,21 @@ def build_clump(name, aspect_front, aspect_side, atlas_png):
             uv_layer.data[li].uv = corner_uv
             li += 1
     mesh.update()
+
+    # bend normals outward from a point below the clump core so shading rolls
+    # smoothly across the cards instead of flipping per flat plane
+    import mathutils
+
+    core = mathutils.Vector((0.0, 0.0, -h * 0.25))
+    bent = []
+    for v in mesh.vertices:
+        n = (mathutils.Vector(v.co) - core).normalized()
+        bent.append(n)
+    try:
+        mesh.normals_split_custom_set_from_vertices(bent)
+        print(f"  bent normals OK ({len(bent)} verts)")
+    except Exception as e:
+        print(f"  bent normals FAILED ({e}) — cards will shade flat")
 
     mat = bpy.data.materials.new(name + "_mat")
     mat.use_nodes = True
@@ -194,10 +247,10 @@ for src_obj in meshes:
     front_png = os.path.join(OUT_DIR, f"{short}_front.png")
     side_png = os.path.join(OUT_DIR, f"{short}_side.png")
     atlas_png = os.path.join(OUT_DIR, f"{short}_atlas.png")
-    render_view(src_obj, "front", front_png)
-    render_view(src_obj, "side", side_png)
+    occ_front = render_view(src_obj, "front", front_png)
+    occ_side = render_view(src_obj, "side", side_png)
     compose_atlas(front_png, side_png, atlas_png)
-    clump = build_clump(short, sx / sz, sy / sz, atlas_png)
+    clump = build_clump(short, sx / sz, sy / sz, occ_front, occ_side, atlas_png)
 
     bpy.ops.object.select_all(action="DESELECT")
     clump.select_set(True)
