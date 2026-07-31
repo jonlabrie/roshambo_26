@@ -82,6 +82,7 @@
 
 import sys
 import os
+import re
 import json
 import math
 
@@ -636,6 +637,33 @@ def tri_count(obj):
     return n
 
 
+def short_asset_name(obj_name):
+    """"3DGardenPlants_Iris ensata_01-009" -> "Iris009". Roblox truncates at 50 chars."""
+    m = re.search(r"-(\d+)\s*$", obj_name)
+    tag = m.group(1) if m else re.sub(r"[^A-Za-z0-9]", "", obj_name)[-3:]
+    words = re.findall(r"[A-Za-z]+", obj_name)
+    base = words[1] if len(words) > 1 else (words[0] if words else "Asset")
+    return "%s%s" % (base.capitalize(), tag)
+
+
+def role_of(mat):
+    """Name a piece by what it IS, not by the vendor's label. Petals are identified by a
+    linked Alpha — the same test patch_petals uses — because this kit calls its flower
+    materials "Leaves02_39E47DCB" and "Leaves03_C51ACDDA"."""
+    name = mat.name
+    digits = re.findall(r"\d+", name)
+    suffix = digits[0] if digits else ""
+    if name.startswith("Stem"):
+        return "Stems"
+    has_alpha = False
+    if mat.node_tree:
+        for n in mat.node_tree.nodes:
+            if n.type == "BSDF_PRINCIPLED" and n.inputs["Alpha"].is_linked:
+                has_alpha = True
+                break
+    return ("Petals%s" if has_alpha else "Blades%s") % suffix
+
+
 def split_by_material(obj, limit):
     """Separate an object BY MATERIAL. ALWAYS — not only when it is over the limit.
 
@@ -669,11 +697,15 @@ def split_by_material(obj, limit):
     bpy.ops.object.mode_set(mode="OBJECT")
     pieces = [obj] + [o for o in bpy.context.scene.objects if o not in before]
     # name each piece after the material it carries, so the import is legible
-    stem = obj.name
+    # SHORT, ROLE-BASED names. Roblox truncates instance names at 50 characters, and
+    # "3DGardenPlants_Iris ensata_01-001_Leaves03_C51ACDDA" is 51 — two pieces of one
+    # variant could also collide once truncated. Naming by role is shorter AND more
+    # honest than the vendor's: "Leaves03_C51ACDDA" is a FLOWER material.
+    stem = short_asset_name(obj.name)
     for pc in pieces:
-        mats = [m.name for m in pc.data.materials if m]
+        mats = [m for m in pc.data.materials if m]
         if mats:
-            pc.name = "%s_%s" % (stem, mats[0])
+            pc.name = "%s_%s" % (stem, role_of(mats[0]))
         # a single-material piece can still exceed the limit; the Sugi answer is to halve
         # it again. The iris never needs it - worst piece is 14,595 - so just report.
         if tri_count(pc) > limit:
