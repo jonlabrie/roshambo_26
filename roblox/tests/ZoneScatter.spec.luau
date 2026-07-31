@@ -974,4 +974,69 @@ describe("ZoneScatter grove pre-pass", function()
             expect(sawMember).toBe(true)
         end)
     end)
+
+    describe("grove member retries", function()
+        local function hostileZones(): { ZoneScatter.Zone }
+            return {
+                {
+                    name = "Grove",
+                    shape = "rect",
+                    bounds = { 0, 0, 100, 100 },
+                    recipe = "Grove",
+                    densityScale = 1,
+                    seed = 11,
+                },
+                -- keep-out covers 60% of the zone by width (x in [0,60]),
+                -- forcing anchors into a narrow strip and many single-dart
+                -- member attempts to land on hostile ground
+                {
+                    name = "KO_Hostile",
+                    shape = "rect",
+                    bounds = { 0, 0, 60, 100 },
+                    recipe = "KeepOut",
+                    densityScale = 1,
+                    seed = 1,
+                },
+            }
+        end
+
+        test("memberTries=1 is byte-identical to a run without memberTries config", function()
+            local withTries = groveRecipe()
+            withTries.grove.memberTries = 1
+            local without = groveRecipe()
+            local outA = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = withTries })
+            local outB = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = without })
+            expect(#outA).toBe(#outB)
+            for i, p in outA do
+                expect(p.x).toBe(outB[i].x)
+                expect(p.z).toBe(outB[i].z)
+                expect(p.species).toBe(outB[i].species)
+                expect(p.scale).toBe(outB[i].scale)
+                expect(p.yaw).toBe(outB[i].yaw)
+            end
+        end)
+
+        test(
+            "memberTries=6 on hostile ground yields substantially fuller groves than memberTries=1",
+            function()
+                local tries1 = groveRecipe()
+                tries1.grove.memberTries = 1
+                tries1.grove.anchorDarts = 200
+                tries1.grove.maxGroves = 6
+                local tries6 = groveRecipe()
+                tries6.grove.memberTries = 6
+                tries6.grove.anchorDarts = 200
+                tries6.grove.maxGroves = 6
+
+                local out1 = ZoneScatter.plan(hostileZones(), flatSamples(), { Grove = tries1 })
+                local out6 = ZoneScatter.plan(hostileZones(), flatSamples(), { Grove = tries6 })
+
+                -- anchors are unaffected by memberTries (same darts, same
+                -- spacing/maxGroves), so any growth in total placement count is
+                -- entirely recovered members that a single dart would have lost
+                expect(#out1 > 0).toBe(true)
+                expect(#out6 > #out1).toBe(true)
+            end
+        )
+    end)
 end)
