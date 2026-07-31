@@ -268,12 +268,14 @@ local RECIPES: { [string]: Recipe } = {
         pathMargin = 4,
         footingRadius = 2.5,
         footingMaxDrop = 6,
+        -- gate feedback (2026-07-31): adult-heavy shrine stand centred on the
+        -- user's mark.
         grove = {
             spacing = 30,
             radiusMin = 4,
             radiusMax = 12,
-            membersMin = 5,
-            membersMax = 8,
+            membersMin = 7,
+            membersMax = 10,
             memberSpacing = 5,
             dominantScale = 1.2,
             anchorDarts = 200,
@@ -282,7 +284,7 @@ local RECIPES: { [string]: Recipe } = {
             -- free-mix: hero stand draws all six sculpted variants
             coherent = false,
             saplings = {
-                chance = 0.35,
+                chance = 0.25,
                 map = {
                     SugiHero_SugiSmart = "XfSugiYb",
                     SugiHero_SugiB = "XfSugiYb",
@@ -665,60 +667,24 @@ local function plan(
         local layer = recipe.layer or "canopy"
         local heightScale = recipe.heightScale or 1
         groveStates[zone] = seedState(zone.seed + GROVE_SEED_OFFSET)
+        -- COHERENT (default: coherent ~= false): dominant + attendant species
+        -- for this grove; excluding the dominant entry from the attendant
+        -- roll degenerates to the same species when the pool only has one.
+        -- FREE-MIX (coherent == false): every placement, elder included,
+        -- draws independently from the full pool — a "hero stand" rather
+        -- than a coherent clump. The dominant/attendant rolls never enter the
+        -- stream in this mode: draw only what's used.
+        local coherent = grove.coherent ~= false
 
         local x1, z1, x2, z2 = zoneBBox(zone)
         local zoneAnchors: { { number } } = {}
-        for _ = 1, grove.anchorDarts do
-            if #zoneAnchors >= grove.maxGroves then
-                break
-            end
-            local ax = x1 + groveRoll(zone) * (x2 - x1)
-            local az = z1 + groveRoll(zone) * (z2 - z1)
-            if not containsXZ(zone, ax, az) then
-                continue
-            end
-            -- exact grid cell only: a dart with no sample under it (off-grid,
-            -- a hole in the survey) is rejected outright, never nudged onto a
-            -- neighbour like clump children do
-            local gs = sampleIndex[sampleKey(ax, az, pitch)]
-            if gs == nil then
-                continue
-            end
-            if not contains(zone, ax, az, gs.y) then
-                continue
-            end
-            -- pads are sacred: a KeepOut zone vetoes an anchor exactly like it
-            -- vetoes an ordinary per-sample placement, regardless of layer order
-            if keepOutAt(zones, ax, az, gs.y) then
-                continue
-            end
-            local anchorProbe: Sample =
-                { x = ax, z = az, y = gs.y, steep = gs.steep, depth = gs.depth, material = gs.material }
-            if not accepts(zone, anchorProbe) then
-                continue
-            end
-            local tooClose = false
-            for _, a in zoneAnchors do
-                local dx, dz = ax - a[1], az - a[2]
-                if dx * dx + dz * dz <= grove.spacing * grove.spacing then
-                    tooClose = true
-                    break
-                end
-            end
-            if tooClose then
-                continue
-            end
+
+        -- plants one grove (elder + members) at an anchor that already
+        -- cleared every site gate. Shared by both dart-selection strategies
+        -- below so accepting an anchor always means the same thing.
+        local function placeGrove(ax: number, az: number, gs: Sample)
             table.insert(zoneAnchors, { ax, az })
 
-            -- COHERENT (default: coherent ~= false): dominant + attendant
-            -- species for this grove; excluding the dominant entry from the
-            -- attendant roll degenerates to the same species when the pool
-            -- only has one entry.
-            -- FREE-MIX (coherent == false): every placement, elder included,
-            -- draws independently from the full pool — a "hero stand" rather
-            -- than a coherent clump. The dominant/attendant rolls never enter
-            -- the stream in this mode: draw only what's used.
-            local coherent = grove.coherent ~= false
             local domSpecies, domScale, attSpecies, attScale
             local elderSpecies, elderScale
             if coherent then
@@ -836,6 +802,93 @@ local function plan(
                 end
             end
         end
+
+        if grove.maxGroves == 1 then
+            -- CENTER-SEEKING: a single-grove zone represents a user-placed
+            -- stand, not wild growth — the first passing dart could land
+            -- hard against a zone edge (e.g. the true centre failing
+            -- pathMargin). Evaluate EVERY dart, drawing rolls exactly as the
+            -- multi-grove path does regardless of acceptance, and keep the
+            -- passing candidate closest to the zone's centroid.
+            local cx, cz = (x1 + x2) / 2, (z1 + z2) / 2
+            local bestAx: number?, bestAz: number?, bestGs: Sample?, bestD = nil, nil, nil, math.huge
+            for _ = 1, grove.anchorDarts do
+                local ax = x1 + groveRoll(zone) * (x2 - x1)
+                local az = z1 + groveRoll(zone) * (z2 - z1)
+                if not containsXZ(zone, ax, az) then
+                    continue
+                end
+                local gs = sampleIndex[sampleKey(ax, az, pitch)]
+                if gs == nil then
+                    continue
+                end
+                if not contains(zone, ax, az, gs.y) then
+                    continue
+                end
+                if keepOutAt(zones, ax, az, gs.y) then
+                    continue
+                end
+                local anchorProbe: Sample =
+                    { x = ax, z = az, y = gs.y, steep = gs.steep, depth = gs.depth, material = gs.material }
+                if not accepts(zone, anchorProbe) then
+                    continue
+                end
+                local dx, dz = ax - cx, az - cz
+                local d = dx * dx + dz * dz
+                if d < bestD then
+                    bestAx, bestAz, bestGs, bestD = ax, az, gs, d
+                end
+            end
+            if bestAx ~= nil and bestAz ~= nil and bestGs ~= nil then
+                placeGrove(bestAx, bestAz, bestGs)
+            end
+        else
+            -- multi-grove: unchanged first-accept + inter-anchor spacing
+            for _ = 1, grove.anchorDarts do
+                if #zoneAnchors >= grove.maxGroves then
+                    break
+                end
+                local ax = x1 + groveRoll(zone) * (x2 - x1)
+                local az = z1 + groveRoll(zone) * (z2 - z1)
+                if not containsXZ(zone, ax, az) then
+                    continue
+                end
+                -- exact grid cell only: a dart with no sample under it
+                -- (off-grid, a hole in the survey) is rejected outright,
+                -- never nudged onto a neighbour like clump children do
+                local gs = sampleIndex[sampleKey(ax, az, pitch)]
+                if gs == nil then
+                    continue
+                end
+                if not contains(zone, ax, az, gs.y) then
+                    continue
+                end
+                -- pads are sacred: a KeepOut zone vetoes an anchor exactly
+                -- like it vetoes an ordinary per-sample placement, regardless
+                -- of layer order
+                if keepOutAt(zones, ax, az, gs.y) then
+                    continue
+                end
+                local anchorProbe: Sample =
+                    { x = ax, z = az, y = gs.y, steep = gs.steep, depth = gs.depth, material = gs.material }
+                if not accepts(zone, anchorProbe) then
+                    continue
+                end
+                local tooClose = false
+                for _, a in zoneAnchors do
+                    local dx, dz = ax - a[1], az - a[2]
+                    if dx * dx + dz * dz <= grove.spacing * grove.spacing then
+                        tooClose = true
+                        break
+                    end
+                end
+                if tooClose then
+                    continue
+                end
+                placeGrove(ax, az, gs)
+            end
+        end
+
         for _, a in zoneAnchors do
             table.insert(groveAnchors, a)
         end

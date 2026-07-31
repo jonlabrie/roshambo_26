@@ -197,6 +197,18 @@ describe("grove pre-pass", function()
         assert(coreGrove ~= nil)
         expect(coreGrove.coherent == nil or coreGrove.coherent == true).toBe(true)
     end)
+    -- gate feedback (2026-07-31): adult-heavy shrine stand centred on the
+    -- user's mark — fewer young saplings, a taller minimum member count.
+    test("SugiStand is adult-heavy and single-grove (centre-seeking)", function()
+        local grove = Recipes.SugiStand.grove
+        assert(grove ~= nil)
+        expect(grove.maxGroves).toBe(1) -- triggers centre-seeking anchor selection
+        expect(grove.membersMin).toBe(7)
+        expect(grove.membersMax).toBe(10)
+        local saplings = grove.saplings
+        assert(saplings ~= nil)
+        expect(saplings.chance).toBe(0.25)
+    end)
 end)
 
 describe("waterline ecology", function()

@@ -241,12 +241,14 @@ local Recipes: { [string]: Recipe } = {
         pathMargin = 4,
         footingRadius = 2.5,
         footingMaxDrop = 6,
+        -- gate feedback (2026-07-31): adult-heavy shrine stand centred on the
+        -- user's mark.
         grove = {
             spacing = 30,
             radiusMin = 4,
             radiusMax = 12,
-            membersMin = 5,
-            membersMax = 8,
+            membersMin = 7,
+            membersMax = 10,
             memberSpacing = 5,
             dominantScale = 1.2,
             anchorDarts = 200,
@@ -255,7 +257,7 @@ local Recipes: { [string]: Recipe } = {
             -- free-mix: hero stand draws all six sculpted variants
             coherent = false,
             saplings = {
-                chance = 0.35,
+                chance = 0.25,
                 map = {
                     SugiHero_SugiSmart = "XfSugiYb",
                     SugiHero_SugiB = "XfSugiYb",
