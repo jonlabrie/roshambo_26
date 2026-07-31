@@ -848,34 +848,37 @@ local function readBuiltCells(): { { number } }
     return cells
 end
 
--- Care-source ring around the falls dock: the garden-floor spec grants
--- FallsDock a 15-stud garden radius that overrides the longitude formula for
--- everything nearby (see tools/studio/placeFallsPoolIris.luau's siting notes)
--- — a staffed deck reads as tended regardless of how far west it sits.
--- Implemented as more "care cells" (same bucketed index as readBuiltCells'
--- path/structure points) rather than a special-cased branch, so
--- nearestCareDist treats the dock identically to a path.
+-- Staged-site HARD override: the canyon-garden-floor spec (§2, "Staged sites
+-- override longitude" — docs/superpowers/specs/2026-07-29-canyon-garden-floor-design.md:51-53)
+-- grants FallsDock its own 15-stud garden radius "irrespective of" reach(x),
+-- measured from its FOOTPRINT (not its pivot). This is NOT folded into the
+-- generic care-cell index: at the dock's longitude (x≈-345) reach(x)≈11.6, so
+-- routing it through the ordinary careModelBand formula would read the dock's
+-- own interior as PRESERVE (15 studs from a ring exceeds reach) — the inverse
+-- of the spec's intent. careBand checks this override FIRST and only falls
+-- through to the generic formula when it doesn't apply.
 local FALLS_DOCK_GARDEN_RADIUS = 15
 
-local function fallsDockCells(): { { number } }
-    local cells: { { number } } = {}
+-- FallsDock's footprint as an axis-aligned XZ box (x0, z0, x1, z1), or nil if
+-- the model isn't in the place yet.
+local function fallsDockFootprint(): { number }?
     local stage = workspace:FindFirstChild("RoshamboStage")
     local dock = stage and stage:FindFirstChild("FallsDock")
     if not dock or not dock:IsA("Model") then
         warn("[preserve] no RoshamboStage.FallsDock — care override inert")
-        return cells
+        return nil
     end
-    local cf = (dock :: Model):GetBoundingBox()
-    local cx, cz = cf.Position.X, cf.Position.Z
-    local count = math.clamp(6 + math.floor(FALLS_DOCK_GARDEN_RADIUS), 6, 10)
-    for i = 0, count - 1 do
-        local ang = (i / count) * 2 * math.pi
-        table.insert(cells, {
-            cx + math.cos(ang) * FALLS_DOCK_GARDEN_RADIUS,
-            cz + math.sin(ang) * FALLS_DOCK_GARDEN_RADIUS,
-        })
-    end
-    return cells
+    local cf, size = (dock :: Model):GetBoundingBox()
+    local hx, hz = size.X / 2, size.Z / 2
+    return { cf.Position.X - hx, cf.Position.Z - hz, cf.Position.X + hx, cf.Position.Z + hz }
+end
+
+-- Distance (studs) from (x,z) to the nearest point on an axis-aligned XZ box
+-- footprint; 0 if (x,z) sits inside the box.
+local function distToFootprint(box: { number }, x: number, z: number): number
+    local dx = math.max(box[1] - x, 0, x - box[3])
+    local dz = math.max(box[2] - z, 0, z - box[4])
+    return math.sqrt(dx * dx + dz * dz)
 end
 
 -- Nearest distance (studs) from (x,z) to any care cell, by expanding ring over
@@ -1067,14 +1070,15 @@ return function(opts: {
     local cells = readWaterCells()
     local builtCells = readBuiltCells()
 
-    -- care distance: built geometry (paths/structures) plus the falls-dock
-    -- garden-radius ring, indexed the same way as the water/built lookups
-    local careCells = table.clone(builtCells)
-    for _, c in fallsDockCells() do
-        table.insert(careCells, c)
-    end
-    local careIndex = indexWater(careCells)
+    -- care distance: built geometry (paths/structures), indexed the same way
+    -- as the water/built lookups; FallsDock is a HARD override checked first
+    -- (see fallsDockFootprint's comment), never folded into this index
+    local careIndex = indexWater(builtCells)
+    local dockFootprint = fallsDockFootprint()
     local function careBand(x: number, z: number): string
+        if dockFootprint ~= nil and distToFootprint(dockFootprint, x, z) <= FALLS_DOCK_GARDEN_RADIUS then
+            return "GARDEN"
+        end
         return careModelBand(x, nearestCareDist(careIndex, x, z))
     end
 
