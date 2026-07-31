@@ -879,13 +879,19 @@ describe("ZoneScatter grove pre-pass", function()
         end
         expect(#canopyPlacements > 0).toBe(true)
         expect(#understoryPlacements > 0).toBe(true)
+        -- the affinity gate itself checks proximity to the exact (unjittered)
+        -- anchor grid point; every placement (canopy included) is then
+        -- jittered up to GROVE_JITTER_MAX studs per axis, so a boundary
+        -- understory sample can end up a hair over the raw radius from the
+        -- nearest jittered canopy placement — pad the assertion accordingly
+        local slack = 3
         for _, u in understoryPlacements do
             local nearest = math.huge
             for _, c in canopyPlacements do
                 local dx, dz = u.x - c.x, u.z - c.z
                 nearest = math.min(nearest, dx * dx + dz * dz)
             end
-            expect(nearest <= 20 * 20).toBe(true)
+            expect(nearest <= (20 + slack) * (20 + slack)).toBe(true)
         end
     end)
 
@@ -975,34 +981,14 @@ describe("ZoneScatter grove pre-pass", function()
         end)
     end)
 
-    describe("grove member retries", function()
-        local function hostileZones(): { ZoneScatter.Zone }
-            return {
-                {
-                    name = "Grove",
-                    shape = "rect",
-                    bounds = { 0, 0, 100, 100 },
-                    recipe = "Grove",
-                    densityScale = 1,
-                    seed = 11,
-                },
-                -- keep-out covers 60% of the zone by width (x in [0,60]),
-                -- forcing anchors into a narrow strip and many single-dart
-                -- member attempts to land on hostile ground
-                {
-                    name = "KO_Hostile",
-                    shape = "rect",
-                    bounds = { 0, 0, 60, 100 },
-                    recipe = "KeepOut",
-                    densityScale = 1,
-                    seed = 1,
-                },
-            }
-        end
-
-        test("memberTries=1 is byte-identical to a run without memberTries config", function()
+    describe("legacy dart-era fields are inert (anchorDarts, memberTries)", function()
+        -- the grove pre-pass no longer dart-throws (see the "starvation
+        -- regression" describe below for why); both fields are kept in
+        -- GroveConfig purely so existing recipe literals don't need to drop
+        -- them, and are never read by the exhaustive placer.
+        test("memberTries is inert: byte-identical with or without it", function()
             local withTries = groveRecipe()
-            withTries.grove.memberTries = 1
+            withTries.grove.memberTries = 6
             local without = groveRecipe()
             local outA = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = withTries })
             local outB = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = without })
@@ -1016,28 +1002,22 @@ describe("ZoneScatter grove pre-pass", function()
             end
         end)
 
-        test(
-            "memberTries=6 on hostile ground yields substantially fuller groves than memberTries=1",
-            function()
-                local tries1 = groveRecipe()
-                tries1.grove.memberTries = 1
-                tries1.grove.anchorDarts = 200
-                tries1.grove.maxGroves = 6
-                local tries6 = groveRecipe()
-                tries6.grove.memberTries = 6
-                tries6.grove.anchorDarts = 200
-                tries6.grove.maxGroves = 6
-
-                local out1 = ZoneScatter.plan(hostileZones(), flatSamples(), { Grove = tries1 })
-                local out6 = ZoneScatter.plan(hostileZones(), flatSamples(), { Grove = tries6 })
-
-                -- anchors are unaffected by memberTries (same darts, same
-                -- spacing/maxGroves), so any growth in total placement count is
-                -- entirely recovered members that a single dart would have lost
-                expect(#out1 > 0).toBe(true)
-                expect(#out6 > #out1).toBe(true)
+        test("anchorDarts is inert: byte-identical regardless of its value", function()
+            local few = groveRecipe()
+            few.grove.anchorDarts = 1
+            local many = groveRecipe()
+            many.grove.anchorDarts = 5000
+            local outA = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = few })
+            local outB = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = many })
+            expect(#outA).toBe(#outB)
+            for i, p in outA do
+                expect(p.x).toBe(outB[i].x)
+                expect(p.z).toBe(outB[i].z)
+                expect(p.species).toBe(outB[i].species)
+                expect(p.scale).toBe(outB[i].scale)
+                expect(p.yaw).toBe(outB[i].yaw)
             end
-        )
+        end)
     end)
 
     describe("free-mix groves (coherent = false)", function()
@@ -1107,126 +1087,29 @@ describe("ZoneScatter grove pre-pass", function()
     end)
 
     describe("single-grove anchors seek the centre (maxGroves = 1)", function()
-        local function centeredRecipe(anchorDarts: number): ZoneScatter.Recipe
+        local function centeredRecipe(): ZoneScatter.Recipe
             local r = groveRecipe()
             r.grove.maxGroves = 1
-            r.grove.anchorDarts = anchorDarts
             return r
         end
 
-        test("determinism regression: maxGroves > 1 zones stay byte-identical", function()
-            local recipe = groveRecipe()
-            local out = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = recipe })
-            -- golden snapshot captured from the pre-fix implementation
-            -- (commit 0b2cf5d) for this exact recipe/zone/seed, full double
-            -- precision (%.17g) so it round-trips bit-for-bit
-            local expected = {
-                {
-                    x = 1.2346982955932617,
-                    z = 92.163255438208580,
-                    species = "SugiMidA",
-                    scale = 1.7588677978515628,
-                    yaw = 5.2194705604250187,
-                },
-                {
-                    x = -0.08185510676064478,
-                    z = 86.284560266947281,
-                    species = "SugiMidA",
-                    scale = 0.98641753196716309,
-                    yaw = 3.2061842552664106,
-                },
-                {
-                    x = 2.8687478443025176,
-                    z = 87.642541163367142,
-                    species = "SugiMidA",
-                    scale = 0.93968098759651186,
-                    yaw = 1.3189545815353374,
-                },
-                {
-                    x = 74.703937768936157,
-                    z = 89.552903175354004,
-                    species = "PineA",
-                    scale = 1.6144324493408204,
-                    yaw = 1.7374684326942562,
-                },
-                {
-                    x = 69.868044392854657,
-                    z = 86.282060875885549,
-                    species = "PineA",
-                    scale = 0.91513485908508296,
-                    yaw = 4.7408230520007617,
-                },
-                {
-                    x = 72.085464873038603,
-                    z = 93.204768603195973,
-                    species = "PineA",
-                    scale = 0.91170778870582581,
-                    yaw = 0.31361817760450245,
-                },
-                {
-                    x = 61.059373617172241,
-                    z = 36.700940132141113,
-                    species = "MapleA",
-                    scale = 1.4612857055664064,
-                    yaw = 5.0101052150608689,
-                },
-                {
-                    x = 58.612682371768976,
-                    z = 39.918320698658135,
-                    species = "MapleA",
-                    scale = 1.0794261574745179,
-                    yaw = 0.76949453518749766,
-                },
-                {
-                    x = 58.577735208831612,
-                    z = 34.234497119970726,
-                    species = "SugiMidA",
-                    scale = 1.0823550939559936,
-                    yaw = 2.8994116916320647,
-                },
-                {
-                    x = 95.068109035491943,
-                    z = 33.988177776336670,
-                    species = "SugiMidA",
-                    scale = 1.5973931121826173,
-                    yaw = 2.890103132190343,
-                },
-                {
-                    x = 90.800794487797347,
-                    z = 30.949440638379119,
-                    species = "MapleA",
-                    scale = 1.0008147716522218,
-                    yaw = 2.4148258125136888,
-                },
-                {
-                    x = 96.528623745456031,
-                    z = 38.219954660589799,
-                    species = "SugiMidA",
-                    scale = 1.097284060716629,
-                    yaw = 1.123839415851227,
-                },
-            }
-            expect(#out).toBe(#expected)
-            for i, p in out do
-                expect(p.x).toBe(expected[i].x)
-                expect(p.z).toBe(expected[i].z)
-                expect(p.species).toBe(expected[i].species)
-                expect(p.scale).toBe(expected[i].scale)
-                expect(p.yaw).toBe(expected[i].yaw)
-            end
-        end)
+        -- placements are jittered up to GROVE_JITTER_MAX studs per axis off
+        -- their exact (gate-checked) grid point, so distance assertions near
+        -- a boundary need a little slack — the gate itself is exact, only
+        -- the rendered position wobbles.
+        local JITTER_SLACK = 2
 
         test("open centre: single-grove anchor lands within 8 studs of the zone centroid", function()
-            local recipe = centeredRecipe(500)
+            local recipe = centeredRecipe()
             local out = ZoneScatter.plan(groveZones(), flatSamples(), { Grove = recipe })
             expect(#out > 0).toBe(true)
             local elder = out[1]
             local dx, dz = elder.x - 50, elder.z - 50
-            expect(dx * dx + dz * dz <= 8 * 8).toBe(true)
+            expect(dx * dx + dz * dz <= (8 + JITTER_SLACK) ^ 2).toBe(true)
         end)
 
         test("blocked centre: single-grove anchor hugs the keep-out boundary, not the far edge", function()
-            local recipe = centeredRecipe(500)
+            local recipe = centeredRecipe()
             local zones: { ZoneScatter.Zone } = {
                 {
                     name = "Grove",
@@ -1250,8 +1133,77 @@ describe("ZoneScatter grove pre-pass", function()
             local elder = out[1]
             local dx, dz = elder.x - 50, elder.z - 50
             local d2 = dx * dx + dz * dz
-            expect(d2 >= 15 * 15).toBe(true)
-            expect(d2 < 25 * 25).toBe(true)
+            expect(d2 >= (15 - JITTER_SLACK) ^ 2).toBe(true)
+            expect(d2 < (25 + JITTER_SLACK) ^ 2).toBe(true)
+        end)
+    end)
+
+    describe("starvation regression: exhaustive placement finds sparse legal ground", function()
+        test("a contiguous patch of exactly M legal spots yields a FULL M-member grove", function()
+            -- ONLY 5 samples exist in the entire world: a plus-shaped patch,
+            -- 4 studs apart, nothing else. The old dart-throw pre-pass threw
+            -- continuous random (x,z) darts and needed one to land on the
+            -- EXACT grid cell of one of these 5 points to ever plant
+            -- anything here — vanishingly unlikely. The exhaustive placer
+            -- considers every legal sample directly, so a fully-supported
+            -- compact patch should yield a complete grove using every spot.
+            local patch: { ZoneScatter.Sample } = {
+                { x = 48, z = 48, y = 50, steep = 0 },
+                { x = 52, z = 48, y = 50, steep = 0 },
+                { x = 44, z = 48, y = 50, steep = 0 },
+                { x = 48, z = 52, y = 50, steep = 0 },
+                { x = 48, z = 44, y = 50, steep = 0 },
+            }
+            local recipe = groveRecipe()
+            recipe.grove.maxGroves = 1
+            recipe.grove.membersMin = 5
+            recipe.grove.membersMax = 5
+            recipe.grove.radiusMax = 8
+            recipe.grove.memberSpacing = 3
+            local zones: { ZoneScatter.Zone } = {
+                {
+                    name = "Grove",
+                    shape = "rect",
+                    bounds = { 0, 0, 100, 100 },
+                    recipe = "Grove",
+                    densityScale = 1,
+                    seed = 11,
+                },
+            }
+            local out = ZoneScatter.plan(zones, patch, { Grove = recipe })
+            expect(#out).toBe(5)
+        end)
+
+        test("legal ground scattered beyond radiusMax of each other starves a grove of members", function()
+            -- the inverse control: candidates exist but none are within
+            -- radiusMax of any other, so support is always 0 — a grove can
+            -- still anchor (an elder needs no neighbours) but can never grow
+            -- past the elder, proving the placer isn't just "always fills M"
+            local scattered: { ZoneScatter.Sample } = {
+                { x = 10, z = 10, y = 50, steep = 0 },
+                { x = 90, z = 10, y = 50, steep = 0 },
+                { x = 10, z = 90, y = 50, steep = 0 },
+                { x = 90, z = 90, y = 50, steep = 0 },
+                { x = 50, z = 50, y = 50, steep = 0 },
+            }
+            local recipe = groveRecipe()
+            recipe.grove.maxGroves = 1
+            recipe.grove.membersMin = 3
+            recipe.grove.membersMax = 5
+            recipe.grove.radiusMax = 7
+            recipe.grove.memberSpacing = 3
+            local zones: { ZoneScatter.Zone } = {
+                {
+                    name = "Grove",
+                    shape = "rect",
+                    bounds = { 0, 0, 100, 100 },
+                    recipe = "Grove",
+                    densityScale = 1,
+                    seed = 11,
+                },
+            }
+            local out = ZoneScatter.plan(zones, scattered, { Grove = recipe })
+            expect(#out).toBe(1)
         end)
     end)
 end)
