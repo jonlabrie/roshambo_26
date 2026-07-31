@@ -437,7 +437,8 @@ end
 -- ── bake ──────────────────────────────────────────────────────────────────────────────
 local function bake(
     placements: { MossPlacement },
-    families: { [string]: { MeshPart } }
+    families: { [string]: { MeshPart } },
+    params: Params
 ): (number, number, { [string]: number })
     local terrain = workspace.Terrain
     local rp = RaycastParams.new()
@@ -445,7 +446,7 @@ local function bake(
     rp.FilterDescendantsInstances = { terrain }
     local folder = mossFolder()
 
-    local state = seedState(PARAMS.seed + BAKE_SEED_OFFSET)
+    local state = seedState(params.seed + BAKE_SEED_OFFSET)
     local placed = 0
     local refused = 0
     local missing: { [string]: number } = {}
@@ -490,8 +491,24 @@ end
 --   local run = require(game.ServerStorage.MossTransitionsTool)
 --   return run({ mode = "plan" })
 --   return run({ mode = "bake" })
-return function(opts: { mode: string? }?): string
+--   return run({ mode = "plan", overrides = { dartsPerSeed = 6, footing = 0.2 } })
+-- overrides accepts the flat numeric Params fields (seed/spacing/maxDist/dartsPerSeed/
+-- scaleMin/scaleMax) plus the four kind names as kindDensity shortcuts.
+return function(opts: { mode: string?, overrides: { [string]: number }? }?): string
     local mode = (opts and opts.mode) or MODE
+    local params: Params = table.clone(PARAMS)
+    params.kindDensity = table.clone(PARAMS.kindDensity)
+    if opts and opts.overrides then
+        for k, v in opts.overrides do
+            if params.kindDensity[k] ~= nil then
+                params.kindDensity[k] = v
+            elseif (PARAMS :: { [string]: any })[k] ~= nil and k ~= "pool" and k ~= "kindDensity" then
+                (params :: { [string]: any })[k] = v
+            else
+                return `[mossTransitions] unknown override "{k}"`
+            end
+        end
+    end
 
     local seeds: { Seed } = {}
     for _, s in collectStoneSeeds() do
@@ -520,7 +537,7 @@ return function(opts: { mode: string? }?): string
         perKind[s.kind] = (perKind[s.kind] or 0) + 1
     end
 
-    local placements = planMoss(seeds, PARAMS)
+    local placements = planMoss(seeds, params)
 
     local kindLines = {}
     for _, kind in { "stone", "footing", "waterline", "crevice" } do
@@ -538,7 +555,7 @@ return function(opts: { mode: string? }?): string
     if mode == "bake" then
         wipeMossFolder()
         local families = familiesFromLibrary()
-        local placed, refused, missing = bake(placements, families)
+        local placed, refused, missing = bake(placements, families, params)
         local lines = { `stamped {placed} clumps into CanyonWorld.Foliage.MossTransitions` }
         if refused > 0 then
             table.insert(lines, `refused {refused} (keep-out or no ground hit)`)
