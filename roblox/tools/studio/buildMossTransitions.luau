@@ -156,12 +156,15 @@ end
 -- dated-seed convention (buildMossScatter used 20260802), scaleMin/scaleMax mirror the
 -- modest jitter used by MossTransitions.spec.luau's own test params. Tune alongside
 -- kindDensity/maxDist at the USER GATE if the mix reads wrong.
+-- densities/darts/spacing gate-tuned 2026-07-31 (previously per-bake overrides): the
+-- brief's defaults planned ~10k clumps against the old scatter's 825; the approved
+-- bake is 1,247. A bare bake now reproduces the approved world.
 local PARAMS: Params = {
     seed = 20260730,
-    spacing = 1.5,
+    spacing = 3,
     maxDist = 5,
-    dartsPerSeed = 16,
-    kindDensity = { stone = 0.9, footing = 0.7, waterline = 0.8, crevice = 0.5 },
+    dartsPerSeed = 4,
+    kindDensity = { stone = 0.45, footing = 0.15, waterline = 0.45, crevice = 0.2 },
     pool = {
         { name = "Moss_A", weight = 3 },
         { name = "Moos_C", weight = 2 }, -- kit's own typo, real family name
