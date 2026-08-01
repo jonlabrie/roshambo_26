@@ -218,15 +218,38 @@ local RECIPES: { [string]: Recipe } = {
         -- of scattering uniformly across the whole zone.
         groveAffinity = { radius = 22, inside = 1, outside = 0.25 },
     },
+    -- THE WALL FRINGE: a continuous green mass backing onto the canyon walls.
+    -- Rebuilt 2026-08-01 (user: "scattered by the previous non-grove logic ...
+    -- looking pretty sparse"). It was the ONLY canopy recipe with no grove and
+    -- clumpChance = 0, so it read as an even, thin scatter while every other
+    -- wood in the canyon had learned to cluster.
+    --
+    -- IT IS DELIBERATELY NOT GROVED THE WAY THE WOODS ARE. A grove works by
+    -- anchors separated by real MEADOW GAPS — and a gap in the fringe exposes
+    -- the bare rock the fringe exists to hide. So the anchors are packed at 22
+    -- studs (against PreserveCore's 45) so the clumps OVERLAP: coverage stays
+    -- continuous, but density varies the way a real hillside forest does —
+    -- thicker in the folds, thinner on the ribs, with emergent taller trees
+    -- (dominantScale 1.35) breaking the canopy line.
     WallFringe = {
         pool = {
             -- the Xfrog untrimmed adults, foliated to the ground on purpose:
             -- the fringe backs onto the canyon wall, not a sightline a player
             -- walks through, so a full-height stand is correct here.
-            { name = "XfHinokiM", weight = 30 },
-            { name = "XfSpruceM", weight = 30 },
-            { name = "XfFirM", weight = 25 },
-            { name = "XfSugi40", weight = 15 },
+            { name = "XfHinokiM", weight = 26 },
+            { name = "XfSpruceM", weight = 24 },
+            { name = "XfFirM", weight = 22 },
+            { name = "XfSugi40", weight = 12 },
+            -- AGE VARIATION: the fringe had none — every tree an identical adult.
+            -- The 10-stud Yr tier reads as younger growth filling between elders.
+            { name = "XfHinokiYr", weight = 5 },
+            { name = "XfFirYr", weight = 4 },
+            -- A SPLASH OF COLOUR (user 2026-08-01): "not as much as the canyon,
+            -- but something to catch the wandering eye looking for detail." 7% of
+            -- draws, so autumn shows as occasional punctuation in a green mass,
+            -- never as a feature. Both ride the LOD geometry (21.1k, not 54k).
+            { name = "XfMapleGold", weight = 4 },
+            { name = "XfMapleRed", weight = 3 },
         },
         spacingMin = 10,
         spacingMax = 16,
@@ -242,6 +265,30 @@ local RECIPES: { [string]: Recipe } = {
         -- walls are steep; sparser footing is accepted here
         footingRadius = 3,
         footingMaxDrop = 6,
+        grove = {
+            -- 22, not 45: anchors this close OVERLAP, which is the whole point —
+            -- lumpy density instead of clusters-and-clearings
+            spacing = 22,
+            radiusMin = 5,
+            radiusMax = 14,
+            membersMin = 5,
+            membersMax = 9,
+            memberSpacing = 6,
+            -- emergents punctuating the mass; higher than the woods use
+            dominantScale = 1.35,
+            anchorDarts = 300,
+            maxGroves = 14,
+            memberTries = 6,
+            saplings = {
+                chance = 0.2,
+                map = {
+                    XfHinokiM = "XfHinokiYb",
+                    XfSpruceM = "XfSpruceYb",
+                    XfFirM = "XfFirYb",
+                    XfSugi40 = "XfSugiYb",
+                },
+            },
+        },
     },
     WaterMargin = {
         pool = {

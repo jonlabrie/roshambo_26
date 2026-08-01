@@ -84,12 +84,16 @@ describe("recipes name only species that exist", function()
         XfSugi25T = true,
         XfMapleA = true,
         XfMapleM = true,
+        XfMapleGold = true,
+        XfMapleRed = true,
         SugiHero_SugiSmart = true,
         SugiHero_SugiB = true,
         SugiHero_SugiC = true,
         SugiHero_SugiD = true,
         SugiHero_SugiE = true,
         SugiHero_SugiF = true,
+        XfHinokiYr = true,
+        XfFirYr = true,
         XfHinokiYb = true,
         XfSpruceYb = true,
         XfFirYb = true,
@@ -124,10 +128,14 @@ describe("grove pre-pass", function()
         expect(grove.anchorDarts > 0).toBe(true)
         expect(grove.maxGroves > 0).toBe(true)
     end)
-    -- only PreserveCore should carry a grove; every other recipe still scatters
-    -- per-sample, so an accidental grove elsewhere silently changes its planter.
+    -- only the canopy recipes should carry a grove; an accidental grove elsewhere
+    -- silently changes that zone's planter from per-sample scatter to clustering.
+    -- WallFringe joined the list 2026-08-01 but for the OPPOSITE reason to the
+    -- woods: its anchors are packed tight enough to OVERLAP, giving lumpy density
+    -- with no meadow gaps, because a gap in the fringe exposes the canyon wall it
+    -- exists to hide. See the "fringe groves overlap" test below.
     test("only the canopy recipes carry groves", function()
-        local groved = { PreserveCore = true, SugiStand = true, MapleStand = true }
+        local groved = { PreserveCore = true, SugiStand = true, MapleStand = true, WallFringe = true }
         for name, recipe in Recipes do
             if not groved[name] then
                 expect(recipe.grove == nil).toBe(true)
@@ -210,6 +218,36 @@ describe("grove pre-pass", function()
         local saplings = grove.saplings
         assert(saplings ~= nil)
         expect(saplings.chance).toBe(0.25)
+    end)
+end)
+
+-- 2026-08-01: the fringe is a CONTINUOUS mass, not a set of stands. What keeps it
+-- continuous is anchors closer together than the clumps are wide — if this ever
+-- inverts, the fringe grows meadow gaps and the canyon wall shows through.
+describe("fringe groves overlap rather than separate", function()
+    test("anchor spacing is tighter than the woods, and tighter than clump width", function()
+        local fringe = Recipes.WallFringe.grove
+        expect(fringe ~= nil).toBe(true)
+        assert(fringe ~= nil)
+        local core = Recipes.PreserveCore.grove
+        assert(core ~= nil)
+        expect(fringe.spacing < core.spacing).toBe(true)
+        -- THE invariant: anchors sit closer than a clump's diameter, so clumps overlap
+        expect(fringe.spacing < fringe.radiusMax * 2).toBe(true)
+        -- emergents break the canopy line harder here than in the woods
+        expect(fringe.dominantScale > core.dominantScale).toBe(true)
+    end)
+    test("the fringe carries a minority colour accent", function()
+        local total, colour = 0, 0
+        for _, sp in Recipes.WallFringe.pool do
+            total += sp.weight
+            if sp.name:find("Gold") or sp.name:find("Red") then
+                colour += sp.weight
+            end
+        end
+        expect(colour > 0).toBe(true)
+        -- "not as much as the canyon" — a splash, never a feature
+        expect(colour / total <= 0.12).toBe(true)
     end)
 end)
 
