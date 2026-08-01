@@ -1475,6 +1475,11 @@ end
 -- Engine flags per the scatter standard. Mid/hero TRUNK parts keep CanCollide so
 -- players cannot walk through the forest; foliage and blob fill never collide.
 local function flagClone(model: Model, collidableTrunk: boolean)
+    -- stamped FALSE (not merely left unset) so the checkbox is visible in the
+    -- Properties panel: an attribute that does not exist yet cannot be discovered
+    -- or ticked without typing its name by hand. Set on the MODEL — the rescue
+    -- reads it there, not on the parts.
+    model:SetAttribute(HAND_TUNED, false)
     for _, d in model:GetDescendants() do
         if d:IsA("BasePart") then
             d.Anchored = true

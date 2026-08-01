@@ -620,6 +620,10 @@ end
 -- 2026-07-31 as ZenCanyonRock_RETIRED, 0 users). dress=false (Moss Kit trail
 -- stones): they carry their own SurfaceAppearance PBR — leave the look alone.
 local function flagRockClone(part: BasePart, dress: boolean)
+    -- stamped FALSE (not merely left unset) so the checkbox is visible in the
+    -- Properties panel: an attribute that does not exist yet cannot be discovered
+    -- or ticked without typing its name by hand
+    part:SetAttribute(HAND_TUNED, false)
     part.Anchored = true
     part.CanCollide = true
     part.CastShadow = true
