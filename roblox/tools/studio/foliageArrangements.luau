@@ -36,117 +36,122 @@ local PLACE_AT = { x = 0, z = 0 }
 export type Tree = { species: string, dx: number, dz: number, scale: number, yawDeg: number? }
 export type Arrangement = { name: string, site: string, trees: { Tree } }
 
+-- REBUILT 2026-08-01 (user gate): the original 13 predated the xFrog/hero imports and
+-- were judged weak once the ScaleTo bug stopped rendering them 2-9x oversized. This set
+-- draws on the current palette and is COST-AWARE — the poly census that day found the
+-- value ranking is not what the eye assumes:
+--   PineNiwaki ~15.8k @ 22-34 studs and SugiMid ~19k @ 22-30 are the best value we own;
+--   XfMapleA is the worst on paper (54k for a 14-stud tree) but is a MUCH better tree
+--     than the cheap maples — cost picks between EQUALS, it never overrules the eye;
+--   SugiHero_* are 68k EACH — one per composition, never a pair.
+-- BlushAccent (= the "Cherry Blossom M" model, particle emitter and all) is deliberately
+-- ABSENT: parked as a possible purchasable bonsai, not general planting.
 local ARRANGEMENTS: { Arrangement } = {
     {
-        name = "PathGate",
+        -- gold over dark green at a path turn; the dominant sits BACK off the axis
+        name = "KatsuraGate",
         site = "pathEdge",
         trees = {
-            { species = "PineNiwakiA", dx = -5, dz = 0, scale = 1.0 },
-            { species = "PineNiwakiC", dx = 5.5, dz = 1.5, scale = 0.85 },
-            -- tall third set BACK off the gate axis: the dominant of the group
-            { species = "PineNiwakiE", dx = -2, dz = 9, scale = 1.0, yawDeg = 215 },
+            { species = "XfHinokiMT", dx = -5, dz = 0, scale = 0.9 },
+            { species = "XfKatsuraM", dx = 3, dz = 7, scale = 1.0, yawDeg = 215 },
+            { species = "XfHinokiYb", dx = -7, dz = 4, scale = 1.0 },
         },
     },
     {
-        name = "StreamBend",
+        -- leans over water; scale steps DOWN toward the bank, ferns at the foot.
+        -- XfMapleA is the DOMINANT despite being the worst tris-per-stud in the kit:
+        -- the user's call, and the right one — it is a far better tree than the cheap
+        -- alternatives, and a hero moment is exactly where that cost belongs. Poly
+        -- economy picks between equals; it does not overrule the eye.
+        name = "MapleMirror",
         site = "waterEdge",
         trees = {
-            { species = "MapleGold", dx = 0, dz = 0, scale = 1.0 },
-            { species = "MapleGreen", dx = -7, dz = 4, scale = 0.8 },
-            { species = "CedarS", dx = -13, dz = 9, scale = 0.9 },
+            { species = "XfMapleA", dx = 0, dz = 0, scale = 1.0 },
+            { species = "XfMapleM", dx = -8, dz = 5, scale = 0.85 },
+            { species = "FernClump", dx = 4, dz = -3, scale = 1.0 },
         },
     },
     {
-        name = "PoolMirror",
+        -- the pink cherry pair, with a green mid between them so the jewel tone never
+        -- touches dark conifer directly
+        name = "KanzanPair",
         site = "waterEdge",
         trees = {
-            { species = "MapleGold", dx = 0, dz = 0, scale = 1.1 },
-            { species = "BroadleafMid", dx = 6, dz = 5, scale = 0.65 },
+            { species = "XfKanzanA", dx = 0, dz = 0, scale = 1.0 },
+            { species = "XfSpruceYr", dx = 8, dz = 3, scale = 1.0 },
+            { species = "XfKanzanM", dx = 14, dz = -2, scale = 0.9 },
         },
     },
     {
-        name = "FallsFrame",
-        site = "waterEdge",
-        trees = {
-            { species = "MapleRed", dx = -9, dz = 0, scale = 1.05 },
-            { species = "MapleGold", dx = 9, dz = 2, scale = 0.9 },
-            { species = "BroadleafMid", dx = 0, dz = 7, scale = 0.8 },
-        },
-    },
-    {
-        name = "StairCompanion",
-        site = "pathEdge",
-        trees = {
-            { species = "BlushAccent", dx = 0, dz = 0, scale = 0.85 },
-            { species = "CedarS", dx = 5, dz = 4, scale = 0.75 },
-        },
-    },
-    {
-        name = "DeckCorner",
-        site = "deckCorner",
-        trees = {
-            { species = "BlushAccent", dx = 0, dz = 0, scale = 0.7 },
-            { species = "BroadleafMid", dx = 4.5, dz = 3, scale = 0.5 },
-        },
-    },
-    {
-        name = "PerchCrown",
-        site = "promontory",
-        trees = {
-            { species = "PineNiwakiE", dx = 0, dz = 0, scale = 1.0 },
-        },
-    },
-    {
-        name = "CliffTrio",
-        site = "cliffShelf",
-        trees = {
-            { species = "FirM", dx = 0, dz = 0, scale = 1.15 },
-            { species = "CedarM", dx = 8, dz = 6, scale = 0.8 },
-            { species = "CedarS", dx = -7, dz = 5, scale = 0.8 },
-        },
-    },
-    {
-        name = "GroveFive",
-        site = "cliffShelf",
-        trees = {
-            { species = "MapleGreen", dx = 0, dz = 0, scale = 1.0 },
-            { species = "BroadleafMid", dx = 8, dz = -3, scale = 0.8 },
-            { species = "CedarS", dx = 14, dz = 4, scale = 0.95 },
-            { species = "MapleGreen", dx = -8, dz = 5, scale = 0.75 },
-            { species = "BroadleafMid", dx = 4, dz = 9, scale = 0.6 },
-        },
-    },
-    {
-        name = "JewelIsland",
-        site = "cliffShelf",
-        trees = {
-            { species = "MapleRed", dx = 0, dz = 0, scale = 1.0 },
-            { species = "BroadleafMid", dx = 7, dz = 3, scale = 0.7 },
-            { species = "MapleGreen", dx = -6, dz = 6, scale = 0.65 },
-        },
-    },
-    {
-        name = "SentinelPair",
+        -- bridge gateposts, deliberately unequal. SugiMid not SugiHero: same species
+        -- character at 19k instead of 68k, and a pair of heroes would cost 136k alone
+        name = "SugiSentinels",
         site = "bridgeEnd",
         trees = {
-            { species = "CedarM", dx = 0, dz = 0, scale = 1.0 },
-            { species = "CedarM", dx = 12, dz = 1, scale = 0.9 },
+            { species = "SugiMidC", dx = 0, dz = 0, scale = 1.0 },
+            { species = "SugiMidA", dx = 11, dz = 2, scale = 0.85 },
         },
     },
     {
-        name = "TunnelMarker",
-        site = "tunnelMouth",
+        -- a deck should read TENDED: the sculpted niwaki does that, and it is the
+        -- cheapest characterful tree we own
+        name = "NiwakiCorner",
+        site = "deckCorner",
         trees = {
-            { species = "MapleRed", dx = 0, dz = 0, scale = 0.9 },
+            { species = "PineNiwakiA", dx = 0, dz = 0, scale = 0.9 },
+            { species = "XfMapleM", dx = 5, dz = 4, scale = 0.7 },
         },
     },
     {
-        name = "ValleySeed",
+        -- for the cliff-dressing pass: tight, leaning, small enough for a carved ledge
+        name = "CliffClutch",
         site = "cliffShelf",
         trees = {
-            { species = "BlushAccent", dx = 0, dz = 0, scale = 1.0 },
-            { species = "FirM", dx = 7, dz = 7, scale = 0.9 },
-            { species = "BroadleafMid", dx = -6, dz = 4, scale = 0.6 },
+            { species = "XfHinokiMT", dx = 0, dz = 0, scale = 0.85 },
+            { species = "XfFirMT", dx = 6, dz = 4, scale = 0.7 },
+            { species = "XfHinokiYb", dx = -4, dz = 3, scale = 1.0 },
+        },
+    },
+    {
+        -- 10.2k each and a whole multi-culm clump per instance: the cheapest screen
+        -- in the kit, for a path turn that wants privacy
+        name = "BambooScreen",
+        site = "pathEdge",
+        trees = {
+            { species = "RealisticBamboo", dx = 0, dz = 0, scale = 1.0 },
+            { species = "RealisticBamboo", dx = 9, dz = 3, scale = 0.85 },
+        },
+    },
+    {
+        -- a single gold marker against a dark opening
+        name = "TunnelSentinel",
+        site = "tunnelMouth",
+        trees = {
+            { species = "XfKatsuraM", dx = 0, dz = 0, scale = 1.0 },
+        },
+    },
+    {
+        -- the 10-stud Yr tier has never appeared in an arrangement, and it is exactly
+        -- the band between saplings and canopy that reads thin. 24k for five trees.
+        name = "YoungWood",
+        site = "pathEdge",
+        trees = {
+            { species = "XfHinokiYr", dx = 0, dz = 0, scale = 1.0 },
+            { species = "XfSpruceYr", dx = 7, dz = 3, scale = 0.9 },
+            { species = "XfFirYr", dx = -6, dz = 5, scale = 1.0 },
+            { species = "XfHinokiYb", dx = 3, dz = 8, scale = 1.0 },
+            { species = "XfSpruceYb", dx = -3, dz = -4, scale = 1.0 },
+        },
+    },
+    {
+        -- ONE true hero (68k) with two cheaper same-species companions: the scrub-pine
+        -- stand that reads from across the valley without three hero prices
+        name = "ShrineTrio",
+        site = "promontory",
+        trees = {
+            { species = "SugiHero_SugiSmart", dx = 0, dz = 0, scale = 1.0 },
+            { species = "SugiMidB", dx = 9, dz = 5, scale = 0.85 },
+            { species = "SugiMidA", dx = -8, dz = 4, scale = 0.8 },
         },
     },
 }
