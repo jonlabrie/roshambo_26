@@ -34,7 +34,16 @@ local PROBE_TOP = 400
 -- `submergeMax` narrows the recipe-level submergence gate to THIS species only —
 -- a fern shouldn't wade as deep as a reed sharing its pool. nil = defer to the
 -- recipe, exactly as if the field didn't exist.
-type Species = { name: string, weight: number, scale: number?, submergeMax: number? }
+type Species = {
+    name: string,
+    weight: number,
+    scale: number?,
+    submergeMax: number?,
+    -- NARROWS the recipe's nearWater for THIS species only. Iris is a water's-edge
+    -- plant: it belongs in the first few studs of bank, not across the whole margin
+    -- a reed is happy in (user gate 2026-08-01).
+    nearWater: number?,
+}
 type Recipe = {
     pool: { Species },
     spacingMin: number,
@@ -293,8 +302,8 @@ local RECIPES: { [string]: Recipe } = {
             { name = "FernClump", weight = 10, submergeMax = 0 },
             -- iris raised from 5+5: the user's favourite waterline asset, and the
             -- pink at the waterline is meant to be iris (the muhly is parked)
-            { name = "IrisA", weight = 9, submergeMax = 0.6 },
-            { name = "IrisB", weight = 9, submergeMax = 0.6 },
+            { name = "IrisA", weight = 9, submergeMax = 0.6, nearWater = 4 },
+            { name = "IrisB", weight = 9, submergeMax = 0.6, nearWater = 4 },
             -- LOW TIER: the same models at half scale read as marsh grass under the
             -- taller stems, breaking the uniform 2.4-4 stud carpet the gate flagged
             { name = "ReedClump", weight = 8, scale = 0.5, submergeMax = 1.2 },
@@ -324,8 +333,8 @@ local RECIPES: { [string]: Recipe } = {
     },
     WaterMarginTended = {
         pool = {
-            { name = "IrisA", weight = 26, submergeMax = 0.6 },
-            { name = "IrisB", weight = 26, submergeMax = 0.6 },
+            { name = "IrisA", weight = 26, submergeMax = 0.6, nearWater = 4 },
+            { name = "IrisB", weight = 26, submergeMax = 0.6, nearWater = 4 },
             { name = "ReedClump", weight = 20, submergeMax = 1.2 },
             { name = "TallWeeds", weight = 12, submergeMax = 0.8 },
             { name = "FernClump", weight = 8, submergeMax = 0 },
@@ -578,7 +587,7 @@ local function inInnerClear(zone: Zone, frac: number, x: number, z: number): boo
     return math.abs(x - cx) < hw and math.abs(z - cz) < hh
 end
 
-local function pickSpecies(pool: { Species }, r: number): (string, number, number?)
+local function pickSpecies(pool: { Species }, r: number): (string, number, number?, number?)
     local total = 0
     for _, s in pool do
         total += s.weight
@@ -587,11 +596,11 @@ local function pickSpecies(pool: { Species }, r: number): (string, number, numbe
     for _, s in pool do
         at -= s.weight
         if at <= 0 then
-            return s.name, s.scale or 1, s.submergeMax
+            return s.name, s.scale or 1, s.submergeMax, s.nearWater
         end
     end
     local last = pool[#pool]
-    return last.name, last.scale or 1, last.submergeMax
+    return last.name, last.scale or 1, last.submergeMax, last.nearWater
 end
 
 -- a wet sample already cleared the recipe-level submergeMax (the OUTER bound) in
@@ -606,12 +615,19 @@ local function pickWadingSpecies(
     pool: { Species },
     depth: number,
     recipeSubmergeMax: number?,
-    rollFn: () -> number
+    rollFn: () -> number,
+    waterOk: ((number) -> boolean)?
 ): (string?, number, number?)
     for _ = 1, MAX_SUBMERGE_ATTEMPTS do
-        local name, scale, speciesMax = pickSpecies(pool, rollFn())
+        local name, scale, speciesMax, speciesNear = pickSpecies(pool, rollFn())
         local limit = if speciesMax ~= nil then speciesMax else recipeSubmergeMax
-        if depth <= (limit or 0) then
+        local wet = depth <= (limit or 0)
+        -- a species may only NARROW the recipe's bank width, never widen it
+        local bankOk = true
+        if wet and speciesNear ~= nil and waterOk ~= nil then
+            bankOk = waterOk(speciesNear)
+        end
+        if wet and bankOk then
             return name, scale, speciesMax
         end
     end

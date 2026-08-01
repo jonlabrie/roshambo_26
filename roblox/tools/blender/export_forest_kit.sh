@@ -61,5 +61,19 @@ run XfFirYb     "$FIR/JA01y.obj"    JA01y 1800  900 4 1.82 1 1 0
 # of scaling fills that without the cards reading as slabs, so it buys more budget
 run XfSugiYb    "$SUGI/JA06y.obj"   JA06y 6000 1400 4 1.90 1 1 0
 
+MAPLE=JA03_Acer_palmatum_Japanese_Maple
+KATSURA=JA04_Cercidiphyllum_japonicum_Katsura_Tree
+BAMBOO=JA14_Phyllostachis_nigra_var_Henonis_Hachiko_Bamboo
+
+echo "### ACCENTS — untrimmed deciduous, for the composition layer (never scatter pools);"
+echo "### skirt 0: ornamental low canopy is the point, sited by hand off the sightline rule"
+run XfMapleA    "$MAPLE/JA03a.obj"   JA03a 15000 12000 20 1.0 1 1 0
+run XfMapleM    "$MAPLE/JA03m.obj"   JA03m 12000 10000 14 1.0 1 1 0
+run XfKatsuraA  "$KATSURA/JA04a.obj" JA04a 15000 12000 26 1.0 1 1 0
+run XfKatsuraM  "$KATSURA/JA04m.obj" JA04m 12000 10000 18 1.0 1 1 0
+
+echo "### BAMBOO — one contrast grove only; culms are the look, wood budget generous"
+run XfBambooA   "$BAMBOO/JA14a.obj"  JA14a 12000 14000 22 1.0 1 1 0
+
 echo
 echo "Wrote to: $OUT"

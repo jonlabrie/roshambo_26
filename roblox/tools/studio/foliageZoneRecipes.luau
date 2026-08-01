@@ -256,8 +256,8 @@ local Recipes: { [string]: Recipe } = {
             { name = "FernClump", weight = 10, submergeMax = 0 },
             -- iris raised from 5+5: the user's favourite waterline asset, and the
             -- pink at the waterline is meant to be iris (the muhly is parked)
-            { name = "IrisA", weight = 9, submergeMax = 0.6 },
-            { name = "IrisB", weight = 9, submergeMax = 0.6 },
+            { name = "IrisA", weight = 9, submergeMax = 0.6, nearWater = 4 },
+            { name = "IrisB", weight = 9, submergeMax = 0.6, nearWater = 4 },
             -- LOW TIER: the same models at half scale read as marsh grass under the
             -- taller stems, breaking the uniform 2.4-4 stud carpet the gate flagged
             { name = "ReedClump", weight = 8, scale = 0.5, submergeMax = 1.2 },
@@ -290,8 +290,8 @@ local Recipes: { [string]: Recipe } = {
     -- deliberately composed AT the stones — a garden waterline, not a wild one.
     WaterMarginTended = {
         pool = {
-            { name = "IrisA", weight = 26, submergeMax = 0.6 },
-            { name = "IrisB", weight = 26, submergeMax = 0.6 },
+            { name = "IrisA", weight = 26, submergeMax = 0.6, nearWater = 4 },
+            { name = "IrisB", weight = 26, submergeMax = 0.6, nearWater = 4 },
             { name = "ReedClump", weight = 20, submergeMax = 1.2 },
             { name = "TallWeeds", weight = 12, submergeMax = 0.8 },
             { name = "FernClump", weight = 8, submergeMax = 0 },

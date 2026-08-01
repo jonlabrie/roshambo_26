@@ -1391,3 +1391,77 @@ describe("ZoneScatter rockAffinity", function()
         expect(#outBoth < #outRock).toBe(true)
     end)
 end)
+
+-- 2026-08-01 user gate: "irises are popping up too far away from the water ...
+-- they're a water's edge plant". nearWater was recipe-wide, so iris inherited the
+-- same bank width as reeds. A species may now NARROW it for itself.
+describe("per-species nearWater", function()
+    local WATER = { { 0, 0 } }
+    local function bankSamples()
+        -- a line of samples marching away from a single water cell at (0,0)
+        local out = {}
+        for d = 2, 20, 2 do
+            table.insert(out, { x = d, z = 0, y = 100, steep = 0, depth = 0 })
+        end
+        return out
+    end
+    local function recipe(pool)
+        return {
+            pool = pool,
+            spacingMin = 0.5,
+            spacingMax = 0.5,
+            clumpChance = 0,
+            clumpSize = 0,
+            maxSteep = 1,
+            waterMargin = 0,
+            scaleJitter = 0,
+            nearWater = 20, -- the RECIPE allows the whole bank
+            layer = "ground",
+        }
+    end
+    local ZONE = {
+        {
+            name = "bank",
+            shape = "rect",
+            bounds = { -30, -30, 30, 30 },
+            recipe = "bank",
+            densityScale = 1,
+            seed = 5,
+            mist = false,
+        },
+    }
+
+    test("a species with a tight nearWater stays close to the water", function()
+        local plan = ZoneScatter.plan(
+            ZONE,
+            bankSamples(),
+            { bank = recipe({ { name = "Iris", weight = 1, nearWater = 5 } }) },
+            ZoneScatter.indexWater(WATER),
+            ZoneScatter.indexWater({}),
+            { pitch = 2 }
+        )
+        expect(#plan > 0).toBeTruthy()
+        for _, p in plan do
+            -- every iris must sit within its own 5-stud limit, not the recipe's 20
+            expect(math.abs(p.x) <= 5).toBeTruthy()
+        end
+    end)
+
+    test("a species without the override still uses the recipe's width", function()
+        local plan = ZoneScatter.plan(
+            ZONE,
+            bankSamples(),
+            { bank = recipe({ { name = "Reed", weight = 1 } }) },
+            ZoneScatter.indexWater(WATER),
+            ZoneScatter.indexWater({}),
+            { pitch = 2 }
+        )
+        local far = 0
+        for _, p in plan do
+            if p.x > 5 then
+                far += 1
+            end
+        end
+        expect(far > 0).toBeTruthy()
+    end)
+end)

@@ -29,7 +29,16 @@ export type Zone = {
 -- species only — a fern shouldn't wade as deep as a reed sharing its pool.
 -- nil = defer to the recipe's submergeMax, exactly as if the field didn't
 -- exist.
-export type Species = { name: string, weight: number, scale: number?, submergeMax: number? }
+export type Species = {
+    name: string,
+    weight: number,
+    scale: number?,
+    submergeMax: number?,
+    -- NARROWS the recipe's nearWater for THIS species only. Iris is a water's-edge
+    -- plant: it belongs in the first few studs of bank, not across the whole margin
+    -- a reed is happy in. nil = defer to the recipe, exactly as if absent.
+    nearWater: number?,
+}
 export type Recipe = {
     pool: { Species },
     spacingMin: number,
@@ -237,7 +246,7 @@ local function inInnerClear(zone: Zone, frac: number, x: number, z: number): boo
     return math.abs(x - cx) < hw and math.abs(z - cz) < hh
 end
 
-local function pickSpecies(pool: { Species }, roll: number): (string, number, number?)
+local function pickSpecies(pool: { Species }, roll: number): (string, number, number?, number?)
     local total = 0
     for _, s in pool do
         total += s.weight
@@ -246,11 +255,11 @@ local function pickSpecies(pool: { Species }, roll: number): (string, number, nu
     for _, s in pool do
         at -= s.weight
         if at <= 0 then
-            return s.name, s.scale or 1, s.submergeMax
+            return s.name, s.scale or 1, s.submergeMax, s.nearWater
         end
     end
     local last = pool[#pool]
-    return last.name, last.scale or 1, last.submergeMax
+    return last.name, last.scale or 1, last.submergeMax, last.nearWater
 end
 
 -- a wet sample has already cleared the recipe-level submergeMax gate in
@@ -264,16 +273,28 @@ end
 -- a no-op wrapper until a recipe opts in.
 local MAX_SUBMERGE_ATTEMPTS = 4
 
+-- `waterOk(radius)` answers "is open water within `radius` of this sample?" and is
+-- supplied by the caller, which owns the water index. nil = no per-species bank test
+-- (the recipe-level nearWater in `accepts` already ran).
 local function pickWadingSpecies(
     pool: { Species },
     depth: number,
     recipeSubmergeMax: number?,
-    rollFn: () -> number
+    rollFn: () -> number,
+    waterOk: ((number) -> boolean)?
 ): (string?, number, number?)
     for _ = 1, MAX_SUBMERGE_ATTEMPTS do
-        local name, scale, speciesMax = pickSpecies(pool, rollFn())
+        local name, scale, speciesMax, speciesNear = pickSpecies(pool, rollFn())
         local limit = if speciesMax ~= nil then speciesMax else recipeSubmergeMax
-        if depth <= (limit or 0) then
+        local wet = depth <= (limit or 0)
+        -- a species may only NARROW the recipe's bank width, never widen it: the
+        -- recipe gate already passed, so failing here means this species wants to
+        -- stand closer to the water than this sample allows
+        local bankOk = true
+        if wet and speciesNear ~= nil and waterOk ~= nil then
+            bankOk = waterOk(speciesNear)
+        end
+        if wet and bankOk then
             return name, scale, speciesMax
         end
     end
@@ -934,6 +955,9 @@ function ZoneScatter.plan(
             recipe.submergeMax,
             function()
                 return roll(zone)
+            end,
+            function(radius)
+                return waterWithin(water, s.x, s.z, radius)
             end
         )
         if species == nil then
