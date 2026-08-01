@@ -277,7 +277,11 @@ local RECIPES: { [string]: Recipe } = {
             -- emergents punctuating the mass; higher than the woods use
             dominantScale = 1.35,
             anchorDarts = 300,
-            maxGroves = 14,
+            -- 24, tuned live: 14 gave 165 trees (FEWER than the old scatter's 179,
+            -- and the user's complaint was sparseness). 24 yields 248 and the count
+            -- saturates there — 34 adds only 9 more, because eligible wall ground,
+            -- not the cap, becomes the binding constraint.
+            maxGroves = 24,
             memberTries = 6,
             saplings = {
                 chance = 0.2,
