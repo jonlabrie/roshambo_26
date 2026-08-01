@@ -1438,11 +1438,38 @@ local function preserveFolder(): Folder
     return preserve :: Folder
 end
 
+-- HAND-TUNED RESCUE (2026-08-01): a bake owns its zone folders and rebuilds them
+-- wholesale, so any hand-adjusted plant inside one is destroyed on the next run. Setting
+-- the boolean attribute `HandTuned` on a placement exempts it: the wipe parks it, the
+-- fresh bake spaces around it (see handTunedPlacements below), and it is restored
+-- afterwards. Set the attribute on the MODEL, not its parts.
+local HAND_TUNED = "HandTuned"
+local rescued: { Instance } = {}
+
 local function wipeZone(name: string)
     local existing = preserveFolder():FindFirstChild(name)
     if existing then
+        for _, child in existing:GetChildren() do
+            if child:GetAttribute(HAND_TUNED) == true then
+                child.Parent = nil -- held off-tree; re-parented after the bake
+                table.insert(rescued, child)
+            end
+        end
         existing:Destroy()
     end
+end
+
+-- the XZ positions of everything rescued, so fresh placements space around them instead
+-- of growing through the arrangement the user just hand-made
+local function handTunedPlacements(): { { x: number, z: number } }
+    local out = {}
+    for _, inst in rescued do
+        if inst:IsA("PVInstance") then
+            local p = (inst :: PVInstance):GetPivot().Position
+            table.insert(out, { x = p.X, z = p.Z })
+        end
+    end
+    return out
 end
 
 -- Engine flags per the scatter standard. Mid/hero TRUNK parts keep CanCollide so
@@ -1463,7 +1490,12 @@ local function flagClone(model: Model, collidableTrunk: boolean)
     end
 end
 
+-- fresh placements must not grow through a hand-tuned arrangement; 5 studs is the
+-- tightest spacing any recipe uses, so it never blocks more than one slot per plant
+local HAND_TUNED_CLEARANCE = 5
+
 local function bake(placements: { Placement }, mode: string)
+    local reserved = handTunedPlacements()
     local kit = ServerStorage:FindFirstChild("FoliageKit")
     if not kit then
         warn("[preserve] no ServerStorage.FoliageKit")
@@ -1484,10 +1516,23 @@ local function bake(placements: { Placement }, mode: string)
     rpBed.FilterType = Enum.RaycastFilterType.Include
     rpBed.FilterDescendantsInstances = { workspace.Terrain }
     rpBed.IgnoreWater = true
+    local yielded = 0
     for _, p in placements do
         local template = kit:FindFirstChild(p.species)
         if not template or not template:IsA("Model") then
             missing[p.species] = (missing[p.species] or 0) + 1
+            continue
+        end
+        local blocked = false
+        for _, r in reserved do
+            local dx, dz = p.x - r.x, p.z - r.z
+            if dx * dx + dz * dz < HAND_TUNED_CLEARANCE * HAND_TUNED_CLEARANCE then
+                blocked = true
+                break
+            end
+        end
+        if blocked then
+            yielded += 1
             continue
         end
         local folder = folders[p.zone]
@@ -1543,7 +1588,31 @@ local function bake(placements: { Placement }, mode: string)
     for species, n in missing do
         warn(`[preserve] missing FoliageKit template "{species}" — skipped {n} placements`)
     end
-    print(`[preserve] {mode}: stamped {placed} plants`)
+    -- restore the hand-tuned plants the wipe parked (their zone folder may have been
+    -- recreated above; if a zone produced no placements at all, recreate it for them)
+    local restored = 0
+    for _, inst in rescued do
+        local zoneName = inst:GetAttribute("Zone")
+        local target = if typeof(zoneName) == "string" then folders[zoneName] else nil
+        if target == nil then
+            target =
+                preserve:FindFirstChild(typeof(zoneName) == "string" and zoneName or "HandTuned") :: Folder?
+            if target == nil then
+                local f = Instance.new("Folder")
+                f.Name = if typeof(zoneName) == "string" then zoneName else "HandTuned"
+                f.Parent = preserve
+                target = f
+            end
+        end
+        inst.Parent = target
+        restored += 1
+    end
+    table.clear(rescued)
+    local note = ""
+    if restored > 0 then
+        note = `, restored {restored} hand-tuned (yielded {yielded} placements to them)`
+    end
+    print(`[preserve] {mode}: stamped {placed} plants` .. note)
 end
 
 local function bakeMist(anchors: { MistAnchor })

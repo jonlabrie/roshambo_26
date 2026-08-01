@@ -590,11 +590,25 @@ local function rockFolder(): Folder
     return folder :: Folder
 end
 
+-- HAND-TUNED RESCUE (2026-08-01): this bake owns its folder and rebuilds it wholesale,
+-- so a rock the user nudged is destroyed on the next run. The boolean attribute
+-- `HandTuned` on a rock exempts it — the wipe parks it, fresh placements stand clear of
+-- it, and it is restored afterwards.
+local HAND_TUNED = "HandTuned"
+local HAND_TUNED_CLEARANCE = 4
+local rescued: { Instance } = {}
+
 local function wipeRockFolder()
     local cw = workspace:FindFirstChild("CanyonWorld")
     local foliage = cw and cw:FindFirstChild("Foliage")
     local existing = foliage and foliage:FindFirstChild("ShoreRocks")
     if existing then
+        for _, child in existing:GetChildren() do
+            if child:GetAttribute(HAND_TUNED) == true then
+                child.Parent = nil
+                table.insert(rescued, child)
+            end
+        end
         existing:Destroy()
     end
 end
@@ -669,7 +683,26 @@ local function bake(
     local refused = 0
     local perRole: { [string]: number } = {}
 
+    local reserved: { { x: number, z: number } } = {}
+    for _, inst in rescued do
+        if inst:IsA("BasePart") then
+            table.insert(reserved, { x = inst.Position.X, z = inst.Position.Z })
+        end
+    end
+
     for i, p in placements do
+        local blocked = false
+        for _, r in reserved do
+            local dx, dz = p.x - r.x, p.z - r.z
+            if dx * dx + dz * dz < HAND_TUNED_CLEARANCE * HAND_TUNED_CLEARANCE then
+                blocked = true
+                break
+            end
+        end
+        if blocked then
+            refused += 1
+            continue
+        end
         local pool = tiers[p.role]
         if pool == nil or #pool == 0 then
             refused += 1
@@ -705,6 +738,14 @@ local function bake(
         placed += 1
         perRole[p.role] = (perRole[p.role] or 0) + 1
     end
+
+    -- restore the rocks the wipe parked
+    for _, inst in rescued do
+        inst.Parent = folder
+        placed += 1
+        perRole.handTuned = (perRole.handTuned or 0) + 1
+    end
+    table.clear(rescued)
 
     return placed, refused, perRole
 end
