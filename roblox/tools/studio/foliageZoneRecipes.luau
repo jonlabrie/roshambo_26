@@ -1,7 +1,9 @@
 --!strict
 -- Zone recipes for the forest preserve (spec 2026-07-27-forest-preserve-foliage-design).
 -- Data only: the ZoneScatter planner interprets these. Tune values live at the gates.
-export type Species = { name: string, weight: number, scale: number? }
+-- submergeMax on a SPECIES overrides the recipe-level value for that species only:
+-- reeds wade, ferns must keep dry feet, and one pool can hold both.
+export type Species = { name: string, weight: number, scale: number?, submergeMax: number? }
 export type Recipe = {
     pool: { Species },
     spacingMin: number,
@@ -32,6 +34,16 @@ export type Recipe = {
     -- effective density near any grove anchor is multiplied by `inside`
     -- instead of `outside`, so ground cover thickens around the groves.
     groveAffinity: GroveAffinity?,
+    -- same mechanism keyed on the SHORE ROCKS instead of grove anchors: real bank
+    -- plants gather at and between stones rather than scattering evenly, which is
+    -- what makes the planting and the ishigumi read as one composed shoreline.
+    rockAffinity: GroveAffinity?,
+    -- terrain GRASS painting along the waterline (2026-08-01 user gate): the kit has
+    -- nothing under 2.4 studs, so the 0-2 band can only come from Roblox's own terrain
+    -- grass — free to render, and the reeds then stand IN it instead of on bare rock.
+    -- `below` extends the paint INTO the shallows (the user's note: a bit of grass
+    -- washing in the water sells the untended shoreline).
+    grassPaint: { below: number, above: number, maxSlope: number }?,
 }
 export type GroveConfig = {
     spacing: number, -- min distance between grove ANCHORS (meadows live between)
@@ -191,16 +203,24 @@ local Recipes: { [string]: Recipe } = {
         footingRadius = 3,
         footingMaxDrop = 6,
     },
+    -- THE WILD REACH (x -420..-90): the upper canyon, where care barely reaches.
+    -- Lush, scraggly, reed-led — the register the user approved as "untended wild
+    -- shoreline" (2026-08-01), whose real ingredient turned out to be terrain grass.
     WaterMargin = {
         pool = {
-            { name = "ReedClump", weight = 28 },
-            { name = "TallWeeds", weight = 27 },
-            { name = "WeedStalks", weight = 20 },
-            { name = "FernClump", weight = 15 },
-            -- sparse iris = the waterline's jewel accent; the hand-composed
-            -- falls-pool planting remains separate and untouched.
-            { name = "IrisA", weight = 5 },
-            { name = "IrisB", weight = 5 },
+            { name = "ReedClump", weight = 30, submergeMax = 1.2 },
+            { name = "TallWeeds", weight = 24, submergeMax = 0.8 },
+            { name = "WeedStalks", weight = 18, submergeMax = 0.5 },
+            -- ferns keep DRY FEET: 0 means they refuse any standing water
+            { name = "FernClump", weight = 10, submergeMax = 0 },
+            -- iris raised from 5+5: the user's favourite waterline asset, and the
+            -- pink at the waterline is meant to be iris (the muhly is parked)
+            { name = "IrisA", weight = 9, submergeMax = 0.6 },
+            { name = "IrisB", weight = 9, submergeMax = 0.6 },
+            -- LOW TIER: the same models at half scale read as marsh grass under the
+            -- taller stems, breaking the uniform 2.4-4 stud carpet the gate flagged
+            { name = "ReedClump", weight = 8, scale = 0.5, submergeMax = 1.2 },
+            { name = "TallWeeds", weight = 8, scale = 0.55, submergeMax = 0.8 },
         },
         spacingMin = 4,
         spacingMax = 8,
@@ -217,8 +237,45 @@ local Recipes: { [string]: Recipe } = {
         layer = "ground",
         footingRadius = 1,
         footingMaxDrop = 2,
-        -- partial submersion is a feature: reeds and grass can wade
-        submergeMax = 1.0,
+        -- OUTER bound: the per-species values above do the real gating
+        submergeMax = 1.2,
+        -- the wild reach barely thins where tending reaches it
+        careDensity = { GARDEN = 0.5, TENDED = 0.7 },
+        rockAffinity = { radius = 5, inside = 1.4, outside = 0.9 },
+        grassPaint = { below = 1, above = 6, maxSlope = 0.5 },
+    },
+    -- THE TENDED REACH (x -90..220, zone MarginTended): the arena end, where the care
+    -- model's reach is at its widest (28 studs vs 8 at the head). Iris-led, sparser,
+    -- deliberately composed AT the stones — a garden waterline, not a wild one.
+    WaterMarginTended = {
+        pool = {
+            { name = "IrisA", weight = 26, submergeMax = 0.6 },
+            { name = "IrisB", weight = 26, submergeMax = 0.6 },
+            { name = "ReedClump", weight = 20, submergeMax = 1.2 },
+            { name = "TallWeeds", weight = 12, submergeMax = 0.8 },
+            { name = "FernClump", weight = 8, submergeMax = 0 },
+            { name = "WeedStalks", weight = 8, submergeMax = 0.5 },
+            { name = "ReedClump", weight = 6, scale = 0.5, submergeMax = 1.2 },
+        },
+        -- sparser and more deliberate than the wild reach
+        spacingMin = 6,
+        spacingMax = 11,
+        clumpChance = 0.4,
+        clumpSize = 3,
+        maxSteep = 0.35,
+        waterMargin = 0,
+        scaleJitter = 0.25,
+        nearWater = 7,
+        layer = "ground",
+        footingRadius = 1,
+        footingMaxDrop = 2,
+        submergeMax = 1.2,
+        -- thins HARD where tending reaches: a tended bank shows its stones and water
+        careDensity = { GARDEN = 0.25, TENDED = 0.5 },
+        -- stronger than wild: in a garden the planting gathers at the stones on purpose
+        rockAffinity = { radius = 6, inside = 1.6, outside = 0.7 },
+        -- narrower band than wild, so more shore reads as deliberate
+        grassPaint = { below = 1, above = 4, maxSlope = 0.5 },
     },
     -- ONE dense dark stand at a user-marked spot: sugi is the shrine-grove
     -- species and grows exactly this way. Zone: ServerStorage.FoliageZones.Grove_Sugi.

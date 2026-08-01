@@ -31,7 +31,10 @@ local SAMPLE_PITCH = 4 -- terrain probe grid, studs
 local PROBE_TOP = 400
 
 -- ── recipes (MIRROR of tools/studio/foliageZoneRecipes.luau) ────────────────
-type Species = { name: string, weight: number, scale: number? }
+-- `submergeMax` narrows the recipe-level submergence gate to THIS species only —
+-- a fern shouldn't wade as deep as a reed sharing its pool. nil = defer to the
+-- recipe, exactly as if the field didn't exist.
+type Species = { name: string, weight: number, scale: number?, submergeMax: number? }
 type Recipe = {
     pool: { Species },
     spacingMin: number,
@@ -59,6 +62,13 @@ type Recipe = {
     -- effective density near any grove anchor is multiplied by `inside`
     -- instead of `outside`, so ground cover thickens around the groves.
     groveAffinity: GroveAffinity?,
+    -- same mechanism keyed on the SHORE ROCKS: real bank plants gather at and
+    -- between stones, which is what makes the planting and the ishigumi read as
+    -- one composed shoreline instead of two independent passes
+    rockAffinity: GroveAffinity?,
+    -- terrain GRASS painting along the waterline; `below` extends the paint INTO
+    -- the shallows so a little grass washes in the water
+    grassPaint: { below: number, above: number, maxSlope: number }?,
 }
 type GroveConfig = {
     spacing: number, -- min distance between grove ANCHORS (meadows live between)
@@ -235,14 +245,19 @@ local RECIPES: { [string]: Recipe } = {
     },
     WaterMargin = {
         pool = {
-            { name = "ReedClump", weight = 28 },
-            { name = "TallWeeds", weight = 27 },
-            { name = "WeedStalks", weight = 20 },
-            { name = "FernClump", weight = 15 },
-            -- sparse iris = the waterline's jewel accent; the hand-composed
-            -- falls-pool planting remains separate and untouched.
-            { name = "IrisA", weight = 5 },
-            { name = "IrisB", weight = 5 },
+            { name = "ReedClump", weight = 30, submergeMax = 1.2 },
+            { name = "TallWeeds", weight = 24, submergeMax = 0.8 },
+            { name = "WeedStalks", weight = 18, submergeMax = 0.5 },
+            -- ferns keep DRY FEET: 0 means they refuse any standing water
+            { name = "FernClump", weight = 10, submergeMax = 0 },
+            -- iris raised from 5+5: the user's favourite waterline asset, and the
+            -- pink at the waterline is meant to be iris (the muhly is parked)
+            { name = "IrisA", weight = 9, submergeMax = 0.6 },
+            { name = "IrisB", weight = 9, submergeMax = 0.6 },
+            -- LOW TIER: the same models at half scale read as marsh grass under the
+            -- taller stems, breaking the uniform 2.4-4 stud carpet the gate flagged
+            { name = "ReedClump", weight = 8, scale = 0.5, submergeMax = 1.2 },
+            { name = "TallWeeds", weight = 8, scale = 0.55, submergeMax = 0.8 },
         },
         spacingMin = 4,
         spacingMax = 8,
@@ -259,8 +274,42 @@ local RECIPES: { [string]: Recipe } = {
         layer = "ground",
         footingRadius = 1,
         footingMaxDrop = 2,
-        -- partial submersion is a feature: reeds and grass can wade
-        submergeMax = 1.0,
+        -- OUTER bound: the per-species values above do the real gating
+        submergeMax = 1.2,
+        -- the wild reach barely thins where tending reaches it
+        careDensity = { GARDEN = 0.5, TENDED = 0.7 },
+        rockAffinity = { radius = 5, inside = 1.4, outside = 0.9 },
+        grassPaint = { below = 1, above = 6, maxSlope = 0.5 },
+    },
+    WaterMarginTended = {
+        pool = {
+            { name = "IrisA", weight = 26, submergeMax = 0.6 },
+            { name = "IrisB", weight = 26, submergeMax = 0.6 },
+            { name = "ReedClump", weight = 20, submergeMax = 1.2 },
+            { name = "TallWeeds", weight = 12, submergeMax = 0.8 },
+            { name = "FernClump", weight = 8, submergeMax = 0 },
+            { name = "WeedStalks", weight = 8, submergeMax = 0.5 },
+            { name = "ReedClump", weight = 6, scale = 0.5, submergeMax = 1.2 },
+        },
+        -- sparser and more deliberate than the wild reach
+        spacingMin = 6,
+        spacingMax = 11,
+        clumpChance = 0.4,
+        clumpSize = 3,
+        maxSteep = 0.35,
+        waterMargin = 0,
+        scaleJitter = 0.25,
+        nearWater = 7,
+        layer = "ground",
+        footingRadius = 1,
+        footingMaxDrop = 2,
+        submergeMax = 1.2,
+        -- thins HARD where tending reaches: a tended bank shows its stones and water
+        careDensity = { GARDEN = 0.25, TENDED = 0.5 },
+        -- stronger than wild: in a garden the planting gathers at the stones on purpose
+        rockAffinity = { radius = 6, inside = 1.6, outside = 0.7 },
+        -- narrower band than wild, so more shore reads as deliberate
+        grassPaint = { below = 1, above = 4, maxSlope = 0.5 },
     },
     -- ONE dense dark stand at a user-marked spot: sugi is the shrine-grove
     -- species and grows exactly this way. Zone: ServerStorage.FoliageZones.Grove_Sugi.
@@ -488,7 +537,7 @@ local function inInnerClear(zone: Zone, frac: number, x: number, z: number): boo
     return math.abs(x - cx) < hw and math.abs(z - cz) < hh
 end
 
-local function pickSpecies(pool: { Species }, r: number): (string, number)
+local function pickSpecies(pool: { Species }, r: number): (string, number, number?)
     local total = 0
     for _, s in pool do
         total += s.weight
@@ -497,11 +546,62 @@ local function pickSpecies(pool: { Species }, r: number): (string, number)
     for _, s in pool do
         at -= s.weight
         if at <= 0 then
-            return s.name, s.scale or 1
+            return s.name, s.scale or 1, s.submergeMax
         end
     end
     local last = pool[#pool]
-    return last.name, last.scale or 1
+    return last.name, last.scale or 1, last.submergeMax
+end
+
+-- a wet sample already cleared the recipe-level submergeMax (the OUTER bound) in
+-- `accepts` before any species is drawn. This re-rolls a fresh draw — same stream,
+-- not a separate one — up to 4 times when the species it lands on can't personally
+-- tolerate this depth, and gives up rather than forcing a dry-footed species into
+-- water because it won the weight roll. A dry sample always clears on the FIRST
+-- draw, so a pool with no overrides costs exactly the one roll it always did.
+local MAX_SUBMERGE_ATTEMPTS = 4
+
+local function pickWadingSpecies(
+    pool: { Species },
+    depth: number,
+    recipeSubmergeMax: number?,
+    rollFn: () -> number
+): (string?, number, number?)
+    for _ = 1, MAX_SUBMERGE_ATTEMPTS do
+        local name, scale, speciesMax = pickSpecies(pool, rollFn())
+        local limit = if speciesMax ~= nil then speciesMax else recipeSubmergeMax
+        if depth <= (limit or 0) then
+            return name, scale, speciesMax
+        end
+    end
+    return nil, 1, nil
+end
+
+-- grove COHERENT members choose between the already-rolled dominant/attendant pair
+-- (a threshold roll, not a fresh draw) — this re-rolls that SAME threshold against
+-- the member's own depth, which can differ from the elder's.
+local function pickWadingCoherentMember(
+    domSpecies: string,
+    domScale: number,
+    domLimit: number?,
+    attSpecies: string,
+    attScale: number,
+    attLimit: number?,
+    depth: number,
+    rollFn: () -> number
+): (string?, number)
+    for _ = 1, MAX_SUBMERGE_ATTEMPTS do
+        local species, scale, limit
+        if rollFn() < GROVE_ATTENDANT_THRESHOLD then
+            species, scale, limit = domSpecies, domScale, domLimit
+        else
+            species, scale, limit = attSpecies, attScale, attLimit
+        end
+        if depth <= (limit or 0) then
+            return species, scale
+        end
+    end
+    return nil, 1
 end
 
 local function nearestSample(samples: { Sample }, x: number, z: number): Sample?
@@ -788,26 +888,50 @@ local function plan(
         -- inter-anchor spacing check.
         local function placeGrove(anchor: Sample, memberTarget: number)
             removeCandidate(anchor)
-            table.insert(zoneAnchors, { anchor.x, anchor.z })
 
-            local domSpecies, domScale, attSpecies, attScale
+            -- the elder plants exactly at the anchor, so the anchor's own depth is
+            -- the depth to check; an empty grove is not a placement (no zoneAnchors
+            -- entry) when nothing in the pool tolerates it
+            local anchorDepth = anchor.depth or 0
+            local domSpecies, domScale, domLimit, attSpecies, attScale, attLimit
             local elderSpecies, elderScale
             if coherent then
-                domSpecies, domScale = pickSpecies(recipe.pool, groveRoll(zone))
-                local attPool: { Species } = {}
-                for _, sp in recipe.pool do
-                    if sp.name ~= domSpecies then
-                        table.insert(attPool, sp)
+                domSpecies, domScale, domLimit = pickWadingSpecies(
+                    recipe.pool,
+                    anchorDepth,
+                    recipe.submergeMax,
+                    function()
+                        return groveRoll(zone)
                     end
+                )
+                if domSpecies ~= nil then
+                    local attPool: { Species } = {}
+                    for _, sp in recipe.pool do
+                        if sp.name ~= domSpecies then
+                            table.insert(attPool, sp)
+                        end
+                    end
+                    if #attPool == 0 then
+                        attPool = recipe.pool
+                    end
+                    attSpecies, attScale, attLimit = pickSpecies(attPool, groveRoll(zone))
+                    elderSpecies, elderScale = domSpecies, domScale
                 end
-                if #attPool == 0 then
-                    attPool = recipe.pool
-                end
-                attSpecies, attScale = pickSpecies(attPool, groveRoll(zone))
-                elderSpecies, elderScale = domSpecies, domScale
             else
-                elderSpecies, elderScale = pickSpecies(recipe.pool, groveRoll(zone))
+                elderSpecies, elderScale = pickWadingSpecies(
+                    recipe.pool,
+                    anchorDepth,
+                    recipe.submergeMax,
+                    function()
+                        return groveRoll(zone)
+                    end
+                )
             end
+
+            if elderSpecies == nil then
+                return
+            end
+            table.insert(zoneAnchors, { anchor.x, anchor.z })
 
             -- every already-placed member of THIS grove (elder included),
             -- for the memberSpacing check below — scoped to the grove, not
@@ -864,15 +988,37 @@ local function plan(
                 removeCandidate(best)
                 table.insert(groveMembers, best)
 
+                -- a member stands on ITS OWN candidate, so its wading gate checks
+                -- `best`, never `anchor` — a member can be wetter than its elder
+                local bestDepth = best.depth or 0
                 local mSpecies, mScale
                 if coherent then
-                    if groveRoll(zone) < GROVE_ATTENDANT_THRESHOLD then
-                        mSpecies, mScale = domSpecies, domScale
-                    else
-                        mSpecies, mScale = attSpecies, attScale
-                    end
+                    mSpecies, mScale = pickWadingCoherentMember(
+                        domSpecies,
+                        domScale,
+                        if domLimit ~= nil then domLimit else recipe.submergeMax,
+                        attSpecies,
+                        attScale,
+                        if attLimit ~= nil then attLimit else recipe.submergeMax,
+                        bestDepth,
+                        function()
+                            return groveRoll(zone)
+                        end
+                    )
                 else
-                    mSpecies, mScale = pickSpecies(recipe.pool, groveRoll(zone))
+                    mSpecies, mScale = pickWadingSpecies(
+                        recipe.pool,
+                        bestDepth,
+                        recipe.submergeMax,
+                        function()
+                            return groveRoll(zone)
+                        end
+                    )
+                end
+                if mSpecies == nil then
+                    -- the ground is spent (already removed from candidates) but
+                    -- nothing is placed on it, same as the per-sample skip
+                    continue
                 end
                 -- sapling roll: always drawn, whether or not this recipe
                 -- configures `saplings`, so the stream's shape never depends
@@ -979,6 +1125,20 @@ local function plan(
     end
     local groveIndex = indexWater(groveAnchors)
 
+    -- rockAffinity's lookup: the Studio side reads the ShoreRocks pass' output
+    -- straight from the workspace rather than taking an injected point set
+    local rockCells: { { number } } = {}
+    local foliageFolder = workspace.CanyonWorld:FindFirstChild("Foliage")
+    local shoreRocks = foliageFolder and foliageFolder:FindFirstChild("ShoreRocks")
+    if shoreRocks then
+        for _, r in shoreRocks:GetChildren() do
+            if r:IsA("BasePart") then
+                table.insert(rockCells, { r.Position.X, r.Position.Z })
+            end
+        end
+    end
+    local rockIndex = indexWater(rockCells)
+
     for _, s in ordered do
         local zone = resolveZone(zones, s.x, s.z, s.y, function(candidate)
             -- grove-recipe zones already planted in the pre-pass; excluding
@@ -1017,6 +1177,16 @@ local function plan(
                 density *= aff.outside
             end
         end
+        -- rockAffinity COMPOUNDS with careDensity and groveAffinity — same
+        -- multiplicative slot, not a separate gate
+        if recipe.rockAffinity ~= nil then
+            local aff = recipe.rockAffinity :: GroveAffinity
+            if waterWithin(rockIndex, s.x, s.z, aff.radius) then
+                density *= aff.inside
+            else
+                density *= aff.outside
+            end
+        end
         if roll(zone) >= density then
             continue
         end
@@ -1037,7 +1207,19 @@ local function plan(
             continue
         end
         local heightScale = recipe.heightScale or 1
-        local species, speciesScale = pickSpecies(recipe.pool, roll(zone))
+        local species, speciesScale = pickWadingSpecies(
+            recipe.pool,
+            s.depth or 0,
+            recipe.submergeMax,
+            function()
+                return roll(zone)
+            end
+        )
+        if species == nil then
+            -- every attempt drew a species that can't tolerate this depth: skip
+            -- the sample entirely, never a fallback
+            continue
+        end
         table.insert(out, {
             x = s.x,
             z = s.z,
@@ -1656,6 +1838,169 @@ end
 --                recipes = { PreserveCore = { spacingMin = 9, spacingMax = 14 } } })
 -- `recipes` shallow-merges per key, so gate tuning is a two-line call; fold the
 -- settled values back into RECIPES here AND into foliageZoneRecipes.luau.
+-- ── terrain grass painting (mode="grass") ───────────────────────────────────
+-- The 0-2 stud band has no asset: nothing in FoliageKit is shorter than a 2.4-stud
+-- ReedClump, and the muhly card experiment failed its gate. Roblox's OWN terrain
+-- grass renders that band for free, at zero instance cost, and the reeds then stand
+-- IN it rather than on bare rock — which is what the user identified as the missing
+-- ingredient in the shoreline that already read well (2026-08-01).
+--
+-- DESTRUCTIVE: this rewrites terrain voxels. Every tile is snapshotted to
+-- ServerStorage.TerrainBackup_Grass BEFORE it is written, so the whole pass can be
+-- reverted by re-pasting those regions. Delete that folder once satisfied.
+local GRASS_TILE = 64 -- studs per read/write tile; keeps each region well inside limits
+local VOXEL = 4
+
+local function paintGrass(zones: { Zone }, recipes: { [string]: Recipe }): string
+    local terrain = workspace.Terrain
+    local rp = RaycastParams.new()
+    rp.FilterType = Enum.RaycastFilterType.Include
+    rp.FilterDescendantsInstances = { terrain }
+    rp.IgnoreWater = true
+
+    -- readWaterCells drops Y (the planner never needs it); the paint band is defined
+    -- RELATIVE to the local waterline, so read the markers again here with elevation
+    local wet: { { x: number, y: number, z: number } } = {}
+    local sandbox = workspace:FindFirstChild("Sandbox")
+    local map = sandbox and sandbox:FindFirstChild("WaterMap")
+    local markers = map and map:FindFirstChild("WaterMarkers")
+    if not markers then
+        return "[grass] no Sandbox.WaterMap.WaterMarkers — nothing to paint"
+    end
+    for _, m in markers:GetChildren() do
+        if m:IsA("BasePart") then
+            table.insert(wet, { x = m.Position.X, y = m.Position.Y, z = m.Position.Z })
+        end
+    end
+
+    -- columns to consider: every 4-stud column within `nearWater` of a water cell
+    -- that belongs to a zone whose recipe paints. Keyed so overlapping zones and
+    -- neighbouring cells don't queue the same column twice.
+    type Target = { x: number, z: number, surfaceY: number }
+    local seen: { [string]: boolean } = {}
+    local targets: { Target } = {}
+
+    for _, zone in zones do
+        local recipe = recipes[zone.recipe]
+        local paint = recipe and recipe.grassPaint
+        if paint == nil then
+            continue
+        end
+        local reach = recipe.nearWater or 8
+        for _, c in wet do
+            local wx, wz, waterY = c.x, c.z, c.y
+            if not containsXZ(zone, wx, wz) then
+                continue
+            end
+            for dx = -reach, reach, VOXEL do
+                for dz = -reach, reach, VOXEL do
+                    if dx * dx + dz * dz > reach * reach then
+                        continue
+                    end
+                    local x = math.floor((wx + dx) / VOXEL + 0.5) * VOXEL
+                    local z = math.floor((wz + dz) / VOXEL + 0.5) * VOXEL
+                    local key = `{x},{z}`
+                    if seen[key] then
+                        continue
+                    end
+                    seen[key] = true
+                    local hit = workspace:Raycast(Vector3.new(x, PROBE_TOP, z), Vector3.new(0, -900, 0), rp)
+                    if hit == nil then
+                        continue
+                    end
+                    -- inside the vertical band (below = INTO the shallows), on
+                    -- ground gentle enough to hold soil
+                    local dy = hit.Position.Y - waterY
+                    if dy < -paint.below or dy > paint.above then
+                        continue
+                    end
+                    if 1 - hit.Normal.Y > paint.maxSlope then
+                        continue
+                    end
+                    table.insert(targets, { x = x, z = z, surfaceY = hit.Position.Y })
+                end
+            end
+        end
+    end
+
+    if #targets == 0 then
+        return "[grass] no columns matched — nothing painted"
+    end
+
+    -- group into tiles so this is a handful of voxel reads, not one per column
+    local tiles: { [string]: { Target } } = {}
+    for _, t in targets do
+        local key = `{math.floor(t.x / GRASS_TILE)},{math.floor(t.z / GRASS_TILE)}`
+        local bucket = tiles[key]
+        if bucket == nil then
+            bucket = {}
+            tiles[key] = bucket
+        end
+        table.insert(bucket, t)
+    end
+
+    local backup = ServerStorage:FindFirstChild("TerrainBackup_Grass")
+    if backup then
+        backup:Destroy()
+    end
+    backup = Instance.new("Folder")
+    backup.Name = "TerrainBackup_Grass"
+    backup.Parent = ServerStorage
+
+    local painted, tileCount = 0, 0
+    for _, bucket in tiles do
+        local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+        local minY, maxY = math.huge, -math.huge
+        local lookup: { [string]: number } = {}
+        for _, t in bucket do
+            minX, maxX = math.min(minX, t.x), math.max(maxX, t.x)
+            minZ, maxZ = math.min(minZ, t.z), math.max(maxZ, t.z)
+            minY, maxY = math.min(minY, t.surfaceY), math.max(maxY, t.surfaceY)
+            lookup[`{t.x},{t.z}`] = t.surfaceY
+        end
+        local region = Region3.new(
+            Vector3.new(minX - VOXEL, minY - VOXEL * 2, minZ - VOXEL),
+            Vector3.new(maxX + VOXEL, maxY + VOXEL * 2, maxZ + VOXEL)
+        ):ExpandToGrid(VOXEL)
+
+        local snapshot = terrain:CopyRegion(region:ExpandToGrid(VOXEL))
+        snapshot.Name = `tile_{tileCount}`
+        snapshot.Parent = backup
+
+        local mats, occ = terrain:ReadVoxels(region, VOXEL)
+        local origin = region.CFrame.Position - region.Size / 2
+        local sx, sy, sz = mats.Size.X, mats.Size.Y, mats.Size.Z
+        for ix = 1, sx do
+            for iz = 1, sz do
+                local wx = origin.X + (ix - 0.5) * VOXEL
+                local wz = origin.Z + (iz - 0.5) * VOXEL
+                local surfaceY =
+                    lookup[`{math.floor(wx / VOXEL + 0.5) * VOXEL},{math.floor(wz / VOXEL + 0.5) * VOXEL}`]
+                if surfaceY == nil then
+                    continue
+                end
+                for iy = 1, sy do
+                    local wy = origin.Y + (iy - 0.5) * VOXEL
+                    -- only the SURFACE skin: the voxel holding the ground point and
+                    -- the one just under it. Deeper voxels keep their rock so a cut
+                    -- bank still reads as stone under a grass lip.
+                    if occ[ix][iy][iz] > 0.5 and mats[ix][iy][iz] ~= Enum.Material.Water then
+                        if wy <= surfaceY + VOXEL and wy >= surfaceY - VOXEL then
+                            mats[ix][iy][iz] = Enum.Material.Grass
+                            painted += 1
+                        end
+                    end
+                end
+            end
+        end
+        terrain:WriteVoxels(region, VOXEL, mats, occ)
+        tileCount += 1
+    end
+
+    return `[grass] painted {painted} voxels across {tileCount} tiles ({#targets} columns); `
+        .. `snapshot in ServerStorage.TerrainBackup_Grass`
+end
+
 return function(opts: {
     mode: string?,
     zones: { string }?,
@@ -1735,6 +2080,8 @@ return function(opts: {
         bake(filtered, "bake")
     elseif mode == "mist" then
         bakeMist(anchors)
+    elseif mode == "grass" then
+        return summary .. "\n" .. paintGrass(zones, recipes)
     end
     return summary
 end
