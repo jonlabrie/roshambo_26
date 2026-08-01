@@ -1465,3 +1465,284 @@ describe("per-species nearWater", function()
         expect(far > 0).toBeTruthy()
     end)
 end)
+
+-- 2026-08-01 user gate: "your approach is also either/or, never and ... I like
+-- the shuffled mix, but it should be a line of shuffled mixes marching along
+-- the shore." Two faults fixed: clumps were monospecific (a clump child
+-- inherited its parent's species), and placement was area-scatter (every
+-- nearWater sample was a candidate, so plants spread across the whole band
+-- instead of tracking the shoreline). The shoreline pre-pass replaces both
+-- with stations (spaced ALONG the shore) whose members each independently
+-- draw their own species.
+describe("ZoneScatter shoreline pass", function()
+    -- a straight shoreline along x = WATER_X, running the full z span so
+    -- station-spacing tests have plenty of shore to walk
+    local WATER_X = 50
+    local function waterLine(): ZoneScatter.WaterIndex
+        local cells = {}
+        for z = 0, 100, 4 do
+            table.insert(cells, { WATER_X, z })
+        end
+        return ZoneScatter.indexWater(cells)
+    end
+    -- like the submersion describe block's shoreSamples(), but with a
+    -- configurable depth so submergence tests can check the ACTUAL nearest
+    -- sample's depth (ground truth) rather than inferring "in water" from an
+    -- x threshold, which the member's continuous (non-grid) offset makes
+    -- unreliable near the boundary.
+    local function shoreSamples(waterDepth: number): { ZoneScatter.Sample }
+        local s = {}
+        for x = 0, 100, 4 do
+            for z = 0, 100, 4 do
+                if x >= WATER_X then
+                    table.insert(s, { x = x, z = z, y = 49, steep = 0, depth = waterDepth })
+                else
+                    table.insert(s, { x = x, z = z, y = 50, steep = 0 })
+                end
+            end
+        end
+        return s
+    end
+    -- replicates the planner's own nearestSample lookup (unexported) so a
+    -- test can ask "what depth did THIS placement's member actually see",
+    -- exactly what pickWadingSpecies gated on internally
+    local function nearestDepth(samples: { ZoneScatter.Sample }, x: number, z: number): number
+        local bestD, bestDepth = math.huge, 0
+        for _, s in samples do
+            local dx, dz = s.x - x, s.z - z
+            local d = dx * dx + dz * dz
+            if d < bestD then
+                bestD, bestDepth = d, s.depth or 0
+            end
+        end
+        return bestDepth
+    end
+    -- ground-truth "distance to nearest water cell", using the exact cell
+    -- list the water index was built from — independent of the planner's
+    -- internals, unlike nearestDepth above (which deliberately mirrors them)
+    local function nearestWaterDistSq(x: number, z: number): number
+        local best = math.huge
+        for z2 = 0, 100, 4 do
+            local dx, dz = x - WATER_X, z - z2
+            best = math.min(best, dx * dx + dz * dz)
+        end
+        return best
+    end
+    local function shoreZone(): { ZoneScatter.Zone }
+        return {
+            {
+                name = "Shore",
+                shape = "rect",
+                bounds = { 0, 0, 100, 100 },
+                recipe = "Shore",
+                densityScale = 1,
+                seed = 21,
+            },
+        }
+    end
+    local function shoreRecipe(pool: { ZoneScatter.Species }): ZoneScatter.Recipe
+        return {
+            pool = pool,
+            spacingMin = 3,
+            spacingMax = 3,
+            clumpChance = 0,
+            clumpSize = 0,
+            maxSteep = 1,
+            waterMargin = 0,
+            scaleJitter = 0.1,
+            nearWater = 16,
+            shoreline = {
+                stationSpacing = 12,
+                membersMin = 2,
+                membersMax = 4,
+                spread = 3,
+                inland = 2,
+            },
+        }
+    end
+    -- single-linkage clustering by proximity, to recover "which station"
+    -- a placement belongs to from the output alone — same technique as the
+    -- grove pre-pass describe block's local helper (duplicated rather than
+    -- shared: that one is scoped inside its own describe).
+    local function clusterPlacements(
+        placements: { ZoneScatter.Placement },
+        linkDist: number
+    ): { { ZoneScatter.Placement } }
+        local clusters: { { ZoneScatter.Placement } } = {}
+        for _, p in placements do
+            local merged: { ZoneScatter.Placement } = { p }
+            local kept: { { ZoneScatter.Placement } } = {}
+            for _, cluster in clusters do
+                local linked = false
+                for _, q in cluster do
+                    local dx, dz = p.x - q.x, p.z - q.z
+                    if dx * dx + dz * dz <= linkDist * linkDist then
+                        linked = true
+                        break
+                    end
+                end
+                if linked then
+                    for _, q in cluster do
+                        table.insert(merged, q)
+                    end
+                else
+                    table.insert(kept, cluster)
+                end
+            end
+            table.insert(kept, merged)
+            clusters = kept
+        end
+        return clusters
+    end
+
+    test("deterministic: same shoreline input twice = identical output", function()
+        local recipe = shoreRecipe({ { name = "SpeciesA", weight = 1 } })
+        local water = waterLine()
+        local a = ZoneScatter.plan(shoreZone(), flatSamples(), { Shore = recipe }, water)
+        local b = ZoneScatter.plan(shoreZone(), flatSamples(), { Shore = recipe }, water)
+        expect(#a).toBe(#b)
+        for i, p in a do
+            expect(p.x).toBe(b[i].x)
+            expect(p.z).toBe(b[i].z)
+            expect(p.species).toBe(b[i].species)
+            expect(p.yaw).toBe(b[i].yaw)
+        end
+    end)
+
+    test("follows the shore: placements track the water line, spread along it more than across it", function()
+        local recipe = shoreRecipe({ { name = "SpeciesA", weight = 1 } })
+        local water = waterLine()
+        local out = ZoneScatter.plan(shoreZone(), flatSamples(), { Shore = recipe }, water)
+        expect(#out > 0).toBe(true)
+        local minX, maxX, minZ, maxZ = math.huge, -math.huge, math.huge, -math.huge
+        for _, p in out do
+            expect(nearestWaterDistSq(p.x, p.z) <= recipe.nearWater * recipe.nearWater).toBe(true)
+            minX, maxX = math.min(minX, p.x), math.max(maxX, p.x)
+            minZ, maxZ = math.min(minZ, p.z), math.max(maxZ, p.z)
+        end
+        -- the shore runs along z; a band-scatter fault would spread roughly
+        -- as wide across (x) as along (z) — a shoreline should spread FAR
+        -- more along the shore than across it
+        expect((maxZ - minZ) > (maxX - minX)).toBe(true)
+    end)
+
+    test("stations are spaced: no two are closer than stationSpacing*0.8", function()
+        -- one member per station isolates this test to STATION spacing
+        -- alone, independent of any within-station member-spread geometry —
+        -- every output placement IS a station, so pairwise placement
+        -- distance is exactly pairwise station distance. A large
+        -- stationSpacing against a small spacingMin (the ordinary per-sample
+        -- fault's own spacing) is what makes this fail pre-implementation:
+        -- the old per-sample path packs the whole band at ~spacingMin, far
+        -- tighter than stations are supposed to be.
+        local recipe = shoreRecipe({ { name = "SpeciesA", weight = 1 } })
+        recipe.shoreline.stationSpacing = 40
+        recipe.shoreline.membersMin = 1
+        recipe.shoreline.membersMax = 1
+        recipe.shoreline.spread = 2
+        recipe.shoreline.inland = 1
+        recipe.spacingMin = 8
+        recipe.spacingMax = 10
+        local water = waterLine()
+        local out = ZoneScatter.plan(shoreZone(), flatSamples(), { Shore = recipe }, water)
+        expect(#out > 0).toBe(true)
+        for i = 1, #out do
+            for j = i + 1, #out do
+                local dx, dz = out[i].x - out[j].x, out[i].z - out[j].z
+                expect(dx * dx + dz * dz >= (recipe.shoreline.stationSpacing * 0.8) ^ 2).toBe(true)
+            end
+        end
+    end)
+
+    test("handfuls are mixed: at least one station contains more than one distinct species", function()
+        local recipe = shoreRecipe({
+            { name = "SpeciesA", weight = 1 },
+            { name = "SpeciesB", weight = 1 },
+        })
+        recipe.shoreline.membersMin = 3
+        recipe.shoreline.membersMax = 4
+        local water = waterLine()
+        local out = ZoneScatter.plan(shoreZone(), flatSamples(), { Shore = recipe }, water)
+        expect(#out > 0).toBe(true)
+        local clusters = clusterPlacements(out, (recipe.shoreline.spread + recipe.shoreline.inland) * 2)
+        local mixedStations = 0
+        for _, cluster in clusters do
+            local species: { [string]: boolean } = {}
+            for _, p in cluster do
+                species[p.species] = true
+            end
+            local distinct = 0
+            for _ in species do
+                distinct += 1
+            end
+            if distinct >= 2 then
+                mixedStations += 1
+            end
+        end
+        expect(mixedStations > 0).toBe(true)
+    end)
+
+    test(
+        "per-species gates still sort within a handful: Wet stays near water, Dry stays out of it",
+        function()
+            local recipe = shoreRecipe({
+                { name = "Wet", weight = 1, nearWater = 3 },
+                { name = "Dry", weight = 1, submergeMax = 0 },
+            })
+            recipe.submergeMax = 5 -- outer bound: generous enough that depth 0.5 clears it
+            recipe.shoreline.spread = 8
+            recipe.shoreline.inland = 6
+            recipe.shoreline.stationSpacing = 10
+            recipe.shoreline.membersMin = 3
+            recipe.shoreline.membersMax = 5
+            local samples = shoreSamples(0.5)
+            local water = waterLine()
+            local out = ZoneScatter.plan(shoreZone(), samples, { Shore = recipe }, water)
+            expect(#out > 0).toBe(true)
+            local sawWet, sawDry = false, false
+            for _, p in out do
+                if p.species == "Wet" then
+                    sawWet = true
+                    expect(nearestWaterDistSq(p.x, p.z) <= 3 * 3).toBe(true)
+                elseif p.species == "Dry" then
+                    sawDry = true
+                    expect(nearestDepth(samples, p.x, p.z)).toBe(0)
+                end
+            end
+            expect(sawWet).toBe(true)
+            expect(sawDry).toBe(true)
+        end
+    )
+
+    test("member count is respected: no station has more than membersMax placements", function()
+        local recipe = shoreRecipe({ { name = "SpeciesA", weight = 1 } })
+        recipe.shoreline.stationSpacing = 30
+        recipe.shoreline.membersMin = 1
+        recipe.shoreline.membersMax = 3
+        local water = waterLine()
+        local out = ZoneScatter.plan(shoreZone(), flatSamples(), { Shore = recipe }, water)
+        expect(#out > 0).toBe(true)
+        local clusters = clusterPlacements(out, (recipe.shoreline.spread + recipe.shoreline.inland) * 2)
+        for _, cluster in clusters do
+            expect(#cluster <= recipe.shoreline.membersMax).toBe(true)
+        end
+    end)
+
+    test(
+        "a shoreline recipe's zone does NOT also scatter per-sample: bounded by stations * membersMax",
+        function()
+            local recipe = shoreRecipe({ { name = "SpeciesA", weight = 1 } })
+            recipe.shoreline.stationSpacing = 20
+            recipe.shoreline.membersMax = 4
+            local water = waterLine()
+            local out = ZoneScatter.plan(shoreZone(), flatSamples(), { Shore = recipe }, water)
+            expect(#out > 0).toBe(true)
+            -- the shoreline runs the full 0..100 z-span; at stationSpacing=20 the
+            -- greedy walk can accept at most floor(100/20)+1 stations along it.
+            -- A per-sample-scatter fault (the bug being fixed) would blow far
+            -- past this bound, since every nearWater sample is a candidate.
+            local maxStations = math.floor(100 / recipe.shoreline.stationSpacing) + 1
+            expect(#out <= maxStations * recipe.shoreline.membersMax).toBe(true)
+        end
+    )
+end)
