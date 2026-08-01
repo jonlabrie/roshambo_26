@@ -81,9 +81,14 @@ return function(opts: { mode: string?, size: string? }?): string
         decorationCatalog = require(find("DecorationCatalog")),
     })
 
-    -- a lit, undecorated owner treatment; centered placement is the runtime default
+    -- a lit, undecorated owner treatment; centered placement is the runtime default.
+    -- The LOADOUT IS REQUIRED: _buildBuilding reads loadout.baseStyle, and a nil
+    -- loadout means "bare deck" to the applier — it fault-isolates the resulting
+    -- error and silently leaves deck-only (which is exactly what a first attempt
+    -- here produced). This is the same shape VacantState hands the runtime.
     local CENTERED = { offset = { 0, 0 }, facing = "N" }
-    local built, failed = 0, {}
+    local LOADOUT = { baseStyle = "teahouse-1story", colorScheme = "scheme.ink" }
+    local built, failed, deckOnly = 0, {}, {}
     for padId, spec in PadSites do
         -- respect each perch's cap rather than forcing L onto an S-only site
         local wanted = size
@@ -93,11 +98,11 @@ return function(opts: { mode: string?, size: string? }?): string
         local ok, err = pcall(function()
             applier:apply(padId, spec, {
                 kind = "structure",
-                loadout = nil,
+                loadout = LOADOUT,
                 lit = true,
                 portalOwned = false,
                 deckDecorations = nil,
-            }, wanted, { size = wanted, loadout = nil, placement = CENTERED })
+            }, wanted, { size = wanted, loadout = LOADOUT, placement = CENTERED })
         end)
         if ok then
             built += 1
@@ -105,10 +110,20 @@ return function(opts: { mode: string?, size: string? }?): string
             table.insert(failed, padId .. ": " .. tostring(err))
         end
     end
+    -- verify the BUILDING actually landed on each deck: the applier degrades to
+    -- deck-only on a bad build rather than failing, so a silent skip must be reported
+    for _, padFolder in container:GetChildren() do
+        if not padFolder:FindFirstChild("Structure") then
+            table.insert(deckOnly, padFolder.Name)
+        end
+    end
     local msg =
         `[padPreview] on — {built} pads materialized at size {size} under Workspace.Sandbox.{PREVIEW_NAME}`
     if #failed > 0 then
         msg ..= "\nFAILED: " .. table.concat(failed, " | ")
+    end
+    if #deckOnly > 0 then
+        msg ..= "\nDECK-ONLY (building silently skipped): " .. table.concat(deckOnly, ", ")
     end
     return msg .. "\nTurn OFF before publishing."
 end
