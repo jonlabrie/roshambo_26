@@ -351,10 +351,28 @@ local function buildGallery(): string
     local topY = GALLERY_CENTRE.Y + 1
     local x0 = GALLERY_CENTRE.X - width / 2 + GALLERY_CELL / 2
     local z0 = GALLERY_CENTRE.Z - depth / 2 + GALLERY_CELL / 2
+    local draftForLabels = draftFolder()
     for i, arr in ARRANGEMENTS do
         local col = (i - 1) % GALLERY_COLS
         local row = math.floor((i - 1) / GALLERY_COLS)
-        stamp(arr, x0 + col * GALLERY_CELL, z0 + row * GALLERY_CELL, true, topY)
+        local ax, az = x0 + col * GALLERY_CELL, z0 + row * GALLERY_CELL
+        stamp(arr, ax, az, true, topY)
+        -- stamp() puts the label post AT the anchor, which is exactly where the
+        -- dominant tree stands — buried. In the gallery, stand it at the front edge
+        -- of the cell and lift the card above the arrangement's own height.
+        local group = draftForLabels:FindFirstChild("Arr_" .. arr.name)
+        local post = group and group:FindFirstChild("Label_" .. arr.name)
+        if post and post:IsA("BasePart") then
+            local _, size = (group :: Model):GetBoundingBox()
+            post.CFrame = CFrame.new(ax, topY + 4, az - GALLERY_CELL / 2 + 4)
+            local bb = post:FindFirstChildOfClass("BillboardGui")
+            if bb then
+                bb.StudsOffset = Vector3.new(0, math.max(size.Y, 8) + 4, 0)
+                -- the platform is 300 studs across; the default 120 hides half the
+                -- labels the moment you pull back far enough to compare them
+                bb.MaxDistance = 600
+            end
+        end
     end
     -- the draft folder is where stamp() parents its groups; move them onto the gallery
     -- so the canyon's own ArrangementsDraft is not left holding floating trees
