@@ -1963,7 +1963,16 @@ local function paintGrass(zones: { Zone }, recipes: { [string]: Recipe }): strin
             Vector3.new(maxX + VOXEL, maxY + VOXEL * 2, maxZ + VOXEL)
         ):ExpandToGrid(VOXEL)
 
-        local snapshot = terrain:CopyRegion(region:ExpandToGrid(VOXEL))
+        -- CopyRegion takes Region3int16 in VOXEL coordinates (studs/4), not a Region3
+        -- in studs — the cast error is silent about which unit it wanted
+        local rmin = region.CFrame.Position - region.Size / 2
+        local rmax = region.CFrame.Position + region.Size / 2
+        local snapshot = terrain:CopyRegion(
+            Region3int16.new(
+                Vector3int16.new(rmin.X / VOXEL, rmin.Y / VOXEL, rmin.Z / VOXEL),
+                Vector3int16.new(rmax.X / VOXEL, rmax.Y / VOXEL, rmax.Z / VOXEL)
+            )
+        )
         snapshot.Name = `tile_{tileCount}`
         snapshot.Parent = backup
 
