@@ -279,7 +279,7 @@ local RECIPES: { [string]: Recipe } = {
         -- the wild reach barely thins where tending reaches it
         careDensity = { GARDEN = 0.5, TENDED = 0.7 },
         rockAffinity = { radius = 5, inside = 1.4, outside = 0.9 },
-        grassPaint = { below = 1, above = 6, maxSlope = 0.5 },
+        grassPaint = { below = 1, above = 4, maxSlope = 0.5 },
     },
     WaterMarginTended = {
         pool = {
@@ -309,7 +309,7 @@ local RECIPES: { [string]: Recipe } = {
         -- stronger than wild: in a garden the planting gathers at the stones on purpose
         rockAffinity = { radius = 6, inside = 1.6, outside = 0.7 },
         -- narrower band than wild, so more shore reads as deliberate
-        grassPaint = { below = 1, above = 4, maxSlope = 0.5 },
+        grassPaint = { below = 1, above = 3, maxSlope = 0.5 },
     },
     -- ONE dense dark stand at a user-marked spot: sugi is the shrine-grove
     -- species and grows exactly this way. Zone: ServerStorage.FoliageZones.Grove_Sugi.
@@ -1851,6 +1851,39 @@ end
 local GRASS_TILE = 64 -- studs per read/write tile; keeps each region well inside limits
 local VOXEL = 4
 
+-- Painting is additive: a later pass with tighter rules cannot REMOVE grass an earlier
+-- pass laid down. This sweeps every keep-out rect and puts Grass back to Sand, which is
+-- what the karesansui is made of — run before each paint so the rules are enforced
+-- retroactively rather than only on new work.
+local function repairKeepOutGrass(): number
+    local terrain = workspace.Terrain
+    local restored = 0
+    for _, zn in KEEPOUT_ZONES do
+        local region = Region3.new(
+            Vector3.new(zn.x0 - VOXEL, -20, zn.z0 - VOXEL),
+            Vector3.new(zn.x1 + VOXEL, 320, zn.z1 + VOXEL)
+        ):ExpandToGrid(VOXEL)
+        local mats, occ = terrain:ReadVoxels(region, VOXEL)
+        local touched = false
+        local sx, sy, sz = mats.Size.X, mats.Size.Y, mats.Size.Z
+        for ix = 1, sx do
+            for iy = 1, sy do
+                for iz = 1, sz do
+                    if mats[ix][iy][iz] == Enum.Material.Grass and occ[ix][iy][iz] > 0 then
+                        mats[ix][iy][iz] = Enum.Material.Sand
+                        restored += 1
+                        touched = true
+                    end
+                end
+            end
+        end
+        if touched then
+            terrain:WriteVoxels(region, VOXEL, mats, occ)
+        end
+    end
+    return restored
+end
+
 local function paintGrass(zones: { Zone }, recipes: { [string]: Recipe }): string
     local terrain = workspace.Terrain
     local rp = RaycastParams.new()
@@ -1906,6 +1939,12 @@ local function paintGrass(zones: { Zone }, recipes: { [string]: Recipe }): strin
                     seen[key] = true
                     local hit = workspace:Raycast(Vector3.new(x, PROBE_TOP, z), Vector3.new(0, -900, 0), rp)
                     if hit == nil then
+                        continue
+                    end
+                    -- KEEP-OUTS BIND THE PAINT TOO (2026-08-01): the first pass
+                    -- consulted them for plants but not for terrain, and grass crept
+                    -- onto the karesansui. The raked sand is sacrosanct.
+                    if keepOutBlocks(x, z, hit.Material.Name) then
                         continue
                     end
                     -- inside the vertical band (below = INTO the shallows), on
@@ -1974,6 +2013,11 @@ local function paintGrass(zones: { Zone }, recipes: { [string]: Recipe }): strin
             )
         )
         snapshot.Name = `tile_{tileCount}`
+        -- a TerrainRegion does NOT remember where it came from, and PasteRegion needs
+        -- the corner in voxel coords — without these the snapshot is unrestorable
+        snapshot:SetAttribute("CornerX", rmin.X / VOXEL)
+        snapshot:SetAttribute("CornerY", rmin.Y / VOXEL)
+        snapshot:SetAttribute("CornerZ", rmin.Z / VOXEL)
         snapshot.Parent = backup
 
         local mats, occ = terrain:ReadVoxels(region, VOXEL)
@@ -2006,8 +2050,9 @@ local function paintGrass(zones: { Zone }, recipes: { [string]: Recipe }): strin
         tileCount += 1
     end
 
+    local repaired = repairKeepOutGrass()
     return `[grass] painted {painted} voxels across {tileCount} tiles ({#targets} columns); `
-        .. `snapshot in ServerStorage.TerrainBackup_Grass`
+        .. `restored {repaired} keep-out voxels to sand; snapshot in ServerStorage.TerrainBackup_Grass`
 end
 
 return function(opts: {

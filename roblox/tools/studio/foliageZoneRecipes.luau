@@ -242,7 +242,7 @@ local Recipes: { [string]: Recipe } = {
         -- the wild reach barely thins where tending reaches it
         careDensity = { GARDEN = 0.5, TENDED = 0.7 },
         rockAffinity = { radius = 5, inside = 1.4, outside = 0.9 },
-        grassPaint = { below = 1, above = 6, maxSlope = 0.5 },
+        grassPaint = { below = 1, above = 4, maxSlope = 0.5 },
     },
     -- THE TENDED REACH (x -90..220, zone MarginTended): the arena end, where the care
     -- model's reach is at its widest (28 studs vs 8 at the head). Iris-led, sparser,
@@ -275,7 +275,7 @@ local Recipes: { [string]: Recipe } = {
         -- stronger than wild: in a garden the planting gathers at the stones on purpose
         rockAffinity = { radius = 6, inside = 1.6, outside = 0.7 },
         -- narrower band than wild, so more shore reads as deliberate
-        grassPaint = { below = 1, above = 4, maxSlope = 0.5 },
+        grassPaint = { below = 1, above = 3, maxSlope = 0.5 },
     },
     -- ONE dense dark stand at a user-marked spot: sugi is the shrine-grove
     -- species and grows exactly this way. Zone: ServerStorage.FoliageZones.Grove_Sugi.
