@@ -1503,6 +1503,16 @@ local function sampleTerrain(zones: { Zone }): { Sample }
         x1, z1 = math.min(x1, a), math.min(z1, b)
         x2, z2 = math.max(x2, c), math.max(z2, d)
     end
+    -- SNAP THE GRID TO A FIXED WORLD LATTICE (2026-08-01). Without this the grid
+    -- starts at the min of the zone bounds, so editing ANY zone's extent moves the
+    -- origin by a non-multiple of the pitch and shifts EVERY sample point in the
+    -- canyon — which silently re-rolls every zone, including ones the user already
+    -- approved and never touched. Extending the fringe west by 35 studs moved all
+    -- samples 3 studs and rearranged the whole world. Snapped, a zone edit only
+    -- ADDS or REMOVES samples at its own edges; existing sample positions never
+    -- move, per-zone LCG streams stay aligned, and approved planting survives.
+    x1 = math.floor(x1 / SAMPLE_PITCH) * SAMPLE_PITCH
+    z1 = math.floor(z1 / SAMPLE_PITCH) * SAMPLE_PITCH
     local samples: { Sample } = {}
     if x1 > x2 then
         return samples
