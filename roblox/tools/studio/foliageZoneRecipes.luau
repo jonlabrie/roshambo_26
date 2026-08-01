@@ -191,6 +191,24 @@ local Recipes: { [string]: Recipe } = {
     -- continuous, but density varies the way a real hillside forest does —
     -- thicker in the folds, thinner on the ribs, with emergent taller trees
     -- (dominantScale 1.35) breaking the canopy line.
+    -- THE WALL FRINGE: a continuous green mass over the canyon walls and the
+    -- plateau beyond. Rewritten TWICE on 2026-08-01, and the second rewrite is
+    -- the instructive one:
+    --
+    -- It was first given a GROVE (clusters), reasoning that it "read as random
+    -- scatter" like the woods had. Wrong diagnosis. A grove pre-pass caps output
+    -- at maxGroves x members AND excludes the zone from per-sample resolution, so
+    -- once the cap is spent the rest of the zone gets nothing however good the
+    -- ground is. The user found an area where 163 of 441 samples passed every gate
+    -- and only 18 trees stood: "perfectly plantable areas you're completely
+    -- skipping." Cluster count is the wrong control for a mass whose job is
+    -- COVERAGE.
+    --
+    -- Per-sample scatter considers every eligible sample, so coverage is complete
+    -- by construction and `spacing` means trees-per-area. What the fringe always
+    -- lacked was not groves but CLUMPING — the original had clumpChance = 0, the
+    -- actual reason it read as an even carpet. 0.55/4 gives lumpy density inside
+    -- full coverage: both properties at once, which a grove cannot do here.
     WallFringe = {
         pool = {
             -- the Xfrog untrimmed adults, foliated to the ground on purpose:
@@ -200,21 +218,21 @@ local Recipes: { [string]: Recipe } = {
             { name = "XfSpruceM", weight = 24 },
             { name = "XfFirM", weight = 22 },
             { name = "XfSugi40", weight = 12 },
-            -- AGE VARIATION: the fringe had none — every tree an identical adult.
-            -- The 10-stud Yr tier reads as younger growth filling between elders.
+            -- age variation: the fringe had none — every tree an identical adult
             { name = "XfHinokiYr", weight = 5 },
             { name = "XfFirYr", weight = 4 },
-            -- A SPLASH OF COLOUR (user 2026-08-01): "not as much as the canyon,
-            -- but something to catch the wandering eye looking for detail." 7% of
-            -- draws, so autumn shows as occasional punctuation in a green mass,
-            -- never as a feature. Both ride the LOD geometry (21.1k, not 54k).
+            -- a splash of colour (user): "not as much as the canyon, but something
+            -- to catch the wandering eye." Both ride the LOD geometry (21.1k).
             { name = "XfMapleGold", weight = 4 },
             { name = "XfMapleRed", weight = 3 },
         },
-        spacingMin = 10,
-        spacingMax = 16,
-        clumpChance = 0,
-        clumpSize = 0,
+        -- spacing IS the density dial now; 16-26 reads lighter than the grove
+        -- version did ("a bit much" on the skyline) while covering everything
+        spacingMin = 16,
+        spacingMax = 26,
+        -- the missing ingredient all along: clusters WITHIN full coverage
+        clumpChance = 0.55,
+        clumpSize = 4,
         maxSteep = 0.9,
         waterMargin = 4,
         scaleJitter = 0.35,
@@ -225,34 +243,6 @@ local Recipes: { [string]: Recipe } = {
         -- walls are steep; sparser footing is accepted here
         footingRadius = 3,
         footingMaxDrop = 6,
-        grove = {
-            -- 22, not 45: anchors this close OVERLAP, which is the whole point —
-            -- lumpy density instead of clusters-and-clearings
-            spacing = 22,
-            radiusMin = 5,
-            radiusMax = 14,
-            membersMin = 5,
-            membersMax = 9,
-            memberSpacing = 6,
-            -- emergents punctuating the mass; higher than the woods use
-            dominantScale = 1.35,
-            anchorDarts = 300,
-            -- 24, tuned live: 14 gave 165 trees (FEWER than the old scatter's 179,
-            -- and the user's complaint was sparseness). 24 yields 248 and the count
-            -- saturates there — 34 adds only 9 more, because eligible wall ground,
-            -- not the cap, becomes the binding constraint.
-            maxGroves = 24,
-            memberTries = 6,
-            saplings = {
-                chance = 0.2,
-                map = {
-                    XfHinokiM = "XfHinokiYb",
-                    XfSpruceM = "XfSpruceYb",
-                    XfFirM = "XfFirYb",
-                    XfSugi40 = "XfSugiYb",
-                },
-            },
-        },
     },
     -- THE WILD REACH (x -420..-90): the upper canyon, where care barely reaches.
     -- Lush, scraggly, reed-led — the register the user approved as "untended wild

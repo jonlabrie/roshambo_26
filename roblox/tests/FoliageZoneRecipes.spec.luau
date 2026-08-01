@@ -130,10 +130,9 @@ describe("grove pre-pass", function()
     end)
     -- only the canopy recipes should carry a grove; an accidental grove elsewhere
     -- silently changes that zone's planter from per-sample scatter to clustering.
-    -- WallFringe joined the list 2026-08-01 but for the OPPOSITE reason to the
-    -- woods: its anchors are packed tight enough to OVERLAP, giving lumpy density
-    -- with no meadow gaps, because a gap in the fringe exposes the canyon wall it
-    -- exists to hide. See the "fringe groves overlap" test below.
+    -- WallFringe briefly carried one on 2026-08-01 and it was REVERTED the same
+    -- day: a grove caps output at maxGroves x members and skips everything past
+    -- the cap, which starved plantable ground in a zone whose job is coverage.
     test("only the canopy recipes carry groves", function()
         local groved = { PreserveCore = true, SugiStand = true, MapleStand = true, WallFringe = true }
         for name, recipe in Recipes do
@@ -221,21 +220,16 @@ describe("grove pre-pass", function()
     end)
 end)
 
--- 2026-08-01: the fringe is a CONTINUOUS mass, not a set of stands. What keeps it
--- continuous is anchors closer together than the clumps are wide — if this ever
--- inverts, the fringe grows meadow gaps and the canyon wall shows through.
-describe("fringe groves overlap rather than separate", function()
-    test("anchor spacing is tighter than the woods, and tighter than clump width", function()
-        local fringe = Recipes.WallFringe.grove
-        expect(fringe ~= nil).toBe(true)
-        assert(fringe ~= nil)
-        local core = Recipes.PreserveCore.grove
-        assert(core ~= nil)
-        expect(fringe.spacing < core.spacing).toBe(true)
-        -- THE invariant: anchors sit closer than a clump's diameter, so clumps overlap
-        expect(fringe.spacing < fringe.radiusMax * 2).toBe(true)
-        -- emergents break the canopy line harder here than in the woods
-        expect(fringe.dominantScale > core.dominantScale).toBe(true)
+-- The fringe's job is COVERAGE (hide the wall), so it must stay on the per-sample
+-- planter, which considers every eligible sample. A grove here caps output and
+-- leaves good ground bare — that regression cost a user gate on 2026-08-01.
+describe("the fringe covers rather than clusters", function()
+    test("it scatters per-sample and clumps, instead of carrying a grove", function()
+        local fringe = Recipes.WallFringe
+        expect(fringe.grove == nil).toBe(true)
+        -- clumpChance 0 was the real reason it once read as an even carpet
+        expect(fringe.clumpChance > 0.3).toBe(true)
+        expect(fringe.clumpSize >= 3).toBe(true)
     end)
     test("the fringe carries a minority colour accent", function()
         local total, colour = 0, 0
