@@ -144,6 +144,20 @@ local ARRANGEMENTS: { Arrangement } = {
         },
     },
     {
+        -- THE WHITE CHERRY (XfCherryA, 26.3k @ 22 studs) — forgotten, not rejected.
+        -- Paired with a sculpted niwaki: flowering cherry against a clipped evergreen
+        -- is the oldest pairing in the temple-garden vocabulary, and white reads as
+        -- LUMINOUS against dark green rather than clashing the way jewel tones do, so
+        -- it wants the conifer close, not cushioned away from it.
+        name = "HanamiStand",
+        site = "pathEdge",
+        trees = {
+            { species = "XfCherryA", dx = 0, dz = 0, scale = 1.0 },
+            { species = "PineNiwakiD", dx = -9, dz = 5, scale = 0.8 },
+            { species = "XfCherryM", dx = 8, dz = 6, scale = 0.85 },
+        },
+    },
+    {
         -- ONE true hero (68k) with two cheaper same-species companions: the scrub-pine
         -- stand that reads from across the valley without three hero prices
         name = "ShrineTrio",
@@ -267,16 +281,30 @@ local function stamp(arr: Arrangement, ax: number, az: number, labelled: boolean
         clone:SetAttribute("Arrangement", arr.name)
         clone.Parent = group
         local yaw = if t.yawDeg then math.rad(t.yawDeg) else yawRoll * 2 * math.pi
-        clone:PivotTo(CFrame.new(x, y, z) * CFrame.Angles(0, yaw, 0))
         -- ScaleTo is ABSOLUTE, and the kit templates are already scaled (CedarM sits
         -- at 0.23, CedarS at 0.143) — so ScaleTo(1.0) did not mean "natural size", it
         -- RESET the model to its authored size and blew a 45-stud cedar up to 196.
         -- Every cedar/fir/blush arrangement has been rendering 2-9x oversized since
         -- this tool was written; multiply by the template's own scale as the plant
-        -- scatter does. (2026-08-01)
+        -- scatter does. SCALE FIRST — it moves geometry, so seating must follow it.
         if clone:IsA("Model") and t.scale ~= 1 then
             clone:ScaleTo(clone:GetScale() * t.scale)
         end
+        clone:PivotTo(CFrame.new(x, y, z) * CFrame.Angles(0, yaw, 0))
+        -- PLANTING DEPTH (2026-08-01 gate): this tool used to drop each model's PIVOT
+        -- onto the ground, which floats or buries a tree depending on where its pivot
+        -- happens to sit, and ignored the hand-calibrated PlantDepth attribute
+        -- entirely — the Kanzan's is 2.74 studs. Seat the BOUNDING-BOX BOTTOM at
+        -- ground minus that depth, scaled by this tree's own factor, exactly as the
+        -- plant scatter does. NEVER recompute PlantDepth by formula: the values are
+        -- hand-calibrated per template.
+        local depth = template:GetAttribute("PlantDepth")
+        if typeof(depth) ~= "number" then
+            depth = 0.3
+        end
+        depth *= t.scale
+        local box, bsize = clone:GetBoundingBox()
+        clone:PivotTo(clone:GetPivot() + Vector3.new(0, y - depth - (box.Position.Y - bsize.Y / 2), 0))
     end
     if labelled then
         -- the label must sit on the SAME plane as its trees; raycasting here put the
