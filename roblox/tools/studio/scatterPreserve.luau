@@ -1270,6 +1270,9 @@ local function plan(
             recipe.submergeMax,
             function()
                 return roll(zone)
+            end,
+            function(radius)
+                return waterWithin(water, s.x, s.z, radius)
             end
         )
         if species == nil then
