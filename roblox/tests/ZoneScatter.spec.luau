@@ -1207,3 +1207,187 @@ describe("ZoneScatter grove pre-pass", function()
         end)
     end)
 end)
+
+-- helper: a flat 100x100 grid of samples, 4-stud pitch, all uniformly
+-- submerged to `depth` studs (shore-margin recipes, unlike CORE, opt in)
+local function wetSamples(depth: number): { ZoneScatter.Sample }
+    local s = {}
+    for x = 0, 100, 4 do
+        for z = 0, 100, 4 do
+            table.insert(s, { x = x, z = z, y = 49, steep = 0, depth = depth })
+        end
+    end
+    return s
+end
+
+describe("ZoneScatter per-species submergence override", function()
+    local zones: { ZoneScatter.Zone } = {
+        {
+            name = "A",
+            shape = "rect",
+            bounds = { 0, 0, 100, 100 },
+            recipe = "R",
+            densityScale = 1,
+            seed = 7,
+        },
+    }
+
+    test("species submergence gates: the deeper-tolerant species always wins the re-pick", function()
+        -- FernA can't tolerate ANY water (submergeMax=0); ReedB tolerates up
+        -- to 2 studs. Over uniformly 1-stud-deep samples, every FernA draw
+        -- must re-pick — with only two species in the pool, that always
+        -- lands on ReedB, so nothing but ReedB should ever be placed.
+        local recipe = table.clone(CORE)
+        recipe.submergeMax = 5 -- outer bound: generous, not the limiting factor
+        recipe.pool = {
+            { name = "FernA", weight = 1, submergeMax = 0 },
+            { name = "ReedB", weight = 1, submergeMax = 2 },
+        }
+        local out = ZoneScatter.plan(zones, wetSamples(1), { R = recipe })
+        expect(#out > 0).toBe(true)
+        for _, p in out do
+            expect(p.species).toBe("ReedB")
+        end
+    end)
+
+    test("skip when all 4 attempts fail: zero placements, not a crash or a fallback", function()
+        -- a single-species pool whose only species can't tolerate ANY water:
+        -- every attempt (all 4) draws the same intolerant species, so every
+        -- sample is skipped outright.
+        local recipe = table.clone(CORE)
+        recipe.submergeMax = 5
+        recipe.pool = { { name = "FernA", weight = 1, submergeMax = 0 } }
+        local out = ZoneScatter.plan(zones, wetSamples(1), { R = recipe })
+        expect(#out).toBe(0)
+    end)
+
+    test("no override = unchanged (pinned to the pre-change baseline, not a re-run of this code)", function()
+        -- two species, NEITHER carries a submergeMax override: pickWadingSpecies
+        -- must behave as a pure pass-through, so this is byte-identical to
+        -- the plan this exact recipe/sample/seed produced before the feature
+        -- existed. Counts pinned by hand against the unmodified planner.
+        local recipe = table.clone(CORE)
+        recipe.submergeMax = 2
+        recipe.pool = { { name = "SpeciesA", weight = 1 }, { name = "SpeciesB", weight = 1 } }
+        local out = ZoneScatter.plan(zones, wetSamples(1), { R = recipe })
+        expect(#out).toBe(68)
+        local counts: { [string]: number } = {}
+        for _, p in out do
+            counts[p.species] = (counts[p.species] or 0) + 1
+        end
+        expect(counts.SpeciesA).toBe(38)
+        expect(counts.SpeciesB).toBe(30)
+    end)
+
+    test("the recipe-level gate is still the outer bound: a species override can't widen it", function()
+        -- ReedB claims it can tolerate 5 studs, but the RECIPE's submergeMax
+        -- (0.3) is the pre-filter checked in `accepts`, before any species is
+        -- ever drawn — a 1-stud-deep sample never reaches species selection.
+        local recipe = table.clone(CORE)
+        recipe.submergeMax = 0.3
+        recipe.pool = { { name = "ReedB", weight = 1, submergeMax = 5 } }
+        local out = ZoneScatter.plan(zones, wetSamples(1), { R = recipe })
+        expect(#out).toBe(0)
+    end)
+
+    test(
+        "determinism: a plan using submergence override + rockAffinity together is identical across runs",
+        function()
+            local recipe = table.clone(CORE)
+            recipe.submergeMax = 5
+            recipe.pool = {
+                { name = "FernA", weight = 1, submergeMax = 0 },
+                { name = "ReedB", weight = 1, submergeMax = 2 },
+            }
+            recipe.rockAffinity = { radius = 10, inside = 1, outside = 0.5 }
+            local opts = { rocks = { { x = 50, z = 50 }, { x = 20, z = 80 } } }
+            local a = ZoneScatter.plan(zones, wetSamples(1), { R = recipe }, nil, nil, opts)
+            local b = ZoneScatter.plan(zones, wetSamples(1), { R = recipe }, nil, nil, opts)
+            expect(#a).toBe(#b)
+            for i, p in a do
+                expect(p.x).toBe(b[i].x)
+                expect(p.species).toBe(b[i].species)
+                expect(p.yaw).toBe(b[i].yaw)
+            end
+        end
+    )
+end)
+
+describe("ZoneScatter rockAffinity", function()
+    local zones: { ZoneScatter.Zone } = {
+        {
+            name = "A",
+            shape = "rect",
+            bounds = { 0, 0, 100, 100 },
+            recipe = "R",
+            densityScale = 1,
+            seed = 7,
+        },
+    }
+
+    test("inside/outside: every placement lies within radius of the injected rock", function()
+        local shore = table.clone(CORE)
+        shore.spacingMin = 4
+        shore.spacingMax = 6
+        shore.rockAffinity = { radius = 10, inside = 1, outside = 0 }
+        local out = ZoneScatter.plan(zones, flatSamples(), { R = shore }, nil, nil, {
+            rocks = { { x = 50, z = 50 } },
+        })
+        expect(#out > 0).toBe(true)
+        for _, p in out do
+            local dx, dz = p.x - 50, p.z - 50
+            expect(dx * dx + dz * dz <= 10 * 10).toBe(true)
+        end
+    end)
+
+    test("no rocks supplied behaves as all-outside", function()
+        local shore = table.clone(CORE)
+        shore.spacingMin = 4
+        shore.spacingMax = 6
+        shore.rockAffinity = { radius = 10, inside = 1, outside = 0 }
+        -- opts.rocks nil (not even passed) — outside=0 means every sample is
+        -- treated as outside, so nothing plants at all
+        local out = ZoneScatter.plan(zones, flatSamples(), { R = shore })
+        expect(#out).toBe(0)
+    end)
+
+    test("compounds with careDensity: BOTH apply, so the combined count beats either factor alone", function()
+        -- "strictly between the single-factor counts" isn't a reliable
+        -- relationship here — the two multipliers interact with the shared
+        -- LCG stream and the greedy min-spacing pass in a way that isn't
+        -- simply monotonic sample-by-sample. What IS reliable, and what
+        -- actually proves the two multipliers compound (rather than one
+        -- silently overwriting the other, or only one taking effect), is
+        -- that the combined-multiplier count sits below EITHER single-factor
+        -- count on its own. Values pinned empirically for this seed/recipe.
+        local careOnly = table.clone(CORE)
+        careOnly.careDensity = { PRESERVE = 0.5 }
+        local rockOnly = table.clone(CORE)
+        rockOnly.rockAffinity = { radius = 15, inside = 1, outside = 0.3 }
+        local both = table.clone(CORE)
+        both.careDensity = { PRESERVE = 0.5 }
+        both.rockAffinity = { radius = 15, inside = 1, outside = 0.3 }
+
+        local careBand = function(_x: number, _z: number): string
+            return "PRESERVE"
+        end
+        local rocks = { { x = 50, z = 50 } }
+
+        local outCare = ZoneScatter.plan(
+            zones,
+            flatSamples(),
+            { R = careOnly },
+            nil,
+            nil,
+            { careBand = careBand }
+        )
+        local outRock = ZoneScatter.plan(zones, flatSamples(), { R = rockOnly }, nil, nil, { rocks = rocks })
+        local outBoth = ZoneScatter.plan(zones, flatSamples(), { R = both }, nil, nil, {
+            careBand = careBand,
+            rocks = rocks,
+        })
+
+        expect(#outBoth < #outCare).toBe(true)
+        expect(#outBoth < #outRock).toBe(true)
+    end)
+end)

@@ -23,10 +23,15 @@ export type Zone = {
     yMin: number?,
     yMax: number?,
 }
+-- per-species `scale` normalises source assets of wildly different native
+-- size (the toolbox redwoods import at ~100 studs against 22-30-stud sugi).
+-- `submergeMax` narrows the recipe-level submergence gate (below) to THIS
+-- species only — a fern shouldn't wade as deep as a reed sharing its pool.
+-- nil = defer to the recipe's submergeMax, exactly as if the field didn't
+-- exist.
+export type Species = { name: string, weight: number, scale: number?, submergeMax: number? }
 export type Recipe = {
-    -- per-species `scale` normalises source assets of wildly different native
-    -- size (the toolbox redwoods import at ~100 studs against 22-30-stud sugi)
-    pool: { { name: string, weight: number, scale: number? } },
+    pool: { Species },
     spacingMin: number,
     spacingMax: number,
     clumpChance: number,
@@ -54,7 +59,10 @@ export type Recipe = {
     footingMaxDrop: number?,
     -- submersion: nil rejects any wet sample outright; a number accepts
     -- 0 < depth <= submergeMax (studs of water over the ground point). Most
-    -- flora is dry-only; shore reeds and the like opt in.
+    -- flora is dry-only; shore reeds and the like opt in. This is the OUTER
+    -- bound for the whole pool, checked before any species is drawn — a
+    -- species' own (optional) submergeMax can only narrow it further, never
+    -- widen it (see pickWadingSpecies below).
     submergeMax: number?,
     -- per-band multiplier on the zone's densityScale (e.g. GARDEN = 0 clears a
     -- tended front yard of wild growth). Applied only when the caller supplies
@@ -69,6 +77,12 @@ export type Recipe = {
     -- effective density near any grove anchor is multiplied by `inside`
     -- instead of `outside`, so ground cover thickens around the groves.
     groveAffinity: GroveAffinity?,
+    -- generalises groveAffinity to an arbitrary injected point set
+    -- (PlanOptions.rocks): effective density is multiplied by `inside` when
+    -- the sample lies within `radius` of any rock, else `outside`. COMPOUNDS
+    -- with careDensity — both multiply the same density slot. With
+    -- opts.rocks nil/empty, every sample is treated as `outside`.
+    rockAffinity: GroveAffinity?,
 }
 export type GroveConfig = {
     spacing: number, -- min distance between grove ANCHORS (meadows live between)
@@ -223,10 +237,7 @@ local function inInnerClear(zone: Zone, frac: number, x: number, z: number): boo
     return math.abs(x - cx) < hw and math.abs(z - cz) < hh
 end
 
-local function pickSpecies(
-    pool: { { name: string, weight: number, scale: number? } },
-    roll: number
-): (string, number)
+local function pickSpecies(pool: { Species }, roll: number): (string, number, number?)
     local total = 0
     for _, s in pool do
         total += s.weight
@@ -235,11 +246,69 @@ local function pickSpecies(
     for _, s in pool do
         at -= s.weight
         if at <= 0 then
-            return s.name, s.scale or 1
+            return s.name, s.scale or 1, s.submergeMax
         end
     end
     local last = pool[#pool]
-    return last.name, last.scale or 1
+    return last.name, last.scale or 1, last.submergeMax
+end
+
+-- a wet sample has already cleared the recipe-level submergeMax gate in
+-- `accepts` (the OUTER bound) before any species is drawn. This re-rolls a
+-- fresh pickSpecies draw — same stream, not a separate one — up to 4 times
+-- if the species it lands on can't personally tolerate this depth, and
+-- gives up (no species) rather than forcing a shallow-water species into
+-- deep water just because it won the weight roll. A dry sample (depth 0)
+-- always clears on the FIRST draw, so a recipe with no per-species
+-- submergeMax overrides costs exactly the one roll it always has — this is
+-- a no-op wrapper until a recipe opts in.
+local MAX_SUBMERGE_ATTEMPTS = 4
+
+local function pickWadingSpecies(
+    pool: { Species },
+    depth: number,
+    recipeSubmergeMax: number?,
+    rollFn: () -> number
+): (string?, number, number?)
+    for _ = 1, MAX_SUBMERGE_ATTEMPTS do
+        local name, scale, speciesMax = pickSpecies(pool, rollFn())
+        local limit = if speciesMax ~= nil then speciesMax else recipeSubmergeMax
+        if depth <= (limit or 0) then
+            return name, scale, speciesMax
+        end
+    end
+    return nil, 1, nil
+end
+
+-- grove COHERENT members choose between the already-rolled dominant/attendant
+-- species (a threshold roll, not a fresh pickSpecies draw) — the wading
+-- equivalent re-rolls that SAME threshold up to 4 times against the member's
+-- own depth (which can differ from the elder's), reusing whichever of the two
+-- species' submergence limits applies. No override on either species = the
+-- limit is always the recipe's outer bound, already cleared by `accepts`, so
+-- this costs exactly the one threshold roll it always has.
+local function pickWadingCoherentMember(
+    domSpecies: string,
+    domScale: number,
+    domLimit: number?,
+    attSpecies: string,
+    attScale: number,
+    attLimit: number?,
+    depth: number,
+    rollFn: () -> number
+): (string?, number)
+    for _ = 1, MAX_SUBMERGE_ATTEMPTS do
+        local species, scale, limit
+        if rollFn() < GROVE_ATTENDANT_THRESHOLD then
+            species, scale, limit = domSpecies, domScale, domLimit
+        else
+            species, scale, limit = attSpecies, attScale, attLimit
+        end
+        if depth <= (limit or 0) then
+            return species, scale
+        end
+    end
+    return nil, 1
 end
 
 local function nearestSample(samples: { Sample }, x: number, z: number): Sample?
@@ -318,6 +387,9 @@ export type PlanOptions = {
     pitch: number?,
     keepOut: ((number, number, string?) -> boolean)?,
     careBand: ((number, number) -> string)?,
+    -- injected point set for rockAffinity (e.g. the ShoreRocks pass' placed
+    -- rocks); nil/empty = every recipe.rockAffinity sample is "outside"
+    rocks: { { x: number, z: number } }?,
 }
 
 local function sampleKey(x: number, z: number, pitch: number): string
@@ -531,26 +603,54 @@ function ZoneScatter.plan(
         -- inter-anchor spacing check.
         local function placeGrove(anchor: Sample, memberTarget: number)
             removeCandidate(anchor)
-            table.insert(zoneAnchors, { anchor.x, anchor.z })
 
-            local domSpecies, domScale, attSpecies, attScale
+            -- species submergence (see pickWadingSpecies): the elder plants
+            -- exactly at the anchor, so the anchor's own depth is the known
+            -- depth to check. If a submergeMax-bearing pool can't find
+            -- anything that tolerates it after 4 attempts, this candidate
+            -- can't seat a grove at all — the anchor is already spent (never
+            -- retried elsewhere) but no elder, no members, no zoneAnchors
+            -- entry: an empty grove is not a placement.
+            local anchorDepth = anchor.depth or 0
+            local domSpecies, domScale, domLimit, attSpecies, attScale, attLimit
             local elderSpecies, elderScale
             if coherent then
-                domSpecies, domScale = pickSpecies(recipe.pool, groveRoll(zone))
-                local attPool: { { name: string, weight: number, scale: number? } } = {}
-                for _, sp in recipe.pool do
-                    if sp.name ~= domSpecies then
-                        table.insert(attPool, sp)
+                domSpecies, domScale, domLimit = pickWadingSpecies(
+                    recipe.pool,
+                    anchorDepth,
+                    recipe.submergeMax,
+                    function()
+                        return groveRoll(zone)
                     end
+                )
+                if domSpecies ~= nil then
+                    local attPool: { Species } = {}
+                    for _, sp in recipe.pool do
+                        if sp.name ~= domSpecies then
+                            table.insert(attPool, sp)
+                        end
+                    end
+                    if #attPool == 0 then
+                        attPool = recipe.pool
+                    end
+                    attSpecies, attScale, attLimit = pickSpecies(attPool, groveRoll(zone))
+                    elderSpecies, elderScale = domSpecies, domScale
                 end
-                if #attPool == 0 then
-                    attPool = recipe.pool
-                end
-                attSpecies, attScale = pickSpecies(attPool, groveRoll(zone))
-                elderSpecies, elderScale = domSpecies, domScale
             else
-                elderSpecies, elderScale = pickSpecies(recipe.pool, groveRoll(zone))
+                elderSpecies, elderScale = pickWadingSpecies(
+                    recipe.pool,
+                    anchorDepth,
+                    recipe.submergeMax,
+                    function()
+                        return groveRoll(zone)
+                    end
+                )
             end
+
+            if elderSpecies == nil then
+                return
+            end
+            table.insert(zoneAnchors, { anchor.x, anchor.z })
 
             -- every already-placed member of THIS grove (elder included),
             -- for the memberSpacing check below — scoped to the grove, not
@@ -607,15 +707,41 @@ function ZoneScatter.plan(
                 removeCandidate(best)
                 table.insert(groveMembers, best)
 
+                -- a member stands on ITS OWN candidate, not the anchor's, so
+                -- its depth (and therefore its wading gate) is checked
+                -- against `best`, never `anchor` — a member can be wetter or
+                -- drier than the elder it clusters around
+                local bestDepth = best.depth or 0
                 local mSpecies, mScale
                 if coherent then
-                    if groveRoll(zone) < GROVE_ATTENDANT_THRESHOLD then
-                        mSpecies, mScale = domSpecies, domScale
-                    else
-                        mSpecies, mScale = attSpecies, attScale
-                    end
+                    mSpecies, mScale = pickWadingCoherentMember(
+                        domSpecies,
+                        domScale,
+                        if domLimit ~= nil then domLimit else recipe.submergeMax,
+                        attSpecies,
+                        attScale,
+                        if attLimit ~= nil then attLimit else recipe.submergeMax,
+                        bestDepth,
+                        function()
+                            return groveRoll(zone)
+                        end
+                    )
                 else
-                    mSpecies, mScale = pickSpecies(recipe.pool, groveRoll(zone))
+                    mSpecies, mScale = pickWadingSpecies(
+                        recipe.pool,
+                        bestDepth,
+                        recipe.submergeMax,
+                        function()
+                            return groveRoll(zone)
+                        end
+                    )
+                end
+                if mSpecies == nil then
+                    -- no species (dom/att, or the free-mix pool) tolerates
+                    -- this candidate's depth: the ground is spent — it's
+                    -- already removed from `candidates` above — but nothing
+                    -- is placed on it, same as the per-sample skip
+                    continue
                 end
                 -- sapling roll: always drawn, whether or not this recipe
                 -- configures `saplings`, so the stream's shape never depends
@@ -722,6 +848,16 @@ function ZoneScatter.plan(
     end
     local groveIndex = ZoneScatter.indexWater(groveAnchors)
 
+    -- rockAffinity's lookup, built exactly like the grove-anchor index above
+    -- but from the caller-injected point set rather than this pass' own
+    -- output; indexWater takes positional {x, z} cells, so translate
+    -- opts.rocks' named fields once here rather than at every query site
+    local rockCells: { { number } } = {}
+    for _, r in o.rocks or {} do
+        table.insert(rockCells, { r.x, r.z })
+    end
+    local rockIndex = ZoneScatter.indexWater(rockCells)
+
     for _, s in ordered do
         local zone = resolveZone(zones, s.x, s.z, s.y, function(candidate)
             -- grove-recipe zones already planted in the pre-pass; excluding
@@ -760,6 +896,16 @@ function ZoneScatter.plan(
                 density *= aff.outside
             end
         end
+        -- rockAffinity COMPOUNDS with careDensity and groveAffinity above —
+        -- it's the same multiplicative `density` slot, not a separate gate
+        if recipe.rockAffinity ~= nil then
+            local aff = recipe.rockAffinity :: GroveAffinity
+            if waterWithin(rockIndex, s.x, s.z, aff.radius) then
+                density *= aff.inside
+            else
+                density *= aff.outside
+            end
+        end
         if roll(zone) >= density then
             continue
         end
@@ -782,7 +928,19 @@ function ZoneScatter.plan(
         end
 
         local heightScale = recipe.heightScale or 1
-        local species, speciesScale = pickSpecies(recipe.pool, roll(zone))
+        local species, speciesScale = pickWadingSpecies(
+            recipe.pool,
+            s.depth or 0,
+            recipe.submergeMax,
+            function()
+                return roll(zone)
+            end
+        )
+        if species == nil then
+            -- every attempt drew a species that can't tolerate this depth:
+            -- skip the sample entirely, no placement (never a fallback)
+            continue
+        end
         table.insert(out, {
             x = s.x,
             z = s.z,
