@@ -18,6 +18,17 @@ the atlas, which should stay brown in autumn.
 Measured on XfMapleA_leaves.png (2026-08-01): 1021x1024, 26% opaque, hue
 clustered 60-77 deg, sat 0.44, val 0.44 — a narrow band, which is why this
 works so cleanly here.
+
+⚠️ MODERATION (2026-08-01, learned the hard way): Roblox REMOVED the uploaded
+GREEN maple variant within hours, while the gold and red survived untouched. A
+palmate, serrated, GREEN leaf reads to automated moderation as cannabis — the
+colour is what completes the match, which is exactly why only the green was
+pulled. Practical rules:
+  * Do NOT upload green palmate foliage. You almost never need to: the vendor's
+    own green colormap is already uploaded and working.
+  * Autumn recolours (gold/red/bronze) are safe for the same leaf shape.
+  * Re-uploading a removed asset invites escalation against the account; drop it
+    and use the original instead.
 """
 
 import argparse
