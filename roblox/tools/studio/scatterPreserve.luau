@@ -1402,8 +1402,13 @@ local function nameSeed(name: string): number
     return acc
 end
 
+-- Which zones this run may WIPE and STAMP. Never affects planning.
+-- Destructive modes REQUIRE an explicit target: pass zones = { "Margin" } for one,
+-- or zones = { "ALL" } to deliberately restamp everything. There is no implicit
+-- "everything" — a bake meant for one zone must never be able to silently rewrite
+-- the rest of the canyon, which is exactly how approved planting got destroyed.
 local function wanted(name: string): boolean
-    if #ZONES == 0 then
+    if #ZONES == 1 and ZONES[1] == "ALL" then
         return true
     end
     return table.find(ZONES, name) ~= nil
@@ -1429,10 +1434,13 @@ local function readZones(): { Zone }
                 warn(`[preserve] {part.Name}: missing Recipe attribute — skipped`)
                 continue
             end
-            -- KeepOut zones always participate (they mask every bake)
-            if recipe ~= "KeepOut" and not wanted(part.Name) then
-                continue
-            end
+            -- EVERY zone is always loaded, even when only one is being stamped.
+            -- Planning is a WHOLE-WORLD computation: the sample grid spans the union
+            -- of zone bounds, and spacing is checked across zones sharing a layer. Drop
+            -- a zone here and the surviving zones plan against a different world, so a
+            -- filtered bake produced DIFFERENT trees than a full one — the reason
+            -- zone-filtered bakes were never isolation-safe. `wanted` now gates only
+            -- what is WIPED and STAMPED (see the shell), never what is planned.
             local pos, size = part.Position, part.Size
             local shape = "rect"
             local bounds: { number }
@@ -2113,6 +2121,13 @@ return function(opts: {
 }): string
     local mode = opts.mode or MODE
     ZONES = opts.zones or ZONES
+    if (mode == "bake" or mode == "wipe") and #ZONES == 0 then
+        return "[preserve] REFUSED: "
+            .. mode
+            .. " needs an explicit zones list, e.g. "
+            .. 'zones = { "Margin" } for one zone or zones = { "ALL" } for the whole canyon. '
+            .. "Planning is always whole-world; this only limits what gets rewritten."
+    end
 
     local recipes: { [string]: Recipe } = {}
     for key, recipe in RECIPES do
