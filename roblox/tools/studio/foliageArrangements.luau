@@ -221,7 +221,10 @@ local function draftFolder(): Folder
     return draft :: Folder
 end
 
-local function stamp(arr: Arrangement, ax: number, az: number, labelled: boolean)
+-- flatY: when set, every tree in the arrangement seats on that plane instead of
+-- raycasting terrain — the gallery stands them on a built platform, where a terrain
+-- ray would find the canyon hundreds of studs below (or nothing at all).
+local function stamp(arr: Arrangement, ax: number, az: number, labelled: boolean, flatY: number?)
     local kit = ServerStorage:FindFirstChild("FoliageKit")
     assert(kit, "ServerStorage.FoliageKit missing")
     local draft = draftFolder()
@@ -237,7 +240,12 @@ local function stamp(arr: Arrangement, ax: number, az: number, labelled: boolean
             continue
         end
         local x, z = ax + t.dx, az + t.dz
-        local y, isWater = groundAt(x, z)
+        local y, isWater
+        if flatY ~= nil then
+            y, isWater = flatY, false
+        else
+            y, isWater = groundAt(x, z)
+        end
         if not y or isWater then
             warn(
                 `[arr] {arr.name}/{t.species} skipped at ({x}, {z}) — {isWater and "water" or "no ground"}`
@@ -255,12 +263,20 @@ local function stamp(arr: Arrangement, ax: number, az: number, labelled: boolean
         clone.Parent = group
         local yaw = if t.yawDeg then math.rad(t.yawDeg) else yawRoll * 2 * math.pi
         clone:PivotTo(CFrame.new(x, y, z) * CFrame.Angles(0, yaw, 0))
+        -- ScaleTo is ABSOLUTE, and the kit templates are already scaled (CedarM sits
+        -- at 0.23, CedarS at 0.143) — so ScaleTo(1.0) did not mean "natural size", it
+        -- RESET the model to its authored size and blew a 45-stud cedar up to 196.
+        -- Every cedar/fir/blush arrangement has been rendering 2-9x oversized since
+        -- this tool was written; multiply by the template's own scale as the plant
+        -- scatter does. (2026-08-01)
         if clone:IsA("Model") and t.scale ~= 1 then
-            clone:ScaleTo(t.scale)
+            clone:ScaleTo(clone:GetScale() * t.scale)
         end
     end
     if labelled then
-        local y = groundAt(ax, az) or 150
+        -- the label must sit on the SAME plane as its trees; raycasting here put the
+        -- gallery's posts on the canyon floor 400 studs below their own arrangement
+        local y = flatY or groundAt(ax, az) or 150
         local post = Instance.new("Part")
         post.Name = "Label_" .. arr.name
         post.Anchored = true
@@ -288,24 +304,102 @@ local function stamp(arr: Arrangement, ax: number, az: number, labelled: boolean
     end
 end
 
-if MODE == "display" then
-    local draft = draftFolder()
-    draft:ClearAllChildren()
-    for i, arr in ARRANGEMENTS do
-        local site = SITES[i]
-        if site then
-            stamp(arr, site[1], site[2], true)
-        end
+-- GALLERY (2026-08-01): the up-valley display row was judged unattractive, but it was
+-- shown at full scale amid canyon clutter, which is not a fair test of a composition.
+-- This lifts all 13 onto a neutral platform ABOVE the canyon, evenly spaced, so each
+-- can be read on its own terms.
+local GALLERY_CENTRE = Vector3.new(0, 520, 0)
+local GALLERY_CELL = 60
+local GALLERY_COLS = 5
+
+local function galleryFolder(): Folder
+    local sandbox = workspace:FindFirstChild("Sandbox")
+    if not sandbox then
+        local s = Instance.new("Folder")
+        s.Name = "Sandbox"
+        s.Parent = workspace
+        sandbox = s
     end
-    print(`[arr] displayed {math.min(#ARRANGEMENTS, #SITES)} arrangements up-valley`)
-else
+    local old = (sandbox :: Instance):FindFirstChild("ArrangementGallery")
+    if old then
+        old:Destroy()
+    end
+    local f = Instance.new("Folder")
+    f.Name = "ArrangementGallery"
+    f.Parent = sandbox
+    return f
+end
+
+local function buildGallery(): string
+    local rows = math.ceil(#ARRANGEMENTS / GALLERY_COLS)
+    local width = GALLERY_COLS * GALLERY_CELL
+    local depth = rows * GALLERY_CELL
+    local folder = galleryFolder()
+
+    local slab = Instance.new("Part")
+    slab.Name = "GalleryFloor"
+    slab.Anchored = true
+    slab.CanCollide = true
+    -- never shadow the canyon below with a 300-stud slab hanging over it
+    slab.CastShadow = false
+    slab.Size = Vector3.new(width, 2, depth)
+    slab.Position = GALLERY_CENTRE
+    slab.Material = Enum.Material.Slate
+    slab.Color = Color3.fromRGB(105, 105, 100)
+    slab.Parent = folder
+
+    local topY = GALLERY_CENTRE.Y + 1
+    local x0 = GALLERY_CENTRE.X - width / 2 + GALLERY_CELL / 2
+    local z0 = GALLERY_CENTRE.Z - depth / 2 + GALLERY_CELL / 2
+    for i, arr in ARRANGEMENTS do
+        local col = (i - 1) % GALLERY_COLS
+        local row = math.floor((i - 1) / GALLERY_COLS)
+        stamp(arr, x0 + col * GALLERY_CELL, z0 + row * GALLERY_CELL, true, topY)
+    end
+    -- the draft folder is where stamp() parents its groups; move them onto the gallery
+    -- so the canyon's own ArrangementsDraft is not left holding floating trees
+    local draft = draftFolder()
+    for _, child in draft:GetChildren() do
+        child.Parent = folder
+    end
+    return `[arr] gallery: {#ARRANGEMENTS} arrangements on a {width}x{depth} platform at `
+        .. `({GALLERY_CENTRE.X}, {GALLERY_CENTRE.Y}, {GALLERY_CENTRE.Z}) — Sandbox.ArrangementGallery`
+end
+
+return function(opts: { mode: string?, name: string?, at: { x: number, z: number }? }?): string
+    local mode = (opts and opts.mode) or MODE
+    if mode == "gallery" then
+        return buildGallery()
+    end
+    if mode == "gallery-off" then
+        local sandbox = workspace:FindFirstChild("Sandbox")
+        local g = sandbox and sandbox:FindFirstChild("ArrangementGallery")
+        if g then
+            g:Destroy()
+            return "[arr] gallery removed"
+        end
+        return "[arr] no gallery to remove"
+    end
+    if mode == "display" then
+        local draft = draftFolder()
+        draft:ClearAllChildren()
+        for i, arr in ARRANGEMENTS do
+            local site = SITES[i]
+            if site then
+                stamp(arr, site[1], site[2], true)
+            end
+        end
+        return `[arr] displayed {math.min(#ARRANGEMENTS, #SITES)} arrangements up-valley`
+    end
+    local wanted = (opts and opts.name) or PLACE_NAME
+    local at = (opts and opts.at) or PLACE_AT
     local arr
     for _, a in ARRANGEMENTS do
-        if a.name == PLACE_NAME then
+        if a.name == wanted then
             arr = a
         end
     end
-    assert(arr, "unknown arrangement " .. PLACE_NAME)
-    stamp(arr, PLACE_AT.x, PLACE_AT.z, false)
-    print(`[arr] placed {PLACE_NAME} at ({PLACE_AT.x}, {PLACE_AT.z})`)
+    assert(arr, "unknown arrangement " .. wanted)
+    stamp(arr, at.x, at.z, false)
+    return `[arr] placed {wanted} at ({at.x}, {at.z})`
 end
