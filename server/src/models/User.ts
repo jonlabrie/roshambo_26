@@ -17,6 +17,20 @@ export interface IUser extends Document {
     currentStreak: number;
     stakingStreak: number;
     pointsAtStake: number;
+    // Play HUD (2026-08-02). unresolvedWin is NOT derivable from pointsAtStake: after choosing
+    // RISK the pot still rides, so that value is identical in the bound and unbound states.
+    unresolvedWin: boolean;
+    escalationPrompts: boolean;
+    seenBeats: string[];
+    roundsPlayed: number;
+    wins: number;
+    safes: number;
+    losses: number;
+    lifetimeBanked: number;
+    bestPot: number;
+    throwsR: number;
+    throwsP: number;
+    throwsS: number;
     inventory: string[];
     equippedCharacterId: string;
     teahouses: Map<string, unknown>;
@@ -47,6 +61,18 @@ const UserSchema: Schema = new Schema({
     currentStreak: { type: Number, default: 0 },
     stakingStreak: { type: Number, default: 0 },
     pointsAtStake: { type: Number, default: 0 },
+    unresolvedWin: { type: Boolean, default: false },
+    escalationPrompts: { type: Boolean, default: true },
+    seenBeats: { type: [String], default: [] },
+    roundsPlayed: { type: Number, default: 0 },
+    wins: { type: Number, default: 0 },
+    safes: { type: Number, default: 0 },
+    losses: { type: Number, default: 0 },
+    lifetimeBanked: { type: Number, default: 0 },
+    bestPot: { type: Number, default: 0 },
+    throwsR: { type: Number, default: 0 },
+    throwsP: { type: Number, default: 0 },
+    throwsS: { type: Number, default: 0 },
     inventory: { type: [String], default: ['default'] },
     equippedCharacterId: { type: String, default: 'default' },
     teahouses: { type: Map, of: Schema.Types.Mixed, default: {} },

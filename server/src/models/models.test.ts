@@ -50,3 +50,24 @@ describe('schema additions', () => {
         expect(set.maxDeckSize).toBe('M');
     });
 });
+
+describe('User defaults — play HUD fields', () => {
+    it('defaults every new play-HUD field so existing docs need no migration', () => {
+        const u = new User({ deviceId: 'd1' });
+        expect(u.unresolvedWin).toBe(false);
+        expect(u.escalationPrompts).toBe(true); // prompts are on until the player turns them off
+        expect(u.seenBeats).toEqual([]);
+        for (const k of ['roundsPlayed', 'wins', 'safes', 'losses', 'lifetimeBanked', 'bestPot',
+                         'throwsR', 'throwsP', 'throwsS'] as const) {
+            expect(u[k]).toBe(0);
+        }
+    });
+
+    it('unresolvedWin is independent of pointsAtStake', () => {
+        // the whole reason it needs its own field: after choosing RISK the pot still rides,
+        // so pointsAtStake > 0 is true in BOTH the bound and unbound states
+        const u = new User({ deviceId: 'd2', pointsAtStake: 27, unresolvedWin: false });
+        expect(u.pointsAtStake).toBe(27);
+        expect(u.unresolvedWin).toBe(false);
+    });
+});
