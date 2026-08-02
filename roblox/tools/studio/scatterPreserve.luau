@@ -354,6 +354,21 @@ local RECIPES: { [string]: Recipe } = {
         careDensity = { GARDEN = 0.5, TENDED = 0.7 },
         rockAffinity = { radius = 5, inside = 1.4, outside = 0.9 },
         grassPaint = { below = 1, above = 4, maxSlope = 0.5 },
+        -- SHORELINE STATIONS (user gate 2026-08-01): "a line of shuffled mixes
+        -- marching along the shore". Area-scatter spread plants across the whole
+        -- bank with no sense of the water running through it, and its clumps were
+        -- monospecific — three reeds or three ferns, never a handful. Stations walk
+        -- the shore at a fixed spacing and each one plants a MIXED group whose
+        -- members roll species independently. The per-species nearWater/submergeMax
+        -- gates then sort each handful wet-to-dry on their own, so an iris and a
+        -- fern can be co-located without either being fenced into its own band.
+        shoreline = {
+            stationSpacing = 14,
+            membersMin = 3,
+            membersMax = 6,
+            spread = 4,
+            inland = 5,
+        },
     },
     WaterMarginTended = {
         pool = {
@@ -384,6 +399,15 @@ local RECIPES: { [string]: Recipe } = {
         rockAffinity = { radius = 6, inside = 1.6, outside = 0.7 },
         -- narrower band than wild, so more shore reads as deliberate
         grassPaint = { below = 1, above = 3, maxSlope = 0.5 },
+        -- a tended shore: stations further apart and handfuls smaller, so the
+        -- planting reads as placed rather than grown (see WaterMargin's note)
+        shoreline = {
+            stationSpacing = 20,
+            membersMin = 2,
+            membersMax = 4,
+            spread = 3,
+            inland = 4,
+        },
     },
     -- ONE dense dark stand at a user-marked spot: sugi is the shrine-grove
     -- species and grows exactly this way. Zone: ServerStorage.FoliageZones.Grove_Sugi.

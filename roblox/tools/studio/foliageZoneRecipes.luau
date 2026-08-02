@@ -256,8 +256,8 @@ local Recipes: { [string]: Recipe } = {
             { name = "FernClump", weight = 10, submergeMax = 0 },
             -- iris raised from 5+5: the user's favourite waterline asset, and the
             -- pink at the waterline is meant to be iris (the muhly is parked)
-            { name = "IrisA", weight = 9, submergeMax = 0.6, nearWater = 4 },
-            { name = "IrisB", weight = 9, submergeMax = 0.6, nearWater = 4 },
+            { name = "IrisA", weight = 22, submergeMax = 0.6, nearWater = 4 },
+            { name = "IrisB", weight = 22, submergeMax = 0.6, nearWater = 4 },
             -- LOW TIER: the same models at half scale read as marsh grass under the
             -- taller stems, breaking the uniform 2.4-4 stud carpet the gate flagged
             { name = "ReedClump", weight = 8, scale = 0.5, submergeMax = 1.2 },
@@ -284,14 +284,29 @@ local Recipes: { [string]: Recipe } = {
         careDensity = { GARDEN = 0.5, TENDED = 0.7 },
         rockAffinity = { radius = 5, inside = 1.4, outside = 0.9 },
         grassPaint = { below = 1, above = 4, maxSlope = 0.5 },
+        -- SHORELINE STATIONS (user gate 2026-08-01): "a line of shuffled mixes
+        -- marching along the shore". Area-scatter spread plants across the whole
+        -- bank with no sense of the water running through it, and its clumps were
+        -- monospecific — three reeds or three ferns, never a handful. Stations walk
+        -- the shore at a fixed spacing and each one plants a MIXED group whose
+        -- members roll species independently. The per-species nearWater/submergeMax
+        -- gates then sort each handful wet-to-dry on their own, so an iris and a
+        -- fern can be co-located without either being fenced into its own band.
+        shoreline = {
+            stationSpacing = 14,
+            membersMin = 3,
+            membersMax = 6,
+            spread = 4,
+            inland = 5,
+        },
     },
     -- THE TENDED REACH (x -90..220, zone MarginTended): the arena end, where the care
     -- model's reach is at its widest (28 studs vs 8 at the head). Iris-led, sparser,
     -- deliberately composed AT the stones — a garden waterline, not a wild one.
     WaterMarginTended = {
         pool = {
-            { name = "IrisA", weight = 26, submergeMax = 0.6, nearWater = 4 },
-            { name = "IrisB", weight = 26, submergeMax = 0.6, nearWater = 4 },
+            { name = "IrisA", weight = 38, submergeMax = 0.6, nearWater = 4 },
+            { name = "IrisB", weight = 38, submergeMax = 0.6, nearWater = 4 },
             { name = "ReedClump", weight = 20, submergeMax = 1.2 },
             { name = "TallWeeds", weight = 12, submergeMax = 0.8 },
             { name = "FernClump", weight = 8, submergeMax = 0 },
@@ -317,6 +332,15 @@ local Recipes: { [string]: Recipe } = {
         rockAffinity = { radius = 6, inside = 1.6, outside = 0.7 },
         -- narrower band than wild, so more shore reads as deliberate
         grassPaint = { below = 1, above = 3, maxSlope = 0.5 },
+        -- a tended shore: stations further apart and handfuls smaller, so the
+        -- planting reads as placed rather than grown (see WaterMargin's note)
+        shoreline = {
+            stationSpacing = 20,
+            membersMin = 2,
+            membersMax = 4,
+            spread = 3,
+            inland = 4,
+        },
     },
     -- ONE dense dark stand at a user-marked spot: sugi is the shrine-grove
     -- species and grows exactly this way. Zone: ServerStorage.FoliageZones.Grove_Sugi.

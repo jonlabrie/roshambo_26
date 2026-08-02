@@ -245,6 +245,39 @@ describe("the fringe covers rather than clusters", function()
     end)
 end)
 
+-- 2026-08-01 user gate: "I like the shuffled mix, but it should be a line of shuffled
+-- mixes marching along the shore." The waterline plants by SHORELINE STATIONS, and the
+-- handfuls must be able to hold several species at once — segregating iris and fern
+-- into separate bands was explicitly rejected as "either/or, never and".
+describe("the waterline marches along the shore", function()
+    test("both waterline recipes plant by station, and nothing else does", function()
+        for _, name in { "WaterMargin", "WaterMarginTended" } do
+            local sl = Recipes[name].shoreline
+            expect(sl ~= nil).toBe(true)
+            assert(sl ~= nil)
+            expect(sl.stationSpacing > 0).toBe(true)
+            expect(sl.membersMax >= sl.membersMin).toBe(true)
+            -- a handful, not a single plant: mixing needs room for >1 member
+            expect(sl.membersMax >= 2).toBe(true)
+            expect(sl.spread > 0).toBe(true)
+        end
+        local shored = { WaterMargin = true, WaterMarginTended = true }
+        for name, recipe in Recipes do
+            if not shored[name] then
+                expect(recipe.shoreline == nil).toBe(true)
+            end
+        end
+    end)
+    -- the tended reach is a garden: placed, not grown
+    test("the tended shore is sparser and its handfuls smaller than the wild one", function()
+        local wild = Recipes.WaterMargin.shoreline
+        local tended = Recipes.WaterMarginTended.shoreline
+        assert(wild ~= nil and tended ~= nil)
+        expect(tended.stationSpacing > wild.stationSpacing).toBe(true)
+        expect(tended.membersMax < wild.membersMax).toBe(true)
+    end)
+end)
+
 describe("waterline ecology", function()
     test("margin flora refuses steep hillsides", function()
         expect(Recipes.WaterMargin.maxSteep <= 0.4).toBe(true)
