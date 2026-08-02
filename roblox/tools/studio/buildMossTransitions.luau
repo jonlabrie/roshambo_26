@@ -318,8 +318,16 @@ local WATER_CELL = 4
 
 local function collectWaterlineSeeds(): { Seed }
     local seeds: { Seed } = {}
-    local sandbox = workspace:FindFirstChild("Sandbox")
-    local map = sandbox and sandbox:FindFirstChild("WaterMap")
+    -- WaterMap is AUTHORING DATA, not viewport geometry, so it lives in ServerStorage
+    -- beside FoliageZones. The legacy Workspace.Sandbox path is still honoured.
+    -- (2026-08-01: parking Workspace.Sandbox for a perf clean-up silently took the water
+    -- index with it — every plan reported water=0 and the whole waterline planned to
+    -- nothing. Look in BOTH places.)
+    local map = game:GetService("ServerStorage"):FindFirstChild("WaterMap")
+    if map == nil then
+        local sandbox = workspace:FindFirstChild("Sandbox")
+        map = sandbox and sandbox:FindFirstChild("WaterMap")
+    end
     local markers = map and map:FindFirstChild("WaterMarkers")
     if not markers then
         warn("[mossTransitions] no Sandbox.WaterMap.WaterMarkers — waterline seeds empty")
