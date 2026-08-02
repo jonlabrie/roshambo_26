@@ -51,6 +51,19 @@ local CONFIG = {
     -- them. They stay fine ANYWHERE ELSE — this bars them from the skyline only.
     skylineExclude = { XfSugi40 = true },
 
+    -- CHEAP GEOMETRY FOR THE SKYLINE. A skyline tree is never seen closer than
+    -- nearTrailRadius, so it does not need the canopy a walked-past tree needs. These
+    -- are the same species re-exported at a lower budget (export_forest_kit style,
+    -- foliage 3500 / wood 3000, spray sqrt(total/kept)), user-gated 2026-08-02 at
+    -- 38-40% of full cost. The full-detail template keeps its own name and is what a
+    -- bake still plants; this step swaps only the tagged skyline instances afterwards,
+    -- which is what makes the whole arrangement survive a re-bake.
+    skylineSwap = {
+        XfHinokiM = "XfHinokiM_sky",
+        XfSpruceM = "XfSpruceM_sky",
+        XfFirM = "XfFirM_sky",
+    },
+
     parkFolder = "OffstagePlateau", -- a date suffix is appended
     tagSkyline = "SkylineImpostorCandidate",
     tagNearTrail = "SkylineNearTrail",
@@ -287,7 +300,65 @@ return function(opts: { dryRun: boolean?, stamp: string? }?): string
         r.tree.inst:SetAttribute(CONFIG.tagNearTrail, true)
     end
 
+    -- swap the tagged skyline trees onto their cheap variant, aligned by BOUNDING BOX
+    -- (an FBX round-trip moves the model origin, so pivot alignment drifts)
+    local kit = ss:FindFirstChild("FoliageKit")
+    local swapped = 0
+    for _, r in skyline do
+        local species = (r.tree.inst.Name:gsub("_%d+$", ""))
+        local wanted = CONFIG.skylineSwap[species]
+        local tmpl = wanted ~= nil and kit ~= nil and kit:FindFirstChild(wanted) or nil
+        if tmpl ~= nil and r.tree.inst:GetAttribute("SkylineVariant") ~= true then
+            local inst = r.tree.inst
+            local hcf, hsize = (inst :: any):GetBoundingBox()
+            local hbase = hcf.Position.Y - hsize.Y / 2
+            local yaw = select(2, inst:GetPivot():ToOrientation())
+            local c = tmpl:Clone()
+            c.Name = inst.Name -- keep the species name stable for every other tool
+            local _, s0 = c:GetBoundingBox()
+            c:ScaleTo(c:GetScale() * (hsize.Y / s0.Y)) -- ScaleTo is ABSOLUTE
+            c.Parent = inst.Parent
+            c:PivotTo(CFrame.new(hcf.Position) * CFrame.Angles(0, yaw, 0))
+            local c1, s1 = c:GetBoundingBox()
+            c:PivotTo(
+                c:GetPivot()
+                    + Vector3.new(
+                        hcf.Position.X - c1.Position.X,
+                        hbase - (c1.Position.Y - s1.Y / 2),
+                        hcf.Position.Z - c1.Position.Z
+                    )
+            )
+            for k, v in pairs(inst:GetAttributes()) do
+                if not k:match("^RBX_") then
+                    pcall(function()
+                        c:SetAttribute(k, v)
+                    end)
+                end
+            end
+            for _, tag in ipairs(cs:GetTags(inst)) do
+                pcall(function()
+                    cs:AddTag(c, tag)
+                end)
+            end
+            c:SetAttribute("SkylineVariant", true)
+            for _, d in c:GetDescendants() do
+                if d:IsA("BasePart") then
+                    local isFol = d.Name:lower():find("foliage") ~= nil
+                    d.DoubleSided = isFol
+                    d.CastShadow, d.CanCollide, d.CanQuery, d.CanTouch = false, false, false, false
+                    if d:IsA("MeshPart") then
+                        d.RenderFidelity = Enum.RenderFidelity.Automatic
+                    end
+                end
+            end
+            inst:Destroy()
+            r.tree.inst = c
+            swapped += 1
+        end
+    end
+
     say(`  parked {#offstage} to ServerStorage.ParkedFoliage.{CONFIG.parkFolder}_{stamp}`)
+    say(`  swapped {swapped} skyline trees onto their cheap variant`)
     say(`  tagged {#skyline} {CONFIG.tagSkyline}, {#held} {CONFIG.tagNearTrail}`)
     return table.concat(lines, "\n")
 end
