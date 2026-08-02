@@ -21,10 +21,15 @@
 
 local CONFIG = {
     dryRun = true, -- set false to actually park and tag
-    zones = { "FringeNorth", "FringeSouth" },
+    -- every zone whose planting is judged against the canyon view. The east walls join
+    -- here from the start (2026-08-02) rather than being planted full-detail and clawed
+    -- back afterwards, which is what happened to the west.
+    zones = { "FringeNorth", "FringeSouth", "EastFringeNorth", "EastFringeSouth" },
 
     -- viewpoints
     floorStepX = 30, -- sample the canyon floor every N studs of X
+    floorX0 = -450, -- ...between these, which must span the WHOLE canyon or trees at
+    floorX1 = 240, -- the far end get judged with no viewpoint near them
     floorZ = { -40, 0, 40 },
     eyeHeight = 5,
     originExclusion = 40, -- ignore "walkable" parts parked at the world origin
@@ -83,7 +88,7 @@ local function collectViewpoints(): ({ Vector3 }, { [number]: number })
     local views: { Vector3 } = {}
     local elevations: { [number]: number } = {}
 
-    for x = -450, 210, CONFIG.floorStepX do
+    for x = CONFIG.floorX0, CONFIG.floorX1, CONFIG.floorStepX do
         for _, z in CONFIG.floorZ do
             local hit = ws:Raycast(Vector3.new(x, 520, z), Vector3.new(0, -700, 0), params)
             if hit then

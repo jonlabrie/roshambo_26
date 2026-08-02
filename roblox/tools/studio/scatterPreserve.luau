@@ -1650,6 +1650,22 @@ local KEEPOUT_ZONES = {
         z1 = 22,
         why = "the raked gravel field is the artwork",
     },
+    -- THE WHOLE ARENA SQUARE IS COMPOSED AND UNTOUCHABLE (user, 2026-08-02, twice).
+    -- Union of the RoshamboStage props that make it — Karesansui, Shoro, ShoroRoof,
+    -- BellDrive, BonshoRig, BonshoBell, ThrowDrum, RanmaCarvings, Waterwheel,
+    -- ArenaSpawn, Overlook — plus 8 studs, which also clears half the widest canopy in
+    -- the Core pool so nothing can overhang it either.
+    -- A zone part with Recipe="KeepOut" is NOT sufficient: that only competes for zone
+    -- assignment, so a sample claimed by EastCore still plants. Measured — 16 trees
+    -- landed inside the square with the zone part alone. THIS list is the hard gate.
+    {
+        name = "ArenaSquare",
+        x0 = -32,
+        x1 = 100,
+        z0 = -36,
+        z1 = 52,
+        why = "the arena square is a composed set piece",
+    },
 }
 
 local function keepOutBlocks(x: number, z: number, materialName: string?): boolean
