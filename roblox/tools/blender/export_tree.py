@@ -638,14 +638,61 @@ bm, comps = islands_of(foliage)
 _tris = sum(len(f.verts) - 2 for c in comps for f in c)
 per_island = max(1.0, _tris / len(comps))
 frac = min(1.0, (FOLIAGE_TRIS / per_island) / len(comps))
+# CROSSES. xFrog hangs each needle spray as a CROSS: two cards at 90 degrees through
+# a shared centre, so the spray reads from every angle (a MeshPart cannot billboard).
+# The arms are coincident but NOT connected, so islands_of() returns them as two
+# independent islands — and an independent roll per island splits half the crosses,
+# leaving lone flat quads that vanish edge-on. Measured on XfHinokiM at a 7k budget:
+# 46% of surviving cards were lone arms. Verified 2026-08-01 that the arms really are
+# perpendicular (median normal dot 0.0), i.e. crossed billboards, NOT duplicates and
+# NOT backface pairs — so they must be kept or dropped TOGETHER, never deduped.
+# Group coincident islands, then roll ONCE per cross. Budget is unaffected: keeping
+# `frac` of crosses keeps `frac` of the cards they contain.
+_cent = []
+for comp in comps:
+    _vs = {v for f in comp for v in f.verts}
+    _n = len(_vs)
+    _cent.append((sum(v.co.x for v in _vs) / _n,
+                  sum(v.co.y for v in _vs) / _n,
+                  sum(v.co.z for v in _vs) / _n))
+_zs = [v.co.z for f in bm.faces for v in f.verts]
+_tol = (max(_zs) - min(_zs)) * 1e-4 if _zs else 1e-9
+_cell = max(_tol * 2.0, 1e-12)
+_buckets = {}
+for _i, _c in enumerate(_cent):
+    _buckets.setdefault((int(_c[0] // _cell), int(_c[1] // _cell), int(_c[2] // _cell)),
+                        []).append(_i)
+_seen_x, crosses = set(), []
+for _i, _c in enumerate(_cent):
+    if _i in _seen_x:
+        continue
+    _k = (int(_c[0] // _cell), int(_c[1] // _cell), int(_c[2] // _cell))
+    _grp = [_i]
+    _seen_x.add(_i)
+    for _dx in (-1, 0, 1):
+        for _dy in (-1, 0, 1):
+            for _dz in (-1, 0, 1):
+                for _j in _buckets.get((_k[0] + _dx, _k[1] + _dy, _k[2] + _dz), ()):
+                    if _j in _seen_x:
+                        continue
+                    _d = _cent[_j]
+                    if ((_c[0] - _d[0]) ** 2 + (_c[1] - _d[1]) ** 2
+                            + (_c[2] - _d[2]) ** 2) <= _tol * _tol:
+                        _grp.append(_j)
+                        _seen_x.add(_j)
+    crosses.append(_grp)
+print(f"CROSSES: {len(comps)} cards group into {len(crosses)} crosses "
+      f"(avg {len(comps)/max(len(crosses),1):.2f} arms)")
+
 state = 12345
 doomed, kept = [], 0
-for comp in comps:
+for grp in crosses:
     state = (1103515245 * state + 12345) % 2147483648
     if state / 2147483648 < frac:
-        kept += 1
+        kept += len(grp)
     else:
-        doomed.extend(comp)
+        for _i in grp:
+            doomed.extend(comps[_i])
 bmesh.ops.delete(bm, geom=doomed, context="FACES")
 if SPRAY_SCALE != 1.0 or RELAX > 0.0:
     bm.faces.ensure_lookup_table()
