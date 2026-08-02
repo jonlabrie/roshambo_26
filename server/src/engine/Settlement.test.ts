@@ -3,7 +3,7 @@ import { connectTestDb, clearTestDb, disconnectTestDb } from '../test/db';
 import User from '../models/User';
 import Round from '../models/Round';
 import PlayerRound from '../models/PlayerRound';
-import { settleRound } from './Settlement';
+import { settleRound, buildCounterUpdate } from './Settlement';
 import { ThrowEntry } from './RoundEngine';
 
 function throwsMap(entries: [string, ThrowEntry][]) { return new Map(entries); }
@@ -96,5 +96,45 @@ describe('settleRound', () => {
         // (c) failed participant absent from returned players array
         const absent = result!.players.find(p => p.key === 'roblox:88');
         expect(absent).toBeUndefined();
+    });
+});
+
+describe('buildCounterUpdate', () => {
+    it('counts a win, sets the gate, and tracks the biggest pot', () => {
+        const u = buildCounterUpdate('R', 'WIN', 81);
+        expect(u.$inc.roundsPlayed).toBe(1);
+        expect(u.$inc.wins).toBe(1);
+        expect(u.$inc.throwsR).toBe(1);
+        expect(u.$set.unresolvedWin).toBe(true);
+        expect(u.$max.bestPot).toBe(81);
+    });
+
+    it('a SAFE counts a round and a throw but sets no gate', () => {
+        const u = buildCounterUpdate('P', 'SAFE', 27);
+        expect(u.$inc.safes).toBe(1);
+        expect(u.$inc.throwsP).toBe(1);
+        expect(u.$set.unresolvedWin).toBe(false);
+    });
+
+    it('a LOSS clears the gate — there is nothing left to decide', () => {
+        // the pot is forfeited, so a player cannot be left bound on a decision about zero
+        const u = buildCounterUpdate('S', 'LOSS', 0);
+        expect(u.$inc.losses).toBe(1);
+        expect(u.$inc.throwsS).toBe(1);
+        expect(u.$set.unresolvedWin).toBe(false);
+    });
+
+    it('proposes the new pot for bestPot and lets $max arbitrate', () => {
+        // the builder never reads the stored best — it proposes, Mongo keeps the larger
+        const u = buildCounterUpdate('R', 'WIN', 3);
+        expect(u.$max.bestPot).toBe(3);
+    });
+
+    it('every round counts exactly one throw', () => {
+        for (const t of ['R', 'P', 'S'] as const) {
+            const u = buildCounterUpdate(t, 'SAFE', 0);
+            const thrown = (u.$inc.throwsR ?? 0) + (u.$inc.throwsP ?? 0) + (u.$inc.throwsS ?? 0);
+            expect(thrown).toBe(1);
+        }
     });
 });
