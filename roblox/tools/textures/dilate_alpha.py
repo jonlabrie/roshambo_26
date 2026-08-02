@@ -24,6 +24,27 @@ new becomes visible. Only the colour hiding under transparent pixels changes.
 
 bake_clump_tree.py already does this for its baked atlas and explains why; this brings the
 same treatment to the vendor atlases export_tree.py writes.
+
+HOW STRONG THE EFFECT ACTUALLY IS — measured, and REVERTED, 2026-08-02
+----------------------------------------------------------------------
+The numbers above are UNWEIGHTED texel means. Computing the ALPHA-WEIGHTED (premultiplied)
+mip instead gives sugi [111,115,38] and spruce [71,86,43] at mip4 — *identical* before and
+after dilation, because a premultiplied chain never lets a zero-alpha texel contribute
+colour at all. So the two measurements bracket the two possible renderers, and shipping
+the dilated atlases decided which one Roblox is: the trees visibly changed, therefore
+**Roblox filters RGB independently of alpha (straight, not premultiplied)**. That is worth
+knowing on its own — it also means the black under transparent texels bleeds into leaf
+EDGES at full resolution, not only into distant mips.
+
+Which is why the change was not subtle and not confined to distance. Flooding black →
+leaf colour lifts every partially-transparent texel, and partial alpha is a big share of
+these atlases: 28.7% of sugi's visible texels, 25.6% of spruce's, against 9.3% hinoki and
+2.2% maple. The species the user singled out as "way brighter" were exactly the top two.
+Per-species `--fill-sat` / `--fill-val` trims of ±10% were noise beside that.
+
+The nine canyon atlases were reverted to their pre-dilation uploads. If this is revisited,
+the knob is `--fill-val` around 0.5-0.6, NOT 0.9: dark-but-not-black kills the edge fringe
+while keeping the canopy's value where the user has already approved it.
 """
 
 import argparse
