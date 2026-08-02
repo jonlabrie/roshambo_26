@@ -263,8 +263,12 @@ local Recipes: { [string]: Recipe } = {
             { name = "ReedClump", weight = 8, scale = 0.5, submergeMax = 1.2 },
             { name = "TallWeeds", weight = 8, scale = 0.55, submergeMax = 0.8 },
         },
-        spacingMin = 4,
-        spacingMax = 8,
+        -- spacing here is INTRA-HANDFUL, not between stations (stationSpacing does
+        -- that). It must stay well below `spread` or the first member of a handful
+        -- vetoes its own companions — at 4 studs against a 4-stud spread every
+        -- station came out with a single plant and nothing mixed.
+        spacingMin = 2,
+        spacingMax = 4,
         clumpChance = 0.3,
         clumpSize = 3,
         -- weeds on steep hillsides just look bad (user)
@@ -296,7 +300,7 @@ local Recipes: { [string]: Recipe } = {
             stationSpacing = 14,
             membersMin = 3,
             membersMax = 6,
-            spread = 4,
+            spread = 6,
             inland = 5,
         },
     },
@@ -314,8 +318,9 @@ local Recipes: { [string]: Recipe } = {
             { name = "ReedClump", weight = 6, scale = 0.5, submergeMax = 1.2 },
         },
         -- sparser and more deliberate than the wild reach
-        spacingMin = 6,
-        spacingMax = 11,
+        -- see WaterMargin: intra-handful spacing, must stay below `spread`
+        spacingMin = 2.5,
+        spacingMax = 5,
         clumpChance = 0.4,
         clumpSize = 3,
         maxSteep = 0.35,
@@ -338,7 +343,7 @@ local Recipes: { [string]: Recipe } = {
             stationSpacing = 20,
             membersMin = 2,
             membersMax = 4,
-            spread = 3,
+            spread = 5,
             inland = 4,
         },
     },
