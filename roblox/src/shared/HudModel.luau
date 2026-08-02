@@ -4,22 +4,24 @@
 -- The escalation rule is the delicate part. Roshambo is an ambient game — most people in the
 -- canyon at any moment are not playing, they are hanging out. An ungated "CHOOSE A THROW" alarm
 -- would fire at them every single round, forever, and turn the calmest part of the game into an
--- alarm clock. So the prompt ARMS generously (a new arrival, someone who threw last round, or
--- anyone with a pot riding) and DISARMS itself after three consecutive ignored rounds.
+-- alarm clock.
 --
--- Crucially, a round only counts as ignored if the player COULD have thrown. Rounds spent
--- win-bound or fate-bound are not misses — the player was prevented, not inattentive. Counting
--- them would disarm the prompt for exactly the player who was stuck on a decision.
+-- The rule is a UNIFORM backoff: anyone stays armed for three consecutive ignored rounds, then
+-- goes silent, and re-arms the instant they throw again. "New arrival", "threw last round" and
+-- "pot riding" describe who STARTS armed — a fresh session has zero misses — but they are not
+-- ongoing conditions, so they do not appear here. An earlier draft carried them as live OR-terms
+-- and a player who threw, won nothing and missed once fell out of the OR: the prompt died after
+-- ONE miss instead of three, giving the most common case the least grace.
+--
+-- A round only counts as ignored if the player COULD have thrown. Rounds spent win-bound or
+-- fate-bound are not misses — the player was prevented, not inattentive. Counting them would
+-- disarm the prompt for exactly the player who was stuck on a decision.
 local HudModel = {}
 
 local ESCALATE_AT = 5 -- seconds remaining
 local BACKOFF_MISSES = 3
 
-export type Session = {
-    hasThrownThisSession: boolean,
-    threwLastRound: boolean,
-    consecutiveMisses: number,
-}
+export type Session = { consecutiveMisses: number }
 
 export type Inputs = {
     phase: string,
@@ -42,7 +44,7 @@ export type View = {
 }
 
 function HudModel.newSession(): Session
-    return { hasThrownThisSession = false, threwLastRound = false, consecutiveMisses = 0 }
+    return { consecutiveMisses = 0 }
 end
 
 function HudModel.view(inputs: Inputs, session: Session): View
@@ -63,11 +65,6 @@ function HudModel.view(inputs: Inputs, session: Session): View
         and inputs.phase == "ACTIVE"
         and not inputs.pickedThisRound
         and session.consecutiveMisses < BACKOFF_MISSES
-        and (
-            not session.hasThrownThisSession -- a new arrival, who needs the prompt most
-            or session.threwLastRound -- actively playing
-            or inputs.pointsAtStake > 0 -- something on the line
-        )
 
     return {
         plate = {
@@ -84,21 +81,13 @@ end
 
 function HudModel.onRoundEnded(session: Session, outcome: { couldThrow: boolean, picked: boolean }): Session
     if outcome.picked then
-        return { hasThrownThisSession = true, threwLastRound = true, consecutiveMisses = 0 }
+        return { consecutiveMisses = 0 }
     end
     if not outcome.couldThrow then
-        -- prevented, not inattentive — carry the session forward untouched
-        return {
-            hasThrownThisSession = session.hasThrownThisSession,
-            threwLastRound = session.threwLastRound,
-            consecutiveMisses = session.consecutiveMisses,
-        }
+        -- prevented, not inattentive — carry the count forward untouched
+        return { consecutiveMisses = session.consecutiveMisses }
     end
-    return {
-        hasThrownThisSession = session.hasThrownThisSession,
-        threwLastRound = false,
-        consecutiveMisses = session.consecutiveMisses + 1,
-    }
+    return { consecutiveMisses = session.consecutiveMisses + 1 }
 end
 
 return HudModel
