@@ -204,7 +204,7 @@ now computes an atlas's appearance at range so this is judged **before** uploadi
 
 ## Known state at the gate
 
-**190 of 1,915 plants (9.9%) are flagged for hand cleanup** — 100 BURIED, 63 HALF_BURIED,
+**190 of 1,915 plants (9.9%) were flagged for hand cleanup** — 100 BURIED, 63 HALF_BURIED,
 26 PERCH, 1 FLOAT — indexed at `CanyonWorld.Foliage.CleanupIndex` (worst first) and marked
 in-world at `Workspace.CleanupMarkers`. Each carries `Cleanup` and `CleanupDetail`
 attributes. This is **not** evenly spread: the middle canyon runs 1–9%, while the head
@@ -212,6 +212,18 @@ bowl (x −500..−401) runs 15–23% and the east seam (x 150..249) runs 25–2
 are ground that was reworked *after* it was planted. The lesson for future terrain edits is
 to re-run the cleanup audit over the edited band, because the scatter's footing checks were
 correct when they ran and the terrain moved underneath them.
+
+**The BURIED tier was then cleared, except at the waterline.** 75 plants were parked to
+`ServerStorage.ParkedFoliage.BuriedCleanup_2026_08_02` (foldered by origin zone, each
+carrying `ParkedFrom` and `ParkedReason` so a restore is possible). The 25 in `Margin` and
+`MarginTended` were **kept on purpose**: at the water margin a plant standing deeper than
+its own base is the intended look, not a defect, so the burial test cannot distinguish
+them and the zone is the right discriminator. 115 flags remain — 25 BURIED (all waterline),
+63 HALF_BURIED, 26 PERCH, 1 FLOAT — as the owner's ongoing hand list.
+
+The parked count by origin says the same thing the distribution did: `EastUnder` 26,
+`CoreUnder` 11, `EastFringeNorth` 10, `HeadBowlUnder` 8, `EastCore` 7 — the *Under* zones
+and the east dominate, because those are the surfaces terrain edits moved most.
 
 Three arrangement seeds found no legal anchor and were left unplaced rather than forced:
 **Pool_3**, **Pool_5**, **RiverUpperClimb_head**. The **suspension-bridge abutments placed
