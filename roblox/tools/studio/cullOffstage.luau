@@ -67,6 +67,13 @@ local CONFIG = {
         XfHinokiM = "XfHinokiM_sky",
         XfSpruceM = "XfSpruceM_sky",
         XfFirM = "XfFirM_sky",
+        -- the maples cost 21,121 and would not decimate: their trunk is ~1,800 tiny twig
+        -- islands, and collapse cannot reduce a 4-tri island, so a hard LOD saved 7%.
+        -- export_tree wood MODE 0 (cull whole twigs rather than decimate them) took the
+        -- trunk from 16,995 to exactly its 4,000 budget: 21,121 -> 10,014. Gold and red
+        -- share the geometry and differ only in foliage ColorMap.
+        XfMapleGold = "XfMapleGold_sky",
+        XfMapleRed = "XfMapleRed_sky",
     },
 
     parkFolder = "OffstagePlateau", -- a date suffix is appended
