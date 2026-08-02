@@ -9,28 +9,35 @@
 -- completely and renders at full daylight brightness at midnight. The falls looked identical
 -- at noon and at 2am, which in a night-first arena is the single most obvious tell.
 --
--- WHY NOT JUST RAISE LightInfluence AT NIGHT. Because it overshoots: at LightInfluence 1 a
--- particle is lit only by the scene, and a night canyon is dark, so the whitewater would go
--- nearly black. That is wrong in the other direction — moonlit falls are the BRIGHTEST thing
--- in a night landscape, not the dimmest. What changes after dark is that they read as
--- luminous grey rather than blazing white. So the two self-emission channels come down
--- partway and stop: Brightness (overall output) and LightEmission (how much the texture
--- ignores shading).
+-- LightInfluence IS THE LEVER, AND IT CANNOT BE SCALED. First attempt dimmed Brightness and
+-- LightEmission only, which measurably worked (1.00 -> 0.55 on all 135 objects) and was
+-- visually almost undetectable. The reason is that at LightInfluence 0 an effect is FULLY
+-- self-lit — it does not know the sun has gone down — so dimming it just makes a self-lit
+-- object slightly less self-lit. Nothing lets the darkness touch it.
 --
--- SCALES, NOT VALUES. Each object keeps its own authored look — the hero fall is authored
--- brighter than a gentle run, foam sits at LightEmission 0.25 while whitewater sits at 0.60 —
--- and this module only says what FRACTION of it survives the night. One curve therefore
--- governs 135 objects without flattening the differences between them.
+-- Raising LightInfluence was dismissed the first time on the grounds that 1.0 lights the
+-- particle by the scene alone and would turn whitewater black. That was a false dichotomy:
+-- LightInfluence is a continuous blend, not a switch, and a partial value is exactly the
+-- "responds to the night without vanishing into it" the falls want. Note it must be LERPED
+-- TOWARD a target, never scaled — the authored value is 0 (a few at 0.10), and zero times any
+-- factor is still zero, which is the shape of bug that made the first pass a no-op.
+--
+-- SCALES FOR EMISSION, A TARGET FOR INFLUENCE. Each object keeps its own authored look — the
+-- hero fall is brighter than a gentle run, foam sits at LightEmission 0.25 while whitewater
+-- sits at 0.60 — so those two channels are FRACTIONS of what the artist set. LightInfluence
+-- is the one property where every object should end up in the same place after dark, because
+-- it describes a relationship to the scene rather than a look.
 
 local VfxNightDim = {}
 
-export type Scale = { brightness: number, lightEmission: number }
+export type Values = { brightness: number, lightEmission: number, lightInfluence: number }
 
--- Night floors, chosen so the falls stay legible as the loudest feature in the canyon while
--- no longer reading as daylight. LightEmission falls further than Brightness: it is the
--- channel that makes spray look self-lit, and that is the specifically daytime quality.
-local NIGHT_BRIGHTNESS = 0.55
-local NIGHT_LIGHT_EMISSION = 0.45
+-- Night targets. The falls should still be the loudest feature in a night canyon, just
+-- luminous grey rather than blazing white. LightEmission falls further than Brightness
+-- because self-lit is the specifically daytime quality.
+local NIGHT_BRIGHTNESS = 0.45
+local NIGHT_LIGHT_EMISSION = 0.35
+local NIGHT_LIGHT_INFLUENCE = 0.75
 
 local function lerp(a: number, b: number, t: number): number
     return a + (b - a) * t
@@ -39,11 +46,12 @@ end
 -- nightFactor is clamped for the same reason LanternGlow clamps it: the signal arrives over
 -- an EventBus that can be primed, replayed, or fired mid-transition, and a negative value
 -- would scale emission ABOVE its authored maximum — a brighter-than-daylight waterfall.
-function VfxNightDim.scaleAt(nightFactor: number): Scale
+function VfxNightDim.at(authored: Values, nightFactor: number): Values
     local t = math.clamp(nightFactor, 0, 1)
     return {
-        brightness = lerp(1, NIGHT_BRIGHTNESS, t),
-        lightEmission = lerp(1, NIGHT_LIGHT_EMISSION, t),
+        brightness = authored.brightness * lerp(1, NIGHT_BRIGHTNESS, t),
+        lightEmission = authored.lightEmission * lerp(1, NIGHT_LIGHT_EMISSION, t),
+        lightInfluence = lerp(authored.lightInfluence, NIGHT_LIGHT_INFLUENCE, t),
     }
 end
 

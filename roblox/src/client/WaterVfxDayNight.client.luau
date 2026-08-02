@@ -34,6 +34,7 @@ local config = ReplicatedStorage:WaitForChild("DayNightConfig")
 
 local AUTHORED_BRIGHTNESS = "AuthoredBrightness"
 local AUTHORED_LIGHT_EMISSION = "AuthoredLightEmission"
+local AUTHORED_LIGHT_INFLUENCE = "AuthoredLightInfluence"
 
 local tracked: { Instance } = {}
 local current: number = config:GetAttribute("CurrentNightFactor") or 0
@@ -61,28 +62,35 @@ local function isWaterVfx(inst: Instance): boolean
     return false
 end
 
+-- capture once, then always read the capture: applying to a live value would scale an
+-- already-scaled number and fade the falls further on every dusk
+local function capture(inst: Instance, key: string, live: number): number
+    local stored = inst:GetAttribute(key)
+    if typeof(stored) == "number" then
+        return stored
+    end
+    inst:SetAttribute(key, live)
+    return live
+end
+
 local function applyTo(inst: Instance)
-    local scale = VfxNightDim.scaleAt(current)
     if inst:IsA("Beam") then
-        local authored = inst:GetAttribute(AUTHORED_BRIGHTNESS)
-        if typeof(authored) ~= "number" then
-            authored = inst.Brightness
-            inst:SetAttribute(AUTHORED_BRIGHTNESS, authored)
-        end
-        inst.Brightness = (authored :: number) * scale.brightness
+        local v = VfxNightDim.at({
+            brightness = capture(inst, AUTHORED_BRIGHTNESS, inst.Brightness),
+            lightEmission = 0, -- Beams have no LightEmission; the field is unused for them
+            lightInfluence = capture(inst, AUTHORED_LIGHT_INFLUENCE, inst.LightInfluence),
+        }, current)
+        inst.Brightness = v.brightness
+        inst.LightInfluence = v.lightInfluence
     elseif inst:IsA("ParticleEmitter") then
-        local b = inst:GetAttribute(AUTHORED_BRIGHTNESS)
-        if typeof(b) ~= "number" then
-            b = inst.Brightness
-            inst:SetAttribute(AUTHORED_BRIGHTNESS, b)
-        end
-        local le = inst:GetAttribute(AUTHORED_LIGHT_EMISSION)
-        if typeof(le) ~= "number" then
-            le = inst.LightEmission
-            inst:SetAttribute(AUTHORED_LIGHT_EMISSION, le)
-        end
-        inst.Brightness = (b :: number) * scale.brightness
-        inst.LightEmission = (le :: number) * scale.lightEmission
+        local v = VfxNightDim.at({
+            brightness = capture(inst, AUTHORED_BRIGHTNESS, inst.Brightness),
+            lightEmission = capture(inst, AUTHORED_LIGHT_EMISSION, inst.LightEmission),
+            lightInfluence = capture(inst, AUTHORED_LIGHT_INFLUENCE, inst.LightInfluence),
+        }, current)
+        inst.Brightness = v.brightness
+        inst.LightEmission = v.lightEmission
+        inst.LightInfluence = v.lightInfluence
     end
 end
 
