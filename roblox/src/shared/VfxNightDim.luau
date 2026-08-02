@@ -28,9 +28,19 @@
 -- is the one property where every object should end up in the same place after dark, because
 -- it describes a relationship to the scene rather than a look.
 
+-- THE BLUE CAST, AND WHY IT ONLY APPEARS AT NIGHT. Every whitewater and foam emitter is
+-- authored with a two-key ramp: born pale cyan (189,246,255), fading to white as the particle
+-- dies. In daylight LightEmission 0.60 at LightInfluence 0 blew that out — the spray was
+-- self-lit hard enough that the blue washed to white before anyone could see it. Dimming
+-- emission and letting the scene reach the particles makes the authored birth colour survive,
+-- so the falls picked up a blue cast the moment the night curve started working. The colour
+-- was always there; daylight was hiding it. neutraliseColor walks the ramp back toward white
+-- as night comes on, leaving the daytime authoring untouched.
+
 local VfxNightDim = {}
 
 export type Values = { brightness: number, lightEmission: number, lightInfluence: number }
+export type ColorKey = { t: number, r: number, g: number, b: number }
 
 -- Night targets. The falls should still be the loudest feature in a night canyon, just
 -- luminous grey rather than blazing white. LightEmission falls further than Brightness
@@ -38,6 +48,9 @@ export type Values = { brightness: number, lightEmission: number, lightInfluence
 local NIGHT_BRIGHTNESS = 0.45
 local NIGHT_LIGHT_EMISSION = 0.35
 local NIGHT_LIGHT_INFLUENCE = 0.75
+-- 1.0 = the ramp is fully white at full night. Lower it to leave a whisper of the authored
+-- cyan; the user asked for the cast neutralised, so it goes all the way.
+local NIGHT_COLOR_NEUTRALISE = 1.0
 
 local function lerp(a: number, b: number, t: number): number
     return a + (b - a) * t
@@ -53,6 +66,24 @@ function VfxNightDim.at(authored: Values, nightFactor: number): Values
         lightEmission = authored.lightEmission * lerp(1, NIGHT_LIGHT_EMISSION, t),
         lightInfluence = lerp(authored.lightInfluence, NIGHT_LIGHT_INFLUENCE, t),
     }
+end
+
+-- Plain data in, plain data out: ColorSequence is a Roblox type and this has to stay
+-- Lune-testable, so the client converts at the boundary. Keypoint TIMES are preserved
+-- exactly — Roblox requires the first at 0, the last at 1, and strictly increasing between,
+-- so rebuilding them from scratch would be a way to construct an invalid sequence.
+function VfxNightDim.neutraliseColor(keys: { ColorKey }, nightFactor: number): { ColorKey }
+    local t = math.clamp(nightFactor, 0, 1) * NIGHT_COLOR_NEUTRALISE
+    local out: { ColorKey } = {}
+    for i, k in keys do
+        out[i] = {
+            t = k.t,
+            r = lerp(k.r, 1, t),
+            g = lerp(k.g, 1, t),
+            b = lerp(k.b, 1, t),
+        }
+    end
+    return out
 end
 
 return VfxNightDim

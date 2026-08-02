@@ -71,6 +71,51 @@ describe("VfxNightDim.at", function()
         expect(near(over.lightInfluence, hi.lightInfluence)).toBe(true)
     end)
 
+    test("colour: day leaves the authored ramp exactly alone", function()
+        -- the pale-cyan birth colour is deliberate authoring and is correct in daylight
+        local keys = { { t = 0, r = 189 / 255, g = 246 / 255, b = 1 }, { t = 1, r = 1, g = 1, b = 1 } }
+        local out = VfxNightDim.neutraliseColor(keys, 0)
+        expect(near(out[1].r, 189 / 255)).toBe(true)
+        expect(near(out[1].g, 246 / 255)).toBe(true)
+        expect(near(out[2].r, 1)).toBe(true)
+    end)
+
+    test("colour: night walks the cast out to white", function()
+        local keys = { { t = 0, r = 189 / 255, g = 246 / 255, b = 1 }, { t = 1, r = 1, g = 1, b = 1 } }
+        local out = VfxNightDim.neutraliseColor(keys, 1)
+        expect(near(out[1].r, 1)).toBe(true)
+        expect(near(out[1].g, 1)).toBe(true)
+        expect(near(out[1].b, 1)).toBe(true)
+    end)
+
+    test("colour: keypoint TIMES are preserved exactly", function()
+        -- Roblox demands first at 0, last at 1, strictly increasing; regenerating times
+        -- would be a way to build an invalid ColorSequence
+        local keys = {
+            { t = 0, r = 0.5, g = 0.5, b = 1 },
+            { t = 0.37, r = 0.8, g = 0.9, b = 1 },
+            { t = 1, r = 1, g = 1, b = 1 },
+        }
+        for _, nf in { 0, 0.5, 1 } do
+            local out = VfxNightDim.neutraliseColor(keys, nf)
+            expect(#out).toBe(3)
+            expect(near(out[1].t, 0)).toBe(true)
+            expect(near(out[2].t, 0.37)).toBe(true)
+            expect(near(out[3].t, 1)).toBe(true)
+        end
+    end)
+
+    test("colour: partway is partway, and never overshoots white", function()
+        local keys = { { t = 0, r = 0.5, g = 0.5, b = 1 } }
+        local mid = VfxNightDim.neutraliseColor(keys, 0.5)
+        expect(mid[1].r > 0.5).toBe(true)
+        expect(mid[1].r < 1).toBe(true)
+        for _, nf in { 1, 5, 100 } do
+            local out = VfxNightDim.neutraliseColor(keys, nf)
+            expect(out[1].r <= 1 + 1e-9).toBe(true)
+        end
+    end)
+
     test("monotonic — no flicker as nightFactor sweeps through dusk", function()
         local prevB, prevL, prevI = math.huge, math.huge, -math.huge
         for i = 0, 20 do

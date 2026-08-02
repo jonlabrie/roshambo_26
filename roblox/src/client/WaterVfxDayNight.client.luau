@@ -35,6 +35,7 @@ local config = ReplicatedStorage:WaitForChild("DayNightConfig")
 local AUTHORED_BRIGHTNESS = "AuthoredBrightness"
 local AUTHORED_LIGHT_EMISSION = "AuthoredLightEmission"
 local AUTHORED_LIGHT_INFLUENCE = "AuthoredLightInfluence"
+local AUTHORED_COLOR = "AuthoredColor"
 
 local tracked: { Instance } = {}
 local current: number = config:GetAttribute("CurrentNightFactor") or 0
@@ -73,6 +74,30 @@ local function capture(inst: Instance, key: string, live: number): number
     return live
 end
 
+-- ColorSequence is a supported attribute type, so the authored ramp is captured the same way
+-- the scalars are. Converting through plain {t,r,g,b} keeps the curve itself in VfxNightDim,
+-- where it can be tested under Lune without a Roblox datatype.
+local function neutralised(emitter: ParticleEmitter): ColorSequence
+    local stored = emitter:GetAttribute(AUTHORED_COLOR)
+    local authored: ColorSequence
+    if typeof(stored) == "ColorSequence" then
+        authored = stored
+    else
+        authored = emitter.Color
+        emitter:SetAttribute(AUTHORED_COLOR, authored)
+    end
+    local keys = {}
+    for i, kp in authored.Keypoints do
+        keys[i] = { t = kp.Time, r = kp.Value.R, g = kp.Value.G, b = kp.Value.B }
+    end
+    local shifted = VfxNightDim.neutraliseColor(keys, current)
+    local out = {}
+    for i, k in shifted do
+        out[i] = ColorSequenceKeypoint.new(k.t, Color3.new(k.r, k.g, k.b))
+    end
+    return ColorSequence.new(out)
+end
+
 local function applyTo(inst: Instance)
     if inst:IsA("Beam") then
         local v = VfxNightDim.at({
@@ -91,6 +116,7 @@ local function applyTo(inst: Instance)
         inst.Brightness = v.brightness
         inst.LightEmission = v.lightEmission
         inst.LightInfluence = v.lightInfluence
+        inst.Color = neutralised(inst)
     end
 end
 
