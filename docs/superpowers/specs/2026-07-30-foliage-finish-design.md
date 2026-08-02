@@ -225,6 +225,22 @@ The parked count by origin says the same thing the distribution did: `EastUnder`
 `CoreUnder` 11, `EastFringeNorth` 10, `HeadBowlUnder` 8, `EastCore` 7 — the *Under* zones
 and the east dominate, because those are the surfaces terrain edits moved most.
 
+**The PERCH tier was cleared on the same rule**, 24 parked to
+`ParkedFoliage.PerchCleanup_2026_08_02`, 2 kept at the waterline. Same origin story:
+`EastUnder` 6, `EastFringeNorth` 4, `FringeNorth` 4.
+
+**91 flags remain**, and the bulk of them is now HALF_BURIED (63) — the 1.0–1.3× band,
+deliberately left for the eye rather than cleared by measurement, because that tier is
+where a genuinely good tree tucked into a slope and a genuinely bad one look alike to the
+instrument.
+
+*Caveat on the PERCH pass:* 2 of the 24 were `PadBamboo`, the clumps planted on purpose to
+screen pad-slot retaining walls. Ground falling away behind a screening clump is its job,
+so those are arguably the same false positive the waterline exclusion exists to prevent —
+the exclusion was applied as written (Margin/MarginTended) rather than extended to every
+zone whose placement intent defeats the test. They are parked with `ParkedFrom` intact and
+restore cleanly.
+
 Three arrangement seeds found no legal anchor and were left unplaced rather than forced:
 **Pool_3**, **Pool_5**, **RiverUpperClimb_head**. The **suspension-bridge abutments placed
 nothing** — the most prominent bridge in the canyon — because both ends are already densely
