@@ -35,6 +35,21 @@ local ServerStorage = game:GetService("ServerStorage")
 
 local DRY_RUN = false -- true reports the site table and places nothing
 
+-- THIS TOOL DESTROYS AND REBUILDS ArrangementsDraft. That is safe exactly once — before
+-- anyone hand-tunes it. The user's tuning is expected to be AD HOC and spread over months,
+-- interleaved with building the teahouse areas into curated places, so by the time this is
+-- next run the folder will hold decisions that exist nowhere else.
+--
+-- A moved tree returning to its computed spot is visible. A DELETED tree coming back is
+-- not, and deletion is usually the most deliberate judgement of the lot ("this one does not
+-- belong here"). So the tool fingerprints its own output and refuses to run again if what
+-- it finds is not what it last wrote.
+--
+-- If you are an agent and this guard trips: STOP AND ASK. Do not set the override to get
+-- the script working. Re-baking into a fresh folder and merging by hand is nearly always
+-- the right move instead.
+local ALLOW_DESTROYING_HAND_WORK = false
+
 local ARENA = { x0 = -32, x1 = 100, z0 = -36, z1 = 52 }
 local RES = 4
 local PATH_GATE = 7
@@ -402,8 +417,34 @@ end
 local kit = ServerStorage:FindFirstChild("FoliageKit") :: Folder
 assert(kit, "ServerStorage.FoliageKit missing")
 local foliage = workspace.CanyonWorld.Foliage
+
+-- group names plus rounded pivots: catches a deleted arrangement, an added one, and a
+-- tree nudged more than a stud. Names alone would miss every move.
+local function fingerprint(folder: Instance): string
+    local rows = {}
+    for _, g in folder:GetChildren() do
+        if g:IsA("Model") then
+            local q = g:GetPivot().Position
+            table.insert(
+                rows,
+                ("%s@%d,%d,%d"):format(g.Name, math.round(q.X), math.round(q.Y), math.round(q.Z))
+            )
+        end
+    end
+    table.sort(rows)
+    return table.concat(rows, "|")
+end
+
 local existing = foliage:FindFirstChild("ArrangementsDraft")
 if existing then
+    local wrote = existing:GetAttribute("BakeFingerprint")
+    if typeof(wrote) == "string" and wrote ~= fingerprint(existing) and not ALLOW_DESTROYING_HAND_WORK then
+        error(
+            "[arr] ArrangementsDraft has been hand-edited since the last bake — refusing to "
+                .. "destroy it. Those moves and deletions exist nowhere else. Ask the user "
+                .. "before overriding; prefer baking into a fresh folder and merging by hand."
+        )
+    end
     existing:Destroy()
 end
 local draft = Instance.new("Folder")
@@ -455,6 +496,8 @@ for _, e in resolved do
         group:Destroy()
     end
 end
+
+draft:SetAttribute("BakeFingerprint", fingerprint(draft))
 
 print(
     ("[arr] %d arrangements, %d trees placed, %d skipped, %d seeds unplaceable"):format(
