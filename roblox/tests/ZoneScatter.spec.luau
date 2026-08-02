@@ -1746,3 +1746,88 @@ describe("ZoneScatter shoreline pass", function()
         end
     )
 end)
+
+-- 2026-08-01: stationBand exists because `nearWater` was doing three jobs at once
+-- (station eligibility, the accepts gate for members, and the grass reach), so
+-- stations could not be pulled to the water's edge without also forbidding members
+-- further out. With a station 8 studs from water plus spread and an inland push, a
+-- member could land 19 studs out — starving iris, whose own limit is 4.
+describe("stationBand keeps stations at the water's edge", function()
+    local function water()
+        local cells = {}
+        for x = 0, 120, 4 do
+            table.insert(cells, { x, 0 })
+        end
+        return ZoneScatter.indexWater(cells)
+    end
+    local function samples()
+        local out = {}
+        for x = 0, 120, 4 do
+            for z = 2, 18, 4 do
+                table.insert(out, { x = x, z = z, y = 100, steep = 0, depth = 0 })
+            end
+        end
+        return out
+    end
+    local ZONE = {
+        {
+            name = "Shore",
+            shape = "rect",
+            bounds = { -10, -10, 130, 30 },
+            recipe = "Shore",
+            densityScale = 1,
+            seed = 3,
+            mist = false,
+        },
+    }
+    local function recipe(band)
+        return {
+            pool = { { name = "Reed", weight = 1 } },
+            spacingMin = 2,
+            spacingMax = 2,
+            clumpChance = 0,
+            clumpSize = 0,
+            maxSteep = 1,
+            waterMargin = 0,
+            scaleJitter = 0,
+            nearWater = 16, -- generous OUTER bound
+            layer = "ground",
+            shoreline = {
+                stationSpacing = 12,
+                membersMin = 2,
+                membersMax = 4,
+                spread = 4,
+                inland = 0,
+                stationBand = band,
+            },
+        }
+    end
+
+    test("a tight stationBand pulls the whole line toward the water", function()
+        local tight = ZoneScatter.plan(ZONE, samples(), { Shore = recipe(3) }, water())
+        local loose = ZoneScatter.plan(ZONE, samples(), { Shore = recipe(16) }, water())
+        expect(#tight > 0).toBe(true)
+        expect(#loose > 0).toBe(true)
+        local function meanZ(plan)
+            local sum = 0
+            for _, p in plan do
+                sum += p.z
+            end
+            return sum / #plan
+        end
+        -- the tight band must sit demonstrably closer to the water line at z = 0
+        expect(meanZ(tight) < meanZ(loose)).toBe(true)
+    end)
+
+    test("members may still reach past the station band, up to nearWater", function()
+        local plan = ZoneScatter.plan(ZONE, samples(), { Shore = recipe(3) }, water())
+        local beyondBand = 0
+        for _, p in plan do
+            if p.z > 3 then
+                beyondBand += 1
+            end
+        end
+        -- spread carries members past the band; the band constrains STATIONS only
+        expect(beyondBand > 0).toBe(true)
+    end)
+end)

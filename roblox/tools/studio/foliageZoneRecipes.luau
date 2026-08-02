@@ -43,7 +43,15 @@ export type Recipe = {
     -- grass — free to render, and the reeds then stand IN it instead of on bare rock.
     -- `below` extends the paint INTO the shallows (the user's note: a bit of grass
     -- washing in the water sells the untended shoreline).
-    grassPaint: { below: number, above: number, maxSlope: number }?,
+    -- `reach` is the grass band's own width (it used to borrow nearWater, which
+    -- painted across the trail); `pathMargin` keeps it off built geometry.
+    grassPaint: {
+        below: number,
+        above: number,
+        maxSlope: number,
+        reach: number?,
+        pathMargin: number?,
+    }?,
 }
 export type GroveConfig = {
     spacing: number, -- min distance between grove ANCHORS (meadows live between)
@@ -287,7 +295,7 @@ local Recipes: { [string]: Recipe } = {
         -- the wild reach barely thins where tending reaches it
         careDensity = { GARDEN = 0.5, TENDED = 0.7 },
         rockAffinity = { radius = 5, inside = 1.4, outside = 0.9 },
-        grassPaint = { below = 1, above = 4, maxSlope = 0.5 },
+        grassPaint = { below = 1, above = 4, maxSlope = 0.5, reach = 5, pathMargin = 3 },
         -- SHORELINE STATIONS (user gate 2026-08-01): "a line of shuffled mixes
         -- marching along the shore". Area-scatter spread plants across the whole
         -- bank with no sense of the water running through it, and its clumps were
@@ -300,8 +308,14 @@ local Recipes: { [string]: Recipe } = {
             stationSpacing = 14,
             membersMin = 3,
             membersMax = 6,
-            spread = 6,
-            inland = 5,
+            spread = 4,
+            -- stations sit at the water's EDGE; members reach out from there
+            stationBand = 2,
+            -- 0, not 5: the inland push existed to stop a handful sitting entirely
+            -- in the water, but the per-species wading limits already do that job
+            -- properly. All the push did was drag every handful off the shore,
+            -- which is what starved the iris.
+            inland = 0,
         },
     },
     -- THE TENDED REACH (x -90..220, zone MarginTended): the arena end, where the care
@@ -336,15 +350,16 @@ local Recipes: { [string]: Recipe } = {
         -- stronger than wild: in a garden the planting gathers at the stones on purpose
         rockAffinity = { radius = 6, inside = 1.6, outside = 0.7 },
         -- narrower band than wild, so more shore reads as deliberate
-        grassPaint = { below = 1, above = 3, maxSlope = 0.5 },
+        grassPaint = { below = 1, above = 3, maxSlope = 0.5, reach = 5, pathMargin = 3 },
         -- a tended shore: stations further apart and handfuls smaller, so the
         -- planting reads as placed rather than grown (see WaterMargin's note)
         shoreline = {
             stationSpacing = 20,
             membersMin = 2,
             membersMax = 4,
-            spread = 5,
-            inland = 4,
+            spread = 4,
+            stationBand = 2,
+            inland = 0,
         },
     },
     -- ONE dense dark stand at a user-marked spot: sugi is the shrine-grove

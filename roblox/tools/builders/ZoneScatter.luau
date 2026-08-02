@@ -153,6 +153,14 @@ export type GroveAffinity = { radius: number, inside: number, outside: number }
 -- one station.
 export type ShorelineConfig = {
     stationSpacing: number, -- min distance between stations ALONG the shore
+    -- How close a station must sit to open water. SEPARATE from the recipe's
+    -- nearWater, which does three jobs at once (outer bound for members, the
+    -- `accepts` gate, and the grass reach) and so cannot also express "stations
+    -- hug the water's edge". Without this the stations were scattered through
+    -- the whole 8-stud margin, and a member could end up 19 studs from water
+    -- once spread and the inland push were added on top — which is what starved
+    -- the iris, whose own limit is 4. nil = fall back to the recipe's nearWater.
+    stationBand: number?,
     membersMin: number,
     membersMax: number, -- plants per station
     spread: number, -- max offset of a member from its station
@@ -924,6 +932,8 @@ function ZoneScatter.plan(
         local layer = recipe.layer or "canopy"
         local heightScale = recipe.heightScale or 1
         local shoreNearWater = recipe.nearWater or 0
+        -- stations hug the water; members may reach out to the recipe's nearWater
+        local stationBand = shoreline.stationBand or shoreNearWater
         shoreStates[zone] = seedState(zone.seed + SHORE_SEED_OFFSET)
 
         -- SHORE SAMPLES: every grid sample that clears the recipe's ordinary
@@ -939,7 +949,7 @@ function ZoneScatter.plan(
                 contains(zone, s.x, s.z, s.y)
                 and not keepOutAt(zones, s.x, s.z, s.y)
                 and accepts(zone, s)
-                and waterWithin(water, s.x, s.z, shoreNearWater)
+                and waterWithin(water, s.x, s.z, stationBand)
             then
                 table.insert(shoreSamples, s)
             end

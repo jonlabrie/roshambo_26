@@ -77,7 +77,17 @@ type Recipe = {
     rockAffinity: GroveAffinity?,
     -- terrain GRASS painting along the waterline; `below` extends the paint INTO
     -- the shallows so a little grass washes in the water
-    grassPaint: { below: number, above: number, maxSlope: number }?,
+    -- `reach` is the grass band's own width. It used to borrow the recipe's
+    -- nearWater (8), which painted grass across the trail wherever the trail runs
+    -- near water. `pathMargin` keeps it off built geometry the way plants are kept
+    -- off it — the paint had NO concept of paths at all before 2026-08-01.
+    grassPaint: {
+        below: number,
+        above: number,
+        maxSlope: number,
+        reach: number?,
+        pathMargin: number?,
+    }?,
     -- 2026-08-01 user gate: "your approach is also either/or, never and ...
     -- I like the shuffled mix, but it should be a line of shuffled mixes
     -- marching along the shore." The old per-sample nearWater band read as a
@@ -139,6 +149,11 @@ type GroveAffinity = { radius: number, inside: number, outside: number }
 -- one station.
 type ShorelineConfig = {
     stationSpacing: number, -- min distance between stations ALONG the shore
+    -- How close a station must sit to open water. SEPARATE from the recipe's
+    -- nearWater, which does three jobs at once (outer bound for members, the
+    -- `accepts` gate, and the grass reach) and so cannot also express "stations
+    -- hug the water's edge". nil = fall back to the recipe's nearWater.
+    stationBand: number?,
     membersMin: number,
     membersMax: number, -- plants per station
     spread: number, -- max offset of a member from its station
@@ -357,7 +372,7 @@ local RECIPES: { [string]: Recipe } = {
         -- the wild reach barely thins where tending reaches it
         careDensity = { GARDEN = 0.5, TENDED = 0.7 },
         rockAffinity = { radius = 5, inside = 1.4, outside = 0.9 },
-        grassPaint = { below = 1, above = 4, maxSlope = 0.5 },
+        grassPaint = { below = 1, above = 4, maxSlope = 0.5, reach = 5, pathMargin = 3 },
         -- SHORELINE STATIONS (user gate 2026-08-01): "a line of shuffled mixes
         -- marching along the shore". Area-scatter spread plants across the whole
         -- bank with no sense of the water running through it, and its clumps were
@@ -370,8 +385,14 @@ local RECIPES: { [string]: Recipe } = {
             stationSpacing = 14,
             membersMin = 3,
             membersMax = 6,
-            spread = 6,
-            inland = 5,
+            spread = 4,
+            -- stations sit at the water's EDGE; members reach out from there
+            stationBand = 2,
+            -- 0, not 5: the inland push existed to stop a handful sitting entirely
+            -- in the water, but the per-species wading limits already do that job
+            -- properly. All the push did was drag every handful off the shore,
+            -- which is what starved the iris.
+            inland = 0,
         },
     },
     WaterMarginTended = {
@@ -403,15 +424,16 @@ local RECIPES: { [string]: Recipe } = {
         -- stronger than wild: in a garden the planting gathers at the stones on purpose
         rockAffinity = { radius = 6, inside = 1.6, outside = 0.7 },
         -- narrower band than wild, so more shore reads as deliberate
-        grassPaint = { below = 1, above = 3, maxSlope = 0.5 },
+        grassPaint = { below = 1, above = 3, maxSlope = 0.5, reach = 5, pathMargin = 3 },
         -- a tended shore: stations further apart and handfuls smaller, so the
         -- planting reads as placed rather than grown (see WaterMargin's note)
         shoreline = {
             stationSpacing = 20,
             membersMin = 2,
             membersMax = 4,
-            spread = 5,
-            inland = 4,
+            spread = 4,
+            stationBand = 2,
+            inland = 0,
         },
     },
     -- ONE dense dark stand at a user-marked spot: sugi is the shrine-grove
@@ -1266,6 +1288,8 @@ local function plan(
         local layer = recipe.layer or "canopy"
         local heightScale = recipe.heightScale or 1
         local shoreNearWater = recipe.nearWater or 0
+        -- stations hug the water; members may reach out to the recipe's nearWater
+        local stationBand = shoreline.stationBand or shoreNearWater
         shoreStates[zone] = seedState(zone.seed + SHORE_SEED_OFFSET)
 
         -- SHORE SAMPLES: every grid sample that clears the recipe's ordinary
@@ -1281,7 +1305,7 @@ local function plan(
                 contains(zone, s.x, s.z, s.y)
                 and not keepOutAt(zones, s.x, s.z, s.y)
                 and accepts(zone, s)
-                and waterWithin(water, s.x, s.z, shoreNearWater)
+                and waterWithin(water, s.x, s.z, stationBand)
             then
                 table.insert(shoreSamples, s)
             end
@@ -2195,7 +2219,7 @@ local function repairKeepOutGrass(): number
     return restored
 end
 
-local function paintGrass(zones: { Zone }, recipes: { [string]: Recipe }): string
+local function paintGrass(zones: { Zone }, recipes: { [string]: Recipe }, builtIndex: any): string
     local terrain = workspace.Terrain
     local rp = RaycastParams.new()
     rp.FilterType = Enum.RaycastFilterType.Include
@@ -2230,7 +2254,7 @@ local function paintGrass(zones: { Zone }, recipes: { [string]: Recipe }): strin
         if paint == nil then
             continue
         end
-        local reach = recipe.nearWater or 8
+        local reach = paint.reach or recipe.nearWater or 8
         for _, c in wet do
             local wx, wz, waterY = c.x, c.z, c.y
             if not containsXZ(zone, wx, wz) then
@@ -2256,6 +2280,12 @@ local function paintGrass(zones: { Zone }, recipes: { [string]: Recipe }): strin
                     -- consulted them for plants but not for terrain, and grass crept
                     -- onto the karesansui. The raked sand is sacrosanct.
                     if keepOutBlocks(x, z, hit.Material.Name) then
+                        continue
+                    end
+                    -- keep the paint off paths and structures; grass was crossing
+                    -- the trail wherever the trail runs close to the water
+                    local pm = paint.pathMargin
+                    if pm ~= nil and waterWithin(builtIndex, x, z, pm) then
                         continue
                     end
                     -- inside the vertical band (below = INTO the shallows), on
@@ -2453,7 +2483,7 @@ return function(opts: {
     elseif mode == "mist" then
         bakeMist(anchors)
     elseif mode == "grass" then
-        return summary .. "\n" .. paintGrass(zones, recipes)
+        return summary .. "\n" .. paintGrass(zones, recipes, indexWater(builtCells))
     end
     return summary
 end
