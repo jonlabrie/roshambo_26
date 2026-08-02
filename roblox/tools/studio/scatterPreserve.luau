@@ -78,6 +78,19 @@ type Recipe = {
     -- terrain GRASS painting along the waterline; `below` extends the paint INTO
     -- the shallows so a little grass washes in the water
     grassPaint: { below: number, above: number, maxSlope: number }?,
+    -- 2026-08-01 user gate: "your approach is also either/or, never and ...
+    -- I like the shuffled mix, but it should be a line of shuffled mixes
+    -- marching along the shore." The old per-sample nearWater band read as a
+    -- monospecific clump-scatter smeared across the whole margin, not a line
+    -- following the water. If set, this recipe's zone runs a SHORELINE
+    -- PRE-PASS instead of the ordinary per-sample scatter (modelled closely
+    -- on `grove` above): stations are chosen by exhaustive greedy selection
+    -- walking the shore, and each station's members independently roll
+    -- their OWN species via pickWadingSpecies — one mixed handful sorts
+    -- itself wet-to-dry instead of a clump inheriting a single parent
+    -- species. The zone is excluded from per-sample resolution, exactly
+    -- like a grove-recipe zone.
+    shoreline: ShorelineConfig?,
 }
 type GroveConfig = {
     spacing: number, -- min distance between grove ANCHORS (meadows live between)
@@ -120,6 +133,17 @@ type GroveConfig = {
     coherent: boolean?,
 }
 type GroveAffinity = { radius: number, inside: number, outside: number }
+-- 2026-08-01 user gate: "a line of shuffled mixes marching along the shore."
+-- stationSpacing/spread/inland are studs; membersMin/Max bound how many
+-- plants (independently-species'd, see the shoreline pre-pass below) sit at
+-- one station.
+type ShorelineConfig = {
+    stationSpacing: number, -- min distance between stations ALONG the shore
+    membersMin: number,
+    membersMax: number, -- plants per station
+    spread: number, -- max offset of a member from its station
+    inland: number, -- how far a member may be pushed AWAY from water
+}
 -- THE FOUR BANDS (the user's structure, and the point of the whole system):
 --   0-2 studs   ground cover — grass and weeds. DOES NOT EXIST YET; the same gap
 --               leaves the waterline bare. See the WaterMargin pool below.
@@ -504,6 +528,10 @@ local GROVE_ATTENDANT_THRESHOLD = 0.6
 -- until jittered by up to this many studs per axis, so a grove doesn't read
 -- as trees standing on a lattice
 local GROVE_JITTER_MAX = 1.2
+local SHORE_SEED_OFFSET = 700000
+-- the four cardinal directions probed (at `pitch` distance) to find which
+-- way a shore station should push its members "inland"
+local SHORE_PROBE_DIRS = { { 1, 0 }, { -1, 0 }, { 0, 1 }, { 0, -1 } }
 
 local function lcg(state: number): (number, number)
     state = (1103515245 * state + 12345) % 2147483648
@@ -816,6 +844,16 @@ local function plan(
     local function groveRoll(zone: Zone): number
         local state, r = lcg(groveStates[zone])
         groveStates[zone] = state
+        return r
+    end
+
+    -- separate LCG stream for the shoreline pre-pass, so adding/removing a
+    -- shoreline recipe never perturbs the ordinary per-sample roll sequence
+    -- of other zones (same reasoning as the grove stream above)
+    local shoreStates: { [Zone]: number } = {}
+    local function shoreRoll(zone: Zone): number
+        local state, r = lcg(shoreStates[zone])
+        shoreStates[zone] = state
         return r
     end
 
@@ -1182,6 +1220,171 @@ local function plan(
     end
     local groveIndex = indexWater(groveAnchors)
 
+    -- shoreline pre-pass: mixed handfuls of plants at stations spaced along
+    -- the shore, instead of a monospecific band scattered across the whole
+    -- nearWater margin (2026-08-01 user gate — see ShorelineConfig above).
+    -- Modelled closely on the grove pre-pass: its own LCG stream, exhaustive
+    -- (not dart-thrown) candidate selection, and the same per-sample
+    -- exclusion below. Runs after grove so grove placements already in
+    -- `out` are respected by the members' spacing check, same as any other
+    -- already-placed flora.
+    for _, zone in zones do
+        local recipe = recipes[zone.recipe]
+        if recipe == nil or recipe.shoreline == nil then
+            continue
+        end
+        local shoreline = recipe.shoreline :: ShorelineConfig
+        local layer = recipe.layer or "canopy"
+        local heightScale = recipe.heightScale or 1
+        local shoreNearWater = recipe.nearWater or 0
+        shoreStates[zone] = seedState(zone.seed + SHORE_SEED_OFFSET)
+
+        -- SHORE SAMPLES: every grid sample that clears the recipe's ordinary
+        -- site gates (accepts — maxSteep, footing, submergence, pathMargin,
+        -- waterMargin, the recipe's own nearWater...) AND sits within the
+        -- recipe's nearWater of open water. `ordered` is already sorted
+        -- (x then z), so the station walk below is deterministic. KeepOut
+        -- zones veto here too, same as a grove candidate — pads are sacred
+        -- for a shoreline station exactly like they are for a grove anchor.
+        local shoreSamples: { Sample } = {}
+        for _, s in ordered do
+            if
+                contains(zone, s.x, s.z, s.y)
+                and not keepOutAt(zones, s.x, s.z, s.y)
+                and accepts(zone, s)
+                and waterWithin(water, s.x, s.z, shoreNearWater)
+            then
+                table.insert(shoreSamples, s)
+            end
+        end
+
+        -- STATIONS: exhaustive greedy selection (project standard — no
+        -- darts). Walking the sorted shore samples and accepting one as a
+        -- station whenever it clears `stationSpacing` from every
+        -- already-accepted station walks the shoreline end to end, evenly
+        -- spaced, deterministically.
+        local stations: { Sample } = {}
+        for _, s in shoreSamples do
+            local farEnough = true
+            for _, st in stations do
+                local dx, dz = s.x - st.x, s.z - st.z
+                if dx * dx + dz * dz < shoreline.stationSpacing * shoreline.stationSpacing then
+                    farEnough = false
+                    break
+                end
+            end
+            if farEnough then
+                table.insert(stations, s)
+            end
+        end
+
+        for _, station in stations do
+            -- WATER DIRECTION: probe the four cardinal offsets at `pitch`
+            -- distance and sum the unit vectors toward whichever probes land
+            -- in water (a probe "is water" when a water cell sits within
+            -- half a pitch of it — the same grid-cell tolerance sampleKey
+            -- uses elsewhere). None or all four water = no usable bias (a
+            -- station mid-peninsula or mid-lake isn't meaningfully "toward"
+            -- anything) — inland push is simply inert there, not a crash.
+            local wx, wz, wetCount = 0, 0, 0
+            for _, dir in SHORE_PROBE_DIRS do
+                local px, pz = station.x + dir[1] * pitch, station.z + dir[2] * pitch
+                if waterWithin(water, px, pz, pitch / 2) then
+                    wx += dir[1]
+                    wz += dir[2]
+                    wetCount += 1
+                end
+            end
+            local inlandX, inlandZ = 0, 0
+            if wetCount > 0 and wetCount < 4 then
+                local mag = math.sqrt(wx * wx + wz * wz)
+                if mag > 0 then
+                    inlandX, inlandZ = -wx / mag, -wz / mag
+                end
+            end
+
+            local target = shoreline.membersMin
+                + math.floor(shoreRoll(zone) * (shoreline.membersMax - shoreline.membersMin + 1))
+
+            for _ = 1, target do
+                -- up to 3 attempts; a station short on legal ground plants
+                -- fewer members rather than fabricating a spot for one —
+                -- the slot is simply abandoned when all 3 fail
+                for _attempt = 1, 3 do
+                    -- polar offset from the station, then an additional push
+                    -- AWAY from water along the station's inland direction
+                    local angle = shoreRoll(zone) * 2 * math.pi
+                    local radius = shoreRoll(zone) * shoreline.spread
+                    local push = shoreRoll(zone) * shoreline.inland
+                    local mx = station.x + math.cos(angle) * radius + inlandX * push
+                    local mz = station.z + math.sin(angle) * radius + inlandZ * push
+
+                    local nearest = nearestSample(ordered, mx, mz)
+                    if nearest == nil then
+                        continue
+                    end
+                    local probe: Sample = {
+                        x = mx,
+                        z = mz,
+                        y = nearest.y,
+                        steep = nearest.steep,
+                        depth = nearest.depth,
+                        material = nearest.material,
+                    }
+                    if not accepts(zone, probe) then
+                        continue
+                    end
+                    local tooClose = false
+                    for _, p in out do
+                        if p.layer == layer then
+                            local dx, dz = mx - p.x, mz - p.z
+                            if dx * dx + dz * dz < recipe.spacingMin * recipe.spacingMin then
+                                tooClose = true
+                                break
+                            end
+                        end
+                    end
+                    if tooClose then
+                        continue
+                    end
+
+                    -- each member draws its OWN species independently — this
+                    -- is what sorts a mixed handful wet-to-dry within one
+                    -- station instead of every member inheriting one parent
+                    -- species the way a clump child does
+                    local species, speciesScale = pickWadingSpecies(
+                        recipe.pool,
+                        probe.depth or 0,
+                        recipe.submergeMax,
+                        function()
+                            return shoreRoll(zone)
+                        end,
+                        function(bankRadius)
+                            return waterWithin(water, mx, mz, bankRadius)
+                        end
+                    )
+                    if species == nil then
+                        continue
+                    end
+
+                    table.insert(out, {
+                        x = mx,
+                        z = mz,
+                        y = nearest.y,
+                        species = species,
+                        yaw = shoreRoll(zone) * 2 * math.pi,
+                        scale = (1 + (shoreRoll(zone) * 2 - 1) * recipe.scaleJitter)
+                            * heightScale
+                            * speciesScale,
+                        zone = zone.name,
+                        layer = layer,
+                    })
+                    break
+                end
+            end
+        end
+    end
+
     -- rockAffinity's lookup: the Studio side reads the ShoreRocks pass' output
     -- straight from the workspace rather than taking an injected point set
     local rockCells: { { number } } = {}
@@ -1198,12 +1401,13 @@ local function plan(
 
     for _, s in ordered do
         local zone = resolveZone(zones, s.x, s.z, s.y, function(candidate)
-            -- grove-recipe zones already planted in the pre-pass; excluding
-            -- them here (rather than filtering `zones`) lets their samples
-            -- fall through to whatever zone is layered beneath, exactly like
-            -- a recipe that simply rejects the sample
+            -- grove- and shoreline-recipe zones already planted in their own
+            -- pre-passes; excluding them here (rather than filtering
+            -- `zones`) lets their samples fall through to whatever zone is
+            -- layered beneath, exactly like a recipe that simply rejects
+            -- the sample
             local crecipe = recipes[candidate.recipe]
-            if crecipe ~= nil and crecipe.grove ~= nil then
+            if crecipe ~= nil and (crecipe.grove ~= nil or crecipe.shoreline ~= nil) then
                 return false
             end
             return accepts(candidate, s)
