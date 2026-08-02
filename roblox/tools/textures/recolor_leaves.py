@@ -25,9 +25,15 @@ red 138457704702807 shift -61 sat 1.60) read well up close but went muddy at ran
 2026-08-02 gold and red were re-cut hotter and then run through dilate_alpha.py, which is
 what makes the colour survive the mip chain:
 
-    gold  rbxassetid://114315144065350   --shift -27 --sat 1.90 --val 1.18
-    red   rbxassetid://89777902880770    --shift -61 --sat 2.10 --val 1.15
+    gold  rbxassetid://104112050806577   --shift -27 --sat 1.71 --val 1.06
+    red   rbxassetid://125377348277491   --shift -61 --sat 1.89 --val 1.04
     then  dilate_alpha.py --passes 12 --fill-sat 1.35 --fill-val 1.10
+
+The first cut of that pass (gold 114315144065350 sat 1.90 val 1.18, red 89777902880770
+sat 2.10 val 1.15) fixed the distance problem but read "really hot" up close, so both
+knobs came down 10%. The FILL boost was left alone deliberately: it multiplies the leaf
+colour, so it had already come down with it, and cutting it too would have given back the
+distance punch this was all for.
 
 Judged on preview_distance.py sheets before uploading, not by uploading and looking. GREEN
 was deliberately NOT re-cut — see the moderation note below.
