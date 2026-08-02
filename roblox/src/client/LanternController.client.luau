@@ -16,15 +16,16 @@ local TweenService = game:GetService("TweenService")
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local RevealTheater = remotes:WaitForChild("RevealTheater") :: RemoteEvent
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
+local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
+local Glyphs = require(shared:WaitForChild("Glyphs"))
 
-local GLYPH = { R = "○", P = "─", S = "∧" }
 local INK = Color3.fromRGB(36, 30, 24) -- dark silhouette on the glowing warm paper
 local LATTICE = Color3.fromRGB(40, 32, 24)
 local FACES = { Enum.NormalId.Front, Enum.NormalId.Back, Enum.NormalId.Left, Enum.NormalId.Right }
 local FADE = TweenInfo.new(0.35, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
 local BLANK_LEAD = 10 -- blank this many seconds before the next reveal
 
-local glyphLabels: { TextLabel } = {}
+local glyphGroups: { CanvasGroup } = {}
 local current: string? = nil -- the throw currently displayed (nil = blanked)
 
 -- one face: a thin kumiko frame + shrine double-line + a fading glyph label
@@ -64,26 +65,19 @@ local function buildFace(part: BasePart, face: Enum.NormalId)
     bar(0.11, 0.15, 0.78, 0.028)
     bar(0.11, 0.205, 0.78, 0.028)
 
-    -- glyph (a touch shorter) centered in the clear field below the double-line
-    local g = Instance.new("TextLabel")
-    g.Name = "Glyph"
-    g.BackgroundTransparency = 1
-    g.Position = UDim2.fromScale(0.22, 0.34)
-    g.Size = UDim2.fromScale(0.56, 0.52)
-    g.Font = Enum.Font.GothamBlack
-    g.TextColor3 = INK
-    g.TextScaled = false
-    g.TextSize = 44
+    -- glyph centered in the clear field below the double-line
+    local holder = Instance.new("Frame")
+    holder.Name = "GlyphHolder"
+    holder.BackgroundTransparency = 1
+    holder.Position = UDim2.fromScale(0.22, 0.34)
+    holder.Size = UDim2.fromScale(0.56, 0.52)
+    holder.Parent = gui
+
+    local g = Glyphs.renderGroup(holder, current or "R", INK, INK)
+    g:SetAttribute("ShownT", 0)
     -- late-arriving lanterns (streamed in) pick up whatever throw is currently shown
-    if current then
-        g.Text = GLYPH[current] or ""
-        g.TextTransparency = 0
-    else
-        g.Text = ""
-        g.TextTransparency = 1
-    end
-    g.Parent = gui
-    table.insert(glyphLabels, g)
+    g.GroupTransparency = if current then 0 else 1
+    table.insert(glyphGroups, g)
 end
 
 -- soft warm "lit-from-within" glow on the block lantern body — a feathered radial sprite that
@@ -142,26 +136,20 @@ local function buildRoundFace(part: Instance)
     gui.PixelsPerStud = 50
     gui.LightInfluence = 0
     gui.Parent = part
-    local g = Instance.new("TextLabel")
-    g.Name = "Glyph"
-    g.BackgroundTransparency = 1
-    g.AnchorPoint = Vector2.new(0.5, 0.5)
-    g.Position = UDim2.fromScale(0.5, 0.5)
-    g.Size = UDim2.fromScale(0.7, 0.7)
-    g.Font = Enum.Font.GothamBlack
-    g.TextColor3 = INK
-    g.TextScaled = true
+
+    local holder = Instance.new("Frame")
+    holder.Name = "GlyphHolder"
+    holder.BackgroundTransparency = 1
+    holder.AnchorPoint = Vector2.new(0.5, 0.5)
+    holder.Position = UDim2.fromScale(0.5, 0.5)
+    holder.Size = UDim2.fromScale(0.7, 0.7)
+    holder.Parent = gui
+
+    local g = Glyphs.renderGroup(holder, current or "R", INK, INK)
     g:SetAttribute("ShownT", 0.2) -- round glyphs rest at 20% transparency (softer ink on the paper)
     -- late-arriving lanterns pick up whatever throw is currently shown
-    if current then
-        g.Text = GLYPH[current] or ""
-        g.TextTransparency = 0.2
-    else
-        g.Text = ""
-        g.TextTransparency = 1
-    end
-    g.Parent = gui
-    table.insert(glyphLabels, g)
+    g.GroupTransparency = if current then 0.2 else 1
+    table.insert(glyphGroups, g)
 end
 for _, p in CollectionService:GetTagged("RoundLantern") do
     buildRoundFace(p)
@@ -175,28 +163,47 @@ local period = 25 -- measured reveal→reveal; default a touch over a round
 local shownAt: number? = nil -- when the current glyph went up (for the blank lead)
 
 local function fadeBlank()
-    for _, g in glyphLabels do
-        TweenService:Create(g, FADE, { TextTransparency = 1 }):Play()
+    for _, g in glyphGroups do
+        TweenService:Create(g, FADE, { GroupTransparency = 1 }):Play()
     end
 end
 
 local function fadeShown()
-    -- each label rises to its own resting transparency (block faces 0, round chōchin 0.2)
-    for _, g in glyphLabels do
+    -- each group rises to its own resting transparency (block faces 0, round chōchin 0.2)
+    for _, g in glyphGroups do
         local st = (g:GetAttribute("ShownT") :: number?) or 0
-        TweenService:Create(g, FADE, { TextTransparency = st }):Play()
+        TweenService:Create(g, FADE, { GroupTransparency = st }):Play()
+    end
+end
+
+-- Retarget the two ImageLabels in a group. Layer order is outline-behind, core-in-front, matching
+-- Glyphs.renderGroup; children come back in insertion order so index 1 is the outline.
+local function setGroupSymbol(g: CanvasGroup, symbol: string)
+    local layers = Glyphs.IMAGE[symbol]
+    if not layers then
+        return
+    end
+    local kids = g:GetChildren()
+    local imgs: { ImageLabel } = {}
+    for _, k in kids do
+        if k:IsA("ImageLabel") then
+            table.insert(imgs, k)
+        end
+    end
+    if #imgs >= 2 then
+        imgs[1].Image = layers.outline
+        imgs[2].Image = layers.core
     end
 end
 
 local function showThrow(throw: string)
-    local glyph = GLYPH[throw]
-    if not glyph then
+    if not Glyphs.IMAGE[throw] then
         return
     end
     fadeBlank() -- fade the old symbol down…
     task.delay(0.4, function() -- swap after the (slower) fade-out completes
-        for _, g in glyphLabels do
-            g.Text = glyph
+        for _, g in glyphGroups do
+            setGroupSymbol(g, throw)
         end
         fadeShown() -- …swap, then fade the new one up
     end)

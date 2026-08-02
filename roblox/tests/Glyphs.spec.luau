@@ -20,6 +20,17 @@ describe("Glyphs image map", function()
             expect(Glyphs.IMAGE[sym].core ~= Glyphs.IMAGE[sym].outline).toBe(true)
         end
     end)
+
+    test("no two layers share an asset id", function()
+        -- a copy-paste in this table renders the wrong throw on every lantern in the canyon
+        local seen: { [string]: boolean } = {}
+        for _, sym in { "R", "P", "S" } do
+            for _, id in { Glyphs.IMAGE[sym].core, Glyphs.IMAGE[sym].outline } do
+                expect(seen[id]).toBe(nil)
+                seen[id] = true
+            end
+        end
+    end)
 end)
 
 describe("Glyphs day/night palette + API", function()
@@ -45,8 +56,9 @@ describe("Glyphs day/night palette + API", function()
         end
     end)
 
-    test("renderDay + buildNightNeon are functions", function()
+    test("renderDay + buildNightNeon + renderGroup are functions", function()
         expect(type(Glyphs.renderDay)).toBe("function")
         expect(type(Glyphs.buildNightNeon)).toBe("function")
+        expect(type(Glyphs.renderGroup)).toBe("function")
     end)
 end)

@@ -68,6 +68,43 @@ function Glyphs.render(parent: Instance, symbol: string, coreColor: Color3, outl
     return root
 end
 
+-- As `render`, but inside a CanvasGroup so the caller fades the whole glyph with a single
+-- GroupTransparency tween. The lanterns need this: they cross-fade every reveal, and tweening
+-- two ImageLabels independently drifts them out of step at the edges of the fade.
+function Glyphs.renderGroup(
+    parent: Instance,
+    symbol: string,
+    coreColor: Color3,
+    outlineColor: Color3?
+): CanvasGroup
+    local g = Instance.new("CanvasGroup")
+    g.Name = "Glyph"
+    g.BackgroundTransparency = 1
+    g.AnchorPoint = Vector2.new(0.5, 0.5)
+    g.Position = UDim2.fromScale(0.5, 0.5)
+    g.Size = UDim2.fromScale(1, 1)
+    local ar = Instance.new("UIAspectRatioConstraint")
+    ar.AspectRatio = 1
+    ar.Parent = g
+
+    local imgs = Glyphs.IMAGE[symbol]
+    if imgs then
+        local function layer(assetId: string, tint: Color3)
+            local img = Instance.new("ImageLabel")
+            img.BackgroundTransparency = 1
+            img.Size = UDim2.fromScale(1, 1)
+            img.Image = assetId
+            img.ImageColor3 = tint
+            img.Parent = g
+        end
+        layer(imgs.outline, outlineColor or coreColor)
+        layer(imgs.core, coreColor)
+    end
+
+    g.Parent = parent
+    return g
+end
+
 -- DAY glyph: the gilt-gold image (current approved look) in an aspect-locked CanvasGroup, tagged
 -- for the day/night subscriber (GlyphDayNight.client.luau) which fades it via GroupTransparency.
 -- Full-bright (the SurfaceGui is LightInfluence 0) so gold reads gilt on cypress. Roblox globals
