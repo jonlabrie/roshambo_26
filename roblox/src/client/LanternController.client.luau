@@ -28,7 +28,7 @@ local BLANK_LEAD = 10 -- blank this many seconds before the next reveal
 local glyphGroups: { CanvasGroup } = {}
 local current: string? = nil -- the throw currently displayed (nil = blanked)
 
--- one face: a thin kumiko frame + shrine double-line + a fading glyph label
+-- one face: a thin kumiko frame + shrine double-line + a fading glyph
 local function buildFace(part: BasePart, face: Enum.NormalId)
     local gui = Instance.new("SurfaceGui")
     gui.Name = "LanternFace"
