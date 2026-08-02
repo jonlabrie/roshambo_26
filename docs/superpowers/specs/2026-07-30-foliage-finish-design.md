@@ -133,3 +133,100 @@ Final-quality polish (later art passes may rework any of this) · broad Xfrog co
 hosta or further purchases · mass sugi scatter (A13 verdict stands) · the 0–2 stud ground
 cover question beyond the reach ribbon · water/hydrology work · FoliageDayNight
 night-dimming (parked with the arena program's foliage notes).
+
+---
+
+# As-built — 2026-08-02
+
+Written at the walk-through gate, after the owner accepted the world ("I've seen this
+place plenty"). The spec above is the design as approved; this section records where the
+built world **differs from it**, and why. Where the two disagree, the world is correct.
+
+## What shipped that the spec did not describe
+
+**A composition layer with derived sites, not hand-listed ones.** Part 4 named the site
+grammar (bridge ends, path gates, pool mirror, stair companions, tunnel mouths) but
+assumed a human would choose the locations. `tools/studio/bakeArrangements.luau` derives
+them from the world instead — pad-slot tunnel mouths, bridge abutments, shore-rock pool
+clusters, the foot and head of every path climbing 20+ studs, two promontories — so the
+sweep survives the terrain moving. 40 arrangements, 94 trees, into
+`CanyonWorld.Foliage.ArrangementsDraft`.
+
+**An east backdrop the spec never contemplated.** Terrain added ad hoc east of the canyon
+(x 205..470, curving north) had 71 plants in it, all hugging the x 200–240 edge. It is
+scenery, not a place: the easternmost path marker is x 149 and 72 of 74 sampled spots lie
+more than 120 studs from any path — but every vantage sees it, FallsLanding at 686 studs
+included, which makes it the far end of the canyon's longest sightline. It got **backdrop
+massing**: 35 skyline-variant trees for 73 MeshParts, roughly a third of what full-detail
+trees would cost. `tools/studio/bakeEastBackdrop.luau`.
+
+**A tree-LOD and atlas program.** Not in the spec at all; it arrived through the fringe
+work. Cheap maple variants, offstage culling (`cullOffstage`), skyline swaps, and the
+repair of a real rendering defect: 1,657 wood parts carried a **ColorMap-only
+SurfaceAppearance**, which Roblox renders warm and shiny because it substitutes its own
+defaults for the missing channels. Converting them to `TextureID` fixed it.
+
+## Deviations from the spec
+
+**RealisticBamboo replaced XfBambooA.** The spec assumed the Xfrog library would supply
+the bamboo. It does not read as a thicket: `RealisticBamboo` ships a whole multi-culm
+clump per instance at 10.2k triangles, which is both cheaper and better than several
+Xfrog culms. Template base scale is **4.93**, not 1 — relative scaling must multiply
+`GetScale()`, because `ScaleTo` is absolute. Tinted `SurfaceAppearance.Color` RGB
+(195,200,180); `part.Color` is inert under `AlphaMode = Transparency`.
+
+**Part 3 (the moss transition engine) was built, then cut.** 1,247 clumps were placed and
+removed after a visual A/B in which the owner's verdict was that nothing was lost. The
+planner and collector remain committed and dormant; the clumps are parked at
+`ParkedFoliage.MossTransitions_2026_08_01`. Future moss is intended as hand-sculpted mossy
+rock piles at one or two discoverable spots, not scatter. **The engine was not wrong; the
+register was.**
+
+**Pad bamboo was added mid-flight** — 52 clumps screening all 14 pad-slot terrain walls,
+with a clean perf A/B (locked 60fps steady-state under Samsung emulation).
+
+**A shore-rock pass (T14a) was added mid-flight** — 99 ishigumi rocks at pool waterlines,
+Moss Kit stones mixed in. It later became load-bearing in an unplanned way: the
+arrangements sweep derives its `waterEdge` sites by clustering those rocks.
+
+## A defect the spec's model did not anticipate
+
+The foliage atlases were **dilated** to stop distant foliage darkening, then **reverted**
+the next day. The measurement behind the change was wrong: unweighted texel means ignore
+that alpha mips down alongside colour. Shipping it did settle a question worth recording —
+**Roblox filters foliage RGB independently of alpha (straight, not premultiplied)** — so
+the black under transparent texels bleeds into leaf *edges* at full resolution, not only
+into distant mips. The effect scales with each atlas's partial-alpha share (sugi 28.7%,
+spruce 25.6%, maple 2.2%), which is why the same treatment wrecked the conifers and was
+exactly right for the maples. Gold and red maples now ship hotter and dilated; the other
+seven species are back on their pre-dilation uploads. `tools/textures/preview_distance.py`
+now computes an atlas's appearance at range so this is judged **before** uploading.
+
+## Known state at the gate
+
+**190 of 1,915 plants (9.9%) are flagged for hand cleanup** — 100 BURIED, 63 HALF_BURIED,
+26 PERCH, 1 FLOAT — indexed at `CanyonWorld.Foliage.CleanupIndex` (worst first) and marked
+in-world at `Workspace.CleanupMarkers`. Each carries `Cleanup` and `CleanupDetail`
+attributes. This is **not** evenly spread: the middle canyon runs 1–9%, while the head
+bowl (x −500..−401) runs 15–23% and the east seam (x 150..249) runs 25–29%. Both hotspots
+are ground that was reworked *after* it was planted. The lesson for future terrain edits is
+to re-run the cleanup audit over the edited band, because the scatter's footing checks were
+correct when they ran and the terrain moved underneath them.
+
+Three arrangement seeds found no legal anchor and were left unplaced rather than forced:
+**Pool_3**, **Pool_5**, **RiverUpperClimb_head**. The **suspension-bridge abutments placed
+nothing** — the most prominent bridge in the canyon — because both ends are already densely
+planted; that wants trees moved, not a gate loosened. Stair-end arrangement assignment is
+round-robin and therefore arbitrary per site.
+
+`DayNightLockT` is still **0.19** and must be cleared before any publish.
+
+## Durability note
+
+`bakeArrangements` and `bakeEastBackdrop` both destroy and rebuild their folders, which is
+safe exactly once — before anyone hand-tunes them. Tuning here is expected to be ad hoc and
+spread over months as the teahouse areas become curated places, so both now stamp a
+`BakeFingerprint` (group names plus rounded pivots, so a move counts as well as a deletion)
+and refuse to run if what they find is not what they last wrote. A moved tree returning to
+its computed spot is visible; a **deleted** one coming back is not, and deletion is usually
+the most deliberate judgement in a tuning pass.
