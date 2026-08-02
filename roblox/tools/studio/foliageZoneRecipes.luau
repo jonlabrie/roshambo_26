@@ -250,7 +250,13 @@ local Recipes: { [string]: Recipe } = {
         heightScale = 0.5,
         -- walls are steep; sparser footing is accepted here
         footingRadius = 3,
-        footingMaxDrop = 6,
+        -- 6 was starving the CREVICES. Measured 2026-08-01: cells with >=20 studs of
+        -- local relief carried 1.20 trees vs 1.81 on flat ground, and 58 crevice cells
+        -- were empty outright — the gully walls fall 2-3 studs per stud, so at radius 3
+        -- the drop underfoot is 6-9 and the gate rejected them. A conifer on a steep
+        -- gully wall is exactly what belongs there. Plan sweep: 6->426 fringe trees,
+        -- 10->548, 14->579, 20->563, 30->562 — it SATURATES at 14, so 14 it is.
+        footingMaxDrop = 14,
     },
     -- THE WILD REACH (x -420..-90): the upper canyon, where care barely reaches.
     -- Lush, scraggly, reed-led — the register the user approved as "untended wild
