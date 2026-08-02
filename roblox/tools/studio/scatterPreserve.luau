@@ -382,12 +382,21 @@ local RECIPES: { [string]: Recipe } = {
         -- gates then sort each handful wet-to-dry on their own, so an iris and a
         -- fern can be co-located without either being fenced into its own band.
         shoreline = {
-            stationSpacing = 14,
-            membersMin = 3,
-            membersMax = 6,
+            -- 8/4-7, tuned live 2026-08-01: at 14/3-6 the shore carried 101 plants
+            -- and only ~22 iris across 700 studs of bank, which clustered by chance
+            -- into a 179-stud stretch of north shore with a single iris in it. The
+            -- user read that as "no iris on the north shore" — it was small-number
+            -- gapping, not a bias, and density is the cure.
+            stationSpacing = 8,
+            membersMin = 4,
+            membersMax = 7,
             spread = 4,
-            -- stations sit at the water's EDGE; members reach out from there
-            stationBand = 2,
+            -- stations sit at the water's EDGE; members reach out from there.
+            -- 5, not 2: the sample grid is 4 studs, so a band under ~3 matches NO
+            -- sample and the zone plans to zero (caught by planning before baking).
+            -- Anything in 3..6 selects the same set — the samples adjacent to a
+            -- water cell — so 5 sits safely inside that plateau.
+            stationBand = 5,
             -- 0, not 5: the inland push existed to stop a handful sitting entirely
             -- in the water, but the per-species wading limits already do that job
             -- properly. All the push did was drag every handful off the shore,
@@ -428,11 +437,12 @@ local RECIPES: { [string]: Recipe } = {
         -- a tended shore: stations further apart and handfuls smaller, so the
         -- planting reads as placed rather than grown (see WaterMargin's note)
         shoreline = {
-            stationSpacing = 20,
-            membersMin = 2,
-            membersMax = 4,
+            -- the tended shore stays sparser than the wild one, but not empty
+            stationSpacing = 12,
+            membersMin = 3,
+            membersMax = 5,
             spread = 4,
-            stationBand = 2,
+            stationBand = 5,
             inland = 0,
         },
     },
@@ -2190,6 +2200,64 @@ local VOXEL = 4
 -- pass laid down. This sweeps every keep-out rect and puts Grass back to Sand, which is
 -- what the karesansui is made of — run before each paint so the rules are enforced
 -- retroactively rather than only on new work.
+-- Painting is additive: tightening the rules cannot REMOVE grass an earlier, looser
+-- pass laid down. This scrubs grass back off built geometry (paths, decks, structures)
+-- the same way repairKeepOutGrass scrubs it off the karesansui — the paint had no
+-- concept of paths until 2026-08-01, so it had crossed the trail wherever the trail
+-- runs near water. Restores to Slate, the canyon's default ground.
+local function repairPathGrass(builtCells: { { number } }, margin: number): number
+    local terrain = workspace.Terrain
+    local restored = 0
+    local seen: { [string]: boolean } = {}
+    for _, c in builtCells do
+        -- one region per built cell is far too many writes; snap to a coarse tile and
+        -- do each tile once
+        local tx = math.floor(c[1] / 32) * 32
+        local tz = math.floor(c[2] / 32) * 32
+        local key = `{tx},{tz}`
+        if seen[key] then
+            continue
+        end
+        seen[key] = true
+        local region = Region3.new(
+            Vector3.new(tx - margin, -20, tz - margin),
+            Vector3.new(tx + 32 + margin, 320, tz + 32 + margin)
+        ):ExpandToGrid(VOXEL)
+        local mats, occ = terrain:ReadVoxels(region, VOXEL)
+        local origin = region.CFrame.Position - region.Size / 2
+        local touched = false
+        local sx, sy, sz = mats.Size.X, mats.Size.Y, mats.Size.Z
+        for ix = 1, sx do
+            for iz = 1, sz do
+                local wx = origin.X + (ix - 0.5) * VOXEL
+                local wz = origin.Z + (iz - 0.5) * VOXEL
+                -- only where this column is actually within `margin` of built geometry
+                local near = false
+                for _, b in builtCells do
+                    local dx, dz = wx - b[1], wz - b[2]
+                    if dx * dx + dz * dz <= margin * margin then
+                        near = true
+                        break
+                    end
+                end
+                if near then
+                    for iy = 1, sy do
+                        if mats[ix][iy][iz] == Enum.Material.Grass and occ[ix][iy][iz] > 0 then
+                            mats[ix][iy][iz] = Enum.Material.Slate
+                            restored += 1
+                            touched = true
+                        end
+                    end
+                end
+            end
+        end
+        if touched then
+            terrain:WriteVoxels(region, VOXEL, mats, occ)
+        end
+    end
+    return restored
+end
+
 local function repairKeepOutGrass(): number
     local terrain = workspace.Terrain
     local restored = 0
@@ -2392,8 +2460,22 @@ local function paintGrass(zones: { Zone }, recipes: { [string]: Recipe }, builtI
     end
 
     local repaired = repairKeepOutGrass()
+    -- the widest pathMargin any painting recipe asks for governs the scrub
+    local pathScrub = 0
+    for _, zone in zones do
+        local r = recipes[zone.recipe]
+        local pm = r and r.grassPaint and r.grassPaint.pathMargin
+        if pm ~= nil and pm > pathScrub then
+            pathScrub = pm
+        end
+    end
+    local offPath = 0
+    if pathScrub > 0 then
+        offPath = repairPathGrass(readBuiltCells(), pathScrub)
+    end
     return `[grass] painted {painted} voxels across {tileCount} tiles ({#targets} columns); `
-        .. `restored {repaired} keep-out voxels to sand; snapshot in ServerStorage.TerrainBackup_Grass`
+        .. `restored {repaired} keep-out + {offPath} path voxels; `
+        .. `snapshot in ServerStorage.TerrainBackup_Grass`
 end
 
 return function(opts: {

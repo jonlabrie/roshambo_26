@@ -305,12 +305,21 @@ local Recipes: { [string]: Recipe } = {
         -- gates then sort each handful wet-to-dry on their own, so an iris and a
         -- fern can be co-located without either being fenced into its own band.
         shoreline = {
-            stationSpacing = 14,
-            membersMin = 3,
-            membersMax = 6,
+            -- 8/4-7, tuned live 2026-08-01: at 14/3-6 the shore carried 101 plants
+            -- and only ~22 iris across 700 studs of bank, which clustered by chance
+            -- into a 179-stud stretch of north shore with a single iris in it. The
+            -- user read that as "no iris on the north shore" — it was small-number
+            -- gapping, not a bias, and density is the cure.
+            stationSpacing = 8,
+            membersMin = 4,
+            membersMax = 7,
             spread = 4,
-            -- stations sit at the water's EDGE; members reach out from there
-            stationBand = 2,
+            -- stations sit at the water's EDGE; members reach out from there.
+            -- 5, not 2: the sample grid is 4 studs, so a band under ~3 matches NO
+            -- sample and the zone plans to zero (caught by planning before baking).
+            -- Anything in 3..6 selects the same set — the samples adjacent to a
+            -- water cell — so 5 sits safely inside that plateau.
+            stationBand = 5,
             -- 0, not 5: the inland push existed to stop a handful sitting entirely
             -- in the water, but the per-species wading limits already do that job
             -- properly. All the push did was drag every handful off the shore,
@@ -354,11 +363,12 @@ local Recipes: { [string]: Recipe } = {
         -- a tended shore: stations further apart and handfuls smaller, so the
         -- planting reads as placed rather than grown (see WaterMargin's note)
         shoreline = {
-            stationSpacing = 20,
-            membersMin = 2,
-            membersMax = 4,
+            -- the tended shore stays sparser than the wild one, but not empty
+            stationSpacing = 12,
+            membersMin = 3,
+            membersMax = 5,
             spread = 4,
-            stationBand = 2,
+            stationBand = 5,
             inland = 0,
         },
     },
