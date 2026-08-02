@@ -4,13 +4,39 @@ import { ResultsStore } from '../engine/ResultsStore';
 import { requireApiKey } from '../middleware/apiKey';
 import { resolveUser } from '../identity';
 import { bankPot, resolveWin } from '../wallet';
-import User from '../models/User';
+import User, { IUser } from '../models/User';
 import { Throw } from '../engine/GameRules';
 import { validateLoadout, validateSizeClass, validatePadPreferences, validateDecorations, validateAccess } from '../loadout';
 import {
     validatePurchase, applyPurchase, validateDisplay, PRICES, DEFAULT_TEAHOUSE_LOADOUT,
     Size, EconomyState, appendDecoration, DEFAULT_ACCESS,
 } from '../economy';
+
+// Extracted so the shape is testable without a request. Every field is defaulted: no migration
+// was run for the 2026-08-02 play-HUD fields, so documents written before them lack the keys.
+export function buildProfilePayload(user: IUser) {
+    return {
+        totalPoints: user.totalPoints,
+        pointsAtStake: user.pointsAtStake,
+        currentStreak: user.currentStreak,
+        stakingStreak: user.stakingStreak,
+        bestStreak: user.bestStreak,
+        unresolvedWin: user.unresolvedWin ?? false,
+        escalationPrompts: user.escalationPrompts ?? true,
+        seenBeats: user.seenBeats ?? [],
+        counters: {
+            roundsPlayed: user.roundsPlayed ?? 0,
+            wins: user.wins ?? 0,
+            safes: user.safes ?? 0,
+            losses: user.losses ?? 0,
+            lifetimeBanked: user.lifetimeBanked ?? 0,
+            bestPot: user.bestPot ?? 0,
+            throwsR: user.throwsR ?? 0,
+            throwsP: user.throwsP ?? 0,
+            throwsS: user.throwsS ?? 0,
+        },
+    };
+}
 
 export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     const router = express.Router();
@@ -94,13 +120,36 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             res.json({
                 robloxUserId: req.params.robloxUserId,
                 displayName: user.displayName,
-                totalPoints: user.totalPoints,
-                pointsAtStake: user.pointsAtStake,
-                currentStreak: user.currentStreak,
-                stakingStreak: user.stakingStreak,
-                bestStreak: user.bestStreak,
                 identityTier: user.identityTier,
+                ...buildProfilePayload(user),
             });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
+    router.put('/players/:robloxUserId/preferences-hud', async (req, res) => {
+        try {
+            const user = await resolveUser({ robloxUserId: String(req.params.robloxUserId) });
+            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            const set: Record<string, unknown> = {};
+            if (typeof req.body?.escalationPrompts === 'boolean') {
+                set.escalationPrompts = req.body.escalationPrompts;
+            }
+            // seenBeat is add-only: a beat can be marked seen but never un-seen from the client
+            const addToSet = typeof req.body?.seenBeat === 'string'
+                ? { seenBeats: req.body.seenBeat } : undefined;
+            if (!Object.keys(set).length && !addToSet) {
+                res.status(400).json({ error: 'BAD_REQUEST' });
+                return;
+            }
+            const updated = await User.findByIdAndUpdate(
+                user._id,
+                { ...(Object.keys(set).length ? { $set: set } : {}), ...(addToSet ? { $addToSet: addToSet } : {}) },
+                { new: true }
+            );
+            const s = updated ?? user;
+            res.json({ escalationPrompts: s.escalationPrompts ?? true, seenBeats: s.seenBeats ?? [] });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
         }

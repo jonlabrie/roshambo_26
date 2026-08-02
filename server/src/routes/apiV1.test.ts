@@ -6,7 +6,7 @@ import User from '../models/User';
 import { RoundEngine } from '../engine/RoundEngine';
 import { ResultsStore } from '../engine/ResultsStore';
 import { settleRound } from '../engine/Settlement';
-import { createApiV1 } from './apiV1';
+import { createApiV1, buildProfilePayload } from './apiV1';
 
 const API_KEY = 'test-key';
 
@@ -161,6 +161,93 @@ describe('/api/v1', () => {
             });
             const u = await User.findOne({ robloxId: '12345' });
             expect(u?.country).toBe('US');
+        });
+
+        it('carries the ledger: gate, preference and counters', async () => {
+            await User.create({
+                robloxId: '55501', identityTier: 'roblox', totalPoints: 1240, pointsAtStake: 27,
+                currentStreak: 3, stakingStreak: 3, bestStreak: 6,
+                unresolvedWin: true, escalationPrompts: false, seenBeats: ['drum'],
+                roundsPlayed: 386, wins: 131, safes: 92, losses: 163,
+                lifetimeBanked: 1240, bestPot: 243, throwsR: 181, throwsP: 120, throwsS: 85,
+            });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const res = await request(app)
+                .get('/api/v1/players/55501').set('X-API-Key', API_KEY).expect(200);
+            expect(res.body.unresolvedWin).toBe(true);
+            expect(res.body.escalationPrompts).toBe(false);
+            expect(res.body.seenBeats).toEqual(['drum']);
+            expect(res.body.counters).toEqual({
+                roundsPlayed: 386, wins: 131, safes: 92, losses: 163,
+                lifetimeBanked: 1240, bestPot: 243, throwsR: 181, throwsP: 120, throwsS: 85,
+            });
+            // pre-existing fields must still be present alongside the new ones
+            expect(res.body).toMatchObject({ robloxUserId: '55501', identityTier: 'roblox' });
+        });
+    });
+
+    describe('buildProfilePayload', () => {
+        it('carries the gate, the preference and every counter', () => {
+            const p = buildProfilePayload({
+                totalPoints: 1240, pointsAtStake: 27, currentStreak: 3, stakingStreak: 3, bestStreak: 6,
+                unresolvedWin: true, escalationPrompts: false, seenBeats: ['drum'],
+                roundsPlayed: 386, wins: 131, safes: 92, losses: 163,
+                lifetimeBanked: 1240, bestPot: 243, throwsR: 181, throwsP: 120, throwsS: 85,
+            } as never);
+            expect(p.unresolvedWin).toBe(true);
+            expect(p.escalationPrompts).toBe(false);
+            expect(p.seenBeats).toEqual(['drum']);
+            expect(p.counters.roundsPlayed).toBe(386);
+            expect(p.counters.throwsS).toBe(85);
+        });
+
+        it('tolerates a document written before these fields existed', () => {
+            // no migration was run, so old docs simply lack the keys
+            const p = buildProfilePayload({ totalPoints: 5, pointsAtStake: 0, currentStreak: 0,
+                stakingStreak: 0, bestStreak: 0 } as never);
+            expect(p.unresolvedWin).toBe(false);
+            expect(p.escalationPrompts).toBe(true);
+            expect(p.seenBeats).toEqual([]);
+            expect(p.counters.roundsPlayed).toBe(0);
+        });
+    });
+
+    describe('PUT /players/:robloxUserId/preferences-hud', () => {
+        it('sets escalationPrompts', async () => {
+            await User.create({ robloxId: 'hud-1', identityTier: 'roblox' });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const res = await request(app)
+                .put('/api/v1/players/hud-1/preferences-hud')
+                .set('X-API-Key', API_KEY).send({ escalationPrompts: false }).expect(200);
+            expect(res.body).toEqual({ escalationPrompts: false, seenBeats: [] });
+            const u = await User.findOne({ robloxId: 'hud-1' });
+            expect(u?.escalationPrompts).toBe(false);
+        });
+
+        it('adds a seenBeat without duplicating it, and never removes one', async () => {
+            await User.create({ robloxId: 'hud-2', identityTier: 'roblox', seenBeats: ['drum'] });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const res = await request(app)
+                .put('/api/v1/players/hud-2/preferences-hud')
+                .set('X-API-Key', API_KEY).send({ seenBeat: 'drum' }).expect(200);
+            expect(res.body.seenBeats).toEqual(['drum']);
+
+            const res2 = await request(app)
+                .put('/api/v1/players/hud-2/preferences-hud')
+                .set('X-API-Key', API_KEY).send({ seenBeat: 'gong' }).expect(200);
+            expect(res2.body.seenBeats.sort()).toEqual(['drum', 'gong']);
+        });
+
+        it('400 when the body has neither field', async () => {
+            await User.create({ robloxId: 'hud-3', identityTier: 'roblox' });
+            await request(makeApp(makeEngine(), new ResultsStore()))
+                .put('/api/v1/players/hud-3/preferences-hud')
+                .set('X-API-Key', API_KEY).send({}).expect(400);
+        });
+
+        it('401 without the API key', async () => {
+            await request(makeApp(makeEngine(), new ResultsStore()))
+                .put('/api/v1/players/hud-4/preferences-hud').send({ escalationPrompts: true }).expect(401);
         });
     });
 
