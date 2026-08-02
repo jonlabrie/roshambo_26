@@ -162,17 +162,33 @@ It is a label, not a button, so it costs nothing in camera surface.
 
 **It must be gated, or it becomes a nag.** Roshambo is ambient: a player chatting on their deck
 with no intention of throwing would otherwise get a five-second red alarm every single minute,
-forever, turning the calmest part of the game into an alarm clock. The escalation fires only
-when **all** of these hold:
+forever, turning the calmest part of the game into an alarm clock.
+
+The escalation is **armed** when all of these hold:
 
 1. The player *can* throw — not fate-bound, not win-bound. (A bound player cannot act on
    "choose a throw", so escalating at them is pure noise.)
 2. The player has **not** already picked this round.
-3. The player is in the game — **threw in the previous round, or has a pot riding**.
+3. **Their preference allows it** (see *Preferences*, default on).
+4. Any one of: they **have not yet thrown this session** (a new arrival, who needs the prompt
+   most), they **threw in the previous round**, or they **have a pot riding**.
 
-Someone who has not thrown in ten minutes gets silence. Someone mid-streak about to let it lapse
-gets the alarm. Proximity to the arena was considered as the third signal and rejected: it is
-wrong for anyone watching from a teahouse deck.
+And it **disarms after three consecutive missed rounds**, whichever condition armed it. It
+re-arms the moment they throw again.
+
+A round only counts as *missed* if the player **could** have thrown and did not. Rounds spent
+win-bound or fate-bound are not misses — they were not ignoring anything, they were prevented.
+
+The effect: a new arrival is prompted, a mid-streak player about to let it lapse is prompted, and
+anyone who has settled into hanging out goes quiet within three minutes and stays quiet. Nobody
+is nagged and nobody is silently surprised.
+
+Session-scoped state (has-thrown-yet, consecutive-misses) lives **client-side in `HudModel`** and
+resets on rejoin, which is correct — a returning player is a new arrival and is armed again.
+Only the preference persists.
+
+Proximity to the arena was considered as an arming signal and rejected: it is wrong for anyone
+watching from a teahouse deck.
 
 ## Maximal — "the ledger"
 
@@ -198,7 +214,17 @@ Four blocks:
    WIN/SAFE/LOSS bar.
 3. **Your throws** — the player's own R/P/S distribution. Three counters, and the only statistic
    that says something about the player rather than their score. If scope is cut, keep this one.
-4. **Feed** — timestamped scrollback of announcements and personal history.
+4. **Feed** — timestamped scrollback. **Personal-only in v1**: your own banks, streaks, results
+   and milestones passed. This is data the client already receives, so it costs nothing. Social
+   lines ("kaz_9 banked 243", "mochi claimed the switchback perch") need a server-side event
+   stream and join later with item 6, which builds one anyway.
+
+...and a fifth element that is not a block:
+
+5. **Preferences footer** — a thin row along the bottom of the panel. It carries one switch in
+   v1 (*escalation prompts on/off*) and is sized to take later preferences — toast verbosity,
+   audio, and so on — without ever needing a second takeover surface. Persisted on the profile
+   alongside `padPreferences`.
 
 ### Where the ticker went
 
@@ -215,6 +241,11 @@ at settlement in `Settlement.ts`:
 
 `roundsPlayed`, `wins`, `safes`, `losses`, `lifetimeBanked`, `bestPot`, `throwsR`, `throwsP`,
 `throwsS`.
+
+Twelve profile fields in total across this spec: those nine, plus `unresolvedWin`, `seenBeats`
+and `escalationPrompts`. All three of these server slices were confirmed as belonging in item 2 —
+without the gate the RISK/BANK overlay has nothing behind it, without the counters the ledger
+shows four numbers, and without `seenBeats` onboarding cannot fire once.
 
 Item 7 (Statistics) does aggregation and the global/social view. **Item 2 builds the surface and
 the plumbing only.** No leaderboard here — that is the Statistics room, by design.
@@ -251,11 +282,13 @@ exactly the absence of that split.
 New pure modules (no Roblox globals, dependency-injected, Lune-testable):
 
 - **`src/shared/HudModel.luau`** — given round phase, seconds remaining, profile
-  (`pointsAtStake`, `currentStreak`, `totalPoints`, `unresolvedWin`), fate-bound state and
-  last-round participation, returns the minimal view model: what the plate shows, whether the
-  throws are enabled, whether the choice overlay is up, whether the escalation fires.
-  **The escalation gate lives here and is fully unit-tested** — it is the rule most likely to be
-  got subtly wrong, and the most annoying if it is.
+  (`pointsAtStake`, `currentStreak`, `totalPoints`, `unresolvedWin`, `escalationPrompts`),
+  fate-bound state, and its own session counters (has-thrown-yet, consecutive misses), returns
+  the minimal view model: what the plate shows, whether the throws are enabled, whether the
+  choice overlay is up, whether the escalation fires.
+  **The escalation arm/disarm rule lives here and is fully unit-tested** — four arming
+  conditions, a three-miss backoff, and a definition of "missed" that excludes bound rounds. It
+  is the rule most likely to be got subtly wrong and the most annoying if it is.
 - **`src/shared/LedgerModel.luau`** — the maximal view model: derived win rate, pays-next,
   distribution percentages, WIN/SAFE/LOSS bar proportions. Pure arithmetic over the counters.
 - **`src/shared/OnboardingBeats.luau`** — the beat machine: given `seenBeats` and an event,
@@ -296,8 +329,10 @@ is already tracked as item 8.
 ## Testing
 
 - `HudModel`, `LedgerModel` and `OnboardingBeats` are pure and get full Lune coverage via
-  `lune run tests/run`. The escalation gate gets explicit cases for each of its three conditions
-  and their combinations.
+  `lune run tests/run`. The escalation rule gets explicit cases for each arming condition, the
+  preference switch, the three-miss backoff, re-arming after a throw, and the "bound rounds are
+  not misses" carve-out — including a bound player who stays bound for many rounds and must
+  still be armed the moment they resolve and throw.
 - `GameRules` fixtures in `shared-fixtures/game-rules.json` are untouched — pot progression is
   unchanged. Only *who may throw* changes.
 - Server: the `unresolvedWin` gate and the `ResolveWin` route get Vitest coverage in `server/`,
@@ -334,11 +369,20 @@ Recorded because several were close calls, and one reversed mid-discussion.
 6. **Overlay at half height**, not full — the dimmed glyphs underneath are what make the lock
    self-explaining.
 7. **One `ResolveWin` remote** rather than a separate `RiskRequest`.
+8. **The escalation arms for new arrivals and backs off after three missed rounds**, and is
+   player-switchable. Owner decision, and a better rule than any of the three offered: arming on
+   "pot riding" alone would have excluded the new player who needs the prompt most, while arming
+   on "anyone who can throw" would have nagged everyone forever. The backoff is what makes it
+   safe to arm generously.
+9. **Feed is personal-only in v1.** Social lines wait for item 6's event stream.
+10. **A preferences footer in maximal**, rather than a mute affordance on the alarm itself
+    (which could only ever turn the thing off, never back on) or a separate settings panel
+    (a second takeover surface for one boolean). The footer is sized for later preferences.
+11. **All three server slices stay in item 2** — the gate, the counters and `seenBeats`.
 
-## To confirm at spec review
+## Open
 
-- **The escalation gate.** Its three conditions are designed above but were proposed, not
-  ratified. Condition 3 in particular ("threw last round, or has a pot riding") is a judgement
-  call about how loudly an ambient game may ask for attention.
-- **Feed contents in v1.** Personal-only is cheap; mixing in server events ("kaz_9 banked 243")
-  needs a modest event stream and could defer to item 6.
+Nothing blocking. Two things deliberately deferred:
+
+- **Social feed lines** — item 6, which builds the event stream this needs.
+- **Folding the Teahouse toggle into the HUD** — item 4, with merchant row.
