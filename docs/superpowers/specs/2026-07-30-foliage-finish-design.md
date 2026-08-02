@@ -249,6 +249,38 @@ round-robin and therefore arbitrary per site.
 
 `DayNightLockT` is still **0.19** and must be cleared before any publish.
 
+## Pad keep-outs (2026-08-02, after the gate)
+
+The owner found an arrangement sitting in the middle of a teahouse pad. It was **21 of 40**,
+and the keep-outs already existed: `ServerStorage.FoliageZones` holds `KO_Pad_T01`–`T14`
+alongside `KO_ClearingPool`, `KO_FallsLanding` and `KO_ArenaSquare`, which the rest of the
+foliage tooling already honours. `bakeArrangements` had hardcoded an Arena box of its own and
+never looked for the project's convention. It now READS those volumes, so it cannot drift
+from what `scatterPreserve` and the shore-rock pass treat as off-limits.
+
+**The cause was structural, not careless.** The tunnel sites are *seeded from pad slots*,
+because many bores exit onto pads by design — so "beside a tunnel mouth" and "in the middle
+of someone's pad" are frequently the same coordinate. Seeding from pads without holding out
+pads could only ever produce this. All 11 sentinels were offenders.
+
+Fixed surgically rather than by re-baking, so the fingerprint guard was not tripped and the
+untouched arrangements and the earlier cleanup survived. Where a sentinel could be re-homed
+**behind and above its pad** it was, on the owner's instruction that "the pad
+owner/occupiers will definitely appreciate us finding someplace for them when we can".
+
+That turned out to be rarely possible, and the reason is geology: these are perch pads on a
+canyon wall, so the ground mostly falls AWAY behind them. A full 24-direction sweep out to 48
+studs found legal ground at or above pad level for only 4 of 7, and two of those were then
+rejected on judgement — one level with its pad (+0), one 55 studs above it and therefore
+belonging to the cliff rather than to the pad. The kept band is **+6 to +30 studs of rise,
+within ~36 studs**: below that it is not above, above that the occupant reads it as unrelated
+scenery.
+
+Final: **23 arrangements standing, 0 in any keep-out**; 16 parked to
+`ParkedFoliage.PadOverlap_2026_08_02`, each with a `ParkedReason`. Of the tunnel sentinels, 7
+stand and 5 are parked. The draft fingerprint is deliberately left stale so a re-bake refuses
+until this is reconciled.
+
 ## Durability note
 
 `bakeArrangements` and `bakeEastBackdrop` both destroy and rebuild their folders, which is
