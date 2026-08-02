@@ -5,9 +5,12 @@ material, same UV range, centroids 0.001 apart) — a jittered density double, N
 backfaces, so deleting one removes real leaf mass. Growing the remaining cards
 about their own centroids puts that mass back without putting the triangles back.
 """
-import bpy, bmesh, sys
+import bpy, bmesh, sys, os
 argv = sys.argv[sys.argv.index("--")+1:]
 src, out_fbx, GROW, TRUNK = argv[0], argv[1], float(argv[2]), float(argv[3])
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from lod_trunk import decimate_trunk  # noqa: E402  (bole-preserving trunk reduction)
 
 bpy.ops.wm.read_homefile(use_empty=True)
 bpy.ops.import_scene.fbx(filepath=src)
@@ -50,9 +53,8 @@ for o in fols[:1]:
 
 if TRUNK < 1.0:
     for o in [x for x in bpy.context.scene.objects if x.type=="MESH" and "Trunk" in x.name]:
-        m = o.modifiers.new("dec","DECIMATE"); m.decimate_type="COLLAPSE"; m.ratio=TRUNK
-        bpy.context.view_layer.objects.active = o
-        bpy.ops.object.modifier_apply(modifier=m.name)
+        name, b, a, note = decimate_trunk(o, TRUNK)
+        print(f"  {name}: {b} -> {a} tris  ({note})")
 
 after = sum(sum(len(p.vertices)-2 for p in o.data.polygons)
             for o in bpy.context.scene.objects if o.type == "MESH")

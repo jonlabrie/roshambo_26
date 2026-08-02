@@ -53,6 +53,22 @@ run XfHinokiMT  "$HINOKI/JA05m.obj" JA05m 15000 10000 20 1.0 1 1 0.32
 run XfSpruceMT  "$SPRUCE/JA15m.obj" JA15m 14000 10000 20 1.0 1 1 0.32
 run XfFirMT     "$FIR/JA01m.obj"    JA01m 13000 10000 20 1.0 1 1 0.32
 
+# The fringe is backdrop mass against the canyon wall, never walked among, so it
+# takes the UNTRIMMED models (skirt 0): foliage to the ground is right there, and
+# the sightline rule that drives the canopy trim does not apply. These three were
+# exported ad hoc in an earlier session and were missing from this script, which is
+# how they later got "LOD"ed by post-processing their finished FBXs — a detour that
+# destroyed every bole, because a single decimate budget starves the bole exactly as
+# the mode-3 note above warns. Regenerate from source instead of post-processing.
+# Budgets 7000/7000 (was 13000/10000) with SPRAY 1.36 = sqrt(13000/7000), user-gated
+# 2026-08-01 in a Blender side-by-side against both the originals and the trees then
+# standing in the canyon. Wood is now the larger half of these trees and that is
+# correct: a conifer bole cannot be cheated, only budgeted (see mode 3 above).
+echo "### FRINGE — untrimmed backdrop mass for the canyon wall"
+run XfHinokiM   "$HINOKI/JA05m.obj" JA05m 7000 7000 20 1.36 1 1 0
+run XfSpruceM   "$SPRUCE/JA15m.obj" JA15m 7000 7000 20 1.36 1 1 0
+run XfFirM      "$FIR/JA01m.obj"    JA01m 7000 7000 20 1.36 1 1 0
+
 echo "### BRUSH — untrimmed, below the eyeline; SPRAY refills what thinning removes"
 run XfHinokiYb  "$HINOKI/JA05y.obj" JA05y 2500 1200 4 1.78 1 1 0
 run XfSpruceYb  "$SPRUCE/JA15y.obj" JA15y 2300 1100 4 1.76 1 1 0
