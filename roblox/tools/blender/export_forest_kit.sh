@@ -23,7 +23,7 @@ set -euo pipefail
 
 BL="${BLENDER:-/Applications/Blender.app/Contents/MacOS/Blender}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-XF="${XFROG:-$HOME/Desktop/Roshambo Reference/XfrogPlants_Japan_OBJ/Models}"
+XF="${XFROG:-$HOME/Desktop/Roshambo Reference/foliage/XfrogPlants_Japan_OBJ/Models}"
 OUT="${1:-$HOME/Desktop/Roshambo Reference/xfrog_import_$(date +%Y-%m-%d)}"
 mkdir -p "$OUT"
 
