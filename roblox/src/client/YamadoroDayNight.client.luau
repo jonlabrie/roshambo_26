@@ -18,11 +18,13 @@ local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
+local LanternGlow = require(ReplicatedStorage:WaitForChild("RoshamboShared"):WaitForChild("LanternGlow"))
 local config = ReplicatedStorage:WaitForChild("DayNightConfig")
 
 local TAG = "YamadoroFirebox"
-local MAX_BRIGHTNESS = 1.0 -- matches the value the cores are authored with in Edit
-local MIN_TRANSPARENCY = 0.32 -- fully lit; well above 0, or the Neon reads as a solid hot block
+-- the curve lives in LanternGlow ("stone" profile) so the paper lanterns can share the
+-- machinery without sharing the behaviour — they never go out, these do
+local PROFILE = "stone"
 
 local current: number = config:GetAttribute("CurrentNightFactor") or 0
 
@@ -31,11 +33,12 @@ local function applyTo(core: Instance)
         return
     end
     -- Transparency=1 truly skips the draw, so the stone reads as an empty dark opening by day
-    core.Transparency = 1 - (1 - MIN_TRANSPARENCY) * current
+    local glow = LanternGlow.at(PROFILE, current)
+    core.Transparency = glow.transparency
     local light = core:FindFirstChildWhichIsA("Light")
     if light and light:IsA("PointLight") then
-        light.Brightness = MAX_BRIGHTNESS * current
-        light.Enabled = current > 0.01 -- a Range-11 light at Brightness 0 still costs a slot
+        light.Brightness = glow.brightness
+        light.Enabled = glow.enabled -- a light at Brightness 0 still costs a renderer slot
     end
 end
 
