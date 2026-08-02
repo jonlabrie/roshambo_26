@@ -43,10 +43,17 @@ argv = sys.argv[sys.argv.index("--") + 1:]
 FBX, OBJ, FOLIAGE_KEY = argv[0], argv[1], argv[2]
 TARGET_CLUMPS, TRUNK_TRIS = int(argv[3]), int(argv[4])
 HEIGHT_STUDS, OUT_FBX = float(argv[5]), argv[6]
+# optional tuning, so density and lighting can be swept without editing the file:
+#   argv[7] planes per clump   argv[8] world strength   argv[9] card frame multiplier
+PLANES_OVERRIDE = int(argv[7]) if len(argv) > 7 else None
+WORLD_STRENGTH = float(argv[8]) if len(argv) > 8 else 1.6
+CARD_MULT = float(argv[9]) if len(argv) > 9 else 1.0
 
 ATLAS_VARIANTS = 4        # distinct baked clump images (2x2 atlas)
 TILE = 1024               # px per variant
 PLANES_PER_CLUMP = 3      # crossed planes
+CAM_FRAME = 2.2           # bake ortho_scale, as a multiple of clump radius
+CARD_FRAME = CAM_FRAME / 2  # card half-size: keeps one texel = one world unit
 MIN_ISLAND, MAX_TRUNK_ISLANDS = 200, 10
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -195,6 +202,18 @@ clumps.sort(key=lambda c: -len(c["idxs"]))
 # ---- bake ATLAS_VARIANTS representative clumps to an RGBA atlas ------------
 scene = bpy.context.scene
 scene.render.engine = "CYCLES"
+# TEXTURE DATA, NOT A PHOTOGRAPH. Blender's default view transform is AgX, which
+# desaturates and darkens on save — measured 2026-08-02 it pulled the sugi atlas from
+# the source's [102,107,32] to [84,80,14], muddy and yellow, and every species came out
+# duller than its own leaf map. Baking a colour map means writing shaded albedo through
+# unchanged, so the transform must be Standard.
+try:
+    scene.view_settings.view_transform = "Standard"
+    scene.view_settings.look = "None"
+    scene.view_settings.exposure = 0.0
+    scene.view_settings.gamma = 1.0
+except Exception as _e:
+    print("WARN could not set Standard view transform:", _e)
 scene.cycles.samples = 24
 scene.cycles.use_denoising = True
 scene.render.film_transparent = True
@@ -206,7 +225,9 @@ scene.render.image_settings.color_mode = "RGBA"
 world = bpy.data.worlds.new("BakeWorld")
 world.use_nodes = True
 world.node_tree.nodes["Background"].inputs[0].default_value = (1, 1, 1, 1)
-world.node_tree.nodes["Background"].inputs[1].default_value = 1.6  # even ambient: no baked directional shadow
+world.node_tree.nodes["Background"].inputs[1].default_value = WORLD_STRENGTH
+# NOTE: a flat white world bakes NO self-shadowing, so the clump reads brighter and
+# flatter than the source tree, whose cards shade and occlude one another.
 scene.world = world
 
 cam_data = bpy.data.cameras.new("BakeCam")
@@ -262,7 +283,15 @@ for vi, clump in enumerate(picks):
     tmp_mesh.materials.append(fol_mat)
 
     ctr, rad = clump["ctr"], clump["rad"]
-    cam_data.ortho_scale = rad * 2.2
+    cam_data.ortho_scale = rad * CAM_FRAME
+    # NEAR CLIP MUST TRACK THE SCALE. These trees are exported at Roblox scale (1 stud =
+    # 0.01), so a 20-stud tree is 0.2 units and a clump radius is ~0.01 — putting the
+    # camera at rad*8 = 0.08, INSIDE Blender's default 0.1 near plane. The clump is then
+    # clipped away and the tile renders empty. Measured 2026-08-02: three of four atlases
+    # came out 0.00% coverage and their impostors rendered as blank cards; only the sugi
+    # baked, purely because its larger cell put the camera at 0.16.
+    cam_data.clip_start = max(rad * 0.01, 1e-6)
+    cam_data.clip_end = max(rad * 100.0, 1.0)
     cam.location = ctr + mathutils.Vector((0, -rad * 8, 0))
     cam.rotation_euler = (math.radians(90), 0, 0)
     path = os.path.join(tmp_dir, f"tile{vi}.png")
@@ -336,11 +365,17 @@ def rnd():
 
 UV_CELLS = [(0.0, 0.5), (0.5, 0.5), (0.0, 0.0), (0.5, 0.0)]  # (u0, v0) of each tile
 for clump in clumps:
-    ctr, rad = clump["ctr"], clump["rad"] * 1.5  # overlap so clumps knit together
+    # THE CARD MUST MATCH THE BAKE FRAME OR THE IMAGE IS STRETCHED. The tile was
+    # rendered with ortho_scale = rad*CAM_FRAME, i.e. a half-width of rad*CAM_FRAME/2,
+    # so a card built at 1.5*rad draws that image 1.36x oversized and the canopy reads
+    # as giant blobs (user, 2026-08-02: "wildly oversized foliage images"). Clumps still
+    # knit together because their radii already overlap in space — not the card's job.
+    ctr, rad = clump["ctr"], clump["rad"] * CARD_FRAME * CARD_MULT
     tile = UV_CELLS[int(rnd() * ATLAS_VARIANTS) % ATLAS_VARIANTS]
     base_yaw = rnd() * math.pi
-    for p in range(PLANES_PER_CLUMP):
-        yaw = base_yaw + p * math.pi / PLANES_PER_CLUMP
+    _planes = PLANES_OVERRIDE or PLANES_PER_CLUMP
+    for p in range(_planes):
+        yaw = base_yaw + p * math.pi / _planes
         tilt = (rnd() - 0.5) * 0.5
         rot = mathutils.Euler((tilt, 0, yaw), "XYZ").to_matrix()
         corners = [

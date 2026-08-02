@@ -42,6 +42,15 @@ local CONFIG = {
     hitTolerance = 6, -- a ray landing this close counts as reaching the tree
     behindDistance = 500, -- how far past the tree to look for rock
 
+    -- SPECIES BARRED FROM THE SKYLINE. A skyline tree is seen small against sky, so an
+    -- expensive one earns nothing there. XfSugi40 costs 18,125 tris and REFUSES to
+    -- cheapen: a reduced-budget export came out 126 tris HEAVIER, because its 38,780
+    -- tiny sprays need most of that budget just to avoid going bald. User's call
+    -- 2026-08-02: "why bother with Sugi if it's larger? Let's just remove Sugi from the
+    -- skyline entirely." Parked like any offstage tree so a re-bake cannot reintroduce
+    -- them. They stay fine ANYWHERE ELSE — this bars them from the skyline only.
+    skylineExclude = { XfSugi40 = true },
+
     parkFolder = "OffstagePlateau", -- a date suffix is appended
     tagSkyline = "SkylineImpostorCandidate",
     tagNearTrail = "SkylineNearTrail",
@@ -195,8 +204,14 @@ return function(opts: { dryRun: boolean?, stamp: string? }?): string
     local results = classify(trees, views)
 
     local offstage, skyline, rock, held = {}, {}, 0, {}
+    local barred = 0
     for _, r in results do
-        if r.class == "OFFSTAGE" then
+        local species = (r.tree.inst.Name:gsub("_%d+$", ""))
+        if r.class == "SKYLINE" and CONFIG.skylineExclude[species] then
+            -- too expensive to earn its place on the skyline: park it with the offstage set
+            barred += 1
+            table.insert(offstage, r)
+        elseif r.class == "OFFSTAGE" then
             table.insert(offstage, r)
         elseif r.class == "SKYLINE" then
             if r.nearTrail then
@@ -221,7 +236,10 @@ return function(opts: { dryRun: boolean?, stamp: string? }?): string
     end
     table.sort(bands)
     say(`  walkable viewpoint elevations — {table.concat(bands, " ")}`)
-    say(`  OFFSTAGE {#offstage} | SKYLINE {#skyline} (+{#held} held near a trail) | AGAINST ROCK {rock}`)
+    say(
+        `  OFFSTAGE {#offstage} (of which {barred} barred from the skyline by species)`
+            .. ` | SKYLINE {#skyline} (+{#held} held near a trail) | AGAINST ROCK {rock}`
+    )
 
     if dryRun then
         say("  re-run with dryRun = false to park and tag")
