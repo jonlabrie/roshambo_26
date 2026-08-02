@@ -50,7 +50,15 @@ local DRY_RUN = false -- true reports the site table and places nothing
 -- the right move instead.
 local ALLOW_DESTROYING_HAND_WORK = false
 
-local ARENA = { x0 = -32, x1 = 100, z0 = -36, z1 = 52 }
+-- KEEP-OUTS COME FROM ServerStorage.FoliageZones, NOT FROM CONSTANTS HERE. Every KO_* part in
+-- that folder is a keep-out volume the rest of the foliage tooling already honours: the 14
+-- KO_Pad_T## teahouse pads, KO_ClearingPool, KO_FallsLanding, KO_ArenaSquare. The first bake
+-- hardcoded an Arena box and never looked for the others, and put 21 of 40 arrangements
+-- inside a pad — including all 11 tunnel sentinels, which is self-inflicted, because the
+-- tunnel sites are SEEDED from pad slots. Many bores exit onto pads by design, so "next to a
+-- tunnel mouth" and "in the middle of someone's teahouse pad" are frequently the same spot.
+-- Reading the volumes means this cannot drift from what scatterPreserve and the shore-rock
+-- pass consider off-limits.
 local RES = 4
 local PATH_GATE = 7
 local RING_DROP = 8
@@ -144,15 +152,40 @@ end
 
 local pathPts, pathByModel, plants = collect()
 
-local function judge(x: number, z: number, treeGate: number): number?
-    if x >= ARENA.x0 and x <= ARENA.x1 and z >= ARENA.z0 and z <= ARENA.z1 then
-        return nil
+local keepOuts: { BasePart } = {}
+do
+    local zones = ServerStorage:FindFirstChild("FoliageZones")
+    assert(zones, "ServerStorage.FoliageZones missing — keep-out volumes live there")
+    for _, c in zones:GetChildren() do
+        if c:IsA("BasePart") and c.Name:sub(1, 3) == "KO_" then
+            table.insert(keepOuts, c)
+        end
     end
+    assert(#keepOuts > 0, "no KO_* keep-out volumes found in FoliageZones")
+end
+
+-- tested against the volume's own CFrame, not an axis-aligned box: a rotated keep-out would
+-- otherwise leak at its corners
+local function insideKeepOut(at: Vector3): boolean
+    for _, ko in keepOuts do
+        local rel = ko.CFrame:PointToObjectSpace(at)
+        local half = ko.Size / 2
+        if math.abs(rel.X) <= half.X and math.abs(rel.Y) <= half.Y and math.abs(rel.Z) <= half.Z then
+            return true
+        end
+    end
+    return false
+end
+
+local function judge(x: number, z: number, treeGate: number): number?
     local y, water = ground(x, z)
     if not y or water then
         return nil
     end
     local at = Vector3.new(x, y, z)
+    if insideKeepOut(at) then
+        return nil
+    end
     if nearest(at, pathPts) < PATH_GATE or nearest(at, plants) < treeGate then
         return nil
     end
