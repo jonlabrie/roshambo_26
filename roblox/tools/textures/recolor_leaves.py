@@ -19,6 +19,19 @@ Measured on XfMapleA_leaves.png (2026-08-01): 1021x1024, 26% opaque, hue
 clustered 60-77 deg, sat 0.44, val 0.44 — a narrow band, which is why this
 works so cleanly here.
 
+WHAT IS ACTUALLY LIVE IN THE CANYON. All maples derive from XfMapleA_leaves.png. The
+2026-08-01 pass (green 113908195064379; gold 111846883522531 shift -27 sat 1.43 val 1.10;
+red 138457704702807 shift -61 sat 1.60) read well up close but went muddy at range, so on
+2026-08-02 gold and red were re-cut hotter and then run through dilate_alpha.py, which is
+what makes the colour survive the mip chain:
+
+    gold  rbxassetid://114315144065350   --shift -27 --sat 1.90 --val 1.18
+    red   rbxassetid://89777902880770    --shift -61 --sat 2.10 --val 1.15
+    then  dilate_alpha.py --passes 12 --fill-sat 1.35 --fill-val 1.10
+
+Judged on preview_distance.py sheets before uploading, not by uploading and looking. GREEN
+was deliberately NOT re-cut — see the moderation note below.
+
 ⚠️ MODERATION (2026-08-01, learned the hard way): Roblox REMOVED the uploaded
 GREEN maple variant within hours, while the gold and red survived untouched. A
 palmate, serrated, GREEN leaf reads to automated moderation as cannabis — the
