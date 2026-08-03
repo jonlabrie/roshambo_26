@@ -64,6 +64,8 @@ local PortalTarget = require(shared:WaitForChild("PortalTarget"))
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local SubmitPick = remotes:WaitForChild("SubmitPick") :: RemoteEvent
 local BankRequest = remotes:WaitForChild("BankRequest") :: RemoteEvent
+local ResolveWin = remotes:WaitForChild("ResolveWin") :: RemoteEvent
+local SetHudPreference = remotes:WaitForChild("SetHudPreference") :: RemoteEvent
 local RoundUpdate = remotes:WaitForChild("RoundUpdate") :: RemoteEvent
 local RevealResult = remotes:WaitForChild("RevealResult") :: RemoteEvent
 local ProfileUpdate = remotes:WaitForChild("ProfileUpdate") :: RemoteEvent
@@ -229,6 +231,7 @@ local function fireProfile(player: Player, source: string)
             currentStreak = row.currentStreak,
             stakingStreak = row.stakingStreak,
             bestStreak = row.bestStreak,
+            unresolvedWin = row.unresolvedWin,
             source = source,
         })
     end
@@ -306,15 +309,17 @@ local coordinator = RoundCoordinator.new({
         end,
         onReconciled = function(rows)
             for _, row in rows do
+                -- /instances/.../results carries round results, not wallet state -- it has no
+                -- unresolvedWin field. Pass through the row's current value; do not default to
+                -- false or a bound player would be silently unbound on every reconciliation.
+                local existing = profiles:get(row.robloxUserId)
                 profiles:applyServer(row.robloxUserId, {
                     totalPoints = row.totalPoints,
                     pointsAtStake = row.pot,
                     currentStreak = row.streak,
                     stakingStreak = row.streak,
-                    bestStreak = math.max(
-                        row.streak,
-                        (profiles:get(row.robloxUserId) or { bestStreak = 0 }).bestStreak
-                    ),
+                    bestStreak = math.max(row.streak, (existing or { bestStreak = 0 }).bestStreak),
+                    unresolvedWin = existing ~= nil and existing.unresolvedWin,
                 })
                 local player = playerByUserId(row.robloxUserId)
                 if player then
@@ -349,6 +354,7 @@ Players.PlayerAdded:Connect(function(player)
                 currentStreak = res.data.currentStreak,
                 stakingStreak = res.data.stakingStreak,
                 bestStreak = res.data.bestStreak,
+                unresolvedWin = res.data.unresolvedWin,
             })
             pushStats(player)
             fireProfile(player, "sync")
@@ -366,6 +372,13 @@ SubmitPick.OnServerEvent:Connect(function(player, throwValue)
         print(`[PICK] {player.Name} rejected: FATE_BOUND`)
         return
     end
+    -- A WIN binds the player until they answer RISK or BANK. Server-authoritative: the client
+    -- dims the buttons and paints the choice over them, but this is what actually refuses.
+    local prof = profiles:get(tostring(player.UserId))
+    if prof and prof.unresolvedWin then
+        print(`[PICK] {player.Name} rejected: WIN_BOUND`)
+        return
+    end
     local accepted, reason = coordinator:submitPick(tostring(player.UserId), throwValue)
     if not accepted then
         print(`[PICK] {player.Name} rejected: {reason}`)
@@ -378,16 +391,60 @@ BankRequest.OnServerEvent:Connect(function(player)
     handlerQueue:run(tostring(player.UserId), function()
         local res = net:postBank(tostring(player.UserId))
         if res.ok then
+            -- /bank's response doesn't carry unresolvedWin (it's not the win-gate endpoint); pass
+            -- through the row's current value rather than defaulting to false.
+            local existing = profiles:get(tostring(player.UserId))
+            profiles:applyServer(tostring(player.UserId), {
+                totalPoints = res.data.totalPoints,
+                pointsAtStake = res.data.pointsAtStake,
+                currentStreak = res.data.currentStreak,
+                stakingStreak = res.data.stakingStreak,
+                bestStreak = (existing or { bestStreak = 0 }).bestStreak,
+                unresolvedWin = existing ~= nil and existing.unresolvedWin,
+            })
+            pushStats(player)
+            fireProfile(player, "banked")
+        end
+    end)
+end)
+
+ResolveWin.OnServerEvent:Connect(function(player, choice)
+    if choice ~= "risk" and choice ~= "bank" then
+        return
+    end
+    handlerQueue:run(tostring(player.UserId), function()
+        local res = net:postResolveWin(tostring(player.UserId), choice)
+        if res.ok then
             profiles:applyServer(tostring(player.UserId), {
                 totalPoints = res.data.totalPoints,
                 pointsAtStake = res.data.pointsAtStake,
                 currentStreak = res.data.currentStreak,
                 stakingStreak = res.data.stakingStreak,
                 bestStreak = (profiles:get(tostring(player.UserId)) or { bestStreak = 0 }).bestStreak,
+                unresolvedWin = res.data.unresolvedWin,
             })
             pushStats(player)
-            fireProfile(player, "banked")
+            fireProfile(player, if choice == "bank" then "banked" else "risked")
         end
+    end)
+end)
+
+SetHudPreference.OnServerEvent:Connect(function(player, body)
+    if type(body) ~= "table" then
+        return
+    end
+    local payload: { [string]: any } = {}
+    if type(body.escalationPrompts) == "boolean" then
+        payload.escalationPrompts = body.escalationPrompts
+    end
+    if type(body.seenBeat) == "string" then
+        payload.seenBeat = body.seenBeat
+    end
+    if next(payload) == nil then
+        return
+    end
+    task.spawn(function()
+        net:putHudPreference(tostring(player.UserId), payload)
     end)
 end)
 

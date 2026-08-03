@@ -121,6 +121,10 @@ function NetworkClient.postBank(self: any, robloxUserId: string): Result
     return self:_request("POST", "/api/v1/bank", { robloxUserId = robloxUserId })
 end
 
+function NetworkClient.postResolveWin(self: any, robloxUserId: string, choice: string): Result
+    return self:_request("POST", "/api/v1/resolve-win", { robloxUserId = robloxUserId, choice = choice })
+end
+
 function NetworkClient.getLeaderboards(self: any, scope: string): Result
     return self:_request("GET", `/api/v1/leaderboards?scope={scope}`)
 end
@@ -135,6 +139,10 @@ function NetworkClient.setPreferences(self: any, robloxUserId: string, padPrefer
         `/api/v1/players/{robloxUserId}/preferences`,
         { padPreferences = padPreferences }
     )
+end
+
+function NetworkClient.putHudPreference(self: any, robloxUserId: string, body: { [string]: any }): Result
+    return self:_request("PUT", `/api/v1/players/{robloxUserId}/preferences-hud`, body)
 end
 
 function NetworkClient.setTeahouse(self: any, robloxUserId: string, sizeClass: string, loadout: any): Result

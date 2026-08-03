@@ -12,6 +12,8 @@
                 "$className": "Folder",
                 "SubmitPick": { "$className": "RemoteEvent" },
                 "BankRequest": { "$className": "RemoteEvent" },
+                "ResolveWin": { "$className": "RemoteEvent" },
+                "SetHudPreference": { "$className": "RemoteEvent" },
                 "RoundUpdate": { "$className": "RemoteEvent" },
                 "RevealResult": { "$className": "RemoteEvent" },
                 "ProfileUpdate": { "$className": "RemoteEvent" },

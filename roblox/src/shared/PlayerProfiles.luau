@@ -11,6 +11,7 @@ export type Row = {
     currentStreak: number,
     stakingStreak: number,
     bestStreak: number,
+    unresolvedWin: boolean,
 }
 
 function PlayerProfiles.new(rules: any)
@@ -24,6 +25,7 @@ function PlayerProfiles.applyServer(self: any, userId: string, row: Row)
         currentStreak = row.currentStreak,
         stakingStreak = row.stakingStreak,
         bestStreak = row.bestStreak,
+        unresolvedWin = row.unresolvedWin or false,
     }
 end
 
@@ -36,6 +38,10 @@ function PlayerProfiles.applyLocalResult(self: any, userId: string, result: stri
     row.currentStreak = self._rules.nextStreak(row.currentStreak, result)
     row.stakingStreak = self._rules.nextStreak(row.stakingStreak, result)
     row.bestStreak = math.max(row.bestStreak, row.currentStreak)
+    -- A WIN binds the player until they answer; a LOSS or SAFE leaves nothing to decide. Applied
+    -- optimistically so the choice overlay appears with the theater, then overwritten by the
+    -- authoritative reconciliation like every other field here.
+    row.unresolvedWin = result == "WIN"
 end
 
 function PlayerProfiles.get(self: any, userId: string): Row?
