@@ -3,11 +3,16 @@
 -- `Instance.new` moved to HudController (the minimal HUD). What stays is the seam between the
 -- remotes and the renderers, because it is the part that is subtle rather than decorative:
 --   • the authoritative World-Throw tape and the per-round personal WIN/SAFE/LOSS badges,
---   • the DRUM-REST SPOILER GATE (see `visibleTape` / `maybeShowReveal`) — which now holds the FATE
---     as well as the tape and the headline,
+--   • the DRUM-REST SPOILER GATE (see `visibleTape` / `maybeShowReveal`), which holds the tape
+--     tile and the headline until the wheel stops turning,
 --   • the pick itself — held here as `chosen` until the lockout (`HudModel.sendAtLockout`), the
 --     one point it goes over the wire,
 --   • the HudModel session — the escalation's consecutive-miss backoff.
+--
+-- FATES ARE PARKED (2026-08-03). The rock drop, the avatar grow and ACCEPT YOUR FATE are all
+-- off; a LOSS now simply forfeits the pot and says so on the drum. The machinery they rode on
+-- (ChoreographyMachine, EffectSelector, TheaterController) is intact and still drives the WIN,
+-- SAFE and BANK effects — see the spec's §5 for where the seam is.
 --
 -- It publishes all of that on `EventBus.HudState:Fire(inputs, aux)`:
 --   inputs : a HudModel.Inputs — the controller calls HudModel.view(inputs, aux.session)
@@ -37,7 +42,6 @@ local RoundUpdate = remotes:WaitForChild("RoundUpdate") :: RemoteEvent
 local RevealResult = remotes:WaitForChild("RevealResult") :: RemoteEvent
 local ProfileUpdate = remotes:WaitForChild("ProfileUpdate") :: RemoteEvent
 local RevealTheater = remotes:WaitForChild("RevealTheater") :: RemoteEvent
-local FateResolvedEvt = remotes:WaitForChild("FateResolved") :: RemoteEvent
 local BoardData = remotes:WaitForChild("BoardData") :: RemoteEvent
 
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
@@ -62,11 +66,6 @@ local revealedRoundId: string? = nil -- the latest round our drum has finished
 
 local phase = ""
 local lockoutAt: number? = nil
--- Written by the fate branches below (maybeShowReveal, FateResolvedEvt) but no longer READ:
--- Task 4 stopped passing it into HudModel and stopped gating roundCouldThrow on it (see the
--- RoundUpdate handler). It stays write-only until Task 5 removes the fate system outright.
--- selene: allow(unused_variable)
-local fateBound = false
 local roundCouldThrow = false
 
 local wallet =
@@ -210,8 +209,8 @@ end
 local function publish()
     local inputs = buildInputs()
     -- Onboarding beat 2: the RISING EDGE of throws becoming enabled — once per round, not once
-    -- per session. HudModel.view is the single source of truth for the enabled rule (fate-bound,
-    -- phase, pick already made) — re-deriving it here from the raw flags would be a second copy
+    -- per session. HudModel.view is the single source of truth for the enabled rule (phase, pick
+    -- already made) — re-deriving it here from the raw flags would be a second copy
     -- of a rule that already lives in one place. Firing on every rising edge (rather than "the
     -- first time ever", latched at fire time) is what lets a dropped occurrence — the join card
     -- was still up when throws first unlocked — retry on the very next round instead of the beat
@@ -270,31 +269,9 @@ end)
 local pendingReveal: { headline: string, roundId: string?, result: string? }? = nil
 local drumAtRest = false
 
--- THE FATE WAITS FOR THE DRUM TOO. `fateBound` is what HudModel turns into the ACCEPT YOUR FATE
--- slot, so setting it the instant RevealTheater lands put an unambiguous "you lost" on screen while
--- the wheel was still turning — and a loss names the world's throw by implication. Same gate as the
--- toast and the tape tile, same REVEAL_SAFETY fallback, deliberately NOT a parallel mechanism.
---
--- It is held SEPARATELY from `pendingReveal` rather than folded into it because the two arrive on
--- different remotes (RevealTheater is arena-wide, RevealResult is per-player) with no ordering
--- guarantee between them: a fate parked inside `pendingReveal` would be dropped on any round where
--- the arena-wide event lost the race, and a fate that never lands leaves a player with no way out.
-local pendingFate = false
-
 local function maybeShowReveal()
     if not drumAtRest then
         return
-    end
-    if pendingFate then
-        pendingFate = false
-        fateBound = true
-        -- A pick tapped in the sliver between the round reopening and the drum settling was already
-        -- refused by the server (its fate gate is not client-timed), so stop lighting it — the same
-        -- reasoning as the whiff branch in the RevealTheater handler.
-        chosen = nil
-        switchPrompt = nil
-        switchPromptAt = nil
-        publish()
     end
     if pendingReveal then
         local p = pendingReveal
@@ -415,20 +392,6 @@ end)
 
 RevealTheater.OnClientEvent:Connect(function(r)
     local myId = tostring(player.UserId)
-    local mine = r.results and r.results[myId]
-    if mine and mine.result == "LOSS" then
-        -- HELD, not applied — see `pendingFate`. `maybeShowReveal` releases it on `drumRest`, and
-        -- the safety below releases it if that cue never arrives. The identity guard is `pendingFate`
-        -- itself: it is cleared the moment the fate lands, so a stale timer finds nothing to do.
-        pendingFate = true
-        maybeShowReveal() -- only lands if the drum is already at rest
-        task.delay(REVEAL_SAFETY, function()
-            if pendingFate then
-                drumAtRest = true -- safety: never strand a fate if the cue dropped
-                maybeShowReveal()
-            end
-        end)
-    end
     if r.whiffed and r.whiffed[myId] then
         toast("⏳ TOO LATE — your throw didn't count this round")
         -- and stop lighting the glyph: leaving it chosen would keep the tile illuminated
@@ -438,13 +401,6 @@ RevealTheater.OnClientEvent:Connect(function(r)
         switchPromptAt = nil
     end
     publish()
-end)
-
-FateResolvedEvt.OnClientEvent:Connect(function(userId)
-    if userId == tostring(player.UserId) then
-        fateBound = false
-        publish()
-    end
 end)
 
 RoundUpdate.OnClientEvent:Connect(function(info)
@@ -479,9 +435,6 @@ RoundUpdate.OnClientEvent:Connect(function(info)
         roundCouldThrow = true
         lockoutAt = if info.secondsToLockout then os.clock() + info.secondsToLockout else nil
         pendingReveal = nil -- the drum respins; last round's reveal has already been shown
-        -- pendingFate is deliberately NOT cleared here, for the same reason pendingReveal is not
-        -- cleared by the safety timer: dropping it would strand a player fate-bound on the server
-        -- with no ACCEPT YOUR FATE button. It always resolves within REVEAL_SAFETY.
         drumAtRest = false
     else
         lockoutAt = nil
