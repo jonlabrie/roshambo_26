@@ -52,32 +52,17 @@ describe("HudLayout — derivation of the cluster's own primitives", function()
         expect(HudLayout.TILE_TOUCH < HudLayout.TILE).toBe(true)
     end)
 
-    -- Adapted, not dropped: the module used to hold plain numbers only, so this asserted
-    -- `typeof(value) == "number"` for every entry. `plateBottomOffset` is now a deliberate
-    -- exception (see the module header), so a function is allowed too — but nothing else. This
-    -- is the only automated enforcement in this file that `src/shared` stays Lune-testable
-    -- (no tables, no Roblox instances) as the module grows.
-    test("holds no Roblox globals — numbers and pure functions only", function()
+    -- This module used to hold plain numbers only, then briefly gained `plateBottomOffset` (a
+    -- function) while the plate measured the jump button at runtime. The owner moved the plate
+    -- into the bottom row instead (2026-08-03, mid-execution) and that function was deleted with
+    -- its three tests below — this module is back to numbers only, so the assertion is back to
+    -- what it originally was. This is the only automated enforcement in this file that
+    -- `src/shared` stays Lune-testable (no tables, no Roblox instances, no functions) as the
+    -- module grows.
+    test("holds no Roblox globals — numbers only", function()
         for key, value in HudLayout do
             expect(typeof(key)).toBe("string")
-            expect(typeof(value) == "number" or typeof(value) == "function").toBe(true)
+            expect(typeof(value)).toBe("number")
         end
-    end)
-end)
-
-describe("HudLayout.plateBottomOffset — where the plate sits above the jump button", function()
-    test("with no jump button it falls back to the screen edge", function()
-        expect(HudLayout.plateBottomOffset(400, nil)).toBe(HudLayout.EDGE)
-    end)
-
-    test("it clears a measured button by PLATE_JUMP_GAP", function()
-        -- gui bottom at y=400, jump button's top edge at y=310 -> 90 up from the bottom, plus
-        -- the gap.
-        expect(HudLayout.plateBottomOffset(400, 310)).toBe(90 + HudLayout.PLATE_JUMP_GAP)
-    end)
-
-    test("a button measured below the screen edge cannot push the plate off-screen", function()
-        -- Defensive: AbsolutePosition is read live and can be stale or nonsense for a frame.
-        expect(HudLayout.plateBottomOffset(400, 500)).toBe(HudLayout.EDGE)
     end)
 end)

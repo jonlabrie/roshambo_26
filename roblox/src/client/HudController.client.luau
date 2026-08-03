@@ -8,19 +8,22 @@
 --                  open most of the time, so this is the worst corner on the screen, not a safe one.
 --   top-right    : the player list, expanding down. (The old pick cluster lived here — the furthest
 --                  reach from either thumb AND the corner the player list grows into.)
---   top-centre   : free. Roblox claims nothing there.
---   bottom-right, above the jump button : also claimed by Roblox for jump/camera drag, but a
---                  display with NO interactive elements can share it — see the PLATE below.
--- Hence: PLATE in the right margin, ABOVE the jump button (measured, not predicted — see
--- `placePlate`); THROW AREA bottom-right but INBOARD of the jump button, with the tape BELOW the
--- buttons (the buttons stay closest to where the thumb rests; the tape is read, never touched);
--- the round TIMER as a hairline along the bottom edge, competing with nothing.
+--   top-centre   : free. Roblox claims nothing there, and nothing lives there any more either.
+-- Hence: THROW AREA bottom-right but INBOARD of the jump button, with the tape BELOW the buttons
+-- (the buttons stay closest to where the thumb rests; the tape is read, never touched) and the
+-- PLATE as one line at the bottom of that same cluster, left of the tape (see "Plate: one line
+-- at the bottom of the cluster" below); the round TIMER as a hairline along the bottom edge,
+-- competing with nothing.
+--
+-- The plate briefly lived in the right margin above the jump button, measured at runtime — the
+-- owner superseded that mid-implementation for the bottom row instead. Nothing in this HUD is
+-- positioned against geometry Roblox owns any more.
 --
 -- Every information element MUST stay Active = false. Frames and labels default to false, but
 -- setting it true anywhere here punches a permanent hole in the camera-drag surface, which is
 -- the whole right side of the screen on touch. The whole interactive budget is: the three throw
 -- buttons, the one bank button (see `setBank`), and the ledger door (see "The ledger door")
--- — the plate is a pure display now, not a door; that job moved to its own dedicated button.
+-- — the plate is a pure display, not a door; that job belongs to the ledger door alone.
 --
 -- This file RENDERS HudModel; it never re-derives it. main.client.luau owns the wiring and fires
 -- EventBus.HudState(inputs, aux):
@@ -88,8 +91,6 @@ local TOUCH = UserInputService.TouchEnabled and not UserInputService.KeyboardEna
 local JUMP_CLEARANCE = HudLayout.JUMP_CLEARANCE
 local EDGE = HudLayout.EDGE
 
-local PLATE_W = HudLayout.PLATE_W
-local PLATE_ROW_H = HudLayout.PLATE_ROW_H
 -- BTN_W tracks BTN_H (the buttons are square) off the SAME shared scale, so "50% smaller" shrinks
 -- the cluster in both axes rather than leaving three squat letterboxes.
 local BTN_H = if TOUCH then HudLayout.BTN_H_TOUCH else HudLayout.BTN_H
@@ -98,6 +99,9 @@ local BTN_GAP = if TOUCH then 8 else 10
 local TAPE_N = 5
 local TILE = if TOUCH then HudLayout.TILE_TOUCH else HudLayout.TILE
 local TILE_GAP = if TOUCH then 4 else 6
+-- The tape row's own width — the plate (below) registers off its left edge, and the tape's own
+-- Size uses it too, so it is pulled out here rather than left as a repeated inline expression.
+local TAPE_W = TAPE_N * (TILE + TILE_GAP) - TILE_GAP
 local BADGE = if TOUCH then 7 else 9
 local ROW_GAP = HudLayout.ROW_GAP
 local AREA_W = 3 * BTN_W + 2 * BTN_GAP
@@ -106,6 +110,9 @@ local TIMER_H = 3
 local TIMER_H_HOT = 7 -- the escalation thickens the hairline as well as reddening it
 local TOAST_SECONDS = 4
 local TOAST_MAX = 6
+-- The gap between the throw cluster and the two things registered against its edges: the ledger
+-- door (left of the buttons) and the plate (left of the tape). One constant, two uses.
+local LEDGER_GAP = 8
 
 -- The bank button, directly above the throw row.
 local BANK_W = 150
@@ -178,105 +185,125 @@ local function tintGlyph(g: Frame, core: Color3, outline: Color3)
     end
 end
 
--- ===== Plate: the right margin, above the jump button =====
--- It left top-centre because that band is the middle of a phone's view. This is the strip
--- Roblox claims for jump and camera drag, and a display with NO interactive elements is the
--- one thing that can safely live in it: everything here is a Frame or a TextLabel at the
--- default Active = false, so every drag passes straight through to the camera.
+-- ===== Plate: one line at the bottom of the cluster, normally hidden =====
+-- Superseded the right-margin placement (owner, mid-implementation): the jump-button measurement
+-- is gone entirely. The plate is now a single line at the bottom of the throw cluster, exactly
+-- as tall as a tape tile and right-aligned LEDGER_GAP left of the tape's own left edge, so the
+-- bottom row reads as one band. AutomaticSize = X: it reserves no dead space when the line is
+-- short (no streak riding).
 --
--- The POT IS NOT HERE. It has its own button (see setBank). The streak is shown only when it
--- is non-zero — a "×0" is noise on a display whose whole job is to be ignorable.
+-- NORMALLY HIDDEN. Points are not a thing you need at a glance — a riding pot already has its
+-- own always-visible bank button. The plate reveals on the ledger door's first tap and on any
+-- change to the figures it shows (see `revealPlate` and the change-guard in `render`), holds for
+-- PLATE_HOLD, then fades over PLATE_FADE. It stays genuinely inert throughout — Active is false
+-- on the Frame and the label both; the ledger door (below) is the only door.
+local PLATE_HOLD = 2
+local PLATE_FADE = 0.35
+
 local plate = Instance.new("Frame")
 plate.Name = "Plate"
 plate.AnchorPoint = Vector2.new(1, 1)
-plate.Size = UDim2.fromOffset(PLATE_W, PLATE_ROW_H)
+plate.AutomaticSize = Enum.AutomaticSize.X
+plate.Size = UDim2.fromOffset(0, TILE)
+-- Fixed off the SAME shared right reference (1 - JUMP_CLEARANCE) the throw cluster, the bank
+-- button and the ledger door all register to — LEDGER_GAP left of the tape's own left edge
+-- (offset -TAPE_W from that reference), bottom-aligned with the tape (D = EDGE from the gui's
+-- bottom, same as the tape). AutomaticSize grows the frame LEFTWARD from this anchored right
+-- edge, so a longer line (a streak riding) never creeps toward the tape. See the task report for
+-- the overlap arithmetic against the tape, the ledger door and the timer hairline.
+plate.Position = UDim2.new(1 - JUMP_CLEARANCE, -(TAPE_W + LEDGER_GAP), 1, -EDGE)
 plate.BackgroundColor3 = WASHI
 plate.BackgroundTransparency = 0.3
 plate.BorderSizePixel = 0
+plate.Visible = false
 plate.Parent = gui
 corner(plate, 6)
-stroke(plate, GOLD, 1, 0.35)
-
-local streakLabel = Instance.new("TextLabel")
-streakLabel.Name = "Streak"
-streakLabel.Size = UDim2.new(1, 0, 0, PLATE_ROW_H)
-streakLabel.Position = UDim2.fromOffset(0, 0)
-streakLabel.BackgroundTransparency = 1
-streakLabel.TextColor3 = GOLD
-streakLabel.TextSize = 14
-streakLabel.Font = Enum.Font.GothamBold
-streakLabel.Text = ""
-streakLabel.Visible = false
-streakLabel.Parent = plate
-
-local pointsLabel = Instance.new("TextLabel")
-pointsLabel.Name = "Points"
-pointsLabel.AnchorPoint = Vector2.new(0, 1)
-pointsLabel.Position = UDim2.fromScale(0, 1)
-pointsLabel.Size = UDim2.new(1, 0, 0, PLATE_ROW_H)
-pointsLabel.BackgroundTransparency = 1
-pointsLabel.TextColor3 = INK_CREAM
-pointsLabel.TextSize = 15
-pointsLabel.Font = Enum.Font.GothamBold
-pointsLabel.Text = "0"
-pointsLabel.Parent = plate
-
--- WHERE THE PLATE SITS IS MEASURED, NOT PREDICTED.
---
--- Roblox's default TouchJump sizes the jump button 70px on screens <=500px tall and 120px
--- above that, and positions it UDim2.new(1, -(size*1.5-10), 1, -size-20). Those are current
--- defaults, not a contract: they differ by screen size, they have changed before, and nothing
--- stops them changing again. So rather than encoding that arithmetic, the plate reads the real
--- button and sits PLATE_JUMP_GAP above its measured top edge.
---
--- The fallback is the bottom-right corner, which is where a desktop client — no TouchGui, no
--- jump button at all — should put it anyway.
-local function jumpButton(): GuiObject?
-    local touchGui = playerGui:FindFirstChild("TouchGui")
-    local frame = touchGui and touchGui:FindFirstChild("TouchControlFrame")
-    return frame and frame:FindFirstChild("JumpButton") :: GuiObject?
+local plateStroke = stroke(plate, GOLD, 1, 0.35)
+do
+    local pad = Instance.new("UIPadding")
+    pad.PaddingLeft = UDim.new(0, 8)
+    pad.PaddingRight = UDim.new(0, 8)
+    pad.Parent = plate
 end
 
--- This function MEASURES; HudLayout.plateBottomOffset decides. The arithmetic (the fallback,
--- and the clamp against a stale AbsolutePosition) lives there because it is pure and therefore
--- testable, and this file is not.
-local function placePlate()
-    local jump = jumpButton()
-    local jumpTop: number? = if jump and jump.AbsoluteSize.Y > 0 then jump.AbsolutePosition.Y else nil
-    local guiBottom = gui.AbsolutePosition.Y + gui.AbsoluteSize.Y
-    plate.Position = UDim2.new(1, -EDGE, 1, -HudLayout.plateBottomOffset(guiBottom, jumpTop))
+-- ONE label for the whole line: `900`, or `×3  900` when a streak rides (see `render`). No
+-- stroke on it — contrast comes from the Frame's opaque backing, never an outline on text.
+local plateLabel = Instance.new("TextLabel")
+plateLabel.Name = "Line"
+plateLabel.AutomaticSize = Enum.AutomaticSize.X
+plateLabel.Size = UDim2.fromScale(0, 1)
+plateLabel.BackgroundTransparency = 1
+plateLabel.TextColor3 = INK_CREAM
+plateLabel.TextSize = 15
+plateLabel.Font = Enum.Font.GothamBold
+plateLabel.Text = "0"
+plateLabel.Parent = plate
+
+-- The plate's own stroke is never day/night-adjusted (only the tape tile rims and the backing
+-- are — see `applyContrast`), so its "fully revealed" transparency is a plain constant.
+-- `plateRestTransparency` is NOT a constant: `applyContrast` keeps it in sync with the current
+-- day/night lerp, and `revealPlate` reads it rather than a hardcoded literal, so a reveal in full
+-- daylight does not sit at the authored-for-night value until the next ambient tick corrects it.
+local PLATE_STROKE_REST_TRANSPARENCY = 0.35
+local plateRestTransparency = 0.3
+
+-- Reveal/hide state. A GENERATION counter — the same pattern as `pressSeq`/`potPulse` above —
+-- so a fade cancelled by a newer reveal cannot let its own stale `Completed` callback fire late
+-- and hide a plate the newer reveal just showed.
+local plateGen = 0
+-- True from the instant a reveal starts until the fade has ACTUALLY finished (hold + fade both
+-- count). The ledger door's two-stage test below reads exactly this, never a timer: a control
+-- that is still visible must still be answerable, whether that visibility is the hold or the
+-- tail of the fade.
+local plateVisible = false
+local plateFadeTweens: { Tween } = {}
+
+local function cancelPlateFade()
+    for _, t in plateFadeTweens do
+        t:Cancel()
+    end
+    table.clear(plateFadeTweens)
 end
 
--- The jump button is not there at require time on every client, it resizes when the viewport
--- crosses the small-screen threshold, and it disappears entirely if the player docks a
--- keyboard. Watch all three rather than measuring once.
-local jumpWatch: { RBXScriptConnection } = {}
-local function rewatchJump()
-    for _, c in jumpWatch do
-        c:Disconnect()
+local function startPlateFade(gen: number)
+    if gen ~= plateGen then
+        return -- superseded by a newer reveal; this fade no longer applies
     end
-    table.clear(jumpWatch)
-    local jump = jumpButton()
-    if jump then
-        table.insert(jumpWatch, jump:GetPropertyChangedSignal("AbsolutePosition"):Connect(placePlate))
-        table.insert(jumpWatch, jump:GetPropertyChangedSignal("AbsoluteSize"):Connect(placePlate))
-    end
-    placePlate()
+    local info = TweenInfo.new(PLATE_FADE, Enum.EasingStyle.Quad, Enum.EasingDirection.In)
+    -- The fade takes the backing AND the stroke with the text — a washi panel that stays put
+    -- while its number dissolves is worse than either alone.
+    local bgTween = TweenService:Create(plate, info, { BackgroundTransparency = 1 })
+    local textTween = TweenService:Create(plateLabel, info, { TextTransparency = 1 })
+    local strokeTween = TweenService:Create(plateStroke, info, { Transparency = 1 })
+    plateFadeTweens = { bgTween, textTween, strokeTween }
+    bgTween.Completed:Connect(function()
+        if gen == plateGen then
+            plateVisible = false
+            plate.Visible = false
+        end
+    end)
+    bgTween:Play()
+    textTween:Play()
+    strokeTween:Play()
 end
 
-rewatchJump()
-gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(rewatchJump)
-playerGui.ChildAdded:Connect(function(child)
-    if child.Name == "TouchGui" then
-        -- TouchControlFrame is built a frame or two after TouchGui itself.
-        task.defer(rewatchJump)
-    end
-end)
-playerGui.ChildRemoved:Connect(function(child)
-    if child.Name == "TouchGui" then
-        task.defer(rewatchJump)
-    end
-end)
+-- Reveal on the ledger door's first tap, and on any change to the figures (the change-guard
+-- lives in `render`, not here — this function only knows how to show). Re-revealing mid-hold or
+-- mid-fade CANCELS the fade and restores full opacity instead of stacking: the plate is either
+-- fully there or on its way out, never two competing states at once.
+local function revealPlate()
+    plateGen += 1
+    local gen = plateGen
+    cancelPlateFade()
+    plate.Visible = true
+    plate.BackgroundTransparency = plateRestTransparency -- Cancel leaves properties mid-tween
+    plateLabel.TextTransparency = 0
+    plateStroke.Transparency = PLATE_STROKE_REST_TRANSPARENCY
+    plateVisible = true
+    task.delay(PLATE_HOLD, function()
+        startPlateFade(gen)
+    end)
+end
 
 -- ===== Throw area: bottom-right, inboard of the jump button =====
 local throwArea = Instance.new("Frame")
@@ -294,7 +321,7 @@ local tapeRow = Instance.new("Frame")
 tapeRow.Name = "Tape"
 tapeRow.AnchorPoint = Vector2.new(1, 1)
 tapeRow.Position = UDim2.fromScale(1, 1)
-tapeRow.Size = UDim2.fromOffset(TAPE_N * (TILE + TILE_GAP) - TILE_GAP, TILE)
+tapeRow.Size = UDim2.fromOffset(TAPE_W, TILE)
 tapeRow.BackgroundTransparency = 1
 tapeRow.Parent = throwArea
 
@@ -567,17 +594,22 @@ end
 
 -- ===== The ledger door =====
 -- The fourth and last interactive element in the minimal HUD, after the three throws and the
--- bank button. It exists because moving the plate into the jump/camera strip made the plate
+-- bank button. It exists because moving the plate off the jump/camera strip made the plate
 -- inert, and a tap on the plate had been the ledger's ONLY entry point — deliberately, so that
--- maximal cost no persistent button. That trade is now spent: the strip cannot host a sinking
--- rectangle, so the door becomes a button.
+-- maximal cost no persistent button. That trade is now spent: a display with no interactive
+-- elements has nowhere it needs sinking touches any more, so the door becomes a button.
 --
 -- Placed AGAINST the cluster rather than into a corner. The teahouse toggle that used to live in
 -- the bottom-right corner was deleted because it collided with the throw row on a narrow
 -- viewport; anchoring to the cluster's own left edge means this moves with the cluster and
 -- cannot repeat that.
+--
+-- TWO-STAGE (owner, mid-implementation): the first tap on an unrevealed plate reveals it; a
+-- second tap while ANYTHING from that reveal is still on screen — the hold or the fade, see
+-- `plateVisible` — opens the ledger instead. A tap that lands after the plate has fully faded
+-- reveals again. A double-tap from cold therefore opens the ledger, so nobody has to learn the
+-- two stages to reach it the obvious way.
 local LEDGER_SIZE = if TOUCH then HudLayout.BTN_H_TOUCH else 40
-local LEDGER_GAP = 8
 
 local ledgerButton = Instance.new("TextButton")
 ledgerButton.Name = "LedgerDoor"
@@ -608,7 +640,14 @@ ledgerButton.MouseButton1Down:Connect(function()
     pressDepress(ledgerScale)
 end)
 ledgerButton.MouseButton1Click:Connect(function()
-    EventBus.OpenLedger:Fire()
+    -- "Is anything on screen", not a 2s timer: `plateVisible` covers the hold AND the fade, so
+    -- a tap while the line is mid-fade still lands on the ledger rather than doing nothing — a
+    -- control that is still visible must still be answerable.
+    if plateVisible then
+        EventBus.OpenLedger:Fire()
+    else
+        revealPlate()
+    end
 end)
 
 -- ===== Round timer: a hairline along the bottom edge, depleting =====
@@ -666,8 +705,9 @@ stroke(escalationPrompt, WASHI, 2, 0.2)
 local toast = Instance.new("TextLabel")
 toast.Name = "Toast"
 toast.AnchorPoint = Vector2.new(0.5, 0)
--- The plate has vacated top-centre for the right margin (Task 7), so there is no PLATE_H left
--- to offset against. Sits at EDGE for now; Task 9 owns making this opaque per the design's §3.
+-- The plate has vacated top-centre entirely (first for the right margin, then the bottom row),
+-- so there is nothing left to offset against up here. Sits at EDGE for now; Task 9 owns making
+-- this opaque per the design's §3.
 toast.Position = UDim2.new(0.5, 0, 0, EDGE)
 toast.Size = UDim2.new(0.5, 0, 0, 26)
 toast.AutomaticSize = Enum.AutomaticSize.Y -- a long notice wraps and grows rather than clipping
@@ -730,17 +770,30 @@ end)
 local span = 0
 local lastPhase = ""
 
+-- Start at nil, not 0/false: the very first render has nothing to compare against, and treating
+-- "no prior value" as a change would auto-reveal the plate the instant the HUD loads, which is
+-- exactly the "normally hidden" rule being broken on frame one.
+local lastPlatePoints: number? = nil
+local lastPlateStreak: number? = nil
+
 local function render(inputs: any, aux: any)
     local view = HudModel.view(inputs, aux.session)
     canThrow = view.throwsEnabled
 
-    -- A "×0" is noise on a display whose whole job is to be ignorable, so the streak row only
-    -- exists when there is a streak — and the plate shrinks to one row when it goes.
-    local hasStreak = view.plate.streak > 0
-    streakLabel.Visible = hasStreak
-    streakLabel.Text = if hasStreak then `×{view.plate.streak}` else ""
-    pointsLabel.Text = tostring(view.plate.points)
-    plate.Size = UDim2.fromOffset(PLATE_W, if hasStreak then PLATE_ROW_H * 2 else PLATE_ROW_H)
+    -- Reveal is keyed on the TARGET having changed, not on `render` running: `render` is a 10Hz
+    -- repaint, and a reveal re-armed every tick would hold forever and never fade — precisely how
+    -- the bank pulse (`setBank`, below) failed when it wasn't guarded this way.
+    if
+        lastPlatePoints ~= nil
+        and (view.plate.points ~= lastPlatePoints or view.plate.streak ~= lastPlateStreak)
+    then
+        revealPlate()
+    end
+    lastPlatePoints = view.plate.points
+    lastPlateStreak = view.plate.streak
+    plateLabel.Text = if view.plate.streak > 0
+        then `×{view.plate.streak}  {view.plate.points}`
+        else tostring(view.plate.points)
 
     setBank(view.bankVisible, view.pot, view.potPulses)
 
@@ -867,8 +920,17 @@ end
 local nightFactor: number = dayNightConfig:GetAttribute("CurrentNightFactor") or 0
 
 local function applyContrast()
-    local plateAuthored = captureNumber(plate, AUTHORED_TRANSPARENCY, plate.BackgroundTransparency)
-    plate.BackgroundTransparency = lerpNumber(PLATE_DAY_TRANSPARENCY, plateAuthored, nightFactor)
+    -- `plateRestTransparency`, not `plate.BackgroundTransparency`, is both the capture source and
+    -- the write target here: the live property now spends most of its time either at 1 (hidden)
+    -- or mid-fade, neither of which is the "authored" value this pass needs. `revealPlate` reads
+    -- `plateRestTransparency` back when it shows the plate, so a reveal during full daylight uses
+    -- the current day/night value rather than a stale one baked in at construction. Writing it to
+    -- `plate.BackgroundTransparency` unconditionally is still correct: harmless while the plate is
+    -- Visible = false, and while a fade tween is actively running this write is simply overwritten
+    -- by the tween's own next frame, which is the only property owner that matters at that moment.
+    local plateAuthored = captureNumber(plate, AUTHORED_TRANSPARENCY, plateRestTransparency)
+    plateRestTransparency = lerpNumber(PLATE_DAY_TRANSPARENCY, plateAuthored, nightFactor)
+    plate.BackgroundTransparency = plateRestTransparency
 
     for _, tile in tapeTiles do
         local rim = tile.rim

@@ -9,14 +9,16 @@
 -- went on believing the old height, and the safe band is the only thing standing between a card and
 -- the BANK THESE button. One source, imported by both.
 --
--- Numbers that only ONE file uses (PLATE_W, BTN_W/BTN_GAP, TILE_GAP, the toast/timer sizes) stay
--- local to that file — this module is for the shared skeleton, not for every constant in the HUD.
+-- Numbers that only ONE file uses (BTN_W/BTN_GAP, TILE_GAP, the toast/timer sizes, the plate's
+-- own reveal/fade timing) stay local to that file — this module is for the shared skeleton, not
+-- for every constant in the HUD.
 --
--- No Roblox globals: numbers, and pure arithmetic over them, so it stays Lune-testable like
--- everything else in src/shared. `plateBottomOffset` is the one function in here rather than a
--- bare constant, because it is the only HUD placement that depends on something ROBLOX owns (the
--- jump button's measured position) — and therefore the only one that has to be tested against a
--- fallback and a clamp rather than just asserted as a derivation.
+-- No Roblox globals: plain numbers, and pure arithmetic over them, so it stays Lune-testable like
+-- everything else in src/shared. This used to also hold `plateBottomOffset`, a function rather
+-- than a bare constant, because the plate once sat above the jump button and had to measure it at
+-- runtime. The owner moved the plate into the bottom row instead (2026-08-03, mid-execution) —
+-- nothing in the HUD is positioned against geometry Roblox owns any more, and this module is back
+-- to numbers only.
 local HudLayout = {}
 
 -- SCALE, not pixels: the jump button occupies roughly the right 3-13% of the screen, so the throw
@@ -48,40 +50,6 @@ HudLayout.TAPE_TOUCH_SCALE = 0.7
 
 HudLayout.BTN_H_TOUCH = math.round(HudLayout.BTN_H * HudLayout.THROW_TOUCH_SCALE)
 HudLayout.TILE_TOUCH = math.round(HudLayout.TILE * HudLayout.TAPE_TOUCH_SCALE)
-
--- ===== The player-state plate, now in the right margin =====
--- It moved out of top-centre because that band is the middle of a phone's view. It lives in
--- the strip Roblox claims for jump and camera drag — the one place a display with NO
--- interactive elements can safely go, since nothing in it is Active and every drag passes
--- straight through.
---
--- ABOVE the jump button, not below. Roblox's default TouchJump leaves roughly 20px between
--- that button's lower edge and the bottom of the screen on a phone, and on iOS that 20px is
--- the home indicator. Above it there is ~300px at every size.
---
--- These are the plate's own dimensions only. WHERE it sits vertically is not a constant:
--- HudController measures the real jump button and sits PLATE_JUMP_GAP above it, because the
--- numbers above are Roblox's current defaults rather than a contract.
-HudLayout.PLATE_W = 92
-HudLayout.PLATE_ROW_H = 22
-HudLayout.PLATE_JUMP_GAP = 10
-
--- The one derivation in this module, rather than a bare constant, because it is the only
--- placement in the HUD that depends on something ROBLOX owns — and therefore the only one that
--- has to survive being wrong about it. Pure arithmetic, so the fallback and the clamp are
--- covered by the Lune suite; HudController does nothing but feed it two measurements.
---
---   guiBottomY : the HUD canvas's own bottom edge, in absolute screen Y
---   jumpTopY   : the jump button's top edge in the same space, or nil when there is no such
---                button (desktop), where the bottom-right corner is free anyway
-function HudLayout.plateBottomOffset(guiBottomY: number, jumpTopY: number?): number
-    if jumpTopY == nil then
-        return HudLayout.EDGE
-    end
-    -- max, not a bare subtraction: AbsolutePosition is read live and can be stale for a frame
-    -- after a viewport change, and a negative offset would put the plate off the bottom.
-    return math.max(HudLayout.EDGE, guiBottomY - jumpTopY + HudLayout.PLATE_JUMP_GAP)
-end
 
 -- The bank button's row, directly above the throw cluster. Reserved whether or not a pot is
 -- riding: an onboarding card clamped into a band that ignored it would land on the button the
