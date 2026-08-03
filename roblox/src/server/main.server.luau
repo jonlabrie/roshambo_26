@@ -205,10 +205,10 @@ end
 -- ONE ROW PER PLAYER, not one map per preference: they travel together on ProfileUpdate, they are
 -- written by the same remote and repaired by the same ledger refresh, and a second parallel map is
 -- how one of them ends up cleared on leave and the other left behind.
-type HudPrefs = { escalationPrompts: boolean, confirmThrows: boolean }
+type HudPrefs = { escalationPrompts: boolean }
 local hudPrefs: { [string]: HudPrefs } = {}
 
--- Absent = the profile's own defaults, both ON. The stored row is returned BY REFERENCE for reads;
+-- Absent = the profile's own default, ON. The stored row is returned BY REFERENCE for reads;
 -- anything that writes must clone first (see SetHudPreference), because the failure-revert there
 -- holds the pre-write row and an in-place edit would quietly rewrite its own undo.
 local function prefsFor(uid: string): HudPrefs
@@ -216,16 +216,15 @@ local function prefsFor(uid: string): HudPrefs
     if row then
         return row
     end
-    return { escalationPrompts = true, confirmThrows = true }
+    return { escalationPrompts = true }
 end
 
 -- The wire shape of a GET /players response's preference half, defaulted the same way everywhere it
 -- is read: absent means ON, because that is what the database defaults to for documents written
--- before these fields existed.
+-- before this field existed.
 local function prefsFromProfile(data: any): HudPrefs
     return {
         escalationPrompts = data.escalationPrompts ~= false,
-        confirmThrows = data.confirmThrows ~= false,
     }
 end
 
@@ -294,7 +293,6 @@ local function fireProfile(player: Player, source: string)
             bestStreak = row.bestStreak,
             unresolvedWin = row.unresolvedWin,
             escalationPrompts = prefsFor(tostring(player.UserId)).escalationPrompts,
-            confirmThrows = prefsFor(tostring(player.UserId)).confirmThrows,
             counters = ledgerCounters[tostring(player.UserId)],
             -- NOT `or {}`. This fires from the reveal ("local") and reconciliation ("reconciled")
             -- paths too, which run whether or not the join fetch ever succeeded — so substituting
@@ -553,9 +551,6 @@ SetHudPreference.OnServerEvent:Connect(function(player, body)
     if type(body.escalationPrompts) == "boolean" then
         payload.escalationPrompts = body.escalationPrompts
     end
-    if type(body.confirmThrows) == "boolean" then
-        payload.confirmThrows = body.confirmThrows
-    end
     if type(body.seenBeat) == "string" then
         payload.seenBeat = body.seenBeat
     end
@@ -582,16 +577,11 @@ SetHudPreference.OnServerEvent:Connect(function(player, body)
         -- the database does not hold.
         local prevPref = hudPrefs[uid]
         local prevBeats = hudSeenBeats[uid]
-        if payload.escalationPrompts ~= nil or payload.confirmThrows ~= nil then
+        if payload.escalationPrompts ~= nil then
             -- MERGED onto the current row, never replacing it: one remote carries every preference
-            -- and a body naming only one of them must not silently reset the other to its default.
+            -- and a body naming only one of them must not silently reset another to its default.
             local nextPrefs = table.clone(prefsFor(uid))
-            if payload.escalationPrompts ~= nil then
-                nextPrefs.escalationPrompts = payload.escalationPrompts
-            end
-            if payload.confirmThrows ~= nil then
-                nextPrefs.confirmThrows = payload.confirmThrows
-            end
+            nextPrefs.escalationPrompts = payload.escalationPrompts
             hudPrefs[uid] = nextPrefs
         end
         if payload.seenBeat ~= nil then

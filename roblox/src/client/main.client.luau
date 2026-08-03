@@ -23,9 +23,9 @@
 -- and takes picks back on `EventBus.HudPick`. Transient notices go out on `EventBus.Toast`.
 --
 -- The MAXIMAL panel gets its own channel, `EventBus.LedgerState`, fired only when ProfileUpdate
--- lands: the nine persisted counters, the live wallet, bestStreak and the two HUD preferences. Its
--- controls come back on `EventBus.HudPreference` and go out on `SetHudPreference` — one remote for
--- every preference, never one per switch.
+-- lands: the nine persisted counters, the live wallet, bestStreak and the HUD preference
+-- (escalationPrompts). Its controls come back on `EventBus.HudPreference` and go out on
+-- `SetHudPreference` — one remote for every preference, never one per switch.
 --
 -- BANK THESE (the pot indicator's only button) comes back on `EventBus.HudBank` and goes out on
 -- the long-standing BankRequest remote. There is no RISK counterpart and nothing to "resolve":
@@ -76,7 +76,6 @@ local wallet =
 
 -- Carried by ProfileUpdate. ON until the first one lands, which is the profile's own default.
 local escalationPrompts = true
-local confirmThrows = true
 
 -- THE ROUND'S PICK STATE. `chosen` is the player's commitment and `sent` is the wire's, and
 -- they are separate on purpose: the pick is held here until the lockout (HudModel.sendAtLockout)
@@ -244,7 +243,6 @@ local function publishLedger()
         live = { pot = wallet.pointsAtStake, streak = wallet.currentStreak, points = wallet.totalPoints },
         bestStreak = wallet.bestStreak,
         escalationPrompts = escalationPrompts,
-        confirmThrows = confirmThrows,
     })
 end
 
@@ -344,21 +342,15 @@ EventBus.HudBank.Event:Connect(function()
     BankRequest:FireServer()
 end)
 
--- The ledger's preferences footer, and the confirm strip's "don't ask again". One remote carries
--- every HUD preference (and, from Task 13, the seen-beat writes) — there is deliberately not a
--- second one per switch.
+-- The ledger's preferences footer. One remote carries every HUD preference (and, from Task 13, the
+-- seen-beat writes) — there is deliberately not a second one per switch.
 --
--- Applied LOCALLY as well as sent. The switch's own paint is optimistic in LedgerController, but
--- `confirmThrows` is a RULE input, not a decoration: waiting for the ProfileUpdate echo would leave
--- the very next tap still asking for a confirmation the player has just switched off. The echo
--- reconciles a write that did not land, exactly as it does for the switch.
+-- Applied LOCALLY as well as sent. The switch's own paint is optimistic in LedgerController, and the
+-- echo reconciles a write that did not land.
 EventBus.HudPreference.Event:Connect(function(body)
     if type(body) == "table" then
         if type(body.escalationPrompts) == "boolean" then
             escalationPrompts = body.escalationPrompts
-        end
-        if type(body.confirmThrows) == "boolean" then
-            confirmThrows = body.confirmThrows
         end
         publish()
     end
@@ -483,9 +475,6 @@ ProfileUpdate.OnClientEvent:Connect(function(p)
     wallet.unresolvedWin = p.unresolvedWin == true
     if type(p.escalationPrompts) == "boolean" then
         escalationPrompts = p.escalationPrompts
-    end
-    if type(p.confirmThrows) == "boolean" then
-        confirmThrows = p.confirmThrows
     end
     if type(p.counters) == "table" then
         counters = p.counters
