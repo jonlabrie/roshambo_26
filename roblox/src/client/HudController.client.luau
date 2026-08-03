@@ -84,7 +84,12 @@ local TOUCH = UserInputService.TouchEnabled and not UserInputService.KeyboardEna
 local JUMP_CLEARANCE = HudLayout.JUMP_CLEARANCE
 local EDGE = HudLayout.EDGE
 
-local PLATE_W, PLATE_H = 300, HudLayout.PLATE_H
+local PLATE_W = 300
+-- TEMPORARY (Task 6 → Task 7). HudLayout.PLATE_H is gone: the plate leaves top-centre for the
+-- right margin in Task 7, where PLATE_ROW_H replaces this and the value disappears with it.
+-- Carried as a literal purely so this file still LOADS in the interval — a nil here takes the
+-- whole HUD down, and no gate we run can see it.
+local PLATE_H = 46
 -- BTN_W tracks BTN_H (the buttons are square) off the SAME shared scale, so "50% smaller" shrinks
 -- the cluster in both axes rather than leaving three squat letterboxes.
 local BTN_H = if TOUCH then HudLayout.BTN_H_TOUCH else HudLayout.BTN_H
@@ -104,18 +109,6 @@ local TOAST_MAX = 6
 
 -- The bank button, directly above the throw row.
 local BANK_W = 150
-
--- Still read by confirmStrip's Position below, which Task 8 rewires onto HudLayout.BANK_H — left
--- as-is here since this task does not touch the confirm strip's construction.
-local SLOT_H = HudLayout.SLOT_H
-
--- The confirm strip, one row above the slot. Its HEIGHT and the gap under it come from HudLayout
--- because OnboardingController reserves that row in its safe band; the width is this file's alone.
-local CONFIRM_H = HudLayout.CONFIRM_H
-local CONFIRM_GAP = HudLayout.CONFIRM_GAP
-local CONFIRM_W = 288
-local CONFIRM_PAD = 10
-local CONFIRM_BOX = 16
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "RoshamboHud"
@@ -506,117 +499,6 @@ local function setBank(visible: boolean, pot: number, pulses: boolean)
     end
 end
 
--- ===== The confirm strip: what the round still lets the player do with the glyph they tapped =====
--- Two messages, never both: "TAP AGAIN TO THROW" while a selection is waiting on its second tap, and
--- "THROWN — TAP TO CHANGE" once it has gone but the round has not locked. HudModel decides which
--- this only paints. (Awaiting Task 8's rewire onto the chosen/switchPrompt state.)
--- WHY A STRIP AND NOT A LINE ON THE BUTTON. The alternative was a "TAP AGAIN" caption under the
--- glyph, which costs no geometry at all — but the touch button is 44px wide, and nine characters
--- across 44px is roughly 9px type. This is the one moment in the HUD that must be unmistakable: the
--- player has points riding, they have tapped, and nothing has been thrown yet. A hint they cannot
--- read turns the confirm from a safety net into the "I tapped and nothing happened" report the last
--- gate was about. It also gives the owner's "don't ask me this again" somewhere to live at the moment
--- it is actually wanted, rather than only three menus away in the ledger.
---
--- WHAT IT COSTS. One transient dead zone in the camera-drag surface, up only between a player's first
--- and second tap. It sits ABOVE the slot (which the pot indicator occupies precisely when
--- confirmation is active) and therefore covers neither the throws, the tape nor the slot. Its row is
--- reserved in HudLayout's safe band whether or not it is showing, so an onboarding card can never
--- land on it — the "win" beat's card and the first pot arrive on the same round, so that collision
--- was not hypothetical.
---
--- `.Active` is untouched: the strip and its labels stay Frames/TextLabels at the default false, and
--- the "don't ask again" control is a TextButton, which takes input by being a button. The whole
--- branch still has exactly one `.Active = true` (LedgerController's panel).
-local confirmStrip = Instance.new("Frame")
-confirmStrip.Name = "ConfirmStrip"
-confirmStrip.Active = false
-confirmStrip.AnchorPoint = Vector2.new(1, 1)
-confirmStrip.Position = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE + AREA_H + ROW_GAP + SLOT_H + CONFIRM_GAP))
-confirmStrip.Size = UDim2.fromOffset(CONFIRM_W, CONFIRM_H)
-confirmStrip.BackgroundColor3 = WASHI
-confirmStrip.BackgroundTransparency = 0.1
-confirmStrip.BorderSizePixel = 0
-confirmStrip.Visible = false
-confirmStrip.Parent = gui
-corner(confirmStrip, 6)
-stroke(confirmStrip, SEL_BLUE, 1, 0.3) -- the same blue as the chosen tile: one thing is being said
-
--- TWO MESSAGES, ONE STRIP. The confirm was always going to need a second line once the owner ruled
--- that a lit glyph can be un-confirmed: a player who has thrown needs to know the round is not shut
--- on them, and a player who has not needs the second tap asked for. Saying both at once would be a
--- wall of ~9px text on a 44px row, so the strip says whichever is currently true and nothing else.
--- Terse, because it is read at arm's length on a phone.
--- RELEASE_COPY and HINT_W_WIDE (the strip's second line, for a throw already sent) go with the
--- render-time branch that painted them (see Step 3 of Task 6) — Task 8 reintroduces both when it
--- rewires this strip onto `chosen`/`switchPrompt`.
-local CONFIRM_COPY = "TAP AGAIN TO THROW"
--- 150, not 160: the "don't ask again" control starts at CONFIRM_W - CONFIRM_PAD - 112 = 166, and a
--- wider label would run under it. The copy measures ~140px at 14px GothamBold.
-local HINT_W = 150
-
-local confirmHint = Instance.new("TextLabel")
-confirmHint.Name = "Hint"
-confirmHint.Active = false
-confirmHint.AnchorPoint = Vector2.new(0, 0.5)
-confirmHint.Position = UDim2.new(0, CONFIRM_PAD, 0.5, 0)
-confirmHint.Size = UDim2.fromOffset(HINT_W, 18)
-confirmHint.BackgroundTransparency = 1
-confirmHint.TextColor3 = INK_CREAM
-confirmHint.TextSize = 14
-confirmHint.TextXAlignment = Enum.TextXAlignment.Left
-confirmHint.Font = Enum.Font.GothamBold
-confirmHint.Text = CONFIRM_COPY
-confirmHint.Parent = confirmStrip
-
--- A TextButton, so it takes the tap without anything being made Active. Turning the preference off
--- does NOT throw the pending selection — it only drops the requirement, leaving the tile lit and the
--- next tap committing it. Doing both on one press would be a control that quietly threw a throw.
-local dontAsk = Instance.new("TextButton")
-dontAsk.Name = "DontAskAgain"
-dontAsk.AnchorPoint = Vector2.new(1, 0.5)
-dontAsk.Position = UDim2.new(1, -CONFIRM_PAD, 0.5, 0)
-dontAsk.Size = UDim2.fromOffset(112, CONFIRM_H - 6)
-dontAsk.BackgroundTransparency = 1
-dontAsk.BorderSizePixel = 0
-dontAsk.AutoButtonColor = false
-dontAsk.Text = ""
-dontAsk.Parent = confirmStrip
-
-local dontAskBox = Instance.new("Frame")
-dontAskBox.Name = "Box"
-dontAskBox.Active = false
-dontAskBox.AnchorPoint = Vector2.new(0, 0.5)
-dontAskBox.Position = UDim2.fromScale(0, 0.5)
-dontAskBox.Size = UDim2.fromOffset(CONFIRM_BOX, CONFIRM_BOX)
-dontAskBox.BackgroundColor3 = WASHI
-dontAskBox.BackgroundTransparency = 0.2
-dontAskBox.BorderSizePixel = 0
-dontAskBox.Parent = dontAsk
-corner(dontAskBox, 3)
-stroke(dontAskBox, TAN_RIM, 1, 0.35)
-
-local dontAskLabel = Instance.new("TextLabel")
-dontAskLabel.Name = "Caption"
-dontAskLabel.Active = false
-dontAskLabel.AnchorPoint = Vector2.new(0, 0.5)
-dontAskLabel.Position = UDim2.new(0, CONFIRM_BOX + 6, 0.5, 0)
-dontAskLabel.Size = UDim2.fromOffset(90, 16)
-dontAskLabel.BackgroundTransparency = 1
-dontAskLabel.TextColor3 = INK_CREAM
-dontAskLabel.TextTransparency = 0.25
-dontAskLabel.TextSize = 11
-dontAskLabel.TextXAlignment = Enum.TextXAlignment.Left
-dontAskLabel.Font = Enum.Font.Gotham
-dontAskLabel.Text = "Don't ask again"
-dontAskLabel.Parent = dontAsk
-
-dontAsk.MouseButton1Click:Connect(function()
-    -- The same channel and the same shape as the ledger footer's switches — there is one HUD
-    -- preference remote and this is not a second one.
-    EventBus.HudPreference:Fire({ confirmThrows = false })
-end)
-
 -- ===== Round timer: a hairline along the bottom edge, depleting =====
 local timer = Instance.new("Frame")
 timer.Name = "RoundTimer"
@@ -743,11 +625,10 @@ local function render(inputs: any, aux: any)
 
     setBank(view.bankVisible, view.pot, view.potPulses)
 
-    -- The authoritative pick wins the moment it lands; a CONFIRM-PENDING selection
-    -- (`view.selected` — the glyph tapped once while a pot is riding) is next; and until either has
-    -- come back through main.client, a press keeps its own tile lit (`pressedSym`), so a held finger
-    -- does not flicker the selection off on the next 10Hz repaint. The chosen treatment is identical
-    -- in all three cases on purpose: the strip below says what has and has not been thrown.
+    -- The authoritative pick wins the moment it lands; `view.selected` is next (stale field, kept
+    -- readable pending Task 8's rewire onto `chosen`/`switchPrompt` — it degrades to nil, not an
+    -- error); and until either has come back through main.client, a press keeps its own tile lit
+    -- (`pressedSym`), so a held finger does not flicker the selection off on the next 10Hz repaint.
     if aux.pick or view.selected then
         pressedSym = nil
     end
