@@ -213,7 +213,7 @@ tapeRow.Size = UDim2.fromOffset(TAPE_N * (TILE + TILE_GAP) - TILE_GAP, TILE)
 tapeRow.BackgroundTransparency = 1
 tapeRow.Parent = throwArea
 
-type TapeTile = { frame: Frame, glyphs: { [string]: Frame }, badge: Frame }
+type TapeTile = { frame: Frame, glyphs: { [string]: Frame }, badge: Frame, rim: UIStroke }
 local tapeTiles: { TapeTile } = {}
 for i = 1, TAPE_N do
     local tile = Instance.new("Frame")
@@ -226,7 +226,7 @@ for i = 1, TAPE_N do
     tile.Visible = false
     tile.Parent = tapeRow
     corner(tile, 4)
-    stroke(tile, TAN_RIM, 1, 0.3)
+    local tileRim = stroke(tile, TAN_RIM, 1, 0.3)
 
     local badge = Instance.new("Frame")
     badge.Name = "Badge"
@@ -240,7 +240,7 @@ for i = 1, TAPE_N do
     badge.Parent = tile
     corner(badge, 5)
 
-    tapeTiles[i] = { frame = tile, glyphs = glyphSet(tile, 0.66), badge = badge }
+    tapeTiles[i] = { frame = tile, glyphs = glyphSet(tile, 0.66), badge = badge, rim = tileRim }
 end
 
 -- Mirrors the last rendered `view.throwsEnabled` so a tap can be refused without re-deriving the
@@ -597,3 +597,89 @@ local function render(inputs: any, aux: any)
 end
 
 EventBus.HudState.Event:Connect(render)
+
+-- ===== Day/night contrast: authored against night, kept legible as day comes up =====
+-- The ivory/washi palette above is authored against the dark canyon (DayNightLockT pins the
+-- owner's dusk look at 0.40 — not ours to change here). As nightFactor falls toward day the
+-- canyon goes pale and that palette loses contrast. This darkens the plate backing and deepens
+-- the tape-tile rims to hold legibility across the cycle; it is a contrast pass, not a second
+-- visual design, and nothing here moves geometry.
+--
+-- Scope is deliberately the two elements render() never writes: the plate's own backing, and
+-- each tape tile's UIStroke. render() repaints the throw buttons' fill/rim and the tape tiles'
+-- fill every call for game-state reasons (selection, ageing) unrelated to time of day — driving
+-- those same properties here would just get overwritten on the next HudState event.
+--
+-- Dual subscription, same as WaterVfxDayNight/YamadoroDayNight/PaperLanternDayNight/
+-- AmbientDayNight: EventBus.DayNight for live updates, plus the DayNightConfig
+-- CurrentNightFactor attribute as a start-order-proof prime + backstop, since this controller
+-- can build after the day/night controller's last fire.
+--
+-- Capture authored values ONCE, on an attribute, and always re-derive from that capture — same
+-- rule as WaterVfxDayNight. Reading back a live property would read whatever the previous apply
+-- just wrote, compounding a little further on every dusk. And always LERP toward the day target,
+-- never scale: VfxNightDim's lesson is that an authored value of zero can never be moved by
+-- multiplication, so lerp is the only operation that stays correct regardless of what gets
+-- authored here later, even though today's authored numbers all happen to be non-zero.
+local dayNightConfig = ReplicatedStorage:WaitForChild("DayNightConfig")
+
+local PLATE_DAY_TRANSPARENCY = 0.05 -- authored (night) is 0.3; more opaque reads darker against a pale sky
+local RIM_DAY_COLOR = INK -- authored (night) is TAN_RIM, too pale to hold a line at noon
+local RIM_DAY_THICKNESS = 2 -- authored (night) is 1
+local RIM_DAY_TRANSPARENCY = 0.05 -- authored (night) is 0.3
+
+local AUTHORED_TRANSPARENCY = "AuthoredTransparency"
+local AUTHORED_THICKNESS = "AuthoredThickness"
+local AUTHORED_COLOR = "AuthoredColor"
+
+local function captureNumber(inst: Instance, key: string, live: number): number
+    local stored = inst:GetAttribute(key)
+    if typeof(stored) == "number" then
+        return stored
+    end
+    inst:SetAttribute(key, live)
+    return live
+end
+
+local function captureColor(inst: Instance, key: string, live: Color3): Color3
+    local stored = inst:GetAttribute(key)
+    if typeof(stored) == "Color3" then
+        return stored
+    end
+    inst:SetAttribute(key, live)
+    return live
+end
+
+local function lerpNumber(a: number, b: number, t: number): number
+    return a + (b - a) * t
+end
+
+local nightFactor: number = dayNightConfig:GetAttribute("CurrentNightFactor") or 0
+
+local function applyContrast()
+    local plateAuthored = captureNumber(plate, AUTHORED_TRANSPARENCY, plate.BackgroundTransparency)
+    plate.BackgroundTransparency = lerpNumber(PLATE_DAY_TRANSPARENCY, plateAuthored, nightFactor)
+
+    for _, tile in tapeTiles do
+        local rim = tile.rim
+        local authoredColor = captureColor(rim, AUTHORED_COLOR, rim.Color)
+        local authoredThickness = captureNumber(rim, AUTHORED_THICKNESS, rim.Thickness)
+        local authoredTransparency = captureNumber(rim, AUTHORED_TRANSPARENCY, rim.Transparency)
+
+        rim.Color = RIM_DAY_COLOR:Lerp(authoredColor, nightFactor)
+        rim.Thickness = lerpNumber(RIM_DAY_THICKNESS, authoredThickness, nightFactor)
+        rim.Transparency = lerpNumber(RIM_DAY_TRANSPARENCY, authoredTransparency, nightFactor)
+    end
+end
+
+applyContrast() -- prime before the first EventBus fire
+
+EventBus.DayNight.Event:Connect(function(payload)
+    nightFactor = payload.nightFactor
+    applyContrast()
+end)
+
+dayNightConfig:GetAttributeChangedSignal("CurrentNightFactor"):Connect(function()
+    nightFactor = dayNightConfig:GetAttribute("CurrentNightFactor") or nightFactor
+    applyContrast()
+end)
