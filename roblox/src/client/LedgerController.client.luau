@@ -36,6 +36,7 @@ local LedgerModel = require(sharedFolder:WaitForChild("LedgerModel"))
 local GameRules = require(sharedFolder:WaitForChild("GameRules"))
 local Glyphs = require(sharedFolder:WaitForChild("Glyphs"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
+local Takeover = require(script.Parent:WaitForChild("Takeover"))
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -63,7 +64,6 @@ local FOOTER_H = 46 -- two switches; the row was sized for more than one from th
 local TABS_H = 30
 local BAR_H = 14
 local FEED_MAX = 60
-local DEFAULT_WALK_SPEED = 16
 
 -- Three columns is a LANDSCAPE-TABLET layout. On a landscape phone the columns get too narrow to
 -- read, so the feed collapses to a tab and the two statistic cards share the width. This threshold
@@ -72,130 +72,10 @@ local DEFAULT_WALK_SPEED = 16
 local NARROW_PX = 900
 
 -- ===== Movement suspension =====
--- The canyon is cliff edges and switchbacks. Reading statistics while a thumb drifts on the stick is
--- how someone walks off the FW11 deck. The header says so in plain text — it is a promise, not an
--- apology, and it is the clearest signal that this is a mode.
---
--- PlayerModule is Roblox's default control stack, and this place declares no replacement (see
--- default.project.json: StarterPlayerScripts holds only RoshamboClient). It is still resolved
--- defensively, because a control stack that turns out not to be there must degrade to a working
--- freeze rather than to no freeze at all.
---
--- EVERY WaitForChild HERE IS TIMED. This block runs at require time, before the
--- `EventBus.OpenLedger` connection at the bottom of the file exists — so an untimed wait that never
--- resolved would not merely lose the freeze, it would leave the plate (the design's ONE door into
--- maximal) a dead button for the rest of the session, with nothing on screen to say why.
-local controls: any = nil
-do
-    local playerScripts = player:WaitForChild("PlayerScripts", 10)
-    local playerModule = playerScripts and playerScripts:WaitForChild("PlayerModule", 5)
-    if playerModule then
-        local ok, result = pcall(function()
-            return (require(playerModule :: any) :: any):GetControls()
-        end)
-        if ok then
-            controls = result
-        else
-            warn(`[LEDGER] PlayerModule:GetControls() failed ({result}) — falling back to WalkSpeed`)
-        end
-    elseif playerScripts then
-        warn("[LEDGER] PlayerModule not found — falling back to WalkSpeed")
-    else
-        warn("[LEDGER] PlayerScripts never arrived — falling back to WalkSpeed")
-    end
-end
-
+-- Extracted to Takeover.luau (a reference-counted module shared with the teahouse panel) so a
+-- second copy of the hardened suspend/restore logic can't diverge from this one, and so the two
+-- takeovers can't restore a freeze the other applied. See that module for the mechanism.
 local isOpen = false
--- LATCHED at suspend and read at restore. Without the latch, a mechanism that resolved late could
--- be used to restore a freeze that was applied by the other one — and that leaves a player at
--- WalkSpeed 0 for good.
-local suspendedVia: string? = nil
-local savedWalk: number? = nil
-
-local function currentHumanoid(): Humanoid?
-    local char = player.Character
-    return char and char:FindFirstChildOfClass("Humanoid")
-end
-
--- pcall'd, and the result is REPORTED rather than swallowed. `close()` has already hidden the panel
--- by the time restore runs, so an error thrown out of here would leave a frozen player with the
--- panel gone — no ✕ to press and no way to try again. It also means the latch below is only ever set
--- to "controls" when Disable actually took.
-local function setControlsEnabled(on: boolean): boolean
-    if not controls then
-        return false
-    end
-    local ok, err = pcall(function()
-        if on then
-            controls:Enable()
-        else
-            controls:Disable()
-        end
-    end)
-    if not ok then
-        warn(`[LEDGER] PlayerModule controls {if on then "Enable" else "Disable"} failed: {err}`)
-    end
-    return ok
-end
-
--- WalkSpeed is the FALLBACK path only. Jumping is deliberately left alone: a player who cannot walk
--- cannot travel, and hopping in place has never walked anyone off a deck. Fewer properties touched
--- is fewer ways to hand back a broken character.
-local function suspend()
-    if suspendedVia ~= "walkspeed" and setControlsEnabled(false) then
-        suspendedVia = "controls"
-        return
-    end
-    suspendedVia = "walkspeed"
-    local h = currentHumanoid()
-    if h then
-        if savedWalk == nil then
-            savedWalk = h.WalkSpeed
-        end
-        h.WalkSpeed = 0
-    end
-end
-
-local function restore()
-    local via = suspendedVia
-    suspendedVia = nil
-    if via == "controls" then
-        if not setControlsEnabled(true) then
-            -- Nothing else here can un-disable a control stack. Reopening and closing the panel
-            -- retries this, which is why `close()` is idempotent rather than one-shot.
-            warn("[LEDGER] control stack refused Enable — reopen the ledger and close it to retry")
-        end
-    elseif via == "walkspeed" then
-        local h = currentHumanoid()
-        if h then
-            -- NEVER restore a zero. If something else had already frozen this character when we
-            -- captured, handing that value back would strand the player on our exit — the exact
-            -- failure this whole mechanism exists to prevent.
-            h.WalkSpeed = if savedWalk and savedWalk > 0 then savedWalk else DEFAULT_WALK_SPEED
-        end
-        savedWalk = nil
-    end
-end
-
--- A respawn while the panel is open hands us a brand-new Humanoid carrying its authored WalkSpeed —
--- un-frozen, on the fallback path. Re-apply, re-capturing from the fresh humanoid.
---
--- `isOpen` is tested TWICE, and the second test is the one that matters: WaitForChild yields for up
--- to 10 seconds, and the player can close the panel inside that window. Checking only before the
--- yield lets this resume after `close()` has already restored control and freeze them again with no
--- panel on screen — the exact failure the suspension exists to prevent, and one the player has no
--- way to diagnose.
-player.CharacterAdded:Connect(function(char)
-    if not isOpen then
-        return
-    end
-    char:WaitForChild("Humanoid", 10)
-    if not isOpen then
-        return
-    end
-    savedWalk = nil
-    suspend()
-end)
 
 -- ===== Panel =====
 local gui = Instance.new("ScreenGui")
@@ -881,7 +761,7 @@ local function open()
     render()
     gui.Enabled = true
     isOpen = true
-    suspend()
+    Takeover.acquire()
 end
 
 -- THE ONLY WAY OUT. The X, a tap on the scrim and Escape all route here, so a fourth exit path added
@@ -891,9 +771,9 @@ local function close()
     if not isOpen then
         return
     end
-    isOpen = false -- before the restore, so the CharacterAdded handler cannot re-freeze behind us
+    isOpen = false -- before the release, so a respawn mid-release cannot re-freeze behind us
     gui.Enabled = false
-    restore()
+    Takeover.release()
 end
 
 EventBus.OpenLedger.Event:Connect(open)
