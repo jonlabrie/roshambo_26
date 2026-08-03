@@ -13,6 +13,10 @@
 --             timerKnown = boolean }
 -- and takes picks back on `EventBus.HudPick`. Transient notices go out on `EventBus.Toast`.
 --
+-- The MAXIMAL panel gets its own channel, `EventBus.LedgerState`, fired only when ProfileUpdate
+-- lands: the nine persisted counters, the live wallet, bestStreak and the escalation preference. Its
+-- one control comes back on `EventBus.HudPreference` and goes out on `SetHudPreference`.
+--
 -- BANK THESE (the pot indicator's only button) comes back on `EventBus.HudBank` and goes out on
 -- the long-standing BankRequest remote. There is no RISK counterpart and nothing to "resolve":
 -- riding is throwing again, and the server clears unresolvedWin at the next settlement.
@@ -25,6 +29,7 @@ local HudModel = require(shared:WaitForChild("HudModel"))
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local SubmitPick = remotes:WaitForChild("SubmitPick") :: RemoteEvent
 local BankRequest = remotes:WaitForChild("BankRequest") :: RemoteEvent
+local SetHudPreference = remotes:WaitForChild("SetHudPreference") :: RemoteEvent
 local RoundUpdate = remotes:WaitForChild("RoundUpdate") :: RemoteEvent
 local RevealResult = remotes:WaitForChild("RevealResult") :: RemoteEvent
 local ProfileUpdate = remotes:WaitForChild("ProfileUpdate") :: RemoteEvent
@@ -56,10 +61,15 @@ local fateBound = false
 local myPick: string? = nil
 local roundCouldThrow = false
 
-local wallet = { totalPoints = 0, pointsAtStake = 0, currentStreak = 0, unresolvedWin = false }
+local wallet =
+    { totalPoints = 0, pointsAtStake = 0, currentStreak = 0, bestStreak = 0, unresolvedWin = false }
 
 -- Carried by ProfileUpdate. ON until the first one lands, which is the profile's own default.
 local escalationPrompts = true
+
+-- The nine persisted ledger counters, carried by ProfileUpdate. The maximal panel is the only
+-- reader; the minimal HUD never sees them.
+local counters: { [string]: number }? = nil
 
 local session = HudModel.newSession()
 
@@ -127,6 +137,20 @@ local function publish()
     })
 end
 
+-- The maximal panel's whole input. Fired only on ProfileUpdate, because everything in it changes
+-- only there — unlike HudState, which is a 10Hz heartbeat for a depleting hairline.
+local function publishLedger()
+    if not counters then
+        return -- nothing to study until the profile lands; the panel keeps its zeros
+    end
+    EventBus.LedgerState:Fire({
+        counters = counters,
+        live = { pot = wallet.pointsAtStake, streak = wallet.currentStreak, points = wallet.totalPoints },
+        bestStreak = wallet.bestStreak,
+        escalationPrompts = escalationPrompts,
+    })
+end
+
 local function toast(line: string)
     EventBus.Toast:Fire(line)
 end
@@ -186,6 +210,12 @@ end)
 -- wallet, and guessing here would flash the pot to 0 and back if the request failed.
 EventBus.HudBank.Event:Connect(function()
     BankRequest:FireServer()
+end)
+
+-- The ledger's preferences footer. One remote carries every HUD preference (and, from Task 13, the
+-- seen-beat writes) — there is deliberately not a second one per switch.
+EventBus.HudPreference.Event:Connect(function(body)
+    SetHudPreference:FireServer(body)
 end)
 
 RevealTheater.OnClientEvent:Connect(function(r)
@@ -257,13 +287,26 @@ RevealResult.OnClientEvent:Connect(function(r)
 end)
 
 ProfileUpdate.OnClientEvent:Connect(function(p)
+    -- Read BEFORE the wallet is overwritten: /bank moves the whole pot, so the pot we were holding
+    -- is exactly what was banked. The maximal panel's feed is personal-only, and a bank with no line
+    -- in it would be the one personal event the scrollback missed.
+    local bankedNow = if p.source == "banked" then wallet.pointsAtStake else 0
+
     wallet.totalPoints = p.totalPoints
     wallet.pointsAtStake = p.pointsAtStake
     wallet.currentStreak = p.currentStreak
+    wallet.bestStreak = p.bestStreak or wallet.bestStreak
     wallet.unresolvedWin = p.unresolvedWin == true
     if type(p.escalationPrompts) == "boolean" then
         escalationPrompts = p.escalationPrompts
     end
+    if type(p.counters) == "table" then
+        counters = p.counters
+    end
+    if bankedNow > 0 then
+        toast(`💰 BANKED {bankedNow} — that's yours to keep`)
+    end
+    publishLedger()
     publish()
 end)
 

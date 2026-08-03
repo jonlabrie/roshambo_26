@@ -226,6 +226,34 @@ end
 -- the ledger's preference switch would be write-only. Absent = the profile's own default, ON.
 local hudPrefs: { [string]: boolean } = {}
 
+-- The nine ledger counters are not wallet fields either, so they get the same treatment: seeded from
+-- GET /players at join, carried on ProfileUpdate, and advanced OPTIMISTICALLY from the local reveal
+-- exactly as PlayerProfiles advances the wallet. There is no per-round authoritative source for them
+-- — /instances/.../results carries round results, not lifetime totals — so the local advance is what
+-- keeps the ledger moving during a session, and the next join re-seeds from the database.
+type Counters = { [string]: number }
+local COUNTER_KEYS = {
+    "roundsPlayed",
+    "wins",
+    "safes",
+    "losses",
+    "lifetimeBanked",
+    "bestPot",
+    "throwsR",
+    "throwsP",
+    "throwsS",
+}
+local ledgerCounters: { [string]: Counters } = {}
+
+local function seedCounters(userId: string, from: any)
+    local out: Counters = {}
+    for _, key in COUNTER_KEYS do
+        local v = if type(from) == "table" then from[key] else nil
+        out[key] = if type(v) == "number" then v else 0
+    end
+    ledgerCounters[userId] = out
+end
+
 local function fireProfile(player: Player, source: string)
     local row = profiles:get(tostring(player.UserId))
     if row then
@@ -237,9 +265,34 @@ local function fireProfile(player: Player, source: string)
             bestStreak = row.bestStreak,
             unresolvedWin = row.unresolvedWin,
             escalationPrompts = hudPrefs[tostring(player.UserId)] ~= false,
+            counters = ledgerCounters[tostring(player.UserId)],
             source = source,
         })
     end
+end
+
+-- Mirrors server/src/engine/Settlement.ts buildCounterUpdate: one round, one throw, one result, and
+-- bestPot proposed as a maximum. Kept in the same order so the two are legible side by side.
+local THROW_COUNTER = { R = "throwsR", P = "throwsP", S = "throwsS" }
+
+local function bumpCounters(userId: string, pick: string?, result: string, newPot: number)
+    local c = ledgerCounters[userId]
+    if not c then
+        return
+    end
+    c.roundsPlayed += 1
+    if result == "WIN" then
+        c.wins += 1
+    elseif result == "SAFE" then
+        c.safes += 1
+    elseif result == "LOSS" then
+        c.losses += 1
+    end
+    local key = pick and THROW_COUNTER[pick]
+    if key then
+        c[key] += 1
+    end
+    c.bestPot = math.max(c.bestPot, newPot)
 end
 
 local function playerByUserId(userId: string): Player?
@@ -289,6 +342,10 @@ local coordinator = RoundCoordinator.new({
                 })
                 if mine then
                     profiles:applyLocalResult(userId, mine.result)
+                    -- After applyLocalResult, so the pot offered to bestPot is the POST-round one —
+                    -- the same figure Settlement.ts proposes to $max.
+                    local after = profiles:get(userId)
+                    bumpCounters(userId, mine.pick, mine.result, if after then after.pointsAtStake else 0)
                     pushStats(player)
                     fireProfile(player, "local")
                     if mine.result == "WIN" then
@@ -354,6 +411,7 @@ Players.PlayerAdded:Connect(function(player)
         local res = net:getPlayer(tostring(player.UserId), country)
         if res.ok then
             hudPrefs[tostring(player.UserId)] = res.data.escalationPrompts ~= false
+            seedCounters(tostring(player.UserId), res.data.counters)
             profiles:applyServer(tostring(player.UserId), {
                 totalPoints = res.data.totalPoints,
                 pointsAtStake = res.data.pointsAtStake,
@@ -395,6 +453,12 @@ BankRequest.OnServerEvent:Connect(function(player)
             -- /bank's response doesn't carry unresolvedWin, but wallet.bankPot sets it false in
             -- the same atomic update, so mirror that rather than passing a now-stale true through.
             local existing = profiles:get(tostring(player.UserId))
+            -- bankPot accrues the WHOLE pot to lifetimeBanked on that same write; mirror it here so
+            -- the ledger's BANKED figure moves with the bank rather than at the next join.
+            local counters = ledgerCounters[tostring(player.UserId)]
+            if counters and existing then
+                counters.lifetimeBanked += existing.pointsAtStake
+            end
             profiles:applyServer(tostring(player.UserId), {
                 totalPoints = res.data.totalPoints,
                 pointsAtStake = res.data.pointsAtStake,
@@ -446,6 +510,7 @@ end)
 Players.PlayerRemoving:Connect(function(player)
     fates:remove(tostring(player.UserId))
     hudPrefs[tostring(player.UserId)] = nil
+    ledgerCounters[tostring(player.UserId)] = nil
 end)
 
 local lastBoard: any = nil

@@ -12,6 +12,8 @@ local NAMES = {
     "HudBank",
     "Toast",
     "OpenLedger",
+    "LedgerState",
+    "HudPreference",
     "Onboard",
 }
 for _, name in NAMES do
