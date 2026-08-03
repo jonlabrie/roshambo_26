@@ -13,9 +13,9 @@
 -- and a player who threw, won nothing and missed once fell out of the OR: the prompt died after
 -- ONE miss instead of three, giving the most common case the least grace.
 --
--- A round only counts as ignored if the player COULD have thrown. Rounds spent win-bound or
--- fate-bound are not misses — the player was prevented, not inattentive. Counting them would
--- disarm the prompt for exactly the player who was stuck on a decision.
+-- A round only counts as ignored if the player COULD have thrown. Rounds spent fate-bound are not
+-- misses — the player was prevented, not inattentive. Counting them would disarm the prompt for
+-- exactly the player who was held out of the round.
 local HudModel = {}
 
 local ESCALATE_AT = 5 -- seconds remaining
@@ -38,7 +38,8 @@ export type Inputs = {
 export type View = {
     plate: { streak: number, pot: number, points: number },
     throwsEnabled: boolean,
-    choiceUp: boolean,
+    slot: string, -- "pot" | "fate" | "none"
+    potPulses: boolean,
     escalate: boolean,
     secondsLeft: number,
 }
@@ -48,20 +49,23 @@ function HudModel.newSession(): Session
 end
 
 function HudModel.view(inputs: Inputs, session: Session): View
-    -- Win-bound and fate-bound are both server-enforced; this only mirrors them so the UI can
-    -- dim. The server is what actually refuses the pick.
-    local bound = inputs.unresolvedWin or inputs.fateBound
+    -- Only a FATE blocks a throw. An unacknowledged win does not: throwing again IS riding,
+    -- which is why there is no RISK button and nothing to resolve. Server-enforced either way;
+    -- this only mirrors it so the UI can dim.
+    local blocked = inputs.fateBound
     local throwsEnabled = inputs.phase == "ACTIVE"
         and inputs.secondsLeft > 0
-        and not bound
+        and not blocked
         and not inputs.pickedThisRound
 
-    -- The choice has no expiry: it survives the round, the session, and a week away. It is NOT
-    -- gated on phase for that reason.
-    local choiceUp = inputs.unresolvedWin
+    -- One slot above the throw row, two possible tenants. A LOSS forfeits the pot, so
+    -- pointsAtStake is always 0 while fate-bound and these cannot really coexist -- but fate
+    -- takes precedence defensively, because the wrong tenant here would hide the only way out.
+    -- Neither is gated on phase: an unbanked pot outlives the round, the session and a week away.
+    local slot: string = if inputs.fateBound then "fate" elseif inputs.pointsAtStake > 0 then "pot" else "none"
 
     local armed = inputs.escalationPrompts
-        and not bound
+        and not blocked
         and inputs.phase == "ACTIVE"
         and not inputs.pickedThisRound
         and session.consecutiveMisses < BACKOFF_MISSES
@@ -73,7 +77,10 @@ function HudModel.view(inputs: Inputs, session: Session): View
             points = inputs.totalPoints,
         },
         throwsEnabled = throwsEnabled,
-        choiceUp = choiceUp,
+        slot = slot,
+        -- unresolvedWin's only remaining job: "the last scored round was a WIN and the player has
+        -- not banked since". It drives the pulse and nothing else.
+        potPulses = slot == "pot" and inputs.unresolvedWin,
         escalate = armed and inputs.secondsLeft > 0 and inputs.secondsLeft <= ESCALATE_AT,
         secondsLeft = inputs.secondsLeft,
     }

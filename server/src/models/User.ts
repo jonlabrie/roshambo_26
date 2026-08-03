@@ -17,8 +17,9 @@ export interface IUser extends Document {
     currentStreak: number;
     stakingStreak: number;
     pointsAtStake: number;
-    // Play HUD (2026-08-02). unresolvedWin is NOT derivable from pointsAtStake: after choosing
-    // RISK the pot still rides, so that value is identical in the bound and unbound states.
+    // Play HUD (2026-08-02). "The last scored round was a WIN and nothing has been banked since."
+    // It gates nothing — it makes the pot indicator pulse. NOT derivable from pointsAtStake: a pot
+    // ridden through a SAFE is identical in figure to one just won.
     unresolvedWin: boolean;
     escalationPrompts: boolean;
     seenBeats: string[];

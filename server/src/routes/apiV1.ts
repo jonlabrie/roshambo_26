@@ -3,7 +3,7 @@ import { RoundEngine } from '../engine/RoundEngine';
 import { ResultsStore } from '../engine/ResultsStore';
 import { requireApiKey } from '../middleware/apiKey';
 import { resolveUser } from '../identity';
-import { bankPot, resolveWin } from '../wallet';
+import { bankPot } from '../wallet';
 import User, { IUser } from '../models/User';
 import { Throw } from '../engine/GameRules';
 import { validateLoadout, validateSizeClass, validatePadPreferences, validateDecorations, validateAccess } from '../loadout';
@@ -328,32 +328,6 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
                 pointsAtStake: updated.pointsAtStake,
                 stakingStreak: updated.stakingStreak,
                 currentStreak: updated.currentStreak,
-            });
-        } catch (err) {
-            res.status(500).json({ error: (err as Error).message });
-        }
-    });
-
-    router.post('/resolve-win', async (req, res) => {
-        try {
-            const robloxUserId = String(req.body?.robloxUserId ?? '');
-            const choice = req.body?.choice;
-            if (!robloxUserId || (choice !== 'risk' && choice !== 'bank')) {
-                res.status(400).json({ error: 'BAD_REQUEST' });
-                return;
-            }
-            const user = await resolveUser({ robloxUserId });
-            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
-            const updated = await resolveWin(user._id.toString(), choice);
-            // A null here means the player was not bound — already resolved, or a duplicate tap.
-            // That is not an error; echo current state so the client converges either way.
-            const state = updated ?? user;
-            res.json({
-                totalPoints: state.totalPoints,
-                pointsAtStake: state.pointsAtStake,
-                stakingStreak: state.stakingStreak,
-                currentStreak: state.currentStreak,
-                unresolvedWin: state.unresolvedWin ?? false,
             });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });

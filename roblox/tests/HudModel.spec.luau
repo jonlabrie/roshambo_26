@@ -52,31 +52,56 @@ describe("HudModel.view — plate and throws", function()
         expect(HudModel.view(inputs({ pickedThisRound = true }), session(0)).throwsEnabled).toBe(false)
     end)
 
-    test("fate-bound and win-bound both disable throws", function()
+    test("a win no longer blocks throwing — riding IS throwing again", function()
+        local v = HudModel.view(inputs({ unresolvedWin = true, pointsAtStake = 27 }), session(0))
+        expect(v.throwsEnabled).toBe(true)
+    end)
+
+    test("a fate still blocks throwing", function()
         expect(HudModel.view(inputs({ fateBound = true }), session(0)).throwsEnabled).toBe(false)
-        expect(HudModel.view(inputs({ unresolvedWin = true }), session(0)).throwsEnabled).toBe(false)
     end)
 end)
 
-describe("HudModel.view — the choice overlay", function()
-    test("the overlay is up exactly when the player is win-bound", function()
-        expect(HudModel.view(inputs({ unresolvedWin = true, pointsAtStake = 27 }), session(0)).choiceUp).toBe(
-            true
-        )
-        expect(HudModel.view(inputs({ unresolvedWin = false }), session(0)).choiceUp).toBe(false)
+describe("HudModel.view — the slot above the throw row", function()
+    test("the slot holds the pot whenever points are unbanked", function()
+        local v = HudModel.view(inputs({ pointsAtStake = 27 }), session(0))
+        expect(v.slot).toBe("pot")
     end)
 
-    test("the overlay persists through every phase — it does not expire with the round", function()
-        -- the owner's rule: no default and no expiry. They have a choice to make.
+    test("the slot holds the fate prompt when fate-bound", function()
+        expect(HudModel.view(inputs({ fateBound = true }), session(0)).slot).toBe("fate")
+    end)
+
+    test("the slot is empty with no pot and no fate", function()
+        expect(HudModel.view(inputs({}), session(0)).slot).toBe("none")
+    end)
+
+    test("fate wins the slot if both are somehow set", function()
+        -- a LOSS forfeits the pot, so this should be unreachable; assert the defensive order
+        -- rather than trusting it, because the wrong tenant here hides the only way out of a fate
+        local v = HudModel.view(inputs({ fateBound = true, pointsAtStake = 27 }), session(0))
+        expect(v.slot).toBe("fate")
+    end)
+
+    test("the pot survives every phase — an unbanked pot does not expire with the round", function()
         for _, p in { "ACTIVE", "TALLY", "REVEAL" } do
-            local v =
-                HudModel.view(inputs({ phase = p, unresolvedWin = true, pointsAtStake = 27 }), session(0))
-            expect(v.choiceUp).toBe(true)
+            expect(HudModel.view(inputs({ phase = p, pointsAtStake = 27 }), session(0)).slot).toBe("pot")
         end
     end)
 
-    test("being fate-bound does not raise the win choice", function()
-        expect(HudModel.view(inputs({ fateBound = true }), session(0)).choiceUp).toBe(false)
+    test("the pot pulses only while the win is unacknowledged", function()
+        expect(HudModel.view(inputs({ pointsAtStake = 27, unresolvedWin = true }), session(0)).potPulses).toBe(
+            true
+        )
+        expect(HudModel.view(inputs({ pointsAtStake = 27, unresolvedWin = false }), session(0)).potPulses).toBe(
+            false
+        )
+    end)
+
+    test("nothing pulses when there is no pot", function()
+        expect(HudModel.view(inputs({ pointsAtStake = 0, unresolvedWin = true }), session(0)).potPulses).toBe(
+            false
+        )
     end)
 end)
 
@@ -99,9 +124,13 @@ describe("HudModel.view — escalation", function()
     test("it never fires at a player who cannot throw", function()
         -- "CHOOSE A THROW" is noise at someone the server will refuse
         expect(HudModel.view(inputs({ secondsLeft = 2, fateBound = true }), session(0)).escalate).toBe(false)
-        expect(HudModel.view(inputs({ secondsLeft = 2, unresolvedWin = true }), session(0)).escalate).toBe(
-            false
-        )
+    end)
+
+    test("an unacknowledged win does not silence the escalation", function()
+        -- it used to: unresolvedWin was part of `bound`, and bound players were never armed
+        expect(
+            HudModel.view(inputs({ secondsLeft = 3, unresolvedWin = true, pointsAtStake = 9 }), session(0)).escalate
+        ).toBe(true)
     end)
 
     test("the preference switch silences it outright", function()
@@ -166,8 +195,8 @@ describe("HudModel.onRoundEnded", function()
     end)
 
     test("a round the player COULD NOT throw in is not a miss", function()
-        -- being win-bound or fate-bound is being prevented, not ignoring it; counting these
-        -- would disarm the prompt for a player who was stuck deciding
+        -- being fate-bound is being prevented, not ignoring it; counting these would disarm the
+        -- prompt for a player who was held out of the round
         expect(HudModel.onRoundEnded(session(0), { couldThrow = false, picked = false }).consecutiveMisses).toBe(
             0
         )

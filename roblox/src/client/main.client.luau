@@ -9,11 +9,13 @@
 --
 -- It publishes all of that on `EventBus.HudState:Fire(inputs, aux)`:
 --   inputs : a HudModel.Inputs — the controller calls HudModel.view(inputs, aux.session)
---   aux    : { session = HudModel.Session, tape = { { worldThrow, result? } }, pick = string? }
+--   aux    : { session = HudModel.Session, tape = { { worldThrow, result? } }, pick = string?,
+--             timerKnown = boolean }
 -- and takes picks back on `EventBus.HudPick`. Transient notices go out on `EventBus.Toast`.
 --
--- BankRequest is deliberately not bound here any more: the persistent BANK button is gone, and
--- banking is one half of the RISK/BANK pair that resolves a win through the ResolveWin remote.
+-- BANK THESE (the pot indicator's only button) comes back on `EventBus.HudBank` and goes out on
+-- the long-standing BankRequest remote. There is no RISK counterpart and nothing to "resolve":
+-- riding is throwing again, and the server clears unresolvedWin at the next settlement.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -22,6 +24,7 @@ local HudModel = require(shared:WaitForChild("HudModel"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local SubmitPick = remotes:WaitForChild("SubmitPick") :: RemoteEvent
+local BankRequest = remotes:WaitForChild("BankRequest") :: RemoteEvent
 local RoundUpdate = remotes:WaitForChild("RoundUpdate") :: RemoteEvent
 local RevealResult = remotes:WaitForChild("RevealResult") :: RemoteEvent
 local ProfileUpdate = remotes:WaitForChild("ProfileUpdate") :: RemoteEvent
@@ -55,8 +58,7 @@ local roundCouldThrow = false
 
 local wallet = { totalPoints = 0, pointsAtStake = 0, currentStreak = 0, unresolvedWin = false }
 
--- Not on the wire yet: ProfileUpdate does not carry the profile's escalationPrompts. Default ON,
--- which is the profile's own default, until the ledger's preference switch feeds it.
+-- Carried by ProfileUpdate. ON until the first one lands, which is the profile's own default.
 local escalationPrompts = true
 
 local session = HudModel.newSession()
@@ -67,9 +69,12 @@ local function roundEnded(couldThrow: boolean, picked: boolean)
     session = HudModel.onRoundEnded(session, { couldThrow = couldThrow, picked = picked })
 end
 
--- The clock may not have synced when ACTIVE opens (secondsToLockout arrives nil). The old HUD let
--- the player throw anyway and so do we: report a nominal countdown comfortably above the
--- escalation threshold, so throws stay enabled and the alarm stays quiet.
+-- The clock may not have synced when ACTIVE opens (secondsToLockout arrives nil), and lockoutAt is
+-- only ever assigned at that transition — so a nil there stays nil for the whole round. The old HUD
+-- let the player throw anyway and so do we: report a nominal countdown comfortably above the
+-- escalation threshold, so throws stay enabled and the alarm stays quiet. But the HAIRLINE must not
+-- fake a span it does not have: a constant would pin it full and motionless while throws kept
+-- working past the real lockout. `timerKnown` tells the HUD to hide it instead.
 local UNSYNCED_SECONDS = 30
 
 local function secondsLeft(): number
@@ -116,6 +121,9 @@ local function publish()
         session = session,
         tape = visibleTape(),
         pick = myPick,
+        -- Render-only, so it stays out of HudModel: false means we never got a lockout for this
+        -- round and the hairline has no real span to deplete against.
+        timerKnown = lockoutAt ~= nil,
     })
 end
 
@@ -168,10 +176,16 @@ end)
 
 EventBus.HudPick.Event:Connect(function(value: string)
     -- Optimistic: the tile lights the moment it is tapped. The server is what actually refuses a
-    -- pick (fate-bound, win-bound, past the lockout).
+    -- pick (fate-bound, past the lockout).
     myPick = value
     SubmitPick:FireServer(value)
     publish()
+end)
+
+-- No optimistic wallet edit: the pot indicator clears when ProfileUpdate lands with the banked
+-- wallet, and guessing here would flash the pot to 0 and back if the request failed.
+EventBus.HudBank.Event:Connect(function()
+    BankRequest:FireServer()
 end)
 
 RevealTheater.OnClientEvent:Connect(function(r)
@@ -182,6 +196,9 @@ RevealTheater.OnClientEvent:Connect(function(r)
     end
     if r.whiffed and r.whiffed[myId] then
         toast("⏳ TOO LATE — your throw didn't count this round")
+        -- and stop lighting the tile they tapped: leaving myPick set would keep it illuminated
+        -- through REVEAL as though it had counted, contradicting the toast.
+        myPick = nil
     end
     publish()
 end)
@@ -204,7 +221,7 @@ RoundUpdate.OnClientEvent:Connect(function(info)
     phase = info.phase
     if info.phase == "ACTIVE" then
         myPick = nil
-        roundCouldThrow = not (fateBound or wallet.unresolvedWin)
+        roundCouldThrow = not fateBound
         lockoutAt = if info.secondsToLockout then os.clock() + info.secondsToLockout else nil
         pendingReveal = nil -- the drum respins; last round's reveal has already been shown
         drumAtRest = false
@@ -244,6 +261,9 @@ ProfileUpdate.OnClientEvent:Connect(function(p)
     wallet.pointsAtStake = p.pointsAtStake
     wallet.currentStreak = p.currentStreak
     wallet.unresolvedWin = p.unresolvedWin == true
+    if type(p.escalationPrompts) == "boolean" then
+        escalationPrompts = p.escalationPrompts
+    end
     publish()
 end)
 
@@ -252,7 +272,7 @@ end)
 -- throw at any point in it did not have the round taken from them.
 task.spawn(function()
     while true do
-        if phase == "ACTIVE" and not (fateBound or wallet.unresolvedWin) then
+        if phase == "ACTIVE" and not fateBound then
             roundCouldThrow = true
         end
         publish()

@@ -38,9 +38,10 @@ function PlayerProfiles.applyLocalResult(self: any, userId: string, result: stri
     row.currentStreak = self._rules.nextStreak(row.currentStreak, result)
     row.stakingStreak = self._rules.nextStreak(row.stakingStreak, result)
     row.bestStreak = math.max(row.bestStreak, row.currentStreak)
-    -- A WIN binds the player until they answer; a LOSS or SAFE leaves nothing to decide. Applied
-    -- optimistically so the choice overlay appears with the theater, then overwritten by the
-    -- authoritative reconciliation like every other field here.
+    -- unresolvedWin = "the last scored round was a WIN and nothing has been banked since". It
+    -- gates nothing — it only makes the pot indicator pulse. Applied optimistically so the pulse
+    -- starts with the theater, then overwritten by the authoritative reconciliation like every
+    -- other field here.
     row.unresolvedWin = result == "WIN"
 end
 

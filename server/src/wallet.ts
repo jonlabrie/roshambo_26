@@ -17,24 +17,3 @@ export async function bankPot(userId: string): Promise<IUser | null> {
         { new: true }
     );
 }
-
-// Answer an outstanding WIN. RISK leaves the pot staked and only lifts the gate; BANK banks and
-// lifts it. Both are conditional on unresolvedWin so a double-tap cannot double-bank.
-export async function resolveWin(userId: string, choice: 'risk' | 'bank'): Promise<IUser | null> {
-    if (choice === 'risk') {
-        return User.findOneAndUpdate(
-            { _id: userId, unresolvedWin: true },
-            { $set: { unresolvedWin: false } },
-            { new: true }
-        );
-    }
-    const banked = await bankPot(userId);
-    if (banked) return banked;
-    // Nothing was staked (should be unreachable after a WIN). Clear the gate regardless —
-    // leaving it set would lock the player out of throwing permanently.
-    return User.findOneAndUpdate(
-        { _id: userId, unresolvedWin: true },
-        { $set: { unresolvedWin: false } },
-        { new: true }
-    );
-}

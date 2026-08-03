@@ -64,7 +64,6 @@ local PortalTarget = require(shared:WaitForChild("PortalTarget"))
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local SubmitPick = remotes:WaitForChild("SubmitPick") :: RemoteEvent
 local BankRequest = remotes:WaitForChild("BankRequest") :: RemoteEvent
-local ResolveWin = remotes:WaitForChild("ResolveWin") :: RemoteEvent
 local SetHudPreference = remotes:WaitForChild("SetHudPreference") :: RemoteEvent
 local RoundUpdate = remotes:WaitForChild("RoundUpdate") :: RemoteEvent
 local RevealResult = remotes:WaitForChild("RevealResult") :: RemoteEvent
@@ -222,6 +221,11 @@ local function pushStats(player: Player)
     (stats:FindFirstChild("Streak") :: IntValue).Value = row.currentStreak
 end
 
+-- HUD preferences are not wallet fields, so they do not live on a PlayerProfiles row. They ride
+-- ProfileUpdate all the same: without that the client can only hard-default escalationPrompts and
+-- the ledger's preference switch would be write-only. Absent = the profile's own default, ON.
+local hudPrefs: { [string]: boolean } = {}
+
 local function fireProfile(player: Player, source: string)
     local row = profiles:get(tostring(player.UserId))
     if row then
@@ -232,6 +236,7 @@ local function fireProfile(player: Player, source: string)
             stakingStreak = row.stakingStreak,
             bestStreak = row.bestStreak,
             unresolvedWin = row.unresolvedWin,
+            escalationPrompts = hudPrefs[tostring(player.UserId)] ~= false,
             source = source,
         })
     end
@@ -310,8 +315,8 @@ local coordinator = RoundCoordinator.new({
         onReconciled = function(rows)
             for _, row in rows do
                 -- /instances/.../results carries round results, not wallet state -- it has no
-                -- unresolvedWin field. Pass through the row's current value; do not default to
-                -- false or a bound player would be silently unbound on every reconciliation.
+                -- unresolvedWin field. Pass through the row's current value; defaulting to false
+                -- would drop the pot indicator's pulse on every reconciliation.
                 local existing = profiles:get(row.robloxUserId)
                 profiles:applyServer(row.robloxUserId, {
                     totalPoints = row.totalPoints,
@@ -348,6 +353,7 @@ Players.PlayerAdded:Connect(function(player)
         end)
         local res = net:getPlayer(tostring(player.UserId), country)
         if res.ok then
+            hudPrefs[tostring(player.UserId)] = res.data.escalationPrompts ~= false
             profiles:applyServer(tostring(player.UserId), {
                 totalPoints = res.data.totalPoints,
                 pointsAtStake = res.data.pointsAtStake,
@@ -372,13 +378,8 @@ SubmitPick.OnServerEvent:Connect(function(player, throwValue)
         print(`[PICK] {player.Name} rejected: FATE_BOUND`)
         return
     end
-    -- A WIN binds the player until they answer RISK or BANK. Server-authoritative: the client
-    -- dims the buttons and paints the choice over them, but this is what actually refuses.
-    local prof = profiles:get(tostring(player.UserId))
-    if prof and prof.unresolvedWin then
-        print(`[PICK] {player.Name} rejected: WIN_BOUND`)
-        return
-    end
+    -- No win gate: an unbanked pot never blocks a throw, because throwing again IS riding it.
+    -- A fate is the only thing that refuses a pick here.
     local accepted, reason = coordinator:submitPick(tostring(player.UserId), throwValue)
     if not accepted then
         print(`[PICK] {player.Name} rejected: {reason}`)
@@ -391,8 +392,8 @@ BankRequest.OnServerEvent:Connect(function(player)
     handlerQueue:run(tostring(player.UserId), function()
         local res = net:postBank(tostring(player.UserId))
         if res.ok then
-            -- /bank's response doesn't carry unresolvedWin (it's not the win-gate endpoint); pass
-            -- through the row's current value rather than defaulting to false.
+            -- /bank's response doesn't carry unresolvedWin, but wallet.bankPot sets it false in
+            -- the same atomic update, so mirror that rather than passing a now-stale true through.
             local existing = profiles:get(tostring(player.UserId))
             profiles:applyServer(tostring(player.UserId), {
                 totalPoints = res.data.totalPoints,
@@ -400,38 +401,10 @@ BankRequest.OnServerEvent:Connect(function(player)
                 currentStreak = res.data.currentStreak,
                 stakingStreak = res.data.stakingStreak,
                 bestStreak = (existing or { bestStreak = 0 }).bestStreak,
-                unresolvedWin = existing ~= nil and existing.unresolvedWin,
+                unresolvedWin = false,
             })
             pushStats(player)
             fireProfile(player, "banked")
-        end
-    end)
-end)
-
-ResolveWin.OnServerEvent:Connect(function(player, choice)
-    if choice ~= "risk" and choice ~= "bank" then
-        return
-    end
-    handlerQueue:run(tostring(player.UserId), function()
-        local res = net:postResolveWin(tostring(player.UserId), choice)
-        if res.ok then
-            profiles:applyServer(tostring(player.UserId), {
-                totalPoints = res.data.totalPoints,
-                pointsAtStake = res.data.pointsAtStake,
-                currentStreak = res.data.currentStreak,
-                stakingStreak = res.data.stakingStreak,
-                bestStreak = (profiles:get(tostring(player.UserId)) or { bestStreak = 0 }).bestStreak,
-                unresolvedWin = res.data.unresolvedWin,
-            })
-            pushStats(player)
-            fireProfile(player, if choice == "bank" then "banked" else "risked")
-        else
-            -- A successful postResolveWin is the ONLY in-session path that clears the gate:
-            -- onReconciled deliberately passes unresolvedWin through, and applyLocalResult
-            -- cannot run for a gated player because they cannot throw. So a dropped request
-            -- here leaves the player unable to play, and a silent failure makes that lockout
-            -- undiagnosable. Mirrors the [PROFILE] sync warn above.
-            warn(`[RESOLVE] {player.Name} failed ({choice}): {res.error or res.status}`)
         end
     end)
 end)
@@ -450,6 +423,11 @@ SetHudPreference.OnServerEvent:Connect(function(player, body)
     if next(payload) == nil then
         return
     end
+    if payload.escalationPrompts ~= nil then
+        -- Keep the cache in step with the write, or the next fireProfile would echo the OLD value
+        -- back at the client and appear to undo the switch.
+        hudPrefs[tostring(player.UserId)] = payload.escalationPrompts
+    end
     task.spawn(function()
         net:putHudPreference(tostring(player.UserId), payload)
     end)
@@ -467,6 +445,7 @@ end)
 
 Players.PlayerRemoving:Connect(function(player)
     fates:remove(tostring(player.UserId))
+    hudPrefs[tostring(player.UserId)] = nil
 end)
 
 local lastBoard: any = nil

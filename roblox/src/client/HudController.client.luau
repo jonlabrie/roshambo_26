@@ -15,17 +15,20 @@
 --
 -- Every information element MUST stay Active = false. Frames and labels default to false, but
 -- setting it true anywhere here punches a permanent hole in the camera-drag surface, which is
--- the whole right side of the screen on touch. Only the three throw buttons, the two choice
--- buttons and the plate may sink input.
+-- the whole right side of the screen on touch. The whole interactive budget is: the three throw
+-- buttons, the plate, and EXACTLY ONE slot button (see `setSlot`). The pot disc is a Frame and
+-- must stay a Frame — it carries no action, only the figure.
 --
 -- This file RENDERS HudModel; it never re-derives it. main.client.luau owns the wiring and fires
 -- EventBus.HudState(inputs, aux):
 --   inputs : a HudModel.Inputs
---   aux    : { session = HudModel.Session, tape = { { worldThrow, result? } }, pick = string? }
+--   aux    : { session = HudModel.Session, tape = { { worldThrow, result? } }, pick = string?,
+--             timerKnown = boolean }
 --            `tape` is already spoiler-gated by the wiring — paint it as given.
--- Picks travel back the other way on EventBus.HudPick.
+-- Picks travel back the other way on EventBus.HudPick, banking on EventBus.HudBank.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local TweenService = game:GetService("TweenService")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local HudModel = require(shared:WaitForChild("HudModel"))
@@ -47,6 +50,7 @@ local WASHI = Color3.fromRGB(26, 24, 28)
 local WIN_GREEN = Color3.fromRGB(86, 196, 120)
 local LOSS_RED = Color3.fromRGB(206, 86, 86)
 local SEL_BLUE = Color3.fromRGB(74, 150, 255)
+local POT_RED = Color3.fromRGB(190, 58, 52) -- the pot disc; deeper than LOSS_RED so it reads as a seal
 
 local THROWS = { "R", "P", "S" }
 
@@ -64,8 +68,16 @@ local ROW_GAP = 10
 local AREA_W = 3 * BTN_W + 2 * BTN_GAP
 local AREA_H = TILE + ROW_GAP + BTN_H
 local TIMER_H = 3
+local TIMER_H_HOT = 7 -- the escalation thickens the hairline as well as reddening it
 local TOAST_SECONDS = 4
 local TOAST_MAX = 6
+
+-- The one slot above the throw row: the pot indicator, or the fate prompt, or nothing.
+local SLOT_H = 40
+local SLOT_GAP = 8
+local DISC = SLOT_H
+local BANK_W = 128
+local FATE_W = 190
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "RoshamboHud"
@@ -261,6 +273,130 @@ for i, sym in THROWS do
     throwTiles[sym] = { button = b, glyph = Glyphs.render(glyphBox(b, 0.62), sym, INK), rim = rim }
 end
 
+-- ===== The slot: directly above the throw row, one tenant at a time =====
+-- POT: the figure in a red disc with BANK THESE beside it. Throwing again IS riding, so there is
+-- no counterpart button and nothing to "resolve" — the pot indicator is a standing statement of
+-- what is unbanked, not a wager prompt.
+-- FATE: after a LOSS, ACCEPT YOUR FATE. A LOSS forfeits the pot, so pointsAtStake is always 0
+-- while fate-bound and the two can never want the slot at once (HudModel decides; this only paints).
+local slotRow = Instance.new("Frame")
+slotRow.Name = "Slot"
+slotRow.Active = false
+slotRow.AnchorPoint = Vector2.new(1, 1)
+slotRow.Position = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE + AREA_H + ROW_GAP))
+slotRow.Size = UDim2.fromOffset(AREA_W, SLOT_H)
+slotRow.BackgroundTransparency = 1
+slotRow.Parent = gui
+
+local potGroup = Instance.new("Frame")
+potGroup.Name = "Pot"
+potGroup.Active = false
+potGroup.Size = UDim2.fromScale(1, 1)
+potGroup.BackgroundTransparency = 1
+potGroup.Visible = false
+potGroup.Parent = slotRow
+
+local bankButton = Instance.new("TextButton")
+bankButton.Name = "BankThese"
+bankButton.AnchorPoint = Vector2.new(1, 0.5)
+bankButton.Position = UDim2.fromScale(1, 0.5)
+bankButton.Size = UDim2.fromOffset(BANK_W, SLOT_H)
+bankButton.BackgroundColor3 = WASHI
+bankButton.BackgroundTransparency = 0.15
+bankButton.BorderSizePixel = 0
+bankButton.AutoButtonColor = false
+bankButton.TextColor3 = INK_CREAM
+bankButton.TextSize = 15
+bankButton.Font = Enum.Font.GothamBold
+bankButton.Text = "BANK THESE"
+bankButton.Parent = potGroup
+corner(bankButton, 6)
+stroke(bankButton, GOLD, 1, 0.3)
+
+-- A Frame, deliberately. It says how many points are unbanked; it is not a button, and making it
+-- one would both add a second live control to this slot and punch another hole in the drag surface.
+local potDisc = Instance.new("Frame")
+potDisc.Name = "Disc"
+potDisc.Active = false
+potDisc.AnchorPoint = Vector2.new(1, 0.5)
+potDisc.Position = UDim2.new(1, -(BANK_W + SLOT_GAP), 0.5, 0)
+potDisc.Size = UDim2.fromOffset(DISC, DISC)
+potDisc.BackgroundColor3 = POT_RED
+potDisc.BackgroundTransparency = 0
+potDisc.BorderSizePixel = 0
+potDisc.Parent = potGroup
+do
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(1, 0) -- a disc, not a rounded box
+    c.Parent = potDisc
+end
+
+local potFigure = Instance.new("TextLabel")
+potFigure.Name = "Figure"
+potFigure.Active = false
+potFigure.AnchorPoint = Vector2.new(0.5, 0.5)
+potFigure.Position = UDim2.fromScale(0.5, 0.5)
+potFigure.Size = UDim2.fromScale(0.76, 0.52) -- 3^n runs long fast; let the figure shrink to fit
+potFigure.BackgroundTransparency = 1
+potFigure.TextColor3 = INK_CREAM
+potFigure.TextScaled = true
+potFigure.Font = Enum.Font.GothamBlack
+potFigure.Text = "0"
+potFigure.Parent = potDisc
+
+local fateButton = Instance.new("TextButton")
+fateButton.Name = "AcceptFate"
+fateButton.AnchorPoint = Vector2.new(1, 0.5)
+fateButton.Position = UDim2.fromScale(1, 0.5)
+fateButton.Size = UDim2.fromOffset(FATE_W, SLOT_H)
+fateButton.BackgroundColor3 = LOSS_RED
+fateButton.BackgroundTransparency = 0.1
+fateButton.BorderSizePixel = 0
+fateButton.AutoButtonColor = false
+fateButton.TextColor3 = INK_CREAM
+fateButton.TextSize = 15
+fateButton.Font = Enum.Font.GothamBold
+fateButton.Text = "ACCEPT YOUR FATE"
+fateButton.Visible = false
+fateButton.Parent = slotRow
+corner(fateButton, 6)
+stroke(fateButton, GOLD, 1, 0.3)
+
+bankButton.MouseButton1Click:Connect(function()
+    EventBus.HudBank:Fire()
+end)
+fateButton.MouseButton1Click:Connect(function()
+    EventBus.Cue:Fire({ kind = "acceptFate" })
+end)
+
+-- THE ONLY place either tenant's Visible is written, and both are written from the same `kind` on
+-- every call. That is what makes "two slot buttons can never be live at once" true by
+-- construction rather than by discipline: there is no assignment that can set one without
+-- clearing the other, and a Visible = false GuiObject receives no input at all.
+local pulse: Tween? = nil
+
+local function setSlot(kind: string, pulses: boolean)
+    potGroup.Visible = kind == "pot"
+    fateButton.Visible = kind == "fate"
+
+    if pulses and potGroup.Visible then
+        if not pulse then
+            local t = TweenService:Create(
+                potDisc,
+                TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+                { BackgroundTransparency = 0.55 }
+            )
+            t:Play()
+            pulse = t
+        end
+    elseif pulse then
+        local t = pulse :: Tween
+        t:Cancel()
+        pulse = nil
+        potDisc.BackgroundTransparency = 0 -- Cancel leaves the property mid-tween; put it back
+    end
+end
+
 -- ===== Round timer: a hairline along the bottom edge, depleting =====
 local timer = Instance.new("Frame")
 timer.Name = "RoundTimer"
@@ -276,20 +412,41 @@ timer.Parent = gui
 -- Active = false: this is a LABEL, not a button. It covers the centre of the screen, which is the
 -- middle of the camera-drag surface — sinking input here would make the canyon unrotatable for the
 -- seconds it is up. The arming rule lives in HudModel and is never second-guessed here.
-local escalation = Instance.new("TextLabel")
+local escalation = Instance.new("Frame")
 escalation.Name = "Escalation"
 escalation.Active = false
 escalation.AnchorPoint = Vector2.new(0.5, 0.5)
 escalation.Position = UDim2.fromScale(0.5, 0.42)
-escalation.Size = UDim2.new(0.8, 0, 0, 108) -- scale width: a fixed 460px overflows a small phone
+escalation.Size = UDim2.new(0.8, 0, 0, 130) -- scale width: a fixed 460px overflows a small phone
 escalation.BackgroundTransparency = 1
-escalation.TextColor3 = INK_CREAM
-escalation.TextSize = 38
-escalation.Font = Enum.Font.GothamBlack
-escalation.Text = ""
 escalation.Visible = false
 escalation.Parent = gui
-stroke(escalation, WASHI, 2, 0.2)
+
+local escalationCount = Instance.new("TextLabel")
+escalationCount.Name = "Count"
+escalationCount.Active = false
+escalationCount.Size = UDim2.new(1, 0, 0, 92)
+escalationCount.BackgroundTransparency = 1
+escalationCount.TextColor3 = INK_CREAM
+escalationCount.TextSize = 84
+escalationCount.Font = Enum.Font.GothamBlack
+escalationCount.Text = ""
+escalationCount.Parent = escalation
+stroke(escalationCount, WASHI, 3, 0.15)
+
+local escalationPrompt = Instance.new("TextLabel")
+escalationPrompt.Name = "Prompt"
+escalationPrompt.Active = false
+escalationPrompt.AnchorPoint = Vector2.new(0.5, 1)
+escalationPrompt.Position = UDim2.fromScale(0.5, 1)
+escalationPrompt.Size = UDim2.new(1, 0, 0, 30)
+escalationPrompt.BackgroundTransparency = 1
+escalationPrompt.TextColor3 = INK_CREAM
+escalationPrompt.TextSize = 24
+escalationPrompt.Font = Enum.Font.GothamBold
+escalationPrompt.Text = "CHOOSE A THROW"
+escalationPrompt.Parent = escalation
+stroke(escalationPrompt, WASHI, 2, 0.2)
 
 -- ===== Toast: the transient notice that replaced the persistent prose ticker =====
 local toast = Instance.new("TextLabel")
@@ -365,6 +522,9 @@ local function render(inputs: any, aux: any)
     cellValue.pot.Text = tostring(view.plate.pot)
     cellValue.points.Text = tostring(view.plate.points)
 
+    potFigure.Text = tostring(view.plate.pot)
+    setSlot(view.slot, view.potPulses)
+
     for _, sym in THROWS do
         local t = throwTiles[sym]
         local selected = aux.pick == sym
@@ -411,21 +571,28 @@ local function render(inputs: any, aux: any)
         end
     end
 
-    if inputs.phase == "ACTIVE" then
-        if lastPhase ~= "ACTIVE" then
-            span = 0
-        end
+    -- The hairline thickens and reddens under the escalation threshold — the ambient half of the
+    -- same signal the centred count carries.
+    local height = if view.escalate then TIMER_H_HOT else TIMER_H
+    timer.BackgroundColor3 = if view.escalate then LOSS_RED else GOLD
+    -- A round with no lockout on the wire has no span to deplete against. Showing a constant
+    -- would pin the hairline full and motionless while the real lockout came and went, which
+    -- reads as "plenty of time" and is a lie. Show nothing instead; throws stay enabled.
+    if lastPhase ~= inputs.phase then
+        span = 0
+    end
+    if inputs.phase == "ACTIVE" and aux.timerKnown ~= false then
         span = math.max(span, view.secondsLeft)
         local frac = if span > 0 then math.clamp(view.secondsLeft / span, 0, 1) else 0
-        timer.Size = UDim2.new(frac, 0, 0, TIMER_H)
+        timer.Size = UDim2.new(frac, 0, 0, height)
     else
-        timer.Size = UDim2.fromOffset(0, TIMER_H)
+        timer.Size = UDim2.fromOffset(0, height)
     end
     lastPhase = inputs.phase
 
     escalation.Visible = view.escalate
     if view.escalate then
-        escalation.Text = `{math.ceil(view.secondsLeft)}\nCHOOSE A THROW`
+        escalationCount.Text = tostring(math.ceil(view.secondsLeft))
     end
 end
 

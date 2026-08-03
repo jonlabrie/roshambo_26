@@ -9,7 +9,7 @@ local NAMES = {
     "DayNight",
     "HudState",
     "HudPick",
-    "HudResolve",
+    "HudBank",
     "Toast",
     "OpenLedger",
     "Onboard",
