@@ -11,7 +11,7 @@ return {
     -- THIS EMPTY POOL IS THE WHOLE PARK for the client visuals: EffectSelector returns nil for
     -- an empty pool, so no `fate*` effect ever reaches FateController's cue guard and that file
     -- needs no edit at all. Re-enabling fates means putting the byThrow table back — a
-    -- deliberate act that breaks the test above rather than a silent one.
+    -- deliberate act that breaks the test in tests/EffectSelector.spec.luau rather than a silent one.
     LOSS = {},
     BANK = { "coinToss" },
 }

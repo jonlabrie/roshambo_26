@@ -48,6 +48,10 @@ export type View = {
     throwsEnabled: boolean,
     -- The pot's own control. It is a button, not a readout: the figure belongs IN the thing
     -- that acts on it, which is why the plate no longer carries a pot at all.
+    -- Nothing renders this field directly — HudController shows the button on `pot > 0 or
+    -- displayedPot > 0` instead, so the drain animation survives its own count-down. That is
+    -- correct layering (a display-lag concern the controller owns), not this field going unused;
+    -- do not delete it.
     bankVisible: boolean,
     pot: number,
     potPulses: boolean,

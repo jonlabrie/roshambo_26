@@ -402,6 +402,14 @@ describe("HudModel.sendAtLockout — the pick's ONE trip to the wire", function(
         expect(HudModel.sendAtLockout(inputs({ chosen = "R", secondsLeft = 5 }))).toBe(nil)
     end)
 
+    -- Pins SEND_AT from above, not just at/below the boundary tested next: without this, SEND_AT
+    -- could be raised from 0.5 to anything up to 4.9 and every other test in this file would stay
+    -- green. That constant governs how long backing out stays honest — the branch's central
+    -- premise — so its ceiling needs its own witness, not just its floor.
+    test("still holds just above the send boundary", function()
+        expect(HudModel.sendAtLockout(inputs({ chosen = "R", secondsLeft = 0.6 }))).toBe(nil)
+    end)
+
     test("sends at the half-second boundary", function()
         expect(HudModel.sendAtLockout(inputs({ chosen = "R", secondsLeft = 0.5 }))).toBe("R")
         expect(HudModel.sendAtLockout(inputs({ chosen = "R", secondsLeft = 0.1 }))).toBe("R")

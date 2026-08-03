@@ -32,9 +32,11 @@ local depth = 0
 -- freeze rather than to no freeze at all.
 --
 -- EVERY WaitForChild HERE IS TIMED. This block runs at require time, before the
--- `EventBus.OpenLedger` connection at the bottom of the file exists — so an untimed wait that never
--- resolved would not merely lose the freeze, it would leave the plate (the design's ONE door into
--- maximal) a dead button for the rest of the session, with nothing on screen to say why.
+-- `EventBus.OpenLedger` connection in LedgerController (not this file — extracting Takeover out of
+-- LedgerController left that connection behind at LedgerController.client.luau:782) exists — so an
+-- untimed wait that never resolved would not merely lose the freeze, it would leave the `≡` ledger
+-- door (the design's ONE door into maximal) a dead button for the rest of the session, with
+-- nothing on screen to say why.
 local controls: any = nil
 do
     local playerScripts = player:WaitForChild("PlayerScripts", 10)

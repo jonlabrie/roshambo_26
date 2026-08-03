@@ -105,8 +105,10 @@ local DANGER = Color3.fromRGB(206, 86, 86) -- remove-favorite
 -- surface -- one that was up every second of every session for a panel opened rarely.
 --
 -- THE LEDGER IS THE DOOR NOW: its MY TEAHOUSE button fires EventBus.OpenTeahouse (see the bottom of
--- this file), having closed itself first. That follows the play-HUD design's own rule -- the
--- player-state plate is the ONE persistent interactive element, so nothing else needs a button.
+-- this file), having closed itself first. That follows the play-HUD design's own rule -- one
+-- persistent entry point, everything else reached through it -- except the entry point is the `≡`
+-- ledger door in the minimal HUD's bottom row (HudController), not the player-state plate; the
+-- plate is a pure display now and carries no button of its own.
 local gui = Instance.new("ScreenGui")
 gui.Name = "TeahousePanel"
 gui.ResetOnSpawn = false

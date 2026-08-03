@@ -106,6 +106,12 @@ local BADGE = if TOUCH then 7 else 9
 local ROW_GAP = HudLayout.ROW_GAP
 local AREA_W = 3 * BTN_W + 2 * BTN_GAP
 local AREA_H = if TOUCH then HudLayout.AREA_H_TOUCH else HudLayout.AREA_H
+-- How far the bank+throws+tape cluster's own TOP edge sits from the screen bottom, at this tier —
+-- the escalation overlay (below) clamps against this so it can never sit on top of the bank
+-- button on a short viewport.
+local CLUSTER_TOP_FROM_BOTTOM = if TOUCH
+    then HudLayout.CLUSTER_TOP_FROM_BOTTOM_TOUCH
+    else HudLayout.CLUSTER_TOP_FROM_BOTTOM
 local TIMER_H = 3
 local TIMER_H_HOT = 7 -- the escalation thickens the hairline as well as reddening it
 local TOAST_SECONDS = 4
@@ -409,6 +415,11 @@ end
 -- rule. Advisory only: the server is what actually refuses a pick.
 local canThrow = false
 
+-- Mirrors the last rendered `view.chosen`, so the press handler below can tell a "choose" tap
+-- (nothing chosen yet) from a tap that would only raise a SWITCH? prompt (something already is).
+-- Advisory, same as `canThrow` above.
+local chosenSym: string? = nil
+
 -- The tile the player just PRESSED, lit before any round trip and cleared by the next render (which
 -- runs at 10Hz, and immediately on the pick's own publish). See the press handlers below.
 local pressedSym: string? = nil
@@ -479,7 +490,12 @@ end
 local switchPill = Instance.new("Frame")
 switchPill.Name = "SwitchPrompt"
 switchPill.AnchorPoint = Vector2.new(0.5, 0.5)
-switchPill.Size = UDim2.fromOffset(BTN_W - 8, 24)
+-- Flush with the button's own width, not inset 8px off it: at the old BTN_W - 8 the touch pill
+-- was only 36px wide (BTN_W = BTN_H_TOUCH = 44) and TextScaled alone drives "SWITCH?" (13px
+-- GothamBold measures ~57-64px unscaled) down to ~8px there — below the ~9px legibility floor.
+-- At the full BTN_W the touch pill is 44px, which lands the scaled text at ~9-10px, still
+-- flush with (never wider than) the button beneath it.
+switchPill.Size = UDim2.fromOffset(BTN_W, 24)
 switchPill.BackgroundColor3 = WASHI
 switchPill.BackgroundTransparency = 0
 switchPill.BorderSizePixel = 0
@@ -499,6 +515,17 @@ switchLabel.Font = Enum.Font.GothamBold
 switchLabel.Text = "SWITCH?"
 switchLabel.ZIndex = 5
 switchLabel.Parent = switchPill
+
+-- TextScaled + a MaxTextSize constraint, same pattern as `bankButton` above: at BTN_W-8 the pill
+-- is only 36px wide on touch (BTN_W = BTN_H_TOUCH = 44) while "SWITCH?" at 13px GothamBold runs
+-- ~57-64px unscaled — it clipped to roughly "WITC". Scaling down still reads at this width; the
+-- constraint just stops it growing past 13px on the wider desktop pill.
+switchLabel.TextScaled = true
+do
+    local constraint = Instance.new("UITextSizeConstraint")
+    constraint.MaxTextSize = 13
+    constraint.Parent = switchLabel
+end
 
 local THROW_INDEX: { [string]: number } = {}
 for i, sym in THROWS do
@@ -639,7 +666,7 @@ local function depress(t: ThrowTile)
 end
 
 -- How long the optimistic light survives without the pick coming back on HudState. In the normal
--- case it is superseded within a frame (main.client sets `myPick` and publishes on HudPick, all
+-- case it is superseded within a frame (main.client sets `chosen` and publishes on HudPick, all
 -- client-local — the server round trip is not in this path). This only has to catch a press that
 -- never became a click, e.g. the finger slid off the button.
 local PRESS_HOLD_SECONDS = 0.5
@@ -650,6 +677,15 @@ for _, sym in THROWS do
     tile.button.MouseButton1Down:Connect(function()
         depress(tile)
         if not canThrow then
+            return
+        end
+        -- The optimistic chosen-paint is only honest when the tap is a "choose" — nothing chosen
+        -- yet. When something already is, the tap only raises a SWITCH? prompt (see `paintThrows`'s
+        -- `prompted` branch), and lighting a third glyph fully chosen here would assert something
+        -- false for up to PRESS_HOLD_SECONDS, until `render` corrects it. `chosenSym` mirrors
+        -- `view.chosen` for exactly this check — deliberately not `HudModel.tapAction`, which needs
+        -- a full `Inputs` this controller does not hold.
+        if chosenSym ~= nil then
             return
         end
         pressedSym = sym
@@ -858,16 +894,23 @@ timer.Parent = gui
 -- Active = false: this is a LABEL, not a button. It covers the centre of the screen, which is the
 -- middle of the camera-drag surface — sinking input here would make the canyon unrotatable for the
 -- seconds it is up. The arming rule lives in HudModel and is never second-guessed here.
+local ESCALATION_H = 154 -- kept as a named constant: updateEscalationPosition needs it too, below
+
 local escalation = Instance.new("Frame")
 escalation.Name = "Escalation"
 escalation.Active = false
 escalation.AnchorPoint = Vector2.new(0.5, 0.5)
+-- Y is set by `updateEscalationPosition`, below, not a bare fromScale(0.5, 0.42): that fraction
+-- is the resting position on a tall screen, but on a short landscape phone it collides with the
+-- bank button. Task 9 grew this frame 130 -> 154 to stop its own two labels overlapping, and at
+-- 130 it cleared the bank button by 0.3px on an 844x390 viewport — both constraints are real, so
+-- this frame cannot simply shrink back. See `updateEscalationPosition` for the clamp.
 escalation.Position = UDim2.fromScale(0.5, 0.42)
 -- scale width: a fixed 460px overflows a small phone. Fixed height is 130px of CONTENT (count
 -- [0,92] + an 8px gap + prompt [100,130]) plus 24px the UIPadding below eats (12 top + 12
 -- bottom) — 154, not 130. If the padding ever changes, grow this to match or the two labels
 -- overlap inside the unchanged content box.
-escalation.Size = UDim2.new(0.8, 0, 0, 154)
+escalation.Size = UDim2.new(0.8, 0, 0, ESCALATION_H)
 -- Opaque backing, not a stroke on the text. The count and prompt used to float over open
 -- canyon with strokes standing in for contrast (see the spec's §3) — a real backing plate
 -- instead, same as every other readable surface in this HUD.
@@ -911,6 +954,28 @@ escalationPrompt.Font = Enum.Font.GothamBold
 escalationPrompt.Text = "CHOOSE A THROW"
 escalationPrompt.Parent = escalation
 -- No UIStroke on the label — same rationale as escalationCount above.
+
+-- Clamp the overlay's Y against the cluster instead of trusting the 0.42 scale fraction on every
+-- viewport. `gui.AbsoluteSize.Y` already excludes the topbar inset (ScreenGui's default
+-- IgnoresGuiInset = false), so it is the same H a hand check against a device's reported
+-- viewport height would use. Resting position is 0.42 * H; the clamp keeps the overlay's own
+-- BOTTOM edge at least ESCALATION_MARGIN above the cluster's top edge (CLUSTER_TOP_FROM_BOTTOM,
+-- from the bottom of the screen), and the smaller of the two wins. On a tall screen the clamp
+-- never binds, so this reduces to the original 0.42 fraction; on a short landscape phone it
+-- lifts the overlay clear of the bank button instead of trusting a fraction that only ever held
+-- at the reviewer's own reference height.
+local ESCALATION_MARGIN = ROW_GAP -- the same "cluster row" gap used everywhere else in this file
+local function updateEscalationPosition()
+    local h = gui.AbsoluteSize.Y
+    if h <= 0 then
+        return -- not laid out yet; AbsoluteSize firing again once it is will re-run this
+    end
+    local resting = 0.42 * h
+    local clamped = h - CLUSTER_TOP_FROM_BOTTOM - ESCALATION_MARGIN - ESCALATION_H / 2
+    escalation.Position = UDim2.new(0.5, 0, 0, math.min(resting, clamped))
+end
+updateEscalationPosition()
+gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateEscalationPosition)
 
 -- ===== Toast: the transient notice that replaced the persistent prose ticker =====
 local toast = Instance.new("TextLabel")
@@ -989,6 +1054,7 @@ local lastPlateStreak: number? = nil
 local function render(inputs: any, aux: any)
     local view = HudModel.view(inputs, aux.session)
     canThrow = view.throwsEnabled
+    chosenSym = view.chosen
 
     -- Reveal is keyed on the TARGET having changed, not on `render` running: `render` is a 10Hz
     -- repaint, and a reveal re-armed every tick would hold forever and never fade — precisely how

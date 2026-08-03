@@ -488,9 +488,10 @@ ProfileUpdate.OnClientEvent:Connect(function(p)
     end
     if bankedNow > 0 then
         -- Onboarding beat 4's copy ("Banked. That's yours to keep.") says almost exactly what the
-        -- bank toast says, anchored right below the plate — the same screen region the toast
-        -- itself occupies. Showing both on someone's FIRST bank would say it twice, in the same
-        -- spot, at the same moment.
+        -- bank toast says. The card shows at the `wallet` anchor (OnboardingController — the same
+        -- spot as `throwArea`/`potIndicator`, above the bank+throws+tape cluster); the toast itself
+        -- is top-centre (HudController). Different screen regions, but showing both on someone's
+        -- FIRST bank would still say the same thing twice at the same moment.
         --
         -- Once beat 4 is `resolved` (it has either shown once already, or was already seen coming
         -- in) it can never show again, so the toast is unconditional and immediate — the common

@@ -2,7 +2,7 @@
 -- The minimal HUD's layout skeleton — the handful of numbers MORE THAN ONE file has to agree on
 -- exactly (spec: docs/superpowers/specs/2026-08-02-play-hud-design.md).
 --
--- HudController places the plate, the tape+throw cluster and the one slot; OnboardingController has
+-- HudController places the plate, the tape+throw cluster and the bank button; OnboardingController has
 -- to put cards BESIDE them without ever covering a live button, so it derives its safe band from the
 -- same numbers. That derivation was hand-copied — `AREA_H = 120 -- TILE(34) + ROW_GAP(10) + BTN_H(76)`
 -- — which means a later tweak to BTN_H would silently move the cluster while the onboarding clamp

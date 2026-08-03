@@ -5,9 +5,12 @@
 -- and it is allowed to. Everything else in the play UI is the quiet hangout HUD; this is the half a
 -- player opens on purpose to study their own numbers.
 --
--- ENTRY is a tap on the player-state plate (HudController fires EventBus.OpenLedger). That plate is
--- the only interactive information element in the whole design, precisely so maximal costs no
--- persistent button of its own anywhere on screen.
+-- ENTRY is a tap on the `≡` ledger door, bottom row of the minimal HUD (HudController fires
+-- EventBus.OpenLedger from `ledgerButton`'s click handler). The player-state plate used to be
+-- this entry point, back when it was the design's only interactive information element — but the
+-- plate has since moved into the bottom row as a pure display (see HudController's own header),
+-- and Active must stay false on a display or it permanently sinks touches on the camera-drag
+-- surface behind it. The `≡` button is what took over being a door; the plate no longer is one.
 --
 -- AND THE LEDGER IS ITSELF A DOOR. The teahouse panel's own persistent bottom-right toggle collided
 -- with the throw row on a narrow viewport, so it is gone and MY TEAHOUSE in this header replaces it
