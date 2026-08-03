@@ -186,26 +186,34 @@ forever, turning the calmest part of the game into an alarm clock.
 
 The escalation is **armed** when all of these hold:
 
-1. The player *can* throw — not fate-bound, not win-bound. (A bound player cannot act on
-   "choose a throw", so escalating at them is pure noise.)
+1. The player *can* throw — not fate-bound. (A bound player cannot act on "choose a throw", so
+   escalating at them is pure noise.)
 2. The player has **not** already picked this round.
 3. **Their preference allows it** (see *Preferences*, default on).
-4. Any one of: they **have not yet thrown this session** (a new arrival, who needs the prompt
-   most), they **threw in the previous round**, or they **have a pot riding**.
+4. They have **fewer than three consecutive missed rounds**.
 
-And it **disarms after three consecutive missed rounds**, whichever condition armed it. It
-re-arms the moment they throw again.
+That last condition is the whole rule; the backoff is **uniform**. "New arrival", "threw last
+round" and "pot riding" describe who *starts* armed — a fresh session has zero misses — but they
+are **not ongoing conditions** and do not appear in the arm expression. `Session` is therefore a
+single field, `{ consecutiveMisses }`.
+
+An earlier draft carried those three as live OR-terms alongside the counter, and it produced a
+bug worth recording: a player who threw, won nothing (pot 0) and then missed one round had
+`threwLastRound` false, `pointsAtStake` 0 and `hasThrownThisSession` true — the OR went false and
+the prompt died after **one** miss instead of three. The most common case got the least grace.
+The backoff must be the thing that silences the prompt, never an arm condition evaporating.
+
+It re-arms the moment they throw again.
 
 A round only counts as *missed* if the player **could** have thrown and did not. Rounds spent
-win-bound or fate-bound are not misses — they were not ignoring anything, they were prevented.
+fate-bound are not misses — they were not ignoring anything, they were prevented.
 
-The effect: a new arrival is prompted, a mid-streak player about to let it lapse is prompted, and
-anyone who has settled into hanging out goes quiet within three minutes and stays quiet. Nobody
+The effect: a new arrival is prompted, a player who has just been throwing is prompted, and
+anyone who has settled into hanging out goes quiet within three rounds and stays quiet. Nobody
 is nagged and nobody is silently surprised.
 
-Session-scoped state (has-thrown-yet, consecutive-misses) lives **client-side in `HudModel`** and
-resets on rejoin, which is correct — a returning player is a new arrival and is armed again.
-Only the preference persists.
+The consecutive-miss counter lives **client-side in `HudModel`** and resets on rejoin, which is
+correct — a returning player is a new arrival and is armed again. Only the preference persists.
 
 Proximity to the arena was considered as an arming signal and rejected: it is wrong for anyone
 watching from a teahouse deck.
@@ -227,9 +235,9 @@ Four blocks:
 
 1. **Hero band** — `STREAK · POT · POINTS`, and the number minimal cannot afford:
    **"A WIN HERE PAYS n"**. That is the whole bank-or-ride decision as one figure, and it is
-   free — pot ×3, derived client-side from the mirrored `GameRules`. If the player is win-bound,
-   RISK/BANK appears here too, so opening the ledger to *think about* the decision does not force
-   them to close it to *make* it.
+   free — pot ×3, derived client-side from the mirrored `GameRules`. A **BANK THESE** button
+   appears here whenever a pot exists, so opening the ledger to *think about* the decision does
+   not force you to close it to *act* on it. There is no RISK button — riding is throwing again.
 2. **Lifetime** — banked total, rounds thrown, win rate, best streak, biggest pot, and a
    WIN/SAFE/LOSS bar.
 3. **Your throws** — the player's own R/P/S distribution. Three counters, and the only statistic
@@ -264,7 +272,7 @@ at settlement in `Settlement.ts`:
 
 Twelve profile fields in total across this spec: those nine, plus `unresolvedWin`, `seenBeats`
 and `escalationPrompts`. All three of these server slices were confirmed as belonging in item 2 —
-without the gate the RISK/BANK overlay has nothing behind it, without the counters the ledger
+without the counters the ledger
 shows four numbers, and without `seenBeats` onboarding cannot fire once.
 
 Item 7 (Statistics) does aggregation and the global/social view. **Item 2 builds the surface and
@@ -285,7 +293,7 @@ until the thing actually happens, so a guided first-timer is never reading ahead
 | --- | --- | --- | --- |
 | 1 | First join, in the arena | "The drum throws every minute. Beat it." | the drum |
 | 2 | First time the throws unlock | "Tap a throw." | the throw area |
-| 3 | First win | "You won. Take it, or ride it — a win triples your pot." | the RISK/BANK overlay |
+| 3 | First win | "You won. Take it, or ride it — a win triples your pot." | the pot indicator |
 | 4 | First bank | "Banked. That's yours to keep." | the player-state plate |
 
 Each is dismissable and shown once. `seenBeats: string[]` on the profile, checked server-side.
