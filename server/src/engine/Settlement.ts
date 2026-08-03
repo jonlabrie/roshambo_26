@@ -48,8 +48,11 @@ export function buildCounterUpdate(thrown: Throw, result: RoundResult, newPot: n
             losses: result === 'LOSS' ? 1 : 0,
             [throwKey]: 1,
         } as Record<string, number>,
-        // A WIN binds the player until they answer RISK or BANK. A LOSS forfeits the pot, so
-        // there is nothing to decide and the gate must NOT be left standing.
+        // unresolvedWin = "the last scored round was a WIN and the player has not banked since".
+        // Nothing is blocked by it — the blocking RISK/BANK overlay was withdrawn in the 2026-08-02
+        // play-HUD design; riding is simply throwing again. It drives the pot indicator's pulse, so
+        // it must clear on a SAFE or a LOSS (a LOSS forfeits the pot, a SAFE decides nothing) and
+        // on a bank.
         $set: { unresolvedWin: result === 'WIN' },
         $max: { bestPot: newPot },
     };

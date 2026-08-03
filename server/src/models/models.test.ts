@@ -64,8 +64,9 @@ describe('User defaults — play HUD fields', () => {
     });
 
     it('unresolvedWin is independent of pointsAtStake', () => {
-        // the whole reason it needs its own field: after choosing RISK the pot still rides,
-        // so pointsAtStake > 0 is true in BOTH the bound and unbound states
+        // the whole reason it needs its own field: a pot rides on after a WIN and equally after a
+        // SAFE, so pointsAtStake > 0 is true whether or not the last scored round was a win — only
+        // this flag distinguishes them, and the pot indicator's pulse reads it
         const u = new User({ deviceId: 'd2', pointsAtStake: 27, unresolvedWin: false });
         expect(u.pointsAtStake).toBe(27);
         expect(u.unresolvedWin).toBe(false);

@@ -80,7 +80,11 @@ describe("PlayerProfiles", function()
     end)
 end)
 
-describe("PlayerProfiles — the win gate", function()
+-- unresolvedWin no longer gates anything: the blocking RISK/BANK overlay it was named for was
+-- withdrawn in the 2026-08-02 play-HUD design (riding is just throwing again). What it means now is
+-- "the last scored round was a WIN and the player has not banked since", and the minimal HUD reads
+-- it to PULSE the pot indicator — the nudge that replaced the overlay.
+describe("PlayerProfiles — unresolvedWin, the pot indicator's pulse", function()
     test("applyServer carries unresolvedWin", function()
         local p = PlayerProfiles.new(GameRules)
         p:applyServer("u1", {
@@ -94,8 +98,9 @@ describe("PlayerProfiles — the win gate", function()
         expect(p:get("u1").unresolvedWin).toBe(true)
     end)
 
-    test("a local WIN raises the gate optimistically", function()
-        -- the theater reveals before the server reconciles; the overlay must appear with the win
+    test("a local WIN sets it optimistically", function()
+        -- the theater reveals before the server reconciles; the pot must pulse with the win, not a
+        -- round later
         local p = PlayerProfiles.new(GameRules)
         p:applyServer("u1", {
             totalPoints = 100,
@@ -109,7 +114,7 @@ describe("PlayerProfiles — the win gate", function()
         expect(p:get("u1").unresolvedWin).toBe(true)
     end)
 
-    test("a local LOSS clears it — nothing left to decide", function()
+    test("a local LOSS clears it — the pot is forfeit, there is nothing to pulse for", function()
         local p = PlayerProfiles.new(GameRules)
         p:applyServer("u1", {
             totalPoints = 100,
@@ -123,7 +128,7 @@ describe("PlayerProfiles — the win gate", function()
         expect(p:get("u1").unresolvedWin).toBe(false)
     end)
 
-    test("a missing field defaults to unbound", function()
+    test("a missing field defaults to no unresolved win", function()
         local p = PlayerProfiles.new(GameRules)
         p:applyServer(
             "u1",
