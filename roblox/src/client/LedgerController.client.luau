@@ -166,11 +166,20 @@ end
 
 -- A respawn while the panel is open hands us a brand-new Humanoid carrying its authored WalkSpeed —
 -- un-frozen, on the fallback path. Re-apply, re-capturing from the fresh humanoid.
+--
+-- `isOpen` is tested TWICE, and the second test is the one that matters: WaitForChild yields for up
+-- to 10 seconds, and the player can close the panel inside that window. Checking only before the
+-- yield lets this resume after `close()` has already restored control and freeze them again with no
+-- panel on screen — the exact failure the suspension exists to prevent, and one the player has no
+-- way to diagnose.
 player.CharacterAdded:Connect(function(char)
     if not isOpen then
         return
     end
     char:WaitForChild("Humanoid", 10)
+    if not isOpen then
+        return
+    end
     savedWalk = nil
     suspend()
 end)

@@ -13,6 +13,7 @@
                 "SubmitPick": { "$className": "RemoteEvent" },
                 "BankRequest": { "$className": "RemoteEvent" },
                 "SetHudPreference": { "$className": "RemoteEvent" },
+                "RequestLedger": { "$className": "RemoteEvent" },
                 "RoundUpdate": { "$className": "RemoteEvent" },
                 "RevealResult": { "$className": "RemoteEvent" },
                 "ProfileUpdate": { "$className": "RemoteEvent" },

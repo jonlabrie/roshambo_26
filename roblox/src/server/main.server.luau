@@ -65,6 +65,7 @@ local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local SubmitPick = remotes:WaitForChild("SubmitPick") :: RemoteEvent
 local BankRequest = remotes:WaitForChild("BankRequest") :: RemoteEvent
 local SetHudPreference = remotes:WaitForChild("SetHudPreference") :: RemoteEvent
+local RequestLedger = remotes:WaitForChild("RequestLedger") :: RemoteEvent
 local RoundUpdate = remotes:WaitForChild("RoundUpdate") :: RemoteEvent
 local RevealResult = remotes:WaitForChild("RevealResult") :: RemoteEvent
 local ProfileUpdate = remotes:WaitForChild("ProfileUpdate") :: RemoteEvent
@@ -226,11 +227,18 @@ end
 -- the ledger's preference switch would be write-only. Absent = the profile's own default, ON.
 local hudPrefs: { [string]: boolean } = {}
 
--- The nine ledger counters are not wallet fields either, so they get the same treatment: seeded from
--- GET /players at join, carried on ProfileUpdate, and advanced OPTIMISTICALLY from the local reveal
--- exactly as PlayerProfiles advances the wallet. There is no per-round authoritative source for them
--- — /instances/.../results carries round results, not lifetime totals — so the local advance is what
--- keeps the ledger moving during a session, and the next join re-seeds from the database.
+-- The nine ledger counters are not wallet fields either, so they get the same treatment as hudPrefs:
+-- a per-instance cache, carried on ProfileUpdate.
+--
+-- They are NEVER advanced locally. The wallet can be, because the reconciliation loop overwrites it
+-- authoritatively every round; these have no such path, and the local reveal is computed from the
+-- pick buffer whether or not the POST /throws flush ever reached the backend. An accumulating
+-- counter could therefore only drift UPWARD — a player watches ROUNDS THROWN climb to 40, rejoins,
+-- and sees 37. A lifetime total that goes DOWN is worse than one that is briefly stale.
+--
+-- Instead they are RE-SEEDED FROM THE AUTHORITATIVE PROFILE when the player opens the ledger (see
+-- RequestLedger). Opening maximal is a deliberate, occasional act, and these numbers only matter on
+-- the one occasion someone looks at them.
 type Counters = { [string]: number }
 local COUNTER_KEYS = {
     "roundsPlayed",
@@ -269,30 +277,6 @@ local function fireProfile(player: Player, source: string)
             source = source,
         })
     end
-end
-
--- Mirrors server/src/engine/Settlement.ts buildCounterUpdate: one round, one throw, one result, and
--- bestPot proposed as a maximum. Kept in the same order so the two are legible side by side.
-local THROW_COUNTER = { R = "throwsR", P = "throwsP", S = "throwsS" }
-
-local function bumpCounters(userId: string, pick: string?, result: string, newPot: number)
-    local c = ledgerCounters[userId]
-    if not c then
-        return
-    end
-    c.roundsPlayed += 1
-    if result == "WIN" then
-        c.wins += 1
-    elseif result == "SAFE" then
-        c.safes += 1
-    elseif result == "LOSS" then
-        c.losses += 1
-    end
-    local key = pick and THROW_COUNTER[pick]
-    if key then
-        c[key] += 1
-    end
-    c.bestPot = math.max(c.bestPot, newPot)
 end
 
 local function playerByUserId(userId: string): Player?
@@ -342,10 +326,6 @@ local coordinator = RoundCoordinator.new({
                 })
                 if mine then
                     profiles:applyLocalResult(userId, mine.result)
-                    -- After applyLocalResult, so the pot offered to bestPot is the POST-round one —
-                    -- the same figure Settlement.ts proposes to $max.
-                    local after = profiles:get(userId)
-                    bumpCounters(userId, mine.pick, mine.result, if after then after.pointsAtStake else 0)
                     pushStats(player)
                     fireProfile(player, "local")
                     if mine.result == "WIN" then
@@ -403,6 +383,12 @@ Players.PlayerAdded:Connect(function(player)
     end
     stats.Parent = player
 
+    -- Zeros BEFORE the fetch, unconditionally. Seeding only inside `if res.ok` would leave the cache
+    -- nil for the whole session on one transient failure, and ProfileUpdate is the ledger's ONLY
+    -- channel — a nil there takes the live hero band and the preference switch down with the
+    -- counters, none of which self-heal the way the wallet does.
+    seedCounters(tostring(player.UserId), nil)
+
     task.spawn(function()
         local country: string? = nil
         pcall(function()
@@ -453,12 +439,6 @@ BankRequest.OnServerEvent:Connect(function(player)
             -- /bank's response doesn't carry unresolvedWin, but wallet.bankPot sets it false in
             -- the same atomic update, so mirror that rather than passing a now-stale true through.
             local existing = profiles:get(tostring(player.UserId))
-            -- bankPot accrues the WHOLE pot to lifetimeBanked on that same write; mirror it here so
-            -- the ledger's BANKED figure moves with the bank rather than at the next join.
-            local counters = ledgerCounters[tostring(player.UserId)]
-            if counters and existing then
-                counters.lifetimeBanked += existing.pointsAtStake
-            end
             profiles:applyServer(tostring(player.UserId), {
                 totalPoints = res.data.totalPoints,
                 pointsAtStake = res.data.pointsAtStake,
@@ -470,6 +450,40 @@ BankRequest.OnServerEvent:Connect(function(player)
             pushStats(player)
             fireProfile(player, "banked")
         end
+    end)
+end)
+
+-- The ledger's authoritative refresh. Fired when the player OPENS maximal, which is the one moment
+-- the nine lifetime counters are actually looked at.
+--
+-- NOT hung off RequestSync, which was checked first and is the wrong hook: it is the late-listener
+-- recovery path — it re-echoes state already cached on this server and makes no network call, and
+-- EconomySync fires it on a 1s retry loop up to twenty times per join. Putting an HTTP fetch behind
+-- it would mean up to twenty GET /players per player per join.
+--
+-- Only the counters are taken from the response. The wallet is deliberately NOT re-applied: the
+-- reconciliation loop already owns it authoritatively, and a mid-round fetch could stomp a fresher
+-- local reveal with a settlement that has not happened yet.
+local lastLedgerFetch: { [string]: number } = {}
+local LEDGER_FETCH_DEBOUNCE = 3
+
+RequestLedger.OnServerEvent:Connect(function(player)
+    local uid = tostring(player.UserId)
+    local now = os.clock()
+    if lastLedgerFetch[uid] ~= nil and now - lastLedgerFetch[uid] < LEDGER_FETCH_DEBOUNCE then
+        return
+    end
+    lastLedgerFetch[uid] = now
+    task.spawn(function()
+        local res = net:getPlayer(uid)
+        if not res.ok then
+            -- The panel keeps whatever it last had rather than blanking; it is stale, not wrong.
+            warn(`[LEDGER] refresh failed for {uid}: {res.error or res.status}`)
+            return
+        end
+        seedCounters(uid, res.data.counters)
+        hudPrefs[uid] = res.data.escalationPrompts ~= false
+        fireProfile(player, "ledger")
     end)
 end)
 
@@ -511,6 +525,7 @@ Players.PlayerRemoving:Connect(function(player)
     fates:remove(tostring(player.UserId))
     hudPrefs[tostring(player.UserId)] = nil
     ledgerCounters[tostring(player.UserId)] = nil
+    lastLedgerFetch[tostring(player.UserId)] = nil
 end)
 
 local lastBoard: any = nil

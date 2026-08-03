@@ -30,6 +30,7 @@ local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local SubmitPick = remotes:WaitForChild("SubmitPick") :: RemoteEvent
 local BankRequest = remotes:WaitForChild("BankRequest") :: RemoteEvent
 local SetHudPreference = remotes:WaitForChild("SetHudPreference") :: RemoteEvent
+local RequestLedger = remotes:WaitForChild("RequestLedger") :: RemoteEvent
 local RoundUpdate = remotes:WaitForChild("RoundUpdate") :: RemoteEvent
 local RevealResult = remotes:WaitForChild("RevealResult") :: RemoteEvent
 local ProfileUpdate = remotes:WaitForChild("ProfileUpdate") :: RemoteEvent
@@ -139,10 +140,11 @@ end
 
 -- The maximal panel's whole input. Fired only on ProfileUpdate, because everything in it changes
 -- only there — unlike HudState, which is a 10Hz heartbeat for a depleting hairline.
+--
+-- Deliberately NOT gated on `counters` being present. This is the panel's ONLY channel, so an early
+-- return here would take the live hero band, best streak and the preference switch down with the
+-- counters — none of which are counters. A nil simply leaves the renderer's zeros in place.
 local function publishLedger()
-    if not counters then
-        return -- nothing to study until the profile lands; the panel keeps its zeros
-    end
     EventBus.LedgerState:Fire({
         counters = counters,
         live = { pot = wallet.pointsAtStake, streak = wallet.currentStreak, points = wallet.totalPoints },
@@ -216,6 +218,15 @@ end)
 -- seen-beat writes) — there is deliberately not a second one per switch.
 EventBus.HudPreference.Event:Connect(function(body)
     SetHudPreference:FireServer(body)
+end)
+
+-- OpenLedger has two listeners: LedgerController shows the panel, and this asks the server to
+-- re-read the nine lifetime counters from the authoritative profile. They are never accumulated
+-- locally — an optimistic lifetime total can only drift upward and would read LOWER after a rejoin —
+-- so opening the panel is what refreshes them. The panel paints its last-known figures immediately
+-- and snaps to the authoritative ones when the ProfileUpdate echo lands a moment later.
+EventBus.OpenLedger.Event:Connect(function()
+    RequestLedger:FireServer()
 end)
 
 RevealTheater.OnClientEvent:Connect(function(r)
