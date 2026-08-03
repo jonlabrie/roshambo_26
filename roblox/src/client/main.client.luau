@@ -323,7 +323,11 @@ end)
 -- The one place a pick leaves this client. Both the tap that commits and the lockout auto-commit go
 -- through it, so neither can forget to clear the selection or to publish.
 local function commitPick(value: string)
-    selectedThrow = nil
+    -- The selection SURVIVES the commit. It is what a release (below) falls back to, and holding it
+    -- is what makes "no tap can ever leave nothing selected" true: the lockout's auto-commit always
+    -- has a glyph to send. Clearing it here — as this used to — would mean a released confirmation
+    -- had nothing to fall back to.
+    selectedThrow = value
     -- Optimistic: the tile lights the moment it is tapped. The server is what actually refuses a
     -- pick (fate-bound, past the lockout).
     myPick = value
@@ -331,15 +335,27 @@ local function commitPick(value: string)
     publish()
 end
 
--- HudController fires this on EVERY accepted tap; the MODEL decides whether the tap throws or only
--- selects (HudModel.tapAction). The controller does not re-derive that rule, and there is no second
--- EventBus channel for "selected" — a select is just a publish with `selectedThrow` set.
+-- HudController fires this on EVERY accepted tap; the MODEL decides whether the tap throws, only
+-- selects, or takes a confirmation back (HudModel.tapAction). The controller does not re-derive that
+-- rule, and there is no second EventBus channel for "selected" — a select is just a publish with
+-- `selectedThrow` set.
+--
+-- ONLY "commit" TALKS TO THE SERVER. Selecting and releasing are entirely local; a later commit
+-- overwrites whatever the server last received, because the throw buffer upserts per player under a
+-- seq guard.
 EventBus.HudPick.Event:Connect(function(value: string)
     local action = HudModel.tapAction(buildInputs(), value)
     if action == "commit" then
         commitPick(value)
     elseif action == "select" then
+        -- Moving the selection releases any confirmation with it: the player is now standing on a
+        -- different glyph, and leaving `myPick` set would light one tile while claiming another.
         selectedThrow = value
+        myPick = nil
+        publish()
+    elseif action == "release" then
+        -- CONFIRMED -> selected. The glyph stays chosen and stays lit; only the commitment goes.
+        myPick = nil
         publish()
     end
 end)
@@ -420,6 +436,10 @@ RevealTheater.OnClientEvent:Connect(function(r)
         -- and stop lighting the tile they tapped: leaving myPick set would keep it illuminated
         -- through REVEAL as though it had counted, contradicting the toast.
         myPick = nil
+        -- The SELECTION goes too, and it must. Since a commit now leaves it standing, a whiff that
+        -- cleared only `myPick` would leave `autoCommit`'s past-ACTIVE branch looking at an
+        -- uncommitted selection and re-firing the very pick the server has just refused.
+        selectedThrow = nil
     end
     publish()
 end)
@@ -447,7 +467,11 @@ RoundUpdate.OnClientEvent:Connect(function(info)
         tape = info.tape -- authoritative World-Throw history, every phase change
     end
     if phase == "ACTIVE" and info.phase ~= "ACTIVE" then
-        roundEnded(roundCouldThrow, myPick ~= nil)
+        -- A STANDING SELECTION COUNTS AS PICKED. The lockout's auto-commit normally converts it half
+        -- a second before this fires, but a player who released their confirmation inside that last
+        -- sliver would otherwise be scored as having ignored the round — and three of those start
+        -- the escalation nagging someone who is demonstrably playing.
+        roundEnded(roundCouldThrow, myPick ~= nil or selectedThrow ~= nil)
     end
     phase = info.phase
     if info.phase == "ACTIVE" then

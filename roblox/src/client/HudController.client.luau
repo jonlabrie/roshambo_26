@@ -579,7 +579,10 @@ local function setSlot(kind: string, pulses: boolean)
     end
 end
 
--- ===== The confirm strip: shown only while a throw is waiting on its second tap =====
+-- ===== The confirm strip: what the round still lets the player do with the glyph they tapped =====
+-- Two messages, never both: "TAP AGAIN TO THROW" while a selection is waiting on its second tap, and
+-- "THROWN — TAP TO CHANGE" once it has gone but the round has not locked. HudModel decides which
+-- (view.confirmPending / view.releasable); this only paints.
 -- WHY A STRIP AND NOT A LINE ON THE BUTTON. The alternative was a "TAP AGAIN" caption under the
 -- glyph, which costs no geometry at all — but the touch button is 44px wide, and nine characters
 -- across 44px is roughly 9px type. This is the one moment in the HUD that must be unmistakable: the
@@ -612,20 +615,33 @@ confirmStrip.Parent = gui
 corner(confirmStrip, 6)
 stroke(confirmStrip, SEL_BLUE, 1, 0.3) -- the same blue as the chosen tile: one thing is being said
 
+-- TWO MESSAGES, ONE STRIP. The confirm was always going to need a second line once the owner ruled
+-- that a lit glyph can be un-confirmed: a player who has thrown needs to know the round is not shut
+-- on them, and a player who has not needs the second tap asked for. Saying both at once would be a
+-- wall of ~9px text on a 44px row, so the strip says whichever is currently true and nothing else.
+-- Terse, because it is read at arm's length on a phone.
+local CONFIRM_COPY = "TAP AGAIN TO THROW"
+local RELEASE_COPY = "THROWN — TAP TO CHANGE"
+-- 150, not 160: the "don't ask again" control starts at CONFIRM_W - CONFIRM_PAD - 112 = 166, and a
+-- wider label would run under it. The copy measures ~140px at 14px GothamBold.
+local HINT_W = 150
+-- In the released-able state "don't ask again" is hidden (a preference switch is not what someone
+-- reaching to change their throw is looking for, and turning it off there would silently make the
+-- pick final), so the longer line gets the whole strip.
+local HINT_W_WIDE = CONFIRM_W - 2 * CONFIRM_PAD
+
 local confirmHint = Instance.new("TextLabel")
 confirmHint.Name = "Hint"
 confirmHint.Active = false
 confirmHint.AnchorPoint = Vector2.new(0, 0.5)
 confirmHint.Position = UDim2.new(0, CONFIRM_PAD, 0.5, 0)
--- 150, not 160: the "don't ask again" control starts at CONFIRM_W - CONFIRM_PAD - 112 = 166, and a
--- wider label would run under it. The copy measures ~140px at 14px GothamBold.
-confirmHint.Size = UDim2.fromOffset(150, 18)
+confirmHint.Size = UDim2.fromOffset(HINT_W, 18)
 confirmHint.BackgroundTransparency = 1
 confirmHint.TextColor3 = INK_CREAM
 confirmHint.TextSize = 14
 confirmHint.TextXAlignment = Enum.TextXAlignment.Left
 confirmHint.Font = Enum.Font.GothamBold
-confirmHint.Text = "TAP AGAIN TO THROW"
+confirmHint.Text = CONFIRM_COPY
 confirmHint.Parent = confirmStrip
 
 -- A TextButton, so it takes the tap without anything being made Active. Turning the preference off
@@ -813,7 +829,21 @@ local function render(inputs: any, aux: any)
         pressedSym = nil
     end
     paintThrows(aux.pick or view.selected or pressedSym, view.throwsEnabled)
-    confirmStrip.Visible = view.confirmPending
+
+    -- The strip is the ONLY thing that distinguishes "chosen" from "thrown" — the tile treatment is
+    -- deliberately identical for both (see paintThrows). So it has to carry the release affordance
+    -- too, or a confirmed throw would look exactly like an unconfirmed one with no way to tell that
+    -- tapping again takes it back rather than throwing it twice.
+    confirmStrip.Visible = view.confirmPending or view.releasable
+    if view.releasable then
+        confirmHint.Text = RELEASE_COPY
+        confirmHint.Size = UDim2.fromOffset(HINT_W_WIDE, 18)
+        dontAsk.Visible = false
+    else
+        confirmHint.Text = CONFIRM_COPY
+        confirmHint.Size = UDim2.fromOffset(HINT_W, 18)
+        dontAsk.Visible = true
+    end
 
     local entries = aux.tape or {}
     local count = math.min(#entries, TAPE_N)
