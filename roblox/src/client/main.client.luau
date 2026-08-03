@@ -79,6 +79,19 @@ local counters: { [string]: number }? = nil
 -- "already seen" list — see the fires below. Empty until the first ProfileUpdate lands.
 local knownSeenBeats: { string } = {}
 
+-- Whether `knownSeenBeats` has been told ANYTHING yet. Until the first ProfileUpdate lands it is
+-- empty NOT because the player has seen nothing, but because the answer has not arrived — the
+-- server only fires ProfileUpdate once its `GET /players` round trip returns. The `join` beat is the
+-- one fired on a timer the fetch can lose: it goes out on the first RoundUpdate, and a phase
+-- boundary landing inside the fetch window would re-show the drum card to someone who dismissed it
+-- months ago — permanently, because OnboardShown latches it. Worse, if the join fetch FAILS the
+-- server never fires ProfileUpdate at all, and every beat would re-show. So `join` waits for the
+-- profile. It costs nothing: `join` re-fires on every RoundUpdate until resolved, so the very next
+-- one after the profile lands shows the card. If the fetch never succeeds the card is skipped for
+-- that session, which is the right trade — a first-timer missing one card beats a returning player
+-- being re-taught all four.
+local profileSeen = false
+
 -- Whether each beat's event still needs firing. NOT the same as "has the event happened yet" —
 -- a round-1 review caught that mistake: latching the moment an event is FIRED (rather than once
 -- OnboardingController confirms it actually SHOWED a card) meant a beat dropped for stacking
@@ -328,11 +341,12 @@ end)
 
 RoundUpdate.OnClientEvent:Connect(function(info)
     -- Onboarding beat 1: "the arena is live" per the design intent, not tied to any particular
-    -- phase. Fires on every RoundUpdate until `resolved.join` — in practice this always resolves
-    -- on the very first call (nothing can be up before this client's first Onboard fire ever), but
-    -- gating on the confirmation rather than latching at fire time keeps this consistent with the
-    -- other three and costs nothing.
-    if not resolved.join then
+    -- phase. Fires on every RoundUpdate until `resolved.join` — in practice this resolves on the
+    -- first call once the profile has landed (nothing can be up before this client's first Onboard
+    -- fire ever), but gating on the confirmation rather than latching at fire time keeps this
+    -- consistent with the other three and costs nothing. `profileSeen` is the race guard: firing
+    -- with an empty `knownSeenBeats` would re-show a dismissed card and latch it (see above).
+    if not resolved.join and profileSeen then
         EventBus.Onboard:Fire("join", knownSeenBeats)
     end
     currentRoundId = info.roundId
@@ -400,6 +414,9 @@ ProfileUpdate.OnClientEvent:Connect(function(p)
     if type(p.seenBeats) == "table" then
         knownSeenBeats = p.seenBeats
     end
+    -- Set even when the payload carries no seenBeats: what this latch means is "the profile has
+    -- answered", and an answer of "no beats seen" is a real answer — a genuine first-timer.
+    profileSeen = true
     if bankedNow > 0 then
         -- Onboarding beat 4's copy ("Banked. That's yours to keep.") says almost exactly what the
         -- bank toast says, anchored right below the plate — the same screen region the toast
