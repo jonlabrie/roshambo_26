@@ -69,8 +69,21 @@ local EDGE = HudLayout.EDGE
 local JUMP_CLEARANCE = HudLayout.JUMP_CLEARANCE
 local AREA_H = if TOUCH then HudLayout.AREA_H_TOUCH else HudLayout.AREA_H
 local ROW_GAP = HudLayout.ROW_GAP
-local SLOT_H = HudLayout.SLOT_H
-local SLOT_GAP = HudLayout.SLOT_GAP
+-- TEMPORARY BRIDGE (Task 6 → Task 10). Task 3 RENAMED SLOT_H/SLOT_GAP to BANK_H/BANK_GAP and
+-- deleted PLATE_BOTTOM outright, so all three reads below returned nil and the UDim2 arithmetic
+-- they feed made this whole file fail to load — a dead onboarding controller that no gate we run
+-- can see (Lune never loads .client.luau, selene does not resolve cross-module field types).
+--
+-- Task 10 re-derives this file's safe band properly: SLOT_* become BANK_*, and PLATE_BOTTOM is
+-- replaced by a toast reservation, because the plate has left the top of the screen entirely.
+-- These literals exist only so the branch stays runnable in the interval, and they carry the
+-- values those constants held.
+local SLOT_H = HudLayout.BANK_H
+local SLOT_GAP = HudLayout.BANK_GAP
+-- Declared HERE, above STATIC_ANCHORS, because that table reads it — it used to be defined much
+-- further down beside CLUSTER_TOP_FROM_BOTTOM, which worked only while the anchors read
+-- HudLayout directly. 58 is what HudLayout.PLATE_BOTTOM held (EDGE 12 + PLATE_H 46).
+local PLATE_BOTTOM = 58
 
 local CARD_W = 220
 local PLATE_CARD_W = 260
@@ -183,7 +196,7 @@ hintLabel.Parent = card
 local STATIC_ANCHORS: { [string]: { point: Vector2, offset: UDim2, width: number } } = {
     plate = {
         point = Vector2.new(0.5, 0),
-        offset = UDim2.new(0.5, 0, 0, HudLayout.PLATE_BOTTOM + 60),
+        offset = UDim2.new(0.5, 0, 0, PLATE_BOTTOM + 60),
         width = PLATE_CARD_W,
     },
     -- Both sit above the WHOLE bottom-right cluster — tape+buttons AND the slot above them —
@@ -225,7 +238,6 @@ local DRUM_LAST_RESORT = { point = Vector2.new(0.5, 0), offset = UDim2.new(0.5, 
 -- actually applied to the NOT-YET-TRACKED fallback — only to a live projection — leaving the
 -- exact same "card covers BANK THESE" failure mode reachable through a slower path (join fires on
 -- the first RoundUpdate, which can beat the drum's replication).
-local PLATE_BOTTOM = HudLayout.PLATE_BOTTOM
 local CLUSTER_TOP_FROM_BOTTOM = if TOUCH
     then HudLayout.CLUSTER_TOP_FROM_BOTTOM_TOUCH
     else HudLayout.CLUSTER_TOP_FROM_BOTTOM
