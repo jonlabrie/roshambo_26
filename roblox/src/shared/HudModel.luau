@@ -47,6 +47,14 @@ export type Inputs = {
     -- throws.
     confirmThrows: boolean,
     selectedThrow: string?,
+    -- The glyph the player has chosen this round, the glyph currently carrying a SWITCH?
+    -- prompt, and whether the pick has gone over the wire. `chosen` is the player's
+    -- commitment; `sent` is the wire's. They are separate because the pick is held locally
+    -- until the lockout, which is the only thing that makes a back-out honest.
+    chosen: string?,
+    switchPrompt: string?,
+    sent: boolean,
+    declinedThisRound: boolean,
 }
 
 export type View = {
@@ -56,100 +64,75 @@ export type View = {
     potPulses: boolean,
     escalate: boolean,
     secondsLeft: number,
-    -- The glyph to light as the player's current choice, and the two things the confirm strip can
-    -- say about it. All three come apart:
-    --   confirmPending : chosen but NOT thrown — the strip asks for the second tap.
-    --   releasable     : thrown, and still changeable — the strip says so.
-    -- Banking mid-selection ends the REQUIREMENT to confirm without ending the SELECTION, so
-    -- `selected` can be set with neither flag up (see confirmRequired).
+    -- The glyph to light as the player's current choice.
     selected: string?,
-    confirmPending: boolean,
-    releasable: boolean,
 }
 
--- WHEN A THROW HAS TO BE CONFIRMED. Only when there is a pot: the owner's "especially if there's
--- points riding on the throw" read as the CONDITION rather than as emphasis. Roshambo is an ambient
--- hangout and most throws in the canyon cost nothing; making every one of those a two-tap ritual
--- would tax the calm case to protect the rare one. A mis-tap only costs something when there is
--- something at stake, and that is exactly when this is on.
-function HudModel.confirmRequired(inputs: Inputs): boolean
-    return inputs.confirmThrows ~= false and inputs.pointsAtStake > 0
-end
+-- Four seconds. A prompt is a question, and an unanswered question must not sit on screen
+-- indefinitely — but note the expiry is safe in BOTH directions: expiring restores exactly the
+-- state before the stray tap, and answering only ever unlocks. Neither outcome throws anything.
+HudModel.SWITCH_PROMPT_SECONDS = 4
 
--- Only a FATE blocks a throw outright. An unacknowledged win does not: throwing again IS riding,
--- which is why there is no RISK button and nothing to resolve. Server-enforced either way; this only
--- mirrors it so the UI can dim. Factored out because the confirm rule needs the same answer as
--- `view`, and two copies of it would be two places to forget the fate.
---
--- A COMMITTED PICK NO LONGER CLOSES THE ROUND. Nothing is final until the lockout (owner's ruling):
--- while confirmation is in play the tiles have to stay live, because tapping the lit glyph is how a
--- confirmation is released and tapping another is how it is moved. Without confirmation there is no
--- release gesture to make, so a commit is the end of it, exactly as before.
+-- The round takes taps for the whole of ACTIVE. There is deliberately no "you have committed,
+-- so the round is closed to you" state: that state is what made backing out impossible, and
+-- backing out is now the point.
 local function throwsEnabledFor(inputs: Inputs): boolean
-    if inputs.phase ~= "ACTIVE" or inputs.secondsLeft <= 0 or inputs.fateBound then
-        return false
-    end
-    if not inputs.pickedThisRound then
-        return true
-    end
-    return HudModel.confirmRequired(inputs)
+    return inputs.phase == "ACTIVE" and inputs.secondsLeft > 0
 end
 
--- What a tap on `symbol` does:
---   "commit"  — throw it (the ONLY action that talks to the server)
---   "select"  — light it and wait for the second tap; drops any confirmation that was standing
---   "release" — take the confirmation back, LEAVING the glyph selected
---   "ignore"  — the round cannot take a throw at all
+export type TapState = { chosen: string?, switchPrompt: string? }
+
+-- What a tap on `symbol` does. Evaluated top to bottom; first match wins.
 --
--- A tap on a DIFFERENT glyph moves the selection rather than committing — a player correcting a
--- mis-tap must not have the correction itself count as the confirmation, which would make the second
--- tap of every correction throw the wrong-then-right glyph in one motion and defeat the whole thing.
+--   "choose" — light it; the throw is chosen (locally — see sendAtLockout)
+--   "prompt" — raise SWITCH? over `symbol`, moving it if it was elsewhere
+--   "clear"  — all three available again, NOTHING chosen. This is the back-out.
+--   "ignore" — the round cannot take a throw, or the tap lands on the lit glyph
 --
--- "release" NEVER EMPTIES THE SELECTION. It is only ever returned for the glyph that is already
--- selected, so the lockout always still has something to send, and that send overwrites whatever the
--- server last received (the throw buffer upserts per player, seq-guarded). A release that returned
--- the player to "nothing chosen" would leave the earlier pick standing on the server with nothing on
--- screen saying so — the one failure this feature could introduce.
+-- TAPPING THE LIT GLYPH DOES NOTHING (owner's ruling). The switch path is the only way out, so
+-- there is exactly one gesture to learn. A lit glyph that also un-chose would give one button
+-- two meanings depending on invisible state.
+--
+-- CONFIRMING A SWITCH UNLOCKS; IT DOES NOT SELECT. That is the whole reason a back-out exists:
+-- a confirm-that-also-selects would leave no way to end a round having chosen nothing.
 function HudModel.tapAction(inputs: Inputs, symbol: string): string
     if not throwsEnabledFor(inputs) then
         return "ignore"
     end
-    if not HudModel.confirmRequired(inputs) then
-        return "commit"
+    if inputs.chosen == nil then
+        return "choose"
     end
-    if inputs.selectedThrow ~= symbol then
-        return "select"
+    if symbol == inputs.chosen then
+        return "ignore"
     end
-    if inputs.pickedThisRound then
-        return "release"
+    if symbol == inputs.switchPrompt then
+        return "clear"
     end
-    return "commit"
+    return "prompt"
 end
 
-export type TapState = { selectedThrow: string?, myPick: string? }
-
--- The state transition for a `tapAction` result. Pulled out of the controller and in here so the
--- "release NEVER EMPTIES THE SELECTION" rule (see the comment above tapAction) is enforced by a
--- pure function the controller has to CALL, rather than three separate inline assignments it has
--- to keep in sync by hand. A future edit to the release case cannot invent a deselect without
--- editing this table, and this table is what the exhaustive test in HudModel.spec.luau pins down.
+-- The state transition for a `tapAction` result. In here rather than inline in the controller
+-- so the table is enforced in ONE place a future edit has to touch, and pinned by the
+-- exhaustive test in HudModel.spec.luau.
 --
---   commit  -> selectedThrow = symbol, myPick = symbol   (the throw)
---   select  -> selectedThrow = symbol, myPick = nil      (moved; any confirmation drops)
---   release -> selectedThrow unchanged, myPick = nil     (confirmation taken back, glyph stays)
---   ignore  -> unchanged
---
--- Pure: no Roblox globals, no I/O. The controller still owns the side effects that go with a
--- commit (SubmitPick:FireServer, publish()) — this function only computes the two fields.
+-- Pure: the controller still owns the side effects (publishing, the wire) — this computes the
+-- two fields and nothing else.
 function HudModel.applyTap(state: TapState, action: string, symbol: string): TapState
-    if action == "commit" then
-        return { selectedThrow = symbol, myPick = symbol }
-    elseif action == "select" then
-        return { selectedThrow = symbol, myPick = nil }
-    elseif action == "release" then
-        return { selectedThrow = state.selectedThrow, myPick = nil }
+    if action == "choose" then
+        return { chosen = symbol, switchPrompt = nil }
+    elseif action == "prompt" then
+        return { chosen = state.chosen, switchPrompt = symbol }
+    elseif action == "clear" then
+        return { chosen = nil, switchPrompt = nil }
     end
-    return { selectedThrow = state.selectedThrow, myPick = state.myPick }
+    return { chosen = state.chosen, switchPrompt = state.switchPrompt }
+end
+
+-- Whether a standing prompt has aged out. A predicate rather than a timer so it is pure and
+-- testable; main.client's existing 10Hz heartbeat is what calls it, which is ample resolution
+-- for a four-second question.
+function HudModel.switchPromptExpired(setAt: number?, now: number): boolean
+    return setAt ~= nil and (now - setAt) >= HudModel.SWITCH_PROMPT_SECONDS
 end
 
 -- The selection that must be thrown NOW rather than lost, or nil.
@@ -200,13 +183,6 @@ function HudModel.view(inputs: Inputs, session: Session): View
         and not inputs.pickedThisRound
         and session.consecutiveMisses < BACKOFF_MISSES
 
-    -- A selection only exists while the round could still take it: it is cleared by the round
-    -- closing and by a fate, both of which throwsEnabled already covers. It is NOT cleared by the
-    -- pick landing — a committed pick stays lit and stays changeable while confirmation is in play,
-    -- and once it is not, throwsEnabled has gone false anyway and the controller lights the
-    -- authoritative pick instead.
-    local selected = if throwsEnabled then inputs.selectedThrow else nil
-
     return {
         plate = {
             streak = inputs.currentStreak,
@@ -220,13 +196,7 @@ function HudModel.view(inputs: Inputs, session: Session): View
         potPulses = slot == "pot" and inputs.unresolvedWin,
         escalate = armed and inputs.secondsLeft > 0 and inputs.secondsLeft <= ESCALATE_AT,
         secondsLeft = inputs.secondsLeft,
-        selected = selected,
-        -- Pending means CHOSEN BUT NOT THROWN. A committed pick is not pending — the strip must
-        -- never say "TAP AGAIN TO THROW" about something that has already gone.
-        confirmPending = selected ~= nil and not inputs.pickedThisRound and HudModel.confirmRequired(inputs),
-        -- Thrown, and still takeable back. throwsEnabled already encodes "committed AND confirmation
-        -- is in play", so this needs no second copy of that rule.
-        releasable = throwsEnabled and inputs.pickedThisRound,
+        selected = inputs.selectedThrow,
     }
 end
 

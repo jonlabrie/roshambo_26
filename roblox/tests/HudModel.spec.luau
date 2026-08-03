@@ -16,6 +16,10 @@ local function inputs(over: any): any
         escalationPrompts = true,
         confirmThrows = true,
         selectedThrow = nil,
+        chosen = nil,
+        switchPrompt = nil,
+        sent = false,
+        declinedThisRound = false,
     }
     for k, v in over or {} do
         base[k] = v
@@ -50,17 +54,15 @@ describe("HudModel.view — plate and throws", function()
         expect(HudModel.view(inputs({ secondsLeft = 0 }), session(0)).throwsEnabled).toBe(false)
     end)
 
-    test("throws are disabled once a pick is in", function()
-        expect(HudModel.view(inputs({ pickedThisRound = true }), session(0)).throwsEnabled).toBe(false)
+    test("the round stays open to taps for the whole of ACTIVE", function()
+        -- No "you have committed, so the round is closed to you" state: that state is exactly
+        -- what made backing out impossible, and backing out is now the point.
+        expect(HudModel.view(inputs({ chosen = "R" }), session(0)).throwsEnabled).toBe(true)
     end)
 
     test("a win no longer blocks throwing — riding IS throwing again", function()
         local v = HudModel.view(inputs({ unresolvedWin = true, pointsAtStake = 27 }), session(0))
         expect(v.throwsEnabled).toBe(true)
-    end)
-
-    test("a fate still blocks throwing", function()
-        expect(HudModel.view(inputs({ fateBound = true }), session(0)).throwsEnabled).toBe(false)
     end)
 end)
 
@@ -231,284 +233,118 @@ describe("HudModel.onRoundEnded", function()
     end)
 end)
 
--- ===== Confirming a throw when points are riding =====
--- The rule, in the owner's words: "especially if there's points riding on the throw, it makes sense
--- to ask players to confirm a throw choice". Read as: the confirmation exists ONLY when there is a
--- pot. With nothing at stake one tap throws and the ambient case stays calm — an arena where every
--- casual throw costs two taps would be a worse hangout, and the mis-tap it guards against only costs
--- something when there is something to lose.
-describe("HudModel.tapAction — one tap, or two", function()
-    test("no pot: one tap throws", function()
-        expect(HudModel.tapAction(inputs({ pointsAtStake = 0 }), "R")).toBe("commit")
-    end)
-
-    test("a pot riding: the first tap only selects", function()
-        expect(HudModel.tapAction(inputs({ pointsAtStake = 27 }), "R")).toBe("select")
-    end)
-
-    test("a second tap on the SAME glyph commits", function()
-        expect(HudModel.tapAction(inputs({ pointsAtStake = 27, selectedThrow = "R" }), "R")).toBe("commit")
-    end)
-
-    test("a tap on a DIFFERENT glyph moves the selection, it does not commit", function()
-        expect(HudModel.tapAction(inputs({ pointsAtStake = 27, selectedThrow = "R" }), "P")).toBe("select")
-    end)
-
-    test("the preference off: one tap throws however big the pot is", function()
-        local i = inputs({ pointsAtStake = 243, confirmThrows = false })
-        expect(HudModel.tapAction(i, "R")).toBe("commit")
-    end)
-
-    test("a tap that could never be thrown is ignored, not selected", function()
-        -- leaving a selection lit on a round the player is locked out of would be a lie about what
-        -- is about to happen
-        for _, over in { { phase = "TALLY" }, { secondsLeft = 0 }, { fateBound = true } } do
-            local i = inputs(over)
-            i.pointsAtStake = 27
-            expect(HudModel.tapAction(i, "R")).toBe("ignore")
-        end
-    end)
-
-    test("with no confirmation to release, a committed pick is final and further taps are ignored", function()
-        -- no pot (nothing to confirm) and the preference off are the two ways confirmation is not
-        -- required; in both, a commit is the end of the round for that player
-        expect(HudModel.tapAction(inputs({ pickedThisRound = true, selectedThrow = "R" }), "R")).toBe(
-            "ignore"
-        )
-        local off =
-            inputs({ pointsAtStake = 27, confirmThrows = false, pickedThisRound = true, selectedThrow = "R" })
-        expect(HudModel.tapAction(off, "R")).toBe("ignore")
-    end)
-end)
-
--- ===== Un-confirming: nothing is final until the round locks =====
--- Owner's decision. A confirmed throw is a STATEMENT OF INTENT, not a commitment: tapping the lit
--- glyph releases it back to merely selected, tapping a different glyph moves the selection, and the
--- round's lockout is the only thing that makes any of it final. The server supports this for free —
--- the throw buffer does per-player seq-guarded upserts, so a later pick simply overwrites an
--- earlier one.
---
--- The invariant that makes it safe is that a release goes CONFIRMED -> SELECTED, never to nothing:
--- whatever the player last touched is still there for the lockout to throw, and it overwrites
--- whatever the server last received. There is therefore no way to release yourself into a round
--- where the server holds a pick you have visibly taken back.
-describe("HudModel.tapAction — releasing a confirmed throw", function()
-    local function confirmed(sym: string, over: any): any
-        local i = inputs(over)
-        i.pointsAtStake = 27
-        i.selectedThrow = sym
-        i.pickedThisRound = true
-        return i
-    end
-
-    test("CONFIRMED --tap the same glyph--> released back to selected", function()
-        expect(HudModel.tapAction(confirmed("R", {}), "R")).toBe("release")
-    end)
-
-    test("CONFIRMED --tap a different glyph--> that glyph selected", function()
-        expect(HudModel.tapAction(confirmed("R", {}), "P")).toBe("select")
-    end)
-
-    test("the tiles stay live while a pick is confirmed, so it CAN be released", function()
-        -- pickedThisRound used to close the round for that player outright; with a pot riding it now
-        -- only means "there is a committed pick right now", and the player can still change it
-        expect(HudModel.view(confirmed("R", {}), session(0)).throwsEnabled).toBe(true)
-    end)
-
-    test("a released selection can be re-confirmed", function()
-        local i = inputs({ pointsAtStake = 27, selectedThrow = "R", pickedThisRound = false })
-        expect(HudModel.tapAction(i, "R")).toBe("commit")
-    end)
-
-    test("the round closing ends it — a confirmed pick is not releasable past the lockout", function()
-        for _, over in { { phase = "TALLY" }, { secondsLeft = 0 }, { fateBound = true } } do
-            expect(HudModel.tapAction(confirmed("R", over), "R")).toBe("ignore")
-        end
-    end)
-
-    test("NO TAP CAN EVER EMPTY THE SELECTION — exhaustive over the whole tap matrix", function()
-        -- The one invariant this feature turns on. "release" is only ever returned for the glyph
-        -- that is ALREADY selected (so the selection survives it), and "select"/"commit" always name
-        -- the glyph tapped. There is no action that returns the player to "nothing chosen", which is
-        -- what guarantees the lockout always has something to send.
-        for _, picked in { true, false } do
-            for _, confirmPref in { true, false } do
-                for _, pot in { 0, 27 } do
-                    for _, sel in { "R", "P", "S", "none" } do
-                        for _, tap in { "R", "P", "S" } do
-                            local i = inputs({
-                                pointsAtStake = pot,
-                                confirmThrows = confirmPref,
-                                pickedThisRound = picked,
-                                selectedThrow = if sel == "none" then nil else sel,
-                            })
-                            local action = HudModel.tapAction(i, tap)
-                            if action == "release" then
-                                expect(i.selectedThrow).toBe(tap)
-                            elseif action == "select" or action == "commit" then
-                                -- the tapped glyph becomes the selection; never nil
-                                expect(tap ~= nil).toBe(true)
-                            else
-                                expect(action).toBe("ignore")
-                            end
-                        end
-                    end
-                end
+describe("HudModel.tapAction — the five-row table", function()
+    test("a closed round ignores every tap", function()
+        for _, over in { { phase = "TALLY" }, { phase = "REVEAL" }, { secondsLeft = 0 } } do
+            for _, sym in { "R", "P", "S" } do
+                expect(HudModel.tapAction(inputs(over), sym)).toBe("ignore")
             end
         end
     end)
+
+    test("with nothing chosen, any tap chooses", function()
+        for _, sym in { "R", "P", "S" } do
+            expect(HudModel.tapAction(inputs({ chosen = nil }), sym)).toBe("choose")
+        end
+    end)
+
+    test("tapping the chosen glyph does nothing", function()
+        expect(HudModel.tapAction(inputs({ chosen = "R" }), "R")).toBe("ignore")
+    end)
+
+    test("tapping the chosen glyph does nothing even while a prompt is up", function()
+        expect(HudModel.tapAction(inputs({ chosen = "R", switchPrompt = "P" }), "R")).toBe("ignore")
+    end)
+
+    test("tapping another glyph raises a prompt over it", function()
+        expect(HudModel.tapAction(inputs({ chosen = "R" }), "P")).toBe("prompt")
+        expect(HudModel.tapAction(inputs({ chosen = "R" }), "S")).toBe("prompt")
+    end)
+
+    test("tapping the prompted glyph clears", function()
+        expect(HudModel.tapAction(inputs({ chosen = "R", switchPrompt = "P" }), "P")).toBe("clear")
+    end)
+
+    test("tapping the third glyph moves the prompt rather than clearing", function()
+        expect(HudModel.tapAction(inputs({ chosen = "R", switchPrompt = "P" }), "S")).toBe("prompt")
+    end)
 end)
 
--- ===== applyTap: the state transition, extracted so the controller cannot invent a deselect =====
--- tapAction only NAMES the action; applyTap is what actually computes selectedThrow/myPick from
--- it. Before this existed, that computation was three separate inline assignments in
--- main.client.luau, and nothing stopped a future edit to the "release" branch from clearing
--- selectedThrow — which is exactly the failure "release NEVER EMPTIES THE SELECTION" (see
--- tapAction's doc comment) exists to prevent. This is the test that would catch that edit.
 describe("HudModel.applyTap — the transition table", function()
-    test("commit sets both fields to the tapped symbol", function()
-        local s = HudModel.applyTap({ selectedThrow = nil, myPick = nil }, "commit", "R")
-        expect(s.selectedThrow).toBe("R")
-        expect(s.myPick).toBe("R")
+    local function state(chosen: string?, prompt: string?): any
+        return { chosen = chosen, switchPrompt = prompt }
+    end
+
+    test("choose sets the glyph and drops any prompt", function()
+        local s = HudModel.applyTap(state(nil, nil), "choose", "R")
+        expect(s.chosen).toBe("R")
+        expect(s.switchPrompt).toBe(nil)
     end)
 
-    test("select sets selectedThrow to the tapped symbol and drops myPick", function()
-        local s = HudModel.applyTap({ selectedThrow = "P", myPick = "P" }, "select", "R")
-        expect(s.selectedThrow).toBe("R")
-        expect(s.myPick).toBe(nil)
+    test("prompt leaves the choice untouched", function()
+        local s = HudModel.applyTap(state("R", nil), "prompt", "P")
+        expect(s.chosen).toBe("R")
+        expect(s.switchPrompt).toBe("P")
     end)
 
-    test("release drops myPick and leaves selectedThrow EXACTLY as it was", function()
-        local s = HudModel.applyTap({ selectedThrow = "R", myPick = "R" }, "release", "R")
-        expect(s.selectedThrow).toBe("R")
-        expect(s.myPick).toBe(nil)
+    test("prompt moves an existing prompt", function()
+        local s = HudModel.applyTap(state("R", "P"), "prompt", "S")
+        expect(s.chosen).toBe("R")
+        expect(s.switchPrompt).toBe("S")
+    end)
+
+    test("CLEAR EMPTIES BOTH — this is the back-out", function()
+        local s = HudModel.applyTap(state("R", "P"), "clear", "P")
+        expect(s.chosen).toBe(nil)
+        expect(s.switchPrompt).toBe(nil)
     end)
 
     test("ignore changes nothing", function()
-        local s = HudModel.applyTap({ selectedThrow = "S", myPick = "S" }, "ignore", "R")
-        expect(s.selectedThrow).toBe("S")
-        expect(s.myPick).toBe("S")
+        local s = HudModel.applyTap(state("R", "P"), "ignore", "R")
+        expect(s.chosen).toBe("R")
+        expect(s.switchPrompt).toBe("P")
     end)
-
-    test(
-        "THE INVARIANT — for every action, a non-nil selectedThrow going in is non-nil coming out",
-        function()
-            -- Exhaustive over the four actions, a selection already set, and both myPick states.
-            -- This is the test that must fail if someone edits the release branch to clear the
-            -- selection: with a selection already standing, no action may return the player to
-            -- "nothing chosen".
-            for _, action in { "commit", "select", "release", "ignore" } do
-                for _, sel in { "R", "P", "S" } do
-                    for _, pick in { sel, nil :: string? } do
-                        for _, tap in { "R", "P", "S" } do
-                            local result =
-                                HudModel.applyTap({ selectedThrow = sel, myPick = pick }, action, tap)
-                            expect(result.selectedThrow ~= nil).toBe(true)
-                        end
-                    end
-                end
-            end
-        end
-    )
 end)
 
-describe("HudModel — the full transition table", function()
-    -- The owner's table, run as a sequence. This mirrors main.client.luau's HudPick handler: a
-    -- "commit" sets the committed pick (and fires it), a "select" moves the selection and drops any
-    -- committed pick, a "release" drops the committed pick and LEAVES the selection standing.
-    type State = { selected: string?, committed: string?, fires: number }
-
-    local function start(pot: number, confirmPref: boolean): (State, () -> any)
-        local state: State = { selected = nil, committed = nil, fires = 0 }
-        local function current(): any
-            return inputs({
-                pointsAtStake = pot,
-                confirmThrows = confirmPref,
-                selectedThrow = state.selected,
-                pickedThisRound = state.committed ~= nil,
-            })
+describe("HudModel — the invariant, over every reachable sequence", function()
+    -- A prompt is always a question ABOUT an existing choice, raised over a DIFFERENT glyph.
+    -- Walk every tap sequence up to depth 4 and assert it holds at every step.
+    test("no reachable sequence yields a prompt without a choice, or a prompt on the choice", function()
+        local SYMS = { "R", "P", "S" }
+        local function walk(st: any, depth: number)
+            expect(st.switchPrompt == nil or st.chosen ~= nil).toBe(true)
+            expect(st.switchPrompt == nil or st.switchPrompt ~= st.chosen).toBe(true)
+            if depth == 0 then
+                return
+            end
+            for _, sym in SYMS do
+                local i = inputs({ chosen = st.chosen, switchPrompt = st.switchPrompt })
+                walk(HudModel.applyTap(st, HudModel.tapAction(i, sym), sym), depth - 1)
+            end
         end
-        return state, current
-    end
+        walk({ chosen = nil, switchPrompt = nil }, 4)
+    end)
 
-    local function tap(state: State, current: () -> any, symbol: string): string
-        local action = HudModel.tapAction(current(), symbol)
-        if action == "commit" then
-            state.selected = symbol
-            state.committed = symbol
-            state.fires += 1
-        elseif action == "select" then
-            state.selected = symbol
-            state.committed = nil
-        elseif action == "release" then
-            state.committed = nil
+    test("a back-out is always reachable in two taps from any choice", function()
+        for _, chosen in { "R", "P", "S" } do
+            local other = if chosen == "R" then "P" else "R"
+            local st = { chosen = chosen, switchPrompt = nil }
+            st = HudModel.applyTap(st, HudModel.tapAction(inputs(st), other), other)
+            st = HudModel.applyTap(st, HudModel.tapAction(inputs(st), other), other)
+            expect(st.chosen).toBe(nil)
         end
-        return action
-    end
+    end)
+end)
 
-    test("nothing -> X selected -> X CONFIRMED -> X selected -> Y selected", function()
-        local state, current = start(27, true)
-
-        expect(tap(state, current, "R")).toBe("select")
-        expect(state.selected).toBe("R")
-        expect(state.committed).toBe(nil)
-        expect(state.fires).toBe(0)
-
-        expect(tap(state, current, "R")).toBe("commit")
-        expect(state.committed).toBe("R")
-        expect(state.fires).toBe(1)
-
-        expect(tap(state, current, "R")).toBe("release")
-        expect(state.selected).toBe("R") -- released, NOT emptied
-        expect(state.committed).toBe(nil)
-        expect(state.fires).toBe(1) -- a release never talks to the server
-
-        expect(tap(state, current, "P")).toBe("select")
-        expect(state.selected).toBe("P")
-        expect(state.committed).toBe(nil)
-        expect(state.fires).toBe(1)
+describe("HudModel.switchPromptExpired", function()
+    test("an absent prompt never expires", function()
+        expect(HudModel.switchPromptExpired(nil, 1000)).toBe(false)
     end)
 
-    test("X CONFIRMED --tap Y--> Y selected, and only a commit talks to the server", function()
-        local state, current = start(27, true)
-        tap(state, current, "S")
-        tap(state, current, "S") -- CONFIRMED S, one fire
-        expect(state.fires).toBe(1)
-
-        expect(tap(state, current, "P")).toBe("select")
-        expect(state.selected).toBe("P")
-        expect(state.committed).toBe(nil)
-        expect(state.fires).toBe(1)
-
-        expect(tap(state, current, "P")).toBe("commit")
-        expect(state.fires).toBe(2) -- the later pick overwrites the earlier one server-side
-    end)
-
-    test("no pot: one tap throws, and there is no confirm step at all", function()
-        local state, current = start(0, true)
-        expect(tap(state, current, "R")).toBe("commit")
-        expect(state.committed).toBe("R")
-        expect(state.fires).toBe(1)
-        expect(tap(state, current, "P")).toBe("ignore") -- final, as today
-        expect(state.committed).toBe("R")
-        expect(state.fires).toBe(1)
-    end)
-
-    test("lockout throws whatever is selected, including a released one", function()
-        local state, current = start(27, true)
-        tap(state, current, "R")
-        tap(state, current, "R") -- CONFIRMED
-        tap(state, current, "R") -- released
-        expect(state.committed).toBe(nil)
-
-        -- the countdown runs out with a selection standing and nothing committed
-        local atLockout = inputs({
-            pointsAtStake = 27,
-            selectedThrow = state.selected,
-            pickedThisRound = false,
-            secondsLeft = 0.4,
-        })
-        expect(HudModel.autoCommit(atLockout)).toBe("R")
+    test("it expires at exactly SWITCH_PROMPT_SECONDS, not before", function()
+        local t = 100
+        expect(HudModel.switchPromptExpired(t, t + HudModel.SWITCH_PROMPT_SECONDS - 0.01)).toBe(false)
+        expect(HudModel.switchPromptExpired(t, t + HudModel.SWITCH_PROMPT_SECONDS)).toBe(true)
     end)
 end)
 
@@ -559,106 +395,6 @@ describe("HudModel.autoCommit — a missed second tap must never cost a round", 
         -- still a glyph they meant to throw, and dropping it silently would cost them the round
         local i = inputs({ pointsAtStake = 0, selectedThrow = "R", secondsLeft = 0.2 })
         expect(HudModel.autoCommit(i)).toBe("R")
-    end)
-end)
-
-describe("HudModel.view — the confirm affordance", function()
-    test("a pending selection is lit and asks for its second tap", function()
-        local v = HudModel.view(inputs({ pointsAtStake = 27, selectedThrow = "P" }), session(0))
-        expect(v.selected).toBe("P")
-        expect(v.confirmPending).toBe(true)
-    end)
-
-    test("with no pot there is nothing pending to show", function()
-        local v = HudModel.view(inputs({ pointsAtStake = 0 }), session(0))
-        expect(v.selected).toBe(nil)
-        expect(v.confirmPending).toBe(false)
-    end)
-
-    test("banking mid-selection keeps the tile lit but drops the prompt", function()
-        local v = HudModel.view(inputs({ pointsAtStake = 0, selectedThrow = "R" }), session(0))
-        expect(v.selected).toBe("R")
-        expect(v.confirmPending).toBe(false)
-    end)
-
-    test("the preference off never prompts", function()
-        local v = HudModel.view(inputs({ pointsAtStake = 27, confirmThrows = false }), session(0))
-        expect(v.confirmPending).toBe(false)
-    end)
-
-    test("a selection does not survive the round closing", function()
-        local v =
-            HudModel.view(inputs({ pointsAtStake = 27, selectedThrow = "P", phase = "REVEAL" }), session(0))
-        expect(v.selected).toBe(nil)
-        expect(v.confirmPending).toBe(false)
-        expect(v.releasable).toBe(false)
-    end)
-
-    test("a CONFIRMED pick asks nothing further, but says it can still be changed", function()
-        local v = HudModel.view(
-            inputs({ pointsAtStake = 27, selectedThrow = "P", pickedThisRound = true }),
-            session(0)
-        )
-        expect(v.selected).toBe("P")
-        expect(v.confirmPending).toBe(false) -- nothing is pending: it HAS been thrown
-        expect(v.releasable).toBe(true)
-    end)
-
-    test("releasing puts the prompt back", function()
-        local v = HudModel.view(
-            inputs({ pointsAtStake = 27, selectedThrow = "P", pickedThisRound = false }),
-            session(0)
-        )
-        expect(v.confirmPending).toBe(true)
-        expect(v.releasable).toBe(false)
-    end)
-
-    test("nothing is releasable when confirmation was never required", function()
-        -- no pot, or the preference off: the commit was final, so there is nothing to take back
-        expect(
-            HudModel.view(
-                inputs({ pointsAtStake = 0, selectedThrow = "P", pickedThisRound = true }),
-                session(0)
-            ).releasable
-        ).toBe(false)
-        expect(HudModel.view(
-            inputs({
-                pointsAtStake = 27,
-                confirmThrows = false,
-                selectedThrow = "P",
-                pickedThisRound = true,
-            }),
-            session(0)
-        ).releasable).toBe(false)
-    end)
-end)
-
--- `pickedThisRound` now means "HAS A COMMITTED PICK RIGHT NOW", not "has tapped". It feeds both the
--- throw gate (above) and the escalation's arming, and the two want opposite things from a release:
--- the tiles must stay live so the player can re-confirm, and the prompt must come back because they
--- currently have nothing in.
-describe("HudModel — pickedThisRound after a release", function()
-    test("a confirmed pick silences the escalation", function()
-        local i = inputs({ pointsAtStake = 27, selectedThrow = "R", pickedThisRound = true, secondsLeft = 2 })
-        expect(HudModel.view(i, session(0)).escalate).toBe(false)
-    end)
-
-    test("a RELEASED pick does not — the player has nothing in", function()
-        local i =
-            inputs({ pointsAtStake = 27, selectedThrow = "R", pickedThisRound = false, secondsLeft = 2 })
-        expect(HudModel.view(i, session(0)).escalate).toBe(true)
-    end)
-
-    test("a released pick is auto-committed rather than lost", function()
-        local i =
-            inputs({ pointsAtStake = 27, selectedThrow = "R", pickedThisRound = false, secondsLeft = 0.3 })
-        expect(HudModel.autoCommit(i)).toBe("R")
-    end)
-
-    test("a still-confirmed pick is never re-sent at the lockout", function()
-        local i =
-            inputs({ pointsAtStake = 27, selectedThrow = "R", pickedThisRound = true, secondsLeft = 0.3 })
-        expect(HudModel.autoCommit(i)).toBe(nil)
     end)
 end)
 
