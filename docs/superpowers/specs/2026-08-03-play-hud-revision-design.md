@@ -155,17 +155,35 @@ consecutive back-outs also reach silence.
 
 ### The player-state plate moves to the right margin
 
-Top-centre put it in the middle of a phone's view. It moves to the **right margin, stacked
-below the jump button** — the strip Roblox claims for jump and camera drag, which a display
-with no interactive elements can safely occupy. `Active` stays `false` on every part of it,
-so camera drags pass straight through.
+Top-centre put it in the middle of a phone's view. It moves to the **right margin, above the
+jump button** — the strip Roblox claims for jump and camera drag, which a display with no
+interactive elements can safely occupy. `Active` stays `false` on every part of it, so
+camera drags pass straight through.
 
-- anchored bottom-right, `EDGE` from both edges, inside the `JUMP_CLEARANCE` (0.15) column
+- inside the `JUMP_CLEARANCE` (0.15) column, `EDGE` from the right edge
 - **points always**, in cream
 - **streak only when non-zero**, above the points, in gold, as `×3`
 - **the pot never appears here** — it has its own control (below)
 
 Its height follows its contents: one row when the streak is zero, two when it isn't.
+
+**Above, not below.** Roblox's default `TouchJump` sizes the button 70px on screens ≤500px
+tall and positions it `UDim2.new(1, -(size*1.5-10), 1, -size-20)`, which leaves roughly
+**20px** between its lower edge and the bottom of the screen — and on iOS that 20px is the
+home indicator. On a tablet the button sits higher and there is ~90px below it, which is why
+"below" looked viable. Phone-first, it is not. Above the button there is ~300px at every
+size.
+
+**The plate measures the button rather than predicting it.** The numbers above are Roblox's
+current defaults, not a contract: they differ by screen size, they have changed before, and
+nothing stops them changing again. So the plate reads
+`PlayerGui.TouchGui.TouchControlFrame.JumpButton` at runtime and sits `PLATE_JUMP_GAP = 10`
+above its measured top edge, re-deriving when that button resizes or the viewport changes.
+
+If `TouchGui` is absent — desktop, where there is no jump button at all — the plate falls
+back to the bottom-right corner at `EDGE`, which is free on that platform. This is the only
+placement in the HUD that depends on something Roblox owns, so it is the one placement that
+must not hard-code Roblox's arithmetic.
 
 ### The pot becomes one button
 
@@ -374,9 +392,11 @@ Luau (`lune run tests/run`), all in `HudModel.spec.luau` unless noted:
 Server (`server/ npm test`): `confirmThrows` no longer accepted by the preference route and
 no longer present in `buildProfilePayload`.
 
+Also tested: the plate falls back to the bottom-right corner when no jump button is found,
+and re-derives its position when the measured button moves or resizes.
+
 Not automatable, and therefore the owner's Studio gate: whether the dimmed glyphs read as
-"almost disappeared", whether `SWITCH?` is legible at its size, and whether the right-margin
-plate collides with the jump button on a real phone.
+"almost disappeared", and whether `SWITCH?` is legible at its size.
 
 ## Out of scope
 
@@ -398,8 +418,10 @@ plate collides with the jump button on a real phone.
 5. **The pick is held client-side until the T₀−2s flush.** Back-out must be honest, and
    `ThrowBuffer` has no removal.
 6. **A back-out silences escalation for that round but still counts as a miss.**
-7. **The plate goes in the jump/camera strip.** A display with no interactive elements is
-   the one thing that can safely live there.
+7. **The plate goes in the jump/camera strip, above the jump button**, and measures that
+   button at runtime rather than predicting where Roblox put it. A display with no
+   interactive elements is the one thing that can safely live in that strip; below the
+   button there is only ~20px on a phone.
 8. **The pot leaves the plate entirely** and becomes `BANK n POINTS`.
 9. **`UIStroke` never goes on a `TextLabel`.** Contrast comes from a backing.
 10. **The teahouse becomes a takeover**, and its ✕ returns to play.
@@ -407,5 +429,6 @@ plate collides with the jump button on a real phone.
 
 ## Open
 
-Nothing blocking. The three judgement calls above (3, 4, and the plate's exact vertical
-position against a real jump button) are the owner's to confirm at the Studio gate.
+Nothing. All three judgement calls were confirmed by the owner before the plan was written:
+tapping the lit glyph does nothing, the prompt expires after 4s, and the plate sits above
+the jump button.
