@@ -1,4 +1,4 @@
-# Play HUD revision — the switch mechanic, the right margin, and parking the fates
+# Play HUD revision — the switch mechanic, the wallet glance, and parking the fates
 
 **Date:** 2026-08-03
 **Status:** Approved direction. Revises `2026-08-02-play-hud-design.md` (item 2 of the
@@ -102,9 +102,29 @@ anything.
 
 ### The round stays open to taps
 
-Throws are accepted for the whole of `ACTIVE`, up to `secondsLeft <= 0`. There is no longer
-any "you have committed, so the round is closed to you" state — that state is what made
-back-out impossible, and back-out is now the point.
+Throws are accepted for as long as the choice can still be **honoured** — which is not the whole
+of `ACTIVE`. It ends when the pick goes on the wire, roughly the last half-second:
+
+```luau
+inputs.phase == "ACTIVE" and inputs.secondsLeft > 0 and not inputs.sent
+```
+
+**The `not inputs.sent` clause is load-bearing. Do not remove it.** An earlier draft of this spec
+said taps stay live for the whole of `ACTIVE`, on the reasoning that a closed round is what made
+back-out impossible. That was right about the old confirm mechanic and wrong here, and the gap it
+left was found during implementation: `sendAtLockout` fires at `secondsLeft <= 0.5` while taps
+stayed live to `0`, leaving a **400–500ms window in which a player could double-tap another glyph,
+watch all three light up, and believe they had withdrawn — while the server already held their
+throw.** Precisely the dishonesty this whole feature exists to prevent.
+
+The window is structural, not a slip: the half-second of slack exists so the pick reaches the
+server before the lockout, so there will always be a period where the throw is on the wire and
+the round has not visibly ended. The only honest resolution is that **once sent, the round is
+closed to that player** — and because `throwsEnabledFor` drives both `tapAction` and
+`view.throwsEnabled`, the buttons dim and the player *sees* it close.
+
+Owner-visible consequence, accepted: the throw buttons go dark for the last ~0.5s of every round.
+19.5 of 20 seconds remain changeable.
 
 ### When the pick goes over the wire
 
@@ -334,8 +354,8 @@ Applied:
   `WASHI` backing plate, which they never had (they floated over open canyon)
 - **toast** — `BackgroundTransparency` 0.3 → 0.05, and it moves to top-centre at `EDGE`,
   the band the plate has just vacated
-- **the new right-margin plate** — gets a low-opacity backing plate of its own rather than
-  bare text over the canyon
+- **the wallet plate** — gets a low-opacity backing plate of its own rather than bare text over
+  the canyon, and its fade takes that backing and its stroke along with the text
 
 ---
 
@@ -433,9 +453,9 @@ its owner.
 | File | Change |
 | --- | --- |
 | `roblox/src/shared/HudModel.luau` | `chosen`/`switchPrompt` state machine; drop `confirmRequired`, `fateBound`, `slot` |
-| `roblox/src/shared/HudLayout.luau` | drop `CONFIRM_*`; re-derive the cluster; right-margin plate geometry |
+| `roblox/src/shared/HudLayout.luau` | drop `CONFIRM_*` and the jump-button measurement; re-derive the cluster |
 | `roblox/src/shared/EffectRegistry.luau` | `LOSS = {}` |
-| `roblox/src/client/HudController.client.luau` | plate → right margin; bank button; tape below; `SWITCH?`; strokes off text |
+| `roblox/src/client/HudController.client.luau` | plate → bottom row + hide/reveal; `≡` door; bank button; tape below; `SWITCH?`; counting; strokes off text |
 | `roblox/src/client/main.client.luau` | hold the pick to the lockout; `declinedThisRound`; drop the fate branches |
 | `roblox/src/client/OnboardingController.client.luau` | stroke off the copy; safe band re-derives |
 | `roblox/src/client/TeahouseController.client.luau` | takeover panel, header ✕, movement suspension |
@@ -468,8 +488,13 @@ Luau (`lune run tests/run`), all in `HudModel.spec.luau` unless noted:
 Server (`server/ npm test`): `confirmThrows` no longer accepted by the preference route and
 no longer present in `buildProfilePayload`.
 
-Also tested: the plate falls back to the bottom-right corner when no jump button is found,
-and re-derives its position when the measured button moves or resizes.
+`RollingNumber`: `t = 0` returns exactly `from` and `t >= 1` exactly `to` (an off-by-one at the
+end leaves a permanently wrong total on screen), never overshoots, monotonic, counts down as
+correctly as up, and clamps outside `[0, 1]`.
+
+`sendAtLockout` is pinned from BOTH sides — that it sends at `0.5` and that it does NOT at `0.6`.
+Without the upper bound, `SEND_AT` could be changed to anything up to 4.9 with the suite still
+green, and that constant governs how long backing out stays honest.
 
 Not automatable, and therefore the owner's Studio gate: whether the dimmed glyphs read as
 "almost disappeared", and whether `SWITCH?` is legible at its size.
@@ -494,10 +519,9 @@ Not automatable, and therefore the owner's Studio gate: whether the dimmed glyph
 5. **The pick is held client-side until the T₀−2s flush.** Back-out must be honest, and
    `ThrowBuffer` has no removal.
 6. **A back-out silences escalation for that round but still counts as a miss.**
-7. **The plate goes in the jump/camera strip, above the jump button**, and measures that
-   button at runtime rather than predicting where Roblox put it. A display with no
-   interactive elements is the one thing that can safely live in that strip; below the
-   button there is only ~20px on a phone.
+7. ~~**The plate goes in the jump/camera strip, above the jump button**, measuring it at
+   runtime.~~ **SUPERSEDED by #13** — the plate never went there. The measuring machinery and
+   its tests were deleted; nothing in the HUD is now positioned against geometry Roblox owns.
 8. **The pot leaves the plate entirely** and becomes `BANK n POINTS`.
 9. **`UIStroke` never goes on a `TextLabel`.** Contrast comes from a backing.
 10. **The teahouse becomes a takeover**, and its ✕ returns to play.
@@ -513,6 +537,11 @@ Not automatable, and therefore the owner's Studio gate: whether the dimmed glyph
 
 ## Open
 
-Nothing. All three judgement calls were confirmed by the owner before the plan was written:
-tapping the lit glyph does nothing, the prompt expires after 4s, and the plate sits above
-the jump button.
+No open decisions. What remains is the owner's eye, on things no amount of reading settles:
+
+- whether the dimmed unchosen glyphs read as "almost disappeared"
+- `SWITCH?` legibility on a phone, where the pill is 36px wide
+- the plate's nested `AutomaticSize.X` — an auto-sized Frame holding a scale-sized auto-width
+  label plus padding — sizing to its text rather than collapsing to its padding
+- the `≡` two-stage gesture from cold, especially a second tap landing mid-**fade**
+- whether the bank drain and the balance rise read as one transfer at 0.5s
