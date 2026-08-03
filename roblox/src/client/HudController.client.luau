@@ -41,6 +41,7 @@ local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local HudModel = require(shared:WaitForChild("HudModel"))
 local HudLayout = require(shared:WaitForChild("HudLayout"))
 local Glyphs = require(shared:WaitForChild("Glyphs"))
+local RollingNumber = require(shared:WaitForChild("RollingNumber"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local player = Players.LocalPlayer
@@ -184,6 +185,56 @@ local function tintGlyph(g: Frame, core: Color3, outline: Color3)
         o.ImageColor3 = outline
     end
 end
+
+-- ===== Counting: wallet figures animate rather than snap =====
+-- Every figure the HUD shows for the wallet — the points and streak in the plate's line, and
+-- the pot on the bank button — animates to its new value instead of snapping (spec: "Numbers
+-- count rather than jump"). This is what makes banking read as a TRANSFER: press BANK 27 POINTS
+-- and the button's figure runs down to zero while the balance below runs up by the same amount,
+-- both driven off the SAME ProfileUpdate, with no special case for "this one's a bank" — see
+-- `render`, below, where all three counters are ticked from the one `view`.
+--
+-- `RollingNumber` is the pure arithmetic of one count; `Counter` is the small bit of STATE this
+-- file wraps around it — what's currently displayed, what it's counting toward, and when the
+-- current leg began. `tickCounter` is the driver, and it is keyed on the TARGET changing, not on
+-- how often it gets called: `render` runs at 10Hz, and restarting the count on every call would
+-- pin every number at its first frame forever — precisely how the bank pulse (`setBank`, below)
+-- failed earlier in this branch by cancelling and restarting its tween on every repaint.
+type Counter = {
+    -- What `tickCounter` returned last time. Also the next `from` if the target changes again
+    -- mid-count, so a second change continues from where the number visibly IS rather than
+    -- snapping back to whatever it was counting from before.
+    displayed: number,
+    target: number,
+    from: number,
+    startedAt: number?, -- os.clock() the current leg began, or nil once it has settled
+}
+
+local function newCounter(initial: number): Counter
+    return { displayed = initial, target = initial, from = initial, startedAt = nil }
+end
+
+local function tickCounter(c: Counter, target: number): number
+    if target ~= c.target then
+        c.from = c.displayed
+        c.target = target
+        c.startedAt = os.clock()
+    end
+    if c.startedAt then
+        local t = (os.clock() - c.startedAt) / RollingNumber.DURATION
+        c.displayed = RollingNumber.valueAt(c.from, c.target, t)
+        if t >= 1 then
+            c.startedAt = nil -- settled; further calls at the same target are free until it moves
+        end
+    else
+        c.displayed = c.target
+    end
+    return c.displayed
+end
+
+local pointsCounter = newCounter(0)
+local streakCounter = newCounter(0)
+local potCounter = newCounter(0)
 
 -- ===== Plate: one line at the bottom of the cluster, normally hidden =====
 -- Superseded the right-margin placement (owner, mid-implementation): the jump-button measurement
@@ -564,6 +615,16 @@ end)
 -- changes — cancelling and restarting a 0.9s tween every 100ms would give it 3% of its travel
 -- and render as a static button with imperceptible jitter, not a pulse. This is why the code
 -- this replaced (`setSlot`) guarded its tween the same way.
+--
+-- `visible` and `pot` are the caller's (`render`, below): `visible` follows the DISPLAYED pot
+-- (the counter's current value), not the model's, and `pot` IS the displayed figure — this
+-- function paints whatever it's handed and knows nothing about `RollingNumber` itself. `pulses`
+-- is still model-driven (`view.potPulses`), and that is what keeps this guard correct without
+-- any extra coordination: the model clears `potPulses` (it is gated on `pointsAtStake > 0`) the
+-- INSTANT a bank or a loss lands, before the display has counted down at all, so `want = visible
+-- and pulses` already goes false at that exact moment — a button lingering at a nonzero
+-- DISPLAYED value during the count-down is never left pulsing, because `pulses` itself dropped
+-- out from under it on the very same tick the model changed.
 local potPulse: Tween? = nil
 local pulsing = false
 local function setBank(visible: boolean, pot: number, pulses: boolean)
@@ -791,11 +852,25 @@ local function render(inputs: any, aux: any)
     end
     lastPlatePoints = view.plate.points
     lastPlateStreak = view.plate.streak
-    plateLabel.Text = if view.plate.streak > 0
-        then `×{view.plate.streak}  {view.plate.points}`
-        else tostring(view.plate.points)
 
-    setBank(view.bankVisible, view.pot, view.potPulses)
+    -- The label shows the DISPLAYED (animating) figures, not the model's — that is the entire
+    -- point of `tickCounter`. The streak's own "×N" segment tracks the displayed count too, so a
+    -- streak reset to 0 counts down in view rather than vanishing on the same tick it resets.
+    local displayedPoints = tickCounter(pointsCounter, view.plate.points)
+    local displayedStreak = tickCounter(streakCounter, view.plate.streak)
+    plateLabel.Text = if displayedStreak > 0
+        then `×{displayedStreak}  {displayedPoints}`
+        else tostring(displayedPoints)
+
+    -- The pot counts too, and the bank button's VISIBILITY follows the DISPLAYED figure, not
+    -- `view.bankVisible`: the model's pot goes to zero the instant a bank or a loss lands, and a
+    -- button that hid on THAT model transition would take the count-down off screen before
+    -- anyone saw it — which is the whole transfer effect this task exists to deliver. `view.pot
+    -- > 0` stays in the condition too, so the button appears on the very first tick a pot
+    -- exists even though the display itself still reads 0 for that one frame
+    -- (`RollingNumber.valueAt`'s exact-`from`-at-`t=0` guarantee).
+    local displayedPot = tickCounter(potCounter, view.pot)
+    setBank(view.pot > 0 or displayedPot > 0, displayedPot, view.potPulses)
 
     -- The authoritative pick wins the moment it lands; `view.selected` is next (stale field, kept
     -- readable pending Task 8's rewire onto `chosen`/`switchPrompt` — it degrades to nil, not an
