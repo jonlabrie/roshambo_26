@@ -9,8 +9,8 @@
 -- that hand off to each other it would also let one restore what the other suspended.
 --
 -- REFERENCE-COUNTED. The freeze applies on the first acquire and lifts on the last release, so
--- an ordering change (opening the teahouse before closing the ledger, rather than after) can
--- never thaw a player who is still inside a panel.
+-- the two panels' call order relative to each other doesn't matter -- neither can thaw a player
+-- who is still inside the other one, whatever sequence opens and closes them.
 local Players = game:GetService("Players")
 
 local player = Players.LocalPlayer

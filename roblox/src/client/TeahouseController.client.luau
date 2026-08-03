@@ -28,6 +28,7 @@
 -- the same reason.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
@@ -130,8 +131,29 @@ local PANEL_MARGIN = 12
 local HEADER_H = 44
 local CLOSE_W = 34
 
+-- Tap outside the panel closes -- the ledger's pattern (LedgerController:118-126). A TextButton
+-- is the catcher, parented BEFORE `panel` so it sits behind it, and it blackens the world behind,
+-- which is what a takeover is. Without this, the 12px margin around the panel (and, absent
+-- panel.Active below, the whole panel) would leak taps through to whatever ScreenGui sits under
+-- this one's DisplayOrder 20 -- the minimal HUD's live throw/bank/ledger buttons at DisplayOrder 0.
+local scrim = Instance.new("TextButton")
+scrim.Name = "Scrim"
+scrim.Size = UDim2.fromScale(1, 1)
+scrim.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+scrim.BackgroundTransparency = 0.35
+scrim.BorderSizePixel = 0
+scrim.AutoButtonColor = false
+scrim.Text = ""
+scrim.Visible = false
+scrim.Parent = gui
+
 local panel = Instance.new("Frame")
 panel.Name = "Panel"
+-- Active = true, deliberately (LedgerController:131-132). A Frame that is not Active does not
+-- consume input, so every tap inside the panel would fall through to the scrim behind it -- or,
+-- since the scrim only covers the gap the panel leaves, straight through to the HUD buttons under
+-- this GUI's DisplayOrder.
+panel.Active = true
 panel.AnchorPoint = Vector2.new(0.5, 0.5)
 panel.Position = UDim2.fromScale(0.5, 0.5)
 panel.Size = UDim2.new(1, -2 * PANEL_MARGIN, 1, -2 * PANEL_MARGIN)
@@ -990,13 +1012,25 @@ local function setOpen(shouldOpen: boolean)
     if shouldOpen == isOpen then
         return -- idempotent: a double open must not double-acquire, a double close must not double-release
     end
-    isOpen = shouldOpen
-    panel.Visible = shouldOpen
-    closeButton.Visible = shouldOpen
     if shouldOpen then
+        -- ORDER MATTERS, the same as LedgerController's open(): paint first, flag and show
+        -- second, freeze LAST. render() runs inside a Bindable connection, so a throw in there
+        -- is swallowed to a warn -- flagging isOpen before it returns would leave the panel
+        -- visible with isOpen = true and no matching acquire, so a later close() would perform
+        -- an unmatched release.
         render()
+        isOpen = true
+        panel.Visible = true
+        closeButton.Visible = true
+        scrim.Visible = true
         Takeover.acquire()
     else
+        -- isOpen flips false BEFORE the release, so a respawn mid-release cannot re-freeze
+        -- behind us (the same ordering as LedgerController's close()).
+        isOpen = false
+        panel.Visible = false
+        closeButton.Visible = false
+        scrim.Visible = false
         Takeover.release()
     end
 end
@@ -1010,8 +1044,23 @@ EventBus.OpenTeahouse.Event:Connect(function()
     setOpen(true)
 end)
 
+-- Three doors sharing one path, same as the ledger: the ✕, a tap on the scrim, and Escape. A
+-- takeover that suspends movement needs more than one way out.
 closeButton.MouseButton1Click:Connect(function()
     setOpen(false)
+end)
+
+scrim.MouseButton1Click:Connect(function()
+    setOpen(false)
+end)
+
+UserInputService.InputBegan:Connect(function(input)
+    -- gameProcessedEvent is deliberately NOT consulted -- see LedgerController's identical
+    -- handler. Escape is claimed by the Roblox menu, and a panel that only closes when Roblox
+    -- does not want the key is a panel that strands people.
+    if isOpen and input.KeyCode == Enum.KeyCode.Escape then
+        setOpen(false)
+    end
 end)
 
 -- B4 Task 5: Task 6 (not yet built) consumes EventBus.MoveTeahouse.Event to start move mode.
