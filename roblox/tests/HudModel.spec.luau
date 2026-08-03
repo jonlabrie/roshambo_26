@@ -14,6 +14,8 @@ local function inputs(over: any): any
         fateBound = false,
         pickedThisRound = false,
         escalationPrompts = true,
+        confirmThrows = true,
+        selectedThrow = nil,
     }
     for k, v in over or {} do
         base[k] = v
@@ -226,6 +228,134 @@ describe("HudModel.onRoundEnded", function()
         local before = session(0)
         HudModel.onRoundEnded(before, { couldThrow = true, picked = false })
         expect(before.consecutiveMisses).toBe(0)
+    end)
+end)
+
+-- ===== Confirming a throw when points are riding =====
+-- The rule, in the owner's words: "especially if there's points riding on the throw, it makes sense
+-- to ask players to confirm a throw choice". Read as: the confirmation exists ONLY when there is a
+-- pot. With nothing at stake one tap throws and the ambient case stays calm — an arena where every
+-- casual throw costs two taps would be a worse hangout, and the mis-tap it guards against only costs
+-- something when there is something to lose.
+describe("HudModel.tapAction — one tap, or two", function()
+    test("no pot: one tap throws", function()
+        expect(HudModel.tapAction(inputs({ pointsAtStake = 0 }), "R")).toBe("commit")
+    end)
+
+    test("a pot riding: the first tap only selects", function()
+        expect(HudModel.tapAction(inputs({ pointsAtStake = 27 }), "R")).toBe("select")
+    end)
+
+    test("a second tap on the SAME glyph commits", function()
+        expect(HudModel.tapAction(inputs({ pointsAtStake = 27, selectedThrow = "R" }), "R")).toBe("commit")
+    end)
+
+    test("a tap on a DIFFERENT glyph moves the selection, it does not commit", function()
+        expect(HudModel.tapAction(inputs({ pointsAtStake = 27, selectedThrow = "R" }), "P")).toBe("select")
+    end)
+
+    test("the preference off: one tap throws however big the pot is", function()
+        local i = inputs({ pointsAtStake = 243, confirmThrows = false })
+        expect(HudModel.tapAction(i, "R")).toBe("commit")
+    end)
+
+    test("a tap that could never be thrown is ignored, not selected", function()
+        -- leaving a selection lit on a round the player is locked out of would be a lie about what
+        -- is about to happen
+        for _, over in
+            {
+                { phase = "TALLY" },
+                { secondsLeft = 0 },
+                { fateBound = true },
+                { pickedThisRound = true },
+            }
+        do
+            local i = inputs(over)
+            i.pointsAtStake = 27
+            expect(HudModel.tapAction(i, "R")).toBe("ignore")
+        end
+    end)
+end)
+
+describe("HudModel.autoCommit — a missed second tap must never cost a round", function()
+    test("nothing selected, nothing to commit", function()
+        expect(HudModel.autoCommit(inputs({ pointsAtStake = 27, secondsLeft = 0 }))).toBe(nil)
+    end)
+
+    test("it holds while there is still time to tap again", function()
+        expect(HudModel.autoCommit(inputs({ pointsAtStake = 27, selectedThrow = "S", secondsLeft = 3 }))).toBe(
+            nil
+        )
+    end)
+
+    test("the boundary: it fires as the lockout arrives, not after it", function()
+        -- committing AT zero is too late — the pick has to reach the server before the lockout, so
+        -- the model hands it over with a sliver of the countdown still to run
+        local justBefore = inputs({ pointsAtStake = 27, selectedThrow = "S", secondsLeft = 0.6 })
+        expect(HudModel.autoCommit(justBefore)).toBe(nil)
+        local atLockout = inputs({ pointsAtStake = 27, selectedThrow = "S", secondsLeft = 0.5 })
+        expect(HudModel.autoCommit(atLockout)).toBe("S")
+    end)
+
+    test("a round that ended without a countdown still commits the selection", function()
+        -- the unsynced-clock path reports a constant nominal countdown that never reaches the
+        -- boundary above; the phase leaving ACTIVE is the last chance to throw what was tapped
+        local i = inputs({ pointsAtStake = 27, selectedThrow = "P", phase = "TALLY", secondsLeft = 30 })
+        expect(HudModel.autoCommit(i)).toBe("P")
+    end)
+
+    test("a pick already in is never re-committed", function()
+        local i = inputs({
+            pointsAtStake = 27,
+            selectedThrow = "P",
+            pickedThisRound = true,
+            secondsLeft = 0.2,
+        })
+        expect(HudModel.autoCommit(i)).toBe(nil)
+    end)
+
+    test("a fate arriving mid-round drops the selection rather than throwing it", function()
+        local i = inputs({ pointsAtStake = 27, selectedThrow = "P", fateBound = true, secondsLeft = 0.2 })
+        expect(HudModel.autoCommit(i)).toBe(nil)
+    end)
+
+    test("banking mid-round does not strand the selection", function()
+        -- the pot is gone, so confirmation is no longer REQUIRED — but a glyph the player tapped is
+        -- still a glyph they meant to throw, and dropping it silently would cost them the round
+        local i = inputs({ pointsAtStake = 0, selectedThrow = "R", secondsLeft = 0.2 })
+        expect(HudModel.autoCommit(i)).toBe("R")
+    end)
+end)
+
+describe("HudModel.view — the confirm affordance", function()
+    test("a pending selection is lit and asks for its second tap", function()
+        local v = HudModel.view(inputs({ pointsAtStake = 27, selectedThrow = "P" }), session(0))
+        expect(v.selected).toBe("P")
+        expect(v.confirmPending).toBe(true)
+    end)
+
+    test("with no pot there is nothing pending to show", function()
+        local v = HudModel.view(inputs({ pointsAtStake = 0 }), session(0))
+        expect(v.selected).toBe(nil)
+        expect(v.confirmPending).toBe(false)
+    end)
+
+    test("banking mid-selection keeps the tile lit but drops the prompt", function()
+        local v = HudModel.view(inputs({ pointsAtStake = 0, selectedThrow = "R" }), session(0))
+        expect(v.selected).toBe("R")
+        expect(v.confirmPending).toBe(false)
+    end)
+
+    test("the preference off never prompts", function()
+        local v = HudModel.view(inputs({ pointsAtStake = 27, confirmThrows = false }), session(0))
+        expect(v.confirmPending).toBe(false)
+    end)
+
+    test("a selection does not survive the round closing", function()
+        local v =
+            HudModel.view(inputs({ pointsAtStake = 27, selectedThrow = "P", phase = "REVEAL" }), session(0))
+        expect(v.selected).toBe(nil)
+        expect(v.confirmPending).toBe(false)
     end)
 end)
 

@@ -19,8 +19,9 @@
 -- SUSPENDED WHILE IT IS OPEN. See `close()`: every exit path routes through one function.
 --
 -- This file RENDERS LedgerModel; it computes nothing the model already gives it. main.client.luau
--- owns the wiring and fires EventBus.LedgerState{ counters, live, bestStreak, escalationPrompts }.
--- The preference switch travels back on EventBus.HudPreference, banking on EventBus.HudBank.
+-- owns the wiring and fires EventBus.LedgerState{ counters, live, bestStreak, escalationPrompts,
+-- confirmThrows }. The preference switches travel back on EventBus.HudPreference, banking on
+-- EventBus.HudBank.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
@@ -53,7 +54,7 @@ local PAD = 14
 local GAP = 12
 local HEADER_H = 52
 local HERO_H = 96
-local FOOTER_H = 46 -- one switch today; the row is sized to take more without a re-layout
+local FOOTER_H = 46 -- two switches; the row was sized for more than one from the start
 local TABS_H = 30
 local BAR_H = 14
 local FEED_MAX = 60
@@ -626,8 +627,9 @@ EventBus.Toast.Event:Connect(pushFeed)
 EventBus.TickerMessage.Event:Connect(pushFeed)
 
 -- ===== Preferences footer =====
--- One row, one switch. Sized to take later preferences (toast verbosity, audio) without ever needing
--- a second takeover surface — but exactly one ships, because there is no second preference yet.
+-- One row, now TWO switches — the row was built and sized for exactly this, and the confirm-a-throw
+-- preference is the second one the design was waiting for. Both are built by the same factory rather
+-- than copied, so a third cannot drift into looking or behaving differently from the first two.
 local footer = Instance.new("Frame")
 footer.Name = "Preferences"
 footer.AnchorPoint = Vector2.new(0, 1)
@@ -636,33 +638,50 @@ footer.Size = UDim2.new(1, 0, 0, FOOTER_H)
 footer.BackgroundTransparency = 1
 footer.Parent = panel
 
-local prefLabel = label(footer, "Escalation prompts", 14, INK_CREAM, Enum.Font.Gotham)
-prefLabel.AnchorPoint = Vector2.new(0, 0.5)
-prefLabel.Position = UDim2.fromScale(0, 0.5)
-prefLabel.Size = UDim2.fromOffset(140, 18)
+local SWITCH_W, SWITCH_H = 58, 28
+local SWITCH_KNOB = 22
+local PREF_LABEL_W = 140
+local PREF_COL_W = PREF_LABEL_W + 10 + SWITCH_W + 28 -- label + gap + switch + breathing room
 
-local prefSwitch = Instance.new("TextButton")
-prefSwitch.Name = "EscalationPrompts"
-prefSwitch.AnchorPoint = Vector2.new(0, 0.5)
-prefSwitch.Position = UDim2.new(0, 150, 0.5, 0)
-prefSwitch.Size = UDim2.fromOffset(58, 28)
-prefSwitch.BackgroundColor3 = TRACK
-prefSwitch.BorderSizePixel = 0
-prefSwitch.AutoButtonColor = false
-prefSwitch.Text = ""
-prefSwitch.Parent = footer
-corner(prefSwitch, 14)
-stroke(prefSwitch, TAN_RIM, 1, 0.5)
+type PrefSwitch = { button: TextButton, knob: Frame }
 
-local prefKnob = Instance.new("Frame")
-prefKnob.Name = "Knob"
-prefKnob.AnchorPoint = Vector2.new(0, 0.5)
-prefKnob.Position = UDim2.new(0, 3, 0.5, 0)
-prefKnob.Size = UDim2.fromOffset(22, 22)
-prefKnob.BackgroundColor3 = INK_CREAM
-prefKnob.BorderSizePixel = 0
-prefKnob.Parent = prefSwitch
-corner(prefKnob, 11)
+local function makePrefSwitch(name: string, caption: string, column: number): PrefSwitch
+    local x = column * PREF_COL_W
+
+    local prefLabel = label(footer, caption, 14, INK_CREAM, Enum.Font.Gotham)
+    prefLabel.Name = name .. "Label"
+    prefLabel.AnchorPoint = Vector2.new(0, 0.5)
+    prefLabel.Position = UDim2.new(0, x, 0.5, 0)
+    prefLabel.Size = UDim2.fromOffset(PREF_LABEL_W, 18)
+
+    local switch = Instance.new("TextButton")
+    switch.Name = name
+    switch.AnchorPoint = Vector2.new(0, 0.5)
+    switch.Position = UDim2.new(0, x + PREF_LABEL_W + 10, 0.5, 0)
+    switch.Size = UDim2.fromOffset(SWITCH_W, SWITCH_H)
+    switch.BackgroundColor3 = TRACK
+    switch.BorderSizePixel = 0
+    switch.AutoButtonColor = false
+    switch.Text = ""
+    switch.Parent = footer
+    corner(switch, SWITCH_H // 2)
+    stroke(switch, TAN_RIM, 1, 0.5)
+
+    local knob = Instance.new("Frame")
+    knob.Name = "Knob"
+    knob.AnchorPoint = Vector2.new(0, 0.5)
+    knob.Position = UDim2.new(0, 3, 0.5, 0)
+    knob.Size = UDim2.fromOffset(SWITCH_KNOB, SWITCH_KNOB)
+    knob.BackgroundColor3 = INK_CREAM
+    knob.BorderSizePixel = 0
+    knob.Parent = switch
+    corner(knob, SWITCH_KNOB // 2)
+
+    return { button = switch, knob = knob }
+end
+
+local escalationSwitch = makePrefSwitch("EscalationPrompts", "Escalation prompts", 0)
+local confirmSwitch = makePrefSwitch("ConfirmThrows", "Confirm big throws", 1)
 
 -- ===== Layout =====
 local feedTabOpen = false
@@ -760,10 +779,16 @@ local counters = {
 local live = { pot = 0, streak = 0, points = 0 }
 local bestStreak = 0
 local escalationPrompts = true
+local confirmThrows = true
+
+local function paintOne(sw: PrefSwitch, on: boolean)
+    sw.button.BackgroundColor3 = if on then GOLD else TRACK
+    sw.knob.Position = if on then UDim2.new(1, -(SWITCH_KNOB + 3), 0.5, 0) else UDim2.new(0, 3, 0.5, 0)
+end
 
 local function paintSwitch()
-    prefSwitch.BackgroundColor3 = if escalationPrompts then GOLD else TRACK
-    prefKnob.Position = if escalationPrompts then UDim2.new(1, -25, 0.5, 0) else UDim2.new(0, 3, 0.5, 0)
+    paintOne(escalationSwitch, escalationPrompts)
+    paintOne(confirmSwitch, confirmThrows)
 end
 
 local function render()
@@ -845,12 +870,18 @@ bankButton.MouseButton1Click:Connect(function()
     EventBus.HudBank:Fire()
 end)
 
-prefSwitch.MouseButton1Click:Connect(function()
-    -- Optimistic: the switch moves on the tap. The next ProfileUpdate echo reconciles it, so a write
-    -- that does not land flips back rather than leaving the player poking a dead control.
+-- Optimistic: the switch moves on the tap. The next ProfileUpdate echo reconciles it, so a write
+-- that does not land flips back rather than leaving the player poking a dead control.
+escalationSwitch.button.MouseButton1Click:Connect(function()
     escalationPrompts = not escalationPrompts
     paintSwitch()
     EventBus.HudPreference:Fire({ escalationPrompts = escalationPrompts })
+end)
+
+confirmSwitch.button.MouseButton1Click:Connect(function()
+    confirmThrows = not confirmThrows
+    paintSwitch()
+    EventBus.HudPreference:Fire({ confirmThrows = confirmThrows })
 end)
 
 EventBus.LedgerState.Event:Connect(function(state)
@@ -863,6 +894,9 @@ EventBus.LedgerState.Event:Connect(function(state)
     bestStreak = state.bestStreak or bestStreak
     if type(state.escalationPrompts) == "boolean" then
         escalationPrompts = state.escalationPrompts
+    end
+    if type(state.confirmThrows) == "boolean" then
+        confirmThrows = state.confirmThrows
     end
     if isOpen then
         render()

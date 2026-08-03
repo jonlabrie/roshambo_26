@@ -3,7 +3,9 @@
 -- `Instance.new` moved to HudController (the minimal HUD). What stays is the seam between the
 -- remotes and the renderers, because it is the part that is subtle rather than decorative:
 --   • the authoritative World-Throw tape and the per-round personal WIN/SAFE/LOSS badges,
---   • the DRUM-REST SPOILER GATE (see `visibleTape` / `maybeShowReveal`),
+--   • the DRUM-REST SPOILER GATE (see `visibleTape` / `maybeShowReveal`) — which now holds the FATE
+--     as well as the tape and the headline,
+--   • the confirm-a-throw selection (`selectedThrow`), whose rule lives in HudModel,
 --   • the HudModel session — the escalation's consecutive-miss backoff,
 --   • the optimistic local pick.
 --
@@ -14,8 +16,9 @@
 -- and takes picks back on `EventBus.HudPick`. Transient notices go out on `EventBus.Toast`.
 --
 -- The MAXIMAL panel gets its own channel, `EventBus.LedgerState`, fired only when ProfileUpdate
--- lands: the nine persisted counters, the live wallet, bestStreak and the escalation preference. Its
--- one control comes back on `EventBus.HudPreference` and goes out on `SetHudPreference`.
+-- lands: the nine persisted counters, the live wallet, bestStreak and the two HUD preferences. Its
+-- controls come back on `EventBus.HudPreference` and go out on `SetHudPreference` — one remote for
+-- every preference, never one per switch.
 --
 -- BANK THESE (the pot indicator's only button) comes back on `EventBus.HudBank` and goes out on
 -- the long-standing BankRequest remote. There is no RISK counterpart and nothing to "resolve":
@@ -69,6 +72,12 @@ local wallet =
 
 -- Carried by ProfileUpdate. ON until the first one lands, which is the profile's own default.
 local escalationPrompts = true
+local confirmThrows = true
+
+-- The glyph tapped but NOT yet thrown, while a pot is riding — see HudModel.tapAction. It lives here
+-- rather than in HudController because this file is what turns a tap into a pick on the wire, and
+-- because the auto-commit at lockout needs the countdown, which is derived here.
+local selectedThrow: string? = nil
 
 -- The nine persisted ledger counters, carried by ProfileUpdate. The maximal panel is the only
 -- reader; the minimal HUD never sees them.
@@ -171,8 +180,11 @@ local function visibleTape(): { { worldThrow: string, result: string? } }
     return out
 end
 
-local function publish()
-    local inputs = {
+-- One HudModel.Inputs, built in one place. The tap handler and the lockout auto-commit both have to
+-- ask the model questions about the CURRENT state, and a second hand-assembled copy of this table is
+-- exactly how a field ends up set in one and forgotten in the other.
+local function buildInputs(): any
+    return {
         phase = phase,
         secondsLeft = secondsLeft(),
         pointsAtStake = wallet.pointsAtStake,
@@ -182,7 +194,13 @@ local function publish()
         fateBound = fateBound,
         pickedThisRound = myPick ~= nil,
         escalationPrompts = escalationPrompts,
+        confirmThrows = confirmThrows,
+        selectedThrow = selectedThrow,
     }
+end
+
+local function publish()
+    local inputs = buildInputs()
     -- Onboarding beat 2: the RISING EDGE of throws becoming enabled — once per round, not once
     -- per session. HudModel.view is the single source of truth for the enabled rule (fate-bound,
     -- phase, pick already made) — re-deriving it here from the raw flags would be a second copy
@@ -217,6 +235,7 @@ local function publishLedger()
         live = { pot = wallet.pointsAtStake, streak = wallet.currentStreak, points = wallet.totalPoints },
         bestStreak = wallet.bestStreak,
         escalationPrompts = escalationPrompts,
+        confirmThrows = confirmThrows,
     })
 end
 
@@ -244,8 +263,32 @@ end)
 local pendingReveal: { headline: string, roundId: string?, result: string? }? = nil
 local drumAtRest = false
 
+-- THE FATE WAITS FOR THE DRUM TOO. `fateBound` is what HudModel turns into the ACCEPT YOUR FATE
+-- slot, so setting it the instant RevealTheater lands put an unambiguous "you lost" on screen while
+-- the wheel was still turning — and a loss names the world's throw by implication. Same gate as the
+-- toast and the tape tile, same REVEAL_SAFETY fallback, deliberately NOT a parallel mechanism.
+--
+-- It is held SEPARATELY from `pendingReveal` rather than folded into it because the two arrive on
+-- different remotes (RevealTheater is arena-wide, RevealResult is per-player) with no ordering
+-- guarantee between them: a fate parked inside `pendingReveal` would be dropped on any round where
+-- the arena-wide event lost the race, and a fate that never lands leaves a player with no way out.
+local pendingFate = false
+
 local function maybeShowReveal()
-    if pendingReveal and drumAtRest then
+    if not drumAtRest then
+        return
+    end
+    if pendingFate then
+        pendingFate = false
+        fateBound = true
+        -- A pick tapped in the sliver between the round reopening and the drum settling was already
+        -- refused by the server (its fate gate is not client-timed), so stop lighting it — the same
+        -- reasoning as the whiff branch in the RevealTheater handler.
+        myPick = nil
+        selectedThrow = nil -- a fate refuses the pick, so there is nothing left to confirm
+        publish()
+    end
+    if pendingReveal then
         local p = pendingReveal
         pendingReveal = nil
         toast(p.headline)
@@ -277,12 +320,28 @@ EventBus.Cue.Event:Connect(function(cue)
     end
 end)
 
-EventBus.HudPick.Event:Connect(function(value: string)
+-- The one place a pick leaves this client. Both the tap that commits and the lockout auto-commit go
+-- through it, so neither can forget to clear the selection or to publish.
+local function commitPick(value: string)
+    selectedThrow = nil
     -- Optimistic: the tile lights the moment it is tapped. The server is what actually refuses a
     -- pick (fate-bound, past the lockout).
     myPick = value
     SubmitPick:FireServer(value)
     publish()
+end
+
+-- HudController fires this on EVERY accepted tap; the MODEL decides whether the tap throws or only
+-- selects (HudModel.tapAction). The controller does not re-derive that rule, and there is no second
+-- EventBus channel for "selected" — a select is just a publish with `selectedThrow` set.
+EventBus.HudPick.Event:Connect(function(value: string)
+    local action = HudModel.tapAction(buildInputs(), value)
+    if action == "commit" then
+        commitPick(value)
+    elseif action == "select" then
+        selectedThrow = value
+        publish()
+    end
 end)
 
 -- No optimistic wallet edit: the pot indicator clears when ProfileUpdate lands with the banked
@@ -291,9 +350,24 @@ EventBus.HudBank.Event:Connect(function()
     BankRequest:FireServer()
 end)
 
--- The ledger's preferences footer. One remote carries every HUD preference (and, from Task 13, the
--- seen-beat writes) — there is deliberately not a second one per switch.
+-- The ledger's preferences footer, and the confirm strip's "don't ask again". One remote carries
+-- every HUD preference (and, from Task 13, the seen-beat writes) — there is deliberately not a
+-- second one per switch.
+--
+-- Applied LOCALLY as well as sent. The switch's own paint is optimistic in LedgerController, but
+-- `confirmThrows` is a RULE input, not a decoration: waiting for the ProfileUpdate echo would leave
+-- the very next tap still asking for a confirmation the player has just switched off. The echo
+-- reconciles a write that did not land, exactly as it does for the switch.
 EventBus.HudPreference.Event:Connect(function(body)
+    if type(body) == "table" then
+        if type(body.escalationPrompts) == "boolean" then
+            escalationPrompts = body.escalationPrompts
+        end
+        if type(body.confirmThrows) == "boolean" then
+            confirmThrows = body.confirmThrows
+        end
+        publish()
+    end
     SetHudPreference:FireServer(body)
 end)
 
@@ -329,7 +403,17 @@ RevealTheater.OnClientEvent:Connect(function(r)
     local myId = tostring(player.UserId)
     local mine = r.results and r.results[myId]
     if mine and mine.result == "LOSS" then
-        fateBound = true
+        -- HELD, not applied — see `pendingFate`. `maybeShowReveal` releases it on `drumRest`, and
+        -- the safety below releases it if that cue never arrives. The identity guard is `pendingFate`
+        -- itself: it is cleared the moment the fate lands, so a stale timer finds nothing to do.
+        pendingFate = true
+        maybeShowReveal() -- only lands if the drum is already at rest
+        task.delay(REVEAL_SAFETY, function()
+            if pendingFate then
+                drumAtRest = true -- safety: never strand a fate if the cue dropped
+                maybeShowReveal()
+            end
+        end)
     end
     if r.whiffed and r.whiffed[myId] then
         toast("⏳ TOO LATE — your throw didn't count this round")
@@ -368,9 +452,20 @@ RoundUpdate.OnClientEvent:Connect(function(info)
     phase = info.phase
     if info.phase == "ACTIVE" then
         myPick = nil
-        roundCouldThrow = not fateBound
+        -- Belt and braces: the heartbeat's auto-commit consumes a pending selection well before the
+        -- next round opens (TALLY + REVEAL is 5s), and a fate clears it too. This catches anything
+        -- that somehow survived, so a stale glyph from last round can never be lit into this one.
+        selectedThrow = nil
+        -- `pendingFate` counts as bound. The fate is applied on `drumRest`, which lands a moment
+        -- INTO this round, so reading `fateBound` alone here would mark a round the player is about
+        -- to be held out of as one they could have thrown in — and the escalation's backoff would
+        -- score it as an ignored round.
+        roundCouldThrow = not fateBound and not pendingFate
         lockoutAt = if info.secondsToLockout then os.clock() + info.secondsToLockout else nil
         pendingReveal = nil -- the drum respins; last round's reveal has already been shown
+        -- pendingFate is deliberately NOT cleared here, for the same reason pendingReveal is not
+        -- cleared by the safety timer: dropping it would strand a player fate-bound on the server
+        -- with no ACCEPT YOUR FATE button. It always resolves within REVEAL_SAFETY.
         drumAtRest = false
     else
         lockoutAt = nil
@@ -416,6 +511,9 @@ ProfileUpdate.OnClientEvent:Connect(function(p)
     wallet.unresolvedWin = p.unresolvedWin == true
     if type(p.escalationPrompts) == "boolean" then
         escalationPrompts = p.escalationPrompts
+    end
+    if type(p.confirmThrows) == "boolean" then
+        confirmThrows = p.confirmThrows
     end
     if type(p.counters) == "table" then
         counters = p.counters
@@ -480,8 +578,15 @@ end)
 -- throw at any point in it did not have the round taken from them.
 task.spawn(function()
     while true do
-        if phase == "ACTIVE" and not fateBound then
+        if phase == "ACTIVE" and not fateBound and not pendingFate then
             roundCouldThrow = true
+        end
+        -- THE UNCONFIRMED SELECTION IS THROWN RATHER THAN LOST. The model decides when (see
+        -- HudModel.autoCommit); this loop is simply the only thing watching the countdown, at 10Hz —
+        -- close enough to the half-second boundary that the pick still makes the lockout.
+        local auto = HudModel.autoCommit(buildInputs())
+        if auto then
+            commitPick(auto)
         end
         publish()
         task.wait(TICK)
