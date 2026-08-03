@@ -79,17 +79,25 @@ local counters: { [string]: number }? = nil
 -- "already seen" list — see the fires below. Empty until the first ProfileUpdate lands.
 local knownSeenBeats: { string } = {}
 
--- Whether `knownSeenBeats` has been told ANYTHING yet. Until the first ProfileUpdate lands it is
--- empty NOT because the player has seen nothing, but because the answer has not arrived — the
--- server only fires ProfileUpdate once its `GET /players` round trip returns. The `join` beat is the
--- one fired on a timer the fetch can lose: it goes out on the first RoundUpdate, and a phase
--- boundary landing inside the fetch window would re-show the drum card to someone who dismissed it
--- months ago — permanently, because OnboardShown latches it. Worse, if the join fetch FAILS the
--- server never fires ProfileUpdate at all, and every beat would re-show. So `join` waits for the
--- profile. It costs nothing: `join` re-fires on every RoundUpdate until resolved, so the very next
--- one after the profile lands shows the card. If the fetch never succeeds the card is skipped for
--- that session, which is the right trade — a first-timer missing one card beats a returning player
--- being re-taught all four.
+-- NO BEAT FIRES BEFORE THE PROFILE HAS ANSWERED. `knownSeenBeats` starting empty does not mean the
+-- player has dismissed nothing; it means nobody has said yet. Firing into that emptiness re-shows a
+-- card someone dismissed months ago, and `OnboardShown` LATCHES it, so it never self-corrects.
+--
+-- Two ways that happens, and this one flag closes both:
+--   • TIMING. `join` goes out on the first RoundUpdate, and ProfileUpdate waits on the server's
+--     `GET /players` round trip. Usually the fetch wins; a phase boundary landing inside it does
+--     not.
+--   • A FAILED JOIN FETCH, which is deterministic. ProfileUpdate is NOT only fired after that
+--     fetch — the server also fires it from every reveal ("local") and every reconciliation
+--     ("reconciled"), which run regardless. What those carry is a seenBeats the server does not
+--     actually know. The server now sends nil rather than `{}` for that (see fireProfile), and this
+--     flag is set only on a real list, so an "I don't know" no longer reads as "nothing seen".
+--
+-- Costs nothing in the normal case: every beat fires on a repeating occasion (join re-fires each
+-- RoundUpdate, throwsUnlocked on each round's rising edge, win on each win), so the first one after
+-- the profile lands shows the card. If the profile never answers, the session teaches nothing and
+-- the player recovers by opening the ledger, whose refresh repairs the server's cache. A first-timer
+-- missing their cards for one session beats a veteran being re-taught the entire game, latched.
 local profileSeen = false
 
 -- Whether each beat's event still needs firing. NOT the same as "has the event happened yet" —
@@ -183,7 +191,7 @@ local function publish()
     -- was still up when throws first unlocked — retry on the very next round instead of the beat
     -- most first-timers need most simply never firing again this session.
     local nowThrowsEnabled = HudModel.view(inputs, session).throwsEnabled
-    if not resolved.throwsUnlocked and nowThrowsEnabled and not wasThrowsEnabled then
+    if not resolved.throwsUnlocked and profileSeen and nowThrowsEnabled and not wasThrowsEnabled then
         EventBus.Onboard:Fire("throwsUnlocked", knownSeenBeats)
     end
     wasThrowsEnabled = nowThrowsEnabled
@@ -255,7 +263,7 @@ local function maybeShowReveal()
         -- just the session's first — `resolved.win` (only set once OnboardShown confirms "shown"
         -- or "alreadySeen") is what stops the retries, so a WIN dropped for stacking gets another
         -- chance at the player's next one instead of being marked taught-forever for nothing.
-        if not resolved.win and p.result == "WIN" then
+        if not resolved.win and profileSeen and p.result == "WIN" then
             EventBus.Onboard:Fire("win", knownSeenBeats)
         end
         publish()
@@ -344,8 +352,9 @@ RoundUpdate.OnClientEvent:Connect(function(info)
     -- phase. Fires on every RoundUpdate until `resolved.join` — in practice this resolves on the
     -- first call once the profile has landed (nothing can be up before this client's first Onboard
     -- fire ever), but gating on the confirmation rather than latching at fire time keeps this
-    -- consistent with the other three and costs nothing. `profileSeen` is the race guard: firing
-    -- with an empty `knownSeenBeats` would re-show a dismissed card and latch it (see above).
+    -- consistent with the other three and costs nothing. `profileSeen` is the guard all four beats
+    -- share: firing with a `knownSeenBeats` nobody has filled in re-shows a dismissed card and
+    -- latches it (see above).
     if not resolved.join and profileSeen then
         EventBus.Onboard:Fire("join", knownSeenBeats)
     end
@@ -413,10 +422,11 @@ ProfileUpdate.OnClientEvent:Connect(function(p)
     end
     if type(p.seenBeats) == "table" then
         knownSeenBeats = p.seenBeats
+        -- ONLY here. An absent seenBeats is the server saying it does not know (its join fetch
+        -- failed); an EMPTY list is the server saying this player has dismissed nothing, which is a
+        -- real answer about a real first-timer. Latching on the former is what re-taught veterans.
+        profileSeen = true
     end
-    -- Set even when the payload carries no seenBeats: what this latch means is "the profile has
-    -- answered", and an answer of "no beats seen" is a real answer — a genuine first-timer.
-    profileSeen = true
     if bankedNow > 0 then
         -- Onboarding beat 4's copy ("Banked. That's yours to keep.") says almost exactly what the
         -- bank toast says, anchored right below the plate — the same screen region the toast
@@ -433,7 +443,12 @@ ProfileUpdate.OnClientEvent:Connect(function(p)
         -- this engine are DEFERRED — `EventBus.Onboard:Fire` does not run OnboardingController's
         -- handler synchronously, so there is nothing to read back yet at this line. Stash the line
         -- and let the `EventBus.OnboardShown` listener below decide once the answer is in.
-        if resolved.bank then
+        -- `not profileSeen` takes the SAME branch as `resolved.bank`, and that is load-bearing: the
+        -- beat is suppressed when the profile has not answered, so the toast must be the thing that
+        -- speaks. Routing it through the pending-ack path instead would hand the line to a card that
+        -- is never going to be asked for, and the bank would land in silence. The seenBeats block
+        -- above runs first, so a ProfileUpdate that carries a real list has already latched.
+        if resolved.bank or not profileSeen then
             toast(`💰 BANKED {bankedNow} — that's yours to keep`)
         else
             local line = `💰 BANKED {bankedNow} — that's yours to keep`

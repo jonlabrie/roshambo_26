@@ -215,6 +215,9 @@ local MIN_CARD_H = 90 -- floor for AbsoluteSize.Y before AutomaticSize has laid 
 -- first layout pass, in which case the viewport minus the inset is the same number computed the
 -- long way.
 local function guiCanvas(): (Vector2, Vector2)
+    -- GetGuiInset returns (topLeft, bottomRight); only the topLeft one is wanted here. The
+    -- bottom-right inset is 0 on every platform this ships to, and the fallback below is a
+    -- one-frame stand-in for AbsoluteSize rather than a layout anyone measures against.
     local inset = GuiService:GetGuiInset()
     local size = gui.AbsoluteSize
     if size.X <= 0 or size.Y <= 0 then

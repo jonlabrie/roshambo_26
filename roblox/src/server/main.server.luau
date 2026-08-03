@@ -233,7 +233,18 @@ local hudPrefs: { [string]: boolean } = {}
 -- tracks dismissals itself for the rest of the session — this cache exists so a REJOIN (a fresh
 -- OnboardingController with nothing seeded yet) does not re-show a beat the player already
 -- dismissed last time.
+-- NIL MEANS "NOT KNOWN", not "nothing seen". The two are different answers and the client acts on
+-- them differently: an empty list says "a genuine first-timer, teach them", nil says "the profile
+-- has not answered yet, teach them nothing". They were conflated (`or {}` in fireProfile), which is
+-- how a failed join fetch re-taught a veteran the whole game — see fireProfile below.
 local hudSeenBeats: { [string]: { string } } = {}
+
+-- Bumped by every accepted SetHudPreference fire. RequestLedger stamps it before its GET and
+-- compares afterwards, so a response that was already in flight when a write landed is not applied
+-- over the newer value. That is the whole mechanism keeping the ledger's authoritative refresh —
+-- the only thing that repairs these two caches when the join fetch failed — from clobbering a
+-- concurrent preference toggle.
+local hudWriteSeq: { [string]: number } = {}
 
 -- The nine ledger counters are not wallet fields either, so they get the same treatment as hudPrefs:
 -- a per-instance cache, carried on ProfileUpdate.
@@ -282,7 +293,12 @@ local function fireProfile(player: Player, source: string)
             unresolvedWin = row.unresolvedWin,
             escalationPrompts = hudPrefs[tostring(player.UserId)] ~= false,
             counters = ledgerCounters[tostring(player.UserId)],
-            seenBeats = hudSeenBeats[tostring(player.UserId)] or {},
+            -- NOT `or {}`. This fires from the reveal ("local") and reconciliation ("reconciled")
+            -- paths too, which run whether or not the join fetch ever succeeded — so substituting
+            -- an empty list for an unknown one told the client "this player has dismissed nothing"
+            -- on the strength of a failed HTTP call, and every onboarding beat re-showed. nil is
+            -- the honest answer and the client waits for a real one.
+            seenBeats = hudSeenBeats[tostring(player.UserId)],
             source = source,
         })
     end
@@ -473,9 +489,23 @@ end)
 -- EconomySync fires it on a 1s retry loop up to twenty times per join. Putting an HTTP fetch behind
 -- it would mean up to twenty GET /players per player per join.
 --
--- Only the counters are taken from the response. The wallet is deliberately NOT re-applied: the
--- reconciliation loop already owns it authoritatively, and a mid-round fetch could stomp a fresher
--- local reveal with a settlement that has not happened yet.
+-- The counters, the escalation preference and the seen-beats list are taken from the response; the
+-- WALLET deliberately is not. The reconciliation loop already owns the wallet authoritatively, and a
+-- mid-round fetch could stomp a fresher local reveal with a settlement that has not happened yet.
+--
+-- This is also the ONLY repair path for hudPrefs/hudSeenBeats: they are otherwise written once, by
+-- the join fetch, inside its `if res.ok`. If that GET failed they stay nil for the session — the
+-- player's escalation preference silently reads back as ON however the database has it, and their
+-- dismissed onboarding beats are unknown. Opening the ledger is what fixes both.
+--
+-- WHAT IT MUST NOT DO is apply a response that went stale in flight. The failure that flagged it:
+-- open the ledger (fires this GET), toggle the escalation switch inside its latency window ->
+-- SetHudPreference sets the cache and PUTs -> this GET returns carrying the PRE-toggle value and
+-- overwrites it, and fireProfile echoes it back, so the switch visibly flips itself back. Hence the
+-- sequence stamp: `hudWriteSeq[uid]` is read before the GET and re-read after, and the two
+-- preference fields are applied only if no write landed in between. A raced refresh yields to the
+-- write (which is authoritative — it is what the database now holds) instead of either clobbering
+-- it or throwing the whole response away.
 local lastLedgerFetch: { [string]: number } = {}
 local LEDGER_FETCH_DEBOUNCE = 3
 
@@ -486,6 +516,8 @@ RequestLedger.OnServerEvent:Connect(function(player)
         return
     end
     lastLedgerFetch[uid] = now
+    -- Stamped BEFORE the yield, compared after: see the note above.
+    local seqAtFetch = hudWriteSeq[uid] or 0
     task.spawn(function()
         local res = net:getPlayer(uid)
         if not res.ok then
@@ -494,12 +526,12 @@ RequestLedger.OnServerEvent:Connect(function(player)
             return
         end
         seedCounters(uid, res.data.counters)
-        -- ONLY the counters, exactly as the note above promises. hudPrefs/hudSeenBeats are
-        -- deliberately NOT re-applied: this response was already in flight when it was read, so a
-        -- SetHudPreference write that landed inside its latency window would be overwritten by the
-        -- PRE-write value and echoed straight back to the client — open the ledger, flick the
-        -- escalation switch, watch it flip itself back. Both caches are owned by SetHudPreference
-        -- for the life of the session and seeded once at join.
+        if (hudWriteSeq[uid] or 0) == seqAtFetch then
+            hudPrefs[uid] = res.data.escalationPrompts ~= false
+            if type(res.data.seenBeats) == "table" then
+                hudSeenBeats[uid] = res.data.seenBeats
+            end
+        end
         fireProfile(player, "ledger")
     end)
 end)
@@ -518,6 +550,11 @@ SetHudPreference.OnServerEvent:Connect(function(player, body)
     if next(payload) == nil then
         return
     end
+    -- Stamp the write NOW — before the queue wait and before the PUT, both of which yield — so an
+    -- in-flight RequestLedger refresh knows its response predates this write and must not apply its
+    -- own (older) preference fields over it. Bumped on the accepted FIRE rather than on the cache
+    -- mutation so the guarded window covers the whole life of the write, queue time included.
+    hudWriteSeq[tostring(player.UserId)] = (hudWriteSeq[tostring(player.UserId)] or 0) + 1
     -- THROUGH THE QUEUE, like every other mutating handler (SetPadPreference, SetBackDoor,
     -- RequestPurchase, BankRequest). This body yields on HTTP, and a bare task.spawn per fire meant
     -- a scripted client looping this remote could issue unbounded concurrent PUTs — enough to eat
@@ -583,6 +620,7 @@ Players.PlayerRemoving:Connect(function(player)
     ledgerCounters[tostring(player.UserId)] = nil
     lastLedgerFetch[tostring(player.UserId)] = nil
     hudSeenBeats[tostring(player.UserId)] = nil
+    hudWriteSeq[tostring(player.UserId)] = nil
 end)
 
 local lastBoard: any = nil
