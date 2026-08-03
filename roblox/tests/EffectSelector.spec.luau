@@ -6,7 +6,11 @@ local describe, test, expect = harness.describe, harness.test, harness.expect
 
 describe("EffectSelector", function()
     test("LOSS maps deterministically by world throw", function()
-        local s = EffectSelector.new(EffectRegistry, {
+        -- Fixture, not the real EffectRegistry: LOSS is parked there (empty pool), but the
+        -- byThrow branch itself is still live code and still needs coverage.
+        local s = EffectSelector.new({
+            LOSS = { byThrow = { R = "fateBoulder", P = "fatePaper", S = "fateShears" } },
+        }, {
             random = function()
                 return 0
             end,
@@ -42,5 +46,29 @@ describe("EffectSelector", function()
             end,
         })
         expect(s:select("NOPE", {})).toBeNil()
+    end)
+end)
+
+describe("EffectRegistry — fates are parked", function()
+    test("LOSS selects to nothing, for every world throw", function()
+        local selector = EffectSelector.new(EffectRegistry, {
+            random = function()
+                return 0
+            end,
+        })
+        for _, w in { "R", "P", "S" } do
+            expect(selector:select("LOSS", { worldThrow = w })).toBe(nil)
+        end
+    end)
+
+    test("the celebrations are untouched", function()
+        local selector = EffectSelector.new(EffectRegistry, {
+            random = function()
+                return 0
+            end,
+        })
+        for _, slot in { "REVEAL", "WIN", "SAFE", "BANK" } do
+            expect(selector:select(slot, {}) ~= nil).toBe(true)
+        end
     end)
 end)
