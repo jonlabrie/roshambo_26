@@ -26,12 +26,14 @@
 -- player was told nothing — the toast had already been suppressed on the assumption the card would
 -- cover it. "dropped" is the one outcome that must NOT be latched: the caller is expected to retry
 -- on the next natural occurrence of that event (next round's throwsUnlocked, the next win, etc).
+local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local OnboardingBeats = require(shared:WaitForChild("OnboardingBeats"))
+local HudLayout = require(shared:WaitForChild("HudLayout"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local player = Players.LocalPlayer
@@ -43,16 +45,17 @@ local INK_CREAM = Color3.fromRGB(240, 234, 216)
 local WASHI = Color3.fromRGB(26, 24, 28)
 local GOLD = Color3.fromRGB(212, 176, 102)
 
--- Layout constants MIRROR HudController's own — not shared, because HudController's are file-local
--- too (see its "SCALE, not pixels" note). A card's whole job is to sit beside what HudController
--- placed, so it has to agree with those numbers exactly, not approximate them.
-local EDGE = 12
-local JUMP_CLEARANCE = 0.15
-local PLATE_H = 46
-local AREA_H = 120 -- TILE(34) + ROW_GAP(10) + BTN_H(76): the tape+buttons cluster's height
-local ROW_GAP = 10
-local SLOT_H = 40
-local SLOT_GAP = 8
+-- Layout constants come from shared/HudLayout, the SAME module HudController lays itself out from.
+-- A card's whole job is to sit beside what HudController placed, so it has to agree with those
+-- numbers exactly, not approximate them — these used to be hand-copied here (including a
+-- hand-computed `AREA_H = 120`), which meant a tweak to BTN_H would move the cluster while this
+-- file's safe band went on believing the old height.
+local EDGE = HudLayout.EDGE
+local JUMP_CLEARANCE = HudLayout.JUMP_CLEARANCE
+local AREA_H = HudLayout.AREA_H
+local ROW_GAP = HudLayout.ROW_GAP
+local SLOT_H = HudLayout.SLOT_H
+local SLOT_GAP = HudLayout.SLOT_GAP
 
 local CARD_W = 220
 local PLATE_CARD_W = 260
@@ -63,6 +66,14 @@ local DRUM_CARD_W = 220
 -- default to false; never set true) so the one button is the whole interactive budget this
 -- surface spends — consistent with HudController's "every sinking pixel is a permanent hole in
 -- the camera-drag surface" discipline.
+-- ONE COORDINATE SPACE, and it is this ScreenGui's own. Like HudController's, this gui leaves
+-- IgnoreGuiInset at its default FALSE, so its (0, 0) sits BELOW the topbar inset (~36px) — which is
+-- what lets the static anchors below reuse HudController's numbers directly. Camera:ViewportSize and
+-- Camera:WorldToViewportPoint, by contrast, are RAW full-screen values that include the inset band.
+-- Mixing the two (round-3 review) put the drum bubble ~36px low AND made the safe band's maxY ~36px
+-- too permissive, so a card could still overlap the top of the throw/slot cluster despite
+-- SAFE_MARGIN. Everything below is in GUI SPACE: `guiCanvas()` converts, and nothing here reads the
+-- camera's viewport directly.
 local gui = Instance.new("ScreenGui")
 gui.Name = "RoshamboOnboarding"
 gui.ResetOnSpawn = false
@@ -145,7 +156,7 @@ hintLabel.Parent = card
 local STATIC_ANCHORS: { [string]: { point: Vector2, offset: UDim2, width: number } } = {
     plate = {
         point = Vector2.new(0.5, 0),
-        offset = UDim2.new(0.5, 0, 0, EDGE + PLATE_H + 60),
+        offset = UDim2.new(0.5, 0, 0, HudLayout.PLATE_BOTTOM + 60),
         width = PLATE_CARD_W,
     },
     -- Both sit above the WHOLE bottom-right cluster — tape+buttons AND the slot above them —
@@ -176,32 +187,53 @@ local STATIC_ANCHORS: { [string]: { point: Vector2, offset: UDim2, width: number
 -- tracked, so this literal is never reachable in ordinary play.
 local DRUM_LAST_RESORT = { point = Vector2.new(0.5, 0), offset = UDim2.new(0.5, 0, 0, 140) }
 
--- The band the minimal HUD does NOT own, in top-left screen space (Y grows downward, same
--- convention WorldToViewportPoint returns). Round-1 review caught that clamping only to the
+-- The band the minimal HUD does NOT own, in GUI SPACE (this ScreenGui's own; Y grows downward, and
+-- the topbar inset is already excluded — see `guiCanvas`). Round-1 review caught that clamping only to the
 -- viewport edges was not enough: the join card is the first thing a new player sees, stays up
 -- until tapped, and the camera is theirs to swing for as long as it's up — so the drum can project
 -- anywhere, including straight over the throw buttons or the plate. `PLATE_BOTTOM` is where the
 -- plate's own footprint ends; `CLUSTER_TOP_FROM_BOTTOM` is where the tape+buttons+slot cluster's
 -- footprint begins, measured up from the screen's bottom edge (mirrors HudController's own EDGE /
--- AREA_H / SLOT_H numbers above). Round-2 review caught that this band was built but never
+-- AREA_H / SLOT_H numbers, now shared). Round-2 review caught that this band was built but never
 -- actually applied to the NOT-YET-TRACKED fallback — only to a live projection — leaving the
 -- exact same "card covers BANK THESE" failure mode reachable through a slower path (join fires on
 -- the first RoundUpdate, which can beat the drum's replication).
-local PLATE_BOTTOM = EDGE + PLATE_H
-local CLUSTER_TOP_FROM_BOTTOM = EDGE + AREA_H + ROW_GAP + SLOT_H
+local PLATE_BOTTOM = HudLayout.PLATE_BOTTOM
+local CLUSTER_TOP_FROM_BOTTOM = HudLayout.CLUSTER_TOP_FROM_BOTTOM
 local SAFE_MARGIN = 24 -- round-2: was 16, widened to also give the toast strip more clearance
 local DRUM_BUBBLE_LIFT = 36 -- vertical gap between the projected point and the card's bottom edge
 local MIN_CARD_H = 90 -- floor for AbsoluteSize.Y before AutomaticSize has laid out even once —
 -- round-2: was 60, under the card's real ~80-90px, so the very first place() under-clamped by a
 -- frame or two
 
+-- The card's canvas, in GUI SPACE: the size of the area this ScreenGui actually lays out in, and
+-- the offset that converts a raw viewport point into it. With IgnoreGuiInset false the gui's canvas
+-- is the viewport MINUS the topbar inset at the top, so the two differ by exactly that inset — the
+-- ~36px that used to be unaccounted for on both the projection and the bottom bound.
+--
+-- `gui.AbsoluteSize` is the canvas by definition, so it is preferred; it can read (0, 0) before the
+-- first layout pass, in which case the viewport minus the inset is the same number computed the
+-- long way.
+local function guiCanvas(): (Vector2, Vector2)
+    local inset = GuiService:GetGuiInset()
+    local size = gui.AbsoluteSize
+    if size.X <= 0 or size.Y <= 0 then
+        local cam = workspace.CurrentCamera
+        local vp = if cam then cam.ViewportSize else Vector2.new(1280, 720)
+        size = Vector2.new(vp.X - inset.X, vp.Y - inset.Y)
+    end
+    return size, inset
+end
+
 -- The same clamp band `place()` uses for a live projection, factored out so the NOT-YET-TRACKED
 -- fallback (drum unresolved, or off-camera and never once seen) runs through it too rather than
--- reusing an unclamped fixed position.
-local function safeYBounds(vp: Vector2): (number, number)
+-- reusing an unclamped fixed position. `canvas` is GUI SPACE (see `guiCanvas`), never the raw
+-- viewport: measuring maxY against the taller viewport made it a topbar-inset too permissive, which
+-- is enough for a card to sit on top of the throw/slot cluster despite SAFE_MARGIN.
+local function safeYBounds(canvas: Vector2): (number, number)
     local cardH = math.max(card.AbsoluteSize.Y, MIN_CARD_H)
     local minY = PLATE_BOTTOM + SAFE_MARGIN + cardH
-    local maxY = math.max(minY, vp.Y - CLUSTER_TOP_FROM_BOTTOM - SAFE_MARGIN)
+    local maxY = math.max(minY, canvas.Y - CLUSTER_TOP_FROM_BOTTOM - SAFE_MARGIN)
     return minY, maxY
 end
 
@@ -263,15 +295,19 @@ local function place()
         end
         return
     end
-    local vp = cam.ViewportSize
+    local canvas, inset = guiCanvas()
     local at = drumPart
     if at then
         local screen, onScreen = cam:WorldToViewportPoint(at.Position)
         if onScreen then
-            local minY, maxY = safeYBounds(vp)
+            -- Raw viewport -> gui space. WorldToViewportPoint knows nothing about the topbar; this
+            -- card's Position is interpreted inside a gui that does. Subtracting the inset is what
+            -- makes the bubble land ON the drum rather than an inset below it.
+            local px, py = screen.X - inset.X, screen.Y - inset.Y
+            local minY, maxY = safeYBounds(canvas)
             local half = DRUM_CARD_W * 0.5 + 8
-            local x = math.clamp(screen.X, half, math.max(half, vp.X - half))
-            local y = math.clamp(screen.Y - DRUM_BUBBLE_LIFT, minY, maxY)
+            local x = math.clamp(px, half, math.max(half, canvas.X - half))
+            local y = math.clamp(py - DRUM_BUBBLE_LIFT, minY, maxY)
             card.AnchorPoint = Vector2.new(0.5, 1) -- bubble ABOVE the projected point
             card.Position = UDim2.fromOffset(x, y)
             drumEverTracked = true
@@ -282,9 +318,9 @@ local function place()
         -- Not yet resolved, or resolved but off-camera and never once seen: still safe-banded and
         -- horizontally centred, sitting at the TOP of the band (closest to the plate, since that is
         -- the more natural resting spot for "the arena is live" than hugging the throw cluster).
-        local minY = safeYBounds(vp)
+        local minY = safeYBounds(canvas)
         card.AnchorPoint = Vector2.new(0.5, 1)
-        card.Position = UDim2.fromOffset(vp.X * 0.5, minY)
+        card.Position = UDim2.fromOffset(canvas.X * 0.5, minY)
     end
     -- else: hold whatever position was last set — do not teleport to the fallback and back as the
     -- camera swings the drum in and out of view.

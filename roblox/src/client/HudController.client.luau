@@ -32,6 +32,7 @@ local TweenService = game:GetService("TweenService")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local HudModel = require(shared:WaitForChild("HudModel"))
+local HudLayout = require(shared:WaitForChild("HudLayout"))
 local Glyphs = require(shared:WaitForChild("Glyphs"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
@@ -54,27 +55,30 @@ local POT_RED = Color3.fromRGB(190, 58, 52) -- the pot disc; deeper than LOSS_RE
 
 local THROWS = { "R", "P", "S" }
 
--- SCALE, not pixels. The jump button occupies roughly the right 3-13% of the screen, and a pixel
--- offset guessed against a desktop viewport is wrong on every phone. Hold the throw area inboard
--- by a generous fraction of the width; the device-emulator pass settles the real number.
-local JUMP_CLEARANCE = 0.15
-local EDGE = 12
+-- The skeleton — every number OnboardingController also has to know, so that it can place a card
+-- beside this HUD without covering a live button — lives in shared/HudLayout. SCALE, not pixels, for
+-- the jump-button clearance: the jump button occupies roughly the right 3-13% of the screen, and a
+-- pixel offset guessed against a desktop viewport is wrong on every phone. Numbers only this file
+-- uses stay here.
+local JUMP_CLEARANCE = HudLayout.JUMP_CLEARANCE
+local EDGE = HudLayout.EDGE
 
-local PLATE_W, PLATE_H = 300, 46
-local BTN_W, BTN_H, BTN_GAP = 76, 76, 10
+local PLATE_W, PLATE_H = 300, HudLayout.PLATE_H
+local BTN_W, BTN_GAP = 76, 10
+local BTN_H = HudLayout.BTN_H
 local TAPE_N = 5
-local TILE, TILE_GAP = 34, 6
-local ROW_GAP = 10
+local TILE, TILE_GAP = HudLayout.TILE, 6
+local ROW_GAP = HudLayout.ROW_GAP
 local AREA_W = 3 * BTN_W + 2 * BTN_GAP
-local AREA_H = TILE + ROW_GAP + BTN_H
+local AREA_H = HudLayout.AREA_H
 local TIMER_H = 3
 local TIMER_H_HOT = 7 -- the escalation thickens the hairline as well as reddening it
 local TOAST_SECONDS = 4
 local TOAST_MAX = 6
 
 -- The one slot above the throw row: the pot indicator, or the fate prompt, or nothing.
-local SLOT_H = 40
-local SLOT_GAP = 8
+local SLOT_H = HudLayout.SLOT_H
+local SLOT_GAP = HudLayout.SLOT_GAP
 local DISC = SLOT_H
 local BANK_W = 128
 local FATE_W = 190
