@@ -1250,11 +1250,19 @@ git commit -m "feat(roblox): the plate measures the jump button instead of guess
 **Interfaces:**
 - Consumes: `view.chosen`, `view.switchPrompt`, `view.throwsEnabled`.
 
-- [ ] **Step 1: Delete the confirm strip**
+- [ ] **Step 1: Confirm the strip is already gone**
 
-Remove `confirmStrip`, `confirmHint`, `dontAsk`, `dontAskBox`, `dontAskLabel`, the
-`CONFIRM_COPY` / `RELEASE_COPY` / `HINT_W` / `HINT_W_WIDE` / `CONFIRM_PAD` / `CONFIRM_BOX`
-constants, the `dontAsk` click handler, and the `confirmStrip.Visible = …` block in `render`.
+**This moved to Task 6.** The strip's construction read `HudLayout.SLOT_H`, `CONFIRM_H` and
+`CONFIRM_GAP`, all of which Task 3 removed — so the whole file failed to load, and no task
+between 3 and 8 could be run in Studio at all. Task 6 deleted the instance, its children
+(`confirmHint`, `dontAsk`, `dontAskBox`, `dontAskLabel`), its constants and its click handler.
+
+Verify rather than repeat the work:
+
+```bash
+cd roblox && grep -n "confirmStrip\|confirmHint\|dontAsk\|CONFIRM_" src/client/HudController.client.luau
+```
+Expected: no matches. If any remain, delete them here.
 
 - [ ] **Step 2: Build the prompt pill**
 
@@ -1998,3 +2006,96 @@ Nothing in this plan can verify:
 3. whether the plate clears the jump button on a real phone (it measures, but the measurement
    is only as good as `TouchControlFrame` being where we look for it)
 4. whether one switch alone reads correctly in the preferences footer
+
+---
+
+## AMENDMENT (2026-08-03, mid-execution) — the plate moves again, and numbers count
+
+The owner superseded the right-margin placement after Task 7 had landed, and added a behaviour
+the plan did not have. Task 7's committed work (`df7bb80`, `781eb41`) is partly superseded:
+the ledger `≡` button **stays**, the plate's inertness **stays**, its placement and the whole
+jump-button measurement **go**.
+
+Spec: `2026-08-03-play-hud-revision-design.md` §2, sections "The player-state plate moves to the
+bottom row, and is normally hidden" and "Numbers count rather than jump".
+
+### Task 7A: the plate relocates and learns to hide
+
+**Files:** Modify `roblox/src/client/HudController.client.luau`, `roblox/src/shared/HudLayout.luau`,
+`roblox/tests/HudLayout.spec.luau`.
+
+- [ ] **Step 1: Delete the jump-button measurement.** `HudLayout.plateBottomOffset` and
+  `HudLayout.PLATE_JUMP_GAP` go, with the three tests covering them
+  (`HudLayout.plateBottomOffset — where the plate sits above the jump button`). In the
+  controller: `jumpButton()`, `placePlate()`, `rewatchJump()`, `jumpWatch` and every connection
+  they own. Nothing in the HUD is positioned against platform-owned geometry after this.
+
+- [ ] **Step 2: Rebuild the plate as one line in the bottom row.** Same height as a tape tile
+  (`TILE` / `TILE_TOUCH`), right-aligned so its right edge sits `LEDGER_GAP` left of the tape's
+  left edge, bottom-aligned with the tape. `AutomaticSize = X` so it reserves no dead space.
+  One `TextLabel` holding the whole line — `900`, or `×3  900` when a streak rides. The plate
+  Frame keeps its opaque backing and its `GOLD` stroke; **no stroke on the label**. Everything
+  stays `Active = false`: it is inert, and the `≡` button is the only door.
+  `HudLayout.PLATE_W` / `PLATE_ROW_H` are replaced by whatever the single line needs — delete
+  them if nothing reads them.
+
+- [ ] **Step 3: Hide it, and give it a reveal.** Normally `Visible = false`. Reveal on:
+  the `≡` button's first tap, and any change in `view.plate.points` or `view.plate.streak`.
+  Hold `PLATE_HOLD = 2` seconds, then fade over `PLATE_FADE = 0.35`.
+  The fade must move the label's `TextTransparency` **and** the Frame's
+  `BackgroundTransparency` and its stroke — a backing that stays while the text goes is worse
+  than either. Re-revealing during a fade cancels it and restores full opacity.
+  Guard the reveal on a **changed target**, not on `render` running: `render` is a 10Hz repaint
+  and a reveal re-armed every tick would never fade. Compare against the last values seen.
+
+- [ ] **Step 4: Make `≡` two-stage.** First tap reveals. A tap while anything is still visible —
+  during the hold **or** the fade — fires `EventBus.OpenLedger` instead. A tap after it has gone
+  reveals again. The visible-window test must be "is it on screen", not a 2s timer, so the
+  control never invites a tap it will not honour.
+
+- [ ] **Step 5: Verify and commit.** All three gates. Reconcile every `HudLayout.X` and
+  `view.X` read. Confirm `EventBus.OpenLedger:Fire` still occurs exactly once. Confirm the plate
+  does not overlap the tape, the `≡` button or the timer hairline, showing the arithmetic at
+  both tiers.
+
+```bash
+git commit -m "feat(roblox): the wallet is a glance, not a fixture"
+```
+
+### Task 7B: numbers count rather than jump
+
+**Files:** Create `roblox/src/shared/RollingNumber.luau` and `roblox/tests/RollingNumber.spec.luau`;
+modify `roblox/src/client/HudController.client.luau`.
+
+- [ ] **Step 1: Write the failing tests.** `RollingNumber` is pure — no Roblox globals, Lune-
+  testable, dependency-injected. Surface:
+  `RollingNumber.valueAt(from: number, to: number, t: number): number`, where `t` is elapsed
+  fraction in `[0, 1]`, easing out (decelerating), returning an **integer**.
+  Cover: `t = 0` gives exactly `from`; `t >= 1` gives exactly `to` (never overshoots, never
+  lands one short — an off-by-one here shows a wrong total on screen); it is monotonic between;
+  it counts **down** as correctly as up; `from == to` is constant; and a `t` outside `[0, 1]`
+  clamps rather than extrapolating. Also `RollingNumber.DURATION`.
+
+- [ ] **Step 2: Run, confirm failure, implement.**
+
+- [ ] **Step 3: Wire both figures.** A driver in `HudController` that, when a displayed figure's
+  target changes, animates from the currently-shown value to the new one over
+  `RollingNumber.DURATION`. Applies to the points and streak in the plate's line, and to the pot
+  on the bank button.
+  **Key the animation on the target changing, not on `render` running** — restarting the count
+  every 10Hz tick freezes every number at its first frame. This is precisely how the bank pulse
+  failed earlier in this branch; do not repeat it.
+
+- [ ] **Step 4: Let the bank button survive its own count-down.** `view.bankVisible` goes false
+  the instant the model's pot is zero, which would take the animation off screen before anyone
+  saw it. The button's visibility must follow the **displayed** figure: hide only once the
+  count has actually reached zero. This is what makes banking read as a transfer — the pot
+  draining while the balance below rises — so it is the point of the task, not a detail.
+
+- [ ] **Step 5: Verify and commit.** All three gates. Confirm by tracing: a bank lands as one
+  `ProfileUpdate` carrying both the emptied pot and the raised total, so both figures animate
+  from the same event with no special case. A LOSS drains the pot with the balance untouched.
+
+```bash
+git commit -m "feat(roblox): banking looks like what it is"
+```

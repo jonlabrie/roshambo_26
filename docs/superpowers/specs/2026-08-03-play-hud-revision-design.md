@@ -153,37 +153,75 @@ consecutive back-outs also reach silence.
 
 ## §2 — Layout
 
-### The player-state plate moves to the right margin
+### The player-state plate moves to the bottom row, and is normally hidden
 
-Top-centre put it in the middle of a phone's view. It moves to the **right margin, above the
-jump button** — the strip Roblox claims for jump and camera drag, which a display with no
-interactive elements can safely occupy. `Active` stays `false` on every part of it, so
-camera drags pass straight through.
+**Superseded the right-margin placement (owner, mid-implementation).** The plate does not go
+into the jump/camera strip at all. It becomes a **single line at the bottom of the cluster,
+below the hamburger and to the left of the tape**, exactly as tall as a tape tile so the bottom
+row reads as one band.
 
-- inside the `JUMP_CLEARANCE` (0.15) column, `EDGE` from the right edge
-- **points always**, in cream
-- **streak only when non-zero**, above the points, in gold, as `×3`
-- **the pot never appears here** — it has its own control (below)
+- **normally hidden.** Points are not a thing you need at a glance; a riding pot is, and that
+  already has its own always-visible `BANK n POINTS` button.
+- **revealed by a single tap of the hamburger**, and by any change in the point total or the
+  streak length (see below)
+- **holds for 2 seconds, then fades**
+- **a second tap of the hamburger while it is visible opens the ledger**
 
-Its height follows its contents: one row when the streak is zero, two when it isn't.
+The window for that second tap lasts as long as **anything is on screen** — the hold plus the
+fade — not exactly 2s. A control that is still visible must still be answerable; the alternative
+is a UI inviting a gesture it will not honour, which is the same defect the post-send throw
+window turned out to be.
 
-**Above, not below.** Roblox's default `TouchJump` sizes the button 70px on screens ≤500px
-tall and positions it `UDim2.new(1, -(size*1.5-10), 1, -size-20)`, which leaves roughly
-**20px** between its lower edge and the bottom of the screen — and on iOS that 20px is the
-home indicator. On a tablet the button sits higher and there is ~90px below it, which is why
-"below" looked viable. Phone-first, it is not. Above the button there is ~300px at every
-size.
+Content is one line, right-aligned against the tape's left edge, content-sized so it reserves no
+dead space: `900` normally, `×3  900` when a streak is riding.
 
-**The plate measures the button rather than predicting it.** The numbers above are Roblox's
-current defaults, not a contract: they differ by screen size, they have changed before, and
-nothing stops them changing again. So the plate reads
-`PlayerGui.TouchGui.TouchControlFrame.JumpButton` at runtime and sits `PLATE_JUMP_GAP = 10`
-above its measured top edge, re-deriving when that button resizes or the viewport changes.
+This kills the jump-button measurement entirely. `HudLayout.plateBottomOffset` loses its only
+caller and goes, with its tests — the plate no longer sits anywhere near anything Roblox owns.
 
-If `TouchGui` is absent — desktop, where there is no jump button at all — the plate falls
-back to the bottom-right corner at `EDGE`, which is free on that platform. This is the only
-placement in the HUD that depends on something Roblox owns, so it is the one placement that
-must not hard-code Roblox's arithmetic.
+### Numbers count rather than jump
+
+Every figure the HUD shows for the wallet **animates to its new value** rather than snapping:
+the point total, the streak, and the pot on the bank button. Roughly half a second, decelerating.
+
+The reason this is worth building rather than decoration: **banking becomes legible as a
+transfer.** Press `BANK 27 POINTS` and the button's figure runs down to zero while the balance
+below runs up by the same amount. Nothing has to say what banking did; the two numbers say it by
+moving in opposite directions at the same moment.
+
+It falls out of one rule — *animate any change* — rather than a special case, because a bank
+lands as a single `ProfileUpdate` carrying both the emptied pot and the raised total. Two other
+cases come free and read correctly:
+
+- a **LOSS** drains the pot to zero with the balance untouched — a forfeit, visibly not a
+  transfer
+- a **WIN** triples the pot in place
+
+Two consequences the implementation has to honour:
+
+1. **The bank button must survive its own count-down.** Its visibility follows the *displayed*
+   figure, not the model's — `bankVisible` goes false the instant the pot is zero, so a button
+   that hid on the model would take the animation off screen before anyone saw it.
+2. **The animation is keyed on the target changing, not on `render` running.** `render` is a
+   10Hz repaint; restarting the count every tick would freeze every number at its first frame.
+   This is exactly how the bank pulse failed earlier in this branch.
+
+### The right margin, and why it isn't
+
+Recorded because the reasoning still holds and the constants it produced are being deleted.
+
+The plate was going to sit in the right margin above the jump button. **Above, not below**:
+Roblox's default `TouchJump` sizes that button 70px on screens ≤500px tall and positions it
+`UDim2.new(1, -(size*1.5-10), 1, -size-20)`, leaving roughly **20px** beneath it on a landscape
+phone — and on iOS that 20px is the home indicator. A tablet has ~90px there, which is what made
+"below" look viable; phone-first, it is not.
+
+That placement also had the plate **measure** the jump button rather than predict it, since
+those numbers are Roblox's current defaults rather than a contract.
+
+None of it survives: the plate is in the bottom row now and touches nothing Roblox owns.
+`HudLayout.PLATE_JUMP_GAP` and `HudLayout.plateBottomOffset` are deleted with their tests. The
+lesson worth keeping is the general one — **anything positioned against something the platform
+owns must measure it, not encode its arithmetic.** Nothing in the HUD does that any more.
 
 ### The ledger needs its own door
 
@@ -211,6 +249,17 @@ This concedes the "no persistent button" principle that deleted the teahouse tog
 conceded knowingly: that toggle was removed because it *collided* with the throw row on a narrow
 viewport, not because a button was unaffordable. This one is placed against the cluster rather
 than into a corner, so it moves with the cluster and cannot collide with it.
+
+**The button is two-stage**, and the plate's reveal is its first stage:
+
+| Tap | State | Result |
+| --- | --- | --- |
+| 1st | nothing visible | reveal the points line; hold 2s, then fade |
+| 2nd | line still visible (hold **or** fade) | open the ledger |
+| 1st | line faded out | reveal again — the count restarts |
+
+A double-tap from cold therefore opens the ledger, because the first tap reveals and the second
+lands inside the window. Nobody has to learn the two stages to reach the ledger the obvious way.
 
 ### The pot becomes one button
 
@@ -456,6 +505,11 @@ Not automatable, and therefore the owner's Studio gate: whether the dimmed glyph
 12. **The ledger gets a dedicated `≡` button** and the plate becomes genuinely inert. Found only
     when the plate moved: it had been the ledger's only door, and this spec's own premise —
     "there are no interactive elements in this display" — was false about the thing it described.
+13. **The plate leaves the jump strip for the bottom row, and is normally hidden**, revealed by
+    the `≡` button's first tap or by any change in points or streak. The `≡` is two-stage: a
+    second tap while the line shows opens the ledger.
+14. **Wallet figures count rather than jump.** One rule — animate any change — makes banking
+    legible as a transfer, the pot draining into the balance, with no copy to explain it.
 
 ## Open
 
