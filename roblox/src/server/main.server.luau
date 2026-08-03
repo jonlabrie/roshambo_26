@@ -425,6 +425,13 @@ ResolveWin.OnServerEvent:Connect(function(player, choice)
             })
             pushStats(player)
             fireProfile(player, if choice == "bank" then "banked" else "risked")
+        else
+            -- A successful postResolveWin is the ONLY in-session path that clears the gate:
+            -- onReconciled deliberately passes unresolvedWin through, and applyLocalResult
+            -- cannot run for a gated player because they cannot throw. So a dropped request
+            -- here leaves the player unable to play, and a silent failure makes that lockout
+            -- undiagnosable. Mirrors the [PROFILE] sync warn above.
+            warn(`[RESOLVE] {player.Name} failed ({choice}): {res.error or res.status}`)
         end
     end)
 end)
