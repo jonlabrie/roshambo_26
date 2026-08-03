@@ -9,10 +9,17 @@
 --     one point it goes over the wire,
 --   • the HudModel session — the escalation's consecutive-miss backoff.
 --
--- FATES ARE PARKED (2026-08-03). The rock drop, the avatar grow and ACCEPT YOUR FATE are all
--- off; a LOSS now simply forfeits the pot and says so on the drum. The machinery they rode on
--- (ChoreographyMachine, EffectSelector, TheaterController) is intact and still drives the WIN,
--- SAFE and BANK effects — see the spec's §5 for where the seam is.
+-- FATES ARE BEING PARKED (2026-08-03), and THIS FILE IS ONLY THE FIRST HALF. What has gone from
+-- here is the client's fate WAIT: ACCEPT YOUR FATE, the fate-bound throw block, and the
+-- spoiler-gated hand-off that held a loss back for the drum.
+--
+-- Still live until the server half lands: the rock drop (FateController, driven by
+-- EffectRegistry.LOSS), the avatar grow on a win, and the server's own fate gate, which still
+-- refuses a pick from a player mid-chase. Do not read the absence of fate wiring here as the
+-- feature being off — a player can still be caught by a fate this file no longer surfaces.
+--
+-- The machinery underneath (ChoreographyMachine, EffectSelector, TheaterController) is intact by
+-- design and keeps driving the WIN, SAFE and BANK effects. See the spec's §5 for the seam.
 --
 -- It publishes all of that on `EventBus.HudState:Fire(inputs, aux)`:
 --   inputs : a HudModel.Inputs — the controller calls HudModel.view(inputs, aux.session)

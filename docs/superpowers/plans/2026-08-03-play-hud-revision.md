@@ -1867,13 +1867,33 @@ Keep `FateRegistry`, `local fates = FateRegistry.new()` and the `fates:isBound` 
         onReveal = function(reveal)
 ```
 
-- [ ] **Step 6: Run and commit**
+- [ ] **Step 6: Make the client's header note true**
+
+`main.client.luau:12` carries a note written in Task 5 saying fates are only HALF parked — that
+the rock drop, the avatar grow and the server's fate gate are still live. **This task is what
+makes them not live**, so the note is now wrong in the other direction. Replace it with:
+
+```luau
+-- FATES ARE PARKED (2026-08-03). The rock drop, the avatar grow and ACCEPT YOUR FATE are all
+-- off: the client stopped surfacing the wait (Task 5) and the server stopped summoning it
+-- (Task 13, at EffectRegistry.LOSS and the reveal handler). A LOSS now simply forfeits the pot
+-- and says so on the drum.
+--
+-- The machinery underneath (ChoreographyMachine, EffectSelector, TheaterController) is intact by
+-- design and keeps driving the WIN, SAFE and BANK effects. See the spec's §5 for the seam.
+```
+
+The two-commit split is deliberate and the note has to track it. A comment claiming a feature is
+off while half of it still runs is worse than no comment — it is the one thing a reader trusts
+without checking.
+
+- [ ] **Step 7: Run and commit**
 
 Run: `lune run tests/run` — expect PASS.
 
 ```bash
 cd roblox && stylua src tests tools && selene src tools
-git add roblox/src/shared/EffectRegistry.luau roblox/src/server/main.server.luau roblox/tests/EffectSelector.spec.luau
+git add roblox/src/shared/EffectRegistry.luau roblox/src/server/main.server.luau roblox/src/client/main.client.luau roblox/tests/EffectSelector.spec.luau
 git commit -m "feat(roblox): park the fates at the one line that summons them"
 ```
 
