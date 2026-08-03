@@ -11,9 +11,9 @@ Replace the provisional Roblox play UI with a designed, touch-first HUD system: 
 **minimal** state that suits an ambient hangout, a deliberate **maximal** mode for players who
 want to study their numbers, and four onboarding beats that ride the same surface.
 
-Along the way this fixes two defects found while surveying: the HUD, lanterns and arena boards
-all render Unicode stand-ins instead of the real glyph assets, and the bank-or-ride decision has
-no explicit representation in the game at all.
+Along the way this fixes defects found while surveying: the HUD and the canyon lanterns render
+Unicode stand-ins instead of the real glyph assets, unbanked points have no persistent
+representation, and the wallet and the round share one string.
 
 ## What exists today
 
@@ -74,9 +74,10 @@ them means neither gets emphasis when it matters.
 - **Camera drag is the whole right side of the screen.** Every `TextButton`/`ImageButton` sinks
   touch and is a permanent hole in it. `Frame`/`TextLabel`/`ImageLabel` sink only when
   `Active = true`, which defaults to false.
-  → **No information element is ever `Active`.** Tape, plate, status, timer, toasts all pass
-  through. The interactive budget is three throw buttons plus a conditional pair of choice
-  buttons, and nothing else.
+  → **No information element is ever `Active`.** Tape, plate, status, timer, toasts and the pot
+  disc all pass through. The interactive budget is three throw buttons, the plate (the door to
+  maximal), and one conditional button in the slot above the throws — **BANK THESE** while a pot
+  exists, **ACCEPT YOUR FATE** while fate-bound, never both. Nothing else.
 - **Movement is de-emphasised, never disabled.** You explore Roshambo; you do not mash movement.
   The bottom-left corner stays empty and unpaired so the thumbstick reads as a utility rather
   than half of a twin-pole control scheme. Roblox's default `DynamicThumbstick` is already the
@@ -105,53 +106,72 @@ Everything else that is currently persistent — the pot/streak bar, the BANK bu
 ticker — either folds into the above or becomes transient. **Minimal shows nothing that is not
 either always true or currently happening.**
 
-## The win-bound rule
+## The pot indicator — banking, riding, and Roblox's gambling line
 
-This is a **rules change**, not only a layout change, and it is the core of the design.
+**Revised 2026-08-02, mid-implementation, by owner ruling.** The first design blocked the player
+after a WIN until they answered **RISK IT** or **BANK n**. That is now withdrawn. What follows
+replaced it, and the reasoning matters more than the mechanic.
 
-### Today
+### Why the RISK button was wrong
 
-`main.server.luau:361` rejects a pick only when `fates:isBound(...)` — the LOSS → "accept your
-fate" gate. Riding is *implicit*: after a win the pot simply stays staked unless the player
-presses BANK. There is no explicit RISK action anywhere in the codebase.
+Roblox proscribes simulated gambling, and this experience is kid-first, so the line matters more
+than usual. The mechanic was never a wager — a player can only ever choose whether to **collect**
+winnings or keep playing; they cannot take points they own and stake them on an outcome. That
+distinction is load-bearing and was already in the design.
 
-### Designed
+But a button reading **RISK IT** dresses a collect-or-continue choice in wager language. It made
+the game *look* like the thing the mechanic carefully is not. The owner's instinct was that the
+two buttons made the "superposition" of unbanked points explicit; the conclusion was that a
+persistent indicator does that better, without ever asking the player to *stake* anything.
 
-A WIN **binds** the player until they answer. While bound they cannot throw. The choice —
-**RISK IT** or **BANK n** — is painted **over the throw buttons at half height**, with the throw
-glyphs dimmed and still visible beneath. The locked state is therefore self-explaining: nobody
-wonders why a throw will not take, because the reason is sitting on top of it.
+(Design reasoning only. Roblox's community standards shift and must be checked against the live
+policy before shipping — this document is not an authority on them.)
 
-This is the `FateRegistry` pattern again, and the symmetry is deliberate:
+### The mechanic
 
-- **LOSS** binds you to accept your fate.
-- **WIN** binds you to ride it or take it.
+- Whenever `pointsAtStake > 0`, a **pot indicator** sits directly above the throw row: the figure
+  in a red disc, pulsing while the win is unacknowledged, with a **BANK THESE** button beside it.
+- **Throwing again is riding.** No button says so. Playing on is the most natural possible
+  expression of "let it ride", and it needs no wager vocabulary.
+- **Banking is always available** while a pot exists. There is no state in which a player has
+  unbanked points and no way to collect them.
+- **Nothing blocks a throw.** The `SubmitPick` win-gate is removed.
 
-**There is no default and no expiry.** If the round ends unanswered, the player stays bound —
-across rounds, across sessions, across a week. They have a choice to make. This is safe: a
-player who does not throw is not scored at all, so the pot is untouched and *"rounds skippable
-without penalty"* holds. It also gives us a re-engagement hook we did not have — a returning
-player is met with their own unanswered decision.
+### What `unresolvedWin` means now
 
-### Server slice
+It survives, with a narrower job: **"the last scored round was a WIN and the player has not banked
+since."** It drives the *pulse*, nothing else. It is maintained entirely by the server —
+`Settlement` sets it on a WIN and clears it on SAFE/LOSS, `bankPot` clears it — so no client
+action is needed to resolve it, and throwing again clears it naturally at the next settlement.
 
-`unresolvedWin` is **not** derivable from `pointsAtStake > 0`: after choosing RISK the pot still
-rides, so that value is identical in both bound and unbound states. It needs its own field.
+Because it persists on the profile, a player who wins and leaves returns to a still-pulsing pot.
+That is the re-engagement hook the blocking design was reaching for, without the block.
 
-- `User.ts` gains `unresolvedWin: boolean` (default false). Set at settlement on a `WIN`,
-  cleared by either resolution. Persisting it on the profile makes it survive rejoin for free.
-- A new resolve action. Today only `BankRequest` exists; add `RiskRequest`, or a single
-  `ResolveWin` remote taking `"risk" | "bank"`. **Decision: one `ResolveWin` remote** — it makes
-  the two outcomes symmetric and impossible to leave half-wired.
-- `SubmitPick.OnServerEvent` gains an `unresolvedWin` gate beside the existing `fates:isBound`
-  check.
-- The gate is **server-authoritative**. The client dims and overlays, but the server is what
-  actually refuses the pick.
+### What this removes
 
-### Scope note
+`POST /resolve-win` and `wallet.resolveWin` collapse back into the pre-existing `/bank`, which
+already clears the flag and accrues `lifetimeBanked`. The `ResolveWin` remote,
+`NetworkClient.postResolveWin`, the server handler and the `SubmitPick` gate all come out.
+`BankRequest` — which existed all along — carries banking again.
 
-Roblox and PWA economies are split by policy. This rule is **Roblox-only**; the PWA's implicit
-ride is unchanged.
+Retained from that work: `unresolvedWin` on the profile, `Settlement` maintaining it, `bankPot`
+clearing it, `lifetimeBanked`, all nine counters, and `PlayerProfiles.unresolvedWin`.
+
+### The fate prompt shares the slot
+
+A LOSS forfeits the pot, so `pointsAtStake` is **always 0 while a player is fate-bound**. The pot
+indicator and the fate prompt can therefore never be on screen together, and they share one slot
+above the throw row:
+
+| State | Slot shows |
+| --- | --- |
+| `pointsAtStake > 0` | pot disc + **BANK THESE** |
+| fate-bound (after a LOSS) | **ACCEPT YOUR FATE** |
+| neither | nothing |
+
+This restores the affordance that the old `AcceptFate` button provided and that the first
+revision of this spec dropped by omission. **The fate gate itself is unchanged** — `FateRegistry`
+still refuses picks server-side until the fate resolves. Only the win gate is withdrawn.
 
 ## Escalation
 
@@ -283,9 +303,9 @@ New pure modules (no Roblox globals, dependency-injected, Lune-testable):
 
 - **`src/shared/HudModel.luau`** — given round phase, seconds remaining, profile
   (`pointsAtStake`, `currentStreak`, `totalPoints`, `unresolvedWin`, `escalationPrompts`),
-  fate-bound state, and its own session counters (has-thrown-yet, consecutive misses), returns
-  the minimal view model: what the plate shows, whether the throws are enabled, whether the
-  choice overlay is up, whether the escalation fires.
+  fate-bound state, and its own consecutive-miss counter, returns the minimal view model: what
+  the plate shows, whether the throws are enabled, what occupies the slot above them (pot,
+  fate prompt or nothing) and whether the pot pulses, and whether the escalation fires.
   **The escalation arm/disarm rule lives here and is fully unit-tested** — four arming
   conditions, a three-miss backoff, and a definition of "missed" that excludes bound rounds. It
   is the rule most likely to be got subtly wrong and the most annoying if it is.
@@ -335,8 +355,9 @@ is already tracked as item 8.
   still be armed the moment they resolve and throw.
 - `GameRules` fixtures in `shared-fixtures/game-rules.json` are untouched — pot progression is
   unchanged. Only *who may throw* changes.
-- Server: the `unresolvedWin` gate and the `ResolveWin` route get Vitest coverage in `server/`,
-  including the "bound across rejoin" case.
+- Server: `unresolvedWin` is maintained solely by `Settlement` (set on WIN, cleared on
+  SAFE/LOSS) and by `bankPot` (cleared on bank). Both get Vitest coverage. No client action
+  resolves it, so there is no route to test for it.
 - Gates as always: `stylua --check src tools tests && selene src tools`, `lune run tests/run`,
   `npm test` in `server/`.
 
@@ -365,10 +386,16 @@ Recorded because several were close calls, and one reversed mid-discussion.
 4. **The wallet chip was moved out of the top-left and then removed entirely.** It was placed
    there on the conventional-currency-corner argument, which was wrong for a social experience —
    chat sits on it. POINTS lives in the top-centre plate instead.
-5. **The win-bound state never expires and has no default.** Explicit owner decision.
-6. **Overlay at half height**, not full — the dimmed glyphs underneath are what make the lock
-   self-explaining.
-7. **One `ResolveWin` remote** rather than a separate `RiskRequest`.
+5. ~~**The win-bound state never expires and has no default.**~~ **WITHDRAWN** — see below.
+6. ~~**Overlay at half height**~~ / 7. ~~**One `ResolveWin` remote**~~ — **WITHDRAWN** with it.
+   The blocking RISK/BANK overlay was built, reviewed and green before being replaced. It was
+   withdrawn not because it failed but because **"RISK IT" is wager language on a mechanic that
+   is deliberately not a wager**, and Roblox proscribes simulated gambling in a kid-first
+   experience. A persistent pot indicator makes the same point — these points are not yours yet
+   — while framing the action as *collecting winnings*, which is what it actually is. Riding
+   became implicit again: you ride by throwing. See *The pot indicator*.
+   The removal also restored bank-at-will, which the blocking design had quietly taken away, and
+   gave the orphaned ACCEPT YOUR FATE prompt a home.
 8. **The escalation arms for new arrivals and backs off after three missed rounds**, and is
    player-switchable. Owner decision, and a better rule than any of the three offered: arming on
    "pot riding" alone would have excluded the new player who needs the prompt most, while arming
