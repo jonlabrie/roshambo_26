@@ -54,6 +54,47 @@ describe("HudModel.view — plate and throws", function()
     end)
 end)
 
+describe("HudModel — once sent, the round is closed to that player", function()
+    -- The 0.5s send slack is structural: it exists so the pick makes the lockout, which means
+    -- there is ALWAYS a tail where the pick is already on the wire but ACTIVE has not ended.
+    -- ThrowBuffer has no removal, so a tap in that tail cannot be honoured — and a tap we
+    -- cannot honour is worse than a tap we refuse.
+    test("throwsEnabled is false once sent, even with time left and phase ACTIVE", function()
+        local v = HudModel.view(
+            inputs({ phase = "ACTIVE", secondsLeft = 5, chosen = "R", sent = true }),
+            session(0)
+        )
+        expect(v.throwsEnabled).toBe(false)
+    end)
+
+    test(
+        "tapAction ignores every symbol once sent — the chosen glyph, a third glyph, the prompted one",
+        function()
+            local sentInputs = inputs({ chosen = "R", switchPrompt = "P", sent = true })
+            for _, sym in { "R", "P", "S" } do
+                expect(HudModel.tapAction(sentInputs, sym)).toBe("ignore")
+            end
+        end
+    )
+
+    test("a sent pick cannot be backed out of", function()
+        -- Before a send, tapping the prompted glyph returns "clear" — the back-out (pin that
+        -- below). Once sent, that path must be unreachable: clearing `chosen` after the wire
+        -- already has it would make the HUD lie about what the server is about to score.
+        expect(HudModel.tapAction(inputs({ chosen = "R", switchPrompt = "P" }), "P")).toBe("clear")
+        local sentInputs = inputs({ chosen = "R", switchPrompt = "P", sent = true })
+        expect(HudModel.tapAction(sentInputs, "P")).toBe("ignore")
+    end)
+
+    test(
+        "switchPrompt does not survive a send — a question the player cannot answer must not show",
+        function()
+            local v = HudModel.view(inputs({ chosen = "R", switchPrompt = "P", sent = true }), session(0))
+            expect(v.switchPrompt).toBe(nil)
+        end
+    )
+end)
+
 describe("HudModel.view — escalation", function()
     test("a player with no misses is armed", function()
         expect(HudModel.view(inputs({ secondsLeft = 4 }), session(0)).escalate).toBe(true)

@@ -62,11 +62,13 @@ export type View = {
 -- state before the stray tap, and answering only ever unlocks. Neither outcome throws anything.
 HudModel.SWITCH_PROMPT_SECONDS = 4
 
--- The round takes taps for the whole of ACTIVE. There is deliberately no "you have committed,
--- so the round is closed to you" state: that state is what made backing out impossible, and
--- backing out is now the point.
+-- Taps stay live for as long as the choice can still be honoured. That is NOT the whole of
+-- ACTIVE: it ends the moment the pick goes on the wire (`sendAtLockout`, roughly the last
+-- half-second), because ThrowBuffer has no removal — no undo in the buffer, the delta, or
+-- POST /api/v1/throws — so a tap we cannot honour is worse than a tap we refuse. Everything
+-- before that moment is still open, which is what makes backing out possible at all.
 local function throwsEnabledFor(inputs: Inputs): boolean
-    return inputs.phase == "ACTIVE" and inputs.secondsLeft > 0
+    return inputs.phase == "ACTIVE" and inputs.secondsLeft > 0 and not inputs.sent
 end
 
 export type TapState = { chosen: string?, switchPrompt: string? }
