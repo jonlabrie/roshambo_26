@@ -863,7 +863,11 @@ escalation.Name = "Escalation"
 escalation.Active = false
 escalation.AnchorPoint = Vector2.new(0.5, 0.5)
 escalation.Position = UDim2.fromScale(0.5, 0.42)
-escalation.Size = UDim2.new(0.8, 0, 0, 130) -- scale width: a fixed 460px overflows a small phone
+-- scale width: a fixed 460px overflows a small phone. Fixed height is 130px of CONTENT (count
+-- [0,92] + an 8px gap + prompt [100,130]) plus 24px the UIPadding below eats (12 top + 12
+-- bottom) — 154, not 130. If the padding ever changes, grow this to match or the two labels
+-- overlap inside the unchanged content box.
+escalation.Size = UDim2.new(0.8, 0, 0, 154)
 -- Opaque backing, not a stroke on the text. The count and prompt used to float over open
 -- canyon with strokes standing in for contrast (see the spec's §3) — a real backing plate
 -- instead, same as every other readable surface in this HUD.

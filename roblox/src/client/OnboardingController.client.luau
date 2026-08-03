@@ -160,7 +160,7 @@ copyLabel.Parent = card
 -- NO UIStroke ON THE COPY. A stroke parented to a TextLabel outlines every GLYPH: at 2px on
 -- 17px type the outline approaches the stem width, the counters in a/e/o fill in, and adjacent
 -- glyphs merge into a smear. That is what made these cards unreadable. The card's backing is
--- already opaque WASHI under near-white copy (~18:1) and needs no help.
+-- already opaque WASHI under near-white copy (~16.7:1) and needs no help.
 
 local hintLabel = Instance.new("TextLabel")
 hintLabel.Name = "Hint"
