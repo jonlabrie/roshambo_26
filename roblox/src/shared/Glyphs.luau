@@ -52,16 +52,19 @@ function Glyphs.render(parent: Instance, symbol: string, coreColor: Color3, outl
 
     local imgs = Glyphs.IMAGE[symbol]
     if imgs then
-        local function layer(assetId: string, tint: Color3)
+        -- NAMED, so a caller that re-tints later (the HUD's throw buttons light the CORE blue on
+        -- selection) can address the two layers without depending on GetChildren's ordering.
+        local function layer(name: string, assetId: string, tint: Color3)
             local img = Instance.new("ImageLabel")
+            img.Name = name
             img.BackgroundTransparency = 1
             img.Size = UDim2.fromScale(1, 1)
             img.Image = assetId
             img.ImageColor3 = tint
             img.Parent = root
         end
-        layer(imgs.outline, outlineColor or Color3.new(1, 1, 1)) -- behind
-        layer(imgs.core, coreColor) -- in front
+        layer("Outline", imgs.outline, outlineColor or Color3.new(1, 1, 1)) -- behind
+        layer("Core", imgs.core, coreColor) -- in front
     end
 
     root.Parent = parent

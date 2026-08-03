@@ -22,6 +22,30 @@ describe("HudLayout", function()
         )
     end)
 
+    test("the touch tier halves the throw button and shrinks the tape", function()
+        expect(HudLayout.BTN_H_TOUCH).toBe(math.round(HudLayout.BTN_H * HudLayout.THROW_TOUCH_SCALE))
+        expect(HudLayout.TILE_TOUCH).toBe(math.round(HudLayout.TILE * HudLayout.TAPE_TOUCH_SCALE))
+        expect(HudLayout.BTN_H_TOUCH < HudLayout.BTN_H).toBe(true)
+        expect(HudLayout.TILE_TOUCH < HudLayout.TILE).toBe(true)
+    end)
+
+    test("AREA_H_TOUCH is the shrunken cluster, derived", function()
+        expect(HudLayout.AREA_H_TOUCH).toBe(HudLayout.TILE_TOUCH + HudLayout.ROW_GAP + HudLayout.BTN_H_TOUCH)
+    end)
+
+    -- The safe band OnboardingController clamps cards into is derived from the cluster height, and
+    -- the whole point of the touch tier living in this module is that the band moves WITH the
+    -- cluster. Two earlier fix rounds went on cards landing on top of BANK THESE; a touch tier that
+    -- shrank the buttons while the band went on believing the desktop height would reopen exactly
+    -- that, only in the other direction (a needlessly tall dead zone) — and would silently freeze if
+    -- someone later re-derived one and not the other.
+    test("CLUSTER_TOP_FROM_BOTTOM_TOUCH follows the shrunken cluster, derived", function()
+        expect(HudLayout.CLUSTER_TOP_FROM_BOTTOM_TOUCH).toBe(
+            HudLayout.EDGE + HudLayout.AREA_H_TOUCH + HudLayout.ROW_GAP + HudLayout.SLOT_H
+        )
+        expect(HudLayout.CLUSTER_TOP_FROM_BOTTOM_TOUCH < HudLayout.CLUSTER_TOP_FROM_BOTTOM).toBe(true)
+    end)
+
     test("the two bands leave a usable gap on a short landscape phone", function()
         -- 375px is the shortest viewport this HUD targets (landscape phone). The safe band the
         -- onboarding card is clamped into is what is left between the two footprints; if a future
@@ -29,6 +53,10 @@ describe("HudLayout", function()
         -- onto one of the live buttons.
         local band = 375 - HudLayout.PLATE_BOTTOM - HudLayout.CLUSTER_TOP_FROM_BOTTOM
         expect(band > 0).toBe(true)
+        -- A phone is a TOUCH device, so the tier it actually runs is the touch one — that is the
+        -- band this assertion is really about.
+        local touchBand = 375 - HudLayout.PLATE_BOTTOM - HudLayout.CLUSTER_TOP_FROM_BOTTOM_TOUCH
+        expect(touchBand > band).toBe(true)
     end)
 
     test("holds no Roblox globals — plain numbers only", function()

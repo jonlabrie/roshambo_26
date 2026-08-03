@@ -30,6 +30,7 @@ local GuiService = game:GetService("GuiService")
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local OnboardingBeats = require(shared:WaitForChild("OnboardingBeats"))
@@ -41,18 +42,32 @@ local playerGui = player:WaitForChild("PlayerGui")
 
 -- The ZenDojo HUD palette, as in HudController/LedgerController. Duplicated rather than shared:
 -- there is no palette module yet, and inventing one for a third file is not worth a fourth require.
-local INK_CREAM = Color3.fromRGB(240, 234, 216)
 local WASHI = Color3.fromRGB(26, 24, 28)
 local GOLD = Color3.fromRGB(212, 176, 102)
+-- Gate 2026-08-02: "the onboarding messages are too dark to read." The card was 8% transparent over
+-- a dusk canyon, its copy sat on INK_CREAM (240, 234, 216) and its hint on GOLD at 20% text
+-- transparency at 11px. The fix is CONTRAST, not size: an opaque backing, near-white copy carrying
+-- its own washi keyline (so it survives whatever the card happens to be sitting over), and a hint
+-- that is still smaller and still gold — visibly a hint — but fully opaque and a point larger.
+local CARD_COPY = Color3.fromRGB(252, 249, 242)
+local CARD_HINT = Color3.fromRGB(238, 208, 142)
 
 -- Layout constants come from shared/HudLayout, the SAME module HudController lays itself out from.
 -- A card's whole job is to sit beside what HudController placed, so it has to agree with those
 -- numbers exactly, not approximate them — these used to be hand-copied here (including a
 -- hand-computed `AREA_H = 120`), which meant a tweak to BTN_H would move the cluster while this
 -- file's safe band went on believing the old height.
+--
+-- THE TIER MUST MATCH HudController'S. It shrinks the throw cluster on touch (gate 2026-08-02), and
+-- the safe band below is the only thing standing between a card and BANK THESE — so the SAME
+-- `TouchEnabled and not KeyboardEnabled` switch picks the SAME variant here. Detection lives in the
+-- controllers because HudLayout holds no Roblox globals; the numbers live there because these two
+-- files have to agree on them exactly.
+local TOUCH = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
+
 local EDGE = HudLayout.EDGE
 local JUMP_CLEARANCE = HudLayout.JUMP_CLEARANCE
-local AREA_H = HudLayout.AREA_H
+local AREA_H = if TOUCH then HudLayout.AREA_H_TOUCH else HudLayout.AREA_H
 local ROW_GAP = HudLayout.ROW_GAP
 local SLOT_H = HudLayout.SLOT_H
 local SLOT_GAP = HudLayout.SLOT_GAP
@@ -83,7 +98,9 @@ gui.Parent = playerGui
 local card = Instance.new("TextButton")
 card.Name = "Card"
 card.BackgroundColor3 = WASHI
-card.BackgroundTransparency = 0.08
+-- OPAQUE. A card is read once and dismissed; it does not need to show the canyon through itself,
+-- and 8% of a dusk gorge behind 16px text is what made it unreadable.
+card.BackgroundTransparency = 0
 card.BorderSizePixel = 0
 card.AutoButtonColor = false
 card.Text = ""
@@ -98,8 +115,8 @@ do
     c.Parent = card
     local s = Instance.new("UIStroke")
     s.Color = GOLD
-    s.Thickness = 1
-    s.Transparency = 0.3
+    s.Thickness = 2
+    s.Transparency = 0.1 -- a crisper edge: the card has to read as an object, not a smudge
     s.Parent = card
     local pad = Instance.new("UIPadding")
     pad.PaddingLeft = UDim.new(0, 14)
@@ -121,22 +138,32 @@ copyLabel.BackgroundTransparency = 1
 copyLabel.Size = UDim2.fromScale(1, 0)
 copyLabel.AutomaticSize = Enum.AutomaticSize.Y
 copyLabel.TextWrapped = true
-copyLabel.TextColor3 = INK_CREAM
-copyLabel.TextSize = 16
+copyLabel.TextColor3 = CARD_COPY
+copyLabel.TextSize = 17
 copyLabel.Font = Enum.Font.GothamBold
 copyLabel.TextXAlignment = Enum.TextXAlignment.Left
 copyLabel.Text = ""
 copyLabel.Parent = card
+do
+    -- The copy carries its own washi keyline. Belt and braces with the opaque backing: the drum
+    -- bubble tracks a moving world object, so what ends up behind the card is not fixed, and a
+    -- keyline costs nothing where the backing already covers.
+    local s = Instance.new("UIStroke")
+    s.Color = WASHI
+    s.Thickness = 2
+    s.Transparency = 0.35
+    s.Parent = copyLabel
+end
 
 local hintLabel = Instance.new("TextLabel")
 hintLabel.Name = "Hint"
 hintLabel.Active = false
 hintLabel.LayoutOrder = 2
 hintLabel.BackgroundTransparency = 1
-hintLabel.Size = UDim2.new(1, 0, 0, 14)
-hintLabel.TextColor3 = GOLD
-hintLabel.TextTransparency = 0.2
-hintLabel.TextSize = 11
+hintLabel.Size = UDim2.new(1, 0, 0, 16)
+hintLabel.TextColor3 = CARD_HINT
+hintLabel.TextTransparency = 0 -- a hint is SMALLER, not fainter; 11px gold at 20% faded was neither
+hintLabel.TextSize = 12
 hintLabel.Font = Enum.Font.GothamBold
 hintLabel.TextXAlignment = Enum.TextXAlignment.Left
 hintLabel.Text = "TAP TO DISMISS"
@@ -199,7 +226,9 @@ local DRUM_LAST_RESORT = { point = Vector2.new(0.5, 0), offset = UDim2.new(0.5, 
 -- exact same "card covers BANK THESE" failure mode reachable through a slower path (join fires on
 -- the first RoundUpdate, which can beat the drum's replication).
 local PLATE_BOTTOM = HudLayout.PLATE_BOTTOM
-local CLUSTER_TOP_FROM_BOTTOM = HudLayout.CLUSTER_TOP_FROM_BOTTOM
+local CLUSTER_TOP_FROM_BOTTOM = if TOUCH
+    then HudLayout.CLUSTER_TOP_FROM_BOTTOM_TOUCH
+    else HudLayout.CLUSTER_TOP_FROM_BOTTOM
 local SAFE_MARGIN = 24 -- round-2: was 16, widened to also give the toast strip more clearance
 local DRUM_BUBBLE_LIFT = 36 -- vertical gap between the projected point and the card's bottom edge
 local MIN_CARD_H = 90 -- floor for AbsoluteSize.Y before AutomaticSize has laid out even once —

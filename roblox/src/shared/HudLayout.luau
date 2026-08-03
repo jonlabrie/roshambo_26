@@ -28,8 +28,26 @@ HudLayout.BTN_H = 76 -- one throw button
 HudLayout.SLOT_H = 40 -- the one slot above the throw row (pot indicator / fate prompt)
 HudLayout.SLOT_GAP = 8
 
--- The tape+buttons cluster's own height.
+-- ===== The touch tier (gate 2026-08-02) =====
+-- On a phone/tablet the throw cluster crowded the play space, so the owner asked for throw buttons
+-- "50% smaller on a mobile device, and the previous round buttons smaller as well". The DETECTION
+-- (`UserInputService.TouchEnabled and not KeyboardEnabled`) belongs to the controllers — this module
+-- holds no Roblox globals — but the NUMBERS live here, because OnboardingController's safe band has
+-- to shrink in lockstep with the cluster or a card lands on top of BANK THESE. Both files pick the
+-- same variant from the same boolean.
+--
+-- 50% is LINEAR, as asked: 76 -> 38px. That is under the ~44px touch-target rule of thumb, which is
+-- the owner's call to make on a real device and is flagged in the gate report, not silently
+-- overridden here. The tape is read, never touched, so no floor applies to it at all.
+HudLayout.THROW_TOUCH_SCALE = 0.5
+HudLayout.TAPE_TOUCH_SCALE = 0.7
+
+HudLayout.BTN_H_TOUCH = math.round(HudLayout.BTN_H * HudLayout.THROW_TOUCH_SCALE)
+HudLayout.TILE_TOUCH = math.round(HudLayout.TILE * HudLayout.TAPE_TOUCH_SCALE)
+
+-- The tape+buttons cluster's own height, per tier.
 HudLayout.AREA_H = HudLayout.TILE + HudLayout.ROW_GAP + HudLayout.BTN_H
+HudLayout.AREA_H_TOUCH = HudLayout.TILE_TOUCH + HudLayout.ROW_GAP + HudLayout.BTN_H_TOUCH
 
 -- The band the minimal HUD does NOT own, both measured in the HUD ScreenGui's own coordinate space
 -- (which leaves IgnoreGuiInset at its default false — see OnboardingController).
@@ -37,7 +55,12 @@ HudLayout.AREA_H = HudLayout.TILE + HudLayout.ROW_GAP + HudLayout.BTN_H
 --   CLUSTER_TOP_FROM_BOTTOM: where the tape+buttons+slot cluster's footprint begins, measured UP
 --                            from the bottom edge. The slot's frame occupies its space whether or
 --                            not its tenant is visible, so it counts even when empty.
+-- The plate does not change with the tier, so PLATE_BOTTOM has no touch variant; the cluster does.
 HudLayout.PLATE_BOTTOM = HudLayout.EDGE + HudLayout.PLATE_H
 HudLayout.CLUSTER_TOP_FROM_BOTTOM = HudLayout.EDGE + HudLayout.AREA_H + HudLayout.ROW_GAP + HudLayout.SLOT_H
+HudLayout.CLUSTER_TOP_FROM_BOTTOM_TOUCH = HudLayout.EDGE
+    + HudLayout.AREA_H_TOUCH
+    + HudLayout.ROW_GAP
+    + HudLayout.SLOT_H
 
 return HudLayout
