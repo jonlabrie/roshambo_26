@@ -70,8 +70,10 @@ end
 -- Spin is about the hub's LOCAL Y. Symbol `sym` sits at the −Z front window when
 -- θ ≡ −sym*30° (mod 360); symbols recur every 3 facets → a detent every 90° (π/2).
 local DRUM_KICK = 4 -- rad/s during the constant spin (live-tunable via "DrumKick" attr)
-local SPIN_SEC = 1.0
-local GLIDE_SEC = 2.0
+-- From DrumStep, not local literals: the SERVER waits this same span before growing a winner's
+-- avatar (it cannot hear `drumRest`), so a retimed spin or glide has to move both together.
+local SPIN_SEC = DrumStep.SPIN_SECONDS
+local GLIDE_SEC = DrumStep.GLIDE_SECONDS
 -- PADDLE CHOREOGRAPHY (2026-07-23): the strike smacks the paddle 90° so it rests
 -- PARALLEL to the log, out of the dowel's path; once the drawing dowel has crawled
 -- south past the paddle's sweep, the spindle slowly carries it the remaining 270°

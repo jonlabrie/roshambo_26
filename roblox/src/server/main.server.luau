@@ -56,6 +56,7 @@ local PlayerProfiles = require(shared:WaitForChild("PlayerProfiles"))
 local ThemeManifest = require(shared:WaitForChild("ThemeManifest"))
 local ZenDojo = require(shared:WaitForChild("themes"):WaitForChild("ZenDojo"))
 local FateRegistry = require(shared:WaitForChild("FateRegistry"))
+local DrumStep = require(shared:WaitForChild("DrumStep"))
 local PreferenceEditor = require(shared:WaitForChild("PreferenceEditor"))
 local BackDoorEditor = require(shared:WaitForChild("BackDoorEditor"))
 local WallBays = require(shared:WaitForChild("WallBays"))
@@ -168,6 +169,42 @@ local net = NetworkClient.new({ baseUrl = config.baseUrl, apiKey = config.apiKey
 local clock = RoundClock.new()
 local profiles = PlayerProfiles.new(GameRules)
 local fates = FateRegistry.new()
+
+-- HOW LONG AFTER THE REVEAL THE DRUM ACTUALLY STOPS TURNING.
+--
+-- The winner's avatar swelling is an announcement of the result, exactly like the reveal toast and
+-- the tape tile, and it used to fire in the same loop that broadcast RevealTheater — seconds before
+-- the drum landed on the World Throw. Everything on the client now waits for the `drumRest` cue; the
+-- server cannot, because `drumRest` is fired by DrumController on each client and never travels back.
+-- So the server waits out the same span instead.
+--
+-- Two parts, and only one of them is a constant:
+--   • THE DRUM'S OWN CHOREOGRAPHY, from the strike to rest — DrumStep.SETTLE_SECONDS, which is where
+--     the swing/spin/glide durations are now defined and which DrumController and HammerController
+--     read the same numbers from. Not a guess, and not copyable out of date.
+--   • THE REVEAL-TO-STRIKE GAP, which is NOT constant. The round result becomes fetchable the instant
+--     ACTIVE closes, and RoundCoordinator polls every ~1-1.25s, so `onReveal` lands somewhere inside
+--     TALLY — anywhere from the strike itself to a whole TALLY early. A fixed delay would be that far
+--     out. The server already knows the answer: it publishes the absolute strike instant on
+--     RoundScheduleConfig for the client metronome, so read it back.
+--
+-- CLAMPED, because that attribute is a moving target: once the round reaches REVEAL the coordinator
+-- republishes it as the NEXT round's strike, a whole period away. The upper bound is the longest
+-- honest wait — a reveal that arrived at the very start of TALLY — and TallySec is published beside
+-- it, so even the bound is derived rather than guessed.
+--
+-- NOTHING CAN STRAND THE GROW. There is no cue to miss: a `task.delay` always runs, an absent or
+-- nonsense attribute falls back to the bare settle span, and the clamp's floor is 0 (fire now).
+local function growDelaySeconds(): number
+    local settle = DrumStep.SETTLE_SECONDS
+    local strikeAt = roundScheduleConfig:GetAttribute("StrikeAtServerTime")
+    if typeof(strikeAt) ~= "number" then
+        return settle
+    end
+    local tally = roundScheduleConfig:GetAttribute("TallySec")
+    local maxDelay = settle + (if typeof(tally) == "number" then tally else 0)
+    return math.clamp(strikeAt - workspace:GetServerTimeNow() + settle, 0, maxDelay)
+end
 
 local function applyGrow(player: Player)
     local character = player.Character
@@ -332,6 +369,9 @@ local coordinator = RoundCoordinator.new({
             end
         end,
         onReveal = function(reveal)
+            -- Measured ONCE per reveal, before the per-player loop, so every winner in the instance
+            -- grows on the same beat rather than each against their own moment in the loop.
+            local growIn = growDelaySeconds()
             RevealTheater:FireAllClients({
                 worldThrow = reveal.worldThrow,
                 distribution = reveal.distribution,
@@ -354,7 +394,12 @@ local coordinator = RoundCoordinator.new({
                     pushStats(player)
                     fireProfile(player, "local")
                     if mine.result == "WIN" then
-                        applyGrow(player)
+                        -- ON THE DRUM, not on the wire — see growDelaySeconds. `player` is
+                        -- re-checked inside applyGrow (character/humanoid), so a player who leaves
+                        -- or respawns inside the wait simply does not grow.
+                        task.delay(growIn, function()
+                            applyGrow(player)
+                        end)
                     elseif mine.result == "LOSS" then
                         fates:begin(userId)
                     end

@@ -26,3 +26,22 @@ describe("DrumStep (12 faces)", function()
         end
     end)
 end)
+
+-- The settle duration is the number the SERVER schedules the winner's avatar grow against, so it is
+-- asserted as a DERIVATION rather than a literal: a future tweak to the swing, the spin or the glide
+-- has to move the grow with it, and a hand-copied 3.45 somewhere would go on describing the old
+-- choreography while the drum turned to a different beat.
+describe("DrumStep — the strike-to-rest timing", function()
+    test("SETTLE_SECONDS is swing + spin + glide, derived", function()
+        expect(DrumStep.SETTLE_SECONDS).toBe(
+            DrumStep.STRIKE_SWING_SECONDS + DrumStep.SPIN_SECONDS + DrumStep.GLIDE_SECONDS
+        )
+    end)
+
+    test("every leg is a positive duration", function()
+        for _, key in { "STRIKE_SWING_SECONDS", "SPIN_SECONDS", "GLIDE_SECONDS", "SETTLE_SECONDS" } do
+            expect(typeof((DrumStep :: any)[key])).toBe("number")
+            expect((DrumStep :: any)[key] > 0).toBe(true)
+        end
+    end)
+end)

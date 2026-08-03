@@ -7,6 +7,7 @@ local TweenService = game:GetService("TweenService")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local ZenDojo = require(shared:WaitForChild("themes"):WaitForChild("ZenDojo"))
+local DrumStep = require(shared:WaitForChild("DrumStep"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
@@ -302,10 +303,13 @@ local function strike(atTime: number)
     local fineDeg = (stage:GetAttribute("CamPhaseDeg") :: number) or CAM_PHASE_DEG
     anchorNet = math.atan2(dp.Z - CAM_AXLE_YZ.Y, dp.Y - CAM_AXLE_YZ.X) + math.rad(fineDeg)
     anchorAt = atTime
-    -- Stage 1: swing forward (toward the bell = -BACK) to overshoot into it.
+    -- Stage 1: swing forward (toward the bell = -BACK) to overshoot into it. Its duration is
+    -- DrumStep.STRIKE_SWING_SECONDS rather than a local literal: `gongHit` fires at the END of this
+    -- tween, so this is the first leg of the strike-to-drum-rest span the SERVER waits out before
+    -- growing a winner's avatar.
     local swing = TweenService:Create(
         arm,
-        TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        TweenInfo.new(DrumStep.STRIKE_SWING_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
         { CFrame = CFrame.new(-BACK * 0.8) * restCFrame }
     )
     swing.Completed:Connect(function()

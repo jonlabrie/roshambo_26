@@ -8,6 +8,28 @@ local DrumStep = {}
 local FACES = 12
 local SYMBOLS = { R = 0, P = 1, S = 2 }
 
+-- ===== The strike-to-rest timing =====
+-- These used to be private literals in DrumController (SPIN_SEC/GLIDE_SEC) and HammerController (the
+-- 0.45s forward swing). They live here now because a THIRD party needs them: the server schedules
+-- the winner's avatar grow, and a grow that lands while the drum is still turning announces the
+-- result before the drum does — the exact spoiler the client's `drumRest` gate exists to prevent.
+-- `drumRest` is a client cue, so the server cannot listen for it; it can only wait the same span,
+-- and it must wait the REAL span rather than a guess that drifts the first time the choreography is
+-- retimed.
+--
+-- The chain, from the scheduled strike instant:
+--   STRIKE_SWING : the shu-moku's forward swing. `gongHit` (and with it the drum's kick) fires at
+--                  CONTACT, at the end of this tween, not when the swing starts.
+--   SPIN         : the constant-velocity spin before the drum will consider landing.
+--   GLIDE        : the decelerating glide onto the detent. `drumRest` fires when it completes.
+-- (DrumController's STALL_MAX — waiting for a late World Throw before settling — is deliberately NOT
+-- in here: it is an exception path, not the normal choreography, and padding every round by it would
+-- make the grow late for everyone to cover a case that hardly ever happens.)
+DrumStep.STRIKE_SWING_SECONDS = 0.45
+DrumStep.SPIN_SECONDS = 1.0
+DrumStep.GLIDE_SECONDS = 2.0
+DrumStep.SETTLE_SECONDS = DrumStep.STRIKE_SWING_SECONDS + DrumStep.SPIN_SECONDS + DrumStep.GLIDE_SECONDS
+
 -- the low face index (0..2) carrying this throw's symbol
 function DrumStep.faceForThrow(throw: string): number
     return SYMBOLS[throw] or 0
