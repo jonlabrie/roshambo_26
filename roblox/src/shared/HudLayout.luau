@@ -12,8 +12,11 @@
 -- Numbers that only ONE file uses (PLATE_W, BTN_W/BTN_GAP, TILE_GAP, the toast/timer sizes) stay
 -- local to that file — this module is for the shared skeleton, not for every constant in the HUD.
 --
--- No Roblox globals: plain numbers only, so it stays Lune-testable like everything else in
--- src/shared.
+-- No Roblox globals: numbers, and pure arithmetic over them, so it stays Lune-testable like
+-- everything else in src/shared. `plateBottomOffset` is the one function in here rather than a
+-- bare constant, because it is the only HUD placement that depends on something ROBLOX owns (the
+-- jump button's measured position) — and therefore the only one that has to be tested against a
+-- fallback and a clamp rather than just asserted as a derivation.
 local HudLayout = {}
 
 -- SCALE, not pixels: the jump button occupies roughly the right 3-13% of the screen, so the throw
@@ -21,12 +24,9 @@ local HudLayout = {}
 HudLayout.JUMP_CLEARANCE = 0.15
 
 HudLayout.EDGE = 12 -- margin from every screen edge
-HudLayout.PLATE_H = 46 -- the top-centre player-state plate
 HudLayout.TILE = 34 -- one World-Throw tape tile
-HudLayout.ROW_GAP = 10 -- tape -> throw buttons, and cluster -> slot
+HudLayout.ROW_GAP = 10 -- tape -> throw buttons, and cluster -> bank row
 HudLayout.BTN_H = 76 -- one throw button
-HudLayout.SLOT_H = 40 -- the one slot above the throw row (pot indicator / fate prompt)
-HudLayout.SLOT_GAP = 8
 
 -- ===== The touch tier (gate 2026-08-02) =====
 -- On a phone/tablet the throw cluster crowded the play space, so the owner asked for throw buttons
@@ -49,40 +49,60 @@ HudLayout.TAPE_TOUCH_SCALE = 0.7
 HudLayout.BTN_H_TOUCH = math.round(HudLayout.BTN_H * HudLayout.THROW_TOUCH_SCALE)
 HudLayout.TILE_TOUCH = math.round(HudLayout.TILE * HudLayout.TAPE_TOUCH_SCALE)
 
--- The tape+buttons cluster's own height, per tier.
-HudLayout.AREA_H = HudLayout.TILE + HudLayout.ROW_GAP + HudLayout.BTN_H
-HudLayout.AREA_H_TOUCH = HudLayout.TILE_TOUCH + HudLayout.ROW_GAP + HudLayout.BTN_H_TOUCH
+-- ===== The player-state plate, now in the right margin =====
+-- It moved out of top-centre because that band is the middle of a phone's view. It lives in
+-- the strip Roblox claims for jump and camera drag — the one place a display with NO
+-- interactive elements can safely go, since nothing in it is Active and every drag passes
+-- straight through.
+--
+-- ABOVE the jump button, not below. Roblox's default TouchJump leaves roughly 20px between
+-- that button's lower edge and the bottom of the screen on a phone, and on iOS that 20px is
+-- the home indicator. Above it there is ~300px at every size.
+--
+-- These are the plate's own dimensions only. WHERE it sits vertically is not a constant:
+-- HudController measures the real jump button and sits PLATE_JUMP_GAP above it, because the
+-- numbers above are Roblox's current defaults rather than a contract.
+HudLayout.PLATE_W = 92
+HudLayout.PLATE_ROW_H = 22
+HudLayout.PLATE_JUMP_GAP = 10
 
--- The confirm strip: the row directly above the slot, which carries "TAP AGAIN TO THROW" and the
--- "don't ask again" control while a throw is waiting on its second tap (see HudController). It is
--- TRANSIENT — it exists only while a confirm is pending — but its row is reserved here PERMANENTLY,
--- exactly as the slot's frame is: an onboarding card clamped into a band that ignored it would land
--- on top of the one message telling the player their throw has not gone in yet, and the moment it
--- appears (the round after a first win) is the same moment the "win" beat's card is on screen.
--- Reserving costs the band 36px of the 48 the touch tier just gave it back.
-HudLayout.CONFIRM_H = 28
-HudLayout.CONFIRM_GAP = 8
+-- The one derivation in this module, rather than a bare constant, because it is the only
+-- placement in the HUD that depends on something ROBLOX owns — and therefore the only one that
+-- has to survive being wrong about it. Pure arithmetic, so the fallback and the clamp are
+-- covered by the Lune suite; HudController does nothing but feed it two measurements.
+--
+--   guiBottomY : the HUD canvas's own bottom edge, in absolute screen Y
+--   jumpTopY   : the jump button's top edge in the same space, or nil when there is no such
+--                button (desktop), where the bottom-right corner is free anyway
+function HudLayout.plateBottomOffset(guiBottomY: number, jumpTopY: number?): number
+    if jumpTopY == nil then
+        return HudLayout.EDGE
+    end
+    -- max, not a bare subtraction: AbsolutePosition is read live and can be stale for a frame
+    -- after a viewport change, and a negative offset would put the plate off the bottom.
+    return math.max(HudLayout.EDGE, guiBottomY - jumpTopY + HudLayout.PLATE_JUMP_GAP)
+end
 
--- The band the minimal HUD does NOT own, both measured in the HUD ScreenGui's own coordinate space
--- (which leaves IgnoreGuiInset at its default false — see OnboardingController).
---   PLATE_BOTTOM           : where the plate's footprint ends, measured DOWN from the top edge.
---   CLUSTER_TOP_FROM_BOTTOM: where the tape+buttons+slot+confirm cluster's footprint begins,
---                            measured UP from the bottom edge. The slot's frame and the confirm
---                            strip's row occupy their space whether or not their tenants are
---                            visible, so both count even when empty.
--- The plate does not change with the tier, so PLATE_BOTTOM has no touch variant; the cluster does.
-HudLayout.PLATE_BOTTOM = HudLayout.EDGE + HudLayout.PLATE_H
-HudLayout.CLUSTER_TOP_FROM_BOTTOM = HudLayout.EDGE
-    + HudLayout.AREA_H
-    + HudLayout.ROW_GAP
-    + HudLayout.SLOT_H
-    + HudLayout.CONFIRM_GAP
-    + HudLayout.CONFIRM_H
+-- The bank button's row, directly above the throw cluster. Reserved whether or not a pot is
+-- riding: an onboarding card clamped into a band that ignored it would land on the button the
+-- moment a first win put one there.
+HudLayout.BANK_H = 40
+HudLayout.BANK_GAP = 8
+
+-- The tape+buttons cluster's own height, per tier. The TAPE IS BELOW THE BUTTONS now (owner's
+-- ruling); the height is unchanged because the same two rows and one gap are in it either way.
+HudLayout.AREA_H = HudLayout.BTN_H + HudLayout.ROW_GAP + HudLayout.TILE
+HudLayout.AREA_H_TOUCH = HudLayout.BTN_H_TOUCH + HudLayout.ROW_GAP + HudLayout.TILE_TOUCH
+
+-- Where the bank+throws+tape cluster's footprint begins, measured UP from the bottom edge.
+-- The bank row counts whether or not its button is visible, exactly as the old slot did.
+-- There is no PLATE_BOTTOM counterpart any more: the plate has left the top band entirely, so
+-- the only thing an onboarding card has to clear up there is the toast (see
+-- OnboardingController).
+HudLayout.CLUSTER_TOP_FROM_BOTTOM = HudLayout.EDGE + HudLayout.AREA_H + HudLayout.ROW_GAP + HudLayout.BANK_H
 HudLayout.CLUSTER_TOP_FROM_BOTTOM_TOUCH = HudLayout.EDGE
     + HudLayout.AREA_H_TOUCH
     + HudLayout.ROW_GAP
-    + HudLayout.SLOT_H
-    + HudLayout.CONFIRM_GAP
-    + HudLayout.CONFIRM_H
+    + HudLayout.BANK_H
 
 return HudLayout
