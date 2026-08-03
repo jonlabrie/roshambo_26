@@ -16,17 +16,31 @@ describe("HudLayout", function()
         expect(HudLayout.PLATE_BOTTOM).toBe(HudLayout.EDGE + HudLayout.PLATE_H)
     end)
 
-    test("CLUSTER_TOP_FROM_BOTTOM covers the slot as well as the cluster, derived", function()
+    test("CLUSTER_TOP_FROM_BOTTOM covers the slot and the confirm strip too, derived", function()
         expect(HudLayout.CLUSTER_TOP_FROM_BOTTOM).toBe(
-            HudLayout.EDGE + HudLayout.AREA_H + HudLayout.ROW_GAP + HudLayout.SLOT_H
+            HudLayout.EDGE
+                + HudLayout.AREA_H
+                + HudLayout.ROW_GAP
+                + HudLayout.SLOT_H
+                + HudLayout.CONFIRM_GAP
+                + HudLayout.CONFIRM_H
         )
     end)
 
-    test("the touch tier halves the throw button and shrinks the tape", function()
+    test("the touch tier shrinks the throw button and the tape", function()
         expect(HudLayout.BTN_H_TOUCH).toBe(math.round(HudLayout.BTN_H * HudLayout.THROW_TOUCH_SCALE))
         expect(HudLayout.TILE_TOUCH).toBe(math.round(HudLayout.TILE * HudLayout.TAPE_TOUCH_SCALE))
         expect(HudLayout.BTN_H_TOUCH < HudLayout.BTN_H).toBe(true)
         expect(HudLayout.TILE_TOUCH < HudLayout.TILE).toBe(true)
+    end)
+
+    -- The one number in this module with a value the OWNER chose rather than a derivation: the first
+    -- pass shipped 38px (a literal 50%) and it is below the usability floor these buttons have to
+    -- clear — three targets a kid has to hit reliably on a phone while the round clock runs. Asserted
+    -- as a FLOOR, not an equality, so raising the scale later is not a test failure but dropping back
+    -- under 44 is.
+    test("the touch throw target clears the 44px floor", function()
+        expect(HudLayout.BTN_H_TOUCH >= 44).toBe(true)
     end)
 
     test("AREA_H_TOUCH is the shrunken cluster, derived", function()
@@ -41,7 +55,12 @@ describe("HudLayout", function()
     -- someone later re-derived one and not the other.
     test("CLUSTER_TOP_FROM_BOTTOM_TOUCH follows the shrunken cluster, derived", function()
         expect(HudLayout.CLUSTER_TOP_FROM_BOTTOM_TOUCH).toBe(
-            HudLayout.EDGE + HudLayout.AREA_H_TOUCH + HudLayout.ROW_GAP + HudLayout.SLOT_H
+            HudLayout.EDGE
+                + HudLayout.AREA_H_TOUCH
+                + HudLayout.ROW_GAP
+                + HudLayout.SLOT_H
+                + HudLayout.CONFIRM_GAP
+                + HudLayout.CONFIRM_H
         )
         expect(HudLayout.CLUSTER_TOP_FROM_BOTTOM_TOUCH < HudLayout.CLUSTER_TOP_FROM_BOTTOM).toBe(true)
     end)

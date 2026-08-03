@@ -36,10 +36,14 @@ HudLayout.SLOT_GAP = 8
 -- to shrink in lockstep with the cluster or a card lands on top of BANK THESE. Both files pick the
 -- same variant from the same boolean.
 --
--- 50% is LINEAR, as asked: 76 -> 38px. That is under the ~44px touch-target rule of thumb, which is
--- the owner's call to make on a real device and is flagged in the gate report, not silently
--- overridden here. The tape is read, never touched, so no floor applies to it at all.
-HudLayout.THROW_TOUCH_SCALE = 0.5
+-- The first pass took "50% smaller" literally (0.5 -> 38px) and flagged that it sits under the ~44px
+-- touch-target floor both the Apple HIG and this programme's own touch-first brief call for. The
+-- owner has since chosen ~44px, so the scale is 0.58: 76 * 0.58 = 44.08 -> 44px, and the cluster
+-- width, the onboarding safe band and the confirm strip all re-derive from it. This is the ONE lever
+-- for the throw target's size; nothing downstream carries a literal.
+-- The tape is read, never touched, so no floor applies to it at all — it stays where the last pass
+-- left it.
+HudLayout.THROW_TOUCH_SCALE = 0.58
 HudLayout.TAPE_TOUCH_SCALE = 0.7
 
 HudLayout.BTN_H_TOUCH = math.round(HudLayout.BTN_H * HudLayout.THROW_TOUCH_SCALE)
@@ -49,18 +53,36 @@ HudLayout.TILE_TOUCH = math.round(HudLayout.TILE * HudLayout.TAPE_TOUCH_SCALE)
 HudLayout.AREA_H = HudLayout.TILE + HudLayout.ROW_GAP + HudLayout.BTN_H
 HudLayout.AREA_H_TOUCH = HudLayout.TILE_TOUCH + HudLayout.ROW_GAP + HudLayout.BTN_H_TOUCH
 
+-- The confirm strip: the row directly above the slot, which carries "TAP AGAIN TO THROW" and the
+-- "don't ask again" control while a throw is waiting on its second tap (see HudController). It is
+-- TRANSIENT — it exists only while a confirm is pending — but its row is reserved here PERMANENTLY,
+-- exactly as the slot's frame is: an onboarding card clamped into a band that ignored it would land
+-- on top of the one message telling the player their throw has not gone in yet, and the moment it
+-- appears (the round after a first win) is the same moment the "win" beat's card is on screen.
+-- Reserving costs the band 36px of the 48 the touch tier just gave it back.
+HudLayout.CONFIRM_H = 28
+HudLayout.CONFIRM_GAP = 8
+
 -- The band the minimal HUD does NOT own, both measured in the HUD ScreenGui's own coordinate space
 -- (which leaves IgnoreGuiInset at its default false — see OnboardingController).
 --   PLATE_BOTTOM           : where the plate's footprint ends, measured DOWN from the top edge.
---   CLUSTER_TOP_FROM_BOTTOM: where the tape+buttons+slot cluster's footprint begins, measured UP
---                            from the bottom edge. The slot's frame occupies its space whether or
---                            not its tenant is visible, so it counts even when empty.
+--   CLUSTER_TOP_FROM_BOTTOM: where the tape+buttons+slot+confirm cluster's footprint begins,
+--                            measured UP from the bottom edge. The slot's frame and the confirm
+--                            strip's row occupy their space whether or not their tenants are
+--                            visible, so both count even when empty.
 -- The plate does not change with the tier, so PLATE_BOTTOM has no touch variant; the cluster does.
 HudLayout.PLATE_BOTTOM = HudLayout.EDGE + HudLayout.PLATE_H
-HudLayout.CLUSTER_TOP_FROM_BOTTOM = HudLayout.EDGE + HudLayout.AREA_H + HudLayout.ROW_GAP + HudLayout.SLOT_H
+HudLayout.CLUSTER_TOP_FROM_BOTTOM = HudLayout.EDGE
+    + HudLayout.AREA_H
+    + HudLayout.ROW_GAP
+    + HudLayout.SLOT_H
+    + HudLayout.CONFIRM_GAP
+    + HudLayout.CONFIRM_H
 HudLayout.CLUSTER_TOP_FROM_BOTTOM_TOUCH = HudLayout.EDGE
     + HudLayout.AREA_H_TOUCH
     + HudLayout.ROW_GAP
     + HudLayout.SLOT_H
+    + HudLayout.CONFIRM_GAP
+    + HudLayout.CONFIRM_H
 
 return HudLayout
