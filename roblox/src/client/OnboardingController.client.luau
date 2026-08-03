@@ -157,16 +157,10 @@ copyLabel.Font = Enum.Font.GothamBold
 copyLabel.TextXAlignment = Enum.TextXAlignment.Left
 copyLabel.Text = ""
 copyLabel.Parent = card
-do
-    -- The copy carries its own washi keyline. Belt and braces with the opaque backing: the drum
-    -- bubble tracks a moving world object, so what ends up behind the card is not fixed, and a
-    -- keyline costs nothing where the backing already covers.
-    local s = Instance.new("UIStroke")
-    s.Color = WASHI
-    s.Thickness = 2
-    s.Transparency = 0.35
-    s.Parent = copyLabel
-end
+-- NO UIStroke ON THE COPY. A stroke parented to a TextLabel outlines every GLYPH: at 2px on
+-- 17px type the outline approaches the stem width, the counters in a/e/o fill in, and adjacent
+-- glyphs merge into a smear. That is what made these cards unreadable. The card's backing is
+-- already opaque WASHI under near-white copy (~18:1) and needs no help.
 
 local hintLabel = Instance.new("TextLabel")
 hintLabel.Name = "Hint"

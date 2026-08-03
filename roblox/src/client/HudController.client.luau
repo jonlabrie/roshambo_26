@@ -864,9 +864,22 @@ escalation.Active = false
 escalation.AnchorPoint = Vector2.new(0.5, 0.5)
 escalation.Position = UDim2.fromScale(0.5, 0.42)
 escalation.Size = UDim2.new(0.8, 0, 0, 130) -- scale width: a fixed 460px overflows a small phone
-escalation.BackgroundTransparency = 1
+-- Opaque backing, not a stroke on the text. The count and prompt used to float over open
+-- canyon with strokes standing in for contrast (see the spec's §3) — a real backing plate
+-- instead, same as every other readable surface in this HUD.
+escalation.BackgroundColor3 = WASHI
+escalation.BackgroundTransparency = 0.1
 escalation.Visible = false
 escalation.Parent = gui
+corner(escalation, 10)
+do
+    local pad = Instance.new("UIPadding")
+    pad.PaddingLeft = UDim.new(0, 12)
+    pad.PaddingRight = UDim.new(0, 12)
+    pad.PaddingTop = UDim.new(0, 12)
+    pad.PaddingBottom = UDim.new(0, 12)
+    pad.Parent = escalation
+end
 
 local escalationCount = Instance.new("TextLabel")
 escalationCount.Name = "Count"
@@ -878,7 +891,8 @@ escalationCount.TextSize = 84
 escalationCount.Font = Enum.Font.GothamBlack
 escalationCount.Text = ""
 escalationCount.Parent = escalation
-stroke(escalationCount, WASHI, 3, 0.15)
+-- No UIStroke on the label. Contrast comes from the opaque WASHI backing on `escalation` above
+-- (see the spec's §3) — a stroke here would outline every glyph instead.
 
 local escalationPrompt = Instance.new("TextLabel")
 escalationPrompt.Name = "Prompt"
@@ -892,20 +906,19 @@ escalationPrompt.TextSize = 24
 escalationPrompt.Font = Enum.Font.GothamBold
 escalationPrompt.Text = "CHOOSE A THROW"
 escalationPrompt.Parent = escalation
-stroke(escalationPrompt, WASHI, 2, 0.2)
+-- No UIStroke on the label — same rationale as escalationCount above.
 
 -- ===== Toast: the transient notice that replaced the persistent prose ticker =====
 local toast = Instance.new("TextLabel")
 toast.Name = "Toast"
 toast.AnchorPoint = Vector2.new(0.5, 0)
 -- The plate has vacated top-centre entirely (first for the right margin, then the bottom row),
--- so there is nothing left to offset against up here. Sits at EDGE for now; Task 9 owns making
--- this opaque per the design's §3.
+-- so there is nothing left to offset against up here. Sits at EDGE, the band the plate vacated.
 toast.Position = UDim2.new(0.5, 0, 0, EDGE)
 toast.Size = UDim2.new(0.5, 0, 0, 26)
 toast.AutomaticSize = Enum.AutomaticSize.Y -- a long notice wraps and grows rather than clipping
 toast.BackgroundColor3 = WASHI
-toast.BackgroundTransparency = 0.3
+toast.BackgroundTransparency = 0.05
 toast.BorderSizePixel = 0
 toast.TextColor3 = INK_CREAM
 toast.TextSize = 15
