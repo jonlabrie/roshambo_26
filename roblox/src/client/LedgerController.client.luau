@@ -74,10 +74,15 @@ local NARROW_PX = 900
 -- default.project.json: StarterPlayerScripts holds only RoshamboClient). It is still resolved
 -- defensively, because a control stack that turns out not to be there must degrade to a working
 -- freeze rather than to no freeze at all.
+--
+-- EVERY WaitForChild HERE IS TIMED. This block runs at require time, before the
+-- `EventBus.OpenLedger` connection at the bottom of the file exists — so an untimed wait that never
+-- resolved would not merely lose the freeze, it would leave the plate (the design's ONE door into
+-- maximal) a dead button for the rest of the session, with nothing on screen to say why.
 local controls: any = nil
 do
-    local playerScripts = player:WaitForChild("PlayerScripts")
-    local playerModule = playerScripts:WaitForChild("PlayerModule", 5)
+    local playerScripts = player:WaitForChild("PlayerScripts", 10)
+    local playerModule = playerScripts and playerScripts:WaitForChild("PlayerModule", 5)
     if playerModule then
         local ok, result = pcall(function()
             return (require(playerModule :: any) :: any):GetControls()
@@ -87,8 +92,10 @@ do
         else
             warn(`[LEDGER] PlayerModule:GetControls() failed ({result}) — falling back to WalkSpeed`)
         end
-    else
+    elseif playerScripts then
         warn("[LEDGER] PlayerModule not found — falling back to WalkSpeed")
+    else
+        warn("[LEDGER] PlayerScripts never arrived — falling back to WalkSpeed")
     end
 end
 
@@ -243,6 +250,12 @@ panel.Size = UDim2.fromScale(0.94, 0.94)
 panel.BackgroundColor3 = WASHI
 panel.BackgroundTransparency = 0.05
 panel.BorderSizePixel = 0
+-- NOTHING LEAVES THE PANEL. The body's height is whatever is left after the header, hero, tabs and
+-- preferences footer have taken theirs, and on a short landscape phone that is a few dozen pixels —
+-- less than the cards' content. Without this the overflow drew straight through the footer and out
+-- past the panel's own outline, over the scrim and the world behind it. The cards scroll their
+-- content (see makeCard); this is the backstop that makes the panel's edge mean something.
+panel.ClipsDescendants = true
 panel.Parent = gui
 corner(panel, 10)
 stroke(panel, GOLD, 1, 0.4)
@@ -368,7 +381,18 @@ body.Name = "Body"
 body.BackgroundTransparency = 1
 body.Parent = panel
 
-local function makeCard(name: string, heading: string): (Frame, Frame)
+-- Height of a card's heading strip: the 14px label plus the gap under it. Content starts below.
+local CARD_HEADING_H = 20
+
+-- Every card is heading + a SCROLLING body. The bodies are fixed-offset stacks (the lifetime card's
+-- rows, bar and legend run to ~200px), and the body band they sit in is whatever the panel has left
+-- over — on a 375px-tall landscape phone, well under that. Clipping alone would silently truncate
+-- the last rows, so the content scrolls: the figures are all still reachable, on the smallest screen
+-- this design targets, without a breakpoint deciding which ones a player is allowed to see.
+--
+-- A ScrollingFrame is NOT given `.Active`. It drags to scroll on its own, and the minimal HUD's
+-- interactive budget is already spent — the takeover's one carve-out is `panel.Active` above.
+local function makeCard(name: string, heading: string): (Frame, Frame, ScrollingFrame)
     local holder = Instance.new("Frame")
     holder.Name = name .. "Holder"
     holder.BackgroundTransparency = 1
@@ -382,6 +406,7 @@ local function makeCard(name: string, heading: string): (Frame, Frame)
     card.BackgroundColor3 = WASHI_CARD
     card.BackgroundTransparency = 0.15
     card.BorderSizePixel = 0
+    card.ClipsDescendants = true
     card.Parent = holder
     corner(card, 8)
     stroke(card, TAN_RIM, 1, 0.55)
@@ -397,11 +422,29 @@ local function makeCard(name: string, heading: string): (Frame, Frame)
     title2.Size = UDim2.new(1, 0, 0, 14)
     title2.TextTransparency = 0.15
 
-    return holder, card
+    local content = Instance.new("ScrollingFrame")
+    content.Name = "Content"
+    content.Position = UDim2.fromOffset(0, CARD_HEADING_H)
+    content.Size = UDim2.new(1, 0, 1, -CARD_HEADING_H)
+    content.BackgroundTransparency = 1
+    content.BorderSizePixel = 0
+    content.ScrollBarThickness = 4
+    content.ScrollBarImageColor3 = TAN_RIM
+    content.ScrollingDirection = Enum.ScrollingDirection.Y
+    -- Callers building fixed-offset content set this to the height they laid out; the feed sets
+    -- AutomaticCanvasSize instead, because its content grows a line at a time.
+    content.CanvasSize = UDim2.new()
+    content.Parent = card
+
+    return holder, card, content
 end
 
 -- --- Lifetime ---
-local lifetimeHolder, lifetimeCard = makeCard("Lifetime", "LIFETIME")
+local lifetimeHolder, _, lifetimeBody = makeCard("Lifetime", "LIFETIME")
+
+-- All offsets below are relative to the card's SCROLLING BODY, not to the card.
+local LIFETIME_TOP = 4
+local LIFETIME_ROW_H = 30
 
 local LIFETIME_ROWS = {
     { key = "banked", caption = "BANKED" },
@@ -414,10 +457,10 @@ local lifetimeValue: { [string]: TextLabel } = {}
 for i, row in LIFETIME_ROWS do
     local holder = Instance.new("Frame")
     holder.Name = row.key
-    holder.Position = UDim2.fromOffset(0, 24 + (i - 1) * 30)
-    holder.Size = UDim2.new(1, 0, 0, 26)
+    holder.Position = UDim2.fromOffset(0, LIFETIME_TOP + (i - 1) * LIFETIME_ROW_H)
+    holder.Size = UDim2.new(1, -6, 0, 26) -- -6: clear of the scrollbar
     holder.BackgroundTransparency = 1
-    holder.Parent = lifetimeCard
+    holder.Parent = lifetimeBody
 
     local caption = label(holder, row.caption, 12, INK_CREAM, Enum.Font.Gotham)
     caption.Size = UDim2.fromScale(0.6, 1)
@@ -433,16 +476,16 @@ end
 -- WIN/SAFE/LOSS bar. The three segments come from LedgerModel's largest-remainder apportionment and
 -- sum to exactly 100, so laying them end to end by scale leaves NO GAP and no overrun — which is
 -- why the model does that arithmetic and this file does none of it.
-local BAR_TOP = 24 + #LIFETIME_ROWS * 30 + 8
+local BAR_TOP = LIFETIME_TOP + #LIFETIME_ROWS * LIFETIME_ROW_H + 8
 
 local barTrack = Instance.new("Frame")
 barTrack.Name = "Bar"
 barTrack.Position = UDim2.fromOffset(0, BAR_TOP)
-barTrack.Size = UDim2.new(1, 0, 0, BAR_H)
+barTrack.Size = UDim2.new(1, -6, 0, BAR_H)
 barTrack.BackgroundColor3 = TRACK
 barTrack.BorderSizePixel = 0
 barTrack.ClipsDescendants = true
-barTrack.Parent = lifetimeCard
+barTrack.Parent = lifetimeBody
 corner(barTrack, 4)
 
 local function barSegment(name: string, color: Color3): Frame
@@ -459,25 +502,35 @@ local winSeg = barSegment("Win", WIN_GREEN)
 local safeSeg = barSegment("Safe", GOLD)
 local lossSeg = barSegment("Loss", LOSS_RED)
 
-local barLegend = label(lifetimeCard, "", 11, INK_CREAM, Enum.Font.Gotham)
-barLegend.Position = UDim2.fromOffset(0, BAR_TOP + BAR_H + 5)
-barLegend.Size = UDim2.new(1, 0, 0, 14)
+local LEGEND_TOP = BAR_TOP + BAR_H + 5
+local LEGEND_H = 14
+
+local barLegend = label(lifetimeBody, "", 11, INK_CREAM, Enum.Font.Gotham)
+barLegend.Position = UDim2.fromOffset(0, LEGEND_TOP)
+barLegend.Size = UDim2.new(1, -6, 0, LEGEND_H)
 barLegend.TextTransparency = 0.3
+
+-- The card's laid-out height, stated once rather than guessed: this is what makes the body scroll
+-- instead of overflowing when the panel gives it less room than this.
+lifetimeBody.CanvasSize = UDim2.fromOffset(0, LEGEND_TOP + LEGEND_H + 4)
 
 -- --- Your throws ---
 -- The only statistic that says something about the PLAYER rather than about their score. Glyphs,
 -- never a text character: the real assets are what every other surface in the canyon renders.
-local throwsHolder, throwsCard = makeCard("YourThrows", "YOUR THROWS")
+local throwsHolder, _, throwsBody = makeCard("YourThrows", "YOUR THROWS")
+
+local MIX_TOP = 8
+local MIX_ROW_H = 46
 
 type MixRow = { fill: Frame, pct: TextLabel, count: TextLabel }
 local mixRows: { [string]: MixRow } = {}
 for i, sym in THROWS do
     local row = Instance.new("Frame")
     row.Name = sym
-    row.Position = UDim2.fromOffset(0, 28 + (i - 1) * 46)
-    row.Size = UDim2.new(1, 0, 0, 38)
+    row.Position = UDim2.fromOffset(0, MIX_TOP + (i - 1) * MIX_ROW_H)
+    row.Size = UDim2.new(1, -6, 0, 38) -- -6: clear of the scrollbar
     row.BackgroundTransparency = 1
-    row.Parent = throwsCard
+    row.Parent = throwsBody
 
     local box = Instance.new("Frame")
     box.Name = "GlyphBox"
@@ -517,24 +570,17 @@ for i, sym in THROWS do
 
     mixRows[sym] = { fill = fill, pct = pct, count = count }
 end
+throwsBody.CanvasSize = UDim2.fromOffset(0, MIX_TOP + #THROWS * MIX_ROW_H)
 
 -- --- Feed ---
 -- PERSONAL ONLY in v1: the player's own results and banks, which is data this client already
 -- receives. Social lines ("kaz_9 banked 243") need a server-side event stream and belong to a later
 -- item — inventing one here would be inventing data.
-local feedHolder, feedCard = makeCard("Feed", "FEED")
+local feedHolder, _, feed = makeCard("Feed", "FEED")
 
-local feed = Instance.new("ScrollingFrame")
-feed.Name = "Scroll"
-feed.Position = UDim2.fromOffset(0, 22)
-feed.Size = UDim2.new(1, 0, 1, -22)
-feed.BackgroundTransparency = 1
-feed.BorderSizePixel = 0
-feed.ScrollBarThickness = 4
-feed.ScrollBarImageColor3 = TAN_RIM
-feed.CanvasSize = UDim2.new()
+-- The one card whose content is not a fixed layout: it grows a line at a time, so its canvas is
+-- measured rather than stated.
 feed.AutomaticCanvasSize = Enum.AutomaticSize.Y
-feed.Parent = feedCard
 do
     local list = Instance.new("UIListLayout")
     list.SortOrder = Enum.SortOrder.LayoutOrder
