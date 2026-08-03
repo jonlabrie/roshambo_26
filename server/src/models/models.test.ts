@@ -56,6 +56,7 @@ describe('User defaults — play HUD fields', () => {
         const u = new User({ deviceId: 'd1' });
         expect(u.unresolvedWin).toBe(false);
         expect(u.escalationPrompts).toBe(true); // prompts are on until the player turns them off
+        expect(u.confirmThrows).toBe(true); // so is confirming a throw with a pot riding on it
         expect(u.seenBeats).toEqual([]);
         for (const k of ['roundsPlayed', 'wins', 'safes', 'losses', 'lifetimeBanked', 'bestPot',
                          'throwsR', 'throwsP', 'throwsS'] as const) {

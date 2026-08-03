@@ -176,6 +176,7 @@ describe('/api/v1', () => {
                 .get('/api/v1/players/55501').set('X-API-Key', API_KEY).expect(200);
             expect(res.body.unresolvedWin).toBe(true);
             expect(res.body.escalationPrompts).toBe(false);
+            expect(res.body.confirmThrows).toBe(true); // defaulted: no migration was run
             expect(res.body.seenBeats).toEqual(['drum']);
             expect(res.body.counters).toEqual({
                 roundsPlayed: 386, wins: 131, safes: 92, losses: 163,
@@ -207,6 +208,7 @@ describe('/api/v1', () => {
                 stakingStreak: 0, bestStreak: 0 } as never);
             expect(p.unresolvedWin).toBe(false);
             expect(p.escalationPrompts).toBe(true);
+            expect(p.confirmThrows).toBe(true); // confirming a big throw is on until turned off
             expect(p.seenBeats).toEqual([]);
             expect(p.counters.roundsPlayed).toBe(0);
         });
@@ -219,9 +221,23 @@ describe('/api/v1', () => {
             const res = await request(app)
                 .put('/api/v1/players/hud-1/preferences-hud')
                 .set('X-API-Key', API_KEY).send({ escalationPrompts: false }).expect(200);
-            expect(res.body).toEqual({ escalationPrompts: false, seenBeats: [] });
+            expect(res.body).toEqual({ escalationPrompts: false, confirmThrows: true, seenBeats: [] });
             const u = await User.findOne({ robloxId: 'hud-1' });
             expect(u?.escalationPrompts).toBe(false);
+        });
+
+        it('sets confirmThrows independently of escalationPrompts', async () => {
+            await User.create({ robloxId: 'hud-5', identityTier: 'roblox' });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const res = await request(app)
+                .put('/api/v1/players/hud-5/preferences-hud')
+                .set('X-API-Key', API_KEY).send({ confirmThrows: false }).expect(200);
+            expect(res.body).toEqual({ escalationPrompts: true, confirmThrows: false, seenBeats: [] });
+            const u = await User.findOne({ robloxId: 'hud-5' });
+            expect(u?.confirmThrows).toBe(false);
+            // the other preference is untouched — one remote carries both, so a write of one must
+            // never be a silent write of the other
+            expect(u?.escalationPrompts).toBe(true);
         });
 
         it('adds a seenBeat without duplicating it, and never removes one', async () => {

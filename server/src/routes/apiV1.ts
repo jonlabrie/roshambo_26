@@ -23,6 +23,7 @@ export function buildProfilePayload(user: IUser) {
         bestStreak: user.bestStreak,
         unresolvedWin: user.unresolvedWin ?? false,
         escalationPrompts: user.escalationPrompts ?? true,
+        confirmThrows: user.confirmThrows ?? true,
         seenBeats: user.seenBeats ?? [],
         counters: {
             roundsPlayed: user.roundsPlayed ?? 0,
@@ -136,6 +137,9 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             if (typeof req.body?.escalationPrompts === 'boolean') {
                 set.escalationPrompts = req.body.escalationPrompts;
             }
+            if (typeof req.body?.confirmThrows === 'boolean') {
+                set.confirmThrows = req.body.confirmThrows;
+            }
             // seenBeat is add-only: a beat can be marked seen but never un-seen from the client
             const addToSet = typeof req.body?.seenBeat === 'string'
                 ? { seenBeats: req.body.seenBeat } : undefined;
@@ -149,7 +153,11 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
                 { new: true }
             );
             const s = updated ?? user;
-            res.json({ escalationPrompts: s.escalationPrompts ?? true, seenBeats: s.seenBeats ?? [] });
+            res.json({
+                escalationPrompts: s.escalationPrompts ?? true,
+                confirmThrows: s.confirmThrows ?? true,
+                seenBeats: s.seenBeats ?? [],
+            });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
         }

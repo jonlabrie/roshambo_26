@@ -22,6 +22,10 @@ export interface IUser extends Document {
     // ridden through a SAFE is identical in figure to one just won.
     unresolvedWin: boolean;
     escalationPrompts: boolean;
+    // "Ask me to confirm a throw when there is a pot riding on it." Default ON: the confirm guards a
+    // mis-tap at exactly the moment one is expensive, and a player who does not want it turns it off
+    // (ledger footer, or the strip's own "don't ask again").
+    confirmThrows: boolean;
     seenBeats: string[];
     roundsPlayed: number;
     wins: number;
@@ -64,6 +68,7 @@ const UserSchema: Schema = new Schema({
     pointsAtStake: { type: Number, default: 0 },
     unresolvedWin: { type: Boolean, default: false },
     escalationPrompts: { type: Boolean, default: true },
+    confirmThrows: { type: Boolean, default: true },
     seenBeats: { type: [String], default: [] },
     roundsPlayed: { type: Number, default: 0 },
     wins: { type: Number, default: 0 },
