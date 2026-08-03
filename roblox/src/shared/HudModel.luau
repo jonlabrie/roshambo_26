@@ -126,6 +126,32 @@ function HudModel.tapAction(inputs: Inputs, symbol: string): string
     return "commit"
 end
 
+export type TapState = { selectedThrow: string?, myPick: string? }
+
+-- The state transition for a `tapAction` result. Pulled out of the controller and in here so the
+-- "release NEVER EMPTIES THE SELECTION" rule (see the comment above tapAction) is enforced by a
+-- pure function the controller has to CALL, rather than three separate inline assignments it has
+-- to keep in sync by hand. A future edit to the release case cannot invent a deselect without
+-- editing this table, and this table is what the exhaustive test in HudModel.spec.luau pins down.
+--
+--   commit  -> selectedThrow = symbol, myPick = symbol   (the throw)
+--   select  -> selectedThrow = symbol, myPick = nil      (moved; any confirmation drops)
+--   release -> selectedThrow unchanged, myPick = nil     (confirmation taken back, glyph stays)
+--   ignore  -> unchanged
+--
+-- Pure: no Roblox globals, no I/O. The controller still owns the side effects that go with a
+-- commit (SubmitPick:FireServer, publish()) — this function only computes the two fields.
+function HudModel.applyTap(state: TapState, action: string, symbol: string): TapState
+    if action == "commit" then
+        return { selectedThrow = symbol, myPick = symbol }
+    elseif action == "select" then
+        return { selectedThrow = symbol, myPick = nil }
+    elseif action == "release" then
+        return { selectedThrow = state.selectedThrow, myPick = nil }
+    end
+    return { selectedThrow = state.selectedThrow, myPick = state.myPick }
+end
+
 -- The selection that must be thrown NOW rather than lost, or nil.
 --
 -- Owner's decision, and the reason this exists at all: a player who tapped a glyph clearly meant to

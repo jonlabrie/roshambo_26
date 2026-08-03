@@ -359,6 +359,59 @@ describe("HudModel.tapAction — releasing a confirmed throw", function()
     end)
 end)
 
+-- ===== applyTap: the state transition, extracted so the controller cannot invent a deselect =====
+-- tapAction only NAMES the action; applyTap is what actually computes selectedThrow/myPick from
+-- it. Before this existed, that computation was three separate inline assignments in
+-- main.client.luau, and nothing stopped a future edit to the "release" branch from clearing
+-- selectedThrow — which is exactly the failure "release NEVER EMPTIES THE SELECTION" (see
+-- tapAction's doc comment) exists to prevent. This is the test that would catch that edit.
+describe("HudModel.applyTap — the transition table", function()
+    test("commit sets both fields to the tapped symbol", function()
+        local s = HudModel.applyTap({ selectedThrow = nil, myPick = nil }, "commit", "R")
+        expect(s.selectedThrow).toBe("R")
+        expect(s.myPick).toBe("R")
+    end)
+
+    test("select sets selectedThrow to the tapped symbol and drops myPick", function()
+        local s = HudModel.applyTap({ selectedThrow = "P", myPick = "P" }, "select", "R")
+        expect(s.selectedThrow).toBe("R")
+        expect(s.myPick).toBe(nil)
+    end)
+
+    test("release drops myPick and leaves selectedThrow EXACTLY as it was", function()
+        local s = HudModel.applyTap({ selectedThrow = "R", myPick = "R" }, "release", "R")
+        expect(s.selectedThrow).toBe("R")
+        expect(s.myPick).toBe(nil)
+    end)
+
+    test("ignore changes nothing", function()
+        local s = HudModel.applyTap({ selectedThrow = "S", myPick = "S" }, "ignore", "R")
+        expect(s.selectedThrow).toBe("S")
+        expect(s.myPick).toBe("S")
+    end)
+
+    test(
+        "THE INVARIANT — for every action, a non-nil selectedThrow going in is non-nil coming out",
+        function()
+            -- Exhaustive over the four actions, a selection already set, and both myPick states.
+            -- This is the test that must fail if someone edits the release branch to clear the
+            -- selection: with a selection already standing, no action may return the player to
+            -- "nothing chosen".
+            for _, action in { "commit", "select", "release", "ignore" } do
+                for _, sel in { "R", "P", "S" } do
+                    for _, pick in { sel, nil :: string? } do
+                        for _, tap in { "R", "P", "S" } do
+                            local result =
+                                HudModel.applyTap({ selectedThrow = sel, myPick = pick }, action, tap)
+                            expect(result.selectedThrow ~= nil).toBe(true)
+                        end
+                    end
+                end
+            end
+        end
+    )
+end)
+
 describe("HudModel — the full transition table", function()
     -- The owner's table, run as a sequence. This mirrors main.client.luau's HudPick handler: a
     -- "commit" sets the committed pick (and fires it), a "select" moves the selection and drops any
