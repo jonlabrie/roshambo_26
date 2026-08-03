@@ -494,10 +494,12 @@ RequestLedger.OnServerEvent:Connect(function(player)
             return
         end
         seedCounters(uid, res.data.counters)
-        hudPrefs[uid] = res.data.escalationPrompts ~= false
-        if type(res.data.seenBeats) == "table" then
-            hudSeenBeats[uid] = res.data.seenBeats
-        end
+        -- ONLY the counters, exactly as the note above promises. hudPrefs/hudSeenBeats are
+        -- deliberately NOT re-applied: this response was already in flight when it was read, so a
+        -- SetHudPreference write that landed inside its latency window would be overwritten by the
+        -- PRE-write value and echoed straight back to the client — open the ledger, flick the
+        -- escalation switch, watch it flip itself back. Both caches are owned by SetHudPreference
+        -- for the life of the session and seeded once at join.
         fireProfile(player, "ledger")
     end)
 end)
@@ -516,33 +518,52 @@ SetHudPreference.OnServerEvent:Connect(function(player, body)
     if next(payload) == nil then
         return
     end
-    if payload.escalationPrompts ~= nil then
-        -- Keep the cache in step with the write, or the next fireProfile would echo the OLD value
-        -- back at the client and appear to undo the switch.
-        hudPrefs[tostring(player.UserId)] = payload.escalationPrompts
-    end
-    if payload.seenBeat ~= nil then
-        -- Same reasoning, add-only: without this an intervening fireProfile (e.g. a bank landing
-        -- moments later) would echo the seenBeats list from BEFORE this write and the client would
-        -- momentarily believe the beat unseen again. OnboardingController already marks it seen
-        -- optimistically, so this only guards the cache other events read from.
+    -- THROUGH THE QUEUE, like every other mutating handler (SetPadPreference, SetBackDoor,
+    -- RequestPurchase, BankRequest). This body yields on HTTP, and a bare task.spawn per fire meant
+    -- a scripted client looping this remote could issue unbounded concurrent PUTs — enough to eat
+    -- the ~500/min per-server HttpService budget and starve RoundCoordinator's own calls, breaking
+    -- the round loop for all 50 players in the instance. The lane serializes one player's writes
+    -- and drops the overflow past MAX_PENDING.
+    handlerQueue:run(tostring(player.UserId), function()
         local uid = tostring(player.UserId)
-        local existing = hudSeenBeats[uid] or {}
-        local already = false
-        for _, id in existing do
-            if id == payload.seenBeat then
-                already = true
-                break
+        -- Cache first, PUT second, revert if the PUT fails — the same shape as SetPadPreference.
+        -- The cache has to move first because an intervening fireProfile (a bank landing moments
+        -- later) would otherwise echo the PRE-write value and appear to undo the switch; it has to
+        -- be reverted on failure for the mirror-image reason, so the session never asserts a value
+        -- the database does not hold.
+        local prevPref = hudPrefs[uid]
+        local prevBeats = hudSeenBeats[uid]
+        if payload.escalationPrompts ~= nil then
+            hudPrefs[uid] = payload.escalationPrompts
+        end
+        if payload.seenBeat ~= nil then
+            -- Add-only, and only if new: OnboardingController already marks the beat seen
+            -- optimistically, so this just guards the cache other events read from.
+            local existing = hudSeenBeats[uid] or {}
+            local already = false
+            for _, id in existing do
+                if id == payload.seenBeat then
+                    already = true
+                    break
+                end
+            end
+            if not already then
+                local merged = table.clone(existing)
+                table.insert(merged, payload.seenBeat)
+                hudSeenBeats[uid] = merged
             end
         end
-        if not already then
-            local merged = table.clone(existing)
-            table.insert(merged, payload.seenBeat)
-            hudSeenBeats[uid] = merged
+        local persisted = net:putHudPreference(uid, payload)
+        if not persisted.ok then
+            warn(`[HUD] putHudPreference failed for {uid}: {persisted.error or persisted.status}`)
+            hudPrefs[uid] = prevPref
+            hudSeenBeats[uid] = prevBeats
+            if player:IsDescendantOf(Players) then
+                -- Re-fire state so the optimistic switch in the ledger footer flips back rather
+                -- than leaving the player looking at a control that silently did nothing.
+                fireProfile(player, "hudPrefRevert")
+            end
         end
-    end
-    task.spawn(function()
-        net:putHudPreference(tostring(player.UserId), payload)
     end)
 end)
 
