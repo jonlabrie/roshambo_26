@@ -5,14 +5,13 @@
 --   • the authoritative World-Throw tape and the per-round personal WIN/SAFE/LOSS badges,
 --   • the DRUM-REST SPOILER GATE (see `visibleTape` / `maybeShowReveal`) — which now holds the FATE
 --     as well as the tape and the headline,
---   • the confirm-a-throw selection (`selectedThrow`), whose rule lives in HudModel,
---   • the HudModel session — the escalation's consecutive-miss backoff,
---   • the optimistic local pick.
+--   • the pick itself — held here as `chosen` until the lockout (`HudModel.sendAtLockout`), the
+--     one point it goes over the wire,
+--   • the HudModel session — the escalation's consecutive-miss backoff.
 --
 -- It publishes all of that on `EventBus.HudState:Fire(inputs, aux)`:
 --   inputs : a HudModel.Inputs — the controller calls HudModel.view(inputs, aux.session)
---   aux    : { session = HudModel.Session, tape = { { worldThrow, result? } }, pick = string?,
---             timerKnown = boolean }
+--   aux    : { session = HudModel.Session, tape = { { worldThrow, result? } }, timerKnown = boolean }
 -- and takes picks back on `EventBus.HudPick`. Transient notices go out on `EventBus.Toast`.
 --
 -- The MAXIMAL panel gets its own channel, `EventBus.LedgerState`, fired only when ProfileUpdate
@@ -63,8 +62,11 @@ local revealedRoundId: string? = nil -- the latest round our drum has finished
 
 local phase = ""
 local lockoutAt: number? = nil
+-- Written by the fate branches below (maybeShowReveal, FateResolvedEvt) but no longer READ:
+-- Task 4 stopped passing it into HudModel and stopped gating roundCouldThrow on it (see the
+-- RoundUpdate handler). It stays write-only until Task 5 removes the fate system outright.
+-- selene: allow(unused_variable)
 local fateBound = false
-local myPick: string? = nil
 local roundCouldThrow = false
 
 local wallet =
@@ -74,10 +76,16 @@ local wallet =
 local escalationPrompts = true
 local confirmThrows = true
 
--- The glyph tapped but NOT yet thrown, while a pot is riding — see HudModel.tapAction. It lives here
--- rather than in HudController because this file is what turns a tap into a pick on the wire, and
--- because the auto-commit at lockout needs the countdown, which is derived here.
-local selectedThrow: string? = nil
+-- THE ROUND'S PICK STATE. `chosen` is the player's commitment and `sent` is the wire's, and
+-- they are separate on purpose: the pick is held here until the lockout (HudModel.sendAtLockout)
+-- because ThrowBuffer is upsert-only, so sending on the first tap would make backing out a lie.
+local chosen: string? = nil
+local switchPrompt: string? = nil
+local switchPromptAt: number? = nil
+local sent = false
+-- Set by a back-out, cleared when ACTIVE reopens. A player who withdrew has answered the
+-- question the escalation asks, so it must not ask again this round.
+local declinedThisRound = false
 
 -- The nine persisted ledger counters, carried by ProfileUpdate. The maximal panel is the only
 -- reader; the minimal HUD never sees them.
@@ -180,8 +188,8 @@ local function visibleTape(): { { worldThrow: string, result: string? } }
     return out
 end
 
--- One HudModel.Inputs, built in one place. The tap handler and the lockout auto-commit both have to
--- ask the model questions about the CURRENT state, and a second hand-assembled copy of this table is
+-- One HudModel.Inputs, built in one place. The tap handler and the lockout send both have to ask
+-- the model questions about the CURRENT state, and a second hand-assembled copy of this table is
 -- exactly how a field ends up set in one and forgotten in the other.
 local function buildInputs(): any
     return {
@@ -191,11 +199,11 @@ local function buildInputs(): any
         currentStreak = wallet.currentStreak,
         totalPoints = wallet.totalPoints,
         unresolvedWin = wallet.unresolvedWin,
-        fateBound = fateBound,
-        pickedThisRound = myPick ~= nil,
         escalationPrompts = escalationPrompts,
-        confirmThrows = confirmThrows,
-        selectedThrow = selectedThrow,
+        chosen = chosen,
+        switchPrompt = switchPrompt,
+        sent = sent,
+        declinedThisRound = declinedThisRound,
     }
 end
 
@@ -216,7 +224,6 @@ local function publish()
     EventBus.HudState:Fire(inputs, {
         session = session,
         tape = visibleTape(),
-        pick = myPick,
         -- Render-only, so it stays out of HudModel: false means we never got a lockout for this
         -- round and the hairline has no real span to deplete against.
         timerKnown = lockoutAt ~= nil,
@@ -284,8 +291,9 @@ local function maybeShowReveal()
         -- A pick tapped in the sliver between the round reopening and the drum settling was already
         -- refused by the server (its fate gate is not client-timed), so stop lighting it — the same
         -- reasoning as the whiff branch in the RevealTheater handler.
-        myPick = nil
-        selectedThrow = nil -- a fate refuses the pick, so there is nothing left to confirm
+        chosen = nil
+        switchPrompt = nil
+        switchPromptAt = nil
         publish()
     end
     if pendingReveal then
@@ -320,46 +328,34 @@ EventBus.Cue.Event:Connect(function(cue)
     end
 end)
 
--- The one place a pick leaves this client. Both the tap that commits and the lockout auto-commit go
--- through it, so neither can forget to clear the selection or to publish.
-local function commitPick(value: string)
-    -- HudModel.applyTap is the single place that computes selectedThrow/myPick for a tap result —
-    -- see its doc comment for why the state transition lives there and not inline here. The
-    -- selection SURVIVES the commit: it is what a release (below) falls back to, and holding it is
-    -- what makes "no tap can ever leave nothing selected" true, since the lockout's auto-commit
-    -- always has a glyph to send.
-    local nextState = HudModel.applyTap({ selectedThrow = selectedThrow, myPick = myPick }, "commit", value)
-    selectedThrow = nextState.selectedThrow
-    -- Optimistic: the tile lights the moment it is tapped. The server is what actually refuses a
-    -- pick (fate-bound, past the lockout).
-    myPick = nextState.myPick
+-- The one place a pick leaves this client, and it happens ONCE per round at the lockout.
+-- `sent` is set before the fire, not after: a re-entrant heartbeat tick must not be able to
+-- send the same pick twice.
+local function sendPick(value: string)
+    sent = true
     SubmitPick:FireServer(value)
     publish()
 end
 
--- HudController fires this on EVERY accepted tap; the MODEL decides whether the tap throws, only
--- selects, or takes a confirmation back (HudModel.tapAction). The controller does not re-derive that
--- rule, and there is no second EventBus channel for "selected" — a select is just a publish with
--- `selectedThrow` set.
+-- HudController fires this on every accepted tap; the MODEL decides what the tap means
+-- (HudModel.tapAction) and what the state becomes (HudModel.applyTap). The controller
+-- re-derives neither.
 --
--- ONLY "commit" TALKS TO THE SERVER. Selecting and releasing are entirely local; a later commit
--- overwrites whatever the server last received, because the throw buffer upserts per player under a
--- seq guard.
+-- NOTHING HERE TALKS TO THE SERVER. Choosing, prompting and clearing are all local; the pick
+-- goes over the wire in the heartbeat below, at the lockout.
 EventBus.HudPick.Event:Connect(function(value: string)
     local action = HudModel.tapAction(buildInputs(), value)
-    if action == "commit" then
-        commitPick(value)
-    elseif action == "select" or action == "release" then
-        -- "select" moves the selection and drops any confirmation with it (the player is now
-        -- standing on a different glyph, and leaving `myPick` set would light one tile while
-        -- claiming another). "release" is CONFIRMED -> selected: the glyph stays chosen and stays
-        -- lit; only the commitment goes. HudModel.applyTap is the single place that maps the
-        -- action to the two fields — see its doc comment.
-        local nextState = HudModel.applyTap({ selectedThrow = selectedThrow, myPick = myPick }, action, value)
-        selectedThrow = nextState.selectedThrow
-        myPick = nextState.myPick
-        publish()
+    if action == "ignore" then
+        return
     end
+    local nextState = HudModel.applyTap({ chosen = chosen, switchPrompt = switchPrompt }, action, value)
+    chosen = nextState.chosen
+    switchPrompt = nextState.switchPrompt
+    switchPromptAt = if switchPrompt then os.clock() else nil
+    if action == "clear" then
+        declinedThisRound = true
+    end
+    publish()
 end)
 
 -- No optimistic wallet edit: the pot indicator clears when ProfileUpdate lands with the banked
@@ -435,13 +431,11 @@ RevealTheater.OnClientEvent:Connect(function(r)
     end
     if r.whiffed and r.whiffed[myId] then
         toast("⏳ TOO LATE — your throw didn't count this round")
-        -- and stop lighting the tile they tapped: leaving myPick set would keep it illuminated
+        -- and stop lighting the glyph: leaving it chosen would keep the tile illuminated
         -- through REVEAL as though it had counted, contradicting the toast.
-        myPick = nil
-        -- The SELECTION goes too, and it must. Since a commit now leaves it standing, a whiff that
-        -- cleared only `myPick` would leave `autoCommit`'s past-ACTIVE branch looking at an
-        -- uncommitted selection and re-firing the very pick the server has just refused.
-        selectedThrow = nil
+        chosen = nil
+        switchPrompt = nil
+        switchPromptAt = nil
     end
     publish()
 end)
@@ -469,24 +463,20 @@ RoundUpdate.OnClientEvent:Connect(function(info)
         tape = info.tape -- authoritative World-Throw history, every phase change
     end
     if phase == "ACTIVE" and info.phase ~= "ACTIVE" then
-        -- A STANDING SELECTION COUNTS AS PICKED. The lockout's auto-commit normally converts it half
-        -- a second before this fires, but a player who released their confirmation inside that last
-        -- sliver would otherwise be scored as having ignored the round — and three of those start
-        -- the escalation nagging someone who is demonstrably playing.
-        roundEnded(roundCouldThrow, myPick ~= nil or selectedThrow ~= nil)
+        -- A STANDING CHOICE COUNTS AS PLAYED. The lockout normally sends it half a second
+        -- before this fires; a choice made inside that last sliver must not be scored as an
+        -- ignored round, because three of those start the escalation nagging someone who is
+        -- demonstrably playing.
+        roundEnded(roundCouldThrow, chosen ~= nil)
     end
     phase = info.phase
     if info.phase == "ACTIVE" then
-        myPick = nil
-        -- Belt and braces: the heartbeat's auto-commit consumes a pending selection well before the
-        -- next round opens (TALLY + REVEAL is 5s), and a fate clears it too. This catches anything
-        -- that somehow survived, so a stale glyph from last round can never be lit into this one.
-        selectedThrow = nil
-        -- `pendingFate` counts as bound. The fate is applied on `drumRest`, which lands a moment
-        -- INTO this round, so reading `fateBound` alone here would mark a round the player is about
-        -- to be held out of as one they could have thrown in — and the escalation's backoff would
-        -- score it as an ignored round.
-        roundCouldThrow = not fateBound and not pendingFate
+        chosen = nil
+        switchPrompt = nil
+        switchPromptAt = nil
+        sent = false
+        declinedThisRound = false
+        roundCouldThrow = true
         lockoutAt = if info.secondsToLockout then os.clock() + info.secondsToLockout else nil
         pendingReveal = nil -- the drum respins; last round's reveal has already been shown
         -- pendingFate is deliberately NOT cleared here, for the same reason pendingReveal is not
@@ -604,15 +594,21 @@ end)
 -- throw at any point in it did not have the round taken from them.
 task.spawn(function()
     while true do
-        if phase == "ACTIVE" and not fateBound and not pendingFate then
+        if phase == "ACTIVE" then
             roundCouldThrow = true
         end
-        -- THE UNCONFIRMED SELECTION IS THROWN RATHER THAN LOST. The model decides when (see
-        -- HudModel.autoCommit); this loop is simply the only thing watching the countdown, at 10Hz —
-        -- close enough to the half-second boundary that the pick still makes the lockout.
-        local auto = HudModel.autoCommit(buildInputs())
-        if auto then
-            commitPick(auto)
+        -- An unanswered SWITCH? ages out. Both outcomes of expiry are safe: it restores
+        -- exactly the state before the stray tap.
+        if HudModel.switchPromptExpired(switchPromptAt, os.clock()) then
+            switchPrompt = nil
+            switchPromptAt = nil
+        end
+        -- THE PICK'S ONE TRIP TO THE WIRE. The model decides when; this loop is simply the only
+        -- thing watching the countdown, at 10Hz — close enough to the half-second boundary that
+        -- the pick still makes the lockout.
+        local send = HudModel.sendAtLockout(buildInputs())
+        if send then
+            sendPick(send)
         end
         publish()
         task.wait(TICK)
