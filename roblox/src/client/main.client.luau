@@ -137,9 +137,10 @@ BoardData.OnClientEvent:Connect(function(d)
 end)
 
 -- The reveal headline AND the new tape tile wait for the drum to stop turning (the drumRest cue),
--- so the throw is not spoiled mid-spin. The distribution line waits with them: it names the world
--- throw too, so releasing it early would spoil the wheel just as surely.
-local pendingReveal: { headline: string, detail: string, roundId: string?, result: string? }? = nil
+-- so the throw is not spoiled mid-spin. The vote distribution is folded into that same headline
+-- rather than announced on its own: it names the world throw too, and the old prose ticker
+-- released it the instant the reveal landed, which spoiled the wheel while it was still turning.
+local pendingReveal: { headline: string, roundId: string?, result: string? }? = nil
 local drumAtRest = false
 
 local function maybeShowReveal()
@@ -147,7 +148,6 @@ local function maybeShowReveal()
         local p = pendingReveal
         pendingReveal = nil
         toast(p.headline)
-        toast(p.detail)
         -- Badge this round by id and un-gate it in the tape now the drum's at rest.
         if p.roundId then
             if p.result then
@@ -215,20 +215,21 @@ RoundUpdate.OnClientEvent:Connect(function(info)
 end)
 
 RevealResult.OnClientEvent:Connect(function(r)
-    local headline: string
+    local result: string
     if r.result == "WIN" then
-        headline = `🏆 WIN! World threw {r.worldThrow}`
+        result = `🏆 WIN! World threw {r.worldThrow}`
     elseif r.result == "SAFE" then
-        headline = `🛡 SAFE — world matched your {r.pick}`
+        result = `🛡 SAFE — world matched your {r.pick}`
     elseif r.result == "LOSS" then
-        headline = `💥 LOSS — world threw {r.worldThrow}`
+        result = `💥 LOSS — world threw {r.worldThrow}`
     else
-        headline = `World threw {r.worldThrow}`
+        result = `World threw {r.worldThrow}`
     end
-    local detail =
-        `World threw {r.worldThrow} — R {r.distribution.R}% · P {r.distribution.P}% · S {r.distribution.S}%`
+    -- One line, not two. The old status bar and the old prose ticker each carried half of this;
+    -- a toast is transient, and two of them back to back would occupy a third of the round.
+    local headline = `{result} — R {r.distribution.R}% · P {r.distribution.P}% · S {r.distribution.S}%`
     -- The revealing round == the one RoundUpdate last named (REVEAL phase).
-    pendingReveal = { headline = headline, detail = detail, roundId = currentRoundId, result = r.result }
+    pendingReveal = { headline = headline, roundId = currentRoundId, result = r.result }
     maybeShowReveal() -- only shows if the drum is already at rest
     task.delay(REVEAL_SAFETY, function()
         if pendingReveal and pendingReveal.headline == headline then
