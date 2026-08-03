@@ -1051,6 +1051,19 @@ Replace the plate/slot lines at the top of `render` with:
 (The plate lines move in Task 7; leave them for now, but delete `cellValue.pot.Text = …`
 since `view.plate.pot` no longer exists.)
 
+**Also delete the confirm strip's render block in this task**, even though its construction
+waits for Task 8:
+
+```luau
+    confirmStrip.Visible = view.confirmPending or view.releasable
+    if view.releasable then … else … end
+```
+
+`view.confirmPending` and `view.releasable` were removed in Task 1, so both operands are now
+nil and `Visible = nil` is a runtime error — it would leave the branch unrunnable in Studio
+between this task and Task 8. Leave the `confirmStrip` instance itself in place (unused and
+hidden); Task 8 deletes it.
+
 - [ ] **Step 4: Verify and commit**
 
 ```bash
