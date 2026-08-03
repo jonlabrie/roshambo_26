@@ -18,10 +18,19 @@ export type Counters = {
     throwsS: number,
 }
 export type Live = { pot: number, streak: number, points: number }
+export type View = {
+    paysNext: number,
+    winRatePct: number,
+    bar: { win: number, safe: number, loss: number },
+    mix: { R: number, P: number, S: number },
+    lifetime: Counters,
+    live: Live,
+}
 
 -- Largest-remainder apportionment. Rounding three shares independently leaves them summing to
 -- 99 or 101, which shows as a gap or an overrun in a segmented bar. This distributes the
--- rounding error to the largest fractional parts so the total is always exactly 100.
+-- rounding error to the largest fractional parts so the total is exactly 100 -- except for an
+-- all-zero input, which returns all zeros: there is nothing to apportion and nothing to render.
 local function shares(parts: { number }): { number }
     local total = 0
     for _, p in parts do
@@ -57,14 +66,17 @@ local function shares(parts: { number }): { number }
     return out
 end
 
-function LedgerModel.view(counters: Counters, live: Live, rules: any)
+function LedgerModel.view(counters: Counters, live: Live, rules: any): View
     local bar = shares({ counters.wins, counters.safes, counters.losses })
     local mix = shares({ counters.throwsR, counters.throwsP, counters.throwsS })
     return {
         paysNext = rules.nextPot(live.pot, "WIN"),
-        winRatePct = if counters.roundsPlayed > 0
-            then math.round(counters.wins / counters.roundsPlayed * 100)
-            else 0,
+        -- The headline win rate IS the bar's win segment, by definition rather than by a second
+        -- calculation. Round-to-nearest and largest-remainder do not agree: at wins=safes=losses
+        -- the former gives 33 and the latter 34, because the leftover unit is allocated by
+        -- comparing remainders ACROSS categories, not by rounding a value on its own. Two numbers
+        -- for one quantity that disagree on screen is simply a bug, so there is only one number.
+        winRatePct = bar[1],
         bar = { win = bar[1], safe = bar[2], loss = bar[3] },
         mix = { R = mix[1], P = mix[2], S = mix[3] },
         lifetime = counters,

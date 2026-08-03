@@ -44,6 +44,24 @@ describe("LedgerModel.view", function()
         expect(v.winRatePct).toBe(34)
     end)
 
+    test("win rate NEVER disagrees with the bar's win segment", function()
+        -- They are the same quantity. Computed separately, a three-way tie makes the headline
+        -- read 33% while the bar segment reads 34% -- round-to-nearest says 33, largest-remainder
+        -- hands the leftover unit to wins. A player looking at both sees a contradiction.
+        local cases = {
+            { roundsPlayed = 3, wins = 1, safes = 1, losses = 1 },
+            { roundsPlayed = 300, wins = 100, safes = 100, losses = 100 },
+            { roundsPlayed = 386, wins = 131, safes = 92, losses = 163 },
+            { roundsPlayed = 7, wins = 2, safes = 2, losses = 3 },
+            { roundsPlayed = 1, wins = 0, safes = 0, losses = 1 },
+            { roundsPlayed = 9, wins = 3, safes = 3, losses = 3 },
+        }
+        for _, c in cases do
+            local v = LedgerModel.view(counters(c), { pot = 0, streak = 0, points = 0 }, GameRules)
+            expect(v.winRatePct).toBe(v.bar.win)
+        end
+    end)
+
     test("a player who has never thrown does not divide by zero", function()
         local v = LedgerModel.view(counters({}), { pot = 0, streak = 0, points = 0 }, GameRules)
         expect(v.winRatePct).toBe(0)
