@@ -25,6 +25,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local HudModel = require(shared:WaitForChild("HudModel"))
+local OnboardingBeats = require(shared:WaitForChild("OnboardingBeats"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local SubmitPick = remotes:WaitForChild("SubmitPick") :: RemoteEvent
@@ -72,6 +73,21 @@ local escalationPrompts = true
 -- reader; the minimal HUD never sees them.
 local counters: { [string]: number }? = nil
 
+-- The onboarding beats the profile already carries, carried by ProfileUpdate. Passed alongside
+-- every EventBus.Onboard fire so OnboardingController can seed (and keep current) its local
+-- "already seen" list — see the fires below. Empty until the first ProfileUpdate lands.
+local knownSeenBeats: { string } = {}
+
+-- Each of these four beats is fired at most once per client session — the event that explains it
+-- happens once (or its FIRST occurrence is all that matters), so there is nothing to gain by
+-- telling OnboardingController twice. Whether the beat actually SHOWS (the player hasn't seen it
+-- before) is OnboardingBeats' decision, made from knownSeenBeats; these flags only gate this file
+-- emitting the event at all.
+local seenJoinEvent = false
+local seenThrowsUnlockedEvent = false
+local seenWinEvent = false
+local seenBankEvent = false
+
 local session = HudModel.newSession()
 
 -- couldThrow mirrors the server's own refusal conditions: a round the player was refused is not
@@ -118,7 +134,7 @@ local function visibleTape(): { { worldThrow: string, result: string? } }
 end
 
 local function publish()
-    EventBus.HudState:Fire({
+    local inputs = {
         phase = phase,
         secondsLeft = secondsLeft(),
         pointsAtStake = wallet.pointsAtStake,
@@ -128,7 +144,15 @@ local function publish()
         fateBound = fateBound,
         pickedThisRound = myPick ~= nil,
         escalationPrompts = escalationPrompts,
-    }, {
+    }
+    -- Onboarding beat 2: the first time throws are actually enabled. HudModel.view is the single
+    -- source of truth for that rule (fate-bound, phase, pick already made) — re-deriving it here
+    -- from the raw flags would be a second copy of a rule that already lives in one place.
+    if not seenThrowsUnlockedEvent and HudModel.view(inputs, session).throwsEnabled then
+        seenThrowsUnlockedEvent = true
+        EventBus.Onboard:Fire("throwsUnlocked", knownSeenBeats)
+    end
+    EventBus.HudState:Fire(inputs, {
         session = session,
         tape = visibleTape(),
         pick = myPick,
@@ -188,6 +212,14 @@ local function maybeShowReveal()
                 badgeById[p.roundId] = p.result
             end
             revealedRoundId = p.roundId
+        end
+        -- Onboarding beat 3 waits for the SAME gate as the toast/badge above, not for RevealResult
+        -- arriving. WIN implies the exact world throw (the one your pick beats), so firing this
+        -- the instant RevealResult lands — before the drum has stopped spinning — would spoil the
+        -- wheel early, exactly what the drum-rest gate exists to prevent.
+        if not seenWinEvent and p.result == "WIN" then
+            seenWinEvent = true
+            EventBus.Onboard:Fire("win", knownSeenBeats)
         end
         publish()
     end
@@ -252,6 +284,12 @@ FateResolvedEvt.OnClientEvent:Connect(function(userId)
 end)
 
 RoundUpdate.OnClientEvent:Connect(function(info)
+    -- Onboarding beat 1: once, the first time this client hears from the round system at all —
+    -- "the arena is live" per the design intent, not tied to any particular phase.
+    if not seenJoinEvent then
+        seenJoinEvent = true
+        EventBus.Onboard:Fire("join", knownSeenBeats)
+    end
     currentRoundId = info.roundId
     if info.tape and #info.tape > 0 then
         tape = info.tape -- authoritative World-Throw history, every phase change
@@ -314,8 +352,25 @@ ProfileUpdate.OnClientEvent:Connect(function(p)
     if type(p.counters) == "table" then
         counters = p.counters
     end
+    if type(p.seenBeats) == "table" then
+        knownSeenBeats = p.seenBeats
+    end
     if bankedNow > 0 then
-        toast(`💰 BANKED {bankedNow} — that's yours to keep`)
+        -- Onboarding beat 4's copy ("Banked. That's yours to keep.") says almost exactly what this
+        -- toast says, anchored right below the plate — the same screen region the toast itself
+        -- occupies. Showing both on someone's FIRST bank would say it twice, in the same spot, at
+        -- the same moment. Suppress the toast only on the occasion the beat will actually appear
+        -- (OnboardingBeats.next is the one source of truth for "will it show" — re-deriving that
+        -- decision here would be a second copy of it). Every later bank keeps the toast, which is
+        -- the only place the banked AMOUNT is said.
+        local beatWillShow = not seenBankEvent and OnboardingBeats.next(knownSeenBeats, "bank") ~= nil
+        if not beatWillShow then
+            toast(`💰 BANKED {bankedNow} — that's yours to keep`)
+        end
+        if not seenBankEvent then
+            seenBankEvent = true
+            EventBus.Onboard:Fire("bank", knownSeenBeats)
+        end
     end
     publishLedger()
     publish()

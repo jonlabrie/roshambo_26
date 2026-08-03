@@ -227,6 +227,14 @@ end
 -- the ledger's preference switch would be write-only. Absent = the profile's own default, ON.
 local hudPrefs: { [string]: boolean } = {}
 
+-- The onboarding beats a player has already dismissed, same treatment as hudPrefs: not a wallet
+-- field, so it rides ProfileUpdate as its own per-instance cache rather than living on
+-- PlayerProfiles. OnboardingController seeds its local "seenLocal" list from this once and then
+-- tracks dismissals itself for the rest of the session — this cache exists so a REJOIN (a fresh
+-- OnboardingController with nothing seeded yet) does not re-show a beat the player already
+-- dismissed last time.
+local hudSeenBeats: { [string]: { string } } = {}
+
 -- The nine ledger counters are not wallet fields either, so they get the same treatment as hudPrefs:
 -- a per-instance cache, carried on ProfileUpdate.
 --
@@ -274,6 +282,7 @@ local function fireProfile(player: Player, source: string)
             unresolvedWin = row.unresolvedWin,
             escalationPrompts = hudPrefs[tostring(player.UserId)] ~= false,
             counters = ledgerCounters[tostring(player.UserId)],
+            seenBeats = hudSeenBeats[tostring(player.UserId)] or {},
             source = source,
         })
     end
@@ -397,6 +406,9 @@ Players.PlayerAdded:Connect(function(player)
         local res = net:getPlayer(tostring(player.UserId), country)
         if res.ok then
             hudPrefs[tostring(player.UserId)] = res.data.escalationPrompts ~= false
+            hudSeenBeats[tostring(player.UserId)] = if type(res.data.seenBeats) == "table"
+                then res.data.seenBeats
+                else {}
             seedCounters(tostring(player.UserId), res.data.counters)
             profiles:applyServer(tostring(player.UserId), {
                 totalPoints = res.data.totalPoints,
@@ -483,6 +495,9 @@ RequestLedger.OnServerEvent:Connect(function(player)
         end
         seedCounters(uid, res.data.counters)
         hudPrefs[uid] = res.data.escalationPrompts ~= false
+        if type(res.data.seenBeats) == "table" then
+            hudSeenBeats[uid] = res.data.seenBeats
+        end
         fireProfile(player, "ledger")
     end)
 end)
@@ -505,6 +520,26 @@ SetHudPreference.OnServerEvent:Connect(function(player, body)
         -- Keep the cache in step with the write, or the next fireProfile would echo the OLD value
         -- back at the client and appear to undo the switch.
         hudPrefs[tostring(player.UserId)] = payload.escalationPrompts
+    end
+    if payload.seenBeat ~= nil then
+        -- Same reasoning, add-only: without this an intervening fireProfile (e.g. a bank landing
+        -- moments later) would echo the seenBeats list from BEFORE this write and the client would
+        -- momentarily believe the beat unseen again. OnboardingController already marks it seen
+        -- optimistically, so this only guards the cache other events read from.
+        local uid = tostring(player.UserId)
+        local existing = hudSeenBeats[uid] or {}
+        local already = false
+        for _, id in existing do
+            if id == payload.seenBeat then
+                already = true
+                break
+            end
+        end
+        if not already then
+            local merged = table.clone(existing)
+            table.insert(merged, payload.seenBeat)
+            hudSeenBeats[uid] = merged
+        end
     end
     task.spawn(function()
         net:putHudPreference(tostring(player.UserId), payload)

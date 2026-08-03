@@ -16,7 +16,10 @@ OnboardingBeats.BEATS = {
         id = "win",
         event = "win",
         copy = "You won. Take it, or ride it — a win triples your pot.",
-        anchor = "choiceOverlay",
+        -- Was "choiceOverlay": the blocking RISK/BANK overlay this pointed at was withdrawn
+        -- (spec "Decisions taken" #6/7) and replaced by the persistent pot indicator in the slot
+        -- above the throw row. Renamed to name what is actually on screen today.
+        anchor = "potIndicator",
     },
     { id = "bank", event = "bank", copy = "Banked. That's yours to keep.", anchor = "plate" },
 } :: { Beat }
