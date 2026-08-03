@@ -75,7 +75,6 @@ local BANK_H = HudLayout.BANK_H
 local BANK_GAP = HudLayout.BANK_GAP
 
 local CARD_W = 220
-local WALLET_CARD_W = 260
 local DRUM_CARD_W = 220
 
 -- ===== Card: one TextButton (the dismiss target) + two non-Active labels =====
@@ -172,24 +171,32 @@ hintLabel.Parent = card
 -- (`Workspace.RoshamboStage.ThrowDrum.Drum`, see DrumController), so it is tracked live via
 -- `WorldToViewportPoint` rather than guessed at a fixed screen fraction.
 --
--- Nothing here ever covers the throw buttons, the bank button, the ≡ ledger door or the tape:
--- `throwArea` and `potIndicator` sit ABOVE the whole bank+throws+tape cluster (offset clears its
--- full footprint via EDGE/AREA_H/ROW_GAP/BANK_H/BANK_GAP, the same numbers HudController's own
--- stack is built from). `wallet` sits at the SAME bottom row the wallet plate itself occupies
--- (D = EDGE from the bottom, matching the tape) but pinned to the screen's LEFT margin, which the
--- cluster never reaches — the cluster is held inboard of `1 - JUMP_CLEARANCE` on the right. A
--- card level with the plate is never in the cluster's own column, so it cannot grow upward into a
--- live button no matter how tall its text makes it.
+-- Nothing here ever covers the throw buttons, the bank button, the ≡ ledger door or the tape —
+-- ALL THREE sit ABOVE the whole bank+throws+tape cluster (offset clears its full footprint via
+-- EDGE/AREA_H/ROW_GAP/BANK_H/BANK_GAP, the same numbers HudController's own stack is built from).
+--
+-- `wallet` does NOT try to hug the actual plate (right-anchored, immediately left of the tape,
+-- `HudController.client.luau:264`): the plate is hidden by default, so pointing at it precisely
+-- buys nothing, and every attempt to get closer moves the card toward a control. round-3 review
+-- caught a worse bug from the same instinct — a first draft anchored `wallet` bottom-LEFT to sit
+-- "level with" the plate's row, reasoning that the cluster's own column was clear over there. It
+-- was: `Workspace`'s throw cluster never reaches the left side of the screen. But
+-- `HudController.client.luau:5` claims that corner for something this file never checks against —
+-- "bottom-left: the movement thumbstick. Untouchable." — so the card sat on top of it for as long
+-- as it was up, on touch, on the near-universal first-bank beat. THE RULE THAT WAS MISSING: a card
+-- must clear the corners ROBLOX owns, not just the ones this HUD uses. `wallet` gets the exact
+-- same placement as `throwArea`/`potIndicator` instead — proven safe at any card height and both
+-- tiers, because `AutomaticSize.Y` grows the card upward, away from everything below it.
 local STATIC_ANCHORS: { [string]: { point: Vector2, offset: UDim2, width: number } } = {
-    -- Both sit above the WHOLE bottom-right cluster — tape+buttons AND the bank row above them —
-    -- not just above the tape. The bank row is reserved whether or not its button is currently
-    -- Visible (HudController never repositions it, only toggles it), so a card that only cleared
-    -- the tape would sit inside the bank row's footprint. That is harmless while there is no pot,
-    -- but `throwArea`'s card can outlive its dismiss window into a WIN (the bank button can turn
-    -- on WHILE this card is still up — beats do not queue, but a real, un-dismissed card does not
+    -- All three sit above the WHOLE bottom-right cluster — tape+buttons AND the bank row above
+    -- them — not just above the tape. The bank row is reserved whether or not its button is
+    -- currently Visible (HudController never repositions it, only toggles it), so a card that only
+    -- cleared the tape would sit inside the bank row's footprint. That is harmless while there is
+    -- no pot, but a card can outlive its dismiss window into a WIN (the bank button can turn on
+    -- WHILE this card is still up — beats do not queue, but a real, un-dismissed card does not
     -- disappear just because a later event was dropped) and BANK n POINTS is a live button
     -- underneath: an overlap there would both hide it and steal its taps, being ZIndex 5 above the
-    -- HUD's default. Same offset as `potIndicator` on purpose — they are never shown at once, so
+    -- HUD's default. All three share one offset on purpose — none are ever shown at once, so
     -- sharing the spot is a non-issue, and it is one fewer number to keep in step.
     throwArea = {
         point = Vector2.new(1, 1),
@@ -201,15 +208,10 @@ local STATIC_ANCHORS: { [string]: { point: Vector2, offset: UDim2, width: number
         offset = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE + AREA_H + ROW_GAP + BANK_H + BANK_GAP)),
         width = CARD_W,
     },
-    -- Bottom-left, level with the tape/plate row (D = EDGE from the bottom; AnchorPoint's Y = 1
-    -- puts the given offset at the card's bottom edge) but anchored from the screen's LEFT edge
-    -- rather than the cluster's right one — see the comment above this table for why that is what
-    -- keeps it clear of every live element. EDGE is the same margin HudController uses on every
-    -- screen edge, including the tape's own.
     wallet = {
-        point = Vector2.new(0, 1),
-        offset = UDim2.new(0, EDGE, 1, -EDGE),
-        width = WALLET_CARD_W,
+        point = Vector2.new(1, 1),
+        offset = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE + AREA_H + ROW_GAP + BANK_H + BANK_GAP)),
+        width = CARD_W,
     },
 }
 -- Last-resort ONLY: used when there is no `workspace.CurrentCamera` at all to clamp against
@@ -273,8 +275,15 @@ end
 -- is enough for a card to sit on top of the throw/slot cluster despite SAFE_MARGIN.
 local function safeYBounds(canvas: Vector2): (number, number)
     local cardH = math.max(card.AbsoluteSize.Y, MIN_CARD_H)
-    local minY = TOAST_BAND + SAFE_MARGIN + cardH
-    local maxY = math.max(minY, canvas.Y - CLUSTER_TOP_FROM_BOTTOM - SAFE_MARGIN)
+    -- PRIORITY: when the band cannot fit the card, the cluster wins and the toast loses. `maxY`
+    -- is pinned to the cluster's top edge unconditionally; `minY` yields toward it (never past it,
+    -- via math.min) rather than the old shape (`maxY` yielding toward `minY` via math.max), which
+    -- kept `math.clamp` from erroring but let the card's bottom edge sink into the cluster's own
+    -- footprint once `cardH` grew past what the band could hold — covering a transient toast is
+    -- recoverable, covering a live button is not. `minY` is now derived FROM `maxY`, so it can
+    -- never exceed it and `math.clamp(_, minY, maxY)` below still cannot invert.
+    local maxY = canvas.Y - CLUSTER_TOP_FROM_BOTTOM - SAFE_MARGIN
+    local minY = math.min(maxY, TOAST_BAND + SAFE_MARGIN + cardH)
     return minY, maxY
 end
 
