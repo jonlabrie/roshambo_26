@@ -10,14 +10,13 @@
 --                  reach from either thumb AND the corner the player list grows into.)
 --   top-centre   : free. Roblox claims nothing there.
 -- Hence: PLATE top-centre; THROW AREA bottom-right but INBOARD of the jump button, with the tape
--- ABOVE the buttons (the buttons stay closest to where the thumb rests; the tape is read, never
+-- BELOW the buttons (the buttons stay closest to where the thumb rests; the tape is read, never
 -- touched); the round TIMER as a hairline along the bottom edge, competing with nothing.
 --
 -- Every information element MUST stay Active = false. Frames and labels default to false, but
 -- setting it true anywhere here punches a permanent hole in the camera-drag surface, which is
 -- the whole right side of the screen on touch. The whole interactive budget is: the three throw
--- buttons, the plate, and EXACTLY ONE slot button (see `setSlot`). The pot disc is a Frame and
--- must stay a Frame — it carries no action, only the figure.
+-- buttons, the plate, and the one bank button (see `setBank`).
 --
 -- This file RENDERS HudModel; it never re-derives it. main.client.luau owns the wiring and fires
 -- EventBus.HudState(inputs, aux):
@@ -103,12 +102,12 @@ local TIMER_H_HOT = 7 -- the escalation thickens the hairline as well as reddeni
 local TOAST_SECONDS = 4
 local TOAST_MAX = 6
 
--- The one slot above the throw row: the pot indicator, or the fate prompt, or nothing.
+-- The bank button, directly above the throw row.
+local BANK_W = 150
+
+-- Still read by confirmStrip's Position below, which Task 8 rewires onto HudLayout.BANK_H — left
+-- as-is here since this task does not touch the confirm strip's construction.
 local SLOT_H = HudLayout.SLOT_H
-local SLOT_GAP = HudLayout.SLOT_GAP
-local DISC = SLOT_H
-local BANK_W = 128
-local FATE_W = 190
 
 -- The confirm strip, one row above the slot. Its HEIGHT and the gap under it come from HudLayout
 -- because OnboardingController reserves that row in its safe band; the width is this file's alone.
@@ -256,12 +255,13 @@ throwArea.Size = UDim2.fromOffset(AREA_W, AREA_H)
 throwArea.BackgroundTransparency = 1
 throwArea.Parent = gui
 
--- Tape ABOVE the buttons: five square tiles, newest LEFT, ageing ivory -> amber, with a corner dot
--- for the personal WIN/SAFE/LOSS result.
+-- Tape BELOW the buttons (owner's ruling): five square tiles, newest LEFT, ageing ivory ->
+-- amber, with a corner dot for the personal WIN/SAFE/LOSS result. It is read, never touched,
+-- so it takes the outermost edge and the buttons take the reachable one.
 local tapeRow = Instance.new("Frame")
 tapeRow.Name = "Tape"
-tapeRow.AnchorPoint = Vector2.new(1, 0)
-tapeRow.Position = UDim2.fromScale(1, 0)
+tapeRow.AnchorPoint = Vector2.new(1, 1)
+tapeRow.Position = UDim2.fromScale(1, 1)
 tapeRow.Size = UDim2.fromOffset(TAPE_N * (TILE + TILE_GAP) - TILE_GAP, TILE)
 tapeRow.BackgroundTransparency = 1
 tapeRow.Parent = throwArea
@@ -316,11 +316,11 @@ for i, sym in THROWS do
     -- Sibling ZIndexBehavior a child always draws ABOVE its parent, so a halo parented to the button
     -- would sit on top of the glyph instead of behind the tile. A Frame, and left at its default
     -- Active = false — the interactive budget on this surface is the three buttons, the plate and
-    -- the one slot button, and every sinking pixel is a permanent hole in the camera-drag surface.
+    -- the one bank button, and every sinking pixel is a permanent hole in the camera-drag surface.
     local halo = Instance.new("Frame")
     halo.Name = sym .. "Halo"
-    halo.AnchorPoint = Vector2.new(0, 1)
-    halo.Position = UDim2.new(0, (i - 1) * (BTN_W + BTN_GAP) - HALO_BLEED, 1, HALO_BLEED)
+    halo.AnchorPoint = Vector2.new(0, 0)
+    halo.Position = UDim2.fromOffset((i - 1) * (BTN_W + BTN_GAP) - HALO_BLEED, -HALO_BLEED)
     halo.Size = UDim2.fromOffset(BTN_W + 2 * HALO_BLEED, BTN_H + 2 * HALO_BLEED)
     halo.BackgroundColor3 = SEL_HALO
     halo.BackgroundTransparency = 0.55
@@ -332,8 +332,8 @@ for i, sym in THROWS do
 
     local b = Instance.new("TextButton")
     b.Name = sym
-    b.AnchorPoint = Vector2.new(0, 1)
-    b.Position = UDim2.new(0, (i - 1) * (BTN_W + BTN_GAP), 1, 0)
+    b.AnchorPoint = Vector2.new(0, 0)
+    b.Position = UDim2.fromOffset((i - 1) * (BTN_W + BTN_GAP), 0)
     b.Size = UDim2.fromOffset(BTN_W, BTN_H)
     b.BackgroundColor3 = IVORY_DIM -- starts disabled; the first HudState paints the real state
     b.BackgroundTransparency = 0.25
@@ -455,134 +455,61 @@ for _, sym in THROWS do
     end)
 end
 
--- ===== The slot: directly above the throw row, one tenant at a time =====
--- POT: the figure in a red disc with BANK THESE beside it. Throwing again IS riding, so there is
--- no counterpart button and nothing to "resolve" — the pot indicator is a standing statement of
--- what is unbanked, not a wager prompt.
--- FATE: after a LOSS, ACCEPT YOUR FATE. A LOSS forfeits the pot, so pointsAtStake is always 0
--- while fate-bound and the two can never want the slot at once (HudModel decides; this only paints).
-local slotRow = Instance.new("Frame")
-slotRow.Name = "Slot"
-slotRow.Active = false
-slotRow.AnchorPoint = Vector2.new(1, 1)
-slotRow.Position = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE + AREA_H + ROW_GAP))
-slotRow.Size = UDim2.fromOffset(AREA_W, SLOT_H)
-slotRow.BackgroundTransparency = 1
-slotRow.Parent = gui
-
-local potGroup = Instance.new("Frame")
-potGroup.Name = "Pot"
-potGroup.Active = false
-potGroup.Size = UDim2.fromScale(1, 1)
-potGroup.BackgroundTransparency = 1
-potGroup.Visible = false
-potGroup.Parent = slotRow
-
+-- ===== The bank button: directly above the throw row =====
+-- ONE control, not a readout plus a button. The figure belongs IN the thing that acts on it —
+-- a separate red disc saying "27" beside a generic BANK THESE made the player join two
+-- elements to read one fact. Throwing again IS riding, so there is no counterpart button and
+-- nothing to resolve.
 local bankButton = Instance.new("TextButton")
-bankButton.Name = "BankThese"
-bankButton.AnchorPoint = Vector2.new(1, 0.5)
-bankButton.Position = UDim2.fromScale(1, 0.5)
-bankButton.Size = UDim2.fromOffset(BANK_W, SLOT_H)
-bankButton.BackgroundColor3 = WASHI
+bankButton.Name = "Bank"
+bankButton.AnchorPoint = Vector2.new(1, 1)
+bankButton.Position = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE + AREA_H + ROW_GAP))
+bankButton.Size = UDim2.fromOffset(BANK_W, HudLayout.BANK_H)
+bankButton.BackgroundColor3 = POT_RED
 bankButton.BackgroundTransparency = 0.15
 bankButton.BorderSizePixel = 0
 bankButton.AutoButtonColor = false
 bankButton.TextColor3 = INK_CREAM
 bankButton.TextSize = 15
 bankButton.Font = Enum.Font.GothamBold
-bankButton.Text = "BANK THESE"
-bankButton.Parent = potGroup
-corner(bankButton, 6)
+bankButton.Text = ""
+bankButton.Visible = false
+bankButton.Parent = gui
+corner(bankButton, 8)
 stroke(bankButton, GOLD, 1, 0.3)
-
--- A Frame, deliberately. It says how many points are unbanked; it is not a button, and making it
--- one would both add a second live control to this slot and punch another hole in the drag surface.
-local potDisc = Instance.new("Frame")
-potDisc.Name = "Disc"
-potDisc.Active = false
-potDisc.AnchorPoint = Vector2.new(1, 0.5)
-potDisc.Position = UDim2.new(1, -(BANK_W + SLOT_GAP), 0.5, 0)
-potDisc.Size = UDim2.fromOffset(DISC, DISC)
-potDisc.BackgroundColor3 = POT_RED
-potDisc.BackgroundTransparency = 0
-potDisc.BorderSizePixel = 0
-potDisc.Parent = potGroup
-do
-    local c = Instance.new("UICorner")
-    c.CornerRadius = UDim.new(1, 0) -- a disc, not a rounded box
-    c.Parent = potDisc
-end
-
-local potFigure = Instance.new("TextLabel")
-potFigure.Name = "Figure"
-potFigure.Active = false
-potFigure.AnchorPoint = Vector2.new(0.5, 0.5)
-potFigure.Position = UDim2.fromScale(0.5, 0.5)
-potFigure.Size = UDim2.fromScale(0.76, 0.52) -- 3^n runs long fast; let the figure shrink to fit
-potFigure.BackgroundTransparency = 1
-potFigure.TextColor3 = INK_CREAM
-potFigure.TextScaled = true
-potFigure.Font = Enum.Font.GothamBlack
-potFigure.Text = "0"
-potFigure.Parent = potDisc
-
-local fateButton = Instance.new("TextButton")
-fateButton.Name = "AcceptFate"
-fateButton.AnchorPoint = Vector2.new(1, 0.5)
-fateButton.Position = UDim2.fromScale(1, 0.5)
-fateButton.Size = UDim2.fromOffset(FATE_W, SLOT_H)
-fateButton.BackgroundColor3 = LOSS_RED
-fateButton.BackgroundTransparency = 0.1
-fateButton.BorderSizePixel = 0
-fateButton.AutoButtonColor = false
-fateButton.TextColor3 = INK_CREAM
-fateButton.TextSize = 15
-fateButton.Font = Enum.Font.GothamBold
-fateButton.Text = "ACCEPT YOUR FATE"
-fateButton.Visible = false
-fateButton.Parent = slotRow
-corner(fateButton, 6)
-stroke(fateButton, GOLD, 1, 0.3)
 
 bankButton.MouseButton1Click:Connect(function()
     EventBus.HudBank:Fire()
 end)
-fateButton.MouseButton1Click:Connect(function()
-    EventBus.Cue:Fire({ kind = "acceptFate" })
-end)
 
--- THE ONLY place either tenant's Visible is written, and both are written from the same `kind` on
--- every call. That is what makes "two slot buttons can never be live at once" true by
--- construction rather than by discipline: there is no assignment that can set one without
--- clearing the other, and a Visible = false GuiObject receives no input at all.
-local pulse: Tween? = nil
-
-local function setSlot(kind: string, pulses: boolean)
-    potGroup.Visible = kind == "pot"
-    fateButton.Visible = kind == "fate"
-
-    if pulses and potGroup.Visible then
-        if not pulse then
-            local t = TweenService:Create(
-                potDisc,
-                TweenInfo.new(0.7, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
-                { BackgroundTransparency = 0.55 }
-            )
-            t:Play()
-            pulse = t
-        end
-    elseif pulse then
-        local t = pulse :: Tween
-        t:Cancel()
-        pulse = nil
-        potDisc.BackgroundTransparency = 0 -- Cancel leaves the property mid-tween; put it back
+-- The pulse says "this is unacknowledged", nothing more. Cancelled rather than left running,
+-- and the transparency put back by hand, because Cancel leaves the property mid-tween.
+local potPulse: Tween? = nil
+local function setBank(visible: boolean, pot: number, pulses: boolean)
+    bankButton.Visible = visible
+    if visible then
+        bankButton.Text = `BANK {pot} POINTS`
+    end
+    if potPulse then
+        potPulse:Cancel()
+        potPulse = nil
+        bankButton.BackgroundTransparency = 0.15
+    end
+    if visible and pulses then
+        local t = TweenService:Create(
+            bankButton,
+            TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+            { BackgroundTransparency = 0.6 }
+        )
+        t:Play()
+        potPulse = t
     end
 end
 
 -- ===== The confirm strip: what the round still lets the player do with the glyph they tapped =====
 -- Two messages, never both: "TAP AGAIN TO THROW" while a selection is waiting on its second tap, and
 -- "THROWN — TAP TO CHANGE" once it has gone but the round has not locked. HudModel decides which
--- (view.confirmPending / view.releasable); this only paints.
+-- this only paints. (Awaiting Task 8's rewire onto the chosen/switchPrompt state.)
 -- WHY A STRIP AND NOT A LINE ON THE BUTTON. The alternative was a "TAP AGAIN" caption under the
 -- glyph, which costs no geometry at all — but the touch button is 44px wide, and nine characters
 -- across 44px is roughly 9px type. This is the one moment in the HUD that must be unmistakable: the
@@ -620,15 +547,13 @@ stroke(confirmStrip, SEL_BLUE, 1, 0.3) -- the same blue as the chosen tile: one 
 -- on them, and a player who has not needs the second tap asked for. Saying both at once would be a
 -- wall of ~9px text on a 44px row, so the strip says whichever is currently true and nothing else.
 -- Terse, because it is read at arm's length on a phone.
+-- RELEASE_COPY and HINT_W_WIDE (the strip's second line, for a throw already sent) go with the
+-- render-time branch that painted them (see Step 3 of Task 6) — Task 8 reintroduces both when it
+-- rewires this strip onto `chosen`/`switchPrompt`.
 local CONFIRM_COPY = "TAP AGAIN TO THROW"
-local RELEASE_COPY = "THROWN — TAP TO CHANGE"
 -- 150, not 160: the "don't ask again" control starts at CONFIRM_W - CONFIRM_PAD - 112 = 166, and a
 -- wider label would run under it. The copy measures ~140px at 14px GothamBold.
 local HINT_W = 150
--- In the released-able state "don't ask again" is hidden (a preference switch is not what someone
--- reaching to change their throw is looking for, and turning it off there would silently make the
--- pick final), so the longer line gets the whole strip.
-local HINT_W_WIDE = CONFIRM_W - 2 * CONFIRM_PAD
 
 local confirmHint = Instance.new("TextLabel")
 confirmHint.Name = "Hint"
@@ -814,11 +739,9 @@ local function render(inputs: any, aux: any)
     canThrow = view.throwsEnabled
 
     cellValue.streak.Text = tostring(view.plate.streak)
-    cellValue.pot.Text = tostring(view.plate.pot)
     cellValue.points.Text = tostring(view.plate.points)
 
-    potFigure.Text = tostring(view.plate.pot)
-    setSlot(view.slot, view.potPulses)
+    setBank(view.bankVisible, view.pot, view.potPulses)
 
     -- The authoritative pick wins the moment it lands; a CONFIRM-PENDING selection
     -- (`view.selected` — the glyph tapped once while a pot is riding) is next; and until either has
@@ -829,21 +752,6 @@ local function render(inputs: any, aux: any)
         pressedSym = nil
     end
     paintThrows(aux.pick or view.selected or pressedSym, view.throwsEnabled)
-
-    -- The strip is the ONLY thing that distinguishes "chosen" from "thrown" — the tile treatment is
-    -- deliberately identical for both (see paintThrows). So it has to carry the release affordance
-    -- too, or a confirmed throw would look exactly like an unconfirmed one with no way to tell that
-    -- tapping again takes it back rather than throwing it twice.
-    confirmStrip.Visible = view.confirmPending or view.releasable
-    if view.releasable then
-        confirmHint.Text = RELEASE_COPY
-        confirmHint.Size = UDim2.fromOffset(HINT_W_WIDE, 18)
-        dontAsk.Visible = false
-    else
-        confirmHint.Text = CONFIRM_COPY
-        confirmHint.Size = UDim2.fromOffset(HINT_W, 18)
-        dontAsk.Visible = true
-    end
 
     local entries = aux.tape or {}
     local count = math.min(#entries, TAPE_N)
