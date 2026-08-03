@@ -28,8 +28,7 @@
 -- This file RENDERS HudModel; it never re-derives it. main.client.luau owns the wiring and fires
 -- EventBus.HudState(inputs, aux):
 --   inputs : a HudModel.Inputs
---   aux    : { session = HudModel.Session, tape = { { worldThrow, result? } }, pick = string?,
---             timerKnown = boolean }
+--   aux    : { session = HudModel.Session, tape = { { worldThrow, result? } }, timerKnown = boolean }
 --            `tape` is already spoiler-gated by the wiring — paint it as given.
 -- Picks travel back the other way on EventBus.HudPick, banking on EventBus.HudBank.
 local Players = game:GetService("Players")
@@ -469,15 +468,64 @@ for i, sym in THROWS do
     }
 end
 
+-- ===== SWITCH?: the question raised over a glyph the player has just tapped =====
+-- It sits ON the button rather than beside it, because the button is no longer offering an
+-- option — it is asking a question, and covering the glyph is the clearest way to say so.
+-- Answering it UNLOCKS all three; it does not select this one. That is what makes backing out
+-- of a round possible at all.
+--
+-- No UIStroke on the label. Contrast comes from the opaque backing behind it (see the spec's
+-- §3): an outline on 13px type fills the counters in and reads as a smear.
+local switchPill = Instance.new("Frame")
+switchPill.Name = "SwitchPrompt"
+switchPill.AnchorPoint = Vector2.new(0.5, 0.5)
+switchPill.Size = UDim2.fromOffset(BTN_W - 8, 24)
+switchPill.BackgroundColor3 = WASHI
+switchPill.BackgroundTransparency = 0
+switchPill.BorderSizePixel = 0
+switchPill.ZIndex = 4
+switchPill.Visible = false
+switchPill.Parent = throwArea
+corner(switchPill, 6)
+stroke(switchPill, SEL_BLUE, 2, 0)
+
+local switchLabel = Instance.new("TextLabel")
+switchLabel.Name = "Copy"
+switchLabel.Size = UDim2.fromScale(1, 1)
+switchLabel.BackgroundTransparency = 1
+switchLabel.TextColor3 = INK_CREAM
+switchLabel.TextSize = 13
+switchLabel.Font = Enum.Font.GothamBold
+switchLabel.Text = "SWITCH?"
+switchLabel.ZIndex = 5
+switchLabel.Parent = switchPill
+
+local THROW_INDEX: { [string]: number } = {}
+for i, sym in THROWS do
+    THROW_INDEX[sym] = i
+end
+
+-- The buttons are anchored to the TOP of throwArea (the tape moved below them since Task 6), so
+-- the pill's y is measured from that top edge — BTN_H / 2, not from the bottom.
+local function setSwitchPrompt(symbol: string?)
+    switchPill.Visible = symbol ~= nil
+    if symbol then
+        local i = THROW_INDEX[symbol]
+        switchPill.Position = UDim2.fromOffset((i - 1) * (BTN_W + BTN_GAP) + BTN_W / 2, BTN_H / 2)
+    end
+end
+
 -- THE SELECTION TREATMENT, in one place so the optimistic press paint and the authoritative render
--- can never disagree about what "chosen" looks like. Four states, not two:
+-- can never disagree about what "chosen" looks like. Five states, not two:
 --   chosen        : cool and LIT — pale wash, blue glyph, thick blue rim, halo behind.
---   not chosen    : warm and FAINT — dark amber at 0.55, amber glyph. They recede as asked; the
---                   warm/cool split against the blue is what makes the choice unmistakable without
---                   lighting three tiles up at once.
+--   prompted      : lifted OUT of the dimmed treatment — this button is carrying a question, and
+--                   a question on a greyed-out control reads as unanswerable.
+--   not chosen    : warm and FAINT — dark amber, nearly gone, amber glyph. They "almost
+--                   disappear" (owner's words); the warm/cool split against the blue is what
+--                   makes the choice unmistakable without lighting three tiles up at once.
 --   throwable     : the resting ivory tile.
 --   not throwable : ivory dimmed, as before — a whole round is closed, not one option among three.
-local function paintThrows(pick: string?, enabled: boolean)
+local function paintThrows(pick: string?, enabled: boolean, prompted: string?)
     for _, sym in THROWS do
         local t = throwTiles[sym]
         if pick == sym then
@@ -489,11 +537,22 @@ local function paintThrows(pick: string?, enabled: boolean)
             t.rim.Thickness = 4
             t.rim.Transparency = 0
             t.halo.Visible = true
+        elseif sym == prompted then
+            -- Lifted OUT of the dimmed state: this button is carrying a question, and a
+            -- question on a greyed-out control reads as unanswerable.
+            t.button.BackgroundColor3 = IVORY
+            t.button.BackgroundTransparency = 0
+            tintGlyph(t.glyph, INK, GLYPH_OUTLINE)
+            fadeGlyph(t.glyph, 0.2)
+            t.rim.Color = SEL_BLUE
+            t.rim.Thickness = 2
+            t.rim.Transparency = 0.2
+            t.halo.Visible = false
         elseif pick then
             t.button.BackgroundColor3 = WARM_FACE
-            t.button.BackgroundTransparency = 0.55
+            t.button.BackgroundTransparency = 0.75
             tintGlyph(t.glyph, WARM_GLYPH, WARM_FACE)
-            fadeGlyph(t.glyph, 0.5)
+            fadeGlyph(t.glyph, 0.7)
             t.rim.Color = WARM_RIM
             t.rim.Thickness = 1
             t.rim.Transparency = 0.55
@@ -517,6 +576,43 @@ local function paintThrows(pick: string?, enabled: boolean)
             t.rim.Transparency = 0.1
             t.halo.Visible = false
         end
+    end
+end
+
+-- The chosen glyph PULSES. A static light says "this is selected"; a pulse says "this is what
+-- is going in", which is the thing the player is being asked to be sure about.
+--
+-- Guarded on the symbol actually changing, same as `setBank`'s pot pulse: `render` runs at 10Hz,
+-- and cancelling/restarting a 1.1s tween on every repaint would give it 3% of its travel and
+-- render as a static element, not a pulse — this exact bug already shipped once on this branch
+-- in `setBank` and had to be fixed.
+local chosenPulse: Tween? = nil
+local pulsingSym: string? = nil
+local function setChosenPulse(symbol: string?)
+    if pulsingSym == symbol then
+        return
+    end
+    pulsingSym = symbol
+    if chosenPulse then
+        chosenPulse:Cancel()
+        chosenPulse = nil
+    end
+    for _, sym in THROWS do
+        throwTiles[sym].halo.BackgroundTransparency = 0.55
+    end
+    if symbol then
+        -- Assign-then-Play, not a cast chained straight off `Create(...)`: a `)` at the start of
+        -- a line followed by `(` parses in Lua/Luau as a CALL on the previous expression's
+        -- result, not a new statement — `Create(...)\n(x):Play()` silently becomes
+        -- `Create(...)(x):Play()`, calling the Tween as if it were a function. This is the same
+        -- pattern `setBank`'s pot pulse already uses.
+        local t = TweenService:Create(
+            throwTiles[symbol].halo,
+            TweenInfo.new(1.1, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
+            { BackgroundTransparency = 0.15 }
+        )
+        t:Play()
+        chosenPulse = t
     end
 end
 
@@ -559,7 +655,7 @@ for _, sym in THROWS do
         pressedSym = sym
         pressSeq += 1
         local seq = pressSeq
-        paintThrows(sym, canThrow) -- lit on the PRESS, ahead of any round trip
+        paintThrows(sym, canThrow, nil) -- lit on the PRESS, ahead of any round trip
         task.delay(PRESS_HOLD_SECONDS, function()
             if pressSeq == seq and pressedSym == sym then
                 pressedSym = nil -- let the next render tell the truth
@@ -912,14 +1008,16 @@ local function render(inputs: any, aux: any)
     -- must not send a live BankRequest for something that no longer exists.
     bankArmed = view.pot > 0
 
-    -- The authoritative pick wins the moment it lands; `view.selected` is next (stale field, kept
-    -- readable pending Task 8's rewire onto `chosen`/`switchPrompt` — it degrades to nil, not an
-    -- error); and until either has come back through main.client, a press keeps its own tile lit
-    -- (`pressedSym`), so a held finger does not flicker the selection off on the next 10Hz repaint.
-    if aux.pick or view.selected then
+    -- The authoritative choice wins; until it has come back through main.client a press keeps
+    -- its own tile lit (`pressedSym`), so a held finger does not flicker the light off on the
+    -- next 10Hz repaint.
+    if view.chosen then
         pressedSym = nil
     end
-    paintThrows(aux.pick or view.selected or pressedSym, view.throwsEnabled)
+    local lit = view.chosen or pressedSym
+    paintThrows(lit, view.throwsEnabled, view.switchPrompt)
+    setChosenPulse(if view.throwsEnabled then lit else nil)
+    setSwitchPrompt(view.switchPrompt)
 
     local entries = aux.tape or {}
     local count = math.min(#entries, TAPE_N)
