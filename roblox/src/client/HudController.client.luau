@@ -606,7 +606,19 @@ do
     constraint.Parent = bankButton
 end
 
+-- Mirrors `view.pot > 0` (the MODEL's pot, not the displayed one) so a tap can be refused once
+-- the pot is actually gone — set in `render`, read here. Deliberately NOT tied to the button's
+-- own visibility: the button stays visible for the full 0.5s drain because the drain IS the
+-- point (see `render`'s call into `setBank`), but that visible window is an animation of
+-- something that has ALREADY happened, not a live offer. This is the opposite asymmetry from
+-- the `≡`, whose visible window IS its answerable window — here the armed window is the
+-- SHORTER of the two, not the same one.
+local bankArmed = false
+
 bankButton.MouseButton1Click:Connect(function()
+    if not bankArmed then
+        return
+    end
     EventBus.HudBank:Fire()
 end)
 
@@ -686,13 +698,37 @@ ledgerButton.BackgroundColor3 = WASHI
 ledgerButton.BackgroundTransparency = 0.3
 ledgerButton.BorderSizePixel = 0
 ledgerButton.AutoButtonColor = false
-ledgerButton.TextColor3 = INK_CREAM
-ledgerButton.TextSize = 20
-ledgerButton.Font = Enum.Font.GothamBold
-ledgerButton.Text = "≡"
+ledgerButton.Text = ""
 ledgerButton.Parent = gui
 corner(ledgerButton, 8)
 stroke(ledgerButton, GOLD, 1, 0.3)
+
+-- The hamburger glyph is DRAWN, not typed: a "≡" (U+2261) in GothamBold depends on that font
+-- actually carrying the codepoint, and this is the ONLY door to the ledger — a missing glyph
+-- would read as a broken control with no recourse. Three thin Frames instead: font-independent,
+-- unambiguous, and inert like everything else non-throw/non-bank in this file (`Active` stays
+-- at its default `false` on every bar — they carry no input of their own, the button beneath
+-- them does).
+local LEDGER_BAR_H = if TOUCH then 3 else 2
+local LEDGER_BAR_GAP = if TOUCH then 6 else 5
+local LEDGER_BAR_INSET = 8 -- horizontal padding each side, inside the button
+local LEDGER_BARS_H = 3 * LEDGER_BAR_H + 2 * LEDGER_BAR_GAP
+for i = 1, 3 do
+    local bar = Instance.new("Frame")
+    bar.Name = `Bar{i}`
+    bar.AnchorPoint = Vector2.new(0.5, 0.5)
+    bar.Position = UDim2.new(
+        0.5,
+        0,
+        0.5,
+        -LEDGER_BARS_H / 2 + LEDGER_BAR_H / 2 + (i - 1) * (LEDGER_BAR_H + LEDGER_BAR_GAP)
+    )
+    bar.Size = UDim2.new(1, -2 * LEDGER_BAR_INSET, 0, LEDGER_BAR_H)
+    bar.BackgroundColor3 = INK_CREAM
+    bar.BorderSizePixel = 0
+    bar.ZIndex = 2 -- above the button (ZIndex 1 by default), so the bars are never occluded
+    bar.Parent = ledgerButton
+end
 
 local ledgerScale = Instance.new("UIScale")
 ledgerScale.Parent = ledgerButton
@@ -871,6 +907,10 @@ local function render(inputs: any, aux: any)
     -- (`RollingNumber.valueAt`'s exact-`from`-at-`t=0` guarantee).
     local displayedPot = tickCounter(potCounter, view.pot)
     setBank(view.pot > 0 or displayedPot > 0, displayedPot, view.potPulses)
+    -- Armed follows the MODEL's pot, not the displayed one: the button stays VISIBLE through the
+    -- drain (that's the animation), but a tap on it once the model has already emptied the pot
+    -- must not send a live BankRequest for something that no longer exists.
+    bankArmed = view.pot > 0
 
     -- The authoritative pick wins the moment it lands; `view.selected` is next (stale field, kept
     -- readable pending Task 8's rewire onto `chosen`/`switchPrompt` — it degrades to nil, not an
@@ -999,13 +1039,22 @@ local function applyContrast()
     -- the write target here: the live property now spends most of its time either at 1 (hidden)
     -- or mid-fade, neither of which is the "authored" value this pass needs. `revealPlate` reads
     -- `plateRestTransparency` back when it shows the plate, so a reveal during full daylight uses
-    -- the current day/night value rather than a stale one baked in at construction. Writing it to
-    -- `plate.BackgroundTransparency` unconditionally is still correct: harmless while the plate is
-    -- Visible = false, and while a fade tween is actively running this write is simply overwritten
-    -- by the tween's own next frame, which is the only property owner that matters at that moment.
+    -- the current day/night value rather than a stale one baked in at construction. The CAPTURE
+    -- must stay unconditional and must keep reading `plateRestTransparency`, never the live
+    -- property — a fade-driven `1` must never be captured as "authored".
     local plateAuthored = captureNumber(plate, AUTHORED_TRANSPARENCY, plateRestTransparency)
     plateRestTransparency = lerpNumber(PLATE_DAY_TRANSPARENCY, plateAuthored, nightFactor)
-    plate.BackgroundTransparency = plateRestTransparency
+    -- The WRITE, unlike the capture, is guarded: `plateFadeTweens` is non-empty only between
+    -- `startPlateFade` and the next `cancelPlateFade`, i.e. exactly while a fade owns this
+    -- property. TweenService redrives `BackgroundTransparency` from ITS OWN stored start value
+    -- every frame, so an unconditional write here would still let the fade finish — but it would
+    -- also win for up to one frame, showing a flash of rest-transparency mid-fade while the text
+    -- and stroke (which this pass never touches) kept fading smoothly. Skipping the write during
+    -- a fade costs nothing: once the fade completes the plate is `Visible = false`, and the next
+    -- `revealPlate` sets the property explicitly anyway.
+    if #plateFadeTweens == 0 then
+        plate.BackgroundTransparency = plateRestTransparency
+    end
 
     for _, tile in tapeTiles do
         local rim = tile.rim
