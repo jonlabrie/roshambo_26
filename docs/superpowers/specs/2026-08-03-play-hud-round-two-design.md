@@ -15,7 +15,7 @@ player's own outcome and otherwise get out of the way.**
 | 1 | The escalation countdown is halved and becomes dismissable |
 | 2 | Results become a standalone splash, visible on any screen, optional |
 | 3 | Round detail — crowd split, player count — moves to the top of the ledger |
-| 4 | `SWITCH?` moves above its button and expires in 1s |
+| 4 | `SWITCH?` fills its button (an overlay, not a move) and expires in 1s |
 | 5 | A PWA-style circular round timer replaces the bottom hairline |
 | 6 | The wallet plate moves left of the ring and becomes tappable |
 | 7 | With the hairline gone, the whole cluster moves down |
@@ -96,16 +96,22 @@ in the round.
 This is a strict improvement on the toast that carried it. A transient line nobody can re-read
 becomes a panel that is still there thirty seconds later.
 
-## §4 — `SWITCH?` moves above its button and expires in 1s
+## §4 — `SWITCH?` fills its button, and expires in 1s
 
-Two changes:
-
-- **It moves above the button rather than sitting on it.** Freed from the button's width it can
-  be sized for its own text, and it no longer covers the glyph it is asking about — the player
-  can see what they are switching *to*.
+- **It stays an overlay, sized to the button exactly** — not `BTN_W - 8`, which on a phone left
+  36px holding ~60px of text and rendered as roughly `WITC`. Filling the button gives the word
+  the room it needs without moving anything.
 - **`SWITCH_PROMPT_SECONDS` goes 4 → 1.** Four seconds was chosen when a prompt was the only
-  thing on screen; in practice it lingers. Both outcomes of expiry are safe (expiring restores
-  exactly the state before the stray tap), so a short fuse costs nothing.
+  thing on screen; in practice it lingers. Both outcomes of expiry are safe — expiring restores
+  exactly the state before the stray tap — so a short fuse costs nothing.
+
+**Covering the glyph beneath is correct, not a compromise.** An earlier draft of this section
+moved the pill above the button so the player could "see what they are switching to". That
+reasoning was wrong, and the owner caught it: **confirming a switch unlocks; it never selects
+the button that was tapped.** So the glyph underneath is not a destination. Both unchosen
+buttons are **proxies for switch-and-cancel**, and either one does the same thing. Revealing the
+glyph would advertise a destination that does not exist — which is precisely the confusion the
+one-gesture rule was designed to avoid.
 
 ## §5 — A circular round timer, from the PWA
 
@@ -117,10 +123,13 @@ from the top clockwise in proportion to the time remaining. Which segments are l
 fraction is pure arithmetic and belongs in a Lune-tested module; the controller only paints
 what it is told. 36 segments at 10° reads as a ring at this size.
 
-Carried over from the PWA: green → red at ≤4s (matching this HUD's existing `ESCALATE_AT = 5`
-would be a needless second threshold, but 4 is what the PWA uses and the two should agree —
-**use `ESCALATE_AT`, and change the PWA to match if the owner wants them identical**), the
-count in the middle, and the glyph swap on reveal.
+Carried over from the PWA: the count in the middle, the glyph swap on reveal, and green → red
+as time runs short.
+
+**The ring and the escalation prompt turn urgent at the SAME moment** (owner's ruling). Both read
+`HudModel`'s `ESCALATE_AT`; the PWA's own 4s literal does not come across. A ring reddening one
+second before or after the countdown appears would read as two separate alarms about the same
+fact, which is worse than either alone. One threshold, one signal, expressed twice.
 
 **The glyph swap obeys the spoiler gate.** The world throw appears only once the drum has
 settled — the same `drumRest` cue that gates the tape tile, the splash and the headline.
@@ -201,3 +210,8 @@ intrude; and whether the halved escalation still commands attention.
    result.
 6. **The plate becomes a door again.** It went inert only because it was in the camera-drag
    strip, and it has left.
+7. **The ring and the escalation share `ESCALATE_AT`.** One threshold expressed twice, never two
+   alarms about the same fact.
+8. **`SWITCH?` covers the glyph beneath it, deliberately.** Confirming a switch unlocks and never
+   selects, so that glyph is not a destination — both unchosen buttons are switch-and-cancel
+   proxies. Revealing it would advertise a destination that does not exist.
