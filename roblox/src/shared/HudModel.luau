@@ -11,21 +11,17 @@
 -- "pot riding" describe who STARTS armed — a fresh session has zero misses — but they are not
 -- ongoing conditions, so they do not appear here. An earlier draft carried them as live OR-terms
 -- and a player who threw, won nothing and missed once fell out of the OR: the prompt died after
--- ONE miss instead of three, giving the most common case the least grace.
+-- ONE miss instead of three, giving the most common case the least grace. A deliberate back-out
+-- also counts as an answer, not a miss: it silences the prompt for the rest of the round without
+-- touching the backoff count, because the player plainly saw the question and answered it.
 --
--- A round only counts as ignored if the player COULD have thrown. Rounds spent fate-bound are not
--- misses — the player was prevented, not inattentive. Counting them would disarm the prompt for
--- exactly the player who was held out of the round.
+-- A round only counts as ignored if the player COULD have thrown. Rounds where the player was
+-- prevented from throwing are not misses — the player was held out, not inattentive. Counting
+-- them would disarm the prompt for exactly the player who was prevented.
 local HudModel = {}
 
 local ESCALATE_AT = 5 -- seconds remaining
 local BACKOFF_MISSES = 3
-
--- How much of the countdown an unconfirmed selection is given back before it is thrown anyway. It is
--- NOT zero: the pick has to travel client -> SubmitPick -> ThrowBuffer and be flushed before the
--- server's lockout, and `secondsLeft` reaching zero IS the lockout. Half a second is the slack for
--- that trip, and it costs a player who was about to tap almost nothing.
-local AUTO_COMMIT_AT = 0.5 -- seconds remaining
 
 export type Session = { consecutiveMisses: number }
 
@@ -36,17 +32,7 @@ export type Inputs = {
     currentStreak: number,
     totalPoints: number,
     unresolvedWin: boolean,
-    fateBound: boolean,
-    -- "HAS A COMMITTED PICK RIGHT NOW", not "has tapped". A player who releases their confirmation
-    -- (see tapAction) goes back to false, because the server no longer holds anything they still
-    -- stand behind.
-    pickedThisRound: boolean,
     escalationPrompts: boolean,
-    -- The confirm-a-throw preference (default ON) and the glyph the player is currently standing on.
-    -- `selectedThrow` OUTLIVES the commit: it is what a release falls back to, and what the lockout
-    -- throws.
-    confirmThrows: boolean,
-    selectedThrow: string?,
     -- The glyph the player has chosen this round, the glyph currently carrying a SWITCH?
     -- prompt, and whether the pick has gone over the wire. `chosen` is the player's
     -- commitment; `sent` is the wire's. They are separate because the pick is held locally
@@ -58,14 +44,17 @@ export type Inputs = {
 }
 
 export type View = {
-    plate: { streak: number, pot: number, points: number },
+    plate: { streak: number, points: number },
     throwsEnabled: boolean,
-    slot: string, -- "pot" | "fate" | "none"
+    -- The pot's own control. It is a button, not a readout: the figure belongs IN the thing
+    -- that acts on it, which is why the plate no longer carries a pot at all.
+    bankVisible: boolean,
+    pot: number,
     potPulses: boolean,
     escalate: boolean,
     secondsLeft: number,
-    -- The glyph to light as the player's current choice.
-    selected: string?,
+    chosen: string?,
+    switchPrompt: string?,
 }
 
 -- Four seconds. A prompt is a question, and an unanswered question must not sit on screen
@@ -135,32 +124,27 @@ function HudModel.switchPromptExpired(setAt: number?, now: number): boolean
     return setAt ~= nil and (now - setAt) >= HudModel.SWITCH_PROMPT_SECONDS
 end
 
--- The selection that must be thrown NOW rather than lost, or nil.
+-- The chosen glyph, if this is the moment it has to go over the wire, or nil.
 --
--- Owner's decision, and the reason this exists at all: a player who tapped a glyph clearly meant to
--- throw it, and losing a round to a missed second tap reads as broken. The confirm guards a mis-tap;
--- it must never cost a round.
---
--- Deliberately NOT gated on `confirmRequired`. Banking mid-round removes the requirement but not the
--- selection, and dropping it there would silently cost exactly the round the player was mid-decision
--- on. A fate arriving mid-round DOES drop it: the server will refuse that pick whatever we do, and
--- lighting a tile the server threw away is a lie.
-function HudModel.autoCommit(inputs: Inputs): string?
-    local selected = inputs.selectedThrow
-    if selected == nil or inputs.pickedThisRound or inputs.fateBound then
+-- ONE TRIP PER ROUND. The pick is held client-side until here because ThrowBuffer is
+-- upsert-only — there is no removal in the buffer, in the delta, or in POST /api/v1/throws —
+-- so sending on the first tap would make backing out a lie. `secondsLeft` is
+-- secondsToLockout, so zero IS the lockout; half a second is the slack for the
+-- client -> SubmitPick -> ThrowBuffer trip that the buffer's own lockout flush then carries.
+local SEND_AT = 0.5
+
+function HudModel.sendAtLockout(inputs: Inputs): string?
+    local chosen = inputs.chosen
+    if chosen == nil or inputs.sent then
         return nil
     end
     if inputs.phase ~= "ACTIVE" then
-        -- The round moved on with a selection still pending — the unsynced-clock path never reaches
-        -- the boundary below, because its countdown is a constant. Last chance: the server may
-        -- refuse it as PICKS_CLOSED, and the whiff toast then says so honestly. Trying and being
-        -- told beats never trying.
-        return selected
+        return chosen
     end
-    if inputs.secondsLeft > AUTO_COMMIT_AT then
+    if inputs.secondsLeft > SEND_AT then
         return nil
     end
-    return selected
+    return chosen
 end
 
 function HudModel.newSession(): Session
@@ -168,35 +152,33 @@ function HudModel.newSession(): Session
 end
 
 function HudModel.view(inputs: Inputs, session: Session): View
-    local blocked = inputs.fateBound
     local throwsEnabled = throwsEnabledFor(inputs)
 
-    -- One slot above the throw row, two possible tenants. A LOSS forfeits the pot, so
-    -- pointsAtStake is always 0 while fate-bound and these cannot really coexist -- but fate
-    -- takes precedence defensively, because the wrong tenant here would hide the only way out.
-    -- Neither is gated on phase: an unbanked pot outlives the round, the session and a week away.
-    local slot: string = if inputs.fateBound then "fate" elseif inputs.pointsAtStake > 0 then "pot" else "none"
-
+    -- A round only nags someone who has not answered it. `chosen` is the answer; a deliberate
+    -- back-out (`declinedThisRound`) is ALSO an answer, and re-nagging the player who just
+    -- withdrew is exactly wrong — they are demonstrably paying attention.
     local armed = inputs.escalationPrompts
-        and not blocked
+        and not inputs.declinedThisRound
         and inputs.phase == "ACTIVE"
-        and not inputs.pickedThisRound
+        and inputs.chosen == nil
         and session.consecutiveMisses < BACKOFF_MISSES
 
     return {
-        plate = {
-            streak = inputs.currentStreak,
-            pot = inputs.pointsAtStake,
-            points = inputs.totalPoints,
-        },
+        plate = { streak = inputs.currentStreak, points = inputs.totalPoints },
         throwsEnabled = throwsEnabled,
-        slot = slot,
-        -- unresolvedWin's only remaining job: "the last scored round was a WIN and the player has
-        -- not banked since". It drives the pulse and nothing else.
-        potPulses = slot == "pot" and inputs.unresolvedWin,
+        -- Not gated on phase: an unbanked pot outlives the round, the session and a week away.
+        bankVisible = inputs.pointsAtStake > 0,
+        pot = inputs.pointsAtStake,
+        -- unresolvedWin's only job: "the last scored round was a WIN and the player has not
+        -- banked since". It drives the pulse and nothing else.
+        potPulses = inputs.pointsAtStake > 0 and inputs.unresolvedWin,
         escalate = armed and inputs.secondsLeft > 0 and inputs.secondsLeft <= ESCALATE_AT,
         secondsLeft = inputs.secondsLeft,
-        selected = inputs.selectedThrow,
+        -- The choice OUTLIVES the round: after the lockout it is what was thrown, and the tile
+        -- stays lit through TALLY/REVEAL saying so. main.client clears it when ACTIVE reopens.
+        chosen = inputs.chosen,
+        -- The prompt does not. A question about a round that has closed cannot be answered.
+        switchPrompt = if throwsEnabled then inputs.switchPrompt else nil,
     }
 end
 

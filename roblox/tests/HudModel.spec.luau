@@ -11,11 +11,7 @@ local function inputs(over: any): any
         currentStreak = 0,
         totalPoints = 100,
         unresolvedWin = false,
-        fateBound = false,
-        pickedThisRound = false,
         escalationPrompts = true,
-        confirmThrows = true,
-        selectedThrow = nil,
         chosen = nil,
         switchPrompt = nil,
         sent = false,
@@ -32,14 +28,6 @@ local function session(misses: number): any
 end
 
 describe("HudModel.view — plate and throws", function()
-    test("the plate always shows streak, pot and points", function()
-        local v =
-            HudModel.view(inputs({ currentStreak = 3, pointsAtStake = 27, totalPoints = 1240 }), session(0))
-        expect(v.plate.streak).toBe(3)
-        expect(v.plate.pot).toBe(27)
-        expect(v.plate.points).toBe(1240)
-    end)
-
     test("throws are enabled in ACTIVE when unbound and unpicked", function()
         expect(HudModel.view(inputs({}), session(0)).throwsEnabled).toBe(true)
     end)
@@ -66,49 +54,6 @@ describe("HudModel.view — plate and throws", function()
     end)
 end)
 
-describe("HudModel.view — the slot above the throw row", function()
-    test("the slot holds the pot whenever points are unbanked", function()
-        local v = HudModel.view(inputs({ pointsAtStake = 27 }), session(0))
-        expect(v.slot).toBe("pot")
-    end)
-
-    test("the slot holds the fate prompt when fate-bound", function()
-        expect(HudModel.view(inputs({ fateBound = true }), session(0)).slot).toBe("fate")
-    end)
-
-    test("the slot is empty with no pot and no fate", function()
-        expect(HudModel.view(inputs({}), session(0)).slot).toBe("none")
-    end)
-
-    test("fate wins the slot if both are somehow set", function()
-        -- a LOSS forfeits the pot, so this should be unreachable; assert the defensive order
-        -- rather than trusting it, because the wrong tenant here hides the only way out of a fate
-        local v = HudModel.view(inputs({ fateBound = true, pointsAtStake = 27 }), session(0))
-        expect(v.slot).toBe("fate")
-    end)
-
-    test("the pot survives every phase — an unbanked pot does not expire with the round", function()
-        for _, p in { "ACTIVE", "TALLY", "REVEAL" } do
-            expect(HudModel.view(inputs({ phase = p, pointsAtStake = 27 }), session(0)).slot).toBe("pot")
-        end
-    end)
-
-    test("the pot pulses only while the win is unacknowledged", function()
-        expect(HudModel.view(inputs({ pointsAtStake = 27, unresolvedWin = true }), session(0)).potPulses).toBe(
-            true
-        )
-        expect(HudModel.view(inputs({ pointsAtStake = 27, unresolvedWin = false }), session(0)).potPulses).toBe(
-            false
-        )
-    end)
-
-    test("nothing pulses when there is no pot", function()
-        expect(HudModel.view(inputs({ pointsAtStake = 0, unresolvedWin = true }), session(0)).potPulses).toBe(
-            false
-        )
-    end)
-end)
-
 describe("HudModel.view — escalation", function()
     test("a player with no misses is armed", function()
         expect(HudModel.view(inputs({ secondsLeft = 4 }), session(0)).escalate).toBe(true)
@@ -117,17 +62,6 @@ describe("HudModel.view — escalation", function()
     test("it only fires inside the last 5 seconds", function()
         expect(HudModel.view(inputs({ secondsLeft = 6 }), session(0)).escalate).toBe(false)
         expect(HudModel.view(inputs({ secondsLeft = 5 }), session(0)).escalate).toBe(true)
-    end)
-
-    test("it never fires once a pick is in", function()
-        expect(HudModel.view(inputs({ secondsLeft = 2, pickedThisRound = true }), session(0)).escalate).toBe(
-            false
-        )
-    end)
-
-    test("it never fires at a player who cannot throw", function()
-        -- "CHOOSE A THROW" is noise at someone the server will refuse
-        expect(HudModel.view(inputs({ secondsLeft = 2, fateBound = true }), session(0)).escalate).toBe(false)
     end)
 
     test("an unacknowledged win does not silence the escalation", function()
@@ -157,6 +91,76 @@ describe("HudModel.view — escalation", function()
         -- the arm reasons describe who STARTS armed; they are not ongoing conditions
         expect(HudModel.view(inputs({ secondsLeft = 2, pointsAtStake = 0 }), session(2)).escalate).toBe(true)
         expect(HudModel.view(inputs({ secondsLeft = 2, pointsAtStake = 99 }), session(3)).escalate).toBe(
+            false
+        )
+    end)
+end)
+
+describe("HudModel.view — plate, bank and pot", function()
+    test("the plate carries streak and points, and NEVER the pot", function()
+        local v =
+            HudModel.view(inputs({ currentStreak = 3, pointsAtStake = 27, totalPoints = 1240 }), session(0))
+        expect(v.plate.streak).toBe(3)
+        expect(v.plate.points).toBe(1240)
+        expect((v.plate :: any).pot).toBe(nil)
+    end)
+
+    test("the bank button appears only while a pot is riding", function()
+        expect(HudModel.view(inputs({ pointsAtStake = 0 }), session(0)).bankVisible).toBe(false)
+        expect(HudModel.view(inputs({ pointsAtStake = 27 }), session(0)).bankVisible).toBe(true)
+        expect(HudModel.view(inputs({ pointsAtStake = 27 }), session(0)).pot).toBe(27)
+    end)
+
+    test("an unbanked pot outlives the round, the session and a week away", function()
+        for _, p in { "TALLY", "REVEAL" } do
+            expect(HudModel.view(inputs({ phase = p, pointsAtStake = 27 }), session(0)).bankVisible).toBe(
+                true
+            )
+        end
+    end)
+
+    test("the pot pulses only while the win is unacknowledged", function()
+        expect(HudModel.view(inputs({ pointsAtStake = 27, unresolvedWin = true }), session(0)).potPulses).toBe(
+            true
+        )
+        expect(HudModel.view(inputs({ pointsAtStake = 27, unresolvedWin = false }), session(0)).potPulses).toBe(
+            false
+        )
+        expect(HudModel.view(inputs({ pointsAtStake = 0, unresolvedWin = true }), session(0)).potPulses).toBe(
+            false
+        )
+    end)
+
+    test("a chosen glyph stays lit after the round closes — it is what was thrown", function()
+        local v = HudModel.view(inputs({ phase = "REVEAL", chosen = "R" }), session(0))
+        expect(v.chosen).toBe("R")
+    end)
+
+    test("a prompt never survives the round closing", function()
+        local v = HudModel.view(inputs({ phase = "TALLY", chosen = "R", switchPrompt = "P" }), session(0))
+        expect(v.switchPrompt).toBe(nil)
+    end)
+end)
+
+describe("HudModel.view — escalation keys off the CHOICE", function()
+    test("armed while nothing is chosen", function()
+        expect(HudModel.view(inputs({ secondsLeft = 4 }), session(0)).escalate).toBe(true)
+    end)
+
+    test("silent once a glyph is chosen", function()
+        expect(HudModel.view(inputs({ secondsLeft = 4, chosen = "R" }), session(0)).escalate).toBe(false)
+    end)
+
+    test("BACKING OUT SILENCES IT for the rest of the round", function()
+        -- The player has answered the question CHOOSE A THROW is asking. Re-nagging is wrong.
+        local v =
+            HudModel.view(inputs({ secondsLeft = 4, chosen = nil, declinedThisRound = true }), session(0))
+        expect(v.escalate).toBe(false)
+    end)
+
+    test("still silent after three misses, and still off when the preference is off", function()
+        expect(HudModel.view(inputs({ secondsLeft = 4 }), session(3)).escalate).toBe(false)
+        expect(HudModel.view(inputs({ secondsLeft = 4, escalationPrompts = false }), session(0)).escalate).toBe(
             false
         )
     end)
@@ -348,53 +352,36 @@ describe("HudModel.switchPromptExpired", function()
     end)
 end)
 
-describe("HudModel.autoCommit — a missed second tap must never cost a round", function()
-    test("nothing selected, nothing to commit", function()
-        expect(HudModel.autoCommit(inputs({ pointsAtStake = 27, secondsLeft = 0 }))).toBe(nil)
+describe("HudModel.sendAtLockout — the pick's ONE trip to the wire", function()
+    test("nothing to send with nothing chosen", function()
+        expect(HudModel.sendAtLockout(inputs({ chosen = nil, secondsLeft = 0.2 }))).toBe(nil)
     end)
 
-    test("it holds while there is still time to tap again", function()
-        expect(HudModel.autoCommit(inputs({ pointsAtStake = 27, selectedThrow = "S", secondsLeft = 3 }))).toBe(
-            nil
-        )
+    test("holds the pick while there is still time", function()
+        expect(HudModel.sendAtLockout(inputs({ chosen = "R", secondsLeft = 5 }))).toBe(nil)
     end)
 
-    test("the boundary: it fires as the lockout arrives, not after it", function()
-        -- committing AT zero is too late — the pick has to reach the server before the lockout, so
-        -- the model hands it over with a sliver of the countdown still to run
-        local justBefore = inputs({ pointsAtStake = 27, selectedThrow = "S", secondsLeft = 0.6 })
-        expect(HudModel.autoCommit(justBefore)).toBe(nil)
-        local atLockout = inputs({ pointsAtStake = 27, selectedThrow = "S", secondsLeft = 0.5 })
-        expect(HudModel.autoCommit(atLockout)).toBe("S")
+    test("sends at the half-second boundary", function()
+        expect(HudModel.sendAtLockout(inputs({ chosen = "R", secondsLeft = 0.5 }))).toBe("R")
+        expect(HudModel.sendAtLockout(inputs({ chosen = "R", secondsLeft = 0.1 }))).toBe("R")
     end)
 
-    test("a round that ended without a countdown still commits the selection", function()
-        -- the unsynced-clock path reports a constant nominal countdown that never reaches the
-        -- boundary above; the phase leaving ACTIVE is the last chance to throw what was tapped
-        local i = inputs({ pointsAtStake = 27, selectedThrow = "P", phase = "TALLY", secondsLeft = 30 })
-        expect(HudModel.autoCommit(i)).toBe("P")
+    test("NEVER TWICE — once sent, it stays sent", function()
+        expect(HudModel.sendAtLockout(inputs({ chosen = "R", secondsLeft = 0.1, sent = true }))).toBe(nil)
     end)
 
-    test("a pick already in is never re-committed", function()
-        local i = inputs({
-            pointsAtStake = 27,
-            selectedThrow = "P",
-            pickedThisRound = true,
-            secondsLeft = 0.2,
-        })
-        expect(HudModel.autoCommit(i)).toBe(nil)
+    test("a round that moved on with an unsent choice still tries", function()
+        -- The unsynced-clock path never reaches the boundary above (its countdown is a
+        -- constant). The server may answer PICKS_CLOSED and the whiff toast then says so
+        -- honestly; trying and being told beats never trying.
+        for _, p in { "TALLY", "REVEAL" } do
+            expect(HudModel.sendAtLockout(inputs({ chosen = "R", phase = p }))).toBe("R")
+        end
     end)
 
-    test("a fate arriving mid-round drops the selection rather than throwing it", function()
-        local i = inputs({ pointsAtStake = 27, selectedThrow = "P", fateBound = true, secondsLeft = 0.2 })
-        expect(HudModel.autoCommit(i)).toBe(nil)
-    end)
-
-    test("banking mid-round does not strand the selection", function()
-        -- the pot is gone, so confirmation is no longer REQUIRED — but a glyph the player tapped is
-        -- still a glyph they meant to throw, and dropping it silently would cost them the round
-        local i = inputs({ pointsAtStake = 0, selectedThrow = "R", secondsLeft = 0.2 })
-        expect(HudModel.autoCommit(i)).toBe("R")
+    test("a back-out leaves nothing to send at the lockout", function()
+        local st = HudModel.applyTap({ chosen = "R", switchPrompt = "P" }, "clear", "P")
+        expect(HudModel.sendAtLockout(inputs({ chosen = st.chosen, secondsLeft = 0.1 }))).toBe(nil)
     end)
 end)
 
