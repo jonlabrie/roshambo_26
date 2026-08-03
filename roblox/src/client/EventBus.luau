@@ -12,6 +12,10 @@ local NAMES = {
     "HudBank",
     "Toast",
     "OpenLedger",
+    -- The ledger is the door to the teahouse panel. It had a persistent bottom-right toggle of its
+    -- own, which crossed under the scissors button on a narrow viewport and cost a permanent hole in
+    -- the camera-drag surface for a panel most players open rarely.
+    "OpenTeahouse",
     "LedgerState",
     "HudPreference",
     "Onboard",

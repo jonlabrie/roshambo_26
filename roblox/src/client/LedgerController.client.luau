@@ -9,6 +9,11 @@
 -- the only interactive information element in the whole design, precisely so maximal costs no
 -- persistent button of its own anywhere on screen.
 --
+-- AND THE LEDGER IS ITSELF A DOOR. The teahouse panel's own persistent bottom-right toggle collided
+-- with the throw row on a narrow viewport, so it is gone and MY TEAHOUSE in this header replaces it
+-- (EventBus.OpenTeahouse) — the same principle applied once more: one persistent entry point, and
+-- everything else reached through it.
+--
 -- ACTIVE DISCIPLINE, the takeover carve-out. The minimal HUD's rule is that no information element
 -- may be Active, because every sinking pixel is a permanent hole in the camera-drag surface. A
 -- takeover mode is the exception: the scrim and the panel SINK INPUT ON PURPOSE (see `panel.Active`
@@ -276,19 +281,24 @@ header.Size = UDim2.new(1, 0, 0, HEADER_H)
 header.BackgroundTransparency = 1
 header.Parent = panel
 
+-- The header's right end is the navigation end: the ✕ out, and beside it the one door onward.
+local CLOSE_W = 44
+local TEA_W = 160
+local NAV_W = CLOSE_W + 8 + TEA_W + 8 -- what the title/note must keep clear of
+
 local title = label(header, "THE LEDGER", 24, INK_CREAM, Enum.Font.GothamBlack)
-title.Size = UDim2.new(1, -60, 0, 26)
+title.Size = UDim2.new(1, -NAV_W, 0, 26)
 
 local suspendNote = label(header, "MOVEMENT SUSPENDED WHILE OPEN", 13, GOLD, Enum.Font.GothamBold)
 suspendNote.Position = UDim2.fromOffset(0, 28)
-suspendNote.Size = UDim2.new(1, -60, 0, 16)
+suspendNote.Size = UDim2.new(1, -NAV_W, 0, 16)
 suspendNote.TextTransparency = 0.15
 
 local closeButton = Instance.new("TextButton")
 closeButton.Name = "Close"
 closeButton.AnchorPoint = Vector2.new(1, 0)
 closeButton.Position = UDim2.fromScale(1, 0)
-closeButton.Size = UDim2.fromOffset(44, 44)
+closeButton.Size = UDim2.fromOffset(CLOSE_W, CLOSE_W)
 closeButton.BackgroundColor3 = WASHI_CARD
 closeButton.BackgroundTransparency = 0.1
 closeButton.BorderSizePixel = 0
@@ -300,6 +310,37 @@ closeButton.Text = "X"
 closeButton.Parent = header
 corner(closeButton, 8)
 stroke(closeButton, TAN_RIM, 1, 0.4)
+
+-- ===== MY TEAHOUSE: the door that used to be a persistent corner toggle =====
+-- The teahouse panel carried its own 140x40 button pinned to the bottom-right corner. On a narrow
+-- viewport its left edge crossed under the HUD's scissors button (the throw row is held inboard by a
+-- FRACTION of the width, so the two clear each other on a desktop and collide on a phone), and it
+-- cost a permanent hole in the camera-drag surface every second of every session for a panel opened
+-- rarely. The ledger is its door now — the design's own rule, applied once more: one persistent
+-- entry point, everything else reached through it.
+--
+-- WHY THE HEADER AND NOT THE PREFERENCES FOOTER. The footer's two switches already span
+-- 2 x PREF_COL_W = 472px, which leaves no third column at phone width, so the alternative was a
+-- second footer row — and that costs the BODY 48px. The body is the squeezed dimension on exactly
+-- the tier this design targets: on a landscape phone it is 68-83px today, and a second row takes it
+-- to 20-35px, a window smaller than one statistic. The header is free at every size, cannot crowd
+-- the switches at all, and puts "go somewhere else" beside the ✕ where navigation belongs.
+local teahouseButton = Instance.new("TextButton")
+teahouseButton.Name = "MyTeahouse"
+teahouseButton.AnchorPoint = Vector2.new(1, 0)
+teahouseButton.Position = UDim2.new(1, -(CLOSE_W + 8), 0, 0)
+teahouseButton.Size = UDim2.fromOffset(TEA_W, CLOSE_W) -- square with the ✕: one touch-target height
+teahouseButton.BackgroundColor3 = WASHI_CARD
+teahouseButton.BackgroundTransparency = 0.1
+teahouseButton.BorderSizePixel = 0
+teahouseButton.AutoButtonColor = false
+teahouseButton.TextColor3 = INK_CREAM
+teahouseButton.TextSize = 15
+teahouseButton.Font = Enum.Font.GothamBold
+teahouseButton.Text = "MY TEAHOUSE"
+teahouseButton.Parent = header
+corner(teahouseButton, 8)
+stroke(teahouseButton, GOLD, 1, 0.35)
 
 -- ===== Hero band =====
 local hero = Instance.new("Frame")
@@ -868,6 +909,15 @@ end)
 
 bankButton.MouseButton1Click:Connect(function()
     EventBus.HudBank:Fire()
+end)
+
+-- THE LEDGER CLOSES FIRST, AND IT CLOSES THROUGH close(). Two takeover surfaces at once is bad on
+-- its own, but the reason this is not merely tidy is that the ledger SUSPENDS MOVEMENT: opening the
+-- teahouse panel over a still-open ledger would leave a player reading it with no legs and no ✕ in
+-- reach. Routing through the one exit is what hands them back.
+teahouseButton.MouseButton1Click:Connect(function()
+    close()
+    EventBus.OpenTeahouse:Fire()
 end)
 
 -- Optimistic: the switch moves on the tap. The next ProfileUpdate echo reconciles it, so a write

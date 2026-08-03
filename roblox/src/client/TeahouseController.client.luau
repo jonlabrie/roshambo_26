@@ -1,7 +1,7 @@
 --!strict
--- B3 teahouse management panel. A persistent HUD button opens a panel that renders
--- TeahouseMenuModel over the echoed economy/preference/back-door state, and fires the
--- purchase/display/preference remotes. World prompts (claim, back-door, favorite-add) live on
+-- B3 teahouse management panel. The ledger's MY TEAHOUSE button (EventBus.OpenTeahouse) opens a
+-- panel that renders TeahouseMenuModel over the echoed economy/preference/back-door state, and fires
+-- the purchase/display/preference remotes. World prompts (claim, back-door, favorite-add) live on
 -- their own controllers (EconomyController, BackDoorController, PerchPreferenceController); this
 -- is the from-anywhere hub for upgrades + display + favorites.
 --
@@ -96,38 +96,37 @@ local DIM = Color3.fromRGB(110, 102, 92) -- locked / disabled
 local DANGER = Color3.fromRGB(206, 86, 86) -- remove-favorite
 
 -- ===== Step 1: scaffold =====
+-- NO PERSISTENT TOGGLE. This panel used to carry its own 140x40 button pinned to the bottom-right
+-- corner, and on a narrow viewport its left edge crossed under the HUD's scissors button (the throw
+-- row is anchored at 1 - JUMP_CLEARANCE, which is a FRACTION of the width, so the two clear each
+-- other on a desktop and collide on a phone). It also cost a permanent hole in the camera-drag
+-- surface -- one that was up every second of every session for a panel opened rarely.
+--
+-- THE LEDGER IS THE DOOR NOW: its MY TEAHOUSE button fires EventBus.OpenTeahouse (see the bottom of
+-- this file), having closed itself first. That follows the play-HUD design's own rule -- the
+-- player-state plate is the ONE persistent interactive element, so nothing else needs a button.
 local gui = Instance.new("ScreenGui")
 gui.Name = "TeahousePanel"
 gui.ResetOnSpawn = false
 gui.Parent = player:WaitForChild("PlayerGui")
 
-local toggleButton = Instance.new("TextButton")
-toggleButton.Name = "Toggle"
-toggleButton.AnchorPoint = Vector2.new(1, 1)
-toggleButton.Position = UDim2.new(1, -12, 1, -12)
-toggleButton.Size = UDim2.fromOffset(140, 40)
-toggleButton.BackgroundColor3 = BG
-toggleButton.BackgroundTransparency = 0.1
-toggleButton.TextColor3 = TEXT
-toggleButton.Font = Enum.Font.GothamBold
-toggleButton.TextSize = 16
-toggleButton.Text = "Teahouse"
-toggleButton.Parent = gui
-do
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 8)
-    corner.Parent = toggleButton
-end
+-- The panel is a ScrollingFrame with a fixed viewport (PANEL_W x PANEL_H) and an auto-growing
+-- canvas: as sections accumulate (sizes/display/move/portal/decorations/favorites/back-door/access)
+-- the content exceeds the viewport and the user scrolls. Was a plain Frame, which silently
+-- overflowed its bottom edge -> later sections (Access) rendered off-screen as detached buttons.
+--
+-- The geometry is stated as constants rather than inline because the close button below is placed
+-- against the panel's TOP-RIGHT corner and has to be derived from them; two hand-matched literals
+-- would drift the moment the panel is resized.
+local PANEL_W, PANEL_H = 340, 520
+local PANEL_MARGIN = 12 -- from the right edge
+local PANEL_BOTTOM = 60 -- from the bottom edge
 
--- The panel is a ScrollingFrame with a fixed viewport (340x520) and an auto-growing canvas: as
--- sections accumulate (sizes/display/move/portal/decorations/favorites/back-door/access) the content
--- exceeds the viewport and the user scrolls. Was a plain Frame, which silently overflowed its bottom
--- edge -> later sections (Access) rendered off-screen as detached buttons.
 local panel = Instance.new("ScrollingFrame")
 panel.Name = "Panel"
 panel.AnchorPoint = Vector2.new(1, 1)
-panel.Position = UDim2.new(1, -12, 1, -60)
-panel.Size = UDim2.fromOffset(340, 520) -- fixed viewport
+panel.Position = UDim2.new(1, -PANEL_MARGIN, 1, -PANEL_BOTTOM)
+panel.Size = UDim2.fromOffset(PANEL_W, PANEL_H) -- fixed viewport
 panel.CanvasSize = UDim2.new() -- AutomaticCanvasSize.Y grows the canvas to fit the UIListLayout
 panel.AutomaticCanvasSize = Enum.AutomaticSize.Y
 panel.ScrollingDirection = Enum.ScrollingDirection.Y
@@ -141,6 +140,35 @@ do
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 8)
     corner.Parent = panel
+end
+
+-- The only way out, now the toggle is gone. A SIBLING of the panel rather than a child: everything
+-- parented to `panel` is laid out by the UIListLayout below and scrolls with the canvas, and a close
+-- control you have to scroll back up to find is not a close control. Hidden with the panel, so it
+-- adds nothing to the always-on interactive count -- removing the toggle takes that DOWN by one.
+local CLOSE_SIZE = 34
+local CLOSE_INSET = 8
+
+local closeButton = Instance.new("TextButton")
+closeButton.Name = "Close"
+closeButton.AnchorPoint = Vector2.new(1, 0)
+closeButton.Position = UDim2.new(1, -(PANEL_MARGIN + CLOSE_INSET), 1, -(PANEL_BOTTOM + PANEL_H) + CLOSE_INSET)
+closeButton.Size = UDim2.fromOffset(CLOSE_SIZE, CLOSE_SIZE)
+closeButton.BackgroundColor3 = BG
+closeButton.BackgroundTransparency = 0.1
+closeButton.BorderSizePixel = 0
+closeButton.AutoButtonColor = false
+closeButton.TextColor3 = TEXT
+closeButton.Font = Enum.Font.GothamBold
+closeButton.TextSize = 20
+closeButton.Text = "X"
+closeButton.Visible = false
+closeButton.ZIndex = 2 -- above the panel it sits on
+closeButton.Parent = gui
+do
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = closeButton
 end
 
 local layout = Instance.new("UIListLayout")
@@ -176,7 +204,9 @@ end
 local headerLabel = Instance.new("TextLabel")
 headerLabel.Name = "Header"
 headerLabel.LayoutOrder = 10
-headerLabel.Size = UDim2.new(1, 0, 0, 28)
+-- short of the full width: the close button overlays the panel's top-right corner, and a long
+-- "1240 pts · Perch: <padId>" would otherwise run under it
+headerLabel.Size = UDim2.new(1, -(CLOSE_SIZE + CLOSE_INSET), 0, 28)
 headerLabel.BackgroundTransparency = 1
 headerLabel.TextColor3 = TEXT
 headerLabel.Font = Enum.Font.GothamBold
@@ -929,19 +959,29 @@ AccessState.OnClientEvent:Connect(function(p)
     render()
 end)
 
--- ===== Step 5: toggle =====
+-- ===== Step 5: open / close =====
 
-local open = false
+-- No `open` flag any more: the toggle was the only thing that needed to know the current state (to
+-- invert it), and every remaining caller states what it wants.
 local function setOpen(shouldOpen: boolean)
-    open = shouldOpen
-    panel.Visible = open
-    if open then
+    panel.Visible = shouldOpen
+    closeButton.Visible = shouldOpen
+    if shouldOpen then
         render()
     end
 end
 
-toggleButton.MouseButton1Click:Connect(function()
-    setOpen(not open)
+-- The ledger's MY TEAHOUSE button. It closes ITSELF before firing this (see LedgerController), so
+-- the two takeover surfaces are never up together and the ledger's movement suspension is always
+-- lifted on the way through. Nothing else opens this panel: the world prompts (claim, back-door,
+-- favourite-add) belong to EconomyController/BackDoorController/PerchPreferenceController and put up
+-- their own UI, never this one.
+EventBus.OpenTeahouse.Event:Connect(function()
+    setOpen(true)
+end)
+
+closeButton.MouseButton1Click:Connect(function()
+    setOpen(false)
 end)
 
 -- B4 Task 5: Task 6 (not yet built) consumes EventBus.MoveTeahouse.Event to start move mode.
