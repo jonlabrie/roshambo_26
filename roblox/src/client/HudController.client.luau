@@ -9,14 +9,17 @@
 --   top-right    : the player list, expanding down. (The old pick cluster lived here — the furthest
 --                  reach from either thumb AND the corner the player list grows into.)
 --   top-centre   : free. Roblox claims nothing there.
--- Hence: PLATE top-centre; THROW AREA bottom-right but INBOARD of the jump button, with the tape
--- BELOW the buttons (the buttons stay closest to where the thumb rests; the tape is read, never
--- touched); the round TIMER as a hairline along the bottom edge, competing with nothing.
+--   bottom-right, above the jump button : also claimed by Roblox for jump/camera drag, but a
+--                  display with NO interactive elements can share it — see the PLATE below.
+-- Hence: PLATE in the right margin, ABOVE the jump button (measured, not predicted — see
+-- `placePlate`); THROW AREA bottom-right but INBOARD of the jump button, with the tape BELOW the
+-- buttons (the buttons stay closest to where the thumb rests; the tape is read, never touched);
+-- the round TIMER as a hairline along the bottom edge, competing with nothing.
 --
 -- Every information element MUST stay Active = false. Frames and labels default to false, but
 -- setting it true anywhere here punches a permanent hole in the camera-drag surface, which is
 -- the whole right side of the screen on touch. The whole interactive budget is: the three throw
--- buttons, the plate, and the one bank button (see `setBank`).
+-- buttons and the one bank button (see `setBank`) — the plate is a pure display now, not a door.
 --
 -- This file RENDERS HudModel; it never re-derives it. main.client.luau owns the wiring and fires
 -- EventBus.HudState(inputs, aux):
@@ -84,12 +87,8 @@ local TOUCH = UserInputService.TouchEnabled and not UserInputService.KeyboardEna
 local JUMP_CLEARANCE = HudLayout.JUMP_CLEARANCE
 local EDGE = HudLayout.EDGE
 
-local PLATE_W = 300
--- TEMPORARY (Task 6 → Task 7). HudLayout.PLATE_H is gone: the plate leaves top-centre for the
--- right margin in Task 7, where PLATE_ROW_H replaces this and the value disappears with it.
--- Carried as a literal purely so this file still LOADS in the interval — a nil here takes the
--- whole HUD down, and no gate we run can see it.
-local PLATE_H = 46
+local PLATE_W = HudLayout.PLATE_W
+local PLATE_ROW_H = HudLayout.PLATE_ROW_H
 -- BTN_W tracks BTN_H (the buttons are square) off the SAME shared scale, so "50% smaller" shrinks
 -- the cluster in both axes rather than leaving three squat letterboxes.
 local BTN_H = if TOUCH then HudLayout.BTN_H_TOUCH else HudLayout.BTN_H
@@ -178,66 +177,105 @@ local function tintGlyph(g: Frame, core: Color3, outline: Color3)
     end
 end
 
--- ===== Plate: top-centre, the one band Roblox does not claim =====
--- The ONLY interactive information element: it is the door to the maximal ledger, so maximal costs
--- no new persistent button anywhere on screen.
-local plate = Instance.new("TextButton")
+-- ===== Plate: the right margin, above the jump button =====
+-- It left top-centre because that band is the middle of a phone's view. This is the strip
+-- Roblox claims for jump and camera drag, and a display with NO interactive elements is the
+-- one thing that can safely live in it: everything here is a Frame or a TextLabel at the
+-- default Active = false, so every drag passes straight through to the camera.
+--
+-- The POT IS NOT HERE. It has its own button (see setBank). The streak is shown only when it
+-- is non-zero — a "×0" is noise on a display whose whole job is to be ignorable.
+local plate = Instance.new("Frame")
 plate.Name = "Plate"
-plate.AnchorPoint = Vector2.new(0.5, 0)
-plate.Position = UDim2.new(0.5, 0, 0, EDGE)
-plate.Size = UDim2.fromOffset(PLATE_W, PLATE_H)
+plate.AnchorPoint = Vector2.new(1, 1)
+plate.Size = UDim2.fromOffset(PLATE_W, PLATE_ROW_H)
 plate.BackgroundColor3 = WASHI
 plate.BackgroundTransparency = 0.3
 plate.BorderSizePixel = 0
-plate.AutoButtonColor = false
-plate.Text = ""
 plate.Parent = gui
 corner(plate, 6)
 stroke(plate, GOLD, 1, 0.35)
-plate.MouseButton1Click:Connect(function()
-    EventBus.OpenLedger:Fire()
-end)
 
-local CELLS = {
-    { key = "streak", caption = "STREAK" },
-    { key = "pot", caption = "POT" },
-    { key = "points", caption = "POINTS" },
-}
-local cellValue: { [string]: TextLabel } = {}
-for i, cell in CELLS do
-    local holder = Instance.new("Frame")
-    holder.Name = cell.caption
-    holder.Position = UDim2.fromScale((i - 1) / 3, 0)
-    holder.Size = UDim2.fromScale(1 / 3, 1)
-    holder.BackgroundTransparency = 1
-    holder.Parent = plate
+local streakLabel = Instance.new("TextLabel")
+streakLabel.Name = "Streak"
+streakLabel.Size = UDim2.new(1, 0, 0, PLATE_ROW_H)
+streakLabel.Position = UDim2.fromOffset(0, 0)
+streakLabel.BackgroundTransparency = 1
+streakLabel.TextColor3 = GOLD
+streakLabel.TextSize = 14
+streakLabel.Font = Enum.Font.GothamBold
+streakLabel.Text = ""
+streakLabel.Visible = false
+streakLabel.Parent = plate
 
-    local caption = Instance.new("TextLabel")
-    caption.Name = "Caption"
-    caption.Position = UDim2.fromOffset(0, 5)
-    caption.Size = UDim2.new(1, 0, 0, 11)
-    caption.BackgroundTransparency = 1
-    caption.TextColor3 = GOLD
-    caption.TextTransparency = 0.25
-    caption.TextSize = 10
-    caption.Font = Enum.Font.GothamBold
-    caption.Text = cell.caption
-    caption.Parent = holder
+local pointsLabel = Instance.new("TextLabel")
+pointsLabel.Name = "Points"
+pointsLabel.AnchorPoint = Vector2.new(0, 1)
+pointsLabel.Position = UDim2.fromScale(0, 1)
+pointsLabel.Size = UDim2.new(1, 0, 0, PLATE_ROW_H)
+pointsLabel.BackgroundTransparency = 1
+pointsLabel.TextColor3 = INK_CREAM
+pointsLabel.TextSize = 15
+pointsLabel.Font = Enum.Font.GothamBold
+pointsLabel.Text = "0"
+pointsLabel.Parent = plate
 
-    local value = Instance.new("TextLabel")
-    value.Name = "Value"
-    value.AnchorPoint = Vector2.new(0, 1)
-    value.Position = UDim2.new(0, 0, 1, -5)
-    value.Size = UDim2.new(1, 0, 0, 22)
-    value.BackgroundTransparency = 1
-    value.TextColor3 = INK_CREAM
-    value.TextSize = 20
-    value.Font = Enum.Font.GothamBold
-    value.Text = "0"
-    value.Parent = holder
-
-    cellValue[cell.key] = value
+-- WHERE THE PLATE SITS IS MEASURED, NOT PREDICTED.
+--
+-- Roblox's default TouchJump sizes the jump button 70px on screens <=500px tall and 120px
+-- above that, and positions it UDim2.new(1, -(size*1.5-10), 1, -size-20). Those are current
+-- defaults, not a contract: they differ by screen size, they have changed before, and nothing
+-- stops them changing again. So rather than encoding that arithmetic, the plate reads the real
+-- button and sits PLATE_JUMP_GAP above its measured top edge.
+--
+-- The fallback is the bottom-right corner, which is where a desktop client — no TouchGui, no
+-- jump button at all — should put it anyway.
+local function jumpButton(): GuiObject?
+    local touchGui = playerGui:FindFirstChild("TouchGui")
+    local frame = touchGui and touchGui:FindFirstChild("TouchControlFrame")
+    return frame and frame:FindFirstChild("JumpButton") :: GuiObject?
 end
+
+-- This function MEASURES; HudLayout.plateBottomOffset decides. The arithmetic (the fallback,
+-- and the clamp against a stale AbsolutePosition) lives there because it is pure and therefore
+-- testable, and this file is not.
+local function placePlate()
+    local jump = jumpButton()
+    local jumpTop: number? = if jump and jump.AbsoluteSize.Y > 0 then jump.AbsolutePosition.Y else nil
+    local guiBottom = gui.AbsolutePosition.Y + gui.AbsoluteSize.Y
+    plate.Position = UDim2.new(1, -EDGE, 1, -HudLayout.plateBottomOffset(guiBottom, jumpTop))
+end
+
+-- The jump button is not there at require time on every client, it resizes when the viewport
+-- crosses the small-screen threshold, and it disappears entirely if the player docks a
+-- keyboard. Watch all three rather than measuring once.
+local jumpWatch: { RBXScriptConnection } = {}
+local function rewatchJump()
+    for _, c in jumpWatch do
+        c:Disconnect()
+    end
+    table.clear(jumpWatch)
+    local jump = jumpButton()
+    if jump then
+        table.insert(jumpWatch, jump:GetPropertyChangedSignal("AbsolutePosition"):Connect(placePlate))
+        table.insert(jumpWatch, jump:GetPropertyChangedSignal("AbsoluteSize"):Connect(placePlate))
+    end
+    placePlate()
+end
+
+rewatchJump()
+gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(rewatchJump)
+playerGui.ChildAdded:Connect(function(child)
+    if child.Name == "TouchGui" then
+        -- TouchControlFrame is built a frame or two after TouchGui itself.
+        task.defer(rewatchJump)
+    end
+end)
+playerGui.ChildRemoved:Connect(function(child)
+    if child.Name == "TouchGui" then
+        task.defer(rewatchJump)
+    end
+end)
 
 -- ===== Throw area: bottom-right, inboard of the jump button =====
 local throwArea = Instance.new("Frame")
@@ -573,7 +611,9 @@ stroke(escalationPrompt, WASHI, 2, 0.2)
 local toast = Instance.new("TextLabel")
 toast.Name = "Toast"
 toast.AnchorPoint = Vector2.new(0.5, 0)
-toast.Position = UDim2.new(0.5, 0, 0, EDGE + PLATE_H + 8)
+-- The plate has vacated top-centre for the right margin (Task 7), so there is no PLATE_H left
+-- to offset against. Sits at EDGE for now; Task 9 owns making this opaque per the design's §3.
+toast.Position = UDim2.new(0.5, 0, 0, EDGE)
 toast.Size = UDim2.new(0.5, 0, 0, 26)
 toast.AutomaticSize = Enum.AutomaticSize.Y -- a long notice wraps and grows rather than clipping
 toast.BackgroundColor3 = WASHI
@@ -639,8 +679,13 @@ local function render(inputs: any, aux: any)
     local view = HudModel.view(inputs, aux.session)
     canThrow = view.throwsEnabled
 
-    cellValue.streak.Text = tostring(view.plate.streak)
-    cellValue.points.Text = tostring(view.plate.points)
+    -- A "×0" is noise on a display whose whole job is to be ignorable, so the streak row only
+    -- exists when there is a streak — and the plate shrinks to one row when it goes.
+    local hasStreak = view.plate.streak > 0
+    streakLabel.Visible = hasStreak
+    streakLabel.Text = if hasStreak then `×{view.plate.streak}` else ""
+    pointsLabel.Text = tostring(view.plate.points)
+    plate.Size = UDim2.fromOffset(PLATE_W, if hasStreak then PLATE_ROW_H * 2 else PLATE_ROW_H)
 
     setBank(view.bankVisible, view.pot, view.potPulses)
 
