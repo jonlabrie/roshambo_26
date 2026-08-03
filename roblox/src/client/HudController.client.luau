@@ -19,7 +19,8 @@
 -- Every information element MUST stay Active = false. Frames and labels default to false, but
 -- setting it true anywhere here punches a permanent hole in the camera-drag surface, which is
 -- the whole right side of the screen on touch. The whole interactive budget is: the three throw
--- buttons and the one bank button (see `setBank`) — the plate is a pure display now, not a door.
+-- buttons, the one bank button (see `setBank`), and the ledger door (see "The ledger door")
+-- — the plate is a pure display now, not a door; that job moved to its own dedicated button.
 --
 -- This file RENDERS HudModel; it never re-derives it. main.client.luau owns the wiring and fires
 -- EventBus.HudState(inputs, aux):
@@ -346,8 +347,9 @@ for i, sym in THROWS do
     -- The chosen tile's glow. A SIBLING of the button at ZIndex 0, not a child: under the default
     -- Sibling ZIndexBehavior a child always draws ABOVE its parent, so a halo parented to the button
     -- would sit on top of the glyph instead of behind the tile. A Frame, and left at its default
-    -- Active = false — the interactive budget on this surface is the three buttons, the plate and
-    -- the one bank button, and every sinking pixel is a permanent hole in the camera-drag surface.
+    -- Active = false — the interactive budget on this surface is the three buttons, the one bank
+    -- button and the ledger door, and every sinking pixel is a permanent hole in the camera-drag
+    -- surface.
     local halo = Instance.new("Frame")
     halo.Name = sym .. "Halo"
     halo.AnchorPoint = Vector2.new(0, 0)
@@ -446,13 +448,20 @@ end
 -- landing in that window vanished without a trace. That is the "I have to click the throw button
 -- twice, but there's nothing indicating that" report. The depress fires on EVERY press, accepted or
 -- refused; the blue light only on an accepted one.
-local function depress(t: ThrowTile)
-    t.scale.Scale = 1
-    local down = TweenService:Create(t.scale, PRESS_DOWN, { Scale = PRESS_SCALE })
+-- The tween itself, factored out from `depress` so the ledger door (below) gets the same
+-- press feedback without needing a full ThrowTile — every AutoButtonColor = false button in
+-- this file goes through one of these two, never silent on press.
+local function pressDepress(scale: UIScale)
+    scale.Scale = 1
+    local down = TweenService:Create(scale, PRESS_DOWN, { Scale = PRESS_SCALE })
     down.Completed:Connect(function()
-        TweenService:Create(t.scale, PRESS_UP, { Scale = 1 }):Play()
+        TweenService:Create(scale, PRESS_UP, { Scale = 1 }):Play()
     end)
     down:Play()
+end
+
+local function depress(t: ThrowTile)
+    pressDepress(t.scale)
 end
 
 -- How long the optimistic light survives without the pick coming back on HudState. In the normal
@@ -555,6 +564,52 @@ local function setBank(visible: boolean, pot: number, pulses: boolean)
         potPulse = t
     end
 end
+
+-- ===== The ledger door =====
+-- The fourth and last interactive element in the minimal HUD, after the three throws and the
+-- bank button. It exists because moving the plate into the jump/camera strip made the plate
+-- inert, and a tap on the plate had been the ledger's ONLY entry point — deliberately, so that
+-- maximal cost no persistent button. That trade is now spent: the strip cannot host a sinking
+-- rectangle, so the door becomes a button.
+--
+-- Placed AGAINST the cluster rather than into a corner. The teahouse toggle that used to live in
+-- the bottom-right corner was deleted because it collided with the throw row on a narrow
+-- viewport; anchoring to the cluster's own left edge means this moves with the cluster and
+-- cannot repeat that.
+local LEDGER_SIZE = if TOUCH then HudLayout.BTN_H_TOUCH else 40
+local LEDGER_GAP = 8
+
+local ledgerButton = Instance.new("TextButton")
+ledgerButton.Name = "LedgerDoor"
+ledgerButton.AnchorPoint = Vector2.new(1, 1)
+-- Bottom-aligned with the throw button row, not the tape: `throwArea` spans
+-- [EDGE, EDGE + AREA_H] from the gui's bottom edge, and since Task 6 the buttons sit at the
+-- TOP of that frame — so the button row's own bottom edge is EDGE + AREA_H - BTN_H from the
+-- bottom. Inboard of the throw cluster by its own width plus LEDGER_GAP, off the SAME right
+-- edge (1 - JUMP_CLEARANCE) the cluster and the bank button both register to.
+ledgerButton.Position = UDim2.new(1 - JUMP_CLEARANCE, -(AREA_W + LEDGER_GAP), 1, -(EDGE + AREA_H - BTN_H))
+ledgerButton.Size = UDim2.fromOffset(LEDGER_SIZE, LEDGER_SIZE)
+ledgerButton.BackgroundColor3 = WASHI
+ledgerButton.BackgroundTransparency = 0.3
+ledgerButton.BorderSizePixel = 0
+ledgerButton.AutoButtonColor = false
+ledgerButton.TextColor3 = INK_CREAM
+ledgerButton.TextSize = 20
+ledgerButton.Font = Enum.Font.GothamBold
+ledgerButton.Text = "≡"
+ledgerButton.Parent = gui
+corner(ledgerButton, 8)
+stroke(ledgerButton, GOLD, 1, 0.3)
+
+local ledgerScale = Instance.new("UIScale")
+ledgerScale.Parent = ledgerButton
+
+ledgerButton.MouseButton1Down:Connect(function()
+    pressDepress(ledgerScale)
+end)
+ledgerButton.MouseButton1Click:Connect(function()
+    EventBus.OpenLedger:Fire()
+end)
 
 -- ===== Round timer: a hairline along the bottom edge, depleting =====
 local timer = Instance.new("Frame")
