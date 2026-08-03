@@ -185,6 +185,33 @@ back to the bottom-right corner at `EDGE`, which is free on that platform. This 
 placement in the HUD that depends on something Roblox owns, so it is the one placement that
 must not hard-code Roblox's arithmetic.
 
+### The ledger needs its own door
+
+Moving the plate broke something the design had been quietly relying on. **A tap on the plate
+was the only way to open the ledger** — deliberately, so that the maximal panel cost no
+persistent button anywhere on screen (`LedgerController`'s own header comment says exactly
+this). The plate was "the only interactive information element in the whole design".
+
+The premise for putting it in the jump/camera strip was that it holds no interactive elements.
+That premise was wrong about the plate as it existed, and taking it at face value left
+`EventBus.OpenLedger` with two listeners and **zero firing sites** — the ledger unreachable, and
+with it MY TEAHOUSE, the preferences footer and every lifetime statistic.
+
+The owner's ruling: **the plate becomes genuinely inert, and a small dedicated icon opens the
+ledger.** The alternative — keeping the plate tappable — would have put a sinking rectangle in
+the camera-drag strip, which is the one thing that strip cannot host.
+
+- a `≡` button, square, sized to the same touch floor as a throw button
+- inboard of the throw cluster, bottom-aligned with the throw button row so it sits at the same
+  reach as the throws
+- it is the fourth and last interactive element in the minimal HUD, after the three throws and
+  the bank button
+
+This concedes the "no persistent button" principle that deleted the teahouse toggle. It is
+conceded knowingly: that toggle was removed because it *collided* with the throw row on a narrow
+viewport, not because a button was unaffordable. This one is placed against the cluster rather
+than into a corner, so it moves with the cluster and cannot collide with it.
+
 ### The pot becomes one button
 
 The slot above the throw row carries a single button reading **`BANK 27 POINTS`**, visible
@@ -426,6 +453,9 @@ Not automatable, and therefore the owner's Studio gate: whether the dimmed glyph
 9. **`UIStroke` never goes on a `TextLabel`.** Contrast comes from a backing.
 10. **The teahouse becomes a takeover**, and its ✕ returns to play.
 11. **Fates are parked at `EffectRegistry.LOSS`**, one data change, machinery intact.
+12. **The ledger gets a dedicated `≡` button** and the plate becomes genuinely inert. Found only
+    when the plate moved: it had been the ledger's only door, and this spec's own premise —
+    "there are no interactive elements in this display" — was false about the thing it described.
 
 ## Open
 
