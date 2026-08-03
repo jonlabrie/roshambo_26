@@ -45,6 +45,8 @@ local player = Players.LocalPlayer
 local TAPE_N = 5 -- how many tape entries the HUD can show
 local TICK = 0.1 -- HudState cadence; the round timer is a depleting hairline, so keep it smooth
 local REVEAL_SAFETY = 3 -- seconds before a dropped drumRest cue is assumed lost
+local BANK_TOAST_FAILOPEN_SECONDS = 1 -- see pendingBankToast: a missing OnboardingController ack
+-- must never permanently silence the bank toast
 
 -- The tape renders DIRECTLY from the authoritative World-Throw tape (newest-first, deduped, each
 -- entry carrying a round id), carried by both RoundUpdate (every phase) and BoardData (on join +
@@ -85,7 +87,11 @@ local knownSeenBeats: { string } = {}
 -- `EventBus.OnboardShown`'s echo (see below): true once the controller reports "shown" or
 -- "alreadySeen" (nothing left to teach), and left false on "dropped" so the next natural
 -- occurrence of that event (next round's throwsUnlocked, the next win, the next bank) retries.
-local resolved = { join = false, throwsUnlocked = false, win = false, bank = false }
+-- `{ [string]: boolean }`, not the inferred fixed-shape record: `resolved[event]` is indexed
+-- dynamically by whatever string `EventBus.OnboardShown` echoes back, and under `--!strict` a
+-- fixed-shape table has no `[string]` indexer — an event name that wasn't one of the four
+-- literal keys below would silently CREATE a new field rather than being caught.
+local resolved: { [string]: boolean } = { join = false, throwsUnlocked = false, win = false, bank = false }
 
 -- Edge-detector for `throwsUnlocked`: without it, firing on every publish() tick (10Hz) while
 -- throws stay enabled across a whole round would ask the controller ten times a second for no
@@ -413,8 +419,24 @@ ProfileUpdate.OnClientEvent:Connect(function(p)
         if resolved.bank then
             toast(`💰 BANKED {bankedNow} — that's yours to keep`)
         else
-            pendingBankToast = `💰 BANKED {bankedNow} — that's yours to keep`
+            local line = `💰 BANKED {bankedNow} — that's yours to keep`
+            pendingBankToast = line
             EventBus.Onboard:Fire("bank", knownSeenBeats)
+            -- FAIL OPEN. If OnboardingController never acks — dead, not yet connected, or errored
+            -- somewhere in its require/WaitForChild block before it ever reaches its
+            -- EventBus.Onboard:Connect — `pendingBankToast` would strand forever, and because
+            -- `resolved.bank` also never latches, EVERY subsequent bank would go silent too, not
+            -- just this one. A missing onboarding controller must never silence banking. Under
+            -- normal operation the ack lands on the next resumption (BindableEvents are deferred,
+            -- not synchronous, but not slow), so this is a no-op almost always — `line` is
+            -- compared by identity-of-value to the CURRENT pending toast so it never clobbers a
+            -- newer one this delay wasn't for.
+            task.delay(BANK_TOAST_FAILOPEN_SECONDS, function()
+                if pendingBankToast == line then
+                    pendingBankToast = nil
+                    toast(line)
+                end
+            end)
         end
     end
     publishLedger()

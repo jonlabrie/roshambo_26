@@ -169,7 +169,12 @@ local STATIC_ANCHORS: { [string]: { point: Vector2, offset: UDim2, width: number
         width = CARD_W,
     },
 }
-local DRUM_FALLBACK = { point = Vector2.new(0.5, 0), offset = UDim2.new(0.5, 0, 0, 140) }
+-- Last-resort ONLY: used when there is no `workspace.CurrentCamera` at all to clamp against
+-- (should not happen in a live game — Roblox always has a camera once a character exists — but a
+-- card that cannot find one must still show SOMEWHERE rather than nowhere). Every other path
+-- below runs through the same safe band, including the fallback while the drum has never been
+-- tracked, so this literal is never reachable in ordinary play.
+local DRUM_LAST_RESORT = { point = Vector2.new(0.5, 0), offset = UDim2.new(0.5, 0, 0, 140) }
 
 -- The band the minimal HUD does NOT own, in top-left screen space (Y grows downward, same
 -- convention WorldToViewportPoint returns). Round-1 review caught that clamping only to the
@@ -178,12 +183,27 @@ local DRUM_FALLBACK = { point = Vector2.new(0.5, 0), offset = UDim2.new(0.5, 0, 
 -- anywhere, including straight over the throw buttons or the plate. `PLATE_BOTTOM` is where the
 -- plate's own footprint ends; `CLUSTER_TOP_FROM_BOTTOM` is where the tape+buttons+slot cluster's
 -- footprint begins, measured up from the screen's bottom edge (mirrors HudController's own EDGE /
--- AREA_H / SLOT_H numbers above).
+-- AREA_H / SLOT_H numbers above). Round-2 review caught that this band was built but never
+-- actually applied to the NOT-YET-TRACKED fallback — only to a live projection — leaving the
+-- exact same "card covers BANK THESE" failure mode reachable through a slower path (join fires on
+-- the first RoundUpdate, which can beat the drum's replication).
 local PLATE_BOTTOM = EDGE + PLATE_H
 local CLUSTER_TOP_FROM_BOTTOM = EDGE + AREA_H + ROW_GAP + SLOT_H
-local SAFE_MARGIN = 16
+local SAFE_MARGIN = 24 -- round-2: was 16, widened to also give the toast strip more clearance
 local DRUM_BUBBLE_LIFT = 36 -- vertical gap between the projected point and the card's bottom edge
-local MIN_CARD_H = 60 -- floor for AbsoluteSize.Y before AutomaticSize has laid out even once
+local MIN_CARD_H = 90 -- floor for AbsoluteSize.Y before AutomaticSize has laid out even once —
+-- round-2: was 60, under the card's real ~80-90px, so the very first place() under-clamped by a
+-- frame or two
+
+-- The same clamp band `place()` uses for a live projection, factored out so the NOT-YET-TRACKED
+-- fallback (drum unresolved, or off-camera and never once seen) runs through it too rather than
+-- reusing an unclamped fixed position.
+local function safeYBounds(vp: Vector2): (number, number)
+    local cardH = math.max(card.AbsoluteSize.Y, MIN_CARD_H)
+    local minY = PLATE_BOTTOM + SAFE_MARGIN + cardH
+    local maxY = math.max(minY, vp.Y - CLUSTER_TOP_FROM_BOTTOM - SAFE_MARGIN)
+    return minY, maxY
+end
 
 -- Resolved defensively (10s timeout, never yields the whole script) — the physical prop is
 -- Rojo-managed map content and should already exist, but a card that cannot find it must fall
@@ -226,33 +246,51 @@ end
 --      the drum happens to be behind the camera — it HOLDS the last good clamped position. Only
 --      before the very first successful projection does it show the fallback at all, so the card
 --      is never simply missing; once it has a real position, it never snaps away from one.
-local function trackDrum()
-    local function place()
-        local cam = workspace.CurrentCamera
-        local at = drumPart
-        if cam and at then
-            local screen, onScreen = cam:WorldToViewportPoint(at.Position)
-            if onScreen then
-                local vp = cam.ViewportSize
-                local cardH = math.max(card.AbsoluteSize.Y, MIN_CARD_H)
-                local minY = PLATE_BOTTOM + SAFE_MARGIN + cardH
-                local maxY = math.max(minY, vp.Y - CLUSTER_TOP_FROM_BOTTOM - SAFE_MARGIN)
-                local half = DRUM_CARD_W * 0.5 + 8
-                local x = math.clamp(screen.X, half, math.max(half, vp.X - half))
-                local y = math.clamp(screen.Y - DRUM_BUBBLE_LIFT, minY, maxY)
-                card.AnchorPoint = Vector2.new(0.5, 1) -- bubble ABOVE the projected point
-                card.Position = UDim2.fromOffset(x, y)
-                drumEverTracked = true
-                return
-            end
-        end
+--
+-- Round-2 review found a third case the first two hadn't covered: NOT-YET-TRACKED is reachable in
+-- ordinary play — `join` fires on the very first RoundUpdate, which can beat the
+-- RoshamboStage → ThrowDrum → Drum replication chain `drumPart` waits on — and until round-1's
+-- fix, that path used `DRUM_LAST_RESORT` UNCLAMPED, so the exact failure Important 2 named (the
+-- card covering BANK THESE / the fate prompt) was still reachable through a slower door. There is
+-- now exactly one place a card can appear un-safe-banded: no camera at all, which does not happen
+-- in a live game.
+local function place()
+    local cam = workspace.CurrentCamera
+    if not cam then
         if not drumEverTracked then
-            card.AnchorPoint = DRUM_FALLBACK.point
-            card.Position = DRUM_FALLBACK.offset
+            card.AnchorPoint = DRUM_LAST_RESORT.point
+            card.Position = DRUM_LAST_RESORT.offset
         end
-        -- else: hold whatever position was last set — do not teleport to the fallback and back
-        -- as the camera swings the drum in and out of view.
+        return
     end
+    local vp = cam.ViewportSize
+    local at = drumPart
+    if at then
+        local screen, onScreen = cam:WorldToViewportPoint(at.Position)
+        if onScreen then
+            local minY, maxY = safeYBounds(vp)
+            local half = DRUM_CARD_W * 0.5 + 8
+            local x = math.clamp(screen.X, half, math.max(half, vp.X - half))
+            local y = math.clamp(screen.Y - DRUM_BUBBLE_LIFT, minY, maxY)
+            card.AnchorPoint = Vector2.new(0.5, 1) -- bubble ABOVE the projected point
+            card.Position = UDim2.fromOffset(x, y)
+            drumEverTracked = true
+            return
+        end
+    end
+    if not drumEverTracked then
+        -- Not yet resolved, or resolved but off-camera and never once seen: still safe-banded and
+        -- horizontally centred, sitting at the TOP of the band (closest to the plate, since that is
+        -- the more natural resting spot for "the arena is live" than hugging the throw cluster).
+        local minY = safeYBounds(vp)
+        card.AnchorPoint = Vector2.new(0.5, 1)
+        card.Position = UDim2.fromOffset(vp.X * 0.5, minY)
+    end
+    -- else: hold whatever position was last set — do not teleport to the fallback and back as the
+    -- camera swings the drum in and out of view.
+end
+
+local function trackDrum()
     place()
     drumHeartbeat = RunService.Heartbeat:Connect(place)
 end
