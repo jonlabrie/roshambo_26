@@ -51,3 +51,18 @@ describe("OnboardingBeats", function()
         expect(b.event).toBe("win")
     end)
 end)
+
+describe("OnboardingBeats — anchors match what the HUD actually builds", function()
+    test("no beat anchors to a plate that has left the top band", function()
+        for _, beat in Beats.BEATS do
+            expect(beat.anchor ~= "plate").toBe(true)
+        end
+    end)
+
+    test("every anchor is one the controller knows", function()
+        local known = { drum = true, throwArea = true, potIndicator = true, wallet = true }
+        for _, beat in Beats.BEATS do
+            expect(known[beat.anchor] == true).toBe(true)
+        end
+    end)
+end)

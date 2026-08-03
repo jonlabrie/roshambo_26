@@ -69,24 +69,13 @@ local EDGE = HudLayout.EDGE
 local JUMP_CLEARANCE = HudLayout.JUMP_CLEARANCE
 local AREA_H = if TOUCH then HudLayout.AREA_H_TOUCH else HudLayout.AREA_H
 local ROW_GAP = HudLayout.ROW_GAP
--- TEMPORARY BRIDGE (Task 6 → Task 10). Task 3 RENAMED SLOT_H/SLOT_GAP to BANK_H/BANK_GAP and
--- deleted PLATE_BOTTOM outright, so all three reads below returned nil and the UDim2 arithmetic
--- they feed made this whole file fail to load — a dead onboarding controller that no gate we run
--- can see (Lune never loads .client.luau, selene does not resolve cross-module field types).
---
--- Task 10 re-derives this file's safe band properly: SLOT_* become BANK_*, and PLATE_BOTTOM is
--- replaced by a toast reservation, because the plate has left the top of the screen entirely.
--- These literals exist only so the branch stays runnable in the interval, and they carry the
--- values those constants held.
-local SLOT_H = HudLayout.BANK_H
-local SLOT_GAP = HudLayout.BANK_GAP
--- Declared HERE, above STATIC_ANCHORS, because that table reads it — it used to be defined much
--- further down beside CLUSTER_TOP_FROM_BOTTOM, which worked only while the anchors read
--- HudLayout directly. 58 is what HudLayout.PLATE_BOTTOM held (EDGE 12 + PLATE_H 46).
-local PLATE_BOTTOM = 58
+-- The bank button's row, directly above the throw cluster — the same numbers HudController's own
+-- bank button reads. Declared here, above STATIC_ANCHORS, because that table reads them.
+local BANK_H = HudLayout.BANK_H
+local BANK_GAP = HudLayout.BANK_GAP
 
 local CARD_W = 220
-local PLATE_CARD_W = 260
+local WALLET_CARD_W = 260
 local DRUM_CARD_W = 220
 
 -- ===== Card: one TextButton (the dismiss target) + two non-Active labels =====
@@ -177,41 +166,50 @@ hintLabel.Text = "TAP TO DISMISS"
 hintLabel.Parent = card
 
 -- ===== Anchors =====
--- `OnboardingBeats` names four anchors: `drum`, `throwArea`, `potIndicator`, `plate`. Three are
+-- `OnboardingBeats` names four anchors: `drum`, `throwArea`, `potIndicator`, `wallet`. Three are
 -- static offsets from a screen edge, matching where HudController actually put the thing they
 -- point at. `drum` is the one exception — the drum is a real object in the world
 -- (`Workspace.RoshamboStage.ThrowDrum.Drum`, see DrumController), so it is tracked live via
 -- `WorldToViewportPoint` rather than guessed at a fixed screen fraction.
 --
--- Nothing here ever covers the throw buttons: `throwArea` and `potIndicator` sit ABOVE the whole
--- tape+buttons+slot stack (offset clears the slot's full footprint even when the slot itself is
--- empty), and `plate` sits BELOW the plate, clear of both the plate button and the toast that
--- shares that same strip of screen.
+-- Nothing here ever covers the throw buttons, the bank button, the ≡ ledger door or the tape:
+-- `throwArea` and `potIndicator` sit ABOVE the whole bank+throws+tape cluster (offset clears its
+-- full footprint via EDGE/AREA_H/ROW_GAP/BANK_H/BANK_GAP, the same numbers HudController's own
+-- stack is built from). `wallet` sits at the SAME bottom row the wallet plate itself occupies
+-- (D = EDGE from the bottom, matching the tape) but pinned to the screen's LEFT margin, which the
+-- cluster never reaches — the cluster is held inboard of `1 - JUMP_CLEARANCE` on the right. A
+-- card level with the plate is never in the cluster's own column, so it cannot grow upward into a
+-- live button no matter how tall its text makes it.
 local STATIC_ANCHORS: { [string]: { point: Vector2, offset: UDim2, width: number } } = {
-    plate = {
-        point = Vector2.new(0.5, 0),
-        offset = UDim2.new(0.5, 0, 0, PLATE_BOTTOM + 60),
-        width = PLATE_CARD_W,
-    },
-    -- Both sit above the WHOLE bottom-right cluster — tape+buttons AND the slot above them —
-    -- not just above the tape. The slot's Frame occupies that space whether or not its pot/fate
-    -- tenant is currently Visible (HudController never repositions it, only toggles children), so
-    -- a card that only cleared the tape would sit inside the slot's footprint. That is harmless
-    -- while the slot is empty, but `throwArea`'s card can outlive its dismiss window into a WIN
-    -- (the slot can turn on WHILE this card is still up — beats do not queue, but a real, un-
-    -- dismissed card does not disappear just because a later event was dropped) and BANK THESE is
-    -- a live button underneath: an overlap there would both hide it and steal its taps, being
-    -- ZIndex 5 above the slot's default. Same offset as `potIndicator` on purpose — they are never
-    -- shown at once, so sharing the spot is a non-issue, and it is one fewer number to keep in step.
+    -- Both sit above the WHOLE bottom-right cluster — tape+buttons AND the bank row above them —
+    -- not just above the tape. The bank row is reserved whether or not its button is currently
+    -- Visible (HudController never repositions it, only toggles it), so a card that only cleared
+    -- the tape would sit inside the bank row's footprint. That is harmless while there is no pot,
+    -- but `throwArea`'s card can outlive its dismiss window into a WIN (the bank button can turn
+    -- on WHILE this card is still up — beats do not queue, but a real, un-dismissed card does not
+    -- disappear just because a later event was dropped) and BANK n POINTS is a live button
+    -- underneath: an overlap there would both hide it and steal its taps, being ZIndex 5 above the
+    -- HUD's default. Same offset as `potIndicator` on purpose — they are never shown at once, so
+    -- sharing the spot is a non-issue, and it is one fewer number to keep in step.
     throwArea = {
         point = Vector2.new(1, 1),
-        offset = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE + AREA_H + ROW_GAP + SLOT_H + SLOT_GAP)),
+        offset = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE + AREA_H + ROW_GAP + BANK_H + BANK_GAP)),
         width = CARD_W,
     },
     potIndicator = {
         point = Vector2.new(1, 1),
-        offset = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE + AREA_H + ROW_GAP + SLOT_H + SLOT_GAP)),
+        offset = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE + AREA_H + ROW_GAP + BANK_H + BANK_GAP)),
         width = CARD_W,
+    },
+    -- Bottom-left, level with the tape/plate row (D = EDGE from the bottom; AnchorPoint's Y = 1
+    -- puts the given offset at the card's bottom edge) but anchored from the screen's LEFT edge
+    -- rather than the cluster's right one — see the comment above this table for why that is what
+    -- keeps it clear of every live element. EDGE is the same margin HudController uses on every
+    -- screen edge, including the tape's own.
+    wallet = {
+        point = Vector2.new(0, 1),
+        offset = UDim2.new(0, EDGE, 1, -EDGE),
+        width = WALLET_CARD_W,
     },
 }
 -- Last-resort ONLY: used when there is no `workspace.CurrentCamera` at all to clamp against
@@ -222,16 +220,21 @@ local STATIC_ANCHORS: { [string]: { point: Vector2, offset: UDim2, width: number
 local DRUM_LAST_RESORT = { point = Vector2.new(0.5, 0), offset = UDim2.new(0.5, 0, 0, 140) }
 
 -- The band the minimal HUD does NOT own, in GUI SPACE (this ScreenGui's own; Y grows downward, and
--- the topbar inset is already excluded — see `guiCanvas`). Round-1 review caught that clamping only to the
--- viewport edges was not enough: the join card is the first thing a new player sees, stays up
--- until tapped, and the camera is theirs to swing for as long as it's up — so the drum can project
--- anywhere, including straight over the throw buttons or the plate. `PLATE_BOTTOM` is where the
--- plate's own footprint ends; `CLUSTER_TOP_FROM_BOTTOM` is where the tape+buttons+slot cluster's
--- footprint begins, measured up from the screen's bottom edge (mirrors HudController's own EDGE /
--- AREA_H / SLOT_H numbers, now shared). Round-2 review caught that this band was built but never
--- actually applied to the NOT-YET-TRACKED fallback — only to a live projection — leaving the
--- exact same "card covers BANK THESE" failure mode reachable through a slower path (join fires on
--- the first RoundUpdate, which can beat the drum's replication).
+-- the topbar inset is already excluded — see `guiCanvas`). Round-1 review caught that clamping only
+-- to the viewport edges was not enough: the join card is the first thing a new player sees, stays
+-- up until tapped, and the camera is theirs to swing for as long as it's up — so the drum can
+-- project anywhere, including straight over the throw buttons or the toast. `TOAST_BAND` is a
+-- reservation for the toast (spec §2, 2026-08-03: the plate left the top of the screen entirely,
+-- so the toast — which sits at `EDGE` and grows downward with `AutomaticSize` — is the only thing
+-- left up there for a card to clear); it is a reservation, not a measurement, because a card
+-- landing on a transient notice would hide exactly the line explaining what just happened.
+-- `CLUSTER_TOP_FROM_BOTTOM` is where the bank+throws+tape cluster's footprint begins, measured up
+-- from the screen's bottom edge (mirrors HudController's own EDGE / AREA_H / BANK_H numbers, now
+-- shared). Round-2 review caught that this band was built but never actually applied to the
+-- NOT-YET-TRACKED fallback — only to a live projection — leaving the exact same "card covers
+-- BANK n POINTS" failure mode reachable through a slower path (join fires on the first
+-- RoundUpdate, which can beat the drum's replication).
+local TOAST_BAND = 64
 local CLUSTER_TOP_FROM_BOTTOM = if TOUCH
     then HudLayout.CLUSTER_TOP_FROM_BOTTOM_TOUCH
     else HudLayout.CLUSTER_TOP_FROM_BOTTOM
@@ -270,7 +273,7 @@ end
 -- is enough for a card to sit on top of the throw/slot cluster despite SAFE_MARGIN.
 local function safeYBounds(canvas: Vector2): (number, number)
     local cardH = math.max(card.AbsoluteSize.Y, MIN_CARD_H)
-    local minY = PLATE_BOTTOM + SAFE_MARGIN + cardH
+    local minY = TOAST_BAND + SAFE_MARGIN + cardH
     local maxY = math.max(minY, canvas.Y - CLUSTER_TOP_FROM_BOTTOM - SAFE_MARGIN)
     return minY, maxY
 end
@@ -307,11 +310,11 @@ end
 
 -- Live-tracks the drum's screen position as a speech-bubble sitting just above it. Two rules on
 -- top of "stay inside the viewport", both added after round-1 review:
---   1. The clamp band is the HUD's DEAD ZONE, not the raw viewport — below the plate's footprint
---      and above the throw+slot cluster's — and it accounts for the CARD'S OWN measured height
---      (AnchorPoint is (0.5, 1), so `y` is the card's BOTTOM edge; the card's top is `y - height`,
---      and that is the edge that must clear the plate). A card that only avoided screen edges
---      could still land squarely on a live button.
+--   1. The clamp band is the HUD's DEAD ZONE, not the raw viewport — below the toast's reserved
+--      band and above the bank+throws+tape cluster's — and it accounts for the CARD'S OWN measured
+--      height (AnchorPoint is (0.5, 1), so `y` is the card's BOTTOM edge; the card's top is
+--      `y - height`, and that is the edge that must clear the toast). A card that only avoided
+--      screen edges could still land squarely on a live button.
 --   2. Off-screen (or not-yet-resolved) does not teleport to the fixed fallback every frame while
 --      the drum happens to be behind the camera — it HOLDS the last good clamped position. Only
 --      before the very first successful projection does it show the fallback at all, so the card
@@ -354,7 +357,7 @@ local function place()
     end
     if not drumEverTracked then
         -- Not yet resolved, or resolved but off-camera and never once seen: still safe-banded and
-        -- horizontally centred, sitting at the TOP of the band (closest to the plate, since that is
+        -- horizontally centred, sitting at the TOP of the band (closest to the toast, since that is
         -- the more natural resting spot for "the arena is live" than hugging the throw cluster).
         local minY = safeYBounds(canvas)
         card.AnchorPoint = Vector2.new(0.5, 1)
@@ -376,9 +379,9 @@ local function positionCard(beat: any)
         return
     end
     -- An anchor OnboardingBeats names that this file does not recognise still deserves a visible,
-    -- dismissable card rather than one silently mispositioned at (0, 0) — fall back to the plate
-    -- slot, which is always a safe, on-screen, non-covering spot.
-    local a = STATIC_ANCHORS[beat.anchor] or STATIC_ANCHORS.plate
+    -- dismissable card rather than one silently mispositioned at (0, 0) — fall back to `throwArea`,
+    -- which sits above the whole cluster and is always a safe, on-screen, non-covering spot.
+    local a = STATIC_ANCHORS[beat.anchor] or STATIC_ANCHORS.throwArea
     card.Size = UDim2.fromOffset(a.width, 0)
     card.AnchorPoint = a.point
     card.Position = a.offset

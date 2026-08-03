@@ -21,7 +21,10 @@ OnboardingBeats.BEATS = {
         -- above the throw row. Renamed to name what is actually on screen today.
         anchor = "potIndicator",
     },
-    { id = "bank", event = "bank", copy = "Banked. That's yours to keep.", anchor = "plate" },
+    -- Was anchored "plate": the plate moved into the bottom row (spec §2, 2026-08-03) and is
+    -- normally hidden, so a card can no longer point at where it used to sit. "wallet" names what
+    -- this beat actually explains — the balance the plate displays — not a screen position.
+    { id = "bank", event = "bank", copy = "Banked. That's yours to keep.", anchor = "wallet" },
 } :: { Beat }
 
 function OnboardingBeats.next(seen: { string }, event: string): Beat?
