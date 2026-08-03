@@ -471,24 +471,43 @@ bankButton.Parent = gui
 corner(bankButton, 8)
 stroke(bankButton, GOLD, 1, 0.3)
 
+-- 3^n runs long fast (the old potFigure's note): BANK 19683 POINTS already measures ~150px at
+-- 15px GothamBold, and the pot only grows from there. TextScaled + a MaxTextSize constraint lets
+-- the label shrink to fit a long figure instead of clipping it.
+bankButton.TextScaled = true
+do
+    local constraint = Instance.new("UITextSizeConstraint")
+    constraint.MaxTextSize = 15
+    constraint.Parent = bankButton
+end
+
 bankButton.MouseButton1Click:Connect(function()
     EventBus.HudBank:Fire()
 end)
 
--- The pulse says "this is unacknowledged", nothing more. Cancelled rather than left running,
--- and the transparency put back by hand, because Cancel leaves the property mid-tween.
+-- The pulse says "this is unacknowledged", nothing more. `setBank` runs at 10Hz off `render`
+-- (EventBus.HudState), so the tween is touched ONLY when the desired pulsing state actually
+-- changes — cancelling and restarting a 0.9s tween every 100ms would give it 3% of its travel
+-- and render as a static button with imperceptible jitter, not a pulse. This is why the code
+-- this replaced (`setSlot`) guarded its tween the same way.
 local potPulse: Tween? = nil
+local pulsing = false
 local function setBank(visible: boolean, pot: number, pulses: boolean)
     bankButton.Visible = visible
     if visible then
         bankButton.Text = `BANK {pot} POINTS`
     end
+    local want = visible and pulses
+    if want == pulsing then
+        return
+    end
+    pulsing = want
     if potPulse then
         potPulse:Cancel()
         potPulse = nil
-        bankButton.BackgroundTransparency = 0.15
+        bankButton.BackgroundTransparency = 0.15 -- Cancel leaves the property mid-tween
     end
-    if visible and pulses then
+    if want then
         local t = TweenService:Create(
             bankButton,
             TweenInfo.new(0.9, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true),
