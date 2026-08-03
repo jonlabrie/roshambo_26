@@ -86,13 +86,22 @@ local function execute(cue: any)
     end
 end
 
-RoundUpdate.OnClientEvent:Connect(function(info)
-    for _, kind in Choreo.phaseCues(info.phase) do
-        EventBus.Cue:Fire({ kind = kind })
-    end
-end)
+-- ===== THE DRUM-REST GATE =====
+-- RevealTheater lands about three seconds BEFORE the throw drum finishes turning, so scheduling the
+-- choreography off its arrival gave the round away while the wheel was still spinning: the petals
+-- (and the server's avatar grow alongside them) fired on a player whose result was not yet on the
+-- drum. main.client.luau and LanternController already hold their reveal and paint on the `drumRest`
+-- cue (fired by DrumController when the glide settles); this is the same treatment.
+--
+-- The cue offsets stay RELATIVE — `Choreo.revealCues` returns `atMs` measured from the start of the
+-- choreography, and the schedule is built at flush time so the whole sequence simply starts later
+-- with its internal timing intact. Building it early and subtracting would have been the way to
+-- shift it.
+local REVEAL_SAFETY = 3 -- seconds before a dropped drumRest cue is assumed lost
+local pendingReveal: any = nil
+local drumAtRest = false
 
-RevealTheater.OnClientEvent:Connect(function(reveal)
+local function runReveal(reveal: any)
     local cues = Choreo.revealCues(reveal, {
         staggerMaxMs = 600,
         random = math.random,
@@ -103,4 +112,49 @@ RevealTheater.OnClientEvent:Connect(function(reveal)
     for _, cue in cues do
         task.delay(cue.atMs / 1000, execute, cue)
     end
+end
+
+local function maybeRunReveal()
+    if pendingReveal and drumAtRest then
+        local reveal = pendingReveal
+        pendingReveal = nil
+        runReveal(reveal)
+    end
+end
+
+RoundUpdate.OnClientEvent:Connect(function(info)
+    for _, kind in Choreo.phaseCues(info.phase) do
+        EventBus.Cue:Fire({ kind = kind })
+    end
+    if info.phase == "ACTIVE" then
+        -- The drum respins for the new round, so last round's rest no longer counts as this one's.
+        -- `pendingReveal` is deliberately NOT cleared here: REVEAL is ~3s and so is the safety
+        -- below, so this boundary and that timer race — clearing would occasionally drop a round's
+        -- choreography entirely, which is the one outcome worse than playing it late. The safety
+        -- always consumes it within REVEAL_SAFETY, so there is nothing to clear that will not have
+        -- cleared itself.
+        drumAtRest = false
+    end
+end)
+
+EventBus.Cue.Event:Connect(function(cue)
+    if cue.kind == "drumRest" then
+        drumAtRest = true
+        maybeRunReveal()
+    end
+end)
+
+RevealTheater.OnClientEvent:Connect(function(reveal)
+    pendingReveal = reveal
+    maybeRunReveal() -- only runs if the drum has already settled
+    -- CHOREOGRAPHY THAT NEVER PLAYS IS WORSE THAN CHOREOGRAPHY THAT PLAYS EARLY. If the drumRest
+    -- cue is dropped — DrumController's own stall guard reset it, the client joined mid-glide —
+    -- run anyway. Compared by IDENTITY to the current pending reveal so a later round's payload,
+    -- already waiting on its own gate, is never flushed by an older round's timer.
+    task.delay(REVEAL_SAFETY, function()
+        if pendingReveal == reveal then
+            drumAtRest = true
+            maybeRunReveal()
+        end
+    end)
 end)
