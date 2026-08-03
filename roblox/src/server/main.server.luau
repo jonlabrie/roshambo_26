@@ -561,6 +561,7 @@ Players.PlayerRemoving:Connect(function(player)
     hudPrefs[tostring(player.UserId)] = nil
     ledgerCounters[tostring(player.UserId)] = nil
     lastLedgerFetch[tostring(player.UserId)] = nil
+    hudSeenBeats[tostring(player.UserId)] = nil
 end)
 
 local lastBoard: any = nil

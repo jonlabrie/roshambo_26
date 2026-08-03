@@ -25,7 +25,6 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local HudModel = require(shared:WaitForChild("HudModel"))
-local OnboardingBeats = require(shared:WaitForChild("OnboardingBeats"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local SubmitPick = remotes:WaitForChild("SubmitPick") :: RemoteEvent
@@ -78,15 +77,27 @@ local counters: { [string]: number }? = nil
 -- "already seen" list — see the fires below. Empty until the first ProfileUpdate lands.
 local knownSeenBeats: { string } = {}
 
--- Each of these four beats is fired at most once per client session — the event that explains it
--- happens once (or its FIRST occurrence is all that matters), so there is nothing to gain by
--- telling OnboardingController twice. Whether the beat actually SHOWS (the player hasn't seen it
--- before) is OnboardingBeats' decision, made from knownSeenBeats; these flags only gate this file
--- emitting the event at all.
-local seenJoinEvent = false
-local seenThrowsUnlockedEvent = false
-local seenWinEvent = false
-local seenBankEvent = false
+-- Whether each beat's event still needs firing. NOT the same as "has the event happened yet" —
+-- a round-1 review caught that mistake: latching the moment an event is FIRED (rather than once
+-- OnboardingController confirms it actually SHOWED a card) meant a beat dropped for stacking
+-- (e.g. the player banks their first pot without dismissing the still-up "win" card) was marked
+-- consumed forever, having taught the player nothing. `resolved[event]` is instead driven by
+-- `EventBus.OnboardShown`'s echo (see below): true once the controller reports "shown" or
+-- "alreadySeen" (nothing left to teach), and left false on "dropped" so the next natural
+-- occurrence of that event (next round's throwsUnlocked, the next win, the next bank) retries.
+local resolved = { join = false, throwsUnlocked = false, win = false, bank = false }
+
+-- Edge-detector for `throwsUnlocked`: without it, firing on every publish() tick (10Hz) while
+-- throws stay enabled across a whole round would ask the controller ten times a second for no
+-- reason — `OnboardingBeats.next` is cheap but not THAT cheap to call. Fires once per RISING edge
+-- (the moment throws newly become enabled), which is exactly "the first time" per round.
+local wasThrowsEnabled = false
+
+-- The confirmation-in-flight for a bank toast — see the ProfileUpdate handler and the
+-- EventBus.OnboardShown listener below. BindableEvents are deferred in this engine, so "did the
+-- beat 4 card just take this bank's spot" cannot be decided synchronously at the point the bank
+-- lands; the toast is decided when the answer comes back instead.
+local pendingBankToast: string? = nil
 
 local session = HudModel.newSession()
 
@@ -145,13 +156,18 @@ local function publish()
         pickedThisRound = myPick ~= nil,
         escalationPrompts = escalationPrompts,
     }
-    -- Onboarding beat 2: the first time throws are actually enabled. HudModel.view is the single
-    -- source of truth for that rule (fate-bound, phase, pick already made) — re-deriving it here
-    -- from the raw flags would be a second copy of a rule that already lives in one place.
-    if not seenThrowsUnlockedEvent and HudModel.view(inputs, session).throwsEnabled then
-        seenThrowsUnlockedEvent = true
+    -- Onboarding beat 2: the RISING EDGE of throws becoming enabled — once per round, not once
+    -- per session. HudModel.view is the single source of truth for the enabled rule (fate-bound,
+    -- phase, pick already made) — re-deriving it here from the raw flags would be a second copy
+    -- of a rule that already lives in one place. Firing on every rising edge (rather than "the
+    -- first time ever", latched at fire time) is what lets a dropped occurrence — the join card
+    -- was still up when throws first unlocked — retry on the very next round instead of the beat
+    -- most first-timers need most simply never firing again this session.
+    local nowThrowsEnabled = HudModel.view(inputs, session).throwsEnabled
+    if not resolved.throwsUnlocked and nowThrowsEnabled and not wasThrowsEnabled then
         EventBus.Onboard:Fire("throwsUnlocked", knownSeenBeats)
     end
+    wasThrowsEnabled = nowThrowsEnabled
     EventBus.HudState:Fire(inputs, {
         session = session,
         tape = visibleTape(),
@@ -216,9 +232,11 @@ local function maybeShowReveal()
         -- Onboarding beat 3 waits for the SAME gate as the toast/badge above, not for RevealResult
         -- arriving. WIN implies the exact world throw (the one your pick beats), so firing this
         -- the instant RevealResult lands — before the drum has stopped spinning — would spoil the
-        -- wheel early, exactly what the drum-rest gate exists to prevent.
-        if not seenWinEvent and p.result == "WIN" then
-            seenWinEvent = true
+        -- wheel early, exactly what the drum-rest gate exists to prevent. Fires on every WIN, not
+        -- just the session's first — `resolved.win` (only set once OnboardShown confirms "shown"
+        -- or "alreadySeen") is what stops the retries, so a WIN dropped for stacking gets another
+        -- chance at the player's next one instead of being marked taught-forever for nothing.
+        if not resolved.win and p.result == "WIN" then
             EventBus.Onboard:Fire("win", knownSeenBeats)
         end
         publish()
@@ -250,6 +268,25 @@ end)
 -- seen-beat writes) — there is deliberately not a second one per switch.
 EventBus.HudPreference.Event:Connect(function(body)
     SetHudPreference:FireServer(body)
+end)
+
+-- OnboardingController's echo of what actually happened to the beat this file just asked it to
+-- show — see the `resolved` comment above. "dropped" (another card was already up) is the one
+-- outcome that must NOT resolve the event, so the next natural occurrence gets to try again.
+EventBus.OnboardShown.Event:Connect(function(event: string, outcome: string)
+    if outcome ~= "dropped" then
+        resolved[event] = true
+    end
+    if event == "bank" and pendingBankToast then
+        local line = pendingBankToast
+        pendingBankToast = nil
+        if outcome ~= "shown" then
+            -- Either dropped (no card appeared this time, so the amount still needs saying) or
+            -- alreadySeen (nothing was ever going to show) — both mean the toast is the only
+            -- thing that told the player anything about this bank, so it must not be skipped.
+            toast(line)
+        end
+    end
 end)
 
 -- OpenLedger has two listeners: LedgerController shows the panel, and this asks the server to
@@ -284,10 +321,12 @@ FateResolvedEvt.OnClientEvent:Connect(function(userId)
 end)
 
 RoundUpdate.OnClientEvent:Connect(function(info)
-    -- Onboarding beat 1: once, the first time this client hears from the round system at all —
-    -- "the arena is live" per the design intent, not tied to any particular phase.
-    if not seenJoinEvent then
-        seenJoinEvent = true
+    -- Onboarding beat 1: "the arena is live" per the design intent, not tied to any particular
+    -- phase. Fires on every RoundUpdate until `resolved.join` — in practice this always resolves
+    -- on the very first call (nothing can be up before this client's first Onboard fire ever), but
+    -- gating on the confirmation rather than latching at fire time keeps this consistent with the
+    -- other three and costs nothing.
+    if not resolved.join then
         EventBus.Onboard:Fire("join", knownSeenBeats)
     end
     currentRoundId = info.roundId
@@ -356,19 +395,25 @@ ProfileUpdate.OnClientEvent:Connect(function(p)
         knownSeenBeats = p.seenBeats
     end
     if bankedNow > 0 then
-        -- Onboarding beat 4's copy ("Banked. That's yours to keep.") says almost exactly what this
-        -- toast says, anchored right below the plate — the same screen region the toast itself
-        -- occupies. Showing both on someone's FIRST bank would say it twice, in the same spot, at
-        -- the same moment. Suppress the toast only on the occasion the beat will actually appear
-        -- (OnboardingBeats.next is the one source of truth for "will it show" — re-deriving that
-        -- decision here would be a second copy of it). Every later bank keeps the toast, which is
-        -- the only place the banked AMOUNT is said.
-        local beatWillShow = not seenBankEvent and OnboardingBeats.next(knownSeenBeats, "bank") ~= nil
-        if not beatWillShow then
+        -- Onboarding beat 4's copy ("Banked. That's yours to keep.") says almost exactly what the
+        -- bank toast says, anchored right below the plate — the same screen region the toast
+        -- itself occupies. Showing both on someone's FIRST bank would say it twice, in the same
+        -- spot, at the same moment.
+        --
+        -- Once beat 4 is `resolved` (it has either shown once already, or was already seen coming
+        -- in) it can never show again, so the toast is unconditional and immediate — the common
+        -- case for every returning player and every bank after their first.
+        --
+        -- Otherwise, whether THIS bank is the one the card takes cannot be decided here: it
+        -- depends on whether some other card (e.g. beat 3's, still up from the same win) is
+        -- already occupying the slot, which only OnboardingController knows, and BindableEvents in
+        -- this engine are DEFERRED — `EventBus.Onboard:Fire` does not run OnboardingController's
+        -- handler synchronously, so there is nothing to read back yet at this line. Stash the line
+        -- and let the `EventBus.OnboardShown` listener below decide once the answer is in.
+        if resolved.bank then
             toast(`💰 BANKED {bankedNow} — that's yours to keep`)
-        end
-        if not seenBankEvent then
-            seenBankEvent = true
+        else
+            pendingBankToast = `💰 BANKED {bankedNow} — that's yours to keep`
             EventBus.Onboard:Fire("bank", knownSeenBeats)
         end
     end

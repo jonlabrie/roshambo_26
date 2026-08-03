@@ -15,6 +15,7 @@ local NAMES = {
     "LedgerState",
     "HudPreference",
     "Onboard",
+    "OnboardShown",
 }
 for _, name in NAMES do
     local e = Instance.new("BindableEvent")
