@@ -110,9 +110,11 @@ local function restore()
     suspendedVia = nil
     if via == "controls" then
         if not setControlsEnabled(true) then
-            -- Nothing else here can un-disable a control stack. Reopening and closing the panel
-            -- retries this, which is why `close()` is idempotent rather than one-shot.
-            warn("[TAKEOVER] control stack refused Enable — reopen the ledger and close it to retry")
+            -- Nothing else here can un-disable a control stack. Reopening and closing a takeover
+            -- panel retries this, which is why `close()`/`setOpen()` are idempotent rather than
+            -- one-shot. Named generically -- the ledger and the teahouse are both holders now, and
+            -- this warning would otherwise send a teahouse-stranded player to the wrong panel.
+            warn("[TAKEOVER] control stack refused Enable — reopen a takeover panel and close it to retry")
         end
     elseif via == "walkspeed" then
         local h = currentHumanoid()

@@ -33,6 +33,7 @@ local player = Players.LocalPlayer
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local MenuModel = require(shared:WaitForChild("TeahouseMenuModel"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
+local Takeover = require(script.Parent:WaitForChild("Takeover"))
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local RequestPurchase = remotes:WaitForChild("RequestPurchase") :: RemoteEvent
 local SetDisplay = remotes:WaitForChild("SetDisplay") :: RemoteEvent
@@ -108,29 +109,32 @@ local DANGER = Color3.fromRGB(206, 86, 86) -- remove-favorite
 local gui = Instance.new("ScreenGui")
 gui.Name = "TeahousePanel"
 gui.ResetOnSpawn = false
+gui.DisplayOrder = 20 -- a takeover, same layer as the ledger; only one is ever open at a time
 gui.Parent = player:WaitForChild("PlayerGui")
 
--- The panel is a ScrollingFrame with a fixed viewport (PANEL_W x PANEL_H) and an auto-growing
--- canvas: as sections accumulate (sizes/display/move/portal/decorations/favorites/back-door/access)
--- the content exceeds the viewport and the user scrolls. Was a plain Frame, which silently
--- overflowed its bottom edge -> later sections (Access) rendered off-screen as detached buttons.
+-- A TAKEOVER, on the ledger's pattern -- which is the pattern that does not have the bug this
+-- panel had. It was 520px tall at a fixed offset from the bottom, so on any viewport shorter
+-- than 580px the close button sat ABOVE THE TOP OF THE SCREEN and the panel could not be
+-- dismissed at all. Sizing against the viewport rather than in absolute pixels is what makes
+-- that impossible rather than merely unlikely.
 --
--- The geometry is stated as constants rather than inline because the close button below is placed
--- against the panel's TOP-RIGHT corner and has to be derived from them; two hand-matched literals
--- would drift the moment the panel is resized.
-local PANEL_W, PANEL_H = 340, 520
-local PANEL_MARGIN = 12 -- from the right edge
-local PANEL_BOTTOM = 60 -- from the bottom edge
+-- `panel` is now the outer card: viewport-relative, so it cannot exceed the screen at any size.
+-- Its content used to live directly on a ScrollingFrame named `panel` with the close button
+-- floating over it as a sibling positioned from the viewport edge. That close button now has to
+-- live INSIDE the panel, anchored to the panel's own corner -- and a UIListLayout repositions
+-- every GuiObject child it has, with no per-child exemption, so a close button parented
+-- alongside the scrolling content would get dragged into the list instead of floating over it.
+-- `scroll` is a second, inner ScrollingFrame that owns the list/canvas machinery and sits below
+-- a HEADER_H-tall strip reserved for the close button.
+local PANEL_MARGIN = 12
+local HEADER_H = 44
+local CLOSE_W = 34
 
-local panel = Instance.new("ScrollingFrame")
+local panel = Instance.new("Frame")
 panel.Name = "Panel"
-panel.AnchorPoint = Vector2.new(1, 1)
-panel.Position = UDim2.new(1, -PANEL_MARGIN, 1, -PANEL_BOTTOM)
-panel.Size = UDim2.fromOffset(PANEL_W, PANEL_H) -- fixed viewport
-panel.CanvasSize = UDim2.new() -- AutomaticCanvasSize.Y grows the canvas to fit the UIListLayout
-panel.AutomaticCanvasSize = Enum.AutomaticSize.Y
-panel.ScrollingDirection = Enum.ScrollingDirection.Y
-panel.ScrollBarThickness = 8
+panel.AnchorPoint = Vector2.new(0.5, 0.5)
+panel.Position = UDim2.fromScale(0.5, 0.5)
+panel.Size = UDim2.new(1, -2 * PANEL_MARGIN, 1, -2 * PANEL_MARGIN)
 panel.BackgroundColor3 = BG
 panel.BackgroundTransparency = 0.05
 panel.BorderSizePixel = 0
@@ -142,18 +146,15 @@ do
     corner.Parent = panel
 end
 
--- The only way out, now the toggle is gone. A SIBLING of the panel rather than a child: everything
--- parented to `panel` is laid out by the UIListLayout below and scrolls with the canvas, and a close
--- control you have to scroll back up to find is not a close control. Hidden with the panel, so it
--- adds nothing to the always-on interactive count -- removing the toggle takes that DOWN by one.
-local CLOSE_SIZE = 34
-local CLOSE_INSET = 8
-
+-- INSIDE the panel's own header, positioned against the panel rather than against a fixed
+-- offset from the viewport edge. That offset is what put it off-screen. The only way out, now
+-- the toggle is gone: the header strip above `scroll` is never part of the scrolling canvas, so
+-- a close control you have to scroll back up to find is not a close control.
 local closeButton = Instance.new("TextButton")
 closeButton.Name = "Close"
 closeButton.AnchorPoint = Vector2.new(1, 0)
-closeButton.Position = UDim2.new(1, -(PANEL_MARGIN + CLOSE_INSET), 1, -(PANEL_BOTTOM + PANEL_H) + CLOSE_INSET)
-closeButton.Size = UDim2.fromOffset(CLOSE_SIZE, CLOSE_SIZE)
+closeButton.Position = UDim2.new(1, -PANEL_MARGIN, 0, (HEADER_H - CLOSE_W) / 2)
+closeButton.Size = UDim2.fromOffset(CLOSE_W, CLOSE_W)
 closeButton.BackgroundColor3 = BG
 closeButton.BackgroundTransparency = 0.1
 closeButton.BorderSizePixel = 0
@@ -163,26 +164,43 @@ closeButton.Font = Enum.Font.GothamBold
 closeButton.TextSize = 20
 closeButton.Text = "X"
 closeButton.Visible = false
-closeButton.ZIndex = 2 -- above the panel it sits on
-closeButton.Parent = gui
+closeButton.ZIndex = 3 -- above the panel and the scroll content it sits over
+closeButton.Parent = panel
 do
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 6)
     corner.Parent = closeButton
 end
 
+-- The scrolling body: a fixed viewport (the panel below the header strip) with an auto-growing
+-- canvas -- as sections accumulate (sizes/display/move/portal/decorations/favorites/back-door/
+-- access) the content exceeds the viewport and the user scrolls. Was a plain Frame, which
+-- silently overflowed its bottom edge -> later sections (Access) rendered off-screen as
+-- detached buttons.
+local scroll = Instance.new("ScrollingFrame")
+scroll.Name = "Scroll"
+scroll.Position = UDim2.fromOffset(0, HEADER_H)
+scroll.Size = UDim2.new(1, 0, 1, -HEADER_H)
+scroll.CanvasSize = UDim2.new() -- AutomaticCanvasSize.Y grows the canvas to fit the UIListLayout
+scroll.AutomaticCanvasSize = Enum.AutomaticSize.Y
+scroll.ScrollingDirection = Enum.ScrollingDirection.Y
+scroll.ScrollBarThickness = 8
+scroll.BackgroundTransparency = 1
+scroll.BorderSizePixel = 0
+scroll.Parent = panel
+
 local layout = Instance.new("UIListLayout")
 layout.FillDirection = Enum.FillDirection.Vertical
 layout.Padding = UDim.new(0, 8)
 layout.SortOrder = Enum.SortOrder.LayoutOrder
-layout.Parent = panel
+layout.Parent = scroll
 
 local padding = Instance.new("UIPadding")
 padding.PaddingTop = UDim.new(0, 12)
 padding.PaddingBottom = UDim.new(0, 12)
 padding.PaddingLeft = UDim.new(0, 12)
 padding.PaddingRight = UDim.new(0, 12)
-padding.Parent = panel
+padding.Parent = scroll
 
 -- ===== Step 2: widgets =====
 
@@ -197,23 +215,24 @@ local function sectionLabel(order: number, text: string): TextLabel
     label.TextSize = 14
     label.TextXAlignment = Enum.TextXAlignment.Left
     label.Text = text
-    label.Parent = panel
+    label.Parent = scroll
     return label
 end
 
 local headerLabel = Instance.new("TextLabel")
 headerLabel.Name = "Header"
 headerLabel.LayoutOrder = 10
--- short of the full width: the close button overlays the panel's top-right corner, and a long
--- "1240 pts · Perch: <padId>" would otherwise run under it
-headerLabel.Size = UDim2.new(1, -(CLOSE_SIZE + CLOSE_INSET), 0, 28)
+-- Full width now: the close button moved into its own header strip above `scroll` (see the
+-- panel/closeButton/scroll scaffold above), so it no longer overlays this row and this label
+-- no longer needs to leave room for it.
+headerLabel.Size = UDim2.new(1, 0, 0, 28)
 headerLabel.BackgroundTransparency = 1
 headerLabel.TextColor3 = TEXT
 headerLabel.Font = Enum.Font.GothamBold
 headerLabel.TextSize = 18
 headerLabel.TextXAlignment = Enum.TextXAlignment.Left
 headerLabel.Text = "Loading..."
-headerLabel.Parent = panel
+headerLabel.Parent = scroll
 
 local claimNotice = Instance.new("TextLabel")
 claimNotice.Name = "ClaimNotice"
@@ -226,7 +245,7 @@ claimNotice.TextSize = 13
 claimNotice.TextXAlignment = Enum.TextXAlignment.Left
 claimNotice.Text = "Claim a free perch to begin"
 claimNotice.Visible = false
-claimNotice.Parent = panel
+claimNotice.Parent = scroll
 
 -- item A: shown instead of claimNotice for an OWNER whose auto-claim failed (pad scarcity) --
 -- see vm.needsClaim in TeahouseMenuModel.
@@ -241,7 +260,7 @@ needsClaimHint.TextSize = 13
 needsClaimHint.TextXAlignment = Enum.TextXAlignment.Left
 needsClaimHint.Text = "Claim a perch to build"
 needsClaimHint.Visible = false
-needsClaimHint.Parent = panel
+needsClaimHint.Parent = scroll
 
 -- item E: the only thing shown pre-ready (see render()); hides the ladder rows below it rather
 -- than letting their default-visible bare S/M/L buttons show inert before data arrives.
@@ -256,7 +275,7 @@ loadingLabel.TextSize = 13
 loadingLabel.TextXAlignment = Enum.TextXAlignment.Left
 loadingLabel.Text = "Loading…"
 loadingLabel.Visible = false
-loadingLabel.Parent = panel
+loadingLabel.Parent = scroll
 
 type RungWidget = { button: TextButton, pendingItem: string? }
 
@@ -274,7 +293,7 @@ local function buildLadderRow(
     row.LayoutOrder = order + 1
     row.Size = UDim2.new(1, 0, 0, 36)
     row.BackgroundTransparency = 1
-    row.Parent = panel
+    row.Parent = scroll
     local rowLayout = Instance.new("UIListLayout")
     rowLayout.FillDirection = Enum.FillDirection.Horizontal
     rowLayout.Padding = UDim.new(0, 6)
@@ -330,7 +349,7 @@ local function buildDisplayRow(
     row.LayoutOrder = order + 1
     row.Size = UDim2.new(1, 0, 0, 30)
     row.BackgroundTransparency = 1
-    row.Parent = panel
+    row.Parent = scroll
     local rowLayout = Instance.new("UIListLayout")
     rowLayout.FillDirection = Enum.FillDirection.Horizontal
     rowLayout.Padding = UDim.new(0, 6)
@@ -411,7 +430,7 @@ moveButton.TextSize = 13
 moveButton.Text = "Move teahouse"
 moveButton.Active = false -- render() enables once vm.canMove is known
 moveButton.Visible = false
-moveButton.Parent = panel
+moveButton.Parent = scroll
 do
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 6)
@@ -433,7 +452,7 @@ portalButton.TextSize = 13
 portalButton.Text = "Home Portal"
 portalButton.Active = false -- render() enables once vm.portal.canBuy is known
 portalButton.Visible = false
-portalButton.Parent = panel
+portalButton.Parent = scroll
 do
     local corner = Instance.new("UICorner")
     corner.CornerRadius = UDim.new(0, 6)
@@ -453,7 +472,7 @@ shownSmallerHint.TextXAlignment = Enum.TextXAlignment.Left
 shownSmallerHint.TextWrapped = true
 shownSmallerHint.Text = "Displaying smaller than owned — change Display to show your biggest"
 shownSmallerHint.Visible = false
-shownSmallerHint.Parent = panel
+shownSmallerHint.Parent = scroll
 
 sectionLabel(80, "Favorites")
 -- item D: favorites can reach the 32-preference cap. The panel itself now scrolls, so favorites
@@ -466,7 +485,7 @@ favoritesContainer.Size = UDim2.fromScale(1, 0)
 favoritesContainer.AutomaticSize = Enum.AutomaticSize.Y
 favoritesContainer.BackgroundTransparency = 1
 favoritesContainer.BorderSizePixel = 0
-favoritesContainer.Parent = panel
+favoritesContainer.Parent = scroll
 local favoritesLayout = Instance.new("UIListLayout")
 favoritesLayout.FillDirection = Enum.FillDirection.Vertical
 favoritesLayout.Padding = UDim.new(0, 4)
@@ -483,7 +502,7 @@ backDoorLabel.Font = Enum.Font.Gotham
 backDoorLabel.TextSize = 12
 backDoorLabel.TextXAlignment = Enum.TextXAlignment.Left
 backDoorLabel.Text = "Back door: none set"
-backDoorLabel.Parent = panel
+backDoorLabel.Parent = scroll
 
 local DECOR_LABELS = {
     ishidoro = "Stone Lantern",
@@ -499,7 +518,7 @@ decorContainer.LayoutOrder = 77
 decorContainer.Size = UDim2.fromScale(1, 0)
 decorContainer.AutomaticSize = Enum.AutomaticSize.Y
 decorContainer.BackgroundTransparency = 1
-decorContainer.Parent = panel
+decorContainer.Parent = scroll
 local decorLayout = Instance.new("UIListLayout")
 decorLayout.FillDirection = Enum.FillDirection.Vertical
 decorLayout.Padding = UDim.new(0, 4)
@@ -549,7 +568,7 @@ accessModeRow.Name = "AccessModeRow"
 accessModeRow.LayoutOrder = 83
 accessModeRow.Size = UDim2.new(1, 0, 0, 30)
 accessModeRow.BackgroundTransparency = 1
-accessModeRow.Parent = panel
+accessModeRow.Parent = scroll
 do
     local l = Instance.new("UIListLayout")
     l.FillDirection = Enum.FillDirection.Horizontal
@@ -586,7 +605,7 @@ inviteRow.LayoutOrder = 84
 inviteRow.Size = UDim2.new(1, 0, 0, 30)
 inviteRow.BackgroundTransparency = 1
 inviteRow.Visible = false
-inviteRow.Parent = panel
+inviteRow.Parent = scroll
 local inviteBox = Instance.new("TextBox")
 inviteBox.Name = "InviteBox"
 inviteBox.Size = UDim2.new(1, -70, 1, 0)
@@ -640,7 +659,7 @@ noticeLabel.TextSize = 11
 noticeLabel.TextXAlignment = Enum.TextXAlignment.Left
 noticeLabel.Text = ""
 noticeLabel.Visible = false
-noticeLabel.Parent = panel
+noticeLabel.Parent = scroll
 
 -- invitee list (shown only in private mode)
 local inviteeContainer = Instance.new("Frame")
@@ -651,7 +670,7 @@ inviteeContainer.AutomaticSize = Enum.AutomaticSize.Y
 inviteeContainer.BackgroundTransparency = 1
 inviteeContainer.BorderSizePixel = 0
 inviteeContainer.Visible = false
-inviteeContainer.Parent = panel
+inviteeContainer.Parent = scroll
 local inviteeLayout = Instance.new("UIListLayout")
 inviteeLayout.FillDirection = Enum.FillDirection.Vertical
 inviteeLayout.Padding = UDim.new(0, 4)
@@ -961,13 +980,24 @@ end)
 
 -- ===== Step 5: open / close =====
 
--- No `open` flag any more: the toggle was the only thing that needed to know the current state (to
--- invert it), and every remaining caller states what it wants.
+-- A flag again, now that this panel is a takeover: `Takeover.acquire`/`release` are
+-- reference-counted, so a double open must not double-acquire and a double close must not drive
+-- the count negative (which would leave the OTHER takeover holder's release hand back control it
+-- never suspended). Guarding on the current state makes every remaining caller's `setOpen(false)`
+-- a no-op when the panel is already closed, rather than a spurious release.
+local isOpen = false
 local function setOpen(shouldOpen: boolean)
+    if shouldOpen == isOpen then
+        return -- idempotent: a double open must not double-acquire, a double close must not double-release
+    end
+    isOpen = shouldOpen
     panel.Visible = shouldOpen
     closeButton.Visible = shouldOpen
     if shouldOpen then
         render()
+        Takeover.acquire()
+    else
+        Takeover.release()
     end
 end
 
