@@ -263,6 +263,15 @@ Fixed `TextSize` per tier, raised to suit the larger disc: **20** touch (was 14)
 would visibly jump the digits' size at the two-to-one-character boundary every round. Two digits at
 20px on a 32px disc, and at 34px on a 60px disc, both clear their box.
 
+**Weight drops `Enum.Font.GothamBlack` → `Enum.Font.GothamBold`.** The owner's gate on the Studio
+prototype: the digits read a touch heavy. Weight is the lever, not size — Black, Bold and Medium
+were rendered side by side at the fixed sizes above (`ScreenCapture_4`, 2026-08-04), and a one-point
+size reduction was indistinguishable at both tiers while a weight step was obvious. Bold rather than
+Medium because at 20px over moving canyon terrain Medium starts to thin out, and the phone tier is
+the one that has to survive a busy background.
+
+This is the ring's readout only. Nothing else in the HUD changes weight.
+
 The world-throw glyph box (`glyphBox(ringDisc, 0.82)`) is unchanged and scales with the disc for
 free.
 
