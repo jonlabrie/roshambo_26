@@ -64,14 +64,20 @@ describe("DrumStep.SPLASH_LEAD_SECONDS — how early the personal result may lan
         -- The smoothstep alone reads only 72% at s = 0.65, and reasoning from it would say the lead
         -- is far too long; the carried velocity puts the real figure at 83–88%.
         --
-        -- Both terms are reproduced from DrumController's own defaults (ω = DRUM_KICK = 4 rad/s).
+        -- ω is READ from DrumStep, never copied: it used to be a literal 4 here, and the assertion
+        -- INVERTS across the plausible range (ω = 1 gives 0.780 and fails; ω = 8 passes while
+        -- describing a different drum), so a copy that fell out of step would not merely go stale.
+        -- STILL UNTESTED: DrumController's "DrumKick" stage attribute overrides ω at runtime, and
+        -- nothing in this file can see it — setting it in Studio moves the splash's timing with no
+        -- failure here.
+        --
         -- The travel D is not a constant: `landTargetFor` steps down to the first detent at least
         -- ω·G/2 below the current θ, and detents recur every π/2 — so D ∈ [ω·G/2, ω·G/2 + π/2).
         -- The WORST case for how far along the drum is at the splash is the LARGEST D (the fixed
         -- velocity term is then the smallest share of it), so that is what is asserted.
         local G = DrumStep.GLIDE_SECONDS
         local s = (G - DrumStep.SPLASH_LEAD_SECONDS) / G
-        local carried = 4 * G -- ω·G
+        local carried = DrumStep.KICK_OMEGA * G -- ω·G
         local travel = carried / 2 + math.pi / 2 -- the largest D the lander can choose
         local travelled = (3 * s * s - 2 * s * s * s) + carried * (s * (1 - s) * (1 - s)) / travel
         expect(travelled > 0.8).toBe(true)

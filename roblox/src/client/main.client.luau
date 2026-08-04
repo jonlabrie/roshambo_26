@@ -304,7 +304,8 @@ end)
 -- The tape tile waits for the drum to stop turning (the drumRest cue) and the result splash for
 -- the drum to commit to its detent (drumSettling, ~0.7s earlier), so neither spoils the throw
 -- mid-spin. NOT nil'd by the splash: `maybeShowSplash` only reads this record, because the tape
--- tile still needs it afterwards. The splash (SplashController) owns naming the personal result now — the old toast folded the vote distribution into the same headline it built here,
+-- tile still needs it afterwards. The splash (SplashController) owns naming the personal result
+-- now — the old toast folded the vote distribution into the same headline it built here,
 -- but that headline is gone; `distribution`/`totalPlayers`/`pick` are captured anyway (`pick`
 -- unused by the splash) because Task 9's ledger LAST ROUND band needs the same crowd-split,
 -- player-count and personal-throw data the toast used to carry.

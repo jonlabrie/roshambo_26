@@ -69,7 +69,10 @@ end
 -- MOTION (strike-keyed), preserved from the hex drum but on the VERTICAL axis.
 -- Spin is about the hub's LOCAL Y. Symbol `sym` sits at the −Z front window when
 -- θ ≡ −sym*30° (mod 360); symbols recur every 3 facets → a detent every 90° (π/2).
-local DRUM_KICK = 4 -- rad/s during the constant spin (live-tunable via "DrumKick" attr)
+-- rad/s during the constant spin, still live-tunable via the "DrumKick" attribute below. From
+-- DrumStep rather than a literal: the glide carries this velocity, so SPLASH_LEAD_SECONDS is
+-- chosen against it and DrumStep.spec asserts against it — three copies of one number.
+local DRUM_KICK = DrumStep.KICK_OMEGA
 -- From DrumStep, not local literals: the SERVER waits this same span before growing a winner's
 -- avatar (it cannot hear `drumRest`), so a retimed spin or glide has to move both together.
 local SPIN_SEC = DrumStep.SPIN_SECONDS

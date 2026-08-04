@@ -30,16 +30,39 @@ DrumStep.SPIN_SECONDS = 1.0
 DrumStep.GLIDE_SECONDS = 2.0
 DrumStep.SETTLE_SECONDS = DrumStep.STRIKE_SWING_SECONDS + DrumStep.SPIN_SECONDS + DrumStep.GLIDE_SECONDS
 
+-- The spin's angular velocity, rad/s — DrumController's old private `DRUM_KICK`, here for the same
+-- reason as the durations above. The glide is a Hermite that CARRIES this velocity, so how far
+-- along its travel the drum is at any instant cannot be computed without it — and that figure is
+-- exactly what SPLASH_LEAD_SECONDS (below) is chosen against and what DrumStep.spec asserts. A
+-- hand-copied 4 in the test was not merely stale-if-changed: the assertion inverts across the
+-- plausible range (at ω = 1 the worst case is 0.780 and the test fails; at ω = 8 it passes while
+-- describing a drum nobody is running).
+--
+-- DrumController still honours the "DrumKick" stage attribute, which OVERRIDES this at `gongHit`.
+-- Nothing here can see that attribute, so a stage that sets it is running a drum whose travel
+-- fraction at the splash is not the one asserted — retune the lead if you touch it.
+DrumStep.KICK_OMEGA = 4
+
 -- HOW EARLY THE PERSONAL RESULT MAY LAND, measured back from drumRest (spec §2).
 --
 -- The whole 3.45s of swing + spin + glide sat between a round closing and the player being told
 -- what happened, and the owner's word for it was "a long time". But the wait is not padding —
 -- it is what stops the result being announced before the drum has shown the world's throw.
 --
--- The glide is a smoothstep, so it is nearly home long before it stops: at 0.7s from rest the
--- drum has covered ~88% of its travel and the face is effectively in the window. The remaining
--- beat is settling, not suspense. So the SPLASH fires here and the TAPE TILE does not — the tape
--- is the record of the WORLD's throw, the real spoiler, and it has no urgency.
+-- The glide is a HERMITE — a smoothstep PLUS the spin's exit velocity carried into it — so it is
+-- nearly home long before it stops: at 0.7s from rest the drum has covered 83-88% of its travel.
+-- The spread is the travel the lander picks (D ∈ [ω·G/2, ω·G/2 + π/2); the longer the travel, the
+-- smaller the share the fixed velocity term contributes, so the LARGEST D is the worst case). Do
+-- not reason about this lead from the easing curve alone: the bare smoothstep reads only 72% at
+-- this point and would say the lead is far too long. DrumStep.spec computes both terms. The
+-- remaining beat is settling, not suspense. So the SPLASH fires here and the TAPE TILE does not —
+-- the tape is the record of the WORLD's throw, the real spoiler, and it has no urgency.
+--
+-- FRACTION OF TRAVEL IS NOT THE SAME CRITERION AS "THE CORRECT SYMBOL IS IN THE WINDOW", and at
+-- this lead the two part company: 83-88% leaves 28° (best) to 53° (worst) of residual angle with
+-- facets 30° apart, so for 0.19-0.34s after the cue the window still shows a NEIGHBOURING facet
+-- while the splash names the result. That is a known, owner-facing trade, not a defect to fix
+-- here — do not "improve" this lead without pricing it in.
 DrumStep.SPLASH_LEAD_SECONDS = 0.7
 
 -- the low face index (0..2) carrying this throw's symbol
