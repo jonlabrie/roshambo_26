@@ -39,6 +39,7 @@
 -- Picks travel back the other way on EventBus.HudPick, banking on EventBus.HudBank.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local UserInputService = game:GetService("UserInputService")
 
@@ -214,12 +215,13 @@ end
 -- count rather than jump"). This is what makes banking read as a TRANSFER: press BANK 27 POINTS
 -- and the button's figure runs down to zero while the balance below runs up by the same amount,
 -- both driven off the SAME ProfileUpdate, with no special case for "this one's a bank" — see
--- `render`, below, where all three counters are ticked from the one `view`.
+-- `paintCounters`, below, where all three counters are ticked from the one set of targets.
 --
 -- `RollingNumber` is the pure arithmetic of one count; `Counter` is the small bit of STATE this
--- file wraps around it — what's currently displayed, what it's counting toward, and when the
--- current leg began. `tickCounter` is the driver, and it is keyed on the TARGET changing, not on
--- how often it gets called: `render` runs at 10Hz, and restarting the count on every call would
+-- file wraps around it — what's currently displayed, what it's counting toward, when the current
+-- leg began and how long that leg lasts. `tickCounter` is the driver, and it is keyed on the
+-- TARGET changing, not on how often it gets called: it is invoked at 10Hz from `render` AND at
+-- frame rate from the RenderStepped driver below, and restarting the count on every call would
 -- pin every number at its first frame forever — precisely how the bank pulse (`setBank`, below)
 -- failed earlier in this branch by cancelling and restarting its tween on every repaint.
 type Counter = {
@@ -230,10 +232,20 @@ type Counter = {
     target: number,
     from: number,
     startedAt: number?, -- os.clock() the current leg began, or nil once it has settled
+    -- The duration of the CURRENT leg, fixed when the target changed. Recomputed per leg rather
+    -- than read per frame so a count that is interrupted mid-flight finishes on the curve it
+    -- started on instead of jumping to a new one.
+    duration: number,
 }
 
 local function newCounter(initial: number): Counter
-    return { displayed = initial, target = initial, from = initial, startedAt = nil }
+    return {
+        displayed = initial,
+        target = initial,
+        from = initial,
+        startedAt = nil,
+        duration = RollingNumber.MIN_DURATION,
+    }
 end
 
 local function tickCounter(c: Counter, target: number): number
@@ -241,9 +253,10 @@ local function tickCounter(c: Counter, target: number): number
         c.from = c.displayed
         c.target = target
         c.startedAt = os.clock()
+        c.duration = RollingNumber.durationFor(target - c.from)
     end
     if c.startedAt then
-        local t = (os.clock() - c.startedAt) / RollingNumber.DURATION
+        local t = (os.clock() - c.startedAt) / c.duration
         c.displayed = RollingNumber.valueAt(c.from, c.target, t)
         if t >= 1 then
             c.startedAt = nil -- settled; further calls at the same target are free until it moves
@@ -905,6 +918,55 @@ local function setBank(visible: boolean, pot: number, pulses: boolean)
     end
 end
 
+-- The targets `render` last handed the counters. The per-frame driver below re-ticks toward
+-- these without needing a `view` — `render` keeps sole ownership of WHERE the numbers are going;
+-- the driver only advances how far along they are.
+local counterPoints, counterStreak, counterPot = 0, 0, 0
+local counterPulses = false
+
+local function countersAnimating(): boolean
+    return pointsCounter.startedAt ~= nil or streakCounter.startedAt ~= nil or potCounter.startedAt ~= nil
+end
+
+-- The ONE place the plate's line and the bank button's figure are painted. Safe to call at any
+-- rate: `tickCounter` is keyed on the target CHANGING, so re-invoking it with the target it
+-- already has is a no-op re-key that only advances the clock.
+--
+-- The label shows the DISPLAYED (animating) figures, not the model's — that is the entire point
+-- of `tickCounter`. The streak's own "×N" segment tracks the displayed count too, so a streak
+-- reset to 0 counts down in view rather than vanishing on the same tick it resets.
+local function paintCounters()
+    local displayedPoints = tickCounter(pointsCounter, counterPoints)
+    local displayedStreak = tickCounter(streakCounter, counterStreak)
+    plateLabel.Text = if displayedStreak > 0
+        then `×{displayedStreak}  {displayedPoints}`
+        else tostring(displayedPoints)
+
+    -- The bank button's VISIBILITY follows the DISPLAYED figure, not the model's: the model's
+    -- pot goes to zero the instant a bank lands, and a button that hid on THAT transition would
+    -- take the count-down off screen before anyone saw it. `counterPot > 0` stays in the
+    -- condition so the button appears on the very first tick a pot exists, even though the
+    -- display still reads 0 for that one frame (`RollingNumber.valueAt`'s exact-`from`-at-`t=0`
+    -- guarantee).
+    local displayedPot = tickCounter(potCounter, counterPot)
+    setBank(counterPot > 0 or displayedPot > 0, displayedPot, counterPulses)
+end
+
+-- 10Hz IS NOT ENOUGH FRAMES TO COUNT WITH (spec §3c). `render` runs off main.client's 10Hz
+-- heartbeat: a 0.5s count was 5 frames, brief enough that nobody read the steps, but a 2.2s
+-- payoff at that rate is ~22 visible jumps — a number lurching, not counting. So while anything
+-- is mid-count it repaints per frame instead.
+--
+-- The connection is permanent and does nothing once everything has settled, which is nearly all
+-- the time. Note the ordering: the check runs BEFORE the paint, so the frame on which a count
+-- reaches its target still paints — which is what lets that final paint land the exact value and
+-- release any decoration hung on "still counting".
+RunService.RenderStepped:Connect(function()
+    if countersAnimating() then
+        paintCounters()
+    end
+end)
+
 -- The hamburger is gone (spec §6). Roblox's own unibar already owns that glyph top-left, so a
 -- second one bottom-right read as either the same menu or a broken copy — ours was the fake
 -- one. The ring inherited the gesture: it IS the round, and since the LAST ROUND band the
@@ -1321,24 +1383,11 @@ local function render(inputs: any, aux: any)
     lastPlatePoints = view.plate.points
     lastPlateStreak = view.plate.streak
 
-    -- The label shows the DISPLAYED (animating) figures, not the model's — that is the entire
-    -- point of `tickCounter`. The streak's own "×N" segment tracks the displayed count too, so a
-    -- streak reset to 0 counts down in view rather than vanishing on the same tick it resets.
-    local displayedPoints = tickCounter(pointsCounter, view.plate.points)
-    local displayedStreak = tickCounter(streakCounter, view.plate.streak)
-    plateLabel.Text = if displayedStreak > 0
-        then `×{displayedStreak}  {displayedPoints}`
-        else tostring(displayedPoints)
-
-    -- The pot counts too, and the bank button's VISIBILITY follows the DISPLAYED figure, not
-    -- `view.bankVisible`: the model's pot goes to zero the instant a bank or a loss lands, and a
-    -- button that hid on THAT model transition would take the count-down off screen before
-    -- anyone saw it — which is the whole transfer effect this task exists to deliver. `view.pot
-    -- > 0` stays in the condition too, so the button appears on the very first tick a pot
-    -- exists even though the display itself still reads 0 for that one frame
-    -- (`RollingNumber.valueAt`'s exact-`from`-at-`t=0` guarantee).
-    local displayedPot = tickCounter(potCounter, view.pot)
-    setBank(view.pot > 0 or displayedPot > 0, displayedPot, view.potPulses)
+    counterPoints = view.plate.points
+    counterStreak = view.plate.streak
+    counterPot = view.pot
+    counterPulses = view.potPulses
+    paintCounters()
     -- Armed follows the MODEL's pot, not the displayed one: the button stays VISIBLE through the
     -- drain (that's the animation), but a tap on it once the model has already emptied the pot
     -- must not send a live BankRequest for something that no longer exists.
