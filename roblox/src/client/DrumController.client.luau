@@ -74,6 +74,10 @@ local DRUM_KICK = 4 -- rad/s during the constant spin (live-tunable via "DrumKic
 -- avatar (it cannot hear `drumRest`), so a retimed spin or glide has to move both together.
 local SPIN_SEC = DrumStep.SPIN_SECONDS
 local GLIDE_SEC = DrumStep.GLIDE_SECONDS
+-- The fraction of the glide at which the personal result may show. Clamped: a lead longer than
+-- the glide itself would fire at glide start, while the drum is still visibly travelling.
+local SETTLING_S = math.clamp((GLIDE_SEC - DrumStep.SPLASH_LEAD_SECONDS) / GLIDE_SEC, 0, 1)
+local settlingFired = false
 -- PADDLE CHOREOGRAPHY (2026-07-23): the strike smacks the paddle 90° so it rests
 -- PARALLEL to the log, out of the dowel's path; once the drawing dowel has crawled
 -- south past the paddle's sweep, the spindle slowly carries it the remaining 270°
@@ -157,6 +161,7 @@ RunService.Heartbeat:Connect(function(_dt)
             glideP0 = theta
             glideD = theta - landTheta
             glideT0 = os.clock()
+            settlingFired = false -- a new glide: the settling cue is owed again
             mode = "glide"
         end
         applyTheta()
@@ -168,6 +173,12 @@ RunService.Heartbeat:Connect(function(_dt)
             mode = "hold"
             EventBus.Cue:Fire({ kind = "drumRest" })
         else
+            -- ONCE per glide. `drumSettling` says the drum is committed to its detent — near
+            -- enough home that the face is readable — which is all the splash needs to know.
+            if not settlingFired and s >= SETTLING_S then
+                settlingFired = true
+                EventBus.Cue:Fire({ kind = "drumSettling" })
+            end
             theta = glideP0
                 - glideD * (3 * s * s - 2 * s * s * s)
                 - omega * GLIDE_SEC * (s * s * s - 2 * s * s + s)
@@ -220,6 +231,8 @@ EventBus.Cue.Event:Connect(function(cue)
         omega = (stage:GetAttribute("DrumKick") :: number) or DRUM_KICK
         spinUntil = os.clock() + SPIN_SEC
         strikeT0 = os.clock()
+        settlingFired = false -- THE SECOND RESET. Without it the cue fires once per SESSION and
+        -- every later round's splash silently falls back to the `drumRest` gate.
         mode = "spin"
         -- the dowel smacks the paddle: fast 90° to rest PARALLEL to the log
         kickState = "flick"

@@ -30,6 +30,18 @@ DrumStep.SPIN_SECONDS = 1.0
 DrumStep.GLIDE_SECONDS = 2.0
 DrumStep.SETTLE_SECONDS = DrumStep.STRIKE_SWING_SECONDS + DrumStep.SPIN_SECONDS + DrumStep.GLIDE_SECONDS
 
+-- HOW EARLY THE PERSONAL RESULT MAY LAND, measured back from drumRest (spec §2).
+--
+-- The whole 3.45s of swing + spin + glide sat between a round closing and the player being told
+-- what happened, and the owner's word for it was "a long time". But the wait is not padding —
+-- it is what stops the result being announced before the drum has shown the world's throw.
+--
+-- The glide is a smoothstep, so it is nearly home long before it stops: at 0.7s from rest the
+-- drum has covered ~88% of its travel and the face is effectively in the window. The remaining
+-- beat is settling, not suspense. So the SPLASH fires here and the TAPE TILE does not — the tape
+-- is the record of the WORLD's throw, the real spoiler, and it has no urgency.
+DrumStep.SPLASH_LEAD_SECONDS = 0.7
+
 -- the low face index (0..2) carrying this throw's symbol
 function DrumStep.faceForThrow(throw: string): number
     return SYMBOLS[throw] or 0

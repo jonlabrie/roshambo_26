@@ -45,3 +45,44 @@ describe("DrumStep — the strike-to-rest timing", function()
         end
     end)
 end)
+
+describe("DrumStep.SPLASH_LEAD_SECONDS — how early the personal result may land", function()
+    test("it is a real lead, but strictly inside the glide", function()
+        -- At or beyond the glide's whole length the cue would fire the moment the glide STARTS,
+        -- while the drum is still visibly travelling — which is the spoiler the drum-rest gate
+        -- exists to prevent. At zero it buys nothing.
+        expect(DrumStep.SPLASH_LEAD_SECONDS > 0).toBe(true)
+        expect(DrumStep.SPLASH_LEAD_SECONDS < DrumStep.GLIDE_SECONDS).toBe(true)
+    end)
+
+    test("it leaves the drum most of the way home before the result shows", function()
+        -- Whatever the lead is, the drum must have covered a large majority of its travel by the
+        -- time the splash fires, or the face is not yet readable in the window.
+        --
+        -- The glide is a HERMITE, not a bare smoothstep: DrumController carries the spin's velocity
+        -- into it, so θ = θ₀ − D·(3s² − 2s³) − ω·G·(s³ − 2s² + s). The second term matters here.
+        -- The smoothstep alone reads only 72% at s = 0.65, and reasoning from it would say the lead
+        -- is far too long; the carried velocity puts the real figure at 83–88%.
+        --
+        -- Both terms are reproduced from DrumController's own defaults (ω = DRUM_KICK = 4 rad/s).
+        -- The travel D is not a constant: `landTargetFor` steps down to the first detent at least
+        -- ω·G/2 below the current θ, and detents recur every π/2 — so D ∈ [ω·G/2, ω·G/2 + π/2).
+        -- The WORST case for how far along the drum is at the splash is the LARGEST D (the fixed
+        -- velocity term is then the smallest share of it), so that is what is asserted.
+        local G = DrumStep.GLIDE_SECONDS
+        local s = (G - DrumStep.SPLASH_LEAD_SECONDS) / G
+        local carried = 4 * G -- ω·G
+        local travel = carried / 2 + math.pi / 2 -- the largest D the lander can choose
+        local travelled = (3 * s * s - 2 * s * s * s) + carried * (s * (1 - s) * (1 - s)) / travel
+        expect(travelled > 0.8).toBe(true)
+    end)
+
+    test("the drum's own timings are unchanged", function()
+        -- The bell/drum choreography is signed off. This round changes when a CLIENT reacts,
+        -- never how long the drum takes — and the server reads SETTLE_SECONDS to time round
+        -- scheduling.
+        expect(DrumStep.SETTLE_SECONDS).toBe(
+            DrumStep.STRIKE_SWING_SECONDS + DrumStep.SPIN_SECONDS + DrumStep.GLIDE_SECONDS
+        )
+    end)
+end)
