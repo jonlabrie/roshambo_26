@@ -280,8 +280,9 @@ local potCounter = newCounter(0)
 --
 -- NORMALLY HIDDEN. Points are not a thing you need at a glance — a riding pot already has its
 -- own always-visible bank button. The plate reveals on the ring's first tap and on any change to
--- the figures it shows (see `revealPlate` and the change-guard in `render`), holds for
--- PLATE_HOLD, then fades over PLATE_FADE.
+-- the figures it shows (see `revealPlate` and the change-guard in `render`), holds for at least
+-- PLATE_HOLD — longer if a points count is still running, see `plateHoldSeconds` — then fades
+-- over PLATE_FADE.
 --
 -- TAPPABLE (spec §6, Task 5). It went inert only because it had moved into the strip Roblox uses
 -- for camera drag; it is in the bottom row now, so it is safe to make a `TextButton` again — the
@@ -295,6 +296,8 @@ local potCounter = newCounter(0)
 --   2. `GuiButton.Selectable` defaults to `true`, which would put the plate into gamepad focus
 --      navigation alongside the throw/bank buttons. Forced off below — nothing about "one line
 --      that only sometimes exists" belongs in a d-pad tab order.
+-- A FLOOR on the hold, not the whole of it: `plateHoldSeconds` extends it to outlast a points
+-- count that runs longer than this. Every count was half a second when this number was chosen.
 local PLATE_HOLD = 2
 local PLATE_FADE = 0.35
 -- A CAP on how far AutomaticSize.X may grow the plate leftward. It was never a problem for a
@@ -470,6 +473,39 @@ local function startPlateFade(gen: number)
     strokeTween:Play()
 end
 
+-- HOW LONG THE PLATE HOLDS DEPENDS ON WHAT IT IS HOLDING. PLATE_HOLD was chosen when every count
+-- took a flat half second. Counts now scale with the amount, up to RollingNumber.MAX_DURATION, so
+-- any bank above roughly 1120 points already counts for longer than the plate stays up — and at
+-- 6561, eight straight wins and the biggest payoff in the game, the total landed on the very frame
+-- the plate reached full transparency. The number the whole feature exists to show was never
+-- legible, and it failed worst in its best case.
+--
+-- So the hold is at LEAST PLATE_HOLD, and at least however much of the points count is still to
+-- run plus PLATE_READ_BEAT to actually read the figure it lands on. Small moves are untouched: a
+-- 1-point change counts for 0.56s and a streak ticking does not move the points counter at all,
+-- both of which stay under PLATE_HOLD and hold exactly as they did before.
+--
+-- It reads `pointsCounter`'s own `duration` — the value `tickCounter` fixed for this leg — rather
+-- than recomputing the delta, so the hold and the count cannot drift apart. That is also why
+-- `render` arms the reveal AFTER `paintCounters` rather than before: until the paint has run,
+-- `startedAt` and `duration` still describe the PREVIOUS leg.
+--
+-- NOTHING POLLS. The hold is a finite number decided once, at arm time, and handed to the same
+-- `task.delay` as before, so a count that is interrupted or never completes cannot strand the
+-- plate visible — the delay is wall-clock and fires regardless. A second bank landing mid-count
+-- re-arms the reveal, which measures the remaining time against the NEW leg and supersedes the
+-- pending fade by generation: the hold extends, it never truncates.
+local PLATE_READ_BEAT = 0.6
+
+local function plateHoldSeconds(): number
+    local startedAt = pointsCounter.startedAt
+    if startedAt == nil then
+        return PLATE_HOLD -- nothing counting: a streak tick, or a figure that has already settled
+    end
+    local remaining = math.max(pointsCounter.duration - (os.clock() - startedAt), 0)
+    return math.max(PLATE_HOLD, remaining + PLATE_READ_BEAT)
+end
+
 -- Reveal on the ledger door's first tap, and on any change to the figures (the change-guard
 -- lives in `render`, not here — this function only knows how to show). Re-revealing mid-hold or
 -- mid-fade CANCELS the fade and restores full opacity instead of stacking: the plate is either
@@ -488,7 +524,7 @@ local function revealPlate()
         then PLATE_STROKE_LIT_TRANSPARENCY
         else PLATE_STROKE_REST_TRANSPARENCY
     plateVisible = true
-    task.delay(PLATE_HOLD, function()
+    task.delay(plateHoldSeconds(), function()
         startPlateFade(gen)
     end)
 end
@@ -1425,9 +1461,19 @@ local function render(inputs: any, aux: any)
     canThrow = view.throwsEnabled
     chosenSym = view.chosen
 
+    counterPoints = view.plate.points
+    counterStreak = view.plate.streak
+    counterPot = view.pot
+    counterPulses = view.potPulses
+    paintCounters()
+
     -- Reveal is keyed on the TARGET having changed, not on `render` running: `render` is a 10Hz
     -- repaint, and a reveal re-armed every tick would hold forever and never fade — precisely how
     -- the bank pulse (`setBank`, below) failed when it wasn't guarded this way.
+    --
+    -- ARMED AFTER `paintCounters`, and that ordering is load-bearing: `revealPlate` sizes its hold
+    -- from the points counter's CURRENT leg (`plateHoldSeconds`), and before the paint has re-keyed
+    -- the counter, `startedAt` and `duration` still describe the previous one.
     if
         lastPlatePoints ~= nil
         and (view.plate.points ~= lastPlatePoints or view.plate.streak ~= lastPlateStreak)
@@ -1437,11 +1483,6 @@ local function render(inputs: any, aux: any)
     lastPlatePoints = view.plate.points
     lastPlateStreak = view.plate.streak
 
-    counterPoints = view.plate.points
-    counterStreak = view.plate.streak
-    counterPot = view.pot
-    counterPulses = view.potPulses
-    paintCounters()
     -- Armed follows the MODEL's pot, not the displayed one: the button stays VISIBLE through the
     -- drain (that's the animation), but a tap on it once the model has already emptied the pot
     -- must not send a live BankRequest for something that no longer exists.
