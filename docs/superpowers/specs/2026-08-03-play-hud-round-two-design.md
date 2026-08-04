@@ -17,7 +17,7 @@ player's own outcome and otherwise get out of the way.**
 | 3 | Round detail — crowd split, player count — moves to the top of the ledger |
 | 4 | `SWITCH?` fills its button (an overlay, not a move) and expires in 1s |
 | 5 | A PWA-style circular round timer replaces the bottom hairline |
-| 6 | The ring replaces the hamburger as the ledger's door; the plate moves left and becomes tappable |
+| 6 | The ring replaces the hamburger as the ledger's door; the plate stays put and becomes tappable |
 | 7 | With the hairline gone, the whole cluster moves down |
 
 ---
@@ -118,11 +118,18 @@ one-gesture rule was designed to avoid.
 `src/components/PieTimer.tsx` is the reference: a 54px ring, green until `timeLeft <= 4` then
 red, the remaining seconds in the middle, swapping to the world-throw glyph on reveal.
 
-**It is sized to a throw button, not to the tape** — `BTN_H` / `BTN_H_TOUCH`, so 76px on desktop
-and 44px on touch. The PWA's own 54px was the right reference while the ring was a readout; it
-stopped being one the moment it became the ledger's door (§6), and an interactive target should be
-sized like the other interactive targets rather than like the tape beside it. 44px is also exactly
-the touch-target floor this design adopted for the throw buttons.
+**It takes the hamburger's slot exactly** — inboard-left of the throw cluster, bottom-aligned with
+the **throw button row**, which is where `ledgerButton` sits today. It is *not* in the tape's row.
+
+**It is sized to a throw button** — `BTN_H` / `BTN_H_TOUCH`, so 76px on desktop and 44px on touch,
+which is exactly the height of the button row it sits beside. The PWA's own 54px was the right
+reference while the ring was a readout; it stopped being one the moment it became the ledger's
+door (§6), and an interactive target should be sized like the other interactive targets.
+
+**Nothing else moves to accommodate it.** An earlier draft of this spec put the ring in the bottom
+row beside the tape, which would have forced that row to grow to the ring's height and pushed the
+whole cluster up 42px on desktop. It does not go there. The bottom row keeps its tape height, the
+wallet plate keeps its position, and `AREA_H` is unchanged.
 
 The ring's stroke scales with it (7.5% of the diameter, floored at 3px) so a 76px ring does not
 read as a hairline circle.
@@ -149,10 +156,10 @@ Where the countdown is unknown — the unsynced-clock path, where `secondsLeft` 
 the ring shows no sweep at all rather than a full ring that never moves. `timerKnown` already
 carries this.
 
-## §6 — The ring replaces the hamburger, and the plate moves left
+## §6 — The ring replaces the hamburger, and the plate stays put
 
-The ring takes the plate's slot, immediately left of the tape. The plate moves left of the ring.
-Bottom row, left to right: **plate → ring → tape**.
+The ring takes the **hamburger's** slot: inboard-left of the throw cluster, level with the throw
+buttons. The bottom row is untouched — **plate → tape**, exactly as it is today.
 
 **The `≡` button is deleted, and the ring inherits its behaviour.** The owner's reasoning:
 

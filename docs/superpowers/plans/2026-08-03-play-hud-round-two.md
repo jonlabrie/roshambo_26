@@ -343,18 +343,14 @@ describe("HudLayout — the ring shares the bottom row with the tape", function(
         expect(HudLayout.RING_THICKNESS > HudLayout.RING_THICKNESS_TOUCH).toBe(true)
     end)
 
-    test("the bottom row is as tall as its tallest occupant", function()
-        -- The tape and the ring sit side by side. A row derived from the tape alone would let a
-        -- taller ring hang out of the cluster the onboarding band is clamped against.
-        expect(HudLayout.BOTTOM_ROW_H).toBe(math.max(HudLayout.TILE, HudLayout.RING_D))
-        expect(HudLayout.BOTTOM_ROW_H_TOUCH).toBe(math.max(HudLayout.TILE_TOUCH, HudLayout.RING_D_TOUCH))
-    end)
-
-    test("AREA_H is buttons + gap + the bottom row", function()
-        expect(HudLayout.AREA_H).toBe(HudLayout.BTN_H + HudLayout.ROW_GAP + HudLayout.BOTTOM_ROW_H)
+    test("the cluster does NOT grow for the ring", function()
+        -- The ring sits beside the throw buttons, not in the tape's row, so AREA_H keeps its
+        -- original derivation. Growing it here would push the whole cluster up for nothing.
+        expect(HudLayout.AREA_H).toBe(HudLayout.BTN_H + HudLayout.ROW_GAP + HudLayout.TILE)
         expect(HudLayout.AREA_H_TOUCH).toBe(
-            HudLayout.BTN_H_TOUCH + HudLayout.ROW_GAP + HudLayout.BOTTOM_ROW_H_TOUCH
+            HudLayout.BTN_H_TOUCH + HudLayout.ROW_GAP + HudLayout.TILE_TOUCH
         )
+        expect((HudLayout :: any).BOTTOM_ROW_H).toBe(nil)
     end)
 
     test("the cluster still covers bank + throws + bottom row", function()
@@ -395,11 +391,10 @@ HudLayout.RING_THICKNESS = math.max(3, math.round(HudLayout.RING_D * 0.075))
 HudLayout.RING_THICKNESS_TOUCH = math.max(3, math.round(HudLayout.RING_D_TOUCH * 0.075))
 HudLayout.RING_GAP = 8 -- ring <-> tape, and ring <-> plate
 
--- The bottom row is as tall as its TALLEST occupant, not as tall as the tape. The ring is taller
--- than a tape tile at both tiers, and a row derived from the tape alone would let it hang below
--- the cluster the onboarding safe band is clamped against — putting a card over it.
-HudLayout.BOTTOM_ROW_H = math.max(HudLayout.TILE, HudLayout.RING_D)
-HudLayout.BOTTOM_ROW_H_TOUCH = math.max(HudLayout.TILE_TOUCH, HudLayout.RING_D_TOUCH)
+-- NO BOTTOM_ROW_H. The ring does NOT sit in the tape's row — it takes the hamburger's slot,
+-- inboard-left of the cluster and level with the throw buttons, so the bottom row keeps its tape
+-- height and AREA_H is unchanged. An earlier draft of this plan grew the row to the ring's height
+-- and pushed the whole cluster up 42px on desktop for nothing.
 ```
 
 Re-derive `AREA_H` / `AREA_H_TOUCH` from `BOTTOM_ROW_H` instead of `TILE`, and update their
@@ -457,7 +452,9 @@ ring.Name = "RoundRing"
 ring.AutoButtonColor = false
 ring.Text = ""
 ring.AnchorPoint = Vector2.new(1, 1)
-ring.Position = UDim2.new(1 - JUMP_CLEARANCE, -(TAPE_W + RING_GAP), 1, -EDGE)
+-- The hamburger's slot, exactly: inboard-left of the cluster, bottom-aligned with the THROW
+-- BUTTON row (not the tape). Read ledgerButton's own Position before writing this and match it.
+ring.Position = UDim2.new(1 - JUMP_CLEARANCE, -(AREA_W + RING_GAP), 1, -(EDGE + AREA_H - BTN_H))
 ring.Size = UDim2.fromOffset(RING_D, RING_D)
 ring.BackgroundTransparency = 1
 ring.Parent = gui
@@ -484,17 +481,6 @@ end
 
 Add `RING_TRACK = Color3.fromRGB(38, 36, 42)`, `RING_LIVE = Color3.fromRGB(76, 187, 106)` and
 `RING_HOT` (reuse `LOSS_RED`) to the palette.
-
-- [ ] **Step 1b: Move the plate left in the SAME commit**
-
-The ring's slot is where the plate sits today (`-(TAPE_W + LEDGER_GAP)`). Leaving the plate there
-until Task 5 would stack the two on top of each other for a whole task. Move it now:
-
-```luau
-plate.Position = UDim2.new(1 - JUMP_CLEARANCE, -(TAPE_W + RING_GAP + RING_D + RING_GAP), 1, -EDGE)
-```
-
-Task 5 changes its vertical anchor and makes it a button; only the horizontal moves here.
 
 - [ ] **Step 2: The digits and the glyph**
 
@@ -606,12 +592,9 @@ cards further from live buttons. Note it in a comment so it does not read as a b
 
 - [ ] **Step 3: The plate becomes a door**
 
-Change `plate` from a `Frame` to a `TextButton` (`AutoButtonColor = false`, `Text = ""`), sitting
-left of the ring:
-
-```luau
-plate.Position = UDim2.new(1 - JUMP_CLEARANCE, -(TAPE_W + RING_GAP + RING_D + RING_GAP), 1, -EDGE_BOTTOM)
-```
+Change `plate` from a `Frame` to a `TextButton` (`AutoButtonColor = false`, `Text = ""`). **It does
+not move horizontally** — it keeps its slot left of the tape, since the ring never entered that
+row. Only its vertical anchor changes, to `EDGE_BOTTOM`.
 
 ```luau
 -- TAPPABLE AGAIN, and it is safe now in a way it was not before. The plate went inert because it
