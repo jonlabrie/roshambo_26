@@ -71,8 +71,14 @@ describe("RingTimer.isWarning", function()
 end)
 
 describe("RingTimer.segmentWidth — segments overlap so the ring reads solid", function()
-    test("a segment is at least as wide as its share of the circumference", function()
-        local pitch = 2 * math.pi * 23 / N
-        expect(RingTimer.segmentWidth(23, N) >= pitch).toBe(true)
+    test("a segment is STRICTLY wider than its share of the circumference", function()
+        -- Strictly, not >=. Segments are rotated about their own centres, so a width equal to the
+        -- arc pitch leaves hairline gaps and the ring reads dotted. The overlap margin is the
+        -- whole point of this function, and `>=` would pass an implementation that dropped it.
+        for _, r in { 12, 19, 22, 23, 38 } do
+            for _, n in { 12, 24, 36, 60 } do
+                expect(RingTimer.segmentWidth(r, n) > 2 * math.pi * r / n).toBe(true)
+            end
+        end
     end)
 end)
