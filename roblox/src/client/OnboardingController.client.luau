@@ -65,14 +65,20 @@ local CARD_HINT = Color3.fromRGB(238, 208, 142)
 -- files have to agree on them exactly.
 local TOUCH = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
-local EDGE = HudLayout.EDGE
 local JUMP_CLEARANCE = HudLayout.JUMP_CLEARANCE
-local AREA_H = if TOUCH then HudLayout.AREA_H_TOUCH else HudLayout.AREA_H
-local ROW_GAP = HudLayout.ROW_GAP
 -- The bank button's row, directly above the throw cluster — the same numbers HudController's own
 -- bank button reads. Declared here, above STATIC_ANCHORS, because that table reads them.
-local BANK_H = HudLayout.BANK_H
 local BANK_GAP = HudLayout.BANK_GAP
+
+-- `CLUSTER_TOP_FROM_BOTTOM` is where the bank+throws+tape cluster's footprint begins, measured up
+-- from the screen's bottom edge (mirrors HudController's own EDGE / AREA_H / BANK_H numbers, now
+-- shared). Round-2 review caught that this band was built but never actually applied to the
+-- NOT-YET-TRACKED fallback — only to a live projection — leaving the exact same "card covers
+-- BANK n POINTS" failure mode reachable through a slower path (join fires on the first
+-- RoundUpdate, which can beat the drum's replication).
+local CLUSTER_TOP_FROM_BOTTOM = if TOUCH
+    then HudLayout.CLUSTER_TOP_FROM_BOTTOM_TOUCH
+    else HudLayout.CLUSTER_TOP_FROM_BOTTOM
 
 local CARD_W = 220
 local DRUM_CARD_W = 220
@@ -173,7 +179,7 @@ hintLabel.Parent = card
 --
 -- Nothing here ever covers the throw buttons, the bank button, the ring or the tape —
 -- ALL THREE sit ABOVE the whole bank+throws+tape cluster (offset clears its full footprint via
--- EDGE/AREA_H/ROW_GAP/BANK_H/BANK_GAP, the same numbers HudController's own stack is built from).
+-- CLUSTER_TOP_FROM_BOTTOM + BANK_GAP, the same derivation HudController's own stack is built from).
 --
 -- `wallet` does NOT try to hug the actual plate (right-anchored, immediately left of the tape,
 -- `HudController.client.luau:264`): the plate is hidden by default, so pointing at it precisely
@@ -200,17 +206,17 @@ local STATIC_ANCHORS: { [string]: { point: Vector2, offset: UDim2, width: number
     -- sharing the spot is a non-issue, and it is one fewer number to keep in step.
     throwArea = {
         point = Vector2.new(1, 1),
-        offset = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE + AREA_H + ROW_GAP + BANK_H + BANK_GAP)),
+        offset = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(CLUSTER_TOP_FROM_BOTTOM + BANK_GAP)),
         width = CARD_W,
     },
     potIndicator = {
         point = Vector2.new(1, 1),
-        offset = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE + AREA_H + ROW_GAP + BANK_H + BANK_GAP)),
+        offset = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(CLUSTER_TOP_FROM_BOTTOM + BANK_GAP)),
         width = CARD_W,
     },
     wallet = {
         point = Vector2.new(1, 1),
-        offset = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE + AREA_H + ROW_GAP + BANK_H + BANK_GAP)),
+        offset = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(CLUSTER_TOP_FROM_BOTTOM + BANK_GAP)),
         width = CARD_W,
     },
 }
@@ -230,16 +236,7 @@ local DRUM_LAST_RESORT = { point = Vector2.new(0.5, 0), offset = UDim2.new(0.5, 
 -- so the toast — which sits at `EDGE` and grows downward with `AutomaticSize` — is the only thing
 -- left up there for a card to clear); it is a reservation, not a measurement, because a card
 -- landing on a transient notice would hide exactly the line explaining what just happened.
--- `CLUSTER_TOP_FROM_BOTTOM` is where the bank+throws+tape cluster's footprint begins, measured up
--- from the screen's bottom edge (mirrors HudController's own EDGE / AREA_H / BANK_H numbers, now
--- shared). Round-2 review caught that this band was built but never actually applied to the
--- NOT-YET-TRACKED fallback — only to a live projection — leaving the exact same "card covers
--- BANK n POINTS" failure mode reachable through a slower path (join fires on the first
--- RoundUpdate, which can beat the drum's replication).
 local TOAST_BAND = 64
-local CLUSTER_TOP_FROM_BOTTOM = if TOUCH
-    then HudLayout.CLUSTER_TOP_FROM_BOTTOM_TOUCH
-    else HudLayout.CLUSTER_TOP_FROM_BOTTOM
 local SAFE_MARGIN = 24 -- round-2: was 16, widened to also give the toast strip more clearance
 local DRUM_BUBBLE_LIFT = 36 -- vertical gap between the projected point and the card's bottom edge
 local MIN_CARD_H = 90 -- floor for AbsoluteSize.Y before AutomaticSize has laid out even once —

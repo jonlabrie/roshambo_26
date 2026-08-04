@@ -70,7 +70,18 @@ HudLayout.RING_GAP = 8 -- ring <-> tape, and ring <-> plate
 -- The bank button's row, directly above the throw cluster. Reserved whether or not a pot is
 -- riding: an onboarding card clamped into a band that ignored it would land on the button the
 -- moment a first win put one there.
-HudLayout.BANK_H = 40
+--
+-- 36, down from 40 (owner's gate 2026-08-04, spec §3). The HUD is already 6px off the bottom
+-- edge — that is the floor, not a thing to re-litigate — so the only slack in the stack is
+-- here. NOT below 36: banking is the one irreversible action on this surface. The throw
+-- buttons' 44px floor does not bind, because that floor was set for the three targets a player
+-- hits every round under time pressure.
+HudLayout.BANK_H = 36
+
+-- BANK_GAP is now actually the gap. It was declared for it and then only OnboardingController
+-- read it, while HudController and CLUSTER_TOP_FROM_BOTTOM positioned the row with ROW_GAP (10)
+-- — so the constant named for this gap had never been this gap. All three read it now, and the
+-- correction is worth 2 of the 6 pixels this round reclaims.
 HudLayout.BANK_GAP = 8
 
 -- The tape+buttons cluster's own height, per tier. The TAPE IS BELOW THE BUTTONS now (owner's
@@ -85,10 +96,10 @@ HudLayout.AREA_H_TOUCH = HudLayout.BTN_H_TOUCH + HudLayout.ROW_GAP + HudLayout.T
 -- There is no PLATE_BOTTOM counterpart any more: the plate has left the top band entirely, so
 -- the only thing an onboarding card has to clear up there is the toast (see
 -- OnboardingController).
-HudLayout.CLUSTER_TOP_FROM_BOTTOM = HudLayout.EDGE + HudLayout.AREA_H + HudLayout.ROW_GAP + HudLayout.BANK_H
+HudLayout.CLUSTER_TOP_FROM_BOTTOM = HudLayout.EDGE + HudLayout.AREA_H + HudLayout.BANK_GAP + HudLayout.BANK_H
 HudLayout.CLUSTER_TOP_FROM_BOTTOM_TOUCH = HudLayout.EDGE
     + HudLayout.AREA_H_TOUCH
-    + HudLayout.ROW_GAP
+    + HudLayout.BANK_GAP
     + HudLayout.BANK_H
 
 return HudLayout

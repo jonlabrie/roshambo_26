@@ -111,6 +111,7 @@ local EDGE_BOTTOM = 6
 -- registers off the tape's edge too — the hamburger's old gap constant and this were always the
 -- same value (8); one constant now that only one door remains.
 local RING_GAP = HudLayout.RING_GAP
+local BANK_GAP = HudLayout.BANK_GAP
 
 -- BTN_W tracks BTN_H (the buttons are square) off the SAME shared scale, so "50% smaller" shrinks
 -- the cluster in both axes rather than leaving three squat letterboxes.
@@ -802,7 +803,7 @@ end
 local bankButton = Instance.new("TextButton")
 bankButton.Name = "Bank"
 bankButton.AnchorPoint = Vector2.new(1, 1)
-bankButton.Position = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE_BOTTOM + AREA_H + ROW_GAP))
+bankButton.Position = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE_BOTTOM + AREA_H + BANK_GAP))
 bankButton.Size = UDim2.fromOffset(BANK_W, HudLayout.BANK_H)
 bankButton.BackgroundColor3 = POT_RED
 bankButton.BackgroundTransparency = 0.15

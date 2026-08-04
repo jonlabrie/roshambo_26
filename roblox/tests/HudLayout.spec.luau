@@ -6,10 +6,10 @@ local HudLayout = require("../src/shared/HudLayout")
 describe("HudLayout — the cluster the onboarding band has to clear", function()
     test("the cluster is bank + throws + tape, and nothing else", function()
         expect(HudLayout.CLUSTER_TOP_FROM_BOTTOM).toBe(
-            HudLayout.EDGE + HudLayout.AREA_H + HudLayout.ROW_GAP + HudLayout.BANK_H
+            HudLayout.EDGE + HudLayout.AREA_H + HudLayout.BANK_GAP + HudLayout.BANK_H
         )
         expect(HudLayout.CLUSTER_TOP_FROM_BOTTOM_TOUCH).toBe(
-            HudLayout.EDGE + HudLayout.AREA_H_TOUCH + HudLayout.ROW_GAP + HudLayout.BANK_H
+            HudLayout.EDGE + HudLayout.AREA_H_TOUCH + HudLayout.BANK_GAP + HudLayout.BANK_H
         )
     end)
 
@@ -28,6 +28,21 @@ describe("HudLayout — the cluster the onboarding band has to clear", function(
 
     test("the touch throw target clears the 44px floor", function()
         expect(HudLayout.BTN_H_TOUCH >= 44).toBe(true)
+    end)
+
+    test("BANK_GAP is the gap above the cluster, not a number nobody uses", function()
+        -- It was declared for this gap and then only OnboardingController read it, while
+        -- HudController and CLUSTER_TOP_FROM_BOTTOM both positioned the row with ROW_GAP. The
+        -- two are different numbers, so the derivation above is what pins the repair: if a
+        -- later edit puts ROW_GAP back, this fails.
+        expect(HudLayout.BANK_GAP ~= HudLayout.ROW_GAP).toBe(true)
+    end)
+
+    test("the bank button stays comfortably hittable", function()
+        -- The owner's ruling (spec §3): 36, not 32. Banking is the one irreversible action on
+        -- this surface and a mis-tap costs real points. The throw buttons' 44px floor does not
+        -- bind here — that floor is for the three targets hit every round under time pressure.
+        expect(HudLayout.BANK_H).toBe(36)
     end)
 end)
 
@@ -56,7 +71,7 @@ describe("HudLayout — the ring beside the throw buttons", function()
 
     test("the cluster still covers bank + throws + tape", function()
         expect(HudLayout.CLUSTER_TOP_FROM_BOTTOM).toBe(
-            HudLayout.EDGE + HudLayout.AREA_H + HudLayout.ROW_GAP + HudLayout.BANK_H
+            HudLayout.EDGE + HudLayout.AREA_H + HudLayout.BANK_GAP + HudLayout.BANK_H
         )
     end)
 
