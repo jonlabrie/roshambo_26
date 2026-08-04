@@ -118,6 +118,15 @@ one-gesture rule was designed to avoid.
 `src/components/PieTimer.tsx` is the reference: a 54px ring, green until `timeLeft <= 4` then
 red, the remaining seconds in the middle, swapping to the world-throw glyph on reveal.
 
+**It is sized to a throw button, not to the tape** — `BTN_H` / `BTN_H_TOUCH`, so 76px on desktop
+and 44px on touch. The PWA's own 54px was the right reference while the ring was a readout; it
+stopped being one the moment it became the ledger's door (§6), and an interactive target should be
+sized like the other interactive targets rather than like the tape beside it. 44px is also exactly
+the touch-target floor this design adopted for the throw buttons.
+
+The ring's stroke scales with it (7.5% of the diameter, floored at 3px) so a 76px ring does not
+read as a hairline circle.
+
 **Roblox has no SVG**, so the sweep is a **segmented ring** — N wedges around a circle, lit
 from the top clockwise in proportion to the time remaining. Which segments are lit for a given
 fraction is pure arithmetic and belongs in a Lune-tested module; the controller only paints

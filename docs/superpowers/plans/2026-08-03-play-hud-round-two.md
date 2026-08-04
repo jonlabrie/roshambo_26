@@ -329,9 +329,18 @@ git commit -m "feat(roblox): one urgency threshold, and a prompt that does not l
 
 ```luau
 describe("HudLayout — the ring shares the bottom row with the tape", function()
-    test("the ring is exported at both tiers and the touch one is smaller", function()
-        expect(HudLayout.RING_D_TOUCH < HudLayout.RING_D).toBe(true)
-        expect(HudLayout.RING_THICKNESS > 0).toBe(true)
+    test("the ring is exactly a throw button at both tiers", function()
+        -- It is a target now, not a readout. Sizing it to the tape would make the ledger's only
+        -- door smaller than every other control on the surface.
+        expect(HudLayout.RING_D).toBe(HudLayout.BTN_H)
+        expect(HudLayout.RING_D_TOUCH).toBe(HudLayout.BTN_H_TOUCH)
+        expect(HudLayout.RING_D_TOUCH >= 44).toBe(true)
+    end)
+
+    test("the stroke scales with the ring and never vanishes", function()
+        expect(HudLayout.RING_THICKNESS >= 3).toBe(true)
+        expect(HudLayout.RING_THICKNESS_TOUCH >= 3).toBe(true)
+        expect(HudLayout.RING_THICKNESS > HudLayout.RING_THICKNESS_TOUCH).toBe(true)
     end)
 
     test("the bottom row is as tall as its tallest occupant", function()
@@ -373,9 +382,17 @@ Expect FAIL — `RING_D` and `BOTTOM_ROW_H` are nil.
 --
 -- 54px is the PWA's own diameter (src/components/PieTimer.tsx). The touch tier scales it by the
 -- same factor the tape uses — it is read, never touched, so no 44px target floor applies.
-HudLayout.RING_D = 54
-HudLayout.RING_D_TOUCH = math.round(HudLayout.RING_D * HudLayout.TAPE_TOUCH_SCALE)
-HudLayout.RING_THICKNESS = 4
+-- SIZED TO A THROW BUTTON, not to the tape. The PWA's 54px was the right reference while this
+-- was a readout; it stopped being one when it became the ledger's door, and an interactive target
+-- should be sized like the other interactive targets. 44px on touch is also exactly the
+-- touch-target floor the throw buttons adopted.
+HudLayout.RING_D = HudLayout.BTN_H
+HudLayout.RING_D_TOUCH = HudLayout.BTN_H_TOUCH
+
+-- Proportional, so a 76px ring is not a hairline circle. 7.5% is the PWA's own ratio (4px on 54),
+-- floored at 3 so the touch tier keeps a visible stroke.
+HudLayout.RING_THICKNESS = math.max(3, math.round(HudLayout.RING_D * 0.075))
+HudLayout.RING_THICKNESS_TOUCH = math.max(3, math.round(HudLayout.RING_D_TOUCH * 0.075))
 HudLayout.RING_GAP = 8 -- ring <-> tape, and ring <-> plate
 
 -- The bottom row is as tall as its TALLEST occupant, not as tall as the tape. The ring is taller
@@ -428,7 +445,7 @@ modules.
 -- Everything here is Active = false. It is a readout.
 local RING_D = if TOUCH then HudLayout.RING_D_TOUCH else HudLayout.RING_D
 local RING_GAP = HudLayout.RING_GAP
-local RING_THICKNESS = HudLayout.RING_THICKNESS
+local RING_THICKNESS = if TOUCH then HudLayout.RING_THICKNESS_TOUCH else HudLayout.RING_THICKNESS
 local RING_R = RING_D / 2 - RING_THICKNESS / 2
 local SEG_W = RingTimer.segmentWidth(RING_R, RingTimer.SEGMENTS)
 
