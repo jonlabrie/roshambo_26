@@ -70,16 +70,18 @@ end
 -- Spin is about the hub's LOCAL Y. Symbol `sym` sits at the −Z front window when
 -- θ ≡ −sym*30° (mod 360); symbols recur every 3 facets → a detent every 90° (π/2).
 -- rad/s during the constant spin, still live-tunable via the "DrumKick" attribute below. From
--- DrumStep rather than a literal: the glide carries this velocity, so SPLASH_LEAD_SECONDS is
--- chosen against it and DrumStep.spec asserts against it — three copies of one number.
+-- DrumStep rather than a literal: the glide carries this velocity, so the settling cue's residual
+-- is computed against it and DrumStep.spec asserts against it — three copies of one number.
 local DRUM_KICK = DrumStep.KICK_OMEGA
 -- From DrumStep, not local literals: the SERVER waits this same span before growing a winner's
 -- avatar (it cannot hear `drumRest`), so a retimed spin or glide has to move both together.
 local SPIN_SEC = DrumStep.SPIN_SECONDS
 local GLIDE_SEC = DrumStep.GLIDE_SECONDS
--- The fraction of the glide at which the personal result may show. Clamped: a lead longer than
--- the glide itself would fire at glide start, while the drum is still visibly travelling.
-local SETTLING_S = math.clamp((GLIDE_SEC - DrumStep.SPLASH_LEAD_SECONDS) / GLIDE_SEC, 0, 1)
+-- How near home the drum must be before the personal result may show — half a facet, so the symbol
+-- in the window IS the one the splash is about to name. NOT a fixed lead in seconds: the glide's
+-- travel varies with the detent `landTargetFor` picks, so one lead is right for one landing and
+-- wrong for the next (spec §2).
+local SPLASH_RESIDUAL = DrumStep.SPLASH_RESIDUAL_RADIANS
 local settlingFired = false
 -- PADDLE CHOREOGRAPHY (2026-07-23): the strike smacks the paddle 90° so it rests
 -- PARALLEL to the log, out of the dowel's path; once the drawing dowel has crawled
@@ -176,9 +178,12 @@ RunService.Heartbeat:Connect(function(_dt)
             mode = "hold"
             EventBus.Cue:Fire({ kind = "drumRest" })
         else
-            -- ONCE per glide. `drumSettling` says the drum is committed to its detent — near
-            -- enough home that the face is readable — which is all the splash needs to know.
-            if not settlingFired and s >= SETTLING_S then
+            -- ONCE per glide. `drumSettling` says the drum is committed to its detent — within half
+            -- a facet of home, so the symbol in the window is already the world's throw — which is
+            -- all the splash needs to know. Triggered on the RESIDUAL ANGLE, never on the clock, and
+            -- computed from the LIVE `omega` so a "DrumKick" stage override retimes the cue with the
+            -- drum instead of silently invalidating it.
+            if not settlingFired and DrumStep.glideResidual(glideD, omega, s) <= SPLASH_RESIDUAL then
                 settlingFired = true
                 EventBus.Cue:Fire({ kind = "drumSettling" })
             end

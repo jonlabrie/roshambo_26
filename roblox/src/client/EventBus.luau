@@ -25,8 +25,9 @@ local NAMES = {
     -- same thing to the escalation rule, so this does not carry a payload of its own.
     "DismissEscalation",
     -- The result splash (SplashController). Fired from main.client.luau's `maybeShowSplash`, on the
-    -- `drumSettling` cue — ~0.7s ahead of the drumRest gate the TAPE TILE still waits on, because by
-    -- then the drum is committed to its detent and the face is readable. Never from RevealResult
+    -- `drumSettling` cue — 0.36-0.51s ahead of the drumRest gate the TAPE TILE still waits on,
+    -- because by then the drum is within half a facet of home and the face in the window is already
+    -- the world's throw. Never from RevealResult
     -- directly, which would spoil the wheel ~3s early. Payload: { result, streak, pot, forfeited }.
     "Splash",
 }

@@ -302,7 +302,7 @@ BoardData.OnClientEvent:Connect(function(d)
 end)
 
 -- The tape tile waits for the drum to stop turning (the drumRest cue) and the result splash for
--- the drum to commit to its detent (drumSettling, ~0.7s earlier), so neither spoils the throw
+-- the drum to commit to its detent (drumSettling, ~0.36-0.51s earlier), so neither spoils the throw
 -- mid-spin. NOT nil'd by the splash: `maybeShowSplash` only reads this record, because the tape
 -- tile still needs it afterwards. The splash (SplashController) owns naming the personal result
 -- now — the old toast folded the vote distribution into the same headline it built here,
@@ -323,8 +323,9 @@ local pendingReveal: {
     nil
 local drumAtRest = false
 
--- Two gates, not one. The SPLASH — the player's own result — releases on `drumSettling`, ~0.7s
--- before the drum stops. Everything else (the tape badge, the ledger's LAST ROUND band, the
+-- Two gates, not one. The SPLASH — the player's own result — releases on `drumSettling`, which
+-- DrumController fires the first frame the drum is within half a facet of home — 0.36-0.51s before
+-- it stops, varying with the travel the lander picked. Everything else (the tape badge, the ledger's LAST ROUND band, the
 -- first-win onboarding beat) stays on `drumRest`, because those name the WORLD's throw and
 -- releasing them early is the spoiler this gate exists to prevent.
 local drumSettling = false

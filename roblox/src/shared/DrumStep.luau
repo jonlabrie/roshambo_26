@@ -31,39 +31,67 @@ DrumStep.GLIDE_SECONDS = 2.0
 DrumStep.SETTLE_SECONDS = DrumStep.STRIKE_SWING_SECONDS + DrumStep.SPIN_SECONDS + DrumStep.GLIDE_SECONDS
 
 -- The spin's angular velocity, rad/s — DrumController's old private `DRUM_KICK`, here for the same
--- reason as the durations above. The glide is a Hermite that CARRIES this velocity, so how far
--- along its travel the drum is at any instant cannot be computed without it — and that figure is
--- exactly what SPLASH_LEAD_SECONDS (below) is chosen against and what DrumStep.spec asserts. A
--- hand-copied 4 in the test was not merely stale-if-changed: the assertion inverts across the
--- plausible range (at ω = 1 the worst case is 0.780 and the test fails; at ω = 8 it passes while
--- describing a drum nobody is running).
+-- reason as the durations above. The glide is a Hermite that CARRIES this velocity, so how much
+-- angle the drum still has to turn at any instant cannot be computed without it — and that figure
+-- is what `glideResidual` (below) returns and what DrumStep.spec asserts against. A hand-copied 4
+-- in the test was not merely stale-if-changed: the assertion inverts across the plausible range (at
+-- ω = 1 the worst case is 0.780 and the test fails; at ω = 8 it passes while describing a drum
+-- nobody is running).
 --
 -- DrumController still honours the "DrumKick" stage attribute, which OVERRIDES this at `gongHit`.
--- Nothing here can see that attribute, so a stage that sets it is running a drum whose travel
--- fraction at the splash is not the one asserted — retune the lead if you touch it.
+-- Nothing here can see that attribute — which is precisely why the splash cue triggers on the
+-- residual computed from the LIVE ω rather than on a constant lead sized against this one. Retune
+-- the kick in Studio and the cue retimes itself; a constant would silently go wrong.
 DrumStep.KICK_OMEGA = 4
 
--- HOW EARLY THE PERSONAL RESULT MAY LAND, measured back from drumRest (spec §2).
+-- WHEN THE PERSONAL RESULT MAY LAND (spec §2, amended 2026-08-04 by the owner's ruling).
 --
 -- The whole 3.45s of swing + spin + glide sat between a round closing and the player being told
 -- what happened, and the owner's word for it was "a long time". But the wait is not padding —
 -- it is what stops the result being announced before the drum has shown the world's throw.
 --
--- The glide is a HERMITE — a smoothstep PLUS the spin's exit velocity carried into it — so it is
--- nearly home long before it stops: at 0.7s from rest the drum has covered 83-88% of its travel.
--- The spread is the travel the lander picks (D ∈ [ω·G/2, ω·G/2 + π/2); the longer the travel, the
--- smaller the share the fixed velocity term contributes, so the LARGEST D is the worst case). Do
--- not reason about this lead from the easing curve alone: the bare smoothstep reads only 72% at
--- this point and would say the lead is far too long. DrumStep.spec computes both terms. The
--- remaining beat is settling, not suspense. So the SPLASH fires here and the TAPE TILE does not —
--- the tape is the record of the WORLD's throw, the real spoiler, and it has no urgency.
+-- This was first a fixed lead, sized against "the drum has covered >80% of its travel". That
+-- criterion measures the wrong thing. What the splash needs to know is not how far the drum has
+-- COME but WHETHER THE CORRECT SYMBOL IS IN THE WINDOW, and the two part company: at a 0.7s lead
+-- the drum was 83-88% home yet still had 28.1° (best landing) to 53.4° (worst) left to turn, with
+-- facets 30° apart and each carrying a DIFFERENT symbol. For a further 0.19-0.34s the window read a
+-- NEIGHBOURING throw while the splash named the result — on a LOSS, visibly disagreeing with it.
 --
--- FRACTION OF TRAVEL IS NOT THE SAME CRITERION AS "THE CORRECT SYMBOL IS IN THE WINDOW", and at
--- this lead the two part company: 83-88% leaves 28° (best) to 53° (worst) of residual angle with
--- facets 30° apart, so for 0.19-0.34s after the cue the window still shows a NEIGHBOURING facet
--- while the splash names the result. That is a known, owner-facing trade, not a defect to fix
--- here — do not "improve" this lead without pricing it in.
-DrumStep.SPLASH_LEAD_SECONDS = 0.7
+-- No constant fixes that. The residual depends on the travel `landTargetFor` happens to pick
+-- (D ∈ [ω·G/2, ω·G/2 + π/2); the longer the travel, the smaller the share the carried-velocity term
+-- contributes, so the LARGEST D is the worst case). At a 0.5s lead the worst case is still 28.4°, a
+-- full facet off; a fixed lead safe on EVERY landing is ≈0.36s, which barely improves on 3.45s.
+--
+-- So the cue triggers on the RESIDUAL ANGLE, not the clock: the first frame the drum is within half
+-- a facet of home, the correct symbol is the one in the window and the splash may show. That yields
+-- a variable ≈0.36-0.51s lead — right on every landing rather than on the lucky ones — and it is
+-- the only formulation that survives a retune of ω (see KICK_OMEGA above).
+--
+-- HALF A FACET, derived from FACES so it cannot drift out of step with the drum's geometry. Half is
+-- the widest it may ever be: at more than half a facet of residual the NEXT facet round is still the
+-- one nearer the window, so the player would be reading a different symbol from the one named.
+DrumStep.SPLASH_RESIDUAL_RADIANS = (2 * math.pi / FACES) / 2
+
+-- How much angle the glide still has to turn, in radians, at normalised progress `s` ∈ [0,1].
+--
+-- DrumController drives the glide as
+--     θ(s) = θ₀ − d·(3s² − 2s³) − ω·G·(s³ − 2s² + s),   landing at θ₀ − d,
+-- so the angle still owed is
+--     residual(s) = d·(1 − (3s² − 2s³)) − ω·G·(s³ − 2s² + s).
+--
+-- IT IS A HERMITE, NOT A BARE SMOOTHSTEP — a smoothstep PLUS the spin's exit velocity carried into
+-- the glide, because ω is not zeroed until the glide completes. (This module's header used to claim
+-- a plain smoothstep and misled a reader: the smoothstep alone reads 72% travelled where the real
+-- curve reads 83-88%.) Note s³ − 2s² + s = s(1−s)², non-negative on [0,1], so the carried term only
+-- ever brings the drum home sooner. residual(0) = d exactly; residual(1) = 0 exactly.
+--
+-- `d` is the glide's total travel and `omega` the LIVE angular velocity entering it — pass what the
+-- controller is actually running, not KICK_OMEGA, or a "DrumKick" stage override goes unseen.
+function DrumStep.glideResidual(d: number, omega: number, s: number): number
+    local smooth = 3 * s * s - 2 * s * s * s
+    local carried = s * s * s - 2 * s * s + s
+    return d * (1 - smooth) - omega * DrumStep.GLIDE_SECONDS * carried
+end
 
 -- the low face index (0..2) carrying this throw's symbol
 function DrumStep.faceForThrow(throw: string): number
