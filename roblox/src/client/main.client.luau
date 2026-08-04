@@ -66,6 +66,10 @@ local tape: { { id: string, worldThrow: string } } = {}
 local badgeById: { [string]: string } = {}
 local currentRoundId: string? = nil -- the round in play (from RoundUpdate)
 local revealedRoundId: string? = nil -- the latest round our drum has finished
+-- The world's throw for the round `revealedRoundId` names, or nil. Set alongside it in
+-- `maybeShowReveal` and cleared when ACTIVE reopens, so the ring (HudController) inherits the
+-- SAME drum-rest spoiler gate the tape does rather than a second one of its own.
+local revealedWorldThrow: string? = nil
 
 local phase = ""
 local lockoutAt: number? = nil
@@ -228,6 +232,9 @@ local function publish()
         -- Render-only, so it stays out of HudModel: false means we never got a lockout for this
         -- round and the hairline has no real span to deplete against.
         timerKnown = lockoutAt ~= nil,
+        -- The world's throw for the round the drum has FINISHED revealing, or nil. Gated by the
+        -- same `revealedRoundId` the tape is, so the ring cannot spoil the wheel mid-spin.
+        worldThrow = revealedWorldThrow,
     })
 end
 
@@ -267,7 +274,7 @@ end)
 -- so the throw is not spoiled mid-spin. The vote distribution is folded into that same headline
 -- rather than announced on its own: it names the world throw too, and the old prose ticker
 -- released it the instant the reveal landed, which spoiled the wheel while it was still turning.
-local pendingReveal: { headline: string, roundId: string?, result: string? }? = nil
+local pendingReveal: { headline: string, roundId: string?, result: string?, worldThrow: string }? = nil
 local drumAtRest = false
 
 local function maybeShowReveal()
@@ -284,6 +291,7 @@ local function maybeShowReveal()
                 badgeById[p.roundId] = p.result
             end
             revealedRoundId = p.roundId
+            revealedWorldThrow = p.worldThrow
         end
         -- Onboarding beat 3 waits for the SAME gate as the toast/badge above, not for RevealResult
         -- arriving. WIN implies the exact world throw (the one your pick beats), so firing this
@@ -431,6 +439,7 @@ RoundUpdate.OnClientEvent:Connect(function(info)
         lockoutAt = if info.secondsToLockout then os.clock() + info.secondsToLockout else nil
         pendingReveal = nil -- the drum respins; last round's reveal has already been shown
         drumAtRest = false
+        revealedWorldThrow = nil -- the ring must not carry last round's glyph into this one
     else
         lockoutAt = nil
     end
@@ -452,7 +461,8 @@ RevealResult.OnClientEvent:Connect(function(r)
     -- a toast is transient, and two of them back to back would occupy a third of the round.
     local headline = `{result} — R {r.distribution.R}% · P {r.distribution.P}% · S {r.distribution.S}%`
     -- The revealing round == the one RoundUpdate last named (REVEAL phase).
-    pendingReveal = { headline = headline, roundId = currentRoundId, result = r.result }
+    pendingReveal =
+        { headline = headline, roundId = currentRoundId, result = r.result, worldThrow = r.worldThrow }
     maybeShowReveal() -- only shows if the drum is already at rest
     task.delay(REVEAL_SAFETY, function()
         if pendingReveal and pendingReveal.headline == headline then

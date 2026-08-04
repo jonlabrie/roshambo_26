@@ -41,6 +41,7 @@ local HudModel = require(shared:WaitForChild("HudModel"))
 local HudLayout = require(shared:WaitForChild("HudLayout"))
 local Glyphs = require(shared:WaitForChild("Glyphs"))
 local RollingNumber = require(shared:WaitForChild("RollingNumber"))
+local RingTimer = require(shared:WaitForChild("RingTimer"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local player = Players.LocalPlayer
@@ -879,6 +880,124 @@ ledgerButton.MouseButton1Click:Connect(function()
     end
 end)
 
+-- ===== The round-timer ring: the ledger's new door (spec §5, §6) =====
+-- The PWA's PieTimer, rebuilt. Roblox has no SVG and no radial fill, so the sweep is a ring of
+-- discrete segments — RingTimer says how many are lit, this paints them. Green while there is
+-- time, red at HudModel.ESCALATE_AT, which is the SAME constant the escalation prompt reads: two
+-- signals about one fact must not turn urgent at different moments.
+--
+-- It takes the HAMBURGER's old slot, not the plate's: inboard-left of the throw cluster,
+-- bottom-aligned with the button row (see `ledgerButton`'s own Position, just above, which this
+-- matches exactly with RING_GAP standing in for LEDGER_GAP). `ledgerButton` stays in place for
+-- now — Task 5 deletes it — so the two doors briefly coexist; this section is the round's clock
+-- AND the ledger's second door, and it inherits the hamburger's two-stage gesture below rather
+-- than duplicating it.
+--
+-- A BUTTON, not a Frame: only the outer button sinks. Its segments and the centred readout all
+-- stay Active = false (Frames/TextLabels already default there — see the file header), the same
+-- interactive cost the hamburger carried in the same row.
+local RING_D = if TOUCH then HudLayout.RING_D_TOUCH else HudLayout.RING_D
+local RING_GAP = HudLayout.RING_GAP
+local RING_THICKNESS = if TOUCH then HudLayout.RING_THICKNESS_TOUCH else HudLayout.RING_THICKNESS
+local RING_R = RING_D / 2 - RING_THICKNESS / 2
+local SEG_W = RingTimer.segmentWidth(RING_R, RingTimer.SEGMENTS)
+
+local RING_TRACK = Color3.fromRGB(38, 36, 42)
+local RING_LIVE = Color3.fromRGB(76, 187, 106)
+local RING_HOT = LOSS_RED
+
+local ring = Instance.new("TextButton")
+ring.Name = "RoundRing"
+ring.AutoButtonColor = false
+ring.Text = ""
+ring.AnchorPoint = Vector2.new(1, 1)
+-- The hamburger's slot, exactly: inboard of the cluster by AREA_W + RING_GAP, off the SAME
+-- right edge (1 - JUMP_CLEARANCE) everything else in the cluster registers to; bottom-aligned
+-- with the throw BUTTON row's own bottom edge (EDGE + AREA_H - BTN_H from the gui's bottom),
+-- not the tape's.
+ring.Position = UDim2.new(1 - JUMP_CLEARANCE, -(AREA_W + RING_GAP), 1, -(EDGE + AREA_H - BTN_H))
+ring.Size = UDim2.fromOffset(RING_D, RING_D)
+ring.BackgroundTransparency = 1
+ring.Parent = gui
+
+local segments: { Frame } = {}
+for i = 1, RingTimer.SEGMENTS do
+    local a = math.rad(RingTimer.angleAt(i, RingTimer.SEGMENTS))
+    local seg = Instance.new("Frame")
+    seg.Name = `S{i}`
+    seg.Active = false
+    seg.AnchorPoint = Vector2.new(0.5, 0.5)
+    -- Screen space: +x right, +y DOWN, so the top of the circle is -y and the sweep runs
+    -- clockwise as the angle grows.
+    seg.Position = UDim2.fromOffset(RING_D / 2 + RING_R * math.sin(a), RING_D / 2 - RING_R * math.cos(a))
+    seg.Size = UDim2.fromOffset(SEG_W, RING_THICKNESS)
+    seg.Rotation = RingTimer.angleAt(i, RingTimer.SEGMENTS)
+    seg.BackgroundColor3 = RING_TRACK
+    seg.BorderSizePixel = 0
+    seg.Parent = ring
+    segments[i] = seg
+end
+
+-- The centred readout: the remaining seconds, swapping to the world-throw glyph once the drum
+-- has settled on it (see `render`'s `aux.worldThrow` branch, and `main.client.luau`'s drum-rest
+-- gate). No UIStroke on the label — the ring's centre is open canyon, so the digits get their
+-- own small opaque disc backing instead of an outline.
+local ringDisc = Instance.new("Frame")
+ringDisc.Name = "Disc"
+ringDisc.Active = false
+ringDisc.AnchorPoint = Vector2.new(0.5, 0.5)
+ringDisc.Position = UDim2.fromScale(0.5, 0.5)
+ringDisc.Size = UDim2.fromScale(0.56, 0.56)
+ringDisc.BackgroundColor3 = WASHI
+ringDisc.BackgroundTransparency = 0.15
+ringDisc.BorderSizePixel = 0
+ringDisc.Parent = ring
+local ringDiscCorner = Instance.new("UICorner")
+ringDiscCorner.CornerRadius = UDim.new(0.5, 0) -- scale-based, so it stays a circle at either tier
+ringDiscCorner.Parent = ringDisc
+
+local ringCount = Instance.new("TextLabel")
+ringCount.Name = "Count"
+ringCount.Active = false
+ringCount.Size = UDim2.fromScale(1, 1)
+ringCount.BackgroundTransparency = 1
+ringCount.TextColor3 = INK_CREAM
+ringCount.TextSize = if TOUCH then 14 else 18
+ringCount.Font = Enum.Font.GothamBlack
+ringCount.Text = ""
+ringCount.Parent = ringDisc
+-- No UIStroke on this label. Contrast comes from `ringDisc`'s opaque backing above.
+
+-- One glyph box per symbol, built ONCE — same pattern `glyphSet` uses for the tape tiles — so
+-- the reveal can show whichever the world threw without rebuilding an ImageLabel every round.
+local ringGlyphs: { [string]: Frame } = {}
+do
+    local box = glyphBox(ringDisc, 0.82)
+    for _, sym in THROWS do
+        local g = Glyphs.render(box, sym, INK_CREAM)
+        g.Visible = false
+        ringGlyphs[sym] = g
+    end
+end
+
+local ringScale = Instance.new("UIScale")
+ringScale.Parent = ring
+
+-- THE HAMBURGER'S TWO-STAGE GESTURE, ported unchanged: the first tap reveals the plate, and a
+-- tap while the plate is still on screen — the hold or the fade, `plateVisible` covers both —
+-- fires EventBus.OpenLedger instead. `ledgerButton`'s own handlers, just above, are the
+-- reference this was ported from; Task 5 deletes those once this is the only door.
+ring.MouseButton1Down:Connect(function()
+    pressDepress(ringScale)
+end)
+ring.MouseButton1Click:Connect(function()
+    if plateVisible then
+        EventBus.OpenLedger:Fire()
+    else
+        revealPlate()
+    end
+end)
+
 -- ===== Round timer: a hairline along the bottom edge, depleting =====
 local timer = Instance.new("Frame")
 timer.Name = "RoundTimer"
@@ -1148,6 +1267,30 @@ local function render(inputs: any, aux: any)
         timer.Size = UDim2.fromOffset(0, height)
     end
     lastPhase = inputs.phase
+
+    -- The ring, the hairline's eventual replacement (Task 5). `span` is already tracked for the
+    -- hairline just above; reuse it rather than deriving a second notion of the round's length.
+    -- Where the countdown is unknown (`aux.timerKnown == false`, or the phase isn't ACTIVE), light
+    -- NOTHING and blank the digits — a full ring that never moves would read as "plenty of time"
+    -- and be a lie, exactly why the hairline hides itself in that case.
+    local ringKnown = inputs.phase == "ACTIVE" and aux.timerKnown ~= false and span > 0
+    local ringFrac = if ringKnown then math.clamp(view.secondsLeft / span, 0, 1) else 0
+    local litCount = RingTimer.lit(ringFrac, RingTimer.SEGMENTS)
+    local ringHot = RingTimer.isWarning(view.secondsLeft, HudModel.ESCALATE_AT)
+    for i, seg in segments do
+        seg.BackgroundColor3 = if i <= litCount then (if ringHot then RING_HOT else RING_LIVE) else RING_TRACK
+    end
+    ringCount.TextColor3 = if ringHot then RING_HOT else INK_CREAM
+
+    -- The glyph swap: the world's throw appears in the ring's centre only once the drum has
+    -- settled (main.client.luau's drum-rest gate, inherited via `aux.worldThrow` rather than a
+    -- second spoiler gate here). Digits and glyph are mutually exclusive.
+    local worldThrow = aux.worldThrow
+    ringCount.Visible = worldThrow == nil
+    ringCount.Text = if worldThrow == nil and ringKnown then tostring(math.ceil(view.secondsLeft)) else ""
+    for _, sym in THROWS do
+        ringGlyphs[sym].Visible = sym == worldThrow
+    end
 
     escalation.Visible = view.escalate
     if view.escalate then
