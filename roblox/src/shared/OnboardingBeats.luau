@@ -24,7 +24,18 @@ OnboardingBeats.BEATS = {
     -- Was anchored "plate": the plate moved into the bottom row (spec §2, 2026-08-03) and is
     -- normally hidden, so a card can no longer point at where it used to sit. "wallet" names what
     -- this beat actually explains — the balance the plate displays — not a screen position.
-    { id = "bank", event = "bank", copy = "Banked. That's yours to keep.", anchor = "wallet" },
+    --
+    -- Was "Banked. That's yours to keep." — the hamburger was deleted and the round-timer ring
+    -- inherited its two-stage gesture (spec §6, Task 5), but a ring that looks like a readout
+    -- does not invite a tap. The bank TOAST already says "banked" (main.client.luau), so this
+    -- beat's copy no longer needs to; its job is teaching the gesture, at the moment it becomes
+    -- useful — the first time there is a balance worth checking.
+    {
+        id = "bank",
+        event = "bank",
+        copy = "Tap the clock for your points. Tap again for everything.",
+        anchor = "wallet",
+    },
 } :: { Beat }
 
 function OnboardingBeats.next(seen: { string }, event: string): Beat?

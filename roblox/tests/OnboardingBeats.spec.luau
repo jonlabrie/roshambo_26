@@ -50,6 +50,20 @@ describe("OnboardingBeats", function()
         expect(b ~= nil).toBe(true)
         expect(b.event).toBe("win")
     end)
+
+    test("the bank beat teaches the ring gesture, not just the bank itself", function()
+        -- The ring replaced the hamburger (spec §6) but looks like a readout, not a button — the
+        -- owner named this as the risk, and this beat is the only thing left to teach the tap. It
+        -- still fires on `bank` (the bank toast already says "banked"; this beat's job now is the
+        -- gesture, not the confirmation), and it still anchors at `wallet` (OnboardingController's
+        -- STATIC_ANCHORS knows no `ring` anchor).
+        local b = Beats.next({}, "bank")
+        expect(b ~= nil).toBe(true)
+        expect(b.event).toBe("bank")
+        expect(b.anchor).toBe("wallet")
+        expect(b.copy:find("[Tt]ap") ~= nil).toBe(true)
+        expect(b.copy:find("again") ~= nil).toBe(true)
+    end)
 end)
 
 describe("OnboardingBeats — anchors match what the HUD actually builds", function()

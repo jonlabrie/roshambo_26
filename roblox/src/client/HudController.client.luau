@@ -12,8 +12,10 @@
 -- Hence: THROW AREA bottom-right but INBOARD of the jump button, with the tape BELOW the buttons
 -- (the buttons stay closest to where the thumb rests; the tape is read, never touched) and the
 -- PLATE as one line at the bottom of that same cluster, left of the tape (see "Plate: one line
--- at the bottom of the cluster" below); the round TIMER as a hairline along the bottom edge,
--- competing with nothing.
+-- at the bottom of the cluster" below); the round-timer RING beside the buttons, in the
+-- hamburger's old slot, competing with nothing (spec §5-§7; the bottom-edge hairline it replaced
+-- is gone, and with it the reason for the cluster's old clearance from the bottom edge — see
+-- EDGE_BOTTOM).
 --
 -- The plate briefly lived in the right margin above the jump button, measured at runtime — the
 -- owner superseded that mid-implementation for the bottom row instead. Nothing in this HUD is
@@ -22,14 +24,18 @@
 -- Every information element MUST stay Active = false. Frames and labels default to false, but
 -- setting it true anywhere here punches a permanent hole in the camera-drag surface, which is
 -- the whole right side of the screen on touch. The whole interactive budget is: the three throw
--- buttons, the one bank button (see `setBank`), and the ledger door (see "The ledger door")
--- — the plate is a pure display, not a door; that job belongs to the ledger door alone.
+-- buttons, the one bank button (see `setBank`), and the ledger's two doors — the ring and the
+-- plate whenever it is showing (see "The round-timer ring" and the plate's own
+-- `MouseButton1Click`, below).
 --
 -- This file RENDERS HudModel; it never re-derives it. main.client.luau owns the wiring and fires
 -- EventBus.HudState(inputs, aux):
 --   inputs : a HudModel.Inputs
---   aux    : { session = HudModel.Session, tape = { { worldThrow, result? } }, timerKnown = boolean }
---            `tape` is already spoiler-gated by the wiring — paint it as given.
+--   aux    : { session = HudModel.Session, tape = { { worldThrow, result? } }, timerKnown = boolean,
+--              worldThrow = string? }
+--            `tape` is already spoiler-gated by the wiring — paint it as given. `worldThrow` is
+--            the world's throw for the round the drum has FINISHED revealing, or nil — see
+--            `render`'s glyph-swap, below.
 -- Picks travel back the other way on EventBus.HudPick, banking on EventBus.HudBank.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -91,6 +97,18 @@ local TOUCH = UserInputService.TouchEnabled and not UserInputService.KeyboardEna
 -- uses stay here.
 local JUMP_CLEARANCE = HudLayout.JUMP_CLEARANCE
 local EDGE = HudLayout.EDGE
+-- The cluster's own bottom margin — deliberately a SEPARATE constant from EDGE, not a smaller
+-- EDGE. EDGE also sets the HUD's side margins (the throw cluster's/bank button's/toast's
+-- horizontal registration, all still `1 - JUMP_CLEARANCE` / plain `EDGE`), and those are
+-- unchanged; only the bottom edge moved, now that the hairline that used to occupy it is gone
+-- (spec §7). `HudLayout.CLUSTER_TOP_FROM_BOTTOM` still adds `HudLayout.EDGE`, not this — it now
+-- over-reserves by `EDGE - EDGE_BOTTOM`, which is fine and deliberate: the onboarding safe band
+-- erring high keeps cards further from live buttons, never closer.
+local EDGE_BOTTOM = 6
+-- The gap the ring registers off the throw cluster's edge, and (since Task 5) the gap the plate
+-- registers off the tape's edge too — the hamburger's old gap constant and this were always the
+-- same value (8); one constant now that only one door remains.
+local RING_GAP = HudLayout.RING_GAP
 
 -- BTN_W tracks BTN_H (the buttons are square) off the SAME shared scale, so "50% smaller" shrinks
 -- the cluster in both axes rather than leaving three squat letterboxes.
@@ -113,13 +131,8 @@ local AREA_H = if TOUCH then HudLayout.AREA_H_TOUCH else HudLayout.AREA_H
 local CLUSTER_TOP_FROM_BOTTOM = if TOUCH
     then HudLayout.CLUSTER_TOP_FROM_BOTTOM_TOUCH
     else HudLayout.CLUSTER_TOP_FROM_BOTTOM
-local TIMER_H = 3
-local TIMER_H_HOT = 7 -- the escalation thickens the hairline as well as reddening it
 local TOAST_SECONDS = 4
 local TOAST_MAX = 6
--- The gap between the throw cluster and the two things registered against its edges: the ledger
--- door (left of the buttons) and the plate (left of the tape). One constant, two uses.
-local LEDGER_GAP = 8
 
 -- The bank button, directly above the throw row.
 local BANK_W = 150
@@ -245,33 +258,40 @@ local potCounter = newCounter(0)
 -- ===== Plate: one line at the bottom of the cluster, normally hidden =====
 -- Superseded the right-margin placement (owner, mid-implementation): the jump-button measurement
 -- is gone entirely. The plate is now a single line at the bottom of the throw cluster, exactly
--- as tall as a tape tile and right-aligned LEDGER_GAP left of the tape's own left edge, so the
+-- as tall as a tape tile and right-aligned RING_GAP left of the tape's own left edge, so the
 -- bottom row reads as one band. AutomaticSize = X: it reserves no dead space when the line is
 -- short (no streak riding).
 --
 -- NORMALLY HIDDEN. Points are not a thing you need at a glance — a riding pot already has its
--- own always-visible bank button. The plate reveals on the ledger door's first tap and on any
--- change to the figures it shows (see `revealPlate` and the change-guard in `render`), holds for
--- PLATE_HOLD, then fades over PLATE_FADE. It stays genuinely inert throughout — Active is false
--- on the Frame and the label both; the ledger door (below) is the only door.
+-- own always-visible bank button. The plate reveals on the ring's first tap and on any change to
+-- the figures it shows (see `revealPlate` and the change-guard in `render`), holds for
+-- PLATE_HOLD, then fades over PLATE_FADE.
+--
+-- TAPPABLE (spec §6, Task 5). It went inert only because it had moved into the strip Roblox uses
+-- for camera drag; it is in the bottom row now, so it is safe to make a `TextButton` again — the
+-- ledger's second door, alongside the ring, whenever it is showing. See its `MouseButton1Click`
+-- handler below.
 local PLATE_HOLD = 2
 local PLATE_FADE = 0.35
 
-local plate = Instance.new("Frame")
+local plate = Instance.new("TextButton")
 plate.Name = "Plate"
 plate.AnchorPoint = Vector2.new(1, 1)
 plate.AutomaticSize = Enum.AutomaticSize.X
 plate.Size = UDim2.fromOffset(0, TILE)
--- Fixed off the SAME shared right reference (1 - JUMP_CLEARANCE) the throw cluster, the bank
--- button and the ledger door all register to — LEDGER_GAP left of the tape's own left edge
--- (offset -TAPE_W from that reference), bottom-aligned with the tape (D = EDGE from the gui's
--- bottom, same as the tape). AutomaticSize grows the frame LEFTWARD from this anchored right
--- edge, so a longer line (a streak riding) never creeps toward the tape. See the task report for
--- the overlap arithmetic against the tape, the ledger door and the timer hairline.
-plate.Position = UDim2.new(1 - JUMP_CLEARANCE, -(TAPE_W + LEDGER_GAP), 1, -EDGE)
+-- Fixed off the SAME shared right reference (1 - JUMP_CLEARANCE) the throw cluster and the bank
+-- button register to — RING_GAP left of the tape's own left edge (offset -TAPE_W from that
+-- reference), bottom-aligned with the tape at EDGE_BOTTOM from the gui's bottom (the cluster's
+-- new floor now the hairline is gone — see EDGE_BOTTOM, above). AutomaticSize grows the frame
+-- LEFTWARD from this anchored right edge, so a longer line (a streak riding) never creeps toward
+-- the tape. It does NOT move horizontally here — only the vertical anchor changed from EDGE.
+-- See the task report for the overlap arithmetic against the tape and the ring.
+plate.Position = UDim2.new(1 - JUMP_CLEARANCE, -(TAPE_W + RING_GAP), 1, -EDGE_BOTTOM)
 plate.BackgroundColor3 = WASHI
 plate.BackgroundTransparency = 0.3
 plate.BorderSizePixel = 0
+plate.AutoButtonColor = false
+plate.Text = ""
 plate.Visible = false
 plate.Parent = gui
 corner(plate, 6)
@@ -362,11 +382,27 @@ local function revealPlate()
     end)
 end
 
+-- TAPPABLE AGAIN, and it is safe now in a way it was not before. The plate went inert because it
+-- had moved into the strip Roblox uses for camera drag, where a sinking element is a permanent
+-- hole. It is in the bottom row now. So the ledger has two doors — the ring and the plate
+-- whenever it is showing — and tapping the ring then the plate is the same two taps as
+-- double-tapping the ring.
+--
+-- Guarded on `plateVisible`, not `plate.Visible`: a hidden button cannot be clicked, so the
+-- guard's real job is covering the FADE, where the plate is still technically `Visible = true`
+-- on its way out (`plateVisible` stays true through hold AND fade — see its own declaration,
+-- above).
+plate.MouseButton1Click:Connect(function()
+    if plateVisible then
+        EventBus.OpenLedger:Fire()
+    end
+end)
+
 -- ===== Throw area: bottom-right, inboard of the jump button =====
 local throwArea = Instance.new("Frame")
 throwArea.Name = "ThrowArea"
 throwArea.AnchorPoint = Vector2.new(1, 1)
-throwArea.Position = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -EDGE)
+throwArea.Position = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -EDGE_BOTTOM)
 throwArea.Size = UDim2.fromOffset(AREA_W, AREA_H)
 throwArea.BackgroundTransparency = 1
 throwArea.Parent = gui
@@ -714,7 +750,7 @@ end
 local bankButton = Instance.new("TextButton")
 bankButton.Name = "Bank"
 bankButton.AnchorPoint = Vector2.new(1, 1)
-bankButton.Position = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE + AREA_H + ROW_GAP))
+bankButton.Position = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE_BOTTOM + AREA_H + ROW_GAP))
 bankButton.Size = UDim2.fromOffset(BANK_W, HudLayout.BANK_H)
 bankButton.BackgroundColor3 = POT_RED
 bankButton.BackgroundTransparency = 0.15
@@ -798,106 +834,28 @@ local function setBank(visible: boolean, pot: number, pulses: boolean)
     end
 end
 
--- ===== The ledger door =====
--- The fourth and last interactive element in the minimal HUD, after the three throws and the
--- bank button. It exists because moving the plate off the jump/camera strip made the plate
--- inert, and a tap on the plate had been the ledger's ONLY entry point — deliberately, so that
--- maximal cost no persistent button. That trade is now spent: a display with no interactive
--- elements has nowhere it needs sinking touches any more, so the door becomes a button.
---
--- Placed AGAINST the cluster rather than into a corner. The teahouse toggle that used to live in
--- the bottom-right corner was deleted because it collided with the throw row on a narrow
--- viewport; anchoring to the cluster's own left edge means this moves with the cluster and
--- cannot repeat that.
---
--- TWO-STAGE (owner, mid-implementation): the first tap on an unrevealed plate reveals it; a
--- second tap while ANYTHING from that reveal is still on screen — the hold or the fade, see
--- `plateVisible` — opens the ledger instead. A tap that lands after the plate has fully faded
--- reveals again. A double-tap from cold therefore opens the ledger, so nobody has to learn the
--- two stages to reach it the obvious way.
-local LEDGER_SIZE = if TOUCH then HudLayout.BTN_H_TOUCH else 40
+-- The hamburger is gone (spec §6). Roblox's own unibar already owns that glyph top-left, so a
+-- second one bottom-right read as either the same menu or a broken copy — ours was the fake
+-- one. The ring inherited the gesture: it IS the round, and since the LAST ROUND band the
+-- ledger is the round's detail.
 
-local ledgerButton = Instance.new("TextButton")
-ledgerButton.Name = "LedgerDoor"
-ledgerButton.AnchorPoint = Vector2.new(1, 1)
--- Bottom-aligned with the throw button row, not the tape: `throwArea` spans
--- [EDGE, EDGE + AREA_H] from the gui's bottom edge, and since Task 6 the buttons sit at the
--- TOP of that frame — so the button row's own bottom edge is EDGE + AREA_H - BTN_H from the
--- bottom. Inboard of the throw cluster by its own width plus LEDGER_GAP, off the SAME right
--- edge (1 - JUMP_CLEARANCE) the cluster and the bank button both register to.
-ledgerButton.Position = UDim2.new(1 - JUMP_CLEARANCE, -(AREA_W + LEDGER_GAP), 1, -(EDGE + AREA_H - BTN_H))
-ledgerButton.Size = UDim2.fromOffset(LEDGER_SIZE, LEDGER_SIZE)
-ledgerButton.BackgroundColor3 = WASHI
-ledgerButton.BackgroundTransparency = 0.3
-ledgerButton.BorderSizePixel = 0
-ledgerButton.AutoButtonColor = false
-ledgerButton.Text = ""
-ledgerButton.Parent = gui
-corner(ledgerButton, 8)
-stroke(ledgerButton, GOLD, 1, 0.3)
-
--- The hamburger glyph is DRAWN, not typed: a "≡" (U+2261) in GothamBold depends on that font
--- actually carrying the codepoint, and this is the ONLY door to the ledger — a missing glyph
--- would read as a broken control with no recourse. Three thin Frames instead: font-independent,
--- unambiguous, and inert like everything else non-throw/non-bank in this file (`Active` stays
--- at its default `false` on every bar — they carry no input of their own, the button beneath
--- them does).
-local LEDGER_BAR_H = if TOUCH then 3 else 2
-local LEDGER_BAR_GAP = if TOUCH then 6 else 5
-local LEDGER_BAR_INSET = 8 -- horizontal padding each side, inside the button
-local LEDGER_BARS_H = 3 * LEDGER_BAR_H + 2 * LEDGER_BAR_GAP
-for i = 1, 3 do
-    local bar = Instance.new("Frame")
-    bar.Name = `Bar{i}`
-    bar.AnchorPoint = Vector2.new(0.5, 0.5)
-    bar.Position = UDim2.new(
-        0.5,
-        0,
-        0.5,
-        -LEDGER_BARS_H / 2 + LEDGER_BAR_H / 2 + (i - 1) * (LEDGER_BAR_H + LEDGER_BAR_GAP)
-    )
-    bar.Size = UDim2.new(1, -2 * LEDGER_BAR_INSET, 0, LEDGER_BAR_H)
-    bar.BackgroundColor3 = INK_CREAM
-    bar.BorderSizePixel = 0
-    bar.ZIndex = 2 -- above the button (ZIndex 1 by default), so the bars are never occluded
-    bar.Parent = ledgerButton
-end
-
-local ledgerScale = Instance.new("UIScale")
-ledgerScale.Parent = ledgerButton
-
-ledgerButton.MouseButton1Down:Connect(function()
-    pressDepress(ledgerScale)
-end)
-ledgerButton.MouseButton1Click:Connect(function()
-    -- "Is anything on screen", not a 2s timer: `plateVisible` covers the hold AND the fade, so
-    -- a tap while the line is mid-fade still lands on the ledger rather than doing nothing — a
-    -- control that is still visible must still be answerable.
-    if plateVisible then
-        EventBus.OpenLedger:Fire()
-    else
-        revealPlate()
-    end
-end)
-
--- ===== The round-timer ring: the ledger's new door (spec §5, §6) =====
+-- ===== The round-timer ring: the ledger's door (spec §5, §6) =====
 -- The PWA's PieTimer, rebuilt. Roblox has no SVG and no radial fill, so the sweep is a ring of
 -- discrete segments — RingTimer says how many are lit, this paints them. Green while there is
 -- time, red at HudModel.ESCALATE_AT, which is the SAME constant the escalation prompt reads: two
 -- signals about one fact must not turn urgent at different moments.
 --
--- It takes the HAMBURGER's old slot, not the plate's: inboard-left of the throw cluster,
--- bottom-aligned with the button row (see `ledgerButton`'s own Position, just above, which this
--- matches exactly with RING_GAP standing in for LEDGER_GAP). `ledgerButton` stays in place for
--- now — Task 5 deletes it — so the two doors briefly coexist; this section is the round's clock
--- AND the ledger's second door, and it inherits the hamburger's two-stage gesture below rather
--- than duplicating it.
+-- It takes the HAMBURGER's old slot: inboard-left of the throw cluster, bottom-aligned with the
+-- button row — `throwArea` spans [EDGE_BOTTOM, EDGE_BOTTOM + AREA_H] from the gui's bottom edge,
+-- and the buttons sit at the TOP of that frame, so the button row's own bottom edge is
+-- EDGE_BOTTOM + AREA_H - BTN_H from the bottom. Inboard of the throw cluster by AREA_W + RING_GAP,
+-- off the SAME right edge (1 - JUMP_CLEARANCE) everything else in the cluster registers to. This
+-- is now the ONLY door beside the plate — the hamburger it replaced is deleted.
 --
 -- A BUTTON, not a Frame: only the outer button sinks. Its segments and the centred readout all
 -- stay Active = false (Frames/TextLabels already default there — see the file header), the same
 -- interactive cost the hamburger carried in the same row.
 local RING_D = if TOUCH then HudLayout.RING_D_TOUCH else HudLayout.RING_D
-local RING_GAP = HudLayout.RING_GAP
 local RING_THICKNESS = if TOUCH then HudLayout.RING_THICKNESS_TOUCH else HudLayout.RING_THICKNESS
 local RING_R = RING_D / 2 - RING_THICKNESS / 2
 local SEG_W = RingTimer.segmentWidth(RING_R, RingTimer.SEGMENTS)
@@ -913,9 +871,9 @@ ring.Text = ""
 ring.AnchorPoint = Vector2.new(1, 1)
 -- The hamburger's slot, exactly: inboard of the cluster by AREA_W + RING_GAP, off the SAME
 -- right edge (1 - JUMP_CLEARANCE) everything else in the cluster registers to; bottom-aligned
--- with the throw BUTTON row's own bottom edge (EDGE + AREA_H - BTN_H from the gui's bottom),
--- not the tape's.
-ring.Position = UDim2.new(1 - JUMP_CLEARANCE, -(AREA_W + RING_GAP), 1, -(EDGE + AREA_H - BTN_H))
+-- with the throw BUTTON row's own bottom edge (EDGE_BOTTOM + AREA_H - BTN_H from the gui's
+-- bottom), not the tape's.
+ring.Position = UDim2.new(1 - JUMP_CLEARANCE, -(AREA_W + RING_GAP), 1, -(EDGE_BOTTOM + AREA_H - BTN_H))
 ring.Size = UDim2.fromOffset(RING_D, RING_D)
 ring.BackgroundTransparency = 1
 ring.Parent = gui
@@ -983,10 +941,12 @@ end
 local ringScale = Instance.new("UIScale")
 ringScale.Parent = ring
 
--- THE HAMBURGER'S TWO-STAGE GESTURE, ported unchanged: the first tap reveals the plate, and a
+-- THE HAMBURGER'S TWO-STAGE GESTURE, inherited unchanged: the first tap reveals the plate, and a
 -- tap while the plate is still on screen — the hold or the fade, `plateVisible` covers both —
--- fires EventBus.OpenLedger instead. `ledgerButton`'s own handlers, just above, are the
--- reference this was ported from; Task 5 deletes those once this is the only door.
+-- fires EventBus.OpenLedger instead. A tap that lands after the plate has fully faded reveals
+-- again, so a double-tap from cold opens the ledger without anyone having to learn the two
+-- stages to reach it the obvious way. The plate (above) answers the SAME two taps once it is
+-- showing, so the ledger has two doors, never a third.
 ring.MouseButton1Down:Connect(function()
     pressDepress(ringScale)
 end)
@@ -998,16 +958,8 @@ ring.MouseButton1Click:Connect(function()
     end
 end)
 
--- ===== Round timer: a hairline along the bottom edge, depleting =====
-local timer = Instance.new("Frame")
-timer.Name = "RoundTimer"
-timer.AnchorPoint = Vector2.new(0, 1)
-timer.Position = UDim2.fromScale(0, 1)
-timer.Size = UDim2.fromOffset(0, TIMER_H)
-timer.BackgroundColor3 = GOLD
-timer.BackgroundTransparency = 0.2
-timer.BorderSizePixel = 0
-timer.Parent = gui
+-- The bottom-edge hairline is gone (spec §7): the ring is the round's clock now, and with the
+-- hairline gone the cluster no longer needs to clear it — see EDGE_BOTTOM, above.
 
 -- ===== Escalation: a large centred count, shown only when HudModel says so =====
 -- Active = false: this is a LABEL, not a button. It covers the centre of the screen, which is the
@@ -1159,7 +1111,7 @@ end)
 
 -- ===== Render =====
 -- The round's full span is not on the wire; take it from the largest countdown seen since ACTIVE
--- opened, so the hairline depletes against the real round length whatever the server's phase
+-- opened, so the ring depletes against the real round length whatever the server's phase
 -- durations are.
 local span = 0
 local lastPhase = ""
@@ -1249,30 +1201,21 @@ local function render(inputs: any, aux: any)
         end
     end
 
-    -- The hairline thickens and reddens under the escalation threshold — the ambient half of the
-    -- same signal the centred count carries.
-    local height = if view.escalate then TIMER_H_HOT else TIMER_H
-    timer.BackgroundColor3 = if view.escalate then LOSS_RED else GOLD
     -- A round with no lockout on the wire has no span to deplete against. Showing a constant
-    -- would pin the hairline full and motionless while the real lockout came and went, which
-    -- reads as "plenty of time" and is a lie. Show nothing instead; throws stay enabled.
+    -- would pin the ring full and motionless while the real lockout came and went, which reads
+    -- as "plenty of time" and is a lie. Track nothing new in that case; the ring below decides
+    -- what to show from whatever `span` it already has.
     if lastPhase ~= inputs.phase then
         span = 0
     end
     if inputs.phase == "ACTIVE" and aux.timerKnown ~= false then
         span = math.max(span, view.secondsLeft)
-        local frac = if span > 0 then math.clamp(view.secondsLeft / span, 0, 1) else 0
-        timer.Size = UDim2.new(frac, 0, 0, height)
-    else
-        timer.Size = UDim2.fromOffset(0, height)
     end
     lastPhase = inputs.phase
 
-    -- The ring, the hairline's eventual replacement (Task 5). `span` is already tracked for the
-    -- hairline just above; reuse it rather than deriving a second notion of the round's length.
-    -- Where the countdown is unknown (`aux.timerKnown == false`, or the phase isn't ACTIVE), light
-    -- NOTHING and blank the digits — a full ring that never moves would read as "plenty of time"
-    -- and be a lie, exactly why the hairline hides itself in that case.
+    -- The ring. Where the countdown is unknown (`aux.timerKnown == false`, or the phase isn't
+    -- ACTIVE, or nothing has been tracked yet), light NOTHING and blank the digits — a full ring
+    -- that never moves would read as "plenty of time" and be a lie.
     local ringKnown = inputs.phase == "ACTIVE" and aux.timerKnown ~= false and span > 0
     local ringFrac = if ringKnown then math.clamp(view.secondsLeft / span, 0, 1) else 0
     local litCount = RingTimer.lit(ringFrac, RingTimer.SEGMENTS)

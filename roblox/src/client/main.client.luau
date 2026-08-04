@@ -19,7 +19,8 @@
 --
 -- It publishes all of that on `EventBus.HudState:Fire(inputs, aux)`:
 --   inputs : a HudModel.Inputs — the controller calls HudModel.view(inputs, aux.session)
---   aux    : { session = HudModel.Session, tape = { { worldThrow, result? } }, timerKnown = boolean }
+--   aux    : { session = HudModel.Session, tape = { { worldThrow, result? } }, timerKnown = boolean,
+--              worldThrow = string? }
 -- and takes picks back on `EventBus.HudPick`. Transient notices go out on `EventBus.Toast`.
 --
 -- The MAXIMAL panel gets its own channel, `EventBus.LedgerState`, fired only when ProfileUpdate
@@ -230,7 +231,7 @@ local function publish()
         session = session,
         tape = visibleTape(),
         -- Render-only, so it stays out of HudModel: false means we never got a lockout for this
-        -- round and the hairline has no real span to deplete against.
+        -- round and the ring has no real span to deplete against.
         timerKnown = lockoutAt ~= nil,
         -- The world's throw for the round the drum has FINISHED revealing, or nil. Gated by the
         -- same `revealedRoundId` the tape is, so the ring cannot spoil the wheel mid-spin.
