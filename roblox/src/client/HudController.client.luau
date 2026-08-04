@@ -32,11 +32,13 @@
 -- EventBus.HudState(inputs, aux):
 --   inputs : a HudModel.Inputs
 --   aux    : { session = HudModel.Session, tape = { { worldThrow, result? } }, timerKnown = boolean,
---              worldThrow = string?, profileSeen = boolean }
+--              worldThrow = string?, worldThrowFading = boolean?, profileSeen = boolean }
 --            `tape` is already spoiler-gated by the wiring — paint it as given. `worldThrow` is
 --            the world's throw for the round the drum has FINISHED revealing, or nil — see
---            `render`'s glyph-swap, below. `profileSeen` is whether the wallet in `inputs` is the
---            server's answer or main.client's placeholder zeros — see `seedCounter`.
+--            `render`'s glyph-swap, below. `worldThrowFading` is the wiring saying the hold is
+--            over and the glyph should be on its way out (see `setRingGlyph`); absent means not
+--            fading. `profileSeen` is whether the wallet in `inputs` is the server's answer or
+--            main.client's placeholder zeros — see `seedCounter`.
 -- Picks travel back the other way on EventBus.HudPick, banking on EventBus.HudBank.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -50,6 +52,7 @@ local HudLayout = require(shared:WaitForChild("HudLayout"))
 local Glyphs = require(shared:WaitForChild("Glyphs"))
 local RollingNumber = require(shared:WaitForChild("RollingNumber"))
 local RingTimer = require(shared:WaitForChild("RingTimer"))
+local RevealBeat = require(shared:WaitForChild("RevealBeat"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local player = Players.LocalPlayer
@@ -1274,32 +1277,29 @@ ringCount.Position = UDim2.new(0.5, 0, 0.5, -COUNT_NUDGE)
 
 -- One glyph box per symbol, built ONCE — same pattern `glyphSet` uses for the tape tiles — so
 -- the reveal can show whichever the world threw without rebuilding an ImageLabel every round.
-local ringGlyphs: { [string]: Frame } = {}
+local ringGlyphs: { [string]: CanvasGroup } = {}
 do
     local box = glyphBox(ringDisc, 0.82)
     box.ZIndex = 5 -- with the digits, above the disc
     for _, sym in THROWS do
-        local g = Glyphs.render(box, sym, INK_CREAM)
-        g.Visible = false
-        -- LIFT THE WHOLE SUBTREE, not just the box (bug, 2026-08-04: the glyph never appeared —
-        -- the ring showed a plain black disc for the whole reveal).
+        -- A CanvasGroup, not `Glyphs.render`'s bare frame, for two reasons that happen to have the
+        -- same fix. It gives ONE `GroupTransparency` to fade — `Glyphs.renderGroup` exists because
+        -- tweening the outline and core independently drifts them out of step at the edges.
         --
-        -- `Instance.new("ScreenGui")` defaults ZIndexBehavior to **Global**, not Sibling — every
-        -- ScreenGui in this codebase is Global, because none of them set it. Under Global a child
-        -- does NOT draw above its parent; every element is ordered by its own ZIndex against every
-        -- other element in the gui. `Glyphs.render` builds its root and its two ImageLabels at the
-        -- default ZIndex 1, and setting `box.ZIndex` does not propagate to them.
+        -- And it closes the ZIndex trap that hid this glyph completely (2026-08-04): this ScreenGui
+        -- runs in GLOBAL ZIndexBehavior, where a child does NOT draw above its parent, so the
+        -- default-ZIndex-1 image layers rendered behind the opaque ZIndex-4 disc. A CanvasGroup
+        -- composites its descendants as a single element, so only ITS ZIndex matters.
         --
-        -- That was harmless while the disc was ZIndex 1 and translucent. Task 3 of round three made
-        -- it ZIndex 4 AND opaque, which put an opaque black disc in front of a ZIndex-1 glyph. The
-        -- digits kept working the whole time because `ringCount` sets ZIndex 5 on itself — which is
-        -- exactly what disguised it.
+        -- THE OUTLINE COLOUR IS PASSED EXPLICITLY, and it must be. The two builders disagree on
+        -- their default: `render` falls back to WHITE, `renderGroup` falls back to the CORE colour.
+        -- The ring has always had a white keyline (measured live: the outline layer renders at
+        -- 1,1,1), so swapping builders without this argument would silently flatten the glyph to a
+        -- single cream shape — a visual regression no gate could see.
+        local g = Glyphs.renderGroup(box, sym, INK_CREAM, Color3.new(1, 1, 1))
         g.ZIndex = 5
-        for _, layer in g:GetChildren() do
-            if layer:IsA("ImageLabel") then
-                layer.ZIndex = 5
-            end
-        end
+        g.GroupTransparency = 1
+        g.Visible = false
         ringGlyphs[sym] = g
     end
 end
@@ -1544,6 +1544,41 @@ local lastPlateStreak: number? = nil
 -- nothing would ever count again.
 local countersSeeded = false
 
+-- The glyph's own fade. LATCHED on the (symbol, fading) pair, because `render` runs at 10Hz and a
+-- tween cancelled and restarted on every repaint gets a few percent of its travel and renders
+-- static — the failure `setBank`'s pulse already had once in this file.
+local shownGlyph: string? = nil
+local glyphFading = false
+local glyphTween: Tween? = nil
+
+local function setRingGlyph(symbol: string?, fading: boolean)
+    if symbol == shownGlyph and fading == glyphFading then
+        return
+    end
+    shownGlyph, glyphFading = symbol, fading
+    if glyphTween then
+        glyphTween:Cancel()
+        glyphTween = nil
+    end
+    for _, sym in THROWS do
+        ringGlyphs[sym].Visible = sym == symbol
+    end
+    if symbol == nil then
+        return
+    end
+    local g = ringGlyphs[symbol]
+    if fading then
+        glyphTween = TweenService:Create(
+            g,
+            TweenInfo.new(RevealBeat.FADE_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+            { GroupTransparency = 1 }
+        )
+        glyphTween:Play()
+    else
+        g.GroupTransparency = 0 -- it arrives instantly; the drum was the build-up
+    end
+end
+
 local function render(inputs: any, aux: any)
     local view = HudModel.view(inputs, aux.session)
     canThrow = view.throwsEnabled
@@ -1663,13 +1698,12 @@ local function render(inputs: any, aux: any)
 
     -- The glyph swap: the world's throw appears in the ring's centre only once the drum has
     -- settled (main.client.luau's drum-rest gate, inherited via `aux.worldThrow` rather than a
-    -- second spoiler gate here). Digits and glyph are mutually exclusive.
+    -- second spoiler gate here). Digits and glyph are mutually exclusive. The going is a fade, not
+    -- a toggle — `setRingGlyph` owns it, latched, because this runs at 10Hz.
     local worldThrow = aux.worldThrow
     ringCount.Visible = worldThrow == nil
     ringCount.Text = if worldThrow == nil and ringKnown then tostring(math.ceil(view.secondsLeft)) else ""
-    for _, sym in THROWS do
-        ringGlyphs[sym].Visible = sym == worldThrow
-    end
+    setRingGlyph(worldThrow, aux.worldThrowFading == true)
 
     escalation.Visible = view.escalate
     if view.escalate then
