@@ -73,7 +73,7 @@ still be seen.
 the middle of the screen is the failure this branch has already hit twice — a card on the
 movement thumbstick, and a panel leaking taps to live buttons beneath it. An accidental tap
 that dropped the player into a movement-suspending takeover would be worse than the problem it
-solved. The `≡` and the revealed plate are the doors.
+solved. The round-timer ring and the revealed plate are the doors.
 
 **Optional**, as a second preference switch beside `escalationPrompts`. Two switches is what
 the footer was built for. A settings *page* becomes warranted at four or more; it is not yet.

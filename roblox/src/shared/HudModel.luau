@@ -129,7 +129,7 @@ end
 
 -- Whether a standing prompt has aged out. A predicate rather than a timer so it is pure and
 -- testable; main.client's existing 10Hz heartbeat is what calls it, which is ample resolution
--- for a four-second question.
+-- for a one-second question.
 function HudModel.switchPromptExpired(setAt: number?, now: number): boolean
     return setAt ~= nil and (now - setAt) >= HudModel.SWITCH_PROMPT_SECONDS
 end

@@ -35,7 +35,10 @@
 -- owns the wiring and fires EventBus.LedgerState{ counters, live, bestStreak, escalationPrompts,
 -- resultSplash, lastRound }. The preference switches travel back on EventBus.HudPreference,
 -- banking on EventBus.HudBank. `lastRound` (Task 9) is nil until main.client.luau has seen its
--- first drum-rest reveal, and drives the LAST ROUND band above the hero band — see `heroTop`.
+-- first drum-rest reveal, and drives the LAST ROUND card — the FIRST ENTRY in the LIFETIME card's
+-- own scrolling body, not fixed chrome. A whole-branch review found the fixed-chrome version
+-- (a band between the header and the hero) starved the body to a negative height on a landscape
+-- phone; as scrolling content it can never starve anything — see the LIFETIME card section below.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
@@ -123,7 +126,7 @@ local function label(parent: Instance, text: string, size: number, color: Color3
 end
 
 -- One coloured segment inside a bar TRACK. Shared by the lifetime WIN/SAFE/LOSS bar and (Task 9)
--- the LAST ROUND band's crowd-split bar, so a third caller never has to reinvent this — both are
+-- the LAST ROUND card's crowd-split bar, so a third caller never has to reinvent this — both are
 -- painted from a `LedgerModel.shares` triple that already sums to exactly 100, laid end to end by
 -- scale, with no gap and no overrun.
 local function barSegment(track: Frame, name: string, color: Color3): Frame
@@ -159,9 +162,8 @@ panel.Size = UDim2.fromScale(0.94, 0.94)
 panel.BackgroundColor3 = WASHI
 panel.BackgroundTransparency = 0.05
 panel.BorderSizePixel = 0
--- NOTHING LEAVES THE PANEL. The body's height is whatever is left after the header, the LAST ROUND
--- band (when shown), hero, tabs and preferences footer have taken theirs, and on a short landscape
--- phone that is a few dozen pixels —
+-- NOTHING LEAVES THE PANEL. The body's height is whatever is left after the header, hero, tabs and
+-- preferences footer have taken theirs, and on a short landscape phone that is a few dozen pixels —
 -- less than the cards' content. Without this the overflow drew straight through the footer and out
 -- past the panel's own outline, over the scrim and the world behind it. The cards scroll their
 -- content (see makeCard); this is the backstop that makes the panel's edge mean something.
@@ -246,145 +248,10 @@ teahouseButton.Parent = header
 corner(teahouseButton, 8)
 stroke(teahouseButton, GOLD, 1, 0.35)
 
--- ===== Last Round band (Task 9, spec §3) =====
--- The round detail that used to ride the transient toast: the world's throw, the player's own
--- throw, the result, the crowd split as a three-way bar, and the player count. Above the hero
--- band, below the header. HIDDEN when `lastRound` is nil — a fresh join has seen no reveal yet,
--- and the band must hide rather than show zeros — in which case `heroTop()` below collapses back
--- to `HEADER_H` and the hero band sits exactly where it does today.
---
--- `lastRound` (and `LAST_ROUND_H`/`heroTop`) are declared HERE, ahead of the hero band, because
--- the hero band's own position depends on them, and Luau closures can only capture a local that
--- is already in scope at the point the capturing function is defined.
-local lastRound: {
-    worldThrow: string,
-    pick: string?,
-    result: string?,
-    distribution: any?,
-    totalPlayers: number?,
-}? =
-    nil
-
-local LAST_ROUND_H = 128
-
--- `heroTop()` is the one source of truth for where the hero band starts: HEADER_H when there is
--- no last round to show, or HEADER_H plus the band's height and a gap when there is. Everything
--- below (the hero band itself, and `bodyTop()` beneath it) reads THIS rather than re-deriving the
--- same conditional, so a third call site can't drift out of sync with the other two.
-local function heroTop(): number
-    return HEADER_H + (if lastRound then LAST_ROUND_H + GAP else 0)
-end
-
-local lastRoundBand = Instance.new("Frame")
-lastRoundBand.Name = "LastRound"
-lastRoundBand.Position = UDim2.fromOffset(0, HEADER_H)
-lastRoundBand.Size = UDim2.new(1, 0, 0, LAST_ROUND_H)
-lastRoundBand.BackgroundColor3 = WASHI_CARD
-lastRoundBand.BackgroundTransparency = 0.15
-lastRoundBand.BorderSizePixel = 0
-lastRoundBand.Visible = false
-lastRoundBand.Parent = panel
-corner(lastRoundBand, 8)
-stroke(lastRoundBand, TAN_RIM, 1, 0.55)
-
-local lastRoundCaption = label(lastRoundBand, "LAST ROUND", 11, GOLD, Enum.Font.GothamBold)
-lastRoundCaption.Position = UDim2.fromOffset(PAD, 8)
-lastRoundCaption.Size = UDim2.fromOffset(200, 13)
-lastRoundCaption.TextTransparency = 0.2
-
--- One glyph box per symbol, per side, built ONCE and toggled by `.Visible` — the same pattern
--- HudController's round ring and the tape's per-round badges use, so the world's throw and the
--- player's own throw can change every round without rebuilding an ImageLabel every round.
-local function glyphCell(x: number, caption: string): { [string]: Frame }
-    local holder = Instance.new("Frame")
-    holder.Name = caption
-    holder.Position = UDim2.fromOffset(x, 24)
-    holder.Size = UDim2.fromOffset(64, 66)
-    holder.BackgroundTransparency = 1
-    holder.Parent = lastRoundBand
-
-    local cap = label(holder, caption, 10, GOLD, Enum.Font.GothamBold)
-    cap.Size = UDim2.new(1, 0, 0, 12)
-    cap.TextTransparency = 0.2
-    cap.TextXAlignment = Enum.TextXAlignment.Center
-
-    local box = Instance.new("Frame")
-    box.Name = "GlyphBox"
-    box.Position = UDim2.fromOffset(12, 16)
-    box.Size = UDim2.fromOffset(40, 40)
-    box.BackgroundTransparency = 1
-    box.Parent = holder
-
-    local glyphs: { [string]: Frame } = {}
-    for _, sym in THROWS do
-        local g = Glyphs.render(box, sym, GOLD, INK)
-        g.Visible = false
-        glyphs[sym] = g
-    end
-    return glyphs
-end
-
-local worldGlyphs = glyphCell(PAD, "WORLD")
-local youGlyphs = glyphCell(PAD + 80, "YOU")
-
--- No R/P/S palette exists yet in this file (only the WIN/SAFE/LOSS triad does) — reusing that
--- triad here borrows its visual identity (three already-distinct, already-approved colours) for a
--- different three-way split, deliberately, rather than inventing a fourth pair of colours to gate
--- for one band.
--- `{ [string]: Color3 }`, not the inferred fixed-shape record: it is indexed below by whatever
--- string `lastRound.result` holds, and under `--!strict` a fixed-shape table has no `[string]`
--- indexer (see `resolved` in main.client.luau for the same fix, same reason).
-local RESULT_COLOR: { [string]: Color3 } = { WIN = WIN_GREEN, SAFE = GOLD, LOSS = LOSS_RED }
-
-local RESULT_COL_X = PAD + 172
-local resultLabel = label(lastRoundBand, "", 20, INK_CREAM, Enum.Font.GothamBlack)
-resultLabel.Position = UDim2.fromOffset(RESULT_COL_X, 26)
-resultLabel.Size = UDim2.new(1, -(RESULT_COL_X + PAD), 0, 28)
-
-local playersLabel = label(lastRoundBand, "", 12, INK_CREAM, Enum.Font.Gotham)
-playersLabel.Position = UDim2.fromOffset(RESULT_COL_X, 58)
-playersLabel.Size = UDim2.new(1, -(RESULT_COL_X + PAD), 0, 16)
-playersLabel.TextTransparency = 0.35
-
--- The crowd-split three-way bar. Segments come from `LedgerModel.shares` (the SAME
--- largest-remainder apportionment the lifetime WIN/SAFE/LOSS bar below uses), so laying them end
--- to end by scale leaves no gap and no overrun.
---
--- DELIBERATELY NOT the WIN_GREEN/GOLD/LOSS_RED triad, even though this band sits `resultLabel`
--- (which DOES use that triad) directly above this bar. R/P/S are CATEGORIES, not outcomes, and
--- reusing the result colours here would read as "green segment = winning", one row below a result
--- label that might genuinely BE green — the one place in this panel that ambiguity actually
--- bites. These three come from the same ivory/tan/washi family HudController already uses for the
--- tape tiles and the unchosen throw buttons (IVORY / TAN_RIM / AGED_IVORY there), reused here for
--- visual consistency across files rather than invented fresh. They separate by VALUE (bright,
--- mid, dark) rather than hue, which reads at 14px where a hue-only distinction would not.
-local RPS_R = Color3.fromRGB(244, 238, 222) -- = HudController's IVORY (bright)
-local RPS_P = Color3.fromRGB(176, 164, 138) -- = HudController's TAN_RIM (mid)
-local RPS_S = Color3.fromRGB(146, 112, 64) -- = HudController's AGED_IVORY (dark)
-
-local roundBarTrack = Instance.new("Frame")
-roundBarTrack.Name = "RoundBar"
-roundBarTrack.Position = UDim2.fromOffset(PAD, 96)
-roundBarTrack.Size = UDim2.new(1, -(2 * PAD), 0, BAR_H)
-roundBarTrack.BackgroundColor3 = TRACK
-roundBarTrack.BorderSizePixel = 0
-roundBarTrack.ClipsDescendants = true
-roundBarTrack.Parent = lastRoundBand
-corner(roundBarTrack, 4)
-
-local roundRSeg = barSegment(roundBarTrack, "R", RPS_R)
-local roundPSeg = barSegment(roundBarTrack, "P", RPS_P)
-local roundSSeg = barSegment(roundBarTrack, "S", RPS_S)
-
-local roundBarLegend = label(lastRoundBand, "", 11, INK_CREAM, Enum.Font.Gotham)
-roundBarLegend.Position = UDim2.fromOffset(PAD, 112)
-roundBarLegend.Size = UDim2.new(1, -(2 * PAD), 0, 14)
-roundBarLegend.TextTransparency = 0.3
-
 -- ===== Hero band =====
 local hero = Instance.new("Frame")
 hero.Name = "Hero"
-hero.Position = UDim2.fromOffset(0, heroTop())
+hero.Position = UDim2.fromOffset(0, HEADER_H)
 hero.Size = UDim2.new(1, 0, 0, HERO_H)
 hero.BackgroundColor3 = WASHI_CARD
 hero.BackgroundTransparency = 0.15
@@ -447,16 +314,11 @@ corner(bankButton, 6)
 stroke(bankButton, GOLD, 1, 0.3)
 
 -- ===== Body: three cards, or two plus a tab when the screen is narrow =====
--- A FUNCTION, not a literal, because it re-derives from `heroTop()` — which itself moves whenever
--- the LAST ROUND band's visibility changes. Carrying the old `HEADER_H + HERO_H + GAP` literal
--- forward would overlap the body with the band the moment `lastRound` stopped being nil.
-local function bodyTop(): number
-    return heroTop() + HERO_H + GAP
-end
+local BODY_TOP = HEADER_H + HERO_H + GAP
 
 local tabs = Instance.new("Frame")
 tabs.Name = "Tabs"
-tabs.Position = UDim2.fromOffset(0, bodyTop())
+tabs.Position = UDim2.fromOffset(0, BODY_TOP)
 tabs.Size = UDim2.new(1, 0, 0, TABS_H)
 tabs.BackgroundTransparency = 1
 tabs.Visible = false
@@ -470,9 +332,10 @@ body.Parent = panel
 -- Height of a card's heading strip: the 14px label plus the gap under it. Content starts below.
 local CARD_HEADING_H = 20
 
--- Every card is heading + a SCROLLING body. The bodies are fixed-offset stacks (the lifetime card's
--- rows, bar and legend run to ~200px), and the body band they sit in is whatever the panel has left
--- over — on a 375px-tall landscape phone, well under that. Clipping alone would silently truncate
+-- Every card is heading + a SCROLLING body. LIFETIME's own body is a UIListLayout stack (the LAST
+-- ROUND card, when shown, plus the rows, bar and legend run to ~330px); YOUR THROWS is still a
+-- fixed-offset stack. Either way the body band they sit in is whatever the panel has left over —
+-- on a 375px-tall landscape phone, well under that. Clipping alone would silently truncate
 -- the last rows, so the content scrolls: the figures are all still reachable, on the smallest screen
 -- this design targets, without a breakpoint deciding which ones a player is allowed to see.
 --
@@ -528,10 +391,141 @@ end
 -- --- Lifetime ---
 local lifetimeHolder, _, lifetimeBody = makeCard("Lifetime", "LIFETIME")
 
--- All offsets below are relative to the card's SCROLLING BODY, not to the card.
-local LIFETIME_TOP = 4
-local LIFETIME_ROW_H = 30
+-- UIListLayout, not absolute Y offsets (whole-branch review, FIX 1): the LAST ROUND card just
+-- below is the first entry in this stack and must be able to disappear ENTIRELY when `lastRound`
+-- is nil — hidden, not just emptied — without leaving a hole above the rows that follow it.
+-- UIListLayout skips a `Visible = false` child for free and shifts everything after it up; the
+-- previous version got this wrong TWICE — first by putting the band in fixed chrome above the
+-- hero (starving the body to a negative height on a phone), and the absolute-offset alternative
+-- to that would have needed every row below re-positioned by hand on every `lastRound` flip, a
+-- second source of truth this file avoids everywhere else. AutomaticCanvasSize (below) means the
+-- card's CanvasSize needs no companion constant to track this stack's height either — the same
+-- pattern the FEED card already uses for its own growing content.
+local lifetimeList = Instance.new("UIListLayout")
+lifetimeList.SortOrder = Enum.SortOrder.LayoutOrder
+lifetimeList.Padding = UDim.new(0, 4)
+lifetimeList.Parent = lifetimeBody
+lifetimeBody.AutomaticCanvasSize = Enum.AutomaticSize.Y
 
+-- ===== LAST ROUND card (Task 9, spec §3) =====
+-- The round detail that used to ride the transient toast: the world's throw, the player's own
+-- throw, the result, the crowd split as a three-way bar, and the player count. FIRST entry in
+-- this card's scrolling body — the owner's own ask was "the percentages and other numbers belong
+-- at the top of the ledger" — styled like a card of its own so it reads as belonging here rather
+-- than as a sixth lifetime row.
+--
+-- HIDDEN when `lastRound` is nil — a fresh join has seen no reveal yet — in which case the
+-- UIListLayout above closes the gap and LIFETIME's own rows sit flush at the top, exactly as they
+-- did before this card existed. `render()` below is the only place that touches `.Visible`.
+local LAST_ROUND_H = 128
+
+local lastRoundCard = Instance.new("Frame")
+lastRoundCard.Name = "LastRound"
+lastRoundCard.LayoutOrder = 1
+lastRoundCard.Size = UDim2.new(1, -6, 0, LAST_ROUND_H) -- -6: clear of the scrollbar, matching the rows below
+lastRoundCard.BackgroundColor3 = WASHI_CARD
+lastRoundCard.BackgroundTransparency = 0.15
+lastRoundCard.BorderSizePixel = 0
+lastRoundCard.Visible = false
+lastRoundCard.Parent = lifetimeBody
+corner(lastRoundCard, 8)
+stroke(lastRoundCard, TAN_RIM, 1, 0.55)
+
+local lastRoundCaption = label(lastRoundCard, "LAST ROUND", 11, GOLD, Enum.Font.GothamBold)
+lastRoundCaption.Position = UDim2.fromOffset(PAD, 8)
+lastRoundCaption.Size = UDim2.fromOffset(200, 13)
+lastRoundCaption.TextTransparency = 0.2
+
+-- One glyph box per symbol, per side, built ONCE and toggled by `.Visible` — the same pattern
+-- HudController's round ring and the tape's per-round badges use, so the world's throw and the
+-- player's own throw can change every round without rebuilding an ImageLabel every round.
+local function glyphCell(x: number, caption: string): { [string]: Frame }
+    local holder = Instance.new("Frame")
+    holder.Name = caption
+    holder.Position = UDim2.fromOffset(x, 24)
+    holder.Size = UDim2.fromOffset(64, 66)
+    holder.BackgroundTransparency = 1
+    holder.Parent = lastRoundCard
+
+    local cap = label(holder, caption, 10, GOLD, Enum.Font.GothamBold)
+    cap.Size = UDim2.new(1, 0, 0, 12)
+    cap.TextTransparency = 0.2
+    cap.TextXAlignment = Enum.TextXAlignment.Center
+
+    local box = Instance.new("Frame")
+    box.Name = "GlyphBox"
+    box.Position = UDim2.fromOffset(12, 16)
+    box.Size = UDim2.fromOffset(40, 40)
+    box.BackgroundTransparency = 1
+    box.Parent = holder
+
+    local glyphs: { [string]: Frame } = {}
+    for _, sym in THROWS do
+        local g = Glyphs.render(box, sym, GOLD, INK)
+        g.Visible = false
+        glyphs[sym] = g
+    end
+    return glyphs
+end
+
+local worldGlyphs = glyphCell(PAD, "WORLD")
+local youGlyphs = glyphCell(PAD + 80, "YOU")
+
+-- No R/P/S palette exists yet in this file (only the WIN/SAFE/LOSS triad does) — reusing that
+-- triad here borrows its visual identity (three already-distinct, already-approved colours) for a
+-- different three-way split, deliberately, rather than inventing a fourth pair of colours to gate
+-- for one card.
+-- `{ [string]: Color3 }`, not the inferred fixed-shape record: it is indexed below by whatever
+-- string `lastRound.result` holds, and under `--!strict` a fixed-shape table has no `[string]`
+-- indexer (see `resolved` in main.client.luau for the same fix, same reason).
+local RESULT_COLOR: { [string]: Color3 } = { WIN = WIN_GREEN, SAFE = GOLD, LOSS = LOSS_RED }
+
+local RESULT_COL_X = PAD + 172
+local resultLabel = label(lastRoundCard, "", 20, INK_CREAM, Enum.Font.GothamBlack)
+resultLabel.Position = UDim2.fromOffset(RESULT_COL_X, 26)
+resultLabel.Size = UDim2.new(1, -(RESULT_COL_X + PAD), 0, 28)
+
+local playersLabel = label(lastRoundCard, "", 12, INK_CREAM, Enum.Font.Gotham)
+playersLabel.Position = UDim2.fromOffset(RESULT_COL_X, 58)
+playersLabel.Size = UDim2.new(1, -(RESULT_COL_X + PAD), 0, 16)
+playersLabel.TextTransparency = 0.35
+
+-- The crowd-split three-way bar. Segments come from `LedgerModel.shares` (the SAME
+-- largest-remainder apportionment the lifetime WIN/SAFE/LOSS bar below uses), so laying them end
+-- to end by scale leaves no gap and no overrun.
+--
+-- DELIBERATELY NOT the WIN_GREEN/GOLD/LOSS_RED triad, even though this card sits `resultLabel`
+-- (which DOES use that triad) directly above this bar. R/P/S are CATEGORIES, not outcomes, and
+-- reusing the result colours here would read as "green segment = winning", one row below a result
+-- label that might genuinely BE green — the one place in this card that ambiguity actually
+-- bites. These three come from the same ivory/tan/washi family HudController already uses for the
+-- tape tiles and the unchosen throw buttons (IVORY / TAN_RIM / AGED_IVORY there), reused here for
+-- visual consistency across files rather than invented fresh. They separate by VALUE (bright,
+-- mid, dark) rather than hue, which reads at 14px where a hue-only distinction would not.
+local RPS_R = Color3.fromRGB(244, 238, 222) -- = HudController's IVORY (bright)
+local RPS_P = Color3.fromRGB(176, 164, 138) -- = HudController's TAN_RIM (mid)
+local RPS_S = Color3.fromRGB(146, 112, 64) -- = HudController's AGED_IVORY (dark)
+
+local roundBarTrack = Instance.new("Frame")
+roundBarTrack.Name = "RoundBar"
+roundBarTrack.Position = UDim2.fromOffset(PAD, 96)
+roundBarTrack.Size = UDim2.new(1, -(2 * PAD), 0, BAR_H)
+roundBarTrack.BackgroundColor3 = TRACK
+roundBarTrack.BorderSizePixel = 0
+roundBarTrack.ClipsDescendants = true
+roundBarTrack.Parent = lastRoundCard
+corner(roundBarTrack, 4)
+
+local roundRSeg = barSegment(roundBarTrack, "R", RPS_R)
+local roundPSeg = barSegment(roundBarTrack, "P", RPS_P)
+local roundSSeg = barSegment(roundBarTrack, "S", RPS_S)
+
+local roundBarLegend = label(lastRoundCard, "", 11, INK_CREAM, Enum.Font.Gotham)
+roundBarLegend.Position = UDim2.fromOffset(PAD, 112)
+roundBarLegend.Size = UDim2.new(1, -(2 * PAD), 0, 14)
+roundBarLegend.TextTransparency = 0.3
+
+-- All offsets below are relative to the card's SCROLLING BODY, not to the card.
 local LIFETIME_ROWS = {
     { key = "banked", caption = "BANKED" },
     { key = "rounds", caption = "ROUNDS THROWN" },
@@ -543,7 +537,7 @@ local lifetimeValue: { [string]: TextLabel } = {}
 for i, row in LIFETIME_ROWS do
     local holder = Instance.new("Frame")
     holder.Name = row.key
-    holder.Position = UDim2.fromOffset(0, LIFETIME_TOP + (i - 1) * LIFETIME_ROW_H)
+    holder.LayoutOrder = 10 + i
     holder.Size = UDim2.new(1, -6, 0, 26) -- -6: clear of the scrollbar
     holder.BackgroundTransparency = 1
     holder.Parent = lifetimeBody
@@ -562,33 +556,35 @@ end
 -- WIN/SAFE/LOSS bar. The three segments come from LedgerModel's largest-remainder apportionment and
 -- sum to exactly 100, so laying them end to end by scale leaves NO GAP and no overrun — which is
 -- why the model does that arithmetic and this file does none of it.
-local BAR_TOP = LIFETIME_TOP + #LIFETIME_ROWS * LIFETIME_ROW_H + 8
+--
+-- Track + legend share ONE list item (`barBlock`) rather than being two siblings, so the 5px gap
+-- between them stays fixed regardless of `lifetimeList`'s own inter-item padding.
+local LEGEND_H = 14
+
+local barBlock = Instance.new("Frame")
+barBlock.Name = "BarBlock"
+barBlock.LayoutOrder = 100
+barBlock.Size = UDim2.new(1, -6, 0, BAR_H + 5 + LEGEND_H)
+barBlock.BackgroundTransparency = 1
+barBlock.Parent = lifetimeBody
 
 local barTrack = Instance.new("Frame")
 barTrack.Name = "Bar"
-barTrack.Position = UDim2.fromOffset(0, BAR_TOP)
-barTrack.Size = UDim2.new(1, -6, 0, BAR_H)
+barTrack.Size = UDim2.new(1, 0, 0, BAR_H)
 barTrack.BackgroundColor3 = TRACK
 barTrack.BorderSizePixel = 0
 barTrack.ClipsDescendants = true
-barTrack.Parent = lifetimeBody
+barTrack.Parent = barBlock
 corner(barTrack, 4)
 
 local winSeg = barSegment(barTrack, "Win", WIN_GREEN)
 local safeSeg = barSegment(barTrack, "Safe", GOLD)
 local lossSeg = barSegment(barTrack, "Loss", LOSS_RED)
 
-local LEGEND_TOP = BAR_TOP + BAR_H + 5
-local LEGEND_H = 14
-
-local barLegend = label(lifetimeBody, "", 11, INK_CREAM, Enum.Font.Gotham)
-barLegend.Position = UDim2.fromOffset(0, LEGEND_TOP)
-barLegend.Size = UDim2.new(1, -6, 0, LEGEND_H)
+local barLegend = label(barBlock, "", 11, INK_CREAM, Enum.Font.Gotham)
+barLegend.Position = UDim2.fromOffset(0, BAR_H + 5)
+barLegend.Size = UDim2.new(1, 0, 0, LEGEND_H)
 barLegend.TextTransparency = 0.3
-
--- The card's laid-out height, stated once rather than guessed: this is what makes the body scroll
--- instead of overflowing when the panel gives it less room than this.
-lifetimeBody.CanvasSize = UDim2.fromOffset(0, LEGEND_TOP + LEGEND_H + 4)
 
 -- --- Your throws ---
 -- The only statistic that says something about the PLAYER rather than about their score. Glyphs,
@@ -795,18 +791,10 @@ local function viewportWidth(): number
 end
 
 local function applyLayout()
-    -- Re-derive the whole vertical stack from `lastRound`'s presence, not just the body: the band
-    -- itself, the hero band beneath it, and everything the body/tabs depend on via `bodyTop()`.
-    -- Called on every viewport change AND every LedgerState update (below), so a round revealing
-    -- while the panel is open shifts the hero down live rather than only on the next open().
-    lastRoundBand.Visible = lastRound ~= nil
-    hero.Position = UDim2.fromOffset(0, heroTop())
-    tabs.Position = UDim2.fromOffset(0, bodyTop())
-
     local narrow = viewportWidth() < NARROW_PX
     tabs.Visible = narrow
 
-    local top = bodyTop() + (if narrow then TABS_H + 8 else 0)
+    local top = BODY_TOP + (if narrow then TABS_H + 8 else 0)
     body.Position = UDim2.fromOffset(0, top)
     body.Size = UDim2.new(1, 0, 1, -(top + FOOTER_H + GAP))
 
@@ -863,6 +851,16 @@ local live = { pot = 0, streak = 0, points = 0 }
 local bestStreak = 0
 local escalationPrompts = true
 local resultSplash = true
+-- nil until main.client.luau has seen its first drum-rest reveal this session — drives
+-- `lastRoundCard`'s visibility in `render()` (see that card's section, in the LIFETIME card).
+local lastRound: {
+    worldThrow: string,
+    pick: string?,
+    result: string?,
+    distribution: any?,
+    totalPlayers: number?,
+}? =
+    nil
 
 local function paintOne(sw: PrefSwitch, on: boolean)
     sw.button.BackgroundColor3 = if on then GOLD else TRACK
@@ -907,9 +905,12 @@ local function render()
     mixRows.P.count.Text = `{view.lifetime.throwsP} thrown`
     mixRows.S.count.Text = `{view.lifetime.throwsS} thrown`
 
-    -- LAST ROUND band content. Visibility itself is `applyLayout`'s job (it also moves the hero
-    -- band), but the content only needs painting when there is content — a hidden band left with
-    -- last round's stale text would be harmless, but reading into a nil `lastRound` would not be.
+    -- LAST ROUND card. Visibility is set right here, not in `applyLayout`: the card is now a
+    -- UIListLayout child of `lifetimeBody`, so flipping `.Visible` both erases the stale content
+    -- (nothing paints below when `lastRound` is nil) and closes the gap above the rows that
+    -- follow it — the list layout does the reflow, no second call needed. The content only needs
+    -- painting when there is content — reading into a nil `lastRound` would not be harmless.
+    lastRoundCard.Visible = lastRound ~= nil
     if lastRound then
         for _, sym in THROWS do
             worldGlyphs[sym].Visible = sym == lastRound.worldThrow
@@ -923,12 +924,12 @@ local function render()
 
         -- `totalPlayers == 0` is server/src/engine/Settlement.ts's placeholder path
         -- (`buildDistribution` returns {R:33,P:33,S:33} when nobody threw — a pre-existing quirk
-        -- for OTHER readers of `distribution`, not something to fix here). This band is the first
+        -- for OTHER readers of `distribution`, not something to fix here). This card is the first
         -- thing to RENDER that placeholder, so it must not draw a confident-looking split
         -- describing votes that never happened. Hide the bar and its legend instead; the player
         -- count above already says the honest "0 PLAYERS" on its own. Both are absolutely
-        -- positioned within a fixed-height band, so hiding them leaves blank space at the bottom,
-        -- not a collapse or a hole.
+        -- positioned within the fixed-height card, so hiding them leaves blank space at the
+        -- bottom, not a collapse or a hole.
         roundBarTrack.Visible = totalPlayers > 0
         roundBarLegend.Visible = totalPlayers > 0
         if totalPlayers > 0 then
@@ -1032,10 +1033,6 @@ EventBus.LedgerState.Event:Connect(function(state)
     -- this session"), never "no update happened" the way an absent `counters` would be.
     lastRound = state.lastRound
     if isOpen then
-        -- `applyLayout` FIRST: `lastRound`'s presence may have just changed, which moves the hero
-        -- band and everything under it. `render` alone would repaint the band's numbers without
-        -- ever making room for it.
-        applyLayout()
         render()
     end
 end)

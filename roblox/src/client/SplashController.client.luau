@@ -12,8 +12,8 @@
 -- NOTHING HERE IS INTERACTIVE, deliberately. A large sinking element in the middle of the screen
 -- is the failure this branch has already made twice — a card on the movement thumbstick, and a
 -- panel leaking taps to live buttons beneath it. An accidental tap that dropped the player into
--- a movement-suspending takeover would be worse than the friction it saved. The hamburger and
--- the revealed plate are the doors.
+-- a movement-suspending takeover would be worse than the friction it saved. The round-timer ring
+-- and the revealed plate are the doors.
 --
 -- GATED ON THE DRUM, entirely by the caller: main.client.luau fires EventBus.Splash from
 -- `maybeShowReveal`, the SAME drum-rest gate (with the SAME REVEAL_SAFETY fallback) the tape tile

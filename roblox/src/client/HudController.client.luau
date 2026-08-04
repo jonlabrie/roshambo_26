@@ -342,6 +342,27 @@ plateLabel.Font = Enum.Font.GothamBold
 plateLabel.Text = "0"
 plateLabel.Parent = plate
 
+-- A six-digit balance with a two-digit streak ("×12  999999") measures wider than PLATE_MAX_W's
+-- own padded interior (100 - 16 = 84px). AutomaticSize.X alone measures the label's UNCAPPED
+-- natural text width — it has no idea the plate above it is about to clamp — so without this the
+-- label rendered past the plate's right/left edge and over the tape's first tile for every
+-- reveal that had one. A UISizeConstraint mirroring the plate's own cap gives the label the same
+-- hard ceiling `plate` already enforces on itself (the same AutomaticSize + UISizeConstraint
+-- combination, one level down); TextScaled + a MaxTextSize constraint — the pattern `bankButton`
+-- and `switchLabel` use for exactly this — then shrinks the font to fit inside that clamp instead
+-- of clipping the tail digits, which ClipsDescendants would have done.
+do
+    local constraint = Instance.new("UISizeConstraint")
+    constraint.MaxSize = Vector2.new(PLATE_MAX_W - 16, math.huge)
+    constraint.Parent = plateLabel
+end
+plateLabel.TextScaled = true
+do
+    local constraint = Instance.new("UITextSizeConstraint")
+    constraint.MaxTextSize = 15
+    constraint.Parent = plateLabel
+end
+
 -- The plate's own stroke is never day/night-adjusted (only the tape tile rims and the backing
 -- are — see `applyContrast`), so its "fully revealed" transparency is a plain constant.
 -- `plateRestTransparency` is NOT a constant: `applyContrast` keeps it in sync with the current
@@ -584,7 +605,7 @@ switchLabel.Text = "SWITCH?"
 switchLabel.ZIndex = 5
 switchLabel.Parent = switchPill
 
--- TextScaled + a MaxTextSize constraint, same pattern as `bankButton` above: at BTN_W-8 the pill
+-- TextScaled + a MaxTextSize constraint, same pattern as `bankButton` below: at BTN_W-8 the pill
 -- is only 36px wide on touch (BTN_W = BTN_H_TOUCH = 44) while "SWITCH?" at 13px GothamBold runs
 -- ~57-64px unscaled — it clipped to roughly "WITC". Scaling down still reads at this width; the
 -- constraint just stops it growing past 13px on the wider desktop pill.
@@ -1083,7 +1104,7 @@ escalationPrompt.TextSize = 16
 escalationPrompt.Font = Enum.Font.GothamBold
 escalationPrompt.Text = "CHOOSE A THROW"
 escalationPrompt.Parent = escalation
--- Belt-and-braces, same pattern as `switchLabel` below: 16px comfortably fits the 186px content
+-- Belt-and-braces, same pattern as `switchLabel` above: 16px comfortably fits the 186px content
 -- box by estimate (see ESCALATION_W above), but TextScaled + a MaxTextSize constraint means a
 -- font-metrics surprise shrinks the text instead of truncating it, and never grows past 16px.
 escalationPrompt.TextScaled = true

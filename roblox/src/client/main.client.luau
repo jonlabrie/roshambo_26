@@ -181,7 +181,7 @@ end
 -- The clock may not have synced when ACTIVE opens (secondsToLockout arrives nil), and lockoutAt is
 -- only ever assigned at that transition — so a nil there stays nil for the whole round. The old HUD
 -- let the player throw anyway and so do we: report a nominal countdown comfortably above the
--- escalation threshold, so throws stay enabled and the alarm stays quiet. But the HAIRLINE must not
+-- escalation threshold, so throws stay enabled and the alarm stays quiet. But the RING must not
 -- fake a span it does not have: a constant would pin it full and motionless while throws kept
 -- working past the real lockout. `timerKnown` tells the HUD to hide it instead.
 local UNSYNCED_SECONDS = 30
@@ -435,6 +435,13 @@ end)
 --
 -- Applied LOCALLY as well as sent. The switch's own paint is optimistic in LedgerController, and the
 -- echo reconciles a write that did not land.
+--
+-- BOTH `publish()` AND `publishLedger()` — `escalationPrompts` only needs the former (nothing
+-- outside the ledger reads it live), but `resultSplash` is read by SplashController from
+-- `EventBus.LedgerState`, the channel `publishLedger()` fires, not `EventBus.HudState`. Without
+-- this a toggle here would only take effect once something else happened to call
+-- `publishLedger()` next (today that is `ProfileUpdate`, which coincidentally lands before the
+-- next drum rest — but a coincidence is not a guarantee).
 EventBus.HudPreference.Event:Connect(function(body)
     if type(body) == "table" then
         if type(body.escalationPrompts) == "boolean" then
@@ -444,6 +451,7 @@ EventBus.HudPreference.Event:Connect(function(body)
             resultSplash = body.resultSplash
         end
         publish()
+        publishLedger()
     end
     SetHudPreference:FireServer(body)
 end)

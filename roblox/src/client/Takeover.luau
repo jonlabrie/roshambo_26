@@ -33,7 +33,7 @@ local depth = 0
 --
 -- EVERY WaitForChild HERE IS TIMED. This block runs at require time, before the
 -- `EventBus.OpenLedger` connection in LedgerController (not this file — extracting Takeover out of
--- LedgerController left that connection behind at LedgerController.client.luau:782) exists — so an
+-- LedgerController left that connection behind at LedgerController.client.luau:979) exists — so an
 -- untimed wait that never resolved would not merely lose the freeze, it would leave the ledger's
 -- doors (the round-timer ring, and the wallet plate whenever it is showing) dead buttons for the
 -- rest of the session, with nothing on screen to say why.
