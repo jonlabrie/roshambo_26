@@ -57,12 +57,17 @@ describe("OnboardingBeats", function()
         -- still fires on `bank` (the bank toast already says "banked"; this beat's job now is the
         -- gesture, not the confirmation), and it still anchors at `wallet` (OnboardingController's
         -- STATIC_ANCHORS knows no `ring` anchor).
+        -- Two things the copy must actually SAY, not just "tap...again" (which "Tap to bank
+        -- again" would also satisfy without naming the control at all): it must name the
+        -- clock/ring itself, and it must describe what the SECOND tap reaches — the ledger's
+        -- full detail, not just a repeat of the first tap.
         local b = Beats.next({}, "bank")
         expect(b ~= nil).toBe(true)
         expect(b.event).toBe("bank")
         expect(b.anchor).toBe("wallet")
-        expect(b.copy:find("[Tt]ap") ~= nil).toBe(true)
-        expect(b.copy:find("again") ~= nil).toBe(true)
+        local lower = b.copy:lower()
+        expect(lower:find("clock") ~= nil or lower:find("ring") ~= nil).toBe(true)
+        expect(lower:find("everything") ~= nil or lower:find("ledger") ~= nil).toBe(true)
     end)
 end)
 

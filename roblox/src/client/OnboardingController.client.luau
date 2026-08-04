@@ -171,7 +171,7 @@ hintLabel.Parent = card
 -- (`Workspace.RoshamboStage.ThrowDrum.Drum`, see DrumController), so it is tracked live via
 -- `WorldToViewportPoint` rather than guessed at a fixed screen fraction.
 --
--- Nothing here ever covers the throw buttons, the bank button, the ≡ ledger door or the tape —
+-- Nothing here ever covers the throw buttons, the bank button, the ring or the tape —
 -- ALL THREE sit ABOVE the whole bank+throws+tape cluster (offset clears its full footprint via
 -- EDGE/AREA_H/ROW_GAP/BANK_H/BANK_GAP, the same numbers HudController's own stack is built from).
 --

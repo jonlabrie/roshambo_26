@@ -53,7 +53,7 @@ local EventBus = require(script.Parent:WaitForChild("EventBus"))
 local player = Players.LocalPlayer
 
 local TAPE_N = 5 -- how many tape entries the HUD can show
-local TICK = 0.1 -- HudState cadence; the round timer is a depleting hairline, so keep it smooth
+local TICK = 0.1 -- HudState cadence; the round timer is a depleting ring, so keep it smooth
 local REVEAL_SAFETY = 3 -- seconds before a dropped drumRest cue is assumed lost
 local BANK_TOAST_FAILOPEN_SECONDS = 1 -- see pendingBankToast: a missing OnboardingController ack
 -- must never permanently silence the bank toast
@@ -240,7 +240,7 @@ local function publish()
 end
 
 -- The maximal panel's whole input. Fired only on ProfileUpdate, because everything in it changes
--- only there — unlike HudState, which is a 10Hz heartbeat for a depleting hairline.
+-- only there — unlike HudState, which is a 10Hz heartbeat for a depleting ring.
 --
 -- Deliberately NOT gated on `counters` being present. This is the panel's ONLY channel, so an early
 -- return here would take the live hero band, best streak and the preference switch down with the

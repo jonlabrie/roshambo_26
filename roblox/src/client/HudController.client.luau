@@ -98,12 +98,14 @@ local TOUCH = UserInputService.TouchEnabled and not UserInputService.KeyboardEna
 local JUMP_CLEARANCE = HudLayout.JUMP_CLEARANCE
 local EDGE = HudLayout.EDGE
 -- The cluster's own bottom margin — deliberately a SEPARATE constant from EDGE, not a smaller
--- EDGE. EDGE also sets the HUD's side margins (the throw cluster's/bank button's/toast's
--- horizontal registration, all still `1 - JUMP_CLEARANCE` / plain `EDGE`), and those are
--- unchanged; only the bottom edge moved, now that the hairline that used to occupy it is gone
--- (spec §7). `HudLayout.CLUSTER_TOP_FROM_BOTTOM` still adds `HudLayout.EDGE`, not this — it now
--- over-reserves by `EDGE - EDGE_BOTTOM`, which is fine and deliberate: the onboarding safe band
--- erring high keeps cards further from live buttons, never closer.
+-- EDGE, even though EDGE's only other surviving read in this file is the toast's TOP offset (the
+-- throw cluster/bank button/ring/plate all register horizontally off `1 - JUMP_CLEARANCE`, never
+-- off EDGE — this file has no live horizontal use of EDGE to disturb). The real reason to keep
+-- them separate: `HudLayout.CLUSTER_TOP_FROM_BOTTOM` and OnboardingController's static-anchor
+-- band both still add `HudLayout.EDGE`, not this. Shrinking EDGE itself would drag BOTH of those
+-- down TOWARD the live buttons — the unsafe direction — where this constant only ever moves the
+-- cluster itself. The gap that results (`EDGE - EDGE_BOTTOM`) is a deliberate over-reservation:
+-- the onboarding safe band erring high keeps cards further from live buttons, never closer.
 local EDGE_BOTTOM = 6
 -- The gap the ring registers off the throw cluster's edge, and (since Task 5) the gap the plate
 -- registers off the tape's edge too — the hamburger's old gap constant and this were always the
@@ -271,14 +273,33 @@ local potCounter = newCounter(0)
 -- for camera drag; it is in the bottom row now, so it is safe to make a `TextButton` again — the
 -- ledger's second door, alongside the ring, whenever it is showing. See its `MouseButton1Click`
 -- handler below.
+--
+-- Two consequences of being a live button that a plain Frame never had to worry about:
+--   1. AutomaticSize.X now folds the BUTTON's own `Text` into the content width too, not just
+--      `plateLabel`'s — benign here because `plate.Text` stays `""` (see below), but worth
+--      knowing if this ever grows a second label.
+--   2. `GuiButton.Selectable` defaults to `true`, which would put the plate into gamepad focus
+--      navigation alongside the throw/bank buttons. Forced off below — nothing about "one line
+--      that only sometimes exists" belongs in a d-pad tab order.
 local PLATE_HOLD = 2
 local PLATE_FADE = 0.35
+-- A CAP on how far AutomaticSize.X may grow the plate leftward. It was never a problem for a
+-- Frame — nothing sank a touch — but it is a live button now, and it is unbounded: a long-riding
+-- streak plus a large pot ("×12  9999999") can push its content past 100px, and the plate's right
+-- edge already sits close enough to the screen's own left edge at the narrowest supported width
+-- that unbounded growth can creep toward the movement thumbstick (`HudController.client.luau:5`
+-- — "bottom-left: the movement thumbstick. Untouchable."). 100px keeps ordinary play (a one- or
+-- two-digit streak, a three- to five-digit pot) entirely unclipped and puts a hard ceiling on the
+-- pathological case instead of leaving it to grow with the number. See the task report for the
+-- resulting worst-case left edge at 568px and 320px.
+local PLATE_MAX_W = 100
 
 local plate = Instance.new("TextButton")
 plate.Name = "Plate"
 plate.AnchorPoint = Vector2.new(1, 1)
 plate.AutomaticSize = Enum.AutomaticSize.X
 plate.Size = UDim2.fromOffset(0, TILE)
+plate.Selectable = false -- see the button-consequences note above; this is not a d-pad target
 -- Fixed off the SAME shared right reference (1 - JUMP_CLEARANCE) the throw cluster and the bank
 -- button register to — RING_GAP left of the tape's own left edge (offset -TAPE_W from that
 -- reference), bottom-aligned with the tape at EDGE_BOTTOM from the gui's bottom (the cluster's
@@ -296,6 +317,11 @@ plate.Visible = false
 plate.Parent = gui
 corner(plate, 6)
 local plateStroke = stroke(plate, GOLD, 1, 0.35)
+do
+    local constraint = Instance.new("UISizeConstraint")
+    constraint.MaxSize = Vector2.new(PLATE_MAX_W, math.huge) -- height is fixed (TILE), never automatic
+    constraint.Parent = plate
+end
 do
     local pad = Instance.new("UIPadding")
     pad.PaddingLeft = UDim.new(0, 8)
@@ -780,8 +806,8 @@ end
 -- own visibility: the button stays visible for the full 0.5s drain because the drain IS the
 -- point (see `render`'s call into `setBank`), but that visible window is an animation of
 -- something that has ALREADY happened, not a live offer. This is the opposite asymmetry from
--- the `≡`, whose visible window IS its answerable window — here the armed window is the
--- SHORTER of the two, not the same one.
+-- the ring/plate pair, whose visible window IS their answerable window (`plateVisible`) — here
+-- the armed window is the SHORTER of the two, not the same one.
 local bankArmed = false
 
 bankButton.MouseButton1Click:Connect(function()

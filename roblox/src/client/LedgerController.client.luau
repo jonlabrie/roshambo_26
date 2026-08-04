@@ -5,12 +5,17 @@
 -- and it is allowed to. Everything else in the play UI is the quiet hangout HUD; this is the half a
 -- player opens on purpose to study their own numbers.
 --
--- ENTRY is a tap on the `≡` ledger door, bottom row of the minimal HUD (HudController fires
--- EventBus.OpenLedger from `ledgerButton`'s click handler). The player-state plate used to be
--- this entry point, back when it was the design's only interactive information element — but the
--- plate has since moved into the bottom row as a pure display (see HudController's own header),
--- and Active must stay false on a display or it permanently sinks touches on the camera-drag
--- surface behind it. The `≡` button is what took over being a door; the plate no longer is one.
+-- ENTRY is a tap on the round-timer RING, bottom row of the minimal HUD (HudController fires
+-- EventBus.OpenLedger from the ring's click handler) — the ring's SECOND tap, the first only
+-- reveals the wallet plate; see HudController's own header for the two-stage gesture. The plate
+-- is a SECOND door onto the same event whenever it is showing (its own `MouseButton1Click`,
+-- guarded on `plateVisible`), so the ledger has two doors, never a third.
+--
+-- Both doors carry a gesture that used to live on a single `≡` hamburger button — deleted (spec
+-- §6): Roblox's own unibar already owns that glyph top-left, so a second one bottom-right read as
+-- either the same menu or a broken copy of it. The ring inherited the gesture instead, and the
+-- plate — once inert display-only chrome — became tappable again once it left the strip Roblox
+-- uses for camera drag.
 --
 -- AND THE LEDGER IS ITSELF A DOOR. The teahouse panel's own persistent bottom-right toggle collided
 -- with the throw row on a narrow viewport, so it is gone and MY TEAHOUSE in this header replaces it
