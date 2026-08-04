@@ -9,9 +9,10 @@
 -- went on believing the old height, and the safe band is the only thing standing between a card and
 -- the BANK THESE button. One source, imported by both.
 --
--- Numbers that only ONE file uses (BTN_W/BTN_GAP, TILE_GAP, the toast/timer sizes, the plate's
--- own reveal/fade timing) stay local to that file — this module is for the shared skeleton, not
--- for every constant in the HUD.
+-- Numbers that only ONE file uses (BTN_W/BTN_GAP, TILE_GAP, the toast sizes, the plate's own
+-- reveal/fade timing) stay local to that file — this module is for the shared skeleton, not for
+-- every constant in the HUD. The round-timer ring is the exception among "timer" numbers: it
+-- replaced the bottom hairline and sits IN the shared bottom row, so its geometry lives here too.
 --
 -- No Roblox globals: plain numbers, and pure arithmetic over them, so it stays Lune-testable like
 -- everything else in src/shared. This used to also hold `plateBottomOffset`, a function rather
@@ -51,16 +52,40 @@ HudLayout.TAPE_TOUCH_SCALE = 0.7
 HudLayout.BTN_H_TOUCH = math.round(HudLayout.BTN_H * HudLayout.THROW_TOUCH_SCALE)
 HudLayout.TILE_TOUCH = math.round(HudLayout.TILE * HudLayout.TAPE_TOUCH_SCALE)
 
+-- ===== The round-timer ring (spec §5) =====
+-- A PWA-style circular timer replaces the bottom hairline. It shares the bottom row with the
+-- tape, sitting between the tape and the wallet plate.
+--
+-- SIZED TO A THROW BUTTON, not to the tape. The PWA's 54px was the right reference while this
+-- was a readout; it stopped being one when it became the ledger's door, and an interactive target
+-- should be sized like the other interactive targets. 44px on touch is also exactly the
+-- touch-target floor the throw buttons adopted.
+HudLayout.RING_D = HudLayout.BTN_H
+HudLayout.RING_D_TOUCH = HudLayout.BTN_H_TOUCH
+
+-- Proportional, so a 76px ring is not a hairline circle. 7.5% is the PWA's own ratio (4px on 54),
+-- floored at 3 so the touch tier keeps a visible stroke.
+HudLayout.RING_THICKNESS = math.max(3, math.round(HudLayout.RING_D * 0.075))
+HudLayout.RING_THICKNESS_TOUCH = math.max(3, math.round(HudLayout.RING_D_TOUCH * 0.075))
+HudLayout.RING_GAP = 8 -- ring <-> tape, and ring <-> plate
+
 -- The bank button's row, directly above the throw cluster. Reserved whether or not a pot is
 -- riding: an onboarding card clamped into a band that ignored it would land on the button the
 -- moment a first win put one there.
 HudLayout.BANK_H = 40
 HudLayout.BANK_GAP = 8
 
--- The tape+buttons cluster's own height, per tier. The TAPE IS BELOW THE BUTTONS now (owner's
--- ruling); the height is unchanged because the same two rows and one gap are in it either way.
-HudLayout.AREA_H = HudLayout.BTN_H + HudLayout.ROW_GAP + HudLayout.TILE
-HudLayout.AREA_H_TOUCH = HudLayout.BTN_H_TOUCH + HudLayout.ROW_GAP + HudLayout.TILE_TOUCH
+-- The bottom row is as tall as its TALLEST occupant, not as tall as the tape. The ring is taller
+-- than a tape tile at both tiers, and a row derived from the tape alone would let it hang below
+-- the cluster the onboarding safe band is clamped against — putting a card over it.
+HudLayout.BOTTOM_ROW_H = math.max(HudLayout.TILE, HudLayout.RING_D)
+HudLayout.BOTTOM_ROW_H_TOUCH = math.max(HudLayout.TILE_TOUCH, HudLayout.RING_D_TOUCH)
+
+-- The bank+ring+tape cluster's own height, per tier. The bottom row now holds the plate, the
+-- ring and the tape side by side; the height comes from the row's own height (its tallest
+-- occupant), not from the tape directly.
+HudLayout.AREA_H = HudLayout.BTN_H + HudLayout.ROW_GAP + HudLayout.BOTTOM_ROW_H
+HudLayout.AREA_H_TOUCH = HudLayout.BTN_H_TOUCH + HudLayout.ROW_GAP + HudLayout.BOTTOM_ROW_H_TOUCH
 
 -- Where the bank+throws+tape cluster's footprint begins, measured UP from the bottom edge.
 -- The bank row counts whether or not its button is visible, exactly as the old slot did.

@@ -31,18 +31,61 @@ describe("HudLayout — the cluster the onboarding band has to clear", function(
     end)
 end)
 
--- Carried forward from before this task, unchanged: this task did not touch BTN_H, TILE,
--- THROW_TOUCH_SCALE, TAPE_TOUCH_SCALE or the AREA_H formulas built on them. These assert the
--- derivation itself — not a value read back from the module — so a later edit to any of those
--- primitives that silently moves the cluster fails here rather than only in whichever file
--- hand-copied the old number (see the module header's warning at HudLayout.luau:7-10).
+describe("HudLayout — the ring shares the bottom row with the tape", function()
+    test("the ring is exactly a throw button at both tiers", function()
+        -- It is a target now, not a readout. Sizing it to the tape would make the ledger's only
+        -- door smaller than every other control on the surface.
+        expect(HudLayout.RING_D).toBe(HudLayout.BTN_H)
+        expect(HudLayout.RING_D_TOUCH).toBe(HudLayout.BTN_H_TOUCH)
+        expect(HudLayout.RING_D_TOUCH >= 44).toBe(true)
+    end)
+
+    test("the stroke scales with the ring and never vanishes", function()
+        expect(HudLayout.RING_THICKNESS >= 3).toBe(true)
+        expect(HudLayout.RING_THICKNESS_TOUCH >= 3).toBe(true)
+        expect(HudLayout.RING_THICKNESS > HudLayout.RING_THICKNESS_TOUCH).toBe(true)
+    end)
+
+    test("the bottom row is as tall as its tallest occupant", function()
+        -- The tape and the ring sit side by side. A row derived from the tape alone would let a
+        -- taller ring hang out of the cluster the onboarding band is clamped against.
+        expect(HudLayout.BOTTOM_ROW_H).toBe(math.max(HudLayout.TILE, HudLayout.RING_D))
+        expect(HudLayout.BOTTOM_ROW_H_TOUCH).toBe(math.max(HudLayout.TILE_TOUCH, HudLayout.RING_D_TOUCH))
+    end)
+
+    test("AREA_H is buttons + gap + the bottom row", function()
+        expect(HudLayout.AREA_H).toBe(HudLayout.BTN_H + HudLayout.ROW_GAP + HudLayout.BOTTOM_ROW_H)
+        expect(HudLayout.AREA_H_TOUCH).toBe(
+            HudLayout.BTN_H_TOUCH + HudLayout.ROW_GAP + HudLayout.BOTTOM_ROW_H_TOUCH
+        )
+    end)
+
+    test("the cluster still covers bank + throws + bottom row", function()
+        expect(HudLayout.CLUSTER_TOP_FROM_BOTTOM).toBe(
+            HudLayout.EDGE + HudLayout.AREA_H + HudLayout.ROW_GAP + HudLayout.BANK_H
+        )
+    end)
+
+    test("the touch throw target still clears the 44px floor", function()
+        expect(HudLayout.BTN_H_TOUCH >= 44).toBe(true)
+    end)
+end)
+
+-- Carried forward from before this task: this task did not touch BTN_H, TILE, THROW_TOUCH_SCALE
+-- or TAPE_TOUCH_SCALE, but it DID re-derive AREA_H from BOTTOM_ROW_H instead of TILE directly
+-- (the ring, not the tape, now sets the bottom row's height). These assert the derivation
+-- itself — not a value read back from the module — so a later edit to any of those primitives
+-- that silently moves the cluster fails here rather than only in whichever file hand-copied the
+-- old number (see the module header's warning at HudLayout.luau:7-10).
 describe("HudLayout — derivation of the cluster's own primitives", function()
     test("AREA_H is the tape+buttons cluster, derived", function()
-        expect(HudLayout.AREA_H).toBe(HudLayout.TILE + HudLayout.ROW_GAP + HudLayout.BTN_H)
+        expect(HudLayout.AREA_H).toBe(HudLayout.BTN_H + HudLayout.ROW_GAP + HudLayout.BOTTOM_ROW_H)
     end)
 
     test("AREA_H_TOUCH is the shrunken cluster, derived", function()
-        expect(HudLayout.AREA_H_TOUCH).toBe(HudLayout.TILE_TOUCH + HudLayout.ROW_GAP + HudLayout.BTN_H_TOUCH)
+        expect(HudLayout.AREA_H_TOUCH).toBe(
+            HudLayout.BTN_H_TOUCH + HudLayout.ROW_GAP + HudLayout.BOTTOM_ROW_H_TOUCH
+        )
     end)
 
     test("the touch tier shrinks the throw button and the tape", function()
