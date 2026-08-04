@@ -3,9 +3,8 @@
 -- `Instance.new` moved to HudController (the minimal HUD). What stays is the seam between the
 -- remotes and the renderers, because it is the part that is subtle rather than decorative:
 --   • the authoritative World-Throw tape and the per-round personal WIN/SAFE/LOSS badges,
---   • the DRUM SPOILER GATE, now two gates (see `visibleTape` / `maybeShowSplash` /
---     `maybeShowReveal`): the player's own result releases as the drum SETTLES, everything
---     naming the world's throw waits until the wheel actually stops turning,
+--   • the DRUM-REST SPOILER GATE (see `visibleTape` / `maybeShowReveal`), which holds the tape
+--     tile and the headline until the wheel stops turning,
 --   • the pick itself — held here as `chosen` until the lockout (`HudModel.sendAtLockout`), the
 --     one point it goes over the wire,
 --   • the HudModel session — the escalation's consecutive-miss backoff.
@@ -301,11 +300,9 @@ BoardData.OnClientEvent:Connect(function(d)
     setTape(d and d.tape)
 end)
 
--- The tape tile waits for the drum to stop turning (the drumRest cue) and the result splash for
--- the drum to commit to its detent (drumSettling, ~0.36-0.51s earlier), so neither spoils the throw
--- mid-spin. NOT nil'd by the splash: `maybeShowSplash` only reads this record, because the tape
--- tile still needs it afterwards. The splash (SplashController) owns naming the personal result
--- now — the old toast folded the vote distribution into the same headline it built here,
+-- The result splash AND the new tape tile wait for the drum to stop turning (the drumRest cue),
+-- so the throw is not spoiled mid-spin. The splash (SplashController) owns naming the personal
+-- result now — the old toast folded the vote distribution into the same headline it built here,
 -- but that headline is gone; `distribution`/`totalPlayers`/`pick` are captured anyway (`pick`
 -- unused by the splash) because Task 9's ledger LAST ROUND band needs the same crowd-split,
 -- player-count and personal-throw data the toast used to carry.
@@ -323,35 +320,7 @@ local pendingReveal: {
     nil
 local drumAtRest = false
 
--- Two gates, not one. The SPLASH — the player's own result — releases on `drumSettling`, which
--- DrumController fires the first frame the drum is within half a facet of home — 0.36-0.51s before
--- it stops, varying with the travel the lander picked. Everything else (the tape badge, the ledger's LAST ROUND band, the
--- first-win onboarding beat) stays on `drumRest`, because those name the WORLD's throw and
--- releasing them early is the spoiler this gate exists to prevent.
-local drumSettling = false
-local splashDone = false
-
-local function maybeShowSplash()
-    if not drumSettling or splashDone then
-        return
-    end
-    local p = pendingReveal
-    -- `p.result` is nil whenever this player had no throw counted this round (a spectator, or a
-    -- whiff), so the splash cannot appear for a round the player did not throw in.
-    if not p or not p.result then
-        return
-    end
-    splashDone = true
-    EventBus.Splash:Fire({
-        result = p.result,
-        streak = wallet.currentStreak,
-        pot = wallet.pointsAtStake,
-        forfeited = p.forfeited,
-    })
-end
-
 local function maybeShowReveal()
-    maybeShowSplash() -- drumRest implies settling, so a dropped cue still releases the splash here
     if not drumAtRest then
         return
     end
@@ -384,9 +353,8 @@ local function maybeShowReveal()
         -- or "alreadySeen") is what stops the retries, so a WIN dropped for stacking gets another
         -- chance at the player's next one instead of being marked taught-forever for nothing.
         --
-        -- DELIBERATELY NOT DEDUPED against the splash, even though on a first win both are on
-        -- screen together (the splash arrives ~0.7s ahead now, and outlives that). This is not
-        -- the bank case (which grew dedup machinery because
+        -- DELIBERATELY NOT DEDUPED against the splash fired below, even though both can show on
+        -- the SAME first-win tick. This is not the bank case (which grew dedup machinery because
         -- the toast and the beat said the literal same sentence in the same screen region): the
         -- splash CELEBRATES ("YOU WIN! / streak ×1 — pot is now 1") and the beat TEACHES ("You
         -- won. Take it, or ride it — a win triples your pot."), they sit in different regions, and
@@ -395,9 +363,18 @@ local function maybeShowReveal()
         if not resolved.win and profileSeen and p.result == "WIN" then
             EventBus.Onboard:Fire("win", knownSeenBeats)
         end
-        -- THE SPLASH NO LONGER SHARES THIS GATE. It releases on the earlier `drumSettling` cue —
-        -- see `maybeShowSplash` above, called on this function's first line, which is its FALLBACK
-        -- rather than its normal path. What stays here is everything that names the WORLD's throw.
+        -- THE SPLASH INHERITS THIS SAME GATE rather than building a second one — it is fired here,
+        -- never from RevealResult directly, so it can never land ~3s early and spoil the wheel.
+        -- `p.result` is nil whenever this player had no throw counted this round (a spectator, or
+        -- a whiff), so the splash cannot appear for a round the player did not throw in either.
+        if p.result then
+            EventBus.Splash:Fire({
+                result = p.result,
+                streak = wallet.currentStreak,
+                pot = wallet.pointsAtStake,
+                forfeited = p.forfeited,
+            })
+        end
         publish()
         -- The ledger reads `lastRound` from EventBus.LedgerState, not the HudState `publish()`
         -- above — without this call the panel would keep showing the PREVIOUS round's detail
@@ -408,11 +385,7 @@ local function maybeShowReveal()
 end
 
 EventBus.Cue.Event:Connect(function(cue)
-    if cue.kind == "drumSettling" then
-        drumSettling = true
-        maybeShowSplash()
-    elseif cue.kind == "drumRest" then
-        drumSettling = true -- drumRest implies it, even if that cue was dropped
+    if cue.kind == "drumRest" then
         drumAtRest = true
         maybeShowReveal()
     end
@@ -563,10 +536,6 @@ RoundUpdate.OnClientEvent:Connect(function(info)
         lockoutAt = if info.secondsToLockout then os.clock() + info.secondsToLockout else nil
         pendingReveal = nil -- the drum respins; last round's reveal has already been shown
         drumAtRest = false
-        drumSettling = false
-        -- PER ROUND, not per reveal: without this reset the second round of a session, and every
-        -- round after it, would never splash.
-        splashDone = false
         revealedWorldThrow = nil -- the ring must not carry last round's glyph into this one
     else
         lockoutAt = nil
@@ -594,10 +563,7 @@ RevealResult.OnClientEvent:Connect(function(r)
     maybeShowReveal() -- only shows if the drum is already at rest
     task.delay(REVEAL_SAFETY, function()
         if pendingReveal and pendingReveal.roundId == roundId then
-            -- safety: never strand a result if the cues dropped. BOTH flags, so neither half is
-            -- left behind — a splash that never appears is far worse than one that appears early.
-            drumSettling = true
-            drumAtRest = true
+            drumAtRest = true -- safety: never strand a result if the cue dropped
             maybeShowReveal()
         end
     end)

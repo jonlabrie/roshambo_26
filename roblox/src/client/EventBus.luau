@@ -24,11 +24,10 @@ local NAMES = {
     -- main.client.luau folds it into `declinedThisRound` — dismissing and backing out mean the
     -- same thing to the escalation rule, so this does not carry a payload of its own.
     "DismissEscalation",
-    -- The result splash (SplashController). Fired from main.client.luau's `maybeShowSplash`, on the
-    -- `drumSettling` cue — 0.36-0.51s ahead of the drumRest gate the TAPE TILE still waits on,
-    -- because by then the drum is within half a facet of home and the face in the window is already
-    -- the world's throw. Never from RevealResult
-    -- directly, which would spoil the wheel ~3s early. Payload: { result, streak, pot, forfeited }.
+    -- The result splash (SplashController). Fired from main.client.luau's `maybeShowReveal`, on the
+    -- SAME `drumRest` gate as the tape tile — never from RevealResult directly, which would spoil
+    -- the wheel ~3s early. The drum is authoritative: nothing may reflect the world's throw
+    -- anywhere else until it is fully at rest. Payload: { result, streak, pot, forfeited }.
     "Splash",
 }
 for _, name in NAMES do

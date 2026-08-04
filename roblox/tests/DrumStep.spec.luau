@@ -46,126 +46,16 @@ describe("DrumStep — the strike-to-rest timing", function()
     end)
 end)
 
--- WHEN THE PERSONAL RESULT MAY LAND (spec §2, amended 2026-08-04).
---
--- The cue used to fire at a fixed SPLASH_LEAD_SECONDS = 0.7 chosen against "the drum has covered
--- >80% of its travel". That criterion measures the wrong thing: 83–88% travelled still left 28.1°
--- (best landing) to 53.4° (worst) to turn, and facets are 30° apart carrying DIFFERENT symbols, so
--- the window showed a NEIGHBOURING throw for a further 0.19–0.34s while the splash named the
--- result. The trigger is now the RESIDUAL ANGLE, and these tests assert the invariants that make
--- that safe rather than any one number.
---
--- ω is READ from DrumStep, never copied: it used to be a literal 4 here, and the old assertion
--- INVERTED across the plausible range (ω = 1 gave 0.780 and failed; ω = 8 passed while describing a
--- different drum). STILL UNTESTED: DrumController's "DrumKick" stage attribute overrides ω at
--- runtime and nothing here can see it — but the residual formulation is exactly what makes that
--- harmless, since the controller feeds `glideResidual` the LIVE ω.
---
--- The travel `d` is not a constant: `landTargetFor` steps down to the first detent at least ω·G/2
--- below the current θ, and detents recur every π/2 — so d ∈ [ω·G/2, ω·G/2 + π/2). Both extremes are
--- derived from DrumStep's own constants below, never hand-copied.
-local G = DrumStep.GLIDE_SECONDS
-local D_MIN = DrumStep.KICK_OMEGA * G / 2
-local D_MAX = D_MIN + math.pi / 2 -- the open end of the range; the conservative worst case
-
--- The drum's facet count, derived from the module rather than restated: `symmetric` steps +3 and
--- preserves the symbol, so the number of steps back to face 0 times 3 is the ring's size.
-local FACES = 0
-do
-    local face = 0
-    for _ = 1, 100 do
-        face = DrumStep.symmetric(face)
-        FACES += 3
-        if face == 0 then
-            break
-        end
-    end
-end
-
--- The first s at which the residual has fallen to the threshold — i.e. when DrumController fires
--- `drumSettling`. Bisection is valid because the residual is monotone decreasing (asserted below).
-local function crossingS(d: number, omega: number, threshold: number): number
-    local lo, hi = 0, 1
-    for _ = 1, 60 do
-        local mid = (lo + hi) / 2
-        if DrumStep.glideResidual(d, omega, mid) > threshold then
-            lo = mid
-        else
-            hi = mid
-        end
-    end
-    return hi
-end
-
-describe("DrumStep.glideResidual — how much turn the drum still owes", function()
-    test("at s = 0 the whole travel is still owed, exactly", function()
-        for _, d in { D_MIN, D_MAX, 1, 12 } do
-            expect(DrumStep.glideResidual(d, DrumStep.KICK_OMEGA, 0)).toBe(d)
-        end
-    end)
-
-    test("at s = 1 the drum is home, exactly zero", function()
-        -- Not merely close: the smoothstep term is exactly 1 and the carried term exactly 0 at
-        -- s = 1, so a cue keyed on the residual can never be owed a last sliver after `drumRest`.
-        for _, d in { D_MIN, D_MAX, 1, 12 } do
-            for _, omega in { 0, 1, DrumStep.KICK_OMEGA, 8 } do
-                expect(DrumStep.glideResidual(d, omega, 1)).toBe(0)
-            end
-        end
-    end)
-
-    test("it decreases monotonically across the whole range of travel the lander can pick", function()
-        -- The cue latches on the FIRST frame at or below the threshold, so a residual that dipped
-        -- and rose again would announce the result while the drum was still a facet out. It also
-        -- licenses the bisection in `crossingS`. The carried-velocity term is what could break
-        -- this — it is only safe because d ≥ ω·G/2 > ω·G/3, and `landTargetFor` guarantees that.
-        for i = 0, 20 do
-            local d = D_MIN + (D_MAX - D_MIN) * i / 20
-            local prev = DrumStep.glideResidual(d, DrumStep.KICK_OMEGA, 0)
-            for j = 1, 1000 do
-                local now = DrumStep.glideResidual(d, DrumStep.KICK_OMEGA, j / 1000)
-                expect(now <= prev + 1e-12).toBe(true)
-                prev = now
-            end
-        end
-    end)
-end)
-
-describe("DrumStep.SPLASH_RESIDUAL_RADIANS — the threshold that protects the player", function()
-    test("it is at most half a facet", function()
-        -- THE ONE THAT MATTERS. Facets carry different symbols, so a threshold wider than half a
-        -- facet lets a NEIGHBOURING symbol still be the one nearest the window when the splash
-        -- names the result — the exact spoiler the gate exists to prevent.
-        expect(FACES).toBe(12)
-        expect(DrumStep.SPLASH_RESIDUAL_RADIANS > 0).toBe(true)
-        expect(DrumStep.SPLASH_RESIDUAL_RADIANS <= (2 * math.pi / FACES) / 2).toBe(true)
-    end)
-
-    test("the lead it buys is worth having, at both extremes of travel", function()
-        -- The point of the change is a splash that arrives sooner than `drumRest` — but not by a
-        -- fixed amount. Solving residual(s) = threshold with the real kick velocity gives
-        --   shortest travel (d = ω·G/2)      → lead ≈ 0.512s
-        --   longest travel  (d = ω·G/2 + π/2) → lead ≈ 0.358s
-        -- i.e. the splash lands ~2.94–3.09s after the strike instead of 3.45s. The band is asserted
-        -- with margin, not to those digits: retiming the glide or the kick should move the lead,
-        -- and only a lead that has collapsed to nothing (no gain over `drumRest`) or grown past the
-        -- readable point should fail here.
-        local leadShortest = (1 - crossingS(D_MIN, DrumStep.KICK_OMEGA, DrumStep.SPLASH_RESIDUAL_RADIANS)) * G
-        local leadLongest = (1 - crossingS(D_MAX, DrumStep.KICK_OMEGA, DrumStep.SPLASH_RESIDUAL_RADIANS)) * G
-        expect(leadShortest > 0.3 and leadShortest < 0.7).toBe(true)
-        expect(leadLongest > 0.25 and leadLongest < 0.7).toBe(true)
-        -- A longer travel is still moving faster at any given residual, so it reaches the threshold
-        -- later: the worst case is always the shorter lead, never the other way round.
-        expect(leadLongest < leadShortest).toBe(true)
-    end)
-
-    test("the drum's own timings are unchanged", function()
-        -- The bell/drum choreography is signed off. This round changes when a CLIENT reacts,
-        -- never how long the drum takes — and the server reads SETTLE_SECONDS to time round
-        -- scheduling.
-        expect(DrumStep.SETTLE_SECONDS).toBe(
-            DrumStep.STRIKE_SWING_SECONDS + DrumStep.SPIN_SECONDS + DrumStep.GLIDE_SECONDS
-        )
+-- THE DRUM IS AUTHORITATIVE (owner's ruling, 2026-08-04). A round four attempt let the personal
+-- result splash fire ahead of `drumRest` — first at a fixed lead, then refined to a trigger on the
+-- glide's residual angle. Both violated the rule: nothing may reflect the world's throw anywhere
+-- else until the drum has fully settled on it. That arithmetic and its threshold constant have
+-- been retracted; see DrumStep's header for where they used to live and why they are gone.
+-- KICK_OMEGA survives the retraction (it moved out of DrumController for an unrelated reason — a
+-- stage attribute could retune it with no test able to see it), so its value is still worth
+-- pinning here.
+describe("DrumStep.KICK_OMEGA", function()
+    test("is the drum's live spin velocity", function()
         expect(DrumStep.KICK_OMEGA).toBe(4)
     end)
 end)
