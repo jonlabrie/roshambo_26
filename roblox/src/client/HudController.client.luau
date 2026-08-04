@@ -385,6 +385,51 @@ end
 local PLATE_STROKE_REST_TRANSPARENCY = 0.35
 local plateRestTransparency = 0.3
 
+-- ===== The payoff draws the eye =====
+-- WHILE THE BALANCE CLIMBS, the plate lifts: its existing GOLD rim comes up from a hairline to a
+-- real edge, and the figure itself goes gold. It settles back as the count lands.
+--
+-- THE PLATE ONLY. The bank button's figure is DRAINING to zero over the same seconds, and a
+-- number counting down to nothing should not celebrate — the destination gets the emphasis, the
+-- source just empties.
+--
+-- LATCHED, and that is not optional: this is called every frame while a count runs (from
+-- `paintCounters`, which the RenderStepped driver invokes at frame rate), and a tween cancelled
+-- and restarted at frame rate gets a few percent of its travel and renders static. That is
+-- exactly how the bank button's pulse failed earlier in this branch.
+--
+-- DECLARED HERE, beside the plate's other visual state rather than beside `paintCounters` where
+-- it is called: `revealPlate`, below, writes `plateStroke.Transparency` directly, and a re-reveal
+-- can land mid-count. It has to know whether the rim is currently lit, or the second bank of a
+-- streak would drop the rim back to a hairline for the rest of its own count with no tween left
+-- running to bring it up again.
+local CELEBRATE_SECONDS = 0.15
+-- The lit pair, and the rest THICKNESS to go with the rest transparency above. Both ends of the
+-- tween are named for the same reason that constant is: the values it settles back to have to
+-- keep agreeing with the construction call `stroke(plate, GOLD, 1, 0.35)`, and a literal repeated
+-- across three sites is a drift waiting to happen.
+local PLATE_STROKE_LIT_TRANSPARENCY = 0
+local PLATE_STROKE_LIT_THICKNESS = 2
+local PLATE_STROKE_REST_THICKNESS = 1
+local celebrating = false
+
+local function setCelebrating(active: boolean)
+    if active == celebrating then
+        return
+    end
+    celebrating = active
+    local info = TweenInfo.new(CELEBRATE_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    -- The stroke is on the PLATE, a Frame. Never on plateLabel — an outline on text fills the
+    -- counters of every glyph.
+    local rim = if active
+        then { Transparency = PLATE_STROKE_LIT_TRANSPARENCY, Thickness = PLATE_STROKE_LIT_THICKNESS }
+        else { Transparency = PLATE_STROKE_REST_TRANSPARENCY, Thickness = PLATE_STROKE_REST_THICKNESS }
+    TweenService:Create(plateStroke, info, rim):Play()
+    TweenService:Create(plateLabel, info, {
+        TextColor3 = if active then GOLD else INK_CREAM,
+    }):Play()
+end
+
 -- Reveal/hide state. A GENERATION counter — the same pattern as `pressSeq`/`potPulse` above —
 -- so a fade cancelled by a newer reveal cannot let its own stale `Completed` callback fire late
 -- and hide a plate the newer reveal just showed.
@@ -436,7 +481,12 @@ local function revealPlate()
     plate.Visible = true
     plate.BackgroundTransparency = plateRestTransparency -- Cancel leaves properties mid-tween
     plateLabel.TextTransparency = 0
-    plateStroke.Transparency = PLATE_STROKE_REST_TRANSPARENCY
+    -- NOT unconditionally the rest value. A re-reveal can land mid-count, when the rim is up for
+    -- the payoff and `setCelebrating`'s tween finished long ago; writing the rest value here would
+    -- drop it to a hairline for the remainder of the count with nothing left running to raise it.
+    plateStroke.Transparency = if celebrating
+        then PLATE_STROKE_LIT_TRANSPARENCY
+        else PLATE_STROKE_REST_TRANSPARENCY
     plateVisible = true
     task.delay(PLATE_HOLD, function()
         startPlateFade(gen)
@@ -950,6 +1000,10 @@ local function paintCounters()
     -- guarantee).
     local displayedPot = tickCounter(potCounter, counterPot)
     setBank(counterPot > 0 or displayedPot > 0, displayedPot, counterPulses)
+
+    -- Keyed on the POINTS counter alone. The pot draining and the streak resetting are not
+    -- payoffs, and lighting the plate for them would spend the effect on nothing.
+    setCelebrating(pointsCounter.startedAt ~= nil)
 end
 
 -- 10Hz IS NOT ENOUGH FRAMES TO COUNT WITH (spec §3c). `render` runs off main.client's 10Hz
