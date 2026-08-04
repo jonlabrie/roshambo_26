@@ -55,7 +55,11 @@ describe("HudLayout — the ring beside the throw buttons", function()
         expect(HudLayout.RING_D_TOUCH >= 44).toBe(true)
     end)
 
-    test("the stroke scales with the ring and never vanishes", function()
+    test("the band stays visible at both tiers, and the phone's is the narrower", function()
+        -- No longer a proportional stroke around a ragged segment ring: the band is a literal per
+        -- tier, because the pie's inner edge is the centre disc's edge and needs no approximating.
+        -- What still has to hold is that neither tier's band vanishes, and that the phone — whose
+        -- ring is the smaller circle — carries the narrower band, so the centre keeps its room.
         expect(HudLayout.RING_THICKNESS >= 3).toBe(true)
         expect(HudLayout.RING_THICKNESS_TOUCH >= 3).toBe(true)
         expect(HudLayout.RING_THICKNESS > HudLayout.RING_THICKNESS_TOUCH).toBe(true)

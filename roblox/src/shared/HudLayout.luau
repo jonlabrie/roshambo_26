@@ -61,10 +61,13 @@ HudLayout.TILE_TOUCH = math.round(HudLayout.TILE * HudLayout.TAPE_TOUCH_SCALE)
 HudLayout.RING_D = HudLayout.BTN_H
 HudLayout.RING_D_TOUCH = HudLayout.BTN_H_TOUCH
 
--- Proportional, so a 76px ring is not a hairline circle. 7.5% is the PWA's own ratio (4px on 54),
--- floored at 3 so the touch tier keeps a visible stroke.
-HudLayout.RING_THICKNESS = math.max(3, math.round(HudLayout.RING_D * 0.075))
-HudLayout.RING_THICKNESS_TOUCH = math.max(3, math.round(HudLayout.RING_D_TOUCH * 0.075))
+-- The ring's band width — the painted annulus between the pie's outer edge and the centre disc.
+-- A literal per tier now, not a fraction of RING_D: the pie's inner edge is exact (the disc IS
+-- that edge), so there is nothing left for a proportional stroke to approximate. Desktop steps
+-- 6 -> 5 and the centre grows to match, per the owner's "the inner circle can grow to fill the
+-- newly downsized ring" (spec §4).
+HudLayout.RING_THICKNESS = 5
+HudLayout.RING_THICKNESS_TOUCH = 3
 HudLayout.RING_GAP = 8 -- ring <-> tape, and ring <-> plate
 
 -- The bank button's row, directly above the throw cluster. Reserved whether or not a pot is

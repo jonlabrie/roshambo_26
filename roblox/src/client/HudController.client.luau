@@ -893,10 +893,11 @@ end
 -- ledger is the round's detail.
 
 -- ===== The round-timer ring: the ledger's door (spec §5, §6) =====
--- The PWA's PieTimer, rebuilt. Roblox has no SVG and no radial fill, so the sweep is a ring of
--- discrete segments — RingTimer says how many are lit, this paints them. Green while there is
--- time, red at HudModel.ESCALATE_AT, which is the SAME constant the escalation prompt reads: two
--- signals about one fact must not turn urgent at different moments.
+-- The PWA's PieTimer, rebuilt. Roblox has no SVG and no radial fill, so the sweep is a track
+-- circle and two gradient-cut half-discs — RingTimer owns the angles, this owns the instances
+-- and paints what it is told. Green while there is time, red at HudModel.ESCALATE_AT, which is
+-- the SAME constant the escalation prompt reads: two signals about one fact must not turn
+-- urgent at different moments.
 --
 -- It takes the HAMBURGER's old slot: inboard-left of the throw cluster, bottom-aligned with the
 -- button row — `throwArea` spans [EDGE_BOTTOM, EDGE_BOTTOM + AREA_H] from the gui's bottom edge,
@@ -905,18 +906,16 @@ end
 -- off the SAME right edge (1 - JUMP_CLEARANCE) everything else in the cluster registers to. This
 -- is now the ONLY door beside the plate — the hamburger it replaced is deleted.
 --
--- A BUTTON, not a Frame: only the outer button sinks. Its segments and the centred readout all
+-- A BUTTON, not a Frame: only the outer button sinks. Its pie layers and the centred readout all
 -- stay Active = false (Frames/TextLabels already default there — see the file header), the same
 -- interactive cost the hamburger carried in the same row.
 local RING_D = if TOUCH then HudLayout.RING_D_TOUCH else HudLayout.RING_D
 local RING_THICKNESS = if TOUCH then HudLayout.RING_THICKNESS_TOUCH else HudLayout.RING_THICKNESS
--- The ring now sits on a backing the full RING_D square (below), so the segments pull in from
--- that square's edge by RING_INSET rather than touching it — the owner's "the ring will shrink
--- slightly in size to fit". RING_R is derived from the INSET diameter, not RING_D, so
--- RingTimer.segmentWidth keeps its overlap guarantee automatically at the smaller radius.
-local RING_INSET = 4
-local RING_R = (RING_D - 2 * RING_INSET) / 2 - RING_THICKNESS / 2
-local SEG_W = RingTimer.segmentWidth(RING_R, RingTimer.SEGMENTS)
+-- The pie pulls in from the backing square's edge by this much. 3, down from 4: with the
+-- faceting gone the arc no longer needs the extra breathing room a ragged outer edge wanted.
+local RING_INSET = 3
+local RING_OD = RING_D - 2 * RING_INSET
+local RING_DISC_D = RING_OD - 2 * RING_THICKNESS
 
 local RING_TRACK = Color3.fromRGB(38, 36, 42)
 local RING_LIVE = Color3.fromRGB(76, 187, 106)
@@ -948,63 +947,82 @@ ring.BackgroundTransparency = 0.3
 ring.Parent = gui
 corner(ring, 8)
 
-local segments: { Frame } = {}
-for i = 1, RingTimer.SEGMENTS do
-    local a = math.rad(RingTimer.angleAt(i, RingTimer.SEGMENTS))
-    local seg = Instance.new("Frame")
-    seg.Name = `S{i}`
-    seg.Active = false
-    seg.AnchorPoint = Vector2.new(0.5, 0.5)
-    -- Screen space: +x right, +y DOWN, so the top of the circle is -y and the sweep runs
-    -- clockwise as the angle grows.
-    seg.Position = UDim2.fromOffset(RING_D / 2 + RING_R * math.sin(a), RING_D / 2 - RING_R * math.cos(a))
-    seg.Size = UDim2.fromOffset(SEG_W, RING_THICKNESS)
-    seg.Rotation = RingTimer.angleAt(i, RingTimer.SEGMENTS)
-    seg.BackgroundColor3 = RING_TRACK
-    seg.BorderSizePixel = 0
-    seg.Parent = ring
-    segments[i] = seg
+-- A concentric circle inside the ring button. UICorner at scale 0.5 is a true, antialiased
+-- circle at any diameter — which is the whole reason this construction replaces 36 rotated
+-- rectangles. Active = false: the ring BUTTON sinks, nothing inside it does.
+local function ringCircle(diameter: number, color: Color3, zIndex: number): Frame
+    local f = Instance.new("Frame")
+    f.Active = false
+    f.AnchorPoint = Vector2.new(0.5, 0.5)
+    f.Position = UDim2.fromScale(0.5, 0.5)
+    f.Size = UDim2.fromOffset(diameter, diameter)
+    f.BackgroundColor3 = color
+    f.BorderSizePixel = 0
+    f.ZIndex = zIndex
+    f.Parent = ring
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0.5, 0)
+    c.Parent = f
+    return f
 end
+
+-- A half-disc: a full circle whose UIGradient.Transparency steps hard at offset 0.5, so only
+-- half of it paints. Rotating the GRADIENT (never the Frame) sweeps the cut. See RingTimer's
+-- header for the angle derivation: UIGradient.Rotation = arcStart + 180.
+local function ringHalf(diameter: number, color: Color3, zIndex: number): (Frame, UIGradient)
+    local f = ringCircle(diameter, color, zIndex)
+    local g = Instance.new("UIGradient")
+    -- 0.4999 -> 0.5 rather than a single keypoint: NumberSequence interpolates between
+    -- keypoints, so the step has to be narrow rather than instantaneous. At this width the
+    -- ramp is well under a pixel.
+    g.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0),
+        NumberSequenceKeypoint.new(0.4999, 0),
+        NumberSequenceKeypoint.new(0.5, 1),
+        NumberSequenceKeypoint.new(1, 1),
+    })
+    g.Parent = f
+    return f, g
+end
+
+-- ZIndex is load-bearing here, not decoration: half B paints back over half A, and the disc
+-- punches the annulus out of both. Siblings at equal ZIndex have no defined order.
+ringCircle(RING_OD, RING_TRACK, 1)
+local ringHalfA, ringGradA = ringHalf(RING_OD, RING_LIVE, 2)
+local ringHalfB, ringGradB = ringHalf(RING_OD, RING_TRACK, 3)
+
+-- The centre. OPAQUE, and that is a requirement rather than a preference: the pie behind it is
+-- solid, so at the old 0.15 the sweep bleeds through as a hard seam straight across the digits
+-- (observed in the Studio prototype, 2026-08-04). It costs nothing — WASHI is near-black
+-- (26, 24, 28), so INK_CREAM digits GAIN contrast against it.
+--
+-- Its diameter is what defines the band: RING_OD - 2 * RING_THICKNESS. The old 2px
+-- RING_DISC_GAP is deleted, because it existed only to hold the disc clear of the segments'
+-- ragged inner edge, and the pie's inner edge is exact.
+local ringDisc = ringCircle(RING_DISC_D, WASHI, 4)
+ringDisc.Name = "Disc"
+ringDisc.BackgroundTransparency = 0
 
 -- The centred readout: the remaining seconds, swapping to the world-throw glyph once the drum
 -- has settled on it (see `render`'s `aux.worldThrow` branch, and `main.client.luau`'s drum-rest
--- gate). No UIStroke on the label — the ring's centre is open canyon, so the digits get their
--- own small opaque disc backing instead of an outline.
--- Grown to fill the ring's new interior (design §5): sized off the segments' own inner edge
--- (RING_R - RING_THICKNESS / 2) minus a small fixed gap, so the disc reads as backing FOR the
--- ring rather than a filled circle that swallows it. Pixel offsets, not scale, because the two
--- tiers derive from independent RING_R/RING_THICKNESS pairs, not a common fraction of RING_D.
-local RING_DISC_GAP = 2
-local RING_DISC_D = 2 * (RING_R - RING_THICKNESS / 2 - RING_DISC_GAP)
-
--- Same WASHI constant as the ring's own backing above, but NOT redundant with it: the two
--- transparencies stack. The backing alone renders at ~70% opaque WASHI (BackgroundTransparency
--- 0.3); the disc sits on top of it, so its own 0.15 compounds to ~95.5% opaque WASHI
--- (1 - 0.15 * 0.3) over that same patch of canyon. That is a real, visible darkening — the
--- digits and glyph sit on a patch close to solid WASHI, while the ring reads as a lighter,
--- translucent wash between the disc and the segments. Keep it.
-local ringDisc = Instance.new("Frame")
-ringDisc.Name = "Disc"
-ringDisc.Active = false
-ringDisc.AnchorPoint = Vector2.new(0.5, 0.5)
-ringDisc.Position = UDim2.fromScale(0.5, 0.5)
-ringDisc.Size = UDim2.fromOffset(RING_DISC_D, RING_DISC_D)
-ringDisc.BackgroundColor3 = WASHI
-ringDisc.BackgroundTransparency = 0.15
-ringDisc.BorderSizePixel = 0
-ringDisc.Parent = ring
-local ringDiscCorner = Instance.new("UICorner")
-ringDiscCorner.CornerRadius = UDim.new(0.5, 0) -- scale-based, so it stays a circle at either tier
-ringDiscCorner.Parent = ringDisc
-
+-- gate).
 local ringCount = Instance.new("TextLabel")
 ringCount.Name = "Count"
 ringCount.Active = false
 ringCount.Size = UDim2.fromScale(1, 1)
 ringCount.BackgroundTransparency = 1
 ringCount.TextColor3 = INK_CREAM
-ringCount.TextSize = if TOUCH then 14 else 18
-ringCount.Font = Enum.Font.GothamBlack
+ringCount.ZIndex = 5
+-- FIXED TextSize, not TextScaled: the countdown runs 20 -> 1, and TextScaled would visibly jump
+-- the digits' size at the two-to-one-character boundary every single round. Two digits at 20px
+-- clear a 32px disc; at 34px they clear a 60px one.
+--
+-- GothamBold, down from GothamBlack (owner's gate 2026-08-04). Weight was the lever, not size —
+-- a one-point reduction was indistinguishable at both tiers. Bold rather than Medium because at
+-- 20px over moving canyon terrain the lighter face thins out, and the phone is the tier that
+-- has to survive a busy background. The ring's readout only; nothing else in the HUD moves.
+ringCount.TextSize = if TOUCH then 20 else 34
+ringCount.Font = Enum.Font.GothamBold
 ringCount.Text = ""
 ringCount.Parent = ringDisc
 -- No UIStroke on this label. Contrast comes from `ringDisc`'s opaque backing above.
@@ -1014,6 +1032,7 @@ ringCount.Parent = ringDisc
 local ringGlyphs: { [string]: Frame } = {}
 do
     local box = glyphBox(ringDisc, 0.82)
+    box.ZIndex = 5 -- with the digits, above the disc
     for _, sym in THROWS do
         local g = Glyphs.render(box, sym, INK_CREAM)
         g.Visible = false
@@ -1351,11 +1370,13 @@ local function render(inputs: any, aux: any)
     -- that never moves would read as "plenty of time" and be a lie.
     local ringKnown = inputs.phase == "ACTIVE" and aux.timerKnown ~= false and span > 0
     local ringFrac = if ringKnown then math.clamp(view.secondsLeft / span, 0, 1) else 0
-    local litCount = RingTimer.lit(ringFrac, RingTimer.SEGMENTS)
     local ringHot = RingTimer.isWarning(view.secondsLeft, HudModel.ESCALATE_AT)
-    for i, seg in segments do
-        seg.BackgroundColor3 = if i <= litCount then (if ringHot then RING_HOT else RING_LIVE) else RING_TRACK
-    end
+    local ringLit = if ringHot then RING_HOT else RING_LIVE
+    local sweep = RingTimer.sweep(ringFrac)
+    ringGradA.Rotation = sweep.rotationA
+    ringGradB.Rotation = sweep.rotationB
+    ringHalfA.BackgroundColor3 = ringLit
+    ringHalfB.BackgroundColor3 = if sweep.bLit then ringLit else RING_TRACK
     ringCount.TextColor3 = if ringHot then RING_HOT else INK_CREAM
 
     -- The glyph swap: the world's throw appears in the ring's centre only once the drum has
