@@ -271,11 +271,23 @@ BoardData.OnClientEvent:Connect(function(d)
     setTape(d and d.tape)
 end)
 
--- The reveal headline AND the new tape tile wait for the drum to stop turning (the drumRest cue),
--- so the throw is not spoiled mid-spin. The vote distribution is folded into that same headline
--- rather than announced on its own: it names the world throw too, and the old prose ticker
--- released it the instant the reveal landed, which spoiled the wheel while it was still turning.
-local pendingReveal: { headline: string, roundId: string?, result: string?, worldThrow: string }? = nil
+-- The result splash AND the new tape tile wait for the drum to stop turning (the drumRest cue),
+-- so the throw is not spoiled mid-spin. The splash (SplashController) owns naming the personal
+-- result now — the old toast folded the vote distribution into the same headline it built here,
+-- but that headline is gone; `distribution`/`totalPlayers` are kept below anyway (unused by this
+-- file) because Task 9's ledger LAST ROUND band needs the SAME crowd-split/player-count data the
+-- toast used to carry, and removing the toast must not remove the data it was reading from.
+local pendingReveal: {
+    roundId: string?,
+    result: string?,
+    worldThrow: string,
+    distribution: any?,
+    totalPlayers: number?,
+    -- The pot as it stood before a LOSS cleared it. nil until the ProfileUpdate("local") handler
+    -- below fills it in — see that handler's comment for why this is the one place it can be read.
+    forfeited: number?,
+}? =
+    nil
 local drumAtRest = false
 
 local function maybeShowReveal()
@@ -285,7 +297,6 @@ local function maybeShowReveal()
     if pendingReveal then
         local p = pendingReveal
         pendingReveal = nil
-        toast(p.headline)
         -- Badge this round by id and un-gate it in the tape now the drum's at rest.
         if p.roundId then
             if p.result then
@@ -294,7 +305,7 @@ local function maybeShowReveal()
             revealedRoundId = p.roundId
             revealedWorldThrow = p.worldThrow
         end
-        -- Onboarding beat 3 waits for the SAME gate as the toast/badge above, not for RevealResult
+        -- Onboarding beat 3 waits for the SAME gate as the badge above, not for RevealResult
         -- arriving. WIN implies the exact world throw (the one your pick beats), so firing this
         -- the instant RevealResult lands — before the drum has stopped spinning — would spoil the
         -- wheel early, exactly what the drum-rest gate exists to prevent. Fires on every WIN, not
@@ -303,6 +314,18 @@ local function maybeShowReveal()
         -- chance at the player's next one instead of being marked taught-forever for nothing.
         if not resolved.win and profileSeen and p.result == "WIN" then
             EventBus.Onboard:Fire("win", knownSeenBeats)
+        end
+        -- THE SPLASH INHERITS THIS SAME GATE rather than building a second one — it is fired here,
+        -- never from RevealResult directly, so it can never land ~3s early and spoil the wheel.
+        -- `p.result` is nil whenever this player had no throw counted this round (a spectator, or
+        -- a whiff), so the splash cannot appear for a round the player did not throw in either.
+        if p.result then
+            EventBus.Splash:Fire({
+                result = p.result,
+                streak = wallet.currentStreak,
+                pot = wallet.pointsAtStake,
+                forfeited = p.forfeited,
+            })
         end
         publish()
     end
@@ -457,25 +480,24 @@ RoundUpdate.OnClientEvent:Connect(function(info)
 end)
 
 RevealResult.OnClientEvent:Connect(function(r)
-    local result: string
-    if r.result == "WIN" then
-        result = `🏆 WIN! World threw {r.worldThrow}`
-    elseif r.result == "SAFE" then
-        result = `🛡 SAFE — world matched your {r.pick}`
-    elseif r.result == "LOSS" then
-        result = `💥 LOSS — world threw {r.worldThrow}`
-    else
-        result = `World threw {r.worldThrow}`
-    end
-    -- One line, not two. The old status bar and the old prose ticker each carried half of this;
-    -- a toast is transient, and two of them back to back would occupy a third of the round.
-    local headline = `{result} — R {r.distribution.R}% · P {r.distribution.P}% · S {r.distribution.S}%`
-    -- The revealing round == the one RoundUpdate last named (REVEAL phase).
-    pendingReveal =
-        { headline = headline, roundId = currentRoundId, result = r.result, worldThrow = r.worldThrow }
+    -- The revealing round == the one RoundUpdate last named (REVEAL phase). Captured to a local so
+    -- the REVEAL_SAFETY fallback below still identifies THIS reveal even if `currentRoundId` has
+    -- moved on by the time it fires.
+    local roundId = currentRoundId
+    -- No toast built here any more (spec §2 — the splash owns results, fired from the drum-rest
+    -- gate in `maybeShowReveal`). `distribution`/`totalPlayers` are stashed anyway: they are the
+    -- crowd split and player count the old toast headline used to carry, and Task 9's ledger LAST
+    -- ROUND band needs the same data.
+    pendingReveal = {
+        roundId = roundId,
+        result = r.result,
+        worldThrow = r.worldThrow,
+        distribution = r.distribution,
+        totalPlayers = r.totalPlayers,
+    }
     maybeShowReveal() -- only shows if the drum is already at rest
     task.delay(REVEAL_SAFETY, function()
-        if pendingReveal and pendingReveal.headline == headline then
+        if pendingReveal and pendingReveal.roundId == roundId then
             drumAtRest = true -- safety: never strand a result if the cue dropped
             maybeShowReveal()
         end
@@ -487,6 +509,17 @@ ProfileUpdate.OnClientEvent:Connect(function(p)
     -- is exactly what was banked. The maximal panel's feed is personal-only, and a bank with no line
     -- in it would be the one personal event the scrollback missed.
     local bankedNow = if p.source == "banked" then wallet.pointsAtStake else 0
+
+    -- SAME TRICK, for the splash's LOSS consequence line: `p.source == "local"` is the ONE
+    -- ProfileUpdate a reveal fires (main.server.luau's onReveal, right after RevealResult, same
+    -- tick, same client — so `pendingReveal` set by the RevealResult handler above is always this
+    -- SAME round's, never stale). `wallet.pointsAtStake` here is still the PRE-reveal pot — the
+    -- one this LOSS is about to clear — so it is exactly the "forfeited" figure, read the one
+    -- instant it is available. Guarded on `pendingReveal.result == "LOSS"` so a WIN's tripled pot
+    -- or a SAFE's preserved one is never mistaken for a forfeiture.
+    if p.source == "local" and pendingReveal and pendingReveal.result == "LOSS" then
+        pendingReveal.forfeited = wallet.pointsAtStake
+    end
 
     wallet.totalPoints = p.totalPoints
     wallet.pointsAtStake = p.pointsAtStake

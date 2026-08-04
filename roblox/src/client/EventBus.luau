@@ -24,6 +24,10 @@ local NAMES = {
     -- main.client.luau folds it into `declinedThisRound` — dismissing and backing out mean the
     -- same thing to the escalation rule, so this does not carry a payload of its own.
     "DismissEscalation",
+    -- The result splash (SplashController). Fired from main.client.luau's `maybeShowReveal` — the
+    -- same drum-rest gate the tape tile and the headline already wait on — never from RevealResult
+    -- directly, which would spoil the wheel ~3s early. Payload: { result, streak, pot, forfeited }.
+    "Splash",
 }
 for _, name in NAMES do
     local e = Instance.new("BindableEvent")
