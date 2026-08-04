@@ -71,18 +71,50 @@ The gate exists so the result is not announced before the drum has shown the wor
 
 ### The change
 
-The glide is a smoothstep decelerating onto the detent (`DrumController`: `3s² − 2s³`). By 65% of
-the way through it the drum has covered ~88% of its travel and the face is effectively in the
-window — the remaining beat is settling, not suspense. So the splash fires there instead.
+`DrumController` fires a **new cue, `drumSettling`**, once per glide, and the splash gates on that
+instead of on `drumRest`.
 
-`DrumStep` gains:
+**AMENDED 2026-08-04 (owner's ruling), and the amendment is the interesting part.** The cue first
+fired at a fixed `SPLASH_LEAD_SECONDS = 0.7`, sized against the criterion *the drum has covered
+>80% of its travel*. Review showed that criterion measures the wrong thing. What matters is not
+how far the drum has come but **whether the correct symbol is in the window**, and those diverge:
+
+| | residual angle | still turning at |
+| --- | --- | --- |
+| best-case landing | 28.1° | 80°/s |
+| worst-case landing | 53.4° | 142°/s |
+
+Facets sit 30° apart and each carries a *different* symbol, so at a 0.7s lead the window is showing
+a neighbouring throw for a further 0.19–0.34s. On a LOSS the splash names the outcome while the
+drum still reads something else — precisely the spoiler the gate exists to prevent.
+
+Nor does a shorter constant rescue it: at 0.50s the worst case is still 28.4°, a full facet off. A
+*fixed* lead safe in every case is ≈0.36s, which barely improves on 3.45s at all. **The trade is
+unwinnable with a constant, because the residual depends on the travel the lander happens to pick.**
+
+So the cue triggers on the **residual angle** rather than the clock. `DrumStep` gains the glide's
+residual as pure arithmetic, plus the threshold:
 
 ```luau
-DrumStep.SPLASH_LEAD_SECONDS = 0.7
+DrumStep.SPLASH_RESIDUAL_RADIANS  -- half a facet
+function DrumStep.glideResidual(d, omega, s)
 ```
 
-and `DrumController` fires a **new cue, `drumSettling`**, once, when the glide crosses
-`GLIDE_SECONDS − SPLASH_LEAD_SECONDS`. The splash gates on that: **2.75s instead of 3.45s.**
+The glide is a **Hermite**, not a bare smoothstep — it carries the spin's exit velocity, which is
+why the earlier smoothstep-only estimate read 72% where the real curve reads 83–88%:
+
+```
+residual(s) = d·(1 − (3s² − 2s³)) − ω·GLIDE_SECONDS·(s³ − 2s² + s)
+```
+
+The cue fires the first frame the residual falls within half a facet. That yields a **variable
+0.36–0.53s lead** — the splash lands around 2.9–3.1s, correct on every landing rather than on the
+lucky ones. It is also the only formulation that survives a retune of the drum's kick velocity: a
+constant lead silently becomes wrong, and no test can catch it because the kick is overridable at
+runtime by a stage attribute.
+
+`SPLASH_LEAD_SECONDS` is deleted. A fixed lead that is right for one landing and wrong for the next
+is worse than no constant at all.
 
 ### What moves and what does not
 
