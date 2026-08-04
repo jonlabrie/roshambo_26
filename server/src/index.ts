@@ -40,7 +40,13 @@ function makeEngine(initialRoundCount: number): RoundEngine {
     return new RoundEngine({
         activeSeconds: 20,
         tallySeconds: 2,
-        revealSeconds: 3,
+        // REVEAL is 5, not 3. The Roblox arena plays a SEQUENCE after its drum comes to rest — the
+        // world throw shows in the round ring, holds, fades, and only then does the tape tile land
+        // (docs/superpowers/specs/2026-08-04-reveal-beat-design.md). Measured live at 3: the drum
+        // was resting with as little as 1.8s of the round left, so the beat had nowhere to run and
+        // the glyph's lifetime was whatever happened to be spare — 3.03s, 1.81s, 4.15s across three
+        // consecutive rounds. The PWA has no drum and simply gets a longer reveal.
+        revealSeconds: 5,
         pickWorldThrow: roundCount =>
             TEST_MODE ? THROWS[roundCount % 3] : THROWS[Math.floor(Math.random() * 3)],
         makeRoundId: () => Math.random().toString(36).substring(2, 9),
