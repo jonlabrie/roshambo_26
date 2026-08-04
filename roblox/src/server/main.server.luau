@@ -56,6 +56,7 @@ local PlayerProfiles = require(shared:WaitForChild("PlayerProfiles"))
 local ThemeManifest = require(shared:WaitForChild("ThemeManifest"))
 local ZenDojo = require(shared:WaitForChild("themes"):WaitForChild("ZenDojo"))
 local FateRegistry = require(shared:WaitForChild("FateRegistry"))
+local HudPrefs = require(shared:WaitForChild("HudPrefs"))
 local PreferenceEditor = require(shared:WaitForChild("PreferenceEditor"))
 local BackDoorEditor = require(shared:WaitForChild("BackDoorEditor"))
 local WallBays = require(shared:WaitForChild("WallBays"))
@@ -205,28 +206,21 @@ end
 -- ONE ROW PER PLAYER, not one map per preference: they travel together on ProfileUpdate, they are
 -- written by the same remote and repaired by the same ledger refresh, and a second parallel map is
 -- how one of them ends up cleared on leave and the other left behind.
-type HudPrefs = { escalationPrompts: boolean, resultSplash: boolean }
-local hudPrefs: { [string]: HudPrefs } = {}
+--
+-- The default/merge RULE itself lives in shared/HudPrefs.luau, not here: this file is
+-- Roblox-runtime only and Lune never loads it, so a bug in the merge (the exact failure this was
+-- built to prevent — see HudPrefs.luau's header) would be invisible to every test this repo has.
+local hudPrefs: { [string]: HudPrefs.Prefs } = {}
 
 -- Absent = the profile's own defaults, both ON. The stored row is returned BY REFERENCE for reads;
 -- anything that writes must clone first (see SetHudPreference), because the failure-revert there
 -- holds the pre-write row and an in-place edit would quietly rewrite its own undo.
-local function prefsFor(uid: string): HudPrefs
+local function prefsFor(uid: string): HudPrefs.Prefs
     local row = hudPrefs[uid]
     if row then
         return row
     end
-    return { escalationPrompts = true, resultSplash = true }
-end
-
--- The wire shape of a GET /players response's preference half, defaulted the same way everywhere it
--- is read: absent means ON, because that is what the database defaults to for documents written
--- before these fields existed.
-local function prefsFromProfile(data: any): HudPrefs
-    return {
-        escalationPrompts = data.escalationPrompts ~= false,
-        resultSplash = data.resultSplash ~= false,
-    }
+    return HudPrefs.DEFAULTS
 end
 
 -- The onboarding beats a player has already dismissed, same treatment as hudPrefs: not a wallet
@@ -427,7 +421,7 @@ Players.PlayerAdded:Connect(function(player)
         end)
         local res = net:getPlayer(tostring(player.UserId), country)
         if res.ok then
-            hudPrefs[tostring(player.UserId)] = prefsFromProfile(res.data)
+            hudPrefs[tostring(player.UserId)] = HudPrefs.fromProfile(res.data)
             hudSeenBeats[tostring(player.UserId)] = if type(res.data.seenBeats) == "table"
                 then res.data.seenBeats
                 else {}
@@ -536,7 +530,7 @@ RequestLedger.OnServerEvent:Connect(function(player)
         end
         seedCounters(uid, res.data.counters)
         if (hudWriteSeq[uid] or 0) == seqAtFetch then
-            hudPrefs[uid] = prefsFromProfile(res.data)
+            hudPrefs[uid] = HudPrefs.fromProfile(res.data)
             if type(res.data.seenBeats) == "table" then
                 hudSeenBeats[uid] = res.data.seenBeats
             end
@@ -583,16 +577,10 @@ SetHudPreference.OnServerEvent:Connect(function(player, body)
         local prevPref = hudPrefs[uid]
         local prevBeats = hudSeenBeats[uid]
         if payload.escalationPrompts ~= nil or payload.resultSplash ~= nil then
-            -- MERGED onto the current row, never replacing it: one remote carries every preference
-            -- and a body naming only one of them must not silently reset another to its default.
-            local nextPrefs = table.clone(prefsFor(uid))
-            if payload.escalationPrompts ~= nil then
-                nextPrefs.escalationPrompts = payload.escalationPrompts
-            end
-            if payload.resultSplash ~= nil then
-                nextPrefs.resultSplash = payload.resultSplash
-            end
-            hudPrefs[uid] = nextPrefs
+            -- MERGED onto the current row via the shared rule (see HudPrefs.luau), never inline
+            -- and never replacing it: one remote carries every preference and a body naming only
+            -- one of them must not silently reset another to its default.
+            hudPrefs[uid] = HudPrefs.merge(prefsFor(uid), payload :: HudPrefs.Patch)
         end
         if payload.seenBeat ~= nil then
             -- Add-only, and only if new: OnboardingController already marks the beat seen
