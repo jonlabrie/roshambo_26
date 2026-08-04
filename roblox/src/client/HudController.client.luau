@@ -548,6 +548,11 @@ end
 -- Answering it UNLOCKS all three; it does not select this one. That is what makes backing out
 -- of a round possible at all.
 --
+-- IT COVERS THE GLYPH, ON PURPOSE. Confirming a switch UNLOCKS; it never selects the button
+-- that was tapped. So the glyph underneath is not a destination — both unchosen buttons are
+-- proxies for switch-and-cancel, and either does the same thing. Revealing it would advertise
+-- a destination that does not exist.
+--
 -- No UIStroke on the label. Contrast comes from the opaque backing behind it (see the spec's
 -- §3): an outline on 13px type fills the counters in and reads as a smear.
 local switchPill = Instance.new("Frame")
@@ -988,25 +993,37 @@ end)
 -- hairline gone the cluster no longer needs to clear it — see EDGE_BOTTOM, above.
 
 -- ===== Escalation: a large centred count, shown only when HudModel says so =====
--- Active = false: this is a LABEL, not a button. It covers the centre of the screen, which is the
--- middle of the camera-drag surface — sinking input here would make the canyon unrotatable for the
--- seconds it is up. The arming rule lives in HudModel and is never second-guessed here.
-local ESCALATION_H = 154 -- kept as a named constant: updateEscalationPosition needs it too, below
+-- THE ONE SINKING ELEMENT that is not a control. Everything else on this surface stays
+-- Active = false, because every sinking pixel is a permanent hole in the camera-drag surface.
+-- This is the exception the owner asked for: "the worst thing that could happen is it gets
+-- thrown into a user's view in the middle of watching fireworks." It is small, it exists only in
+-- the last few seconds of a round and only when armed, and dismissing it is the entire point.
+-- The arming rule lives in HudModel and is never second-guessed here.
+--
+-- Halved from the previous branch's 154/92/30/84/24 (count/prompt heights and text sizes): the
+-- footprint shrinks, not the prompt's legibility, so the prompt drops 24 -> 16 rather than 12.
+-- Content box (ESCALATION_H minus the 24px the UIPadding below eats, 12 top + 12 bottom) must fit
+-- escalationCount's height + escalationPrompt's height + a visible gap between them:
+--   count  [0, 46]   (was TextSize 84/height 92, now 42/46)
+--   gap    [46, 54]  (8px, unchanged from the previous branch)
+--   prompt [54, 74]  (was TextSize 24/height 30, now 16/20)
+-- Content box needed = 74, so ESCALATION_H = 74 + 24 = 98, not the naively-halved 77 (77 - 24 =
+-- 53 content px, which doesn't even fit the two labels with zero gap: 46 + 20 = 66 > 53).
+local ESCALATION_H = 98 -- kept as a named constant: updateEscalationPosition needs it too, below
 
-local escalation = Instance.new("Frame")
+local escalation = Instance.new("TextButton")
 escalation.Name = "Escalation"
-escalation.Active = false
+escalation.Text = ""
+escalation.AutoButtonColor = false
+escalation.Selectable = false
 escalation.AnchorPoint = Vector2.new(0.5, 0.5)
 -- Y is set by `updateEscalationPosition`, below, not a bare fromScale(0.5, 0.42): that fraction
 -- is the resting position on a tall screen, but on a short landscape phone it collides with the
--- bank button. Task 9 grew this frame 130 -> 154 to stop its own two labels overlapping, and at
--- 130 it cleared the bank button by 0.3px on an 844x390 viewport — both constraints are real, so
--- this frame cannot simply shrink back. See `updateEscalationPosition` for the clamp.
+-- bank button. See `updateEscalationPosition` for the clamp.
 escalation.Position = UDim2.fromScale(0.5, 0.42)
--- scale width: a fixed 460px overflows a small phone. Fixed height is 130px of CONTENT (count
--- [0,92] + an 8px gap + prompt [100,130]) plus 24px the UIPadding below eats (12 top + 12
--- bottom) — 154, not 130. If the padding ever changes, grow this to match or the two labels
--- overlap inside the unchanged content box.
+-- scale width: a fixed 460px overflows a small phone. Fixed height is ESCALATION_H, derived above
+-- from its two children's content box. If either child's TextSize/height or the padding below
+-- changes, re-run that arithmetic or the two labels overlap inside the unchanged content box.
 escalation.Size = UDim2.new(0.8, 0, 0, ESCALATION_H)
 -- Opaque backing, not a stroke on the text. The count and prompt used to float over open
 -- canyon with strokes standing in for contrast (see the spec's §3) — a real backing plate
@@ -1028,10 +1045,10 @@ end
 local escalationCount = Instance.new("TextLabel")
 escalationCount.Name = "Count"
 escalationCount.Active = false
-escalationCount.Size = UDim2.new(1, 0, 0, 92)
+escalationCount.Size = UDim2.new(1, 0, 0, 46)
 escalationCount.BackgroundTransparency = 1
 escalationCount.TextColor3 = INK_CREAM
-escalationCount.TextSize = 84
+escalationCount.TextSize = 42
 escalationCount.Font = Enum.Font.GothamBlack
 escalationCount.Text = ""
 escalationCount.Parent = escalation
@@ -1043,14 +1060,27 @@ escalationPrompt.Name = "Prompt"
 escalationPrompt.Active = false
 escalationPrompt.AnchorPoint = Vector2.new(0.5, 1)
 escalationPrompt.Position = UDim2.fromScale(0.5, 1)
-escalationPrompt.Size = UDim2.new(1, 0, 0, 30)
+escalationPrompt.Size = UDim2.new(1, 0, 0, 20)
 escalationPrompt.BackgroundTransparency = 1
 escalationPrompt.TextColor3 = INK_CREAM
-escalationPrompt.TextSize = 24
+escalationPrompt.TextSize = 16
 escalationPrompt.Font = Enum.Font.GothamBold
 escalationPrompt.Text = "CHOOSE A THROW"
 escalationPrompt.Parent = escalation
 -- No UIStroke on the label — same rationale as escalationCount above.
+
+local escalationScale = Instance.new("UIScale")
+escalationScale.Parent = escalation
+
+-- Tapping dismisses it for the rest of the round. Dismissing and backing out mean the same thing
+-- to the escalation rule (HudModel.applyTap already widened `declinedThisRound` to cover both), so
+-- this does NOT introduce a new field — main.client.luau sets the existing one.
+escalation.MouseButton1Down:Connect(function()
+    pressDepress(escalationScale)
+end)
+escalation.MouseButton1Click:Connect(function()
+    EventBus.DismissEscalation:Fire()
+end)
 
 -- Clamp the overlay's Y against the cluster instead of trusting the 0.42 scale fraction on every
 -- viewport. `gui.AbsoluteSize.Y` already excludes the topbar inset (ScreenGui's default

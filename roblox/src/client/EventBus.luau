@@ -20,6 +20,10 @@ local NAMES = {
     "HudPreference",
     "Onboard",
     "OnboardShown",
+    -- Fired by the escalation overlay's own tap (the one sinking element on the minimal HUD).
+    -- main.client.luau folds it into `declinedThisRound` — dismissing and backing out mean the
+    -- same thing to the escalation rule, so this does not carry a payload of its own.
+    "DismissEscalation",
 }
 for _, name in NAMES do
     local e = Instance.new("BindableEvent")
