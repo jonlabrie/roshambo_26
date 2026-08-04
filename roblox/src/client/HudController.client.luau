@@ -580,19 +580,20 @@ end
 local undoPill = Instance.new("Frame")
 undoPill.Name = "UndoPrompt"
 undoPill.AnchorPoint = Vector2.new(0.5, 0.5)
--- Flush with the button's own width, not inset 8px off it: at the old BTN_W - 8 the touch pill
--- was only 36px wide (BTN_W = BTN_H_TOUCH = 44) and TextScaled alone drives "SWITCH?" (13px
--- GothamBold measures ~57-64px unscaled) down to ~8px there — below the ~9px legibility floor.
--- At the full BTN_W the touch pill is 44px, which lands the scaled text at ~9-10px, still
--- flush with (never wider than) the button beneath it.
-undoPill.Size = UDim2.fromOffset(BTN_W, 24)
+-- EXACTLY THE BUTTON, both dimensions, both tiers (owner's gate 2026-08-04). It anchors at
+-- (0.5, 0.5) on the button's centre, so it covers it precisely.
+--
+-- IT MUST STAY Active = false. It is a Frame, and the tap that answers it is delivered to the
+-- TextButton underneath — a full-size overlay that sank would swallow the very tap that
+-- resolves it, and the mechanic would break outright with every gate green.
+undoPill.Size = UDim2.fromOffset(BTN_W, BTN_H)
 undoPill.BackgroundColor3 = WASHI
 undoPill.BackgroundTransparency = 0
 undoPill.BorderSizePixel = 0
 undoPill.ZIndex = 4
 undoPill.Visible = false
 undoPill.Parent = throwArea
-corner(undoPill, 6)
+corner(undoPill, 8)
 stroke(undoPill, SEL_BLUE, 2, 0)
 
 local undoLabel = Instance.new("TextLabel")
@@ -602,18 +603,19 @@ undoLabel.BackgroundTransparency = 1
 undoLabel.TextColor3 = INK_CREAM
 undoLabel.TextSize = 13
 undoLabel.Font = Enum.Font.GothamBold
-undoLabel.Text = "SWITCH?"
+undoLabel.Text = "UNDO?"
 undoLabel.ZIndex = 5
 undoLabel.Parent = undoPill
 
--- TextScaled + a MaxTextSize constraint, same pattern as `bankButton` below: at BTN_W-8 the pill
--- is only 36px wide on touch (BTN_W = BTN_H_TOUCH = 44) while "SWITCH?" at 13px GothamBold runs
--- ~57-64px unscaled — it clipped to roughly "WITC". Scaling down still reads at this width; the
--- constraint just stops it growing past 13px on the wider desktop pill.
+-- TextScaled + a MaxTextSize constraint, same pattern as `bankButton`. The old copy was seven
+-- characters in a 36px content box on a phone and clipped to roughly "WITC"; five characters in
+-- the same box land near 13px, which reads. The constraint caps growth on the wide tier — at
+-- desktop's 68px content box, five characters of GothamBold cap out near 22px, and higher would
+-- clip the word on the wide tier instead of the narrow one.
 undoLabel.TextScaled = true
 do
     local constraint = Instance.new("UITextSizeConstraint")
-    constraint.MaxTextSize = 13
+    constraint.MaxTextSize = 22
     constraint.Parent = undoLabel
 end
 

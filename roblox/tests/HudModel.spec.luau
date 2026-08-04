@@ -456,15 +456,19 @@ describe("HudModel.ESCALATE_AT is shared, not copied", function()
     end)
 end)
 
-describe("HudModel.UNDO_PROMPT_SECONDS — a one-second fuse", function()
-    test("it is one second", function()
-        expect(HudModel.UNDO_PROMPT_SECONDS).toBe(1)
+describe("HudModel.UNDO_PROMPT_SECONDS — a two-second fuse", function()
+    test("it is two seconds", function()
+        -- One second was too quick to notice, read and answer (owner's gate 2026-08-04). Both
+        -- outcomes of expiry are still safe — expiring restores exactly the state before the
+        -- stray tap, and answering only ever unlocks — so a longer fuse costs nothing but a
+        -- question hanging over a live button, and two seconds is short enough for that.
+        expect(HudModel.UNDO_PROMPT_SECONDS).toBe(2)
     end)
 
-    test("the prompt survives just under and expires at the second", function()
-        local t = 100
-        expect(HudModel.undoPromptExpired(t, t + 0.99)).toBe(false)
-        expect(HudModel.undoPromptExpired(t, t + 1)).toBe(true)
+    test("the fuse burns for the whole two seconds", function()
+        local t = 500
+        expect(HudModel.undoPromptExpired(t, t + 1.99)).toBe(false)
+        expect(HudModel.undoPromptExpired(t, t + 2)).toBe(true)
     end)
 end)
 

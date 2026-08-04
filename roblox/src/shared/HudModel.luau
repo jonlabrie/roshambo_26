@@ -64,15 +64,16 @@ export type View = {
     undoPrompt: string?,
 }
 
--- ONE SECOND. Four was chosen when a prompt was the only thing on screen and in practice it
--- lingered. Both outcomes of expiry are safe — expiring restores exactly the state before the
--- stray tap, and answering only ever unlocks — so a short fuse costs nothing and a long one
--- leaves a question hanging over a live button.
+-- TWO SECONDS. Four was chosen when a prompt was the only thing on screen and in practice it
+-- lingered; one replaced it and proved too quick to notice, read and answer (owner's gate
+-- 2026-08-04). Both outcomes of expiry are safe — expiring restores exactly the state before
+-- the stray tap, and answering only ever unlocks — so the cost of a longer fuse is only a
+-- question hanging over a live button, and two seconds is short enough for that.
 --
--- The word changed from SWITCH? to UNDO? on 2026-08-04 because SWITCH? described something this
--- button has never done: answering it CLEARS the choice, it does not move the choice to the
+-- The prompt's copy changed to UNDO? on 2026-08-04 because the previous word described something
+-- this button has never done: answering it CLEARS the choice, it does not move the choice to the
 -- glyph that was tapped. That is what makes either unchosen button a back-out proxy.
-HudModel.UNDO_PROMPT_SECONDS = 1
+HudModel.UNDO_PROMPT_SECONDS = 2
 
 -- Taps stay live for as long as the choice can still be honoured. That is NOT the whole of
 -- ACTIVE: it ends the moment the pick goes on the wire (`sendAtLockout`, roughly the last
