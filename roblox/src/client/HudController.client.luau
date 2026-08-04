@@ -909,7 +909,12 @@ end
 -- interactive cost the hamburger carried in the same row.
 local RING_D = if TOUCH then HudLayout.RING_D_TOUCH else HudLayout.RING_D
 local RING_THICKNESS = if TOUCH then HudLayout.RING_THICKNESS_TOUCH else HudLayout.RING_THICKNESS
-local RING_R = RING_D / 2 - RING_THICKNESS / 2
+-- The ring now sits on a backing the full RING_D square (below), so the segments pull in from
+-- that square's edge by RING_INSET rather than touching it — the owner's "the ring will shrink
+-- slightly in size to fit". RING_R is derived from the INSET diameter, not RING_D, so
+-- RingTimer.segmentWidth keeps its overlap guarantee automatically at the smaller radius.
+local RING_INSET = 4
+local RING_R = (RING_D - 2 * RING_INSET) / 2 - RING_THICKNESS / 2
 local SEG_W = RingTimer.segmentWidth(RING_R, RingTimer.SEGMENTS)
 
 local RING_TRACK = Color3.fromRGB(38, 36, 42)
@@ -927,8 +932,15 @@ ring.AnchorPoint = Vector2.new(1, 1)
 -- bottom), not the tape's.
 ring.Position = UDim2.new(1 - JUMP_CLEARANCE, -(AREA_W + RING_GAP), 1, -(EDGE_BOTTOM + AREA_H - BTN_H))
 ring.Size = UDim2.fromOffset(RING_D, RING_D)
-ring.BackgroundTransparency = 1
+-- The backing (owner's gate, design §5 "The ring sits on a backing"): a thin arc had nothing to
+-- hold it against the moving canyon. Same neutral/transparency and the SAME corner radius as a
+-- throw button (`corner(b, 8)` below) so the row reads as four elements of one family — painted
+-- directly on the button itself, exactly how the throw buttons carry their own resting fill,
+-- rather than a separate sibling frame.
+ring.BackgroundColor3 = IVORY_DIM
+ring.BackgroundTransparency = 0.25
 ring.Parent = gui
+corner(ring, 8)
 
 local segments: { Frame } = {}
 for i = 1, RingTimer.SEGMENTS do
@@ -952,12 +964,19 @@ end
 -- has settled on it (see `render`'s `aux.worldThrow` branch, and `main.client.luau`'s drum-rest
 -- gate). No UIStroke on the label — the ring's centre is open canyon, so the digits get their
 -- own small opaque disc backing instead of an outline.
+-- Grown to fill the ring's new interior (design §5): sized off the segments' own inner edge
+-- (RING_R - RING_THICKNESS / 2) minus a small fixed gap, so the disc reads as backing FOR the
+-- ring rather than a filled circle that swallows it. Pixel offsets, not scale, because the two
+-- tiers derive from independent RING_R/RING_THICKNESS pairs, not a common fraction of RING_D.
+local RING_DISC_GAP = 2
+local RING_DISC_D = 2 * (RING_R - RING_THICKNESS / 2 - RING_DISC_GAP)
+
 local ringDisc = Instance.new("Frame")
 ringDisc.Name = "Disc"
 ringDisc.Active = false
 ringDisc.AnchorPoint = Vector2.new(0.5, 0.5)
 ringDisc.Position = UDim2.fromScale(0.5, 0.5)
-ringDisc.Size = UDim2.fromScale(0.56, 0.56)
+ringDisc.Size = UDim2.fromOffset(RING_DISC_D, RING_DISC_D)
 ringDisc.BackgroundColor3 = WASHI
 ringDisc.BackgroundTransparency = 0.15
 ringDisc.BorderSizePixel = 0
