@@ -665,13 +665,16 @@ local function paintThrows(pick: string?, enabled: boolean, prompted: string?)
             -- Lifted OUT of the dimmed state: this button is carrying a question, and a
             -- question on a greyed-out control reads as unanswerable.
             --
-            -- CURRENTLY INVISIBLE. `undoPill` is opaque WASHI at this exact rect and ZIndex, with
+            -- CURRENTLY INVISIBLE. `undoPill` is opaque IVORY at this exact rect and ZIndex, with
             -- its own SEL_BLUE stroke standing in for the rim below — and `paintThrows` and
             -- `setUndoPrompt` are always driven by the same value in the same `render` pass, so
             -- this branch is fully occluded every time it runs. It stays as the fallback for a
             -- smaller or translucent pill: if `undoPill` is ever shrunk or given transparency,
             -- this paint is what shows through, and nobody has laid eyes on it since 2026-08-02.
-            -- Anyone changing the pill's size or opacity should look at this branch first.
+            -- Anyone changing the pill's size or opacity should look at this branch first — and
+            -- should re-pick this branch's fill before doing so: the pill and this branch's
+            -- lifted treatment are now the SAME colour (IVORY), so what showed through used to
+            -- contrast against the pill and no longer does.
             t.button.BackgroundColor3 = IVORY
             t.button.BackgroundTransparency = 0
             tintGlyph(t.glyph, INK, GLYPH_OUTLINE)
