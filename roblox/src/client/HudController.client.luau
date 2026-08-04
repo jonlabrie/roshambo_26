@@ -267,6 +267,20 @@ local function tickCounter(c: Counter, target: number): number
     return c.displayed
 end
 
+-- ARRIVING AT A VALUE WITHOUT COUNTING TO IT. Every counter starts at 0 because there is nothing
+-- else to start at — the profile has not arrived when this file runs. The first `render` would
+-- then re-key 0 -> the real balance and run a silent count of up to 2.5s: silent because the
+-- plate's change-guard correctly suppresses a reveal on the first frame, but a ring tap inside
+-- that window opens onto a plate counting up from zero, gold rim and all, celebrating a payoff
+-- that never happened. A player's first look at their own wallet is the one place a count is
+-- meaningless — nothing moved, they simply arrived. So the first `render` seeds instead.
+local function seedCounter(c: Counter, value: number)
+    c.displayed = value
+    c.target = value
+    c.from = value
+    c.startedAt = nil -- not counting; `tickCounter`'s next call finds the target unchanged
+end
+
 local pointsCounter = newCounter(0)
 local streakCounter = newCounter(0)
 local potCounter = newCounter(0)
@@ -310,6 +324,15 @@ local PLATE_FADE = 0.35
 -- pathological case instead of leaving it to grow with the number. See the task report for the
 -- resulting worst-case left edge at 568px and 320px.
 local PLATE_MAX_W = 100
+-- The plate's GOLD rim AT REST. The plate's own stroke is never day/night-adjusted (only the tape
+-- tile rims and the backing are — see `applyContrast`), so its resting weight is a plain pair of
+-- constants rather than a live variable.
+--
+-- DECLARED HERE so the CONSTRUCTION CALL below can use them. `revealPlate` restores this pair and
+-- `setCelebrating` tweens back to it after a payoff, so the value the plate is built at and the
+-- value it settles to have to be the same value, not two literals that happen to agree today.
+local PLATE_STROKE_REST_TRANSPARENCY = 0.35
+local PLATE_STROKE_REST_THICKNESS = 1
 
 local plate = Instance.new("TextButton")
 plate.Name = "Plate"
@@ -333,7 +356,7 @@ plate.Text = ""
 plate.Visible = false
 plate.Parent = gui
 corner(plate, 6)
-local plateStroke = stroke(plate, GOLD, 1, 0.35)
+local plateStroke = stroke(plate, GOLD, PLATE_STROKE_REST_THICKNESS, PLATE_STROKE_REST_TRANSPARENCY)
 do
     local constraint = Instance.new("UISizeConstraint")
     constraint.MaxSize = Vector2.new(PLATE_MAX_W, math.huge) -- height is fixed (TILE), never automatic
@@ -380,12 +403,10 @@ do
     constraint.Parent = plateLabel
 end
 
--- The plate's own stroke is never day/night-adjusted (only the tape tile rims and the backing
--- are — see `applyContrast`), so its "fully revealed" transparency is a plain constant.
--- `plateRestTransparency` is NOT a constant: `applyContrast` keeps it in sync with the current
--- day/night lerp, and `revealPlate` reads it rather than a hardcoded literal, so a reveal in full
--- daylight does not sit at the authored-for-night value until the next ambient tick corrects it.
-local PLATE_STROKE_REST_TRANSPARENCY = 0.35
+-- The BACKING's rest transparency, unlike the rim's pair above, is NOT a constant: `applyContrast`
+-- keeps it in sync with the current day/night lerp, and `revealPlate` reads it rather than a
+-- hardcoded literal, so a reveal in full daylight does not sit at the authored-for-night value
+-- until the next ambient tick corrects it.
 local plateRestTransparency = 0.3
 
 -- ===== The payoff draws the eye =====
@@ -407,14 +428,16 @@ local plateRestTransparency = 0.3
 -- streak would drop the rim back to a hairline for the rest of its own count with no tween left
 -- running to bring it up again.
 local CELEBRATE_SECONDS = 0.15
--- The lit pair, and the rest THICKNESS to go with the rest transparency above. Both ends of the
--- tween are named for the same reason that constant is: the values it settles back to have to
--- keep agreeing with the construction call `stroke(plate, GOLD, 1, 0.35)`, and a literal repeated
--- across three sites is a drift waiting to happen.
+-- The LIT pair. Its rest counterpart is `PLATE_STROKE_REST_*`, declared above the construction
+-- call so the weight the plate is built at and the weight this settles back to are one value.
 local PLATE_STROKE_LIT_TRANSPARENCY = 0
 local PLATE_STROKE_LIT_THICKNESS = 2
-local PLATE_STROKE_REST_THICKNESS = 1
 local celebrating = false
+-- A HANDLE on the rim's tween, for `revealPlate` alone. A reveal writes `plateStroke.Transparency`
+-- directly, and whether that write is right or wrong depends on whether this tween is mid-flight:
+-- a tween interpolates from the value it captured at `Play()`, so a direct write lands for one
+-- frame and is then overwritten. See the read of it in `revealPlate`.
+local celebrateRim: Tween? = nil
 
 local function setCelebrating(active: boolean)
     if active == celebrating then
@@ -427,7 +450,9 @@ local function setCelebrating(active: boolean)
     local rim = if active
         then { Transparency = PLATE_STROKE_LIT_TRANSPARENCY, Thickness = PLATE_STROKE_LIT_THICKNESS }
         else { Transparency = PLATE_STROKE_REST_TRANSPARENCY, Thickness = PLATE_STROKE_REST_THICKNESS }
-    TweenService:Create(plateStroke, info, rim):Play()
+    local rimTween = TweenService:Create(plateStroke, info, rim)
+    celebrateRim = rimTween
+    rimTween:Play()
     TweenService:Create(plateLabel, info, {
         TextColor3 = if active then GOLD else INK_CREAM,
     }):Play()
@@ -517,12 +542,24 @@ local function revealPlate()
     plate.Visible = true
     plate.BackgroundTransparency = plateRestTransparency -- Cancel leaves properties mid-tween
     plateLabel.TextTransparency = 0
-    -- NOT unconditionally the rest value. A re-reveal can land mid-count, when the rim is up for
-    -- the payoff and `setCelebrating`'s tween finished long ago; writing the rest value here would
-    -- drop it to a hairline for the remainder of the count with nothing left running to raise it.
-    plateStroke.Transparency = if celebrating
-        then PLATE_STROKE_LIT_TRANSPARENCY
-        else PLATE_STROKE_REST_TRANSPARENCY
+    -- THE RIM IS RESTORED ONLY WHEN NOTHING IS ANIMATING IT, and it is restored to the LATCHED
+    -- state rather than unconditionally to rest. Three cases, and each needs a different answer:
+    --   * No celebrate tween running, not celebrating — the ordinary reveal. Write rest.
+    --   * No celebrate tween running, celebrating — a RE-reveal mid-count (the second bank of a
+    --     streak; the 0.15s lift finished seconds ago). Writing rest here would drop the rim to a
+    --     hairline for the remainder of the count with nothing left running to raise it.
+    --   * A celebrate tween IS running — the FIRST bank, where `paintCounters` started the lift
+    --     microseconds ago in this same `render`. A tween interpolates from the value it captured
+    --     at `Play()`, so any write here survives exactly one frame before the tween overrides it:
+    --     writing lit would flash the rim bright and then drop it back to swell in again. Leave it
+    --     alone — the tween is already travelling to the right value, including from wherever a
+    --     just-cancelled fade left the property.
+    local rimTween = celebrateRim
+    if rimTween == nil or rimTween.PlaybackState ~= Enum.PlaybackState.Playing then
+        plateStroke.Transparency = if celebrating
+            then PLATE_STROKE_LIT_TRANSPARENCY
+            else PLATE_STROKE_REST_TRANSPARENCY
+    end
     plateVisible = true
     task.delay(plateHoldSeconds(), function()
         startPlateFade(gen)
@@ -1039,7 +1076,17 @@ local function paintCounters()
 
     -- Keyed on the POINTS counter alone. The pot draining and the streak resetting are not
     -- payoffs, and lighting the plate for them would spend the effect on nothing.
-    setCelebrating(pointsCounter.startedAt ~= nil)
+    --
+    -- AND ON ITS DIRECTION. Points go DOWN as well as up: every purchase in the meta-game — a
+    -- teahouse, a deck upgrade, a portal, a decoration — debits the balance, and it arrives here on
+    -- the next reconciliation as an ordinary target change that re-keys the counter downward. Do
+    -- not simplify this back to "the counter is moving": without the direction test, spending 500
+    -- points lights the rim gold and turns the figure gold while the number counts DOWN by 500,
+    -- which is the exact thing the header of `setCelebrating` forbids. The plate still REVEALS for
+    -- a decrease and still holds long enough to read the new balance (`plateHoldSeconds` is
+    -- deliberately direction-blind) — it just does not celebrate.
+    local pointsRising = pointsCounter.target > pointsCounter.from
+    setCelebrating(pointsCounter.startedAt ~= nil and pointsRising)
 end
 
 -- 10Hz IS NOT ENOUGH FRAMES TO COUNT WITH (spec §3c). `render` runs off main.client's 10Hz
@@ -1465,6 +1512,14 @@ local function render(inputs: any, aux: any)
     counterStreak = view.plate.streak
     counterPot = view.pot
     counterPulses = view.potPulses
+    -- FIRST RENDER SEEDS RATHER THAN COUNTS — see `seedCounter`. `lastPlatePoints == nil` is the
+    -- same "no previous value" test the reveal guard below uses, read here before that guard has
+    -- written it, so there is no second flag to keep in step.
+    if lastPlatePoints == nil then
+        seedCounter(pointsCounter, counterPoints)
+        seedCounter(streakCounter, counterStreak)
+        seedCounter(potCounter, counterPot)
+    end
     paintCounters()
 
     -- Reveal is keyed on the TARGET having changed, not on `render` running: `render` is a 10Hz
