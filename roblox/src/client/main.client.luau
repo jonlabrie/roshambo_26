@@ -312,6 +312,14 @@ local function maybeShowReveal()
         -- just the session's first — `resolved.win` (only set once OnboardShown confirms "shown"
         -- or "alreadySeen") is what stops the retries, so a WIN dropped for stacking gets another
         -- chance at the player's next one instead of being marked taught-forever for nothing.
+        --
+        -- DELIBERATELY NOT DEDUPED against the splash fired below, even though both can show on
+        -- the SAME first-win tick. This is not the bank case (which grew dedup machinery because
+        -- the toast and the beat said the literal same sentence in the same screen region): the
+        -- splash CELEBRATES ("YOU WIN! / streak ×1 — pot is now 1") and the beat TEACHES ("You
+        -- won. Take it, or ride it — a win triples your pot."), they sit in different regions, and
+        -- the splash is non-Active so it steals no taps from the card. Complementary, not
+        -- duplicated — do not add dedup machinery here.
         if not resolved.win and profileSeen and p.result == "WIN" then
             EventBus.Onboard:Fire("win", knownSeenBeats)
         end

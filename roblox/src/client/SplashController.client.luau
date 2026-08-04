@@ -190,16 +190,27 @@ end
 -- it is captured, and the comment there on why it should always be present in practice. If it is
 -- ever missing, this shows LOSS without a number rather than guessing one: a wrong figure is
 -- worse than a missing one.
+--
+-- ZERO is its own case, kept distinct from "missing" on purpose: `forfeited == 0` is a KNOWN
+-- fact (no pot was riding), whereas `forfeited == nil` is the degenerate drum-stall path saying
+-- "unknown". `0 points forfeited` is the single most common loss (any loss immediately after a
+-- bank, or a new player's very first loss) and is accurate but teaches nothing — there is no
+-- rule in "0". `> 0` says the number; `== 0` says the fact it stands for instead.
 local function copyFor(body: any): (string?, string?, Color3?)
     local result = body.result
     if result == "WIN" then
-        return "YOU WIN!", `×{body.streak} — pot is now {body.pot}`, GOLD
+        return "YOU WIN!", `streak ×{body.streak} — pot is now {body.pot}`, GOLD
     elseif result == "SAFE" then
         return "SAFE", "your pot survives, streak resets", SAFE_BLUE
     elseif result == "LOSS" then
-        local consequence = if type(body.forfeited) == "number"
-            then `{body.forfeited} points forfeited`
-            else "your pot is forfeited"
+        local consequence
+        if type(body.forfeited) == "number" and body.forfeited > 0 then
+            consequence = `{body.forfeited} points forfeited`
+        elseif body.forfeited == 0 then
+            consequence = "nothing was riding on that one"
+        else
+            consequence = "your pot is forfeited"
+        end
         return "YOU LOSE", consequence, LOSS_RED
     end
     return nil, nil, nil
