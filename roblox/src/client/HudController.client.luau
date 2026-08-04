@@ -587,7 +587,11 @@ undoPill.AnchorPoint = Vector2.new(0.5, 0.5)
 -- TextButton underneath — a full-size overlay that sank would swallow the very tap that
 -- resolves it, and the mechanic would break outright with every gate green.
 undoPill.Size = UDim2.fromOffset(BTN_W, BTN_H)
-undoPill.BackgroundColor3 = WASHI
+-- IVORY, not WASHI (owner's gate 2026-08-04). At 24px the near-black pill read as an accent; at
+-- full button size and fully opaque it read as a hole punched in the HUD. Cream-on-ink under a
+-- cool rim is this HUD's own washi idiom, and the SEL_BLUE stroke is what keeps a light tile
+-- from reading as an ordinary available throw.
+undoPill.BackgroundColor3 = IVORY
 undoPill.BackgroundTransparency = 0
 undoPill.BorderSizePixel = 0
 undoPill.ZIndex = 4
@@ -600,7 +604,7 @@ local undoLabel = Instance.new("TextLabel")
 undoLabel.Name = "Copy"
 undoLabel.Size = UDim2.fromScale(1, 1)
 undoLabel.BackgroundTransparency = 1
-undoLabel.TextColor3 = INK_CREAM
+undoLabel.TextColor3 = INK
 undoLabel.TextSize = 13
 undoLabel.Font = Enum.Font.GothamBold
 undoLabel.Text = "UNDO?"
@@ -1040,6 +1044,15 @@ ringCount.Font = Enum.Font.GothamBold
 ringCount.Text = ""
 ringCount.Parent = ringDisc
 -- No UIStroke on this label. Contrast comes from `ringDisc`'s opaque backing above.
+
+-- OPTICAL CENTRING, not a fudge. Roblox centres the LINE BOX, which reserves room for
+-- descenders; digits have none, so a vertically centred box seats them low by roughly half a
+-- descender. Every value this label ever shows is digits, so the correction is unconditional.
+-- Derived from TextSize rather than a literal pair, so a future size change carries its own
+-- correction: 2px at 34 (desktop), 1px at 20 (touch).
+local COUNT_NUDGE = math.max(1, math.round(ringCount.TextSize * 0.06))
+ringCount.AnchorPoint = Vector2.new(0.5, 0.5)
+ringCount.Position = UDim2.new(0.5, 0, 0.5, -COUNT_NUDGE)
 
 -- One glyph box per symbol, built ONCE — same pattern `glyphSet` uses for the tape tiles — so
 -- the reveal can show whichever the world threw without rebuilding an ImageLabel every round.
