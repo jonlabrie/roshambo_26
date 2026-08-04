@@ -33,12 +33,15 @@
 --   inputs : a HudModel.Inputs
 --   aux    : { session = HudModel.Session, tape = { { worldThrow, result? } }, timerKnown = boolean,
 --              worldThrow = string?, worldThrowFading = boolean?, profileSeen = boolean }
---            `tape` is already spoiler-gated by the wiring — paint it as given. `worldThrow` is
+--            `tape` is already spoiler-gated by the wiring — paint it as given, and note that the
+--            newest tile now arrives a beat AFTER `worldThrow` does, not with it. `worldThrow` is
 --            the world's throw for the round the drum has FINISHED revealing, or nil — see
---            `render`'s glyph-swap, below. `worldThrowFading` is the wiring saying the hold is
---            over and the glyph should be on its way out (see `setRingGlyph`); absent means not
---            fading. `profileSeen` is whether the wallet in `inputs` is the server's answer or
---            main.client's placeholder zeros — see `seedCounter`.
+--            `render`'s glyph-swap, below. `worldThrowFading` is the wiring's reveal beat saying
+--            the hold is over and the glyph should be on its way out (see `setRingGlyph`); it goes
+--            true `RevealBeat.HOLD_SECONDS` after the drum rests, and `worldThrow` goes nil
+--            `RevealBeat.FADE_SECONDS` later. Absent means not fading. `profileSeen` is whether the
+--            wallet in `inputs` is the server's answer or main.client's placeholder zeros — see
+--            `seedCounter`.
 -- Picks travel back the other way on EventBus.HudPick, banking on EventBus.HudBank.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")

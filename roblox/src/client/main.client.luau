@@ -4,7 +4,8 @@
 -- remotes and the renderers, because it is the part that is subtle rather than decorative:
 --   • the authoritative World-Throw tape and the per-round personal WIN/SAFE/LOSS badges,
 --   • the DRUM-REST SPOILER GATE (see `visibleTape` / `maybeShowReveal`), which holds the tape
---     tile and the headline until the wheel stops turning,
+--     tile and the headline until the wheel stops turning — and then THE REVEAL BEAT, which holds
+--     the tile a while longer still, so the ring's glyph gets the moment to itself,
 --   • the pick itself — held here as `chosen` until the lockout (`HudModel.sendAtLockout`), the
 --     one point it goes over the wire,
 --   • the HudModel session — the escalation's consecutive-miss backoff.
@@ -20,7 +21,13 @@
 -- It publishes all of that on `EventBus.HudState:Fire(inputs, aux)`:
 --   inputs : a HudModel.Inputs — the controller calls HudModel.view(inputs, aux.session)
 --   aux    : { session = HudModel.Session, tape = { { worldThrow, result? } }, timerKnown = boolean,
---              worldThrow = string? }
+--              worldThrow = string?, worldThrowFading = boolean?, profileSeen = boolean }
+--            `tape` is spoiler-gated here, so the controller paints it as given. `worldThrow` is
+--            the world's throw for the round the drum has FINISHED revealing, or nil.
+--            `worldThrowFading` is this file saying the beat's hold is over and the glyph should
+--            be on its way out — HudController owns the animation, this is only the cue.
+--            `profileSeen` is whether the wallet in `inputs` is the server's answer or the
+--            placeholder zeros this script starts with.
 -- and takes picks back on `EventBus.HudPick`. Transient notices go out on `EventBus.Toast`.
 --
 -- The MAXIMAL panel gets its own channel, `EventBus.LedgerState`, fired both when ProfileUpdate
@@ -38,6 +45,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local HudModel = require(shared:WaitForChild("HudModel"))
+local RevealBeat = require(shared:WaitForChild("RevealBeat"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local SubmitPick = remotes:WaitForChild("SubmitPick") :: RemoteEvent
@@ -73,6 +81,46 @@ local revealedRoundId: string? = nil -- the latest round our drum has finished
 -- `maybeShowReveal` and cleared when ACTIVE reopens, so the ring (HudController) inherits the
 -- SAME drum-rest spoiler gate the tape does rather than a second one of its own.
 local revealedWorldThrow: string? = nil
+
+-- THE REVEAL BEAT (2026-08-04). The glyph in the ring, the result splash and the new tape tile all
+-- used to arrive in the same frame, and the smallest of the three — the glyph — lost, which is why
+-- it read as missing even while it was rendering. They are separated in time now, every step
+-- measured from the drum coming fully to rest (the numbers live in `RevealBeat`, shared with
+-- HudController because both files have to agree about them):
+--   0                        the glyph appears in the ring, and the splash fires
+--   HOLD_SECONDS             the glyph begins to fade (`worldThrowFading`, animated over there)
+--   TAPE_DELAY_SECONDS       the glyph is gone, and ONLY THEN does the tape tile land
+--
+-- `beatGen` is a generation counter — the same shape `plateGen` uses in HudController. Every beat
+-- increments it and each scheduled step captures the value, so a superseded beat's `task.delay`
+-- is discarded rather than firing late over a newer round.
+local beatGen = 0
+-- Published as `aux.worldThrowFading`.
+local worldThrowFading = false
+-- THE BEAT IN FLIGHT, and the whole reason this record exists: the tape tile is the round's
+-- PERMANENT record, and one lost to a timing edge leaves a hole in the tape that no later round
+-- repairs. If the next round opens mid-beat, the beat collapses and the tile must land AT ONCE —
+-- and the collapse cannot go back to `pendingReveal` for it, because `maybeShowReveal` nils that
+-- the instant the beat starts, so the collapse would find nil, drop the tile silently, and no gate
+-- would notice. Set when the beat starts; cleared by `landTape`, whether it completed or collapsed.
+local beatInFlight: { roundId: string?, result: string? }? = nil
+
+-- The tape half of the reveal: badge the round and un-gate its entry in `visibleTape`. Clearing the
+-- flight record is what makes this idempotent, so the beat's own scheduled landing and a collapse
+-- racing it can never BOTH emit the tile — and neither can skip it.
+local function landTape()
+    local b = beatInFlight
+    if not b then
+        return
+    end
+    beatInFlight = nil
+    if b.roundId then
+        if b.result then
+            badgeById[b.roundId] = b.result
+        end
+        revealedRoundId = b.roundId
+    end
+end
 
 local phase = ""
 local lockoutAt: number? = nil
@@ -196,9 +244,11 @@ local function secondsLeft(): number
     return math.max(0, lockoutAt - os.clock())
 end
 
--- SPOILER GATE. If the newest tape entry is the round still being revealed — our drum has not
--- settled on it yet — hold it back until the wheel stops. Painting it early gives away the
--- world's throw while the drum is still turning.
+-- SPOILER GATE. If the newest tape entry is the round `revealedRoundId` has not caught up to,
+-- hold it back. Painting it early gives away the world's throw while the drum is still turning.
+-- The test is unchanged by the reveal beat, but what it now holds the tile back FOR has changed:
+-- `revealedRoundId` no longer advances at drum rest, it advances at the END of the beat, so this
+-- is what keeps the tile off the tape while the ring's glyph has its moment.
 local function visibleTape(): { { worldThrow: string, result: string? } }
     local skip = 0
     if currentRoundId and tape[1] and tape[1].id == currentRoundId and currentRoundId ~= revealedRoundId then
@@ -254,9 +304,13 @@ local function publish()
         -- Render-only, so it stays out of HudModel: false means we never got a lockout for this
         -- round and the ring has no real span to deplete against.
         timerKnown = lockoutAt ~= nil,
-        -- The world's throw for the round the drum has FINISHED revealing, or nil. Gated by the
-        -- same `revealedRoundId` the tape is, so the ring cannot spoil the wheel mid-spin.
+        -- The world's throw for the round the drum has FINISHED revealing, or nil. Set at drum rest
+        -- and cleared once the beat's fade has run, so the ring can never spoil the wheel mid-spin
+        -- and never carries a glyph into the next round either.
         worldThrow = revealedWorldThrow,
+        -- The beat's hold is over and the glyph should be on its way out. Render-only: HudController
+        -- owns the tween (latched on the symbol/fading pair — this republishes at 10Hz).
+        worldThrowFading = worldThrowFading,
         -- Render-only, the same class of fact as `timerKnown`: whether the server's join fetch has
         -- actually answered with this player's profile, or the wallet above is still the placeholder
         -- zeros this script starts with. HudController seeds its counters on the first render this is
@@ -328,8 +382,10 @@ local function maybeShowReveal()
         local p = pendingReveal
         pendingReveal = nil
         -- Task 9: stash the round detail for the ledger's LAST ROUND band. Unconditional (not
-        -- gated on `p.roundId`, unlike the badge below) so it updates for every revealed round
-        -- this client sees, participant or spectator alike.
+        -- gated on `p.roundId`, unlike the tape tile's badge) so it updates for every revealed
+        -- round this client sees, participant or spectator alike. Immediate, not part of the beat:
+        -- the ledger is a separate screen, so there is no spoiler risk, and the rule is satisfied
+        -- anyway because the drum has stopped.
         lastRound = {
             worldThrow = p.worldThrow,
             pick = p.pick,
@@ -337,16 +393,37 @@ local function maybeShowReveal()
             distribution = p.distribution,
             totalPlayers = p.totalPlayers,
         }
-        -- Badge this round by id and un-gate it in the tape now the drum's at rest.
-        if p.roundId then
-            if p.result then
-                badgeById[p.roundId] = p.result
+        -- THE BEAT STARTS HERE. The ring gets the glyph now; the TAPE TILE WAITS — see the beat
+        -- block above for the timings and for why the tile's round is held in its own record.
+        --
+        -- `landTape()` first, defensively: nothing should be able to deliver a second reveal
+        -- without an ACTIVE in between (which collapses the beat), but if one ever did, the round
+        -- still in flight would have its record overwritten on the next line, and a dropped tile is
+        -- the one failure here that never repairs itself.
+        landTape()
+        beatGen += 1
+        local gen = beatGen
+        beatInFlight = { roundId = p.roundId, result = p.result }
+        revealedWorldThrow = p.worldThrow
+        worldThrowFading = false
+        task.delay(RevealBeat.HOLD_SECONDS, function()
+            if gen ~= beatGen then
+                return -- superseded: a newer beat, or a collapse, owns the ring now
             end
-            revealedRoundId = p.roundId
-            revealedWorldThrow = p.worldThrow
-        end
-        -- Onboarding beat 3 waits for the SAME gate as the badge above, not for RevealResult
-        -- arriving. WIN implies the exact world throw (the one your pick beats), so firing this
+            worldThrowFading = true
+            publish()
+        end)
+        task.delay(RevealBeat.TAPE_DELAY_SECONDS, function()
+            if gen ~= beatGen then
+                return -- superseded; the collapse has already released the tile
+            end
+            landTape()
+            revealedWorldThrow = nil -- the glyph has finished going; the ring is a clock again
+            worldThrowFading = false
+            publish()
+        end)
+        -- Onboarding beat 3 waits for the SAME drum-rest gate the beat above starts from, not for
+        -- RevealResult arriving. WIN implies the exact world throw (the one your pick beats), so firing this
         -- the instant RevealResult lands — before the drum has stopped spinning — would spoil the
         -- wheel early, exactly what the drum-rest gate exists to prevent. Fires on every WIN, not
         -- just the session's first — `resolved.win` (only set once OnboardShown confirms "shown"
@@ -536,7 +613,16 @@ RoundUpdate.OnClientEvent:Connect(function(info)
         lockoutAt = if info.secondsToLockout then os.clock() + info.secondsToLockout else nil
         pendingReveal = nil -- the drum respins; last round's reveal has already been shown
         drumAtRest = false
+        -- COLLAPSE THE BEAT, IN THIS ORDER. A new round opening mid-beat cuts the reveal short, and
+        -- the one thing that must survive being cut short is the tape tile — the round's permanent
+        -- record. So release it NOW (a no-op if the beat already got as far as landing it), then
+        -- clear the ring, then invalidate the generation so the beat's own `task.delay`s find a
+        -- stale `gen` and do nothing. The ring goes back to being a clock on its own: with
+        -- `revealedWorldThrow` nil, ACTIVE restores the countdown.
+        landTape()
         revealedWorldThrow = nil -- the ring must not carry last round's glyph into this one
+        worldThrowFading = false
+        beatGen += 1
     else
         lockoutAt = nil
     end
