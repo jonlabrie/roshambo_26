@@ -350,7 +350,7 @@ plateLabel.Parent = plate
 -- reveal that had one. A UISizeConstraint mirroring the plate's own cap gives the label the same
 -- hard ceiling `plate` already enforces on itself (the same AutomaticSize + UISizeConstraint
 -- combination, one level down); TextScaled + a MaxTextSize constraint — the pattern `bankButton`
--- and `switchLabel` use for exactly this — then shrinks the font to fit inside that clamp instead
+-- and `undoLabel` use for exactly this — then shrinks the font to fit inside that clamp instead
 -- of clipping the tail digits, which ClipsDescendants would have done.
 do
     local constraint = Instance.new("UISizeConstraint")
@@ -501,7 +501,7 @@ end
 local canThrow = false
 
 -- Mirrors the last rendered `view.chosen`, so the press handler below can tell a "choose" tap
--- (nothing chosen yet) from a tap that would only raise a SWITCH? prompt (something already is).
+-- (nothing chosen yet) from a tap that would only raise an UNDO? prompt (something already is).
 -- Advisory, same as `canThrow` above.
 local chosenSym: string? = nil
 
@@ -564,57 +564,57 @@ for i, sym in THROWS do
     }
 end
 
--- ===== SWITCH?: the question raised over a glyph the player has just tapped =====
+-- ===== UNDO?: the question raised over a glyph the player has just tapped =====
 -- It sits ON the button rather than beside it, because the button is no longer offering an
 -- option — it is asking a question, and covering the glyph is the clearest way to say so.
 -- Answering it UNLOCKS all three; it does not select this one. That is what makes backing out
 -- of a round possible at all.
 --
--- IT COVERS THE GLYPH, ON PURPOSE. Confirming a switch UNLOCKS; it never selects the button
+-- IT COVERS THE GLYPH, ON PURPOSE. Confirming an undo UNLOCKS; it never selects the button
 -- that was tapped. So the glyph underneath is not a destination — both unchosen buttons are
--- proxies for switch-and-cancel, and either does the same thing. Revealing it would advertise
+-- proxies for undo-and-cancel, and either does the same thing. Revealing it would advertise
 -- a destination that does not exist.
 --
 -- No UIStroke on the label. Contrast comes from the opaque backing behind it (see the spec's
 -- §3): an outline on 13px type fills the counters in and reads as a smear.
-local switchPill = Instance.new("Frame")
-switchPill.Name = "SwitchPrompt"
-switchPill.AnchorPoint = Vector2.new(0.5, 0.5)
+local undoPill = Instance.new("Frame")
+undoPill.Name = "UndoPrompt"
+undoPill.AnchorPoint = Vector2.new(0.5, 0.5)
 -- Flush with the button's own width, not inset 8px off it: at the old BTN_W - 8 the touch pill
 -- was only 36px wide (BTN_W = BTN_H_TOUCH = 44) and TextScaled alone drives "SWITCH?" (13px
 -- GothamBold measures ~57-64px unscaled) down to ~8px there — below the ~9px legibility floor.
 -- At the full BTN_W the touch pill is 44px, which lands the scaled text at ~9-10px, still
 -- flush with (never wider than) the button beneath it.
-switchPill.Size = UDim2.fromOffset(BTN_W, 24)
-switchPill.BackgroundColor3 = WASHI
-switchPill.BackgroundTransparency = 0
-switchPill.BorderSizePixel = 0
-switchPill.ZIndex = 4
-switchPill.Visible = false
-switchPill.Parent = throwArea
-corner(switchPill, 6)
-stroke(switchPill, SEL_BLUE, 2, 0)
+undoPill.Size = UDim2.fromOffset(BTN_W, 24)
+undoPill.BackgroundColor3 = WASHI
+undoPill.BackgroundTransparency = 0
+undoPill.BorderSizePixel = 0
+undoPill.ZIndex = 4
+undoPill.Visible = false
+undoPill.Parent = throwArea
+corner(undoPill, 6)
+stroke(undoPill, SEL_BLUE, 2, 0)
 
-local switchLabel = Instance.new("TextLabel")
-switchLabel.Name = "Copy"
-switchLabel.Size = UDim2.fromScale(1, 1)
-switchLabel.BackgroundTransparency = 1
-switchLabel.TextColor3 = INK_CREAM
-switchLabel.TextSize = 13
-switchLabel.Font = Enum.Font.GothamBold
-switchLabel.Text = "SWITCH?"
-switchLabel.ZIndex = 5
-switchLabel.Parent = switchPill
+local undoLabel = Instance.new("TextLabel")
+undoLabel.Name = "Copy"
+undoLabel.Size = UDim2.fromScale(1, 1)
+undoLabel.BackgroundTransparency = 1
+undoLabel.TextColor3 = INK_CREAM
+undoLabel.TextSize = 13
+undoLabel.Font = Enum.Font.GothamBold
+undoLabel.Text = "SWITCH?"
+undoLabel.ZIndex = 5
+undoLabel.Parent = undoPill
 
 -- TextScaled + a MaxTextSize constraint, same pattern as `bankButton` below: at BTN_W-8 the pill
 -- is only 36px wide on touch (BTN_W = BTN_H_TOUCH = 44) while "SWITCH?" at 13px GothamBold runs
 -- ~57-64px unscaled — it clipped to roughly "WITC". Scaling down still reads at this width; the
 -- constraint just stops it growing past 13px on the wider desktop pill.
-switchLabel.TextScaled = true
+undoLabel.TextScaled = true
 do
     local constraint = Instance.new("UITextSizeConstraint")
     constraint.MaxTextSize = 13
-    constraint.Parent = switchLabel
+    constraint.Parent = undoLabel
 end
 
 local THROW_INDEX: { [string]: number } = {}
@@ -624,11 +624,11 @@ end
 
 -- The buttons are anchored to the TOP of throwArea (the tape moved below them since Task 6), so
 -- the pill's y is measured from that top edge — BTN_H / 2, not from the bottom.
-local function setSwitchPrompt(symbol: string?)
-    switchPill.Visible = symbol ~= nil
+local function setUndoPrompt(symbol: string?)
+    undoPill.Visible = symbol ~= nil
     if symbol then
         local i = THROW_INDEX[symbol]
-        switchPill.Position = UDim2.fromOffset((i - 1) * (BTN_W + BTN_GAP) + BTN_W / 2, BTN_H / 2)
+        undoPill.Position = UDim2.fromOffset((i - 1) * (BTN_W + BTN_GAP) + BTN_W / 2, BTN_H / 2)
     end
 end
 
@@ -770,7 +770,7 @@ for _, sym in THROWS do
             return
         end
         -- The optimistic chosen-paint is only honest when the tap is a "choose" — nothing chosen
-        -- yet. When something already is, the tap only raises a SWITCH? prompt (see `paintThrows`'s
+        -- yet. When something already is, the tap only raises an UNDO? prompt (see `paintThrows`'s
         -- `prompted` branch), and lighting a third glyph fully chosen here would assert something
         -- false for up to PRESS_HOLD_SECONDS, until `render` corrects it. `chosenSym` mirrors
         -- `view.chosen` for exactly this check — deliberately not `HudModel.tapAction`, which needs
@@ -1089,10 +1089,10 @@ local ESCALATION_H = 98 -- kept as a named constant: updateEscalationPosition ne
 -- view, which is what the owner asked for: "the worst thing that could happen is it gets thrown
 -- into a user's view in the middle of watching fireworks."
 -- 210 verified against its content box (210 - 24 = 186px): "CHOOSE A THROW" at 16px GothamBold is
--- ~126-146px (14 characters; c.f. switchLabel's own measured ~8-9px/char for GothamBold), which
+-- ~126-146px (14 characters; c.f. undoLabel's own measured ~8-9px/char for GothamBold), which
 -- clears with 40-60px to spare. escalationPrompt also carries TextScaled + a MaxTextSize
 -- constraint below as a floor, not because 210 is expected to be tight — the same belt-and-braces
--- pattern switchLabel uses — so a font-metrics surprise shrinks the text instead of truncating it.
+-- pattern undoLabel uses — so a font-metrics surprise shrinks the text instead of truncating it.
 local ESCALATION_W = 210
 
 local escalation = Instance.new("TextButton")
@@ -1154,7 +1154,7 @@ escalationPrompt.TextSize = 16
 escalationPrompt.Font = Enum.Font.GothamBold
 escalationPrompt.Text = "CHOOSE A THROW"
 escalationPrompt.Parent = escalation
--- Belt-and-braces, same pattern as `switchLabel` above: 16px comfortably fits the 186px content
+-- Belt-and-braces, same pattern as `undoLabel` above: 16px comfortably fits the 186px content
 -- box by estimate (see ESCALATION_W above), but TextScaled + a MaxTextSize constraint means a
 -- font-metrics surprise shrinks the text instead of truncating it, and never grows past 16px.
 escalationPrompt.TextScaled = true
@@ -1321,9 +1321,9 @@ local function render(inputs: any, aux: any)
         pressedSym = nil
     end
     local lit = view.chosen or pressedSym
-    paintThrows(lit, view.throwsEnabled, view.switchPrompt)
+    paintThrows(lit, view.throwsEnabled, view.undoPrompt)
     setChosenPulse(if view.throwsEnabled then lit else nil)
-    setSwitchPrompt(view.switchPrompt)
+    setUndoPrompt(view.undoPrompt)
 
     local entries = aux.tape or {}
     local count = math.min(#entries, TAPE_N)

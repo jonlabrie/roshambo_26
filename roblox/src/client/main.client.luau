@@ -89,8 +89,8 @@ local resultSplash = true
 -- they are separate on purpose: the pick is held here until the lockout (HudModel.sendAtLockout)
 -- because ThrowBuffer is upsert-only, so sending on the first tap would make backing out a lie.
 local chosen: string? = nil
-local switchPrompt: string? = nil
-local switchPromptAt: number? = nil
+local undoPrompt: string? = nil
+local undoPromptAt: number? = nil
 local sent = false
 -- Set by a back-out, cleared when ACTIVE reopens. A player who withdrew has answered the
 -- question the escalation asks, so it must not ask again this round.
@@ -228,7 +228,7 @@ local function buildInputs(): any
         unresolvedWin = wallet.unresolvedWin,
         escalationPrompts = escalationPrompts,
         chosen = chosen,
-        switchPrompt = switchPrompt,
+        undoPrompt = undoPrompt,
         sent = sent,
         declinedThisRound = declinedThisRound,
     }
@@ -405,10 +405,10 @@ EventBus.HudPick.Event:Connect(function(value: string)
     if action == "ignore" then
         return
     end
-    local nextState = HudModel.applyTap({ chosen = chosen, switchPrompt = switchPrompt }, action, value)
+    local nextState = HudModel.applyTap({ chosen = chosen, undoPrompt = undoPrompt }, action, value)
     chosen = nextState.chosen
-    switchPrompt = nextState.switchPrompt
-    switchPromptAt = if switchPrompt then os.clock() else nil
+    undoPrompt = nextState.undoPrompt
+    undoPromptAt = if undoPrompt then os.clock() else nil
     if action == "clear" then
         declinedThisRound = true
     end
@@ -491,8 +491,8 @@ RevealTheater.OnClientEvent:Connect(function(r)
         -- and stop lighting the glyph: leaving it chosen would keep the tile illuminated
         -- through REVEAL as though it had counted, contradicting the toast.
         chosen = nil
-        switchPrompt = nil
-        switchPromptAt = nil
+        undoPrompt = nil
+        undoPromptAt = nil
     end
     publish()
 end)
@@ -522,8 +522,8 @@ RoundUpdate.OnClientEvent:Connect(function(info)
     phase = info.phase
     if info.phase == "ACTIVE" then
         chosen = nil
-        switchPrompt = nil
-        switchPromptAt = nil
+        undoPrompt = nil
+        undoPromptAt = nil
         sent = false
         declinedThisRound = false
         roundCouldThrow = true
@@ -658,11 +658,11 @@ task.spawn(function()
         if phase == "ACTIVE" then
             roundCouldThrow = true
         end
-        -- An unanswered SWITCH? ages out. Both outcomes of expiry are safe: it restores
+        -- An unanswered UNDO? ages out. Both outcomes of expiry are safe: it restores
         -- exactly the state before the stray tap.
-        if HudModel.switchPromptExpired(switchPromptAt, os.clock()) then
-            switchPrompt = nil
-            switchPromptAt = nil
+        if HudModel.undoPromptExpired(undoPromptAt, os.clock()) then
+            undoPrompt = nil
+            undoPromptAt = nil
         end
         -- THE PICK'S ONE TRIP TO THE WIRE. The model decides when; this loop is simply the only
         -- thing watching the countdown, at 10Hz — close enough to the half-second boundary that
