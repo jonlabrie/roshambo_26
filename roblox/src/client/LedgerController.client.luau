@@ -349,6 +349,19 @@ playersLabel.TextTransparency = 0.35
 -- The crowd-split three-way bar. Segments come from `LedgerModel.shares` (the SAME
 -- largest-remainder apportionment the lifetime WIN/SAFE/LOSS bar below uses), so laying them end
 -- to end by scale leaves no gap and no overrun.
+--
+-- DELIBERATELY NOT the WIN_GREEN/GOLD/LOSS_RED triad, even though this band sits `resultLabel`
+-- (which DOES use that triad) directly above this bar. R/P/S are CATEGORIES, not outcomes, and
+-- reusing the result colours here would read as "green segment = winning", one row below a result
+-- label that might genuinely BE green — the one place in this panel that ambiguity actually
+-- bites. These three come from the same ivory/tan/washi family HudController already uses for the
+-- tape tiles and the unchosen throw buttons (IVORY / TAN_RIM / AGED_IVORY there), reused here for
+-- visual consistency across files rather than invented fresh. They separate by VALUE (bright,
+-- mid, dark) rather than hue, which reads at 14px where a hue-only distinction would not.
+local RPS_R = Color3.fromRGB(244, 238, 222) -- = HudController's IVORY (bright)
+local RPS_P = Color3.fromRGB(176, 164, 138) -- = HudController's TAN_RIM (mid)
+local RPS_S = Color3.fromRGB(146, 112, 64) -- = HudController's AGED_IVORY (dark)
+
 local roundBarTrack = Instance.new("Frame")
 roundBarTrack.Name = "RoundBar"
 roundBarTrack.Position = UDim2.fromOffset(PAD, 96)
@@ -359,9 +372,9 @@ roundBarTrack.ClipsDescendants = true
 roundBarTrack.Parent = lastRoundBand
 corner(roundBarTrack, 4)
 
-local roundRSeg = barSegment(roundBarTrack, "R", WIN_GREEN)
-local roundPSeg = barSegment(roundBarTrack, "P", GOLD)
-local roundSSeg = barSegment(roundBarTrack, "S", LOSS_RED)
+local roundRSeg = barSegment(roundBarTrack, "R", RPS_R)
+local roundPSeg = barSegment(roundBarTrack, "P", RPS_P)
+local roundSSeg = barSegment(roundBarTrack, "S", RPS_S)
 
 local roundBarLegend = label(lastRoundBand, "", 11, INK_CREAM, Enum.Font.Gotham)
 roundBarLegend.Position = UDim2.fromOffset(PAD, 112)
@@ -908,15 +921,27 @@ local function render()
         local totalPlayers = lastRound.totalPlayers or 0
         playersLabel.Text = `{totalPlayers} PLAYER{if totalPlayers == 1 then "" else "S"}`
 
-        local dist = lastRound.distribution or { R = 0, P = 0, S = 0 }
-        local roundShares = LedgerModel.shares({ dist.R, dist.P, dist.S })
-        roundRSeg.Position = UDim2.fromScale(0, 0)
-        roundRSeg.Size = UDim2.fromScale(roundShares[1] / 100, 1)
-        roundPSeg.Position = UDim2.fromScale(roundShares[1] / 100, 0)
-        roundPSeg.Size = UDim2.fromScale(roundShares[2] / 100, 1)
-        roundSSeg.Position = UDim2.fromScale((roundShares[1] + roundShares[2]) / 100, 0)
-        roundSSeg.Size = UDim2.fromScale(roundShares[3] / 100, 1)
-        roundBarLegend.Text = `R {roundShares[1]}%  ·  P {roundShares[2]}%  ·  S {roundShares[3]}%`
+        -- `totalPlayers == 0` is server/src/engine/Settlement.ts's placeholder path
+        -- (`buildDistribution` returns {R:33,P:33,S:33} when nobody threw — a pre-existing quirk
+        -- for OTHER readers of `distribution`, not something to fix here). This band is the first
+        -- thing to RENDER that placeholder, so it must not draw a confident-looking split
+        -- describing votes that never happened. Hide the bar and its legend instead; the player
+        -- count above already says the honest "0 PLAYERS" on its own. Both are absolutely
+        -- positioned within a fixed-height band, so hiding them leaves blank space at the bottom,
+        -- not a collapse or a hole.
+        roundBarTrack.Visible = totalPlayers > 0
+        roundBarLegend.Visible = totalPlayers > 0
+        if totalPlayers > 0 then
+            local dist = lastRound.distribution or { R = 0, P = 0, S = 0 }
+            local roundShares = LedgerModel.shares({ dist.R, dist.P, dist.S })
+            roundRSeg.Position = UDim2.fromScale(0, 0)
+            roundRSeg.Size = UDim2.fromScale(roundShares[1] / 100, 1)
+            roundPSeg.Position = UDim2.fromScale(roundShares[1] / 100, 0)
+            roundPSeg.Size = UDim2.fromScale(roundShares[2] / 100, 1)
+            roundSSeg.Position = UDim2.fromScale((roundShares[1] + roundShares[2]) / 100, 0)
+            roundSSeg.Size = UDim2.fromScale(roundShares[3] / 100, 1)
+            roundBarLegend.Text = `R {roundShares[1]}%  ·  P {roundShares[2]}%  ·  S {roundShares[3]}%`
+        end
     end
 
     paintSwitch()
