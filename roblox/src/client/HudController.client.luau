@@ -1011,6 +1011,19 @@ end)
 -- 53 content px, which doesn't even fit the two labels with zero gap: 46 + 20 = 66 > 53).
 local ESCALATION_H = 98 -- kept as a named constant: updateEscalationPosition needs it too, below
 
+-- WIDTH IS THE LEVER, not height. The height cannot halve: 42px of count plus a 16px prompt plus
+-- 12px padding all round has a hard floor of 98. The width had no such floor — it was 80% of the
+-- screen to hold ~130px of content, which on a landscape phone is a 675px panel for a two-line
+-- message. A fixed width sized to the content is what actually makes this stop dominating the
+-- view, which is what the owner asked for: "the worst thing that could happen is it gets thrown
+-- into a user's view in the middle of watching fireworks."
+-- 210 verified against its content box (210 - 24 = 186px): "CHOOSE A THROW" at 16px GothamBold is
+-- ~126-146px (14 characters; c.f. switchLabel's own measured ~8-9px/char for GothamBold), which
+-- clears with 40-60px to spare. escalationPrompt also carries TextScaled + a MaxTextSize
+-- constraint below as a floor, not because 210 is expected to be tight — the same belt-and-braces
+-- pattern switchLabel uses — so a font-metrics surprise shrinks the text instead of truncating it.
+local ESCALATION_W = 210
+
 local escalation = Instance.new("TextButton")
 escalation.Name = "Escalation"
 escalation.Text = ""
@@ -1021,10 +1034,13 @@ escalation.AnchorPoint = Vector2.new(0.5, 0.5)
 -- is the resting position on a tall screen, but on a short landscape phone it collides with the
 -- bank button. See `updateEscalationPosition` for the clamp.
 escalation.Position = UDim2.fromScale(0.5, 0.42)
--- scale width: a fixed 460px overflows a small phone. Fixed height is ESCALATION_H, derived above
--- from its two children's content box. If either child's TextSize/height or the padding below
--- changes, re-run that arithmetic or the two labels overlap inside the unchanged content box.
-escalation.Size = UDim2.new(0.8, 0, 0, ESCALATION_H)
+-- Fixed width (ESCALATION_W, above) sized to the content, not a screen fraction — see the
+-- arithmetic there. Fixed height is ESCALATION_H, derived above from its two children's content
+-- box. If either child's TextSize/height or the padding below changes, re-run that arithmetic or
+-- the two labels overlap inside the unchanged content box. AnchorPoint (0.5, 0.5) plus a
+-- Scale-0.5 X position (both offset components below are Y-only) keeps a fixed-width frame
+-- centred exactly the same as a scale-width one.
+escalation.Size = UDim2.fromOffset(ESCALATION_W, ESCALATION_H)
 -- Opaque backing, not a stroke on the text. The count and prompt used to float over open
 -- canyon with strokes standing in for contrast (see the spec's §3) — a real backing plate
 -- instead, same as every other readable surface in this HUD.
@@ -1067,6 +1083,15 @@ escalationPrompt.TextSize = 16
 escalationPrompt.Font = Enum.Font.GothamBold
 escalationPrompt.Text = "CHOOSE A THROW"
 escalationPrompt.Parent = escalation
+-- Belt-and-braces, same pattern as `switchLabel` below: 16px comfortably fits the 186px content
+-- box by estimate (see ESCALATION_W above), but TextScaled + a MaxTextSize constraint means a
+-- font-metrics surprise shrinks the text instead of truncating it, and never grows past 16px.
+escalationPrompt.TextScaled = true
+do
+    local constraint = Instance.new("UITextSizeConstraint")
+    constraint.MaxTextSize = 16
+    constraint.Parent = escalationPrompt
+end
 -- No UIStroke on the label — same rationale as escalationCount above.
 
 local escalationScale = Instance.new("UIScale")
