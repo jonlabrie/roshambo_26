@@ -32,10 +32,11 @@
 -- EventBus.HudState(inputs, aux):
 --   inputs : a HudModel.Inputs
 --   aux    : { session = HudModel.Session, tape = { { worldThrow, result? } }, timerKnown = boolean,
---              worldThrow = string? }
+--              worldThrow = string?, profileSeen = boolean }
 --            `tape` is already spoiler-gated by the wiring — paint it as given. `worldThrow` is
 --            the world's throw for the round the drum has FINISHED revealing, or nil — see
---            `render`'s glyph-swap, below.
+--            `render`'s glyph-swap, below. `profileSeen` is whether the wallet in `inputs` is the
+--            server's answer or main.client's placeholder zeros — see `seedCounter`.
 -- Picks travel back the other way on EventBus.HudPick, banking on EventBus.HudBank.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
@@ -268,12 +269,23 @@ local function tickCounter(c: Counter, target: number): number
 end
 
 -- ARRIVING AT A VALUE WITHOUT COUNTING TO IT. Every counter starts at 0 because there is nothing
--- else to start at — the profile has not arrived when this file runs. The first `render` would
--- then re-key 0 -> the real balance and run a silent count of up to 2.5s: silent because the
--- plate's change-guard correctly suppresses a reveal on the first frame, but a ring tap inside
--- that window opens onto a plate counting up from zero, gold rim and all, celebrating a payoff
--- that never happened. A player's first look at their own wallet is the one place a count is
--- meaningless — nothing moved, they simply arrived. So the first `render` seeds instead.
+-- else to start at — the profile has not arrived when this file runs. Re-keying 0 -> the real
+-- balance when it lands would run a full count of up to 2.5s, with the plate revealed, its gold
+-- rim lifted and the figure gold, celebrating a payoff that never happened — seconds after
+-- spawning, before the player has done anything. A player's first look at their own wallet is
+-- the one place a count is meaningless: nothing moved, they simply arrived. So that first look
+-- SEEDS the counters instead — they arrive at the value rather than counting to it.
+--
+-- WHICH RENDER THAT IS, is the whole of the problem. It is NOT the first one: main.client
+-- publishes on a 10Hz heartbeat from script load, while its `wallet` is still the placeholder
+-- `{ 0, 0, 0 }`, and the real profile cannot land until the server's join fetch returns from an
+-- HTTP round trip this controller is always listening well before. Seeding on the first render
+-- captured 0 and left the real balance to arrive as a rising count — the exact celebration this
+-- is meant to prevent. `aux.profileSeen` is main.client's own "the profile has answered" flag
+-- (the one gating its onboarding beats), carried through on the HudState path; `render` seeds on
+-- the first render where it is true. If the join fetch never succeeds it stays false and nothing
+-- is ever seeded — which is correct rather than stuck: the wallet is then genuinely zero (the
+-- server's fetch is what fills it), so every later move IS a real move and SHOULD count.
 local function seedCounter(c: Counter, value: number)
     c.displayed = value
     c.target = value
@@ -1503,6 +1515,12 @@ local lastPhase = ""
 local lastPlatePoints: number? = nil
 local lastPlateStreak: number? = nil
 
+-- Latched the first time `aux.profileSeen` comes through true — see `seedCounter`. A flag rather
+-- than re-reading `aux.profileSeen` each render because the seed must happen ONCE: it stays true
+-- for every render afterwards, and re-seeding would pin the counters at their targets forever and
+-- nothing would ever count again.
+local countersSeeded = false
+
 local function render(inputs: any, aux: any)
     local view = HudModel.view(inputs, aux.session)
     canThrow = view.throwsEnabled
@@ -1512,10 +1530,14 @@ local function render(inputs: any, aux: any)
     counterStreak = view.plate.streak
     counterPot = view.pot
     counterPulses = view.potPulses
-    -- FIRST RENDER SEEDS RATHER THAN COUNTS — see `seedCounter`. `lastPlatePoints == nil` is the
-    -- same "no previous value" test the reveal guard below uses, read here before that guard has
-    -- written it, so there is no second flag to keep in step.
-    if lastPlatePoints == nil then
+    -- THE PROFILE'S ARRIVAL SEEDS RATHER THAN COUNTS — see `seedCounter`. Keyed on
+    -- `aux.profileSeen`, the wiring's own "the server has answered" fact, NOT on this being the
+    -- first render: the 10Hz heartbeat starts publishing placeholder zeros long before the join
+    -- fetch returns, so "first render" seeded 0 and turned the balance's arrival into a count.
+    local seededNow = false
+    if not countersSeeded and aux.profileSeen == true then
+        countersSeeded = true
+        seededNow = true
         seedCounter(pointsCounter, counterPoints)
         seedCounter(streakCounter, counterStreak)
         seedCounter(potCounter, counterPot)
@@ -1529,8 +1551,16 @@ local function render(inputs: any, aux: any)
     -- ARMED AFTER `paintCounters`, and that ordering is load-bearing: `revealPlate` sizes its hold
     -- from the points counter's CURRENT leg (`plateHoldSeconds`), and before the paint has re-keyed
     -- the counter, `startedAt` and `duration` still describe the previous one.
+    --
+    -- AND NOT ON THE SEEDING RENDER. That render is where the placeholder zeros are replaced by
+    -- the balance the player already had, so `view.plate.points` legitimately differs from the
+    -- last one — but nothing MOVED, and a plate that reveals itself unprompted on join is the
+    -- "normally hidden" rule broken on arrival. `lastPlatePoints ~= nil` still covers the very
+    -- first render; `seededNow` covers the one the profile lands on. If the profile never lands
+    -- there is no seeding render, and every change reveals exactly as it does today.
     if
-        lastPlatePoints ~= nil
+        not seededNow
+        and lastPlatePoints ~= nil
         and (view.plate.points ~= lastPlatePoints or view.plate.streak ~= lastPlateStreak)
     then
         revealPlate()

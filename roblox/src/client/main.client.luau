@@ -258,6 +258,12 @@ local function publish()
         -- The world's throw for the round the drum has FINISHED revealing, or nil. Gated by the
         -- same `revealedRoundId` the tape is, so the ring cannot spoil the wheel mid-spin.
         worldThrow = revealedWorldThrow,
+        -- Render-only, the same class of fact as `timerKnown`: whether the server's join fetch has
+        -- actually answered with this player's profile, or the wallet above is still the placeholder
+        -- zeros this script starts with. HudController seeds its counters on the first render this is
+        -- true rather than counting to the balance from those zeros — see `seedCounter` there. It is
+        -- NOT a HudModel input: nothing in `HudModel.view` derives anything from it.
+        profileSeen = profileSeen,
     })
 end
 
