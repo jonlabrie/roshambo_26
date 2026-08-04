@@ -177,8 +177,11 @@ describe("RollingNumber.valueAt — the easing is a payoff, not a decay", functi
 
     test("and settles rather than stopping dead", function()
         -- Symmetric with the wind-up: the last quarter of the time covers well under a quarter
-        -- of the distance.
+        -- of the distance. Upper bound is 90, not just "under 100": smoothstep(0.75) = 84 but the
+        -- old ease-out this replaces gives 94 here, so a loose bound (e.g. < 95) would admit both
+        -- curves and never catch a regression back to ease-out. 90 sits between the two with a
+        -- real margin on both sides.
         expect(RollingNumber.valueAt(0, 100, 0.75) > 75).toBe(true)
-        expect(RollingNumber.valueAt(0, 100, 0.75) < 95).toBe(true)
+        expect(RollingNumber.valueAt(0, 100, 0.75) < 90).toBe(true)
     end)
 end)
