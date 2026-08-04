@@ -576,7 +576,7 @@ end
 -- a destination that does not exist.
 --
 -- No UIStroke on the label. Contrast comes from the opaque backing behind it (see the spec's
--- §3): an outline on 13px type fills the counters in and reads as a smear.
+-- §3): an outline on TextScaled type this size fills the counters in and reads as a smear.
 local undoPill = Instance.new("Frame")
 undoPill.Name = "UndoPrompt"
 undoPill.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -607,11 +607,12 @@ undoLabel.Text = "UNDO?"
 undoLabel.ZIndex = 5
 undoLabel.Parent = undoPill
 
--- TextScaled + a MaxTextSize constraint, same pattern as `bankButton`. The old copy was seven
--- characters in a 36px content box on a phone and clipped to roughly "WITC"; five characters in
--- the same box land near 13px, which reads. The constraint caps growth on the wide tier — at
--- desktop's 68px content box, five characters of GothamBold cap out near 22px, and higher would
--- clip the word on the wide tier instead of the narrow one.
+-- TextScaled + a MaxTextSize constraint, same pattern as `bankButton`. The pill is BTN_W x BTN_H
+-- with no padding, so the content box is the full button: 44px on the touch tier, 76px on
+-- desktop. "UNDO?" fills the touch tier's 44px box comfortably. The constraint caps growth on
+-- the wide tier — at desktop's 76px content box, five characters of GothamBold cap out near
+-- 22px, and higher would clip the word on the wide tier instead of the narrow one. If MaxTextSize
+-- ever needs to move, compute it from these box widths, not from the old 24px pill's numbers.
 undoLabel.TextScaled = true
 do
     local constraint = Instance.new("UITextSizeConstraint")
@@ -659,6 +660,14 @@ local function paintThrows(pick: string?, enabled: boolean, prompted: string?)
         elseif sym == prompted then
             -- Lifted OUT of the dimmed state: this button is carrying a question, and a
             -- question on a greyed-out control reads as unanswerable.
+            --
+            -- CURRENTLY INVISIBLE. `undoPill` is opaque WASHI at this exact rect and ZIndex, with
+            -- its own SEL_BLUE stroke standing in for the rim below — and `paintThrows` and
+            -- `setUndoPrompt` are always driven by the same value in the same `render` pass, so
+            -- this branch is fully occluded every time it runs. It stays as the fallback for a
+            -- smaller or translucent pill: if `undoPill` is ever shrunk or given transparency,
+            -- this paint is what shows through, and nobody has laid eyes on it since 2026-08-02.
+            -- Anyone changing the pill's size or opacity should look at this branch first.
             t.button.BackgroundColor3 = IVORY
             t.button.BackgroundTransparency = 0
             tintGlyph(t.glyph, INK, GLYPH_OUTLINE)
@@ -952,8 +961,11 @@ corner(ring, 8)
 -- A concentric circle inside the ring button. UICorner at scale 0.5 is a true, antialiased
 -- circle at any diameter — which is the whole reason this construction replaces 36 rotated
 -- rectangles. Active = false: the ring BUTTON sinks, nothing inside it does.
-local function ringCircle(diameter: number, color: Color3, zIndex: number): Frame
+local function ringCircle(diameter: number, color: Color3, zIndex: number, name: string?): Frame
     local f = Instance.new("Frame")
+    if name then
+        f.Name = name
+    end
     f.Active = false
     f.AnchorPoint = Vector2.new(0.5, 0.5)
     f.Position = UDim2.fromScale(0.5, 0.5)
@@ -971,8 +983,8 @@ end
 -- A half-disc: a full circle whose UIGradient.Transparency steps hard at offset 0.5, so only
 -- half of it paints. Rotating the GRADIENT (never the Frame) sweeps the cut. See RingTimer's
 -- header for the angle derivation: UIGradient.Rotation = arcStart + 180.
-local function ringHalf(diameter: number, color: Color3, zIndex: number): (Frame, UIGradient)
-    local f = ringCircle(diameter, color, zIndex)
+local function ringHalf(diameter: number, color: Color3, zIndex: number, name: string?): (Frame, UIGradient)
+    local f = ringCircle(diameter, color, zIndex, name)
     local g = Instance.new("UIGradient")
     -- 0.4999 -> 0.5 rather than a single keypoint: NumberSequence interpolates between
     -- keypoints, so the step has to be narrow rather than instantaneous. At this width the
@@ -989,9 +1001,9 @@ end
 
 -- ZIndex is load-bearing here, not decoration: half B paints back over half A, and the disc
 -- punches the annulus out of both. Siblings at equal ZIndex have no defined order.
-ringCircle(RING_OD, RING_TRACK, 1)
-local ringHalfA, ringGradA = ringHalf(RING_OD, RING_LIVE, 2)
-local ringHalfB, ringGradB = ringHalf(RING_OD, RING_TRACK, 3)
+ringCircle(RING_OD, RING_TRACK, 1, "Track")
+local ringHalfA, ringGradA = ringHalf(RING_OD, RING_LIVE, 2, "SweepA")
+local ringHalfB, ringGradB = ringHalf(RING_OD, RING_TRACK, 3, "SweepB")
 
 -- The centre. OPAQUE, and that is a requirement rather than a preference: the pie behind it is
 -- solid, so at the old 0.15 the sweep bleeds through as a hard seam straight across the digits
