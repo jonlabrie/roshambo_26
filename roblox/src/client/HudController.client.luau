@@ -933,12 +933,17 @@ ring.AnchorPoint = Vector2.new(1, 1)
 ring.Position = UDim2.new(1 - JUMP_CLEARANCE, -(AREA_W + RING_GAP), 1, -(EDGE_BOTTOM + AREA_H - BTN_H))
 ring.Size = UDim2.fromOffset(RING_D, RING_D)
 -- The backing (owner's gate, design §5 "The ring sits on a backing"): a thin arc had nothing to
--- hold it against the moving canyon. Same neutral/transparency and the SAME corner radius as a
--- throw button (`corner(b, 8)` below) so the row reads as four elements of one family — painted
--- directly on the button itself, exactly how the throw buttons carry their own resting fill,
--- rather than a separate sibling frame.
-ring.BackgroundColor3 = IVORY_DIM
-ring.BackgroundTransparency = 0.25
+-- hold it against the moving canyon. WASHI at 0.3 — exactly the hamburger's own fill before Task
+-- 5 deleted it (`ledgerButton.BackgroundColor3 = WASHI, BackgroundTransparency = 0.3`), and the
+-- SAME fill the plate, the bank button and the escalation prompt all use. The ring replaced the
+-- hamburger, so it inherits its treatment rather than borrowing IVORY_DIM — that colour is the
+-- throw buttons' DISABLED state (see `-- starts disabled` below and `paintThrows`'s can't-throw
+-- branch), and painting the ring with it would read as a permanently greyed-out button beside
+-- three buttons that use that exact fill to mean "you can't press this". Same corner radius as a
+-- throw button (`corner(b, 8)` below) so the row still reads as four elements of one family —
+-- painted directly on the button itself, not a separate sibling frame.
+ring.BackgroundColor3 = WASHI
+ring.BackgroundTransparency = 0.3
 ring.Parent = gui
 corner(ring, 8)
 
@@ -971,6 +976,12 @@ end
 local RING_DISC_GAP = 2
 local RING_DISC_D = 2 * (RING_R - RING_THICKNESS / 2 - RING_DISC_GAP)
 
+-- Same WASHI constant as the ring's own backing above, but NOT redundant with it: the two
+-- transparencies stack. The backing alone renders at ~70% opaque WASHI (BackgroundTransparency
+-- 0.3); the disc sits on top of it, so its own 0.15 compounds to ~95.5% opaque WASHI
+-- (1 - 0.15 * 0.3) over that same patch of canyon. That is a real, visible darkening — the
+-- digits and glyph sit on a patch close to solid WASHI, while the ring reads as a lighter,
+-- translucent wash between the disc and the segments. Keep it.
 local ringDisc = Instance.new("Frame")
 ringDisc.Name = "Disc"
 ringDisc.Active = false
