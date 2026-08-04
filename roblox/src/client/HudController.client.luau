@@ -666,7 +666,11 @@ type ThrowTile = { button: TextButton, glyph: Frame, rim: UIStroke, halo: Frame,
 local throwTiles: { [string]: ThrowTile } = {}
 for i, sym in THROWS do
     -- The chosen tile's glow. A SIBLING of the button at ZIndex 0, not a child: under the default
-    -- Sibling ZIndexBehavior a child always draws ABOVE its parent, so a halo parented to the button
+    -- FALSE PREMISE, kept visible on purpose: this said "under Sibling ZIndexBehavior a child
+    -- always draws ABOVE its parent". This gui is GLOBAL (see the ring's glyph block) — nothing
+    -- here sets ZIndexBehavior, and Instance.new's default is Global. The halo happens to land
+    -- correctly anyway (ZIndex 0 against the button's default 1), so this is right by accident,
+    -- not by the rule it cites. Do not reason from it. Under Global a halo parented to the button
     -- would sit on top of the glyph instead of behind the tile. A Frame, and left at its default
     -- Active = false — the interactive budget on this surface is the three buttons, the one bank
     -- button and the ledger door, and every sinking pixel is a permanent hole in the camera-drag
@@ -1277,6 +1281,25 @@ do
     for _, sym in THROWS do
         local g = Glyphs.render(box, sym, INK_CREAM)
         g.Visible = false
+        -- LIFT THE WHOLE SUBTREE, not just the box (bug, 2026-08-04: the glyph never appeared —
+        -- the ring showed a plain black disc for the whole reveal).
+        --
+        -- `Instance.new("ScreenGui")` defaults ZIndexBehavior to **Global**, not Sibling — every
+        -- ScreenGui in this codebase is Global, because none of them set it. Under Global a child
+        -- does NOT draw above its parent; every element is ordered by its own ZIndex against every
+        -- other element in the gui. `Glyphs.render` builds its root and its two ImageLabels at the
+        -- default ZIndex 1, and setting `box.ZIndex` does not propagate to them.
+        --
+        -- That was harmless while the disc was ZIndex 1 and translucent. Task 3 of round three made
+        -- it ZIndex 4 AND opaque, which put an opaque black disc in front of a ZIndex-1 glyph. The
+        -- digits kept working the whole time because `ringCount` sets ZIndex 5 on itself — which is
+        -- exactly what disguised it.
+        g.ZIndex = 5
+        for _, layer in g:GetChildren() do
+            if layer:IsA("ImageLabel") then
+                layer.ZIndex = 5
+            end
+        end
         ringGlyphs[sym] = g
     end
 end
