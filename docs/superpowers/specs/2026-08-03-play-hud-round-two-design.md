@@ -17,7 +17,7 @@ player's own outcome and otherwise get out of the way.**
 | 3 | Round detail — crowd split, player count — moves to the top of the ledger |
 | 4 | `SWITCH?` fills its button (an overlay, not a move) and expires in 1s |
 | 5 | A PWA-style circular round timer replaces the bottom hairline |
-| 6 | The wallet plate moves left of the ring and becomes tappable |
+| 6 | The ring replaces the hamburger as the ledger's door; the plate moves left and becomes tappable |
 | 7 | With the hairline gone, the whole cluster moves down |
 
 ---
@@ -140,16 +140,40 @@ Where the countdown is unknown — the unsynced-clock path, where `secondsLeft` 
 the ring shows no sweep at all rather than a full ring that never moves. `timerKnown` already
 carries this.
 
-## §6 — The wallet plate moves left and becomes a door
+## §6 — The ring replaces the hamburger, and the plate moves left
 
-The ring takes the plate's slot, immediately left of the tape. The plate moves left of the
-ring. Bottom row, left to right: **plate → ring → tape**.
+The ring takes the plate's slot, immediately left of the tape. The plate moves left of the ring.
+Bottom row, left to right: **plate → ring → tape**.
 
-The plate is **tappable again** when visible, opening the ledger. This is safe now in a way it
-was not before: the reason it went inert was that it had moved into the strip Roblox uses for
-camera drag, and it is no longer there. So the ledger has two doors — the `≡` (two-stage) and
-the plate itself whenever it is showing. Tapping `≡` then the plate is the same two taps as
-double-tapping `≡`, and either works.
+**The `≡` button is deleted, and the ring inherits its behaviour.** The owner's reasoning:
+
+> the hamburger is already confusing, because there's already another one (the Roblox default
+> one) on screen.
+
+Ours is the *fake* one. Roblox's unibar owns that glyph top-left, so a second one bottom-right
+reads as either the same menu or a broken copy of it. This design also deleted the teahouse's
+persistent corner button for precisely this reason, and then added one back — the ring lets us
+stop paying that cost at all.
+
+The semantic fit is better than it first appears. **The ring is the round** — its clock, and its
+world throw once the drum settles — and since §3 the ledger is the round's *detail*. "Tap the
+round to see the round" holds together in a way "tap the hamburger" never did.
+
+Tapping the ring is **two-stage, exactly as the `≡` was**: the first tap reveals the wallet plate,
+and a second tap while anything is still on screen — hold or fade — opens the ledger. The plate is
+**also tappable** whenever it is visible. Two routes in, and tapping the ring then the plate is
+the same two taps as double-tapping the ring.
+
+The plate being tappable is safe now in a way it was not before: it went inert only because it had
+moved into the strip Roblox uses for camera drag, and it has left.
+
+### Teaching it
+
+A ring that looks like a readout does not invite a tap, and the owner named this as the risk. The
+answer is already built: **the onboarding beats**. One beat is repointed at the ring and fired the
+first time a result lands — the moment the gesture becomes useful. That is what those bones exist
+for, and it beats a permanent hint, which would put back the very persistent chrome this change
+removes.
 
 ## §7 — The hairline goes, and everything moves down
 
@@ -210,8 +234,11 @@ intrude; and whether the halved escalation still commands attention.
    result.
 6. **The plate becomes a door again.** It went inert only because it was in the camera-drag
    strip, and it has left.
-7. **The ring and the escalation share `ESCALATE_AT`.** One threshold expressed twice, never two
+7. **The hamburger is deleted and the ring inherits it.** Roblox's unibar already owns that glyph;
+   ours was the fake one. Discoverability is answered by an onboarding beat rather than by
+   permanent chrome, which is what the change exists to remove.
+8. **The ring and the escalation share `ESCALATE_AT`.** One threshold expressed twice, never two
    alarms about the same fact.
-8. **`SWITCH?` covers the glyph beneath it, deliberately.** Confirming a switch unlocks and never
+9. **`SWITCH?` covers the glyph beneath it, deliberately.** Confirming a switch unlocks and never
    selects, so that glyph is not a destination — both unchosen buttons are switch-and-cancel
    proxies. Revealing it would advertise a destination that does not exist.

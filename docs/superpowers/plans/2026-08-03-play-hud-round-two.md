@@ -6,7 +6,7 @@
 detail into the ledger, and make the HUD smaller and easier to dismiss.
 
 **Architecture:** One new pure module (`RingTimer`) and one new controller
-(`SplashController`). `HudModel` gains a shared `ESCALATE_AT` so the ring and the escalation
+(`SplashController`). The ring absorbs the hamburger's job and the hamburger is deleted. `HudModel` gains a shared `ESCALATE_AT` so the ring and the escalation
 prompt cannot disagree. Everything else is change to `HudController`, `LedgerController` and the
 preference plumbing.
 
@@ -432,8 +432,13 @@ local RING_THICKNESS = HudLayout.RING_THICKNESS
 local RING_R = RING_D / 2 - RING_THICKNESS / 2
 local SEG_W = RingTimer.segmentWidth(RING_R, RingTimer.SEGMENTS)
 
-local ring = Instance.new("Frame")
+-- A BUTTON, not a Frame: the ring is the ledger's door now (spec §6). The hamburger it replaces
+-- is deleted in Task 5. Its segments and labels all stay Active = false; only this outer frame
+-- sinks, which is the same interactive cost the hamburger carried, in the same row.
+local ring = Instance.new("TextButton")
 ring.Name = "RoundRing"
+ring.AutoButtonColor = false
+ring.Text = ""
 ring.AnchorPoint = Vector2.new(1, 1)
 ring.Position = UDim2.new(1 - JUMP_CLEARANCE, -(TAPE_W + RING_GAP), 1, -EDGE)
 ring.Size = UDim2.fromOffset(RING_D, RING_D)
@@ -530,11 +535,22 @@ and cleared when ACTIVE reopens.
 
 In `render`, show the glyph and hide the digits when `aux.worldThrow` is set, and vice versa.
 
+- [ ] **Step 4b: The ring inherits the hamburger's two-stage gesture**
+
+Move the `ledgerButton`'s `MouseButton1Down` (press feedback) and `MouseButton1Click` handlers
+onto `ring`, unchanged in behaviour: the first tap reveals the plate, and a tap while the plate is
+still on screen — hold **or** fade — fires `EventBus.OpenLedger`. Read the existing handler and
+port its `plateVisible` test rather than rewriting the rule.
+
+Keep `ledgerButton` itself in place for now; Task 5 deletes it. Two doors briefly coexisting is
+harmless, whereas a task that both adds and removes the door cannot be reviewed against either.
+
 - [ ] **Step 5: Verify and commit**
 
 Run the standing check. Additionally confirm: at `secondsLeft = span` every segment is lit; at 0
 none is; and the bottom row's three occupants — plate, ring, tape — do not overlap. **State the
-full horizontal arithmetic at both tiers**, since the plate moved in this same commit.
+full horizontal arithmetic at both tiers**, since the plate moved in this same commit. Confirm the
+ring's segments and labels are all `Active = false` and only the outer button sinks.
 
 ```bash
 cd roblox && stylua src tests tools && selene src tools
@@ -543,7 +559,7 @@ git commit -am "feat(roblox): the round's clock is a ring, not a hairline"
 
 ---
 
-### Task 5: The hairline goes, the cluster moves down, the plate becomes a door
+### Task 5: The hairline and the hamburger go, the cluster moves down, the plate becomes a door
 
 **Files:** Modify `roblox/src/client/HudController.client.luau`.
 
@@ -597,12 +613,38 @@ The `plateVisible` guard matters: the plate is `Visible = false` most of the tim
 button cannot be clicked — but the guard also covers the fade, where it is still technically
 visible while on its way out.
 
+- [ ] **Step 3b: Delete the hamburger**
+
+Remove `ledgerButton`, its three bar Frames, and `LEDGER_SIZE`, `LEDGER_GAP`, `LEDGER_BAR_H`,
+`LEDGER_BAR_GAP`, `LEDGER_BAR_INSET`, `LEDGER_BARS_H`. Its handlers moved to the ring in Task 4.
+
+`LEDGER_GAP` is read by the plate's old position — that read is already gone, replaced by
+`RING_GAP` in Task 4. Confirm before deleting; selene will catch an orphan but not a missing one.
+
+```luau
+-- The hamburger is gone (spec §6). Roblox's own unibar already owns that glyph top-left, so a
+-- second one bottom-right read as either the same menu or a broken copy — ours was the fake one.
+-- The ring inherited the gesture: it IS the round, and since the LAST ROUND band the ledger is
+-- the round's detail.
+```
+
+- [ ] **Step 3c: Repoint an onboarding beat at the ring**
+
+A ring that looks like a readout does not invite a tap. In `roblox/src/shared/OnboardingBeats.luau`,
+repoint the beat that currently anchors at `wallet` so its copy teaches the gesture — something to
+the effect of "Tap the clock for your points. Tap again for everything." Fire it where it is
+already fired; do not add a new event.
+
+Update `roblox/tests/OnboardingBeats.spec.luau` accordingly, and confirm the anchor still resolves
+in `OnboardingController`'s `STATIC_ANCHORS`. Write the test first and watch it fail.
+
 - [ ] **Step 4: Verify and commit**
 
 Run the standing check. State the bottom row's full horizontal arithmetic at both tiers —
 plate, ring, tape — and confirm no overlap and nothing pushed off the left edge on a 320px-wide
-viewport. Confirm `EventBus.OpenLedger:Fire` now occurs **twice** in `src/client/` (the hamburger
-and the plate) and that both are guarded.
+viewport. Confirm `EventBus.OpenLedger:Fire` occurs **exactly twice** in `src/client/` — the ring
+and the plate — and that both are guarded. Confirm no `LEDGER_*` constant and no `ledgerButton`
+survives.
 
 ```bash
 cd roblox && stylua src tests tools && selene src tools
