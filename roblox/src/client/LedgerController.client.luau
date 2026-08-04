@@ -33,8 +33,9 @@
 --
 -- This file RENDERS LedgerModel; it computes nothing the model already gives it. main.client.luau
 -- owns the wiring and fires EventBus.LedgerState{ counters, live, bestStreak, escalationPrompts,
--- resultSplash }. The preference switches travel back on EventBus.HudPreference, banking on
--- EventBus.HudBank.
+-- resultSplash, lastRound }. The preference switches travel back on EventBus.HudPreference,
+-- banking on EventBus.HudBank. `lastRound` (Task 9) is nil until main.client.luau has seen its
+-- first drum-rest reveal, and drives the LAST ROUND band above the hero band — see `heroTop`.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
@@ -121,6 +122,20 @@ local function label(parent: Instance, text: string, size: number, color: Color3
     return l
 end
 
+-- One coloured segment inside a bar TRACK. Shared by the lifetime WIN/SAFE/LOSS bar and (Task 9)
+-- the LAST ROUND band's crowd-split bar, so a third caller never has to reinvent this — both are
+-- painted from a `LedgerModel.shares` triple that already sums to exactly 100, laid end to end by
+-- scale, with no gap and no overrun.
+local function barSegment(track: Frame, name: string, color: Color3): Frame
+    local f = Instance.new("Frame")
+    f.Name = name
+    f.Size = UDim2.fromScale(0, 1)
+    f.BackgroundColor3 = color
+    f.BorderSizePixel = 0
+    f.Parent = track
+    return f
+end
+
 -- Tap outside the panel closes. A TextButton is the catcher, and it blackens the world behind —
 -- which is what a takeover is.
 local scrim = Instance.new("TextButton")
@@ -144,8 +159,9 @@ panel.Size = UDim2.fromScale(0.94, 0.94)
 panel.BackgroundColor3 = WASHI
 panel.BackgroundTransparency = 0.05
 panel.BorderSizePixel = 0
--- NOTHING LEAVES THE PANEL. The body's height is whatever is left after the header, hero, tabs and
--- preferences footer have taken theirs, and on a short landscape phone that is a few dozen pixels —
+-- NOTHING LEAVES THE PANEL. The body's height is whatever is left after the header, the LAST ROUND
+-- band (when shown), hero, tabs and preferences footer have taken theirs, and on a short landscape
+-- phone that is a few dozen pixels —
 -- less than the cards' content. Without this the overflow drew straight through the footer and out
 -- past the panel's own outline, over the scrim and the world behind it. The cards scroll their
 -- content (see makeCard); this is the backstop that makes the panel's edge mean something.
@@ -230,10 +246,132 @@ teahouseButton.Parent = header
 corner(teahouseButton, 8)
 stroke(teahouseButton, GOLD, 1, 0.35)
 
+-- ===== Last Round band (Task 9, spec §3) =====
+-- The round detail that used to ride the transient toast: the world's throw, the player's own
+-- throw, the result, the crowd split as a three-way bar, and the player count. Above the hero
+-- band, below the header. HIDDEN when `lastRound` is nil — a fresh join has seen no reveal yet,
+-- and the band must hide rather than show zeros — in which case `heroTop()` below collapses back
+-- to `HEADER_H` and the hero band sits exactly where it does today.
+--
+-- `lastRound` (and `LAST_ROUND_H`/`heroTop`) are declared HERE, ahead of the hero band, because
+-- the hero band's own position depends on them, and Luau closures can only capture a local that
+-- is already in scope at the point the capturing function is defined.
+local lastRound: {
+    worldThrow: string,
+    pick: string?,
+    result: string?,
+    distribution: any?,
+    totalPlayers: number?,
+}? =
+    nil
+
+local LAST_ROUND_H = 128
+
+-- `heroTop()` is the one source of truth for where the hero band starts: HEADER_H when there is
+-- no last round to show, or HEADER_H plus the band's height and a gap when there is. Everything
+-- below (the hero band itself, and `bodyTop()` beneath it) reads THIS rather than re-deriving the
+-- same conditional, so a third call site can't drift out of sync with the other two.
+local function heroTop(): number
+    return HEADER_H + (if lastRound then LAST_ROUND_H + GAP else 0)
+end
+
+local lastRoundBand = Instance.new("Frame")
+lastRoundBand.Name = "LastRound"
+lastRoundBand.Position = UDim2.fromOffset(0, HEADER_H)
+lastRoundBand.Size = UDim2.new(1, 0, 0, LAST_ROUND_H)
+lastRoundBand.BackgroundColor3 = WASHI_CARD
+lastRoundBand.BackgroundTransparency = 0.15
+lastRoundBand.BorderSizePixel = 0
+lastRoundBand.Visible = false
+lastRoundBand.Parent = panel
+corner(lastRoundBand, 8)
+stroke(lastRoundBand, TAN_RIM, 1, 0.55)
+
+local lastRoundCaption = label(lastRoundBand, "LAST ROUND", 11, GOLD, Enum.Font.GothamBold)
+lastRoundCaption.Position = UDim2.fromOffset(PAD, 8)
+lastRoundCaption.Size = UDim2.fromOffset(200, 13)
+lastRoundCaption.TextTransparency = 0.2
+
+-- One glyph box per symbol, per side, built ONCE and toggled by `.Visible` — the same pattern
+-- HudController's round ring and the tape's per-round badges use, so the world's throw and the
+-- player's own throw can change every round without rebuilding an ImageLabel every round.
+local function glyphCell(x: number, caption: string): { [string]: Frame }
+    local holder = Instance.new("Frame")
+    holder.Name = caption
+    holder.Position = UDim2.fromOffset(x, 24)
+    holder.Size = UDim2.fromOffset(64, 66)
+    holder.BackgroundTransparency = 1
+    holder.Parent = lastRoundBand
+
+    local cap = label(holder, caption, 10, GOLD, Enum.Font.GothamBold)
+    cap.Size = UDim2.new(1, 0, 0, 12)
+    cap.TextTransparency = 0.2
+    cap.TextXAlignment = Enum.TextXAlignment.Center
+
+    local box = Instance.new("Frame")
+    box.Name = "GlyphBox"
+    box.Position = UDim2.fromOffset(12, 16)
+    box.Size = UDim2.fromOffset(40, 40)
+    box.BackgroundTransparency = 1
+    box.Parent = holder
+
+    local glyphs: { [string]: Frame } = {}
+    for _, sym in THROWS do
+        local g = Glyphs.render(box, sym, GOLD, INK)
+        g.Visible = false
+        glyphs[sym] = g
+    end
+    return glyphs
+end
+
+local worldGlyphs = glyphCell(PAD, "WORLD")
+local youGlyphs = glyphCell(PAD + 80, "YOU")
+
+-- No R/P/S palette exists yet in this file (only the WIN/SAFE/LOSS triad does) — reusing that
+-- triad here borrows its visual identity (three already-distinct, already-approved colours) for a
+-- different three-way split, deliberately, rather than inventing a fourth pair of colours to gate
+-- for one band.
+-- `{ [string]: Color3 }`, not the inferred fixed-shape record: it is indexed below by whatever
+-- string `lastRound.result` holds, and under `--!strict` a fixed-shape table has no `[string]`
+-- indexer (see `resolved` in main.client.luau for the same fix, same reason).
+local RESULT_COLOR: { [string]: Color3 } = { WIN = WIN_GREEN, SAFE = GOLD, LOSS = LOSS_RED }
+
+local RESULT_COL_X = PAD + 172
+local resultLabel = label(lastRoundBand, "", 20, INK_CREAM, Enum.Font.GothamBlack)
+resultLabel.Position = UDim2.fromOffset(RESULT_COL_X, 26)
+resultLabel.Size = UDim2.new(1, -(RESULT_COL_X + PAD), 0, 28)
+
+local playersLabel = label(lastRoundBand, "", 12, INK_CREAM, Enum.Font.Gotham)
+playersLabel.Position = UDim2.fromOffset(RESULT_COL_X, 58)
+playersLabel.Size = UDim2.new(1, -(RESULT_COL_X + PAD), 0, 16)
+playersLabel.TextTransparency = 0.35
+
+-- The crowd-split three-way bar. Segments come from `LedgerModel.shares` (the SAME
+-- largest-remainder apportionment the lifetime WIN/SAFE/LOSS bar below uses), so laying them end
+-- to end by scale leaves no gap and no overrun.
+local roundBarTrack = Instance.new("Frame")
+roundBarTrack.Name = "RoundBar"
+roundBarTrack.Position = UDim2.fromOffset(PAD, 96)
+roundBarTrack.Size = UDim2.new(1, -(2 * PAD), 0, BAR_H)
+roundBarTrack.BackgroundColor3 = TRACK
+roundBarTrack.BorderSizePixel = 0
+roundBarTrack.ClipsDescendants = true
+roundBarTrack.Parent = lastRoundBand
+corner(roundBarTrack, 4)
+
+local roundRSeg = barSegment(roundBarTrack, "R", WIN_GREEN)
+local roundPSeg = barSegment(roundBarTrack, "P", GOLD)
+local roundSSeg = barSegment(roundBarTrack, "S", LOSS_RED)
+
+local roundBarLegend = label(lastRoundBand, "", 11, INK_CREAM, Enum.Font.Gotham)
+roundBarLegend.Position = UDim2.fromOffset(PAD, 112)
+roundBarLegend.Size = UDim2.new(1, -(2 * PAD), 0, 14)
+roundBarLegend.TextTransparency = 0.3
+
 -- ===== Hero band =====
 local hero = Instance.new("Frame")
 hero.Name = "Hero"
-hero.Position = UDim2.fromOffset(0, HEADER_H)
+hero.Position = UDim2.fromOffset(0, heroTop())
 hero.Size = UDim2.new(1, 0, 0, HERO_H)
 hero.BackgroundColor3 = WASHI_CARD
 hero.BackgroundTransparency = 0.15
@@ -296,11 +434,16 @@ corner(bankButton, 6)
 stroke(bankButton, GOLD, 1, 0.3)
 
 -- ===== Body: three cards, or two plus a tab when the screen is narrow =====
-local BODY_TOP = HEADER_H + HERO_H + GAP
+-- A FUNCTION, not a literal, because it re-derives from `heroTop()` — which itself moves whenever
+-- the LAST ROUND band's visibility changes. Carrying the old `HEADER_H + HERO_H + GAP` literal
+-- forward would overlap the body with the band the moment `lastRound` stopped being nil.
+local function bodyTop(): number
+    return heroTop() + HERO_H + GAP
+end
 
 local tabs = Instance.new("Frame")
 tabs.Name = "Tabs"
-tabs.Position = UDim2.fromOffset(0, BODY_TOP)
+tabs.Position = UDim2.fromOffset(0, bodyTop())
 tabs.Size = UDim2.new(1, 0, 0, TABS_H)
 tabs.BackgroundTransparency = 1
 tabs.Visible = false
@@ -418,19 +561,9 @@ barTrack.ClipsDescendants = true
 barTrack.Parent = lifetimeBody
 corner(barTrack, 4)
 
-local function barSegment(name: string, color: Color3): Frame
-    local f = Instance.new("Frame")
-    f.Name = name
-    f.Size = UDim2.fromScale(0, 1)
-    f.BackgroundColor3 = color
-    f.BorderSizePixel = 0
-    f.Parent = barTrack
-    return f
-end
-
-local winSeg = barSegment("Win", WIN_GREEN)
-local safeSeg = barSegment("Safe", GOLD)
-local lossSeg = barSegment("Loss", LOSS_RED)
+local winSeg = barSegment(barTrack, "Win", WIN_GREEN)
+local safeSeg = barSegment(barTrack, "Safe", GOLD)
+local lossSeg = barSegment(barTrack, "Loss", LOSS_RED)
 
 local LEGEND_TOP = BAR_TOP + BAR_H + 5
 local LEGEND_H = 14
@@ -649,10 +782,18 @@ local function viewportWidth(): number
 end
 
 local function applyLayout()
+    -- Re-derive the whole vertical stack from `lastRound`'s presence, not just the body: the band
+    -- itself, the hero band beneath it, and everything the body/tabs depend on via `bodyTop()`.
+    -- Called on every viewport change AND every LedgerState update (below), so a round revealing
+    -- while the panel is open shifts the hero down live rather than only on the next open().
+    lastRoundBand.Visible = lastRound ~= nil
+    hero.Position = UDim2.fromOffset(0, heroTop())
+    tabs.Position = UDim2.fromOffset(0, bodyTop())
+
     local narrow = viewportWidth() < NARROW_PX
     tabs.Visible = narrow
 
-    local top = BODY_TOP + (if narrow then TABS_H + 8 else 0)
+    local top = bodyTop() + (if narrow then TABS_H + 8 else 0)
     body.Position = UDim2.fromOffset(0, top)
     body.Size = UDim2.new(1, 0, 1, -(top + FOOTER_H + GAP))
 
@@ -753,6 +894,31 @@ local function render()
     mixRows.P.count.Text = `{view.lifetime.throwsP} thrown`
     mixRows.S.count.Text = `{view.lifetime.throwsS} thrown`
 
+    -- LAST ROUND band content. Visibility itself is `applyLayout`'s job (it also moves the hero
+    -- band), but the content only needs painting when there is content — a hidden band left with
+    -- last round's stale text would be harmless, but reading into a nil `lastRound` would not be.
+    if lastRound then
+        for _, sym in THROWS do
+            worldGlyphs[sym].Visible = sym == lastRound.worldThrow
+            youGlyphs[sym].Visible = lastRound.pick ~= nil and sym == lastRound.pick
+        end
+        local result = lastRound.result
+        resultLabel.Text = result or "\u{2014}" -- em dash: this player had no throw counted
+        resultLabel.TextColor3 = (result and RESULT_COLOR[result]) or INK_CREAM
+        local totalPlayers = lastRound.totalPlayers or 0
+        playersLabel.Text = `{totalPlayers} PLAYER{if totalPlayers == 1 then "" else "S"}`
+
+        local dist = lastRound.distribution or { R = 0, P = 0, S = 0 }
+        local roundShares = LedgerModel.shares({ dist.R, dist.P, dist.S })
+        roundRSeg.Position = UDim2.fromScale(0, 0)
+        roundRSeg.Size = UDim2.fromScale(roundShares[1] / 100, 1)
+        roundPSeg.Position = UDim2.fromScale(roundShares[1] / 100, 0)
+        roundPSeg.Size = UDim2.fromScale(roundShares[2] / 100, 1)
+        roundSSeg.Position = UDim2.fromScale((roundShares[1] + roundShares[2]) / 100, 0)
+        roundSSeg.Size = UDim2.fromScale(roundShares[3] / 100, 1)
+        roundBarLegend.Text = `R {roundShares[1]}%  ·  P {roundShares[2]}%  ·  S {roundShares[3]}%`
+    end
+
     paintSwitch()
 end
 
@@ -836,7 +1002,15 @@ EventBus.LedgerState.Event:Connect(function(state)
     if type(state.resultSplash) == "boolean" then
         resultSplash = state.resultSplash
     end
+    -- Unconditional, unlike the guarded fields above: `state.lastRound` is either a round's worth
+    -- of detail or nil, and BOTH are meaningful, current answers (nil means "still no reveal seen
+    -- this session"), never "no update happened" the way an absent `counters` would be.
+    lastRound = state.lastRound
     if isOpen then
+        -- `applyLayout` FIRST: `lastRound`'s presence may have just changed, which moves the hero
+        -- band and everything under it. `render` alone would repaint the band's numbers without
+        -- ever making room for it.
+        applyLayout()
         render()
     end
 end)

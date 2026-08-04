@@ -23,9 +23,11 @@
 --              worldThrow = string? }
 -- and takes picks back on `EventBus.HudPick`. Transient notices go out on `EventBus.Toast`.
 --
--- The MAXIMAL panel gets its own channel, `EventBus.LedgerState`, fired only when ProfileUpdate
--- lands: the nine persisted counters, the live wallet, bestStreak and the two HUD preferences
--- (escalationPrompts, resultSplash). Its controls come back on `EventBus.HudPreference` and go out
+-- The MAXIMAL panel gets its own channel, `EventBus.LedgerState`, fired both when ProfileUpdate
+-- lands AND at every drum-rest reveal (Task 9): the nine persisted counters, the live wallet,
+-- bestStreak, the two HUD preferences (escalationPrompts, resultSplash), and `lastRound` — the
+-- LAST ROUND band's detail (worldThrow, pick, result, distribution, totalPlayers), nil until this
+-- client has seen its first reveal. Its controls come back on `EventBus.HudPreference` and go out
 -- on `SetHudPreference` — one remote for every preference, never one per switch.
 --
 -- BANK THESE (the pot indicator's only button) comes back on `EventBus.HudBank` and goes out on
@@ -97,6 +99,24 @@ local declinedThisRound = false
 -- The nine persisted ledger counters, carried by ProfileUpdate. The maximal panel is the only
 -- reader; the minimal HUD never sees them.
 local counters: { [string]: number }? = nil
+
+-- The ledger's LAST ROUND band (spec §3): the same five fields the toast used to carry, minus
+-- `forfeited` (the splash's own). Set once per round, in `maybeShowReveal`, at the SAME drum-rest
+-- gate `pendingReveal` observes — never read `pendingReveal` itself outside that function, since
+-- it is nil'd out the instant `maybeShowReveal` runs. UNLIKE `pendingReveal`, this PERSISTS across
+-- rounds, so `publishLedger`'s payload still has something to show between reveals. nil only
+-- until the FIRST round this client has seen revealed, so a fresh join hides the band rather than
+-- showing zeros to someone who just arrived. Declared here (well before `pendingReveal`, which is
+-- built for the same reveal) because `publishLedger` below closes over it, and Luau closures can
+-- only capture a local already in scope at the point the capturing function is defined.
+local lastRound: {
+    worldThrow: string,
+    pick: string?,
+    result: string?,
+    distribution: any?,
+    totalPlayers: number?,
+}? =
+    nil
 
 -- The onboarding beats the profile already carries, carried by ProfileUpdate. Passed alongside
 -- every EventBus.Onboard fire so OnboardingController can seed (and keep current) its local
@@ -253,6 +273,7 @@ local function publishLedger()
         bestStreak = wallet.bestStreak,
         escalationPrompts = escalationPrompts,
         resultSplash = resultSplash,
+        lastRound = lastRound,
     })
 end
 
@@ -276,13 +297,14 @@ end)
 -- The result splash AND the new tape tile wait for the drum to stop turning (the drumRest cue),
 -- so the throw is not spoiled mid-spin. The splash (SplashController) owns naming the personal
 -- result now — the old toast folded the vote distribution into the same headline it built here,
--- but that headline is gone; `distribution`/`totalPlayers` are kept below anyway (unused by this
--- file) because Task 9's ledger LAST ROUND band needs the SAME crowd-split/player-count data the
--- toast used to carry, and removing the toast must not remove the data it was reading from.
+-- but that headline is gone; `distribution`/`totalPlayers`/`pick` are captured anyway (`pick`
+-- unused by the splash) because Task 9's ledger LAST ROUND band needs the same crowd-split,
+-- player-count and personal-throw data the toast used to carry.
 local pendingReveal: {
     roundId: string?,
     result: string?,
     worldThrow: string,
+    pick: string?,
     distribution: any?,
     totalPlayers: number?,
     -- The pot as it stood before a LOSS cleared it. nil until the ProfileUpdate("local") handler
@@ -299,6 +321,16 @@ local function maybeShowReveal()
     if pendingReveal then
         local p = pendingReveal
         pendingReveal = nil
+        -- Task 9: stash the round detail for the ledger's LAST ROUND band. Unconditional (not
+        -- gated on `p.roundId`, unlike the badge below) so it updates for every revealed round
+        -- this client sees, participant or spectator alike.
+        lastRound = {
+            worldThrow = p.worldThrow,
+            pick = p.pick,
+            result = p.result,
+            distribution = p.distribution,
+            totalPlayers = p.totalPlayers,
+        }
         -- Badge this round by id and un-gate it in the tape now the drum's at rest.
         if p.roundId then
             if p.result then
@@ -338,6 +370,11 @@ local function maybeShowReveal()
             })
         end
         publish()
+        -- The ledger reads `lastRound` from EventBus.LedgerState, not the HudState `publish()`
+        -- above — without this call the panel would keep showing the PREVIOUS round's detail
+        -- until the next ProfileUpdate happened to fire publishLedger() again (a bank, or this
+        -- player's own next reveal), which for a spectator round might never come.
+        publishLedger()
     end
 end
 
@@ -505,6 +542,7 @@ RevealResult.OnClientEvent:Connect(function(r)
         roundId = roundId,
         result = r.result,
         worldThrow = r.worldThrow,
+        pick = r.pick,
         distribution = r.distribution,
         totalPlayers = r.totalPlayers,
     }

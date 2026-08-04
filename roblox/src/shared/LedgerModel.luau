@@ -31,7 +31,14 @@ export type View = {
 -- 99 or 101, which shows as a gap or an overrun in a segmented bar. This distributes the
 -- rounding error to the largest fractional parts so the total is exactly 100 -- except for an
 -- all-zero input, which returns all zeros: there is nothing to apportion and nothing to render.
-local function shares(parts: { number }): { number }
+--
+-- EXPORTED (Task 9) so LedgerController can apportion the LAST ROUND band's crowd-split bar with
+-- the SAME rule this file's own win-rate bar uses, rather than a second copy that disagrees with
+-- it on a tie. It is agnostic to what `parts` already are: fed raw counts OR fed an
+-- already-(naively)-rounded percentage triple, it renormalizes proportionally and still returns a
+-- triple that sums to exactly 100 -- which is what the round-detail payload hands it, since the
+-- server's own `distribution` is Math.round per-category and does not itself sum to 100.
+function LedgerModel.shares(parts: { number }): { number }
     local total = 0
     for _, p in parts do
         total += p
@@ -67,8 +74,8 @@ local function shares(parts: { number }): { number }
 end
 
 function LedgerModel.view(counters: Counters, live: Live, rules: any): View
-    local bar = shares({ counters.wins, counters.safes, counters.losses })
-    local mix = shares({ counters.throwsR, counters.throwsP, counters.throwsS })
+    local bar = LedgerModel.shares({ counters.wins, counters.safes, counters.losses })
+    local mix = LedgerModel.shares({ counters.throwsR, counters.throwsP, counters.throwsS })
     return {
         paysNext = rules.nextPot(live.pot, "WIN"),
         -- The headline win rate IS the bar's win segment, by definition rather than by a second

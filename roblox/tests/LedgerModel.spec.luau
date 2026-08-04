@@ -109,3 +109,42 @@ describe("LedgerModel.view", function()
         expect(v.live.points).toBe(1240)
     end)
 end)
+
+describe("LedgerModel.shares", function()
+    -- Task 9: the ledger's LAST ROUND band apportions the server's crowd-split `distribution`
+    -- with this SAME exported function rather than a second copy, so it can never disagree with
+    -- the win-rate bar on a tie.
+    test("is exported so a second caller can reuse it", function()
+        expect(type(LedgerModel.shares)).toBe("function")
+    end)
+
+    test("a 1/1/1 split sums to exactly 100, not 99", function()
+        -- The case naive independent rounding gets wrong: 1/3 -> 33.33... rounds to 33 for each
+        -- of three categories, summing to 99. Largest-remainder hands the leftover unit to the
+        -- first tied category instead.
+        local out = LedgerModel.shares({ 1, 1, 1 })
+        expect(out[1] + out[2] + out[3]).toBe(100)
+        expect(out[1]).toBe(34)
+        expect(out[2]).toBe(33)
+        expect(out[3]).toBe(33)
+    end)
+
+    test("re-apportions an already-rounded (server) triple that itself sums to 99", function()
+        -- The wire shape this function actually receives: RevealResult's `distribution` is the
+        -- server's OWN Math.round-per-category percentages (buildDistribution in
+        -- server/src/engine/Settlement.ts), which for a 1-1-1 vote split arrives as {33,33,33} --
+        -- already off by one. Feeding that back through `shares` must still land on exactly 100.
+        local out = LedgerModel.shares({ 33, 33, 33 })
+        expect(out[1] + out[2] + out[3]).toBe(100)
+        expect(out[1]).toBe(34)
+        expect(out[2]).toBe(33)
+        expect(out[3]).toBe(33)
+    end)
+
+    test("an all-zero split (nobody threw) returns all zeros, not NaN", function()
+        local out = LedgerModel.shares({ 0, 0, 0 })
+        expect(out[1]).toBe(0)
+        expect(out[2]).toBe(0)
+        expect(out[3]).toBe(0)
+    end)
+end)
