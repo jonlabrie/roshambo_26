@@ -147,6 +147,23 @@ as time runs short.
 second before or after the countdown appears would read as two separate alarms about the same
 fact, which is worse than either alone. One threshold, one signal, expressed twice.
 
+### The ring sits on a backing (owner's fourth gate)
+
+The ring read poorly against the moving canyon behind it — a thin arc over foliage, water and
+changing light has nothing to hold it. It gains a **backing plate the size of a throw button**,
+neutral and partly transparent, shaped like the throw buttons it sits beside.
+
+- the backing occupies the ring's full `BTN_H` / `BTN_H_TOUCH` square, so the row still reads as
+  four elements of one size
+- the **ring shrinks** to sit inside it with a margin
+- the **inner disc grows** to fill the ring's new interior, giving the digits and the world glyph a
+  larger, more solid ground than they had
+
+It also answers a risk this spec named and could not otherwise close: *"a ring that looks like a
+readout does not invite a tap"* (§6). A backing shaped like the other buttons says "control"
+without a word of onboarding — the beat now reinforces a visible affordance rather than being the
+only thing carrying it.
+
 **The glyph swap obeys the spoiler gate.** The world throw appears only once the drum has
 settled — the same `drumRest` cue that gates the tape tile, the splash and the headline.
 Showing it early would give away the throw while the wheel is still turning, which is the one
