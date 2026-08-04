@@ -57,6 +57,7 @@ describe('User defaults — play HUD fields', () => {
         expect(u.unresolvedWin).toBe(false);
         expect(u.escalationPrompts).toBe(true); // prompts are on until the player turns them off
         expect(u.confirmThrows).toBe(true); // so is confirming a throw with a pot riding on it
+        expect(u.resultSplash).toBe(true); // so is the big centred result splash after a round
         expect(u.seenBeats).toEqual([]);
         for (const k of ['roundsPlayed', 'wins', 'safes', 'losses', 'lifetimeBanked', 'bestPot',
                          'throwsR', 'throwsP', 'throwsS'] as const) {

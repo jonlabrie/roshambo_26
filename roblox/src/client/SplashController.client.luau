@@ -18,7 +18,13 @@
 -- GATED ON THE DRUM, entirely by the caller: main.client.luau fires EventBus.Splash from
 -- `maybeShowReveal`, the SAME drum-rest gate (with the SAME REVEAL_SAFETY fallback) the tape tile
 -- and the onboarding "win" beat already wait on. This file never reads RevealResult itself and
--- has no gate of its own — firing early would spoil the wheel while it is still turning.
+-- has no gate of its own for TIMING — firing early would spoil the wheel while it is still turning.
+--
+-- OPTIONAL (spec §2, "Optional"): a second HUD preference beside escalationPrompts, default ON.
+-- Read from `EventBus.LedgerState`, the same channel LedgerController's footer switch reads —
+-- main.client.luau fires it only on ProfileUpdate, so this is the authoritative, persisted value,
+-- not a locally-invented default. When it is off, EventBus.Splash still fires (main.client.luau
+-- does not know or care whether the splash is enabled) and this file simply does not show it.
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
@@ -216,7 +222,20 @@ local function copyFor(body: any): (string?, string?, Color3?)
     return nil, nil, nil
 end
 
+-- ON until the first EventBus.LedgerState lands, mirroring every other HUD preference's default —
+-- see main.client.luau's `resultSplash` and the profile route's `resultSplash ?? true`.
+local resultSplash = true
+
+EventBus.LedgerState.Event:Connect(function(state)
+    if type(state.resultSplash) == "boolean" then
+        resultSplash = state.resultSplash
+    end
+end)
+
 EventBus.Splash.Event:Connect(function(body)
+    if not resultSplash then
+        return
+    end
     local headline, consequence, color = copyFor(body)
     if headline and consequence and color then
         showSplash(headline, consequence, color)

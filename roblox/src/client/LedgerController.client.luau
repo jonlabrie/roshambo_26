@@ -32,8 +32,9 @@
 -- SUSPENDED WHILE IT IS OPEN. See `close()`: every exit path routes through one function.
 --
 -- This file RENDERS LedgerModel; it computes nothing the model already gives it. main.client.luau
--- owns the wiring and fires EventBus.LedgerState{ counters, live, bestStreak, escalationPrompts }.
--- The preference switch travels back on EventBus.HudPreference, banking on EventBus.HudBank.
+-- owns the wiring and fires EventBus.LedgerState{ counters, live, bestStreak, escalationPrompts,
+-- resultSplash }. The preference switches travel back on EventBus.HudPreference, banking on
+-- EventBus.HudBank.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local UserInputService = game:GetService("UserInputService")
@@ -67,7 +68,7 @@ local PAD = 14
 local GAP = 12
 local HEADER_H = 52
 local HERO_H = 96
-local FOOTER_H = 46 -- one switch, centred; the row's height is the touch floor, not a column count
+local FOOTER_H = 46 -- two switches; the row was sized for more than one from the start
 local TABS_H = 30
 local BAR_H = 14
 local FEED_MAX = 60
@@ -206,11 +207,12 @@ stroke(closeButton, TAN_RIM, 1, 0.4)
 -- rarely. The ledger is its door now — the design's own rule, applied once more: one persistent
 -- entry point, everything else reached through it.
 --
--- WHY THE HEADER AND NOT THE PREFERENCES FOOTER. A second footer row for a navigation button would
--- cost the BODY 48px. The body is the squeezed dimension on exactly the tier this design targets: on
--- a landscape phone it is 68-83px today, and a second row takes it to 20-35px, a window smaller than
--- one statistic. The header is free at every size, cannot crowd the preferences footer at all, and
--- puts "go somewhere else" beside the ✕ where navigation belongs.
+-- WHY THE HEADER AND NOT THE PREFERENCES FOOTER. The footer's two switches already span
+-- 2 x PREF_COL_W = 472px, which leaves no third column at phone width, so the alternative was a
+-- second footer row — and that costs the BODY 48px. The body is the squeezed dimension on exactly
+-- the tier this design targets: on a landscape phone it is 68-83px today, and a second row takes it
+-- to 20-35px, a window smaller than one statistic. The header is free at every size, cannot crowd
+-- the switches at all, and puts "go somewhere else" beside the ✕ where navigation belongs.
 local teahouseButton = Instance.new("TextButton")
 teahouseButton.Name = "MyTeahouse"
 teahouseButton.AnchorPoint = Vector2.new(1, 0)
@@ -554,11 +556,9 @@ EventBus.Toast.Event:Connect(pushFeed)
 EventBus.TickerMessage.Event:Connect(pushFeed)
 
 -- ===== Preferences footer =====
--- One row, one switch (escalationPrompts) — the second switch, which guarded a two-tap throw
--- confirmation, was retired 2026-08-03 along with the mechanic itself (see the design's §1, "What
--- this deletes"). The row was originally built for a pair, so the label+switch block is centred
--- here rather than left-anchored at column 0: a lone control stranded against the left edge of a
--- band this wide would read as though its neighbour had failed to load.
+-- One row, now TWO switches — the row was built and sized for exactly this, and the result-splash
+-- preference is the second one the design was waiting for. Both are built by the same factory rather
+-- than copied, so a third cannot drift into looking or behaving differently from the first two.
 local footer = Instance.new("Frame")
 footer.Name = "Preferences"
 footer.AnchorPoint = Vector2.new(0, 1)
@@ -570,26 +570,23 @@ footer.Parent = panel
 local SWITCH_W, SWITCH_H = 58, 28
 local SWITCH_KNOB = 22
 local PREF_LABEL_W = 140
-local PREF_BLOCK_W = PREF_LABEL_W + 10 + SWITCH_W -- label + gap + switch, centred as one unit
+local PREF_COL_W = PREF_LABEL_W + 10 + SWITCH_W + 28 -- label + gap + switch + breathing room
 
 type PrefSwitch = { button: TextButton, knob: Frame }
 
--- Positioned from the footer's horizontal CENTRE (scale 0.5) rather than a pixel column, so the
--- block centres correctly at any footer width — the footer spans the whole panel, which itself
--- scales with the viewport.
-local function makePrefSwitch(name: string, caption: string): PrefSwitch
-    local startX = -PREF_BLOCK_W / 2
+local function makePrefSwitch(name: string, caption: string, column: number): PrefSwitch
+    local x = column * PREF_COL_W
 
     local prefLabel = label(footer, caption, 14, INK_CREAM, Enum.Font.Gotham)
     prefLabel.Name = name .. "Label"
     prefLabel.AnchorPoint = Vector2.new(0, 0.5)
-    prefLabel.Position = UDim2.new(0.5, startX, 0.5, 0)
+    prefLabel.Position = UDim2.new(0, x, 0.5, 0)
     prefLabel.Size = UDim2.fromOffset(PREF_LABEL_W, 18)
 
     local switch = Instance.new("TextButton")
     switch.Name = name
     switch.AnchorPoint = Vector2.new(0, 0.5)
-    switch.Position = UDim2.new(0.5, startX + PREF_LABEL_W + 10, 0.5, 0)
+    switch.Position = UDim2.new(0, x + PREF_LABEL_W + 10, 0.5, 0)
     switch.Size = UDim2.fromOffset(SWITCH_W, SWITCH_H)
     switch.BackgroundColor3 = TRACK
     switch.BorderSizePixel = 0
@@ -612,7 +609,8 @@ local function makePrefSwitch(name: string, caption: string): PrefSwitch
     return { button = switch, knob = knob }
 end
 
-local escalationSwitch = makePrefSwitch("EscalationPrompts", "Escalation prompts")
+local escalationSwitch = makePrefSwitch("EscalationPrompts", "Escalation prompts", 0)
+local resultSplashSwitch = makePrefSwitch("ResultSplash", "Result splash", 1)
 
 -- ===== Layout =====
 local feedTabOpen = false
@@ -710,6 +708,7 @@ local counters = {
 local live = { pot = 0, streak = 0, points = 0 }
 local bestStreak = 0
 local escalationPrompts = true
+local resultSplash = true
 
 local function paintOne(sw: PrefSwitch, on: boolean)
     sw.button.BackgroundColor3 = if on then GOLD else TRACK
@@ -718,6 +717,7 @@ end
 
 local function paintSwitch()
     paintOne(escalationSwitch, escalationPrompts)
+    paintOne(resultSplashSwitch, resultSplash)
 end
 
 local function render()
@@ -816,6 +816,12 @@ escalationSwitch.button.MouseButton1Click:Connect(function()
     EventBus.HudPreference:Fire({ escalationPrompts = escalationPrompts })
 end)
 
+resultSplashSwitch.button.MouseButton1Click:Connect(function()
+    resultSplash = not resultSplash
+    paintSwitch()
+    EventBus.HudPreference:Fire({ resultSplash = resultSplash })
+end)
+
 EventBus.LedgerState.Event:Connect(function(state)
     if state.counters then
         counters = state.counters
@@ -826,6 +832,9 @@ EventBus.LedgerState.Event:Connect(function(state)
     bestStreak = state.bestStreak or bestStreak
     if type(state.escalationPrompts) == "boolean" then
         escalationPrompts = state.escalationPrompts
+    end
+    if type(state.resultSplash) == "boolean" then
+        resultSplash = state.resultSplash
     end
     if isOpen then
         render()

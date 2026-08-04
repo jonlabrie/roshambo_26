@@ -167,7 +167,7 @@ describe('/api/v1', () => {
             await User.create({
                 robloxId: '55501', identityTier: 'roblox', totalPoints: 1240, pointsAtStake: 27,
                 currentStreak: 3, stakingStreak: 3, bestStreak: 6,
-                unresolvedWin: true, escalationPrompts: false, seenBeats: ['drum'],
+                unresolvedWin: true, escalationPrompts: false, resultSplash: false, seenBeats: ['drum'],
                 roundsPlayed: 386, wins: 131, safes: 92, losses: 163,
                 lifetimeBanked: 1240, bestPot: 243, throwsR: 181, throwsP: 120, throwsS: 85,
             });
@@ -176,6 +176,7 @@ describe('/api/v1', () => {
                 .get('/api/v1/players/55501').set('X-API-Key', API_KEY).expect(200);
             expect(res.body.unresolvedWin).toBe(true);
             expect(res.body.escalationPrompts).toBe(false);
+            expect(res.body.resultSplash).toBe(false);
             expect(res.body).not.toHaveProperty('confirmThrows'); // retired: no longer shipped
             expect(res.body.seenBeats).toEqual(['drum']);
             expect(res.body.counters).toEqual({
@@ -191,12 +192,13 @@ describe('/api/v1', () => {
         it('carries the gate, the preference and every counter', () => {
             const p = buildProfilePayload({
                 totalPoints: 1240, pointsAtStake: 27, currentStreak: 3, stakingStreak: 3, bestStreak: 6,
-                unresolvedWin: true, escalationPrompts: false, seenBeats: ['drum'],
+                unresolvedWin: true, escalationPrompts: false, resultSplash: false, seenBeats: ['drum'],
                 roundsPlayed: 386, wins: 131, safes: 92, losses: 163,
                 lifetimeBanked: 1240, bestPot: 243, throwsR: 181, throwsP: 120, throwsS: 85,
             } as never);
             expect(p.unresolvedWin).toBe(true);
             expect(p.escalationPrompts).toBe(false);
+            expect(p.resultSplash).toBe(false);
             expect(p.seenBeats).toEqual(['drum']);
             expect(p.counters.roundsPlayed).toBe(386);
             expect(p.counters.throwsS).toBe(85);
@@ -208,6 +210,7 @@ describe('/api/v1', () => {
                 stakingStreak: 0, bestStreak: 0 } as never);
             expect(p.unresolvedWin).toBe(false);
             expect(p.escalationPrompts).toBe(true);
+            expect(p.resultSplash).toBe(true);
             expect(p).not.toHaveProperty('confirmThrows'); // retired: no longer shipped
             expect(p.seenBeats).toEqual([]);
             expect(p.counters.roundsPlayed).toBe(0);
@@ -221,9 +224,23 @@ describe('/api/v1', () => {
             const res = await request(app)
                 .put('/api/v1/players/hud-1/preferences-hud')
                 .set('X-API-Key', API_KEY).send({ escalationPrompts: false }).expect(200);
-            expect(res.body).toEqual({ escalationPrompts: false, seenBeats: [] });
+            expect(res.body).toEqual({ escalationPrompts: false, resultSplash: true, seenBeats: [] });
             const u = await User.findOne({ robloxId: 'hud-1' });
             expect(u?.escalationPrompts).toBe(false);
+        });
+
+        it('sets resultSplash independently of escalationPrompts', async () => {
+            await User.create({ robloxId: 'hud-5', identityTier: 'roblox' });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const res = await request(app)
+                .put('/api/v1/players/hud-5/preferences-hud')
+                .set('X-API-Key', API_KEY).send({ resultSplash: false }).expect(200);
+            expect(res.body).toEqual({ escalationPrompts: true, resultSplash: false, seenBeats: [] });
+            const u = await User.findOne({ robloxId: 'hud-5' });
+            expect(u?.resultSplash).toBe(false);
+            // the other preference is untouched — one remote carries both, so a write of one must
+            // never be a silent write of the other
+            expect(u?.escalationPrompts).toBe(true);
         });
 
         it('adds a seenBeat without duplicating it, and never removes one', async () => {

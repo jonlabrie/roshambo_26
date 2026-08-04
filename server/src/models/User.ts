@@ -26,6 +26,9 @@ export interface IUser extends Document {
     // mis-tap at exactly the moment one is expensive, and a player who does not want it turns it off
     // (ledger footer, or the strip's own "don't ask again").
     confirmThrows: boolean;
+    // Show the big centred result splash (spec: docs/superpowers/specs/2026-08-03-play-hud-round-two-
+    // design.md §2) after a round settles. Default ON, a second preference beside escalationPrompts.
+    resultSplash: boolean;
     seenBeats: string[];
     roundsPlayed: number;
     wins: number;
@@ -69,6 +72,7 @@ const UserSchema: Schema = new Schema({
     unresolvedWin: { type: Boolean, default: false },
     escalationPrompts: { type: Boolean, default: true },
     confirmThrows: { type: Boolean, default: true },
+    resultSplash: { type: Boolean, default: true },
     seenBeats: { type: [String], default: [] },
     roundsPlayed: { type: Number, default: 0 },
     wins: { type: Number, default: 0 },

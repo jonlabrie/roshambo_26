@@ -24,9 +24,9 @@
 -- and takes picks back on `EventBus.HudPick`. Transient notices go out on `EventBus.Toast`.
 --
 -- The MAXIMAL panel gets its own channel, `EventBus.LedgerState`, fired only when ProfileUpdate
--- lands: the nine persisted counters, the live wallet, bestStreak and the HUD preference
--- (escalationPrompts). Its controls come back on `EventBus.HudPreference` and go out on
--- `SetHudPreference` — one remote for every preference, never one per switch.
+-- lands: the nine persisted counters, the live wallet, bestStreak and the two HUD preferences
+-- (escalationPrompts, resultSplash). Its controls come back on `EventBus.HudPreference` and go out
+-- on `SetHudPreference` — one remote for every preference, never one per switch.
 --
 -- BANK THESE (the pot indicator's only button) comes back on `EventBus.HudBank` and goes out on
 -- the long-standing BankRequest remote. There is no RISK counterpart and nothing to "resolve":
@@ -81,6 +81,7 @@ local wallet =
 
 -- Carried by ProfileUpdate. ON until the first one lands, which is the profile's own default.
 local escalationPrompts = true
+local resultSplash = true
 
 -- THE ROUND'S PICK STATE. `chosen` is the player's commitment and `sent` is the wire's, and
 -- they are separate on purpose: the pick is held here until the lockout (HudModel.sendAtLockout)
@@ -251,6 +252,7 @@ local function publishLedger()
         live = { pot = wallet.pointsAtStake, streak = wallet.currentStreak, points = wallet.totalPoints },
         bestStreak = wallet.bestStreak,
         escalationPrompts = escalationPrompts,
+        resultSplash = resultSplash,
     })
 end
 
@@ -401,6 +403,9 @@ EventBus.HudPreference.Event:Connect(function(body)
         if type(body.escalationPrompts) == "boolean" then
             escalationPrompts = body.escalationPrompts
         end
+        if type(body.resultSplash) == "boolean" then
+            resultSplash = body.resultSplash
+        end
         publish()
     end
     SetHudPreference:FireServer(body)
@@ -536,6 +541,9 @@ ProfileUpdate.OnClientEvent:Connect(function(p)
     wallet.unresolvedWin = p.unresolvedWin == true
     if type(p.escalationPrompts) == "boolean" then
         escalationPrompts = p.escalationPrompts
+    end
+    if type(p.resultSplash) == "boolean" then
+        resultSplash = p.resultSplash
     end
     if type(p.counters) == "table" then
         counters = p.counters

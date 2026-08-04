@@ -200,15 +200,15 @@ local function pushStats(player: Player)
 end
 
 -- HUD preferences are not wallet fields, so they do not live on a PlayerProfiles row. They ride
--- ProfileUpdate all the same: without that the client can only hard-default escalationPrompts and
--- the ledger's preference switch would be write-only. Absent = the profile's own default, ON.
+-- ProfileUpdate all the same: without that the client can only hard-default its preferences and
+-- the ledger's preference switches would be write-only. Absent = the profile's own defaults, ON.
 -- ONE ROW PER PLAYER, not one map per preference: they travel together on ProfileUpdate, they are
 -- written by the same remote and repaired by the same ledger refresh, and a second parallel map is
 -- how one of them ends up cleared on leave and the other left behind.
-type HudPrefs = { escalationPrompts: boolean }
+type HudPrefs = { escalationPrompts: boolean, resultSplash: boolean }
 local hudPrefs: { [string]: HudPrefs } = {}
 
--- Absent = the profile's own default, ON. The stored row is returned BY REFERENCE for reads;
+-- Absent = the profile's own defaults, both ON. The stored row is returned BY REFERENCE for reads;
 -- anything that writes must clone first (see SetHudPreference), because the failure-revert there
 -- holds the pre-write row and an in-place edit would quietly rewrite its own undo.
 local function prefsFor(uid: string): HudPrefs
@@ -216,15 +216,16 @@ local function prefsFor(uid: string): HudPrefs
     if row then
         return row
     end
-    return { escalationPrompts = true }
+    return { escalationPrompts = true, resultSplash = true }
 end
 
 -- The wire shape of a GET /players response's preference half, defaulted the same way everywhere it
 -- is read: absent means ON, because that is what the database defaults to for documents written
--- before this field existed.
+-- before these fields existed.
 local function prefsFromProfile(data: any): HudPrefs
     return {
         escalationPrompts = data.escalationPrompts ~= false,
+        resultSplash = data.resultSplash ~= false,
     }
 end
 
@@ -293,6 +294,7 @@ local function fireProfile(player: Player, source: string)
             bestStreak = row.bestStreak,
             unresolvedWin = row.unresolvedWin,
             escalationPrompts = prefsFor(tostring(player.UserId)).escalationPrompts,
+            resultSplash = prefsFor(tostring(player.UserId)).resultSplash,
             counters = ledgerCounters[tostring(player.UserId)],
             -- NOT `or {}`. This fires from the reveal ("local") and reconciliation ("reconciled")
             -- paths too, which run whether or not the join fetch ever succeeded — so substituting
@@ -496,13 +498,13 @@ end)
 -- EconomySync fires it on a 1s retry loop up to twenty times per join. Putting an HTTP fetch behind
 -- it would mean up to twenty GET /players per player per join.
 --
--- The counters, the escalation preference and the seen-beats list are taken from the response; the
+-- The counters, the HUD preferences and the seen-beats list are taken from the response; the
 -- WALLET deliberately is not. The reconciliation loop already owns the wallet authoritatively, and a
 -- mid-round fetch could stomp a fresher local reveal with a settlement that has not happened yet.
 --
 -- This is also the ONLY repair path for hudPrefs/hudSeenBeats: they are otherwise written once, by
 -- the join fetch, inside its `if res.ok`. If that GET failed they stay nil for the session — the
--- player's escalation preference silently reads back as ON however the database has it, and their
+-- player's preferences silently read back as ON however the database has them, and their
 -- dismissed onboarding beats are unknown. Opening the ledger is what fixes both.
 --
 -- WHAT IT MUST NOT DO is apply a response that went stale in flight. The failure that flagged it:
@@ -551,6 +553,9 @@ SetHudPreference.OnServerEvent:Connect(function(player, body)
     if type(body.escalationPrompts) == "boolean" then
         payload.escalationPrompts = body.escalationPrompts
     end
+    if type(body.resultSplash) == "boolean" then
+        payload.resultSplash = body.resultSplash
+    end
     if type(body.seenBeat) == "string" then
         payload.seenBeat = body.seenBeat
     end
@@ -577,11 +582,16 @@ SetHudPreference.OnServerEvent:Connect(function(player, body)
         -- the database does not hold.
         local prevPref = hudPrefs[uid]
         local prevBeats = hudSeenBeats[uid]
-        if payload.escalationPrompts ~= nil then
+        if payload.escalationPrompts ~= nil or payload.resultSplash ~= nil then
             -- MERGED onto the current row, never replacing it: one remote carries every preference
             -- and a body naming only one of them must not silently reset another to its default.
             local nextPrefs = table.clone(prefsFor(uid))
-            nextPrefs.escalationPrompts = payload.escalationPrompts
+            if payload.escalationPrompts ~= nil then
+                nextPrefs.escalationPrompts = payload.escalationPrompts
+            end
+            if payload.resultSplash ~= nil then
+                nextPrefs.resultSplash = payload.resultSplash
+            end
             hudPrefs[uid] = nextPrefs
         end
         if payload.seenBeat ~= nil then

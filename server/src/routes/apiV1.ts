@@ -23,6 +23,7 @@ export function buildProfilePayload(user: IUser) {
         bestStreak: user.bestStreak,
         unresolvedWin: user.unresolvedWin ?? false,
         escalationPrompts: user.escalationPrompts ?? true,
+        resultSplash: user.resultSplash ?? true,
         seenBeats: user.seenBeats ?? [],
         counters: {
             roundsPlayed: user.roundsPlayed ?? 0,
@@ -136,6 +137,9 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             if (typeof req.body?.escalationPrompts === 'boolean') {
                 set.escalationPrompts = req.body.escalationPrompts;
             }
+            if (typeof req.body?.resultSplash === 'boolean') {
+                set.resultSplash = req.body.resultSplash;
+            }
             // seenBeat is add-only: a beat can be marked seen but never un-seen from the client
             const addToSet = typeof req.body?.seenBeat === 'string'
                 ? { seenBeats: req.body.seenBeat } : undefined;
@@ -151,6 +155,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             const s = updated ?? user;
             res.json({
                 escalationPrompts: s.escalationPrompts ?? true,
+                resultSplash: s.resultSplash ?? true,
                 seenBeats: s.seenBeats ?? [],
             });
         } catch (err) {
