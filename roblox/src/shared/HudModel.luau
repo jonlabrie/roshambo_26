@@ -32,12 +32,12 @@ export type Inputs = {
     totalPoints: number,
     unresolvedWin: boolean,
     escalationPrompts: boolean,
-    -- The glyph the player has chosen this round, the glyph currently carrying a SWITCH?
+    -- The glyph the player has chosen this round, the glyph currently carrying an UNDO?
     -- prompt, and whether the pick has gone over the wire. `chosen` is the player's
     -- commitment; `sent` is the wire's. They are separate because the pick is held locally
     -- until the lockout, which is the only thing that makes a back-out honest.
     chosen: string?,
-    switchPrompt: string?,
+    undoPrompt: string?,
     sent: boolean,
     -- Set by a back-out OR by dismissing the escalation prompt, cleared when ACTIVE reopens.
     -- One field, two gestures, because they mean the same thing to this rule: the player has
@@ -61,14 +61,18 @@ export type View = {
     escalate: boolean,
     secondsLeft: number,
     chosen: string?,
-    switchPrompt: string?,
+    undoPrompt: string?,
 }
 
 -- ONE SECOND. Four was chosen when a prompt was the only thing on screen and in practice it
 -- lingered. Both outcomes of expiry are safe — expiring restores exactly the state before the
 -- stray tap, and answering only ever unlocks — so a short fuse costs nothing and a long one
 -- leaves a question hanging over a live button.
-HudModel.SWITCH_PROMPT_SECONDS = 1
+--
+-- The word changed from SWITCH? to UNDO? on 2026-08-04 because SWITCH? described something this
+-- button has never done: answering it CLEARS the choice, it does not move the choice to the
+-- glyph that was tapped. That is what makes either unchosen button a back-out proxy.
+HudModel.UNDO_PROMPT_SECONDS = 1
 
 -- Taps stay live for as long as the choice can still be honoured. That is NOT the whole of
 -- ACTIVE: it ends the moment the pick goes on the wire (`sendAtLockout`, roughly the last
@@ -79,20 +83,20 @@ local function throwsEnabledFor(inputs: Inputs): boolean
     return inputs.phase == "ACTIVE" and inputs.secondsLeft > 0 and not inputs.sent
 end
 
-export type TapState = { chosen: string?, switchPrompt: string? }
+export type TapState = { chosen: string?, undoPrompt: string? }
 
 -- What a tap on `symbol` does. Evaluated top to bottom; first match wins.
 --
 --   "choose" — light it; the throw is chosen (locally — see sendAtLockout)
---   "prompt" — raise SWITCH? over `symbol`, moving it if it was elsewhere
+--   "prompt" — raise UNDO? over `symbol`, moving it if it was elsewhere
 --   "clear"  — all three available again, NOTHING chosen. This is the back-out.
 --   "ignore" — the round cannot take a throw, or the tap lands on the lit glyph
 --
--- TAPPING THE LIT GLYPH DOES NOTHING (owner's ruling). The switch path is the only way out, so
+-- TAPPING THE LIT GLYPH DOES NOTHING (owner's ruling). The undo path is the only way out, so
 -- there is exactly one gesture to learn. A lit glyph that also un-chose would give one button
 -- two meanings depending on invisible state.
 --
--- CONFIRMING A SWITCH UNLOCKS; IT DOES NOT SELECT. That is the whole reason a back-out exists:
+-- CONFIRMING AN UNDO UNLOCKS; IT DOES NOT SELECT. That is the whole reason a back-out exists:
 -- a confirm-that-also-selects would leave no way to end a round having chosen nothing.
 function HudModel.tapAction(inputs: Inputs, symbol: string): string
     if not throwsEnabledFor(inputs) then
@@ -104,7 +108,7 @@ function HudModel.tapAction(inputs: Inputs, symbol: string): string
     if symbol == inputs.chosen then
         return "ignore"
     end
-    if symbol == inputs.switchPrompt then
+    if symbol == inputs.undoPrompt then
         return "clear"
     end
     return "prompt"
@@ -118,20 +122,20 @@ end
 -- two fields and nothing else.
 function HudModel.applyTap(state: TapState, action: string, symbol: string): TapState
     if action == "choose" then
-        return { chosen = symbol, switchPrompt = nil }
+        return { chosen = symbol, undoPrompt = nil }
     elseif action == "prompt" then
-        return { chosen = state.chosen, switchPrompt = symbol }
+        return { chosen = state.chosen, undoPrompt = symbol }
     elseif action == "clear" then
-        return { chosen = nil, switchPrompt = nil }
+        return { chosen = nil, undoPrompt = nil }
     end
-    return { chosen = state.chosen, switchPrompt = state.switchPrompt }
+    return { chosen = state.chosen, undoPrompt = state.undoPrompt }
 end
 
 -- Whether a standing prompt has aged out. A predicate rather than a timer so it is pure and
 -- testable; main.client's existing 10Hz heartbeat is what calls it, which is ample resolution
 -- for a one-second question.
-function HudModel.switchPromptExpired(setAt: number?, now: number): boolean
-    return setAt ~= nil and (now - setAt) >= HudModel.SWITCH_PROMPT_SECONDS
+function HudModel.undoPromptExpired(setAt: number?, now: number): boolean
+    return setAt ~= nil and (now - setAt) >= HudModel.UNDO_PROMPT_SECONDS
 end
 
 -- The chosen glyph, if this is the moment it has to go over the wire, or nil.
@@ -192,7 +196,7 @@ function HudModel.view(inputs: Inputs, session: Session): View
         -- stays lit through TALLY/REVEAL saying so. main.client clears it when ACTIVE reopens.
         chosen = inputs.chosen,
         -- The prompt does not. A question about a round that has closed cannot be answered.
-        switchPrompt = if throwsEnabled then inputs.switchPrompt else nil,
+        undoPrompt = if throwsEnabled then inputs.undoPrompt else nil,
     }
 end
 

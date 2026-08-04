@@ -13,7 +13,7 @@ local function inputs(over: any): any
         unresolvedWin = false,
         escalationPrompts = true,
         chosen = nil,
-        switchPrompt = nil,
+        undoPrompt = nil,
         sent = false,
         declinedThisRound = false,
     }
@@ -70,7 +70,7 @@ describe("HudModel — once sent, the round is closed to that player", function(
     test(
         "tapAction ignores every symbol once sent — the chosen glyph, a third glyph, the prompted one",
         function()
-            local sentInputs = inputs({ chosen = "R", switchPrompt = "P", sent = true })
+            local sentInputs = inputs({ chosen = "R", undoPrompt = "P", sent = true })
             for _, sym in { "R", "P", "S" } do
                 expect(HudModel.tapAction(sentInputs, sym)).toBe("ignore")
             end
@@ -81,16 +81,16 @@ describe("HudModel — once sent, the round is closed to that player", function(
         -- Before a send, tapping the prompted glyph returns "clear" — the back-out (pin that
         -- below). Once sent, that path must be unreachable: clearing `chosen` after the wire
         -- already has it would make the HUD lie about what the server is about to score.
-        expect(HudModel.tapAction(inputs({ chosen = "R", switchPrompt = "P" }), "P")).toBe("clear")
-        local sentInputs = inputs({ chosen = "R", switchPrompt = "P", sent = true })
+        expect(HudModel.tapAction(inputs({ chosen = "R", undoPrompt = "P" }), "P")).toBe("clear")
+        local sentInputs = inputs({ chosen = "R", undoPrompt = "P", sent = true })
         expect(HudModel.tapAction(sentInputs, "P")).toBe("ignore")
     end)
 
     test(
-        "switchPrompt does not survive a send — a question the player cannot answer must not show",
+        "undoPrompt does not survive a send — a question the player cannot answer must not show",
         function()
-            local v = HudModel.view(inputs({ chosen = "R", switchPrompt = "P", sent = true }), session(0))
-            expect(v.switchPrompt).toBe(nil)
+            local v = HudModel.view(inputs({ chosen = "R", undoPrompt = "P", sent = true }), session(0))
+            expect(v.undoPrompt).toBe(nil)
         end
     )
 end)
@@ -178,8 +178,8 @@ describe("HudModel.view — plate, bank and pot", function()
     end)
 
     test("a prompt never survives the round closing", function()
-        local v = HudModel.view(inputs({ phase = "TALLY", chosen = "R", switchPrompt = "P" }), session(0))
-        expect(v.switchPrompt).toBe(nil)
+        local v = HudModel.view(inputs({ phase = "TALLY", chosen = "R", undoPrompt = "P" }), session(0))
+        expect(v.undoPrompt).toBe(nil)
     end)
 end)
 
@@ -298,7 +298,7 @@ describe("HudModel.tapAction — the five-row table", function()
     end)
 
     test("tapping the chosen glyph does nothing even while a prompt is up", function()
-        expect(HudModel.tapAction(inputs({ chosen = "R", switchPrompt = "P" }), "R")).toBe("ignore")
+        expect(HudModel.tapAction(inputs({ chosen = "R", undoPrompt = "P" }), "R")).toBe("ignore")
     end)
 
     test("tapping another glyph raises a prompt over it", function()
@@ -307,47 +307,47 @@ describe("HudModel.tapAction — the five-row table", function()
     end)
 
     test("tapping the prompted glyph clears", function()
-        expect(HudModel.tapAction(inputs({ chosen = "R", switchPrompt = "P" }), "P")).toBe("clear")
+        expect(HudModel.tapAction(inputs({ chosen = "R", undoPrompt = "P" }), "P")).toBe("clear")
     end)
 
     test("tapping the third glyph moves the prompt rather than clearing", function()
-        expect(HudModel.tapAction(inputs({ chosen = "R", switchPrompt = "P" }), "S")).toBe("prompt")
+        expect(HudModel.tapAction(inputs({ chosen = "R", undoPrompt = "P" }), "S")).toBe("prompt")
     end)
 end)
 
 describe("HudModel.applyTap — the transition table", function()
     local function state(chosen: string?, prompt: string?): any
-        return { chosen = chosen, switchPrompt = prompt }
+        return { chosen = chosen, undoPrompt = prompt }
     end
 
     test("choose sets the glyph and drops any prompt", function()
         local s = HudModel.applyTap(state(nil, nil), "choose", "R")
         expect(s.chosen).toBe("R")
-        expect(s.switchPrompt).toBe(nil)
+        expect(s.undoPrompt).toBe(nil)
     end)
 
     test("prompt leaves the choice untouched", function()
         local s = HudModel.applyTap(state("R", nil), "prompt", "P")
         expect(s.chosen).toBe("R")
-        expect(s.switchPrompt).toBe("P")
+        expect(s.undoPrompt).toBe("P")
     end)
 
     test("prompt moves an existing prompt", function()
         local s = HudModel.applyTap(state("R", "P"), "prompt", "S")
         expect(s.chosen).toBe("R")
-        expect(s.switchPrompt).toBe("S")
+        expect(s.undoPrompt).toBe("S")
     end)
 
     test("CLEAR EMPTIES BOTH — this is the back-out", function()
         local s = HudModel.applyTap(state("R", "P"), "clear", "P")
         expect(s.chosen).toBe(nil)
-        expect(s.switchPrompt).toBe(nil)
+        expect(s.undoPrompt).toBe(nil)
     end)
 
     test("ignore changes nothing", function()
         local s = HudModel.applyTap(state("R", "P"), "ignore", "R")
         expect(s.chosen).toBe("R")
-        expect(s.switchPrompt).toBe("P")
+        expect(s.undoPrompt).toBe("P")
     end)
 end)
 
@@ -357,23 +357,23 @@ describe("HudModel — the invariant, over every reachable sequence", function()
     test("no reachable sequence yields a prompt without a choice, or a prompt on the choice", function()
         local SYMS = { "R", "P", "S" }
         local function walk(st: any, depth: number)
-            expect(st.switchPrompt == nil or st.chosen ~= nil).toBe(true)
-            expect(st.switchPrompt == nil or st.switchPrompt ~= st.chosen).toBe(true)
+            expect(st.undoPrompt == nil or st.chosen ~= nil).toBe(true)
+            expect(st.undoPrompt == nil or st.undoPrompt ~= st.chosen).toBe(true)
             if depth == 0 then
                 return
             end
             for _, sym in SYMS do
-                local i = inputs({ chosen = st.chosen, switchPrompt = st.switchPrompt })
+                local i = inputs({ chosen = st.chosen, undoPrompt = st.undoPrompt })
                 walk(HudModel.applyTap(st, HudModel.tapAction(i, sym), sym), depth - 1)
             end
         end
-        walk({ chosen = nil, switchPrompt = nil }, 4)
+        walk({ chosen = nil, undoPrompt = nil }, 4)
     end)
 
     test("a back-out is always reachable in two taps from any choice", function()
         for _, chosen in { "R", "P", "S" } do
             local other = if chosen == "R" then "P" else "R"
-            local st = { chosen = chosen, switchPrompt = nil }
+            local st = { chosen = chosen, undoPrompt = nil }
             st = HudModel.applyTap(st, HudModel.tapAction(inputs(st), other), other)
             st = HudModel.applyTap(st, HudModel.tapAction(inputs(st), other), other)
             expect(st.chosen).toBe(nil)
@@ -381,15 +381,15 @@ describe("HudModel — the invariant, over every reachable sequence", function()
     end)
 end)
 
-describe("HudModel.switchPromptExpired", function()
+describe("HudModel.undoPromptExpired", function()
     test("an absent prompt never expires", function()
-        expect(HudModel.switchPromptExpired(nil, 1000)).toBe(false)
+        expect(HudModel.undoPromptExpired(nil, 1000)).toBe(false)
     end)
 
-    test("it expires at exactly SWITCH_PROMPT_SECONDS, not before", function()
+    test("it expires at exactly UNDO_PROMPT_SECONDS, not before", function()
         local t = 100
-        expect(HudModel.switchPromptExpired(t, t + HudModel.SWITCH_PROMPT_SECONDS - 0.01)).toBe(false)
-        expect(HudModel.switchPromptExpired(t, t + HudModel.SWITCH_PROMPT_SECONDS)).toBe(true)
+        expect(HudModel.undoPromptExpired(t, t + HudModel.UNDO_PROMPT_SECONDS - 0.01)).toBe(false)
+        expect(HudModel.undoPromptExpired(t, t + HudModel.UNDO_PROMPT_SECONDS)).toBe(true)
     end)
 end)
 
@@ -429,7 +429,7 @@ describe("HudModel.sendAtLockout — the pick's ONE trip to the wire", function(
     end)
 
     test("a back-out leaves nothing to send at the lockout", function()
-        local st = HudModel.applyTap({ chosen = "R", switchPrompt = "P" }, "clear", "P")
+        local st = HudModel.applyTap({ chosen = "R", undoPrompt = "P" }, "clear", "P")
         expect(HudModel.sendAtLockout(inputs({ chosen = st.chosen, secondsLeft = 0.1 }))).toBe(nil)
     end)
 end)
@@ -456,15 +456,15 @@ describe("HudModel.ESCALATE_AT is shared, not copied", function()
     end)
 end)
 
-describe("HudModel.SWITCH_PROMPT_SECONDS — a one-second fuse", function()
+describe("HudModel.UNDO_PROMPT_SECONDS — a one-second fuse", function()
     test("it is one second", function()
-        expect(HudModel.SWITCH_PROMPT_SECONDS).toBe(1)
+        expect(HudModel.UNDO_PROMPT_SECONDS).toBe(1)
     end)
 
     test("the prompt survives just under and expires at the second", function()
         local t = 100
-        expect(HudModel.switchPromptExpired(t, t + 0.99)).toBe(false)
-        expect(HudModel.switchPromptExpired(t, t + 1)).toBe(true)
+        expect(HudModel.undoPromptExpired(t, t + 0.99)).toBe(false)
+        expect(HudModel.undoPromptExpired(t, t + 1)).toBe(true)
     end)
 end)
 
@@ -481,7 +481,7 @@ describe("HudModel — dismissing the nag is not declining the round", function(
     end)
 
     test("and a throw after a dismissal still counts as played", function()
-        local st = HudModel.applyTap({ chosen = nil, switchPrompt = nil }, "choose", "R")
+        local st = HudModel.applyTap({ chosen = nil, undoPrompt = nil }, "choose", "R")
         expect(st.chosen).toBe("R")
         expect(HudModel.sendAtLockout(inputs({ chosen = "R", secondsLeft = 0.2, declinedThisRound = true }))).toBe(
             "R"
