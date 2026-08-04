@@ -20,7 +20,6 @@
 -- them would disarm the prompt for exactly the player who was prevented.
 local HudModel = {}
 
-local ESCALATE_AT = 5 -- seconds remaining
 local BACKOFF_MISSES = 3
 
 export type Session = { consecutiveMisses: number }
@@ -40,6 +39,10 @@ export type Inputs = {
     chosen: string?,
     switchPrompt: string?,
     sent: boolean,
+    -- Set by a back-out OR by dismissing the escalation prompt, cleared when ACTIVE reopens.
+    -- One field, two gestures, because they mean the same thing to this rule: the player has
+    -- answered the question the prompt asks. It silences the prompt and NOTHING else — throws
+    -- stay live, and a throw after a dismissal is an ordinary throw.
     declinedThisRound: boolean,
 }
 
@@ -61,10 +64,11 @@ export type View = {
     switchPrompt: string?,
 }
 
--- Four seconds. A prompt is a question, and an unanswered question must not sit on screen
--- indefinitely — but note the expiry is safe in BOTH directions: expiring restores exactly the
--- state before the stray tap, and answering only ever unlocks. Neither outcome throws anything.
-HudModel.SWITCH_PROMPT_SECONDS = 4
+-- ONE SECOND. Four was chosen when a prompt was the only thing on screen and in practice it
+-- lingered. Both outcomes of expiry are safe — expiring restores exactly the state before the
+-- stray tap, and answering only ever unlocks — so a short fuse costs nothing and a long one
+-- leaves a question hanging over a live button.
+HudModel.SWITCH_PROMPT_SECONDS = 1
 
 -- Taps stay live for as long as the choice can still be honoured. That is NOT the whole of
 -- ACTIVE: it ends the moment the pick goes on the wire (`sendAtLockout`, roughly the last
@@ -153,6 +157,10 @@ function HudModel.sendAtLockout(inputs: Inputs): string?
     return chosen
 end
 
+-- Exported so the ring (RingTimer.isWarning) and this prompt read the SAME fact instead of two
+-- copies of it — the ring and the prompt must turn urgent at the same moment (spec §5).
+HudModel.ESCALATE_AT = 5 -- seconds remaining
+
 function HudModel.newSession(): Session
     return { consecutiveMisses = 0 }
 end
@@ -178,7 +186,7 @@ function HudModel.view(inputs: Inputs, session: Session): View
         -- unresolvedWin's only job: "the last scored round was a WIN and the player has not
         -- banked since". It drives the pulse and nothing else.
         potPulses = inputs.pointsAtStake > 0 and inputs.unresolvedWin,
-        escalate = armed and inputs.secondsLeft > 0 and inputs.secondsLeft <= ESCALATE_AT,
+        escalate = armed and inputs.secondsLeft > 0 and inputs.secondsLeft <= HudModel.ESCALATE_AT,
         secondsLeft = inputs.secondsLeft,
         -- The choice OUTLIVES the round: after the lockout it is what was thrown, and the tile
         -- stays lit through TALLY/REVEAL saying so. main.client clears it when ACTIVE reopens.

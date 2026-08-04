@@ -441,3 +441,50 @@ describe("HudModel.newSession", function()
         expect(HudModel.view(inputs({ secondsLeft = 3 }), s).escalate).toBe(true)
     end)
 end)
+
+describe("HudModel.ESCALATE_AT is shared, not copied", function()
+    test("it is exported so the ring can read the same threshold", function()
+        -- The ring and the prompt must turn urgent at the SAME moment (spec §5). A second
+        -- literal anywhere would be two alarms about one fact.
+        expect(type(HudModel.ESCALATE_AT)).toBe("number")
+    end)
+
+    test("escalate fires exactly at the exported threshold and not above", function()
+        local at = HudModel.ESCALATE_AT
+        expect(HudModel.view(inputs({ secondsLeft = at }), session(0)).escalate).toBe(true)
+        expect(HudModel.view(inputs({ secondsLeft = at + 0.01 }), session(0)).escalate).toBe(false)
+    end)
+end)
+
+describe("HudModel.SWITCH_PROMPT_SECONDS — a one-second fuse", function()
+    test("it is one second", function()
+        expect(HudModel.SWITCH_PROMPT_SECONDS).toBe(1)
+    end)
+
+    test("the prompt survives just under and expires at the second", function()
+        local t = 100
+        expect(HudModel.switchPromptExpired(t, t + 0.99)).toBe(false)
+        expect(HudModel.switchPromptExpired(t, t + 1)).toBe(true)
+    end)
+end)
+
+describe("HudModel — dismissing the nag is not declining the round", function()
+    test("a dismissal silences escalation for the round", function()
+        local v = HudModel.view(inputs({ secondsLeft = 2, declinedThisRound = true }), session(0))
+        expect(v.escalate).toBe(false)
+    end)
+
+    test("but it does NOT stop the player throwing", function()
+        -- Dismissing means "stop shouting", not "I'm out". The buttons stay live.
+        local v = HudModel.view(inputs({ secondsLeft = 2, declinedThisRound = true }), session(0))
+        expect(v.throwsEnabled).toBe(true)
+    end)
+
+    test("and a throw after a dismissal still counts as played", function()
+        local st = HudModel.applyTap({ chosen = nil, switchPrompt = nil }, "choose", "R")
+        expect(st.chosen).toBe("R")
+        expect(HudModel.sendAtLockout(inputs({ chosen = "R", secondsLeft = 0.2, declinedThisRound = true }))).toBe(
+            "R"
+        )
+    end)
+end)
