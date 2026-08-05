@@ -46,6 +46,34 @@ describe("DrumStep — the strike-to-rest timing", function()
     end)
 end)
 
+-- THE FALLBACK MUST SIT BEHIND THE DRUM. main.client.luau releases the round's result on `drumRest`
+-- with these as the safety windows if that cue is lost. The old fallback was a flat 3s armed from
+-- RevealResult ARRIVING and it won the race on every instrumented round, showing the glyph while the
+-- drum was still gliding onto its detent — so what is asserted here is the RELATION to the
+-- choreography, not the numbers: a fallback that is not strictly longer than the rest it protects is
+-- a spoiler, whichever literal it happens to hold.
+describe("DrumStep — the reveal-safety windows", function()
+    test("the normal window clears the whole strike-to-rest chain, with margin", function()
+        expect(DrumStep.SAFETY_MARGIN_SECONDS > 0).toBe(true)
+        expect(DrumStep.SAFETY_AFTER_STRIKE_SECONDS).toBe(
+            DrumStep.SETTLE_SECONDS + DrumStep.SAFETY_MARGIN_SECONDS
+        )
+        expect(DrumStep.SAFETY_AFTER_STRIKE_SECONDS > DrumStep.SETTLE_SECONDS).toBe(true)
+    end)
+
+    test("the stalled window also clears the stall", function()
+        -- DrumController waits STALL_MAX_SECONDS past the end of the spin for a late World Throw
+        -- before it settles at all; a fallback that ignored that would merely race a different way.
+        expect(DrumStep.STALL_MAX_SECONDS > 0).toBe(true)
+        expect(DrumStep.SAFETY_AFTER_STRIKE_STALLED_SECONDS).toBe(
+            DrumStep.SAFETY_AFTER_STRIKE_SECONDS + DrumStep.STALL_MAX_SECONDS
+        )
+        -- The worst legitimate rest, measured from the strike: swing + spin + stall + glide.
+        local worstRest = DrumStep.SETTLE_SECONDS + DrumStep.STALL_MAX_SECONDS
+        expect(DrumStep.SAFETY_AFTER_STRIKE_STALLED_SECONDS > worstRest).toBe(true)
+    end)
+end)
+
 -- THE DRUM IS AUTHORITATIVE (owner's ruling, 2026-08-04). A round four attempt let the personal
 -- result splash fire ahead of `drumRest` — first at a fixed lead, then refined to a trigger on the
 -- glide's residual angle. Both violated the rule: nothing may reflect the world's throw anywhere

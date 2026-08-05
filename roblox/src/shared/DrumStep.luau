@@ -22,13 +22,39 @@ local SYMBOLS = { R = 0, P = 1, S = 2 }
 --                  CONTACT, at the end of this tween, not when the swing starts.
 --   SPIN         : the constant-velocity spin before the drum will consider landing.
 --   GLIDE        : the decelerating glide onto the detent. `drumRest` fires when it completes.
--- (DrumController's STALL_MAX — waiting for a late World Throw before settling — is deliberately NOT
--- in here: it is an exception path, not the normal choreography, and padding every round by it would
--- make the grow late for everyone to cover a case that hardly ever happens.)
+-- SETTLE_SECONDS is the NORMAL chain only. The stall (STALL_MAX_SECONDS, below) is deliberately not
+-- folded into it: it is an exception path, and padding every round by it would make the grow late
+-- for everyone to cover a case that hardly ever happens.
 DrumStep.STRIKE_SWING_SECONDS = 0.45
 DrumStep.SPIN_SECONDS = 1.0
 DrumStep.GLIDE_SECONDS = 2.0
 DrumStep.SETTLE_SECONDS = DrumStep.STRIKE_SWING_SECONDS + DrumStep.SPIN_SECONDS + DrumStep.GLIDE_SECONDS
+
+-- ===== The stall, and the reveal-safety windows derived from it =====
+-- THE STALL. If the World Throw has not reached the client by the end of the spin, DrumController
+-- keeps spinning for up to this long, waiting for it, before it settles on the last one anyway.
+-- It was a private literal in that client file; it lives here because the fallback below is sized
+-- from it and a fallback sized from a number no test can see is a fallback that silently rots.
+DrumStep.STALL_MAX_SECONDS = 6
+
+-- THE REVEAL-SAFETY FALLBACK. main.client.luau holds the round's result until `drumRest`, with a
+-- fallback so a dropped cue cannot strand it forever. That fallback used to be a flat 3s armed from
+-- RevealResult ARRIVING — an unrelated constant, measured from an unrelated event — and it beat the
+-- drum on every instrumented round (RevealResult t=8.28s, ring glyph t=11.31s = 8.28 + 3.00 + a
+-- frame), which is precisely the spoiler THE RULE forbids. It is armed from the STRIKE now and sized
+-- from the choreography above, so it cannot precede the rest it is protecting:
+--   SAFETY_AFTER_STRIKE_SECONDS          the World Throw is already in hand at the strike, so the
+--                                        drum CANNOT stall; rest is the normal chain away.
+--   SAFETY_AFTER_STRIKE_STALLED_SECONDS  the throw has not arrived yet, so the drum may wait out
+--                                        the whole stall before it even begins to glide.
+-- Both are measured from `gongHit`, which fires at the END of the swing — so re-counting
+-- STRIKE_SWING_SECONDS inside SETTLE_SECONDS is free headroom in the safe direction, on top of the
+-- explicit margin. The margin itself covers the frame the cue is dispatched on and the client's
+-- phase-poll lag.
+DrumStep.SAFETY_MARGIN_SECONDS = 0.5
+DrumStep.SAFETY_AFTER_STRIKE_SECONDS = DrumStep.SETTLE_SECONDS + DrumStep.SAFETY_MARGIN_SECONDS
+DrumStep.SAFETY_AFTER_STRIKE_STALLED_SECONDS = DrumStep.SAFETY_AFTER_STRIKE_SECONDS
+    + DrumStep.STALL_MAX_SECONDS
 
 -- The spin's angular velocity, rad/s — DrumController's old private `DRUM_KICK`, here for the same
 -- reason as the durations above. DrumController still honours the "DrumKick" stage attribute,

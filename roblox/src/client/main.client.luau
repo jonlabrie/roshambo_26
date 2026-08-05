@@ -46,6 +46,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local HudModel = require(shared:WaitForChild("HudModel"))
 local RevealBeat = require(shared:WaitForChild("RevealBeat"))
+local DrumStep = require(shared:WaitForChild("DrumStep"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local SubmitPick = remotes:WaitForChild("SubmitPick") :: RemoteEvent
@@ -64,9 +65,30 @@ local player = Players.LocalPlayer
 
 local TAPE_N = 5 -- how many tape entries the HUD can show
 local TICK = 0.1 -- HudState cadence; the round timer is a depleting ring, so keep it smooth
-local REVEAL_SAFETY = 3 -- seconds before a dropped drumRest cue is assumed lost
 local BANK_TOAST_FAILOPEN_SECONDS = 1 -- see pendingBankToast: a missing OnboardingController ack
 -- must never permanently silence the bank toast
+
+-- THE REVEAL-SAFETY FALLBACK, armed from the STRIKE (`gongHit`) — see DrumStep for the derivation
+-- and for why it used to be a flat 3s armed from RevealResult arriving, and why that flat 3s was
+-- beating the drum on EVERY round rather than on the rare dropped-cue round it was written for.
+local REVEAL_SAFETY = DrumStep.SAFETY_AFTER_STRIKE_SECONDS
+local REVEAL_SAFETY_STALLED = DrumStep.SAFETY_AFTER_STRIKE_STALLED_SECONDS
+-- Slack on top of the strike's own lead, covering the client's phase-poll lag (the observed
+-- transitions run ~1s behind the nominal boundaries). Only ever makes the missed-strike backstop
+-- LATER, never earlier.
+local STRIKE_LEAD_SLACK = 1
+-- How far ahead of a reveal that has ALREADY arrived a legitimate `gongHit` can still be: the reveal
+-- can land as early as the start of TALLY (RoundCoordinator fetches on TALLY as well as REVEAL)
+-- while the strike is scheduled TallySec into it, with `gongHit` at the END of the shu-moku's swing.
+-- Read from the live schedule so a server retune of TALLY carries — FindFirstChild, never
+-- WaitForChild, because the HUD must not block on the arena's config folder.
+local function strikeLeadSeconds(): number
+    local cfg = ReplicatedStorage:FindFirstChild("RoundScheduleConfig")
+    local tally = if cfg then cfg:GetAttribute("TallySec") else nil
+    return (if typeof(tally) == "number" then tally else 2)
+        + DrumStep.STRIKE_SWING_SECONDS
+        + STRIKE_LEAD_SLACK
+end
 
 -- The tape renders DIRECTLY from the authoritative World-Throw tape (newest-first, deduped, each
 -- entry carrying a round id), carried by both RoundUpdate (every phase) and BoardData (on join +
@@ -373,6 +395,16 @@ local pendingReveal: {
 }? =
     nil
 local drumAtRest = false
+-- THE DRUM'S OWN STALL CONDITION, MIRRORED — not guessed at. DrumController spins on for up to
+-- DrumStep.STALL_MAX_SECONDS when the World Throw has not reached it by the end of the spin, and it
+-- reads that throw off RevealTheater. This flag is set from the SAME remote on the SAME client (the
+-- handler further down), so at the strike it says exactly what DrumController's `latestWorldThrow`
+-- says — which is what lets the fallback below pick the short window instead of always padding by
+-- the full stall. Cleared when ACTIVE reopens, matching DrumController consuming it on landing.
+local worldThrowInHand = false
+-- Whether this round's strike has been seen yet. Cleared when ACTIVE reopens; read by the
+-- missed-strike backstop in the RevealResult handler.
+local strikeSeen = false
 
 local function maybeShowReveal()
     if not drumAtRest then
@@ -461,10 +493,36 @@ local function maybeShowReveal()
     end
 end
 
+-- RELEASE A REVEAL WHOSE `drumRest` NEVER CAME. The fallback has to exist — a dropped cue must not
+-- strand a result — but its timing is the whole problem, because a fallback that fires early breaks
+-- THE RULE (the drum is authoritative; nothing may reflect the world's throw until it is fully at
+-- rest) on every round instead of protecting a rare one. Callers pass a window derived from the
+-- choreography in DrumStep and measured from an event the drum's own timing is measured from.
+--
+-- The round is pinned at arming time so a stale timer can never release a NEWER round's reveal
+-- early: by then `pendingReveal` is either nil (ACTIVE clears it) or a different round's.
+local function armRevealSafety(afterSeconds: number)
+    local roundId = currentRoundId
+    task.delay(afterSeconds, function()
+        if pendingReveal and pendingReveal.roundId == roundId then
+            drumAtRest = true -- safety: never strand a result if the cue dropped
+            maybeShowReveal()
+        end
+    end)
+end
+
 EventBus.Cue.Event:Connect(function(cue)
     if cue.kind == "drumRest" then
         drumAtRest = true
         maybeShowReveal()
+    elseif cue.kind == "gongHit" then
+        -- THE STRIKE — the instant everything the drum does is measured from, which is why the
+        -- fallback is armed HERE and not from RevealResult arriving. The reveal can land a second
+        -- or more BEFORE the strike (RoundCoordinator:_fetchRevealIfDue accepts TALLY as well as
+        -- REVEAL), so a window measured from its arrival is measured from an event with no fixed
+        -- relationship to the rest it is meant to sit behind.
+        strikeSeen = true
+        armRevealSafety(if worldThrowInHand then REVEAL_SAFETY else REVEAL_SAFETY_STALLED)
     end
 end)
 
@@ -568,6 +626,10 @@ EventBus.OpenLedger.Event:Connect(function()
 end)
 
 RevealTheater.OnClientEvent:Connect(function(r)
+    -- The arena-wide reveal carries the World Throw, and this is the remote DrumController takes its
+    -- own copy from — so noting its arrival here is exactly DrumController's stall condition, read
+    -- off the same event on the same client. The reveal-safety fallback picks its window from this.
+    worldThrowInHand = true
     local myId = tostring(player.UserId)
     if r.whiffed and r.whiffed[myId] then
         toast("⏳ TOO LATE — your throw didn't count this round")
@@ -613,6 +675,10 @@ RoundUpdate.OnClientEvent:Connect(function(info)
         lockoutAt = if info.secondsToLockout then os.clock() + info.secondsToLockout else nil
         pendingReveal = nil -- the drum respins; last round's reveal has already been shown
         drumAtRest = false
+        -- Both fallback inputs are per-round and reset with the round, matching DrumController:
+        -- it consumes its own World Throw on landing, and its next strike is this round's.
+        worldThrowInHand = false
+        strikeSeen = false
         -- COLLAPSE THE BEAT, IN THIS ORDER. A new round opening mid-beat cuts the reveal short, and
         -- the one thing that must survive being cut short is the tape tile — the round's permanent
         -- record. So release it NOW (a no-op if the beat already got as far as landing it), then
@@ -631,7 +697,7 @@ end)
 
 RevealResult.OnClientEvent:Connect(function(r)
     -- The revealing round == the one RoundUpdate last named (REVEAL phase). Captured to a local so
-    -- the REVEAL_SAFETY fallback below still identifies THIS reveal even if `currentRoundId` has
+    -- the missed-strike backstop below still identifies THIS reveal even if `currentRoundId` has
     -- moved on by the time it fires.
     local roundId = currentRoundId
     -- No toast built here any more (spec §2 — the splash owns results, fired from the drum-rest
@@ -647,12 +713,25 @@ RevealResult.OnClientEvent:Connect(function(r)
         totalPlayers = r.totalPlayers,
     }
     maybeShowReveal() -- only shows if the drum is already at rest
-    task.delay(REVEAL_SAFETY, function()
-        if pendingReveal and pendingReveal.roundId == roundId then
-            drumAtRest = true -- safety: never strand a result if the cue dropped
-            maybeShowReveal()
-        end
-    end)
+    -- THE BACKSTOP FOR A MISSED STRIKE. The fallback is armed on `gongHit`, so a `gongHit` that
+    -- never arrives arms nothing and the result would sit here until ACTIVE swept it away unseen.
+    -- Nothing is armed if the strike has already been seen — that round's window is running and
+    -- this must not undercut it. Otherwise wait out the longest a legitimate strike can still be
+    -- ahead of a reveal that has already landed, and if it has STILL not arrived, take it as lost
+    -- and release: a strike that never came means a drum that never spun and never will, so there
+    -- is no turning drum left to spoil.
+    if not strikeSeen then
+        local leadSeconds = strikeLeadSeconds()
+        task.delay(leadSeconds, function()
+            if strikeSeen then
+                return -- the strike was merely late; its own window owns this round
+            end
+            if pendingReveal and pendingReveal.roundId == roundId then
+                drumAtRest = true
+                maybeShowReveal()
+            end
+        end)
+    end
 end)
 
 ProfileUpdate.OnClientEvent:Connect(function(p)

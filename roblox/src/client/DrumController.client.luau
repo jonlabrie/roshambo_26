@@ -98,7 +98,10 @@ local landTheta = 0
 local strikeT0 = -1
 local latestWorldThrow: string? = nil
 local lastLandedThrow: string? = nil
-local STALL_MAX = 6 -- s past min spin to wait for the reveal before settling anyway
+-- s past min spin to wait for the reveal before settling anyway. From DrumStep, not a local literal:
+-- main.client.luau's reveal-safety fallback has to sit BEHIND this worst case or it spoils the throw
+-- while the drum is still turning, and it can only do that if the number is visible outside this file.
+local STALL_MAX = DrumStep.STALL_MAX_SECONDS
 
 -- PIN-WHEEL parts that flick on the strike (BellDrive) — unchanged; ambient machinery.
 local bell = stage:WaitForChild("BellDrive")
