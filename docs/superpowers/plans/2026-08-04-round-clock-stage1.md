@@ -197,7 +197,43 @@ git commit -m "feat(roblox): the round's timeline can say what phase it is"
 
 ---
 
-### Task 2: The HUD's clock comes from the timeline
+## AMENDMENT — 2026-08-04, after Task 2 was built and reverted
+
+**Tasks 2 and 3 below are superseded by 2R and 3R at the end of this file. Do not implement them
+as written.**
+
+The plan's premise was wrong and the implementer caught it. The claim was "a fresh countdown reads
+18 instead of 20 because the phase arrives ~2s late." It does not:
+
+```lua
+local function secondsLeft(): number
+    if phase ~= "ACTIVE" then return 0 end
+    if not lockoutAt then return UNSYNCED_SECONDS end
+    return math.max(0, lockoutAt - os.clock())
+end
+```
+
+That is **time to lockout, computed locally** off a synced `lockoutAt`. 18 = 20 − the 2s lockout.
+It was never poll-delayed and it was never wrong: it counts down to the moment a player can no
+longer change their throw, which is why the buttons die when it reaches 0. The owner has confirmed
+this is the correct display and is not to change.
+
+**What Task 2 broke.** `HudModel` uses that one number for three jobs — the ring, `throwsEnabledFor`
+(`secondsLeft > 0`), and `sendAtLockout` (`secondsLeft > 0.5`). Redefining it as time-to-round-end
+left throws open 2s past the lockout and fired the pick 1.5s late, so `RoundCoordinator` answered
+`LOCKED` and every held pick was silently discarded. Reverted in `633ca8a`.
+
+**What is actually late:** only the phase *transition*, by ~1s of poll.
+
+**And why the obvious narrow fix wins nothing.** Making only the phase local does not help: the ring
+(`ringKnown`) and the throw gate both require `secondsLeft > 0`, which requires `lockoutAt`, which
+arrives on the same delayed `RoundUpdate`. The phase would flip a second early and nothing visible
+would follow. To gain the second, **the lockout instant must come from the timeline too** — which
+means the lockout constant has to be shared rather than living only on the Roblox server.
+
+---
+
+### Task 2 (SUPERSEDED — see Task 2R): The HUD's clock comes from the timeline
 
 **Files:**
 - Modify: `roblox/src/client/main.client.luau`
@@ -250,7 +286,7 @@ git commit -m "feat(roblox): the countdown starts at twenty"
 
 ---
 
-### Task 3: Throws cannot open before the server's round does
+### Task 3 (SUPERSEDED — see Task 3R): Throws cannot open before the server's round does
 
 **Files:**
 - Modify: `roblox/src/client/main.client.luau` (the throw gate)
@@ -310,3 +346,187 @@ Hand back for the owner's Studio gate. What needs eyes:
 **Do not push without telling the owner** — every push to `m4b-zendojo-art-pass` auto-deploys the dev App Runner service under any live Studio session.
 
 **Not in this stage:** the world-throw push, the OPEN/LOCK/REVEAL restructure, and the reveal ceremony. Each gets its own plan against the same spec.
+
+---
+
+# THE LIVE TASKS
+
+Tasks 2R and 3R replace Tasks 2 and 3. Task 1 is done and unchanged (`5fab0c9`).
+
+---
+
+### Task 2R: The lockout instant comes from the timeline, not the poll
+
+**Files:**
+- Modify: `roblox/src/shared/RoundMetronome.luau` (one derived field)
+- Modify: `roblox/tests/RoundMetronome.spec.luau`
+- Modify: `roblox/src/server/RoundCoordinator.luau` (read the shared constant)
+- Modify: `roblox/src/client/main.client.luau`
+
+**Interfaces:**
+- Consumes: `Reading.phase` / `Reading.secondsLeft` from Task 1.
+- Produces:
+  - `RoundMetronome.LOCKOUT_SECONDS` — the shared constant, moved out of `RoundCoordinator`
+  - `Reading.lockoutIn: number` — seconds from `now` until this round's lockout; `0` once past it,
+    and `0` in any phase but `ACTIVE`
+
+**Context:** `RoundCoordinator` owns `LOCKOUT_BEFORE_END_MS = 2000` privately and sends the client a
+`secondsToLockout` on each `RoundUpdate`. That arrival is the ~1s of poll lag. The timeline already
+knows where the round's ACTIVE phase ends, so it can derive the same instant locally — but only if
+both sides read the same constant.
+
+**`secondsLeft()`'s MEANING DOES NOT CHANGE.** It is still seconds-to-lockout. This task changes
+only where `lockoutAt` comes from, never what the number means. `HudModel` keeps using it for the
+ring, `throwsEnabledFor` and `sendAtLockout` exactly as it does today.
+
+- [ ] **Step 1: Write the failing tests**
+
+Add to `roblox/tests/RoundMetronome.spec.luau`, reusing the 27s fixture from Task 1's block:
+
+```lua
+describe("RoundMetronome — the lockout, derived rather than delivered", function()
+    test("the constant is here so the client and the game server cannot disagree", function()
+        -- It lived privately in RoundCoordinator and reached the client only on a
+        -- RoundUpdate, which is the ~1s of poll lag this stage removes. Two copies
+        -- of a deadline is how they drift.
+        expect(RoundMetronome.LOCKOUT_SECONDS).toBe(2)
+    end)
+
+    test("it counts down to the lockout, not to the end of ACTIVE", function()
+        local m = m27()
+        local roundStart = 1000 - 22
+        -- ACTIVE is 20s and the lockout is 2s before its end, so the window is 18s.
+        expect(m:read(roundStart).lockoutIn).toBeCloseTo(18, 0.001)
+        expect(m:read(roundStart + 17).lockoutIn).toBeCloseTo(1, 0.001)
+    end)
+
+    test("it is zero THROUGH the lockout window, not negative", function()
+        -- The throw gate is `> 0`. A negative here would read as "time remaining"
+        -- to anything doing arithmetic on it, and would reopen throws that must
+        -- stay shut.
+        local m = m27()
+        local roundStart = 1000 - 22
+        expect(m:read(roundStart + 18).lockoutIn).toBe(0)
+        expect(m:read(roundStart + 19).lockoutIn).toBe(0)
+        expect(m:read(roundStart + 19.99).lockoutIn).toBe(0)
+    end)
+
+    test("it is zero outside ACTIVE", function()
+        local m = m27()
+        local roundStart = 1000 - 22
+        expect(m:read(roundStart + 20).lockoutIn).toBe(0) -- TALLY
+        expect(m:read(roundStart + 23).lockoutIn).toBe(0) -- REVEAL
+    end)
+end)
+```
+
+- [ ] **Step 2: Run and watch them fail**, then implement
+
+`LOCKOUT_SECONDS = 2` on the module. In `read()`, derive from the values already in scope:
+
+```lua
+    -- The lockout instant, derived rather than delivered. Zero outside ACTIVE and zero
+    -- THROUGH the window itself — never negative, because the throw gate is `> 0` and a
+    -- negative would read as time remaining.
+    local lockoutIn = 0
+    if phase == "ACTIVE" then
+        lockoutIn = math.max(0, (activeEnd - RoundMetronome.LOCKOUT_SECONDS) - elapsed)
+    end
+```
+
+Return it on `Reading`. Do not recompute `elapsed`, `activeEnd` or `phase` — Task 1 put them in
+scope.
+
+- [ ] **Step 3: Point `RoundCoordinator` at the shared constant**
+
+Replace its private `LOCKOUT_BEFORE_END_MS = 2000` with `RoundMetronome.LOCKOUT_SECONDS * 1000`,
+requiring the module the way that file requires its other shared modules. The Roblox **server** and
+the client now read one number.
+
+Confirm `RoundCoordinator`'s existing tests still pass untouched. If it has none covering the
+lockout, say so in your report rather than adding them here.
+
+- [ ] **Step 4: Use the local lockout in the client**
+
+In `main.client.luau`:
+
+- build a `RoundMetronome` fed from `ReplicatedStorage:WaitForChild("RoundScheduleConfig")`,
+  mirroring `HammerController.client.luau`'s reading of the same attributes and defaults
+- pass **`workspace:GetServerTimeNow()`** to `read()` — the schedule is published on that timeline.
+  Not `os.clock()`, not `tick()`
+- derive `phase` and `lockoutAt` from the reading when one is available
+- **fall back to exactly today's behaviour when `read()` returns `nil`** — the last `RoundUpdate` —
+  so a client joining mid-round degrades to what it does now
+- `RoundUpdate` remains authoritative for round identity, and corrects the phase when it disagrees
+
+**Do not touch `secondsLeft()`'s formula or its meaning.** It stays `max(0, lockoutAt - now)`. The
+only change is that `lockoutAt` may now come from the timeline.
+
+Note the clock mismatch and handle it explicitly: `secondsLeft()` currently compares against
+`os.clock()`. If `lockoutAt` becomes a `GetServerTimeNow` value, both sides of that subtraction must
+be on the same timeline. Getting this wrong yields a countdown off by the server's uptime. State in
+your report which timeline you settled on and why.
+
+- [ ] **Step 5: The standing check**
+
+No gate loads `main.client.luau`. Verify by reading, with line numbers:
+1. every `Reading.X` read exists on what Task 1 and Step 2 return
+2. `lockoutAt` and the value it is compared against are on the **same** clock
+3. the nil-reading fallback is reachable — trace a client joining mid-round
+4. `secondsLeft()`'s formula is unchanged
+5. no new local used above its declaration
+
+- [ ] **Step 6: Gates and commit**
+
+```bash
+cd /Users/jonlabrie/Desktop/ClaudeCode/Roshambo_26/roblox
+lune run tests/run && stylua --check src tests tools && selene src tools
+cd /Users/jonlabrie/Desktop/ClaudeCode/Roshambo_26
+git add roblox/src/shared/RoundMetronome.luau roblox/tests/RoundMetronome.spec.luau \
+        roblox/src/server/RoundCoordinator.luau roblox/src/client/main.client.luau
+git commit -m "feat(roblox): the lockout is derived from the timeline, not waited for"
+```
+
+---
+
+### Task 3R: Throws open late, never early
+
+**Files:**
+- Modify: `roblox/src/client/main.client.luau`
+
+**Context:** This stage inverts a failure mode, which is why it gets its own diff.
+
+The phase used to arrive **late**, so throws opened late and a player quietly lost a second. Derived
+locally it can arrive **early** if the clock or schedule is off — and a pick made before the
+server's round has opened is buffered against a round that has not started. The server's own guards
+(`RoundCoordinator:submitPick`, the API's phase gate) mean it cannot corrupt a result, but it can
+swallow a player's first tap: the fault nobody reports and everybody feels.
+
+- [ ] **Step 1: Require agreement before opening**
+
+Throws open only when the locally-derived phase says `ACTIVE` **and** the last `RoundUpdate` has
+confirmed the same round. Write it so disagreement fails **shut**. Losing 200ms of throwing time is
+invisible; a swallowed first tap is not.
+
+Comment the reasoning — the condition will look redundant and invite simplification.
+
+- [ ] **Step 2: Trace and report each case**
+
+1. local ACTIVE, `RoundUpdate` confirms the same round → open
+2. local ACTIVE, `RoundUpdate` still on the previous round → shut
+3. local ACTIVE early by 500ms → opens 500ms late, never early
+4. no schedule at all → identical to today
+5. the lockout arrives → closes, unchanged
+6. `sendAtLockout` still fires inside the server's window → **the pick reaches the wire**
+
+Case 6 is the one that was broken before and must be stated explicitly.
+
+- [ ] **Step 3: Gates and commit**
+
+```bash
+cd /Users/jonlabrie/Desktop/ClaudeCode/Roshambo_26/roblox
+lune run tests/run && stylua --check src tests tools && selene src tools
+cd /Users/jonlabrie/Desktop/ClaudeCode/Roshambo_26
+git add roblox/src/client/main.client.luau
+git commit -m "fix(roblox): a local clock may open throws late, never early"
+```
