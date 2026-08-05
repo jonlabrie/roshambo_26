@@ -2,7 +2,7 @@
 -- Continuously spins the waterwheels. The creek always flows, so the wheels never
 -- stop — they kept turning through the round before, then froze on the lockout
 -- "ratchet", which read wrong (a live stream with stalled wheels). The striker's
--- draw/latch is driven by the clock (HammerCurve), not the wheel's real rotation,
+-- draw/latch is driven by the clock (RoundMetronome), not the wheel's real rotation,
 -- so the two are decoupled and the wheels just turn forever.
 local RunService = game:GetService("RunService")
 

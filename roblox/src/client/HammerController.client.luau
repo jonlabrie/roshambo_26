@@ -1,5 +1,5 @@
 --!strict
--- Animates the placeholder hammer arm from HammerCurve and fires the gong
+-- Animates the placeholder hammer arm from the RoundMetronome timeline and fires the gong
 -- placeholder on reveal. 4b swaps parts for art; the curve stays.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
