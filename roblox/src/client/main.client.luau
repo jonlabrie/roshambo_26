@@ -154,8 +154,11 @@ end
 -- it happens; RoundUpdate only learns of one when the Roblox game server's 1-1.25s poll notices,
 -- which is the second the ring used to appear and disappear late by.
 --
--- `serverPhase` is the last phase RoundUpdate reported, and it is not vestigial. It is the
--- FALLBACK when no schedule has landed, and it is the phase the round-ended edge is measured on —
+-- `serverPhase` is the last phase RoundUpdate reported, and it is not vestigial. It has three
+-- jobs. It is the FALLBACK when no schedule has landed; it is what THROWS OPEN ON, in agreement
+-- with the timeline (`throwPhase` below — a timeline that leads may open throws before the server
+-- has a round to take them, and the tap would be swallowed by this handler's own reset); and it is
+-- the phase the round-ended edge is measured on —
 -- that edge is about the SERVER's round closing, so re-keying it to a local clock that
 -- deliberately leads the server would fire it early, or (worse) never, because by the time
 -- RoundUpdate said TALLY the effective phase would already have left ACTIVE and the edge would
@@ -390,12 +393,64 @@ local function visibleTape(): { { worldThrow: string, result: string? } }
     return out
 end
 
+-- ⚠ THROWS MAY OPEN LATE. THEY MAY NEVER OPEN EARLY.
+--
+-- This is the phase HudModel is handed, and it is deliberately NOT always the effective `phase`
+-- the rest of the HUD runs on. `phase` comes from the published timeline, so it LEADS RoundUpdate
+-- by however long the Roblox game server's 1-1.25s poll takes to notice a boundary. Leading is the
+-- whole point for anything that is merely drawn. It is the wrong thing for OPENING THROWS, and the
+-- reason is not on this line — it is in the RoundUpdate handler below: the poll's ACTIVE report is
+-- ALSO what resets the round's pick state. A tap taken between the local ACTIVE and the server's
+-- is written into `chosen`, and then `chosen = nil` a fraction of a second later. The glyph lights
+-- and goes dark, nothing reaches the wire, and the player is told nothing. Nobody reports that
+-- fault; everybody feels it.
+--
+-- So the two sources must AGREE before throws open, and disagreement fails SHUT. Losing 200ms of
+-- an 18s window is invisible. A swallowed first tap is not.
+--
+-- THIS WILL LOOK REDUNDANT TO THE NEXT READER. `phase` is already `localPhase or serverPhase`, so
+-- the eye reads "local says ACTIVE, therefore phase is ACTIVE, therefore why ask serverPhase at
+-- all?" — and that reading is exactly the case being rejected. Simplifying this to `return phase`
+-- restores the swallow, and no automated gate in this repo will catch it: nothing loads a
+-- `.client.luau`.
+--
+-- ROUND IDENTITY IS CARRIED BY THE PHASE REPORT, NOT COMPARED AS AN ID. `serverPhase == "ACTIVE"`
+-- is per-round by construction — it is set from the same RoundUpdate whose ACTIVE branch resets
+-- this round's pick state, so agreement means that reset has already happened. Comparing round ids
+-- instead would be worse: RoundScheduleConfig's RoundId is an ATTRIBUTE and RoundUpdate is a
+-- RemoteEvent, and those two have no replication ordering, so the comparison would invent
+-- disagreement rather than detect it (RoundMetronome's Reading carries no round id at all). And
+-- "both say ACTIVE" cannot name two different rounds: the metronome hard re-anchors past
+-- SLEW_TOLERANCE, so the timeline is never a whole period out.
+--
+-- IT CANNOT WITHHOLD THE HELD PICK'S ONE TRIP TO THE WIRE, and that is a property of
+-- HudModel.sendAtLockout rather than a hope: for a pick that is chosen and unsent, an ACTIVE phase
+-- returns nil while time remains, and ANY non-ACTIVE phase returns the pick at once. Substituting
+-- non-ACTIVE for ACTIVE — the only substitution this function makes — can therefore turn a nil
+-- into the pick, never the pick into a nil. The lockout send is unreachable from here. (It is not
+-- moved earlier in practice either: the only window this changes is one in which the server is not
+-- in ACTIVE, and by then the previous round's pick has already gone — `sent` is true — or there
+-- never was one.)
+local function throwPhase(): string
+    if localPhase == "ACTIVE" and serverPhase ~= "ACTIVE" then
+        -- The timeline has opened a round the server has not. Report the server's phase, so the
+        -- gate stays shut until the poll catches up.
+        return serverPhase
+    end
+    return phase
+end
+
 -- One HudModel.Inputs, built in one place. The tap handler and the lockout send both have to ask
 -- the model questions about the CURRENT state, and a second hand-assembled copy of this table is
 -- exactly how a field ends up set in one and forgotten in the other.
+--
+-- The `phase` here is `throwPhase()`, not the effective `phase` — see above. This table is also
+-- what goes out on EventBus.HudState, so HudController's ring latches on the gated phase too and
+-- appears when throws do rather than up to a poll ahead of them. That is a consequence, not the
+-- goal; decoupling the two needs a second field on HudModel.Inputs and a HudController edit.
 local function buildInputs(): any
     return {
-        phase = phase,
+        phase = throwPhase(),
         secondsLeft = secondsLeft(),
         pointsAtStake = wallet.pointsAtStake,
         currentStreak = wallet.currentStreak,
