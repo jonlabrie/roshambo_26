@@ -858,16 +858,23 @@ RoundUpdate.OnClientEvent:Connect(function(info)
         -- it consumes its own World Throw on landing, and its next strike is this round's.
         worldThrowInHand = false
         strikeSeen = false
-        -- COLLAPSE THE BEAT, IN THIS ORDER. A new round opening mid-beat cuts the reveal short, and
-        -- the one thing that must survive being cut short is the tape tile — the round's permanent
-        -- record. So release it NOW (a no-op if the beat already got as far as landing it), then
-        -- clear the ring, then invalidate the generation so the beat's own `task.delay`s find a
-        -- stale `gen` and do nothing. The ring goes back to being a clock on its own: with
-        -- `revealedWorldThrow` nil, ACTIVE restores the countdown.
-        landTape()
-        revealedWorldThrow = nil -- the ring must not carry last round's glyph into this one
-        worldThrowFading = false
-        beatGen += 1
+        -- THE BEAT IS DELIBERATELY NOT COLLAPSED HERE (owner's ruling, 2026-08-04, after seeing it
+        -- in Studio). This used to release the tape, clear the ring and invalidate the generation,
+        -- on the reasoning that "the ring must not carry last round's glyph into this one".
+        --
+        -- It turned out that reasoning cost the whole feature. The drum comes to rest with about a
+        -- second left before the next round opens, so collapsing on ACTIVE cut the glyph off almost
+        -- the instant it appeared — the owner watched it arrive at exactly the right moment and be
+        -- replaced by the fresh countdown in well under a second.
+        --
+        -- So the beat now runs ACROSS the boundary: the glyph holds and fades over the first few
+        -- seconds of the new round, and the ring hands back to a countdown already part-way down.
+        -- Its own `task.delay`s are wall-clock and always fire, so it completes on its own; and if
+        -- a NEXT reveal ever arrived mid-beat, `maybeShowReveal` already releases the older tile
+        -- defensively before overwriting the flight record, so the tape tile is still never lost.
+        --
+        -- `pendingReveal`, `drumAtRest` and the fallback inputs above ARE still reset — those are
+        -- about the next round's gate, not about the beat that is still playing out.
     else
         lockoutAt = nil
     end

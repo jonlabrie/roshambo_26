@@ -18,7 +18,7 @@ local RevealBeat = {}
 
 -- How long the glyph sits before it begins to go. The owner asked for "a few seconds"; this is the
 -- first thing to tune at a Studio gate, which is why it is named rather than inline.
-RevealBeat.HOLD_SECONDS = 2
+RevealBeat.HOLD_SECONDS = 3
 
 -- A real fade, not a Visible toggle. A toggle is what it did before, and part of why it read as a
 -- flicker rather than a reveal.
@@ -28,27 +28,20 @@ RevealBeat.FADE_SECONDS = 0.4
 -- round's RECORD, and a record arriving with the announcement is what buried the announcement.
 RevealBeat.TAPE_DELAY_SECONDS = RevealBeat.HOLD_SECONDS + RevealBeat.FADE_SECONDS
 
--- How much time exists after the drum stops. PROVISIONAL — THIS NUMBER IS NOT MEASURED, and the
--- previous comment here claiming it was ("the drum rests ~3.2s into the gap") was measuring the
--- wrong event: every instrumented round released through main.client's reveal-safety FALLBACK, not
--- through `drumRest`, because the fallback was armed from RevealResult arriving and beat the drum.
--- The 3.2s was the fallback's own lead, and it says nothing about where the drum actually stops.
+-- THE BEAT DELIBERATELY OUTLIVES THE ROUND BOUNDARY (owner's ruling, 2026-08-04, confirmed in
+-- Studio). The drum comes to rest with roughly a second left before the next round opens, so a
+-- beat that had to fit between rest and ACTIVE was cut off after well under a second — the owner
+-- saw the glyph appear at the right moment and be replaced by the fresh countdown almost at once.
 --
--- WHAT IS ACTUALLY KNOWN:
---   * The nominal arithmetic. The strike is scheduled at ACTIVE-end + TallySec, and the drum rests
---     DrumStep.SETTLE_SECONDS (3.45s) after it — so 5.45s into a TALLY(2) + REVEAL(5) = 7s gap,
---     leaving a nominal runway of 1.55s.
---   * The client's phase transitions lag the nominal boundaries. Measured at revealSeconds: 3,
---     TALLY was seen at 8.13s and ACTIVE at 14.34s — a 6.21s observed gap against a 5s nominal one,
---     so the gap the client actually experiences runs on the order of a second longer than nominal.
---   * The true post-rest runway has NOT been measured, at either reveal length. It cannot be until
---     the fallback stops pre-empting `drumRest`.
+-- Rather than shortening the beat to fit, or lengthening the round to make room, the beat is now
+-- allowed to run ACROSS the boundary: the glyph holds and fades over the first few seconds of the
+-- new round, and the ring hands back to a countdown already part-way down. main.client no longer
+-- collapses the beat when ACTIVE arrives.
 --
--- So 1.55s nominal, perhaps ~2.7s once the observed lag is allowed for, against a 3.8s literal that
--- the spec test leans on — the literal may well be too generous, and the beat (2.4s to the tape) may
--- not fit. RE-MEASURE AT THE STUDIO GATE, from `drumRest` to the next ACTIVE, and set this from that
--- reading; if it comes in under TAPE_DELAY_SECONDS the beat itself has to shorten. Left as a literal
--- deliberately: deriving it from the phase durations would only dress the same guess up as a fact.
-RevealBeat.RUNWAY_SECONDS = 3.8
+-- WHAT STILL BOUNDS IT: the beat must finish comfortably before the NEXT reveal, or two beats
+-- would overlap and the older one's tape tile would be released by the newer one's arrival rather
+-- than by its own schedule. Drum rests are about a round apart, so the ceiling is generous — but
+-- it is a real ceiling and the test below pins it.
+RevealBeat.MAX_SAFE_SECONDS = 6
 
 return RevealBeat

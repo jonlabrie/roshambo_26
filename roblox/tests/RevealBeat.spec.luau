@@ -18,14 +18,20 @@ describe("RevealBeat — the sequence after the drum stops", function()
         expect(RevealBeat.TAPE_DELAY_SECONDS).toBe(RevealBeat.HOLD_SECONDS + RevealBeat.FADE_SECONDS)
     end)
 
-    test("the whole beat fits the runway, with headroom", function()
-        -- RUNWAY_SECONDS is PROVISIONAL, not measured — see its comment in RevealBeat. The old
-        -- "~3.2s into the gap" reading was the reveal-safety fallback firing, not the drum coming
-        -- to rest, so the true post-rest runway is still unknown. This asserts the beat fits the
-        -- number we are carrying; it cannot assert the number is right.
-        expect(RevealBeat.TAPE_DELAY_SECONDS < RevealBeat.RUNWAY_SECONDS).toBe(true)
-        -- Not merely fitting: the tape must be readable before the next round opens.
-        expect(RevealBeat.RUNWAY_SECONDS - RevealBeat.TAPE_DELAY_SECONDS >= 1).toBe(true)
+    test("the beat is a real beat, and outlives the round boundary on purpose", function()
+        -- The drum rests with about a second left before the next round opens. A beat that had to
+        -- fit inside that was cut off almost immediately — the owner saw the glyph appear correctly
+        -- and be replaced by the fresh countdown in under a second. So it now runs ACROSS the
+        -- boundary rather than being squeezed to fit, and main.client no longer collapses it when
+        -- ACTIVE arrives.
+        expect(RevealBeat.TAPE_DELAY_SECONDS > 2).toBe(true)
+    end)
+
+    test("but it must finish well before the NEXT reveal", function()
+        -- The one real ceiling. Two overlapping beats would mean the older one's tape tile is
+        -- released by the newer beat's arrival instead of by its own schedule — the tile still
+        -- lands, but its timing stops being the beat's to control.
+        expect(RevealBeat.TAPE_DELAY_SECONDS < RevealBeat.MAX_SAFE_SECONDS).toBe(true)
     end)
 
     test("it holds no Roblox globals — numbers only", function()
