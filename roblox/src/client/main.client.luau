@@ -47,6 +47,7 @@ local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local HudModel = require(shared:WaitForChild("HudModel"))
 local RevealBeat = require(shared:WaitForChild("RevealBeat"))
 local DrumStep = require(shared:WaitForChild("DrumStep"))
+local RoundMetronome = require(shared:WaitForChild("RoundMetronome"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local SubmitPick = remotes:WaitForChild("SubmitPick") :: RemoteEvent
@@ -144,7 +145,30 @@ local function landTape()
     end
 end
 
+-- THE ROUND'S PHASE, from two sources that are NOT interchangeable.
+--
+-- `phase` is the EFFECTIVE phase — what the HUD renders and what HudModel reads. Since
+-- 2026-08-04 it normally comes from the PUBLISHED TIMELINE (`refreshClock` below: RoundMetronome
+-- fed from RoundScheduleConfig, on the GetServerTimeNow clock every client already shares — the
+-- same schedule the bell's cam has always run on). The timeline knows a boundary at the instant
+-- it happens; RoundUpdate only learns of one when the Roblox game server's 1-1.25s poll notices,
+-- which is the second the ring used to appear and disappear late by.
+--
+-- `serverPhase` is the last phase RoundUpdate reported, and it is not vestigial. It is the
+-- FALLBACK when no schedule has landed, and it is the phase the round-ended edge is measured on —
+-- that edge is about the SERVER's round closing, so re-keying it to a local clock that
+-- deliberately leads the server would fire it early, or (worse) never, because by the time
+-- RoundUpdate said TALLY the effective phase would already have left ACTIVE and the edge would
+-- have passed unobserved.
 local phase = ""
+local serverPhase = ""
+-- The timeline's last phase, sampled by `refreshClock` on the 10Hz heartbeat. nil until a
+-- schedule lands, which is exactly the "no schedule, no local clock" state — and the one flag
+-- that says whether the timeline or the poll owns `lockoutAt` at this instant.
+local localPhase: string? = nil
+-- THE MOMENT PICKS CLOSE, on the os.clock() timeline (see `secondsLeft`). Derived from the
+-- published schedule when there is one and carried by RoundUpdate's `secondsToLockout` when
+-- there is not.
 local lockoutAt: number? = nil
 local roundCouldThrow = false
 
@@ -248,6 +272,76 @@ local function roundEnded(couldThrow: boolean, picked: boolean)
     session = HudModel.onRoundEnded(session, { couldThrow = couldThrow, picked = picked })
 end
 
+-- THE PUBLISHED TIMELINE. RoundScheduleConfig carries the round's absolute schedule on the
+-- GetServerTimeNow clock; RoundMetronome is the pure, slew-not-snap reader of it, and this file
+-- is its second consumer.
+--
+-- HammerController reads the SAME configuration with the SAME attribute names and the SAME
+-- defaults (its `pullSchedule`) — two files reading one schedule must not disagree about what its
+-- attributes are called, and this block is a deliberate mirror of that one, not an independent
+-- reading. They are two literal copies today; a shared reader is worth extracting, but that is a
+-- change to HammerController as well and belongs in its own diff.
+--
+-- WaitForChild, but OFF THE MAIN THREAD. The config folder is created by main.server.luau at
+-- runtime, and this file must not hold up wiring its remote handlers waiting for it — a blocked
+-- top level would miss the first RoundUpdate outright. Until the folder lands, `metronome:read`
+-- returns nil and the HUD runs on RoundUpdate exactly as it did before this change.
+local metronome = RoundMetronome.new()
+task.spawn(function()
+    local scheduleConfig = ReplicatedStorage:WaitForChild("RoundScheduleConfig")
+    local function pullSchedule()
+        local strikeAt = scheduleConfig:GetAttribute("StrikeAtServerTime")
+        local periodSec = scheduleConfig:GetAttribute("PeriodSec")
+        if typeof(strikeAt) ~= "number" or typeof(periodSec) ~= "number" then
+            return
+        end
+        metronome:setSchedule({
+            roundId = scheduleConfig:GetAttribute("RoundId") :: string?,
+            strikeAt = strikeAt,
+            periodSec = periodSec,
+            activeSec = (scheduleConfig:GetAttribute("ActiveSec") :: number?) or 20,
+            tallySec = (scheduleConfig:GetAttribute("TallySec") :: number?) or 2,
+            -- Fallbacks mirror the server's configured phase durations (server/src/index.ts); only
+            -- used until the first schedule attributes replicate, but a stale one is a wrong schedule.
+            revealSec = (scheduleConfig:GetAttribute("RevealSec") :: number?) or 5,
+        }, workspace:GetServerTimeNow())
+    end
+    -- StrikeAtServerTime is written LAST on the server, so one changed-signal on it pulls a
+    -- coherent schedule.
+    scheduleConfig:GetAttributeChangedSignal("StrikeAtServerTime"):Connect(pullSchedule)
+    pullSchedule()
+end)
+
+-- The ONE writer of `phase`, `localPhase` and (when the timeline has a schedule) `lockoutAt`:
+-- called from the 10Hz heartbeat at the bottom of this file, and again the moment RoundUpdate
+-- lands.
+--
+-- TWO CLOCKS MEET IN THIS FUNCTION AND THEY MUST NOT BE MIXED UP.
+--   • `metronome:read` is fed `workspace:GetServerTimeNow()`, never os.clock() or tick(). The
+--     schedule is published on that timeline (main.server.luau's onSchedule converts into it).
+--   • `reading.lockoutIn` is a DURATION — seconds from that instant until picks close — and a
+--     duration belongs to no timeline at all. That is what makes the line below safe: adding it
+--     to os.clock() yields a deadline on the SAME clock `secondsLeft` subtracts from. Storing a
+--     GetServerTimeNow instant in `lockoutAt` while `secondsLeft` compared against os.clock()
+--     would put the countdown out by however long the machine had been up — a wrong number with
+--     no visible cause. The two clocks are read one line apart, so the conversion costs nothing.
+--
+-- NO SCHEDULE, NO LOCAL CLOCK. `read()` returns nil until a schedule has landed: a client that
+-- just joined, or one whose config never replicates. There is nothing local to fall back on and
+-- inventing a start instant would be worse than the lag, so `phase` reverts to whatever
+-- RoundUpdate last said and `lockoutAt` is left exactly as RoundUpdate set it — which is
+-- precisely the behaviour this file had before the timeline existed.
+local function refreshClock()
+    local reading = metronome:read(workspace:GetServerTimeNow())
+    localPhase = if reading then reading.phase else nil
+    phase = localPhase or serverPhase
+    if reading then
+        -- Outside ACTIVE there is no lockout to count down to, and `lockoutAt = nil` is how this
+        -- file has always said so (`timerKnown`, and the ring, both read it that way).
+        lockoutAt = if reading.phase == "ACTIVE" then os.clock() + reading.lockoutIn else nil
+    end
+end
+
 -- The clock may not have synced when ACTIVE opens (secondsToLockout arrives nil), and lockoutAt is
 -- only ever assigned at that transition — so a nil there stays nil for the whole round. The old HUD
 -- let the player throw anyway and so do we: report a nominal countdown comfortably above the
@@ -256,6 +350,15 @@ end
 -- working past the real lockout. `timerKnown` tells the HUD to hide it instead.
 local UNSYNCED_SECONDS = 30
 
+-- ⚠ SECONDS TO THE LOCKOUT. NOT to the end of ACTIVE, and NOT to the end of the round. HudModel
+-- spends this one number three ways — the ring's display, `throwsEnabledFor` (`secondsLeft > 0`)
+-- and `sendAtLockout` (`> 0.5`) — so redefining it as anything longer leaves throws open past the
+-- moment RoundCoordinator stops accepting them and fires the held pick too late to be counted.
+-- That was tried on 2026-08-04 (582abfe) and reverted: every held pick was silently discarded.
+--
+-- The 2026-08-04 change is only that `lockoutAt` now comes from the published timeline when there
+-- is one (`refreshClock`) rather than from the poll's `secondsToLockout`. The formula and the
+-- meaning are untouched, and both sides of the subtraction are on os.clock().
 local function secondsLeft(): number
     if phase ~= "ACTIVE" then
         return 0
@@ -657,13 +760,27 @@ RoundUpdate.OnClientEvent:Connect(function(info)
     if info.tape and #info.tape > 0 then
         tape = info.tape -- authoritative World-Throw history, every phase change
     end
-    if phase == "ACTIVE" and info.phase ~= "ACTIVE" then
+    -- MEASURED ON `serverPhase`, NOT on the effective `phase`. This edge is "the server's round
+    -- has closed", and the effective phase is now the local timeline's, which leads the server by
+    -- up to the length of its poll — so against `phase` the edge would already have passed by the
+    -- time this fires and `roundEnded` would never be called at all, silently breaking the
+    -- escalation's consecutive-miss backoff. `serverPhase` still holds the PREVIOUS report here.
+    if serverPhase == "ACTIVE" and info.phase ~= "ACTIVE" then
         -- A STANDING CHOICE COUNTS AS PLAYED. The lockout normally sends it half a second
         -- before this fires; a choice made inside that last sliver must not be scored as an
         -- ignored round, because three of those start the escalation nagging someone who is
         -- demonstrably playing.
         roundEnded(roundCouldThrow, chosen ~= nil)
     end
+    serverPhase = info.phase
+    refreshClock() -- resample the timeline for this instant, so `localPhase` is current below
+    -- RECONCILE, DO NOT FIGHT. The server is right about the phase it just named, so take it; the
+    -- next heartbeat (one TICK, 100ms) re-reads the timeline. That is deliberately a NUDGE and not
+    -- a latch: disagreement is the NORMAL state for the second a poll takes to notice a boundary —
+    -- the timeline leading the remote is the entire point — so a correction that HELD until the
+    -- two agreed would hand the round straight back to the poll and undo the change. Nothing here
+    -- rewrites the schedule either: RoundMetronome owns the slewing that makes the two converge
+    -- for real, and it already does it (setSchedule / SLEW_RATE).
     phase = info.phase
     if info.phase == "ACTIVE" then
         chosen = nil
@@ -672,7 +789,14 @@ RoundUpdate.OnClientEvent:Connect(function(info)
         sent = false
         declinedThisRound = false
         roundCouldThrow = true
-        lockoutAt = if info.secondsToLockout then os.clock() + info.secondsToLockout else nil
+        -- THE POLL'S LOCKOUT IS THE FALLBACK NOW, not the source. `localPhase == nil` is exactly
+        -- "refreshClock has no schedule and will not be touching `lockoutAt`" — so this fills it
+        -- in for a client whose RoundScheduleConfig has not replicated (or never does), and stays
+        -- out of the way otherwise rather than overwriting the timeline's figure with a value the
+        -- poll computed up to a second ago and having the next tick undo it.
+        if localPhase == nil then
+            lockoutAt = if info.secondsToLockout then os.clock() + info.secondsToLockout else nil
+        end
         pendingReveal = nil -- the drum respins; last round's reveal has already been shown
         drumAtRest = false
         -- Both fallback inputs are per-round and reset with the round, matching DrumController:
@@ -826,6 +950,9 @@ end)
 -- throw at any point in it did not have the round taken from them.
 task.spawn(function()
     while true do
+        -- FIRST, before anything reads `phase` or `secondsLeft()` this tick: resample the
+        -- published timeline. This loop is the phase's clock now — nothing pushes it.
+        refreshClock()
         if phase == "ACTIVE" then
             roundCouldThrow = true
         end

@@ -10,6 +10,14 @@ RoundMetronome.__index = RoundMetronome
 local SLEW_TOLERANCE = 2.0 -- seconds; beyond this, snap
 local SLEW_RATE = 0.05 -- seconds of correction per second of wall time
 
+-- THE LOCKOUT LEAD, and it lives here because the timeline is the one thing both sides of the
+-- game share. Picks close this many seconds before ACTIVE ends (spec §4). RoundCoordinator owned
+-- it privately and shipped the client a `secondsToLockout` on each RoundUpdate — which is to say
+-- the client learned its own deadline only when a 1-1.25s poll got round to telling it. With the
+-- constant here the client derives the same instant off the published schedule, and there is one
+-- number rather than two that agree until someone retunes one of them.
+RoundMetronome.LOCKOUT_SECONDS = 2
+
 export type Schedule = {
     roundId: string?,
     strikeAt: number,
@@ -28,6 +36,7 @@ export type Reading = {
     nextStrikeAt: number,
     phase: string,
     secondsLeft: number,
+    lockoutIn: number,
 }
 
 function RoundMetronome.new()
@@ -112,6 +121,14 @@ function RoundMetronome.read(self: any, now: number): Reading?
         phase, phaseEndsAt = "REVEAL", period
     end
 
+    -- The lockout instant, derived rather than delivered. Zero outside ACTIVE and zero
+    -- THROUGH the window itself — never negative, because the throw gate is `> 0` and a
+    -- negative would read as time remaining.
+    local lockoutIn = 0
+    if phase == "ACTIVE" then
+        lockoutIn = math.max(0, (activeEnd - RoundMetronome.LOCKOUT_SECONDS) - elapsed)
+    end
+
     return {
         drawP = drawP,
         camAngle = camAngle,
@@ -121,6 +138,7 @@ function RoundMetronome.read(self: any, now: number): Reading?
         nextStrikeAt = nextStrikeAt,
         phase = phase,
         secondsLeft = math.max(0, phaseEndsAt - elapsed),
+        lockoutIn = lockoutIn,
     }
 end
 

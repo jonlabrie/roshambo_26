@@ -51,6 +51,10 @@ local HandlerQueue = require(script.Parent:WaitForChild("HandlerQueue"))
 local PortalController = require(script.Parent:WaitForChild("PortalController"))
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local RoundClock = require(shared:WaitForChild("RoundClock"))
+-- Required here for ONE value: LOCKOUT_SECONDS. The client derives its own lockout instant off
+-- the published timeline from the same constant, so this is the wiring that makes "the game
+-- server's lockout" and "the client's lockout" literally the same number.
+local RoundMetronome = require(shared:WaitForChild("RoundMetronome"))
 local GameRules = require(shared:WaitForChild("GameRules"))
 local PlayerProfiles = require(shared:WaitForChild("PlayerProfiles"))
 local ThemeManifest = require(shared:WaitForChild("ThemeManifest"))
@@ -320,6 +324,7 @@ local coordinator = RoundCoordinator.new({
     log = print,
     random = math.random,
     now = deps.now,
+    lockoutMs = RoundMetronome.LOCKOUT_SECONDS * 1000,
     instanceId = if game.JobId ~= "" then game.JobId else "studio-local",
     callbacks = {
         onRound = function(info)

@@ -1,6 +1,7 @@
 --!strict
 local harness = require("./harness")
 local RoundMetronome = require("../src/shared/RoundMetronome")
+local RoundCoordinator = require("../src/server/RoundCoordinator")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 
 local TAU = 2 * math.pi
@@ -85,23 +86,24 @@ describe("RoundMetronome", function()
     end)
 end)
 
-describe("RoundMetronome — the phase, read off the same timeline as the cam", function()
-    -- A 27s round: 20 active, 2 tally, 5 reveal, with the strike at the first
-    -- instant of REVEAL (activeSec + tallySec into the period), which is how
-    -- RoundCoordinator publishes it.
-    local function m27()
-        local m = RoundMetronome.new()
-        m:setSchedule({
-            roundId = "r1",
-            strikeAt = 1000,
-            periodSec = 27,
-            activeSec = 20,
-            tallySec = 2,
-            revealSec = 5,
-        }, 1000)
-        return m
-    end
+-- A 27s round: 20 active, 2 tally, 5 reveal, with the strike at the first
+-- instant of REVEAL (activeSec + tallySec into the period), which is how
+-- RoundCoordinator publishes it. Shared by the phase block and the lockout block
+-- below — one fixture, so the two cannot describe different rounds.
+local function m27()
+    local m = RoundMetronome.new()
+    m:setSchedule({
+        roundId = "r1",
+        strikeAt = 1000,
+        periodSec = 27,
+        activeSec = 20,
+        tallySec = 2,
+        revealSec = 5,
+    }, 1000)
+    return m
+end
 
+describe("RoundMetronome — the phase, read off the same timeline as the cam", function()
     test("the strike instant is the first instant of REVEAL", function()
         -- This is the anchor the whole timeline hangs off. If it drifts, every
         -- phase boundary drifts with it.
@@ -164,5 +166,50 @@ describe("RoundMetronome — the phase, read off the same timeline as the cam", 
         -- read() already returns nil before a schedule lands; the new fields must
         -- not tempt a caller into treating an unsynced client as being mid-round.
         expect(RoundMetronome.new():read(100)).toBeNil()
+    end)
+end)
+
+describe("RoundMetronome — the lockout, derived rather than delivered", function()
+    test("the constant is here so the client and the game server cannot disagree", function()
+        -- It lived privately in RoundCoordinator and reached the client only on a
+        -- RoundUpdate, which is the ~1s of poll lag this stage removes. Two copies
+        -- of a deadline is how they drift.
+        expect(RoundMetronome.LOCKOUT_SECONDS).toBe(2)
+    end)
+
+    test("the game server's fallback lead is the same number", function()
+        -- Modules in src/ are dependency-injected and never require one another (the same
+        -- files run under Lune and Roblox), so main.server.luau hands RoundCoordinator
+        -- `lockoutMs` from the constant above and the Roblox server reads it at runtime.
+        -- DEFAULT_LOCKOUT_MS is what the Lune tests construct against — pinned here so a
+        -- retune of the shared constant cannot leave RoundCoordinator's suite asserting a
+        -- lockout the game no longer has.
+        expect(RoundCoordinator.DEFAULT_LOCKOUT_MS).toBe(RoundMetronome.LOCKOUT_SECONDS * 1000)
+    end)
+
+    test("it counts down to the lockout, not to the end of ACTIVE", function()
+        local m = m27()
+        local roundStart = 1000 - 22
+        -- ACTIVE is 20s and the lockout is 2s before its end, so the window is 18s.
+        expect(m:read(roundStart).lockoutIn).toBeCloseTo(18, 0.001)
+        expect(m:read(roundStart + 17).lockoutIn).toBeCloseTo(1, 0.001)
+    end)
+
+    test("it is zero THROUGH the lockout window, not negative", function()
+        -- The throw gate is `> 0`. A negative here would read as "time remaining"
+        -- to anything doing arithmetic on it, and would reopen throws that must
+        -- stay shut.
+        local m = m27()
+        local roundStart = 1000 - 22
+        expect(m:read(roundStart + 18).lockoutIn).toBe(0)
+        expect(m:read(roundStart + 19).lockoutIn).toBe(0)
+        expect(m:read(roundStart + 19.99).lockoutIn).toBe(0)
+    end)
+
+    test("it is zero outside ACTIVE", function()
+        local m = m27()
+        local roundStart = 1000 - 22
+        expect(m:read(roundStart + 20).lockoutIn).toBe(0) -- TALLY
+        expect(m:read(roundStart + 23).lockoutIn).toBe(0) -- REVEAL
     end)
 end)

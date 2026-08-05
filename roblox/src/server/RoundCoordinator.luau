@@ -6,7 +6,18 @@
 local RoundCoordinator = {}
 RoundCoordinator.__index = RoundCoordinator
 
-local LOCKOUT_BEFORE_END_MS = 2000
+-- THE LOCKOUT LEAD IS NOT THIS FILE'S ANY MORE. It belongs to RoundMetronome (shared), so the
+-- client can derive the same instant off the published timeline instead of waiting to be told it
+-- on a RoundUpdate. Modules under src/ are dependency-injected and never require one another —
+-- that is what lets the same files run under Lune and under Roblox — so main.server.luau reads
+-- RoundMetronome.LOCKOUT_SECONDS and hands it in as `deps.lockoutMs`; at runtime the Roblox
+-- server and every client are reading ONE number.
+--
+-- The value below is only the fallback the Lune tests construct against (they build Deps by hand
+-- and there is no ReplicatedStorage to require through). RoundMetronome.spec asserts the two
+-- agree, so a retune of the shared constant cannot leave this suite testing a lockout the game no
+-- longer has.
+RoundCoordinator.DEFAULT_LOCKOUT_MS = 2000
 local FLUSH_INTERVAL_MS = 5000
 local FLUSH_PICK_THRESHOLD = 10
 
@@ -25,6 +36,9 @@ export type Deps = {
     log: (msg: string) -> (),
     random: () -> number,
     now: () -> number, -- local epoch ms
+    -- RoundMetronome.LOCKOUT_SECONDS * 1000, injected by main.server.luau. Optional only so the
+    -- Lune tests can build Deps without it; see DEFAULT_LOCKOUT_MS above.
+    lockoutMs: number?,
     instanceId: string,
     callbacks: Callbacks?,
 }
@@ -38,6 +52,7 @@ function RoundCoordinator.new(deps: Deps)
         _phase = nil :: string?,
         _roundCount = 0,
         _resultLogged = false,
+        _lockoutMs = deps.lockoutMs or RoundCoordinator.DEFAULT_LOCKOUT_MS,
         _lockoutAtMs = nil :: number?,
         _seq = 0,
         _lastFlushMs = nil :: number?,
@@ -205,7 +220,7 @@ function RoundCoordinator.pollOnce(self: any): number
     end
 
     if state.phase == "ACTIVE" and d.clock:hasSync() then
-        self._lockoutAtMs = d.clock:toLocalTime(state.phaseEndsAt) - LOCKOUT_BEFORE_END_MS
+        self._lockoutAtMs = d.clock:toLocalTime(state.phaseEndsAt) - self._lockoutMs
     end
 
     if state.phase ~= self._phase then
