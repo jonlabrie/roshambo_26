@@ -17,8 +17,13 @@
 --      the player was ~110 studs up the canyon. This version launches relative to LocalPlayer.
 --
 -- MOBILE-PERF DESIGN: Trail ascent, ParticleEmitter :Emit burst, LightEmission=1 + ONE global Bloom
--- for glow (no per-shell lights), small sparks. Tune the KNOBS in the LocalScript to stress-test
--- fill-rate on device (lower LAUNCH_INTERVAL / raise the counts until the phone's FPS drops).
+-- for glow (no per-shell lights), small sparks.
+--
+-- IT RAMPS ITSELF. Publish ONCE and run it: the launch rate starts easy and shortens every 15s,
+-- printing each new rate to the developer console. Watch the in-app Performance Stats and note the
+-- shells/sec at which sustained FPS crosses 30 — that is the number the fireworks director's budget
+-- is derived from. No edit-publish-retry cycle, and the ramp is identical on every device, so a
+-- second phone is directly comparable to the first.
 
 local Lighting = game:GetService("Lighting")
 local StarterPlayer = game:GetService("StarterPlayer")
@@ -46,8 +51,20 @@ bloom.Parent = Lighting
 local ls = Instance.new("LocalScript")
 ls.Name = "FireworkLauncher"
 ls.Source = [==[
--- CLIENT-side firework (Emit only renders where it's called). TUNE to stress-test mobile fill-rate:
-local LAUNCH_INTERVAL = 2.8      -- seconds between shells (LOWER = more concurrent load)
+-- CLIENT-side firework (Emit only renders where it's called).
+--
+-- SELF-RAMPING: this bench does NOT need to be re-published to try a different rate. It starts at
+-- RAMP_START seconds between shells and shortens the interval every RAMP_EVERY seconds until it
+-- reaches RAMP_FLOOR, printing the current rate as it goes. Publish ONCE, open on the device, turn
+-- on the in-app Performance Stats, and note the shells/sec at which sustained FPS crosses 30.
+--
+-- Why a ramp rather than a ladder of publishes: hand-stepping finds "the rung where it broke",
+-- which is a lower bound with an unknown gap beneath it. A continuous ramp finds the knee, and it
+-- is identical every run, so a second device is directly comparable to the first.
+local RAMP_START = 3.0           -- seconds between shells at the easy end
+local RAMP_FLOOR = 0.10          -- fastest rate the ramp will reach (10 shells/sec)
+local RAMP_EVERY = 15            -- seconds at each rate before shortening
+local RAMP_FACTOR = 0.75         -- each step multiplies the interval by this
 local SPARK = "rbxasset://textures/particles/sparkles_main.dds" -- placeholder; swap a crisp round-dot upload
 
 local Workspace = game:GetService("Workspace")
@@ -157,9 +174,26 @@ local order = { "peony", "willow" }
 local i = 0
 task.wait(1) -- let the character spawn
 launch("peony")
+
+-- THE RAMP. Two loops: one fires at the current interval, the other shortens it on a timer. The
+-- rate is printed to the developer console (three-dot menu -> Developer Console on mobile) so the
+-- number can be read off the device rather than guessed from a stopwatch.
+local interval = RAMP_START
 task.spawn(function()
 	while bench.Parent do
-		task.wait(LAUNCH_INTERVAL)
+		task.wait(RAMP_EVERY)
+		if interval <= RAMP_FLOOR then
+			print(string.format("[FireworkBench] FLOOR reached: %.2fs (%.1f shells/sec) — holding", interval, 1 / interval))
+			break
+		end
+		interval = math.max(RAMP_FLOOR, interval * RAMP_FACTOR)
+		print(string.format("[FireworkBench] now %.2fs between shells (%.1f shells/sec)", interval, 1 / interval))
+	end
+end)
+
+task.spawn(function()
+	while bench.Parent do
+		task.wait(interval)
 		i += 1
 		launch(order[(i % 2) + 1])
 	end
