@@ -2,6 +2,11 @@
 -- THE REEL. What the ring's centre shows while the drum is still turning — the three glyphs
 -- cycling IN PLACE, decelerating, until the drum's rest ends it.
 --
+-- It runs from THE BELL (REVEAL's first instant), not from the lockout: LOCK's two seconds are a
+-- black disc on purpose, so the reel reads as the wheel turning rather than as the HUD filling a
+-- gap. That also means `elapsed` and the drum's own settle start together, which is what makes a
+-- curve tuned to `settleSeconds` decelerate in step with the wheel it is standing in for.
+--
 -- WHY IN PLACE AND NOT SCROLLING. The obvious design is a slot-machine reel sliding sideways, and
 -- it will not fit: the revealed glyph is 0.82 of the ring's inner disc, so its ink reaches ~0.35·D
 -- from centre against a radius of 0.5·D. It can travel about ±0.15·D — ±9px on the real 60px ring —

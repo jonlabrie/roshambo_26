@@ -1622,13 +1622,16 @@ local function setRingGlyph(symbol: string?, fading: boolean)
 end
 
 -- ===== The reel: what the ring shows while the drum is still turning =====
--- OPEN closes and the ring's countdown has nothing left to count, but the answer is still ~3.45s
--- away behind the drum's settle. That used to be a blank disc. Now the three glyphs cycle IN PLACE
--- at exactly the size the reveal uses, decelerating, so the handover is not an animation at all —
--- the glyph simply stops changing. ReelStep owns the timing and the reasoning; see its header for
--- why the cycle is in place rather than scrolling, and why it must never stop on its own.
+-- The bell strikes, the drum spins, and the answer is still DrumStep.SETTLE_SECONDS away. That
+-- used to be a blank disc. Now the three glyphs cycle IN PLACE at exactly the size the reveal
+-- uses, decelerating with the drum, so the handover is not an animation at all — the glyph simply
+-- stops changing. ReelStep owns the timing and the reasoning; see its header for why the cycle is
+-- in place rather than scrolling, and why it must never stop on its own.
 --
--- Set when the round leaves OPEN, cleared the moment `aux.worldThrow` lands or OPEN returns.
+-- LOCK'S TWO SECONDS STAY BLACK. The reel starts at REVEAL, not at the lockout — see the branch
+-- in `render`.
+--
+-- Set at the bell, cleared the moment `aux.worldThrow` lands or OPEN returns.
 local reelStartedAt: number? = nil
 -- WHETHER THIS ROUND'S ANSWER HAS ALREADY BEEN SHOWN, and why a second latch is needed at all.
 -- `worldThrow` goes nil again at the END of the reveal beat, when the glyph has finished fading —
@@ -1793,7 +1796,14 @@ local function render(inputs: any, aux: any)
     elseif worldThrow ~= nil then
         reelStartedAt = nil -- the drum has answered; the reel's job is done for this round
         reelSpent = true
-    elseif not reelSpent and reelStartedAt == nil then
+    elseif inputs.phase == "REVEAL" and not reelSpent and reelStartedAt == nil then
+        -- AT THE BELL, NOT AT THE LOCKOUT (owner, 2026-08-05). REVEAL's first instant IS the
+        -- strike, so LOCK's two seconds stay a black disc and the reel begins with the bell and
+        -- the drum's spin — it should read as the wheel turning, not as the HUD filling a gap.
+        --
+        -- It also puts the deceleration back in step with the drum. Starting at the lockout gave
+        -- the reel a 2s head start on a curve tuned to DrumStep.SETTLE_SECONDS, so it was already
+        -- into its plateau before the drum began; from the bell the two slow down together.
         reelStartedAt = os.clock()
     end
     local shown = worldThrow or reelSymbol()
