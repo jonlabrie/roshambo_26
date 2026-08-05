@@ -32,7 +32,8 @@
 -- EventBus.HudState(inputs, aux):
 --   inputs : a HudModel.Inputs
 --   aux    : { session = HudModel.Session, tape = { { worldThrow, result? } }, timerKnown = boolean,
---              worldThrow = string?, worldThrowFading = boolean?, profileSeen = boolean }
+--              openSeconds = number?, worldThrow = string?, worldThrowFading = boolean?,
+--              profileSeen = boolean }
 --            `tape` is already spoiler-gated by the wiring — paint it as given, and note that the
 --            newest tile now arrives a beat AFTER `worldThrow` does, not with it. `worldThrow` is
 --            the world's throw for the round the drum has FINISHED revealing, or nil — see
@@ -1547,9 +1548,17 @@ task.spawn(function()
 end)
 
 -- ===== Render =====
--- The round's full span is not on the wire; take it from the largest countdown seen since OPEN
--- opened, so the ring depletes against the real round length whatever the server's phase
--- durations are.
+-- THE RING'S DENOMINATOR. `aux.openSeconds` is OPEN's published length (RoundScheduleConfig's
+-- `OpenSec`, relayed by main.client), and the ring depletes against that.
+--
+-- It used to be the largest countdown seen since OPEN opened, on the stated grounds that "the
+-- round's full span is not on the wire". That was true when written and stage 3 made it false —
+-- and measuring it was wrong for every player who joined mid-round, because their first sample IS
+-- the maximum: the ring read 100% full no matter how little of the round was left, then drained
+-- over whatever remained. Arriving with 20s of a 51s round left gave a full ring emptying in 20s.
+--
+-- The observed maximum stays in the `math.max` below as the fallback for a client whose schedule
+-- has not replicated yet, which is exactly the old behaviour and no worse than it was.
 local span = 0
 local lastPhase = ""
 
@@ -1709,7 +1718,10 @@ local function render(inputs: any, aux: any)
         span = 0
     end
     if inputs.phase == "OPEN" and aux.timerKnown ~= false then
-        span = math.max(span, view.secondsLeft)
+        -- The published length wins; the observed maximum is the fallback until it replicates.
+        -- `math.max` over both rather than a branch, so a countdown that somehow exceeds the
+        -- published span still cannot drive `ringFrac` above 1.
+        span = math.max(aux.openSeconds or 0, span, view.secondsLeft)
     end
     lastPhase = inputs.phase
 

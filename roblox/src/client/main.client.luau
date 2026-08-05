@@ -21,7 +21,8 @@
 -- It publishes all of that on `EventBus.HudState:Fire(inputs, aux)`:
 --   inputs : a HudModel.Inputs — the controller calls HudModel.view(inputs, aux.session)
 --   aux    : { session = HudModel.Session, tape = { { worldThrow, result? } }, timerKnown = boolean,
---              worldThrow = string?, worldThrowFading = boolean?, profileSeen = boolean }
+--              openSeconds = number?, worldThrow = string?, worldThrowFading = boolean?,
+--              profileSeen = boolean }
 --            `tape` is spoiler-gated here, so the controller paints it as given. `worldThrow` is
 --            the world's throw for the round the drum has FINISHED revealing, or nil.
 --            `worldThrowFading` is this file saying the beat's hold is over and the glyph should
@@ -296,6 +297,15 @@ end
 -- top level would miss the first RoundUpdate outright. Until the folder lands, `metronome:read`
 -- returns nil and the HUD runs on RoundUpdate exactly as it did before this change.
 local metronome = RoundMetronome.new()
+-- OPEN's full length, published to the HUD as `aux.openSeconds` — THE RING'S DENOMINATOR.
+-- The ring used to measure its own span as the largest countdown it had seen since OPEN opened,
+-- because when that code was written the round's length genuinely was not on the wire. It is now
+-- (`OpenSec`, below), and measuring it was wrong for every player who joined mid-round: their
+-- first sample WAS the maximum, so the ring read 100% full whatever the real remainder — a player
+-- arriving with 20s left saw a full ring drain over 20s. The digits were right the whole time,
+-- because they print `secondsLeft` and never touch the span.
+-- Stays nil until the schedule replicates; the HUD keeps the old observed-max behaviour until then.
+local openSeconds: number? = nil
 task.spawn(function()
     local scheduleConfig = ReplicatedStorage:WaitForChild("RoundScheduleConfig")
     local function pullSchedule()
@@ -304,11 +314,13 @@ task.spawn(function()
         if typeof(strikeAt) ~= "number" or typeof(periodSec) ~= "number" then
             return
         end
+        local openSec = (scheduleConfig:GetAttribute("OpenSec") :: number?) or 51
+        openSeconds = openSec
         metronome:setSchedule({
             roundId = scheduleConfig:GetAttribute("RoundId") :: string?,
             strikeAt = strikeAt,
             periodSec = periodSec,
-            openSec = (scheduleConfig:GetAttribute("OpenSec") :: number?) or 51,
+            openSec = openSec,
             lockSec = (scheduleConfig:GetAttribute("LockSec") :: number?) or 2,
             -- Fallbacks mirror the server's DEFAULT phase durations (server/src/index.ts, now
             -- env-overridable); only used until the first schedule attributes replicate, but a
@@ -491,6 +503,9 @@ local function publish()
         -- Render-only, so it stays out of HudModel: false means we never got a lockout for this
         -- round and the ring has no real span to deplete against.
         timerKnown = lockoutAt ~= nil,
+        -- OPEN's full length, straight off the published schedule — the ring's denominator. nil
+        -- until the schedule replicates. See the declaration above for what measuring it cost.
+        openSeconds = openSeconds,
         -- The world's throw for the round the drum has FINISHED revealing, or nil. Set at drum rest
         -- and cleared once the beat's fade has run, so the ring can never spoil the wheel mid-spin
         -- and never carries a glyph into the next round either.
