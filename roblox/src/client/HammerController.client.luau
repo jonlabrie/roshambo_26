@@ -213,9 +213,15 @@ task.spawn(function()
         -- strikeP maps the flank onto the metronome timeline (the strike lands at
         -- drawP=(active+tally)/period, not full draw) — derived from the live
         -- schedule so a round-length change rebuilds the right cam on next join.
-        local strikeP = ((scheduleConfig:GetAttribute("ActiveSec") :: number?) or 20)
-            + ((scheduleConfig:GetAttribute("TallySec") :: number?) or 2)
-        strikeP /= (scheduleConfig:GetAttribute("PeriodSec") :: number?) or 25
+        -- The PERIOD default is derived from the three phase defaults rather than
+        -- written out: it said 25 against a 20+2+5 = 27s round, and a stale period
+        -- skews where the strike lands until the first attributes replicate.
+        local activeSec = (scheduleConfig:GetAttribute("ActiveSec") :: number?) or 20
+        local tallySec = (scheduleConfig:GetAttribute("TallySec") :: number?) or 2
+        local revealSec = (scheduleConfig:GetAttribute("RevealSec") :: number?) or 5
+        local periodSec = (scheduleConfig:GetAttribute("PeriodSec") :: number?)
+            or (activeSec + tallySec + revealSec)
+        local strikeP = (activeSec + tallySec) / periodSec
         local G = {
             gapZ = 2.2,
             draw = 3.0,
