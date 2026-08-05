@@ -19,8 +19,10 @@ describe("RevealBeat — the sequence after the drum stops", function()
     end)
 
     test("the whole beat fits the runway, with headroom", function()
-        -- RUNWAY_SECONDS is measured, not guessed: the drum rests ~3.2s into the gap between
-        -- rounds, and Task 2 made that gap TALLY(2) + REVEAL(5) = 7s.
+        -- RUNWAY_SECONDS is PROVISIONAL, not measured — see its comment in RevealBeat. The old
+        -- "~3.2s into the gap" reading was the reveal-safety fallback firing, not the drum coming
+        -- to rest, so the true post-rest runway is still unknown. This asserts the beat fits the
+        -- number we are carrying; it cannot assert the number is right.
         expect(RevealBeat.TAPE_DELAY_SECONDS < RevealBeat.RUNWAY_SECONDS).toBe(true)
         -- Not merely fitting: the tape must be readable before the next round opens.
         expect(RevealBeat.RUNWAY_SECONDS - RevealBeat.TAPE_DELAY_SECONDS >= 1).toBe(true)

@@ -32,7 +32,9 @@ local function pullSchedule()
         periodSec = periodSec,
         activeSec = (scheduleConfig:GetAttribute("ActiveSec") :: number?) or 20,
         tallySec = (scheduleConfig:GetAttribute("TallySec") :: number?) or 2,
-        revealSec = (scheduleConfig:GetAttribute("RevealSec") :: number?) or 3,
+        -- Fallbacks mirror the server's configured phase durations (server/src/index.ts); only
+        -- used until the first schedule attributes replicate, but a stale one is a wrong schedule.
+        revealSec = (scheduleConfig:GetAttribute("RevealSec") :: number?) or 5,
     }, workspace:GetServerTimeNow())
 end
 scheduleConfig:GetAttributeChangedSignal("StrikeAtServerTime"):Connect(pullSchedule)

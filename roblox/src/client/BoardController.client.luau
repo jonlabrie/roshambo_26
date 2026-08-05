@@ -157,6 +157,17 @@ RoundUpdate.OnClientEvent:Connect(function(info)
     end
 end)
 
+-- THE RULE (owner, 2026-08-04): the drum is authoritative, and must be fully at rest before the
+-- world throw is reflected ANYWHERE else. This handler breaks it — RevealTheater lands at the top of
+-- the reveal and the drum does not stop until DrumStep.SETTLE_SECONDS (3.45s) after the strike, so
+-- this row would name the throw about three seconds before the drum does. It is dead today (the
+-- controller early-returns above: JumbotronBoard is gone), which is the only reason it is not a live
+-- spoiler — but the comment at the top of this file says the renderer is to be RETARGETED to the
+-- kōsatsu boards, and retargeting it as written would resurrect the spoiler intact.
+--
+-- SO: before this path is ever brought back, move it off RevealTheater and onto the `drumRest` cue.
+-- LanternController and TheaterController already hold their reveals on exactly that cue — copy
+-- them: stash the throw when RevealTheater lands, paint it when `EventBus.Cue` reports "drumRest".
 RevealTheater.OnClientEvent:Connect(function(r)
     setRow(6, `WORLD THREW {GLYPH[r.worldThrow] or "?"}`)
 end)

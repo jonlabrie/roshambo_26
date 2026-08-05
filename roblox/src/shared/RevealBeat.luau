@@ -28,10 +28,27 @@ RevealBeat.FADE_SECONDS = 0.4
 -- round's RECORD, and a record arriving with the announcement is what buried the announcement.
 RevealBeat.TAPE_DELAY_SECONDS = RevealBeat.HOLD_SECONDS + RevealBeat.FADE_SECONDS
 
--- How much time actually exists after the drum stops, MEASURED (Studio, 2026-08-04) rather than
--- derived: the drum rests ~3.2s into the gap between rounds, and that gap is TALLY(2) + REVEAL(5)
--- = 7s once the server change lands. Held here only so the spec test can assert the beat fits with
--- room to read the tape afterwards. If the server's phase durations change, this changes with them.
+-- How much time exists after the drum stops. PROVISIONAL — THIS NUMBER IS NOT MEASURED, and the
+-- previous comment here claiming it was ("the drum rests ~3.2s into the gap") was measuring the
+-- wrong event: every instrumented round released through main.client's reveal-safety FALLBACK, not
+-- through `drumRest`, because the fallback was armed from RevealResult arriving and beat the drum.
+-- The 3.2s was the fallback's own lead, and it says nothing about where the drum actually stops.
+--
+-- WHAT IS ACTUALLY KNOWN:
+--   * The nominal arithmetic. The strike is scheduled at ACTIVE-end + TallySec, and the drum rests
+--     DrumStep.SETTLE_SECONDS (3.45s) after it — so 5.45s into a TALLY(2) + REVEAL(5) = 7s gap,
+--     leaving a nominal runway of 1.55s.
+--   * The client's phase transitions lag the nominal boundaries. Measured at revealSeconds: 3,
+--     TALLY was seen at 8.13s and ACTIVE at 14.34s — a 6.21s observed gap against a 5s nominal one,
+--     so the gap the client actually experiences runs on the order of a second longer than nominal.
+--   * The true post-rest runway has NOT been measured, at either reveal length. It cannot be until
+--     the fallback stops pre-empting `drumRest`.
+--
+-- So 1.55s nominal, perhaps ~2.7s once the observed lag is allowed for, against a 3.8s literal that
+-- the spec test leans on — the literal may well be too generous, and the beat (2.4s to the tape) may
+-- not fit. RE-MEASURE AT THE STUDIO GATE, from `drumRest` to the next ACTIVE, and set this from that
+-- reading; if it comes in under TAPE_DELAY_SECONDS the beat itself has to shorten. Left as a literal
+-- deliberately: deriving it from the phase durations would only dress the same guess up as a fact.
 RevealBeat.RUNWAY_SECONDS = 3.8
 
 return RevealBeat
