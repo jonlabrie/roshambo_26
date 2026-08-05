@@ -1280,30 +1280,48 @@ ringCount.Position = UDim2.new(0.5, 0, 0.5, -COUNT_NUDGE)
 
 -- One glyph box per symbol, built ONCE — same pattern `glyphSet` uses for the tape tiles — so
 -- the reveal can show whichever the world threw without rebuilding an ImageLabel every round.
-local ringGlyphs: { [string]: CanvasGroup } = {}
+-- NOT A CanvasGroup. THIS WAS MEASURED, NOT REASONED — see below before "simplifying" it back.
+--
+-- `Glyphs.renderGroup` is the obvious choice here: it exists precisely so a caller can fade a
+-- glyph with ONE `GroupTransparency` instead of tweening two ImageLabels that drift apart at the
+-- edges, and the lanterns use it happily. It was used here, and the glyph did not render AT ALL
+-- for several rounds of work while every instrumented check said it should.
+--
+-- The isolating test (2026-08-04, live in Studio): two probes built in the SAME call, same parent
+-- (`GlyphBox`), same size, position, ZIndex and assets — one from `Glyphs.render` (plain Frame +
+-- two ImageLabels), one from `Glyphs.renderGroup` (CanvasGroup). The plain one drew. The
+-- CanvasGroup drew nothing. Whatever the underlying limitation is — offscreen-buffer budget,
+-- nesting, driver — a CanvasGroup does not composite in this spot, and no property on it says so:
+-- it reports `Visible = true`, `GroupTransparency = 0`, a correct `AbsoluteSize`, and renders
+-- empty. That is why this cost so long to find and why the comment is this long.
+--
+-- ZIndex on the layers is load-bearing, separately. `Instance.new("ScreenGui")` defaults
+-- `ZIndexBehavior` to GLOBAL — nothing in this codebase sets it — so a child does NOT draw above
+-- its parent, and `Glyphs.render` builds its layers at the default ZIndex 1, which would put them
+-- behind this opaque ZIndex-4 disc. Lift the root and both layers.
+--
+-- The outline colour is explicit because the two builders disagree on their default (`render`
+-- falls back to WHITE, `renderGroup` to the core colour). White is the ring's long-standing
+-- keyline; passing it keeps that true if anyone ever swaps builders again.
+local ringGlyphLayers: { [string]: { ImageLabel } } = {}
+local ringGlyphs: { [string]: Frame } = {}
 do
     local box = glyphBox(ringDisc, 0.82)
     box.ZIndex = 5 -- with the digits, above the disc
     for _, sym in THROWS do
-        -- A CanvasGroup, not `Glyphs.render`'s bare frame, for two reasons that happen to have the
-        -- same fix. It gives ONE `GroupTransparency` to fade — `Glyphs.renderGroup` exists because
-        -- tweening the outline and core independently drifts them out of step at the edges.
-        --
-        -- And it closes the ZIndex trap that hid this glyph completely (2026-08-04): this ScreenGui
-        -- runs in GLOBAL ZIndexBehavior, where a child does NOT draw above its parent, so the
-        -- default-ZIndex-1 image layers rendered behind the opaque ZIndex-4 disc. A CanvasGroup
-        -- composites its descendants as a single element, so only ITS ZIndex matters.
-        --
-        -- THE OUTLINE COLOUR IS PASSED EXPLICITLY, and it must be. The two builders disagree on
-        -- their default: `render` falls back to WHITE, `renderGroup` falls back to the CORE colour.
-        -- The ring has always had a white keyline (measured live: the outline layer renders at
-        -- 1,1,1), so swapping builders without this argument would silently flatten the glyph to a
-        -- single cream shape — a visual regression no gate could see.
-        local g = Glyphs.renderGroup(box, sym, INK_CREAM, Color3.new(1, 1, 1))
+        local g = Glyphs.render(box, sym, INK_CREAM, Color3.new(1, 1, 1))
         g.ZIndex = 5
-        g.GroupTransparency = 1
         g.Visible = false
+        local layers: { ImageLabel } = {}
+        for _, layer in g:GetChildren() do
+            if layer:IsA("ImageLabel") then
+                layer.ZIndex = 5
+                layer.ImageTransparency = 1
+                table.insert(layers, layer)
+            end
+        end
         ringGlyphs[sym] = g
+        ringGlyphLayers[sym] = layers
     end
 end
 
@@ -1552,33 +1570,43 @@ local countersSeeded = false
 -- static — the failure `setBank`'s pulse already had once in this file.
 local shownGlyph: string? = nil
 local glyphFading = false
-local glyphTween: Tween? = nil
+-- A LIST, not one tween: the glyph is two ImageLabels since the CanvasGroup was found not to
+-- render here, so a fade is two tweens that must be cancelled together.
+local glyphTweens: { Tween } = {}
 
 local function setRingGlyph(symbol: string?, fading: boolean)
     if symbol == shownGlyph and fading == glyphFading then
         return
     end
     shownGlyph, glyphFading = symbol, fading
-    if glyphTween then
-        glyphTween:Cancel()
-        glyphTween = nil
+    for _, t in glyphTweens do
+        t:Cancel()
     end
+    table.clear(glyphTweens)
     for _, sym in THROWS do
         ringGlyphs[sym].Visible = sym == symbol
     end
     if symbol == nil then
         return
     end
-    local g = ringGlyphs[symbol]
-    if fading then
-        glyphTween = TweenService:Create(
-            g,
-            TweenInfo.new(RevealBeat.FADE_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
-            { GroupTransparency = 1 }
-        )
-        glyphTween:Play()
-    else
-        g.GroupTransparency = 0 -- it arrives instantly; the drum was the build-up
+    -- BOTH LAYERS, tweened together. A CanvasGroup's single GroupTransparency would be tidier and
+    -- is what `Glyphs.renderGroup` exists for — but a CanvasGroup does not render here at all (see
+    -- the construction above). Two tweens on identical TweenInfo start on the same frame and run
+    -- the same curve, so the outline and core stay in step; the drift `renderGroup` was built to
+    -- avoid comes from tweening them on DIFFERENT curves or start times, not from there being two.
+    local target = if fading then 1 else 0
+    for _, layer in ringGlyphLayers[symbol] do
+        if fading then
+            local t = TweenService:Create(
+                layer,
+                TweenInfo.new(RevealBeat.FADE_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+                { ImageTransparency = target }
+            )
+            t:Play()
+            table.insert(glyphTweens, t)
+        else
+            layer.ImageTransparency = target -- it arrives instantly; the drum was the build-up
+        end
     end
 end
 
