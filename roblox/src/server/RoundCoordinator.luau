@@ -1,23 +1,14 @@
 --!strict
 -- Orchestrates the playable loop on a Roblox game server: polls /state, accepts
--- picks until the T0-2s lockout (spec §4), delta-flushes throws (5s cadence /
+-- picks until OPEN closes, delta-flushes throws (5s cadence /
 -- 10-pick / final flush), computes the local reveal from mirrored GameRules,
--- and reconciles authoritative per-player results on the next ACTIVE.
+-- and reconciles authoritative per-player results on the next OPEN.
 local RoundCoordinator = {}
 RoundCoordinator.__index = RoundCoordinator
 
--- THE LOCKOUT LEAD IS NOT THIS FILE'S ANY MORE. It belongs to RoundMetronome (shared), so the
--- client can derive the same instant off the published timeline instead of waiting to be told it
--- on a RoundUpdate. Modules under src/ are dependency-injected and never require one another —
--- that is what lets the same files run under Lune and under Roblox — so main.server.luau reads
--- RoundMetronome.LOCKOUT_SECONDS and hands it in as `deps.lockoutMs`; at runtime the Roblox
--- server and every client are reading ONE number.
---
--- The value below is only the fallback the Lune tests construct against (they build Deps by hand
--- and there is no ReplicatedStorage to require through). RoundMetronome.spec asserts the two
--- agree, so a retune of the shared constant cannot leave this suite testing a lockout the game no
--- longer has.
-RoundCoordinator.DEFAULT_LOCKOUT_MS = 2000
+-- THERE IS NO LOCKOUT LEAD ANY MORE. Picks close when OPEN closes — a phase boundary the
+-- server publishes — so the instant is read off `phaseEndsAt` rather than computed by
+-- subtracting a constant that two files had to agree on.
 local FLUSH_INTERVAL_MS = 5000
 local FLUSH_PICK_THRESHOLD = 10
 
@@ -36,9 +27,6 @@ export type Deps = {
     log: (msg: string) -> (),
     random: () -> number,
     now: () -> number, -- local epoch ms
-    -- RoundMetronome.LOCKOUT_SECONDS * 1000, injected by main.server.luau. Optional only so the
-    -- Lune tests can build Deps without it; see DEFAULT_LOCKOUT_MS above.
-    lockoutMs: number?,
     instanceId: string,
     callbacks: Callbacks?,
 }
@@ -52,7 +40,6 @@ function RoundCoordinator.new(deps: Deps)
         _phase = nil :: string?,
         _roundCount = 0,
         _resultLogged = false,
-        _lockoutMs = deps.lockoutMs or RoundCoordinator.DEFAULT_LOCKOUT_MS,
         _lockoutAtMs = nil :: number?,
         _seq = 0,
         _lastFlushMs = nil :: number?,
@@ -69,7 +56,11 @@ function RoundCoordinator.submitPick(self: any, userId: string, throwValue: stri
     if not VALID_THROWS[throwValue] then
         return false, "BAD_THROW"
     end
-    if self._phase ~= "ACTIVE" or self._picksClosed then
+    -- OPEN ONLY. This is the asymmetry that makes LOCK work: player input ends here,
+    -- while _maybeFlush below keeps posting through LOCK so the picks already taken
+    -- reach the server. Gating both the same way either lets players throw two seconds
+    -- past the deadline or strands every buffered pick.
+    if self._phase ~= "OPEN" or self._picksClosed then
         return false, "PICKS_CLOSED"
     end
     if self._lockoutAtMs and self._deps.now() >= self._lockoutAtMs then
@@ -110,7 +101,7 @@ end
 
 function RoundCoordinator._maybeFlush(self: any)
     local d: Deps = self._deps
-    if self._phase ~= "ACTIVE" or self._picksClosed then
+    if (self._phase ~= "OPEN" and self._phase ~= "LOCK") or self._picksClosed then
         return
     end
     local unflushed = d.buffer:unflushedCount()
@@ -118,11 +109,14 @@ function RoundCoordinator._maybeFlush(self: any)
         return
     end
     local nowMs = d.now()
+    -- LOCK is short (2s) and exists precisely to get whatever's buffered out the door —
+    -- picks already closed with OPEN, so there is no reason to wait on the 5s cadence.
+    -- Treat being in LOCK the same as being past the lockout instant.
     if self._lastFlushMs == nil then
         -- First sighting of picks this round: start the cadence clock.
         -- Still check threshold/lockout triggers immediately before returning.
         self._lastFlushMs = nowMs
-        local pastLockout = self._lockoutAtMs ~= nil and nowMs >= self._lockoutAtMs
+        local pastLockout = self._phase == "LOCK" or (self._lockoutAtMs ~= nil and nowMs >= self._lockoutAtMs)
         if unflushed >= FLUSH_PICK_THRESHOLD or pastLockout then
             self._lastFlushMs = nowMs
             self:_flush()
@@ -130,7 +124,7 @@ function RoundCoordinator._maybeFlush(self: any)
         return
     end
     local elapsed = nowMs - self._lastFlushMs
-    local pastLockout = self._lockoutAtMs ~= nil and nowMs >= self._lockoutAtMs
+    local pastLockout = self._phase == "LOCK" or (self._lockoutAtMs ~= nil and nowMs >= self._lockoutAtMs)
     if elapsed >= FLUSH_INTERVAL_MS or unflushed >= FLUSH_PICK_THRESHOLD or pastLockout then
         self._lastFlushMs = nowMs
         self:_flush()
@@ -139,7 +133,7 @@ end
 
 function RoundCoordinator._fetchRevealIfDue(self: any, state: any)
     local d: Deps = self._deps
-    if not (state.phase == "TALLY" or state.phase == "REVEAL") or self._resultLogged then
+    if not (state.phase == "LOCK" or state.phase == "REVEAL") or self._resultLogged then
         return
     end
     local result = d.net:getRoundResult(self._roundId)
@@ -176,7 +170,7 @@ end
 
 function RoundCoordinator._reconcileIfDue(self: any)
     local d: Deps = self._deps
-    if not self._pendingReconcileRoundId or self._phase ~= "ACTIVE" then
+    if not self._pendingReconcileRoundId or self._phase ~= "OPEN" then
         return
     end
     local res = d.net:getInstanceResults(d.instanceId, self._pendingReconcileRoundId)
@@ -219,8 +213,11 @@ function RoundCoordinator.pollOnce(self: any): number
         self._whiffed = {}
     end
 
-    if state.phase == "ACTIVE" and d.clock:hasSync() then
-        self._lockoutAtMs = d.clock:toLocalTime(state.phaseEndsAt) - self._lockoutMs
+    -- The lockout IS the end of OPEN. Same wall-clock instant it always was — OPEN's
+    -- duration is what ACTIVE's was minus the two seconds that are now LOCK — but read
+    -- off the schedule instead of inferred from it.
+    if state.phase == "OPEN" and d.clock:hasSync() then
+        self._lockoutAtMs = d.clock:toLocalTime(state.phaseEndsAt)
     end
 
     if state.phase ~= self._phase then
@@ -228,7 +225,7 @@ function RoundCoordinator.pollOnce(self: any): number
         d.log(`[ROUND {self._roundCount}] {self._roundId} {state.phase}`)
         if d.callbacks and d.callbacks.onRound then
             local secondsToLockout: number? = nil
-            if state.phase == "ACTIVE" and self._lockoutAtMs then
+            if state.phase == "OPEN" and self._lockoutAtMs then
                 secondsToLockout = math.max(0, (self._lockoutAtMs - d.now()) / 1000)
             end
             d.callbacks.onRound({
@@ -242,18 +239,18 @@ function RoundCoordinator.pollOnce(self: any): number
     end
 
     -- Publish the round's absolute schedule (round-metronome spec): the strike is
-    -- reveal start = activeEnd + tally. Republish on roundId change or when sync
-    -- refinement moves the strike > 150ms; clients slew, so small edits are cheap.
+    -- reveal start = end of OPEN + the whole of LOCK. Republish on roundId change or
+    -- when sync refinement moves the strike > 150ms; clients slew, so small edits are cheap.
     local dur = state.durations
     if dur and d.clock:hasSync() then
         local endLocal = d.clock:toLocalTime(state.phaseEndsAt)
         local strikeAtMs
-        if state.phase == "ACTIVE" then
-            strikeAtMs = endLocal + dur.tallyMs
-        elseif state.phase == "TALLY" then
+        if state.phase == "OPEN" then
+            strikeAtMs = endLocal + dur.lockMs
+        elseif state.phase == "LOCK" then
             strikeAtMs = endLocal
         else -- REVEAL: the NEXT round's strike
-            strikeAtMs = endLocal + dur.activeMs + dur.tallyMs
+            strikeAtMs = endLocal + dur.openMs + dur.lockMs
         end
         if
             self._publishedStrikeMs == nil
@@ -267,9 +264,9 @@ function RoundCoordinator.pollOnce(self: any): number
                     roundId = state.roundId,
                     roundCount = state.roundCount,
                     strikeAtMs = strikeAtMs,
-                    periodMs = dur.activeMs + dur.tallyMs + dur.revealMs,
-                    activeMs = dur.activeMs,
-                    tallyMs = dur.tallyMs,
+                    periodMs = dur.openMs + dur.lockMs + dur.revealMs,
+                    openMs = dur.openMs,
+                    lockMs = dur.lockMs,
                     revealMs = dur.revealMs,
                 })
             end

@@ -29,7 +29,7 @@ local function makeFakes(
             end,
             getRoundResult = function(_self, _roundId: string): any
                 resultIdx = math.min(resultIdx + 1, #results)
-                return results[resultIdx]
+                return results[resultIdx] or { ok = false, status = 404 }
             end,
             postThrows = function(_self, batch: any): any
                 table.insert(postCalls, batch)
@@ -103,18 +103,18 @@ end
 
 describe("RoundCoordinator.pollOnce", function()
     test("logs new round and phase, feeds the clock", function()
-        local f = makeFakes({ okState("r1", "ACTIVE", 7) }, {}, {})
+        local f = makeFakes({ okState("r1", "OPEN", 7) }, {}, {})
         local c = makeCoordinator(f)
         local delay = c:pollOnce()
         expect(#f.logs).toBe(1)
-        expect(f.logs[1]).toBe("[ROUND 7] r1 ACTIVE")
+        expect(f.logs[1]).toBe("[ROUND 7] r1 OPEN")
         expect(f.clock.samples()).toBe(1)
         expect(delay).toBe(1) -- 1s + jitter(0)
     end)
 
     test("logs each phase change once, not on repeat polls", function()
         local f = makeFakes(
-            { okState("r1", "ACTIVE", 7), okState("r1", "ACTIVE", 7), okState("r1", "TALLY", 7) },
+            { okState("r1", "OPEN", 7), okState("r1", "OPEN", 7), okState("r1", "LOCK", 7) },
             {
                 {
                     ok = true,
@@ -127,15 +127,15 @@ describe("RoundCoordinator.pollOnce", function()
         c:pollOnce()
         c:pollOnce()
         c:pollOnce()
-        expect(f.logs[1]).toBe("[ROUND 7] r1 ACTIVE")
-        expect(f.logs[2]).toBe("[ROUND 7] r1 TALLY")
+        expect(f.logs[1]).toBe("[ROUND 7] r1 OPEN")
+        expect(f.logs[2]).toBe("[ROUND 7] r1 LOCK")
         expect(f.logs[3]).toBe("[ROUND 7] WORLD THROW: S | R 100% P 0% S 0% | players 1")
         expect(#f.logs).toBe(3)
     end)
 
     test("fetches the result exactly once per round even across REVEAL polls", function()
         local f = makeFakes(
-            { okState("r1", "TALLY", 7), okState("r1", "REVEAL", 7), okState("r1", "REVEAL", 7) },
+            { okState("r1", "LOCK", 7), okState("r1", "REVEAL", 7), okState("r1", "REVEAL", 7) },
             {
                 {
                     ok = true,
@@ -158,7 +158,7 @@ describe("RoundCoordinator.pollOnce", function()
     end)
 
     test("notReady result retries on the next poll", function()
-        local f = makeFakes({ okState("r1", "TALLY", 7), okState("r1", "REVEAL", 7) }, {
+        local f = makeFakes({ okState("r1", "LOCK", 7), okState("r1", "REVEAL", 7) }, {
             { ok = false, notReady = true },
             {
                 ok = true,
@@ -187,7 +187,7 @@ describe("RoundCoordinator.pollOnce", function()
 
     test("a new roundId resets the per-round result latch", function()
         local f = makeFakes(
-            { okState("r1", "REVEAL", 7), okState("r2", "ACTIVE", 8), okState("r2", "TALLY", 8) },
+            { okState("r1", "REVEAL", 7), okState("r2", "OPEN", 8), okState("r2", "LOCK", 8) },
             {
                 {
                     ok = true,
@@ -216,11 +216,41 @@ describe("RoundCoordinator.pollOnce", function()
 end)
 
 describe("RoundCoordinator v2 picks + flush", function()
-    test("accepts a pick during ACTIVE before lockout; rejects after lockout", function()
-        -- phaseEndsAt 30000 -> lockout 28000. The nows queue feeds submitPick's
+    test("picks are refused once OPEN has closed", function()
+        local f = makeFakes({ okState("r1", "OPEN", 1), okState("r1", "LOCK", 1) }, {}, {})
+        local c = makeCoordinator(f)
+        c:pollOnce()
+        expect(select(1, c:submitPick("u1", "R"))).toBe(true)
+        c:pollOnce()
+        local ok, reason = c:submitPick("u2", "R")
+        expect(ok).toBe(false)
+        expect(reason).toBe("PICKS_CLOSED")
+    end)
+
+    test("the buffer still flushes during LOCK — that is what LOCK is for", function()
+        local f = makeFakes({ okState("r1", "OPEN", 1), okState("r1", "LOCK", 1) }, {}, {})
+        local c = makeCoordinator(f)
+        c:pollOnce()
+        c:submitPick("u1", "R")
+        local before = #f.postCalls
+        c:pollOnce() -- now LOCK
+        expect(#f.postCalls).toBe(before + 1)
+        expect(f.postCalls[#f.postCalls].throws[1].robloxUserId).toBe("u1")
+    end)
+
+    test("the lockout instant is the end of OPEN, with no lead subtracted", function()
+        -- makeFakes' clock is identity, so local time == phaseEndsAt.
+        local f = makeFakes({ okState("r1", "OPEN", 1, 90000) }, {}, {})
+        local c = makeCoordinator(f)
+        c:pollOnce()
+        expect(c._lockoutAtMs).toBe(90000)
+    end)
+
+    test("accepts a pick during OPEN before lockout; rejects after lockout", function()
+        -- phaseEndsAt 30000 -> lockout 30000. The nows queue feeds submitPick's
         -- lockout checks (pollOnce consumes no now() when there are no picks):
-        -- first submit sees 0 (< 28000, accepted), second sees 29000 (locked).
-        local f = makeFakes({ okState("r1", "ACTIVE", 7, 30000) }, {}, { nows = { 0, 29000 } })
+        -- first submit sees 0 (< 30000, accepted), second sees 30000 (locked).
+        local f = makeFakes({ okState("r1", "OPEN", 7, 30000) }, {}, { nows = { 0, 30000 } })
         local c = makeCoordinator(f)
         c:pollOnce()
         local ok1 = c:submitPick("9", "R")
@@ -230,8 +260,8 @@ describe("RoundCoordinator v2 picks + flush", function()
         expect(reason).toBe("LOCKED")
     end)
 
-    test("rejects picks outside ACTIVE and invalid throws", function()
-        local f = makeFakes({ okState("r1", "TALLY", 7) }, { { ok = false, notReady = true } }, {})
+    test("rejects picks outside OPEN and invalid throws", function()
+        local f = makeFakes({ okState("r1", "LOCK", 7) }, { { ok = false, notReady = true } }, {})
         local c = makeCoordinator(f)
         c:pollOnce()
         local ok, reason = c:submitPick("9", "R")
@@ -247,9 +277,9 @@ describe("RoundCoordinator v2 picks + flush", function()
         -- 1000 (becomes the cadence baseline, no flush); the last takes 6500
         -- (5.5s elapsed -> flush). Polls with zero unflushed picks consume no now().
         local f = makeFakes({
-            okState("r1", "ACTIVE", 7, 99000),
-            okState("r1", "ACTIVE", 7, 99000),
-            okState("r1", "ACTIVE", 7, 99000),
+            okState("r1", "OPEN", 7, 99000),
+            okState("r1", "OPEN", 7, 99000),
+            okState("r1", "OPEN", 7, 99000),
         }, {}, { nows = { 0, 1000, 6500 } })
         local c = makeCoordinator(f)
         c:pollOnce() -- no picks: consumes no now()
@@ -266,7 +296,7 @@ describe("RoundCoordinator v2 picks + flush", function()
 
     test("flushes immediately when 10 picks accumulate", function()
         local f = makeFakes(
-            { okState("r1", "ACTIVE", 7, 99000), okState("r1", "ACTIVE", 7, 99000) },
+            { okState("r1", "OPEN", 7, 99000), okState("r1", "OPEN", 7, 99000) },
             {},
             { nows = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 1000 } }
         )
@@ -281,12 +311,13 @@ describe("RoundCoordinator v2 picks + flush", function()
     end)
 
     test("final flush fires once past lockout even under the 5s cadence", function()
-        -- lockout = 10000-2000 = 8000. submitPick sees 4000; next poll's flush
-        -- check sees 4500 (baseline, no flush); last poll sees 8100 >= lockout -> flush.
+        -- lockout = phaseEndsAt = 8000 (no lead subtracted). submitPick sees 4000;
+        -- next poll's flush check sees 4500 (baseline, no flush); last poll sees
+        -- 8100 >= lockout -> flush.
         local f = makeFakes({
-            okState("r1", "ACTIVE", 7, 10000),
-            okState("r1", "ACTIVE", 7, 10000),
-            okState("r1", "ACTIVE", 7, 10000),
+            okState("r1", "OPEN", 7, 8000),
+            okState("r1", "OPEN", 7, 8000),
+            okState("r1", "OPEN", 7, 8000),
         }, {}, { nows = { 4000, 4500, 8100 } })
         local c = makeCoordinator(f)
         c:pollOnce() -- no picks: consumes no now()
@@ -301,9 +332,9 @@ describe("RoundCoordinator v2 picks + flush", function()
         -- submitPick sees 0; flush-check nows: 1000 (baseline), 7000 (flush 1, fails,
         -- baseline moves to 7000), 13000 (flush 2 succeeds with the requeued pick).
         local f = makeFakes({
-            okState("r1", "ACTIVE", 7, 99000),
-            okState("r1", "ACTIVE", 7, 99000),
-            okState("r1", "ACTIVE", 7, 99000),
+            okState("r1", "OPEN", 7, 99000),
+            okState("r1", "OPEN", 7, 99000),
+            okState("r1", "OPEN", 7, 99000),
         }, {}, { nows = { 0, 1000, 7000, 13000 } })
         f.net.postThrows = function(_self, batch: any): any
             table.insert(f.postCalls, batch)
@@ -327,7 +358,7 @@ end)
 describe("RoundCoordinator v2 reveal + reconciliation", function()
     test("reveal computes per-player local results and fires onReveal once", function()
         local f = makeFakes(
-            { okState("r1", "ACTIVE", 7, 99000), okState("r1", "TALLY", 7), okState("r1", "REVEAL", 7) },
+            { okState("r1", "OPEN", 7, 99000), okState("r1", "LOCK", 7), okState("r1", "REVEAL", 7) },
             {
                 {
                     ok = true,
@@ -345,7 +376,7 @@ describe("RoundCoordinator v2 reveal + reconciliation", function()
         c:pollOnce()
         c:submitPick("9", "R") -- beats S -> WIN
         c:submitPick("10", "P") -- loses to S -> LOSS
-        c:pollOnce() -- TALLY: result fetched, reveal fired
+        c:pollOnce() -- LOCK: result fetched, reveal fired
         c:pollOnce() -- REVEAL: no second fire
         expect(#reveals).toBe(1)
         expect(reveals[1].worldThrow).toBe("S")
@@ -365,13 +396,13 @@ describe("RoundCoordinator v2 reveal + reconciliation", function()
         --   pollOnce() elapsed 6000 >= 5000     -> now[3]=7000 (cadence flush #1 SUCCEEDS)
         --   submitPick("10","P") -> now[4]=7500  (lockout check, 7500<8000 accepted)
         --   pollOnce() pastLockout 8100>=8000   -> now[5]=8100 (final flush WHIFFS)
-        --   pollOnce() TALLY: no picks->no now()
+        --   pollOnce() LOCK: no picks->no now()
         local f = makeFakes({
-            okState("r1", "ACTIVE", 7, 10000),
-            okState("r1", "ACTIVE", 7, 10000),
-            okState("r1", "ACTIVE", 7, 10000),
-            okState("r1", "ACTIVE", 7, 10000),
-            okState("r1", "TALLY", 7),
+            okState("r1", "OPEN", 7, 8000),
+            okState("r1", "OPEN", 7, 8000),
+            okState("r1", "OPEN", 7, 8000),
+            okState("r1", "OPEN", 7, 8000),
+            okState("r1", "LOCK", 7),
         }, {
             {
                 ok = true,
@@ -393,24 +424,24 @@ describe("RoundCoordinator v2 reveal + reconciliation", function()
                 table.insert(reveals, r)
             end,
         })
-        c:pollOnce() -- ACTIVE, no picks: consumes no now()
+        c:pollOnce() -- OPEN, no picks: consumes no now()
         c:submitPick("9", "R") -- now=0; R beats S -> WIN
         c:pollOnce() -- now=1000: baseline set, no flush
         c:pollOnce() -- now=7000: elapsed 6000 >= 5000 -> flush #1 (player 9) SUCCEEDS
         c:submitPick("10", "P") -- now=7500 < lockout 8000 -> accepted
         c:pollOnce() -- now=8100 >= lockout 8000 -> final flush (player 10) WHIFFS
-        c:pollOnce() -- TALLY: reveal fires
+        c:pollOnce() -- LOCK: reveal fires
         expect(#reveals).toBe(1)
         expect(reveals[1].results["9"].result).toBe("WIN")
         expect(reveals[1].results["10"]).toBeNil() -- whiffed: must not invent a result
     end)
 
-    test("reconciliation fetches instance results on the next ACTIVE and passes rows through", function()
+    test("reconciliation fetches instance results on the next OPEN and passes rows through", function()
         local rows = { { robloxUserId = "9", result = "WIN", totalPoints = 0, pot = 1, streak = 1 } }
         local f = makeFakes({
-            okState("r1", "ACTIVE", 7, 99000),
+            okState("r1", "OPEN", 7, 99000),
             okState("r1", "REVEAL", 7),
-            okState("r2", "ACTIVE", 8, 99000),
+            okState("r2", "OPEN", 8, 99000),
         }, {
             {
                 ok = true,
@@ -426,7 +457,7 @@ describe("RoundCoordinator v2 reveal + reconciliation", function()
         c:pollOnce()
         c:submitPick("9", "R")
         c:pollOnce() -- REVEAL for r1
-        c:pollOnce() -- r2 ACTIVE: reconciliation for r1 fires
+        c:pollOnce() -- r2 OPEN: reconciliation for r1 fires
         expect(#f.instanceCalls).toBe(1)
         expect(f.instanceCalls[1].roundId).toBe("r1")
         expect(#reconciled).toBe(1)
@@ -436,7 +467,7 @@ end)
 
 describe("RoundCoordinator v3 payload extensions", function()
     test("onRound includes the tape from /state", function()
-        local f = makeFakes({ okState("r1", "ACTIVE", 7) }, {})
+        local f = makeFakes({ okState("r1", "OPEN", 7) }, {})
         local rounds: { any } = {}
         local c = makeCoordinator(f, {
             onRound = function(info: any)
@@ -451,12 +482,12 @@ describe("RoundCoordinator v3 payload extensions", function()
     test("onReveal includes the whiffed set", function()
         -- now() consumption: submitPick takes 0; poll2's flush check takes 1000
         -- (cadence baseline, no flush); poll3 takes 7000 (6s elapsed -> flush,
-        -- which whiffs); poll4 is TALLY (no flush check) and fires the reveal.
+        -- which whiffs); poll4 is LOCK (no flush check) and fires the reveal.
         local f = makeFakes({
-            okState("r1", "ACTIVE", 7, 99000),
-            okState("r1", "ACTIVE", 7, 99000),
-            okState("r1", "ACTIVE", 7, 99000),
-            okState("r1", "TALLY", 7),
+            okState("r1", "OPEN", 7, 99000),
+            okState("r1", "OPEN", 7, 99000),
+            okState("r1", "OPEN", 7, 99000),
+            okState("r1", "LOCK", 7),
         }, {
             {
                 ok = true,
@@ -477,14 +508,14 @@ describe("RoundCoordinator v3 payload extensions", function()
         c:submitPick("9", "R")
         c:pollOnce() -- baseline, no flush
         c:pollOnce() -- flush -> PICKS_CLOSED -> whiff
-        c:pollOnce() -- TALLY: reveal fires
+        c:pollOnce() -- LOCK: reveal fires
         expect(reveals[1].whiffed["9"]).toBe(true)
         expect(reveals[1].results["9"]).toBeNil()
     end)
 end)
 
 describe("RoundCoordinator schedule publish (round metronome)", function()
-    local DUR = { activeMs = 20000, tallyMs = 2000, revealMs = 3000 }
+    local DUR = { openMs = 20000, lockMs = 2000, revealMs = 3000 }
     local function makeScheduleRig(states: { any })
         local schedules: { any } = {}
         local idx = 0
@@ -541,7 +572,7 @@ describe("RoundCoordinator schedule publish (round metronome)", function()
             localReceiveMs = 0,
             data = {
                 roundId = "r1",
-                phase = "ACTIVE",
+                phase = "OPEN",
                 phaseEndsAt = 100000,
                 serverTime = 90000,
                 roundCount = 7,
@@ -555,25 +586,36 @@ describe("RoundCoordinator schedule publish (round metronome)", function()
         return s
     end
 
-    test("ACTIVE publishes strike = phase end + tally (in local ms)", function()
+    test("OPEN publishes strike = phase end + lock (in local ms)", function()
         local c, schedules = makeScheduleRig({ stateOk({}) })
         c:pollOnce()
         expect(#schedules).toBe(1)
-        -- toLocalTime(100000) = 99500; + tallyMs 2000
+        -- toLocalTime(100000) = 99500; + lockMs 2000
         expect(schedules[1].strikeAtMs).toBe(101500)
         expect(schedules[1].periodMs).toBe(25000)
         expect(schedules[1].roundId).toBe("r1")
         expect(schedules[1].roundCount).toBe(7)
-        expect(schedules[1].activeMs).toBe(20000)
+        expect(schedules[1].openMs).toBe(20000)
     end)
 
-    test("TALLY strike = phase end; REVEAL strike = next round's", function()
-        local c, schedules = makeScheduleRig({ stateOk({ phase = "TALLY" }), stateOk({ phase = "REVEAL" }) })
+    test("the published schedule names the durations openMs/lockMs/revealMs", function()
+        local c, schedules = makeScheduleRig({ stateOk({}) })
+        c:pollOnce()
+        expect(schedules[1].openMs).toBe(20000)
+        expect(schedules[1].lockMs).toBe(2000)
+        expect(schedules[1].revealMs).toBe(3000)
+        -- toLocalTime(100000) = 99500; the strike is reveal-start, so + lockMs 2000
+        expect(schedules[1].strikeAtMs).toBe(101500)
+        expect(schedules[1].periodMs).toBe(25000)
+    end)
+
+    test("LOCK strike = phase end; REVEAL strike = next round's", function()
+        local c, schedules = makeScheduleRig({ stateOk({ phase = "LOCK" }), stateOk({ phase = "REVEAL" }) })
         c:pollOnce()
         c:pollOnce()
         expect(#schedules).toBe(2)
-        expect(schedules[1].strikeAtMs).toBe(99500) -- TALLY ends at the strike
-        expect(schedules[2].strikeAtMs).toBe(99500 + 22000) -- REVEAL end + active + tally
+        expect(schedules[1].strikeAtMs).toBe(99500) -- LOCK ends at the strike
+        expect(schedules[2].strikeAtMs).toBe(99500 + 22000) -- REVEAL end + open + lock
     end)
 
     test("re-publishes only past the 150ms wobble gate", function()

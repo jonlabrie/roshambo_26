@@ -51,10 +51,6 @@ local HandlerQueue = require(script.Parent:WaitForChild("HandlerQueue"))
 local PortalController = require(script.Parent:WaitForChild("PortalController"))
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local RoundClock = require(shared:WaitForChild("RoundClock"))
--- Required here for ONE value: LOCKOUT_SECONDS. The client derives its own lockout instant off
--- the published timeline from the same constant, so this is the wiring that makes "the game
--- server's lockout" and "the client's lockout" literally the same number.
-local RoundMetronome = require(shared:WaitForChild("RoundMetronome"))
 local GameRules = require(shared:WaitForChild("GameRules"))
 local PlayerProfiles = require(shared:WaitForChild("PlayerProfiles"))
 local ThemeManifest = require(shared:WaitForChild("ThemeManifest"))
@@ -324,7 +320,6 @@ local coordinator = RoundCoordinator.new({
     log = print,
     random = math.random,
     now = deps.now,
-    lockoutMs = RoundMetronome.LOCKOUT_SECONDS * 1000,
     instanceId = if game.JobId ~= "" then game.JobId else "studio-local",
     callbacks = {
         onRound = function(info)
@@ -337,7 +332,7 @@ local coordinator = RoundCoordinator.new({
         -- lands ~3s before the drum settles, so anything triggered on the remote is early. The
         -- recipe the deleted applyGrow used: delay by
         -- math.clamp(StrikeAtServerTime - workspace:GetServerTimeNow() + DrumStep.SETTLE_SECONDS,
-        -- 0, DrumStep.SETTLE_SECONDS + TallySec) — clamped so it fails late, never early.
+        -- 0, DrumStep.SETTLE_SECONDS + LockSec) — clamped so it fails late, never early.
         --
         -- And it has to be SERVER-side: Humanoid scale replicates server->client only, so an
         -- avatar effect triggered on the client is visible to nobody but its owner.
@@ -373,8 +368,8 @@ local coordinator = RoundCoordinator.new({
             roundScheduleConfig:SetAttribute("RoundId", s.roundId)
             roundScheduleConfig:SetAttribute("RoundCount", s.roundCount)
             roundScheduleConfig:SetAttribute("PeriodSec", s.periodMs / 1000)
-            roundScheduleConfig:SetAttribute("ActiveSec", s.activeMs / 1000)
-            roundScheduleConfig:SetAttribute("TallySec", s.tallyMs / 1000)
+            roundScheduleConfig:SetAttribute("OpenSec", s.openMs / 1000)
+            roundScheduleConfig:SetAttribute("LockSec", s.lockMs / 1000)
             roundScheduleConfig:SetAttribute("RevealSec", s.revealMs / 1000)
             -- StrikeAtServerTime LAST: clients pull the whole schedule on its change.
             roundScheduleConfig:SetAttribute("StrikeAtServerTime", strikeSt)
