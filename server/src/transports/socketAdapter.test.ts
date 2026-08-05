@@ -53,6 +53,11 @@ describe('socket adapter wire format', () => {
         expect(init.revealMs).toBe(1000); // revealSeconds: 1 in beforeEach
     });
 
+    it('sends openMs on init so the client can calibrate the pie timer to OPEN\'s actual length', async () => {
+        const init = await initPromise;
+        expect(init.openMs).toBe(2000); // openSeconds: 2 in beforeEach
+    });
+
     it('emits sync heartbeats on tick with timeLeft and playerCount', async () => {
         await initPromise;
         const sync = waitFor<any>(client, 'sync');
@@ -81,7 +86,8 @@ describe('socket adapter wire format', () => {
         const revealP = waitFor<any>(client, 'reveal');
         const playerDataP = waitFor<any>(client, 'player-data');
         for (let i = 0; i < 3; i++) { engine.tick(); await new Promise(r => setTimeout(r, 20)); }
-        // ticks: 2->1, 1->0 closes round (settlement), TALLY 1->0 starts REVEAL (broadcast)
+        // ticks: OPEN 2->1, OPEN 1->0 enters LOCK, LOCK 1->0 closes the round and starts
+        // REVEAL (settlement completes and the reveal broadcasts on the same transition)
 
         const reveal = await revealP;
         expect(reveal).toMatchObject({ worldThrow: 'S', totalPlayers: 1, distribution: { R: 100, P: 0, S: 0 } });
@@ -91,6 +97,37 @@ describe('socket adapter wire format', () => {
         expect(pd.lastResult).toEqual({ result: 'WIN', delta: 1 });
         expect(pd.user).toMatchObject({ pointsAtStake: 1, currentStreak: 1 });
         expect(Array.isArray(pd.history)).toBe(true);
+    });
+
+    it('emits player-data before reveal for the same round (CLAUDE.md emit order)', async () => {
+        // Regression for a bug where the two fired in reverse order: settleRound's
+        // first `await` let revealStarted run before the player-data loop, so
+        // reveal always beat player-data to the PWA and the client showed the
+        // previous round's result. Unlike the "full round" test above — which
+        // awaits both promises CONCURRENTLY and can't observe which landed
+        // first — this records arrival order via listeners registered up front.
+        await initPromise;
+        client.emit('sync-player', { deviceId: 'devA' });
+        await waitFor(client, 'player-data'); // initial sync-player reply, not part of the round broadcast
+
+        client.emit('submit-throw', { deviceId: 'devA', throw: 'R' }); // R beats S -> WIN
+        await new Promise(r => setTimeout(r, 50)); // let the emit land
+
+        const order: string[] = [];
+        const bothArrived = new Promise<void>(resolve => {
+            let count = 0;
+            const mark = (name: string) => () => {
+                order.push(name);
+                if (++count === 2) resolve();
+            };
+            client.once('player-data', mark('player-data'));
+            client.once('reveal', mark('reveal'));
+        });
+
+        for (let i = 0; i < 3; i++) { engine.tick(); await new Promise(r => setTimeout(r, 20)); }
+
+        await bothArrived;
+        expect(order).toEqual(['player-data', 'reveal']);
     });
 
     it('buffers a throw submitted during REVEAL and enters it next round', async () => {

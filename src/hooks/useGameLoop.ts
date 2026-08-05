@@ -24,6 +24,12 @@ export function useGameLoop() {
     const [lastRound, setLastRound] = useState<RoundData | null>(null)
     const [history, setHistory] = useState<RoundData[]>([])
     const [showResult, setShowResult] = useState(false)
+    // Server-reported OPEN length, arriving on `init`. Unlike revealMs (read only
+    // inside a socket-handler closure via a ref) this is rendered directly as
+    // PieTimer's `totalTime` prop, so it must be state — a ref mutation wouldn't
+    // trigger the re-render the countdown ring needs. The fallback matches the
+    // server's default (51s) but should never be the number in use.
+    const [openMs, setOpenMs] = useState(51000)
     const [stats, setStats] = useState<ServerStats | null>(null)
     const [user, setUser] = useState<AuthUser | null>(null)
     const [token, setToken] = useState<string | null>(localStorage.getItem('roshambo_auth_token'))
@@ -400,6 +406,7 @@ export function useGameLoop() {
         socket.on('init', (data) => {
             setGameState('ACTIVE')
             if (typeof data.revealMs === 'number') revealMsRef.current = data.revealMs
+            if (typeof data.openMs === 'number') setOpenMs(data.openMs)
             setTimeLeft(data.timeLeft)
             setRoundCount(data.roundCount)
 
@@ -474,6 +481,7 @@ export function useGameLoop() {
 
     return {
         timeLeft,
+        openMs,
         gameState,
         playerThrow,
         setPlayerThrow,

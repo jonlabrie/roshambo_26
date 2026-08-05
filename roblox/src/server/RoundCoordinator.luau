@@ -213,9 +213,9 @@ function RoundCoordinator.pollOnce(self: any): number
         self._whiffed = {}
     end
 
-    -- The lockout IS the end of OPEN. Same wall-clock instant it always was — OPEN's
-    -- duration is what ACTIVE's was minus the two seconds that are now LOCK — but read
-    -- off the schedule instead of inferred from it.
+    -- The lockout IS the end of OPEN. The durable invariant is `lockout = strike - lockMs`
+    -- — true whatever OPEN's own duration is tuned to — read off the schedule instead of
+    -- inferred from it.
     if state.phase == "OPEN" and d.clock:hasSync() then
         self._lockoutAtMs = d.clock:toLocalTime(state.phaseEndsAt)
     end

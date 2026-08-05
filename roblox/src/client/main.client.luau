@@ -676,10 +676,11 @@ EventBus.Cue.Event:Connect(function(cue)
         maybeShowReveal()
     elseif cue.kind == "gongHit" then
         -- THE STRIKE — the instant everything the drum does is measured from, which is why the
-        -- fallback is armed HERE and not from RevealResult arriving. The reveal can land a second
-        -- or more BEFORE the strike (RoundCoordinator:_fetchRevealIfDue accepts LOCK as well as
-        -- REVEAL), so a window measured from its arrival is measured from an event with no fixed
-        -- relationship to the rest it is meant to sit behind.
+        -- fallback is armed HERE and not from RevealResult arriving. The world throw is decided
+        -- at the END of LOCK, so a LOCK-phase fetch (RoundCoordinator's `_fetchRevealIfDue`
+        -- accepts LOCK as well as REVEAL) always 404s — the reveal cannot land before the strike,
+        -- only poll-jittered 0-1.25s AFTER it. A window measured from its arrival would still be
+        -- measured from an event with no fixed relationship to the rest it is meant to sit behind.
         strikeSeen = true
         armRevealSafety(if worldThrowInHand then REVEAL_SAFETY else REVEAL_SAFETY_STALLED)
     end

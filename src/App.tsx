@@ -23,6 +23,7 @@ const THROW_LABEL: Record<string, string> = {
 export default function App() {
     const {
         timeLeft,
+        openMs,
         gameState,
         playerThrow,
         setPlayerThrow,
@@ -164,7 +165,7 @@ export default function App() {
                 <div className="mt-2 flex items-center gap-4">
                     <PieTimer
                         timeLeft={timeLeft}
-                        totalTime={20}
+                        totalTime={openMs / 1000}
                         worldThrow={lastRound?.worldThrow ?? null}
                         showResult={showResult}
                     />

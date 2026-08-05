@@ -57,7 +57,7 @@ The server requires `MONGODB_URI` (exits immediately without it; `server/.env` h
 
 `index.ts` is an ~80-line composition root. The pieces:
 - `engine/GameRules.ts` — pure result/pot/streak math, fixture-tested against `shared-fixtures/game-rules.json` (repo root; the Roblox Luau mirror `roblox/src/shared/GameRules.luau` runs the same fixtures — keep them in sync)
-- `engine/RoundEngine.ts` — timer-less phase machine (`ACTIVE 20s → TALLY 2s → REVEAL 3s`), ticked by a `setInterval` in the composition root; collects throws with per-player seq-guarded upserts
+- `engine/RoundEngine.ts` — timer-less phase machine (`OPEN 51s → LOCK 2s → REVEAL 7s`, durations env-overridable via `ROUND_OPEN_SECONDS` / `ROUND_LOCK_SECONDS` / `ROUND_REVEAL_SECONDS`), ticked by a `setInterval` in the composition root; collects throws with per-player seq-guarded upserts
 - `engine/Settlement.ts` — persists rounds, scores all participants (PWA + Roblox) via `identity.resolveUser`
 - `engine/ResultsStore.ts` — in-memory recent results (global, per-instance, tape)
 - `transports/socketAdapter.ts` — the PWA's Socket.io wire format, unchanged from the legacy server
@@ -76,7 +76,7 @@ Luau modules are **dependency-injected and never `require` each other**, so the 
 
 Milestone 3 adds the playable loop: picks flow client→`SubmitPick` RemoteEvent→`RoundCoordinator:submitPick`→`ThrowBuffer`→delta-flushed to `POST /api/v1/throws` (5s cadence / 10 picks / final flush at the T₀−2s lockout). Reveals are computed locally from the mirrored GameRules and reconciled next round via `GET /instances/.../results` (authoritative overwrite in `PlayerProfiles`). RemoteEvents contract lives in `default.project.json` (`RoshamboRemotes`).
 
-Milestone 4a adds the arena machinery: pure modules (`FlapScheduler`, `HammerCurve`, `DoomEscalation`, `ChoreographyMachine`, `FateRegistry`, `ThemeManifest`+`themes/ZenDojo`, `EffectRegistry`/`EffectSelector`) drive client controllers (`BoardController`, `HammerController`, `TheaterController`, `FateController`) over a client-side `EventBus`. New remotes: `RevealTheater` (arena-wide results), `FateResolved` (victim-authority catch/accept), `BoardData`. Fate-bound players cannot throw until their fate resolves (server gate in `main.server.luau`). All visuals are placeholders pending milestone 4b's art pass.
+Milestone 4a adds the arena machinery: pure modules (`FlapScheduler`, `DoomEscalation`, `ChoreographyMachine`, `FateRegistry`, `ThemeManifest`+`themes/ZenDojo`, `EffectRegistry`/`EffectSelector`) drive client controllers (`BoardController`, `HammerController`, `TheaterController`, `FateController`) over a client-side `EventBus`. New remotes: `RevealTheater` (arena-wide results), `FateResolved` (victim-authority catch/accept), `BoardData`. Fate-bound players cannot throw until their fate resolves (server gate in `main.server.luau`). All visuals are placeholders pending milestone 4b's art pass.
 
 ### Workspace organization (Rojo vs place-only)
 

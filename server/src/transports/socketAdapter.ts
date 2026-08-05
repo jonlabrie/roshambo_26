@@ -70,11 +70,6 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
                 // bound the dedup set — only the in-flight round matters
                 settledRounds.delete(settledRounds.values().next().value!);
             }
-            // If reveal already fired before settlement finished (slow DB), emit now.
-            if (revealPending === round.id) {
-                revealPending = null;
-                broadcastReveal(round.id);
-            }
             await Promise.all(players.filter(p => p.platform === 'pwa').map(async (p: SettledPlayer) => {
                 const history = await personalHistory(p.user);
                 io.to(p.deviceId!).emit('player-data', {
@@ -83,6 +78,12 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
                     lastResult: { result: p.result, delta: p.delta },
                 });
             }));
+            // player-data must reach each device BEFORE the arena-wide reveal broadcast
+            // (CLAUDE.md's documented emit order) — emit it only after the loop above.
+            if (revealPending === round.id) {
+                revealPending = null;
+                broadcastReveal(round.id);
+            }
         } catch (err) {
             console.error('[SETTLE] round settlement failed:', (err as Error).message);
         }
@@ -115,6 +116,9 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
             // as long as the phase lasts. It used to be a literal in useGameLoop.ts and
             // silently went stale when the server changed (3s -> 5s -> 7s).
             revealMs: engine.durationsMs().revealMs,
+            // OPEN's length, so the PieTimer's countdown ring is calibrated to the
+            // actual phase duration instead of a stale literal (same reasoning as revealMs).
+            openMs: engine.durationsMs().openMs,
         });
 
         // Player Persistence Sync (ported verbatim from index.ts:364-401)
