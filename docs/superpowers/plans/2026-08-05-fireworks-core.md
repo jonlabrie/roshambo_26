@@ -43,9 +43,10 @@
 | `roblox/src/server/main.server.luau` | The referee: validate, spend, broadcast | 5 |
 | `roblox/default.project.json` | Three new RemoteEvents | 5 |
 | `roblox/src/shared/FireworkDirector.luau` | Pure: admit / stagger / drop, and LOD | 6 |
-| `roblox/src/shared/FireworkCatalog.luau` | The four recipes | 7 |
-| `roblox/src/client/FireworkController.client.luau` | Pooled emitters; renders what the director admits | 7 |
-| `roblox/src/client/HudController.client.luau` | The picker and the site-triggered button | 8 |
+| `roblox/src/shared/FireworkCatalog.luau` | The four recipes, each a list of phases | 7 |
+| `roblox/src/shared/FireworkSchedule.luau` | Pure: recipe + budget → a timed schedule | 7 |
+| `roblox/src/client/FireworkController.client.luau` | The phase player: pooled emitters and sounds | 8 |
+| `roblox/src/client/HudController.client.luau` | The picker and the site-triggered button | 9 |
 
 ---
 
@@ -1108,21 +1109,148 @@ git commit -m "feat(roblox): the firework director — a measured budget, stagge
 ```
 
 ---
+### Task 7: The catalog and the schedule — a recipe is a list of phases
 
-### Task 7: The catalog and the controller — the show
+A real shell is a **launch report**, an **ascent**, a **burst**, and — for anything past the
+simplest — **sub-bursts**, each with its own sound. A fixed ascent-then-burst chain cannot express
+that, and the cost of shell #12 is what this task is really about.
 
-The first thing anyone can look at. The three bench lessons are load-bearing here.
+The catalog is data. The schedule compiler is pure logic and carries the rule that matters: **the
+particle budget is per shell, divided across its burst phases, never multiplied.**
 
 **Files:**
 - Create: `roblox/src/shared/FireworkCatalog.luau`
+- Create: `roblox/src/shared/FireworkSchedule.luau`
+- Create: `roblox/tests/fixtures/fireworkShells.luau`
 - Test: `roblox/tests/FireworkCatalog.spec.luau`
-- Create: `roblox/src/client/FireworkController.client.luau`
+- Test: `roblox/tests/FireworkSchedule.spec.luau`
 
 **Interfaces:**
-- Consumes: `FireworkDirector.admit/lodFor` (Task 6); the `FireworkLaunched` remote (Task 5).
-- Produces: `FireworkCatalog.RECIPES: { [string]: Recipe }` where `Recipe = { coreColor: {number}, trailColor: {number}, burst: string, droop: boolean, spread: number }`.
+- Consumes: `FireworkDirector.PARTICLES_NEAR` (Task 6) only as a test value.
+- Produces:
+  - `FireworkCatalog.RECIPES: { [string]: Recipe }` where `Recipe = { phases: { Phase } }`
+  - `Phase = { at: number, kind: string, anchor: string, points: number?, scatter: number?, share: number?, sound: string?, color: { number }?, edgeColor: { number }?, spread: number?, droop: boolean? }`
+  - `FireworkSchedule.compile(recipe: Recipe, budget: number): { Event }`
+  - `Event = { at: number, kind: string, anchor: string, points: number, scatter: number, particles: number, sound: string?, color: { number }?, edgeColor: { number }?, spread: number?, droop: boolean? }`
 
-- [ ] **Step 1: Write the failing catalog test**
+- [ ] **Step 1: Write the Luau-side fixture**
+
+Lune cannot `require` a `.json` file, so the id list is transcribed. Create
+`roblox/tests/fixtures/fireworkShells.luau`:
+
+```lua
+--!strict
+-- Mirrors shared-fixtures/firework-shells.json. Lune cannot require JSON, so the id list is
+-- transcribed. Keep them identical: this list is what proves every sellable shell can be drawn.
+return { shells = { "firecracker", "peony", "willow", "ishibana" } }
+```
+
+- [ ] **Step 2: Write the failing schedule tests**
+
+Create `roblox/tests/FireworkSchedule.spec.luau`:
+
+```lua
+--!strict
+local harness = require("./harness")
+local describe, test, expect = harness.describe, harness.test, harness.expect
+local FireworkSchedule = require("../src/shared/FireworkSchedule")
+
+-- A nested shell: one main break, then six secondary points a third of a second later. No shipping
+-- shell uses this yet — it is here because the FORMAT and the PLAYER must support it, so the first
+-- nested shell is authored rather than engineered.
+local NESTED = {
+    phases = {
+        { at = 0.0, kind = "report", anchor = "origin", sound = "rbxassetid://1" },
+        { at = 0.02, kind = "ascent", anchor = "origin", sound = "rbxassetid://2" },
+        { at = 1.1, kind = "burst", anchor = "apex", points = 1, scatter = 0, share = 2, sound = "rbxassetid://3" },
+        { at = 1.45, kind = "burst", anchor = "apex", points = 6, scatter = 26, share = 1, sound = "rbxassetid://4" },
+    },
+}
+
+local SIMPLE = {
+    phases = {
+        { at = 0.0, kind = "report", anchor = "origin" },
+        { at = 0.02, kind = "ascent", anchor = "origin" },
+        { at = 1.1, kind = "burst", anchor = "apex" },
+    },
+}
+
+describe("FireworkSchedule — compiling a recipe", function()
+    test("it emits one event per phase, in time order", function()
+        local ev = FireworkSchedule.compile(NESTED, 400)
+        expect(#ev).toBe(4)
+        local prev = -1
+        for _, e in ev do
+            expect(e.at >= prev).toBe(true)
+            prev = e.at
+        end
+    end)
+
+    test("non-burst phases carry no particles", function()
+        for _, e in FireworkSchedule.compile(NESTED, 400) do
+            if e.kind ~= "burst" then
+                expect(e.particles).toBe(0)
+            end
+        end
+    end)
+
+    test("sounds survive compilation", function()
+        local ev = FireworkSchedule.compile(NESTED, 400)
+        expect(ev[1].sound).toBe("rbxassetid://1")
+        expect(ev[4].sound).toBe("rbxassetid://4")
+    end)
+
+    test("defaults fill in for a simple shell", function()
+        local ev = FireworkSchedule.compile(SIMPLE, 400)
+        local burst = ev[3]
+        expect(burst.points).toBe(1)
+        expect(burst.scatter).toBe(0)
+        expect(burst.particles).toBe(400) -- the only burst gets the whole budget
+    end)
+end)
+
+describe("FireworkSchedule — THE BUDGET IS PER SHELL", function()
+    test("total particles across every break point never exceed the budget", function()
+        -- THE LOAD-BEARING TEST. A nested shell has 7 break points; at the full near-budget each,
+        -- it would cost seven times what the mobile floor was measured against — authored in good
+        -- faith by someone assuming each break looks like a normal break.
+        for _, budget in { 90, 250, 400 } do
+            local total = 0
+            for _, e in FireworkSchedule.compile(NESTED, budget) do
+                total += e.particles * e.points
+            end
+            expect(total <= budget).toBe(true)
+        end
+    end)
+
+    test("share splits the budget between burst phases", function()
+        -- share 2 : share 1 over 400, with the second phase spread across 6 points.
+        local ev = FireworkSchedule.compile(NESTED, 400)
+        expect(ev[3].particles).toBe(266) -- floor(400 * 2/3)
+        expect(ev[3].points).toBe(1)
+        expect(ev[4].particles).toBe(22) -- floor(400 * 1/3 / 6)
+        expect(ev[4].points).toBe(6)
+    end)
+
+    test("a break point always gets at least one particle", function()
+        -- At the far LOD a heavily nested shell could round to zero and vanish silently, which
+        -- reads as a bug rather than as distance.
+        for _, e in FireworkSchedule.compile(NESTED, 8) do
+            if e.kind == "burst" then
+                expect(e.particles >= 1).toBe(true)
+            end
+        end
+    end)
+
+    test("a recipe with no burst phases does not divide by zero", function()
+        local ev = FireworkSchedule.compile({ phases = { { at = 0, kind = "report", anchor = "origin" } } }, 400)
+        expect(#ev).toBe(1)
+        expect(ev[1].particles).toBe(0)
+    end)
+end)
+```
+
+- [ ] **Step 3: Write the failing catalog tests**
 
 Create `roblox/tests/FireworkCatalog.spec.luau`:
 
@@ -1131,6 +1259,7 @@ Create `roblox/tests/FireworkCatalog.spec.luau`:
 local harness = require("./harness")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 local FireworkCatalog = require("../src/shared/FireworkCatalog")
+local FireworkSchedule = require("../src/shared/FireworkSchedule")
 local fixture = require("./fixtures/fireworkShells")
 
 describe("FireworkCatalog — the other half of the contract", function()
@@ -1152,107 +1281,310 @@ describe("FireworkCatalog — the other half of the contract", function()
         end
     end)
 
-    test("every recipe names a burst texture — an empty Texture renders NOTHING", function()
+    test("every shell has a launch report, an ascent and at least one burst", function()
+        -- A shell that skips the report has no thump at the tube and reads as a firework that
+        -- started halfway through.
         for _, recipe in FireworkCatalog.RECIPES do
-            expect(typeof(recipe.burst)).toBe("string")
-            expect(#recipe.burst > 0).toBe(true)
+            local kinds = {}
+            for _, ph in recipe.phases do
+                kinds[ph.kind] = true
+            end
+            expect(kinds.report).toBe(true)
+            expect(kinds.ascent).toBe(true)
+            expect(kinds.burst).toBe(true)
+        end
+    end)
+
+    test("every burst names a texture — an empty Texture renders NOTHING", function()
+        for _, recipe in FireworkCatalog.RECIPES do
+            for _, ph in recipe.phases do
+                if ph.kind == "burst" then
+                    expect(typeof(ph.texture)).toBe("string")
+                    expect(#ph.texture > 0).toBe(true)
+                end
+            end
+        end
+    end)
+
+    test("every recipe compiles, and stays inside a budget", function()
+        for _, recipe in FireworkCatalog.RECIPES do
+            local total = 0
+            for _, e in FireworkSchedule.compile(recipe, 400) do
+                total += e.particles * e.points
+            end
+            expect(total <= 400).toBe(true)
         end
     end)
 
     test("it holds no Roblox globals — colours are plain {r,g,b} arrays", function()
         for _, recipe in FireworkCatalog.RECIPES do
-            expect(typeof(recipe.coreColor)).toBe("table")
-            expect(#recipe.coreColor).toBe(3)
+            for _, ph in recipe.phases do
+                if ph.color then
+                    expect(typeof(ph.color)).toBe("table")
+                    expect(#ph.color).toBe(3)
+                end
+            end
         end
     end)
 end)
 ```
 
-- [ ] **Step 2: Make the fixture readable from Lune**
-
-Lune cannot `require` a `.json` file. Create `roblox/tests/fixtures/fireworkShells.luau` as the Luau-side mirror, and pin it to the JSON with a comment so drift is at least visible in review:
-
-```lua
---!strict
--- Mirrors shared-fixtures/firework-shells.json. Lune cannot require JSON, so the id list is
--- transcribed. Keep them identical: this list is what proves every sellable shell can be drawn.
-return { shells = { "firecracker", "peony", "willow", "ishibana" } }
-```
-
-- [ ] **Step 3: Run to verify it fails**
+- [ ] **Step 4: Run both to verify they fail**
 
 Run from `roblox/`: `lune run tests/run`
 
-Expected: FAIL — `FireworkCatalog` does not exist.
+Expected: FAIL — neither module exists.
 
-- [ ] **Step 4: Write the catalog**
+- [ ] **Step 5: Write the schedule compiler**
+
+Create `roblox/src/shared/FireworkSchedule.luau`:
+
+```lua
+--!strict
+-- A RECIPE IS A LIST OF PHASES; THIS TURNS ONE INTO A TIMED SCHEDULE. Pure, so it runs under Lune —
+-- which matters because the rule it carries cannot be checked any other way.
+--
+-- THE RULE: the particle budget is PER SHELL. A nested shell divides it across its burst phases and
+-- across each phase's break points; it never multiplies. Six break points at the full near-budget
+-- is six times the fill-rate the mobile floor was measured against, and it would be authored in
+-- perfectly good faith by someone assuming each break looks like a normal break. The recipe cannot
+-- opt out of the division, which is why `share` is a weight and not a count.
+local FireworkSchedule = {}
+
+export type Phase = {
+    at: number,
+    kind: string, -- "report" | "ascent" | "burst"
+    anchor: string, -- "origin" (the tube) | "apex" (where the shell broke)
+    points: number?, -- break points; 1 = a simple break, 6 = a nested one
+    scatter: number?, -- how far those points spread from the anchor, in studs
+    share: number?, -- this burst's weight in the shell's budget
+    sound: string?,
+    texture: string?,
+    color: { number }?,
+    edgeColor: { number }?,
+    spread: number?,
+    droop: boolean?,
+}
+export type Recipe = { phases: { Phase } }
+
+export type Event = {
+    at: number,
+    kind: string,
+    anchor: string,
+    points: number,
+    scatter: number,
+    particles: number, -- PER BREAK POINT, not per phase
+    sound: string?,
+    texture: string?,
+    color: { number }?,
+    edgeColor: { number }?,
+    spread: number?,
+    droop: boolean?,
+}
+
+function FireworkSchedule.compile(recipe: Recipe, budget: number): { Event }
+    local totalShare = 0
+    for _, ph in recipe.phases do
+        if ph.kind == "burst" then
+            totalShare += ph.share or 1
+        end
+    end
+
+    local out: { Event } = {}
+    for _, ph in recipe.phases do
+        local points = ph.points or 1
+        local particles = 0
+        if ph.kind == "burst" and totalShare > 0 then
+            local slice = budget * ((ph.share or 1) / totalShare)
+            -- Floor, then floor again per point: rounding UP anywhere here would let a nested
+            -- shell creep over the budget the floor measurement bought.
+            particles = math.floor(slice / points)
+            -- ...but never to nothing. At the far LOD a heavily nested shell would otherwise round
+            -- to zero and vanish silently, which reads as a bug rather than as distance.
+            if particles < 1 then
+                particles = 1
+            end
+        end
+        table.insert(out, {
+            at = ph.at,
+            kind = ph.kind,
+            anchor = ph.anchor,
+            points = points,
+            scatter = ph.scatter or 0,
+            particles = particles,
+            sound = ph.sound,
+            texture = ph.texture,
+            color = ph.color,
+            edgeColor = ph.edgeColor,
+            spread = ph.spread,
+            droop = ph.droop,
+        })
+    end
+    table.sort(out, function(a, b)
+        return a.at < b.at
+    end)
+    return out
+end
+
+return FireworkSchedule
+```
+
+**Note on the floor:** the `particles < 1` clamp can push a heavily nested shell fractionally over
+budget at very small budgets. That is deliberate — one particle per point is the difference between
+"far away" and "broken" — and the schedule test asserts the bound at realistic budgets (90 and
+above), not at pathological ones.
+
+- [ ] **Step 6: Write the catalog**
 
 Create `roblox/src/shared/FireworkCatalog.luau`:
 
 ```lua
 --!strict
--- HOW EACH SHELL LOOKS. The other half of the contract with server/src/fireworks.ts: that side owns
--- ids, prices and requirements; this side owns the recipe. They meet at one string, and
--- FireworkCatalog.spec asserts this table covers every id the server can sell.
+-- HOW EACH SHELL LOOKS AND SOUNDS. The other half of the contract with server/src/fireworks.ts:
+-- that side owns ids, prices and requirements; this side owns the recipe. They meet at one string,
+-- and FireworkCatalog.spec asserts this table covers every id the server can sell.
 --
--- Pure data, no Roblox globals (colours are {r,g,b} 0-255 arrays), so it runs under Lune. The
--- controller turns these into emitters.
+-- A RECIPE IS A LIST OF PHASES — report, ascent, burst, and (for shells beyond these four)
+-- sub-bursts. FireworkController just walks the list, so adding a shell never touches it. That is
+-- the whole reason for the format: the memory is explicit that many distinct shells matter to this
+-- game's economics, and a fixed chain would make every new break a code change.
+--
+-- Pure data, no Roblox globals (colours are {r,g,b} 0-255 arrays), so it runs under Lune.
 --
 -- THE TEXTURE IS NOT OPTIONAL. A ParticleEmitter with Texture == "" renders nothing at all — no
 -- error, no warning. Learned on the 2026-07-20 bench; see the roshambo-fireworks memory.
 local FireworkCatalog = {}
 
 local SPARKLE = "rbxasset://textures/particles/sparkles_main.dds"
-
-export type Recipe = {
-    coreColor: { number },
-    trailColor: { number },
-    burst: string,
-    droop: boolean,
-    spread: number,
-}
+-- Built-in stand-ins, replaced at the art pass. Named here rather than inline so the swap is one
+-- edit per sound rather than one per shell.
+local S_REPORT = "rbxasset://sounds/collide.wav"
+local S_ASCENT = "rbxasset://sounds/swoosh.wav"
+local S_BURST = "rbxasset://sounds/impact_explosion_03.mp3"
 
 FireworkCatalog.RECIPES = {
     -- Hand-launched: low, fast, cheap. Deliberately the least spectacular — it is the one everybody
-    -- has, and the mortar shells have to feel like an upgrade.
-    firecracker = { coreColor = { 255, 236, 170 }, trailColor = { 255, 200, 120 }, burst = SPARKLE, droop = false, spread = 18 },
+    -- has, and the mortar shells must feel like an upgrade.
+    firecracker = {
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.02, kind = "ascent", anchor = "origin", sound = S_ASCENT, color = { 255, 200, 120 } },
+            {
+                at = 0.7,
+                kind = "burst",
+                anchor = "apex",
+                sound = S_BURST,
+                texture = SPARKLE,
+                color = { 255, 236, 170 },
+                edgeColor = { 255, 200, 120 },
+                spread = 18,
+                droop = false,
+            },
+        },
+    },
     -- The bench's proven radial break.
-    peony = { coreColor = { 255, 120, 140 }, trailColor = { 255, 190, 200 }, burst = SPARKLE, droop = false, spread = 42 },
+    peony = {
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.02, kind = "ascent", anchor = "origin", sound = S_ASCENT, color = { 255, 190, 200 } },
+            {
+                at = 1.1,
+                kind = "burst",
+                anchor = "apex",
+                sound = S_BURST,
+                texture = SPARKLE,
+                color = { 255, 120, 140 },
+                edgeColor = { 255, 190, 200 },
+                spread = 42,
+                droop = false,
+            },
+        },
+    },
     -- The bench's proven drooping break.
-    willow = { coreColor = { 180, 220, 255 }, trailColor = { 220, 240, 255 }, burst = SPARKLE, droop = true, spread = 34 },
+    willow = {
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.02, kind = "ascent", anchor = "origin", sound = S_ASCENT, color = { 220, 240, 255 } },
+            {
+                at = 1.2,
+                kind = "burst",
+                anchor = "apex",
+                sound = S_BURST,
+                texture = SPARKLE,
+                color = { 180, 220, 255 },
+                edgeColor = { 220, 240, 255 },
+                spread = 34,
+                droop = true,
+            },
+        },
+    },
     -- 石花, stone flower — the Rock shell. Stone-pale and slow, so the shell that only flies after
     -- an R round reads differently from the ones that fly any time.
-    ishibana = { coreColor = { 226, 222, 210 }, trailColor = { 198, 194, 186 }, burst = SPARKLE, droop = false, spread = 26 },
-} :: { [string]: Recipe }
+    ishibana = {
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.02, kind = "ascent", anchor = "origin", sound = S_ASCENT, color = { 198, 194, 186 } },
+            {
+                at = 1.3,
+                kind = "burst",
+                anchor = "apex",
+                sound = S_BURST,
+                texture = SPARKLE,
+                color = { 226, 222, 210 },
+                edgeColor = { 198, 194, 186 },
+                spread = 26,
+                droop = false,
+            },
+        },
+    },
+} :: { [string]: any }
 
 return FireworkCatalog
 ```
 
-- [ ] **Step 5: Run to verify it passes**
+- [ ] **Step 7: Run to verify both pass, lint, and commit**
 
-Run from `roblox/`: `lune run tests/run`
+```bash
+cd roblox && lune run tests/run && stylua --check src tests tools && selene src tools && cd ..
+git add roblox/src/shared/FireworkCatalog.luau roblox/src/shared/FireworkSchedule.luau roblox/tests/FireworkCatalog.spec.luau roblox/tests/FireworkSchedule.spec.luau roblox/tests/fixtures/fireworkShells.luau
+git commit -m "feat(roblox): a recipe is a list of phases, and the budget divides across them"
+```
 
-Expected: PASS.
+---
 
-- [ ] **Step 6: Write the controller**
+### Task 8: The phase player — the show
 
-Create `roblox/src/client/FireworkController.client.luau`. It listens on `FireworkLaunched`, asks the director, and renders from a pool.
+Walks a compiled schedule and renders it from pools. Owns instances and nothing else: every
+decision about *what* and *how much* was made in Tasks 6 and 7, both of which are tested. This file
+is not, because no harness loads a `.client.luau`.
+
+**Files:**
+- Create: `roblox/src/client/FireworkController.client.luau`
+- Modify: `roblox/default.project.json` (only if client scripts are listed individually)
+
+**Interfaces:**
+- Consumes: `FireworkSchedule.compile`, `FireworkCatalog.RECIPES` (Task 7); `FireworkDirector.admit/lodFor` (Task 6); the `FireworkLaunched` remote (Task 5).
+- Produces: nothing downstream.
+
+- [ ] **Step 1: Write the controller**
+
+Create `roblox/src/client/FireworkController.client.luau`:
 
 ```lua
 --!strict
--- THE SHOW. Renders what the director admits, from a fixed pool. Owns instances and nothing else:
--- every policy decision (render / stagger / drop, and how many particles) belongs to
--- FireworkDirector, which is testable — this file is not, because no harness loads a .client.luau.
+-- THE PHASE PLAYER. Compiles a recipe against the distance-appropriate budget and executes the
+-- resulting schedule from fixed pools. It knows nothing about any particular shell — a new shell is
+-- a row in FireworkCatalog and this file does not change.
 --
--- THREE LESSONS THE 2026-07-20 BENCH PAID FOR, and none of them are optional:
+-- THREE LESSONS THE 2026-07-20 BENCH PAID FOR, none of them optional:
 --   1. ParticleEmitter:Emit() does NOT replicate server->client. Emission happens HERE, on each
 --      client, from a tiny server event. A server-side :Emit() is simply invisible.
---   2. An emitter with Texture == "" renders nothing. FireworkCatalog always names one.
+--   2. An emitter with Texture == "" renders nothing. Every burst phase names one.
 --   3. Launch relative to something real. The bench's first pass fired at the world origin, 110
 --      studs below the player, and showed nothing.
 --
 -- NO PER-SHELL DYNAMIC LIGHTS. The single biggest killer on mobile. Glow is LightEmission plus the
--- one global Bloom, and adding a PointLight per burst would undo the entire budget.
+-- one global Bloom; a PointLight per burst would undo the entire budget.
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
@@ -1260,14 +1592,13 @@ local TweenService = game:GetService("TweenService")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local FireworkCatalog = require(shared:WaitForChild("FireworkCatalog"))
+local FireworkSchedule = require(shared:WaitForChild("FireworkSchedule"))
 local FireworkDirector = require(shared:WaitForChild("FireworkDirector"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local FireworkLaunched = remotes:WaitForChild("FireworkLaunched") :: RemoteEvent
 
-local player = Players.LocalPlayer
-
--- One global Bloom, created once. Per-shell lights are forbidden; this is the glow.
+-- One global Bloom, created once. This is the glow; per-shell lights are forbidden.
 if not Lighting:FindFirstChild("FireworkBloom") then
     local bloom = Instance.new("BloomEffect")
     bloom.Name = "FireworkBloom"
@@ -1277,98 +1608,165 @@ if not Lighting:FindFirstChild("FireworkBloom") then
     bloom.Parent = Lighting
 end
 
-local POOL_SIZE = FireworkDirector.MAX_CONCURRENT + 4
-local pool: { { part: BasePart, emitter: ParticleEmitter, trail: Trail } } = {}
-local poolNext = 1
-local active = 0
-
 local folder = Instance.new("Folder")
 folder.Name = "FireworkPool"
 folder.Parent = workspace
 
+-- MAX_POINTS burst parts per slot, because a nested break happens at several places AT ONCE and
+-- :Emit() fires wherever its part currently is — one part cannot be in six places in one frame.
+local MAX_POINTS = 8
+local POOL_SIZE = FireworkDirector.MAX_CONCURRENT + 4
+
+type Slot = { shell: BasePart, trail: Trail, points: { BasePart }, emitters: { ParticleEmitter }, sound: Sound }
+local pool: { Slot } = {}
+local poolNext = 1
+local active = 0
+
 for _ = 1, POOL_SIZE do
-    local part = Instance.new("Part")
-    part.Anchored, part.CanCollide, part.CanQuery, part.CanTouch = true, false, false, false
-    part.Transparency = 1
-    part.Size = Vector3.new(1, 1, 1)
-    part.Parent = folder
-    local em = Instance.new("ParticleEmitter")
-    em.Enabled = false -- burst-only; :Emit() drives it
-    em.LightEmission = 1
-    em.Speed = NumberRange.new(20, 60)
-    em.Lifetime = NumberRange.new(1.2, 2.4)
-    em.Rate = 0
-    em.Parent = part
-    -- The ascent comet. A Trail needs two attachments; it is property-driven rather than :Emit()-
-    -- driven, so unlike the burst it would have replicated from the server — it lives here anyway
-    -- so the whole shell is one pooled object with one lifetime.
+    local shell = Instance.new("Part")
+    shell.Anchored, shell.CanCollide, shell.CanQuery, shell.CanTouch = true, false, false, false
+    shell.Transparency = 1
+    shell.Size = Vector3.new(1, 1, 1)
+    shell.Parent = folder
+
+    -- The ascent comet. A Trail is property-driven rather than :Emit()-driven, so unlike the burst
+    -- it WOULD have replicated from the server — it lives here anyway so a shell is one pooled
+    -- object with one lifetime.
     local a0, a1 = Instance.new("Attachment"), Instance.new("Attachment")
     a0.Position, a1.Position = Vector3.new(0, -0.5, 0), Vector3.new(0, 0.5, 0)
-    a0.Parent, a1.Parent = part, part
+    a0.Parent, a1.Parent = shell, shell
     local trail = Instance.new("Trail")
     trail.Attachment0, trail.Attachment1 = a0, a1
     trail.Lifetime = 0.45
     trail.LightEmission = 1
     trail.Enabled = false
-    trail.Parent = part
-    table.insert(pool, { part = part, emitter = em, trail = trail })
+    trail.Parent = shell
+
+    -- ONE Sound per slot, not one per phase. A shell's phases never overlap in time, and a
+    -- sub-burst volley plays ONE report rather than six — six voices of one clip is noise and six
+    -- times the mixer cost.
+    local snd = Instance.new("Sound")
+    snd.RollOffMode = Enum.RollOffMode.InverseTapered
+    snd.RollOffMaxDistance = FireworkDirector.NEAR_STUDS
+    snd.Parent = shell
+
+    local points, emitters = {}, {}
+    for _ = 1, MAX_POINTS do
+        local p = Instance.new("Part")
+        p.Anchored, p.CanCollide, p.CanQuery, p.CanTouch = true, false, false, false
+        p.Transparency = 1
+        p.Size = Vector3.new(1, 1, 1)
+        p.Parent = folder
+        local em = Instance.new("ParticleEmitter")
+        em.Enabled = false -- burst-only; :Emit() drives it
+        em.LightEmission = 1
+        em.Rate = 0
+        em.Speed = NumberRange.new(20, 60)
+        em.Lifetime = NumberRange.new(1.2, 2.4)
+        em.Parent = p
+        table.insert(points, p)
+        table.insert(emitters, em)
+    end
+
+    table.insert(pool, { shell = shell, trail = trail, points = points, emitters = emitters, sound = snd })
 end
 
 local function colorOf(rgb: { number }): Color3
     return Color3.fromRGB(rgb[1], rgb[2], rgb[3])
 end
 
-local ASCENT_SECONDS = 1.1
+local function playSound(slot: Slot, id: string?, audible: boolean)
+    if id and audible then
+        slot.sound.SoundId = id
+        slot.sound:Play()
+    end
+end
 
-local function render(payload: any)
+local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random)
+    -- `points` break locations scattered around the anchor. `particles` is PER POINT — the schedule
+    -- already divided the shell's budget, so this must never multiply it back up.
+    local n = math.min(ev.points, MAX_POINTS)
+    for i = 1, n do
+        local p, em = slot.points[i], slot.emitters[i]
+        local off = if ev.scatter > 0
+            then Vector3.new(
+                rng:NextNumber(-ev.scatter, ev.scatter),
+                rng:NextNumber(-ev.scatter, ev.scatter) * 0.6,
+                rng:NextNumber(-ev.scatter, ev.scatter)
+            )
+            else Vector3.zero
+        p.Position = anchorPos + off
+        em.Texture = ev.texture
+        em.Color = ColorSequence.new(colorOf(ev.color), colorOf(ev.edgeColor or ev.color))
+        em.Size = NumberSequence.new((ev.spread or 30) / 40)
+        em.Acceleration = if ev.droop then Vector3.new(0, -28, 0) else Vector3.new(0, -6, 0)
+        em:Emit(ev.particles)
+    end
+end
+
+local function play(payload: any, distance: number)
     local recipe = FireworkCatalog.RECIPES[payload.shellId]
     if not recipe then
-        return -- unknown shell: the contract test exists so this never happens in a shipped build
+        return -- the contract test exists so this cannot happen in a shipped build
     end
     local slot = pool[poolNext]
     poolNext = (poolNext % POOL_SIZE) + 1
 
-    local cam = workspace.CurrentCamera
-    local distance = if cam then (cam.CFrame.Position - payload.origin).Magnitude else 0
     local lod = FireworkDirector.lodFor(distance)
+    local schedule = FireworkSchedule.compile(recipe, lod.particles)
 
     -- THE SEED IS WHY EVERY CLIENT SEES THE SAME SHOW. Without it each machine rolls its own
-    -- variation and two people watching one firework cannot talk about what they saw. The server
-    -- sends one per launch; a local Random seeded from it makes the jitter shared rather than
-    -- private.
+    -- apex and its own scatter, and two people watching one firework cannot talk about what they
+    -- saw. The server sends one per launch.
     local rng = Random.new(payload.seed)
-    local apex = payload.origin + Vector3.new(rng:NextNumber(-8, 8), 46 + rng:NextNumber(-6, 6), rng:NextNumber(-8, 8))
+    local origin = payload.origin
+    local apex = origin
+        + Vector3.new(rng:NextNumber(-8, 8), 46 + rng:NextNumber(-6, 6), rng:NextNumber(-8, 8))
 
-    -- The ascent, then the break — the chain the bench proved. The comet rises to the apex and the
-    -- burst fires there, not at the launcher's feet.
-    slot.part.Position = payload.origin
-    slot.trail.Color = ColorSequence.new(colorOf(recipe.trailColor))
-    slot.trail.Enabled = true
-    local rise = TweenService:Create(
-        slot.part,
-        TweenInfo.new(ASCENT_SECONDS, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-        { Position = apex }
-    )
-    rise:Play()
+    local last = 0
+    for _, ev in schedule do
+        last = math.max(last, ev.at)
+    end
 
     active += 1
-    task.delay(ASCENT_SECONDS, function()
-        slot.trail.Enabled = false
-        slot.emitter.Texture = recipe.burst
-        -- Core at the centre fading to the trail colour at the edge: two named colours per recipe
-        -- is what makes four shells read as four shells rather than one in four hues.
-        slot.emitter.Color = ColorSequence.new(colorOf(recipe.coreColor), colorOf(recipe.trailColor))
-        slot.emitter.Size = NumberSequence.new(recipe.spread / 40)
-        slot.emitter.Acceleration = if recipe.droop then Vector3.new(0, -28, 0) else Vector3.new(0, -6, 0)
-        slot.emitter:Emit(lod.particles)
-        task.delay(2.6, function()
-            active -= 1
+    for _, ev in schedule do
+        task.delay(ev.at, function()
+            local anchorPos = if ev.anchor == "apex" then apex else origin
+            if ev.kind == "report" then
+                slot.shell.Position = origin
+                playSound(slot, ev.sound, lod.sound)
+            elseif ev.kind == "ascent" then
+                slot.shell.Position = origin
+                slot.trail.Color = ColorSequence.new(colorOf(ev.color or { 255, 255, 255 }))
+                slot.trail.Enabled = true
+                playSound(slot, ev.sound, lod.sound)
+                -- The comet rises to the apex over whatever time the next phase leaves it.
+                local rise = math.max(0.05, last - ev.at)
+                TweenService
+                    :Create(
+                        slot.shell,
+                        TweenInfo.new(rise, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                        { Position = apex }
+                    )
+                    :Play()
+            elseif ev.kind == "burst" then
+                slot.trail.Enabled = false
+                playSound(slot, ev.sound, lod.sound)
+                fireBurst(slot, ev, anchorPos, rng)
+            end
         end)
+    end
+
+    -- Released after the last phase plus the longest particle lifetime, so the slot is not reused
+    -- while its own sparks are still on screen.
+    task.delay(last + 2.6, function()
+        active -= 1
+        slot.trail.Enabled = false
     end)
 end
 
 FireworkLaunched.OnClientEvent:Connect(function(payload)
-    if typeof(payload) ~= "table" or typeof(payload.origin) ~= "Vector3" then
+    if typeof(payload) ~= "table" or typeof(payload.origin) ~= "Vector3" or typeof(payload.seed) ~= "number" then
         return
     end
     local cam = workspace.CurrentCamera
@@ -1379,39 +1777,44 @@ FireworkLaunched.OnClientEvent:Connect(function(payload)
     end
     if decision.delayMs > 0 then
         task.delay(decision.delayMs / 1000, function()
-            render(payload)
+            play(payload, distance)
         end)
     else
-        render(payload)
+        play(payload, distance)
     end
 end)
 
--- Silence the unused-local warning selene would otherwise raise; `player` is here because the next
--- task's picker needs it and removing it would only churn the file.
-local _ = player
+local _ = Players -- required for the picker in the next task; kept to avoid churning this file
 ```
 
-- [ ] **Step 7: Add the controller to the Rojo project**
-
-Client scripts under `roblox/src/client/` are already mapped by `default.project.json`. Confirm with:
+- [ ] **Step 2: Confirm the Rojo mapping**
 
 ```bash
 grep -n "src/client" roblox/default.project.json
 ```
 
-If the directory is mapped wholesale, no change is needed. If scripts are listed individually, add `FireworkController` alongside the others.
+If the directory is mapped wholesale, no change is needed. If scripts are listed individually, add
+`FireworkController` alongside the others.
 
-- [ ] **Step 8: Run every gate and commit**
+- [ ] **Step 3: Run every gate**
 
 ```bash
 cd roblox && lune run tests/run && stylua --check src tests tools && selene src tools && cd ..
-git add roblox/src/shared/FireworkCatalog.luau roblox/tests/FireworkCatalog.spec.luau roblox/tests/fixtures/fireworkShells.luau roblox/src/client/FireworkController.client.luau roblox/default.project.json
-git commit -m "feat(roblox): four shell recipes and a pooled renderer"
+```
+
+Expected: PASS, clean, zero warnings. **Note what this does and does not prove:** the suite never
+loads this file. Green here means Tasks 6 and 7 still pass, not that a firework appears.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add roblox/src/client/FireworkController.client.luau roblox/default.project.json
+git commit -m "feat(roblox): the phase player — report, ascent, burst, sub-bursts, and their sounds"
 ```
 
 ---
 
-### Task 8: The picker
+### Task 9: The picker
 
 The site-triggered button and the four tiles. This is the last task and none of it is testable — read every line.
 
@@ -1651,7 +2054,7 @@ git commit -m "feat(roblox): the firework picker, offered where it works"
 
 ## The Studio gate
 
-**Nothing in tasks 5, 7 and 8 is covered by any test.** No harness loads a `.client.luau`, selene does not resolve cross-module field types, and `main.server.luau` is invisible to the Lune runner. The suite being green says nothing about whether a firework appears.
+**Nothing in tasks 5, 8 and 9 is covered by any test.** No harness loads a `.client.luau`, selene does not resolve cross-module field types, and `main.server.luau` is invisible to the Lune runner. The suite being green says nothing about whether a firework appears.
 
 Push server and Roblox together — a version mismatch here is the same hazard as the round rename, and the poll loop is still not `pcall`-wrapped.
 

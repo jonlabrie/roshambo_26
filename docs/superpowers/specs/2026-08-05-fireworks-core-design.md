@@ -90,6 +90,43 @@ with nothing holding them together.
 ishigumi, tsukubai, shu-moku), and tying the Rock condition to a *stone* flower is the mechanic
 saying itself.
 
+### A recipe is a list of phases
+
+A real firework is not two events. It is a **launch report** at the tube, an **ascent**, a
+**burst**, and — for anything beyond the simplest shell — **sub-bursts**: the secondary breaks that
+make a crossette a crossette. Each of those carries its own sound.
+
+So a recipe is `{ phases: { Phase } }`, where a phase declares *when* it happens, *where* it
+happens, what it looks like, and what it sounds like. The controller is a **phase player**: it
+walks the list and schedules each entry. It knows nothing about any particular shell.
+
+```
+Phase = {
+  at      : seconds from launch
+  kind    : "report" | "ascent" | "burst"
+  anchor  : "origin" | "apex"       -- the tube, or where the shell broke
+  points  : how many break points (1 = a simple break; 6 = a nested one)
+  scatter : how far those points spread from the anchor
+  sound   : asset id, or none
+  ...visual parameters
+}
+```
+
+**This is the decision that sets the cost of shell #12.** With a fixed ascent-then-burst chain, a
+multi-break shell is a controller rewrite. With a phase list it is a data row, which is what the
+"many distinct shells matter financially" requirement actually demands.
+
+The four launch shells use `report → ascent → burst` and nothing more. **Sub-bursts ship as a
+capability, not as content** — the player executes them and a test proves it, so the first nested
+shell is authored rather than engineered.
+
+### THE PARTICLE BUDGET IS PER SHELL, NOT PER BURST
+
+A nested shell with six break points must **divide** the measured budget across them, never
+multiply it. Six points at the full near-budget is six times the fill-rate the mobile floor was
+measured against, and it would be authored by someone reasonably assuming each break looks like a
+normal break. The player divides; the recipe cannot opt out.
+
 ### The three tubes
 
 Durable purchases, in `PRICES` beside decks and teahouses. Bigger tube, bigger shells.
@@ -215,8 +252,9 @@ payoff. The shape admits it; nothing pre-builds it.
 
 - `roblox/src/shared/FireworkDirector.luau` — pure. Given the active burst count and a distance,
   answers *render now / stagger by N ms / drop*, and *at what detail*. Testable under Lune.
-- `roblox/src/client/FireworkController.client.luau` — owns pooled emitters and does what it is
-  told.
+- `roblox/src/client/FireworkController.client.luau` — the **phase player**: owns pooled emitters
+  and pooled sounds, walks a recipe's phase list, and does what the director tells it. It knows
+  nothing about any particular shell.
 
 No harness in this repo loads a `.client.luau`, so this split is the only way any of the perf logic
 gets a test at all.
@@ -230,8 +268,12 @@ gets a test at all.
 - **Distance LOD** — far bursts get fewer particles, no sound.
 - **No per-shell dynamic lights.** The single biggest killer. Glow is `LightEmission` plus one
   global Bloom.
-- **Pooled emitters and pooled sounds.** Instance churn per shell means GC hitches.
-- **Particle counts bounded** — roughly 150–400 per shell. Mobile is fill-rate bound.
+- **Pooled emitters and pooled sounds.** Instance churn per shell means GC hitches, and a shell now
+  makes up to four sounds (report, ascent, burst, sub-bursts) rather than one.
+- **Particle counts bounded** — roughly 150–400 per shell, **divided across its burst phases**.
+  Mobile is fill-rate bound.
+- **Sound is distance-culled**, and a sub-burst volley plays ONE sound, not one per break point —
+  six simultaneous voices of the same clip is noise and six times the mixer cost.
 
 **Three lessons the bench already paid for, carried into the build:** `ParticleEmitter:Emit()` does
 not replicate server→client; an emitter with an empty `Texture` renders nothing; and a launch must
@@ -251,6 +293,8 @@ what they saw.
 - TS — every id in `firework-shells.json` has a price.
 - Luau — the director's admit/stagger/drop policy and its LOD thresholds.
 - Luau — every id in `firework-shells.json` has a recipe in `FireworkCatalog`.
+- Luau — **the phase schedule**: a recipe compiles to an ordered list of timed events, sub-bursts
+  included, and the particle budget divides across burst phases rather than multiplying.
 
 **Not gated, and this must be said plainly:** the VFX themselves, the picker, the site affordance,
 and every frame of the director's actual output. No harness loads a `.client.luau`. The Studio gate
