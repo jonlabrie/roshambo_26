@@ -140,7 +140,7 @@ describe('socket adapter wire format', () => {
         client.emit('submit-throw', { deviceId: 'devA', throw: 'P' });
         await new Promise(r => setTimeout(r, 50));
 
-        for (let i = 0; i < 1; i++) engine.tick(); // REVEAL -> next OPEN (replay drains the buffer)
+        engine.tick(); // REVEAL -> next OPEN (replay drains the buffer)
         const playerDataP = waitFor<any>(client, 'player-data');
         for (let i = 0; i < 3; i++) { engine.tick(); await new Promise(r => setTimeout(r, 20)); } // close round 2
         const pd = await playerDataP;

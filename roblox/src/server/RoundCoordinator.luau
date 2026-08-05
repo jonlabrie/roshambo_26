@@ -3,12 +3,13 @@
 -- picks until OPEN closes, delta-flushes throws (5s cadence /
 -- 10-pick / final flush), computes the local reveal from mirrored GameRules,
 -- and reconciles authoritative per-player results on the next OPEN.
-local RoundCoordinator = {}
-RoundCoordinator.__index = RoundCoordinator
-
+--
 -- THERE IS NO LOCKOUT LEAD ANY MORE. Picks close when OPEN closes — a phase boundary the
 -- server publishes — so the instant is read off `phaseEndsAt` rather than computed by
 -- subtracting a constant that two files had to agree on.
+local RoundCoordinator = {}
+RoundCoordinator.__index = RoundCoordinator
+
 local FLUSH_INTERVAL_MS = 5000
 local FLUSH_PICK_THRESHOLD = 10
 
@@ -109,9 +110,15 @@ function RoundCoordinator._maybeFlush(self: any)
         return
     end
     local nowMs = d.now()
-    -- LOCK is short (2s) and exists precisely to get whatever's buffered out the door —
-    -- picks already closed with OPEN, so there is no reason to wait on the 5s cadence.
-    -- Treat being in LOCK the same as being past the lockout instant.
+    -- BEING IN LOCK COUNTS AS BEING PAST THE LOCKOUT — see both `pastLockout` lines below.
+    -- LOCK is 2s and exists precisely to get whatever is buffered out the door; picks already
+    -- closed with OPEN, so waiting on the 5s cadence would strand them.
+    --
+    -- The phase test is not merely a shortcut for the clock test. `_lockoutAtMs` is only ever
+    -- assigned when `d.clock:hasSync()` is true, so on a server whose clock never synced it stays
+    -- nil and `nowMs >= _lockoutAtMs` can never fire — a pick taken in OPEN's last 5s would then
+    -- sit unflushed through LOCK and be destroyed by `clearRound()` at the boundary. The
+    -- server-published phase is the authoritative signal; the clock is the local estimate.
     if self._lastFlushMs == nil then
         -- First sighting of picks this round: start the cadence clock.
         -- Still check threshold/lockout triggers immediately before returning.

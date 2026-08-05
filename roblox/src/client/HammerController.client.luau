@@ -215,8 +215,9 @@ task.spawn(function()
         -- drawP=(open+lock)/period, not full draw) — derived from the live
         -- schedule so a round-length change rebuilds the right cam on next join.
         -- The PERIOD default is derived from the three phase defaults rather than
-        -- written out: it said 25 against a 20+2+5 = 27s round, and a stale period
-        -- skews where the strike lands until the first attributes replicate.
+        -- written out. It was once a literal 25 against what was then a 20+2+5 = 27s round, and a
+        -- stale period skews where the strike lands until the first attributes replicate. The
+        -- round is 51+2+7 = 60s now, which is exactly why this is a sum and not a number.
         local openSec = (scheduleConfig:GetAttribute("OpenSec") :: number?) or 51
         local lockSec = (scheduleConfig:GetAttribute("LockSec") :: number?) or 2
         local revealSec = (scheduleConfig:GetAttribute("RevealSec") :: number?) or 7

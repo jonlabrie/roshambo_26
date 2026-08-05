@@ -28,20 +28,28 @@ RevealBeat.FADE_SECONDS = 0.4
 -- round's RECORD, and a record arriving with the announcement is what buried the announcement.
 RevealBeat.TAPE_DELAY_SECONDS = RevealBeat.HOLD_SECONDS + RevealBeat.FADE_SECONDS
 
--- THE BEAT DELIBERATELY OUTLIVES THE ROUND BOUNDARY (owner's ruling, 2026-08-04, confirmed in
--- Studio). The drum comes to rest with roughly a second left before the next round opens, so a
--- beat that had to fit between rest and ACTIVE was cut off after well under a second — the owner
--- saw the glyph appear at the right moment and be replaced by the fresh countdown almost at once.
+-- THE BEAT MAY OUTLIVE THE ROUND BOUNDARY, AND MUST STILL BE ALLOWED TO (owner's ruling
+-- 2026-08-04, re-derived 2026-08-05 when REVEAL grew to 7s).
 --
--- Rather than shortening the beat to fit, or lengthening the round to make room, the beat is now
--- allowed to run ACROSS the boundary: the glyph holds and fades over the first few seconds of the
--- new round, and the ring hands back to a countdown already part-way down. main.client no longer
--- collapses the beat when ACTIVE arrives.
+-- The original reason is gone: REVEAL used to be 3s (briefly 5s) against a 6.85s ceremony, so the
+-- beat could not possibly fit and ran across the boundary by necessity. At REVEAL 7s it fits —
+-- drum rest at DrumStep.SETTLE_SECONDS 3.45, tape at 3.45 + 3.4 = 6.85, OPEN at 7.0.
 --
--- WHAT STILL BOUNDS IT: the beat must finish comfortably before the NEXT reveal, or two beats
--- would overlap and the older one's tape tile would be released by the newer one's arrival rather
--- than by its own schedule. Drum rests are about a round apart, so the ceiling is generous — but
--- it is a real ceiling and the test below pins it.
+-- BUT THE MARGIN IS 0.15 SECONDS, AND SETTLE_SECONDS IS THE UNSTALLED CHAIN ONLY. When the World
+-- Throw is late the drum waits (DrumStep.STALL_MAX_SECONDS), rest happens later than 3.45, and
+-- the beat runs past OPEN again. Since stage 3 the throw arrives AFTER the strike rather than ~2s
+-- before it, so that is the common case, not the rare one.
+--
+-- So the tolerance stays, and its reason is now STALL, not a phase too short to hold a ceremony.
+-- Anyone re-checking the arithmetic will find the beat fits and may conclude the tolerance is
+-- removable: it is not. Removing it reinstates the cut-off glyph on exactly the rounds whose
+-- timing is already worst. main.client does not collapse the beat when OPEN arrives.
+--
+-- WHAT STILL BOUNDS IT: the beat must finish before the NEXT drum rest, or two beats overlap and
+-- the older one's tape tile is released by the newer beat's arrival instead of by its own
+-- schedule. Rests are exactly one period apart, and the shortest period ever run is the 27s test
+-- config — so against a 3.4s beat this static ceiling is generous by a wide margin. It is not
+-- derived from the period because this module is pure and never sees one.
 RevealBeat.MAX_SAFE_SECONDS = 6
 
 return RevealBeat

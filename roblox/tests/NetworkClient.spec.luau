@@ -57,7 +57,7 @@ local CONFIG = { baseUrl = "http://x", apiKey = "k", maxAttempts = 3 }
 describe("NetworkClient.getState", function()
     test("returns decoded state with rtt and localReceive timing", function()
         local f = makeDeps(
-            { { ok = true, statusCode = 200, body = '{"roundId":"r1","phase":"ACTIVE","serverTime":111}' } },
+            { { ok = true, statusCode = 200, body = '{"roundId":"r1","phase":"OPEN","serverTime":111}' } },
             { now = { 100, 140 } } -- send at 100, receive at 140 -> rtt 40
         )
         local net = NetworkClient.new(CONFIG, f.deps)

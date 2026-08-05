@@ -26,7 +26,7 @@ local RingTimer = {}
 --
 -- This is the old segment count's `math.ceil` restated for a continuous ring, and it is
 -- load-bearing: an empty ring must mean the round is over and nothing else. A raw
--- fraction * 360 breaks that silently, because 0.2s of a 20s round is 3.6 degrees — sub-pixel
+-- fraction * 360 breaks that silently, because 0.2s of a 51s OPEN is 1.4 degrees — sub-pixel
 -- at 44px, and it renders as nothing while the throw buttons are still live. 6 degrees is
 -- roughly 2px along a 38px-diameter phone ring: small, but visibly not gone.
 RingTimer.MIN_SWEEP_DEGREES = 6

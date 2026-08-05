@@ -83,6 +83,12 @@ local STRIKE_LEAD_SLACK = 1
 -- fetch (RoundCoordinator's `_fetchRevealIfDue` accepts LOCK as well as REVEAL) always 404s, and the
 -- payload lands after REVEAL opens, not before it — while the strike is scheduled LockSec into
 -- LOCK, with `gongHit` at the END of the shu-moku's swing.
+--
+-- SO THE `LockSec` TERM BELOW IS NOW HEADROOM, NOT A MEASUREMENT. It sized the gap back when the
+-- reveal could arrive a whole TALLY ahead of the strike; today the real lead is only the swing.
+-- It is KEPT because every error here must fail LATE — a window too wide merely accepts a
+-- `gongHit` it would have accepted anyway, while one too narrow rejects a legitimate strike and
+-- strands the round's reveal. Do not "simplify" it away.
 -- Read from the live schedule so a server retune of LOCK carries — FindFirstChild, never
 -- WaitForChild, because the HUD must not block on the arena's config folder.
 local function strikeLeadSeconds(): number
@@ -407,7 +413,7 @@ end
 -- fault; everybody feels it.
 --
 -- So the two sources must AGREE before throws open, and disagreement fails SHUT. Losing 200ms of
--- an 18s window is invisible. A swallowed first tap is not.
+-- a 51s window is invisible. A swallowed first tap is not.
 --
 -- THIS WILL LOOK REDUNDANT TO THE NEXT READER. `phase` is already `localPhase or serverPhase`, so
 -- the eye reads "local says OPEN, therefore phase is OPEN, therefore why ask serverPhase at
@@ -860,19 +866,24 @@ RoundUpdate.OnClientEvent:Connect(function(info)
         -- it consumes its own World Throw on landing, and its next strike is this round's.
         worldThrowInHand = false
         strikeSeen = false
-        -- THE BEAT IS DELIBERATELY NOT COLLAPSED HERE (owner's ruling, 2026-08-04, after seeing it
-        -- in Studio). This used to release the tape, clear the ring and invalidate the generation,
-        -- on the reasoning that "the ring must not carry last round's glyph into this one".
+        -- THE BEAT IS DELIBERATELY NOT COLLAPSED HERE (owner's ruling 2026-08-04, re-derived
+        -- 2026-08-05 when REVEAL grew to 7s). This used to release the tape, clear the ring and
+        -- invalidate the generation, on the reasoning that "the ring must not carry last round's
+        -- glyph into this one" — and that reasoning cost the whole feature: against a 3s REVEAL it
+        -- cut the glyph off almost the instant it appeared.
         --
-        -- It turned out that reasoning cost the whole feature. The drum comes to rest with about a
-        -- second left before the next round opens, so collapsing on OPEN cut the glyph off almost
-        -- the instant it appeared — the owner watched it arrive at exactly the right moment and be
-        -- replaced by the fresh countdown in well under a second.
+        -- REVEAL is 7s now and the beat NOMINALLY FITS: rest at DrumStep.SETTLE_SECONDS 3.45, tape
+        -- at 6.85, OPEN at 7.0. So a reader checking the arithmetic will find no reason for this
+        -- and may delete it. THE REASON IS THE STALL. SETTLE_SECONDS is the unstalled chain only;
+        -- when the World Throw is late the drum waits and rest lands past 3.45, spending the whole
+        -- 0.15s of margin. Since stage 3 the throw arrives AFTER the strike rather than ~2s before
+        -- it, so that is the common case — collapsing here would cut the glyph off on exactly the
+        -- rounds whose timing is already worst. RevealBeat.spec pins both halves.
         --
-        -- So the beat now runs ACROSS the boundary: the glyph holds and fades over the first few
-        -- seconds of the new round, and the ring hands back to a countdown already part-way down.
-        -- Its own `task.delay`s are wall-clock and always fire, so it completes on its own; and if
-        -- a NEXT reveal ever arrived mid-beat, `maybeShowReveal` already releases the older tile
+        -- When it does run across: the glyph holds and fades over the first seconds of the new
+        -- round, and the ring hands back to a countdown already part-way down. Its own
+        -- `task.delay`s are wall-clock and always fire, so it completes on its own; and if a NEXT
+        -- reveal ever arrived mid-beat, `maybeShowReveal` already releases the older tile
         -- defensively before overwriting the flight record, so the tape tile is still never lost.
         --
         -- `pendingReveal`, `drumAtRest` and the fallback inputs above ARE still reset — those are

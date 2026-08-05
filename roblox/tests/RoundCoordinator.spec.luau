@@ -29,7 +29,10 @@ local function makeFakes(
             end,
             getRoundResult = function(_self, _roundId: string): any
                 resultIdx = math.min(resultIdx + 1, #results)
-                return results[resultIdx] or { ok = false, status = 404 }
+                -- notReady mirrors NetworkClient's 404 mapping: without it these fakes route the
+                -- coordinator down the hard-failure branch and log a fetch error that production
+                -- never sees.
+                return results[resultIdx] or { ok = false, status = 404, notReady = true }
             end,
             postThrows = function(_self, batch: any): any
                 table.insert(postCalls, batch)

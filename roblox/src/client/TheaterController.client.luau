@@ -132,6 +132,10 @@ local STRIKE_LEAD_SLACK = 1
 -- is scheduled LockSec after OPEN ends, with `gongHit` at the END of the shu-moku's swing. Read
 -- off the live schedule so a server retune of LOCK carries — FindFirstChild, never WaitForChild,
 -- so this controller cannot hang on the arena's config folder. (Mirrors main.client.luau.)
+--
+-- The `LockSec` term is HEADROOM, not a measurement — see main.client.luau's copy for why it is
+-- kept: the reveal can no longer arrive ahead of the strike at all, and every error here must
+-- fail LATE, because a window too narrow rejects a legitimate strike and strands the reveal.
 local function strikeLeadSeconds(): number
     local cfg = ReplicatedStorage:FindFirstChild("RoundScheduleConfig")
     local lock = if cfg then cfg:GetAttribute("LockSec") else nil

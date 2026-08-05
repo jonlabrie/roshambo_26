@@ -2,6 +2,7 @@
 local harness = require("./harness")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 local RevealBeat = require("../src/shared/RevealBeat")
+local DrumStep = require("../src/shared/DrumStep")
 
 describe("RevealBeat — the sequence after the drum stops", function()
     test("the glyph gets a real beat, not a flash", function()
@@ -18,13 +19,31 @@ describe("RevealBeat — the sequence after the drum stops", function()
         expect(RevealBeat.TAPE_DELAY_SECONDS).toBe(RevealBeat.HOLD_SECONDS + RevealBeat.FADE_SECONDS)
     end)
 
-    test("the beat is a real beat, and outlives the round boundary on purpose", function()
-        -- The drum rests with about a second left before the next round opens. A beat that had to
-        -- fit inside that was cut off almost immediately — the owner saw the glyph appear correctly
-        -- and be replaced by the fresh countdown in under a second. So it now runs ACROSS the
-        -- boundary rather than being squeezed to fit, and main.client no longer collapses it when
-        -- ACTIVE arrives.
-        expect(RevealBeat.TAPE_DELAY_SECONDS > 2).toBe(true)
+    test("the whole ceremony fits the REVEAL phase the server ships", function()
+        -- THE CROSS-CODEBASE NUMBER, and the one this project keeps getting wrong by writing it
+        -- down twice. REVEAL's length is not derived here — it is `ROUND_REVEAL_SECONDS` in
+        -- server/src/index.ts (default 7). If that changes, this constant changes with it, and
+        -- this test is what makes the drift loud instead of silent.
+        local REVEAL_SECONDS = 7
+        -- Measured from the strike, which IS the start of REVEAL: the drum settles, then the beat.
+        local ceremony = DrumStep.SETTLE_SECONDS + RevealBeat.TAPE_DELAY_SECONDS
+        expect(ceremony <= REVEAL_SECONDS).toBe(true)
+        -- ...and it genuinely needed the room. REVEAL was 3s, then 5s, and the ceremony fits
+        -- neither — which is why the glyph's lifetime used to be whatever time happened to be
+        -- spare (3.03s, 1.81s and 4.15s across three consecutive measured rounds).
+        expect(ceremony > 5).toBe(true)
+    end)
+
+    test("but a stalled drum still pushes it past the boundary, so the tolerance must stay", function()
+        -- SETTLE_SECONDS is the unstalled chain only. When the World Throw is late the drum waits,
+        -- rest lands later than 3.45, and the beat runs into the next round. Since stage 3 the
+        -- throw arrives AFTER the strike rather than ~2s before it, so this is the common case.
+        -- main.client must NOT collapse the beat when OPEN arrives; deleting that tolerance
+        -- reinstates the cut-off glyph on exactly the rounds whose timing is already worst.
+        local stalledCeremony = DrumStep.SETTLE_SECONDS
+            + DrumStep.STALL_MAX_SECONDS
+            + RevealBeat.TAPE_DELAY_SECONDS
+        expect(stalledCeremony > 7).toBe(true)
     end)
 
     test("but it must finish well before the NEXT reveal", function()
