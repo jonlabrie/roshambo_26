@@ -316,10 +316,14 @@ export function useGameLoop() {
 
         setLastRound(roundData)
         setShowResult(true)
+        // TRACKS THE SERVER'S REVEAL PHASE (`revealSeconds` in server/src/index.ts) — the overlay should hold for the whole reveal and hand straight over to the
+        // next round, not clear early and leave a "Waiting…" gap. It went 3s → 5s and this literal
+        // did not follow, because nothing links them: grep revealSeconds does not reach into this
+        // file. If the server's reveal phase changes again, change this with it.
         setTimeout(() => {
             setShowResult(false)
             setHistory(prev => [roundData, ...prev].slice(0, 30))
-        }, 3000)
+        }, 5000)
 
         setPlayerThrow(null)
         setIsLocked(false)
