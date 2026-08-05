@@ -185,6 +185,29 @@ local roundCouldThrow = false
 local wallet =
     { totalPoints = 0, pointsAtStake = 0, currentStreak = 0, bestStreak = 0, unresolvedWin = false }
 
+-- THE WALLET AS THE HUD SEES IT, and why there are two.
+--
+-- `wallet` is the truth and updates the instant ProfileUpdate lands. For a round's outcome that is
+-- at the BELL — main.server fires it right after RevealResult — which is DrumStep.SETTLE_SECONDS
+-- before the wheel stops. Publishing it straight through made the plate announce a raised streak
+-- while the drum was still turning, and a raised streak names the World Throw exactly: it is the
+-- one your pick beats. The owner caught it 2026-08-05.
+--
+-- So the HUD reads this copy, refreshed where the tape tile and the ring's glyph are refreshed —
+-- at the drum's rest — and the plate inherits that ONE gate rather than growing a second. The
+-- splash already worked this way (see `maybeShowReveal`); the plate was the last thing reading the
+-- wallet live.
+--
+-- The LEDGER deliberately still reads `wallet`. It is a separate screen with the wheel not in
+-- view, and `lastRound` already hands it the whole result at this same moment.
+local shownWallet =
+    { totalPoints = 0, pointsAtStake = 0, currentStreak = 0, bestStreak = 0, unresolvedWin = false }
+local function showWallet()
+    for k, v in wallet do
+        shownWallet[k] = v
+    end
+end
+
 -- Carried by ProfileUpdate. ON until the first one lands, which is the profile's own default.
 local escalationPrompts = true
 local resultSplash = true
@@ -471,10 +494,12 @@ local function buildInputs(): any
     return {
         phase = throwPhase(),
         secondsLeft = secondsLeft(),
-        pointsAtStake = wallet.pointsAtStake,
-        currentStreak = wallet.currentStreak,
-        totalPoints = wallet.totalPoints,
-        unresolvedWin = wallet.unresolvedWin,
+        -- `shownWallet`, NOT `wallet` — see its declaration. These four are the round's outcome in
+        -- numeric form, and the drum announces the outcome.
+        pointsAtStake = shownWallet.pointsAtStake,
+        currentStreak = shownWallet.currentStreak,
+        totalPoints = shownWallet.totalPoints,
+        unresolvedWin = shownWallet.unresolvedWin,
         escalationPrompts = escalationPrompts,
         chosen = chosen,
         undoPrompt = undoPrompt,
@@ -590,6 +615,12 @@ local function maybeShowReveal()
     if not drumAtRest then
         return
     end
+    -- THE PLATE'S GATE, and it is deliberately OUTSIDE the `pendingReveal` block below. A
+    -- spectator, or a player whose pick whiffed, gets no `pendingReveal` at all — but their wallet
+    -- may still have moved (a bank settling, say), and it must not stay frozen because this round
+    -- happened to carry no reveal for them. Idempotent: a copy with nothing to copy costs nothing,
+    -- and this runs at most once per drum rest.
+    showWallet()
     if pendingReveal then
         local p = pendingReveal
         pendingReveal = nil
@@ -970,6 +1001,14 @@ ProfileUpdate.OnClientEvent:Connect(function(p)
     wallet.currentStreak = p.currentStreak
     wallet.bestStreak = p.bestStreak or wallet.bestStreak
     wallet.unresolvedWin = p.unresolvedWin == true
+    -- HELD ONLY WHILE THE WHEEL IS STILL TURNING. `source == "local"` is the reveal's own update —
+    -- the round's answer as numbers — so it waits for the drum. Every other kind (a bank, the join
+    -- fetch, a purchase) is not a round outcome and shows at once; holding those would just feel
+    -- broken. And once `drumAtRest` is true the wheel has already stopped, so a late arrival is
+    -- merely late: holding it then would strand the plate a full round behind.
+    if p.source ~= "local" or drumAtRest then
+        showWallet()
+    end
     if type(p.escalationPrompts) == "boolean" then
         escalationPrompts = p.escalationPrompts
     end
