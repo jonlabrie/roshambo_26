@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Working Preferences
 
-- **TDD**: Write a failing test first, then the implementation. The server has a Vitest suite (`server/`: `npm test`); the React frontend has no tests yet.
+- **TDD**: Write a failing test first, then the implementation. Both TypeScript codebases have Vitest suites (`server/`: `npm test`; repo root: `npm test`, scoped to `src/` by `vite.config.ts` so it does not pick up the server's).
 
 ## What This Is
 
@@ -20,6 +20,7 @@ Frontend (repo root):
 ```bash
 npm run dev        # vite --host (LAN-accessible for mobile testing)
 npm run build      # tsc && vite build
+npm test           # vitest, scoped to src/ (see vite.config.ts)
 npm run lint       # eslint, --max-warnings 0
 ```
 
@@ -63,7 +64,7 @@ The server requires `MONGODB_URI` (exits immediately without it; `server/.env` h
 - `transports/socketAdapter.ts` — the PWA's Socket.io wire format, unchanged from the legacy server
 - `routes/apiV1.ts` — REST surface for Roblox game servers (`X-API-Key` auth via `API_KEY` env var)
 
-Game rules (`GameRules.calculateResult`, duplicated client-side in `useGameLoop.ts` — keep in sync):
+Game rules live in THREE implementations, and all three are held to `shared-fixtures/game-rules.json` so drift fails CI rather than "keep in sync" being a hope: `server/src/engine/GameRules.ts` (authoritative), `roblox/src/shared/GameRules.luau`, and `src/lib/gameRules.ts` (the PWA's fallback for a result the server has not sent yet). The rules:
 - Player beats world → **WIN**: pot goes 0→1, then ×3 per win; streak +1
 - Player matches world → **SAFE**: pot preserved, streaks reset to 0
 - World beats player → **LOSS**: pot forfeited, streaks reset

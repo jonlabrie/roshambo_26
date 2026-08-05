@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { io, Socket } from 'socket.io-client'
 import type { Throw, Result, RoundData, ServerRound, PersonalRoundResult, Character, AuthUser, ServerStats } from '../types'
+import { calculateResult as rulesCalculateResult, potDelta } from '../lib/gameRules'
 
 export type { Throw, Result, RoundData } from '../types'
 export type GameState = 'ACTIVE' | 'REVEAL'
@@ -175,15 +176,13 @@ export function useGameLoop() {
         }
     }, [isLocked, playerThrow, token])
 
+    // The rules themselves live in `src/lib/gameRules.ts`, held to the same
+    // `shared-fixtures/game-rules.json` the server and the Roblox client run — this wrapper only
+    // adds the nil-guard the UI needs. Inlining the matchup table here again is how the third copy
+    // of the rules came to have no test at all.
     const calculateResult = useCallback((player: Throw, world: Throw): Result => {
         if (!player || !world) return null
-        if (player === world) return 'SAFE'
-        if (
-            (player === 'R' && world === 'S') ||
-            (player === 'P' && world === 'R') ||
-            (player === 'S' && world === 'P')
-        ) return 'WIN'
-        return 'LOSS'
+        return rulesCalculateResult(player, world)
     }, [])
 
     // SFX: Modern Gong synthesis (FM + Noise)
@@ -297,9 +296,9 @@ export function useGameLoop() {
                 delta = serverResultRef.current.delta
                 serverResultRef.current = null // Consume
             } else {
-                // Safety fallback for local calculation
-                if (res === 'WIN') delta = pointsAtStakeRef.current === 0 ? 1 : pointsAtStakeRef.current * 3
-                else if (res === 'LOSS') delta = -pointsAtStakeRef.current
+                // Safety fallback for local calculation — the pot math from `src/lib/gameRules.ts`
+                // rather than restated here, so the shared fixtures cover it too.
+                if (res) delta = potDelta(pointsAtStakeRef.current, res)
             }
 
             if (res === 'WIN') {
