@@ -2,10 +2,14 @@
 -- THE REEL. What the ring's centre shows while the drum is still turning — the three glyphs
 -- cycling IN PLACE, decelerating, until the drum's rest ends it.
 --
--- It runs from THE BELL (REVEAL's first instant), not from the lockout: LOCK's two seconds are a
--- black disc on purpose, so the reel reads as the wheel turning rather than as the HUD filling a
--- gap. That also means `elapsed` and the drum's own settle start together, which is what makes a
--- curve tuned to `settleSeconds` decelerate in step with the wheel it is standing in for.
+-- It runs from CONTACT — `DrumStep.STRIKE_SWING_SECONDS` after REVEAL opens, where the bell
+-- sounds and the wheel starts turning — not from the lockout and not from REVEAL's edge. LOCK's two
+-- seconds and the shu-moku's swing are both a black disc on purpose, so the reel reads as the wheel
+-- turning rather than as the HUD filling a gap.
+--
+-- Callers therefore pass `DrumStep.TURN_SECONDS` as `settleSeconds`, not `SETTLE_SECONDS`: elapsed
+-- and the wheel's travel start together, which is what makes the curve decelerate in step with the
+-- thing it is standing in for.
 --
 -- WHY IN PLACE AND NOT SCROLLING. The obvious design is a slot-machine reel sliding sideways, and
 -- it will not fit: the revealed glyph is 0.82 of the ring's inner disc, so its ink reaches ~0.35·D

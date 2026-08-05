@@ -4,7 +4,9 @@ local describe, test, expect = harness.describe, harness.test, harness.expect
 local ReelStep = require("../src/shared/ReelStep")
 local DrumStep = require("../src/shared/DrumStep")
 
-local SETTLE = DrumStep.SETTLE_SECONDS
+-- TURN_SECONDS, not SETTLE_SECONDS: the reel runs from CONTACT, where the wheel's travel
+-- begins, not from the strike instant that precedes it by the shu-moku's swing.
+local SETTLE = DrumStep.TURN_SECONDS
 local SYMS = { "R", "P", "S" }
 
 describe("ReelStep — the glyph cycle while the drum turns", function()

@@ -1647,7 +1647,17 @@ local function reelSymbol(): string?
     if t0 == nil then
         return nil
     end
-    return ReelStep.symbolAt(THROWS, os.clock() - t0, DrumStep.SETTLE_SECONDS)
+    -- `reelStartedAt` is CONTACT, which is in the future when it is latched at REVEAL — the disc
+    -- stays black through the shu-moku's swing, so the reel starts with the bell and the drum
+    -- rather than 0.45s ahead of both.
+    local elapsed = os.clock() - t0
+    if elapsed < 0 then
+        return nil
+    end
+    -- TURN_SECONDS, not SETTLE_SECONDS: the reel is standing in for the wheel, and the wheel's
+    -- travel begins at contact. Against SETTLE the curve would be pacing a 3.45s journey the
+    -- drum makes in 3.0s from here, and reach its plateau early.
+    return ReelStep.symbolAt(THROWS, elapsed, DrumStep.TURN_SECONDS)
 end
 
 -- REPAINTED AT FRAME RATE, not on the 10Hz HudState cadence: the reel's fastest interval is
@@ -1797,14 +1807,16 @@ local function render(inputs: any, aux: any)
         reelStartedAt = nil -- the drum has answered; the reel's job is done for this round
         reelSpent = true
     elseif inputs.phase == "REVEAL" and not reelSpent and reelStartedAt == nil then
-        -- AT THE BELL, NOT AT THE LOCKOUT (owner, 2026-08-05). REVEAL's first instant IS the
-        -- strike, so LOCK's two seconds stay a black disc and the reel begins with the bell and
-        -- the drum's spin — it should read as the wheel turning, not as the HUD filling a gap.
+        -- AT CONTACT, NOT AT THE LOCKOUT AND NOT AT REVEAL'S EDGE (owner, 2026-08-05, twice).
+        -- LOCK's two seconds stay a black disc, and so does the shu-moku's swing: REVEAL's first
+        -- instant is the strike being THROWN, while the bell sounds and the drum starts turning
+        -- DrumStep.STRIKE_SWING_SECONDS later, at contact. Latching plain `os.clock()` here put
+        -- the reel 0.45s ahead of both, which is exactly what the owner saw.
         --
-        -- It also puts the deceleration back in step with the drum. Starting at the lockout gave
-        -- the reel a 2s head start on a curve tuned to DrumStep.SETTLE_SECONDS, so it was already
-        -- into its plateau before the drum began; from the bell the two slow down together.
-        reelStartedAt = os.clock()
+        -- Derived from the phase edge rather than taken from the `gongHit` cue on purpose: that
+        -- cue can drop — main.client's whole REVEAL_SAFETY fallback exists because it does — and a
+        -- dropped cue would leave the ring black for the entire settle.
+        reelStartedAt = os.clock() + DrumStep.STRIKE_SWING_SECONDS
     end
     local shown = worldThrow or reelSymbol()
     ringCount.Visible = shown == nil

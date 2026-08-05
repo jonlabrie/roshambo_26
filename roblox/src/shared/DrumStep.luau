@@ -30,6 +30,13 @@ DrumStep.SPIN_SECONDS = 1.0
 DrumStep.GLIDE_SECONDS = 2.0
 DrumStep.SETTLE_SECONDS = DrumStep.STRIKE_SWING_SECONDS + DrumStep.SPIN_SECONDS + DrumStep.GLIDE_SECONDS
 
+-- HOW LONG THE DRUM IS ACTUALLY TURNING: contact to rest. SETTLE_SECONDS measures from the strike
+-- instant and so includes the swing, during which the wheel has not moved — so anything animating
+-- ALONGSIDE the wheel (the ring's reel) wants this, and anything scheduling against the strike
+-- (the reveal-safety windows) wants SETTLE_SECONDS. Mixing them puts an animation 0.45s ahead of
+-- the thing it is standing in for, which is exactly how the reel first shipped.
+DrumStep.TURN_SECONDS = DrumStep.SPIN_SECONDS + DrumStep.GLIDE_SECONDS
+
 -- ===== The stall, and the reveal-safety windows derived from it =====
 -- THE STALL. If the World Throw has not reached the client by the end of the spin, DrumController
 -- keeps spinning for up to this long, waiting for it, before it settles on the last one anyway.
