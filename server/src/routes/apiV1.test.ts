@@ -17,12 +17,13 @@ function makeApp(engine: RoundEngine, store: ResultsStore) {
     return app;
 }
 
-function makeEngine() {
+function makeEngine(overrides: Partial<ConstructorParameters<typeof RoundEngine>[0]> = {}) {
     let n = 0;
     return new RoundEngine({
-        activeSeconds: 20, tallySeconds: 2, revealSeconds: 3,
+        openSeconds: 20, lockSeconds: 2, revealSeconds: 3,
         pickWorldThrow: () => 'S',
         makeRoundId: () => `round-${++n}`,
+        ...overrides,
     });
 }
 
@@ -46,7 +47,7 @@ describe('/api/v1', () => {
             const res = await request(makeApp(engine, store))
                 .get('/api/v1/state').set('X-API-Key', API_KEY).expect(200);
             expect(res.headers['cache-control']).toBe('no-store');
-            expect(res.body).toMatchObject({ roundId: 'round-1', phase: 'ACTIVE', roundCount: 0, tape: [] });
+            expect(res.body).toMatchObject({ roundId: 'round-1', phase: 'OPEN', roundCount: 0, tape: [] });
             expect(res.body.phaseEndsAt).toBeGreaterThan(res.body.serverTime);
             expect(res.body.phaseEndsAt - res.body.serverTime).toBe(20000);
         });
@@ -54,7 +55,15 @@ describe('/api/v1', () => {
         it('states its phase durations (round-metronome schedule source)', async () => {
             const res = await request(makeApp(makeEngine(), new ResultsStore()))
                 .get('/api/v1/state').set('X-API-Key', API_KEY).expect(200);
-            expect(res.body.durations).toEqual({ activeMs: 20000, tallyMs: 2000, revealMs: 3000 });
+            expect(res.body.durations).toEqual({ openMs: 20000, lockMs: 2000, revealMs: 3000 });
+        });
+
+        it('names the durations openMs/lockMs/revealMs', async () => {
+            const engine = makeEngine({ openSeconds: 51, lockSeconds: 2, revealSeconds: 7 });
+            const res = await request(makeApp(engine, new ResultsStore()))
+                .get('/api/v1/state').set('X-API-Key', API_KEY).expect(200);
+            expect(res.body.durations).toEqual({ openMs: 51000, lockMs: 2000, revealMs: 7000 });
+            expect(res.body.phase).toBe('OPEN');
         });
     });
 
@@ -99,11 +108,23 @@ describe('/api/v1', () => {
             expect(res.body).toEqual({ error: 'ROUND_MISMATCH', currentRoundId: 'round-1' });
         });
 
-        it('409 PICKS_CLOSED outside ACTIVE', async () => {
-            const engine = makeEngine();
-            for (let i = 0; i < 20; i++) engine.tick(); // exhaust ACTIVE -> TALLY
-            await request(makeApp(engine, new ResultsStore()))
+        it('202 accepts a batch during LOCK — game servers are still flushing', async () => {
+            const engine = makeEngine({ openSeconds: 1, lockSeconds: 5 });
+            engine.tick(); // OPEN (1s) expires -> LOCK
+            expect(engine.snapshot().phase).toBe('LOCK');
+            const res = await request(makeApp(engine, new ResultsStore()))
+                .post('/api/v1/throws').set('X-API-Key', API_KEY).send(body()).expect(202);
+            expect(res.body).toEqual({ accepted: 2, rejected: [] });
+        });
+
+        it('409 PICKS_CLOSED during REVEAL', async () => {
+            const engine = makeEngine({ openSeconds: 1, lockSeconds: 1, revealSeconds: 5 });
+            engine.tick(); // -> LOCK
+            engine.tick(); // -> REVEAL
+            expect(engine.snapshot().phase).toBe('REVEAL');
+            const res = await request(makeApp(engine, new ResultsStore()))
                 .post('/api/v1/throws').set('X-API-Key', API_KEY).send(body()).expect(409);
+            expect(res.body).toEqual({ error: 'PICKS_CLOSED' });
         });
 
         it('reports per-player rejections (stale seq) without failing the batch', async () => {

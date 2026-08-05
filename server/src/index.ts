@@ -36,17 +36,34 @@ app.use(express.json());
 
 const THROWS: Throw[] = ['R', 'P', 'S'];
 
+// Round durations, env-overridable so a short test round and the 60s launch round
+// differ by config rather than by commit — a duration edit used to mean a push, and
+// a push auto-deploys the dev App Runner service under any live Studio session.
+//
+// The DEFAULTS ARE THE LAUNCH VALUES: OPEN 51 + LOCK 2 + REVEAL 7 = a 60s round.
+// REVEAL's 7 is derived (3.45s drum settle + 3.0s glyph hold + 0.4s fade = 6.85) and
+// does not scale with round length; LOCK's 2 is an HTTP flush window, likewise fixed.
+// Lengthening a round therefore means lengthening OPEN and nothing else.
+function envSeconds(name: string, fallback: number): number {
+    const raw = process.env[name];
+    if (raw === undefined) return fallback;
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) {
+        console.warn(`[SYS] ${name}="${raw}" is not a positive number - using ${fallback}`);
+        return fallback;
+    }
+    return n;
+}
+
 function makeEngine(initialRoundCount: number): RoundEngine {
+    const openSeconds = envSeconds('ROUND_OPEN_SECONDS', 51);
+    const lockSeconds = envSeconds('ROUND_LOCK_SECONDS', 2);
+    const revealSeconds = envSeconds('ROUND_REVEAL_SECONDS', 7);
+    console.log(`[SYS] round: OPEN ${openSeconds}s / LOCK ${lockSeconds}s / REVEAL ${revealSeconds}s`);
     return new RoundEngine({
-        activeSeconds: 20,
-        tallySeconds: 2,
-        // REVEAL is 5, not 3. The Roblox arena plays a SEQUENCE after its drum comes to rest — the
-        // world throw shows in the round ring, holds, fades, and only then does the tape tile land
-        // (docs/superpowers/specs/2026-08-04-reveal-beat-design.md). Measured live at 3: the drum
-        // was resting with as little as 1.8s of the round left, so the beat had nowhere to run and
-        // the glyph's lifetime was whatever happened to be spare — 3.03s, 1.81s, 4.15s across three
-        // consecutive rounds. The PWA has no drum and simply gets a longer reveal.
-        revealSeconds: 5,
+        openSeconds,
+        lockSeconds,
+        revealSeconds,
         pickWorldThrow: roundCount =>
             TEST_MODE ? THROWS[roundCount % 3] : THROWS[Math.floor(Math.random() * 3)],
         makeRoundId: () => Math.random().toString(36).substring(2, 9),

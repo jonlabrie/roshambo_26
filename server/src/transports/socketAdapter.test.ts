@@ -25,7 +25,7 @@ describe('socket adapter wire format', () => {
         await clearTestDb();
         let n = 0;
         engine = new RoundEngine({
-            activeSeconds: 2, tallySeconds: 1, revealSeconds: 1,
+            openSeconds: 2, lockSeconds: 1, revealSeconds: 1,
             pickWorldThrow: () => 'S',
             makeRoundId: () => `round-${++n}`,
         });
@@ -43,7 +43,7 @@ describe('socket adapter wire format', () => {
 
     it('emits legacy-shaped init on connect', async () => {
         const init = await initPromise;
-        expect(init).toMatchObject({ phase: 'ACTIVE', roundCount: 0 });
+        expect(init).toMatchObject({ phase: 'OPEN', roundCount: 0 });
         expect(init.history).toEqual([]);
         expect(typeof init.timeLeft).toBe('number');
     });
@@ -52,7 +52,17 @@ describe('socket adapter wire format', () => {
         await initPromise;
         const sync = waitFor<any>(client, 'sync');
         engine.tick();
-        expect(await sync).toMatchObject({ phase: 'ACTIVE', timeLeft: 1, roundCount: 0, playerCount: 1 });
+        expect(await sync).toMatchObject({ phase: 'OPEN', timeLeft: 1, roundCount: 0, playerCount: 1 });
+    });
+
+    it('zeroes timeLeft once OPEN has closed', async () => {
+        await initPromise;
+        const sync1 = waitFor<any>(client, 'sync');
+        engine.tick(); // 2 -> 1, still OPEN
+        await sync1; // let the first sync land before arming the next listener
+        const sync2 = waitFor<any>(client, 'sync');
+        engine.tick(); // OPEN expires -> LOCK
+        expect(await sync2).toMatchObject({ phase: 'LOCK', timeLeft: 0 });
     });
 
     it('full round: submit-throw -> reveal with distribution -> player-data with lastResult', async () => {
@@ -78,16 +88,17 @@ describe('socket adapter wire format', () => {
         expect(Array.isArray(pd.history)).toBe(true);
     });
 
-    it('buffers a throw submitted during TALLY/REVEAL and enters it next round', async () => {
+    it('buffers a throw submitted during REVEAL and enters it next round', async () => {
         await initPromise;
         client.emit('sync-player', { deviceId: 'devA' });
         await waitFor(client, 'player-data');
 
-        for (let i = 0; i < 2; i++) engine.tick(); // into TALLY
+        // OPEN and LOCK both accept submissions now — only REVEAL rejects (and buffers).
+        for (let i = 0; i < 3; i++) engine.tick(); // OPEN -> LOCK -> REVEAL
         client.emit('submit-throw', { deviceId: 'devA', throw: 'P' });
         await new Promise(r => setTimeout(r, 50));
 
-        for (let i = 0; i < 2; i++) engine.tick(); // REVEAL -> next ACTIVE (replay)
+        for (let i = 0; i < 1; i++) engine.tick(); // REVEAL -> next OPEN (replay drains the buffer)
         const playerDataP = waitFor<any>(client, 'player-data');
         for (let i = 0; i < 3; i++) { engine.tick(); await new Promise(r => setTimeout(r, 20)); } // close round 2
         const pd = await playerDataP;

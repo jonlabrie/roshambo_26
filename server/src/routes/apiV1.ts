@@ -81,7 +81,9 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             res.status(409).json({ error: 'ROUND_MISMATCH', currentRoundId: snap.roundId });
             return;
         }
-        if (snap.phase !== 'ACTIVE') {
+        // REVEAL only. Submissions during LOCK are the whole point of LOCK: player
+        // input has closed, but game servers are flushing picks already taken.
+        if (snap.phase === 'REVEAL') {
             res.status(409).json({ error: 'PICKS_CLOSED' });
             return;
         }

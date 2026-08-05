@@ -20,15 +20,14 @@ async function personalHistory(user: { _id: unknown; deviceId?: string }) {
 
 export function attachSocketAdapter(io: Server, engine: RoundEngine, store: ResultsStore): void {
     let seqCounter = 0;
-    // PWA submits arriving during TALLY/REVEAL are held for the next round
+    // PWA submits arriving during REVEAL are held for the next round
     // (the legacy server accepted submits at any time; this preserves intent).
     const pendingNextRound = new Map<string, ThrowEntry>();
-    // Reveal broadcast depends on settlement (roundClosed handler) having stored
-    // the round. roundClosed is async (DB writes); revealStarted is a later tick.
-    // In production a full 1s tick separates them so settlement is always done,
-    // but if a slow DB ever pushed settlement past the reveal tick the broadcast
-    // would be silently lost. These guard against that race: whichever of the two
-    // fires last performs the emit.
+    // roundClosed is async (DB writes); revealStarted now fires on the SAME
+    // transition, synchronously after it — the gap that used to be a full TALLY
+    // tick is zero. That is safe, and always was: these guards make whichever of
+    // the two finishes last perform the emit, which is why the two seconds could
+    // be deleted without anything else moving.
     let revealPending: string | null = null; // roundId awaiting reveal broadcast
     const settledRounds = new Set<string>();
 
@@ -56,7 +55,7 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
     engine.on('tick', snap => {
         io.emit('sync', {
             phase: snap.phase,
-            timeLeft: snap.phase === 'ACTIVE' ? snap.secondsLeft : 0,
+            timeLeft: snap.phase === 'OPEN' ? snap.secondsLeft : 0,
             roundCount: snap.roundCount,
             playerCount: io.engine.clientsCount,
         });
@@ -109,7 +108,7 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
         const snap = engine.snapshot();
         socket.emit('init', {
             phase: snap.phase,
-            timeLeft: snap.phase === 'ACTIVE' ? snap.secondsLeft : 0,
+            timeLeft: snap.phase === 'OPEN' ? snap.secondsLeft : 0,
             roundCount: snap.roundCount,
             history: store.tape(10),
         });
