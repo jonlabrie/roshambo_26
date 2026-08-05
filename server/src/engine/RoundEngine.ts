@@ -1,7 +1,14 @@
 import { EventEmitter } from 'events';
 import { Throw } from './GameRules';
 
-export type Phase = 'ACTIVE' | 'TALLY' | 'REVEAL';
+// OPEN: throws accepted and changeable — the round as a player experiences it.
+// LOCK: player input closed, game servers flush their buffers, the API STILL ACCEPTS.
+//       The world throw is decided at the END of LOCK.
+// REVEAL: the ceremony. The only phase that rejects throws.
+// Named for what happens in them, 2026-08-05. The previous names (ACTIVE/TALLY/REVEAL)
+// were offset by one from the events: ACTIVE's last 2s were the lockout, and TALLY
+// tallied nothing — the count is a synchronous loop that finishes in microseconds.
+export type Phase = 'OPEN' | 'LOCK' | 'REVEAL';
 
 export interface ThrowEntry {
     throw: Throw;
@@ -14,8 +21,10 @@ export interface ThrowEntry {
 }
 
 export interface EngineConfig {
-    activeSeconds: number;
-    tallySeconds: number;
+    openSeconds: number;
+    lockSeconds: number;
+    // Derived, not chosen: 3.45s drum settle + 3.0s glyph hold + 0.4s fade = 6.85.
+    // It does not scale with round length — the drum takes 3.45s at any period.
     revealSeconds: number;
     pickWorldThrow: (roundCount: number, counts: Record<Throw, number>) => Throw;
     makeRoundId: () => string;
@@ -42,7 +51,7 @@ export interface RoundClosedEvent {
 }
 
 export class RoundEngine extends EventEmitter {
-    private phase: Phase = 'ACTIVE';
+    private phase: Phase = 'OPEN';
     private secondsLeft: number;
     private roundCount: number;
     private roundId: string;
@@ -53,10 +62,10 @@ export class RoundEngine extends EventEmitter {
 
     constructor(private cfg: EngineConfig, initialRoundCount = 0) {
         super();
-        this.secondsLeft = cfg.activeSeconds;
+        this.secondsLeft = cfg.openSeconds;
         this.roundCount = initialRoundCount;
         this.roundId = cfg.makeRoundId();
-        this.stampPhaseEnd(cfg.activeSeconds);
+        this.stampPhaseEnd(cfg.openSeconds);
     }
 
     private stampPhaseEnd(durationSeconds: number): void {
@@ -73,16 +82,19 @@ export class RoundEngine extends EventEmitter {
         };
     }
 
-    durationsMs(): { activeMs: number; tallyMs: number; revealMs: number } {
+    durationsMs(): { openMs: number; lockMs: number; revealMs: number } {
         return {
-            activeMs: this.cfg.activeSeconds * 1000,
-            tallyMs: this.cfg.tallySeconds * 1000,
+            openMs: this.cfg.openSeconds * 1000,
+            lockMs: this.cfg.lockSeconds * 1000,
             revealMs: this.cfg.revealSeconds * 1000,
         };
     }
 
     submitThrow(key: string, entry: ThrowEntry): { accepted: boolean; reason?: string } {
-        if (this.phase !== 'ACTIVE') return { accepted: false, reason: 'PICKS_CLOSED' };
+        // OPEN *and* LOCK. LOCK exists precisely so game servers can flush picks that
+        // were already taken before player input closed — rejecting here would discard
+        // every held pick in the arena.
+        if (this.phase === 'REVEAL') return { accepted: false, reason: 'PICKS_CLOSED' };
         const existing = this.throws.get(key);
         if (existing && entry.seq < existing.seq) return { accepted: false, reason: 'STALE_SEQ' };
         this.throws.set(key, entry);
@@ -104,28 +116,34 @@ export class RoundEngine extends EventEmitter {
         try {
         this.secondsLeft--;
         if (this.secondsLeft <= 0) {
-            if (this.phase === 'ACTIVE') {
+            if (this.phase === 'OPEN') {
+                // Player input closes; the API stays open so game servers can flush.
+                // Nothing is decided here.
+                this.phase = 'LOCK';
+                this.secondsLeft = this.cfg.lockSeconds;
+                this.stampPhaseEnd(this.cfg.lockSeconds);
+            } else if (this.phase === 'LOCK') {
+                // THE ANSWER IS DECIDED HERE, at round close, and REVEAL begins on the
+                // same transition. roundClosed is async (settlement); revealStarted is
+                // synchronous. socketAdapter's revealPending guard makes whichever
+                // finishes last perform the broadcast, so the zero gap is safe.
                 const counts = this.countThrows();
                 const worldThrow = this.cfg.pickWorldThrow(this.roundCount, counts);
-                this.phase = 'TALLY';
-                this.secondsLeft = this.cfg.tallySeconds;
-                this.stampPhaseEnd(this.cfg.tallySeconds);
+                this.phase = 'REVEAL';
+                this.secondsLeft = this.cfg.revealSeconds;
+                this.stampPhaseEnd(this.cfg.revealSeconds);
                 const event: RoundClosedEvent = {
                     roundId: this.roundId, worldThrow, counts, throws: new Map(this.throws),
                 };
                 this.emit('roundClosed', event);
-            } else if (this.phase === 'TALLY') {
-                this.phase = 'REVEAL';
-                this.secondsLeft = this.cfg.revealSeconds;
-                this.stampPhaseEnd(this.cfg.revealSeconds);
                 this.emit('revealStarted', { roundId: this.roundId });
             } else {
                 this.roundCount++;
                 this.roundId = this.cfg.makeRoundId();
                 this.throws.clear();
-                this.phase = 'ACTIVE';
-                this.secondsLeft = this.cfg.activeSeconds;
-                this.stampPhaseEnd(this.cfg.activeSeconds);
+                this.phase = 'OPEN';
+                this.secondsLeft = this.cfg.openSeconds;
+                this.stampPhaseEnd(this.cfg.openSeconds);
                 this.emit('roundStarted', this.snapshot());
             }
         }
