@@ -39,7 +39,7 @@ export type Inputs = {
     chosen: string?,
     undoPrompt: string?,
     sent: boolean,
-    -- Set by a back-out OR by dismissing the escalation prompt, cleared when ACTIVE reopens.
+    -- Set by a back-out OR by dismissing the escalation prompt, cleared when OPEN reopens.
     -- One field, two gestures, because they mean the same thing to this rule: the player has
     -- answered the question the prompt asks. It silences the prompt and NOTHING else — throws
     -- stay live, and a throw after a dismissal is an ordinary throw.
@@ -76,12 +76,12 @@ export type View = {
 HudModel.UNDO_PROMPT_SECONDS = 2
 
 -- Taps stay live for as long as the choice can still be honoured. That is NOT the whole of
--- ACTIVE: it ends the moment the pick goes on the wire (`sendAtLockout`, roughly the last
+-- OPEN: it ends the moment the pick goes on the wire (`sendAtLockout`, roughly the last
 -- half-second), because ThrowBuffer has no removal — no undo in the buffer, the delta, or
 -- POST /api/v1/throws — so a tap we cannot honour is worse than a tap we refuse. Everything
 -- before that moment is still open, which is what makes backing out possible at all.
 local function throwsEnabledFor(inputs: Inputs): boolean
-    return inputs.phase == "ACTIVE" and inputs.secondsLeft > 0 and not inputs.sent
+    return inputs.phase == "OPEN" and inputs.secondsLeft > 0 and not inputs.sent
 end
 
 export type TapState = { chosen: string?, undoPrompt: string? }
@@ -153,7 +153,7 @@ function HudModel.sendAtLockout(inputs: Inputs): string?
     if chosen == nil or inputs.sent then
         return nil
     end
-    if inputs.phase ~= "ACTIVE" then
+    if inputs.phase ~= "OPEN" then
         return chosen
     end
     if inputs.secondsLeft > SEND_AT then
@@ -178,7 +178,7 @@ function HudModel.view(inputs: Inputs, session: Session): View
     -- withdrew is exactly wrong — they are demonstrably paying attention.
     local armed = inputs.escalationPrompts
         and not inputs.declinedThisRound
-        and inputs.phase == "ACTIVE"
+        and inputs.phase == "OPEN"
         and inputs.chosen == nil
         and session.consecutiveMisses < BACKOFF_MISSES
 
@@ -194,7 +194,7 @@ function HudModel.view(inputs: Inputs, session: Session): View
         escalate = armed and inputs.secondsLeft > 0 and inputs.secondsLeft <= HudModel.ESCALATE_AT,
         secondsLeft = inputs.secondsLeft,
         -- The choice OUTLIVES the round: after the lockout it is what was thrown, and the tile
-        -- stays lit through TALLY/REVEAL saying so. main.client clears it when ACTIVE reopens.
+        -- stays lit through LOCK/REVEAL saying so. main.client clears it when OPEN reopens.
         chosen = inputs.chosen,
         -- The prompt does not. A question about a round that has closed cannot be answered.
         undoPrompt = if throwsEnabled then inputs.undoPrompt else nil,

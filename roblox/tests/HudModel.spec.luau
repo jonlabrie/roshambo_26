@@ -5,7 +5,7 @@ local HudModel = require("../src/shared/HudModel")
 
 local function inputs(over: any): any
     local base = {
-        phase = "ACTIVE",
+        phase = "OPEN",
         secondsLeft = 20,
         pointsAtStake = 0,
         currentStreak = 0,
@@ -28,13 +28,21 @@ local function session(misses: number): any
 end
 
 describe("HudModel.view — plate and throws", function()
-    test("throws are enabled in ACTIVE when unbound and unpicked", function()
+    test("throws are enabled in OPEN when unbound and unpicked", function()
         expect(HudModel.view(inputs({}), session(0)).throwsEnabled).toBe(true)
     end)
 
-    test("throws are disabled outside ACTIVE", function()
-        for _, p in { "TALLY", "REVEAL" } do
+    test("throws are disabled outside OPEN", function()
+        for _, p in { "LOCK", "REVEAL" } do
             expect(HudModel.view(inputs({ phase = p }), session(0)).throwsEnabled).toBe(false)
+        end
+    end)
+
+    test("throws are enabled in OPEN and in no other phase", function()
+        expect(HudModel.view(inputs({ secondsLeft = 10 }), session(0)).throwsEnabled).toBe(true)
+        for _, p in { "LOCK", "REVEAL" } do
+            local v = HudModel.view(inputs({ phase = p, secondsLeft = 10 }), session(0))
+            expect(v.throwsEnabled).toBe(false)
         end
     end)
 
@@ -42,7 +50,7 @@ describe("HudModel.view — plate and throws", function()
         expect(HudModel.view(inputs({ secondsLeft = 0 }), session(0)).throwsEnabled).toBe(false)
     end)
 
-    test("the round stays open to taps for the whole of ACTIVE", function()
+    test("the round stays open to taps for the whole of OPEN", function()
         -- No "you have committed, so the round is closed to you" state: that state is exactly
         -- what made backing out impossible, and backing out is now the point.
         expect(HudModel.view(inputs({ chosen = "R" }), session(0)).throwsEnabled).toBe(true)
@@ -56,14 +64,12 @@ end)
 
 describe("HudModel — once sent, the round is closed to that player", function()
     -- The 0.5s send slack is structural: it exists so the pick makes the lockout, which means
-    -- there is ALWAYS a tail where the pick is already on the wire but ACTIVE has not ended.
+    -- there is ALWAYS a tail where the pick is already on the wire but OPEN has not ended.
     -- ThrowBuffer has no removal, so a tap in that tail cannot be honoured — and a tap we
     -- cannot honour is worse than a tap we refuse.
-    test("throwsEnabled is false once sent, even with time left and phase ACTIVE", function()
-        local v = HudModel.view(
-            inputs({ phase = "ACTIVE", secondsLeft = 5, chosen = "R", sent = true }),
-            session(0)
-        )
+    test("throwsEnabled is false once sent, even with time left and phase OPEN", function()
+        local v =
+            HudModel.view(inputs({ phase = "OPEN", secondsLeft = 5, chosen = "R", sent = true }), session(0))
         expect(v.throwsEnabled).toBe(false)
     end)
 
@@ -153,7 +159,7 @@ describe("HudModel.view — plate, bank and pot", function()
     end)
 
     test("an unbanked pot outlives the round, the session and a week away", function()
-        for _, p in { "TALLY", "REVEAL" } do
+        for _, p in { "LOCK", "REVEAL" } do
             expect(HudModel.view(inputs({ phase = p, pointsAtStake = 27 }), session(0)).bankVisible).toBe(
                 true
             )
@@ -178,7 +184,7 @@ describe("HudModel.view — plate, bank and pot", function()
     end)
 
     test("a prompt never survives the round closing", function()
-        local v = HudModel.view(inputs({ phase = "TALLY", chosen = "R", undoPrompt = "P" }), session(0))
+        local v = HudModel.view(inputs({ phase = "LOCK", chosen = "R", undoPrompt = "P" }), session(0))
         expect(v.undoPrompt).toBe(nil)
     end)
 end)
@@ -280,7 +286,7 @@ end)
 
 describe("HudModel.tapAction — the five-row table", function()
     test("a closed round ignores every tap", function()
-        for _, over in { { phase = "TALLY" }, { phase = "REVEAL" }, { secondsLeft = 0 } } do
+        for _, over in { { phase = "LOCK" }, { phase = "REVEAL" }, { secondsLeft = 0 } } do
             for _, sym in { "R", "P", "S" } do
                 expect(HudModel.tapAction(inputs(over), sym)).toBe("ignore")
             end
@@ -402,6 +408,14 @@ describe("HudModel.sendAtLockout — the pick's ONE trip to the wire", function(
         expect(HudModel.sendAtLockout(inputs({ chosen = "R", secondsLeft = 5 }))).toBe(nil)
     end)
 
+    test("sendAtLockout releases a held pick the moment OPEN is over", function()
+        expect(HudModel.sendAtLockout(inputs({ phase = "LOCK", secondsLeft = 0, chosen = "R" }))).toBe("R")
+    end)
+
+    test("sendAtLockout holds while OPEN still has time", function()
+        expect(HudModel.sendAtLockout(inputs({ secondsLeft = 10, chosen = "R" }))).toBeNil()
+    end)
+
     -- Pins SEND_AT from above, not just at/below the boundary tested next: without this, SEND_AT
     -- could be raised from 0.5 to anything up to 4.9 and every other test in this file would stay
     -- green. That constant governs how long backing out stays honest — the branch's central
@@ -423,7 +437,7 @@ describe("HudModel.sendAtLockout — the pick's ONE trip to the wire", function(
         -- The unsynced-clock path never reaches the boundary above (its countdown is a
         -- constant). The server may answer PICKS_CLOSED and the whiff toast then says so
         -- honestly; trying and being told beats never trying.
-        for _, p in { "TALLY", "REVEAL" } do
+        for _, p in { "LOCK", "REVEAL" } do
             expect(HudModel.sendAtLockout(inputs({ chosen = "R", phase = p }))).toBe("R")
         end
     end)

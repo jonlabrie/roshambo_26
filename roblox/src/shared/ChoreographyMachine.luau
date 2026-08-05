@@ -11,8 +11,8 @@ export type Opts = {
 }
 
 local PHASE_CUES: { [string]: { string } } = {
-    ACTIVE = { "lanternsAmbient", "hammerReset", "tickerCountdown" },
-    TALLY = { "lanternsDim", "drumrollStart", "heroTileSpin", "tickerCascade" },
+    OPEN = { "lanternsAmbient", "hammerReset", "tickerCountdown" },
+    LOCK = { "lanternsDim", "drumrollStart", "heroTileSpin", "tickerCascade" },
     REVEAL = {},
 }
 

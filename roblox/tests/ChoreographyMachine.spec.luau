@@ -19,15 +19,30 @@ local OPTS = {
 }
 
 describe("ChoreographyMachine.phaseCues", function()
-    test("ACTIVE and TALLY cue sets", function()
-        expect(Choreo.phaseCues("ACTIVE")).toEqual({ "lanternsAmbient", "hammerReset", "tickerCountdown" })
-        expect(Choreo.phaseCues("TALLY")).toEqual({
+    test("REVEAL cues", function()
+        expect(Choreo.phaseCues("REVEAL")).toEqual({})
+    end)
+
+    test("OPEN carries the ambient cues", function()
+        expect(Choreo.phaseCues("OPEN")).toEqual({
+            "lanternsAmbient",
+            "hammerReset",
+            "tickerCountdown",
+        })
+    end)
+
+    test("LOCK carries the wind-up cues", function()
+        expect(Choreo.phaseCues("LOCK")).toEqual({
             "lanternsDim",
             "drumrollStart",
             "heroTileSpin",
             "tickerCascade",
         })
-        expect(Choreo.phaseCues("REVEAL")).toEqual({})
+    end)
+
+    test("the retired names cue nothing", function()
+        expect(#Choreo.phaseCues("ACTIVE")).toBe(0)
+        expect(#Choreo.phaseCues("TALLY")).toBe(0)
     end)
 end)
 
