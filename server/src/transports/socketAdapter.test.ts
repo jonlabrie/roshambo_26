@@ -48,6 +48,11 @@ describe('socket adapter wire format', () => {
         expect(typeof init.timeLeft).toBe('number');
     });
 
+    it('sends revealMs on init so the client need not hardcode the reveal length', async () => {
+        const init = await initPromise;
+        expect(init.revealMs).toBe(1000); // revealSeconds: 1 in beforeEach
+    });
+
     it('emits sync heartbeats on tick with timeLeft and playerCount', async () => {
         await initPromise;
         const sync = waitFor<any>(client, 'sync');

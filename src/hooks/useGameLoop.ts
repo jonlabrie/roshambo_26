@@ -55,6 +55,9 @@ export function useGameLoop() {
     const audioCtxRef = useRef<AudioContext | null>(null)
     const audioEnabledRef = useRef(audioEnabled)
     const audioVolumeRef = useRef(audioVolume)
+    // Server-reported REVEAL length, arriving on `init`. The fallback matches the
+    // server's default (7s) but should never be the number in use.
+    const revealMsRef = useRef(7000)
 
     // Initialize Device ID if missing
     useEffect(() => {
@@ -316,14 +319,14 @@ export function useGameLoop() {
 
         setLastRound(roundData)
         setShowResult(true)
-        // TRACKS THE SERVER'S REVEAL PHASE (`revealSeconds` in server/src/index.ts) — the overlay should hold for the whole reveal and hand straight over to the
-        // next round, not clear early and leave a "Waiting…" gap. It went 3s → 5s and this literal
-        // did not follow, because nothing links them: grep revealSeconds does not reach into this
-        // file. If the server's reveal phase changes again, change this with it.
+        // The overlay holds for the whole reveal and hands straight over to the next
+        // round, rather than clearing early and leaving a "Waiting…" gap. The length
+        // comes off the wire (`revealMs` on init) because the literal that used to live
+        // here went stale twice — nothing links a number here to the server's config.
         setTimeout(() => {
             setShowResult(false)
             setHistory(prev => [roundData, ...prev].slice(0, 30))
-        }, 5000)
+        }, revealMsRef.current)
 
         setPlayerThrow(null)
         setIsLocked(false)
@@ -396,6 +399,7 @@ export function useGameLoop() {
 
         socket.on('init', (data) => {
             setGameState('ACTIVE')
+            if (typeof data.revealMs === 'number') revealMsRef.current = data.revealMs
             setTimeLeft(data.timeLeft)
             setRoundCount(data.roundCount)
 

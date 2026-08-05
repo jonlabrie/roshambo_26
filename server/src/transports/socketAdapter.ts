@@ -111,6 +111,10 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
             timeLeft: snap.phase === 'OPEN' ? snap.secondsLeft : 0,
             roundCount: snap.roundCount,
             history: store.tape(10),
+            // The reveal's length, so the client's result overlay can hold for exactly
+            // as long as the phase lasts. It used to be a literal in useGameLoop.ts and
+            // silently went stale when the server changed (3s -> 5s -> 7s).
+            revealMs: engine.durationsMs().revealMs,
         });
 
         // Player Persistence Sync (ported verbatim from index.ts:364-401)
