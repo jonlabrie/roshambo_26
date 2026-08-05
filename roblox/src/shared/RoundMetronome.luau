@@ -10,20 +10,17 @@ RoundMetronome.__index = RoundMetronome
 local SLEW_TOLERANCE = 2.0 -- seconds; beyond this, snap
 local SLEW_RATE = 0.05 -- seconds of correction per second of wall time
 
--- THE LOCKOUT LEAD, and it lives here because the timeline is the one thing both sides of the
--- game share. Picks close this many seconds before ACTIVE ends (spec §4). RoundCoordinator owned
--- it privately and shipped the client a `secondsToLockout` on each RoundUpdate — which is to say
--- the client learned its own deadline only when a 1-1.25s poll got round to telling it. With the
--- constant here the client derives the same instant off the published schedule, and there is one
--- number rather than two that agree until someone retunes one of them.
-RoundMetronome.LOCKOUT_SECONDS = 2
+-- THE LOCKOUT IS NO LONGER A LEAD SUBTRACTED FROM ANYTHING. Picks close when OPEN closes,
+-- which the server now publishes as a phase boundary rather than leaving the client to infer
+-- it two seconds before the end of a longer phase. `lockoutIn` below is therefore just the
+-- time remaining in OPEN, and there is no constant to keep in agreement with anyone.
 
 export type Schedule = {
     roundId: string?,
     strikeAt: number,
     periodSec: number,
-    activeSec: number,
-    tallySec: number,
+    openSec: number,
+    lockSec: number,
     revealSec: number,
 }
 
@@ -44,8 +41,8 @@ function RoundMetronome.new()
         _strikeAt = nil :: number?,
         _targetStrikeAt = nil :: number?,
         _periodSec = nil :: number?,
-        _activeSec = 0,
-        _tallySec = 0,
+        _openSec = 0,
+        _lockSec = 0,
         _revealSec = 0,
         _lastNow = nil :: number?,
     }, RoundMetronome)
@@ -58,8 +55,8 @@ local function nearest(strikeAt: number, period: number, ref: number): number
 end
 
 function RoundMetronome.setSchedule(self: any, sched: Schedule, _now: number)
-    self._activeSec = sched.activeSec
-    self._tallySec = sched.tallySec
+    self._openSec = sched.openSec
+    self._lockSec = sched.lockSec
     self._revealSec = sched.revealSec
     if self._strikeAt == nil or self._periodSec ~= sched.periodSec then
         -- first schedule, or a period change (e.g. the 20s->60s launch): adopt
@@ -97,8 +94,8 @@ function RoundMetronome.read(self: any, now: number): Reading?
     local prevStrikeAt = strike + k * period -- last instant <= now
     local nextStrikeAt = prevStrikeAt + period
     local camAngle = omega * (now - prevStrikeAt) -- == 0 (mod 2pi) at every strike
-    -- the round containing `now`: starts active+tally before its own strike
-    local anchorStart = strike - (self._activeSec + self._tallySec)
+    -- the round containing `now`: starts open+lock before its own strike
+    local anchorStart = strike - (self._openSec + self._lockSec)
     local roundStart = anchorStart + math.floor((now - anchorStart) / period) * period
     local drawP = math.clamp((now - roundStart) / period, 0, 1)
 
@@ -110,23 +107,23 @@ function RoundMetronome.read(self: any, now: number): Reading?
     -- intervals would make the boundary belong to two phases at once, and whichever
     -- a caller sampled first would win.
     local elapsed = now - roundStart
-    local activeEnd = self._activeSec
-    local tallyEnd = activeEnd + self._tallySec
+    local openEnd = self._openSec
+    local lockEnd = openEnd + self._lockSec
     local phase, phaseEndsAt
-    if elapsed < activeEnd then
-        phase, phaseEndsAt = "ACTIVE", activeEnd
-    elseif elapsed < tallyEnd then
-        phase, phaseEndsAt = "TALLY", tallyEnd
+    if elapsed < openEnd then
+        phase, phaseEndsAt = "OPEN", openEnd
+    elseif elapsed < lockEnd then
+        phase, phaseEndsAt = "LOCK", lockEnd
     else
         phase, phaseEndsAt = "REVEAL", period
     end
 
-    -- The lockout instant, derived rather than delivered. Zero outside ACTIVE and zero
-    -- THROUGH the window itself — never negative, because the throw gate is `> 0` and a
-    -- negative would read as time remaining.
+    -- The lockout instant, derived rather than delivered. It IS the end of OPEN, so inside
+    -- OPEN this equals `secondsLeft`; everywhere else it is zero. Never negative, because
+    -- the throw gate is `> 0` and a negative would read as time remaining.
     local lockoutIn = 0
-    if phase == "ACTIVE" then
-        lockoutIn = math.max(0, (activeEnd - RoundMetronome.LOCKOUT_SECONDS) - elapsed)
+    if phase == "OPEN" then
+        lockoutIn = math.max(0, openEnd - elapsed)
     end
 
     return {
