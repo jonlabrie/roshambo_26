@@ -57,6 +57,8 @@ local Glyphs = require(shared:WaitForChild("Glyphs"))
 local RollingNumber = require(shared:WaitForChild("RollingNumber"))
 local RingTimer = require(shared:WaitForChild("RingTimer"))
 local RevealBeat = require(shared:WaitForChild("RevealBeat"))
+local ReelStep = require(shared:WaitForChild("ReelStep"))
+local DrumStep = require(shared:WaitForChild("DrumStep"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local player = Players.LocalPlayer
@@ -1619,6 +1621,44 @@ local function setRingGlyph(symbol: string?, fading: boolean)
     end
 end
 
+-- ===== The reel: what the ring shows while the drum is still turning =====
+-- OPEN closes and the ring's countdown has nothing left to count, but the answer is still ~3.45s
+-- away behind the drum's settle. That used to be a blank disc. Now the three glyphs cycle IN PLACE
+-- at exactly the size the reveal uses, decelerating, so the handover is not an animation at all —
+-- the glyph simply stops changing. ReelStep owns the timing and the reasoning; see its header for
+-- why the cycle is in place rather than scrolling, and why it must never stop on its own.
+--
+-- Set when the round leaves OPEN, cleared the moment `aux.worldThrow` lands or OPEN returns.
+local reelStartedAt: number? = nil
+-- WHETHER THIS ROUND'S ANSWER HAS ALREADY BEEN SHOWN, and why a second latch is needed at all.
+-- `worldThrow` goes nil again at the END of the reveal beat, when the glyph has finished fading —
+-- and at a 7s REVEAL that happens at 6.85s, with OPEN 0.15s later. Without this, those 0.15s look
+-- exactly like "OPEN has closed and the drum has not answered", so the reel would restart and
+-- flash a glyph after the real one had just faded out. Cleared only by OPEN.
+local reelSpent = false
+
+-- The glyph the reel is showing, or nil when the reel is not running. A function of elapsed time
+-- and nothing else — it is never given the World Throw, so it cannot spoil one.
+local function reelSymbol(): string?
+    local t0 = reelStartedAt
+    if t0 == nil then
+        return nil
+    end
+    return ReelStep.symbolAt(THROWS, os.clock() - t0, DrumStep.SETTLE_SECONDS)
+end
+
+-- REPAINTED AT FRAME RATE, not on the 10Hz HudState cadence: the reel's fastest interval is
+-- ReelStep.FAST_SECONDS (0.05s), which 10Hz cannot resolve — driven from `render` alone it would
+-- cycle at half speed and stutter. `setRingGlyph` is latched, so the frames between changes cost a
+-- comparison. Guarded on `reelStartedAt`, which `render` clears the instant the answer arrives, so
+-- this can never paint over a real reveal.
+RunService.RenderStepped:Connect(function()
+    local sym = reelSymbol()
+    if sym then
+        setRingGlyph(sym, false)
+    end
+end)
+
 local function render(inputs: any, aux: any)
     local view = HudModel.view(inputs, aux.session)
     canThrow = view.throwsEnabled
@@ -1744,9 +1784,24 @@ local function render(inputs: any, aux: any)
     -- second spoiler gate here). Digits and glyph are mutually exclusive. The going is a fade, not
     -- a toggle — `setRingGlyph` owns it, latched, because this runs at 10Hz.
     local worldThrow = aux.worldThrow
-    ringCount.Visible = worldThrow == nil
-    ringCount.Text = if worldThrow == nil and ringKnown then tostring(math.ceil(view.secondsLeft)) else ""
-    setRingGlyph(worldThrow, aux.worldThrowFading == true)
+    -- THE REEL'S WINDOW: OPEN has closed and the drum has not answered yet. Latched here rather
+    -- than in the frame driver so there is ONE writer, and cleared on `worldThrow` arriving so the
+    -- reel can never race the reveal for the ring's centre.
+    if inputs.phase == "OPEN" then
+        reelStartedAt = nil -- a fresh round: armed again, but the reel does not run during OPEN
+        reelSpent = false
+    elseif worldThrow ~= nil then
+        reelStartedAt = nil -- the drum has answered; the reel's job is done for this round
+        reelSpent = true
+    elseif not reelSpent and reelStartedAt == nil then
+        reelStartedAt = os.clock()
+    end
+    local shown = worldThrow or reelSymbol()
+    ringCount.Visible = shown == nil
+    ringCount.Text = if shown == nil and ringKnown then tostring(math.ceil(view.secondsLeft)) else ""
+    -- `fading` is gated on the REAL reveal: the beat's fade belongs to the answer, and a cycling
+    -- glyph that faded would read as the answer going away before one had arrived.
+    setRingGlyph(shown, worldThrow ~= nil and aux.worldThrowFading == true)
 
     escalation.Visible = view.escalate
     if view.escalate then
