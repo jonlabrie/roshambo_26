@@ -26,6 +26,8 @@ export type Reading = {
     periodSec: number,
     prevStrikeAt: number,
     nextStrikeAt: number,
+    phase: string,
+    secondsLeft: number,
 }
 
 function RoundMetronome.new()
@@ -90,6 +92,26 @@ function RoundMetronome.read(self: any, now: number): Reading?
     local anchorStart = strike - (self._activeSec + self._tallySec)
     local roundStart = anchorStart + math.floor((now - anchorStart) / period) * period
     local drawP = math.clamp((now - roundStart) / period, 0, 1)
+
+    -- THE PHASE, off the same timeline as the cam above — not a second source of
+    -- truth. `elapsed` is where `now` sits inside the round that contains it, so
+    -- the phase is that position measured against the three durations.
+    --
+    -- HALF-OPEN boundaries: a phase owns its start instant and not its end. Closed
+    -- intervals would make the boundary belong to two phases at once, and whichever
+    -- a caller sampled first would win.
+    local elapsed = now - roundStart
+    local activeEnd = self._activeSec
+    local tallyEnd = activeEnd + self._tallySec
+    local phase, phaseEndsAt
+    if elapsed < activeEnd then
+        phase, phaseEndsAt = "ACTIVE", activeEnd
+    elseif elapsed < tallyEnd then
+        phase, phaseEndsAt = "TALLY", tallyEnd
+    else
+        phase, phaseEndsAt = "REVEAL", period
+    end
+
     return {
         drawP = drawP,
         camAngle = camAngle,
@@ -97,6 +119,8 @@ function RoundMetronome.read(self: any, now: number): Reading?
         periodSec = period,
         prevStrikeAt = prevStrikeAt,
         nextStrikeAt = nextStrikeAt,
+        phase = phase,
+        secondsLeft = math.max(0, phaseEndsAt - elapsed),
     }
 end
 

@@ -84,3 +84,85 @@ describe("RoundMetronome", function()
         expect(m:read(123).camAngle).toBeCloseTo(TAU * 1 / 25, 0.0001)
     end)
 end)
+
+describe("RoundMetronome — the phase, read off the same timeline as the cam", function()
+    -- A 27s round: 20 active, 2 tally, 5 reveal, with the strike at the first
+    -- instant of REVEAL (activeSec + tallySec into the period), which is how
+    -- RoundCoordinator publishes it.
+    local function m27()
+        local m = RoundMetronome.new()
+        m:setSchedule({
+            roundId = "r1",
+            strikeAt = 1000,
+            periodSec = 27,
+            activeSec = 20,
+            tallySec = 2,
+            revealSec = 5,
+        }, 1000)
+        return m
+    end
+
+    test("the strike instant is the first instant of REVEAL", function()
+        -- This is the anchor the whole timeline hangs off. If it drifts, every
+        -- phase boundary drifts with it.
+        expect(m27():read(1000).phase).toBe("REVEAL")
+    end)
+
+    test("it walks the period in order", function()
+        local m = m27()
+        local roundStart = 1000 - 22 -- strike less (active + tally)
+        expect(m:read(roundStart).phase).toBe("ACTIVE")
+        expect(m:read(roundStart + 19.9).phase).toBe("ACTIVE")
+        expect(m:read(roundStart + 20).phase).toBe("TALLY")
+        expect(m:read(roundStart + 21.9).phase).toBe("TALLY")
+        expect(m:read(roundStart + 22).phase).toBe("REVEAL")
+        expect(m:read(roundStart + 26.9).phase).toBe("REVEAL")
+    end)
+
+    test("boundaries are half-open — a phase owns its start, not its end", function()
+        -- Closed-closed would make one instant belong to two phases, and whichever
+        -- the caller sampled first would win. That is the kind of ambiguity that
+        -- shows up once an hour and is never reproducible.
+        local m = m27()
+        local roundStart = 1000 - 22
+        expect(m:read(roundStart + 20).phase).toBe("TALLY")
+        expect(m:read(roundStart + 22).phase).toBe("REVEAL")
+        expect(m:read(roundStart + 27).phase).toBe("ACTIVE") -- the next round
+    end)
+
+    test("it repeats every period, forwards and backwards", function()
+        local m = m27()
+        local roundStart = 1000 - 22
+        for _, k in { -3, -1, 0, 1, 5 } do
+            local base = roundStart + k * 27
+            expect(m:read(base + 1).phase).toBe("ACTIVE")
+            expect(m:read(base + 21).phase).toBe("TALLY")
+            expect(m:read(base + 23).phase).toBe("REVEAL")
+        end
+    end)
+
+    test("secondsLeft counts down to the NEXT boundary, not the round's end", function()
+        local m = m27()
+        local roundStart = 1000 - 22
+        expect(m:read(roundStart).secondsLeft).toBeCloseTo(20, 0.001)
+        expect(m:read(roundStart + 19).secondsLeft).toBeCloseTo(1, 0.001)
+        expect(m:read(roundStart + 20).secondsLeft).toBeCloseTo(2, 0.001) -- TALLY's whole length
+        expect(m:read(roundStart + 22).secondsLeft).toBeCloseTo(5, 0.001) -- REVEAL's
+    end)
+
+    test("secondsLeft is never negative and never exceeds its phase", function()
+        local m = m27()
+        local roundStart = 1000 - 22
+        for i = 0, 270 do
+            local r = m:read(roundStart + i / 10)
+            expect(r.secondsLeft >= 0).toBe(true)
+            expect(r.secondsLeft <= 20).toBe(true)
+        end
+    end)
+
+    test("no schedule, no phase", function()
+        -- read() already returns nil before a schedule lands; the new fields must
+        -- not tempt a caller into treating an unsynced client as being mid-round.
+        expect(RoundMetronome.new():read(100)).toBeNil()
+    end)
+end)
