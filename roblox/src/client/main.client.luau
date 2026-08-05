@@ -78,17 +78,17 @@ local REVEAL_SAFETY_STALLED = DrumStep.SAFETY_AFTER_STRIKE_STALLED_SECONDS
 -- transitions run ~1s behind the nominal boundaries). Only ever makes the missed-strike backstop
 -- LATER, never earlier.
 local STRIKE_LEAD_SLACK = 1
--- How far ahead of a reveal that has ALREADY arrived a legitimate `gongHit` can still be: the reveal
--- can land as early as the start of TALLY (RoundCoordinator fetches on TALLY as well as REVEAL)
--- while the strike is scheduled TallySec into it, with `gongHit` at the END of the shu-moku's swing.
--- Read from the live schedule so a server retune of TALLY carries — FindFirstChild, never
+-- How far ahead of a reveal that has ALREADY arrived a legitimate `gongHit` can still be. The
+-- reveal no longer lands early: the world throw is decided at the END of LOCK, so a LOCK-phase
+-- fetch (RoundCoordinator's `_fetchRevealIfDue` accepts LOCK as well as REVEAL) always 404s, and the
+-- payload lands after REVEAL opens, not before it — while the strike is scheduled LockSec into
+-- LOCK, with `gongHit` at the END of the shu-moku's swing.
+-- Read from the live schedule so a server retune of LOCK carries — FindFirstChild, never
 -- WaitForChild, because the HUD must not block on the arena's config folder.
 local function strikeLeadSeconds(): number
     local cfg = ReplicatedStorage:FindFirstChild("RoundScheduleConfig")
-    local tally = if cfg then cfg:GetAttribute("TallySec") else nil
-    return (if typeof(tally) == "number" then tally else 2)
-        + DrumStep.STRIKE_SWING_SECONDS
-        + STRIKE_LEAD_SLACK
+    local lock = if cfg then cfg:GetAttribute("LockSec") else nil
+    return (if typeof(lock) == "number" then lock else 2) + DrumStep.STRIKE_SWING_SECONDS + STRIKE_LEAD_SLACK
 end
 
 -- The tape renders DIRECTLY from the authoritative World-Throw tape (newest-first, deduped, each
@@ -101,7 +101,7 @@ local badgeById: { [string]: string } = {}
 local currentRoundId: string? = nil -- the round in play (from RoundUpdate)
 local revealedRoundId: string? = nil -- the latest round our drum has finished
 -- The world's throw for the round `revealedRoundId` names, or nil. Set alongside it in
--- `maybeShowReveal` and cleared when ACTIVE reopens, so the ring (HudController) inherits the
+-- `maybeShowReveal` and cleared when OPEN reopens, so the ring (HudController) inherits the
 -- SAME drum-rest spoiler gate the tape does rather than a second one of its own.
 local revealedWorldThrow: string? = nil
 
@@ -161,7 +161,7 @@ end
 -- the phase the round-ended edge is measured on —
 -- that edge is about the SERVER's round closing, so re-keying it to a local clock that
 -- deliberately leads the server would fire it early, or (worse) never, because by the time
--- RoundUpdate said TALLY the effective phase would already have left ACTIVE and the edge would
+-- RoundUpdate said LOCK the effective phase would already have left OPEN and the edge would
 -- have passed unobserved.
 local phase = ""
 local serverPhase = ""
@@ -189,7 +189,7 @@ local chosen: string? = nil
 local undoPrompt: string? = nil
 local undoPromptAt: number? = nil
 local sent = false
--- Set by a back-out, cleared when ACTIVE reopens. A player who withdrew has answered the
+-- Set by a back-out, cleared when OPEN reopens. A player who withdrew has answered the
 -- question the escalation asks, so it must not ask again this round.
 local declinedThisRound = false
 
@@ -302,11 +302,12 @@ task.spawn(function()
             roundId = scheduleConfig:GetAttribute("RoundId") :: string?,
             strikeAt = strikeAt,
             periodSec = periodSec,
-            activeSec = (scheduleConfig:GetAttribute("ActiveSec") :: number?) or 20,
-            tallySec = (scheduleConfig:GetAttribute("TallySec") :: number?) or 2,
-            -- Fallbacks mirror the server's configured phase durations (server/src/index.ts); only
-            -- used until the first schedule attributes replicate, but a stale one is a wrong schedule.
-            revealSec = (scheduleConfig:GetAttribute("RevealSec") :: number?) or 5,
+            openSec = (scheduleConfig:GetAttribute("OpenSec") :: number?) or 51,
+            lockSec = (scheduleConfig:GetAttribute("LockSec") :: number?) or 2,
+            -- Fallbacks mirror the server's DEFAULT phase durations (server/src/index.ts, now
+            -- env-overridable); only used until the first schedule attributes replicate, but a
+            -- stale one is a wrong schedule.
+            revealSec = (scheduleConfig:GetAttribute("RevealSec") :: number?) or 7,
         }, workspace:GetServerTimeNow())
     end
     -- StrikeAtServerTime is written LAST on the server, so one changed-signal on it pulls a
@@ -339,13 +340,13 @@ local function refreshClock()
     localPhase = if reading then reading.phase else nil
     phase = localPhase or serverPhase
     if reading then
-        -- Outside ACTIVE there is no lockout to count down to, and `lockoutAt = nil` is how this
+        -- Outside OPEN there is no lockout to count down to, and `lockoutAt = nil` is how this
         -- file has always said so (`timerKnown`, and the ring, both read it that way).
-        lockoutAt = if reading.phase == "ACTIVE" then os.clock() + reading.lockoutIn else nil
+        lockoutAt = if reading.phase == "OPEN" then os.clock() + reading.lockoutIn else nil
     end
 end
 
--- The clock may not have synced when ACTIVE opens (secondsToLockout arrives nil), and lockoutAt is
+-- The clock may not have synced when OPEN opens (secondsToLockout arrives nil), and lockoutAt is
 -- only ever assigned at that transition — so a nil there stays nil for the whole round. The old HUD
 -- let the player throw anyway and so do we: report a nominal countdown comfortably above the
 -- escalation threshold, so throws stay enabled and the alarm stays quiet. But the RING must not
@@ -353,7 +354,7 @@ end
 -- working past the real lockout. `timerKnown` tells the HUD to hide it instead.
 local UNSYNCED_SECONDS = 30
 
--- ⚠ SECONDS TO THE LOCKOUT. NOT to the end of ACTIVE, and NOT to the end of the round. HudModel
+-- ⚠ SECONDS TO THE LOCKOUT. NOT to the end of OPEN, and NOT to the end of the round. HudModel
 -- spends this one number three ways — the ring's display, `throwsEnabledFor` (`secondsLeft > 0`)
 -- and `sendAtLockout` (`> 0.5`) — so redefining it as anything longer leaves throws open past the
 -- moment RoundCoordinator stops accepting them and fires the held pick too late to be counted.
@@ -363,7 +364,7 @@ local UNSYNCED_SECONDS = 30
 -- is one (`refreshClock`) rather than from the poll's `secondsToLockout`. The formula and the
 -- meaning are untouched, and both sides of the subtraction are on os.clock().
 local function secondsLeft(): number
-    if phase ~= "ACTIVE" then
+    if phase ~= "OPEN" then
         return 0
     end
     if not lockoutAt then
@@ -399,8 +400,8 @@ end
 -- the rest of the HUD runs on. `phase` comes from the published timeline, so it LEADS RoundUpdate
 -- by however long the Roblox game server's 1-1.25s poll takes to notice a boundary. Leading is the
 -- whole point for anything that is merely drawn. It is the wrong thing for OPENING THROWS, and the
--- reason is not on this line — it is in the RoundUpdate handler below: the poll's ACTIVE report is
--- ALSO what resets the round's pick state. A tap taken between the local ACTIVE and the server's
+-- reason is not on this line — it is in the RoundUpdate handler below: the poll's OPEN report is
+-- ALSO what resets the round's pick state. A tap taken between the local OPEN and the server's
 -- is written into `chosen`, and then `chosen = nil` a fraction of a second later. The glyph lights
 -- and goes dark, nothing reaches the wire, and the player is told nothing. Nobody reports that
 -- fault; everybody feels it.
@@ -409,30 +410,30 @@ end
 -- an 18s window is invisible. A swallowed first tap is not.
 --
 -- THIS WILL LOOK REDUNDANT TO THE NEXT READER. `phase` is already `localPhase or serverPhase`, so
--- the eye reads "local says ACTIVE, therefore phase is ACTIVE, therefore why ask serverPhase at
+-- the eye reads "local says OPEN, therefore phase is OPEN, therefore why ask serverPhase at
 -- all?" — and that reading is exactly the case being rejected. Simplifying this to `return phase`
 -- restores the swallow, and no automated gate in this repo will catch it: nothing loads a
 -- `.client.luau`.
 --
--- ROUND IDENTITY IS CARRIED BY THE PHASE REPORT, NOT COMPARED AS AN ID. `serverPhase == "ACTIVE"`
--- is per-round by construction — it is set from the same RoundUpdate whose ACTIVE branch resets
+-- ROUND IDENTITY IS CARRIED BY THE PHASE REPORT, NOT COMPARED AS AN ID. `serverPhase == "OPEN"`
+-- is per-round by construction — it is set from the same RoundUpdate whose OPEN branch resets
 -- this round's pick state, so agreement means that reset has already happened. Comparing round ids
 -- instead would be worse: RoundScheduleConfig's RoundId is an ATTRIBUTE and RoundUpdate is a
 -- RemoteEvent, and those two have no replication ordering, so the comparison would invent
 -- disagreement rather than detect it (RoundMetronome's Reading carries no round id at all). And
--- "both say ACTIVE" cannot name two different rounds: the metronome hard re-anchors past
+-- "both say OPEN" cannot name two different rounds: the metronome hard re-anchors past
 -- SLEW_TOLERANCE, so the timeline is never a whole period out.
 --
 -- IT CANNOT WITHHOLD THE HELD PICK'S ONE TRIP TO THE WIRE, and that is a property of
--- HudModel.sendAtLockout rather than a hope: for a pick that is chosen and unsent, an ACTIVE phase
--- returns nil while time remains, and ANY non-ACTIVE phase returns the pick at once. Substituting
--- non-ACTIVE for ACTIVE — the only substitution this function makes — can therefore turn a nil
+-- HudModel.sendAtLockout rather than a hope: for a pick that is chosen and unsent, an OPEN phase
+-- returns nil while time remains, and ANY non-OPEN phase returns the pick at once. Substituting
+-- non-OPEN for OPEN — the only substitution this function makes — can therefore turn a nil
 -- into the pick, never the pick into a nil. The lockout send is unreachable from here. (It is not
 -- moved earlier in practice either: the only window this changes is one in which the server is not
--- in ACTIVE, and by then the previous round's pick has already gone — `sent` is true — or there
+-- in OPEN, and by then the previous round's pick has already gone — `sent` is true — or there
 -- never was one.)
 local function throwPhase(): string
-    if localPhase == "ACTIVE" and serverPhase ~= "ACTIVE" then
+    if localPhase == "OPEN" and serverPhase ~= "OPEN" then
         -- The timeline has opened a round the server has not. Report the server's phase, so the
         -- gate stays shut until the poll catches up.
         return serverPhase
@@ -558,9 +559,9 @@ local drumAtRest = false
 -- reads that throw off RevealTheater. This flag is set from the SAME remote on the SAME client (the
 -- handler further down), so at the strike it says exactly what DrumController's `latestWorldThrow`
 -- says — which is what lets the fallback below pick the short window instead of always padding by
--- the full stall. Cleared when ACTIVE reopens, matching DrumController consuming it on landing.
+-- the full stall. Cleared when OPEN reopens, matching DrumController consuming it on landing.
 local worldThrowInHand = false
--- Whether this round's strike has been seen yet. Cleared when ACTIVE reopens; read by the
+-- Whether this round's strike has been seen yet. Cleared when OPEN reopens; read by the
 -- missed-strike backstop in the RevealResult handler.
 local strikeSeen = false
 
@@ -587,7 +588,7 @@ local function maybeShowReveal()
         -- block above for the timings and for why the tile's round is held in its own record.
         --
         -- `landTape()` first, defensively: nothing should be able to deliver a second reveal
-        -- without an ACTIVE in between (which collapses the beat), but if one ever did, the round
+        -- without an OPEN in between (which collapses the beat), but if one ever did, the round
         -- still in flight would have its record overwritten on the next line, and a dropped tile is
         -- the one failure here that never repairs itself.
         landTape()
@@ -658,7 +659,7 @@ end
 -- choreography in DrumStep and measured from an event the drum's own timing is measured from.
 --
 -- The round is pinned at arming time so a stale timer can never release a NEWER round's reveal
--- early: by then `pendingReveal` is either nil (ACTIVE clears it) or a different round's.
+-- early: by then `pendingReveal` is either nil (OPEN clears it) or a different round's.
 local function armRevealSafety(afterSeconds: number)
     local roundId = currentRoundId
     task.delay(afterSeconds, function()
@@ -676,7 +677,7 @@ EventBus.Cue.Event:Connect(function(cue)
     elseif cue.kind == "gongHit" then
         -- THE STRIKE — the instant everything the drum does is measured from, which is why the
         -- fallback is armed HERE and not from RevealResult arriving. The reveal can land a second
-        -- or more BEFORE the strike (RoundCoordinator:_fetchRevealIfDue accepts TALLY as well as
+        -- or more BEFORE the strike (RoundCoordinator:_fetchRevealIfDue accepts LOCK as well as
         -- REVEAL), so a window measured from its arrival is measured from an event with no fixed
         -- relationship to the rest it is meant to sit behind.
         strikeSeen = true
@@ -820,7 +821,7 @@ RoundUpdate.OnClientEvent:Connect(function(info)
     -- up to the length of its poll — so against `phase` the edge would already have passed by the
     -- time this fires and `roundEnded` would never be called at all, silently breaking the
     -- escalation's consecutive-miss backoff. `serverPhase` still holds the PREVIOUS report here.
-    if serverPhase == "ACTIVE" and info.phase ~= "ACTIVE" then
+    if serverPhase == "OPEN" and info.phase ~= "OPEN" then
         -- A STANDING CHOICE COUNTS AS PLAYED. The lockout normally sends it half a second
         -- before this fires; a choice made inside that last sliver must not be scored as an
         -- ignored round, because three of those start the escalation nagging someone who is
@@ -837,7 +838,7 @@ RoundUpdate.OnClientEvent:Connect(function(info)
     -- rewrites the schedule either: RoundMetronome owns the slewing that makes the two converge
     -- for real, and it already does it (setSchedule / SLEW_RATE).
     phase = info.phase
-    if info.phase == "ACTIVE" then
+    if info.phase == "OPEN" then
         chosen = nil
         undoPrompt = nil
         undoPromptAt = nil
@@ -863,7 +864,7 @@ RoundUpdate.OnClientEvent:Connect(function(info)
         -- on the reasoning that "the ring must not carry last round's glyph into this one".
         --
         -- It turned out that reasoning cost the whole feature. The drum comes to rest with about a
-        -- second left before the next round opens, so collapsing on ACTIVE cut the glyph off almost
+        -- second left before the next round opens, so collapsing on OPEN cut the glyph off almost
         -- the instant it appeared — the owner watched it arrive at exactly the right moment and be
         -- replaced by the fresh countdown in well under a second.
         --
@@ -900,7 +901,7 @@ RevealResult.OnClientEvent:Connect(function(r)
     }
     maybeShowReveal() -- only shows if the drum is already at rest
     -- THE BACKSTOP FOR A MISSED STRIKE. The fallback is armed on `gongHit`, so a `gongHit` that
-    -- never arrives arms nothing and the result would sit here until ACTIVE swept it away unseen.
+    -- never arrives arms nothing and the result would sit here until OPEN swept it away unseen.
     -- Nothing is armed if the strike has already been seen — that round's window is running and
     -- this must not undercut it. Otherwise wait out the longest a legitimate strike can still be
     -- ahead of a reveal that has already landed, and if it has STILL not arrived, take it as lost
@@ -1015,7 +1016,7 @@ task.spawn(function()
         -- FIRST, before anything reads `phase` or `secondsLeft()` this tick: resample the
         -- published timeline. This loop is the phase's clock now — nothing pushes it.
         refreshClock()
-        if phase == "ACTIVE" then
+        if phase == "OPEN" then
             roundCouldThrow = true
         end
         -- An unanswered UNDO? ages out. Both outcomes of expiry are safe: it restores

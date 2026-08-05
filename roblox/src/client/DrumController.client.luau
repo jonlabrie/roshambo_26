@@ -1,5 +1,5 @@
 --!strict
--- Drives the mawari-dōrō revolving lantern atop the shōrō. It RESTS through ACTIVE + TALLY
+-- Drives the mawari-dōrō revolving lantern atop the shōrō. It RESTS through OPEN + LOCK
 -- showing the prior throw; on the bell strike (`gongHit`) the inner 12-facet drum is kicked
 -- into a fast spin about its VERTICAL axis and DECELERATES to rest on the actual World Throw
 -- (that becomes the next round's "prior"). Four windows 90° apart all read the same symbol.
@@ -206,7 +206,7 @@ RevealTheater.OnClientEvent:Connect(function(reveal)
 end)
 
 RoundUpdate.OnClientEvent:Connect(function(info)
-    if info.phase == "ACTIVE" and mode ~= "hold" and strikeT0 >= 0 then
+    if info.phase == "OPEN" and mode ~= "hold" and strikeT0 >= 0 then
         -- Guard fires only beyond the worst legitimate spin + stall + glide (10s)
         if os.clock() - strikeT0 > SPIN_SEC + STALL_MAX + GLIDE_SEC + 1 then
             if latestWorldThrow then

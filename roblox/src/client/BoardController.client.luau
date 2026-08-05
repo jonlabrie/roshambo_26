@@ -150,9 +150,9 @@ BoardData.OnClientEvent:Connect(function(d)
 end)
 
 RoundUpdate.OnClientEvent:Connect(function(info)
-    if info.phase == "ACTIVE" then
+    if info.phase == "OPEN" then
         setRow(5, "WORLD CHOOSES SOON")
-    elseif info.phase == "TALLY" then
+    elseif info.phase == "LOCK" then
         setRow(5, "WORLD CHOOSES NOW")
     end
 end)

@@ -30,11 +30,12 @@ local function pullSchedule()
         roundId = scheduleConfig:GetAttribute("RoundId") :: string?,
         strikeAt = strikeAt,
         periodSec = periodSec,
-        activeSec = (scheduleConfig:GetAttribute("ActiveSec") :: number?) or 20,
-        tallySec = (scheduleConfig:GetAttribute("TallySec") :: number?) or 2,
-        -- Fallbacks mirror the server's configured phase durations (server/src/index.ts); only
-        -- used until the first schedule attributes replicate, but a stale one is a wrong schedule.
-        revealSec = (scheduleConfig:GetAttribute("RevealSec") :: number?) or 5,
+        openSec = (scheduleConfig:GetAttribute("OpenSec") :: number?) or 51,
+        lockSec = (scheduleConfig:GetAttribute("LockSec") :: number?) or 2,
+        -- Fallbacks mirror the server's DEFAULT phase durations (server/src/index.ts, now
+        -- env-overridable); only used until the first schedule attributes replicate, but a
+        -- stale one is a wrong schedule — it put the strike on the wrong part of the cam once.
+        revealSec = (scheduleConfig:GetAttribute("RevealSec") :: number?) or 7,
     }, workspace:GetServerTimeNow())
 end
 scheduleConfig:GetAttributeChangedSignal("StrikeAtServerTime"):Connect(pullSchedule)
@@ -211,17 +212,17 @@ task.spawn(function()
         -- geometry mirrors ArenaLayout.bellDrive/shuMoku (build-time constants;
         -- draw also mirrors DRAW_STUDS, declared later in this file)
         -- strikeP maps the flank onto the metronome timeline (the strike lands at
-        -- drawP=(active+tally)/period, not full draw) — derived from the live
+        -- drawP=(open+lock)/period, not full draw) — derived from the live
         -- schedule so a round-length change rebuilds the right cam on next join.
         -- The PERIOD default is derived from the three phase defaults rather than
         -- written out: it said 25 against a 20+2+5 = 27s round, and a stale period
         -- skews where the strike lands until the first attributes replicate.
-        local activeSec = (scheduleConfig:GetAttribute("ActiveSec") :: number?) or 20
-        local tallySec = (scheduleConfig:GetAttribute("TallySec") :: number?) or 2
-        local revealSec = (scheduleConfig:GetAttribute("RevealSec") :: number?) or 5
+        local openSec = (scheduleConfig:GetAttribute("OpenSec") :: number?) or 51
+        local lockSec = (scheduleConfig:GetAttribute("LockSec") :: number?) or 2
+        local revealSec = (scheduleConfig:GetAttribute("RevealSec") :: number?) or 7
         local periodSec = (scheduleConfig:GetAttribute("PeriodSec") :: number?)
-            or (activeSec + tallySec + revealSec)
-        local strikeP = (activeSec + tallySec) / periodSec
+            or (openSec + lockSec + revealSec)
+        local strikeP = (openSec + lockSec) / periodSec
         local G = {
             gapZ = 2.2,
             draw = 3.0,
@@ -283,7 +284,7 @@ local function updateSuspension()
 end
 
 local striking = false
--- The cam is anchored to the RELEASE (strike) event, not ACTIVE: at each strike we set its
+-- The cam is anchored to the RELEASE (strike) event, not OPEN: at each strike we set its
 -- orientation so the high point is exactly on the dowel, then it free-runs at the metronome's
 -- omega until the next strike. This makes the high point meet the dowel at EVERY release
 -- regardless of network jitter — the strike itself is self-timed off the metronome's schedule,
@@ -294,7 +295,7 @@ local anchorAt: number? = nil
 local lastMetroNow: number? = nil
 
 RoundUpdate.OnClientEvent:Connect(function(info)
-    if info.phase == "ACTIVE" then
+    if info.phase == "OPEN" then
         striking = false -- new round: the draw ramp owns the log again
     end
 end)
@@ -376,7 +377,7 @@ end)
 
 -- CONSTANT-SPEED cam. The cam turns continuously at the metronome's rate (omega = 2π/period),
 -- RE-PINNED at each strike so the high point is on the dowel at every release — the strike
--- is now self-timed off the metronome's schedule (no ACTIVE/reveal event jitter to inherit);
+-- is now self-timed off the metronome's schedule (no OPEN/reveal event jitter to inherit);
 -- before this client's first strike it free-runs phase-locked to the strike instants as a
 -- fallback. The ONLY timing constraint is the high point at release — set by CAM_PHASE
 -- (live-tunable via the "CamPhaseDeg" attribute, degrees). Everything else is sold by the cam
@@ -406,7 +407,7 @@ RunService.Heartbeat:Connect(function()
         strike(r.prevStrikeAt)
     end
     lastMetroNow = nowSt
-    -- Self-timed backstop: RoundUpdate("ACTIVE") normally clears `striking`, but a
+    -- Self-timed backstop: RoundUpdate("OPEN") normally clears `striking`, but a
     -- dropped broadcast must not freeze the machine (spec: it never stops). Clear once
     -- the next round's ramp is underway — drawP has wrapped low — never mid-REVEAL
     -- (releasing early would slam the log back to near-full draw before the wrap).

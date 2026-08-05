@@ -911,7 +911,7 @@ end
 
 -- A tap must ALWAYS visibly do something. The buttons carry AutoButtonColor = false (the palette is
 -- hand-painted), so before this a press produced no feedback whatsoever — and roughly a fifth of
--- every round sits in TALLY/REVEAL where `canThrow` is legitimately false, so a perfectly good tap
+-- every round sits in LOCK/REVEAL where `canThrow` is legitimately false, so a perfectly good tap
 -- landing in that window vanished without a trace. That is the "I have to click the throw button
 -- twice, but there's nothing indicating that" report. The depress fires on EVERY press, accepted or
 -- refused; the blue light only on an accepted one.
@@ -1547,7 +1547,7 @@ task.spawn(function()
 end)
 
 -- ===== Render =====
--- The round's full span is not on the wire; take it from the largest countdown seen since ACTIVE
+-- The round's full span is not on the wire; take it from the largest countdown seen since OPEN
 -- opened, so the ring depletes against the real round length whatever the server's phase
 -- durations are.
 local span = 0
@@ -1708,15 +1708,15 @@ local function render(inputs: any, aux: any)
     if lastPhase ~= inputs.phase then
         span = 0
     end
-    if inputs.phase == "ACTIVE" and aux.timerKnown ~= false then
+    if inputs.phase == "OPEN" and aux.timerKnown ~= false then
         span = math.max(span, view.secondsLeft)
     end
     lastPhase = inputs.phase
 
     -- The ring. Where the countdown is unknown (`aux.timerKnown == false`, or the phase isn't
-    -- ACTIVE, or nothing has been tracked yet), light NOTHING and blank the digits — a full ring
+    -- OPEN, or nothing has been tracked yet), light NOTHING and blank the digits — a full ring
     -- that never moves would read as "plenty of time" and be a lie.
-    local ringKnown = inputs.phase == "ACTIVE" and aux.timerKnown ~= false and span > 0
+    local ringKnown = inputs.phase == "OPEN" and aux.timerKnown ~= false and span > 0
     local ringFrac = if ringKnown then math.clamp(view.secondsLeft / span, 0, 1) else 0
     local ringHot = RingTimer.isWarning(view.secondsLeft, HudModel.ESCALATE_AT)
     local ringLit = if ringHot then RING_HOT else RING_LIVE

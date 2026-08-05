@@ -103,8 +103,9 @@ end
 -- It used to be `REVEAL_SAFETY = 3`, armed from RevealTheater ARRIVING — the same defect
 -- main.client.luau carried, in the same shape, for the same reason: 3 is unrelated to the
 -- choreography (the drum rests DrumStep.SETTLE_SECONDS = 3.45s after the STRIKE) and RevealTheater's
--- arrival is unrelated to the strike (the reveal can land a whole tally before it, because
--- RoundCoordinator:_fetchRevealIfDue accepts TALLY as well as REVEAL). Instrumented on the HUD side,
+-- arrival is unrelated to the strike (RoundCoordinator:_fetchRevealIfDue accepts LOCK as well as
+-- REVEAL, but the world throw is not decided until LOCK ends, so a LOCK-phase attempt just 404s —
+-- the payload lands after REVEAL opens, not a whole phase before it). Instrumented on the HUD side,
 -- the equivalent timer won on three consecutive rounds — so this safety has been routinely firing
 -- the petals and the umbrella while the drum was still gliding onto its detent, which is the exact
 -- spoiler the gate above exists to prevent.
@@ -116,7 +117,7 @@ end
 local pendingReveal: any = nil
 local drumAtRest = false
 -- This round's strike, `os.clock()` at `gongHit`, nil until it lands. Doubles as "has the strike
--- been seen", which the missed-strike backstop reads. Cleared when ACTIVE reopens.
+-- been seen", which the missed-strike backstop reads. Cleared when OPEN reopens.
 local strikeAt: number? = nil
 -- Was the World Throw still missing when the strike landed? That is DrumController's stall
 -- condition, and this file receives RevealTheater — the very remote that controller takes its throw
@@ -128,15 +129,13 @@ local strikeStalled = false
 -- missed-strike backstop LATER, never earlier.
 local STRIKE_LEAD_SLACK = 1
 -- How far ahead of a reveal that has ALREADY arrived a legitimate `gongHit` can still be: the strike
--- is scheduled TallySec after ACTIVE ends, with `gongHit` at the END of the shu-moku's swing. Read
--- off the live schedule so a server retune of TALLY carries — FindFirstChild, never WaitForChild,
+-- is scheduled LockSec after OPEN ends, with `gongHit` at the END of the shu-moku's swing. Read
+-- off the live schedule so a server retune of LOCK carries — FindFirstChild, never WaitForChild,
 -- so this controller cannot hang on the arena's config folder. (Mirrors main.client.luau.)
 local function strikeLeadSeconds(): number
     local cfg = ReplicatedStorage:FindFirstChild("RoundScheduleConfig")
-    local tally = if cfg then cfg:GetAttribute("TallySec") else nil
-    return (if typeof(tally) == "number" then tally else 2)
-        + DrumStep.STRIKE_SWING_SECONDS
-        + STRIKE_LEAD_SLACK
+    local lock = if cfg then cfg:GetAttribute("LockSec") else nil
+    return (if typeof(lock) == "number" then lock else 2) + DrumStep.STRIKE_SWING_SECONDS + STRIKE_LEAD_SLACK
 end
 
 local function runReveal(reveal: any)
@@ -190,7 +189,7 @@ RoundUpdate.OnClientEvent:Connect(function(info)
     for _, kind in Choreo.phaseCues(info.phase) do
         EventBus.Cue:Fire({ kind = kind })
     end
-    if info.phase == "ACTIVE" then
+    if info.phase == "OPEN" then
         -- The drum respins for the new round, so last round's rest no longer counts as this one's,
         -- and this round's strike has not landed yet.
         --
