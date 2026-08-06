@@ -153,6 +153,15 @@ function NetworkClient.postPurchase(self: any, robloxUserId: string, item: strin
     return self:_request("POST", `/api/v1/players/{robloxUserId}/purchase`, { item = item })
 end
 
+function NetworkClient.getFireworks(self: any, robloxUserId: string, lastWorldThrow: string?): Result
+    local q = if lastWorldThrow then `?lastWorldThrow={lastWorldThrow}` else ""
+    return self:_request("GET", `/api/v1/players/{robloxUserId}/fireworks{q}`)
+end
+
+function NetworkClient.postFireworkSpend(self: any, robloxUserId: string, shellId: string): Result
+    return self:_request("POST", `/api/v1/players/{robloxUserId}/fireworks/spend`, { shellId = shellId })
+end
+
 function NetworkClient.postDisplay(
     self: any,
     robloxUserId: string,

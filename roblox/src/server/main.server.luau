@@ -51,6 +51,8 @@ local HandlerQueue = require(script.Parent:WaitForChild("HandlerQueue"))
 local PortalController = require(script.Parent:WaitForChild("PortalController"))
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local RoundClock = require(shared:WaitForChild("RoundClock"))
+local CollectionService = game:GetService("CollectionService")
+local LaunchSites = require(shared:WaitForChild("LaunchSites"))
 local GameRules = require(shared:WaitForChild("GameRules"))
 local PlayerProfiles = require(shared:WaitForChild("PlayerProfiles"))
 local ThemeManifest = require(shared:WaitForChild("ThemeManifest"))
@@ -90,6 +92,9 @@ local InviteUser = remotes:WaitForChild("InviteUser") :: RemoteEvent
 local RevokeUser = remotes:WaitForChild("RevokeUser") :: RemoteEvent
 local AccessState = remotes:WaitForChild("AccessState") :: RemoteEvent
 local AccessBlocked = remotes:WaitForChild("AccessBlocked") :: RemoteEvent
+local RequestFireworkLaunch = remotes:WaitForChild("RequestFireworkLaunch") :: RemoteEvent
+local FireworkLaunched = remotes:WaitForChild("FireworkLaunched") :: RemoteEvent
+local FireworkState = remotes:WaitForChild("FireworkState") :: RemoteEvent
 local TextService = game:GetService("TextService")
 
 local secretsModule = script.Parent:FindFirstChild("SecretsLocal")
@@ -312,6 +317,11 @@ end
 
 local lastTape: any = {}
 
+-- FORWARD DECLARATION. The referee's helpers need playerEconomy and PadSites, which are built far
+-- below; but the reveal fan-out just above here has to re-push shell state the moment a round
+-- closes. Declared here, assigned once those exist.
+local pushFireworkState: ((Player) -> ())? = nil
+
 local coordinator = RoundCoordinator.new({
     net = net,
     clock = clock,
@@ -358,6 +368,14 @@ local coordinator = RoundCoordinator.new({
                     profiles:applyLocalResult(userId, mine.result)
                     pushStats(player)
                     fireProfile(player, "local")
+                    -- Two things just changed: ishibana's window opened or closed with the world
+                    -- throw, and a WIN has granted a firecracker. Without this the picker shows a
+                    -- stale WAITING_FOR_R and a count one behind. A stale state can never produce a
+                    -- WRONG firework — the referee re-validates every launch — but it can produce a
+                    -- button a player will not tap.
+                    if pushFireworkState then
+                        pushFireworkState(player)
+                    end
                 end
             end
         end,
@@ -754,6 +772,109 @@ local function echoEconomy(player: Player, uid: string)
     })
 end
 
+-- ============================ FIREWORKS: THE REFEREE ============================
+-- A client asks; the server decides, spends, and only then tells everyone. A client never announces
+-- its own firework. That is both the anti-cheat property and the perf rule: the server emits one
+-- tiny event and every client renders locally from its own catalogue, so nothing about the show
+-- crosses the wire per particle.
+local SITE_RADIUS = 24
+
+-- The newest tape entry is the last CLOSED round, which is exactly what ishibana's condition is
+-- about. The tape already arrives on every poll — nothing extra is fetched to answer this.
+local function lastWorldThrow(): string?
+    local newest = lastTape and lastTape[1]
+    return newest and newest.worldThrow or nil
+end
+
+-- Public sites are tagged in the place, not declared here — Rojo owns no place geometry.
+-- NOTE: with no part tagged FireworkLaunchSite, the only site a player has is their own deck.
+local function fireworkSites(): { LaunchSites.Site }
+    local sites: { LaunchSites.Site } = {}
+    for _, part in CollectionService:GetTagged("FireworkLaunchSite") do
+        if part:IsA("BasePart") then
+            local p = part.Position
+            table.insert(
+                sites,
+                { pos = { x = p.X, y = p.Y, z = p.Z }, radius = SITE_RADIUS, ownerUserId = nil }
+            )
+        end
+    end
+    return sites
+end
+
+-- A player's own deck is a site for that player ALONE. Returns nil when they own no deck, which is
+-- the common case for a new player: they use the public sites. The deck does NOT lend a mortar —
+-- gear is personal, and the tube is the thing you bought.
+local function deckSiteFor(uid: string): LaunchSites.Site?
+    local e = playerEconomy[uid]
+    if e == nil or e.claimedPadId == nil then
+        return nil
+    end
+    local spec = PadSites[e.claimedPadId]
+    if spec == nil then
+        return nil
+    end
+    local row = spec.deckPlacements[e.maxDeckSize or "S"] or spec.deckPlacements.S
+    if row == nil then
+        return nil
+    end
+    return { pos = { x = row[1], y = row[2], z = row[3] }, radius = SITE_RADIUS, ownerUserId = uid }
+end
+
+-- Push the whole shell state to one player: after every launch (their count changed), at every
+-- reveal (the window moved, a grant may have landed) and once on join. HTTP-yielding, so it runs on
+-- the HandlerQueue like every other call here rather than a bare task.spawn per event.
+pushFireworkState = function(player: Player)
+    local uid = tostring(player.UserId)
+    handlerQueue:run(uid, function()
+        local res = net:getFireworks(uid, lastWorldThrow())
+        if res.ok and player:IsDescendantOf(Players) then
+            FireworkState:FireClient(player, res.data)
+        end
+    end)
+end
+
+RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
+    if typeof(shellId) ~= "string" then
+        return
+    end
+    local uid = tostring(player.UserId)
+    handlerQueue:run(uid, function()
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+        if not root then
+            return
+        end
+        local pos = root.Position
+        local sites = fireworkSites()
+        local deck = deckSiteFor(uid)
+        if deck then
+            table.insert(sites, deck)
+        end
+        if not LaunchSites.isValid({ x = pos.X, y = pos.Y, z = pos.Z }, sites, uid) then
+            return -- not at a site; the client should not have offered the button
+        end
+        -- SPEND FIRST, BROADCAST SECOND. The reverse order would show a shell the player was not
+        -- charged for whenever the spend loses its race.
+        local res = net:postFireworkSpend(uid, shellId)
+        if not res.ok then
+            if pushFireworkState then
+                pushFireworkState(player) -- re-sync: their count was not what they thought
+            end
+            return
+        end
+        FireworkLaunched:FireAllClients({
+            shellId = shellId,
+            origin = root.Position + Vector3.new(0, 6, 0),
+            seed = math.random(1, 2 ^ 31 - 1),
+            by = uid,
+        })
+        if pushFireworkState then
+            pushFireworkState(player)
+        end
+    end)
+end)
+
 -- B3 gate fix: mid-session live rebuilds (buy-to-claim, upgrade, display change) destroy the
 -- old Structure (and its back-door prompts) and build a new one; re-fire BackDoorState so the
 -- client rebinds prompts to the NEW structure. No-op if playerHouse[uid] was just cleared (bare
@@ -1102,6 +1223,9 @@ Players.PlayerAdded:Connect(function(player)
             )
         end
         echoEconomy(player, uid)
+        if pushFireworkState then
+            pushFireworkState(player)
+        end
         pushAccessState(player, uid)
         recomputeAllAccess()
     end)
