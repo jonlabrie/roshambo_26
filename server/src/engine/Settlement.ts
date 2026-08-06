@@ -120,7 +120,13 @@ export async function settleRound(data: RoundToSettle): Promise<{ round: GlobalR
                         bestStreak,
                         ...counters.$set,
                     },
-                    $inc: counters.$inc,
+                    $inc: {
+                        ...counters.$inc,
+                        // THE GRANT PATHWAY'S FIRST SOURCE. A multi-day streak or a Robux pack is
+                        // the same operation with a different trigger — which is why acquisition is
+                        // one pathway and not a purchase feature with grants bolted on.
+                        ...(result === 'WIN' ? { 'fireworks.firecracker': 1 } : {}),
+                    },
                     $max: counters.$max,
                 }, { new: true })) || user;
 

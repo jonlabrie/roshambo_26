@@ -51,6 +51,53 @@ describe('settleRound', () => {
         expect(u).toMatchObject({ pointsAtStake: 1, currentStreak: 1, stakingStreak: 1, bestStreak: 1 });
     });
 
+    it('a WIN grants one firecracker', async () => {
+        // The grant pathway's first source. A new player should see their own firework within
+        // minutes of joining, without buying anything.
+        const user = await User.create({ deviceId: 'grantWin', pointsAtStake: 0 });
+        await settleRound({
+            roundId: 'rGrantWin',
+            worldThrow: 'S', // R beats S -> WIN
+            counts: { R: 1, P: 0, S: 0 },
+            throws: throwsMap([
+                ['pwa:grantWin', { throw: 'R', seq: 1, platform: 'pwa', deviceId: 'grantWin' }],
+            ]),
+            timestamp: new Date(),
+        });
+        const after = await User.findById(user._id);
+        expect(after!.fireworks.get('firecracker')).toBe(1);
+    });
+
+    it('a LOSS grants nothing', async () => {
+        const user = await User.create({ deviceId: 'grantLoss', pointsAtStake: 0 });
+        await settleRound({
+            roundId: 'rGrantLoss',
+            worldThrow: 'P', // P beats R -> LOSS
+            counts: { R: 1, P: 0, S: 0 },
+            throws: throwsMap([
+                ['pwa:grantLoss', { throw: 'R', seq: 1, platform: 'pwa', deviceId: 'grantLoss' }],
+            ]),
+            timestamp: new Date(),
+        });
+        const after = await User.findById(user._id);
+        expect(after!.fireworks.get('firecracker') ?? 0).toBe(0);
+    });
+
+    it('a SAFE grants nothing either — the grant rides WIN alone', async () => {
+        const user = await User.create({ deviceId: 'grantSafe', pointsAtStake: 0 });
+        await settleRound({
+            roundId: 'rGrantSafe',
+            worldThrow: 'R', // matching the world is SAFE
+            counts: { R: 1, P: 0, S: 0 },
+            throws: throwsMap([
+                ['pwa:grantSafe', { throw: 'R', seq: 1, platform: 'pwa', deviceId: 'grantSafe' }],
+            ]),
+            timestamp: new Date(),
+        });
+        const after = await User.findById(user._id);
+        expect(after!.fireworks.get('firecracker') ?? 0).toBe(0);
+    });
+
     it('uses 33/33/33 distribution when nobody played', async () => {
         const { round } = await settleRound({
             roundId: 'r3', worldThrow: 'R', counts: { R: 0, P: 0, S: 0 }, throws: new Map(), timestamp: new Date(),
