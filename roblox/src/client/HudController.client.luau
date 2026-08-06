@@ -1672,6 +1672,139 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- ============================== THE FIREWORK PICKER ==============================
+-- THE AFFORDANCE APPEARS WHERE IT WORKS. Stepping onto a site is what tells a player they can
+-- launch — no copy required, which matters more than usual with onboarding deferred.
+--
+-- The client's site check is an AFFORDANCE, NOT A GATE. The server re-validates every launch, and a
+-- player's own deck is a site only server-side, so this being generous or stale can never let an
+-- invalid launch through — only offer a button that gets refused.
+local CollectionService = game:GetService("CollectionService")
+local SITE_RADIUS = 24
+local atLaunchSite = false
+
+-- Polled rather than checked per frame: the answer changes at walking pace and this runs on phones.
+task.spawn(function()
+    while true do
+        local char = Players.LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+        local near = false
+        if root then
+            for _, part in CollectionService:GetTagged("FireworkLaunchSite") do
+                if part:IsA("BasePart") then
+                    local d = part.Position - root.Position
+                    -- Horizontal only, matching LaunchSites: a deck sits well above its marker.
+                    if d.X * d.X + d.Z * d.Z <= SITE_RADIUS * SITE_RADIUS then
+                        near = true
+                        break
+                    end
+                end
+            end
+        end
+        atLaunchSite = near
+        task.wait(0.5)
+    end
+end)
+
+-- Fixed order, built once, painted per render — the same shape the throw buttons and the tape tiles
+-- use. Four tiles is the whole catalogue: a player should be able to see what exists and why they
+-- cannot fire it yet, which is why a shell held at zero still gets a tile.
+local SHELL_ORDER = { "firecracker", "peony", "willow", "ishibana" }
+local SHELL_NAME: { [string]: string } = {
+    firecracker = "Firecracker",
+    peony = "Peony",
+    willow = "Willow",
+    ishibana = "Ishibana",
+}
+-- Reasons arrive as symbols from the server and are turned into copy HERE. An unmapped reason falls
+-- back to the symbol rather than to an empty label: a player seeing "NEEDS_MORTAR_XL" learns
+-- something; a player seeing a blank tile learns nothing and reports a bug that is really a typo.
+local REASON_COPY: { [string]: string } = {
+    NONE_HELD = "none left",
+    NEEDS_MORTAR_S = "needs a small mortar",
+    NEEDS_MORTAR_M = "needs a medium mortar",
+    NEEDS_MORTAR_L = "needs a large mortar",
+    WAITING_FOR_R = "waiting for Rock",
+    BAD_SHELL = "unavailable",
+}
+
+local fireworkPanel = Instance.new("Frame")
+fireworkPanel.Name = "FireworkPicker"
+fireworkPanel.AnchorPoint = Vector2.new(0.5, 1)
+fireworkPanel.Position = UDim2.new(0.5, 0, 1, -CLUSTER_TOP_FROM_BOTTOM - BANK_GAP)
+fireworkPanel.Size = UDim2.fromOffset(BTN_W * 4 + 8 * 3, BTN_H)
+fireworkPanel.BackgroundTransparency = 1
+fireworkPanel.Visible = false
+fireworkPanel.ZIndex = 6
+fireworkPanel.Parent = gui
+
+local shellTiles: { [string]: { button: TextButton, count: TextLabel, sub: TextLabel } } = {}
+-- Declared BEFORE the loop so the click handlers close over it. `paintFireworkTiles` is the only
+-- writer, so a tap always tests exactly the state the tile was painted from.
+local shellStates: any = nil
+
+for i, id in SHELL_ORDER do
+    local b = Instance.new("TextButton")
+    b.Name = id
+    b.Size = UDim2.fromOffset(BTN_W, BTN_H)
+    b.Position = UDim2.fromOffset((i - 1) * (BTN_W + 8), 0)
+    b.BackgroundColor3 = IVORY
+    b.BorderSizePixel = 0
+    b.AutoButtonColor = false
+    b.Text = SHELL_NAME[id]
+    b.TextColor3 = INK
+    b.TextSize = 15
+    b.ZIndex = 6
+    corner(b, 8)
+    b.Parent = fireworkPanel
+
+    local count = Instance.new("TextLabel")
+    count.Size = UDim2.new(1, 0, 0, 16)
+    count.Position = UDim2.fromOffset(0, 4)
+    count.BackgroundTransparency = 1
+    count.TextColor3 = INK
+    count.TextSize = 14
+    count.ZIndex = 6
+    count.Parent = b
+
+    local sub = Instance.new("TextLabel")
+    sub.Size = UDim2.new(1, -6, 0, 26)
+    sub.Position = UDim2.new(0, 3, 1, -28)
+    sub.BackgroundTransparency = 1
+    sub.TextColor3 = INK
+    sub.TextSize = 11
+    sub.TextWrapped = true
+    sub.ZIndex = 6
+    sub.Parent = b
+
+    -- Only a launchable shell fires. The check is repeated on the server, so this is an affordance
+    -- rather than a gate — but a tile that does nothing when tapped reads as broken, so the greyed
+    -- state has to be visibly un-tappable, not silently inert.
+    b.MouseButton1Click:Connect(function()
+        local st = shellStates and shellStates[id]
+        if st and st.launchable then
+            EventBus.HudFireworkLaunch:Fire(id)
+        end
+    end)
+
+    shellTiles[id] = { button = b, count = count, sub = sub }
+end
+
+local function paintFireworkTiles(states: any)
+    shellStates = states
+    for _, id in SHELL_ORDER do
+        local st = states[id]
+        local tile = shellTiles[id]
+        local live = st ~= nil and st.launchable == true
+        tile.count.Text = if st then `×{st.count}` else ""
+        tile.sub.Text = if live then "" else REASON_COPY[st and st.reason or ""] or (st and st.reason or "")
+        -- Dim rather than hide: the catalogue stays visible so a player can see what a mortar buys.
+        tile.button.BackgroundTransparency = if live then 0 else 0.55
+        tile.button.TextTransparency = if live then 0 else 0.35
+        tile.count.TextTransparency = tile.button.TextTransparency
+    end
+end
+
 local function render(inputs: any, aux: any)
     local view = HudModel.view(inputs, aux.session)
     canThrow = view.throwsEnabled
@@ -1828,6 +1961,13 @@ local function render(inputs: any, aux: any)
     escalation.Visible = view.escalate
     if view.escalate then
         escalationCount.Text = tostring(math.ceil(view.secondsLeft))
+    end
+
+    -- The picker is the only HUD element gated on WHERE the player is standing. Everything else in
+    -- this cluster is about the round; this is about the ground under their feet.
+    fireworkPanel.Visible = atLaunchSite and aux.fireworkShells ~= nil
+    if fireworkPanel.Visible then
+        paintFireworkTiles(aux.fireworkShells)
     end
 end
 

@@ -10,6 +10,9 @@ local NAMES = {
     "HudState",
     "HudPick",
     "HudBank",
+    -- The picker asking the SERVER to launch. It carries a shellId and nothing else: whether that
+    -- shell may fly is the server's answer, never this client's.
+    "HudFireworkLaunch",
     "Toast",
     "OpenLedger",
     -- The ledger is the door to the teahouse panel. It had a persistent bottom-right toggle of its

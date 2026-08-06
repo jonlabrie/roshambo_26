@@ -22,7 +22,7 @@
 --   inputs : a HudModel.Inputs — the controller calls HudModel.view(inputs, aux.session)
 --   aux    : { session = HudModel.Session, tape = { { worldThrow, result? } }, timerKnown = boolean,
 --              openSeconds = number?, worldThrow = string?, worldThrowFading = boolean?,
---              profileSeen = boolean }
+--              profileSeen = boolean, fireworkShells = { [string]: { count, launchable, reason } }? }
 --            `tape` is spoiler-gated here, so the controller paints it as given. `worldThrow` is
 --            the world's throw for the round the drum has FINISHED revealing, or nil.
 --            `worldThrowFading` is this file saying the beat's hold is over and the glyph should
@@ -60,6 +60,8 @@ local RevealResult = remotes:WaitForChild("RevealResult") :: RemoteEvent
 local ProfileUpdate = remotes:WaitForChild("ProfileUpdate") :: RemoteEvent
 local RevealTheater = remotes:WaitForChild("RevealTheater") :: RemoteEvent
 local BoardData = remotes:WaitForChild("BoardData") :: RemoteEvent
+local FireworkState = remotes:WaitForChild("FireworkState") :: RemoteEvent
+local RequestFireworkLaunch = remotes:WaitForChild("RequestFireworkLaunch") :: RemoteEvent
 
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
@@ -508,6 +510,12 @@ local function buildInputs(): any
     }
 end
 
+-- The server's answer about every shell: how many you hold, whether it can fly, and if not, why.
+-- THE CLIENT NEVER EVALUATES A REQUIREMENT. It does not know what a mortar is and does not read the
+-- tape; it renders `reason`. A requirement that depends on round history is exactly the kind of
+-- fact this codebase has repeatedly re-derived client-side and got wrong.
+local fireworkShells: any = nil
+
 local function publish()
     local inputs = buildInputs()
     -- Onboarding beat 2: the RISING EDGE of throws becoming enabled — once per round, not once
@@ -531,6 +539,9 @@ local function publish()
         -- OPEN's full length, straight off the published schedule — the ring's denominator. nil
         -- until the schedule replicates. See the declaration above for what measuring it cost.
         openSeconds = openSeconds,
+        -- Render-only, and deliberately opaque: a table of { count, launchable, reason } straight
+        -- off the wire. Not a HudModel input — nothing about the round derives from it.
+        fireworkShells = fireworkShells,
         -- The world's throw for the round the drum has FINISHED revealing, or nil. Set at drum rest
         -- and cleared once the beat's fade has run, so the ring can never spoil the wheel mid-spin
         -- and never carries a glyph into the next round either.
@@ -781,6 +792,20 @@ end)
 -- wallet, and guessing here would flash the pot to 0 and back if the request failed.
 EventBus.HudBank.Event:Connect(function()
     BankRequest:FireServer()
+end)
+
+-- The picker's tap. It carries only a shellId: the server owns whether that shell may fly, where
+-- from, and whether the player still holds one. A refused launch comes back as a fresh FireworkState
+-- rather than silence, so the tile repaints instead of leaving the player tapping a stale count.
+EventBus.HudFireworkLaunch.Event:Connect(function(shellId: string)
+    RequestFireworkLaunch:FireServer(shellId)
+end)
+
+FireworkState.OnClientEvent:Connect(function(state)
+    if typeof(state) == "table" then
+        fireworkShells = state.shells
+        publish()
+    end
 end)
 
 -- The ledger's preferences footer. One remote carries every HUD preference (and, from Task 13, the
