@@ -6,6 +6,7 @@ import { resolveUser } from '../identity';
 import { bankPot } from '../wallet';
 import User, { IUser } from '../models/User';
 import { Throw } from '../engine/GameRules';
+import { shellStates, SHELL_IDS, LaunchContext } from '../fireworks';
 import { validateLoadout, validateSizeClass, validatePadPreferences, validateDecorations, validateAccess } from '../loadout';
 import {
     validatePurchase, applyPurchase, validateDisplay, PRICES, DEFAULT_TEAHOUSE_LOADOUT,
@@ -198,12 +199,13 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
         }
     });
 
-    const readEconomy = (user: { totalPoints: number; maxDeckSize: Size | null; teahouses?: Map<string, unknown>; portalOwned?: boolean; deckDecorations?: unknown[] }): EconomyState => ({
+    const readEconomy = (user: { totalPoints: number; maxDeckSize: Size | null; teahouses?: Map<string, unknown>; portalOwned?: boolean; deckDecorations?: unknown[]; mortars?: string[] }): EconomyState => ({
         totalPoints: user.totalPoints,
         maxDeckSize: user.maxDeckSize,
         teahouseSizes: (user.teahouses ? Array.from(user.teahouses.keys()) : []) as Size[],
         portalOwned: user.portalOwned ?? false,
         deckDecorationCount: user.deckDecorations?.length ?? 0,
+        mortars: user.mortars ?? [],
     });
 
     router.get('/players/:robloxUserId/economy', async (req, res) => {
@@ -233,6 +235,51 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
         }
     });
 
+    router.get('/players/:robloxUserId/fireworks', async (req, res) => {
+        try {
+            const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
+            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            const raw = String(req.query.lastWorldThrow ?? '');
+            // The CLIENT is never told a requirement — it is told the ANSWER. The Roblox server
+            // passes the round it already has; anything else reads as "not Rock", which fails shut.
+            const ctx: LaunchContext = {
+                mortars: user.mortars ?? [],
+                lastWorldThrow: (['R', 'P', 'S'].includes(raw) ? raw : null) as Throw | null,
+            };
+            const held: Record<string, number> = {};
+            for (const id of SHELL_IDS) held[id] = user.fireworks?.get(id) ?? 0;
+            res.set('Cache-Control', 'no-store');
+            res.json({ shells: shellStates(held, ctx), mortars: ctx.mortars });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
+    router.post('/players/:robloxUserId/fireworks/spend', async (req, res) => {
+        try {
+            const shellId = req.body?.shellId;
+            if (typeof shellId !== 'string' || !SHELL_IDS.includes(shellId as never)) {
+                res.status(400).json({ error: 'BAD_SHELL' });
+                return;
+            }
+            const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
+            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            // CONDITIONAL $inc, NOT read-modify-write. Two launches racing on one held shell must
+            // resolve to exactly one firing: the filter and the decrement are a single atomic
+            // operation, so the loser matches no document and gets 409. The existing /purchase
+            // route's read-then-save pattern would let both read 1 and both write 0.
+            const updated = await User.findOneAndUpdate(
+                { _id: user._id, [`fireworks.${shellId}`]: { $gte: 1 } },
+                { $inc: { [`fireworks.${shellId}`]: -1 } },
+                { new: true }
+            );
+            if (!updated) { res.status(409).json({ error: 'NONE_HELD' }); return; }
+            res.json({ shellId, count: updated.fireworks.get(shellId) ?? 0 });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
     router.post('/players/:robloxUserId/purchase', async (req, res) => {
         try {
             const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
@@ -246,6 +293,14 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             user.totalPoints = after.totalPoints;
             user.maxDeckSize = after.maxDeckSize;
             user.portalOwned = after.portalOwned ?? false;
+            user.mortars = after.mortars ?? [];
+            if (item.startsWith('firework:')) {
+                const shellId = item.slice('firework:'.length);
+                user.fireworks.set(shellId, (user.fireworks.get(shellId) ?? 0) + 1);
+                await user.save();
+                res.json({ item, totalPoints: after.totalPoints, shellId, count: user.fireworks.get(shellId) });
+                return;
+            }
             if (item.startsWith('decoration:')) {
                 const propId = item.slice('decoration:'.length);
                 const { list, instance } = appendDecoration(user.deckDecorations ?? [], propId);

@@ -1,3 +1,5 @@
+import { SHELL_PRICES, MORTAR_PRICES, MORTAR_IDS, MortarId } from './fireworks';
+
 export type Size = 'S' | 'M' | 'L';
 export const SIZE_RANK: Record<Size, number> = { S: 1, M: 2, L: 3 };
 export const PRICES = {
@@ -31,7 +33,7 @@ export function appendDecoration(
     return { list: [...decorations, instance], instance };
 }
 
-export type EconomyState = { totalPoints: number; maxDeckSize: Size | null; teahouseSizes: Size[]; portalOwned?: boolean; deckDecorationCount?: number };
+export type EconomyState = { totalPoints: number; maxDeckSize: Size | null; teahouseSizes: Size[]; portalOwned?: boolean; deckDecorationCount?: number; mortars?: string[] };
 type Check = { ok: true; cost: number } | { ok: false; error: string };
 
 // the tier that must be owned before buying `size` (null = nothing below S)
@@ -50,6 +52,27 @@ export function validatePurchase(state: EconomyState, item: string): Check {
         if (!DECORATION_PROPS.has(propId)) return { ok: false, error: 'BAD_ITEM' };
         if ((state.deckDecorationCount ?? 0) >= MAX_DECORATIONS) return { ok: false, error: 'DECOR_CAP' };
         const cost = (PRICES.decoration as Record<string, number>)[propId];
+        if (state.totalPoints < cost) return { ok: false, error: 'INSUFFICIENT_POINTS' };
+        return { ok: true, cost };
+    }
+    // These two MUST precede the `item.split(':')` below: `mortar:S` would otherwise be parsed as
+    // a deck/teahouse tier and rejected as BAD_ITEM.
+    if (item.startsWith('firework:')) {
+        // No deck required and no tier order: a shell is the everyday purchase, and gating it on
+        // property would put the whole feature behind hours of play.
+        const cost = SHELL_PRICES[item.slice('firework:'.length)];
+        if (cost === undefined) return { ok: false, error: 'BAD_ITEM' };
+        if (state.totalPoints < cost) return { ok: false, error: 'INSUFFICIENT_POINTS' };
+        return { ok: true, cost };
+    }
+    if (item.startsWith('mortar:')) {
+        const cost = (MORTAR_PRICES as Record<string, number>)[item];
+        if (cost === undefined) return { ok: false, error: 'BAD_ITEM' };
+        const owned = state.mortars ?? [];
+        if (owned.includes(item)) return { ok: false, error: 'ALREADY_OWNED' };
+        // Linear, like decks: the tier below must already be owned.
+        const idx = MORTAR_IDS.indexOf(item as MortarId);
+        if (idx > 0 && !owned.includes(MORTAR_IDS[idx - 1])) return { ok: false, error: 'BAD_TIER_ORDER' };
         if (state.totalPoints < cost) return { ok: false, error: 'INSUFFICIENT_POINTS' };
         return { ok: true, cost };
     }
@@ -83,6 +106,7 @@ export function applyPurchase(state: EconomyState, item: string): EconomyState {
         maxDeckSize: state.maxDeckSize,
         teahouseSizes: [...state.teahouseSizes],
         portalOwned: state.portalOwned ?? false,
+        mortars: [...(state.mortars ?? [])],
     };
     if (item === 'portal') {
         next.portalOwned = true;
@@ -90,6 +114,13 @@ export function applyPurchase(state: EconomyState, item: string): EconomyState {
     }
     if (item.startsWith('decoration:')) {
         return next; // cost already deducted above; decoration list is tracked outside EconomyState
+    }
+    if (item.startsWith('firework:')) {
+        return next; // cost deducted above; the shell count is incremented by the route
+    }
+    if (item.startsWith('mortar:')) {
+        next.mortars = [...(next.mortars ?? []), item];
+        return next;
     }
     const [kind, size] = item.split(':') as [string, Size];
     if (kind === 'deck') next.maxDeckSize = size;

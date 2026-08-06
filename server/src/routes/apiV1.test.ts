@@ -543,4 +543,117 @@ describe('/api/v1', () => {
             expect(u?.portalOwned).toBe(true);
         });
     });
+
+    describe('fireworks', () => {
+        // NB: the identity field is `robloxId`; `resolveUser({ robloxUserId })` looks it up and
+        // UPSERTS. Seeding with `robloxUserId` would leave an orphan and let the route mint a
+        // second, empty user — the counts would silently read zero.
+        it('reports every shell with counts and reasons', async () => {
+            const u = await User.create({ robloxId: '900', fireworks: { firecracker: 2 } });
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .get('/api/v1/players/900/fireworks')
+                .set('X-API-Key', API_KEY)
+                .expect(200);
+            expect(res.body.shells.firecracker).toEqual({
+                count: 2,
+                launchable: true,
+                reason: null,
+            });
+            expect(res.body.shells.peony).toEqual({
+                count: 0,
+                launchable: false,
+                reason: 'NONE_HELD',
+            });
+            expect(res.body.mortars).toEqual([]);
+            await User.deleteOne({ _id: u._id });
+        });
+
+        it('honours lastWorldThrow for the condition shell', async () => {
+            await User.create({ robloxId: '901', fireworks: { ishibana: 1 } });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const waiting = await request(app)
+                .get('/api/v1/players/901/fireworks?lastWorldThrow=P')
+                .set('X-API-Key', API_KEY)
+                .expect(200);
+            expect(waiting.body.shells.ishibana.reason).toBe('WAITING_FOR_R');
+            const open = await request(app)
+                .get('/api/v1/players/901/fireworks?lastWorldThrow=R')
+                .set('X-API-Key', API_KEY)
+                .expect(200);
+            expect(open.body.shells.ishibana.launchable).toBe(true);
+        });
+
+        it('spend decrements and returns the new count', async () => {
+            await User.create({ robloxId: '902', fireworks: { firecracker: 2 } });
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .post('/api/v1/players/902/fireworks/spend')
+                .set('X-API-Key', API_KEY)
+                .send({ shellId: 'firecracker' })
+                .expect(200);
+            expect(res.body).toEqual({ shellId: 'firecracker', count: 1 });
+        });
+
+        it('spend refuses when none are held, and does not go negative', async () => {
+            await User.create({ robloxId: '903', fireworks: { firecracker: 0 } });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            await request(app)
+                .post('/api/v1/players/903/fireworks/spend')
+                .set('X-API-Key', API_KEY)
+                .send({ shellId: 'firecracker' })
+                .expect(409);
+            const after = await User.findOne({ robloxId: '903' });
+            expect(after!.fireworks.get('firecracker') ?? 0).toBe(0);
+        });
+
+        it('CONCURRENT SPENDS CANNOT OVERSPEND — the conditional $inc is the whole point', async () => {
+            // Two launches racing on a single held shell. A read-modify-write would let both read
+            // count=1 and both write count=0, firing two shells for one. Exactly one must win.
+            await User.create({ robloxId: '904', fireworks: { firecracker: 1 } });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const fire = () =>
+                request(app)
+                    .post('/api/v1/players/904/fireworks/spend')
+                    .set('X-API-Key', API_KEY)
+                    .send({ shellId: 'firecracker' });
+            const [a, b] = await Promise.all([fire(), fire()]);
+            const codes = [a.status, b.status].sort();
+            expect(codes).toEqual([200, 409]);
+            const after = await User.findOne({ robloxId: '904' });
+            expect(after!.fireworks.get('firecracker')).toBe(0);
+        });
+
+        it('buys a shell through the existing purchase route', async () => {
+            await User.create({ robloxId: '905', totalPoints: 10 });
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .post('/api/v1/players/905/purchase')
+                .set('X-API-Key', API_KEY)
+                .send({ item: 'firework:peony' })
+                .expect(200);
+            expect(res.body.totalPoints).toBe(7);
+            const after = await User.findOne({ robloxId: '905' });
+            expect(after!.fireworks.get('peony')).toBe(1);
+        });
+
+        it('buys a mortar tube, and tubes are linear', async () => {
+            await User.create({ robloxId: '906', totalPoints: 5000 });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            await request(app)
+                .post('/api/v1/players/906/purchase')
+                .set('X-API-Key', API_KEY)
+                .send({ item: 'mortar:M' })
+                .expect(400); // no S yet
+            await request(app)
+                .post('/api/v1/players/906/purchase')
+                .set('X-API-Key', API_KEY)
+                .send({ item: 'mortar:S' })
+                .expect(200);
+            await request(app)
+                .post('/api/v1/players/906/purchase')
+                .set('X-API-Key', API_KEY)
+                .send({ item: 'mortar:M' })
+                .expect(200);
+            const after = await User.findOne({ robloxId: '906' });
+            expect(after!.mortars.sort()).toEqual(['mortar:M', 'mortar:S']);
+        });
+    });
 });
