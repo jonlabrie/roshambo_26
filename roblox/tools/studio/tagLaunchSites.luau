@@ -28,11 +28,14 @@ local CollectionService = game:GetService("CollectionService")
 local TAG = "FireworkLaunchSite"
 local SITE_RADIUS = 24 -- documentation only; the authority is SITE_RADIUS in main.server.luau
 
--- The three viewing perches the canyon was designed around, plus the clearing itself. The clearing
--- is the load-bearing one: it is where a new player lands, so it is the only site most players
--- will ever find without being told.
+-- The three viewing perches the canyon was designed around. Launching is somewhere you WALK TO.
+--
+-- A fourth marker at the arena spawn was added and then removed on the owner's gate (2026-08-05):
+-- it put a player inside a launch site the instant they loaded in, which made the HUD's firework
+-- button near-permanent rather than a reward for reaching a perch. Do not re-add it without
+-- deciding that question again — it is a design call about where fireworks belong, not an
+-- oversight.
 local SITES = {
-    { name = "Site_Arena", pos = Vector3.new(40, 113, 8), note = "the clearing, by ArenaSpawn" },
     { name = "Site_FallsDock", pos = Vector3.new(-345, 188, -15), note = "the falls dock" },
     { name = "Site_SuspensionBridge", pos = Vector3.new(-246, 222, 0), note = "the high mid-canyon bridge" },
     { name = "Site_Overlook", pos = Vector3.new(73, 110, 19), note = "the downcanyon viewing platform" },

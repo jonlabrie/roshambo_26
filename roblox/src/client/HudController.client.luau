@@ -1676,6 +1676,13 @@ end)
 -- THE AFFORDANCE APPEARS WHERE IT WORKS. Stepping onto a site is what tells a player they can
 -- launch — no copy required, which matters more than usual with onboarding deferred.
 --
+-- SHAPE (owner's gate 2026-08-05): ONE button in the right-hand column, above BANK, which expands
+-- a VERTICAL list. The first pass put four BTN_W tiles in a centred row, which was wrong twice
+-- over: it anchored to the screen centre while every other element in this cluster registers to
+-- `1 - JUMP_CLEARANCE`, and four tiles at BTN_W is 328px against a 248px cluster — a row that
+-- cannot fit the layout at ANY anchor. A column at BANK_W is also the only shape where a reason
+-- like "needs a small mortar" is legible instead of wrapped to three lines.
+--
 -- The client's site check is an AFFORDANCE, NOT A GATE. The server re-validates every launch, and a
 -- player's own deck is a site only server-side, so this being generous or stale can never let an
 -- invalid launch through — only offer a button that gets refused.
@@ -1706,9 +1713,6 @@ task.spawn(function()
     end
 end)
 
--- Fixed order, built once, painted per render — the same shape the throw buttons and the tape tiles
--- use. Four tiles is the whole catalogue: a player should be able to see what exists and why they
--- cannot fire it yet, which is why a shell held at zero still gets a tile.
 local SHELL_ORDER = { "firecracker", "peony", "willow", "ishibana" }
 local SHELL_NAME: { [string]: string } = {
     firecracker = "Firecracker",
@@ -1718,7 +1722,7 @@ local SHELL_NAME: { [string]: string } = {
 }
 -- Reasons arrive as symbols from the server and are turned into copy HERE. An unmapped reason falls
 -- back to the symbol rather than to an empty label: a player seeing "NEEDS_MORTAR_XL" learns
--- something; a player seeing a blank tile learns nothing and reports a bug that is really a typo.
+-- something; a player seeing a blank row learns nothing and reports a bug that is really a typo.
 local REASON_COPY: { [string]: string } = {
     NONE_HELD = "none left",
     NEEDS_MORTAR_S = "needs a small mortar",
@@ -1728,57 +1732,95 @@ local REASON_COPY: { [string]: string } = {
     BAD_SHELL = "unavailable",
 }
 
-local fireworkPanel = Instance.new("Frame")
-fireworkPanel.Name = "FireworkPicker"
-fireworkPanel.AnchorPoint = Vector2.new(0.5, 1)
-fireworkPanel.Position = UDim2.new(0.5, 0, 1, -CLUSTER_TOP_FROM_BOTTOM - BANK_GAP)
-fireworkPanel.Size = UDim2.fromOffset(BTN_W * 4 + 8 * 3, BTN_H)
-fireworkPanel.BackgroundTransparency = 1
-fireworkPanel.Visible = false
-fireworkPanel.ZIndex = 6
-fireworkPanel.Parent = gui
+local SHELL_ROW_H = 40
+local SHELL_ROW_GAP = 4
 
-local shellTiles: { [string]: { button: TextButton, count: TextLabel, sub: TextLabel } } = {}
+-- The collapsed button: the bank row's twin, one BANK_GAP above it, off the SAME right reference
+-- the whole cluster registers to. NOT red — POT_RED is reserved for the one irreversible action on
+-- this surface, and launching a firework is not that.
+local fireworkButton = Instance.new("TextButton")
+fireworkButton.Name = "FireworkToggle"
+fireworkButton.AnchorPoint = Vector2.new(1, 1)
+fireworkButton.Position =
+    UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE_BOTTOM + AREA_H + BANK_GAP + HudLayout.BANK_H + BANK_GAP))
+fireworkButton.Size = UDim2.fromOffset(BANK_W, HudLayout.BANK_H)
+fireworkButton.BackgroundColor3 = WASHI
+fireworkButton.BackgroundTransparency = 0.3
+fireworkButton.BorderSizePixel = 0
+fireworkButton.AutoButtonColor = false
+fireworkButton.TextColor3 = INK_CREAM
+fireworkButton.TextSize = 15
+fireworkButton.Font = Enum.Font.GothamBold
+fireworkButton.Text = "FIREWORKS"
+fireworkButton.Visible = false
+fireworkButton.ZIndex = 6
+fireworkButton.Parent = gui
+corner(fireworkButton, 8)
+stroke(fireworkButton, GOLD, 1, 0.3)
+
+-- The expanded list, growing UPWARD from the button's top edge. Anchored (1,1) at the button's own
+-- right reference so the column and the button share an edge however wide the screen is.
+local fireworkList = Instance.new("Frame")
+fireworkList.Name = "FireworkList"
+fireworkList.AnchorPoint = Vector2.new(1, 1)
+fireworkList.Position = UDim2.new(
+    1 - JUMP_CLEARANCE,
+    0,
+    1,
+    -(EDGE_BOTTOM + AREA_H + BANK_GAP + HudLayout.BANK_H + BANK_GAP + HudLayout.BANK_H + BANK_GAP)
+)
+fireworkList.Size = UDim2.fromOffset(BANK_W, #SHELL_ORDER * SHELL_ROW_H + (#SHELL_ORDER - 1) * SHELL_ROW_GAP)
+fireworkList.BackgroundTransparency = 1
+fireworkList.Visible = false
+fireworkList.ZIndex = 6
+fireworkList.Parent = gui
+
+local expanded = false
+local shellTiles: { [string]: { button: TextButton, title: TextLabel, sub: TextLabel } } = {}
 -- Declared BEFORE the loop so the click handlers close over it. `paintFireworkTiles` is the only
--- writer, so a tap always tests exactly the state the tile was painted from.
+-- writer, so a tap always tests exactly the state the row was painted from.
 local shellStates: any = nil
 
 for i, id in SHELL_ORDER do
     local b = Instance.new("TextButton")
     b.Name = id
-    b.Size = UDim2.fromOffset(BTN_W, BTN_H)
-    b.Position = UDim2.fromOffset((i - 1) * (BTN_W + 8), 0)
-    b.BackgroundColor3 = IVORY
+    b.Size = UDim2.fromOffset(BANK_W, SHELL_ROW_H)
+    -- Newest at the BOTTOM of the column, nearest the button that opened it: the list grows up,
+    -- so the first row should be the one closest to the thumb.
+    b.Position = UDim2.fromOffset(0, (#SHELL_ORDER - i) * (SHELL_ROW_H + SHELL_ROW_GAP))
+    b.BackgroundColor3 = WASHI
+    b.BackgroundTransparency = 0.3
     b.BorderSizePixel = 0
     b.AutoButtonColor = false
-    b.Text = SHELL_NAME[id]
-    b.TextColor3 = INK
-    b.TextSize = 15
+    b.Text = ""
     b.ZIndex = 6
     corner(b, 8)
-    b.Parent = fireworkPanel
+    stroke(b, GOLD, 1, 0.5)
+    b.Parent = fireworkList
 
-    local count = Instance.new("TextLabel")
-    count.Size = UDim2.new(1, 0, 0, 16)
-    count.Position = UDim2.fromOffset(0, 4)
-    count.BackgroundTransparency = 1
-    count.TextColor3 = INK
-    count.TextSize = 14
-    count.ZIndex = 6
-    count.Parent = b
+    local title = Instance.new("TextLabel")
+    title.Size = UDim2.new(1, -16, 0, 18)
+    title.Position = UDim2.fromOffset(8, 3)
+    title.BackgroundTransparency = 1
+    title.TextColor3 = INK_CREAM
+    title.TextSize = 14
+    title.Font = Enum.Font.GothamBold
+    title.TextXAlignment = Enum.TextXAlignment.Left
+    title.ZIndex = 6
+    title.Parent = b
 
     local sub = Instance.new("TextLabel")
-    sub.Size = UDim2.new(1, -6, 0, 26)
-    sub.Position = UDim2.new(0, 3, 1, -28)
+    sub.Size = UDim2.new(1, -16, 0, 14)
+    sub.Position = UDim2.fromOffset(8, 21)
     sub.BackgroundTransparency = 1
-    sub.TextColor3 = INK
+    sub.TextColor3 = IVORY_DIM
     sub.TextSize = 11
-    sub.TextWrapped = true
+    sub.TextXAlignment = Enum.TextXAlignment.Left
     sub.ZIndex = 6
     sub.Parent = b
 
     -- Only a launchable shell fires. The check is repeated on the server, so this is an affordance
-    -- rather than a gate — but a tile that does nothing when tapped reads as broken, so the greyed
+    -- rather than a gate — but a row that does nothing when tapped reads as broken, so the dimmed
     -- state has to be visibly un-tappable, not silently inert.
     b.MouseButton1Click:Connect(function()
         local st = shellStates and shellStates[id]
@@ -1787,8 +1829,13 @@ for i, id in SHELL_ORDER do
         end
     end)
 
-    shellTiles[id] = { button = b, count = count, sub = sub }
+    shellTiles[id] = { button = b, title = title, sub = sub }
 end
+
+fireworkButton.MouseButton1Click:Connect(function()
+    expanded = not expanded
+    fireworkList.Visible = expanded
+end)
 
 local function paintFireworkTiles(states: any)
     shellStates = states
@@ -1796,12 +1843,14 @@ local function paintFireworkTiles(states: any)
         local st = states[id]
         local tile = shellTiles[id]
         local live = st ~= nil and st.launchable == true
-        tile.count.Text = if st then `×{st.count}` else ""
-        tile.sub.Text = if live then "" else REASON_COPY[st and st.reason or ""] or (st and st.reason or "")
+        tile.title.Text = if st then `{SHELL_NAME[id]}  ×{st.count}` else SHELL_NAME[id]
+        tile.sub.Text = if live
+            then "ready"
+            else REASON_COPY[st and st.reason or ""] or (st and st.reason or "")
         -- Dim rather than hide: the catalogue stays visible so a player can see what a mortar buys.
-        tile.button.BackgroundTransparency = if live then 0 else 0.55
-        tile.button.TextTransparency = if live then 0 else 0.35
-        tile.count.TextTransparency = tile.button.TextTransparency
+        tile.button.BackgroundTransparency = if live then 0.3 else 0.65
+        tile.title.TextTransparency = if live then 0 else 0.4
+        tile.sub.TextTransparency = if live then 0.15 else 0.5
     end
 end
 
@@ -1965,8 +2014,15 @@ local function render(inputs: any, aux: any)
 
     -- The picker is the only HUD element gated on WHERE the player is standing. Everything else in
     -- this cluster is about the round; this is about the ground under their feet.
-    fireworkPanel.Visible = atLaunchSite and aux.fireworkShells ~= nil
-    if fireworkPanel.Visible then
+    local canLaunch = atLaunchSite and aux.fireworkShells ~= nil
+    fireworkButton.Visible = canLaunch
+    if not canLaunch then
+        -- Walking away collapses it. Leaving the list open would put four rows over the canyon at
+        -- a spot where nothing can be launched from.
+        expanded = false
+    end
+    fireworkList.Visible = canLaunch and expanded
+    if canLaunch then
         paintFireworkTiles(aux.fireworkShells)
     end
 end
