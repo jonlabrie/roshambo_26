@@ -39,7 +39,10 @@ local EAVE_OVERHANG = 2.5
 local EAVE_T = 0.5
 local ROOF_RIDGE_Z = (Z0 - EAVE_OVERHANG + Z1) / 2 -- ridge centred on the ROOF span, not the walls
 
-local POST_W = 1.125 -- recipe §2: 25% lighter than the Overlook's 1.5
+-- 0.7, not the recipe's 1.125. Deck posts carry a platform over a drop and are sized for it;
+-- a shopfront post is a slender column standing on its own floor, and at 1.125 across a 19-stud
+-- frontage the bays read as a fence rather than an opening. (Owner's gate: "too thick".)
+local POST_W = 0.7
 local GIRDER_H, GIRDER_W = 1.2, 0.825
 local WALL_T = 0.5
 local KOSHI_T = 0.18
@@ -57,6 +60,11 @@ local function flushX(x: number): number
 end
 
 -- row-major rotation about X, for the roof slopes
+-- Row-major rotation about X. SIGN CONVENTION, because getting it backwards builds a TROUGH
+-- instead of a ridge and the tests cannot see it: row 1 is (0, c, -s), so a point at the slab's
+-- +Z end maps to y' = -sin(deg) * L/2. POSITIVE deg therefore LOWERS the +Z end.
+-- So: the slope whose +Z end is the RIDGE takes a NEGATIVE angle; the slope whose +Z end is the
+-- EAVE takes a positive one. (Shipped inverted once, 2026-08-05 — caught by eye, not by test.)
 local function rotX(deg: number): { number }
     local r = math.rad(deg)
     local c, s = math.cos(r), math.sin(r)
@@ -210,7 +218,7 @@ function Machiya.build(palette: any, _layout: any): any
         { CX, EAVE_Y + ROOF_RISE / 2, (Z0 - EAVE_OVERHANG + ROOF_RIDGE_Z) / 2 },
         tile,
         "Slate",
-        rotX(frontDeg)
+        rotX(-frontDeg) -- +Z end is the RIDGE: negative angle raises it
     )
     add(
         "RoofSouth",
@@ -218,7 +226,7 @@ function Machiya.build(palette: any, _layout: any): any
         { CX, EAVE_Y + ROOF_RISE / 2, (ROOF_RIDGE_Z + Z1) / 2 },
         tile,
         "Slate",
-        rotX(-backDeg)
+        rotX(backDeg) -- +Z end is the back EAVE: positive angle drops it
     )
     add("Ridge", { W + 1.2, 0.4, 0.6 }, { CX, TOP - 0.2, ROOF_RIDGE_Z }, ink, "Slate")
 
