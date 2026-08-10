@@ -6,7 +6,7 @@ import { resolveUser } from '../identity';
 import { bankPot } from '../wallet';
 import User, { IUser } from '../models/User';
 import { Throw } from '../engine/GameRules';
-import { shellStates, SHELL_IDS, LaunchContext } from '../fireworks';
+import { shellStates, SHELL_IDS, LaunchContext, SHELL_PRICES, MORTAR_PRICES } from '../fireworks';
 import { validateLoadout, validateSizeClass, validatePadPreferences, validateDecorations, validateAccess } from '../loadout';
 import {
     validatePurchase, applyPurchase, validateDisplay, PRICES, DEFAULT_TEAHOUSE_LOADOUT,
@@ -223,7 +223,10 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
                 teahouses,
                 teahouseSizes: st.teahouseSizes,
                 padPreferences: user.padPreferences ?? [],
-                catalog: PRICES,
+                // The client is told PRICES, never requirements. Shells and mortars live in
+                // fireworks.ts rather than economy.ts, so they have to be spliced in here — the
+                // alternative is a second copy of every price in the Roblox client.
+                catalog: { ...PRICES, fireworks: SHELL_PRICES, mortars: MORTAR_PRICES },
                 deckDisplay: user.deckDisplay ?? null,
                 teahouseDisplay: user.teahouseDisplay ?? null,
                 portalOwned: st.portalOwned ?? false,

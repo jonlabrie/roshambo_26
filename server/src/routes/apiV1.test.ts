@@ -7,6 +7,7 @@ import { RoundEngine } from '../engine/RoundEngine';
 import { ResultsStore } from '../engine/ResultsStore';
 import { settleRound } from '../engine/Settlement';
 import { createApiV1, buildProfilePayload } from './apiV1';
+import { SHELL_IDS } from '../fireworks';
 
 const API_KEY = 'test-key';
 
@@ -654,6 +655,41 @@ describe('/api/v1', () => {
                 .expect(200);
             const after = await User.findOne({ robloxId: '906' });
             expect(after!.mortars.sort()).toEqual(['mortar:M', 'mortar:S']);
+        });
+
+        it('the economy catalog carries shell and mortar prices', async () => {
+            // Without this the shop panel has to hardcode prices, which is the defect class
+            // this project has already hit three times: a number authoritative on the server,
+            // re-derived client-side, going stale.
+            await User.create({ robloxId: '907', totalPoints: 0 });
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .get('/api/v1/players/907/economy')
+                .set('X-API-Key', API_KEY)
+                .expect(200);
+            expect(res.body.catalog.fireworks).toEqual({
+                firecracker: 1,
+                peony: 3,
+                willow: 4,
+                ishibana: 6,
+            });
+            expect(res.body.catalog.mortars).toEqual({
+                'mortar:S': 40,
+                'mortar:M': 250,
+                'mortar:L': 1000,
+            });
+        });
+
+        it('every sellable shell has a catalogued price', async () => {
+            // The gate that matters: a shell added to SHELL_IDS but not to the payload would
+            // render in the shop with a blank price.
+            await User.create({ robloxId: '908', totalPoints: 0 });
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .get('/api/v1/players/908/economy')
+                .set('X-API-Key', API_KEY)
+                .expect(200);
+            for (const id of SHELL_IDS) {
+                expect(typeof res.body.catalog.fireworks[id]).toBe('number');
+            }
         });
     });
 });
