@@ -297,11 +297,61 @@ function Machiya.build(palette: any, _layout: any): any
     )
 
     -- ----- the kanban: the sign board, under the upper floor, facing the promenade -----
-    -- Blank here; Task 5 puts the lettering on it. TextSize caps at 100px and TextScaled is
-    -- inert, so the sign reads big only via a LOW SurfaceGui.PixelsPerStud — a small canvas.
+    -- A SurfaceGui, not a Decal: Roblox renders CJK from the built-in fonts, and the glyph
+    -- pipeline next door is a stroked-path rasterizer with no font support — it draws R/P/S as
+    -- line segments and could not produce a kanji without hand-authored stroke geometry.
+    --
+    -- PixelsPerStud is LOW on purpose. TextSize caps at 100 and TextScaled is inert, so the only
+    -- way to get large lettering is a small canvas — 20 px/stud over a 2.6-stud board means 90px
+    -- text fills it.
+    --
     -- Mounted just inside the frontage line (not proud of it) — same ground-clearance reasoning
-    -- as the noren above.
-    add("Kanban", { W * 0.55, 2.6, 0.25 }, { CX, FLOOR + STOREY_H - 1.6, Z0 + 0.2 }, ink, "WoodPlanks")
+    -- as the noren above. KEEP Z0 + 0.2: a part proud of the frontage at this height hangs into
+    -- the reserved promenade at avatar head height.
+    table.insert(
+        children,
+        Spec.part("Kanban", {
+            Size = { W * 0.55, 2.6, 0.25 },
+            CFrame = Spec.cframe({ CX, FLOOR + STOREY_H - 1.6, Z0 + 0.2 }),
+            Color = ink,
+            Material = "WoodPlanks",
+            CanCollide = false,
+            CanQuery = false,
+            CanTouch = false,
+            CastShadow = false,
+            children = {
+                {
+                    name = "Face",
+                    className = "SurfaceGui",
+                    properties = {
+                        -- Front is -Z, which is north: onto the promenade.
+                        Face = "Front",
+                        PixelsPerStud = 20,
+                        ZIndexBehavior = "Sibling",
+                        AlwaysOnTop = false,
+                    },
+                    children = {
+                        {
+                            name = "Text",
+                            className = "TextLabel",
+                            properties = {
+                                -- UDim2 in this pipeline's model.json is {UDim2 = {{XScale,
+                                -- XOffset}, {YScale, YOffset}}} — verified against `rojo build`,
+                                -- which rejects a flat 4-number array with "Expected UDim2, got
+                                -- an array of four numbers".
+                                Size = { UDim2 = { { 1, 0 }, { 1, 0 } } },
+                                BackgroundTransparency = 1,
+                                Text = "花火屋",
+                                TextColor3 = palette.ivory,
+                                TextSize = 90,
+                                Font = "GothamBold",
+                            },
+                        },
+                    },
+                },
+            },
+        })
+    )
 
     -- ----- the trigger volume -----
     -- Inset one stud from the frontage. See ShopThreshold.FRONT_INSET for why: flush with the

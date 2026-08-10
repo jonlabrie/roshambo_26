@@ -141,6 +141,18 @@ describe("Machiya — the parts other tasks bind to", function()
         expect(k ~= nil).toBe(true)
         expect(k.properties.CFrame[3] < (Z0 + Z1) / 2).toBe(true)
     end)
+
+    test("the Kanban carries the shop's name", function()
+        local k = find(model, "Kanban")
+        local face = find(k, "Face")
+        expect(face ~= nil).toBe(true)
+        local text = find(face, "Text")
+        expect(text ~= nil).toBe(true)
+        expect(text.properties.Text).toBe("花火屋")
+        -- TextSize caps at 100 and TextScaled is inert: a LOW PixelsPerStud is the only lever
+        -- that makes the lettering read from the bridge.
+        expect(face.properties.PixelsPerStud <= 25).toBe(true)
+    end)
 end)
 
 describe("Machiya — the flush rule", function()
