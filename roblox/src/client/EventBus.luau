@@ -13,6 +13,9 @@ local NAMES = {
     -- The picker asking the SERVER to launch. It carries a shellId and nothing else: whether that
     -- shell may fly is the server's answer, never this client's.
     "HudFireworkLaunch",
+    -- The shop counter asking to buy. Carries an item string ("firework:peony", "mortar:S") and
+    -- nothing else: affordability and tier order are the server's answer, never this client's.
+    "ShopPurchase",
     "Toast",
     "OpenLedger",
     -- The ledger is the door to the teahouse panel. It had a persistent bottom-right toggle of its

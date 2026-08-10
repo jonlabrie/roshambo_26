@@ -136,6 +136,18 @@ for _, inst in workspace:GetDescendants() do
     end
 end
 
+-- The shop's trigger volume ships inside the Rojo model, so it is here at startup rather than
+-- created at runtime. Tagging it server-side means the client can find it by tag (which
+-- replicates) instead of by a path that would break the moment a second shop is built.
+do
+    local hanabiya = stage:FindFirstChild("Hanabiya")
+    local threshold = hanabiya and hanabiya:FindFirstChild("Threshold")
+    if threshold then
+        threshold:SetAttribute("shopId", "hanabiya")
+        CollectionService:AddTag(threshold, "ShopThreshold")
+    end
+end
+
 local deps = {
     request = function(req)
         local ok, resp = pcall(function()
