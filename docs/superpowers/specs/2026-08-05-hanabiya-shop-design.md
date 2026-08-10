@@ -130,16 +130,21 @@ of a new archetype is that a shop reads differently from a dwelling.
 
 ## 3. Signage
 
-**花火屋** on a kanban board under the upper floor, generated through the glyph SDF pipeline
-(`tools/glyphs/`) that produced the R/P/S glyphs — same route, three characters, wide board.
+**花火屋** on a kanban board under the upper floor, as a `SurfaceGui` `TextLabel`.
 
-Two hazards carried forward from that pipeline:
+**CORRECTED 2026-08-05, during planning.** This section originally said the sign would come through
+the glyph SDF pipeline that produced the R/P/S marks. It cannot. `tools/glyphs/glyphgen.cjs` is a
+*dependency-free stroked-path rasterizer* — it draws R, P and S as line segments over a signed
+distance field and **has no font support at all**. Three kanji of seven to nine strokes each would
+have to be hand-authored as stroke coordinates, and then uploaded, and then wait on moderation — the
+same pipeline that once had a green maple leaf removed as a false positive.
 
-- **Image moderation.** A green palmate leaf texture was once removed as a false positive while gold
-  and red of the same leaf survived. Kanji should be uncontroversial, but upload early rather than at
-  the end, so a rejection does not block the build.
-- **`SurfaceGui` `TextSize` caps at 100px and `TextScaled` is inert.** Big text needs a *small*
-  canvas. The board is an uploaded image, not a TextLabel, precisely to sidestep this.
+Roblox renders CJK from its built-in fonts for nothing. The real constraint is the documented one:
+**`TextSize` caps at 100px and `TextScaled` is inert**, so large lettering needs a *small canvas* —
+which is what `SurfaceGui.PixelsPerStud` controls. At 20 px/stud, 90px text fills the 2.6-stud board.
+
+If the built-in font turns out not to cover these three characters, the fallback is an uploaded PNG.
+Check before spending anything on it.
 
 Two chōchin hang under the eave, tagged **`RoundLantern`** so `LanternController` finds them —
 discovery is by CollectionService tag, not by name or parent, and not by living under
