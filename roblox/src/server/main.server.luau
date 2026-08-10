@@ -145,6 +145,13 @@ do
     if threshold then
         threshold:SetAttribute("shopId", "hanabiya")
         CollectionService:AddTag(threshold, "ShopThreshold")
+    elseif hanabiya == nil then
+        -- Say so. Silence here looks exactly like a working shop that nobody can open, and the
+        -- likeliest cause is mundane: a place that has not been re-synced from Rojo since the
+        -- model was added.
+        warn("[SHOP] RoshamboStage.Hanabiya is missing — the shop cannot open (re-sync from Rojo?)")
+    else
+        warn("[SHOP] RoshamboStage.Hanabiya has no Threshold child — the shop cannot open")
     end
 end
 
@@ -1424,6 +1431,21 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
             echoEconomy(player, uid)
             return
         end
+        if string.sub(item, 1, 9) == "firework:" or string.sub(item, 1, 7) == "mortar:" then
+            -- Same hazard as the decoration branch above: the firework/mortar /purchase response
+            -- carries only { item, totalPoints, shellId/mortarTier, count } — no maxDeckSize, no
+            -- portalOwned, no teahouseSizes. Falling through would blank this session's deck tier
+            -- and portal ownership (buy-to-claim prompts reappear on owned perches, the home portal
+            -- stops opening, and recomputeAllAccess() drops the pad from `occupied` so a
+            -- friends-only deck opens to EVERYONE). Buying a shell or a mortar changes neither the
+            -- structure nor access, so return before touching any of it; the count that DID change
+            -- lives in FireworkState, which pushFireworkState carries.
+            if pushFireworkState then
+                pushFireworkState(player)
+            end
+            echoEconomy(player, uid)
+            return
+        end
         e.maxDeckSize = res.data.maxDeckSize
         e.portalOwned = res.data.portalOwned or false
         local kind, size = string.match(item, "^(%a+):(%a+)$")
@@ -1529,15 +1551,6 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
             end
         end
         echoEconomy(player, uid)
-        -- Buying a shell changes a COUNT, and the count lives in FireworkState, not
-        -- EconomyState. Without this the balance drops and the picker keeps reading the old
-        -- number until the next reveal happens to push state for its own reasons — which
-        -- reads as the purchase having failed.
-        if typeof(item) == "string" and (item:sub(1, 9) == "firework:" or item:sub(1, 7) == "mortar:") then
-            if pushFireworkState then
-                pushFireworkState(player)
-            end
-        end
         -- re-push access gates: a mid-session claim or size upgrade changes occupancy/deck geometry
         recomputeAllAccess()
     end)

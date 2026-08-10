@@ -2,10 +2,13 @@
 -- THE SHOP COUNTER. Opens when you step inside 花火屋, closes when you leave, and renders exactly
 -- what the server sent — prices from EconomyState.catalog, counts from FireworkState.
 --
--- IT EVALUATES NOTHING. Not affordability, not mortar tier order, not what a shell requires. Every
--- one of those is a server fact, and this codebase has a named, recurring defect where a number
--- authoritative on the server is re-derived client-side and goes stale. The one rule that lives
--- here is geometric — am I inside the box — and even that is in a tested module.
+-- IT EVALUATES NO REQUIREMENT. What a shell needs in order to fire is the server's verdict, and it
+-- arrives whole (`launchable` + `reason`); this file only turns the symbol into copy. The mortar
+-- ladder is the one place a rule is not on the wire, and even there the only client knowledge is
+-- MORTAR_ORDER — presentation order, used to NAME the tier below, never to decide the rule. This
+-- codebase has a named, recurring defect where a number authoritative on the server is re-derived
+-- client-side and goes stale; nothing here re-derives one. The one rule that genuinely lives here
+-- is geometric — am I inside the box — and even that is in a tested module.
 --
 -- NOTHING HERE IS TESTED. No harness in this repo loads a `.client.luau`.
 local Players = game:GetService("Players")
@@ -29,11 +32,32 @@ local SHELL_NAME: { [string]: string } = {
     willow = "Willow",
     ishibana = "Ishibana",
 }
+-- Presentation order, and the ONLY thing this file knows about mortars beyond their names. It is
+-- not the tier rule — the rule (you must own the tier below) lives on the server. What the order
+-- buys us is the ability to NAME the tier the server would have demanded, so a row the server would
+-- reject says which mortar it is waiting on instead of failing mutely when tapped.
 local MORTAR_ORDER = { "mortar:S", "mortar:M", "mortar:L" }
 local MORTAR_NAME: { [string]: string } = {
     ["mortar:S"] = "Small mortar",
     ["mortar:M"] = "Medium mortar",
     ["mortar:L"] = "Large mortar",
+}
+-- The tier immediately below each mortar, derived once from the order above.
+local MORTAR_BELOW: { [string]: string } = {}
+for i = 2, #MORTAR_ORDER do
+    MORTAR_BELOW[MORTAR_ORDER[i]] = MORTAR_ORDER[i - 1]
+end
+
+-- Shell reasons arrive as symbols from the server (FireworkState.shells[id].reason) and are turned
+-- into copy HERE — the same contract HudController's picker uses, and for the same reason: an
+-- unmapped symbol falls back to itself, because a player who sees "NEEDS_MORTAR_XL" learns
+-- something and a player who sees a blank row learns nothing.
+local REASON_COPY: { [string]: string } = {
+    NEEDS_MORTAR_S = "needs a small mortar",
+    NEEDS_MORTAR_M = "needs a medium mortar",
+    NEEDS_MORTAR_L = "needs a large mortar",
+    WAITING_FOR_R = "fires after Rock",
+    BAD_SHELL = "unavailable",
 }
 
 local INK_CREAM = Color3.fromRGB(240, 234, 216)
@@ -106,7 +130,17 @@ layout.SortOrder = Enum.SortOrder.LayoutOrder
 layout.Padding = UDim.new(0, 4)
 layout.Parent = list
 
-type Row = { button: TextButton, title: TextLabel, sub: TextLabel, item: string }
+-- `live` and `priceKnown` are written by paint() and read by the click handler. They are the row's
+-- rendered state, not a judgement made at click time — the button does exactly what it looks like
+-- it will do.
+type Row = {
+    button: TextButton,
+    title: TextLabel,
+    sub: TextLabel,
+    item: string,
+    live: boolean,
+    priceKnown: boolean,
+}
 local rows: { Row } = {}
 
 local function makeRow(order: number, item: string, label: string): Row
@@ -144,8 +178,20 @@ local function makeRow(order: number, item: string, label: string): Row
     s.TextXAlignment = Enum.TextXAlignment.Left
     s.Parent = b
 
-    local row: Row = { button = b, title = t, sub = s, item = item }
+    local row: Row = { button = b, title = t, sub = s, item = item, live = false, priceKnown = false }
     b.MouseButton1Click:Connect(function()
+        -- A row rendered dimmed must not spend points. Without this the dimming is decoration:
+        -- the tap goes through, the server rejects it, and NOTHING on screen changes — the whole
+        -- shop reads as broken. The row's own label already says why it is dim.
+        if not row.live then
+            return
+        end
+        -- And a row that cannot tell you the price must never spend your points. `prices` stays
+        -- empty for the whole session if the server's catalog fetch failed at join, and the
+        -- balance a purchase draws against is real either way.
+        if not row.priceKnown then
+            return
+        end
         EventBus.ShopPurchase:Fire(item)
     end)
     return row
@@ -171,19 +217,40 @@ local function paint()
         local price = if isShell then prices[key] else mortarPrices[key]
         local afford = price ~= nil and points >= price
         local detail
+        local live
         if price == nil then
             -- The catalog has not arrived yet. Say so rather than showing a confident zero.
             detail = "..."
+            live = false
         elseif isShell then
-            local held = shells and shells[key] and shells[key].count or 0
+            -- A shell is always buyable at price; what its state adds is whether the shell you own
+            -- can actually FIRE. That is the server's verdict, arriving whole as launchable+reason —
+            -- this file never works it out. NONE_HELD is dropped: "you hold 0" is right there.
+            local st = shells and shells[key]
+            local held = st and st.count or 0
             detail = ("%d pts   you hold %d"):format(price, held)
+            if st ~= nil and st.launchable ~= true and st.reason ~= nil and st.reason ~= "NONE_HELD" then
+                detail ..= "   " .. (REASON_COPY[st.reason] or st.reason)
+            end
+            live = afford
         elseif ownedMortars[key] then
             detail = "owned"
+            live = false
         else
-            detail = ("%d pts"):format(price)
+            local below = MORTAR_BELOW[key]
+            if below ~= nil and not ownedMortars[below] then
+                -- The server would reject this with BAD_TIER_ORDER. Say which mortar it wants
+                -- instead of lighting the row up and swallowing the failure.
+                detail = ("%d pts   needs the %s first"):format(price, string.lower(MORTAR_NAME[below]))
+                live = false
+            else
+                detail = ("%d pts"):format(price)
+                live = afford
+            end
         end
         row.sub.Text = detail
-        local live = price ~= nil and afford and not (not isShell and ownedMortars[key])
+        row.live = live
+        row.priceKnown = price ~= nil
         row.button.BackgroundTransparency = if live then 0.3 else 0.65
         row.title.TextTransparency = if live then 0 else 0.4
     end

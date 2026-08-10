@@ -128,6 +128,14 @@ describe("Machiya — the parts other tasks bind to", function()
         expect(math.abs((cz + dz / 2) - Z1) < 0.001).toBe(true)
     end)
 
+    test("the Threshold is tall enough that a jump cannot leave it", function()
+        local t = find(model, "Threshold")
+        local cy, dy = t.properties.CFrame[2], t.properties.Size[2]
+        expect(math.abs((cy - dy / 2) - FLOOR) < 0.001).toBe(true)
+        -- HumanoidRootPart stands ~3 above the floor and gains ~7 at the apex of a default jump.
+        expect((cy + dy / 2) > FLOOR + 10).toBe(true)
+    end)
+
     test("the Threshold is invisible and never collides or blocks a ray", function()
         local t = find(model, "Threshold")
         expect(t.properties.Transparency).toBe(1)

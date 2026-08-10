@@ -357,11 +357,18 @@ function Machiya.build(palette: any, _layout: any): any
     -- Inset one stud from the frontage. See ShopThreshold.FRONT_INSET for why: flush with the
     -- frontage it would fire on everyone crossing the square.
     local tz0 = Z0 + 1
+    -- TALL ENOUGH THAT A JUMP CANNOT LEAVE IT. The test is against the HumanoidRootPart, which
+    -- stands ~3 studs above the floor and rises ~7 more at the apex of a default jump — so a box
+    -- only storey-high (it was 4.9) lets the panel blink off mid-air while the player never left
+    -- the shop. 14 puts the ceiling ~4 studs clear of that apex. It costs nothing to be generous:
+    -- this is a trigger volume, invisible and non-colliding, so its height is not geometry and
+    -- rising past the eave line is not a visual fact anyone can see.
+    local TH_H = 14
     table.insert(
         children,
         Spec.part("Threshold", {
-            Size = { W, 4.9, Z1 - tz0 },
-            CFrame = Spec.cframe({ CX, FLOOR + 4.9 / 2, (tz0 + Z1) / 2 }),
+            Size = { W, TH_H, Z1 - tz0 },
+            CFrame = Spec.cframe({ CX, FLOOR + TH_H / 2, (tz0 + Z1) / 2 }),
             Transparency = 1,
             CanCollide = false,
             CanQuery = false,
