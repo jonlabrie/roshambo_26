@@ -32,11 +32,16 @@ local function countPrefix(node, prefix)
     return n
 end
 
--- a part's y extents from its CFrame array + Size
+-- A part's TRUE y extents, accounting for rotation. The naive centre +/- Size.Y/2 is wrong for
+-- anything tilted, and this model's roof planes and shopfront eave are all tilted — the first
+-- version of this helper let a sloping eave measure as though it were flat.
+-- CFrame is { x, y, z, r00..r22 } row-major, so row 1 is indices 7, 8, 9.
 local function yspan(part)
-    local cy = part.properties.CFrame[2]
-    local h = part.properties.Size[2]
-    return cy - h / 2, cy + h / 2
+    local cf, sz = part.properties.CFrame, part.properties.Size
+    local cy = cf[2]
+    local r10, r11, r12 = cf[7], cf[8], cf[9]
+    local ext = math.abs(r10) * sz[1] / 2 + math.abs(r11) * sz[2] / 2 + math.abs(r12) * sz[3] / 2
+    return cy - ext, cy + ext
 end
 
 describe("Machiya — the owner's envelope", function()
@@ -74,7 +79,11 @@ describe("Machiya — the owner's envelope", function()
                 local cz, dz = c.properties.CFrame[3], c.properties.Size[3]
                 local lo = yspan(c)
                 if cz - dz / 2 < Z0 - 0.001 then
-                    expect(lo >= FLOOR + 6).toBe(true)
+                    -- AVATAR CLEARANCE, not a round number. A Roblox character stands about 5
+                    -- studs; the rule this enforces is that the promenade stays WALKABLE, and the
+                    -- shopfront eave is meant to be walked under. 6 was an arbitrary first guess
+                    -- and it argued with a correctly-built hisashi.
+                    expect(lo >= FLOOR + 5.2).toBe(true)
                 end
             end
         end

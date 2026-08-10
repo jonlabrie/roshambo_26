@@ -29,15 +29,25 @@ local SLAB_T = 0.6 -- the raised timber floor, recipe §2's deck slab
 local STOREY_H = 6.0 -- ground storey: clear height under the upper floor
 local UPPER_H = 4.0 -- the closed lattice storey
 local EAVE_Y = FLOOR + STOREY_H + UPPER_H -- 123.10, where the roof springs
-local ROOF_RISE = TOP - EAVE_Y -- 4.26
+local ROOF_T = 0.25 -- roof and eave both halved at the owner's gate: a kawara edge, not a slab
+local EAVE_T = 0.25
+-- Less the slab thickness. A tilted slab meeting at the ridge puts its upper CORNER above the
+-- ridge line by roughly cos(pitch) * thickness/2, so a rise of exactly TOP - EAVE_Y overshoots the
+-- owner's top by ~0.1 studs. Trivial against the 9-stud gap to the shōrō, but TOP should mean the
+-- top — otherwise the envelope test has to tolerate a fudge, and a tolerated fudge grows.
+local ROOF_RISE = TOP - EAVE_Y - ROOF_T
 
 -- The eave overhangs the frontage by this much. THIS IS THE ONE DELIBERATE ENCROACHMENT on the
 -- reserved promenade, and it is aerial: its underside sits a full storey up, so nothing at
 -- ground level enters the corridor. Without it the building has no shopfront shadow and reads
 -- as a shed.
 local EAVE_OVERHANG = 2.5
-local EAVE_T = 0.25 -- owner's gate: half the first pass; a kawara eave is a thin edge, not a slab
-local ROOF_RIDGE_Z = (Z0 - EAVE_OVERHANG + Z1) / 2 -- ridge centred on the ROOF span, not the walls
+-- THE MAIN ROOF COVERS THE UPPER STOREY ONLY (owner's gate). It used to spring from the hisashi's
+-- outer edge, so one roof plane ran from the ridge all the way out over the shopfront — the
+-- building read as a single shed rather than as a two-storey machiya with a shop under a separate
+-- eave. Now it overhangs the WALLS by ROOF_EAVE and no further; the hisashi is its own roof.
+local ROOF_EAVE = 0.8
+local ROOF_RIDGE_Z = (Z0 + Z1) / 2
 
 -- 0.7, not the recipe's 1.125. Deck posts carry a platform over a drop and are sized for it;
 -- a shopfront post is a slender column standing on its own floor, and at 1.125 across a 19-stud
@@ -198,14 +208,20 @@ function Machiya.build(palette: any, _layout: any): any
     )
 
     -- ----- the eave over the shopfront: aerial, a full storey up -----
-    local eaveD = (Z0 - (Z0 - EAVE_OVERHANG))
+    -- It TILTS. A flat hisashi reads as a shelf; the whole point of the shopfront eave is that it
+    -- sheds toward the street and throws the goods into shade. It springs from the upper-floor
+    -- line and drops HISASHI_DROP over its projection — so its +Z end (at the building) is the
+    -- high one, which by the sign convention above means a NEGATIVE angle.
+    local HISASHI_DROP = 0.5
+    local hisashiDeg = math.deg(math.atan2(HISASHI_DROP, EAVE_OVERHANG))
+    local hisashiLen = math.sqrt(EAVE_OVERHANG * EAVE_OVERHANG + HISASHI_DROP * HISASHI_DROP)
     add(
         "Eave",
-        { W + 1.0, EAVE_T, eaveD },
-        { CX, FLOOR + STOREY_H + EAVE_T / 2, Z0 - EAVE_OVERHANG / 2 },
+        { W + 1.0, EAVE_T, hisashiLen },
+        { CX, FLOOR + STOREY_H - HISASHI_DROP / 2, Z0 - EAVE_OVERHANG / 2 },
         tile,
         "Slate",
-        nil,
+        rotX(-hisashiDeg),
         "SlateTile"
     )
 
@@ -213,18 +229,17 @@ function Machiya.build(palette: any, _layout: any): any
     -- Machiya are hirairi — you enter on the long side, under the eave, with the gables at the
     -- ends. Two slopes, symmetric about a ridge centred on the ROOF span (which reaches further
     -- north than the walls because of the overhang).
-    local frontRun = ROOF_RIDGE_Z - (Z0 - EAVE_OVERHANG)
-    local backRun = Z1 - ROOF_RIDGE_Z
+    local frontRun = ROOF_RIDGE_Z - (Z0 - ROOF_EAVE)
+    local backRun = (Z1 + ROOF_EAVE) - ROOF_RIDGE_Z
     local frontLen = math.sqrt(frontRun * frontRun + ROOF_RISE * ROOF_RISE)
     local backLen = math.sqrt(backRun * backRun + ROOF_RISE * ROOF_RISE)
     local frontDeg = math.deg(math.atan2(ROOF_RISE, frontRun))
     local backDeg = math.deg(math.atan2(ROOF_RISE, backRun))
-    local ROOF_T = 0.25 -- see EAVE_T
 
     add(
         "RoofNorth",
         { W + 1.0, ROOF_T, frontLen },
-        { CX, EAVE_Y + ROOF_RISE / 2, (Z0 - EAVE_OVERHANG + ROOF_RIDGE_Z) / 2 },
+        { CX, EAVE_Y + ROOF_RISE / 2, (Z0 - ROOF_EAVE + ROOF_RIDGE_Z) / 2 },
         tile,
         "Slate",
         rotX(-frontDeg), -- +Z end is the RIDGE: negative angle raises it
@@ -233,7 +248,7 @@ function Machiya.build(palette: any, _layout: any): any
     add(
         "RoofSouth",
         { W + 1.0, ROOF_T, backLen },
-        { CX, EAVE_Y + ROOF_RISE / 2, (ROOF_RIDGE_Z + Z1) / 2 },
+        { CX, EAVE_Y + ROOF_RISE / 2, (ROOF_RIDGE_Z + Z1 + ROOF_EAVE) / 2 },
         tile,
         "Slate",
         rotX(backDeg), -- +Z end is the back EAVE: positive angle drops it
@@ -258,7 +273,7 @@ function Machiya.build(palette: any, _layout: any): any
             Spec.part(`Gable{name}North`, {
                 className = "WedgePart",
                 Size = { GABLE_T, ROOF_RISE, frontRun },
-                CFrame = Spec.cframe({ x, EAVE_Y + ROOF_RISE / 2, (Z0 - EAVE_OVERHANG + ROOF_RIDGE_Z) / 2 }),
+                CFrame = Spec.cframe({ x, EAVE_Y + ROOF_RISE / 2, (Z0 - ROOF_EAVE + ROOF_RIDGE_Z) / 2 }),
                 Color = cypress,
                 Material = "WoodPlanks",
                 CanCollide = true,
@@ -271,7 +286,7 @@ function Machiya.build(palette: any, _layout: any): any
                 className = "WedgePart",
                 Size = { GABLE_T, ROOF_RISE, backRun },
                 CFrame = Spec.cframe(
-                    { x, EAVE_Y + ROOF_RISE / 2, (ROOF_RIDGE_Z + Z1) / 2 },
+                    { x, EAVE_Y + ROOF_RISE / 2, (ROOF_RIDGE_Z + Z1 + ROOF_EAVE) / 2 },
                     { -1, 0, 0, 0, 1, 0, 0, 0, -1 }
                 ),
                 Color = cypress,
@@ -335,13 +350,18 @@ function Machiya.build(palette: any, _layout: any): any
     -- canvas, which an 80 px character very nearly fills.
     local KANJI = { "花", "火", "屋" }
     local SIGN_H = 2.6
+    -- On the SECOND storey (owner's gate). Down at shopfront level the boards competed with the
+    -- goods and the noren; up here they are the facade's one piece of writing, which is what the
+    -- upper storey exists to carry. Just proud of the kōshi lattice at z44.18, not of the frontage.
+    local SIGN_Y = FLOOR + STOREY_H + UPPER_H / 2
+    local SIGN_Z = Z0 - 0.15
     for i, glyph in KANJI do
         local a, b = postX[i + 1], postX[i + 2] -- bays 2, 3 and 4 of the five between six posts
         table.insert(
             children,
             Spec.part(`Kanban{i}`, {
                 Size = { (b - a) - POST_W - 0.2, SIGN_H, 0.25 },
-                CFrame = Spec.cframe({ (a + b) / 2, FLOOR + STOREY_H - 1.6, Z0 + 0.2 }),
+                CFrame = Spec.cframe({ (a + b) / 2, SIGN_Y, SIGN_Z }),
                 Color = ink,
                 Material = "WoodPlanks",
                 CanCollide = false,
@@ -354,6 +374,13 @@ function Machiya.build(palette: any, _layout: any): any
                         className = "SurfaceGui",
                         properties = {
                             Face = "Front", -- -Z, which is north: onto the promenade
+                            -- SIZINGMODE IS THE WHOLE TRICK. It defaults to FixedSize, under
+                            -- which the canvas is CanvasSize (800x600) and PixelsPerStud is
+                            -- IGNORED — which is why the first pass rendered an 80px glyph on an
+                            -- 800px canvas and read as a speck. PixelsPerStud mode derives the
+                            -- canvas from the part: 2.69 x 2.6 studs at 32 px/stud = 86 x 83,
+                            -- which an 80px character nearly fills.
+                            SizingMode = "PixelsPerStud",
                             PixelsPerStud = 32,
                             ZIndexBehavior = "Sibling",
                             AlwaysOnTop = false,
