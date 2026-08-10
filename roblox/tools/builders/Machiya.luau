@@ -55,6 +55,7 @@ local ROOF_RIDGE_Z = (Z0 + Z1) / 2
 local POST_W = 0.7
 local GIRDER_H, GIRDER_W = 1.2, 0.825
 local WALL_T = 0.5
+local STUCCO_MAT = "Sandstone"
 local KOSHI_T = 0.18
 local COUNTER_H = 1.1
 local COUNTER_D = 1.4
@@ -84,7 +85,11 @@ end
 function Machiya.build(palette: any, _layout: any): any
     local children = {}
     local timber = palette.timber
-    local cypress = palette.cypressWeathered
+    -- STUCCO, not boards (owner's gate). Roblox has no plaster material; Sandstone over the
+    -- palette's warm grey is the closest read, and quiet walls are what let the timber frame
+    -- and the shoji do the talking.
+    local stucco = palette.gravel
+    local paper = palette.ivory
     local tile = palette.slateTile
     local ink = palette.ink
 
@@ -133,27 +138,84 @@ function Machiya.build(palette: any, _layout: any): any
         )
     end
 
+    -- ----- the shopfront: SLIDING DOORS, STANDING OPEN, UNDER SHOJI TRANSOMS -----
+    -- A machiya's shopfront is not a hole — it is a run of sliding doors that have been pushed
+    -- aside for the day. Rendering them open is what says "this shop is trading", and it reads far
+    -- better than an empty gap: you can see what closes.
+    --
+    -- Each bay gets a fixed shoji transom above the head rail (kamoi) and one door leaf slid to
+    -- the bay's west jamb, leaving roughly two-thirds of the opening clear. Leaves alternate which
+    -- jamb they park against, because a whole row stacked the same way reads mechanical.
+    local HEAD_Y = FLOOR + 3.9 -- the kamoi: door head / transom sill
+    local TRANSOM_TOP = FLOOR + STOREY_H - GIRDER_H
+    local DOOR_Z = Z0 + 0.55 -- inboard of the posts, so the noren still hangs in front
+    local LEAF_FRACTION = 0.36 -- how much of its bay a parked leaf covers
+
+    add("HeadRail", { W - 2 * WALL_T, 0.3, 0.32 }, { CX, HEAD_Y + 0.15, DOOR_Z }, timber, "Wood")
+
+    for i = 1, FRONT_POSTS - 1 do
+        local a, b = postX[i], postX[i + 1]
+        local bayW = (b - a) - POST_W
+        local bayC = (a + b) / 2
+
+        -- the fixed shoji transom (ranma) above the head rail
+        local tH = TRANSOM_TOP - HEAD_Y
+        add(`Transom{i}`, { bayW, tH, 0.1 }, { bayC, HEAD_Y + tH / 2, DOOR_Z }, paper, "Fabric")
+        for k = 1, 2 do
+            add(
+                `TransomBar{i}_{k}`,
+                { 0.09, tH, 0.14 },
+                { bayC - bayW / 4 + (bayW / 2) * (k - 1), HEAD_Y + tH / 2, DOOR_Z },
+                ink,
+                "Wood"
+            )
+        end
+
+        -- the door leaf, parked against one jamb; alternate sides down the row
+        local leafW = bayW * LEAF_FRACTION
+        local parkWest = i % 2 == 1
+        local leafC = if parkWest then (a + POST_W / 2 + leafW / 2) else (b - POST_W / 2 - leafW / 2)
+        local leafH = HEAD_Y - FLOOR
+        add(`DoorLeaf{i}`, { leafW, leafH, 0.08 }, { leafC, FLOOR + leafH / 2, DOOR_Z }, paper, "Fabric")
+        -- its stile-and-rail frame, enough to read as joinery rather than a panel
+        add(
+            `DoorStileW{i}`,
+            { 0.12, leafH, 0.13 },
+            { leafC - leafW / 2 + 0.06, FLOOR + leafH / 2, DOOR_Z },
+            timber,
+            "Wood"
+        )
+        add(
+            `DoorStileE{i}`,
+            { 0.12, leafH, 0.13 },
+            { leafC + leafW / 2 - 0.06, FLOOR + leafH / 2, DOOR_Z },
+            timber,
+            "Wood"
+        )
+        add(`DoorRail{i}`, { leafW, 0.14, 0.13 }, { leafC, FLOOR + leafH * 0.42, DOOR_Z }, timber, "Wood")
+    end
+
     -- ----- side and back walls (ground storey) -----
     add(
         "WallWest",
         { WALL_T, STOREY_H, D },
         { X0 + WALL_T / 2, FLOOR + STOREY_H / 2, CZ },
-        cypress,
-        "WoodPlanks"
+        stucco,
+        STUCCO_MAT
     )
     add(
         "WallEast",
         { WALL_T, STOREY_H, D },
         { X1 - WALL_T / 2, FLOOR + STOREY_H / 2, CZ },
-        cypress,
-        "WoodPlanks"
+        stucco,
+        STUCCO_MAT
     )
     add(
         "WallBack",
         { W, STOREY_H, WALL_T },
         { CX, FLOOR + STOREY_H / 2, Z1 - WALL_T / 2 },
-        cypress,
-        "WoodPlanks"
+        stucco,
+        STUCCO_MAT
     )
 
     -- ----- girders + the upper floor -----
@@ -189,22 +251,22 @@ function Machiya.build(palette: any, _layout: any): any
         "UpperWallWest",
         { WALL_T, UPPER_H, D },
         { X0 + WALL_T / 2, FLOOR + STOREY_H + UPPER_H / 2, CZ },
-        cypress,
-        "WoodPlanks"
+        stucco,
+        STUCCO_MAT
     )
     add(
         "UpperWallEast",
         { WALL_T, UPPER_H, D },
         { X1 - WALL_T / 2, FLOOR + STOREY_H + UPPER_H / 2, CZ },
-        cypress,
-        "WoodPlanks"
+        stucco,
+        STUCCO_MAT
     )
     add(
         "UpperWallBack",
         { W, UPPER_H, WALL_T },
         { CX, FLOOR + STOREY_H + UPPER_H / 2, Z1 - WALL_T / 2 },
-        cypress,
-        "WoodPlanks"
+        stucco,
+        STUCCO_MAT
     )
 
     -- ----- the eave over the shopfront: aerial, a full storey up -----
@@ -274,8 +336,8 @@ function Machiya.build(palette: any, _layout: any): any
                 className = "WedgePart",
                 Size = { GABLE_T, ROOF_RISE, frontRun },
                 CFrame = Spec.cframe({ x, EAVE_Y + ROOF_RISE / 2, (Z0 - ROOF_EAVE + ROOF_RIDGE_Z) / 2 }),
-                Color = cypress,
-                Material = "WoodPlanks",
+                Color = stucco,
+                Material = STUCCO_MAT,
                 CanCollide = true,
                 CastShadow = false,
             })
@@ -289,8 +351,8 @@ function Machiya.build(palette: any, _layout: any): any
                     { x, EAVE_Y + ROOF_RISE / 2, (ROOF_RIDGE_Z + Z1 + ROOF_EAVE) / 2 },
                     { -1, 0, 0, 0, 1, 0, 0, 0, -1 }
                 ),
-                Color = cypress,
-                Material = "WoodPlanks",
+                Color = stucco,
+                Material = STUCCO_MAT,
                 CanCollide = true,
                 CastShadow = false,
             })
@@ -336,72 +398,79 @@ function Machiya.build(palette: any, _layout: any): any
         "WoodPlanks"
     )
 
-    -- ----- the sign: ONE CHARACTER PER BAY -----
-    -- It began as a single 9.86-stud board, and two of the shopfront posts crossed it — so it
-    -- already READ as three panels, with the whole name huddled small in the middle one. Owner's
-    -- gate: give each of the three its own character, larger.
-    --
-    -- The boards register to the POST CENTRES rather than to a division of the frontage, so they
-    -- stay in their bays if the post count ever changes. Reading order is left to right, so 花
-    -- takes the westmost of the three.
-    --
-    -- PixelsPerStud is LOW on purpose. TextSize caps at 100 and TextScaled is inert, so a glyph
-    -- fills its board only when the canvas is small: 32 px/stud over a 2.6-stud board is an 83 px
-    -- canvas, which an 80 px character very nearly fills.
-    local KANJI = { "花", "火", "屋" }
+    -- ----- the sign: ONE FRAMED BOARD -----
+    -- Three separate boards were a workaround for a bug: the glyphs were tiny because SizingMode
+    -- was ignoring PixelsPerStud, and splitting them was the only way to make each one big enough
+    -- to read. With the canvas fixed they no longer need to be split, so the sign is one board
+    -- again — dark ink on a light ground in a plain timber frame, which is what a kanban is.
+    local SIGN_W = W * 0.62
     local SIGN_H = 2.6
-    -- On the SECOND storey (owner's gate). Down at shopfront level the boards competed with the
-    -- goods and the noren; up here they are the facade's one piece of writing, which is what the
-    -- upper storey exists to carry. Just proud of the kōshi lattice at z44.18, not of the frontage.
     local SIGN_Y = FLOOR + STOREY_H + UPPER_H / 2
-    local SIGN_Z = Z0 - 0.15
-    for i, glyph in KANJI do
-        local a, b = postX[i + 1], postX[i + 2] -- bays 2, 3 and 4 of the five between six posts
-        table.insert(
-            children,
-            Spec.part(`Kanban{i}`, {
-                Size = { (b - a) - POST_W - 0.2, SIGN_H, 0.25 },
-                CFrame = Spec.cframe({ (a + b) / 2, SIGN_Y, SIGN_Z }),
-                Color = ink,
-                Material = "WoodPlanks",
-                CanCollide = false,
-                CanQuery = false,
-                CanTouch = false,
-                CastShadow = false,
-                children = {
-                    {
-                        name = "Face",
-                        className = "SurfaceGui",
-                        properties = {
-                            Face = "Front", -- -Z, which is north: onto the promenade
-                            -- SIZINGMODE IS THE WHOLE TRICK. It defaults to FixedSize, under
-                            -- which the canvas is CanvasSize (800x600) and PixelsPerStud is
-                            -- IGNORED — which is why the first pass rendered an 80px glyph on an
-                            -- 800px canvas and read as a speck. PixelsPerStud mode derives the
-                            -- canvas from the part: 2.69 x 2.6 studs at 32 px/stud = 86 x 83,
-                            -- which an 80px character nearly fills.
-                            SizingMode = "PixelsPerStud",
-                            PixelsPerStud = 32,
-                            ZIndexBehavior = "Sibling",
-                            AlwaysOnTop = false,
-                        },
-                        children = {
-                            {
-                                name = "Text",
-                                className = "TextLabel",
-                                properties = {
-                                    Size = { UDim2 = { { 1, 0 }, { 1, 0 } } },
-                                    BackgroundTransparency = 1,
-                                    Text = glyph,
-                                    TextColor3 = palette.ivory,
-                                    TextSize = 80,
-                                    Font = "GothamBold",
-                                },
+    local SIGN_Z = Z0 - 0.15 -- just proud of the kōshi lattice, not of the frontage
+    local FRAME_W = 0.32 -- the surround's member width
+    local FRAME_D = 0.34 -- deeper than the panel, so the frame stands proud of it
+
+    table.insert(
+        children,
+        Spec.part("Kanban", {
+            Size = { SIGN_W, SIGN_H, 0.22 },
+            CFrame = Spec.cframe({ CX, SIGN_Y, SIGN_Z }),
+            Color = paper,
+            Material = "WoodPlanks",
+            CanCollide = false,
+            CanQuery = false,
+            CanTouch = false,
+            CastShadow = false,
+            children = {
+                {
+                    name = "Face",
+                    className = "SurfaceGui",
+                    properties = {
+                        Face = "Front", -- -Z, which is north: onto the promenade
+                        -- SIZINGMODE IS THE WHOLE TRICK. It defaults to FixedSize, under which the
+                        -- canvas is CanvasSize (800x600) and PixelsPerStud is IGNORED — which is
+                        -- why an 80px glyph once rendered as a speck. In PixelsPerStud mode the
+                        -- canvas comes from the part, so the character fills its board.
+                        SizingMode = "PixelsPerStud",
+                        PixelsPerStud = 32,
+                        AlwaysOnTop = false,
+                        ZIndexBehavior = "Sibling",
+                    },
+                    children = {
+                        {
+                            name = "Text",
+                            className = "TextLabel",
+                            properties = {
+                                Size = { UDim2 = { { 1, 0 }, { 1, 0 } } },
+                                BackgroundTransparency = 1,
+                                Text = "花火屋",
+                                TextColor3 = ink, -- dark letters on the light ground
+                                TextSize = 72,
+                                Font = "GothamBold",
                             },
                         },
                     },
                 },
-            })
+            },
+        })
+    )
+
+    -- The surround: four plain members, mitre-free, lapped at the corners the way a cheap shop
+    -- sign is actually made.
+    for _, m in
+        {
+            { "KanbanFrameTop", SIGN_W + 2 * FRAME_W, FRAME_W, 0, SIGN_H / 2 + FRAME_W / 2 },
+            { "KanbanFrameBottom", SIGN_W + 2 * FRAME_W, FRAME_W, 0, -(SIGN_H / 2 + FRAME_W / 2) },
+            { "KanbanFrameWest", FRAME_W, SIGN_H, -(SIGN_W / 2 + FRAME_W / 2), 0 },
+            { "KanbanFrameEast", FRAME_W, SIGN_H, SIGN_W / 2 + FRAME_W / 2, 0 },
+        }
+    do
+        add(
+            m[1] :: string,
+            { m[2] :: number, m[3] :: number, FRAME_D },
+            { CX + (m[4] :: number), SIGN_Y + (m[5] :: number), SIGN_Z },
+            timber,
+            "Wood"
         )
     end
 

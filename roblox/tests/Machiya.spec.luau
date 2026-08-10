@@ -153,40 +153,49 @@ describe("Machiya — the parts other tasks bind to", function()
         expect(t.properties.CanTouch).toBe(false)
     end)
 
-    test("the sign is three boards, one per bay, all facing the promenade", function()
-        expect(countPrefix(model, "Kanban")).toBe(3)
-        for _, c in model.children do
-            if (c.name :: string):sub(1, 6) == "Kanban" then
-                expect(c.properties.CFrame[3] < (Z0 + Z1) / 2).toBe(true)
-            end
-        end
+    test("the sign is one framed board carrying the whole name, facing the promenade", function()
+        local k = find(model, "Kanban")
+        expect(k ~= nil).toBe(true)
+        expect(k.properties.CFrame[3] < (Z0 + Z1) / 2).toBe(true)
+        local face = find(k, "Face")
+        expect(face ~= nil).toBe(true)
+        -- SizingMode is the whole trick: it defaults to FixedSize, under which the canvas is
+        -- CanvasSize (800x600) and PixelsPerStud is IGNORED. That bug rendered the name as a
+        -- speck and is the only reason the sign was ever split into three boards.
+        expect(face.properties.SizingMode).toBe("PixelsPerStud")
+        expect(face.properties.PixelsPerStud <= 40).toBe(true)
+        local text = find(face, "Text")
+        expect(text ~= nil).toBe(true)
+        expect(text.properties.Text).toBe("花火屋")
     end)
 
-    test("THE THREE BOARDS SPELL THE SHOP'S NAME, WEST TO EAST", function()
-        -- Split across three parts, the name can now go wrong in a way one board could not: a
-        -- character in the wrong bay still passes every per-board check. So assert the whole
-        -- string, ordered by x.
-        local boards = {}
+    test("the sign is dark letters on a light ground, in a frame on all four sides", function()
+        local k = find(model, "Kanban")
+        local text = find(find(k, "Face"), "Text")
+        -- A light panel with light lettering is invisible, and it is the kind of thing that
+        -- survives review because both values look reasonable on their own.
+        local panelLum = k.properties.Color[1] + k.properties.Color[2] + k.properties.Color[3]
+        local inkLum = text.properties.TextColor3[1]
+            + text.properties.TextColor3[2]
+            + text.properties.TextColor3[3]
+        expect(panelLum > inkLum + 1).toBe(true)
+        expect(countPrefix(model, "KanbanFrame")).toBe(4)
+    end)
+
+    test("the shopfront is sliding doors standing OPEN, under shoji transoms", function()
+        -- Open is the point: a machiya shopfront is doors pushed aside, not a hole. Every bay
+        -- keeps most of its width clear.
+        expect(countPrefix(model, "Transom") >= 5).toBe(true)
+        expect(countPrefix(model, "DoorLeaf")).toBe(5)
+        local slab = find(model, "FloorSlab")
+        local frontage = slab.properties.Size[1]
+        local covered = 0
         for _, c in model.children do
-            if (c.name :: string):sub(1, 6) == "Kanban" then
-                table.insert(boards, c)
+            if (c.name :: string):sub(1, 8) == "DoorLeaf" then
+                covered += c.properties.Size[1]
             end
         end
-        table.sort(boards, function(a, b)
-            return a.properties.CFrame[1] < b.properties.CFrame[1]
-        end)
-        local name = ""
-        for _, b in boards do
-            local face = find(b, "Face")
-            expect(face ~= nil).toBe(true)
-            -- A small canvas is the ONLY lever that makes the lettering read: TextSize caps at
-            -- 100 and TextScaled is inert.
-            expect(face.properties.PixelsPerStud <= 40).toBe(true)
-            local text = find(face, "Text")
-            expect(text ~= nil).toBe(true)
-            name ..= text.properties.Text
-        end
-        expect(name).toBe("花火屋")
+        expect(covered < frontage * 0.45).toBe(true)
     end)
 end)
 
