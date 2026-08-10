@@ -230,9 +230,15 @@ function Machiya.build(palette: any, _layout: any): any
     )
     add("Ridge", { W + 1.2, 0.4, 0.6 }, { CX, TOP - 0.2, ROOF_RIDGE_Z }, ink, "Slate")
 
-    -- Gable ends. Each is TWO right triangles back to back, which is what an isosceles gable is;
-    -- a WedgePart's native slope descends toward +Z with its vertical face at -Z, so the north
-    -- half is that wedge turned 180° about Y and the south half is it unturned.
+    -- Gable ends. Each is TWO right triangles back to back, which is what an isosceles gable is.
+    --
+    -- A WedgePart's TALL EDGE IS AT +Z, its thin edge at -Z. Established by building it the other
+    -- way round first (2026-08-05): the gables came out as a notch — tall at both eaves, dipping
+    -- at the ridge — the exact inverse of the roof. So the half whose +Z end is the RIDGE is the
+    -- wedge unturned, and the half whose +Z end is the EAVE is turned 180° about Y.
+    --
+    -- North half spans front eave (low, -Z) -> ridge (high, +Z): unturned.
+    -- South half spans ridge (high, -Z) -> back eave (low, +Z): turned.
     local GABLE_T = 0.4
     for _, end_ in { { "West", X0 + GABLE_T / 2 }, { "East", X1 - GABLE_T / 2 } } do
         local name, x = end_[1] :: string, end_[2] :: number
@@ -241,10 +247,7 @@ function Machiya.build(palette: any, _layout: any): any
             Spec.part(`Gable{name}North`, {
                 className = "WedgePart",
                 Size = { GABLE_T, ROOF_RISE, frontRun },
-                CFrame = Spec.cframe(
-                    { x, EAVE_Y + ROOF_RISE / 2, (Z0 - EAVE_OVERHANG + ROOF_RIDGE_Z) / 2 },
-                    { -1, 0, 0, 0, 1, 0, 0, 0, -1 }
-                ),
+                CFrame = Spec.cframe({ x, EAVE_Y + ROOF_RISE / 2, (Z0 - EAVE_OVERHANG + ROOF_RIDGE_Z) / 2 }),
                 Color = cypress,
                 Material = "WoodPlanks",
                 CanCollide = true,
@@ -256,7 +259,10 @@ function Machiya.build(palette: any, _layout: any): any
             Spec.part(`Gable{name}South`, {
                 className = "WedgePart",
                 Size = { GABLE_T, ROOF_RISE, backRun },
-                CFrame = Spec.cframe({ x, EAVE_Y + ROOF_RISE / 2, (ROOF_RIDGE_Z + Z1) / 2 }),
+                CFrame = Spec.cframe(
+                    { x, EAVE_Y + ROOF_RISE / 2, (ROOF_RIDGE_Z + Z1) / 2 },
+                    { -1, 0, 0, 0, 1, 0, 0, 0, -1 }
+                ),
                 Color = cypress,
                 Material = "WoodPlanks",
                 CanCollide = true,
