@@ -144,22 +144,40 @@ describe("Machiya — the parts other tasks bind to", function()
         expect(t.properties.CanTouch).toBe(false)
     end)
 
-    test("the Kanban exists and faces the promenade", function()
-        local k = find(model, "Kanban")
-        expect(k ~= nil).toBe(true)
-        expect(k.properties.CFrame[3] < (Z0 + Z1) / 2).toBe(true)
+    test("the sign is three boards, one per bay, all facing the promenade", function()
+        expect(countPrefix(model, "Kanban")).toBe(3)
+        for _, c in model.children do
+            if (c.name :: string):sub(1, 6) == "Kanban" then
+                expect(c.properties.CFrame[3] < (Z0 + Z1) / 2).toBe(true)
+            end
+        end
     end)
 
-    test("the Kanban carries the shop's name", function()
-        local k = find(model, "Kanban")
-        local face = find(k, "Face")
-        expect(face ~= nil).toBe(true)
-        local text = find(face, "Text")
-        expect(text ~= nil).toBe(true)
-        expect(text.properties.Text).toBe("花火屋")
-        -- TextSize caps at 100 and TextScaled is inert: a LOW PixelsPerStud is the only lever
-        -- that makes the lettering read from the bridge.
-        expect(face.properties.PixelsPerStud <= 25).toBe(true)
+    test("THE THREE BOARDS SPELL THE SHOP'S NAME, WEST TO EAST", function()
+        -- Split across three parts, the name can now go wrong in a way one board could not: a
+        -- character in the wrong bay still passes every per-board check. So assert the whole
+        -- string, ordered by x.
+        local boards = {}
+        for _, c in model.children do
+            if (c.name :: string):sub(1, 6) == "Kanban" then
+                table.insert(boards, c)
+            end
+        end
+        table.sort(boards, function(a, b)
+            return a.properties.CFrame[1] < b.properties.CFrame[1]
+        end)
+        local name = ""
+        for _, b in boards do
+            local face = find(b, "Face")
+            expect(face ~= nil).toBe(true)
+            -- A small canvas is the ONLY lever that makes the lettering read: TextSize caps at
+            -- 100 and TextScaled is inert.
+            expect(face.properties.PixelsPerStud <= 40).toBe(true)
+            local text = find(face, "Text")
+            expect(text ~= nil).toBe(true)
+            name ..= text.properties.Text
+        end
+        expect(name).toBe("花火屋")
     end)
 end)
 

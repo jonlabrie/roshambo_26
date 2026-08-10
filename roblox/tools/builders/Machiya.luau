@@ -36,7 +36,7 @@ local ROOF_RISE = TOP - EAVE_Y -- 4.26
 -- ground level enters the corridor. Without it the building has no shopfront shadow and reads
 -- as a shed.
 local EAVE_OVERHANG = 2.5
-local EAVE_T = 0.5
+local EAVE_T = 0.25 -- owner's gate: half the first pass; a kawara eave is a thin edge, not a slab
 local ROOF_RIDGE_Z = (Z0 - EAVE_OVERHANG + Z1) / 2 -- ridge centred on the ROOF span, not the walls
 
 -- 0.7, not the recipe's 1.125. Deck posts carry a platform over a drop and are sized for it;
@@ -84,19 +84,24 @@ function Machiya.build(palette: any, _layout: any): any
         pos: { number },
         colour: { number },
         material: string,
-        rot: { number }?
+        rot: { number }?,
+        variant: string?
     )
-        table.insert(
-            children,
-            Spec.part(name, {
-                Size = size,
-                CFrame = Spec.cframe(pos, rot),
-                Color = colour,
-                Material = material,
-                CanCollide = true,
-                CastShadow = false,
-            })
-        )
+        local props: { [string]: any } = {
+            Size = size,
+            CFrame = Spec.cframe(pos, rot),
+            Color = colour,
+            Material = material,
+            CanCollide = true,
+            CastShadow = false,
+        }
+        -- THE SHŌRŌ'S OWN ROOF TILE. Its RoofPanels are Material=Slate wearing the `SlateTile`
+        -- variant (base Slate, the ambientCG kawara). Bare Slate reads as flat grey stone and made
+        -- the shop look like a different building tradition standing in the same square.
+        if variant then
+            props.MaterialVariant = variant
+        end
+        table.insert(children, Spec.part(name, props))
     end
 
     -- ----- the raised timber floor -----
@@ -104,9 +109,11 @@ function Machiya.build(palette: any, _layout: any): any
 
     -- ----- the OPEN frontage: six posts, no wall -----
     local FRONT_POSTS = 6
+    local postX = {} -- kept so the sign boards register to the BAYS, not to the frontage
     for i = 1, FRONT_POSTS do
         local t = (i - 1) / (FRONT_POSTS - 1)
         local x = flushX(X0 + (X1 - X0) * t)
+        postX[i] = x
         add(
             `FrontPost{i}`,
             { POST_W, STOREY_H, POST_W },
@@ -197,7 +204,9 @@ function Machiya.build(palette: any, _layout: any): any
         { W + 1.0, EAVE_T, eaveD },
         { CX, FLOOR + STOREY_H + EAVE_T / 2, Z0 - EAVE_OVERHANG / 2 },
         tile,
-        "Slate"
+        "Slate",
+        nil,
+        "SlateTile"
     )
 
     -- ----- the roof: a gabled kirizuma, ridge running east-west along the street -----
@@ -210,7 +219,7 @@ function Machiya.build(palette: any, _layout: any): any
     local backLen = math.sqrt(backRun * backRun + ROOF_RISE * ROOF_RISE)
     local frontDeg = math.deg(math.atan2(ROOF_RISE, frontRun))
     local backDeg = math.deg(math.atan2(ROOF_RISE, backRun))
-    local ROOF_T = 0.5
+    local ROOF_T = 0.25 -- see EAVE_T
 
     add(
         "RoofNorth",
@@ -218,7 +227,8 @@ function Machiya.build(palette: any, _layout: any): any
         { CX, EAVE_Y + ROOF_RISE / 2, (Z0 - EAVE_OVERHANG + ROOF_RIDGE_Z) / 2 },
         tile,
         "Slate",
-        rotX(-frontDeg) -- +Z end is the RIDGE: negative angle raises it
+        rotX(-frontDeg), -- +Z end is the RIDGE: negative angle raises it
+        "SlateTile"
     )
     add(
         "RoofSouth",
@@ -226,9 +236,10 @@ function Machiya.build(palette: any, _layout: any): any
         { CX, EAVE_Y + ROOF_RISE / 2, (ROOF_RIDGE_Z + Z1) / 2 },
         tile,
         "Slate",
-        rotX(backDeg) -- +Z end is the back EAVE: positive angle drops it
+        rotX(backDeg), -- +Z end is the back EAVE: positive angle drops it
+        "SlateTile"
     )
-    add("Ridge", { W + 1.2, 0.4, 0.6 }, { CX, TOP - 0.2, ROOF_RIDGE_Z }, ink, "Slate")
+    add("Ridge", { W + 1.2, 0.4, 0.6 }, { CX, TOP - 0.2, ROOF_RIDGE_Z }, ink, "Slate", nil, "SlateTile")
 
     -- Gable ends. Each is TWO right triangles back to back, which is what an isosceles gable is.
     --
@@ -310,62 +321,62 @@ function Machiya.build(palette: any, _layout: any): any
         "WoodPlanks"
     )
 
-    -- ----- the kanban: the sign board, under the upper floor, facing the promenade -----
-    -- A SurfaceGui, not a Decal: Roblox renders CJK from the built-in fonts, and the glyph
-    -- pipeline next door is a stroked-path rasterizer with no font support — it draws R/P/S as
-    -- line segments and could not produce a kanji without hand-authored stroke geometry.
+    -- ----- the sign: ONE CHARACTER PER BAY -----
+    -- It began as a single 9.86-stud board, and two of the shopfront posts crossed it — so it
+    -- already READ as three panels, with the whole name huddled small in the middle one. Owner's
+    -- gate: give each of the three its own character, larger.
     --
-    -- PixelsPerStud is LOW on purpose. TextSize caps at 100 and TextScaled is inert, so the only
-    -- way to get large lettering is a small canvas — 20 px/stud over a 2.6-stud board means 90px
-    -- text fills it.
+    -- The boards register to the POST CENTRES rather than to a division of the frontage, so they
+    -- stay in their bays if the post count ever changes. Reading order is left to right, so 花
+    -- takes the westmost of the three.
     --
-    -- Mounted just inside the frontage line (not proud of it) — same ground-clearance reasoning
-    -- as the noren above. KEEP Z0 + 0.2: a part proud of the frontage at this height hangs into
-    -- the reserved promenade at avatar head height.
-    table.insert(
-        children,
-        Spec.part("Kanban", {
-            Size = { W * 0.55, 2.6, 0.25 },
-            CFrame = Spec.cframe({ CX, FLOOR + STOREY_H - 1.6, Z0 + 0.2 }),
-            Color = ink,
-            Material = "WoodPlanks",
-            CanCollide = false,
-            CanQuery = false,
-            CanTouch = false,
-            CastShadow = false,
-            children = {
-                {
-                    name = "Face",
-                    className = "SurfaceGui",
-                    properties = {
-                        -- Front is -Z, which is north: onto the promenade.
-                        Face = "Front",
-                        PixelsPerStud = 20,
-                        ZIndexBehavior = "Sibling",
-                        AlwaysOnTop = false,
-                    },
-                    children = {
-                        {
-                            name = "Text",
-                            className = "TextLabel",
-                            properties = {
-                                -- UDim2 in this pipeline's model.json is {UDim2 = {{XScale,
-                                -- XOffset}, {YScale, YOffset}}} — verified against `rojo build`,
-                                -- which rejects a flat 4-number array with "Expected UDim2, got
-                                -- an array of four numbers".
-                                Size = { UDim2 = { { 1, 0 }, { 1, 0 } } },
-                                BackgroundTransparency = 1,
-                                Text = "花火屋",
-                                TextColor3 = palette.ivory,
-                                TextSize = 90,
-                                Font = "GothamBold",
+    -- PixelsPerStud is LOW on purpose. TextSize caps at 100 and TextScaled is inert, so a glyph
+    -- fills its board only when the canvas is small: 32 px/stud over a 2.6-stud board is an 83 px
+    -- canvas, which an 80 px character very nearly fills.
+    local KANJI = { "花", "火", "屋" }
+    local SIGN_H = 2.6
+    for i, glyph in KANJI do
+        local a, b = postX[i + 1], postX[i + 2] -- bays 2, 3 and 4 of the five between six posts
+        table.insert(
+            children,
+            Spec.part(`Kanban{i}`, {
+                Size = { (b - a) - POST_W - 0.2, SIGN_H, 0.25 },
+                CFrame = Spec.cframe({ (a + b) / 2, FLOOR + STOREY_H - 1.6, Z0 + 0.2 }),
+                Color = ink,
+                Material = "WoodPlanks",
+                CanCollide = false,
+                CanQuery = false,
+                CanTouch = false,
+                CastShadow = false,
+                children = {
+                    {
+                        name = "Face",
+                        className = "SurfaceGui",
+                        properties = {
+                            Face = "Front", -- -Z, which is north: onto the promenade
+                            PixelsPerStud = 32,
+                            ZIndexBehavior = "Sibling",
+                            AlwaysOnTop = false,
+                        },
+                        children = {
+                            {
+                                name = "Text",
+                                className = "TextLabel",
+                                properties = {
+                                    Size = { UDim2 = { { 1, 0 }, { 1, 0 } } },
+                                    BackgroundTransparency = 1,
+                                    Text = glyph,
+                                    TextColor3 = palette.ivory,
+                                    TextSize = 80,
+                                    Font = "GothamBold",
+                                },
                             },
                         },
                     },
                 },
-            },
-        })
-    )
+            })
+        )
+    end
 
     -- ----- the trigger volume -----
     -- Inset one stud from the frontage. See ShopThreshold.FRONT_INSET for why: flush with the
