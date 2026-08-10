@@ -1517,6 +1517,15 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
             end
         end
         echoEconomy(player, uid)
+        -- Buying a shell changes a COUNT, and the count lives in FireworkState, not
+        -- EconomyState. Without this the balance drops and the picker keeps reading the old
+        -- number until the next reveal happens to push state for its own reasons — which
+        -- reads as the purchase having failed.
+        if typeof(item) == "string" and (item:sub(1, 9) == "firework:" or item:sub(1, 7) == "mortar:") then
+            if pushFireworkState then
+                pushFireworkState(player)
+            end
+        end
         -- re-push access gates: a mid-session claim or size upgrade changes occupancy/deck geometry
         recomputeAllAccess()
     end)
