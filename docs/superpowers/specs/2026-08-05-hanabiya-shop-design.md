@@ -37,39 +37,53 @@ an inviolable main street, with the note *"shops back onto the south upslope."* 
 the street and the building sits on its south side: **frontage line z44**, keeping all 16 studs of
 promenade clear.
 
-**Footprint: x18 → x34, z44 → z52.** 16 wide, 8 deep — the massing approved in conversation. Floor
-datum **113.1**, the karesansui's `floorY.main`, so the shop floor is continuous with the square.
+**Footprint: x−1.67 → x16.26, z44 → z52, floor 113.10, top 127.36.** 17.93 wide × 8.00 deep ×
+14.26 tall, yaw 0.
+
+**THESE NUMBERS ARE THE OWNER'S, NOT A PROPOSAL.** They were not derived — a holdout block was put
+in Studio at the proposed footprint and the owner moved and resized it in place; this is its
+measured transform, read back on 2026-08-05. My proposed x18–34 was wrong in a way no survey table
+would have caught: it sat the building at one end of the corridor rather than composing the row.
+The study block survives at `Workspace.Sandbox.HanabiyaStudy` for re-measurement.
+
+Three things the owner fixed, each load-bearing:
+
+- **Centred on the corridor** (block centre x7.30; corridor centre x7.0), leaving **18.3 studs of
+  frontage west and 17.7 east** for smaller flanking shops. 花火屋 is the row's ANCHOR, not one of
+  five equals — that is a composition decision and it governs the rest of the row.
+- **Floor exactly on datum** (113.10) and **frontage exactly on z44**, so the promenade is untouched.
+- **Taller: 14.26**, up from my 12. It tops at 127.36 against the shōrō's 136.5 — **9 studs
+  subordinate to the bell tower**, which is the relationship the square depends on. Do not let a
+  later roof tweak close that gap.
+
+The footprint is **completely clear**: no geometry and no foliage stands inside x−2…17, z43…53.
 
 ### The survey (2026-08-05, raycast, foliage excluded)
 
-Top surface, floor datum 113.1:
+Cut depth above the floor datum along the back line (z52), across the whole corridor:
 
-| | x14 | x18 | x22 | x26 | x30 | x34 | x38 |
-|---|---|---|---|---|---|---|---|
-| z44 | 113.3 | 113.6 | 113.8 | 114.4 | 114.7 | 113.8 | 113.9 |
-| z46 | 114.2 | 113.9 | 115.3 | 116.3 | 115.5 | 113.9 | 114.4 |
-| z48 | 115.4 | 117.4 | 118.3 | 118.6 | 117.0 | 114.0 | 114.0 |
-| z50 | 117.3 | 122.8 | 121.1 | 120.5 | 119.5 | 114.0 | 114.7 |
-| z52 | 125.5 | 125.7 | 124.3 | 123.0 | 121.3 | 115.4 | 115.8 |
+| x | −20 | −14 | −8 | −2 | 4 | 10 | 16 | 22 | 28 | 34 |
+|---|---|---|---|---|---|---|---|---|---|---|
+| cut | 11.1 | 9.7 | 6.7 | 6.8 | 6.9 | 11.1 | 12.5 | 11.2 | 9.3 | 2.3 |
 
-**There is a knoll at x18–x30 that climbs hard past z46.** Cut depth at the back wall (z52), floor
-to grade: x18 **12.6**, x22 **11.2**, x26 **9.9**, x30 **8.2**, x34 **2.3**. The cut is a wedge —
-two storeys of stone at the west end, barely a step at the east.
+**The hill is not a slope — it is a saddle (x−8…7) and a ridge (x10…22).** The building spans both:
+roughly **6.8 studs of cut across its west two-thirds, 11–12.5 across its east third.**
 
-**⚠️ THE ONE NUMBER TO LOOK AT IN STUDIO.** A 12.6-stud cut behind an 8-deep building puts the shop
-in a slot, with an ishigaki face as tall as the machiya itself. That may read as dramatic or as
-buried; it cannot be judged from a survey table. **If it reads buried, pull the back wall to z50**
-— the cut drops to 9.7 / 8.0 / 7.4 / 6.4 / 0.9 and the interior loses 2 studs of depth. Decide it by
-looking, at the first Studio gate, before the ishigaki is built.
+Sliding it ~6 studs west would sit it wholly in the saddle at a uniform ~7 studs — and was
+**rejected**, because it costs the centring. Composition cannot be fixed later; excavation is
+terrain work.
 
-**This was checked against the alternative and rejected:** ground east of x34 is almost flat
-(113–116 through z50), so a shop at x34–50 would need no cut at all — but that abandons the reserved
-corridor, which the programme is explicit the row builds against, and crowds the Overlook approach.
-Building where the reservation says is worth the excavation.
+**A correction to this spec's earlier draft:** it warned that a 12-stud ishigaki face was the one
+thing to judge by eye. That over-stated it. With the building butted into its own cut, **most of the
+retaining face is hidden behind the building** — what is actually visible is where the cut continues
+past the shop's ends, and there it reads the same at either position. The wedge is not a risk to the
+design; it is a variable-height wall, which recipe §3's `w = vs / Hs` rule already handles.
 
-**A finding for the future row:** since the knoll rises westward, the remaining four shops will
-need progressively deeper cuts. The row should **step up the hill going west** rather than hold one
-floor level. Decide that when the row is specced; do not let this building's datum imply the others.
+**What the row inherits from this decision:** with a centred anchor, the west flank (x−20…−2) sits
+on 6.7–11.1 of cut and the east flank (x16…34) runs 12.5 down to 2.3. **The east flank is the
+awkward one** — it drops 10 studs across its length, so it likely wants two small shops stepping
+down rather than one. Decide that when the row is specced; do not let this building's single floor
+level imply the others hold it.
 
 ---
 
@@ -136,7 +150,7 @@ free tie between the shop and the game.
 
 ## 4. The threshold
 
-An invisible trigger volume over the shop **interior**: x18–34, **z45–52**, y113–118, tagged
+An invisible trigger volume over the shop **interior**: x−1.67…16.26, **z45–52**, y113.1–118, tagged
 `ShopThreshold` with a `shopId` attribute.
 
 **It starts at z45, one stud inside the frontage.** That is the whole design. A trigger on the
