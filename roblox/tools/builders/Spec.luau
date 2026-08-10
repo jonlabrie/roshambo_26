@@ -26,11 +26,11 @@ function Spec.part(name: string, props: { [string]: any }): PartSpec
     local kids = props.children
     local properties: { [string]: any } = { Anchored = true }
     for k, v in props do
-        if k ~= "children" then
+        if k ~= "children" and k ~= "className" then
             properties[k] = v
         end
     end
-    return { name = name, className = "Part", properties = properties, children = kids }
+    return { name = name, className = props.className or "Part", properties = properties, children = kids }
 end
 
 -- Like Spec.part but emits a MeshPart referencing an uploaded MeshId. Forces
