@@ -5,7 +5,12 @@
 -- IT EVALUATES NO REQUIREMENT. What a shell needs in order to fire is the server's verdict, and it
 -- arrives whole (`launchable` + `reason`); this file only turns the symbol into copy. The mortar
 -- ladder is the one place a rule is not on the wire, and even there the only client knowledge is
--- MORTAR_ORDER — presentation order, used to NAME the tier below, never to decide the rule. This
+-- MORTAR_ORDER — presentation order, AND (be honest about it) the one place this client does
+-- duplicate a server rule: it dims a tier whose predecessor is unowned, which restates
+-- economy.ts's linear-tier predicate. It is in sync today and it FAILS CLOSED — a drift dims a
+-- purchase that would have worked, and the server re-validates every tap regardless. The clean
+-- fix is a server-computed mortarStates on the wire, mirroring shellStates; until then this is a
+-- known, bounded copy, not a rule the client invented. Do not let this comment read as innocent.
 -- codebase has a named, recurring defect where a number authoritative on the server is re-derived
 -- client-side and goes stale; nothing here re-derives one. The one rule that genuinely lives here
 -- is geometric — am I inside the box — and even that is in a tested module.
