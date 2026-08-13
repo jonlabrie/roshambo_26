@@ -197,6 +197,11 @@ describe("Machiya — what makes it a shop and not a teahouse", function()
             local z = cf[3] + cf[11] * ly + cf[12] * lz
             expect(math.abs(y - floorY) < 0.01).toBe(true)
             expect(math.abs(z - wellNorth) < 0.01).toBe(true)
+            -- AND THE FOOT IS IN THE FLOOR. The same square-cut arithmetic at the other end was
+            -- left undone, so both stringers hovered an eighth of a stud above the boards. A
+            -- joint that merely touches shows a seam; this one has to be buried.
+            local lo = cf[2] + cf[8] * (-sz[2] / 2) + cf[9] * (sz[3] / 2)
+            expect(lo < FLOOR - 0.1).toBe(true)
         end
     end)
 

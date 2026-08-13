@@ -492,7 +492,11 @@ function Machiya.build(palette: any, _layout: any): any
     )
     add(
         "WallBack",
-        { SW, STOREY_H, WALL_T },
+        -- BETWEEN the side walls, not across them. At the full SW its end faces landed on exactly
+        -- the same planes as the side walls' outer faces, which is the same coplanar-face defect
+        -- the stairwell flickered from — found on the back corners while checking that fix. The
+        -- side walls run the full depth, so they close the corner and nothing opens up.
+        { SW - 2 * WALL_T, STOREY_H, WALL_T },
         { CX, FLOOR + STOREY_H / 2, SZ1 - WALL_T / 2 },
         stucco,
         STUCCO_MAT,
@@ -658,14 +662,24 @@ function Machiya.build(palette: any, _layout: any): any
         nil,
         FRAME_VAR
     )
+    -- TUCKED INTO THE WALL, not flush with it. The east wall's inner face and this strip's west
+    -- face both sat on x = STAIR_X1, both looking west into the stairwell — two coplanar faces
+    -- claiming one plane, which flickered exactly at attic-floor level as you climbed the stairs
+    -- and read as a horizontal beam laid against the wall. Starting the strip inside the wall
+    -- hides its face entirely; the wall itself fills the sliver, so nothing opens up.
+    local EDGE_TUCK = 0.08
     add(
         "UpperFloorEdge",
-        { X1 - STAIR_X1, SLAB_T, WELL_Z1 - WELL_Z0 },
-        { (STAIR_X1 + X1) / 2, uy, (WELL_Z0 + WELL_Z1) / 2 },
+        { X1 - STAIR_X1 - EDGE_TUCK, SLAB_T, WELL_Z1 - WELL_Z0 },
+        { (STAIR_X1 + EDGE_TUCK + X1) / 2, uy, (WELL_Z0 + WELL_Z1) / 2 },
         timber,
         "Wood",
         nil,
         FRAME_VAR
+    )
+    assert(
+        EDGE_TUCK < WALL_T,
+        "the floor strip is tucked deeper than the wall is thick — it would leave a slot at the well"
     )
 
     -- ----- the stair -----
@@ -709,12 +723,22 @@ function Machiya.build(palette: any, _layout: any): any
     -- the floor edge; the rest of the end face tucks up under the landing, which is where a real
     -- stringer dies into its trimmer.
     local topExtra = (STRINGER_H / 2) * math.tan(rad)
-    local stairLen = math.sqrt(noseRun * noseRun + (UPPER_SURFACE - NOSE_Y0) ^ 2) + topExtra
+    -- AND THE SAME ARITHMETIC AT THE FOOT, which was left undone: the square cut put the low end's
+    -- bottom corner at 113.25 against a floor of 113.10, so both stringers HOVERED an eighth of a
+    -- stud above the boards they were supposed to stand on. Bury the corner instead of touching
+    -- it — a joint that merely touches shows a seam the moment anything moves.
+    local STRINGER_BURY = 0.25
+    local footY = NOSE_Y0 - (STRINGER_H / 2) / math.cos(rad) - (STRINGER_H / 2) * math.cos(rad)
+    local bottomExtra = math.max(0, (footY - (FLOOR - STRINGER_BURY)) / math.sin(rad))
+    local stairLen = math.sqrt(noseRun * noseRun + (UPPER_SURFACE - NOSE_Y0) ^ 2) + topExtra + bottomExtra
+    -- Each extension grows the part by its full length but moves the centre by only half, and they
+    -- pull in opposite directions along the slope — so the net shift is their difference, halved.
+    local shift = (topExtra - bottomExtra) / 2
     for _, s in { { "West", STAIR_X0 + STRINGER_T / 2 }, { "East", STAIR_X1 - STRINGER_T / 2 } } do
         add(`StairStringer{s[1]}`, { STRINGER_T, STRINGER_H, stairLen }, {
             s[2] :: number,
-            stringerCY + math.sin(rad) * topExtra / 2,
-            (COUNTER_BACK_Z + WELL_Z0) / 2 - math.cos(rad) * topExtra / 2,
+            stringerCY + math.sin(rad) * shift,
+            (COUNTER_BACK_Z + WELL_Z0) / 2 - math.cos(rad) * shift,
         }, timber, "Wood", rotX(stairDeg), STAIR_VAR)
     end
 
@@ -808,7 +832,7 @@ function Machiya.build(palette: any, _layout: any): any
     )
     add(
         "UpperWallBack",
-        { SW, UPPER_H, WALL_T },
+        { SW - 2 * WALL_T, UPPER_H, WALL_T }, -- between the side walls; see WallBack
         { CX, FLOOR + STOREY_H + UPPER_H / 2, SZ1 - WALL_T / 2 },
         stucco,
         STUCCO_MAT,
