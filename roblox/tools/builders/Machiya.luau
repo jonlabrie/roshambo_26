@@ -156,7 +156,10 @@ function Machiya.build(palette: any, _layout: any): any
     end
 
     -- ----- the raised timber floor -----
-    add("FloorSlab", { W, SLAB_T, D }, { CX, FLOOR - SLAB_T / 2, CZ }, timber, "WoodPlanks")
+    -- "Wood" + the frame variant, matching the upper floor. WoodPlanks with no variant is the
+    -- pale timber the building has been moving away from — and a variant set on a WoodPlanks part
+    -- would be silently dropped anyway, which is how the upper floor stayed pale twice.
+    add("FloorSlab", { W, SLAB_T, D }, { CX, FLOOR - SLAB_T / 2, CZ }, timber, "Wood", nil, FRAME_VAR)
 
     -- ----- the OPEN frontage: six posts, no wall -----
     local FRONT_POSTS = 5 -- owner's gate: 3 centre posts + 2 corners, down from 4 + 2
@@ -713,7 +716,9 @@ function Machiya.build(palette: any, _layout: any): any
         { postX[FRONT_POSTS - 1] - postX[2] - POST_W, COUNTER_H, COUNTER_D },
         { (postX[2] + postX[FRONT_POSTS - 1]) / 2, FLOOR + COUNTER_H / 2, Z0 + 4.6 },
         timber,
-        "WoodPlanks"
+        "Wood",
+        nil,
+        FRAME_VAR
     )
 
     -- ----- the sign: ONE FRAMED BOARD -----
