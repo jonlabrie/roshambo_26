@@ -316,14 +316,20 @@ function Machiya.build(palette: any, _layout: any): any
             local openW = bayW
             local parkWest = CLOSED[i - 1] == true
             local leafC = if parkWest then (a + POST_W / 2 - openW / 6) else (b - POST_W / 2 + openW / 6)
-            local leafH = HEAD_Y - FLOOR
+            -- The screen RUNS IN A TRACK and closes with a rail top and bottom. Its stiles used
+            -- to end at floor level with no bottom member, so the frame terminated into the floor
+            -- instead of closing against it — which reads as buried, because nothing caps it.
+            local RAIL_T = 0.16
+            local leafY0 = FLOOR + 0.1 -- the track it slides in
+            local leafH = HEAD_Y - leafY0
+            local leafCY = leafY0 + leafH / 2
             -- The paper is INSET inside its own frame. At full leaf size its edges landed exactly on
             -- the stiles', so the sheet was visible edge-on — a pane the same size as its sash.
             -- Real shoji paper is glued behind the frame and stops short of it on every side.
             add(
                 `DoorLeaf{i}`,
-                { leafW - 2 * 0.16, leafH - 2 * 0.1, 0.05 },
-                { leafC, FLOOR + leafH / 2, DOOR_Z },
+                { leafW - 2 * 0.16, leafH - 2 * RAIL_T, 0.05 },
+                { leafC, leafCY, DOOR_Z },
                 paper,
                 "Fabric"
             )
@@ -332,7 +338,18 @@ function Machiya.build(palette: any, _layout: any): any
                 add(
                     `DoorStile{i}_{k}`,
                     { 0.14, leafH, 0.15 },
-                    { sx, FLOOR + leafH / 2, DOOR_Z },
+                    { sx, leafCY, DOOR_Z },
+                    timber,
+                    "Wood",
+                    nil,
+                    FRAME_VAR
+                )
+            end
+            for k, ry in { leafY0 + RAIL_T / 2, HEAD_Y - RAIL_T / 2 } do
+                add(
+                    `DoorRail{i}_{k}`,
+                    { leafW, RAIL_T, 0.15 },
+                    { leafC, ry, DOOR_Z },
                     timber,
                     "Wood",
                     nil,
@@ -344,7 +361,7 @@ function Machiya.build(palette: any, _layout: any): any
                 add(
                     `DoorLatV{i}_{k}`,
                     { 0.075, leafH, 0.13 },
-                    { leafC - leafW / 2 + leafW * (k / (LAT_N_V + 1)), FLOOR + leafH / 2, DOOR_Z },
+                    { leafC - leafW / 2 + leafW * (k / (LAT_N_V + 1)), leafCY, DOOR_Z },
                     timber,
                     "Wood",
                     nil,
@@ -355,7 +372,7 @@ function Machiya.build(palette: any, _layout: any): any
                 add(
                     `DoorLatH{i}_{k}`,
                     { leafW, 0.075, 0.13 },
-                    { leafC, FLOOR + leafH * (k / (LAT_N_H + 1)), DOOR_Z },
+                    { leafC, leafY0 + leafH * (k / (LAT_N_H + 1)), DOOR_Z },
                     timber,
                     "Wood",
                     nil,
