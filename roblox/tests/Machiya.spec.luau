@@ -147,6 +147,43 @@ describe("Machiya — what makes it a shop and not a teahouse", function()
         expect(math.abs(treadBack - counterBack) < 0.001).toBe(true)
     end)
 
+    test("THE STRINGERS REACH THE UPPER FLOOR", function()
+        -- They did not, twice over: built from the top TREAD they stopped a whole riser low, and
+        -- then, once the top face reached the floor, the SQUARE END still left the corner short of
+        -- the well's edge. Both are invisible in the numbers a builder prints and obvious standing
+        -- on the landing. So measure the actual corner: transform the part's top-face, high-end
+        -- corner out of its own CFrame and demand it land on the floor edge.
+        local floorY, wellNorth
+        for _, c in model.children do
+            if c.name == "UpperFloorNorth" then
+                floorY = c.properties.CFrame[2] + c.properties.Size[2] / 2
+                wellNorth = c.properties.CFrame[3] + c.properties.Size[3] / 2
+            end
+        end
+        for _, side in { "West", "East" } do
+            local s = find(model, "StairStringer" .. side)
+            expect(s ~= nil).toBe(true)
+            local cf, sz = s.properties.CFrame, s.properties.Size
+            -- row-major: rows are cf[4..6], cf[7..9], cf[10..12]
+            local ly, lz = sz[2] / 2, -sz[3] / 2 -- top face, high (-Z) end
+            local y = cf[2] + cf[8] * ly + cf[9] * lz
+            local z = cf[3] + cf[11] * ly + cf[12] * lz
+            expect(math.abs(y - floorY) < 0.01).toBe(true)
+            expect(math.abs(z - wellNorth) < 0.01).toBe(true)
+        end
+    end)
+
+    test("the stair timber does not wear the VERTICAL grain variant", function()
+        -- CypressVertical's maps are rotated 90° and it exists for flat vertical members. On a
+        -- tread — a horizontal board — it runs the grain across the plank instead of along it.
+        for _, c in model.children do
+            local n = c.name :: string
+            if n:sub(1, 10) == "StairTread" or n:sub(1, 13) == "StairStringer" then
+                expect(c.properties.MaterialVariant).toBe("CypressWeathered")
+            end
+        end
+    end)
+
     test("THE STAIRWELL IS CUT WHERE THE STAIR NEEDS IT", function()
         -- The whole point of an opening. Walk every tread and check the column of air above it —
         -- one working avatar tall — against every piece of upper floor. A stair that climbs into

@@ -120,8 +120,21 @@ local STAIR_TREADS = 11
 local STAIR_RISE = (UPPER_SURFACE - FLOOR) / (STAIR_TREADS + 1)
 assert(math.abs(STAIR_RISE - 0.8) < 1e-9, `stair rise {STAIR_RISE} is not the intended 0.8`)
 local STAIR_RUN = 0.72 -- 48° — steep, which is the point
-local STAIR_W = 2.8
-local TREAD_T = 0.22
+local STAIR_W = 3.2 -- OUTER to outer, stringers included
+local STRINGER_T = 0.45
+local STRINGER_H = 0.60
+-- How deep a tread is let into its stringer. The treads used to run the full width, so their ends
+-- finished flush with the stringers' outer faces and the joint read as a butt rather than a
+-- housing. Now the stringer stands proud of the tread end by (STRINGER_T - TREAD_HOUSING) and you
+-- can see the tread go into it.
+local TREAD_HOUSING = 0.30
+assert(TREAD_HOUSING < STRINGER_T, "a tread housed the full thickness of its stringer cuts it in two")
+local TREAD_W = STAIR_W - 2 * (STRINGER_T - TREAD_HOUSING)
+local TREAD_T = 0.28
+-- NOT the frame's CypressVertical. That variant's maps are ROTATED 90° and it exists for flat
+-- VERTICAL members — on a tread, which is a horizontal board, the grain ran across the plank
+-- instead of along it. CypressWeathered is the unrotated timber the bridge decking wears.
+local STAIR_VAR = "CypressWeathered"
 
 -- The stairwell. Its south edge is set by HEADROOM, not by taste: a climber on tread k has their
 -- feet at FLOOR + k*RISE and wants a working avatar's 6 studs above that, against an underside at
@@ -633,25 +646,48 @@ function Machiya.build(palette: any, _layout: any): any
     -- treads climb. The stair's low end is at +Z, and by the sign convention above a POSITIVE
     -- angle lowers the +Z end — the same trap that inverted the roof.
     local stairDeg = math.deg(math.atan2(STAIR_RISE, STAIR_RUN))
-    local stairLen = STAIR_TREADS * math.sqrt(STAIR_RUN * STAIR_RUN + STAIR_RISE * STAIR_RISE)
     local stairCX = (STAIR_X0 + STAIR_X1) / 2
     for k = 1, STAIR_TREADS do
         add(
             `StairTread{k}`,
-            { STAIR_W, TREAD_T, STAIR_RUN },
+            { TREAD_W, TREAD_T, STAIR_RUN },
             { stairCX, FLOOR + k * STAIR_RISE - TREAD_T / 2, COUNTER_BACK_Z - (k - 0.5) * STAIR_RUN },
             timber,
             "Wood",
             nil,
-            FRAME_VAR
+            STAIR_VAR
         )
     end
-    for _, s in { { "West", STAIR_X0 + 0.12 }, { "East", STAIR_X1 - 0.12 } } do
-        add(`StairStringer{s[1]}`, { 0.24, 0.55, stairLen }, {
+
+    -- THE NOSE LINE runs through the back-top corner of every tread, and the stair is laid out so
+    -- that it arrives at the upper floor's WALKING SURFACE exactly at the well's north edge. The
+    -- stringers follow that line, so they land on the floor rather than stopping a step short of
+    -- it — which is what they did, because they were built from the top TREAD instead.
+    local NOSE_Y0 = FLOOR + STAIR_RISE -- the line's height at z = COUNTER_BACK_Z
+    local noseRun = COUNTER_BACK_Z - WELL_Z0
+    assert(
+        math.abs((NOSE_Y0 + noseRun * (STAIR_RISE / STAIR_RUN)) - UPPER_SURFACE) < 1e-9,
+        "the stair does not land flush on the upper floor — the nose line misses the well's edge"
+    )
+    local rad = math.rad(stairDeg)
+    -- Dropped so the stringer's TOP FACE lies on the nose line. Measured vertically, a
+    -- perpendicular half-thickness is t/2 over cos(pitch) — at 48° that is half again as much
+    -- as t/2, and using t/2 directly buries the treads.
+    local stringerCY = (NOSE_Y0 + UPPER_SURFACE) / 2 - (STRINGER_H / 2) / math.cos(rad)
+    -- AND THEN EXTENDED, because the end is cut SQUARE to the run. A stringer whose top face
+    -- reaches the floor still stops short of it in the flesh: the square cut leaves the top corner
+    -- (H/2)*sin(pitch) back down the slope, a gap you can see from the landing and cannot see in
+    -- any number. Lengthening by (H/2)*tan(pitch), all of it at the top, walks that corner onto
+    -- the floor edge; the rest of the end face tucks up under the landing, which is where a real
+    -- stringer dies into its trimmer.
+    local topExtra = (STRINGER_H / 2) * math.tan(rad)
+    local stairLen = math.sqrt(noseRun * noseRun + (UPPER_SURFACE - NOSE_Y0) ^ 2) + topExtra
+    for _, s in { { "West", STAIR_X0 + STRINGER_T / 2 }, { "East", STAIR_X1 - STRINGER_T / 2 } } do
+        add(`StairStringer{s[1]}`, { STRINGER_T, STRINGER_H, stairLen }, {
             s[2] :: number,
-            (FLOOR + FLOOR + STAIR_TREADS * STAIR_RISE) / 2 - 0.45,
-            (COUNTER_BACK_Z + WELL_Z0) / 2,
-        }, timber, "Wood", rotX(stairDeg), FRAME_VAR)
+            stringerCY + math.sin(rad) * topExtra / 2,
+            (COUNTER_BACK_Z + WELL_Z0) / 2 - math.cos(rad) * topExtra / 2,
+        }, timber, "Wood", rotX(stairDeg), STAIR_VAR)
     end
 
     -- ----- the closed upper storey: kōshi lattice to the street, boards elsewhere -----
