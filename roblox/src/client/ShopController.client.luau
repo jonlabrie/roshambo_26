@@ -23,7 +23,10 @@ local CollectionService = game:GetService("CollectionService")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local ShopThreshold = require(shared:WaitForChild("ShopThreshold"))
+local ShopCamera = require(shared:WaitForChild("ShopCamera"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
+
+local player = Players.LocalPlayer
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local EconomyState = remotes:WaitForChild("EconomyState") :: RemoteEvent
@@ -85,7 +88,56 @@ gui.IgnoreGuiInset = true
 -- ZIndexBehavior defaults to Global, under which a child does NOT draw above its parent.
 gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Enabled = false
-gui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+gui.Parent = player:WaitForChild("PlayerGui")
+
+-- ===== the way out =====
+-- The panel is centred, and a first-person player's cursor is PINNED to screen centre — on top of
+-- it. The close button cannot be pressed and the scroll that would zoom back out is eaten by the
+-- panel under the cursor, so walking out is the only escape. Borrow the camera while the panel is
+-- open and give it back on close; the arithmetic is in ShopCamera, which is tested.
+--
+-- `holding` is not a nicety. Gripping twice would record OUR OWN grip as the player's setting, and
+-- then the release would hand back the wrong camera — permanently, for the session.
+local holding = false
+local savedMinZoom = 0
+local savedMouseLock = false
+
+local function gripCamera()
+    if holding then
+        return
+    end
+    savedMinZoom = player.CameraMinZoomDistance
+    savedMouseLock = player.DevEnableMouseLock
+    holding = true
+    -- Shift-lock pins the cursor to centre in THIRD person too, so zooming out does not free it
+    -- on its own. This is the supported switch; the camera module drops the lock when it flips.
+    player.DevEnableMouseLock = false
+    local want = ShopCamera.gripMinZoom(savedMinZoom, player.CameraMaxZoomDistance)
+    if want ~= nil then
+        player.CameraMinZoomDistance = want
+    end
+end
+
+local function releaseCamera()
+    if not holding then
+        return
+    end
+    holding = false
+    player.CameraMinZoomDistance = savedMinZoom
+    player.DevEnableMouseLock = savedMouseLock
+end
+
+-- THE ONLY PLACE gui.Enabled IS WRITTEN. The camera grip has to be paired with it exactly, and a
+-- second writer is how a pairing comes apart: a panel closed without releasing leaves the player
+-- unable to zoom in for the rest of the session, with nothing on screen to explain why.
+local function setOpen(open: boolean)
+    if open then
+        gripCamera()
+    else
+        releaseCamera()
+    end
+    gui.Enabled = open
+end
 
 local panel = Instance.new("Frame")
 panel.AnchorPoint = Vector2.new(0.5, 0.5)
@@ -144,7 +196,7 @@ end
 local dismissed = false
 closeButton.MouseButton1Click:Connect(function()
     dismissed = true
-    gui.Enabled = false
+    setOpen(false)
 end)
 
 local balance = Instance.new("TextLabel")
@@ -352,7 +404,7 @@ CollectionService:GetInstanceAddedSignal("ShopThreshold"):Connect(register)
 
 local inside = false
 RunService.Heartbeat:Connect(function()
-    local char = Players.LocalPlayer.Character
+    local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
     local now = false
     if root then
@@ -371,8 +423,8 @@ RunService.Heartbeat:Connect(function()
             dismissed = false -- a fresh visit always opens
             paint()
         end
-        gui.Enabled = now
+        setOpen(now)
     elseif inside and not dismissed and not gui.Enabled then
-        gui.Enabled = true
+        setOpen(true)
     end
 end)
