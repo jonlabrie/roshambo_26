@@ -60,13 +60,13 @@ local ROOF_RIDGE_Z = (Z0 + Z1) / 2
 -- 0.7, not the recipe's 1.125. Deck posts carry a platform over a drop and are sized for it;
 -- a shopfront post is a slender column standing on its own floor, and at 1.125 across a 19-stud
 -- frontage the bays read as a fence rather than an opening. (Owner's gate: "too thick".)
-local POST_W = 0.7
+local POST_W = 0.49 -- owner's gate: 70% of 0.7; six posts at deck weight read as a fence
 local GIRDER_H, GIRDER_W = 1.2, 0.825
 local WALL_T = 0.5
 local STUCCO_MAT = "Sandstone"
 local KOSHI_T = 0.18
-local COUNTER_H = 1.1
-local COUNTER_D = 1.4
+local COUNTER_H = 3.0 -- ~3 ft. 1.1 was 13 inches: a step, not a counter
+local COUNTER_D = 2.0
 
 -- inset a coordinate so a post's OUTER face sits flush with the slab edge (recipe standing rule)
 local function flushX(x: number): number
@@ -137,12 +137,17 @@ function Machiya.build(palette: any, _layout: any): any
         local t = (i - 1) / (FRONT_POSTS - 1)
         local x = flushX(X0 + (X1 - X0) * t)
         postX[i] = x
+        -- CypressVertical, not plain Wood. Roblox's Wood grain runs along the part's X axis, so on
+        -- a tall thin post it bands ACROSS the timber like a stack of planks. The place already
+        -- carries a vertical-grain variant for exactly this — 20 parts wear it.
         add(
             `FrontPost{i}`,
             { POST_W, STOREY_H, POST_W },
             { x, FLOOR + STOREY_H / 2, Z0 + POST_W / 2 },
             timber,
-            "Wood"
+            "Wood",
+            nil,
+            "CypressVertical"
         )
     end
 
@@ -162,7 +167,14 @@ function Machiya.build(palette: any, _layout: any): any
     local DOOR_Z = Z0 + 0.55 -- inboard of the posts, so the noren still hangs in front
     local LEAF_FRACTION = 0.36 -- how much of its bay a parked leaf covers
 
-    add("HeadRail", { W - 2 * WALL_T, 0.3, 0.32 }, { CX, HEAD_Y + 0.15, DOOR_Z }, timber, "Wood")
+    -- spans the OPEN bays only; the closed ends carry their own head band
+    add(
+        "HeadRail",
+        { postX[5] - postX[2], 0.3, 0.32 },
+        { (postX[2] + postX[5]) / 2, HEAD_Y + 0.15, DOOR_Z },
+        timber,
+        "Wood"
+    )
 
     for i = 1, FRONT_POSTS - 1 do
         local a, b = postX[i], postX[i + 1]
@@ -403,8 +415,10 @@ function Machiya.build(palette: any, _layout: any): any
     -- ----- the counter -----
     add(
         "Counter",
-        { W - 2 * WALL_T - 1.0, COUNTER_H, COUNTER_D },
-        { CX, FLOOR + COUNTER_H / 2, Z0 + 2.6 },
+        -- Spans only the OPEN bays now that the outer two are closed, and sits deep in the shop so
+        -- the goods are behind it rather than on the street.
+        { postX[5] - postX[2] - POST_W, COUNTER_H, COUNTER_D },
+        { (postX[2] + postX[5]) / 2, FLOOR + COUNTER_H / 2, Z0 + 4.6 },
         timber,
         "WoodPlanks"
     )
@@ -424,11 +438,22 @@ function Machiya.build(palette: any, _layout: any): any
     local FRAME_W = 0.32 -- the surround's member width
     local FRAME_D = 0.34 -- deeper than the panel, so the frame stands proud of it
 
+    -- TILTED 15 DEGREES, TOP TOWARD THE PATH (owner's gate). A sign flat against the facade is
+    -- read edge-on by anyone standing under it; leaning the top out turns its face toward the
+    -- promenade below. By the rotX sign convention, tipping the TOP toward -Z (north, the street)
+    -- is a NEGATIVE angle.
+    local SIGN_TILT = -15
+    local ST = rotX(SIGN_TILT)
+    -- offsets in the board's own plane, rotated with it, so the frame stays on the board
+    local function signPos(dx: number, dy: number): { number }
+        return { CX + dx, SIGN_Y + ST[5] * dy, SIGN_Z + ST[8] * dy }
+    end
+
     table.insert(
         children,
         Spec.part("Kanban", {
             Size = { SIGN_W, SIGN_H, 0.22 },
-            CFrame = Spec.cframe({ CX, SIGN_Y, SIGN_Z }),
+            CFrame = Spec.cframe({ CX, SIGN_Y, SIGN_Z }, ST),
             -- Stucco, matching the walls (owner's gate). A plastered board with the name cut into
             -- it belongs to the building; a pale timber panel read as a separate object hung on it.
             Color = stucco,
@@ -484,9 +509,10 @@ function Machiya.build(palette: any, _layout: any): any
         add(
             m[1] :: string,
             { m[2] :: number, m[3] :: number, FRAME_D },
-            { CX + (m[4] :: number), SIGN_Y + (m[5] :: number), SIGN_Z },
+            signPos(m[4] :: number, m[5] :: number),
             timber,
-            "Wood"
+            "Wood",
+            ST
         )
     end
 

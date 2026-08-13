@@ -115,6 +115,38 @@ title.TextXAlignment = Enum.TextXAlignment.Left
 title.Text = "花火屋"
 title.Parent = panel
 
+-- A WAY OUT. The panel opened on entering the shop and closed only on LEAVING it, so a player who
+-- wanted to look around inside was stuck behind it — an interface with no dismiss reads as a bug
+-- even when it is doing exactly what it was told. Walking out still closes it; this is the other
+-- way, and it is the one you reach for while standing at the counter.
+local closeButton = Instance.new("TextButton")
+closeButton.Name = "Close"
+closeButton.AnchorPoint = Vector2.new(1, 0)
+closeButton.Position = UDim2.new(1, -8, 0, 8)
+closeButton.Size = UDim2.fromOffset(30, 30)
+closeButton.BackgroundColor3 = WASHI
+closeButton.BackgroundTransparency = 0.35
+closeButton.BorderSizePixel = 0
+closeButton.AutoButtonColor = false
+closeButton.Text = "\u{2715}"
+closeButton.TextColor3 = INK_CREAM
+closeButton.Font = Enum.Font.GothamBold
+closeButton.TextSize = 16
+closeButton.Parent = panel
+do
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6)
+    c.Parent = closeButton
+end
+
+-- Dismissed for THIS visit only. Cleared on leaving the volume, so stepping back in re-opens the
+-- shop rather than leaving a player who dismissed it once unable to buy anything ever again.
+local dismissed = false
+closeButton.MouseButton1Click:Connect(function()
+    dismissed = true
+    gui.Enabled = false
+end)
+
 local balance = Instance.new("TextLabel")
 balance.Size = UDim2.new(1, -20, 0, 18)
 balance.Position = UDim2.fromOffset(10, 40)
@@ -335,9 +367,12 @@ RunService.Heartbeat:Connect(function()
     end
     if now ~= inside then
         inside = now
-        gui.Enabled = now
         if now then
+            dismissed = false -- a fresh visit always opens
             paint()
         end
+        gui.Enabled = now
+    elseif inside and not dismissed and not gui.Enabled then
+        gui.Enabled = true
     end
 end)
