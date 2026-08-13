@@ -20,6 +20,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 local CollectionService = game:GetService("CollectionService")
+local UserInputService = game:GetService("UserInputService")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local ShopThreshold = require(shared:WaitForChild("ShopThreshold"))
@@ -100,22 +101,31 @@ gui.Parent = player:WaitForChild("PlayerGui")
 -- then the release would hand back the wrong camera — permanently, for the session.
 local holding = false
 local savedMinZoom = 0
-local savedMouseLock = false
+
+-- THE CURSOR OVERRIDE. Zooming out is not enough on its own: shift-lock pins the cursor to screen
+-- centre in third person too. The obvious switch, `Player.DevEnableMouseLock`, IS NOT SETTABLE
+-- FROM A LOCALSCRIPT — it throws "Insufficent permissions", and because that threw mid-function it
+-- took the zoom-out with it and left the panel unable to close. Measured, not assumed.
+--
+-- So write MouseBehavior directly, and write it LATE. The camera module sets it during its own
+-- render step; anything written before that is overwritten before the engine reads it. Bound one
+-- priority after the camera, the cursor stays free — and reverts the frame this unbinds.
+local CURSOR_BIND = "ShopPanelCursor"
+local CURSOR_PRIORITY = Enum.RenderPriority.Camera.Value + 1
 
 local function gripCamera()
     if holding then
         return
     end
     savedMinZoom = player.CameraMinZoomDistance
-    savedMouseLock = player.DevEnableMouseLock
     holding = true
-    -- Shift-lock pins the cursor to centre in THIRD person too, so zooming out does not free it
-    -- on its own. This is the supported switch; the camera module drops the lock when it flips.
-    player.DevEnableMouseLock = false
     local want = ShopCamera.gripMinZoom(savedMinZoom, player.CameraMaxZoomDistance)
     if want ~= nil then
         player.CameraMinZoomDistance = want
     end
+    RunService:BindToRenderStep(CURSOR_BIND, CURSOR_PRIORITY, function()
+        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    end)
 end
 
 local function releaseCamera()
@@ -123,8 +133,8 @@ local function releaseCamera()
         return
     end
     holding = false
+    RunService:UnbindFromRenderStep(CURSOR_BIND)
     player.CameraMinZoomDistance = savedMinZoom
-    player.DevEnableMouseLock = savedMouseLock
 end
 
 -- THE ONLY PLACE gui.Enabled IS WRITTEN. The camera grip has to be paired with it exactly, and a
