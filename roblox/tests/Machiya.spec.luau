@@ -220,18 +220,25 @@ describe("Machiya — the parts other tasks bind to", function()
     end)
 
     test("and the doors in those middle bays stand OPEN", function()
-        -- Open is the point: doors pushed aside, not a hole and not a wall. It would be very easy
-        -- to widen a leaf later and quietly shut the shop.
-        local opening, covered = 0, 0
+        -- Open is the point: screens pushed aside, not a hole and not a wall.
+        --
+        -- MEASURED AS OVERLAP, NOT AS WIDTH. The leaf is now the full width of its bay and is SLID
+        -- two-thirds away, so width alone says it covers everything while the bay is actually
+        -- clear. What matters is how much of the opening the leaf still sits in front of.
         for _, c in model.children do
             local n = c.name :: string
             if n:sub(1, 7) == "Transom" and n:sub(1, 10) ~= "TransomBar" then
-                opening += c.properties.Size[1] -- a transom spans its whole bay
-            elseif n:sub(1, 8) == "DoorLeaf" then
-                covered += c.properties.Size[1]
+                local bayC, bayW = c.properties.CFrame[1], c.properties.Size[1]
+                local leaf = find(model, "DoorLeaf" .. n:sub(8))
+                expect(leaf ~= nil).toBe(true)
+                local lc, lw = leaf.properties.CFrame[1], leaf.properties.Size[1]
+                local overlap = math.max(
+                    0,
+                    math.min(bayC + bayW / 2, lc + lw / 2) - math.max(bayC - bayW / 2, lc - lw / 2)
+                )
+                expect(overlap < bayW * 0.40).toBe(true)
             end
         end
-        expect(covered < opening * 0.45).toBe(true)
     end)
 
     test("the upper storey is a WALL with a window, not a row of bars", function()

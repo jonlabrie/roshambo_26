@@ -195,7 +195,9 @@ function Machiya.build(palette: any, _layout: any): any
     -- 3.9 you would have walked face-first into the doorway you were meant to enter.
     local HEAD_Y = FLOOR + 6.8
     local TRANSOM_TOP = FLOOR + STOREY_H - GIRDER_H
-    local DOOR_Z = Z0 + STUCCO_SETBACK + 0.18 -- door plane sits behind the frame
+    -- BEHIND the closed bays' panels (which sit at STUCCO_SETBACK + 0.18, 0.36 thick), so a
+    -- screen slid aside is genuinely occluded by the wall rather than poking through it.
+    local DOOR_Z = Z0 + STUCCO_SETBACK + 0.62
     -- Timber front faces sit EXACTLY on the frontage plane: half the member's depth, no more. At
     -- 0.16 against a 0.34-deep member they poked 0.01 studs into the reserved promenade, which the
     -- clearance test correctly refused — a hair over the line is still over it.
@@ -203,7 +205,6 @@ function Machiya.build(palette: any, _layout: any): any
     local FRAME_Z = Z0 + FRAME_D2 / 2
     local LAT_D = 0.2
     local LAT_Z = Z0 + LAT_D / 2 -- inboard of the posts, so the noren still hangs in front
-    local LEAF_FRACTION = 0.36 -- how much of its bay a parked leaf covers
 
     -- spans the OPEN bays only; the closed ends carry their own head band
     add(
@@ -307,26 +308,51 @@ function Machiya.build(palette: any, _layout: any): any
                     "Wood"
                 )
             end
-            local leafW = bayW * LEAF_FRACTION
-            local parkWest = i % 2 == 1
-            local leafC = if parkWest then (a + POST_W / 2 + leafW / 2) else (b - POST_W / 2 - leafW / 2)
+            -- THE SCREEN IS FULL BAY WIDTH AND SLID TWO-THIRDS AWAY, so the opening is 2/3 clear
+            -- and the hidden third-and-a-bit sits BEHIND the closed bay next to it. That is how a
+            -- sliding screen actually works — it does not shrink, it goes somewhere. It parks
+            -- toward whichever neighbouring bay is closed, which is what gives it somewhere to go.
+            local leafW = bayW
+            local openW = bayW
+            local parkWest = CLOSED[i - 1] == true
+            local leafC = if parkWest then (a + POST_W / 2 - openW / 6) else (b - POST_W / 2 + openW / 6)
             local leafH = HEAD_Y - FLOOR
             add(`DoorLeaf{i}`, { leafW, leafH, 0.08 }, { leafC, FLOOR + leafH / 2, DOOR_Z }, paper, "Fabric")
-            add(
-                `DoorStileW{i}`,
-                { 0.12, leafH, 0.13 },
-                { leafC - leafW / 2 + 0.06, FLOOR + leafH / 2, DOOR_Z },
-                timber,
-                "Wood"
-            )
-            add(
-                `DoorStileE{i}`,
-                { 0.12, leafH, 0.13 },
-                { leafC + leafW / 2 - 0.06, FLOOR + leafH / 2, DOOR_Z },
-                timber,
-                "Wood"
-            )
-            add(`DoorRail{i}`, { leafW, 0.14, 0.13 }, { leafC, FLOOR + leafH * 0.42, DOOR_Z }, timber, "Wood")
+            -- stiles, rails and a proper kumiko grid, all in the frame's dark wood
+            for k, sx in { leafC - leafW / 2 + 0.07, leafC + leafW / 2 - 0.07 } do
+                add(
+                    `DoorStile{i}_{k}`,
+                    { 0.14, leafH, 0.15 },
+                    { sx, FLOOR + leafH / 2, DOOR_Z },
+                    timber,
+                    "Wood",
+                    nil,
+                    FRAME_VAR
+                )
+            end
+            local LAT_N_V, LAT_N_H = 5, 7
+            for k = 1, LAT_N_V do
+                add(
+                    `DoorLatV{i}_{k}`,
+                    { 0.075, leafH, 0.13 },
+                    { leafC - leafW / 2 + leafW * (k / (LAT_N_V + 1)), FLOOR + leafH / 2, DOOR_Z },
+                    timber,
+                    "Wood",
+                    nil,
+                    FRAME_VAR
+                )
+            end
+            for k = 1, LAT_N_H do
+                add(
+                    `DoorLatH{i}_{k}`,
+                    { leafW, 0.075, 0.13 },
+                    { leafC, FLOOR + leafH * (k / (LAT_N_H + 1)), DOOR_Z },
+                    timber,
+                    "Wood",
+                    nil,
+                    FRAME_VAR
+                )
+            end
         end
     end
 
@@ -416,9 +442,11 @@ function Machiya.build(palette: any, _layout: any): any
             )
         end
         -- the beam at the eave line, where the roof edge meets the flank
+        -- out to the ROOF EDGES, not the wall line: the beam at the eave belongs to the roof's
+        -- span, and stopping it at the wall left the overhang unsupported to the eye.
         add(
             `SideEaveBeam{nm}`,
-            { POST_W * 0.85, BAND_T, D },
+            { POST_W * 0.85, BAND_T, D + 2 * ROOF_EAVE },
             { px, EAVE_Y - BAND_T / 2, CZ },
             timber,
             "Wood",
