@@ -982,11 +982,11 @@ function Machiya.build(palette: any, _layout: any): any
     -- to cloth-thick as boxed geometry gets. The remaining "it still looks solid" is answered by
     -- the transparency below, not by more thinness.
     local NOREN_T = 0.05
-    -- Owner's gate: half, up from 0.25. Sheer enough that the shopfront reads THROUGH the cloth
-    -- and the panels stop looking like painted boards hung in the opening — which is the whole
-    -- reason they were flagged. It is well past what a cotton noren really does; the read matters
-    -- more than the fibre here, and at this distance the alternative looked solid.
-    local NOREN_ALPHA = 0.5
+    -- Owner's gate, twice: 0.25 read as solid, and so did 0.5. Three quarters is far past what a
+    -- cotton noren does — the read matters more than the fibre here, and what is being bought is
+    -- the shopfront showing THROUGH the cloth so the panels stop looking like painted boards hung
+    -- in the opening.
+    local NOREN_ALPHA = 0.75
     -- Total lean from vertical at the hem. Small: a noren hangs, it does not billow. NEGATIVE
     -- leans the hem toward +Z — back under the eave, INTO the shop. It is tempting to lean it out
     -- over the street instead, and that pushes the hem 0.05 north of the frontage: the promenade
