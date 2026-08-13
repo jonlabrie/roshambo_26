@@ -24,7 +24,6 @@ local UserInputService = game:GetService("UserInputService")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local ShopThreshold = require(shared:WaitForChild("ShopThreshold"))
-local ShopCamera = require(shared:WaitForChild("ShopCamera"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local player = Players.LocalPlayer
@@ -94,57 +93,56 @@ gui.Parent = player:WaitForChild("PlayerGui")
 -- ===== the way out =====
 -- The panel is centred, and a first-person player's cursor is PINNED to screen centre — on top of
 -- it. The close button cannot be pressed and the scroll that would zoom back out is eaten by the
--- panel under the cursor, so walking out is the only escape. Borrow the camera while the panel is
--- open and give it back on close; the arithmetic is in ShopCamera, which is tested.
+-- panel under the cursor, so walking out was the only escape. Shift-lock does the same thing in
+-- third person, so zooming the player out would not have covered it either.
 --
--- `holding` is not a nicety. Gripping twice would record OUR OWN grip as the player's setting, and
--- then the release would hand back the wrong camera — permanently, for the session.
-local holding = false
-local savedMinZoom = 0
-
--- THE CURSOR OVERRIDE. Zooming out is not enough on its own: shift-lock pins the cursor to screen
--- centre in third person too. The obvious switch, `Player.DevEnableMouseLock`, IS NOT SETTABLE
--- FROM A LOCALSCRIPT — it throws "Insufficent permissions", and because that threw mid-function it
--- took the zoom-out with it and left the panel unable to close. Measured, not assumed.
+-- FREE THE CURSOR; LEAVE THE CAMERA ALONE. An earlier attempt also forced the player out to third
+-- person by raising CameraMinZoomDistance. It worked, and it was wrong: it took the camera away
+-- from someone who had chosen first person, to solve a problem that is not about the camera.
+-- Measured with the camera PINNED in first person, the override alone gives MouseBehavior=Default,
+-- MouseIconEnabled=true, and the close button topmost under the cursor — which is everything the
+-- player needs. The camera is theirs; while the panel is open it simply stops turning.
 --
--- So write MouseBehavior directly, and write it LATE. The camera module sets it during its own
--- render step; anything written before that is overwritten before the engine reads it. Bound one
--- priority after the camera, the cursor stays free — and reverts the frame this unbinds.
+-- The write has to be LATE. The camera module sets MouseBehavior during its own render step, so
+-- anything written before that is overwritten before the engine reads it. Bound one priority
+-- after the camera, the cursor stays free — and reverts the frame this unbinds.
+--
+-- Not `Player.DevEnableMouseLock`, which looks like the switch for the shift-lock half and IS NOT
+-- SETTABLE FROM A LOCALSCRIPT: it throws "Insufficent permissions", and because it threw
+-- mid-function it silently took the rest of the open path with it.
 local CURSOR_BIND = "ShopPanelCursor"
 local CURSOR_PRIORITY = Enum.RenderPriority.Camera.Value + 1
 
-local function gripCamera()
+-- Not a nicety: BindToRenderStep on an already-bound name replaces it quietly, but Unbind on a
+-- name that was never bound throws — and that throw would land in the middle of closing the panel.
+local holding = false
+
+local function gripCursor()
     if holding then
         return
     end
-    savedMinZoom = player.CameraMinZoomDistance
     holding = true
-    local want = ShopCamera.gripMinZoom(savedMinZoom, player.CameraMaxZoomDistance)
-    if want ~= nil then
-        player.CameraMinZoomDistance = want
-    end
     RunService:BindToRenderStep(CURSOR_BIND, CURSOR_PRIORITY, function()
         UserInputService.MouseBehavior = Enum.MouseBehavior.Default
     end)
 end
 
-local function releaseCamera()
+local function releaseCursor()
     if not holding then
         return
     end
     holding = false
     RunService:UnbindFromRenderStep(CURSOR_BIND)
-    player.CameraMinZoomDistance = savedMinZoom
 end
 
--- THE ONLY PLACE gui.Enabled IS WRITTEN. The camera grip has to be paired with it exactly, and a
--- second writer is how a pairing comes apart: a panel closed without releasing leaves the player
--- unable to zoom in for the rest of the session, with nothing on screen to explain why.
+-- THE ONLY PLACE gui.Enabled IS WRITTEN. The cursor grip has to be paired with it exactly, and a
+-- second writer is how a pairing comes apart: a panel closed without releasing would leave the
+-- camera unable to turn for the rest of the session, with nothing on screen to explain why.
 local function setOpen(open: boolean)
     if open then
-        gripCamera()
+        gripCursor()
     else
-        releaseCamera()
+        releaseCursor()
     end
     gui.Enabled = open
 end
