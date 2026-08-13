@@ -101,6 +101,48 @@ local FRAME_VAR = "CypressVertical"
 local KOSHI_T = 0.18
 local COUNTER_H = 3.0 -- ~3 ft. 1.1 was 13 inches: a step, not a counter
 local COUNTER_D = 2.0
+-- Back wall to the counter's CENTRE. Pulled a stud forward at the owner's gate so a shopkeeper
+-- can stand behind it: 1.6 studs of clearance is a shelf, 2.6 is a place to work.
+local COUNTER_STANDOFF = 4.4
+local COUNTER_Z = Z1 - COUNTER_STANDOFF
+local COUNTER_BACK_Z = COUNTER_Z + COUNTER_D / 2
+
+-- ===== the stair to the upper storey =====
+-- Along the EAST wall, climbing NORTH from the counter's back edge (the owner set its foot there,
+-- so it is derived from the counter and moves with it rather than being a second magic number).
+-- Deliberately steep and narrow — a machiya's stair is nearer a ladder than a staircase, and one
+-- body wide is the honest width for a shop this size.
+local UPPER_SURFACE = FLOOR + STOREY_H + SLAB_T -- what you stand on upstairs
+local STAIR_TREADS = 11
+-- The last riser is the upper floor itself, so TREADS+1 risers span the storey. Asserted rather
+-- than trusted: a rise that does not divide leaves a final step of the wrong height, which reads
+-- as a stumble in Play and as nothing at all in the explorer.
+local STAIR_RISE = (UPPER_SURFACE - FLOOR) / (STAIR_TREADS + 1)
+assert(math.abs(STAIR_RISE - 0.8) < 1e-9, `stair rise {STAIR_RISE} is not the intended 0.8`)
+local STAIR_RUN = 0.72 -- 48° — steep, which is the point
+local STAIR_W = 2.8
+local TREAD_T = 0.22
+
+-- The stairwell. Its south edge is set by HEADROOM, not by taste: a climber on tread k has their
+-- feet at FLOOR + k*RISE and wants a working avatar's 6 studs above that, against an underside at
+-- FLOOR + STOREY_H. Treads 1 and 2 pass under it comfortably; the third would clear by about half
+-- a stud, which is no clearance at all once a body has depth, so the cut opens at the third.
+local STAIR_HEAD_CLEAR = 2 -- treads that stay under the upper floor
+-- The invariant is that no COVERED tread traps a climber. Opening a tread earlier than strictly
+-- required is a margin and is fine; opening one later is a low beam you cannot see in the
+-- explorer. Strict headroom would allow three covered treads (the third clears by 0.6) — the
+-- third is given away on purpose, because 0.6 studs is not clearance once a body has depth.
+assert(
+    FLOOR + STAIR_HEAD_CLEAR * STAIR_RISE + 6.0 <= FLOOR + STOREY_H,
+    "the stairwell opens too late — a climber meets the upper floor before the cut"
+)
+local WELL_Z1 = COUNTER_BACK_Z - STAIR_HEAD_CLEAR * STAIR_RUN
+local WELL_Z0 = COUNTER_BACK_Z - STAIR_TREADS * STAIR_RUN
+-- Hard against the east wall's inner face, and the well is cut a little wider than the stair so a
+-- climber's shoulders are not clipping the floor edge on the way up.
+local STAIR_X1 = SX1 - WALL_T
+local STAIR_X0 = STAIR_X1 - STAIR_W
+local WELL_X0 = STAIR_X0 - 0.2
 
 -- inset a coordinate so a post's OUTER face sits flush with the slab edge (recipe standing rule)
 local function flushX(x: number): number
@@ -542,15 +584,75 @@ function Machiya.build(palette: any, _layout: any): any
     -- "Wood", not "WoodPlanks". A MaterialVariant is SILENTLY IGNORED unless the part's Material
     -- equals the variant's BaseMaterial, and CypressVertical is base Wood — so this floor was set
     -- to the dark variant twice and stayed pale both times, with nothing anywhere to say why.
+    --
+    -- FOUR PIECES, NOT ONE, because the stair has to come through it. A rectangular well is cut in
+    -- the east side and the floor is laid around it: the main span west of the well, the two ends
+    -- north and south of it, and a strip along the east wall that keeps the wall standing on
+    -- floor rather than on air. The floor NORTH of the well is the landing the stair arrives on.
+    local uy = FLOOR + STOREY_H + SLAB_T / 2
     add(
         "UpperFloor",
-        { W, SLAB_T, D },
-        { CX, FLOOR + STOREY_H + SLAB_T / 2, CZ },
+        { WELL_X0 - X0, SLAB_T, D },
+        { (X0 + WELL_X0) / 2, uy, CZ },
         timber,
         "Wood",
         nil,
         FRAME_VAR
     )
+    add(
+        "UpperFloorNorth",
+        { X1 - WELL_X0, SLAB_T, WELL_Z0 - Z0 },
+        { (WELL_X0 + X1) / 2, uy, (Z0 + WELL_Z0) / 2 },
+        timber,
+        "Wood",
+        nil,
+        FRAME_VAR
+    )
+    add(
+        "UpperFloorSouth",
+        { X1 - WELL_X0, SLAB_T, Z1 - WELL_Z1 },
+        { (WELL_X0 + X1) / 2, uy, (WELL_Z1 + Z1) / 2 },
+        timber,
+        "Wood",
+        nil,
+        FRAME_VAR
+    )
+    add(
+        "UpperFloorEdge",
+        { X1 - STAIR_X1, SLAB_T, WELL_Z1 - WELL_Z0 },
+        { (STAIR_X1 + X1) / 2, uy, (WELL_Z0 + WELL_Z1) / 2 },
+        timber,
+        "Wood",
+        nil,
+        FRAME_VAR
+    )
+
+    -- ----- the stair -----
+    -- Treads are edge to edge in plan (run == tread depth), so there is no gap to drop through
+    -- even though the risers are open. Two stringers carry them, pitched at the same angle the
+    -- treads climb. The stair's low end is at +Z, and by the sign convention above a POSITIVE
+    -- angle lowers the +Z end — the same trap that inverted the roof.
+    local stairDeg = math.deg(math.atan2(STAIR_RISE, STAIR_RUN))
+    local stairLen = STAIR_TREADS * math.sqrt(STAIR_RUN * STAIR_RUN + STAIR_RISE * STAIR_RISE)
+    local stairCX = (STAIR_X0 + STAIR_X1) / 2
+    for k = 1, STAIR_TREADS do
+        add(
+            `StairTread{k}`,
+            { STAIR_W, TREAD_T, STAIR_RUN },
+            { stairCX, FLOOR + k * STAIR_RISE - TREAD_T / 2, COUNTER_BACK_Z - (k - 0.5) * STAIR_RUN },
+            timber,
+            "Wood",
+            nil,
+            FRAME_VAR
+        )
+    end
+    for _, s in { { "West", STAIR_X0 + 0.12 }, { "East", STAIR_X1 - 0.12 } } do
+        add(`StairStringer{s[1]}`, { 0.24, 0.55, stairLen }, {
+            s[2] :: number,
+            (FLOOR + FLOOR + STAIR_TREADS * STAIR_RISE) / 2 - 0.45,
+            (COUNTER_BACK_Z + WELL_Z0) / 2,
+        }, timber, "Wood", rotX(stairDeg), FRAME_VAR)
+    end
 
     -- ----- the closed upper storey: kōshi lattice to the street, boards elsewhere -----
     -- THE UPPER STOREY HAD NO STREET WALL — just a row of lattice bars with the building's inside
@@ -789,7 +891,7 @@ function Machiya.build(palette: any, _layout: any): any
         -- shop was 8 deep and became a counter marooned in the middle of the street the moment the
         -- frontage moved north. The counter belongs to the back wall; the customers get the rest.
         { postX[FRONT_POSTS - 1] - postX[2] - POST_W, COUNTER_H, COUNTER_D },
-        { (postX[2] + postX[FRONT_POSTS - 1]) / 2, FLOOR + COUNTER_H / 2, Z1 - 3.4 },
+        { (postX[2] + postX[FRONT_POSTS - 1]) / 2, FLOOR + COUNTER_H / 2, COUNTER_Z },
         timber,
         "Wood",
         nil,

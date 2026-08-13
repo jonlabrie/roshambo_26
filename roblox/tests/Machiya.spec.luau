@@ -118,9 +118,63 @@ describe("Machiya — what makes it a shop and not a teahouse", function()
         -- the goods stacked between it and the customers. Measure it from the back wall.
         local counter = find(model, "Counter")
         local cz, dz = counter.properties.CFrame[3], counter.properties.Size[3]
-        expect(Z1 - (cz + dz / 2) < 3).toBe(true)
+        -- In the rear third of the plan. Not "within N studs of the wall" — that fought the
+        -- shopkeeper's standing room, which is a separate requirement with its own test.
+        expect(cz >= Z0 + 2 * (Z1 - Z0) / 3).toBe(true)
         -- and the point of the whole exercise: room for a crowd to stand and buy
         expect((cz - dz / 2) - Z0 >= 8).toBe(true)
+    end)
+
+    test("there is room to STAND behind the counter", function()
+        -- The counter was pulled a stud forward to make space for a shopkeeper. Measure the gap
+        -- against the wall's inner face, not the envelope, or the wall thickness gets counted
+        -- as standing room.
+        local counter = find(model, "Counter")
+        local wall = find(model, "WallBack")
+        local counterBack = counter.properties.CFrame[3] + counter.properties.Size[3] / 2
+        local wallInner = wall.properties.CFrame[3] - wall.properties.Size[3] / 2
+        expect(wallInner - counterBack >= 2.4).toBe(true)
+    end)
+
+    test("THE STAIR STANDS ON THE COUNTER'S BACK EDGE", function()
+        -- The owner placed its foot there, so the two are bound: moving the counter has to move
+        -- the stair. Derive one from the other in the builder and this stays true for free.
+        local counter = find(model, "Counter")
+        local tread = find(model, "StairTread1")
+        expect(tread ~= nil).toBe(true)
+        local counterBack = counter.properties.CFrame[3] + counter.properties.Size[3] / 2
+        local treadBack = tread.properties.CFrame[3] + tread.properties.Size[3] / 2
+        expect(math.abs(treadBack - counterBack) < 0.001).toBe(true)
+    end)
+
+    test("THE STAIRWELL IS CUT WHERE THE STAIR NEEDS IT", function()
+        -- The whole point of an opening. Walk every tread and check the column of air above it —
+        -- one working avatar tall — against every piece of upper floor. A stair that climbs into
+        -- its own ceiling looks completely correct in the explorer and is unusable in Play.
+        local treads, floors = {}, {}
+        for _, c in model.children do
+            local n = c.name :: string
+            if n:sub(1, 10) == "StairTread" then
+                table.insert(treads, c)
+            elseif n:sub(1, 10) == "UpperFloor" then
+                table.insert(floors, c)
+            end
+        end
+        expect(#treads >= 8).toBe(true)
+        expect(#floors >= 2).toBe(true) -- an uncut single slab cannot pass this test
+        for _, t in treads do
+            local tp, ts = t.properties.CFrame, t.properties.Size
+            local headLo = tp[2] + ts[2] / 2
+            local headHi = headLo + 6.0
+            for _, f in floors do
+                local fp, fs = f.properties.CFrame, f.properties.Size
+                local overlaps = math.abs(tp[1] - fp[1]) < (ts[1] + fs[1]) / 2 - 0.001
+                    and math.abs(tp[3] - fp[3]) < (ts[3] + fs[3]) / 2 - 0.001
+                    and fp[2] + fs[2] / 2 > headLo + 0.001
+                    and fp[2] - fs[2] / 2 < headHi - 0.001
+                expect(overlaps).toBe(false)
+            end
+        end
     end)
 
     test("THE FLANK BAYS ARE EQUAL, whatever the depth", function()
