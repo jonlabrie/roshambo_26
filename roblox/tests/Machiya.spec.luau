@@ -172,16 +172,17 @@ describe("Machiya — the parts other tasks bind to", function()
         expect(text.properties.Text).toBe("花火屋")
     end)
 
-    test("the sign is dark letters on a light ground, in a frame on all four sides", function()
+    test("the sign's letters CONTRAST with its board, in a frame on all four sides", function()
         local k = find(model, "Kanban")
         local text = find(find(k, "Face"), "Text")
-        -- A light panel with light lettering is invisible, and it is the kind of thing that
-        -- survives review because both values look reasonable on their own.
+        -- Either polarity is fine — the sign began as dark ink on a light board and is now pale
+        -- characters on dark wood. What is NOT fine is the two drifting together, which is the
+        -- kind of thing that survives review because both values look reasonable on their own.
         local panelLum = k.properties.Color[1] + k.properties.Color[2] + k.properties.Color[3]
         local inkLum = text.properties.TextColor3[1]
             + text.properties.TextColor3[2]
             + text.properties.TextColor3[3]
-        expect(panelLum > inkLum + 1).toBe(true)
+        expect(math.abs(panelLum - inkLum) > 1).toBe(true)
         expect(countPrefix(model, "KanbanFrame")).toBe(4)
         -- Sized to the CHARACTERS, not to the building. At 0.62 of the frontage the name floated
         -- in the middle of a half-empty board; three glyphs want roughly 3:1.

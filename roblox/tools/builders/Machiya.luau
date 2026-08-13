@@ -317,29 +317,59 @@ function Machiya.build(palette: any, _layout: any): any
         "WallWest",
         { WALL_T, STOREY_H, D },
         { X0 + STUCCO_SETBACK + WALL_T / 2, FLOOR + STOREY_H / 2, CZ },
-        stucco,
-        STUCCO_MAT,
+        timber,
+        "Wood",
         nil,
-        STUCCO_VAR
+        FRAME_VAR
     )
     add(
         "WallEast",
         { WALL_T, STOREY_H, D },
         { X1 - STUCCO_SETBACK - WALL_T / 2, FLOOR + STOREY_H / 2, CZ },
-        stucco,
-        STUCCO_MAT,
+        timber,
+        "Wood",
         nil,
-        STUCCO_VAR
+        FRAME_VAR
     )
     add(
         "WallBack",
         { W, STOREY_H, WALL_T },
         { CX, FLOOR + STOREY_H / 2, Z1 - WALL_T / 2 },
-        stucco,
-        STUCCO_MAT,
+        timber,
+        "Wood",
         nil,
-        STUCCO_VAR
+        FRAME_VAR
     )
+
+    -- ----- THE FRAME ON THE FLANKS -----
+    -- From the side the building read as one plane of render with no structure in it — the posts
+    -- and beams only ever existed on the street elevation. A machiya's flank shows its frame:
+    -- corner posts, an intermediate one, and a nageshi band at the storey division. All stand
+    -- proud of the wall behind them, which is the whole point.
+    local SIDE_POST_Z = { Z0 + 0.7, CZ, Z1 - 0.7 }
+    for _, side in { { "West", X0 + POST_W / 2 }, { "East", X1 - POST_W / 2 } } do
+        local nm, px = side[1] :: string, side[2] :: number
+        for k, pz in SIDE_POST_Z do
+            add(
+                `SidePost{nm}{k}`,
+                { POST_W, STOREY_H, POST_W },
+                { px, FLOOR + STOREY_H / 2, pz },
+                timber,
+                "Wood",
+                nil,
+                FRAME_VAR
+            )
+        end
+        add(
+            `SideNageshi{nm}`,
+            { POST_W * 0.85, 0.34, D },
+            { px, FLOOR + STOREY_H - 0.17, CZ },
+            timber,
+            "Wood",
+            nil,
+            FRAME_VAR
+        )
+    end
 
     -- ----- girders + the upper floor -----
     add(
@@ -420,9 +450,11 @@ function Machiya.build(palette: any, _layout: any): any
         add(
             `Koshi{i}`,
             { KOSHI_T, WIN_H, KOSHI_T },
-            { WIN_X0 + (WIN_X1 - WIN_X0) * t, WIN_Y0 + WIN_H / 2, Z0 + KOSHI_T },
-            ink,
-            "Wood"
+            { WIN_X0 + (WIN_X1 - WIN_X0) * t, WIN_Y0 + WIN_H / 2, Z0 + KOSHI_T / 2 },
+            timber,
+            "Wood",
+            nil,
+            FRAME_VAR
         )
     end
 
@@ -546,32 +578,40 @@ function Machiya.build(palette: any, _layout: any): any
         )
     end
 
-    -- ----- noren: the split curtain, over the OPENING only -----
-    -- It hung at 7.9 studs, which on a 9-stud storey is nearly at the ceiling — a noren you cannot
-    -- brush through is a valance. It now hangs from the door head down to 4.2, so you part it on
-    -- the way in. And it covers the OPEN bays only: a curtain in front of a plastered wall is
-    -- advertising a door that is not there.
+    -- ----- noren: three equal panels PER OPEN BAY -----
+    -- They were three panels spread across BOTH bays, so they straddled the middle post and came
+    -- out uneven — one wide, one narrow. A noren belongs to its own doorway: each opening gets its
+    -- own set of three, sized to that bay, so the panels are identical and the post between them
+    -- reads as a post rather than as a seam.
     local NOREN_TOP = HEAD_Y
     local NOREN_H = 2.6
-    local nSpanA, nSpanB = postX[2], postX[FRONT_POSTS - 1]
-    local NOREN_N = 3
-    local nSpan = nSpanB - nSpanA
-    local norenW = nSpan / NOREN_N - 0.25
-    for i = 1, NOREN_N do
-        local t = (i - 0.5) / NOREN_N
-        table.insert(
-            children,
-            Spec.part(`Noren{i}`, {
-                Size = { norenW, NOREN_H, 0.08 },
-                CFrame = Spec.cframe({ nSpanA + nSpan * t, NOREN_TOP - NOREN_H / 2, Z0 + 0.06 }),
-                Color = palette.vermilion,
-                Material = "Fabric",
-                CanCollide = false,
-                CanQuery = false,
-                CanTouch = false,
-                CastShadow = false,
-            })
-        )
+    local NOREN_PER_BAY = 3
+    for i = 1, FRONT_POSTS - 1 do
+        if not CLOSED[i] then
+            local a, b = postX[i], postX[i + 1]
+            local openW = (b - a) - POST_W
+            local panelW = openW / NOREN_PER_BAY - 0.16
+            for k = 1, NOREN_PER_BAY do
+                local t = (k - 0.5) / NOREN_PER_BAY
+                table.insert(
+                    children,
+                    Spec.part(`Noren{i}_{k}`, {
+                        Size = { panelW, NOREN_H, 0.08 },
+                        CFrame = Spec.cframe({
+                            a + POST_W / 2 + openW * t,
+                            NOREN_TOP - NOREN_H / 2,
+                            Z0 + 0.06,
+                        }),
+                        Color = palette.vermilion,
+                        Material = "Fabric",
+                        CanCollide = false,
+                        CanQuery = false,
+                        CanTouch = false,
+                        CastShadow = false,
+                    })
+                )
+            end
+        end
     end
 
     -- ----- the counter -----
@@ -614,12 +654,14 @@ function Machiya.build(palette: any, _layout: any): any
     table.insert(
         children,
         Spec.part("Kanban", {
-            Size = { SIGN_W, SIGN_H, 0.22 },
+            Size = { SIGN_W, SIGN_H, 0.11 }, -- owner's gate: half the first pass
             CFrame = Spec.cframe({ CX, SIGN_Y, SIGN_Z }, ST),
-            -- Stucco, matching the walls (owner's gate). A plastered board with the name cut into
-            -- it belongs to the building; a pale timber panel read as a separate object hung on it.
-            Color = stucco,
-            Material = STUCCO_MAT,
+            -- The posts' dark wood (owner's gate). A dark board with pale characters is the
+            -- ordinary kanban — black lacquer, gold or white letters — and it ties the sign to the
+            -- timber frame rather than to the render.
+            Color = timber,
+            Material = "Wood",
+            MaterialVariant = FRAME_VAR,
             CanCollide = false,
             CanQuery = false,
             CanTouch = false,
@@ -647,7 +689,7 @@ function Machiya.build(palette: any, _layout: any): any
                                 Size = { UDim2 = { { 1, 0 }, { 1, 0 } } },
                                 BackgroundTransparency = 1,
                                 Text = "花火屋",
-                                TextColor3 = ink, -- dark letters on the light ground
+                                TextColor3 = palette.ivory, -- pale letters on the dark board
                                 TextSize = 72,
                                 Font = "GothamBold",
                             },
@@ -674,7 +716,8 @@ function Machiya.build(palette: any, _layout: any): any
             signPos(m[4] :: number, m[5] :: number),
             timber,
             "Wood",
-            ST
+            ST,
+            FRAME_VAR
         )
     end
 
