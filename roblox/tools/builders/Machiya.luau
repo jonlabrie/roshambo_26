@@ -317,7 +317,16 @@ function Machiya.build(palette: any, _layout: any): any
             local parkWest = CLOSED[i - 1] == true
             local leafC = if parkWest then (a + POST_W / 2 - openW / 6) else (b - POST_W / 2 + openW / 6)
             local leafH = HEAD_Y - FLOOR
-            add(`DoorLeaf{i}`, { leafW, leafH, 0.08 }, { leafC, FLOOR + leafH / 2, DOOR_Z }, paper, "Fabric")
+            -- The paper is INSET inside its own frame. At full leaf size its edges landed exactly on
+            -- the stiles', so the sheet was visible edge-on — a pane the same size as its sash.
+            -- Real shoji paper is glued behind the frame and stops short of it on every side.
+            add(
+                `DoorLeaf{i}`,
+                { leafW - 2 * 0.16, leafH - 2 * 0.1, 0.05 },
+                { leafC, FLOOR + leafH / 2, DOOR_Z },
+                paper,
+                "Fabric"
+            )
             -- stiles, rails and a proper kumiko grid, all in the frame's dark wood
             for k, sx in { leafC - leafW / 2 + 0.07, leafC + leafW / 2 - 0.07 } do
                 add(
