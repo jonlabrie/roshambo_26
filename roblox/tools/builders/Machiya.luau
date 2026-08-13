@@ -84,7 +84,10 @@ local STUCCO_SETBACK = 0.30
 local SX0, SX1 = X0 + STUCCO_SETBACK, X1 - STUCCO_SETBACK
 local SZ0, SZ1 = Z0 + STUCCO_SETBACK, Z1 - STUCCO_SETBACK
 local SW = SX1 - SX0 -- the box's width; NOT W
-local SD = SZ1 - Z0 -- side walls run from the open frontage to the back face
+-- Side walls run BETWEEN the box's front and back faces. Running them to Z0 put their front
+-- edge exactly on the corner post's front face — proud on one axis and flush on the other reads
+-- as flush.
+local SD = SZ1 - SZ0
 
 -- The posts wear CypressVertical and came out darker; the beams they carry were plain Wood and did
 -- not match. One variant for every piece of exterior frame.
@@ -328,7 +331,7 @@ function Machiya.build(palette: any, _layout: any): any
     add(
         "WallWest",
         { WALL_T, STOREY_H, SD },
-        { SX0 + WALL_T / 2, FLOOR + STOREY_H / 2, (Z0 + SZ1) / 2 },
+        { SX0 + WALL_T / 2, FLOOR + STOREY_H / 2, (SZ0 + SZ1) / 2 },
         stucco,
         STUCCO_MAT,
         nil,
@@ -337,7 +340,7 @@ function Machiya.build(palette: any, _layout: any): any
     add(
         "WallEast",
         { WALL_T, STOREY_H, SD },
-        { SX1 - WALL_T / 2, FLOOR + STOREY_H / 2, (Z0 + SZ1) / 2 },
+        { SX1 - WALL_T / 2, FLOOR + STOREY_H / 2, (SZ0 + SZ1) / 2 },
         stucco,
         STUCCO_MAT,
         nil,
@@ -368,7 +371,11 @@ function Machiya.build(palette: any, _layout: any): any
     -- The front corner posts already exist as FrontPost1/5 — a SidePost at Z0 + POST_W/2 put a
     -- second post in the same cubic space. The flank contributes the centre and the BACK corner;
     -- the front corner is shared with the street elevation, which is how a corner post works.
+    -- The GROUND storey shares its front corner with the street elevation (FrontPost1/5 stand
+    -- there). The UPPER storey does not — FrontPost stops at the upper floor — so upstairs the
+    -- front corner had no post at all. Two lists, because the two storeys genuinely differ.
     local SIDE_POST_Z = { CZ, Z1 - POST_W / 2 }
+    local UPPER_POST_Z = { Z0 + POST_W / 2, CZ, Z1 - POST_W / 2 }
     local BAND_T = 0.3
     local SKIRT_H = 1.3
     for _, side in { { "West", X0 + POST_W / 2 }, { "East", X1 - POST_W / 2 } } do
@@ -384,9 +391,11 @@ function Machiya.build(palette: any, _layout: any): any
                 nil,
                 FRAME_VAR
             )
-            -- The upper storey repeats the SAME three posts and nothing else — no mid rail, no
-            -- skirt. "Similar but simpler": the grid carries up so the elevation reads as one
-            -- frame, while the storey above stays quieter than the one at street level.
+        end
+        -- The upper storey's own posts, including the front corner. No mid rail and no skirt —
+        -- "similar but simpler": the grid carries up so the elevation reads as one frame, while
+        -- the storey above stays quieter than the one at street level.
+        for k, pz in UPPER_POST_Z do
             add(
                 `SideUpperPost{nm}{k}`,
                 { POST_W * 0.8, UPPER_H, POST_W * 0.8 },
@@ -436,9 +445,19 @@ function Machiya.build(palette: any, _layout: any): any
         { W, GIRDER_H, GIRDER_W },
         { CX, FLOOR + STOREY_H - GIRDER_H / 2, Z1 - GIRDER_W / 2 },
         timber,
-        "Wood"
+        "Wood",
+        nil,
+        FRAME_VAR
     )
-    add("UpperFloor", { W, SLAB_T, D }, { CX, FLOOR + STOREY_H + SLAB_T / 2, CZ }, timber, "WoodPlanks")
+    add(
+        "UpperFloor",
+        { W, SLAB_T, D },
+        { CX, FLOOR + STOREY_H + SLAB_T / 2, CZ },
+        timber,
+        "WoodPlanks",
+        nil,
+        FRAME_VAR
+    )
 
     -- ----- the closed upper storey: kōshi lattice to the street, boards elsewhere -----
     -- THE UPPER STOREY HAD NO STREET WALL — just a row of lattice bars with the building's inside
@@ -500,7 +519,9 @@ function Machiya.build(palette: any, _layout: any): any
         add(
             `Koshi{i}`,
             { KOSHI_T, WIN_H, KOSHI_T },
-            { WIN_X0 + (WIN_X1 - WIN_X0) * t, WIN_Y0 + WIN_H / 2, Z0 + KOSHI_T / 2 },
+            -- IN the opening, centred in the wall's thickness. At Z0 + KOSHI_T/2 they stood a
+            -- third of a stud proud of the render — a lattice floating in front of its own window.
+            { WIN_X0 + (WIN_X1 - WIN_X0) * t, WIN_Y0 + WIN_H / 2, UF_Z },
             timber,
             "Wood",
             nil,
@@ -687,7 +708,7 @@ function Machiya.build(palette: any, _layout: any): any
     local SIGN_H = 2.6
     local SIGN_W = SIGN_H * 3.0
     local SIGN_Y = FLOOR + STOREY_H + UPPER_H / 2
-    local SIGN_Z = Z0 - 0.15 -- just proud of the kōshi lattice, not of the frontage
+    local SIGN_Z = Z0 - 0.65 -- owner's gate: half a stud further out, so it reads off the facade
     local FRAME_W = 0.32 -- the surround's member width
     local FRAME_D = 0.34 -- deeper than the panel, so the frame stands proud of it
 
