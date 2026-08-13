@@ -39,8 +39,14 @@ local CX, CZ = (X0 + X1) / 2, (Z0 + Z1) / 2
 -- ===== storey heights, derived from the envelope so they cannot drift out of it =====
 local SLAB_T = 0.6 -- the raised timber floor, recipe §2's deck slab
 local STOREY_H = 9.0 -- ground storey (owner's gate: +3; the shop read squat under its own upper floor)
-local UPPER_H = 4.0 -- the closed lattice storey
-local EAVE_Y = FLOOR + STOREY_H + UPPER_H -- 123.10, where the roof springs
+-- 5.0, up a stud at the owner's gate: at 4.0 a player climbing the stair put their head through
+-- the roof, and in first person you could see sky through the ceiling. The attic was simply
+-- shorter than a person and nothing measured it. The stud comes from HERE rather than from a
+-- lower attic floor because lowering the floor means shortening the ground storey (dropping it
+-- alone drops the eave with it and gains nothing) — and at STOREY_H 8.0 the shopfront's shoji
+-- transom collapses to zero height, the kamoi being fixed at 6.8 for avatar clearance.
+local UPPER_H = 5.0 -- the closed lattice storey
+local EAVE_Y = FLOOR + STOREY_H + UPPER_H -- where the roof springs
 local ROOF_T = 0.25 -- roof and eave both halved at the owner's gate: a kawara edge, not a slab
 local EAVE_T = 0.25
 -- Less the slab thickness. A tilted slab meeting at the ridge puts its upper CORNER above the
@@ -49,6 +55,11 @@ local EAVE_T = 0.25
 -- top — otherwise the envelope test has to tolerate a fudge, and a tolerated fudge grows.
 local ROOF_RISE = 4.01 -- the pitch, now an input rather than whatever was left under a fixed top
 local TOP = EAVE_Y + ROOF_RISE + ROOF_T -- derived; the slab's corner at the ridge is the true top
+-- THIS IS NOW THE BINDING CONSTRAINT ON THE BUILDING. The attic stud took the gap from 6.14 to
+-- 5.14 against a minimum of 5.0 — 0.14 studs of slack, where there used to be over a stud. Any
+-- further growth in a storey, the rise or the roof thickness breaks it, and that is the point:
+-- the next person to want height has to come back here and argue with the bell tower, not
+-- discover the problem in Studio.
 assert(TOP <= SHORO_TOP - MIN_SHORO_GAP, `machiya top {TOP} crowds the shōrō at {SHORO_TOP}`)
 
 -- The eave overhangs the frontage by this much. THIS IS THE ONE DELIBERATE ENCROACHMENT on the

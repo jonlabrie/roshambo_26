@@ -147,6 +147,28 @@ describe("Machiya — what makes it a shop and not a teahouse", function()
         expect(math.abs(treadBack - counterBack) < 0.001).toBe(true)
     end)
 
+    test("YOU CAN STAND UP AT THE TOP OF THE STAIR", function()
+        -- The owner climbed it and their head came out through the roof — in first person you
+        -- could see the sky through the ceiling. Nothing in the model was wrong; the attic was
+        -- simply shorter than a person, and no test asked.
+        --
+        -- The roof is a tilted slab, so its underside is a plane rather than a number. Take the
+        -- plane from the part's own CFrame and evaluate it where the stair arrives.
+        local roof = find(model, "RoofNorth")
+        local cf, sz = roof.properties.CFrame, roof.properties.Size
+        -- the slab's local +Y in world terms: (r01, r11, r21)
+        local ny, nz = cf[8], cf[11]
+        local py = cf[2] - (sz[2] / 2) * ny
+        local pz = cf[3] - (sz[2] / 2) * nz
+        local floor = find(model, "UpperFloorNorth")
+        local surface = floor.properties.CFrame[2] + floor.properties.Size[2] / 2
+        local stairTopZ = floor.properties.CFrame[3] + floor.properties.Size[3] / 2
+        local underside = py - (nz / ny) * (stairTopZ - pz)
+        -- 6 studs is the WORKING avatar height: a bare R15 is ~5, hair adds a stud, players wear
+        -- hair. Designing to 5 designs for a bald avatar nobody plays.
+        expect(underside - surface >= 6.0).toBe(true)
+    end)
+
     test("THE STRINGERS REACH THE UPPER FLOOR", function()
         -- They did not, twice over: built from the top TREAD they stopped a whole riser low, and
         -- then, once the top face reached the floor, the SQUARE END still left the corner short of
