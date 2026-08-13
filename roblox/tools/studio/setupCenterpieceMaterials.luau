@@ -86,6 +86,20 @@ local SPECS = {
         metal = "rbxassetid://103690182987939",
         rough = "rbxassetid://140223765351870",
     },
+    {
+        -- 花火屋's noren. BORROWED MAPS, HONESTLY: these are the Rope001 set again, run at a
+        -- quarter of HempRopeFine's pitch so the strands stop reading as cord and start reading
+        -- as a coarse woven textile. It is a stand-in — the right fix is a cloth scan uploaded
+        -- like the others — and the thing to judge is whether it reads as WEAVE or as ROPE at
+        -- the distance you actually see the shopfront from.
+        name = "NorenCloth",
+        base = Enum.Material.Fabric,
+        tile = 0.1,
+        color = "rbxassetid://96470016324117",
+        normal = "rbxassetid://108776054419159",
+        metal = "rbxassetid://103690182987939",
+        rough = "rbxassetid://140223765351870",
+    },
 }
 
 for _, s in SPECS do

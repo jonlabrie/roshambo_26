@@ -978,7 +978,14 @@ function Machiya.build(palette: any, _layout: any): any
     local NOREN_H = 2.6
     local NOREN_PER_BAY = 3
     local NOREN_SEGS = 3
-    local NOREN_T = 0.06
+    -- 0.05 IS THE FLOOR — Roblox refuses a Part thinner than that on any axis, so this is as close
+    -- to cloth-thick as boxed geometry gets. The remaining "it still looks solid" is answered by
+    -- the transparency below, not by more thinness.
+    local NOREN_T = 0.05
+    -- Enough to catch the light through it without turning it into a window. Noren are cotton or
+    -- hemp, not gauze — they are meant to screen the shopfront, and a panel you can read straight
+    -- through stops doing the one job it has.
+    local NOREN_ALPHA = 0.25
     -- Total lean from vertical at the hem. Small: a noren hangs, it does not billow. NEGATIVE
     -- leans the hem toward +Z — back under the eave, INTO the shop. It is tempting to lean it out
     -- over the street instead, and that pushes the hem 0.05 north of the frontage: the promenade
@@ -1011,6 +1018,12 @@ function Machiya.build(palette: any, _layout: any): any
                             CFrame = Spec.cframe({ px, hy - dy / 2, hz + dz / 2 }, rotX(lean)),
                             Color = palette.vermilion,
                             Material = "Fabric",
+                            -- Bare Fabric renders at Roblox's own tile scale, which on a panel
+                            -- this small is a weave the size of a fist. NorenCloth is the same
+                            -- pitch problem MachiyaPlaster solved for the render, and it fails
+                            -- SOFT: a place without the variant just shows plain Fabric.
+                            MaterialVariant = "NorenCloth",
+                            Transparency = NOREN_ALPHA,
                             Tags = { "NorenSeg" },
                             CanCollide = false,
                             CanQuery = false,
