@@ -8,7 +8,8 @@ local function v(x: number, y: number, z: number)
 end
 
 -- 花火屋's volume: the owner's footprint, with the front edge inset one stud past the frontage.
-local SHOP = { x0 = -1.67, x1 = 16.26, y0 = 113.1, y1 = 118.0, z0 = 45.0, z1 = 52.0 }
+-- Frontage moved z44 -> z36 when the shop was deepened, so the volume starts at z37.
+local SHOP = { x0 = -1.67, x1 = 16.26, y0 = 113.1, y1 = 118.0, z0 = 37.0, z1 = 52.0 }
 
 describe("ShopThreshold", function()
     test("a player standing in the middle of the shop is inside", function()
@@ -18,8 +19,8 @@ describe("ShopThreshold", function()
     test("THE PROMENADE IS NOT THE SHOP", function()
         -- The whole reason the volume starts at z45 rather than the z44 frontage: a trigger on
         -- the frontage line fires on every player crossing the square.
-        expect(ShopThreshold.isInside(v(7, 114, 44.5), SHOP)).toBe(false)
-        expect(ShopThreshold.isInside(v(7, 114, 36), SHOP)).toBe(false)
+        expect(ShopThreshold.isInside(v(7, 114, 36.5), SHOP)).toBe(false)
+        expect(ShopThreshold.isInside(v(7, 114, 30), SHOP)).toBe(false)
     end)
 
     test("the front inset is exactly one stud", function()

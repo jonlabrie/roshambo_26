@@ -16,7 +16,13 @@ local Machiya = {}
 
 -- ===== the owner's envelope =====
 local X0, X1 = -1.67, 16.26 -- west, east
-local Z0, Z1 = 44.00, 52.00 -- frontage (north, onto the promenade), back (south, into the cut)
+-- DEEPENED 2026-08-13, front edge only: z44 -> z36. The shop held about three people, because a
+-- counter 4.6 studs in left barely three studs of floor to stand on. The back is fixed — it is the
+-- terrain cut — so the depth had to come off the front, and it does so at the owner's direction:
+-- the karesansui is to be reduced to the shōrō's own footprint, which gives the promenade back
+-- more than this takes. Until that lands the street is narrower here; the eave's encroachment is
+-- still aerial and still clears an avatar, which the tests hold.
+local Z0, Z1 = 36.00, 52.00 -- frontage (north, onto the promenade), back (south, into the cut)
 local FLOOR = 113.10 -- finished floor, = the karesansui datum
 
 -- THE HOLDOUT'S TOP IS RETIRED (owner: "approximate, and can be safely ignored"). The height now
@@ -420,17 +426,28 @@ function Machiya.build(palette: any, _layout: any): any
     -- posts and horizontal bands, with a boarded skirt at the bottom where the street reaches it.
     -- The previous pass clad the whole flank in timber, which inverted the relationship: the frame
     -- is supposed to be the minority.
-    -- THREE posts, so the flank divides into TWO IDENTICAL bays (owner's gate). Four posts gave
-    -- three bays of 2.2 / 2.6 / 1.9 — an irregular rhythm that read as a mistake rather than as a
-    -- frame. Corners and centre; the bays are equal by construction, not by arithmetic.
-    -- The front corner posts already exist as FrontPost1/5 — a SidePost at Z0 + POST_W/2 put a
-    -- second post in the same cubic space. The flank contributes the centre and the BACK corner;
-    -- the front corner is shared with the street elevation, which is how a corner post works.
+    -- THE BAY MODULE IS WHAT IS FIXED, not the bay count. The owner's gate here was against an
+    -- IRREGULAR rhythm — four posts once gave bays of 2.2 / 2.6 / 1.9, which read as a mistake
+    -- rather than as a frame — and three posts over an 8-deep flank happened to give two equal
+    -- 4-stud bays. Doubling the depth with that count would have stretched them to 8 studs and
+    -- coarsened the whole elevation, so the module holds at 4 and the count follows the depth.
+    -- The bays are equal BY CONSTRUCTION, which is the property that was actually gated.
+    --
     -- The GROUND storey shares its front corner with the street elevation (FrontPost1/5 stand
-    -- there). The UPPER storey does not — FrontPost stops at the upper floor — so upstairs the
-    -- front corner had no post at all. Two lists, because the two storeys genuinely differ.
-    local SIDE_POST_Z = { CZ, Z1 - POST_W / 2 }
-    local UPPER_POST_Z = { Z0 + POST_W / 2, CZ, Z1 - POST_W / 2 }
+    -- there, and a SidePost at the same z would put a second post in the same cubic space). The
+    -- UPPER storey does not — FrontPost stops at the upper floor — so upstairs the front corner
+    -- had no post at all. Two lists, because the two storeys genuinely differ.
+    local FLANK_BAYS = math.max(2, math.round(D / 4.0))
+    local SIDE_POST_Z, UPPER_POST_Z = {}, {}
+    for k = 0, FLANK_BAYS do
+        -- End posts inset half a post so they sit inside the envelope; the span between those
+        -- insets is what divides, which is why the middle post lands exactly on CZ.
+        local pz = Z0 + POST_W / 2 + (k / FLANK_BAYS) * (D - POST_W)
+        table.insert(UPPER_POST_Z, pz)
+        if k > 0 then
+            table.insert(SIDE_POST_Z, pz)
+        end
+    end
     local BAND_T = 0.3
     local SKIRT_H = 1.3
     for _, side in { { "West", X0 + POST_W / 2 }, { "East", X1 - POST_W / 2 } } do
@@ -765,10 +782,14 @@ function Machiya.build(palette: any, _layout: any): any
     -- ----- the counter -----
     add(
         "Counter",
-        -- Spans only the OPEN bays now that the outer two are closed, and sits deep in the shop so
-        -- the goods are behind it rather than on the street.
+        -- Spans only the OPEN bays now that the outer two are closed, and stands at the BACK of
+        -- the shop so the goods are behind it rather than on the street.
+        --
+        -- MEASURED FROM Z1, NOT Z0. It used to sit at Z0 + 4.6, which was the same place while the
+        -- shop was 8 deep and became a counter marooned in the middle of the street the moment the
+        -- frontage moved north. The counter belongs to the back wall; the customers get the rest.
         { postX[FRONT_POSTS - 1] - postX[2] - POST_W, COUNTER_H, COUNTER_D },
-        { (postX[2] + postX[FRONT_POSTS - 1]) / 2, FLOOR + COUNTER_H / 2, Z0 + 4.6 },
+        { (postX[2] + postX[FRONT_POSTS - 1]) / 2, FLOOR + COUNTER_H / 2, Z1 - 3.4 },
         timber,
         "Wood",
         nil,

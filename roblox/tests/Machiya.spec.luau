@@ -10,7 +10,7 @@ local model = Machiya.build(ZenDojo.palette, ArenaLayout)
 -- THE OWNER'S TRANSFORM, read back from the holdout block they placed in Studio 2026-08-05.
 -- These are not proposals; a change here means the building moved.
 local X0, X1 = -1.67, 16.26
-local Z0, Z1 = 44.00, 52.00
+local Z0, Z1 = 36.00, 52.00 -- deepened off the FRONT 2026-08-13; the back is the terrain cut
 local FLOOR = 113.10
 -- The holdout's fixed top is retired (owner: "approximate, and can be safely ignored"). What the
 -- envelope test actually protects is the bell tower, so it now checks that directly.
@@ -76,8 +76,9 @@ describe("Machiya — the owner's envelope", function()
     end)
 
     test("nothing stands on the ground inside the promenade", function()
-        -- shopCorridor z28..44 is inviolable at ground level. The eave is the ONE exception
-        -- and is aerial — so anything reaching north of z44 must clear an avatar.
+        -- The promenade is inviolable at ground level, and the frontage line is its south edge
+        -- wherever that line currently sits. The eave is the ONE exception and is aerial — so
+        -- anything reaching north of the frontage must clear an avatar.
         for _, c in model.children do
             if c.properties.Size and c.properties.CFrame then
                 local cz, dz = c.properties.CFrame[3], c.properties.Size[3]
@@ -109,6 +110,37 @@ describe("Machiya — what makes it a shop and not a teahouse", function()
         expect(countPrefix(model, "FrontPost") >= 4).toBe(true)
         expect(find(model, "Counter") ~= nil).toBe(true)
         expect(find(model, "UpperFloor") ~= nil).toBe(true)
+    end)
+
+    test("THE COUNTER STANDS AT THE BACK, and the shop floor is in front of it", function()
+        -- It was positioned relative to the FRONTAGE, which meant it marched north with the
+        -- frontage the moment the shop was deepened — a counter halfway into the street, with
+        -- the goods stacked between it and the customers. Measure it from the back wall.
+        local counter = find(model, "Counter")
+        local cz, dz = counter.properties.CFrame[3], counter.properties.Size[3]
+        expect(Z1 - (cz + dz / 2) < 3).toBe(true)
+        -- and the point of the whole exercise: room for a crowd to stand and buy
+        expect((cz - dz / 2) - Z0 >= 8).toBe(true)
+    end)
+
+    test("THE FLANK BAYS ARE EQUAL, whatever the depth", function()
+        -- The owner's gate was against an IRREGULAR rhythm (bays of 2.2 / 2.6 / 1.9), not against
+        -- a count. So the module is what is fixed: deepening the shop adds bays, it does not
+        -- stretch them. Collect the upper storey's posts, which carry the whole flank grid.
+        local zs = {}
+        for _, c in model.children do
+            if (c.name :: string):sub(1, 17) == "SideUpperPostWest" then
+                table.insert(zs, c.properties.CFrame[3])
+            end
+        end
+        table.sort(zs)
+        expect(#zs >= 3).toBe(true)
+        local first = zs[2] - zs[1]
+        for i = 2, #zs - 1 do
+            expect(math.abs((zs[i + 1] - zs[i]) - first) < 0.001).toBe(true)
+        end
+        -- and the module itself holds, so a deeper shop reads at the same grain as a shallow one
+        expect(math.abs(first - 4.0) < 0.6).toBe(true)
     end)
 
     test("the eave overhangs the frontage", function()
