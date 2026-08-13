@@ -72,7 +72,7 @@ local STUCCO_VAR = "MachiyaPlaster"
 -- STUCCO SITS BACK; TIMBER STANDS PROUD. Everything was flush at the frontage plane, so the frame
 -- and the render were coplanar and the timber simply disappeared into the wall. A timber-framed
 -- building only reads if the frame is in front of the panel it holds.
-local STUCCO_SETBACK = 0.22
+local STUCCO_SETBACK = 0.30
 
 -- The posts wear CypressVertical and came out darker; the beams they carry were plain Wood and did
 -- not match. One variant for every piece of exterior frame.
@@ -334,7 +334,7 @@ function Machiya.build(palette: any, _layout: any): any
     add(
         "WallBack",
         { W, STOREY_H, WALL_T },
-        { CX, FLOOR + STOREY_H / 2, Z1 - WALL_T / 2 },
+        { CX, FLOOR + STOREY_H / 2, Z1 - STUCCO_SETBACK - WALL_T / 2 },
         stucco,
         STUCCO_MAT,
         nil,
@@ -353,7 +353,10 @@ function Machiya.build(palette: any, _layout: any): any
     -- THREE posts, so the flank divides into TWO IDENTICAL bays (owner's gate). Four posts gave
     -- three bays of 2.2 / 2.6 / 1.9 — an irregular rhythm that read as a mistake rather than as a
     -- frame. Corners and centre; the bays are equal by construction, not by arithmetic.
-    local SIDE_POST_Z = { Z0 + POST_W / 2, CZ, Z1 - POST_W / 2 }
+    -- The front corner posts already exist as FrontPost1/5 — a SidePost at Z0 + POST_W/2 put a
+    -- second post in the same cubic space. The flank contributes the centre and the BACK corner;
+    -- the front corner is shared with the street elevation, which is how a corner post works.
+    local SIDE_POST_Z = { CZ, Z1 - POST_W / 2 }
     local BAND_T = 0.3
     local SKIRT_H = 1.3
     for _, side in { { "West", X0 + POST_W / 2 }, { "East", X1 - POST_W / 2 } } do
@@ -496,7 +499,7 @@ function Machiya.build(palette: any, _layout: any): any
     add(
         "UpperWallWest",
         { WALL_T, UPPER_H, D },
-        { X0 + WALL_T / 2, FLOOR + STOREY_H + UPPER_H / 2, CZ },
+        { X0 + STUCCO_SETBACK + WALL_T / 2, FLOOR + STOREY_H + UPPER_H / 2, CZ },
         stucco,
         STUCCO_MAT,
         nil,
@@ -505,7 +508,7 @@ function Machiya.build(palette: any, _layout: any): any
     add(
         "UpperWallEast",
         { WALL_T, UPPER_H, D },
-        { X1 - WALL_T / 2, FLOOR + STOREY_H + UPPER_H / 2, CZ },
+        { X1 - STUCCO_SETBACK - WALL_T / 2, FLOOR + STOREY_H + UPPER_H / 2, CZ },
         stucco,
         STUCCO_MAT,
         nil,
@@ -514,7 +517,7 @@ function Machiya.build(palette: any, _layout: any): any
     add(
         "UpperWallBack",
         { W, UPPER_H, WALL_T },
-        { CX, FLOOR + STOREY_H + UPPER_H / 2, Z1 - WALL_T / 2 },
+        { CX, FLOOR + STOREY_H + UPPER_H / 2, Z1 - STUCCO_SETBACK - WALL_T / 2 },
         stucco,
         STUCCO_MAT,
         nil,
