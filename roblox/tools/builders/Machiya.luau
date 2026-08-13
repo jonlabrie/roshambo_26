@@ -396,16 +396,32 @@ function Machiya.build(palette: any, _layout: any): any
         -- "similar but simpler": the grid carries up so the elevation reads as one frame, while
         -- the storey above stays quieter than the one at street level.
         for k, pz in UPPER_POST_Z do
+            -- THE CENTRE POST IS A KING POST: it carries on past the eave line to the ridge,
+            -- which is what the gable is hung on. The others stop at the eave, because that is
+            -- where the wall stops.
+            local isKing = math.abs(pz - CZ) < 0.001
+            local topY = if isKing then TOP else EAVE_Y
+            local h = topY - (FLOOR + STOREY_H)
             add(
                 `SideUpperPost{nm}{k}`,
-                { POST_W * 0.8, UPPER_H, POST_W * 0.8 },
-                { px, FLOOR + STOREY_H + UPPER_H / 2, pz },
+                { POST_W * 0.8, h, POST_W * 0.8 },
+                { px, FLOOR + STOREY_H + h / 2, pz },
                 timber,
                 "Wood",
                 nil,
                 FRAME_VAR
             )
         end
+        -- the beam at the eave line, where the roof edge meets the flank
+        add(
+            `SideEaveBeam{nm}`,
+            { POST_W * 0.85, BAND_T, D },
+            { px, EAVE_Y - BAND_T / 2, CZ },
+            timber,
+            "Wood",
+            nil,
+            FRAME_VAR
+        )
         -- horizontal bands: the skirt head, a mid rail, and the nageshi at the storey division
         for k, by in { FLOOR + SKIRT_H, FLOOR + STOREY_H * 0.55, FLOOR + STOREY_H - BAND_T / 2 } do
             add(
@@ -424,7 +440,7 @@ function Machiya.build(palette: any, _layout: any): any
             { POST_W * 0.7, SKIRT_H, D },
             { px, FLOOR + SKIRT_H / 2, CZ },
             timber,
-            "WoodPlanks",
+            "Wood",
             nil,
             FRAME_VAR
         )
@@ -449,12 +465,15 @@ function Machiya.build(palette: any, _layout: any): any
         nil,
         FRAME_VAR
     )
+    -- "Wood", not "WoodPlanks". A MaterialVariant is SILENTLY IGNORED unless the part's Material
+    -- equals the variant's BaseMaterial, and CypressVertical is base Wood — so this floor was set
+    -- to the dark variant twice and stayed pale both times, with nothing anywhere to say why.
     add(
         "UpperFloor",
         { W, SLAB_T, D },
         { CX, FLOOR + STOREY_H + SLAB_T / 2, CZ },
         timber,
-        "WoodPlanks",
+        "Wood",
         nil,
         FRAME_VAR
     )
