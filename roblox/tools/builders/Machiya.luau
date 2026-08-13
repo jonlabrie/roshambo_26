@@ -29,8 +29,22 @@ local FLOOR = 113.10 -- finished floor, = the karesansui datum
 -- comes from the storeys, and the REAL constraint is the one that always mattered: the shop must
 -- stay clearly subordinate to the bell tower. TOP is derived at the bottom of this block and
 -- checked against these two numbers, so growing a storey can never quietly close the gap.
-local SHORO_TOP = 136.5
-local MIN_SHORO_GAP = 5.0
+--
+-- THE TOWER IS A STACK, AND THIS NUMBER USED TO NAME ITS MIDDLE. It was 136.5 — the top of the
+-- Shoro model — but the tower is seven models and the drum storey stands ON the shōrō's roof:
+--
+--   Shoro 112.00..136.20   ShoroRoof 133.55..136.47   ThrowDrum 135.23..153.54
+--   RanmaCarvings 140.37..147.63   BellDrive 110.00..141.60   BonshoRig 116.95..134.50
+--
+-- Measured in Studio 2026-08-13 across every RoshamboStage model sharing the tower's footprint.
+-- The error was 17 studs and it ran the wrong way: it made the shop look like it was crowding a
+-- tower it clears by 22. Re-measure the same way if the tower is redesigned — one model's
+-- bounding box is not a building.
+local SHORO_TOP = 153.54
+-- The OWNER'S number, from the spec: the shop tops "9 studs subordinate to the bell tower, which
+-- is the relationship the square depends on." This used to be 5.0 — a floor I invented when the
+-- holdout's top was retired, and then quoted back as though it were a gate they had set.
+local MIN_SHORO_GAP = 9.0
 
 local W = X1 - X0
 local D = Z1 - Z0
@@ -55,12 +69,15 @@ local EAVE_T = 0.25
 -- top — otherwise the envelope test has to tolerate a fudge, and a tolerated fudge grows.
 local ROOF_RISE = 4.01 -- the pitch, now an input rather than whatever was left under a fixed top
 local TOP = EAVE_Y + ROOF_RISE + ROOF_T -- derived; the slab's corner at the ridge is the true top
--- THIS IS NOW THE BINDING CONSTRAINT ON THE BUILDING. The attic stud took the gap from 6.14 to
--- 5.14 against a minimum of 5.0 — 0.14 studs of slack, where there used to be over a stud. Any
--- further growth in a storey, the rise or the roof thickness breaks it, and that is the point:
--- the next person to want height has to come back here and argue with the bell tower, not
--- discover the problem in Studio.
-assert(TOP <= SHORO_TOP - MIN_SHORO_GAP, `machiya top {TOP} crowds the shōrō at {SHORO_TOP}`)
+-- NOT A CLEARANCE — the two buildings stand 15.9 studs apart in z and nothing overhangs anything.
+-- This is about the SKYLINE: the bell tower is meant to read as the tallest thing in the square.
+-- At 131.36 against the tower's 153.54 the shop clears it by 22.18, comfortably past the owner's
+-- 9. There is no tension here, and the old message said "crowds", which read as a collision and
+-- sent me chasing a conflict that does not exist.
+assert(
+    TOP <= SHORO_TOP - MIN_SHORO_GAP,
+    `machiya top {TOP} reads too tall beside the bell tower's {SHORO_TOP}`
+)
 
 -- The eave overhangs the frontage by this much. THIS IS THE ONE DELIBERATE ENCROACHMENT on the
 -- reserved promenade, and it is aerial: its underside sits a full storey up, so nothing at

@@ -14,7 +14,12 @@ local Z0, Z1 = 36.00, 52.00 -- deepened off the FRONT 2026-08-13; the back is th
 local FLOOR = 113.10
 -- The holdout's fixed top is retired (owner: "approximate, and can be safely ignored"). What the
 -- envelope test actually protects is the bell tower, so it now checks that directly.
-local SHORO_TOP, MIN_SHORO_GAP = 136.5, 5.0
+--
+-- 153.54 is the TOWER, measured across every RoshamboStage model on its footprint — the drum
+-- storey stands on the shōrō's roof and carries on up. This was 136.5, which is only the Shoro
+-- model's own top and so named the middle of the building. 9.0 is the owner's number from the
+-- spec ("9 studs subordinate to the bell tower"); it was 5.0, which I had invented.
+local SHORO_TOP, MIN_SHORO_GAP = 153.54, 9.0
 
 local function find(node, name)
     for _, c in node.children do
