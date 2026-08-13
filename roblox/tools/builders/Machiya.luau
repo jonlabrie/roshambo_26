@@ -18,7 +18,13 @@ local Machiya = {}
 local X0, X1 = -1.67, 16.26 -- west, east
 local Z0, Z1 = 44.00, 52.00 -- frontage (north, onto the promenade), back (south, into the cut)
 local FLOOR = 113.10 -- finished floor, = the karesansui datum
-local TOP = 127.36 -- ridge. The shōrō tops at 136.5 and must stay above it.
+
+-- THE HOLDOUT'S TOP IS RETIRED (owner: "approximate, and can be safely ignored"). The height now
+-- comes from the storeys, and the REAL constraint is the one that always mattered: the shop must
+-- stay clearly subordinate to the bell tower. TOP is derived at the bottom of this block and
+-- checked against these two numbers, so growing a storey can never quietly close the gap.
+local SHORO_TOP = 136.5
+local MIN_SHORO_GAP = 5.0
 
 local W = X1 - X0
 local D = Z1 - Z0
@@ -26,7 +32,7 @@ local CX, CZ = (X0 + X1) / 2, (Z0 + Z1) / 2
 
 -- ===== storey heights, derived from the envelope so they cannot drift out of it =====
 local SLAB_T = 0.6 -- the raised timber floor, recipe §2's deck slab
-local STOREY_H = 6.0 -- ground storey: clear height under the upper floor
+local STOREY_H = 9.0 -- ground storey (owner's gate: +3; the shop read squat under its own upper floor)
 local UPPER_H = 4.0 -- the closed lattice storey
 local EAVE_Y = FLOOR + STOREY_H + UPPER_H -- 123.10, where the roof springs
 local ROOF_T = 0.25 -- roof and eave both halved at the owner's gate: a kawara edge, not a slab
@@ -35,7 +41,9 @@ local EAVE_T = 0.25
 -- ridge line by roughly cos(pitch) * thickness/2, so a rise of exactly TOP - EAVE_Y overshoots the
 -- owner's top by ~0.1 studs. Trivial against the 9-stud gap to the shōrō, but TOP should mean the
 -- top — otherwise the envelope test has to tolerate a fudge, and a tolerated fudge grows.
-local ROOF_RISE = TOP - EAVE_Y - ROOF_T
+local ROOF_RISE = 4.01 -- the pitch, now an input rather than whatever was left under a fixed top
+local TOP = EAVE_Y + ROOF_RISE + ROOF_T -- derived; the slab's corner at the ridge is the true top
+assert(TOP <= SHORO_TOP - MIN_SHORO_GAP, `machiya top {TOP} crowds the shōrō at {SHORO_TOP}`)
 
 -- The eave overhangs the frontage by this much. THIS IS THE ONE DELIBERATE ENCROACHMENT on the
 -- reserved promenade, and it is aerial: its underside sits a full storey up, so nothing at
@@ -146,7 +154,10 @@ function Machiya.build(palette: any, _layout: any): any
     -- Each bay gets a fixed shoji transom above the head rail (kamoi) and one door leaf slid to
     -- the bay's west jamb, leaving roughly two-thirds of the opening clear. Leaves alternate which
     -- jamb they park against, because a whole row stacked the same way reads mechanical.
-    local HEAD_Y = FLOOR + 3.9 -- the kamoi: door head / transom sill
+    -- THE KAMOI HAS TO CLEAR A PLAYER. The working avatar height is 6 studs (a bare R15 is ~5;
+    -- hair adds a stud and players wear it), and this rail spans the whole frontage — at its old
+    -- 3.9 you would have walked face-first into the doorway you were meant to enter.
+    local HEAD_Y = FLOOR + 6.8
     local TRANSOM_TOP = FLOOR + STOREY_H - GIRDER_H
     local DOOR_Z = Z0 + 0.55 -- inboard of the posts, so the noren still hangs in front
     local LEAF_FRACTION = 0.36 -- how much of its bay a parked leaf covers
@@ -403,8 +414,11 @@ function Machiya.build(palette: any, _layout: any): any
     -- was ignoring PixelsPerStud, and splitting them was the only way to make each one big enough
     -- to read. With the canvas fixed they no longer need to be split, so the sign is one board
     -- again — dark ink on a light ground in a plain timber frame, which is what a kanban is.
-    local SIGN_W = W * 0.62
+    -- Sized to the CHARACTERS, not to the building. At 0.62 of the frontage the board was half
+    -- empty and the name floated in the middle of it. Three glyphs on a 2.6-stud board want about
+    -- 3:1 — the text then fills ~86% of the canvas instead of 60%.
     local SIGN_H = 2.6
+    local SIGN_W = SIGN_H * 3.0
     local SIGN_Y = FLOOR + STOREY_H + UPPER_H / 2
     local SIGN_Z = Z0 - 0.15 -- just proud of the kōshi lattice, not of the frontage
     local FRAME_W = 0.32 -- the surround's member width
@@ -415,8 +429,10 @@ function Machiya.build(palette: any, _layout: any): any
         Spec.part("Kanban", {
             Size = { SIGN_W, SIGN_H, 0.22 },
             CFrame = Spec.cframe({ CX, SIGN_Y, SIGN_Z }),
-            Color = paper,
-            Material = "WoodPlanks",
+            -- Stucco, matching the walls (owner's gate). A plastered board with the name cut into
+            -- it belongs to the building; a pale timber panel read as a separate object hung on it.
+            Color = stucco,
+            Material = STUCCO_MAT,
             CanCollide = false,
             CanQuery = false,
             CanTouch = false,

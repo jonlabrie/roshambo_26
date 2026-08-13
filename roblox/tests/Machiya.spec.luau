@@ -11,7 +11,10 @@ local model = Machiya.build(ZenDojo.palette, ArenaLayout)
 -- These are not proposals; a change here means the building moved.
 local X0, X1 = -1.67, 16.26
 local Z0, Z1 = 44.00, 52.00
-local FLOOR, TOP = 113.10, 127.36
+local FLOOR = 113.10
+-- The holdout's fixed top is retired (owner: "approximate, and can be safely ignored"). What the
+-- envelope test actually protects is the bell tower, so it now checks that directly.
+local SHORO_TOP, MIN_SHORO_GAP = 136.5, 5.0
 
 local function find(node, name)
     for _, c in node.children do
@@ -60,13 +63,14 @@ describe("Machiya — the owner's envelope", function()
         expect(math.abs(slab.properties.CFrame[3] - (Z0 + Z1) / 2) < 0.001).toBe(true)
     end)
 
-    test("NOTHING RISES ABOVE THE OWNER'S TOP", function()
-        -- The shop must stay 9 studs subordinate to the shōrō (136.5). A roof tweak that
-        -- closes that gap is a defect, not a style change.
+    test("NOTHING CROWDS THE SHŌRŌ", function()
+        -- The shop must stay clearly subordinate to the bell tower. This used to test against a
+        -- fixed top from the holdout block; that number is gone, so it tests the thing the number
+        -- was standing in for. A storey that grows into the shōrō is a defect, not a style change.
         for _, c in model.children do
             if c.properties.Size and c.properties.CFrame then
                 local _, hi = yspan(c)
-                expect(hi <= TOP + 0.001).toBe(true)
+                expect(hi <= SHORO_TOP - MIN_SHORO_GAP).toBe(true)
             end
         end
     end)
@@ -79,11 +83,10 @@ describe("Machiya — the owner's envelope", function()
                 local cz, dz = c.properties.CFrame[3], c.properties.Size[3]
                 local lo = yspan(c)
                 if cz - dz / 2 < Z0 - 0.001 then
-                    -- AVATAR CLEARANCE, not a round number. A Roblox character stands about 5
-                    -- studs; the rule this enforces is that the promenade stays WALKABLE, and the
-                    -- shopfront eave is meant to be walked under. 6 was an arbitrary first guess
-                    -- and it argued with a correctly-built hisashi.
-                    expect(lo >= FLOOR + 5.2).toBe(true)
+                    -- AVATAR CLEARANCE. The WORKING avatar height is 6 studs, not the bare R15's
+                    -- ~5 — hair adds a full stud and players wear it (owner's ruling 2026-08-13,
+                    -- made by standing next to a 5-stud marker). The promenade must stay walkable.
+                    expect(lo >= FLOOR + 6.4).toBe(true)
                 end
             end
         end
@@ -180,6 +183,9 @@ describe("Machiya — the parts other tasks bind to", function()
             + text.properties.TextColor3[3]
         expect(panelLum > inkLum + 1).toBe(true)
         expect(countPrefix(model, "KanbanFrame")).toBe(4)
+        -- Sized to the CHARACTERS, not to the building. At 0.62 of the frontage the name floated
+        -- in the middle of a half-empty board; three glyphs want roughly 3:1.
+        expect(k.properties.Size[1] / k.properties.Size[2] < 3.6).toBe(true)
     end)
 
     test("the shopfront is sliding doors standing OPEN, under shoji transoms", function()
