@@ -74,6 +74,18 @@ local STUCCO_VAR = "MachiyaPlaster"
 -- building only reads if the frame is in front of the panel it holds.
 local STUCCO_SETBACK = 0.30
 
+-- THE STUCCO BOX. Every render plane is a face of ONE inset box, derived here, because deriving
+-- them separately is how the building came apart: the side walls were moved in by the setback
+-- while the front, the back and the gables still spanned the full envelope, so each panel was
+-- inset on its own axis and oversized on the others. A wall's IN-PLANE dimensions have to shrink
+-- with the box too, not just its own offset.
+--   SX0/SX1 — the render's west/east faces      SZ1 — its back face
+--   SZ0     — the upper storey's street face (the ground storey opens instead)
+local SX0, SX1 = X0 + STUCCO_SETBACK, X1 - STUCCO_SETBACK
+local SZ0, SZ1 = Z0 + STUCCO_SETBACK, Z1 - STUCCO_SETBACK
+local SW = SX1 - SX0 -- the box's width; NOT W
+local SD = SZ1 - Z0 -- side walls run from the open frontage to the back face
+
 -- The posts wear CypressVertical and came out darker; the beams they carry were plain Wood and did
 -- not match. One variant for every piece of exterior frame.
 local FRAME_VAR = "CypressVertical"
@@ -315,8 +327,8 @@ function Machiya.build(palette: any, _layout: any): any
     -- ----- side and back walls (ground storey) -----
     add(
         "WallWest",
-        { WALL_T, STOREY_H, D },
-        { X0 + STUCCO_SETBACK + WALL_T / 2, FLOOR + STOREY_H / 2, CZ },
+        { WALL_T, STOREY_H, SD },
+        { SX0 + WALL_T / 2, FLOOR + STOREY_H / 2, (Z0 + SZ1) / 2 },
         stucco,
         STUCCO_MAT,
         nil,
@@ -324,8 +336,8 @@ function Machiya.build(palette: any, _layout: any): any
     )
     add(
         "WallEast",
-        { WALL_T, STOREY_H, D },
-        { X1 - STUCCO_SETBACK - WALL_T / 2, FLOOR + STOREY_H / 2, CZ },
+        { WALL_T, STOREY_H, SD },
+        { SX1 - WALL_T / 2, FLOOR + STOREY_H / 2, (Z0 + SZ1) / 2 },
         stucco,
         STUCCO_MAT,
         nil,
@@ -333,8 +345,8 @@ function Machiya.build(palette: any, _layout: any): any
     )
     add(
         "WallBack",
-        { W, STOREY_H, WALL_T },
-        { CX, FLOOR + STOREY_H / 2, Z1 - STUCCO_SETBACK - WALL_T / 2 },
+        { SW, STOREY_H, WALL_T },
+        { CX, FLOOR + STOREY_H / 2, SZ1 - WALL_T / 2 },
         stucco,
         STUCCO_MAT,
         nil,
@@ -439,13 +451,13 @@ function Machiya.build(palette: any, _layout: any): any
     local WIN_Y0 = UPPER_Y0 + (UPPER_H - WIN_H) / 2
     local WIN_HALF = 6.0 -- the opening reaches WIN_HALF either side of centre
     local WIN_X0, WIN_X1 = CX - WIN_HALF, CX + WIN_HALF
-    local UF_Z = Z0 + STUCCO_SETBACK + WALL_T / 2 -- set back; the kōshi and the sign stand proud of it
+    local UF_Z = SZ0 + WALL_T / 2 -- the box's street face; the kōshi and the sign stand proud of it
 
     local belowH = WIN_Y0 - UPPER_Y0
     local aboveH = (UPPER_Y0 + UPPER_H) - (WIN_Y0 + WIN_H)
     add(
         "UpperWallFrontLow",
-        { W, belowH, WALL_T },
+        { SW, belowH, WALL_T },
         { CX, UPPER_Y0 + belowH / 2, UF_Z },
         stucco,
         STUCCO_MAT,
@@ -454,18 +466,18 @@ function Machiya.build(palette: any, _layout: any): any
     )
     add(
         "UpperWallFrontHigh",
-        { W, aboveH, WALL_T },
+        { SW, aboveH, WALL_T },
         { CX, WIN_Y0 + WIN_H + aboveH / 2, UF_Z },
         stucco,
         STUCCO_MAT,
         nil,
         STUCCO_VAR
     )
-    local jambW = WIN_X0 - X0
+    local jambW = WIN_X0 - SX0
     add(
         "UpperWallFrontWest",
         { jambW, WIN_H, WALL_T },
-        { X0 + jambW / 2, WIN_Y0 + WIN_H / 2, UF_Z },
+        { SX0 + jambW / 2, WIN_Y0 + WIN_H / 2, UF_Z },
         stucco,
         STUCCO_MAT,
         nil,
@@ -474,7 +486,7 @@ function Machiya.build(palette: any, _layout: any): any
     add(
         "UpperWallFrontEast",
         { jambW, WIN_H, WALL_T },
-        { X1 - jambW / 2, WIN_Y0 + WIN_H / 2, UF_Z },
+        { SX1 - jambW / 2, WIN_Y0 + WIN_H / 2, UF_Z },
         stucco,
         STUCCO_MAT,
         nil,
@@ -498,8 +510,8 @@ function Machiya.build(palette: any, _layout: any): any
 
     add(
         "UpperWallWest",
-        { WALL_T, UPPER_H, D },
-        { X0 + STUCCO_SETBACK + WALL_T / 2, FLOOR + STOREY_H + UPPER_H / 2, CZ },
+        { WALL_T, UPPER_H, SZ1 - SZ0 },
+        { SX0 + WALL_T / 2, FLOOR + STOREY_H + UPPER_H / 2, (SZ0 + SZ1) / 2 },
         stucco,
         STUCCO_MAT,
         nil,
@@ -507,8 +519,8 @@ function Machiya.build(palette: any, _layout: any): any
     )
     add(
         "UpperWallEast",
-        { WALL_T, UPPER_H, D },
-        { X1 - STUCCO_SETBACK - WALL_T / 2, FLOOR + STOREY_H + UPPER_H / 2, CZ },
+        { WALL_T, UPPER_H, SZ1 - SZ0 },
+        { SX1 - WALL_T / 2, FLOOR + STOREY_H + UPPER_H / 2, (SZ0 + SZ1) / 2 },
         stucco,
         STUCCO_MAT,
         nil,
@@ -516,8 +528,8 @@ function Machiya.build(palette: any, _layout: any): any
     )
     add(
         "UpperWallBack",
-        { W, UPPER_H, WALL_T },
-        { CX, FLOOR + STOREY_H + UPPER_H / 2, Z1 - STUCCO_SETBACK - WALL_T / 2 },
+        { SW, UPPER_H, WALL_T },
+        { CX, FLOOR + STOREY_H + UPPER_H / 2, SZ1 - WALL_T / 2 },
         stucco,
         STUCCO_MAT,
         nil,
@@ -583,7 +595,8 @@ function Machiya.build(palette: any, _layout: any): any
     -- North half spans front eave (low, -Z) -> ridge (high, +Z): unturned.
     -- South half spans ridge (high, -Z) -> back eave (low, +Z): turned.
     local GABLE_T = 0.4
-    for _, end_ in { { "West", X0 + GABLE_T / 2 }, { "East", X1 - GABLE_T / 2 } } do
+    -- on the BOX faces, so the triangles sit over the walls they close rather than 0.3 outboard
+    for _, end_ in { { "West", SX0 + GABLE_T / 2 }, { "East", SX1 - GABLE_T / 2 } } do
         local name, x = end_[1] :: string, end_[2] :: number
         table.insert(
             children,

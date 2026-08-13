@@ -257,6 +257,64 @@ describe("Machiya — the parts other tasks bind to", function()
     end)
 end)
 
+describe("Machiya — the stucco box", function()
+    -- THE TEST THIS BUILDING KEPT NEEDING. The render is ONE inset box, and it came apart twice by
+    -- being nudged a panel at a time: side walls moved in by the setback while the front, the back
+    -- and the gables still spanned the full envelope — each panel inset on its own axis and
+    -- oversized on every other. Neither failure was visible to any test, only to the owner's eye.
+    local S = 0.30
+    local SX0, SX1 = X0 + S, X1 - S
+    local SZ0, SZ1 = Z0 + S, Z1 - S
+
+    local BOX = {
+        { "WallWest", 1 },
+        { "WallEast", 1 },
+        { "WallBack", 3 },
+        { "UpperWallWest", 1 },
+        { "UpperWallEast", 1 },
+        { "UpperWallBack", 3 },
+        { "UpperWallFrontLow", 1 },
+        { "UpperWallFrontHigh", 1 },
+        { "GableWestNorth", 1 },
+        { "GableEastNorth", 1 },
+    }
+
+    test("NO RENDER PANEL REACHES PAST THE BOX", function()
+        for _, e in BOX do
+            local part = find(model, e[1] :: string)
+            expect(part ~= nil).toBe(true)
+            local ax = e[2] :: number
+            local c, w = part.properties.CFrame[ax], part.properties.Size[ax]
+            local lo, hi = c - w / 2, c + w / 2
+            local limLo = if ax == 1 then SX0 else SZ0
+            local limHi = if ax == 1 then SX1 else SZ1
+            expect(lo >= limLo - 0.001).toBe(true)
+            expect(hi <= limHi + 0.001).toBe(true)
+        end
+    end)
+
+    test("and no timber post is BURIED in the panel behind it", function()
+        -- The other half of the same rule. A post enclosed by its own wall is invisible, which is
+        -- how the upper storey shipped with a frame nobody could see.
+        local pairs_ = {
+            { "SidePostWest1", "WallWest", 1, -1 },
+            { "SideUpperPostWest1", "UpperWallWest", 1, -1 },
+            { "SidePostEast1", "WallEast", 1, 1 },
+            { "SideUpperPostEast1", "UpperWallEast", 1, 1 },
+        }
+        for _, e in pairs_ do
+            local post, wall = find(model, e[1] :: string), find(model, e[2] :: string)
+            expect(post ~= nil).toBe(true)
+            expect(wall ~= nil).toBe(true)
+            local ax, dir = e[3] :: number, e[4] :: number
+            local pc, pw = post.properties.CFrame[ax], post.properties.Size[ax]
+            local wc, ww = wall.properties.CFrame[ax], wall.properties.Size[ax]
+            local proud = if dir < 0 then (wc - ww / 2) - (pc - pw / 2) else (pc + pw / 2) - (wc + ww / 2)
+            expect(proud > 0.05).toBe(true)
+        end
+    end)
+end)
+
 describe("Machiya — the flush rule", function()
     test("front posts sit inside the slab, not proud of it", function()
         local slab = find(model, "FloorSlab")
