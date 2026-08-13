@@ -192,10 +192,15 @@ describe("Machiya — the parts other tasks bind to", function()
         -- A machiya front is not open end to end. Five bays: the outer two are plastered infill,
         -- the middle three are the shop. Counting parts alone would let a future edit close the
         -- wrong two and still pass, so this checks WHICH bays are closed by position.
-        expect(countPrefix(model, "BayPanel")).toBe(2)
-        expect(countPrefix(model, "DoorLeaf")).toBe(3)
-        -- NOT countPrefix("Transom"): that also catches the TransomBar lattice, so it counted 9.
-        expect(countPrefix(model, "Transom") - countPrefix(model, "TransomBar")).toBe(3)
+        -- EVERY BAY IS EITHER OPEN OR CLOSED — stated as an invariant rather than as two magic
+        -- numbers, so changing the post count moves both sides together instead of failing.
+        local posts = countPrefix(model, "FrontPost")
+        local closed = countPrefix(model, "BayPanel")
+        local open = countPrefix(model, "DoorLeaf")
+        expect(closed + open).toBe(posts - 1)
+        expect(closed).toBe(2) -- the outer two, whatever the post count
+        -- NOT countPrefix("Transom"): that also catches the TransomBar lattice.
+        expect(countPrefix(model, "Transom") - countPrefix(model, "TransomBar")).toBe(open)
 
         local panels, doors = {}, {}
         for _, c in model.children do

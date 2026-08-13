@@ -63,7 +63,20 @@ local ROOF_RIDGE_Z = (Z0 + Z1) / 2
 local POST_W = 0.49 -- owner's gate: 70% of 0.7; six posts at deck weight read as a fence
 local GIRDER_H, GIRDER_W = 1.2, 0.825
 local WALL_T = 0.5
-local STUCCO_MAT = "Sandstone"
+-- Concrete carrying MachiyaPlaster (a clone of the unused ZenMortar1 at 1.5 studs/tile). Bare
+-- Sandstone renders at Roblox's own tile scale, which on a wall reads as boulders rather than
+-- render. The variant is the shop's OWN, so retuning its pitch cannot disturb the cement paths.
+local STUCCO_MAT = "Concrete"
+local STUCCO_VAR = "MachiyaPlaster"
+
+-- STUCCO SITS BACK; TIMBER STANDS PROUD. Everything was flush at the frontage plane, so the frame
+-- and the render were coplanar and the timber simply disappeared into the wall. A timber-framed
+-- building only reads if the frame is in front of the panel it holds.
+local STUCCO_SETBACK = 0.22
+
+-- The posts wear CypressVertical and came out darker; the beams they carry were plain Wood and did
+-- not match. One variant for every piece of exterior frame.
+local FRAME_VAR = "CypressVertical"
 local KOSHI_T = 0.18
 local COUNTER_H = 3.0 -- ~3 ft. 1.1 was 13 inches: a step, not a counter
 local COUNTER_D = 2.0
@@ -131,7 +144,7 @@ function Machiya.build(palette: any, _layout: any): any
     add("FloorSlab", { W, SLAB_T, D }, { CX, FLOOR - SLAB_T / 2, CZ }, timber, "WoodPlanks")
 
     -- ----- the OPEN frontage: six posts, no wall -----
-    local FRONT_POSTS = 6
+    local FRONT_POSTS = 5 -- owner's gate: 3 centre posts + 2 corners, down from 4 + 2
     local postX = {} -- kept so the sign boards register to the BAYS, not to the frontage
     for i = 1, FRONT_POSTS do
         local t = (i - 1) / (FRONT_POSTS - 1)
@@ -164,16 +177,25 @@ function Machiya.build(palette: any, _layout: any): any
     -- 3.9 you would have walked face-first into the doorway you were meant to enter.
     local HEAD_Y = FLOOR + 6.8
     local TRANSOM_TOP = FLOOR + STOREY_H - GIRDER_H
-    local DOOR_Z = Z0 + 0.55 -- inboard of the posts, so the noren still hangs in front
+    local DOOR_Z = Z0 + STUCCO_SETBACK + 0.18 -- door plane sits behind the frame
+    -- Timber front faces sit EXACTLY on the frontage plane: half the member's depth, no more. At
+    -- 0.16 against a 0.34-deep member they poked 0.01 studs into the reserved promenade, which the
+    -- clearance test correctly refused — a hair over the line is still over it.
+    local FRAME_D2 = 0.34
+    local FRAME_Z = Z0 + FRAME_D2 / 2
+    local LAT_D = 0.2
+    local LAT_Z = Z0 + LAT_D / 2 -- inboard of the posts, so the noren still hangs in front
     local LEAF_FRACTION = 0.36 -- how much of its bay a parked leaf covers
 
     -- spans the OPEN bays only; the closed ends carry their own head band
     add(
         "HeadRail",
-        { postX[5] - postX[2], 0.3, 0.32 },
-        { (postX[2] + postX[5]) / 2, HEAD_Y + 0.15, DOOR_Z },
+        { postX[FRONT_POSTS - 1] - postX[2], 0.3, 0.32 },
+        { (postX[2] + postX[FRONT_POSTS - 1]) / 2, HEAD_Y + 0.15, FRAME_Z },
         timber,
-        "Wood"
+        "Wood",
+        nil,
+        FRAME_VAR
     )
 
     -- THE TWO OUTER BAYS ARE CLOSED (owner's gate, matching the reference). A machiya shopfront is
@@ -187,16 +209,74 @@ function Machiya.build(palette: any, _layout: any): any
         local bayC = (a + b) / 2
 
         if CLOSED[i] then
+            -- render set BACK, so the frame in front of it is what you see
             local panelH = TRANSOM_TOP - FLOOR
             add(
                 `BayPanel{i}`,
                 { bayW, panelH, 0.36 },
-                { bayC, FLOOR + panelH / 2, DOOR_Z },
+                { bayC, FLOOR + panelH / 2, Z0 + STUCCO_SETBACK + 0.18 },
                 stucco,
-                STUCCO_MAT
+                STUCCO_MAT,
+                nil,
+                STUCCO_VAR
             )
-            add(`BaySill{i}`, { bayW, 0.28, 0.44 }, { bayC, FLOOR + 0.14, DOOR_Z }, timber, "Wood")
-            add(`BayHead{i}`, { bayW, 0.28, 0.44 }, { bayC, TRANSOM_TOP - 0.14, DOOR_Z }, timber, "Wood")
+            -- the frame: sill, head and two jambs, all standing at the frontage plane
+            local FR = 0.26
+            add(
+                `BaySill{i}`,
+                { bayW + POST_W, FR, FRAME_D2 },
+                { bayC, FLOOR + FR / 2, FRAME_Z },
+                timber,
+                "Wood",
+                nil,
+                FRAME_VAR
+            )
+            add(
+                `BayHead{i}`,
+                { bayW + POST_W, FR, FRAME_D2 },
+                { bayC, TRANSOM_TOP - FR / 2, FRAME_Z },
+                timber,
+                "Wood",
+                nil,
+                FRAME_VAR
+            )
+            for k, jx in { bayC - bayW / 2, bayC + bayW / 2 } do
+                add(
+                    `BayJamb{i}_{k}`,
+                    { FR, panelH, FRAME_D2 },
+                    { jx, FLOOR + panelH / 2, FRAME_Z },
+                    timber,
+                    "Wood",
+                    nil,
+                    FRAME_VAR
+                )
+            end
+            -- shoji-like lattice across the panel: a coarse grid, proud of the render
+            local LAT = 0.1
+            local latH = panelH - 2 * FR
+            local latY = FLOOR + FR + latH / 2
+            for k = 1, 4 do
+                add(
+                    `BayLatV{i}_{k}`,
+                    { LAT, latH, LAT_D },
+                    { bayC - bayW / 2 + bayW * (k / 5), latY, LAT_Z },
+                    timber,
+                    "Wood",
+                    nil,
+                    FRAME_VAR
+                )
+            end
+            for k = 1, 3 do
+                add(
+                    `BayLatH{i}_{k}`,
+                    { bayW, LAT, LAT_D },
+                    { bayC, latY - latH / 2 + latH * (k / 4), LAT_Z },
+                    timber,
+                    "Wood",
+                    nil,
+                    FRAME_VAR
+                )
+            end
         else
             local tH = TRANSOM_TOP - HEAD_Y
             add(`Transom{i}`, { bayW, tH, 0.1 }, { bayC, HEAD_Y + tH / 2, DOOR_Z }, paper, "Fabric")
@@ -236,23 +316,29 @@ function Machiya.build(palette: any, _layout: any): any
     add(
         "WallWest",
         { WALL_T, STOREY_H, D },
-        { X0 + WALL_T / 2, FLOOR + STOREY_H / 2, CZ },
+        { X0 + STUCCO_SETBACK + WALL_T / 2, FLOOR + STOREY_H / 2, CZ },
         stucco,
-        STUCCO_MAT
+        STUCCO_MAT,
+        nil,
+        STUCCO_VAR
     )
     add(
         "WallEast",
         { WALL_T, STOREY_H, D },
-        { X1 - WALL_T / 2, FLOOR + STOREY_H / 2, CZ },
+        { X1 - STUCCO_SETBACK - WALL_T / 2, FLOOR + STOREY_H / 2, CZ },
         stucco,
-        STUCCO_MAT
+        STUCCO_MAT,
+        nil,
+        STUCCO_VAR
     )
     add(
         "WallBack",
         { W, STOREY_H, WALL_T },
         { CX, FLOOR + STOREY_H / 2, Z1 - WALL_T / 2 },
         stucco,
-        STUCCO_MAT
+        STUCCO_MAT,
+        nil,
+        STUCCO_VAR
     )
 
     -- ----- girders + the upper floor -----
@@ -261,7 +347,9 @@ function Machiya.build(palette: any, _layout: any): any
         { W, GIRDER_H, GIRDER_W },
         { CX, FLOOR + STOREY_H - GIRDER_H / 2, Z0 + GIRDER_W / 2 },
         timber,
-        "Wood"
+        "Wood",
+        nil,
+        FRAME_VAR
     )
     add(
         "GirderBack",
@@ -283,17 +371,27 @@ function Machiya.build(palette: any, _layout: any): any
     local WIN_Y0 = UPPER_Y0 + (UPPER_H - WIN_H) / 2
     local WIN_HALF = 6.0 -- the opening reaches WIN_HALF either side of centre
     local WIN_X0, WIN_X1 = CX - WIN_HALF, CX + WIN_HALF
-    local UF_Z = Z0 + WALL_T / 2
+    local UF_Z = Z0 + STUCCO_SETBACK + WALL_T / 2 -- set back; the kōshi and the sign stand proud of it
 
     local belowH = WIN_Y0 - UPPER_Y0
     local aboveH = (UPPER_Y0 + UPPER_H) - (WIN_Y0 + WIN_H)
-    add("UpperWallFrontLow", { W, belowH, WALL_T }, { CX, UPPER_Y0 + belowH / 2, UF_Z }, stucco, STUCCO_MAT)
+    add(
+        "UpperWallFrontLow",
+        { W, belowH, WALL_T },
+        { CX, UPPER_Y0 + belowH / 2, UF_Z },
+        stucco,
+        STUCCO_MAT,
+        nil,
+        STUCCO_VAR
+    )
     add(
         "UpperWallFrontHigh",
         { W, aboveH, WALL_T },
         { CX, WIN_Y0 + WIN_H + aboveH / 2, UF_Z },
         stucco,
-        STUCCO_MAT
+        STUCCO_MAT,
+        nil,
+        STUCCO_VAR
     )
     local jambW = WIN_X0 - X0
     add(
@@ -301,14 +399,18 @@ function Machiya.build(palette: any, _layout: any): any
         { jambW, WIN_H, WALL_T },
         { X0 + jambW / 2, WIN_Y0 + WIN_H / 2, UF_Z },
         stucco,
-        STUCCO_MAT
+        STUCCO_MAT,
+        nil,
+        STUCCO_VAR
     )
     add(
         "UpperWallFrontEast",
         { jambW, WIN_H, WALL_T },
         { X1 - jambW / 2, WIN_Y0 + WIN_H / 2, UF_Z },
         stucco,
-        STUCCO_MAT
+        STUCCO_MAT,
+        nil,
+        STUCCO_VAR
     )
 
     -- the kōshi, now filling the window band only
@@ -329,21 +431,27 @@ function Machiya.build(palette: any, _layout: any): any
         { WALL_T, UPPER_H, D },
         { X0 + WALL_T / 2, FLOOR + STOREY_H + UPPER_H / 2, CZ },
         stucco,
-        STUCCO_MAT
+        STUCCO_MAT,
+        nil,
+        STUCCO_VAR
     )
     add(
         "UpperWallEast",
         { WALL_T, UPPER_H, D },
         { X1 - WALL_T / 2, FLOOR + STOREY_H + UPPER_H / 2, CZ },
         stucco,
-        STUCCO_MAT
+        STUCCO_MAT,
+        nil,
+        STUCCO_VAR
     )
     add(
         "UpperWallBack",
         { W, UPPER_H, WALL_T },
         { CX, FLOOR + STOREY_H + UPPER_H / 2, Z1 - WALL_T / 2 },
         stucco,
-        STUCCO_MAT
+        STUCCO_MAT,
+        nil,
+        STUCCO_VAR
     )
 
     -- ----- the eave over the shopfront: aerial, a full storey up -----
@@ -415,6 +523,7 @@ function Machiya.build(palette: any, _layout: any): any
                 CFrame = Spec.cframe({ x, EAVE_Y + ROOF_RISE / 2, (Z0 - ROOF_EAVE + ROOF_RIDGE_Z) / 2 }),
                 Color = stucco,
                 Material = STUCCO_MAT,
+                MaterialVariant = STUCCO_VAR,
                 CanCollide = true,
                 CastShadow = false,
             })
@@ -430,32 +539,31 @@ function Machiya.build(palette: any, _layout: any): any
                 ),
                 Color = stucco,
                 Material = STUCCO_MAT,
+                MaterialVariant = STUCCO_VAR,
                 CanCollide = true,
                 CastShadow = false,
             })
         )
     end
 
-    -- ----- noren: the split curtain under the eave, the sign that a shop is OPEN -----
-    -- Four panels with gaps, hung from the eave line. Non-collidable: you walk through a noren.
-    -- Hung at the frontage line itself (not out under the overhang) — the promenade corridor
-    -- north of Z0 is reserved at ground level for everything but the (aerial) eave; a curtain
-    -- that dipped to head height out there would violate that even though it can't be walked
-    -- into.
-    local NOREN_N = 4
-    local norenSpan = W * 0.8
-    local norenW = norenSpan / NOREN_N - 0.25
+    -- ----- noren: the split curtain, over the OPENING only -----
+    -- It hung at 7.9 studs, which on a 9-stud storey is nearly at the ceiling — a noren you cannot
+    -- brush through is a valance. It now hangs from the door head down to 4.2, so you part it on
+    -- the way in. And it covers the OPEN bays only: a curtain in front of a plastered wall is
+    -- advertising a door that is not there.
+    local NOREN_TOP = HEAD_Y
+    local NOREN_H = 2.6
+    local nSpanA, nSpanB = postX[2], postX[FRONT_POSTS - 1]
+    local NOREN_N = 3
+    local nSpan = nSpanB - nSpanA
+    local norenW = nSpan / NOREN_N - 0.25
     for i = 1, NOREN_N do
         local t = (i - 0.5) / NOREN_N
         table.insert(
             children,
             Spec.part(`Noren{i}`, {
-                Size = { norenW, 2.2, 0.08 },
-                CFrame = Spec.cframe({
-                    CX - norenSpan / 2 + norenSpan * t,
-                    FLOOR + STOREY_H - 1.1,
-                    Z0 + 0.4,
-                }),
+                Size = { norenW, NOREN_H, 0.08 },
+                CFrame = Spec.cframe({ nSpanA + nSpan * t, NOREN_TOP - NOREN_H / 2, Z0 + 0.06 }),
                 Color = palette.vermilion,
                 Material = "Fabric",
                 CanCollide = false,
@@ -471,8 +579,8 @@ function Machiya.build(palette: any, _layout: any): any
         "Counter",
         -- Spans only the OPEN bays now that the outer two are closed, and sits deep in the shop so
         -- the goods are behind it rather than on the street.
-        { postX[5] - postX[2] - POST_W, COUNTER_H, COUNTER_D },
-        { (postX[2] + postX[5]) / 2, FLOOR + COUNTER_H / 2, Z0 + 4.6 },
+        { postX[FRONT_POSTS - 1] - postX[2] - POST_W, COUNTER_H, COUNTER_D },
+        { (postX[2] + postX[FRONT_POSTS - 1]) / 2, FLOOR + COUNTER_H / 2, Z0 + 4.6 },
         timber,
         "WoodPlanks"
     )
