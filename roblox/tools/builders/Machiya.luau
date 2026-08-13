@@ -982,11 +982,14 @@ function Machiya.build(palette: any, _layout: any): any
     -- to cloth-thick as boxed geometry gets. The remaining "it still looks solid" is answered by
     -- the transparency below, not by more thinness.
     local NOREN_T = 0.05
-    -- Owner's gate, twice: 0.25 read as solid, and so did 0.5. Three quarters is far past what a
-    -- cotton noren does — the read matters more than the fibre here, and what is being bought is
-    -- the shopfront showing THROUGH the cloth so the panels stop looking like painted boards hung
-    -- in the opening.
-    local NOREN_ALPHA = 0.75
+    -- ROBLOX'S SCALE: 0 is solid, 1 is invisible. Worth stating because it is the opposite of how
+    -- the number gets read out loud — "25% transparency" sounds like a quarter as SOLID, and on
+    -- that reading every increase looks like a request for more body when it delivers less. This
+    -- ran 0.25 -> 0.5 -> 0.75 in the wrong direction before the units were caught.
+    --
+    -- A tenth: cotton, hung in a doorway, with just enough light coming through to say it is
+    -- cloth and not a painted board. Noren SCREEN a shopfront; that is the job.
+    local NOREN_ALPHA = 0.1
     -- Total lean from vertical at the hem. Small: a noren hangs, it does not billow. NEGATIVE
     -- leans the hem toward +Z — back under the eave, INTO the shop. It is tempting to lean it out
     -- over the street instead, and that pushes the hem 0.05 north of the frontage: the promenade
