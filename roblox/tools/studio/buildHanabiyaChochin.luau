@@ -256,8 +256,17 @@ local function buildOne(name: string, x: number)
     light.Shadows = false
     light.Parent = body
 
-    -- Glyph plates face the STREET and the shop interior — the two directions a shopfront
-    -- lantern is read from, where the path poles face across their path instead.
+    -- GLYPH PLATES FACE ALONG THE STREET (owner's gate). They first faced the street and the shop
+    -- INTERIOR, which spends one of the two faces on a wall — nobody stands inside looking back
+    -- out at the lantern. Turned 90° they read from both directions of the promenade, which is
+    -- where the people are.
+    --
+    -- AND THE PLATE SCALES WITH THE LANTERN. It was a flat 1.2 x 1.6 while the barrel shrank to
+    -- LS, so the glyph grew from under half the barrel's width to two thirds of it and its corners
+    -- hung well outside the paper. The plate is the only lever: LanternController builds the
+    -- SurfaceGui from it at PixelsPerStud and fills 0.7 of it, so glyph size IS plate size.
+    -- Same defect is in buildChochinPole — fixed there too, but the placed path lanterns still
+    -- carry the old plates until someone rescales them.
     local function plate(pname: string, facing: Vector3)
         local p = Instance.new("Part")
         p.Name = pname
@@ -265,14 +274,14 @@ local function buildOne(name: string, x: number)
         p.CanCollide = false
         p.CanQuery = false
         p.Transparency = 1
-        p.Size = Vector3.new(1.2, 1.6, 0.05)
+        p.Size = Vector3.new(1.2 * LS, 1.6 * LS, 0.05)
         local pos = lc + facing * (Rmax + 0.04)
         p.CFrame = CFrame.lookAt(pos, pos + facing)
         p.Parent = swing
         CollectionService:AddTag(p, "RoundLantern")
     end
-    plate("GlyphPlateA", Vector3.new(0, 0, -1))
-    plate("GlyphPlateB", Vector3.new(0, 0, 1))
+    plate("GlyphPlateA", Vector3.new(-1, 0, 0)) -- west, up the promenade
+    plate("GlyphPlateB", Vector3.new(1, 0, 0)) -- east, down it
 
     -- The pivot IS the hang point. ChochinSway rocks the model about its own pivot, and a model's
     -- default pivot is its bounding-box centre — leave it and the lantern swings about its waist.

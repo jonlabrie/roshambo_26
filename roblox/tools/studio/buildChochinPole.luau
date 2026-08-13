@@ -268,13 +268,20 @@ local function buildOne(parent: Instance, name: string, base: Vector3, up: Vecto
     light.Parent = body
 
     -- two glyph plates, PERPENDICULAR to the crosspiece (universal), tagged for LanternController
+    --
+    -- SIZED IN LS, like everything else here. This was a flat 1.2 x 1.6 and stayed flat when the
+    -- lantern was scaled down on 2026-08-13 — so the glyph went from under half the barrel's width
+    -- to two thirds of it and its corners hung outside the paper. The plate is the only lever:
+    -- LanternController builds the SurfaceGui from it at PixelsPerStud and fills 0.7, so glyph
+    -- size IS plate size. buildTeahouseChochin keeps the bare 1.2 x 1.6 and is CORRECT to — that
+    -- lantern was never scaled (Rmax 0.9). Check the barrel before copying a number between them.
     local function plate(pname: string, facing: Vector3)
         local p = Instance.new("Part")
         p.Name = pname
         p.Anchored = true
         p.CanCollide = false
         p.Transparency = 1
-        p.Size = Vector3.new(1.2, 1.6, 0.05)
+        p.Size = Vector3.new(1.2 * LS, 1.6 * LS, 0.05)
         local pos = lc + facing * (Rmax + 0.04)
         p.CFrame = CFrame.lookAt(pos, pos + facing)
         p.Parent = swing
