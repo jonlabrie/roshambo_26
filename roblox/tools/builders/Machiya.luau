@@ -942,11 +942,18 @@ function Machiya.build(palette: any, _layout: any): any
     -- Ends buried in the upper front and back walls, so the beam reads as spanning wall to wall
     -- and shows no cut end. CypressWeathered, not the frame's CypressVertical: this is a
     -- horizontal member, which is the distinction the stair timber turned on.
+    --
+    -- STOPPING AN INCH SHORT OF SZ0/SZ1. At the full span the end faces landed exactly on the
+    -- upper walls' OUTER faces — coplanar and same-facing, so they flickered on the street
+    -- elevation. Buried is the intent; flush is a z-fight. The ends still sit a third of a stud
+    -- inside each wall, so nothing opens up.
+    local TIE_TUCK = 1 / 12 -- one inch
     local TIE_T, TIE_H = 0.55, 0.70
+    assert(TIE_TUCK < WALL_T, "the attic tie stops short of the wall it is meant to be buried in")
     for _, side in { { "West", SX0 + WALL_T + TIE_T / 2 }, { "East", SX1 - WALL_T - TIE_T / 2 } } do
         add(
             `AtticTie{side[1]}`,
-            { TIE_T, TIE_H, SZ1 - SZ0 },
+            { TIE_T, TIE_H, (SZ1 - SZ0) - 2 * TIE_TUCK },
             { side[2] :: number, EAVE_Y - TIE_H / 2, (SZ0 + SZ1) / 2 },
             timber,
             "Wood",
