@@ -188,20 +188,66 @@ describe("Machiya — the parts other tasks bind to", function()
         expect(k.properties.Size[1] / k.properties.Size[2] < 3.6).toBe(true)
     end)
 
-    test("the shopfront is sliding doors standing OPEN, under shoji transoms", function()
-        -- Open is the point: a machiya shopfront is doors pushed aside, not a hole. Every bay
-        -- keeps most of its width clear.
-        expect(countPrefix(model, "Transom") >= 5).toBe(true)
-        expect(countPrefix(model, "DoorLeaf")).toBe(5)
-        local slab = find(model, "FloorSlab")
-        local frontage = slab.properties.Size[1]
-        local covered = 0
+    test("the shopfront opens in the MIDDLE, with the outer two bays walled", function()
+        -- A machiya front is not open end to end. Five bays: the outer two are plastered infill,
+        -- the middle three are the shop. Counting parts alone would let a future edit close the
+        -- wrong two and still pass, so this checks WHICH bays are closed by position.
+        expect(countPrefix(model, "BayPanel")).toBe(2)
+        expect(countPrefix(model, "DoorLeaf")).toBe(3)
+        -- NOT countPrefix("Transom"): that also catches the TransomBar lattice, so it counted 9.
+        expect(countPrefix(model, "Transom") - countPrefix(model, "TransomBar")).toBe(3)
+
+        local panels, doors = {}, {}
         for _, c in model.children do
-            if (c.name :: string):sub(1, 8) == "DoorLeaf" then
+            local n = c.name :: string
+            if n:sub(1, 8) == "BayPanel" then
+                table.insert(panels, c.properties.CFrame[1])
+            elseif n:sub(1, 8) == "DoorLeaf" then
+                table.insert(doors, c.properties.CFrame[1])
+            end
+        end
+        table.sort(panels)
+        table.sort(doors)
+        -- every closed panel sits OUTSIDE every door: the walls are the ends, not the middle
+        expect(panels[1] < doors[1]).toBe(true)
+        expect(panels[2] > doors[#doors]).toBe(true)
+    end)
+
+    test("and the doors in those middle bays stand OPEN", function()
+        -- Open is the point: doors pushed aside, not a hole and not a wall. It would be very easy
+        -- to widen a leaf later and quietly shut the shop.
+        local opening, covered = 0, 0
+        for _, c in model.children do
+            local n = c.name :: string
+            if n:sub(1, 7) == "Transom" and n:sub(1, 10) ~= "TransomBar" then
+                opening += c.properties.Size[1] -- a transom spans its whole bay
+            elseif n:sub(1, 8) == "DoorLeaf" then
                 covered += c.properties.Size[1]
             end
         end
-        expect(covered < frontage * 0.45).toBe(true)
+        expect(covered < opening * 0.45).toBe(true)
+    end)
+
+    test("the upper storey is a WALL with a window, not a row of bars", function()
+        -- It shipped as lattice with nothing behind it, so you could see straight through the
+        -- upper floor from the street. A machiya's upper front is plaster with one banded
+        -- opening — the kōshi fills the window, it does not stand in for the wall.
+        expect(countPrefix(model, "UpperWallFront")).toBe(4)
+        local koshi, win = {}, nil
+        for _, c in model.children do
+            local n = c.name :: string
+            if n:sub(1, 5) == "Koshi" then
+                table.insert(koshi, c)
+            elseif n == "UpperWallFrontWest" then
+                win = c
+            end
+        end
+        expect(#koshi > 0).toBe(true)
+        -- every bar sits inboard of the west jamb's inner face: the lattice is IN the opening
+        local jambInner = win.properties.CFrame[1] + win.properties.Size[1] / 2
+        for _, k in koshi do
+            expect(k.properties.CFrame[1] >= jambInner - 0.001).toBe(true)
+        end
     end)
 end)
 

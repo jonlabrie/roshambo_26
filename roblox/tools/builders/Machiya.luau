@@ -176,46 +176,60 @@ function Machiya.build(palette: any, _layout: any): any
         "Wood"
     )
 
+    -- THE TWO OUTER BAYS ARE CLOSED (owner's gate, matching the reference). A machiya shopfront is
+    -- not open end to end — the opening is the middle of the elevation with plastered wall either
+    -- side. It also gives the counter something to sit against.
+    local CLOSED = { [1] = true, [FRONT_POSTS - 1] = true }
+
     for i = 1, FRONT_POSTS - 1 do
         local a, b = postX[i], postX[i + 1]
         local bayW = (b - a) - POST_W
         local bayC = (a + b) / 2
 
-        -- the fixed shoji transom (ranma) above the head rail
-        local tH = TRANSOM_TOP - HEAD_Y
-        add(`Transom{i}`, { bayW, tH, 0.1 }, { bayC, HEAD_Y + tH / 2, DOOR_Z }, paper, "Fabric")
-        for k = 1, 2 do
+        if CLOSED[i] then
+            local panelH = TRANSOM_TOP - FLOOR
             add(
-                `TransomBar{i}_{k}`,
-                { 0.09, tH, 0.14 },
-                { bayC - bayW / 4 + (bayW / 2) * (k - 1), HEAD_Y + tH / 2, DOOR_Z },
-                ink,
+                `BayPanel{i}`,
+                { bayW, panelH, 0.36 },
+                { bayC, FLOOR + panelH / 2, DOOR_Z },
+                stucco,
+                STUCCO_MAT
+            )
+            add(`BaySill{i}`, { bayW, 0.28, 0.44 }, { bayC, FLOOR + 0.14, DOOR_Z }, timber, "Wood")
+            add(`BayHead{i}`, { bayW, 0.28, 0.44 }, { bayC, TRANSOM_TOP - 0.14, DOOR_Z }, timber, "Wood")
+        else
+            local tH = TRANSOM_TOP - HEAD_Y
+            add(`Transom{i}`, { bayW, tH, 0.1 }, { bayC, HEAD_Y + tH / 2, DOOR_Z }, paper, "Fabric")
+            for k = 1, 2 do
+                add(
+                    `TransomBar{i}_{k}`,
+                    { 0.09, tH, 0.14 },
+                    { bayC - bayW / 4 + (bayW / 2) * (k - 1), HEAD_Y + tH / 2, DOOR_Z },
+                    ink,
+                    "Wood"
+                )
+            end
+            local leafW = bayW * LEAF_FRACTION
+            local parkWest = i % 2 == 1
+            local leafC = if parkWest then (a + POST_W / 2 + leafW / 2) else (b - POST_W / 2 - leafW / 2)
+            local leafH = HEAD_Y - FLOOR
+            add(`DoorLeaf{i}`, { leafW, leafH, 0.08 }, { leafC, FLOOR + leafH / 2, DOOR_Z }, paper, "Fabric")
+            add(
+                `DoorStileW{i}`,
+                { 0.12, leafH, 0.13 },
+                { leafC - leafW / 2 + 0.06, FLOOR + leafH / 2, DOOR_Z },
+                timber,
                 "Wood"
             )
+            add(
+                `DoorStileE{i}`,
+                { 0.12, leafH, 0.13 },
+                { leafC + leafW / 2 - 0.06, FLOOR + leafH / 2, DOOR_Z },
+                timber,
+                "Wood"
+            )
+            add(`DoorRail{i}`, { leafW, 0.14, 0.13 }, { leafC, FLOOR + leafH * 0.42, DOOR_Z }, timber, "Wood")
         end
-
-        -- the door leaf, parked against one jamb; alternate sides down the row
-        local leafW = bayW * LEAF_FRACTION
-        local parkWest = i % 2 == 1
-        local leafC = if parkWest then (a + POST_W / 2 + leafW / 2) else (b - POST_W / 2 - leafW / 2)
-        local leafH = HEAD_Y - FLOOR
-        add(`DoorLeaf{i}`, { leafW, leafH, 0.08 }, { leafC, FLOOR + leafH / 2, DOOR_Z }, paper, "Fabric")
-        -- its stile-and-rail frame, enough to read as joinery rather than a panel
-        add(
-            `DoorStileW{i}`,
-            { 0.12, leafH, 0.13 },
-            { leafC - leafW / 2 + 0.06, FLOOR + leafH / 2, DOOR_Z },
-            timber,
-            "Wood"
-        )
-        add(
-            `DoorStileE{i}`,
-            { 0.12, leafH, 0.13 },
-            { leafC + leafW / 2 - 0.06, FLOOR + leafH / 2, DOOR_Z },
-            timber,
-            "Wood"
-        )
-        add(`DoorRail{i}`, { leafW, 0.14, 0.13 }, { leafC, FLOOR + leafH * 0.42, DOOR_Z }, timber, "Wood")
     end
 
     -- ----- side and back walls (ground storey) -----
@@ -259,17 +273,57 @@ function Machiya.build(palette: any, _layout: any): any
     add("UpperFloor", { W, SLAB_T, D }, { CX, FLOOR + STOREY_H + SLAB_T / 2, CZ }, timber, "WoodPlanks")
 
     -- ----- the closed upper storey: kōshi lattice to the street, boards elsewhere -----
-    local KOSHI_N = 14
+    -- THE UPPER STOREY HAD NO STREET WALL — just a row of lattice bars with the building's inside
+    -- visible between them (owner's gate). A machiya's upper floor is a plastered wall with a
+    -- mushiko-mado, an "insect-cage" window: mostly wall, one banded lattice opening. So the wall
+    -- is built in four pieces AROUND the window, and the kōshi fills the opening rather than
+    -- standing in for the wall.
+    local UPPER_Y0 = FLOOR + STOREY_H
+    local WIN_H = 2.0
+    local WIN_Y0 = UPPER_Y0 + (UPPER_H - WIN_H) / 2
+    local WIN_HALF = 6.0 -- the opening reaches WIN_HALF either side of centre
+    local WIN_X0, WIN_X1 = CX - WIN_HALF, CX + WIN_HALF
+    local UF_Z = Z0 + WALL_T / 2
+
+    local belowH = WIN_Y0 - UPPER_Y0
+    local aboveH = (UPPER_Y0 + UPPER_H) - (WIN_Y0 + WIN_H)
+    add("UpperWallFrontLow", { W, belowH, WALL_T }, { CX, UPPER_Y0 + belowH / 2, UF_Z }, stucco, STUCCO_MAT)
+    add(
+        "UpperWallFrontHigh",
+        { W, aboveH, WALL_T },
+        { CX, WIN_Y0 + WIN_H + aboveH / 2, UF_Z },
+        stucco,
+        STUCCO_MAT
+    )
+    local jambW = WIN_X0 - X0
+    add(
+        "UpperWallFrontWest",
+        { jambW, WIN_H, WALL_T },
+        { X0 + jambW / 2, WIN_Y0 + WIN_H / 2, UF_Z },
+        stucco,
+        STUCCO_MAT
+    )
+    add(
+        "UpperWallFrontEast",
+        { jambW, WIN_H, WALL_T },
+        { X1 - jambW / 2, WIN_Y0 + WIN_H / 2, UF_Z },
+        stucco,
+        STUCCO_MAT
+    )
+
+    -- the kōshi, now filling the window band only
+    local KOSHI_N = 18
     for i = 1, KOSHI_N do
         local t = (i - 0.5) / KOSHI_N
         add(
             `Koshi{i}`,
-            { KOSHI_T, UPPER_H, KOSHI_T },
-            { X0 + (X1 - X0) * t, FLOOR + STOREY_H + UPPER_H / 2, Z0 + KOSHI_T },
+            { KOSHI_T, WIN_H, KOSHI_T },
+            { WIN_X0 + (WIN_X1 - WIN_X0) * t, WIN_Y0 + WIN_H / 2, Z0 + KOSHI_T },
             ink,
             "Wood"
         )
     end
+
     add(
         "UpperWallWest",
         { WALL_T, UPPER_H, D },
