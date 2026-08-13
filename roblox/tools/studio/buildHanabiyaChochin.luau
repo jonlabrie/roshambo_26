@@ -86,25 +86,36 @@ local function eaveUndersideAt(z: number): number
     return pY - (nZ / nY) * (z - pZ)
 end
 
--- The corners, from the shop's own floor slab: the lanterns belong to the building, so they are
--- placed off it and follow it if it ever moves.
-local halfW = floorSlab.Size.X / 2
-local frontZ = floorSlab.Position.Z - floorSlab.Size.Z / 2
-local HANG_Z = frontZ - 0.15 -- a hair proud of the frontage, tucked under the eave
+-- THE EAVE'S OUTSIDE CORNERS, not the building's (owner's gate). They first hung tucked against
+-- the shopfront, which reads as lanterns stored under the overhang rather than hung at it — a
+-- shopfront chōchin belongs out at the corner of the roof, where the street sees it side-on and
+-- it marks the building from up and down the promenade. Taken off the EAVE's own extents, so they
+-- follow the overhang rather than the wall.
+local CORNER_INSET = 0.35 -- back from the eave's edge, so they hang under it rather than off it
+local eaveHalfX = eave.Size.X / 2
+local eaveZext = math.abs(eave.CFrame.YVector.Z) * eave.Size.Y / 2
+    + math.abs(eave.CFrame.ZVector.Z) * eave.Size.Z / 2
+local HANG_Z = (eave.Position.Z - eaveZext) + CORNER_INSET
 local CORNERS = {
-    { name = "West", x = floorSlab.Position.X - halfW },
-    { name = "East", x = floorSlab.Position.X + halfW },
+    { name = "West", x = eave.Position.X - eaveHalfX + CORNER_INSET },
+    { name = "East", x = eave.Position.X + eaveHalfX - CORNER_INSET },
 }
 
--- CLEARANCE, CHECKED NOT ASSUMED. These hang over the shopfront and clip the southern edge of the
--- reserved promenade, where the working avatar height is 6 studs (a bare R15 is ~5; hair adds one
--- and players wear it). Refuse rather than hang a lantern in someone's face.
+-- CLEARANCE, CHECKED NOT ASSUMED. The eave SHEDS toward the street, so moving the lanterns out to
+-- its corners necessarily hangs them LOWER — the underside drops about a fifth of a stud for every
+-- stud north. The owner has ruled that acceptable here ("it's okay if they're low"), so the floor
+-- below is a duck-under rather than the 6.0 a player walks under upright. It stays an assert
+-- because something has to catch a lantern hung at chest height; it is not enforcing headroom.
+local MIN_HEM_CLEAR = 5.0
 local armY = eaveUndersideAt(HANG_Z) - HOOK_DROP
 local hemY = armY - 2 * ringR - 0.13 * LS - bodyH - 0.13 * LS
 local clearance = hemY - FLOOR
 assert(
-    clearance >= 6.0,
-    ("the lantern hem would sit %.2f above the floor — under the 6.0 an avatar needs"):format(clearance)
+    clearance >= MIN_HEM_CLEAR,
+    ("the lantern hem would sit %.2f above the floor — below the %.1f a player can duck under"):format(
+        clearance,
+        MIN_HEM_CLEAR
+    )
 )
 
 -- ===== output =====
