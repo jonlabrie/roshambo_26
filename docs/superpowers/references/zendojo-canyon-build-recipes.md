@@ -314,6 +314,17 @@ path relayout/reskin — the old walls won't match the new float profile. As-bui
     (downhill), PathExtension `1–5`, DescentPath `2–20` (downhill), into `Workspace.PathRailings`.
   (Cylinder long axis = local X → vertical needs `CFrame.Angles(0,0,90°)`; rails along a run via `CFrame.lookAt`.)
 
+- **⚠️ RESCALED 2026-08-13 (owner-gated).** The locked v1 stood **12.8** studs with a **2.8 × 1.8**
+  lantern, and against the shōrō and the buildings it read as street furniture: the lantern's
+  underside sat ~9 studs up, nearly two avatar-heights overhead. Now **pole 9.4, lantern 2.02 ×
+  1.30**, underside at **base + 6.49**. `LS`/`PS` in the builder state the two scales once.
+  **`ARM_FRONT` (2.38) is scaled by NEITHER** — the arm's reach carries the lantern out over the
+  path and answers to `STANDOFF` (1.6), not to pole height; scaling it with the pole once left the
+  lanterns hanging beside the path rather than above it.
+  All 38 deployed poles were RESCALED IN PLACE, not rebuilt, so the `RoundLantern` tags, glyph
+  plates, SurfaceGuis, glow sprites and PointLights are the same instances throughout.
+  **AND THE WORKING AVATAR HEIGHT IS 6 STUDS, NOT 5** — a bare R15 is ~5, hair adds a full stud,
+  and players wear hair. Every overhead clearance in this doc should be read against 6.
 - **Hanging chōchin — LOCKED, extracted to `tools/studio/buildChochinPole.luau`** (exact params + deployment
   in `specs/2026-06-27-zendojo-path-railings-lanterns-design.md` "As-built"). The hard-won lessons:
   - **Glyph display = SurfaceGui on a thin transparent `GlyphPlate`, NOT a BillboardGui.** A billboard reads as

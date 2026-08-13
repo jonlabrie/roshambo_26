@@ -77,7 +77,21 @@ local function cyl(
 end
 
 -- straight cylindrical middle, sharp-rounded shoulders to small caps (continuous → no brightness step)
-local Rmax, capR = 0.9, 0.30
+-- ===== SCALE (owner-gated 2026-08-13) =====
+-- The first deployment stood 12.8 studs with a 2.8 x 1.8 lantern. Against the shōrō and the
+-- buildings it read as street furniture, not garden lighting: the lantern's underside sat ~9 studs
+-- up, nearly two avatar-heights overhead. Rescaled to pole 9.4 with a 2.02 x 1.30 lantern, which
+-- puts the underside at base + 6.49 — overhead, but lighting the path rather than the sky.
+--
+-- LS scales the LANTERN, PS the POLE AND ITS IRONMONGERY. They are separate on purpose, and
+-- ARM_FRONT is scaled by NEITHER: the arm's reach exists to carry the lantern out over the path
+-- and answers to STANDOFF (1.6), not to how tall the pole happens to be. Scaling it with the pole
+-- once left the lanterns hanging beside the path instead of above it.
+local LS = 0.65 / 0.9 -- lantern: Rmax 0.9 -> 0.65
+local PS = 9.4 / 12.8 -- pole: 12.8 -> 9.4
+local ARM_FRONT = 2.38 -- INVARIANT. Set by the path standoff. Do not scale.
+
+local Rmax, capR = 0.9 * LS, 0.30 * LS
 local function profile(tt: number): number
     local d = math.abs(2 * tt - 1)
     return capR + (Rmax - capR) * (1 - d ^ 6) ^ 0.5
@@ -96,7 +110,7 @@ local function buildOne(parent: Instance, name: string, base: Vector3, up: Vecto
     local perpAngle = math.atan2(perp.Z, perp.X)
 
     -- ----- bamboo frame (static) -----
-    local poleH, poleDia = 12.8, 0.38
+    local poleH, poleDia = 12.8 * PS, 0.38 * PS
     local poleR = poleDia / 2
     cyl(
         model,
@@ -108,7 +122,7 @@ local function buildOne(parent: Instance, name: string, base: Vector3, up: Vecto
     )
     local armY = base.Y + poleH - 0.5
     local H = Vector3.new(0, poleH - 0.5, 0)
-    local armFront, armBack, armDia = 2.38, poleR + 0.12, 0.225
+    local armFront, armBack, armDia = ARM_FRONT, poleR + 0.12, 0.225 * PS
     local armEnd = base + -up * armFront + H
     local nearEnd = base + up * armBack + H
     local armMid = (armEnd + nearEnd) / 2
@@ -121,13 +135,13 @@ local function buildOne(parent: Instance, name: string, base: Vector3, up: Vecto
         Enum.Material.Wood
     )
     do -- diagonal knee brace
-        local poleP = Vector3.new(base.X, armY - 1.4, base.Z)
+        local poleP = Vector3.new(base.X, armY - 1.4 * PS, base.Z)
         local armP = base + -up * 1.1 + H
         local mid = (poleP + armP) / 2
         cyl(
             model,
             "Brace",
-            Vector3.new((armP - poleP).Magnitude, 0.18, 0.18),
+            Vector3.new((armP - poleP).Magnitude, 0.18 * PS, 0.18 * PS),
             CFrame.lookAt(mid, armP) * CFrame.Angles(0, math.rad(90), 0),
             WOOD,
             Enum.Material.Wood
@@ -135,7 +149,7 @@ local function buildOne(parent: Instance, name: string, base: Vector3, up: Vecto
     end
 
     -- ----- metal loop draped over the crosspiece end (in Swing) -----
-    local ringR, tubeR = 0.22, 0.05
+    local ringR, tubeR = 0.22 * LS, 0.05 * LS
     local ringCenter = Vector3.new(armEnd.X, armY - ringR, armEnd.Z)
     local e1 = Vector3.new(0, 1, 0)
     local e2 = (-up):Cross(e1).Unit
@@ -154,9 +168,9 @@ local function buildOne(parent: Instance, name: string, base: Vector3, up: Vecto
     end
 
     -- ----- paper barrel (in Swing): 18-slice stack, vertical gradient (centre bright, top dimmer) -----
-    local bodyH = 2.8
+    local bodyH = 2.8 * LS
     local ringBottom = armY - 2 * ringR
-    local lc = Vector3.new(armEnd.X, ringBottom - 0.13 - bodyH / 2 + 0.05, armEnd.Z)
+    local lc = Vector3.new(armEnd.X, ringBottom - 0.13 * LS - bodyH / 2 + 0.05 * LS, armEnd.Z)
     local N = 18
     local centerIdx = math.floor(N / 2)
     local body
@@ -183,7 +197,7 @@ local function buildOne(parent: Instance, name: string, base: Vector3, up: Vecto
     -- horizontal ribs (thin)
     for j = 1, 16 do
         local tt = (j - 0.5) / 16
-        local r = profile(tt) + 0.05
+        local r = profile(tt) + 0.05 * LS
         local y = lc.Y + (tt - 0.5) * bodyH
         cyl(
             swing,
@@ -198,7 +212,7 @@ local function buildOne(parent: Instance, name: string, base: Vector3, up: Vecto
     -- spanning the straight zone (horizontal ribs j4..j13) so the ends don't poke past the curve
     local tt4, tt13 = (4 - 0.5) / 16, (13 - 0.5) / 16
     local y4, y13 = lc.Y + (tt4 - 0.5) * bodyH, lc.Y + (tt13 - 0.5) * bodyH
-    local Rv = Rmax + 0.05
+    local Rv = Rmax + 0.05 * LS
     for k = 0, 5 do
         local a = perpAngle + math.rad(30 + k * 60)
         local pos = Vector3.new(lc.X + Rv * math.cos(a), (y4 + y13) / 2, lc.Z + Rv * math.sin(a))
@@ -215,7 +229,7 @@ local function buildOne(parent: Instance, name: string, base: Vector3, up: Vecto
     cyl(
         swing,
         "CapTop",
-        Vector3.new(0.26, 0.66, 0.66),
+        Vector3.new(0.26 * LS, 0.66 * LS, 0.66 * LS),
         CFrame.new(lc + Vector3.new(0, bodyH / 2, 0)) * VERT,
         INK,
         Enum.Material.Wood
@@ -223,7 +237,7 @@ local function buildOne(parent: Instance, name: string, base: Vector3, up: Vecto
     cyl(
         swing,
         "CapBot",
-        Vector3.new(0.26, 0.66, 0.66),
+        Vector3.new(0.26 * LS, 0.66 * LS, 0.66 * LS),
         CFrame.new(lc - Vector3.new(0, bodyH / 2, 0)) * VERT,
         INK,
         Enum.Material.Wood
