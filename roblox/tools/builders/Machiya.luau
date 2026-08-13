@@ -933,6 +933,28 @@ function Machiya.build(palette: any, _layout: any): any
         )
     end
 
+    -- ----- the attic tie beams -----
+    -- The flank already carries a beam at the eave line OUTSIDE (SideEaveBeam); from within the
+    -- attic the same walls were bare render up to the gable. One beam along each, at the height
+    -- the roof springs, running the whole way between the roof edges — the hari of a small
+    -- koyagumi, and the one member that makes an attic read as framed rather than as a void.
+    --
+    -- Ends buried in the upper front and back walls, so the beam reads as spanning wall to wall
+    -- and shows no cut end. CypressWeathered, not the frame's CypressVertical: this is a
+    -- horizontal member, which is the distinction the stair timber turned on.
+    local TIE_T, TIE_H = 0.55, 0.70
+    for _, side in { { "West", SX0 + WALL_T + TIE_T / 2 }, { "East", SX1 - WALL_T - TIE_T / 2 } } do
+        add(
+            `AtticTie{side[1]}`,
+            { TIE_T, TIE_H, SZ1 - SZ0 },
+            { side[2] :: number, EAVE_Y - TIE_H / 2, (SZ0 + SZ1) / 2 },
+            timber,
+            "Wood",
+            nil,
+            STAIR_VAR
+        )
+    end
+
     -- ----- noren: three equal panels PER OPEN BAY -----
     -- They were three panels spread across BOTH bays, so they straddled the middle post and came
     -- out uneven — one wide, one narrow. A noren belongs to its own doorway: each opening gets its

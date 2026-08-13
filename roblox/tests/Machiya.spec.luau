@@ -174,6 +174,30 @@ describe("Machiya — what makes it a shop and not a teahouse", function()
         expect(underside - surface >= 6.0).toBe(true)
     end)
 
+    test("the attic ties run under the roof, not into it", function()
+        -- They sit at the eave line, where the roof is at its LOWEST, and they run the full depth
+        -- to both roof edges. So the clearance is smallest at their ends and it is only 0.23 —
+        -- any flattening of the pitch drives the roof through the beam, and the beam is inside
+        -- the attic where nobody looks until they are standing in it.
+        local function underside(part, z)
+            local cf, sz = part.properties.CFrame, part.properties.Size
+            local ny, nz = cf[8], cf[11]
+            local py = cf[2] - (sz[2] / 2) * ny
+            local pz = cf[3] - (sz[2] / 2) * nz
+            return py - (nz / ny) * (z - pz)
+        end
+        local north, south = find(model, "RoofNorth"), find(model, "RoofSouth")
+        for _, side in { "West", "East" } do
+            local t = find(model, "AtticTie" .. side)
+            expect(t ~= nil).toBe(true)
+            local top = t.properties.CFrame[2] + t.properties.Size[2] / 2
+            local z0 = t.properties.CFrame[3] - t.properties.Size[3] / 2
+            local z1 = t.properties.CFrame[3] + t.properties.Size[3] / 2
+            expect(underside(north, z0) > top).toBe(true)
+            expect(underside(south, z1) > top).toBe(true)
+        end
+    end)
+
     test("THE STRINGERS REACH THE UPPER FLOOR", function()
         -- They did not, twice over: built from the top TREAD they stopped a whole riser low, and
         -- then, once the top face reached the floor, the SQUARE END still left the corner short of
