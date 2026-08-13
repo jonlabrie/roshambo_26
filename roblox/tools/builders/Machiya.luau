@@ -350,7 +350,10 @@ function Machiya.build(palette: any, _layout: any): any
     -- posts and horizontal bands, with a boarded skirt at the bottom where the street reaches it.
     -- The previous pass clad the whole flank in timber, which inverted the relationship: the frame
     -- is supposed to be the minority.
-    local SIDE_POST_Z = { Z0 + 0.7, Z0 + D * 0.36, Z0 + D * 0.68, Z1 - 0.7 }
+    -- THREE posts, so the flank divides into TWO IDENTICAL bays (owner's gate). Four posts gave
+    -- three bays of 2.2 / 2.6 / 1.9 — an irregular rhythm that read as a mistake rather than as a
+    -- frame. Corners and centre; the bays are equal by construction, not by arithmetic.
+    local SIDE_POST_Z = { Z0 + POST_W / 2, CZ, Z1 - POST_W / 2 }
     local BAND_T = 0.3
     local SKIRT_H = 1.3
     for _, side in { { "West", X0 + POST_W / 2 }, { "East", X1 - POST_W / 2 } } do
@@ -366,6 +369,9 @@ function Machiya.build(palette: any, _layout: any): any
                 nil,
                 FRAME_VAR
             )
+            -- The upper storey repeats the SAME three posts and nothing else — no mid rail, no
+            -- skirt. "Similar but simpler": the grid carries up so the elevation reads as one
+            -- frame, while the storey above stays quieter than the one at street level.
             add(
                 `SideUpperPost{nm}{k}`,
                 { POST_W * 0.8, UPPER_H, POST_W * 0.8 },
