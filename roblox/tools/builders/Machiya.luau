@@ -317,28 +317,28 @@ function Machiya.build(palette: any, _layout: any): any
         "WallWest",
         { WALL_T, STOREY_H, D },
         { X0 + STUCCO_SETBACK + WALL_T / 2, FLOOR + STOREY_H / 2, CZ },
-        timber,
-        "Wood",
+        stucco,
+        STUCCO_MAT,
         nil,
-        FRAME_VAR
+        STUCCO_VAR
     )
     add(
         "WallEast",
         { WALL_T, STOREY_H, D },
         { X1 - STUCCO_SETBACK - WALL_T / 2, FLOOR + STOREY_H / 2, CZ },
-        timber,
-        "Wood",
+        stucco,
+        STUCCO_MAT,
         nil,
-        FRAME_VAR
+        STUCCO_VAR
     )
     add(
         "WallBack",
         { W, STOREY_H, WALL_T },
         { CX, FLOOR + STOREY_H / 2, Z1 - WALL_T / 2 },
-        timber,
-        "Wood",
+        stucco,
+        STUCCO_MAT,
         nil,
-        FRAME_VAR
+        STUCCO_VAR
     )
 
     -- ----- THE FRAME ON THE FLANKS -----
@@ -346,9 +346,16 @@ function Machiya.build(palette: any, _layout: any): any
     -- and beams only ever existed on the street elevation. A machiya's flank shows its frame:
     -- corner posts, an intermediate one, and a nageshi band at the storey division. All stand
     -- proud of the wall behind them, which is the whole point.
-    local SIDE_POST_Z = { Z0 + 0.7, CZ, Z1 - 0.7 }
+    -- STUCCO FILLS, TIMBER DIVIDES. The reference's flank is mostly render, gridded by dark
+    -- posts and horizontal bands, with a boarded skirt at the bottom where the street reaches it.
+    -- The previous pass clad the whole flank in timber, which inverted the relationship: the frame
+    -- is supposed to be the minority.
+    local SIDE_POST_Z = { Z0 + 0.7, Z0 + D * 0.36, Z0 + D * 0.68, Z1 - 0.7 }
+    local BAND_T = 0.3
+    local SKIRT_H = 1.3
     for _, side in { { "West", X0 + POST_W / 2 }, { "East", X1 - POST_W / 2 } } do
         local nm, px = side[1] :: string, side[2] :: number
+        -- vertical posts, ground storey AND upper, so the grid runs the full elevation
         for k, pz in SIDE_POST_Z do
             add(
                 `SidePost{nm}{k}`,
@@ -359,13 +366,35 @@ function Machiya.build(palette: any, _layout: any): any
                 nil,
                 FRAME_VAR
             )
+            add(
+                `SideUpperPost{nm}{k}`,
+                { POST_W * 0.8, UPPER_H, POST_W * 0.8 },
+                { px, FLOOR + STOREY_H + UPPER_H / 2, pz },
+                timber,
+                "Wood",
+                nil,
+                FRAME_VAR
+            )
         end
+        -- horizontal bands: the skirt head, a mid rail, and the nageshi at the storey division
+        for k, by in { FLOOR + SKIRT_H, FLOOR + STOREY_H * 0.55, FLOOR + STOREY_H - BAND_T / 2 } do
+            add(
+                `SideBand{nm}{k}`,
+                { POST_W * 0.85, BAND_T, D },
+                { px, by, CZ },
+                timber,
+                "Wood",
+                nil,
+                FRAME_VAR
+            )
+        end
+        -- the boarded skirt (shitami-ita) along the bottom
         add(
-            `SideNageshi{nm}`,
-            { POST_W * 0.85, 0.34, D },
-            { px, FLOOR + STOREY_H - 0.17, CZ },
+            `SideSkirt{nm}`,
+            { POST_W * 0.7, SKIRT_H, D },
+            { px, FLOOR + SKIRT_H / 2, CZ },
             timber,
-            "Wood",
+            "WoodPlanks",
             nil,
             FRAME_VAR
         )
@@ -656,12 +685,12 @@ function Machiya.build(palette: any, _layout: any): any
         Spec.part("Kanban", {
             Size = { SIGN_W, SIGN_H, 0.11 }, -- owner's gate: half the first pass
             CFrame = Spec.cframe({ CX, SIGN_Y, SIGN_Z }, ST),
-            -- The posts' dark wood (owner's gate). A dark board with pale characters is the
-            -- ordinary kanban — black lacquer, gold or white letters — and it ties the sign to the
-            -- timber frame rather than to the render.
-            Color = timber,
-            Material = "Wood",
-            MaterialVariant = FRAME_VAR,
+            -- A WHITE BOARD IN A DARK FRAME, as the reference shows. "The darker wood" meant the
+            -- SURROUND; I applied it to the backing as well and lost the sign. The board is
+            -- plaster and the letters are ink; only the frame is timber.
+            Color = paper,
+            Material = STUCCO_MAT,
+            MaterialVariant = STUCCO_VAR,
             CanCollide = false,
             CanQuery = false,
             CanTouch = false,
@@ -689,7 +718,7 @@ function Machiya.build(palette: any, _layout: any): any
                                 Size = { UDim2 = { { 1, 0 }, { 1, 0 } } },
                                 BackgroundTransparency = 1,
                                 Text = "花火屋",
-                                TextColor3 = palette.ivory, -- pale letters on the dark board
+                                TextColor3 = ink, -- dark characters on the white board
                                 TextSize = 72,
                                 Font = "GothamBold",
                             },
