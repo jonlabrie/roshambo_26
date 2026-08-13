@@ -21,6 +21,31 @@ local FLOOR = 113.10
 -- spec ("9 studs subordinate to the bell tower"); it was 5.0, which I had invented.
 local SHORO_TOP, MIN_SHORO_GAP = 153.54, 9.0
 
+-- EVERY part, including those inside child models. The noren became nested models when each panel
+-- turned into a chain of segments, and every envelope test here walks `model.children` — so the
+-- panels silently dropped out of the promenade and bell-tower checks the moment they were grouped.
+-- A test that stops seeing its subject still passes.
+local function allParts(node, out)
+    out = out or {}
+    for _, c in node.children or {} do
+        if c.properties and c.properties.Size and c.properties.CFrame then
+            table.insert(out, c)
+        end
+        if c.children then
+            allParts(c, out)
+        end
+    end
+    return out
+end
+
+-- The same for z. CFrame row 3 is indices 10, 11, 12.
+local function zspan(part)
+    local cf, sz = part.properties.CFrame, part.properties.Size
+    local cz = cf[3]
+    local ext = math.abs(cf[10]) * sz[1] / 2 + math.abs(cf[11]) * sz[2] / 2 + math.abs(cf[12]) * sz[3] / 2
+    return cz - ext, cz + ext
+end
+
 local function find(node, name)
     for _, c in node.children do
         if c.name == name then
@@ -72,11 +97,9 @@ describe("Machiya — the owner's envelope", function()
         -- The shop must stay clearly subordinate to the bell tower. This used to test against a
         -- fixed top from the holdout block; that number is gone, so it tests the thing the number
         -- was standing in for. A storey that grows into the shōrō is a defect, not a style change.
-        for _, c in model.children do
-            if c.properties.Size and c.properties.CFrame then
-                local _, hi = yspan(c)
-                expect(hi <= SHORO_TOP - MIN_SHORO_GAP).toBe(true)
-            end
+        for _, c in allParts(model) do
+            local _, hi = yspan(c)
+            expect(hi <= SHORO_TOP - MIN_SHORO_GAP).toBe(true)
         end
     end)
 
@@ -84,11 +107,13 @@ describe("Machiya — the owner's envelope", function()
         -- The promenade is inviolable at ground level, and the frontage line is its south edge
         -- wherever that line currently sits. The eave is the ONE exception and is aerial — so
         -- anything reaching north of the frontage must clear an avatar.
-        for _, c in model.children do
-            if c.properties.Size and c.properties.CFrame then
-                local cz, dz = c.properties.CFrame[3], c.properties.Size[3]
+        for _, c in allParts(model) do
+            do
+                -- ROTATION-AWARE, like yspan. The naive centre − Size.Z/2 understates a tilted
+                -- part's reach, and the noren segments are tilted by construction.
+                local zlo = zspan(c)
                 local lo = yspan(c)
-                if cz - dz / 2 < Z0 - 0.001 then
+                if zlo < Z0 - 0.001 then
                     -- AVATAR CLEARANCE. The WORKING avatar height is 6 studs, not the bare R15's
                     -- ~5 — hair adds a full stud and players wear it (owner's ruling 2026-08-13,
                     -- made by standing next to a 5-stud marker). The promenade must stay walkable.
@@ -302,11 +327,42 @@ describe("Machiya — what makes it a shop and not a teahouse", function()
 
     test("the noren hangs under the eave and you can walk through it", function()
         expect(countPrefix(model, "Noren") >= 3).toBe(true)
-        for _, c in model.children do
-            if (c.name :: string):sub(1, 5) == "Noren" then
+        for _, c in allParts(model) do
+            if (c.name :: string):sub(1, 3) == "Seg" then
                 expect(c.properties.CanCollide).toBe(false)
+                expect(c.properties.Tags[1]).toBe("NorenSeg")
             end
         end
+    end)
+
+    test("EACH NOREN PANEL IS A JOINED CHAIN", function()
+        -- A panel is segments hung end to end so it can bend. If a segment's top does not sit
+        -- exactly on the one above, the panel comes apart — and it comes apart WORSE once the
+        -- client sways it, because the sway walks the same chain from the same hinge. Both the
+        -- rest pose and the animation depend on this holding.
+        local panels = 0
+        for _, m in model.children do
+            if (m.name :: string):sub(1, 5) ~= "Noren" or not m.children then
+                continue
+            end
+            panels += 1
+            local segs = m.children
+            expect(#segs >= 2).toBe(true)
+            for s = 1, #segs - 1 do
+                local a, b = segs[s], segs[s + 1]
+                expect(a.name).toBe("Seg" .. s)
+                local ah = a.properties.Size[2] / 2
+                local bh = b.properties.Size[2] / 2
+                -- a's bottom-centre, then b's top-centre, both out of their own CFrames
+                local ay = a.properties.CFrame[2] + a.properties.CFrame[8] * -ah
+                local az = a.properties.CFrame[3] + a.properties.CFrame[11] * -ah
+                local by = b.properties.CFrame[2] + b.properties.CFrame[8] * bh
+                local bz = b.properties.CFrame[3] + b.properties.CFrame[11] * bh
+                expect(math.abs(ay - by) < 1e-6).toBe(true)
+                expect(math.abs(az - bz) < 1e-6).toBe(true)
+            end
+        end
+        expect(panels >= 3).toBe(true)
     end)
 end)
 

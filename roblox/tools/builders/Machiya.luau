@@ -967,9 +967,25 @@ function Machiya.build(palette: any, _layout: any): any
     -- out uneven — one wide, one narrow. A noren belongs to its own doorway: each opening gets its
     -- own set of three, sized to that bay, so the panels are identical and the post between them
     -- reads as a post rather than as a seam.
+    -- EACH PANEL IS A CHAIN, NOT A BOARD. One rigid rectangle per panel reads as painted plywood
+    -- no matter what material it wears — cloth is recognised by its BEND. So a panel is three
+    -- stacked segments hung end to end from the head rail, each tilting a little further out than
+    -- the one above, and the whole chain is what NorenSway.client.luau then animates. The rest
+    -- pose below is the still-air pose, and it is the ONLY place the hang is described: the
+    -- client reads the segments' own angles at startup and adds its wave on top, so there is no
+    -- second copy of these numbers to go stale.
     local NOREN_TOP = HEAD_Y
     local NOREN_H = 2.6
     local NOREN_PER_BAY = 3
+    local NOREN_SEGS = 3
+    local NOREN_T = 0.06
+    -- Total lean from vertical at the hem. Small: a noren hangs, it does not billow. NEGATIVE
+    -- leans the hem toward +Z — back under the eave, INTO the shop. It is tempting to lean it out
+    -- over the street instead, and that pushes the hem 0.05 north of the frontage: the promenade
+    -- is inviolable at ground level, the hem is at FLOOR + 4.2, and a hair over the line is still
+    -- over it. The sway on top of this is clamped for the same reason.
+    local NOREN_BELLY = -3.6
+    local segH = NOREN_H / NOREN_SEGS
     for i = 1, FRONT_POSTS - 1 do
         if not CLOSED[i] then
             local a, b = postX[i], postX[i + 1]
@@ -977,23 +993,34 @@ function Machiya.build(palette: any, _layout: any): any
             local panelW = openW / NOREN_PER_BAY - 0.16
             for k = 1, NOREN_PER_BAY do
                 local t = (k - 0.5) / NOREN_PER_BAY
-                table.insert(
-                    children,
-                    Spec.part(`Noren{i}_{k}`, {
-                        Size = { panelW, NOREN_H, 0.08 },
-                        CFrame = Spec.cframe({
-                            a + POST_W / 2 + openW * t,
-                            NOREN_TOP - NOREN_H / 2,
-                            Z0 + 0.06,
-                        }),
-                        Color = palette.vermilion,
-                        Material = "Fabric",
-                        CanCollide = false,
-                        CanQuery = false,
-                        CanTouch = false,
-                        CastShadow = false,
-                    })
-                )
+                local px = a + POST_W / 2 + openW * t
+                -- Hang the chain: start at the rail and walk down, each segment's top sitting on
+                -- the one above so the panel stays joined however far it leans.
+                local hy, hz = NOREN_TOP, Z0 + 0.06
+                local segs = {}
+                for s = 1, NOREN_SEGS do
+                    -- Deterministic, integer-derived variation — no trig on a hash, so the asset
+                    -- hashes identically on arm64 and x86_64 (the CI drift check depends on it).
+                    local lean = NOREN_BELLY * (s / NOREN_SEGS) + ((i * 3 + k) % 3 - 1) * 0.35
+                    local lr = math.rad(lean)
+                    local dy, dz = math.cos(lr) * segH, -math.sin(lr) * segH
+                    table.insert(
+                        segs,
+                        Spec.part(`Seg{s}`, {
+                            Size = { panelW, segH, NOREN_T },
+                            CFrame = Spec.cframe({ px, hy - dy / 2, hz + dz / 2 }, rotX(lean)),
+                            Color = palette.vermilion,
+                            Material = "Fabric",
+                            Tags = { "NorenSeg" },
+                            CanCollide = false,
+                            CanQuery = false,
+                            CanTouch = false,
+                            CastShadow = false,
+                        })
+                    )
+                    hy, hz = hy - dy, hz + dz
+                end
+                table.insert(children, Spec.model(`Noren{i}_{k}`, segs))
             end
         end
     end
