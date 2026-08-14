@@ -243,6 +243,22 @@ describe("karesansui garden layout (spec 2026-07-24)", function()
         expect(math.abs(r[4] - (pz + out)) < 0.001).toBe(true)
     end)
 
+    test("THE PLINTHS STAND PROUD OF THE KERB, so the two never share a face", function()
+        -- At the kerb's height the thing beside it is the PLINTH, not the post — the post starts
+        -- 1.7 up. A plinth of exactly postD therefore put its outer face on the same plane as the
+        -- kerb's outer face: coplanar, same-facing, z-fighting at all four corners (owner: "kerb
+        -- corners are now co-incident with corner plinths"). Asserted against the panel edge
+        -- rather than against postD, so it keeps meaning something if the kerb line moves again.
+        local r = K.panels.main
+        local px, pz = L.pavilion.pos[1], L.pavilion.pos[3]
+        local s = L.pavilion.postSpacing / 2
+        local half = L.pavilion.plinthD / 2
+        expect(px + s + half > r[3] + 0.02).toBe(true)
+        expect(px - s - half < r[1] - 0.02).toBe(true)
+        expect(pz + s + half > r[4] + 0.02).toBe(true)
+        expect(pz - s - half < r[2] - 0.02).toBe(true)
+    end)
+
     test("THE KERB IS A PLANK ON EDGE, not a sleeper", function()
         -- 4x10 in inches, showing. It was 0.8 x 1.0-proud — a 10x12, near enough square that it
         -- read as a sleeper. The ratio is the requirement; the absolute sizes follow from it.

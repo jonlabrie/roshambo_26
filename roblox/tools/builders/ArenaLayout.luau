@@ -53,7 +53,19 @@ local ArenaLayout = {
     -- because the karesansui kerb is now aligned to the posts' OUTER faces, so the garden panel
     -- and the tower have to agree on how thick a post is — and a number that two builders must
     -- agree on cannot live inside one of them.
-    pavilion = { pos = { -2, 112, 0 }, postSpacing = 18, postD = 2.4, roofHeight = 22, yaw = 0 },
+    -- plinthD is WIDER THAN postD ON PURPOSE (owner's gate 2026-08-14). At the kerb's height the
+    -- thing beside it is the plinth, not the post — the post starts 1.7 up — so a plinth of
+    -- exactly postD put its outer face on the same plane as the kerb's, coplanar and same-facing,
+    -- and the two z-fought at all four corners. The plinth stands proud so the kerb dies INTO it,
+    -- which is also what a base stone does.
+    pavilion = {
+        pos = { -2, 112, 0 },
+        postSpacing = 18,
+        postD = 2.4,
+        plinthD = 2.7,
+        roofHeight = 22,
+        yaw = 0,
+    },
     -- bonshō bell: hangs centred above the clearing floor. Raised +2.7 (2026-07-20) so
     -- the BellBeam rests atop the ring beams and the bell clears the deck better; the
     -- shu-moku striker (y118) realignment to this height is the deferred drive-chain pass.

@@ -11,7 +11,8 @@ local Shoro = {}
 
 function Shoro.build(palette: { [string]: { number } }, L: any)
     local s = L.pavilion.postSpacing / 2
-    local pd = L.pavilion.postD -- post/plinth thickness; shared with the karesansui kerb line
+    local pd = L.pavilion.postD -- post thickness; the karesansui kerb line is derived from it
+    local plinthD = L.pavilion.plinthD -- WIDER than the post, so the kerb dies into it
     local roofY = L.pavilion.roofHeight
     local cypress = palette.cypressWeathered
     local children = {}
@@ -43,7 +44,7 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
             Spec.part(`Plinth{i}`, {
                 -- +0.5 taller (2026-07-24): the karesansui field raised the effective
                 -- grade ~1.2 over the build datum; plinths must show above the raking
-                Size = { pd, 1.7, pd },
+                Size = { plinthD, 1.7, plinthD },
                 CFrame = place({ c[1], 0.85, c[2] }),
                 Color = palette.gravel,
                 Material = "Slate",
