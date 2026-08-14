@@ -231,13 +231,23 @@ describe("karesansui garden layout (spec 2026-07-24)", function()
         -- bearing plinths at x -15, z -6 / 6.5 used to be asserted inside the raking. They now
         -- stand 4 studs west of the kerb on plain terrace. That was the owner's call, not an
         -- oversight — see the comment on panels.main.
+        -- To the posts' OUTER faces, not their centres (owner's gate, second pass): the beams are
+        -- laid inboard of the panel edge, so this is what puts the kerb's own outer face flush
+        -- with the posts.
         local r = K.panels.main
         local px, pz = L.pavilion.pos[1], L.pavilion.pos[3]
-        local s = L.pavilion.postSpacing / 2
-        expect(math.abs(r[1] - (px - s)) < 0.001).toBe(true)
-        expect(math.abs(r[3] - (px + s)) < 0.001).toBe(true)
-        expect(math.abs(r[2] - (pz - s)) < 0.001).toBe(true)
-        expect(math.abs(r[4] - (pz + s)) < 0.001).toBe(true)
+        local out = L.pavilion.postSpacing / 2 + L.pavilion.postD / 2
+        expect(math.abs(r[1] - (px - out)) < 0.001).toBe(true)
+        expect(math.abs(r[3] - (px + out)) < 0.001).toBe(true)
+        expect(math.abs(r[2] - (pz - out)) < 0.001).toBe(true)
+        expect(math.abs(r[4] - (pz + out)) < 0.001).toBe(true)
+    end)
+
+    test("THE KERB IS A PLANK ON EDGE, not a sleeper", function()
+        -- 4x10 in inches, showing. It was 0.8 x 1.0-proud — a 10x12, near enough square that it
+        -- read as a sleeper. The ratio is the requirement; the absolute sizes follow from it.
+        expect(K.kerbProud / K.kerbW).toBeCloseTo(2.5, 0.15)
+        expect(K.kerbProud > K.kerbW).toBe(true)
     end)
 
     test("the bell has room to ring inside the kerb", function()
@@ -251,8 +261,9 @@ describe("karesansui garden layout (spec 2026-07-24)", function()
         expect(margin > 1.5).toBe(true)
     end)
     test("frame constants match the spec", function()
-        expect(K.kerbW).toBeCloseTo(0.8, 0.001)
-        expect(K.kerbProud).toBeCloseTo(1.0, 0.001)
+        -- 4" and 10" (owner's gate 2026-08-14); was 0.8 and 1.0, a near-square sleeper section
+        expect(K.kerbW).toBeCloseTo(4 / 12, 0.001)
+        expect(K.kerbProud).toBeCloseTo(10 / 12, 0.001)
         expect(K.slabProud).toBeCloseTo(0.15, 0.001)
         expect(K.guardH).toBeCloseTo(3.5, 0.001)
     end)

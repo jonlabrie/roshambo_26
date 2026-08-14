@@ -49,7 +49,11 @@ local ArenaLayout = {
         boundaryLipY = 100, -- lowest fall
         inFallTopY = 150, -- in-fall crest
     },
-    pavilion = { pos = { -2, 112, 0 }, postSpacing = 18, roofHeight = 22, yaw = 0 },
+    -- postD was a bare 2.4 repeated seven times inside Shoro.luau. It moved here on 2026-08-14
+    -- because the karesansui kerb is now aligned to the posts' OUTER faces, so the garden panel
+    -- and the tower have to agree on how thick a post is — and a number that two builders must
+    -- agree on cannot live inside one of them.
+    pavilion = { pos = { -2, 112, 0 }, postSpacing = 18, postD = 2.4, roofHeight = 22, yaw = 0 },
     -- bonshō bell: hangs centred above the clearing floor. Raised +2.7 (2026-07-20) so
     -- the BellBeam rests atop the ring beams and the bell clears the deck better; the
     -- shu-moku striker (y118) realignment to this height is the deferred drive-chain pass.
@@ -120,8 +124,11 @@ local ArenaLayout = {
         -- TRUE grade across the garden (probed 2026-07-24: 111.8..113.07 — a flat
         -- bed sits proud of its HIGHEST ground)
         floorY = { main = 113.1 },
-        kerbW = 0.8, -- dressed-slate frame (bearing-plinth vocabulary)
-        kerbProud = 1.0, -- gate-tuned up from 0.5 (raised-bed read)
+        -- A 4x10 ON EDGE (owner's gate 2026-08-14), in inches: 4/12 wide, 10/12 showing. It was
+        -- 0.8 x 1.0-proud, which is a 10x12 — near enough square that it read as a 6x6 sleeper
+        -- rather than as an edging board. What is wanted is a plank standing on its edge.
+        kerbW = 0.3333, -- 4"
+        kerbProud = 0.8333, -- 10" — the SHOWING height; kerbH below is the rooted depth
         kerbH = 2.5, -- rooted below grade through the dips at the taller stand
         slabProud = 0.15, -- raked field rides proud of the terrace like flags-of-bed
         guardH = 3.5, -- EngawaBarrier low guard: blocks walking, never traps jumpers
@@ -131,10 +138,14 @@ local ArenaLayout = {
         -- east of the tower and stopping short of it north and south. A garden the building
         -- happened to stand at one end of.
         --
-        -- Now the kerb runs BETWEEN THE POSTS, so the panel corners ARE the post centres:
-        -- pavilion.pos (-2, 0) ± postSpacing/2 (9). Derived by hand rather than computed because
-        -- ArenaLayout is a flat survey table with no expressions in it — the test asserts the
-        -- relationship, so the two cannot drift apart silently.
+        -- Now the kerb runs BETWEEN THE POSTS, and to their OUTER faces (owner's gate: "between
+        -- the outer edges between the posts, not the inner edge"). The beams are laid inboard of
+        -- the panel edge, so putting the panel on the outer faces is what makes the kerb's own
+        -- outer face flush with the posts — the standing rule for anything meeting a built edge.
+        --
+        -- So the corners are pavilion.pos (-2, 0) ± (postSpacing/2 + postD/2) = ±10.2. Derived by
+        -- hand because ArenaLayout is a flat survey table with no expressions in it; the test
+        -- asserts the relationship against pavilion, so the two cannot drift apart silently.
         --
         -- WHAT THIS GAVE UP, deliberately: the bell-drive's main-run bearing plinths at x -15
         -- used to rise out of the raking, and now stand 4 studs west of the kerb on plain terrace.
@@ -142,7 +153,7 @@ local ArenaLayout = {
         -- stands beside it in the square. That relationship had its own assertion, and retiring it
         -- was a decision, not a casualty.
         panels = {
-            main = { -11, -9, 7, 9 }, -- the post-centre square, 18 x 18
+            main = { -12.2, -10.2, 8.2, 10.2 }, -- the post OUTER square, 20.4 x 20.4
         },
         corridors = {
             eastCorridor = { 34, -10, 54, 38 }, -- kerb face -> Overlook west face

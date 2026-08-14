@@ -11,6 +11,7 @@ local Shoro = {}
 
 function Shoro.build(palette: { [string]: { number } }, L: any)
     local s = L.pavilion.postSpacing / 2
+    local pd = L.pavilion.postD -- post/plinth thickness; shared with the karesansui kerb line
     local roofY = L.pavilion.roofHeight
     local cypress = palette.cypressWeathered
     local children = {}
@@ -42,7 +43,7 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
             Spec.part(`Plinth{i}`, {
                 -- +0.5 taller (2026-07-24): the karesansui field raised the effective
                 -- grade ~1.2 over the build datum; plinths must show above the raking
-                Size = { 2.4, 1.7, 2.4 },
+                Size = { pd, 1.7, pd },
                 CFrame = place({ c[1], 0.85, c[2] }),
                 Color = palette.gravel,
                 Material = "Slate",
@@ -52,7 +53,7 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
         table.insert(
             children,
             Spec.part(`Post{i}`, {
-                Size = { roofY - 1.7, 2.4, 2.4 },
+                Size = { roofY - 1.7, pd, pd },
                 Shape = "Cylinder",
                 CFrame = place({ c[1], 1.7 + (roofY - 1.7) / 2, c[2] }, Spec.ROT.CYL_VERTICAL),
                 Color = cypress,
@@ -64,18 +65,18 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
     for i, z in { s, -s } do
         table.insert(
             children,
-            timberPart(`RingBeamX{i}`, { 2 * s + 2.4, 1.2, 1.4 }, place({ 0, roofY - 0.6, z }))
+            timberPart(`RingBeamX{i}`, { 2 * s + pd, 1.2, 1.4 }, place({ 0, roofY - 0.6, z }))
         )
     end
     for i, x in { s, -s } do
         table.insert(
             children,
-            timberPart(`RingBeamZ{i}`, { 1.4, 1.2, 2 * s + 2.4 }, place({ x, roofY - 0.6, 0 }))
+            timberPart(`RingBeamZ{i}`, { 1.4, 1.2, 2 * s + pd }, place({ x, roofY - 0.6, 0 }))
         )
     end
     -- BellBeam rests ATOP the two ring beams (it carries the bell's weight): its
     -- underside sits on the ring-beam tops (local y = roofY), so centre = roofY + 0.9.
-    table.insert(children, timberPart("BellBeam", { 2.2, 1.8, 2 * s + 2.4 }, place({ 0, roofY + 0.9, 0 })))
+    table.insert(children, timberPart("BellBeam", { 2.2, 1.8, 2 * s + pd }, place({ 0, roofY + 0.9, 0 })))
 
     -- Tokyō: a stepped block-stack over each post head, each course cantilevering wider
     -- toward the eave (the reference's bracket complex). Cheap primitives.
@@ -100,13 +101,13 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
     for i, z in { s, -s } do
         table.insert(
             children,
-            timberPart(`SkirtBeamX{i}`, { 2 * s + 2.4, 1.2, 1.4 }, place({ 0, skirtBeamY, z }))
+            timberPart(`SkirtBeamX{i}`, { 2 * s + pd, 1.2, 1.4 }, place({ 0, skirtBeamY, z }))
         )
     end
     for i, x in { s, -s } do
         table.insert(
             children,
-            timberPart(`SkirtBeamZ{i}`, { 1.4, 1.2, 2 * s + 2.4 }, place({ x, skirtBeamY, 0 }))
+            timberPart(`SkirtBeamZ{i}`, { 1.4, 1.2, 2 * s + pd }, place({ x, skirtBeamY, 0 }))
         )
     end
 
