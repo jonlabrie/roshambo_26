@@ -219,19 +219,36 @@ describe("karesansui garden layout (spec 2026-07-24)", function()
             expect(overlaps(K.panels.main, c)).toBe(false)
         end
     end)
-    test("the machine stands IN the garden: posts and plinths inside the rect", function()
+    test("THE KERB RUNS BETWEEN THE POSTS: the garden's corners ARE the post centres", function()
+        -- This replaces "posts and plinths inside the rect", retired at the owner's gate on
+        -- 2026-08-14 when the garden shrank to the tower's own floor. The old test said the
+        -- machine stood IN the garden; the new arrangement says the garden IS the bell's floor
+        -- and the kerb line passes THROUGH the posts. Both are real relationships — this one is
+        -- the current one, and it is the stronger assertion, because the panel is now derived
+        -- from the pavilion rather than merely containing it.
+        --
+        -- ALSO RETIRED, and worth naming rather than quietly dropping: the bell-drive's main-run
+        -- bearing plinths at x -15, z -6 / 6.5 used to be asserted inside the raking. They now
+        -- stand 4 studs west of the kerb on plain terrace. That was the owner's call, not an
+        -- oversight — see the comment on panels.main.
         local r = K.panels.main
         local px, pz = L.pavilion.pos[1], L.pavilion.pos[3]
         local s = L.pavilion.postSpacing / 2
-        for _, cx in { px - s, px + s } do
-            for _, cz in { pz - s, pz + s } do
-                expect(cx > r[1] and cx < r[3] and cz > r[2] and cz < r[4]).toBe(true)
-            end
-        end
-        -- the main-run bearing plinths (x -15, z -6 / 6.5) rise out of the raking
-        for _, z in { -6, 6.5 } do
-            expect(-15 > r[1] and -15 < r[3] and z > r[2] and z < r[4]).toBe(true)
-        end
+        expect(math.abs(r[1] - (px - s)) < 0.001).toBe(true)
+        expect(math.abs(r[3] - (px + s)) < 0.001).toBe(true)
+        expect(math.abs(r[2] - (pz - s)) < 0.001).toBe(true)
+        expect(math.abs(r[4] - (pz + s)) < 0.001).toBe(true)
+    end)
+
+    test("the bell has room to ring inside the kerb", function()
+        -- The bell is 10.2 across and the field inside the kerb is 16.4, so the raked margin is
+        -- barely three studs. That is the reference photograph and it is meant to be tight — but
+        -- if either number moves the wrong way the bell ends up sitting ON the kerb, which is
+        -- exactly the sort of thing that looks fine in the explorer.
+        local r = K.panels.main
+        local field = math.min(r[3] - r[1], r[4] - r[2]) - 2 * K.kerbW
+        local margin = (field - 2 * L.bell.radius) / 2
+        expect(margin > 1.5).toBe(true)
     end)
     test("frame constants match the spec", function()
         expect(K.kerbW).toBeCloseTo(0.8, 0.001)

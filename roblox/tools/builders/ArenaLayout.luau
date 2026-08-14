@@ -125,13 +125,24 @@ local ArenaLayout = {
         kerbH = 2.5, -- rooted below grade through the dips at the taller stand
         slabProud = 0.15, -- raked field rides proud of the terrace like flags-of-bed
         guardH = 3.5, -- EngawaBarrier low guard: blocks walking, never traps jumpers
-        -- ONE GARDEN CONTAINING THE MACHINE (gate 2 correction, take 2): the
-        -- pavilion posts, bearing plinths, and tower all rise OUT of the raked
-        -- field; the kerb meets the corridors east/south, the river bank north,
-        -- and the wheel run west. Guards enclose the machine — the ritual heart
-        -- is approached by eye.
+        -- THE GARDEN IS NOW THE TOWER'S OWN FLOOR (owner's gate 2026-08-14, from the Chion-in
+        -- bell photograph in roshambo_reference/concept art). It was 55 x 30 and the tower sat in
+        -- its corner — panel centre (6.5, 3) against a tower centre of (-2, 0), running 18 studs
+        -- east of the tower and stopping short of it north and south. A garden the building
+        -- happened to stand at one end of.
+        --
+        -- Now the kerb runs BETWEEN THE POSTS, so the panel corners ARE the post centres:
+        -- pavilion.pos (-2, 0) ± postSpacing/2 (9). Derived by hand rather than computed because
+        -- ArenaLayout is a flat survey table with no expressions in it — the test asserts the
+        -- relationship, so the two cannot drift apart silently.
+        --
+        -- WHAT THIS GAVE UP, deliberately: the bell-drive's main-run bearing plinths at x -15
+        -- used to rise out of the raking, and now stand 4 studs west of the kerb on plain terrace.
+        -- The machine is no longer IN the garden; the garden is the bell's floor and the machine
+        -- stands beside it in the square. That relationship had its own assertion, and retiring it
+        -- was a decision, not a casualty.
         panels = {
-            main = { -21, -12, 34, 18 }, -- gate-tuned: +5 west (shaft+pillow in), -10 south, +2 north
+            main = { -11, -9, 7, 9 }, -- the post-centre square, 18 x 18
         },
         corridors = {
             eastCorridor = { 34, -10, 54, 38 }, -- kerb face -> Overlook west face
