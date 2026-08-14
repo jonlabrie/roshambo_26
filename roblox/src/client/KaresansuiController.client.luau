@@ -34,9 +34,15 @@ local function buildRings(island: BasePart)
     -- pin its inner ring radius exactly (elongated rocks defeat the axis-aligned guess)
     local footprintR = (island:GetAttribute("RingFootprintR") :: number?)
         or math.max(island.Size.X, island.Size.Z) / 2 * FOOT_TUCK
+    -- ...and RingMaxR pins the OUTER radius, because the two are not independent by default:
+    -- maxR is footprintR + RING_BAND, so pulling the rings in toward the centre drags their outer
+    -- edge in with them and leaves bare field at the rim. That coupling is right for a boulder,
+    -- where the band is a skirt around a stone of whatever size. It is wrong for the bell, which
+    -- wants ripples from a point at the centre out to the kerb — two radii chosen independently.
+    local maxR = (island:GetAttribute("RingMaxR") :: number?) or (footprintR + RING_BAND)
     local g = {
         footprintR = footprintR,
-        maxR = footprintR + RING_BAND,
+        maxR = maxR,
         pitch = PITCH,
         amplitude = AMPLITUDE,
         soft = SOFT,
