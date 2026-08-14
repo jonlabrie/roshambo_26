@@ -74,18 +74,20 @@ describe("Karesansui garden (kerb + field + guard)", function()
         expect(top).toBeCloseTo(K.floorY.main + K.kerbProud, 0.001)
     end)
 
-    test("EACH KERB'S GRAIN RUNS ALONG IT, not across", function()
-        -- The cypress maps are projected from WORLD axes, not per-part UVs, so one variant across
-        -- all four beams would run the grain along two of them and across the other two.
-        -- CypressVertical is the same maps turned a quarter — which is what a beam running the
-        -- other way needs, whatever its name suggests. Assert against each beam's own long axis so
-        -- this survives the panel changing shape.
+    test("every kerb wears the grain that was VERIFIED BY EYE", function()
+        -- This asserts an observation, not a derivation. The cypress maps project from world axes,
+        -- so a beam cannot fix its own grain by being turned — only the variant can — and the
+        -- reasoned guess (rotated maps for the beams running the other way) was checked at the
+        -- gate and was WRONG: it banded them across. All four take the unrotated maps.
+        --
+        -- So this test's job is narrow: hold what was seen, and fail loudly if someone
+        -- reintroduces the plausible-but-wrong mapping. It cannot tell you the grain is right —
+        -- only a person looking at it can do that.
         for _, side in { "N", "S", "W", "E" } do
             local k = byName[`KerbMain{side}`]
             expect(k ~= nil).toBe(true)
-            local sz = k.properties.Size
-            local longX = sz[1] > sz[3]
-            expect(k.properties.MaterialVariant).toBe(if longX then "CypressWeathered" else "CypressVertical")
+            expect(k.properties.Material).toBe("Wood")
+            expect(k.properties.MaterialVariant).toBe("CypressWeathered")
         end
     end)
     test("field variants follow the panel's long axis", function()

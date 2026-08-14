@@ -27,15 +27,22 @@ function Karesansui.build(palette: any, L: any): Spec.PartSpec
         -- was right while this was a garden the tower stood in; now the kerb is the tower's own
         -- edging and belongs to the same timber.
         --
-        -- THE VARIANT IS PER SIDE, BECAUSE THE GRAIN IS IN WORLD SPACE. These maps are projected
-        -- from world axes, not from each part's UVs — CypressWeathered runs the grain one way and
-        -- CypressVertical is the SAME maps rotated 90°. So a single variant across all four beams
-        -- would run the grain along two of them and across the other two. N/S beams are long in X
-        -- and take the unrotated maps; W/E beams are long in Z and take the rotated ones. The
-        -- variant's NAME says "vertical" because that is what it was cut for; what it actually
-        -- means is "turned a quarter", which is what a beam running the other way needs.
+        -- THE VARIANT IS PER SIDE, BECAUSE THE GRAIN IS IN WORLD SPACE — these maps are projected
+        -- from world axes, not from each part's UVs, so a beam cannot fix its own grain by being
+        -- turned. Only the variant can.
+        --
+        -- WHICH VARIANT GOES WHERE WAS DETERMINED BY LOOKING, and the reasoned guess was wrong.
+        -- CypressVertical is the same maps turned a quarter, so it read as the obvious choice for
+        -- the beams running the other way — and on those beams it banded ACROSS (owner, at the
+        -- gate: "south and north read correctly, east and west are banded across"). Whatever plane
+        -- that rotation is applied in, it is not the one that governs a horizontal member. All
+        -- four take the unrotated maps.
+        --
+        -- Left per-side rather than collapsed to one constant: the mapping is empirical, so the
+        -- next person to change the panel's shape needs to see that it IS a mapping and re-check
+        -- it, not find a single value that looks like it was never in question.
         local grain =
-            { N = "CypressWeathered", S = "CypressWeathered", W = "CypressVertical", E = "CypressVertical" }
+            { N = "CypressWeathered", S = "CypressWeathered", W = "CypressWeathered", E = "CypressWeathered" }
         for side, b in beams do
             table.insert(
                 children,
