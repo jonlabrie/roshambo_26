@@ -64,11 +64,29 @@ describe("Karesansui garden (kerb + field + guard)", function()
             end
         end
     end)
-    test("kerb wears the plinth vocabulary: Slate, gravel palette, proud", function()
+    test("kerb wears the POSTS' cypress, and stands proud", function()
+        -- Was "the plinth vocabulary: Slate". The kerb belonged to the plinths while this was a
+        -- garden the tower stood in; now it runs between the posts and belongs to their timber
+        -- (owner's gate 2026-08-14).
         local k = byName.KerbMainN
-        expect(k.properties.Material).toBe("Slate")
+        expect(k.properties.Material).toBe("Wood")
         local top = k.properties.CFrame[2] + k.properties.Size[2] / 2
         expect(top).toBeCloseTo(K.floorY.main + K.kerbProud, 0.001)
+    end)
+
+    test("EACH KERB'S GRAIN RUNS ALONG IT, not across", function()
+        -- The cypress maps are projected from WORLD axes, not per-part UVs, so one variant across
+        -- all four beams would run the grain along two of them and across the other two.
+        -- CypressVertical is the same maps turned a quarter — which is what a beam running the
+        -- other way needs, whatever its name suggests. Assert against each beam's own long axis so
+        -- this survives the panel changing shape.
+        for _, side in { "N", "S", "W", "E" } do
+            local k = byName[`KerbMain{side}`]
+            expect(k ~= nil).toBe(true)
+            local sz = k.properties.Size
+            local longX = sz[1] > sz[3]
+            expect(k.properties.MaterialVariant).toBe(if longX then "CypressWeathered" else "CypressVertical")
+        end
     end)
     test("field variants follow the panel's long axis", function()
         for _, panel in { "Main" } do

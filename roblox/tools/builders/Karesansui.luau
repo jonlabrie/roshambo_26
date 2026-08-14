@@ -23,14 +23,28 @@ function Karesansui.build(palette: any, L: any): Spec.PartSpec
             W = { x1 + w / 2, (z1 + z2) / 2, w, z2 - z1 - 2 * w },
             E = { x2 - w / 2, (z1 + z2) / 2, w, z2 - z1 - 2 * w },
         }
+        -- CYPRESS, MATCHING THE POSTS IT NOW RUNS BETWEEN (owner's gate 2026-08-14). Dressed slate
+        -- was right while this was a garden the tower stood in; now the kerb is the tower's own
+        -- edging and belongs to the same timber.
+        --
+        -- THE VARIANT IS PER SIDE, BECAUSE THE GRAIN IS IN WORLD SPACE. These maps are projected
+        -- from world axes, not from each part's UVs — CypressWeathered runs the grain one way and
+        -- CypressVertical is the SAME maps rotated 90°. So a single variant across all four beams
+        -- would run the grain along two of them and across the other two. N/S beams are long in X
+        -- and take the unrotated maps; W/E beams are long in Z and take the rotated ones. The
+        -- variant's NAME says "vertical" because that is what it was cut for; what it actually
+        -- means is "turned a quarter", which is what a beam running the other way needs.
+        local grain =
+            { N = "CypressWeathered", S = "CypressWeathered", W = "CypressVertical", E = "CypressVertical" }
         for side, b in beams do
             table.insert(
                 children,
                 Spec.part(`Kerb{name}{side}`, {
                     Size = { b[3], K.kerbH, b[4] },
                     CFrame = Spec.cframe({ b[1], kerbTopY - K.kerbH / 2, b[2] }),
-                    Color = palette.gravel,
-                    Material = "Slate",
+                    Color = palette.cypressWeathered,
+                    Material = "Wood",
+                    MaterialVariant = grain[side],
                 })
             )
             table.insert(
