@@ -63,12 +63,19 @@ local ArenaLayout = {
         postSpacing = 18,
         postD = 2.4,
         plinthD = 2.7,
-        -- Height from the pavilion base (112) to the plinth's top, set so the stone tops out
-        -- EXACTLY LEVEL WITH THE KERB (owner's gate 2026-08-14): 113.10 floor + 0.8333 proud =
-        -- 113.9333, less the base's 112. It was 1.7, topping at 113.7, so the kerb ran a quarter
-        -- stud higher than the stone it died into. Written as a literal because this table holds
-        -- no expressions; the test asserts it against the kerb so the two cannot drift.
-        plinthH = 1.9333,
+        -- Height from the pavilion base (112) to the plinth's top: an inch PROUD of the kerb's
+        -- 113.9333, so 113.10 + 0.8333 + 0.0833 - 112.
+        --
+        -- IT WENT 1.7 -> 1.9333 -> 2.0166, and the middle step is the lesson. 1.7 left the kerb
+        -- running a quarter stud higher than the stone it dies into; aiming for LEVEL fixed that
+        -- and immediately made the two top faces coplanar and same-facing, which z-fought — the
+        -- same defect this building has now produced six times. Level is never the target where
+        -- two surfaces meet. The stone stands slightly above the timber it carries, exactly as it
+        -- already does laterally (plinthD is 0.15 wider than the kerb line).
+        --
+        -- A literal because this table holds no expressions; the test asserts the GAP against the
+        -- kerb, bounded on both sides, so it can drift neither back to level nor into a step.
+        plinthH = 2.0166,
         roofHeight = 22,
         yaw = 0,
     },

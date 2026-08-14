@@ -259,13 +259,16 @@ describe("karesansui garden layout (spec 2026-07-24)", function()
         expect(pz - s - half < r[2] - 0.02).toBe(true)
     end)
 
-    test("THE PLINTHS TOP OUT LEVEL WITH THE KERB", function()
-        -- They stood at 113.7 against a kerb topping at 113.933, so the timber ran a quarter stud
-        -- higher than the stone it dies into. plinthH is a literal because this table holds no
-        -- expressions — this is what stops it drifting from the kerb it has to match.
+    test("THE PLINTHS STAND PROUD OF THE KERB — level was the bug", function()
+        -- Three states, and the middle one is why this is bounded on BOTH sides. At 1.7 the kerb
+        -- ran a quarter stud above the stone it dies into. Aiming for LEVEL fixed that and made
+        -- the two top faces coplanar and same-facing, which z-fought. The stone has to stand
+        -- slightly above the timber it carries — as it already does laterally, plinthD being 0.15
+        -- wider than the kerb line.
         local plinthTop = L.pavilion.pos[2] + L.pavilion.plinthH
         local kerbTop = K.floorY.main + K.kerbProud
-        expect(plinthTop).toBeCloseTo(kerbTop, 0.002)
+        expect(plinthTop > kerbTop + 0.02).toBe(true) -- never level, never under
+        expect(plinthTop < kerbTop + 0.25).toBe(true) -- and never a step to trip on
     end)
 
     test("THE KERB IS A PLANK ON EDGE, not a sleeper", function()
