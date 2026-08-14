@@ -27,33 +27,52 @@ function Karesansui.build(palette: any, L: any): Spec.PartSpec
         -- was right while this was a garden the tower stood in; now the kerb is the tower's own
         -- edging and belongs to the same timber.
         --
-        -- THE VARIANT IS PER SIDE, BECAUSE THE GRAIN IS IN WORLD SPACE — these maps are projected
-        -- from world axes, not from each part's UVs, so a beam cannot fix its own grain by being
-        -- turned. Only the variant can.
+        -- ONE BEAM CANNOT GET BOTH ITS FACES RIGHT, which is why the E/W beams are capped.
+        -- The cypress maps project from WORLD axes, not per-part UVs, so turning a beam cannot
+        -- turn its grain — only the variant can, and there are two of them: CypressWeathered and
+        -- the same maps a quarter turn round (CypressVertical). Established at the gate by
+        -- looking, in two passes:
         --
-        -- WHICH VARIANT GOES WHERE WAS DETERMINED BY LOOKING, and the reasoned guess was wrong.
-        -- CypressVertical is the same maps turned a quarter, so it read as the obvious choice for
-        -- the beams running the other way — and on those beams it banded ACROSS (owner, at the
-        -- gate: "south and north read correctly, east and west are banded across"). Whatever plane
-        -- that rotation is applied in, it is not the one that governs a horizontal member. All
-        -- four take the unrotated maps.
+        --   N/S beam (long in X)   top -> grain along X  RIGHT    sides -> along X  RIGHT
+        --   E/W beam (long in Z)   top -> grain along X  WRONG    sides -> along Z  RIGHT
         --
-        -- Left per-side rather than collapsed to one constant: the mapping is empirical, so the
-        -- next person to change the panel's shape needs to see that it IS a mapping and re-check
-        -- it, not find a single value that looks like it was never in question.
-        local grain =
-            { N = "CypressWeathered", S = "CypressWeathered", W = "CypressWeathered", E = "CypressWeathered" }
+        -- Rotating the maps only swaps which of the two is wrong: CypressVertical fixed the E/W
+        -- tops and banded their sides instead. So the E/W beams keep the unrotated maps for their
+        -- SIDES — the tall visible face — and a thin capping board takes the rotated maps for the
+        -- TOP. N/S beams need no cap; both their faces already agree.
+        --
+        -- The cap is also just what a timber kerb has. It overhangs a little so its edges never
+        -- land coplanar with the beam's, and the beam is shortened by exactly its thickness so all
+        -- four kerbs still top out on the same line.
+        local CAP_T = 0.08
+        local CAP_OVERHANG = 0.05
         for side, b in beams do
+            local runsInX = b[3] > b[4]
+            local capped = not runsInX
+            local h = if capped then K.kerbH - CAP_T else K.kerbH
+            local topY = if capped then kerbTopY - CAP_T else kerbTopY
             table.insert(
                 children,
                 Spec.part(`Kerb{name}{side}`, {
-                    Size = { b[3], K.kerbH, b[4] },
-                    CFrame = Spec.cframe({ b[1], kerbTopY - K.kerbH / 2, b[2] }),
+                    Size = { b[3], h, b[4] },
+                    CFrame = Spec.cframe({ b[1], topY - h / 2, b[2] }),
                     Color = palette.cypressWeathered,
                     Material = "Wood",
-                    MaterialVariant = grain[side],
+                    MaterialVariant = "CypressWeathered",
                 })
             )
+            if capped then
+                table.insert(
+                    children,
+                    Spec.part(`KerbCap{name}{side}`, {
+                        Size = { b[3] + 2 * CAP_OVERHANG, CAP_T, b[4] },
+                        CFrame = Spec.cframe({ b[1], kerbTopY - CAP_T / 2, b[2] }),
+                        Color = palette.cypressWeathered,
+                        Material = "Wood",
+                        MaterialVariant = "CypressVertical",
+                    })
+                )
+            end
             table.insert(
                 children,
                 Spec.part(`Guard{name}{side}`, {
