@@ -16,12 +16,33 @@ function Karesansui.build(palette: any, L: any): Spec.PartSpec
         local slabTopY = floorY + K.slabProud
         local x1, z1, x2, z2 = r[1], r[2], r[3], r[4]
         local w = K.kerbW
-        -- kerb: N/S beams span the full width; E/W beams inset between them (mitre-read)
+        -- THE KERB RUNS DIE INTO THE PLINTHS; THE GUARDS DO NOT. Two different spans, and they are
+        -- different for a reason.
+        --
+        -- The visible beams used to cross the full panel, so at every corner one ran over the
+        -- plinth's top and the post read as standing ON the kerb (owner, with a photograph). Each
+        -- run now stops at the plinth's INNER face — tucked a little past it, because a joint that
+        -- merely touches shows a seam. All four runs are the same length, and no run meets another:
+        -- the plinths separate them, which is what the reference photograph shows.
+        --
+        -- The GUARD is the invisible barrier and must still close the corners. Shortening it to
+        -- match would leave a plinth-wide gap at each one, and a plinth stands only 0.6 above the
+        -- floor — a step-over, not an obstacle. So the guard keeps the full span.
+        local P = L.pavilion
+        local KERB_TUCK = 0.06
+        local run = P.postSpacing - P.plinthD + 2 * KERB_TUCK
+        local cx, cz = (x1 + x2) / 2, (z1 + z2) / 2
         local beams = {
-            N = { (x1 + x2) / 2, z1 + w / 2, x2 - x1, w },
-            S = { (x1 + x2) / 2, z2 - w / 2, x2 - x1, w },
-            W = { x1 + w / 2, (z1 + z2) / 2, w, z2 - z1 - 2 * w },
-            E = { x2 - w / 2, (z1 + z2) / 2, w, z2 - z1 - 2 * w },
+            N = { cx, z1 + w / 2, run, w },
+            S = { cx, z2 - w / 2, run, w },
+            W = { x1 + w / 2, cz, w, run },
+            E = { x2 - w / 2, cz, w, run },
+        }
+        local guards = {
+            N = { cx, z1 + w / 2, x2 - x1, w },
+            S = { cx, z2 - w / 2, x2 - x1, w },
+            W = { x1 + w / 2, cz, w, z2 - z1 - 2 * w },
+            E = { x2 - w / 2, cz, w, z2 - z1 - 2 * w },
         }
         -- CYPRESS, MATCHING THE POSTS IT NOW RUNS BETWEEN (owner's gate 2026-08-14). Dressed slate
         -- was right while this was a garden the tower stood in; now the kerb is the tower's own
@@ -73,11 +94,13 @@ function Karesansui.build(palette: any, L: any): Spec.PartSpec
                     })
                 )
             end
+            -- from `guards`, not `b`: the barrier keeps the FULL span so the corners stay closed
+            local gb = guards[side]
             table.insert(
                 children,
                 Spec.part(`Guard{name}{side}`, {
-                    Size = { b[3], K.guardH, b[4] },
-                    CFrame = Spec.cframe({ b[1], kerbTopY + K.guardH / 2, b[2] }),
+                    Size = { gb[3], K.guardH, gb[4] },
+                    CFrame = Spec.cframe({ gb[1], kerbTopY + K.guardH / 2, gb[2] }),
                     Transparency = 1,
                     CanCollide = true,
                     CollisionGroup = "EngawaBarrier",

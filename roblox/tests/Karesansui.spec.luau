@@ -103,6 +103,34 @@ describe("Karesansui garden (kerb + field + guard)", function()
         end
     end)
 
+    test("THE KERBS STOP AT THE PLINTHS instead of running over them", function()
+        -- They spanned the full panel, so at every corner a beam ran across the plinth's top and
+        -- the post read as standing ON the kerb — the owner sent a photograph of it. Each run now
+        -- dies into the plinth's inner face, tucked slightly past so the joint shows no seam.
+        local P = L.pavilion
+        local reach = P.postSpacing / 2 - P.plinthD / 2
+        for _, side in { "N", "S", "W", "E" } do
+            local sz = byName[`KerbMain{side}`].properties.Size
+            local half = math.max(sz[1], sz[3]) / 2
+            expect(half > reach).toBe(true) -- tucked in, not merely touching
+            expect(half < reach + 0.25).toBe(true) -- but nowhere near crossing the plinth
+        end
+    end)
+
+    test("the GUARDS still close the corners, though the kerbs no longer do", function()
+        -- Shortening the visible beams must not shorten the invisible barrier. A plinth-wide gap
+        -- at each corner would be walkable: the plinth stands only 0.6 above the floor, which is a
+        -- step-over rather than an obstacle. This is the one place the two spans must disagree.
+        local p = K.panels.main
+        for _, side in { "N", "S" } do
+            expect(byName[`Guard{"Main"}{side}`].properties.Size[1]).toBeCloseTo(p[3] - p[1], 0.001)
+        end
+        for _, side in { "W", "E" } do
+            local want = (p[4] - p[2]) - 2 * K.kerbW
+            expect(byName[`Guard{"Main"}{side}`].properties.Size[3]).toBeCloseTo(want, 0.001)
+        end
+    end)
+
     test("the capping boards leave every kerb topping out on one line", function()
         -- The cap is not stacked ON the beam — the beam is shortened by exactly the cap's
         -- thickness. Otherwise the two capped sides would stand a cap proud of the other two and
