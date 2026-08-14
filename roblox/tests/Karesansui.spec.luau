@@ -131,6 +131,21 @@ describe("Karesansui garden (kerb + field + guard)", function()
         end
     end)
 
+    test("THE KERB REACHES BELOW THE FIELD SLAB IT RETAINS", function()
+        -- This is what actually sets kerbH. The old comment said "rooted below grade through the
+        -- dips", inherited from a 55x30 slate frame on uneven terrace; measured 2026-08-14 the
+        -- ground under this kerb line runs 112.72..113.00, a spread of 0.28, and the kerb was
+        -- buried 1.29 below the lowest of it. What matters is that no daylight opens under the
+        -- sand's edge — so compare against the EMITTED slab, not a thickness repeated here.
+        local f = byName.FieldMain
+        local fieldBottom = f.properties.CFrame[2] - f.properties.Size[2] / 2
+        for _, side in { "N", "S", "W", "E" } do
+            local k = byName[`KerbMain{side}`]
+            local kerbBottom = k.properties.CFrame[2] - k.properties.Size[2] / 2
+            expect(kerbBottom < fieldBottom).toBe(true)
+        end
+    end)
+
     test("the capping boards leave every kerb topping out on one line", function()
         -- The cap is not stacked ON the beam — the beam is shortened by exactly the cap's
         -- thickness. Otherwise the two capped sides would stand a cap proud of the other two and

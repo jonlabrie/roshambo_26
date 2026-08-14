@@ -141,7 +141,19 @@ local ArenaLayout = {
         -- rather than as an edging board. What is wanted is a plank standing on its edge.
         kerbW = 0.3333, -- 4"
         kerbProud = 0.8333, -- 10" — the SHOWING height; kerbH below is the rooted depth
-        kerbH = 2.5, -- rooted below grade through the dips at the taller stand
+        -- ROOTED DEPTH, and it is 1.5 rather than the inherited 2.5. The old comment said "rooted
+        -- below grade through the dips at the taller stand", which was true of a 55x30 slate frame
+        -- crossing uneven terrace and stopped being true when the panel became 20.4 square on the
+        -- tower's own floor. At 2.5 the kerb's bottom sat 1.29 below the LOWEST ground it ever
+        -- meets — two thirds of a "4x10" underground, making it really a 4x40.
+        --
+        -- Measured under the kerb line 2026-08-14: ground runs 112.72..113.00, a spread of 0.28.
+        -- 1.5 puts the bottom at 112.433 — under the lowest point by another full spread. What
+        -- actually constrains this is reaching below the field slab it retains, which the test
+        -- checks against the emitted slab rather than against a number repeated here.
+        --
+        -- Re-measure if the square is regraded; the arena floor is a known upcoming pass.
+        kerbH = 1.5,
         slabProud = 0.15, -- raked field rides proud of the terrace like flags-of-bed
         guardH = 3.5, -- EngawaBarrier low guard: blocks walking, never traps jumpers
         -- THE GARDEN IS NOW THE TOWER'S OWN FLOOR (owner's gate 2026-08-14, from the Chion-in
