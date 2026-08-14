@@ -147,13 +147,28 @@ local ArenaLayout = {
         -- tower's own floor. At 2.5 the kerb's bottom sat 1.29 below the LOWEST ground it ever
         -- meets — two thirds of a "4x10" underground, making it really a 4x40.
         --
-        -- Measured under the kerb line 2026-08-14: ground runs 112.72..113.00, a spread of 0.28.
-        -- 1.5 puts the bottom at 112.433 — under the lowest point by another full spread. What
-        -- actually constrains this is reaching below the field slab it retains, which the test
-        -- checks against the emitted slab rather than against a number repeated here.
+        -- WHAT CONSTRAINS THIS IS REACHING THE GROUND, nothing else. An earlier pass said "below
+        -- the field slab it retains" — over-derived: the slab's underside is 112.85, which is
+        -- BELOW real grade and therefore already buried.
         --
-        -- Re-measure if the square is regraded; the arena floor is a known upcoming pass.
-        kerbH = 1.5,
+        -- Raycast along all four runs 2026-08-14 (80 samples each). Three quarters of the line is
+        -- dead flat at 113.00; the only departure is the NORTHWEST CORNER, which hollows to 112.72
+        -- over the first stud or so of both the N and W runs:
+        --
+        --   N  112.74 112.90 112.92 113.00 113.00 ... flat        S  113.00 flat
+        --   W  112.72 112.98 113.00 113.00 113.00 ... flat        E  113.00 flat
+        --
+        -- So the timber has to be tall enough to bridge ONE soft corner. 1.25 puts its bottom at
+        -- 112.683, under the worst of it. FILL THAT HOLLOW and this can drop to ~1.0, which would
+        -- leave a twentieth of the board underground instead of a quarter — the arena floor is a
+        -- known upcoming pass and that is the place to do it.
+        --
+        -- Note real grade is 113.00, a tenth BELOW the 113.10 datum kerbProud is measured from, so
+        -- the board actually shows 0.933 rather than 0.833.
+        kerbH = 1.25,
+        -- The lowest ground under the kerb line, measured, not assumed. The test compares the
+        -- kerb's bottom against this; re-measure it when the square is regraded.
+        measuredGroundY = 112.72,
         slabProud = 0.15, -- raked field rides proud of the terrace like flags-of-bed
         guardH = 3.5, -- EngawaBarrier low guard: blocks walking, never traps jumpers
         -- THE GARDEN IS NOW THE TOWER'S OWN FLOOR (owner's gate 2026-08-14, from the Chion-in
