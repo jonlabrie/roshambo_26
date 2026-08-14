@@ -28,6 +28,14 @@ return {
         -- tools/studio/setupCenterpieceMaterials.luau): near-neutral where the map already
         -- carries the color, a green tint for the (colorless steel) bell. Gate-tunable.
         cypressWeathered = { 0.85, 0.84, 0.81 }, -- light neutral over gray Wood059 (aged hinoki)
+        -- PAINTED cypress: shu-iro, the orange-red of a shrine torii. The SAME CypressWeathered
+        -- maps — a red cypress needs no new MaterialVariant, because those maps are desaturated
+        -- grey and colour arrives entirely through part.Color. Chosen by standing six candidate
+        -- logs next to the pavilion posts in the same light (2026-08-14): the muted `vermilion`
+        -- above went brown against grey, and the deeper reds read as red rather than as shu-iro.
+        -- For the bell hammer and, later, a torii. NOTE a torii has uprights AND crossbeams, so it
+        -- runs straight into the world-space grain problem the karesansui kerb hit.
+        cypressVermilion = { 0.92, 0.38, 0.24 },
         bronzePatina = { 0.157, 0.196, 0.176 }, -- dark metal + subtle green patina (bell; locked at gate)
         slateTile = { 0.90, 0.90, 0.88 }, -- near-neutral over dark kawara RoofingTiles013A
         ironDark = { 0.50, 0.50, 0.53 }, -- mid over dark Metal046B (bands/collars/gears)

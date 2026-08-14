@@ -64,6 +64,23 @@ describe("Shu-moku striker assembly (tower-hung, boss-height)", function()
         expect(math.abs(byName["ShuMokuDrawDowel"].properties.CFrame[2] - STRIKE_Y) <= 0.1).toBe(true)
         expect(math.abs(byName["ShuMokuDowel"].properties.CFrame[2] - STRIKE_Y) <= 0.1).toBe(true)
     end)
+    test("THE HAMMER IS PAINTED, THE SUSPENSION IS NOT", function()
+        -- The shu-moku and its two drive dowels wear shu-iro (cypressVermilion); the hanger beam
+        -- and spreaders that carry it stay weathered grey. Same maps for both — the cypress
+        -- ColorMap is desaturated, so this is entirely a tint — which is exactly why the two are
+        -- easy to sweep together by accident. A painted beam is the striker; painting the timber
+        -- that holds it up would turn the whole suspension into one red object.
+        local red = ZenDojo.palette.cypressVermilion
+        local grey = ZenDojo.palette.cypressWeathered
+        for _, n in { "ShuMoku", "ShuMokuDrawDowel", "ShuMokuDowel" } do
+            expect(byName[n].properties.Color).toBe(red)
+            expect(byName[n].properties.MaterialVariant).toBe("CypressWeathered")
+        end
+        for _, n in { "HangerBeam", "Spreader1", "Spreader2" } do
+            expect(byName[n].properties.Color).toBe(grey)
+        end
+    end)
+
     test("the freestanding gantry is gone; the tower suspension exists", function()
         for _, c in spec.children :: any do
             expect(c.name:match("^Rail%d$")).toBeNil()
