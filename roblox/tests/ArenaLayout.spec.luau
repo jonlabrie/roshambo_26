@@ -259,6 +259,15 @@ describe("karesansui garden layout (spec 2026-07-24)", function()
         expect(pz - s - half < r[2] - 0.02).toBe(true)
     end)
 
+    test("THE PLINTHS TOP OUT LEVEL WITH THE KERB", function()
+        -- They stood at 113.7 against a kerb topping at 113.933, so the timber ran a quarter stud
+        -- higher than the stone it dies into. plinthH is a literal because this table holds no
+        -- expressions — this is what stops it drifting from the kerb it has to match.
+        local plinthTop = L.pavilion.pos[2] + L.pavilion.plinthH
+        local kerbTop = K.floorY.main + K.kerbProud
+        expect(plinthTop).toBeCloseTo(kerbTop, 0.002)
+    end)
+
     test("THE KERB IS A PLANK ON EDGE, not a sleeper", function()
         -- 4x10 in inches, showing. It was 0.8 x 1.0-proud — a 10x12, near enough square that it
         -- read as a sleeper. The ratio is the requirement; the absolute sizes follow from it.

@@ -13,6 +13,8 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
     local s = L.pavilion.postSpacing / 2
     local pd = L.pavilion.postD -- post thickness; the karesansui kerb line is derived from it
     local plinthD = L.pavilion.plinthD -- WIDER than the post, so the kerb dies into it
+    local plinthH = L.pavilion.plinthH -- TALLER than it was, to top out level with the kerb
+    local POST_FOOT = 1.7 -- the log's own bottom; the plinth now rises past it and sockets it
     local roofY = L.pavilion.roofHeight
     local cypress = palette.cypressWeathered
     local children = {}
@@ -38,14 +40,15 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
 
     local corners = { { s, s }, { s, -s }, { -s, s }, { -s, -s } }
     for i, c in corners do
-        -- stone plinth footing (unchanged: dressed slate)
+        -- stone plinth footing (dressed slate)
         table.insert(
             children,
             Spec.part(`Plinth{i}`, {
-                -- +0.5 taller (2026-07-24): the karesansui field raised the effective
-                -- grade ~1.2 over the build datum; plinths must show above the raking
-                Size = { plinthD, 1.7, plinthD },
-                CFrame = place({ c[1], 0.85, c[2] }),
+                -- Tops out level with the karesansui kerb (owner's gate 2026-08-14). It was 1.7,
+                -- which left the kerb running a quarter stud higher than the stone it dies into.
+                -- The height comes from ArenaLayout because the kerb's does too — see plinthH.
+                Size = { plinthD, plinthH, plinthD },
+                CFrame = place({ c[1], plinthH / 2, c[2] }),
                 Color = palette.gravel,
                 Material = "Slate",
             })
@@ -54,9 +57,13 @@ function Shoro.build(palette: { [string]: { number } }, L: any)
         table.insert(
             children,
             Spec.part(`Post{i}`, {
-                Size = { roofY - 1.7, pd, pd },
+                -- The post's foot stays where it always was. The plinth grew UP past it, so the
+                -- log is now SOCKETED into the stone rather than standing on its face — which is
+                -- how a hinoki post meets a base stone anyway, and it means nothing above the
+                -- plinth moved: the shaft still reaches roofY exactly as before.
+                Size = { roofY - POST_FOOT, pd, pd },
                 Shape = "Cylinder",
-                CFrame = place({ c[1], 1.7 + (roofY - 1.7) / 2, c[2] }, Spec.ROT.CYL_VERTICAL),
+                CFrame = place({ c[1], POST_FOOT + (roofY - POST_FOOT) / 2, c[2] }, Spec.ROT.CYL_VERTICAL),
                 Color = cypress,
                 Material = "Wood",
                 MaterialVariant = "CypressWeathered",

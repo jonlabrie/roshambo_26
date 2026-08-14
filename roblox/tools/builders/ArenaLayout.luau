@@ -63,6 +63,12 @@ local ArenaLayout = {
         postSpacing = 18,
         postD = 2.4,
         plinthD = 2.7,
+        -- Height from the pavilion base (112) to the plinth's top, set so the stone tops out
+        -- EXACTLY LEVEL WITH THE KERB (owner's gate 2026-08-14): 113.10 floor + 0.8333 proud =
+        -- 113.9333, less the base's 112. It was 1.7, topping at 113.7, so the kerb ran a quarter
+        -- stud higher than the stone it died into. Written as a literal because this table holds
+        -- no expressions; the test asserts it against the kerb so the two cannot drift.
+        plinthH = 1.9333,
         roofHeight = 22,
         yaw = 0,
     },
