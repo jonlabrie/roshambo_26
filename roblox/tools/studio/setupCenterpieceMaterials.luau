@@ -42,6 +42,20 @@ local SPECS = {
         rough = "rbxassetid://102554125864758",
     },
     {
+        -- SAME MAPS, FINE TILE — the HempRope/HempRopeFine pattern again. BronzePatina tiles at
+        -- 2 studs in the file (4 as tuned in the place), which is right for a bell 10 studs
+        -- across: it shows 2.5 tiles and the patina reads. The sōrin's mast is 0.45 across and
+        -- showed a ninth of ONE tile, so the same bronze rendered as flat dark metal — identical
+        -- material, no texture. Small parts need their own pitch, not their own material.
+        name = "BronzePatinaFine",
+        base = Enum.Material.Metal,
+        tile = 0.6,
+        color = "rbxassetid://86287559320779",
+        normal = "rbxassetid://97075268059902",
+        metal = "rbxassetid://123874633909877",
+        rough = "rbxassetid://102554125864758",
+    },
+    {
         name = "SlateTile", -- the hip roof
         base = Enum.Material.Slate,
         tile = 1.5,

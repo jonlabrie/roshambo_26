@@ -305,7 +305,7 @@ local ArenaLayout = {
     -- tower and checks it. That test exists because this number was wrong by 17 studs for weeks:
     -- it named the top of the Shoro MODEL while the drum storey stands on the shōrō's roof and
     -- carries on up. Re-measure whenever the drum's roof or its sōrin changes.
-    towerTopY = 168.67,
+    towerTopY = 174.17,
     throwDrum = {
         pos = { -2, 144, 0 },
         radius = 11,
@@ -313,8 +313,9 @@ local ArenaLayout = {
         faces = 12,
         windows = 4,
         -- roofRise was a bare 4.5 inside the builder: 17.8° over the 14-stud run, which read as a
-        -- lid. 8.5 is 31.3°, a temple pitch (owner's gate, against Kiyomizu-dera).
-        roofRise = 8.5,
+        -- lid. Then 8.5 (31.3°, a temple pitch), then the owner asked for more drama: 14.0 is a
+        -- dead 45° over the same run, which is steeper than any real pagoda and is the point.
+        roofRise = 14.0,
         -- the sōrin finial. height is measured from the roof APEX to the top of the mast.
         sorin = { height = 10.5, rings = 9 },
     },

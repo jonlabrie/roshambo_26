@@ -319,7 +319,9 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
             CFrame = Spec.cframe({ px, y, pz }, if shape == "Cylinder" then Spec.ROT.CYL_VERTICAL else nil),
             Color = palette.bronzePatina,
             Material = "Metal",
-            MaterialVariant = "BronzePatina",
+            -- FINE tile: the bell's BronzePatina at 4 studs/tile leaves a 0.45-wide mast
+            -- showing a ninth of one tile, so the same bronze reads as flat dark metal.
+            MaterialVariant = "BronzePatinaFine",
         }
         if shape then
             props.Shape = shape
