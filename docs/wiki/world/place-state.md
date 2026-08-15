@@ -10,7 +10,8 @@ names — everything under `Workspace.RoshamboStage` — and nothing else; all o
 Workspace content is place-only, organized by lifecycle (`CanyonWorld` shipped,
 `Sandbox` throwaway). Ship by **publishing/saving the place, never `rojo build`**
 (a build emits only the declared stage children and drops all place-only content).
-CI fails on any committed `.rbxl(x)`. Authority: CLAUDE.md §Workspace organization.
+CI fails on any committed `.rbxl(x)`. Authority: CLAUDE.md §Workspace organization,
+[[rojo-and-place]].
 
 Everything below marked *verified* was checked live via the Studio MCP on 2026-08-15
 (Edit mode, place "Roshambo").

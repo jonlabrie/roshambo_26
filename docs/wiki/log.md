@@ -50,3 +50,22 @@ this task's files). Notable live reconciliation (Studio, Edit, 2026-08-15): the 
 mistyped MaterialVariant names from the 2026-07-28 audit (ZenGravel1, RopeHemp,
 ZenMossRock1, ZenCanyonRock2) ALL resolve in the live place now — the outstanding-
 defect claims died, the audit recipe survived.
+
+## [2026-08-15] migrate | systems/ shelf + disposition sweep complete (5 migrated, 6 retained)
+
+Systems shelf (3 pages) from `roshambo-deploy-topology`, `roshambo-db-topology`,
+`roshambo-apprunner-migration` (deploy.md; ECS status already lives on
+[[backlog]], linked not restated), and `roblox-rojo-vs-place-state` (rojo-and-
+place.md; live CanyonWorld.Legacy-is-empty correction already carried on
+[[place-state]], cited not restated) — 4 files consumed+deleted. Disposition
+sweep of the memory dir found one unmigrated straggler beyond the brief's
+6-file survivor list: `roblox-waterfall-vfx-recipe` (the official-tutorial
+Beam/ParticleEmitter recipe + ZenDojo tuning levers), not superseded by
+anything already on [[canyon]]/[[misc-engine-traps]] (which cite the as-built
+result and the general Beam-orientation gotcha but not the reusable recipe) —
+migrated into [[blender-pipeline]] as a new section, then deleted (5th
+migration this task). Final memory dir: `MEMORY.md` + 6 user/feedback files
+(`stop-and-ask-after-each-attempt`, `roblox-user-units-feet-inches`,
+`roshambo-local-env-quirks`, `blender-mcp-setup`, `blender-show-in-viewport`,
+`talk-is-cheap-screenplay`) — matches the brief's expected-survivor list
+exactly. `MEMORY.md` rewritten to the slim pointer-only template.

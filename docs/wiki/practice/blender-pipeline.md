@@ -139,6 +139,55 @@ in the NORMAL map only), or a hand-picked seamless water normal map. Terrain wat
 settings the owner picked: `WaterColor` white (255,255,255), `WaterTransparency` 1.0,
 `WaterReflectance` 0.6.
 
+## Waterfall VFX (Beam/ParticleEmitter recipe)
+
+From the official Roblox "Create Waterfalls" VFX tutorial
+(create.roblox.com/docs/tutorials/use-case-tutorials/vfx/create-waterfalls),
+captured 2026-06-22 and reused across the canyon falls. These are
+particle/beam overlays layered on top of the procedural-river geometry above —
+per-reach fall dressing (lip rocks, plunge-pool rocks, whitewater bars, foam,
+splash) lives with the water as-builts on [[canyon]]; this section is the
+reusable technique.
+
+**Layering, cliff-top → pool:** outflow beam (foam texture, races to the lip) →
+whitewater emitter (aerated spray at the edge) → cascade beams (main + slow
+secondary drop, parallax via ZOffset) → splash emitters (dense burst + droplets
+at plunge-pool impact) → foam emitter (ripple rings on the surface) → mist
+emitters (outward + slow-rising) → a stationary camera-facing rainbow above the
+mist.
+
+**Texture asset IDs:** foam beam `4787437624`, fast-drop beam `16808804567`,
+dense splash `16829556885`, splash droplets `17082061238`, whitewater
+`16808075391`, foam ripples `16811365086`, mist `16830667309`, rainbow
+`16828911033`. Per-emitter Size/Transparency/Speed/Acceleration keyframes are
+in the tutorial; treat its values as a **starting** point, not a target — they
+read too intense/tall at ZenDojo's chute scale (final-ish settings: tutorial
+Size ×0.6, Speed ×0.6, accel-Y ×1.3, base Rate ×1.25, then per-spot ×0.85–1.15
+jitter, Lifetime per-spot ×0.90–1.08 jitter).
+
+**Tuning dials are independent, not interchangeable:**
+- **Frequency** = `Rate` (particles/sec) — how *often* puffs appear. Raising
+  Rate alone does not shrink the plumes.
+- **Density** = the `Size` keyframe sequence (scale every keypoint + envelope
+  together) — how thick each puff reads.
+- **Height** = `Speed` (upward launch) + `Acceleration.Y` (more negative pulls
+  plumes down faster) + `Lifetime` (longer life travels further before dying).
+- **Desync:** `ParticleEmitter` has no phase/offset property, so multiple
+  emitters pulse in lockstep by default. Break it by giving each emitter
+  slightly different Rate *and* Lifetime (incommensurate periods → permanent
+  phase drift); ~0.85–1.15 per-spot factors are enough.
+
+**Flat foam-on-water:** to make a foam-ripple emitter lie flat on the surface
+(not billboard toward the camera), use `Orientation = VelocityPerpendicular`
+with `EmissionDirection = Top`, `Speed = 0.6–1.0`, `Acceleration = (0,0,0)`,
+`SpreadAngle = (0,0)` — the quad orients perpendicular to velocity, so a small
+upward velocity yields a horizontal quad. Near-zero Speed (0–0.01) goes nearly
+invisible under `VelocityPerpendicular` — it needs a real velocity vector to
+orient against. Read the actual terrain water height with
+`Terrain:ReadVoxels` before placing (guessing Y leaves foam floating above the
+pool). `FaceCamera=true` is fine for the vertical cascade beams but wrong for
+flat foam — see [[misc-engine-traps]] for the general Beam-Up-vector rule.
+
 ## SDF glyphs (the R/P/S image pipeline)
 
 R/P/S World-Throw glyphs are **uploaded IMAGE assets**, not native UI. Source of truth
