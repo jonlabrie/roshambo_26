@@ -58,3 +58,77 @@ Installed and verified 2026-06-06 (playtest start/stop, screen_capture, execute_
 Before any publish: run `roblox/tools/studio/verifyWorkspaceConvention.luau` and scan
 imported third-party content ([[toolbox-backdoor-scan]]); the checklist lives on
 [[place-state]].
+
+## Dormant tools (2026-08-15 census)
+
+Every `roblox/tools/{studio,builders,textures,blender,glyphs}` script not already
+cited by another wiki page, one line each. "One-shot" = already run against its
+target; safe to leave alone. "Live" = re-runnable / still the current tool for its job.
+
+**One-shot / baked (safe to ignore):**
+- `studio/auditTeahouseEnvelopes.luau` — read-only clearance/tier audit per placed
+  teahouse; survey, not a builder.
+- `studio/bakeEastBackdrop.luau` — one-shot plant of the far-east skyline-massing
+  trees into `CanyonWorld.Foliage.EastBackdrop`.
+- `studio/bakeNW1012Stairway.luau` — one-shot survey; its printed literals are
+  already baked into `buildIshidanStairs`/`buildStairLandingPad` CONFIG (2026-07-02).
+- `studio/bakePathMarkers.luau` — one-shot: prints an `ArenaLayout.paths` table from
+  `PathDraft` markers (that folder no longer exists in the place, see [[place-state]]).
+- `studio/buildPadDemo.luau`, `studio/materializeStructureDemo.luau`,
+  `studio/vacantStateDemo.luau` — one-shot A/B integration visual-gate demos for the
+  Structure builder (pad, loadout, vacant-vs-claimed state); already proved.
+- `studio/buildUpcanyon.luau` — one-shot terrain sculpt/carve for the up-canyon
+  watercourse; mutates live terrain, already executed.
+- `studio/reprepMoss.luau` — one-shot fix-up (re-pointed moss scatter to
+  single-sided meshes + `DoubleSided`); the defect it fixes is closed.
+- `studio/teahousePerches.luau` — 2026-06-20 scouted site-list snapshot, superseded
+  once stamped into `workspace.CanyonTeahouses`.
+- `studio/upcanyonFalls.luau` — a recovery/checkpoint artifact reconstructing the
+  up-canyon falls VFX if the place save were ever lost; not a build step.
+- `blender/export_niwaki.py` — one-shot exporter tied to a specific purchased
+  TurboSquid asset (2017007) that lives outside the repo; re-run only if
+  re-exporting that asset.
+
+**Live / still reusable:**
+- `studio/buildDeckBalustrade.luau`, `studio/buildFlatShelfPath.luau`,
+  `studio/buildMossScatter.luau`, `studio/buildMossTransitions.luau`,
+  `studio/buildRanmaCarvings.luau`, `studio/buildShoreRocks.luau`,
+  `studio/buildStairLandingPad.luau`, `studio/buildSuspensionBridge.luau`,
+  `studio/buildTimberRetainingWall.luau`, `studio/buildTrailPath.luau`,
+  `studio/carveRiverPath.luau`, `studio/cullWaterMargin.luau`,
+  `studio/padOccupancyPreview.luau`, `studio/placeCanopyHeroes.luau`,
+  `studio/surveyDeckPlacements.luau` — reusable builders/scatter/survey scripts for
+  their respective structures (railings, paths, moss, shore rocks, bridge, retaining
+  walls, trails, culling, pad previews); re-run per new site as needed.
+- `studio/buildPaths.luau` — the current canyon path-network builder (baked snapshot
+  of `PathDraft`, mirrors `builders/CanyonPath.luau`).
+- `studio/draftRiverPathMarkers.luau` — draggable river-path waypoint markers, the
+  live successor network.
+- `studio/hideDevMarkers.client.luau` — runtime client script
+  (`StarterPlayerScripts`) hiding `DevMarker`-tagged instances in Play.
+- `studio/padSites.luau` — data module of surveyed cliff `PadSpec`s feeding the pad
+  system.
+- `builders/CanopyScatter.luau`, `builders/Creek.luau`, `builders/Footpath.luau`,
+  `builders/Graybox.luau`, `builders/OffstageCull.luau`,
+  `builders/TerraceDressing.luau` — pure placement/dressing modules (canopy scatter,
+  creek stones, garden circulation, massing-shell validator, sky/rock cull
+  classification, terrace lantern rings).
+- `textures/bump_to_normal.py`, `textures/preview_distance.py` — texture-pipeline
+  utilities (bump-to-normal conversion; preview a foliage atlas at distance without
+  uploading).
+- `blender/bake_clump_tree.py`, `blender/bake_grass_patch.py`, `blender/lod_cards.py`,
+  `blender/lod_drop_duplicate.py`, `blender/lod_trunk.py`, `blender/split_fbx.py` —
+  foliage LOD/impostor pipeline (clump-card baking, LOD thinning/growing, per-object
+  FBX split).
+- `glyphs/rakedtex.cjs` — dependency-free raked-sand texture generator (tileable
+  albedo + normal, deterministic LCG).
+
+**Flags:**
+- `builders/CanopyScatter.luau`'s header says its Studio mirror is
+  `tools/studio/scatterCanopy.luau` — **that file does not exist** anywhere in the
+  repo or its git history; the mirror was never committed, or was renamed to
+  `studio/placeCanopyHeroes.luau` without updating the header comment.
+- `studio/draftPathMarkers.luau` — its own header calls it a superseded legacy
+  network ("do not run it, it would destroy" the river-path markers) and its target
+  (`Workspace.PathDraft`) no longer exists in the place ([[place-state]]); dormant,
+  keep for reference only.

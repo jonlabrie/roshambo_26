@@ -76,8 +76,11 @@ Everything below marked *verified* was checked live via the Studio MCP on 2026-0
 
 - ⚠ unverified: whether the place as **published** matches this Edit-session state —
   publishing history is not inspectable from here; the owner saves/publishes.
-- Draft markers (`PathDraft.River` 21, `PathDraft.T07Spur` 6, remaining `Bridge*`
-  markers) were left in the place `DevMarker`-tagged; presence today unchecked.
+- Draft markers: `Workspace.PathDraft` no longer exists (verified 2026-08-15, audit
+  sweep — searched the full Workspace tree and `CollectionService:GetTagged
+  ("DevMarker")`, both empty). The River/T07Spur/Bridge* markers noted earlier are
+  gone; the remaining `Bridge*`-marker thread on [[backlog]] (canyon path railings
+  item) is resolved by their absence, not by a bake.
 - The place-only `UguisuScheduler` Script has an out-of-place backup at
   `~/Desktop/Roshambo Reference/sound/UguisuScheduler.server.luau`; several audio
   masters and Blender sources live under `~/Desktop/Roshambo Reference/` — outside

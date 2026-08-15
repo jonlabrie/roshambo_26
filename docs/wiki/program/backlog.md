@@ -90,19 +90,12 @@ four, what they say, whether they land for a child who has never played. The emp
 layout defect gates any of this: [[parked-defects]] (d). Revisit before any unattended
 audience.
 
-## Canyon path railings & chōchin — superseded as a to-do
-
-A stale "resume Task 1" note survived in memory; git shows the work done: bamboo railings
-deployed on all canyon paths (`d247a2e`) and chōchin poles per-path including DescentPath
-(`5d1a21e`), confirmed 2026-06-29..07-01. Residual open thread only: the remaining
-`Bridge*` markers in `PathDraft` (⚠ unverified — place-state).
-
 ## Yamadoro trail lighting — placed; lighting decisions open
 
 Six yamadoro are placed along the river trail with coordinates baked (`0c8f362`,
-`roblox/tools/studio/placeYamadoro.luau`; models re-homed to
-`ServerStorage.YamadoroLibrary` — ⚠ unverified, place-state), and night has an ambient
-floor (`17bbb08`). Open: the firebox — the owner chose bind-to-`nightFactor` when this
+`roblox/tools/studio/placeYamadoro.luau`; verified 2026-08-15 — 6 models under
+`Workspace.CanyonWorld.Paths.PathLanterns.Yamadoro_RiverTrail`, template parts in
+`ServerStorage.YamadoroLibrary`), and night has an ambient floor (`17bbb08`). Open: the firebox — the owner chose bind-to-`nightFactor` when this
 was still a yukimi question, re-confirm before wiring (no firebox-lighting commit found);
 the three-register care-gradient idea (built fixture → set stone → no fixture westward)
 was proposed, never decided — stone underlighting, moss glow, and hotaru all remain

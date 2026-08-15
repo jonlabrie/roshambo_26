@@ -69,3 +69,30 @@ migration this task). Final memory dir: `MEMORY.md` + 6 user/feedback files
 `roshambo-local-env-quirks`, `blender-mcp-setup`, `blender-show-in-viewport`,
 `talk-is-cheap-screenplay`) — matches the brief's expected-survivor list
 exactly. `MEMORY.md` rewritten to the slim pointer-only template.
+
+## [2026-08-15] audit | repo audit: 4 findings filed, 1 trivial fix
+
+Tool census (47 previously-uncited `roblox/tools/{studio,builders,textures,
+blender,glyphs}` scripts) filed to [[studio-tooling]] as a new "Dormant tools"
+section, one line each, split one-shot/baked vs live; flags 2 issues —
+`builders/CanopyScatter.luau` cites a Studio mirror (`scatterCanopy.luau`) that
+does not exist anywhere in the repo or its history, and `studio/
+draftPathMarkers.luau` is self-declared superseded (its target `PathDraft` no
+longer exists in the place). TODO/FIXME sweep (`grep TODO\|FIXME\|HACK\|XXX`,
+head -50) found 3 hits, all in `upcanyonRiverPOC.luau`, already tracked under
+[[backlog]] § River hydrology / [[water-audio]] — no new filing. Docs truth
+pass: `README.md` does not exist (not a regression — untracked in git
+history); `README_DEPLOY.md` claims check out against `apprunner.yaml`/
+[[data]]/[[deploy]]. Config drift: both `.nvmrc` files agree (24.12.0) and
+match CI; the Dockerfile/apprunner Node-pin drift is already tracked in
+[[backlog]] § ECS migration. Live Studio session (place "Roshambo", Edit):
+confirmed `Workspace.PathDraft` no longer exists and no `DevMarker`-tagged
+instances remain anywhere — cleared [[place-state]]'s "draft markers presence
+unchecked" caution and removed [[backlog]]'s now-fully-resolved "Canyon path
+railings & chōchin" residual-thread item; confirmed 6 yamadoro models under
+`Workspace.CanyonWorld.Paths.PathLanterns.Yamadoro_RiverTrail` plus the
+`ServerStorage.YamadoroLibrary` template, clearing that unverified marker on
+[[backlog]]. One trivial-and-safe fix applied per controller ruling:
+CLAUDE.md's "Workspace organization" sentence calling `CanyonWorld.Legacy`
+"the frozen 14 `CanyonTeahouses`" corrected to match the verified live place
+(empty, retired to `ServerStorage.RetiredLegacyTeahouses`).

@@ -99,7 +99,9 @@ Everything else in Workspace is **place-only** (saved in the place, not in git) 
 organized by lifecycle:
 - `Workspace.CanyonWorld` — shipped hand-built geometry/VFX: `Arena` (river/falls VFX +
   rocks near the arena, kept `Persistent` for distant spawn-watchers via
-  `StagePersistence`), `Paths`, `Structures`, `Legacy` (the frozen 14 `CanyonTeahouses`).
+  `StagePersistence`), `Paths`, `Structures`, `Legacy` (empty in the live place — the
+  14 legacy `CanyonTeahouses` were retired to `ServerStorage.RetiredLegacyTeahouses`;
+  see `docs/wiki/world/place-state.md`).
 - `Workspace.Sandbox` — throwaway prototypes/drafts.
 
 Ship by **publishing/saving the place, never `rojo build`** (that emits only the declared
