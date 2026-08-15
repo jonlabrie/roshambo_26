@@ -16,9 +16,10 @@ local MODE = "place" -- "place" | "bake"
 
 -- Draft composition (world x/z; y raycast; yawDeg optional — nil = deterministic
 -- jitter). INITIAL DRAFT from the reference image; expect the user to drag.
--- Landmarks: falls pool upstream −X; shopCorridor {-20,28,34,44} (merchant row,
--- south flank); eastCorridor {34,-10,54,38}; garden {-21,-12,34,18}; stair slope
--- climbs the south-west wall.
+-- Landmarks (2026-08-15 survey; the corridor reservations and the 55x30 garden this
+-- draft was composed against are both retired): machiya frontage z36 (merchant row,
+-- south flank); Overlook west face x54; garden = the tower's post-outer square
+-- {-12.2,-10.2,8.2,10.2}; stair slope climbs the south-west wall.
 local CONFIG: { { species: string, x: number, z: number, scale: number, yawDeg: number? } } = {
     -- red maples: over the merchant-row upslope + falls south bank (coords
     -- terrain-probed 2026-07-25: pool water owns x<-40 for z -34..-4; south

@@ -21,14 +21,18 @@ itself — the façade shells around it.
 - Massing references: `ServerStorage.Sandbox_PARKED.MerchantMassing` (per the baseline
   spec, line 103) — verified in the live place 2026-08-15 (Studio MCP, Edit mode):
   6 children survive (`Machiya_1..4`, `Machiya_East`, `DockDeck`), matching [[place-state]].
-- **Prerequisite: re-derive the corridor reservations.** The `corridors` block in
-  `roblox/tools/builders/ArenaLayout.luau:210-213` (`eastCorridor = {34,-10,54,38}`,
-  `shopCorridor = {-20,28,34,44}`) is stale: it predates the hanabiya frontage move
-  z44 → z36 (`22bcf2e`) and the 2026-08-14 karesansui shrink to the bell tower's own
-  floor (`17927df`). Do not build shells against those rectangles as written.
+- **The corridor-reservation prerequisite is dissolved** — the reservations were
+  RETIRED 2026-08-15 (owner's call), not re-derived. Nothing at runtime or in any bake
+  ever read them; their one job (keeping a free 55×30 garden slab out of the streets)
+  ended when the panel was pinned to the pavilion's post faces (`17927df`, tested).
+  The row builds to `Machiya.luau`'s owner-surveyed envelope (frontage z36); if the
+  row wants a machine-readable street reservation, derive it fresh from the massing
+  at the machiya brainstorm — which is now the next step.
 
 ## Gates & decisions
 
+- 2026-08-15 owner decision: corridor reservations retired from `ArenaLayout.luau`
+  (with their tests) rather than re-derived — see log.
 - 2026-08-13 owner gate: hanabiya done for now, place saved. Dropped, do not re-raise:
   the terrain cut behind the shop + its ishigaki dressing.
 - 2026-08-13: the frontage deepening was accepted against the promenade on the promise of

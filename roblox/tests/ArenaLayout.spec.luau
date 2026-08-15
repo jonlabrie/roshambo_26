@@ -228,23 +228,13 @@ end)
 
 describe("karesansui garden layout (spec 2026-07-24)", function()
     local K = L.karesansui
-    local function overlaps(a: { number }, b: { number }): boolean
-        return a[1] < b[3] and b[1] < a[3] and a[2] < b[4] and b[2] < a[4]
-    end
-    test("one garden with sane extents; corridors stay plaza-width", function()
+    -- The corridor tests (plaza-width, garden-never-touches) retired 2026-08-15 with the
+    -- reservations themselves — see the corridors note in ArenaLayout.luau. The panel-from-
+    -- pavilion assertion below is what holds the garden off the square now.
+    test("one garden with sane extents", function()
         local r = K.panels.main
         expect(r[3] > r[1]).toBe(true)
         expect(r[4] > r[2]).toBe(true)
-        for _, name in { "shopCorridor", "eastCorridor" } do
-            local c = K.corridors[name]
-            local w = math.min(c[3] - c[1], c[4] - c[2])
-            expect(w >= 16).toBe(true) -- plaza-width main streets
-        end
-    end)
-    test("the garden never touches a corridor (the plaza is the point)", function()
-        for _, c in K.corridors :: any do
-            expect(overlaps(K.panels.main, c)).toBe(false)
-        end
     end)
     test("THE KERB RUNS BETWEEN THE POSTS: the garden's corners ARE the post centres", function()
         -- This replaces "posts and plinths inside the rect", retired at the owner's gate on

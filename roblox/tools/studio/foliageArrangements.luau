@@ -14,9 +14,10 @@
 --   promontory  ridge/perch points — solo talls that read from across the valley.
 --   bridgeEnd   abutments — sentinel pairs (deploy split across the span).
 --   tunnelMouth single marker tree beside the opening.
--- HARD KEEP-OUTS: reserved corridors (shopCorridor/eastCorridor), the karesansui garden
--- precinct, path footprints, water flowlines, deck footprints. The SQUARE's own heroes
--- are hand-placed via placeCanopyHeroes — arrangements serve everything beyond it.
+-- HARD KEEP-OUTS: the place's KO_* volumes, the karesansui garden precinct, path
+-- footprints, water flowlines, deck footprints. (The corridor reservations this line
+-- once named were retired 2026-08-15 — nothing here ever read them.) The SQUARE's own
+-- heroes are hand-placed via placeCanopyHeroes — arrangements serve everything beyond it.
 -- COMPOSITION RULES: odd counts; one dominant + attendants (shu-shin/fukujin);
 -- asymmetric triangles; jewel tones never touch dark conifer directly (green cushion);
 -- per-tree ground raycast so groups drape over terrain.

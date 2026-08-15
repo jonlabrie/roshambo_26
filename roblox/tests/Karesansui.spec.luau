@@ -16,9 +16,6 @@ describe("Karesansui garden (kerb + field + guard)", function()
         local cf, sz = part.properties.CFrame, part.properties.Size
         return { cf[1] - sz[1] / 2, cf[3] - sz[3] / 2, cf[1] + sz[1] / 2, cf[3] + sz[3] / 2 }
     end
-    local function overlaps(a: { number }, b: { number }): boolean
-        return a[1] < b[3] and b[1] < a[3] and a[2] < b[4] and b[2] < a[4]
-    end
     test("every panel emits kerb x4, field, guard x4, a cap per Z-runner — and nothing else", function()
         -- The "and nothing else" is the point: this is the inventory that catches a builder
         -- quietly gaining parts. It gained two on 2026-08-14 (the E/W capping boards) and this
@@ -39,13 +36,9 @@ describe("Karesansui garden (kerb + field + guard)", function()
         end
         expect(#(spec.children :: any)).toBe(count)
     end)
-    test("NOTHING intersects the corridors (the inviolable rule)", function()
-        for _, c in spec.children :: any do
-            for _, corr in K.corridors :: any do
-                expect(overlaps(rectOf(c), corr)).toBe(false)
-            end
-        end
-    end)
+    -- "NOTHING intersects the corridors" retired 2026-08-15 with the reservations
+    -- themselves (see ArenaLayout.luau): the panel is pinned to the pavilion's post
+    -- faces, so the builder's output cannot reach a street without the tower moving.
     test("fields sit inside their kerbs, proud of the terrace", function()
         for _, panel in { "Main" } do
             local key = "main"

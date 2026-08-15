@@ -126,3 +126,13 @@ answers "what's next" cold as item 4 (merchant row); [[falls-dock]] reads as
 fully built with no future-work language. Step 5 (push) deferred per
 controller instruction — the controller pushes after the whole-branch final
 review.
+
+## [2026-08-15] decision | corridor reservations retired, not re-derived
+
+shopCorridor/eastCorridor (and their tests) deleted from ArenaLayout.luau at the
+owner's call. Rationale: no runtime or bake code ever read them; their job — keeping
+the free 55x30 garden slab out of the square's streets — ended when the panel was
+pinned to the pavilion's post faces (17927df). The merchant row builds to Machiya's
+owner-surveyed envelope (frontage z36). Item 4's prerequisite dissolves; next step is
+the machiya-row brainstorm, where any fresh street reservation would be derived from
+the massing.

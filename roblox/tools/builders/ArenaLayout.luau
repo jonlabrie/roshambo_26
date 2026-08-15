@@ -142,9 +142,17 @@ local ArenaLayout = {
     -- SURVEYED rects {x1, z1, x2, z2} on the terrace floor (Studio survey 2026-07-24:
     -- Shoro eave envelope reaches x16/z18; Overlook west face x54; ArenaSpawn pad
     -- x26..34 z4..12 stays in open plaza; river bank lane north of z-6; floor spans
-    -- to z~40 south). Never derive these from placed parts. Corridors are the
-    -- square's MAIN STREETS (crowd-width, inviolable — no kerb/slab/guard may enter);
-    -- the merchant row later builds against the SAME shopCorridor reservation.
+    -- to z~40 south). Never derive these from placed parts.
+    --
+    -- THE CORRIDOR RESERVATIONS ARE RETIRED (owner's call, 2026-08-15), not moved.
+    -- shopCorridor/eastCorridor existed to stop a free 55x30 garden slab from eating
+    -- the square's main streets. Since 2026-08-14 the panel is pinned to the tower's
+    -- own post faces by a stronger assertion (corners = pavilion ± half-span, tested),
+    -- so the rects could only fail if the tower itself moved into a street — and
+    -- nothing at runtime or in any bake ever read them (foliage keep-outs are the
+    -- place's KO_* volumes; the merchant row builds to Machiya.luau's owner-surveyed
+    -- envelope, frontage z36). A street reservation, if the machiya-row work wants
+    -- one, gets derived fresh from the massing at that brainstorm.
     karesansui = {
         -- TRUE grade across the garden (probed 2026-07-24: 111.8..113.07 — a flat
         -- bed sits proud of its HIGHEST ground)
@@ -206,10 +214,6 @@ local ArenaLayout = {
         -- was a decision, not a casualty.
         panels = {
             main = { -12.2, -10.2, 8.2, 10.2 }, -- the post OUTER square, 20.4 x 20.4
-        },
-        corridors = {
-            eastCorridor = { 34, -10, 54, 38 }, -- kerb face -> Overlook west face
-            shopCorridor = { -20, 28, 34, 44 }, -- promenade; shops back onto the south upslope
         },
     },
     -- (sōzu removed — the throw-lockout beat moves to sound/UI; see the bell-engine spec.)

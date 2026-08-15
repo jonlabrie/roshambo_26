@@ -59,8 +59,8 @@ Torii, Waterwheel, Overlook, FallsDock, Hanabiya, SwitchbackDeck, ArenaSpawn).
 ## Gates & decisions
 
 - 2026-08-14 owner gate: karesansui shrinks to the tower's post-outer square; the
-  machine stands beside the garden. (Corridor reservations in `ArenaLayout` were NOT
-  updated to match — tracked on [[item-4-merchant-row]].)
+  machine stands beside the garden. (The corridor reservations that predated this
+  were retired outright on 2026-08-15 — decision on [[item-4-merchant-row]].)
 - 2026-07-24/25 gates: karesansui furrow look (symmetric sinusoid at ~6× strength
   won); the smallest sanzon stone on the bell axis at (−2,0) was the owner's call;
   strike VFX cut in favour of the bare strike + bell sound.
