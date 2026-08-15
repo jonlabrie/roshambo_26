@@ -99,11 +99,18 @@ function Torii.build(palette: any, L: any): Spec.PartSpec
     timber("Nuki", { T.nukiW, T.nukiH, lintelLen }, { cx, nukiY, cz })
     -- kusabi: the wedges pinning the nuki where it emerges. Small, dark, and the reason the
     -- protrusion reads as joinery rather than as a beam sticking out.
-    local kusabiOut = T.shimakiOut * 0.55
+    --
+    -- POSITIONED FROM THE PILLAR FACE, NOT FROM THE BEAM'S LENGTH. They were a fraction of the
+    -- overhang, so lengthening the nuki slid them outboard with it and left them stranded in the
+    -- middle of the protrusion with nothing to pin. A wedge belongs to the JOINT; it does not care
+    -- how far the beam runs past it. Tucked slightly INTO the pillar so it reads as driven home
+    -- rather than resting against the face.
+    local KUSABI_W, KUSABI_TUCK = 0.3, 0.06
+    local kusabiOut = T.pillarD / 2 + KUSABI_W / 2 - KUSABI_TUCK
     for _, s in { { "North", cz - half - kusabiOut }, { "South", cz + half + kusabiOut } } do
         timber(
             `Kusabi{s[1]}`,
-            { T.nukiW + 0.12, T.nukiH * 0.5, 0.3 },
+            { T.nukiW + 0.12, T.nukiH * 0.5, KUSABI_W },
             { cx, nukiY, s[2] :: number },
             nil,
             ink

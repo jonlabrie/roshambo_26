@@ -79,6 +79,27 @@ describe("Torii — the myōjin gate on the Overlook deck", function()
         expect(math.abs(gHi - shimakiLo) < 0.001).toBe(true)
     end)
 
+    test("THE KUSABI SIT AT THE JOINT, not somewhere along the beam", function()
+        -- They were placed as a fraction of the nuki's OVERHANG, so lengthening the nuki slid them
+        -- outboard with it and stranded them mid-protrusion, pinning nothing (owner: "orphaned the
+        -- kusabi nowhere near the posts"). A wedge belongs to the joint — it does not care how far
+        -- the beam runs past it — so this is asserted against the PILLAR, which is the thing it is
+        -- driven into, and it stays true whatever the nuki's length becomes.
+        -- `dir` is which way "into the pillar" points for that side: the north kusabi sits at
+        -- LOWER z than its pillar, so its inner edge must be GREATER than the pillar's near face,
+        -- and the south one is the mirror of that.
+        for _, side in { { "North", 1 }, { "South", -1 } } do
+            local nm, dir = side[1] :: string, side[2] :: number
+            local k0, k1 = span(byName[`Kusabi{nm}`], 3)
+            local p0, p1 = span(byName[`Pillar{nm}`], 3)
+            local kInner = if dir == 1 then k1 else k0
+            local pFace = if dir == 1 then p0 else p1
+            -- overlapping the pillar: neither merely touching it nor floating free of it
+            expect((kInner - pFace) * dir > 0).toBe(true)
+            expect(math.abs(kInner - pFace) < 0.15).toBe(true)
+        end
+    end)
+
     test("THE TWO LINTELS ARE THE SAME LENGTH", function()
         -- Owner's gate: match the nuki to the shimaki above it. The nuki used to have its own
         -- overhang and came out two studs shorter, so the gate read as a stack of three different
