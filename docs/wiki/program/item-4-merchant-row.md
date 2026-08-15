@@ -8,13 +8,13 @@ updated: 2026-08-15
 
 Item 4 of [[friends-family-baseline]]: a machiya merchant row on the arena promenade —
 4 façade shells plus one WORKING fireworks shop (browse/buy at the counter). The working
-shop already exists: hanabiya (花火屋), built and owner-gated 2026-08-13 with the place
+shop already exists: [[hanabiya]] (花火屋), built and owner-gated 2026-08-13 with the place
 saved (`37469b8` names it "the merchant row's first machiya"). Remaining scope is the row
 itself — the façade shells around it.
 
 ## Current state
 
-- **hanabiya is built and working** (interior stair + attic `219509c..565c307`, shop-panel
+- **[[hanabiya]] is built and working** (interior stair + attic `219509c..565c307`, shop-panel
   cursor fix `322d948`, frontage deepened z44 → z36 `22bcf2e`). It sets the archetype's
   as-built reference.
 - **machiya is a new archetype — needs its own brainstorm** before the shells are built.

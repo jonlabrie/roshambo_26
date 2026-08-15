@@ -113,3 +113,30 @@ displacement, no lichen, faceted roof eave).
 
 From the F&F baseline: a working replica of the arena's throw drum on the PWA. The PWA is
 otherwise out of F&F scope (showable as-is).
+
+## World remainders (carried from the world-shelf migration, 2026-08-15)
+
+- **Bell-engine beauty pass** — owner asked 2026-07-23, deliberately unscheduled:
+  toothed gear meshes, textured/chamfered timber, cast-bronze bonshō mesh, smooth
+  snail-cam mesh, rope/chain meshes, flume/fall foam-mist; also slimmer gear cogs
+  (the −7° mesh phase can never read perfectly clean at current dowel sizes). Do
+  after the mechanism stops shifting. See [[bell-engine]].
+- **River hydrology** — owner deferral 2026-07-28 ("a problem I won't solve now"):
+  the runs are too slight to feed the hero falls. Either build the runs up
+  (`upcanyonRiverPOC.luau` is the prototype) or accept them as quiet connective
+  tissue. Related walks never done: cascades W14–16 audibility from the east decks;
+  a survey pass for silent stretches between features. See [[water-audio]].
+- **Fireworks global director at scale** — the concurrent-shell cap has never been
+  exercised by a multi-player battle; the A13 bench was one launcher. Test before
+  any 50-player event. See [[fireworks]].
+- **Dragon-panel reuses** (owner, 2026-07-22): an eye-level back-lit named gallery of
+  the 8 dragon kings, and a Robux-only 8-sided "magic lamp" deck item (Piece B
+  catalog tie-in). Assets ready in `src/shared/DragonKings.luau`. See [[day-night]].
+- **Climbable shōrō belvedere** — parked idea: a railed gallery at the tower crown,
+  passing the working machine on the way up; fireworks perch.
+- **FoliageDayNight dimming** — jewel canopies read too bright at night; a
+  `nightFactor` subscriber lerping SurfaceAppearance tints (GlyphDayNight pattern)
+  was sketched, never built.
+- **Lantern telegraph tag rollout** — result lanterns are found by `*Lantern` name;
+  a CollectionService tag would make the canyon-wide contract explicit. See
+  [[viewing-platform]].
