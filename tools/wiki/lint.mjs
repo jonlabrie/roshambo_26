@@ -7,7 +7,7 @@ import { pathToFileURL } from 'node:url';
 
 const SHELVES = ['program', 'world', 'practice', 'systems'];
 const LOG_KINDS = 'gate|ship|decision|drop|defect|migrate|lint|audit';
-const STATUS_RE = /\b(NEXT IS|IN PROGRESS|RESUME HERE|OPEN:|BLOCKED|PARKED:|TODO:)\b/;
+const STATUS_RE = /\b(NEXT IS|IN PROGRESS|RESUME HERE|OPEN:|BLOCKED|PARKED:|TODO:)/;
 
 export function lint(root) {
   const errors = [];

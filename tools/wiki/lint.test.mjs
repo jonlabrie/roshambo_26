@@ -57,6 +57,13 @@ test('frontmatter status outside program/ is an error', () => {
   assert.ok(errors.some((e) => e.includes("frontmatter 'status'")));
 });
 
+test('colon-form status language outside program/ is an error', () => {
+  const wiki = structuredClone(CLEAN);
+  wiki.pages['world/dojo.md'] = FM('world') + '# Dojo\nTODO: fix later. See [[board]].\n';
+  const { errors } = lint(makeWiki(wiki));
+  assert.ok(errors.some((e) => e.includes('status language')));
+});
+
 test('malformed log entry is an error', () => {
   const wiki = structuredClone(CLEAN);
   wiki.log = '## [2026-08-15] vibes | not a kind\n';
