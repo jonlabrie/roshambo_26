@@ -131,11 +131,13 @@ wildly (2–9 studs) and multipliers balloon the big ones into a fused mass. A ~
 pool fits ~3 spread rocks. Always surface-snap and embed `+ Size.Y*0.35`.
 
 Water texture options if revisiting (the generate_material water read marbled/stony):
-ZenRiverWater/1/2/3 map asset IDs persist on the cloud (Color/Normal pairs, in the
-raw-layer memory of this page's history); a calmer prompt (near-uniform colour,
-ripples in the NORMAL map only); or a hand-picked seamless water normal map. Terrain
-water settings the owner picked: `WaterColor` white (255,255,255),
-`WaterTransparency` 1.0, `WaterReflectance` 0.6.
+the generated maps persist on the cloud — ZenRiverWater Color `117032050129641` /
+Normal `109118604428293`, ZenRiverWater1 `120891936261441`/`99885893776364`,
+ZenRiverWater2 `116355033742049`/`85551193696366`, ZenRiverWater3
+`131180950523322`/`96495234564862` — or a calmer prompt (near-uniform colour, ripples
+in the NORMAL map only), or a hand-picked seamless water normal map. Terrain water
+settings the owner picked: `WaterColor` white (255,255,255), `WaterTransparency` 1.0,
+`WaterReflectance` 0.6.
 
 ## SDF glyphs (the R/P/S image pipeline)
 
