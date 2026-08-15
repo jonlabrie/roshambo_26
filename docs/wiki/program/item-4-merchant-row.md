@@ -19,8 +19,8 @@ itself — the façade shells around it.
   as-built reference.
 - **machiya is a new archetype — needs its own brainstorm** before the shells are built.
 - Massing references: `ServerStorage.Sandbox_PARKED.MerchantMassing` (per the baseline
-  spec, line 103) — ⚠ unverified: Studio not connected to confirm it survives in the
-  live place.
+  spec, line 103) — verified in the live place 2026-08-15 (Studio MCP, Edit mode):
+  6 children survive (`Machiya_1..4`, `Machiya_East`, `DockDeck`), matching [[place-state]].
 - **Prerequisite: re-derive the corridor reservations.** The `corridors` block in
   `roblox/tools/builders/ArenaLayout.luau:210-213` (`eastCorridor = {34,-10,54,38}`,
   `shopCorridor = {-20,28,34,44}`) is stale: it predates the hanabiya frontage move

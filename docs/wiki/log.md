@@ -105,3 +105,24 @@ never cited. Added `glyphs/pierce.cjs` and `glyphs/png.cjs` to
 check that ran but left no trace: `grep -n engines package.json
 server/package.json` returns no matches in either root — neither declares an
 `engines` field, so there is nothing to drift against `.nvmrc` (24.12.0).
+
+## [2026-08-15] lint | migration complete: 45 pages, 0 lint errors; memory dir reduced 81 → 7 files
+
+Mechanical lint (`tools/wiki/lint.mjs`): 0 errors, 0 warnings across 45 pages.
+Manual pass (schema.md checklist): read index.md end to end, the board +
+all 4 program pages in full, and 3 world pages (falls-dock, hanabiya,
+arena-square) — no contradictions found; statuses and cited commits check out
+against today's git log (`cff3d95`/`156d44a`/`399bf14`/`75d7330`/`8d40514`
+match [[arena-square]]'s bronze/roof citations exactly). One `⚠ unverified`
+marker became checkable with Studio connected: [[item-4-merchant-row]]'s
+`MerchantMassing` survival, confirmed live (6 children: `Machiya_1..4`,
+`Machiya_East`, `DockDeck`) and upgraded from unverified to fact, matching
+[[place-state]]'s existing verification. The two remaining `⚠ unverified`
+markers ([[fireworks]]'s untested 50-player concurrent-shell load,
+[[place-state]]'s published-vs-Edit-session gap) are not Studio-checkable
+facts and were left as-is. Acceptance checks: memory dir is `MEMORY.md` + 6
+survivor files (7 total, all user/feedback, well under 20); [[program]]
+answers "what's next" cold as item 4 (merchant row); [[falls-dock]] reads as
+fully built with no future-work language. Step 5 (push) deferred per
+controller instruction — the controller pushes after the whole-branch final
+review.
