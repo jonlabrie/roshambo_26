@@ -6,6 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **TDD**: Write a failing test first, then the implementation. Both TypeScript codebases have Vitest suites (`server/`: `npm test`; repo root: `npm test`, scoped to `src/` by `vite.config.ts` so it does not pick up the server's).
 
+## Project Wiki (docs/wiki/) — read before relying on memory
+
+`docs/wiki/` is the single authority for project knowledge and work tracking. Read
+`docs/wiki/index.md` at session start before relying on auto-memory. Record project
+facts (gates, decisions, statuses, as-built state, standing rules) THERE, following
+`docs/wiki/schema.md` — not in the auto-memory directory. The auto-memory dir holds
+only user/feedback memories about how we work together. Statuses live only under
+`docs/wiki/program/`; supersede text rather than appending; log events in
+`docs/wiki/log.md`.
+
 ## What This Is
 
 Roshambo: a massively multiplayer rock-paper-scissors PWA where players compete against the "World Throw" (server-decided each round). Wins triple a staked pot (3^n progression); players choose to Bank (cash out) or Stake (keep riding the streak). Two independent codebases in one repo: a React frontend (root) and an Express/Socket.io backend (`server/`), each with its own `package.json` and tsconfig.
