@@ -80,7 +80,7 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
             Size = { drl, 0.5, 0.5 },
             Shape = "Cylinder",
             CFrame = Spec.cframe(drp, drr),
-            Color = palette.cypressVermilion,
+            Color = palette.cypressWeathered,
             Material = "Wood",
             MaterialVariant = "CypressWeathered",
         })
@@ -95,7 +95,7 @@ function Bonsho.build(palette: { [string]: { number } }, L: any)
             Size = { kdl, 0.5, 0.5 },
             Shape = "Cylinder",
             CFrame = Spec.cframe(kdp, kdr),
-            Color = palette.cypressVermilion,
+            Color = palette.cypressWeathered,
             Material = "Wood",
             MaterialVariant = "CypressWeathered",
         })
