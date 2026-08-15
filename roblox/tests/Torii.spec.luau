@@ -100,6 +100,35 @@ describe("Torii — the myōjin gate on the Overlook deck", function()
         end
     end)
 
+    test("THE CENTRE IS CLOSED, and the sides are still walkable", function()
+        -- 正中, the gate's centre line, is the kami's path — a player has to pass to one side. Both
+        -- halves matter: too narrow and it stops nobody, too wide and it shuts the gate. The
+        -- pillars are 15 apart, so this checks real walking room survives on each side.
+        local b = byName["SeichuBar"]
+        expect(b ~= nil).toBe(true)
+        expect(b.properties.Transparency).toBe(1)
+        expect(b.properties.CanCollide).toBe(true)
+        -- EngawaBarrier passes Projectile and blocks players; Default would stop fireworks too
+        expect(b.properties.CollisionGroup).toBe("EngawaBarrier")
+        local bLo, bHi = span(b, 3)
+        local pn = span(byName["PillarNorth"], 3)
+        local _, ps = span(byName["PillarSouth"], 3)
+        expect(math.abs((bLo + bHi) / 2 - T.pos[3]) < 0.001).toBe(true) -- actually centred
+        expect(bLo - pn > 4).toBe(true)
+        expect(ps - bHi > 4).toBe(true)
+    end)
+
+    test("the centre bar cannot be climbed over or stood on", function()
+        -- It runs INTO the nuki rather than stopping under it. A gap would let a player squeeze
+        -- over the top; stopping flush would hand them a ledge to stand on inside the gate.
+        local _, barTop = span(byName["SeichuBar"], 2)
+        local nLo, nTop = span(byName["Nuki"], 2)
+        expect(barTop > nLo + 0.2).toBe(true) -- buried in the beam, not merely reaching it
+        expect(barTop <= nTop + 0.001).toBe(true) -- and not poking out above it
+        local barLo = span(byName["SeichuBar"], 2)
+        expect(math.abs(barLo - T.pos[2]) < 0.001).toBe(true) -- down to the deck, no crawl gap
+    end)
+
     test("THE TWO LINTELS ARE THE SAME LENGTH", function()
         -- Owner's gate: match the nuki to the shimaki above it. The nuki used to have its own
         -- overhang and came out two studs shorter, so the gate read as a stack of three different

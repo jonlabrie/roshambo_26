@@ -117,6 +117,32 @@ function Torii.build(palette: any, L: any): Spec.PartSpec
         )
     end
 
+    -- ===== the seichū bar =====
+    -- 正中 — the gate's centre line — is the kami's path; visitors keep to the sides and pass
+    -- through off-centre. This is that custom made literal: an invisible barrier closing the
+    -- middle of the opening, so a player has to choose a side.
+    --
+    -- EngawaBarrier, not Default. That group is registered in the place and collides with players
+    -- while passing Projectile — so it stops people and lets fireworks through, which matters
+    -- with the Overlook right behind it. Verified against PhysicsService rather than assumed.
+    --
+    -- It runs the whole way INTO the nuki rather than stopping under it: a gap would let a player
+    -- squeeze over the top, and stopping flush would leave them a ledge to stand on.
+    local barLo, barHi = floorY, nukiTopY
+    table.insert(
+        children,
+        Spec.part("SeichuBar", {
+            Size = { T.beamW, barHi - barLo, T.seichuW },
+            CFrame = Spec.cframe({ cx, (barLo + barHi) / 2, cz }),
+            Transparency = 1,
+            CanCollide = true,
+            CollisionGroup = "EngawaBarrier",
+            CanQuery = false,
+            CanTouch = false,
+            CastShadow = false,
+        })
+    )
+
     -- ===== gakuzuka: the central strut between nuki and shimaki =====
     local gLo, gHi = nukiTopY, pillarTopY
     timber("Gakuzuka", { T.nukiW * 0.85, gHi - gLo, 1.0 }, { cx, (gLo + gHi) / 2, cz })

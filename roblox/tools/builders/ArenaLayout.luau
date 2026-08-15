@@ -289,6 +289,8 @@ local ArenaLayout = {
         kasagiRise = 0.9, -- the upturn at the ends; this is what makes it myōjin
         kasagiSegments = 7,
         kasagiCapT = 0.28, -- the black cap over the kasagi (Fushimi Inari)
+        -- how much of the opening the invisible centre bar closes; the rest is walkable
+        seichuW = 1.8,
     },
     sando = { fromZ = -192, toZ = -86, width = 6, fromY = 28, toY = 2 }, -- rim plaza → apron edge
     stele = { pos = { -14, 28, -186 } },
