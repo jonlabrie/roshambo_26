@@ -34,3 +34,19 @@ ServerStorage.RetiredLegacyTeahouses (CanyonWorld.Legacy is empty);
 ServerStorage.FoliageZones holds 35 zone volumes (resolving the "22 of 32" worry);
 StructurePrefabs now carries three authored sizes (teahouse-1story-s/m/l);
 DayNightLockT is back at 0.19.
+
+## [2026-08-15] migrate | practice/ shelf: rules, recipes, traps, owner rulings
+
+From 35 memory files (the standing rules flush-outside-edges / derive-from-what-it-
+touches / one-model / walls-register / placement-discipline / bake-isolation /
+destructive-bake-guard / visible-is-not-pixels / perf-harness-contamination /
+toolbox-backdoor-scan / duplicated-server-constants; the material/mesh/texturing/
+rojo-rbxm/editablemesh references; the three replication-race memories merged;
+modal-cursor-grip; image-moderation + the glyph pipeline; the four build-recipe
+memories merged (build-recipes index, ishidan, organic cobble, mossy terrain PBR);
+studio-ui/mcp/screencapture merged; blender-fbx + procedural-river + glyphs-shared
+merged; five misc traps merged; owner rulings compiled from Task 4's world Gates +
+this task's files). Notable live reconciliation (Studio, Edit, 2026-08-15): the four
+mistyped MaterialVariant names from the 2026-07-28 audit (ZenGravel1, RopeHemp,
+ZenMossRock1, ZenCanyonRock2) ALL resolve in the live place now — the outstanding-
+defect claims died, the audit recipe survived.

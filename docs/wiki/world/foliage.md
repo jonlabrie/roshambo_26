@@ -19,8 +19,8 @@ place).
 - **Composition first** (owner ruling, F&F item 1): **scatter is background fill
   only** — hand-composed arrangements and hero placements govern; a scatter rule must
   never bury a composition someone hand-placed. This settled the scatter-vs-composed
-  conflict at the waterline. (The standing-rule write-up arrives with the practice
-  shelf.)
+  conflict at the waterline. (Compiled with the other rulings on
+  [[owner-rulings]].)
 - **The care model**: `reach(x) = 8 + 20·(x+430)/470`, clamped [8,28], measured to
   the nearest path centreline or staged-site *footprint*. GARDEN = inner 35% of
   reach, TENDED the rest, PRESERVE beyond. Staged sites override longitude — the

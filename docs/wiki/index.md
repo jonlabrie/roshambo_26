@@ -30,7 +30,29 @@ Chronology: [log.md](log.md).
 
 ## practice — how we work
 
-(populated by migration)
+- [Owner Rulings](practice/owner-rulings.md) — the standing taste/copy/process rulings, one line each, with citations
+- [Flush Outside Edges](practice/flush-outside-edges.md) — outer faces flush at free edges, tucked where they die into walls, the z-fight scan, barrier gaps
+- [Derive From What It Touches](practice/derive-from-what-it-touches.md) — size every member from what it meets; level is never the target where surfaces meet
+- [One Model Is Not a Building](practice/one-model-is-not-a-building.md) — measure the composite footprint union, not one model's bbox; document how landmarks were measured
+- [Walls Register to Structure](practice/walls-register-to-structure.md) — retaining walls register to the built edge + standoff, never to the excavation; backfill to the wall backs
+- [Placement Discipline](practice/placement-discipline.md) — full-footprint 8-point footing ring + terrain-top check at every probe; search or skip, never place anyway
+- [Bake Isolation](practice/bake-isolation.md) — a bake aimed at one zone never rewrites another: fixed world lattice, whole-world planning, explicit targets, empirical verification
+- [Destructive Bake Guard](practice/destructive-bake-guard.md) — destroy-and-rebuild bakes refuse to run over hand-tuned output; fingerprint in the tool, stop-and-ask when it trips
+- [Visible Is Not Pixels](practice/visible-is-not-pixels.md) — property reads are not rendering evidence: the ZIndexBehavior=Global trap, the CanvasGroup that drew nothing, the one-variable probe
+- [Perf Harness Contamination](practice/perf-harness-contamination.md) — enumerate what you added before believing a perf regression; park benches immediately; StarterPlayerScripts is the dangerous parent
+- [Toolbox Backdoor Scan](practice/toolbox-backdoor-scan.md) — scanning free-toolbox imports for require-backdoors before any publish; the obfuscation shapes to look for
+- [Duplicated Server Constants](practice/duplicated-server-constants.md) — the server-number-re-derived-client-side defect class, its diagnostic signature, the fixture-gate mutation check
+- [Material and Mesh Traps](practice/material-and-mesh-traps.md) — silent failures: mistyped/duplicate MaterialVariants, global overrides, ColorMap-only SAs, straight-alpha filtering, fetch failures, pivot leftovers
+- [Texturing Pack Meshes](practice/texturing-pack-meshes.md) — recoloring imported mesh packs via world-space MaterialVariant; tint-vs-map, StudsPerTile vs part size
+- [Rojo MeshPart .rbxm](practice/rojo-meshpart-rbxm.md) — hero meshes ship as committed binary .rbxm via $path; parts-not-mesh for simple shapes; the ambientCG materials pipeline
+- [EditableMesh Gotchas](practice/editablemesh-gotchas.md) — normals + local-space verts, runtime restrictions, publish-to-persist recipe, UV-scroll animation
+- [Replication Races](practice/replication-races.md) — WaitForChild at startup, RemoteEvents unordered vs instances, Emit() never replicates
+- [Modal Cursor Grip](practice/modal-cursor-grip.md) — freeing the cursor for a proximity modal (RenderStep at Camera+1) and the DevEnableMouseLock trap
+- [Image Moderation](practice/image-moderation.md) — the green-palmate-leaf takedown, upload URL/approval mechanics, safe recolour rules
+- [Build Recipes](practice/build-recipes.md) — CONSULT FIRST for canyon paths/decks/walls/railings/lanterns: the recipe doc, builders, ishidan style, cobble technique, terrain PBR
+- [Studio Tooling](practice/studio-tooling.md) — Studio UI locations, Rojo patch-by-name, Studio MCP quirks (return values, camera lock, datamodels)
+- [Blender Pipeline](practice/blender-pipeline.md) — FBX unit/pivot/material traps, the bake recipe, the procedural river technique, the SDF glyph pipeline
+- [Misc Engine Traps](practice/misc-engine-traps.md) — SurfaceGui TextSize, flat beams, tunnel boring, genmodels arch portability, teahouse floor-vs-pivot
 
 ## systems — infra pointers
 
