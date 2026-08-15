@@ -17,7 +17,11 @@ itself — the façade shells around it.
 - **[[hanabiya]] is built and working** (interior stair + attic `219509c..565c307`, shop-panel
   cursor fix `322d948`, frontage deepened z44 → z36 `22bcf2e`). It sets the archetype's
   as-built reference.
-- **machiya is a new archetype — needs its own brainstorm** before the shells are built.
+- **The machiya brainstorm is DONE (2026-08-15)** — see the design spec in Raw layer.
+  Street plan: apparel (Machiya_1, wide west) · 花火屋 · accessories (Machiya_4) ·
+  sports book frontage (Machiya_East, cavern deferred to item 7) · riverside chaya +
+  DockDeck (Machiya_2 site; counter with a future-NPC keeper slot). Shells are
+  façades-with-identity, shallow-enterable (sports book closed-kōshi teaser).
 - Massing references: `ServerStorage.Sandbox_PARKED.MerchantMassing` (per the baseline
   spec, line 103) — verified in the live place 2026-08-15 (Studio MCP, Edit mode):
   6 children survive (`Machiya_1..4`, `Machiya_East`, `DockDeck`), matching [[place-state]].
@@ -41,6 +45,8 @@ itself — the façade shells around it.
 
 ## Raw layer
 
+- design spec: `docs/superpowers/specs/2026-08-15-machiya-row-design.md` (the row's
+  own brainstorm — street plan, archetype refactor, identity kits, chaya)
 - spec: `docs/superpowers/specs/2026-07-30-friends-family-baseline-design.md` (item 4)
 - shop ledger: `.superpowers/sdd/2026-08-05-hanabiya-shop/`
 - key commits: `37469b8` shop as-built doc · `22bcf2e` frontage z44→z36 · `219509c` stair

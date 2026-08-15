@@ -136,3 +136,13 @@ pinned to the pavilion's post faces (17927df). The merchant row builds to Machiy
 owner-surveyed envelope (frontage z36). Item 4's prerequisite dissolves; next step is
 the machiya-row brainstorm, where any fresh street reservation would be derived from
 the massing.
+
+## [2026-08-15] decision | machiya-row brainstorm complete, spec committed
+
+Item 4's design settled (spec 2026-08-15-machiya-row-design.md): façades with
+identity, shallow-enterable; apparel/花火屋/accessories on the south row; sports book
+= Machiya_East frontage with the item-7 cavern under the western Overlook (the two
+siting options converged on the old statistics-room mark); Machiya_2 becomes a
+riverside chaya with a service counter and a named ChayaKeeperSlot anchor for a
+future tea-vendor NPC. Build approach: generalize Machiya.luau (snapshot-gated
+refactor) + separate Chaya.luau.
