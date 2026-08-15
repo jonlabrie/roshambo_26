@@ -12,7 +12,7 @@ Every code claim below was re-verified against the working tree on 2026-08-15.
 
 ## (a) `POST /players/:id/purchase` is a read-modify-write race
 
-- **Where:** `server/src/routes/apiV1.ts` (route at line 285): `resolveUser` →
+- **Where:** `server/src/routes/apiV1.ts` (route at line 286): `resolveUser` →
   `readEconomy` → `validatePurchase` → `applyPurchase` → `user.save()`. No
   `optimisticConcurrency`, `$inc`, or conditional `findOneAndUpdate`.
 - **Repro:** a retry or double-tap lets two purchases both read the pre-purchase balance;
@@ -41,7 +41,7 @@ Every code claim below was re-verified against the working tree on 2026-08-15.
 
 ## (c) `RESOLVE_FAILED` returns 500 (minor)
 
-Ten sites in `apiV1.ts` (lines 118–344) answer a `resolveUser` miss with
+Thirteen sites in `apiV1.ts` (lines 118–391) answer a `resolveUser` miss with
 `res.status(500).json({ error: 'RESOLVE_FAILED' })`. It is a client condition and will
 bury real 500s in logs. Fix: a 4xx. Verified present 2026-08-15.
 
