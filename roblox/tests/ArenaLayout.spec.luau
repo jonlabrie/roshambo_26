@@ -1,7 +1,34 @@
 --!strict
 local harness = require("./harness")
 local L = require("../tools/builders/ArenaLayout")
+local ThrowDrum = require("../tools/builders/ThrowDrum")
+local ZenDojo = require("../src/shared/themes/ZenDojo")
 local describe, test, expect = harness.describe, harness.test, harness.expect
+
+describe("ArenaLayout — towerTopY is measured, so it gets checked", function()
+    test("TOWERTOPY MATCHES THE TOWER THAT ACTUALLY GETS BUILT", function()
+        -- The shop and the torii are both held subordinate to this number, and it is EMERGENT: it
+        -- falls out of ThrowDrum's build rather than being an input. A constant like that goes
+        -- stale silently, and this one already did — it named the top of the Shoro MODEL, was
+        -- wrong by 17 studs, and was defended for four exchanges before anyone re-measured.
+        --
+        -- So rebuild the tower's tallest piece and compare. It moved again the same week, when the
+        -- drum's roof was pitched up and given a sōrin.
+        local spec = ThrowDrum.build(ZenDojo.palette, L)
+        local top = -math.huge
+        for _, c in spec.children :: any do
+            local cf, sz = c.properties.CFrame, c.properties.Size
+            if cf and sz then
+                local e = 0
+                for b = 1, 3 do
+                    e += math.abs(cf[6 + b]) * sz[b] / 2
+                end
+                top = math.max(top, cf[2] + e)
+            end
+        end
+        expect(math.abs(top - L.towerTopY) < 0.02).toBe(true)
+    end)
+end)
 
 describe("ArenaLayout", function()
     test("rings nest strictly: basin < apron < tiers ascending < bowl", function()

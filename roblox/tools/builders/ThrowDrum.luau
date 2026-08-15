@@ -156,7 +156,9 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
     -- 4 windows and the hip corners sit over the 4 diagonal posts.
     local RErf = r + 3 -- eave half-side; overhangs the corner posts (r+2) so they tuck under
     local eaveWY = py + 4.8 -- eave meets the post tops (~py+5.1) at the post radius
-    local apexRise = 4.5
+    -- 8.5, up from 4.5 (owner's gate 2026-08-14, against the Kiyomizu-dera pagoda). At 4.5 over
+    -- a 14-stud run this was 17.8° — a lid rather than a roof. 31.3° is a temple pitch.
+    local apexRise = d.roofRise
     local apexWY = eaveWY + apexRise
     local roofT = 0.5
     local function vsub(a, b): { number }
@@ -302,6 +304,50 @@ function ThrowDrum.build(palette: { [string]: { number } }, L: any): Spec.PartSp
             },
         })
     )
+
+    -- ── Sōrin (相輪): the bronze finial mast (owner's gate, from Kiyomizu-dera) ──────────
+    -- The tall vertical that makes a tiered roof read as a pagoda rather than as a hat. Real
+    -- ones stack rohan (base plate), fukubachi (inverted bowl), the nine kurin rings on a
+    -- central mast, and a hōju jewel at the peak; suien — the four flame ornaments between the
+    -- top rings — are left out, being fine tracery that would not survive at this distance.
+    --
+    -- Every piece is DERIVED FROM THE APEX, so raising the roof's pitch carries the whole mast
+    -- with it instead of leaving it embedded or floating.
+    local function bronze(name: string, size: { number }, y: number, shape: string?)
+        local props: { [string]: any } = {
+            Size = size,
+            CFrame = Spec.cframe({ px, y, pz }, if shape == "Cylinder" then Spec.ROT.CYL_VERTICAL else nil),
+            Color = palette.bronzePatina,
+            Material = "Metal",
+            MaterialVariant = "BronzePatina",
+        }
+        if shape then
+            props.Shape = shape
+        end
+        table.insert(top, Spec.part(name, props))
+    end
+
+    local sr = d.sorin
+    local ROHAN_H, FUKU_H, RING_H = 0.5, 1.0, 0.24
+    bronze("SorinRohan", { ROHAN_H, 2.8, 2.8 }, apexWY + ROHAN_H / 2, "Cylinder")
+    local fukuY = apexWY + ROHAN_H
+    bronze("SorinFukubachi", { FUKU_H, 2.1, 2.1 }, fukuY + FUKU_H / 2, "Cylinder")
+
+    -- the mast runs the whole way, so the rings thread ON it rather than stacking as a tower
+    local mastLo = fukuY + FUKU_H
+    local mastHi = apexWY + sr.height
+    bronze("SorinMast", { mastHi - mastLo, 0.45, 0.45 }, (mastLo + mastHi) / 2, "Cylinder")
+
+    -- kurin: evenly spaced up the mast, tapering as they rise (which is what stops a stack of
+    -- identical discs reading as a machine part)
+    local first, last = mastLo + 0.55, mastHi - 1.5
+    for i = 1, sr.rings do
+        local f = (i - 1) / (sr.rings - 1)
+        local ry = first + (last - first) * f
+        bronze(`SorinKurin{i}`, { RING_H, 2.0 - 0.5 * f, 2.0 - 0.5 * f }, ry, "Cylinder")
+    end
+    -- hōju: the jewel, and the only sphere on the whole tower
+    bronze("SorinHoju", { 1.15, 1.15, 1.15 }, mastHi + 0.3, "Ball")
 
     return Spec.model("ThrowDrum", top)
 end

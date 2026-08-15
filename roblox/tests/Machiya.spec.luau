@@ -19,7 +19,7 @@ local FLOOR = 113.10
 -- storey stands on the shōrō's roof and carries on up. This was 136.5, which is only the Shoro
 -- model's own top and so named the middle of the building. 9.0 is the owner's number from the
 -- spec ("9 studs subordinate to the bell tower"); it was 5.0, which I had invented.
-local SHORO_TOP, MIN_SHORO_GAP = 153.54, 9.0
+local SHORO_TOP, MIN_SHORO_GAP = ArenaLayout.towerTopY, 9.0
 
 -- EVERY part, including those inside child models. The noren became nested models when each panel
 -- turned into a chain of segments, and every envelope test here walks `model.children` — so the

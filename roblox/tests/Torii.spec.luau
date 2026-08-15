@@ -165,6 +165,6 @@ describe("Torii — the myōjin gate on the Overlook deck", function()
             top = math.max(top, hi)
         end
         expect(top <= 131.36).toBe(true) -- Hanabiya's ridge
-        expect(top <= 153.54 - 9.0).toBe(true) -- the owner's subordination gap to the tower
+        expect(top <= L.towerTopY - 9.0).toBe(true) -- the owner's subordination gap to the tower
     end)
 end)

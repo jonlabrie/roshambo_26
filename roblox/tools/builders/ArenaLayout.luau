@@ -299,7 +299,25 @@ local ArenaLayout = {
     -- 12-facet glyph legibility ("Beacon", ~56% of the 39-stud roof); height is squat.
     -- `length` is a LEGACY compat field consumed ONLY by BellDrive's yoke sizing
     -- (BellDrive.luau:156) until the T8 drive reconnect — the new vertical builder ignores it.
-    throwDrum = { pos = { -2, 144, 0 }, radius = 11, height = 7.25, faces = 12, windows = 4 },
+    -- THE TOWER'S TOP, MEASURED — the shōrō/drum stack's highest point, which the shop and the
+    -- torii both have to stay subordinate to. It is EMERGENT (it comes out of ThrowDrum's build,
+    -- it is not an input), so it lives here as a measured number with a test that rebuilds the
+    -- tower and checks it. That test exists because this number was wrong by 17 studs for weeks:
+    -- it named the top of the Shoro MODEL while the drum storey stands on the shōrō's roof and
+    -- carries on up. Re-measure whenever the drum's roof or its sōrin changes.
+    towerTopY = 168.67,
+    throwDrum = {
+        pos = { -2, 144, 0 },
+        radius = 11,
+        height = 7.25,
+        faces = 12,
+        windows = 4,
+        -- roofRise was a bare 4.5 inside the builder: 17.8° over the 14-stud run, which read as a
+        -- lid. 8.5 is 31.3°, a temple pitch (owner's gate, against Kiyomizu-dera).
+        roofRise = 8.5,
+        -- the sōrin finial. height is measured from the roof APEX to the top of the mast.
+        sorin = { height = 10.5, rings = 9 },
+    },
     -- ===== Bell engine drive train (exposed on the open frame) =====
     -- One water input → two outputs. The wheel's Z-axle is the MAIN SHAFT; it runs
     -- South down the WEST (upriver) side of the bell+tower (clearing both), then a

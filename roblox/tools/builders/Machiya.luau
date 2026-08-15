@@ -11,6 +11,7 @@
 -- 2026-08-05. The study block survives at Workspace.Sandbox.HanabiyaStudy. Do not re-derive
 -- them from anything — see docs/superpowers/specs/2026-08-05-hanabiya-shop-design.md §1.
 local Spec = require("./Spec")
+local L = require("./ArenaLayout")
 
 local Machiya = {}
 
@@ -30,17 +31,15 @@ local FLOOR = 113.10 -- finished floor, = the karesansui datum
 -- stay clearly subordinate to the bell tower. TOP is derived at the bottom of this block and
 -- checked against these two numbers, so growing a storey can never quietly close the gap.
 --
--- THE TOWER IS A STACK, AND THIS NUMBER USED TO NAME ITS MIDDLE. It was 136.5 — the top of the
--- Shoro model — but the tower is seven models and the drum storey stands ON the shōrō's roof:
+-- THE TOWER IS A STACK, AND THIS USED TO BE A LITERAL HERE THAT NAMED ITS MIDDLE. It was 136.5 —
+-- the top of the Shoro MODEL — while the tower is seven models and the drum storey stands on the
+-- shōrō's roof and carries on up. The error was 17 studs and it ran the wrong way: it made the
+-- shop look like it was crowding a tower it cleared easily.
 --
---   Shoro 112.00..136.20   ShoroRoof 133.55..136.47   ThrowDrum 135.23..153.54
---   RanmaCarvings 140.37..147.63   BellDrive 110.00..141.60   BonshoRig 116.95..134.50
---
--- Measured in Studio 2026-08-13 across every RoshamboStage model sharing the tower's footprint.
--- The error was 17 studs and it ran the wrong way: it made the shop look like it was crowding a
--- tower it clears by 22. Re-measure the same way if the tower is redesigned — one model's
--- bounding box is not a building.
-local SHORO_TOP = 153.54
+-- So it is no longer a literal here at all. ArenaLayout.towerTopY is the one authority, and a test
+-- rebuilds the tower and checks it — which matters, because the drum's roof was pitched up and
+-- given a sōrin on 2026-08-14 and the number moved again, from 153.54 to 168.67.
+local SHORO_TOP = L.towerTopY
 -- The OWNER'S number, from the spec: the shop tops "9 studs subordinate to the bell tower, which
 -- is the relationship the square depends on." This used to be 5.0 — a floor I invented when the
 -- holdout's top was retired, and then quoted back as though it were a gate they had set.
@@ -71,9 +70,8 @@ local ROOF_RISE = 4.01 -- the pitch, now an input rather than whatever was left 
 local TOP = EAVE_Y + ROOF_RISE + ROOF_T -- derived; the slab's corner at the ridge is the true top
 -- NOT A CLEARANCE — the two buildings stand 15.9 studs apart in z and nothing overhangs anything.
 -- This is about the SKYLINE: the bell tower is meant to read as the tallest thing in the square.
--- At 131.36 against the tower's 153.54 the shop clears it by 22.18, comfortably past the owner's
--- 9. There is no tension here, and the old message said "crowds", which read as a collision and
--- sent me chasing a conflict that does not exist.
+-- The shop tops at 131.36 and clears the tower comfortably. There is no tension here, and the old
+-- message said "crowds", which read as a collision and sent me chasing one that does not exist.
 assert(
     TOP <= SHORO_TOP - MIN_SHORO_GAP,
     `machiya top {TOP} reads too tall beside the bell tower's {SHORO_TOP}`
