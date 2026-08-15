@@ -16,6 +16,15 @@ local L = require("./ArenaLayout")
 local Machiya = {}
 
 function Machiya.build(palette: any, _layout: any, shop: any): any
+    -- A KOSHI FRONTAGE CANNOT CARRY THE FULL INTERIOR. The counter and the noren register to
+    -- the OPEN bays (postX), and a kōshi frontage has none — without this gate the combination
+    -- dies later as bare nil arithmetic at the counter's postX lookup, which names nothing.
+    -- No shop uses the combination; if one ever should, the counter needs a new registration.
+    assert(
+        not (shop.frontage == "koshi" and shop.interior == "full"),
+        "a koshi frontage cannot carry the full interior: the counter and stair register to the open bays"
+    )
+
     -- ===== the owner's envelope =====
     local X0, X1 = shop.envelope.x0, shop.envelope.x1 -- west, east
     -- DEEPENED 2026-08-13, front edge only: z44 -> z36. The shop held about three people, because a

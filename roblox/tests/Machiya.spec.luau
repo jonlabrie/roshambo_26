@@ -616,6 +616,65 @@ describe("machiya variants", function()
         expect(b[1]).toBeCloseTo(8 + (a[3] - 106.5), 0.01)
         expect(b[3]).toBeCloseTo(106.5 - (a[1] - 8), 0.01)
     end)
+    test("the identity kit dresses a shell, field by field", function()
+        local Spec = require("../tools/builders/Spec")
+        local kit = table.clone(SHELL)
+        kit.identity = {
+            noren = { color = { 0.2, 0.2, 0.4 }, segments = 3 },
+            chochin = true,
+            board = true,
+            glow = { color = { 1, 0.8, 0.6 }, brightness = 1.5 },
+            dress = function(ctx)
+                return {
+                    Spec.part("TestProp", {
+                        Size = { 1, 1, 1 },
+                        CFrame = Spec.cframe({ ctx.env.cx, ctx.env.floorY + 0.5, ctx.env.cz }),
+                    }),
+                }
+            end,
+        }
+        local m = Machiya.build(ZenDojo.palette, ArenaLayout, kit :: any)
+        -- chochin: the eave-corner pair, one model per corner
+        expect(find(m, "ChochinWest") ~= nil).toBe(true)
+        expect(find(m, "ChochinEast") ~= nil).toBe(true)
+        -- noren: the kit's own colour rides the archetype's hang
+        expect(find(m, "Noren2_1") ~= nil).toBe(true)
+        -- board: one BLANK slab — blank means no children (no SurfaceGui, no copy)
+        local board = find(m, "SignBoard")
+        expect(board ~= nil).toBe(true)
+        expect(board.children == nil or #board.children == 0).toBe(true)
+        -- glow: the interior lighting hooks exist
+        local sawGlow = false
+        for _, p in allParts(m) do
+            if string.find(p.name, "InteriorGlow_") then
+                sawGlow = true
+            end
+        end
+        expect(sawGlow).toBe(true)
+        -- dress: its specs land under the Dressing child model, not loose in the shell
+        local dressing = find(m, "Dressing")
+        expect(dressing ~= nil).toBe(true)
+        expect(find(dressing, "TestProp") ~= nil).toBe(true)
+        -- and interior "none" suppresses EXACTLY the glow — the rest of the kit stays
+        local sealed = table.clone(kit)
+        sealed.interior = "none"
+        local m2 = Machiya.build(ZenDojo.palette, ArenaLayout, sealed :: any)
+        for _, p in allParts(m2) do
+            expect(string.find(p.name, "InteriorGlow_") == nil).toBe(true)
+        end
+        expect(find(m2, "SignBoard") ~= nil).toBe(true)
+        expect(find(m2, "ChochinWest") ~= nil).toBe(true)
+    end)
+    test("koshi + full interior refuses loudly, not with nil arithmetic", function()
+        local bad = table.clone(SHELL)
+        bad.frontage = "koshi"
+        bad.interior = "full"
+        local ok, err = pcall(function()
+            Machiya.build(ZenDojo.palette, ArenaLayout, bad :: any)
+        end)
+        expect(ok).toBe(false)
+        expect(string.find(tostring(err), "koshi frontage cannot carry the full interior") ~= nil).toBe(true)
+    end)
     -- The brief's yaw test reads part [1], which is the FloorSlab — dead on the envelope
     -- centre, so a yaw pass that silently did nothing would still pass it. This one holds
     -- EVERY part, nested noren segments included (the exact class of miss allParts exists
