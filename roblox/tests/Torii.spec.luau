@@ -69,7 +69,7 @@ describe("Torii — the myōjin gate on the Overlook deck", function()
         -- The owner's number, pinned as a literal. Comparing the built gap against T.nukiGap
         -- alone proves only that the builder honours its parameter — both sides move together, so
         -- it cannot notice the value itself drifting away from what was asked for.
-        expect(T.nukiGap).toBeCloseTo(3.0, 0.001)
+        expect(T.nukiGap).toBeCloseTo(2.0, 0.001)
         local _, nukiTop = span(byName["Nuki"], 2)
         local shimakiLo = span(byName["Shimaki"], 2)
         expect(math.abs((shimakiLo - nukiTop) - T.nukiGap) < 0.001).toBe(true)
@@ -77,6 +77,17 @@ describe("Torii — the myōjin gate on the Overlook deck", function()
         local gLo, gHi = span(byName["Gakuzuka"], 2)
         expect(math.abs(gLo - nukiTop) < 0.001).toBe(true)
         expect(math.abs(gHi - shimakiLo) < 0.001).toBe(true)
+    end)
+
+    test("THE TWO LINTELS ARE THE SAME LENGTH", function()
+        -- Owner's gate: match the nuki to the shimaki above it. The nuki used to have its own
+        -- overhang and came out two studs shorter, so the gate read as a stack of three different
+        -- widths. Both now derive from one number in the builder — this is the assertion that
+        -- notices if someone gives the nuki its own again.
+        local nLo, nHi = span(byName["Nuki"], 3)
+        local sLo, sHi = span(byName["Shimaki"], 3)
+        expect(math.abs((nHi - nLo) - (sHi - sLo)) < 0.001).toBe(true)
+        expect(math.abs(nLo - sLo) < 0.001).toBe(true) -- and flush at both ends, not just equal
     end)
 
     test("THE KASAGI IS CAPPED IN BLACK, and the cap oversails the timber", function()

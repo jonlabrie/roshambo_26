@@ -91,12 +91,16 @@ function Torii.build(palette: any, L: any): Spec.PartSpec
     -- horizontal member gets grain along Z on its sides and along X top and bottom, because the
     -- cypress maps project from world axes. Left plain until it has been looked at from
     -- underneath, rather than pre-emptively adding boards to fix what may not read at this height.
+    -- ONE LENGTH FOR BOTH LINTELS (owner: match the nuki to the shimaki above it). Computed once
+    -- and used twice, so they are the same number rather than two numbers that happen to agree.
+    local lintelLen = T.span + 2 * T.shimakiOut
     local nukiTopY = pillarTopY - T.nukiGap
     local nukiY = nukiTopY - T.nukiH / 2
-    timber("Nuki", { T.nukiW, T.nukiH, T.span + 2 * T.nukiOut }, { cx, nukiY, cz })
+    timber("Nuki", { T.nukiW, T.nukiH, lintelLen }, { cx, nukiY, cz })
     -- kusabi: the wedges pinning the nuki where it emerges. Small, dark, and the reason the
     -- protrusion reads as joinery rather than as a beam sticking out.
-    for _, s in { { "North", cz - half - T.nukiOut * 0.55 }, { "South", cz + half + T.nukiOut * 0.55 } } do
+    local kusabiOut = T.shimakiOut * 0.55
+    for _, s in { { "North", cz - half - kusabiOut }, { "South", cz + half + kusabiOut } } do
         timber(
             `Kusabi{s[1]}`,
             { T.nukiW + 0.12, T.nukiH * 0.5, 0.3 },
@@ -111,7 +115,7 @@ function Torii.build(palette: any, L: any): Spec.PartSpec
     timber("Gakuzuka", { T.nukiW * 0.85, gHi - gLo, 1.0 }, { cx, (gLo + gHi) / 2, cz })
 
     -- ===== shimaki: straight, seated on the pillar heads =====
-    timber("Shimaki", { T.beamW, SHIMAKI_T, T.span + 2 * T.shimakiOut }, { cx, shimakiMidY, cz })
+    timber("Shimaki", { T.beamW, SHIMAKI_T, lintelLen }, { cx, shimakiMidY, cz })
 
     -- ===== kasagi: the curved lintel, and its black cap =====
     -- The upturn is what makes it myōjin, and a box cannot bend — so the curve is sampled as a
