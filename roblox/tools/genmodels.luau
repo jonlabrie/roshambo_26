@@ -19,6 +19,7 @@ local SwitchbackDeck = require("./builders/SwitchbackDeck")
 local FallsDock = require("./builders/FallsDock")
 local Karesansui = require("./builders/Karesansui")
 local Machiya = require("./builders/Machiya")
+local Torii = require("./builders/Torii")
 local ArenaLayout = require("./builders/ArenaLayout")
 local ZenDojo = require("../src/shared/themes/ZenDojo")
 
@@ -52,6 +53,7 @@ local OUTPUTS: { [string]: any } = {
     ["FallsDock"] = FallsDock.build(ZenDojo.palette, ArenaLayout),
     ["Karesansui"] = Karesansui.build(ZenDojo.palette, ArenaLayout),
     ["Hanabiya"] = Machiya.build(ZenDojo.palette, ArenaLayout),
+    ["Torii"] = Torii.build(ZenDojo.palette, ArenaLayout),
 }
 
 if not fs.isDir("assets") then

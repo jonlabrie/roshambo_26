@@ -261,7 +261,36 @@ local ArenaLayout = {
     firefly = { heroLightCount = 18 }, -- real-PointLight motes near the water (Phase 2)
     -- Entrance: gate plaza ON the rim (surface ~y28); the sandō descends
     -- through carved tier walls down to the apron (arrive high, walk down).
-    torii = { pos = { 0, 28, -196 } },
+    -- LEGACY, and named so it cannot be mistaken for the real one. This is the bowl arena's
+    -- entrance marker at rim coordinates the canyon redesign abandoned; Graybox.luau is its only
+    -- consumer. The torii that actually exists is toriiGate, below.
+    bowlTorii = { pos = { 0, 28, -196 } },
+    -- THE TORII: myōjin form in shu-iro, standing on the Overlook deck's WESTERN EDGE — the
+    -- threshold between the deck a player spawns on and the square they walk out into.
+    --
+    -- ON THE DECK (113.30) rather than on the ground. West of the deck the terrain falls away —
+    -- measured 2026-08-14, 112.6 at x52 down to 109.7 at x57, with the two footings differing by
+    -- as much as 1.7 across the gate line. A built platform has no such argument.
+    --
+    -- The pillars stand just OUTSIDE the deck's exit gap (UpperStep spans z21.5..34.5) so the gate
+    -- frames the way out instead of standing in it, and clear of the corner newels at z13/z43.
+    toriiGate = {
+        pos = { 58, 113.3, 28 },
+        span = 15, -- pillar centre to centre
+        height = 14, -- deck to the top of the kasagi
+        pillarD = 1.5,
+        nemakiH = 1.1, -- the black wrapped base
+        nukiGap = 3.0, -- CLEAR gap between the nuki's top and the shimaki's underside
+        nukiW = 0.7,
+        nukiH = 1.0,
+        nukiOut = 1.2, -- how far the nuki protrudes past each pillar
+        beamW = 0.95,
+        shimakiOut = 2.2,
+        kasagiOut = 2.8,
+        kasagiRise = 0.9, -- the upturn at the ends; this is what makes it myōjin
+        kasagiSegments = 7,
+        kasagiCapT = 0.28, -- the black cap over the kasagi (Fushimi Inari)
+    },
     sando = { fromZ = -192, toZ = -86, width = 6, fromY = 28, toY = 2 }, -- rim plaza → apron edge
     stele = { pos = { -14, 28, -186 } },
     koiPond = { pos = { -130, 0, -115 }, radius = 14 },

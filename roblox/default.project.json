@@ -59,9 +59,10 @@
                 "FallsDock": { "$path": "assets/FallsDock.model.json" },
                 "Karesansui": { "$path": "assets/Karesansui.model.json" },
                 "Hanabiya": { "$path": "assets/Hanabiya.model.json" },
+                "Torii": { "$path": "assets/Torii.model.json" },
                 "ArenaSpawn": {
                     "$className": "SpawnLocation",
-                    "$properties": { "Anchored": true, "Size": [8, 1, 8], "CFrame": [40, 113.2, 8, 0, 0, 1, 0, 1, 0, -1, 0, 0], "Neutral": true }
+                    "$properties": { "Anchored": true, "Size": [8, 1, 8], "CFrame": [80, 113.8, 28, 0, 0, 1, 0, 1, 0, -1, 0, 0], "Neutral": true }
                 }
             }
         },

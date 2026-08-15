@@ -9,7 +9,7 @@ function Graybox.build(L)
     local children = {
         Spec.part("ToriiShell", {
             Size = { 14, 12, 2 },
-            CFrame = Spec.cframe({ L.torii.pos[1], L.torii.pos[2] + 6, L.torii.pos[3] }),
+            CFrame = Spec.cframe({ L.bowlTorii.pos[1], L.bowlTorii.pos[2] + 6, L.bowlTorii.pos[3] }),
             Color = GRAY,
         }),
         Spec.part("SteleShell", {

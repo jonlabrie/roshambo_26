@@ -20,6 +20,7 @@ WorkspaceConvention.DECLARED_STAGE_CHILDREN = {
     "FallsDock", -- the 6x8 posted timber dock on pool 2 (assets/FallsDock.model.json)
     "Karesansui",
     "Hanabiya", -- 花火屋, the firework shop machiya (assets/Hanabiya.model.json)
+    "Torii", -- myōjin gate on the Overlook deck's west edge (assets/Torii.model.json)
     "ArenaSpawn",
 }
 
