@@ -45,7 +45,14 @@ return {
         -- Worn by every bronze fitting on the bell assembly — the lugs, the shu-moku's nose, the
         -- whole sōrin — and by the BonshoBell MESH, whose copy is baked into
         -- assets/meshes/BonshoBell.rbxm and must be re-exported to follow this.
-        bronzePatina = { 0.36, 0.45, 0.39 },
+        --
+        -- AND THEN DESATURATED, which needed a different move than expected. Pulling the tint
+        -- toward NEUTRAL does nothing: part.Color MULTIPLIES the map, Metal058C is itself a green
+        -- patina, and multiplication can darken a coloured source but never desaturate it — five
+        -- candidates from grey to warm produced five near-identical teals. The only lever is to
+        -- push AGAINST the map: green DOWN relative to red and blue. 0.36/0.45/0.39 had green
+        -- 0.09 clear of red; this has it 0.03 clear, landing between the two the owner chose from.
+        bronzePatina = { 0.390, 0.420, 0.395 },
         slateTile = { 0.90, 0.90, 0.88 }, -- near-neutral over dark kawara RoofingTiles013A
         ironDark = { 0.50, 0.50, 0.53 }, -- mid over dark Metal046B (bands/collars/gears)
         paddleWet = { 0.7, 0.78, 0.58 }, -- moss-green tint over olive Wood065 (wet mossy paddles)
