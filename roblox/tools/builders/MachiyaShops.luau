@@ -59,9 +59,16 @@ MachiyaShops.hanabiya = {
 -- front's highest hit, 113.30 -- reads on the same promenade grade as 花火屋's
 -- 113.10. Back spread is 9.26 (111.82 to 121.08): the south edge climbs into the
 -- terrain cut, unevenly -- matches the pattern, not treated as a floor problem.
+-- EAST EDGE RE-REGISTERED AT THE ROUND-1 GATE: the massing block's surveyed
+-- x1 = 2.30 was STALE against the built neighbour — it ran ~3.97 studs into
+-- 花火屋 (west face x = -1.67). The block predates the built shop, and the
+-- standing rule is to register to the BUILT edge, not the survey
+-- (derive-from-what-it-touches): x1 = -1.67 - 1.5 = -3.17, a 1.5-stud roji —
+-- the narrow alley between row houses — which also keeps the two shells' side
+-- walls off a shared plane (coplanar-face flicker). x0/z/floorY stay surveyed.
 MachiyaShops.apparel = {
     name = "MachiyaApparel",
-    envelope = { x0 = -22.42, x1 = 2.30, z0 = 35.23, z1 = 48.48, floorY = 113.30 },
+    envelope = { x0 = -22.42, x1 = -3.17, z0 = 35.23, z1 = 48.48, floorY = 113.30 },
     yaw = 0,
     frontage = "open",
     interior = "shallow",
@@ -91,16 +98,19 @@ MachiyaShops.apparel = {
             local wallInnerZ = env.z1 - 0.8
 
             -- ----- two kimono racks, one per open bay, 1.2 inside the frontage plane -----
-            -- The bays are ADJACENT (6.18 wide each), so the racks are sized to their bay:
-            -- posts 5.7 apart (a 6.9 span at the design's 2.2-wide cloths would have run the
-            -- two racks' members into each other at the shared mid-post), and the cloths are
-            -- THINNED to 1.7 — the constraint's rule: thin it, never push it through a wall
-            -- or a neighbour. Rail and cloth are non-colliding so the open bays STAY doors;
-            -- the posts collide, like furniture you walk around.
+            -- The bays are ADJACENT, so a rack is SIZED FROM ITS BAY, not from a literal —
+            -- the round-1 gate narrowed the envelope and racks sized for the old width
+            -- would have crossed at the shared mid-post. Facing posts keep a 0.2 clear
+            -- gap, and the cloths take what the span holds (the design's 2.2 width never
+            -- fit two adjacent bays; thin it, never push it through a neighbour). Rail
+            -- and cloth are non-colliding so the open bays STAY doors; the posts collide,
+            -- like furniture you walk around.
             local rackZ = env.z0 + 1.2
             local POST = 0.3
             local POST_H = 5.5
-            local RACK_SPAN = 5.7 -- post centre to post centre
+            local BAY_W = env.w / 4 -- the frontage's 5 posts make 4 equal bays
+            local RACK_SPAN = BAY_W - POST - 0.2 -- post centre to centre; 0.2 clear between racks
+            local CLOTH_W = (RACK_SPAN - 0.6) / 3 -- 0.1 gaps between cloths, 0.05 to each post
             for r, rackCX in { bay2CX, bay3CX } do
                 local kids: { any } = {}
                 for _, side in { { "W", -1 }, { "E", 1 } } do
@@ -136,8 +146,12 @@ MachiyaShops.apparel = {
                     table.insert(
                         kids,
                         Spec.part(`RackCloth_{i}`, {
-                            Size = { 1.7, 3.8, 0.15 },
-                            CFrame = Spec.cframe({ rackCX + (i - 2) * 1.8, FLOOR + 3.4, rackZ }),
+                            Size = { CLOTH_W, 3.8, 0.15 },
+                            CFrame = Spec.cframe({
+                                rackCX + (i - 2) * (CLOTH_W + 0.1),
+                                FLOOR + 3.4,
+                                rackZ,
+                            }),
                             Color = if (r + i) % 2 == 0 then palette.vermilion else palette.water,
                             Material = "Fabric",
                             CanCollide = false,

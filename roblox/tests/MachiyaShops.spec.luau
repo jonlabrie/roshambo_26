@@ -49,7 +49,9 @@ describe("MachiyaShops registry", function()
         local s = MachiyaShops.apparel
         expect(s.name).toBe("MachiyaApparel")
         expect(s.envelope.x0).toBe(-22.42)
-        expect(s.envelope.x1).toBe(2.30)
+        -- x1 is NOT the survey's 2.30: it registers to 花火屋's built west face at a
+        -- 1.5 roji standoff (see the relationship test below).
+        expect(s.envelope.x1).toBe(-3.17)
         expect(s.envelope.z0).toBe(35.23)
         expect(s.envelope.z1).toBe(48.48)
         expect(s.envelope.floorY).toBe(113.30)
@@ -102,5 +104,15 @@ describe("apparel shell", function()
             expect(p.properties.CFrame[1] >= e.x0 and p.properties.CFrame[1] <= e.x1).toBe(true)
             expect(p.properties.CFrame[3] >= e.z0 and p.properties.CFrame[3] <= e.z1).toBe(true)
         end
+    end)
+end)
+
+describe("apparel registers to the built neighbour", function()
+    test("east edge is 花火屋's west face minus the 1.5-stud roji", function()
+        -- The massing block predates the built shop, and its surveyed x1 (2.30) ran
+        -- ~3.97 studs INTO 花火屋. The shell registers to the BUILT edge
+        -- (derive-from-what-it-touches): west face −1.67, minus a 1.5 roji gap —
+        -- so this drift class fails loudly forever.
+        expect(MachiyaShops.apparel.envelope.x1 + 1.5).toBeCloseTo(MachiyaShops.hanabiya.envelope.x0, 0.001)
     end)
 end)
