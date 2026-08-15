@@ -16,11 +16,6 @@ local L = require("./ArenaLayout")
 local Machiya = {}
 
 function Machiya.build(palette: any, _layout: any, shop: any): any
-    assert(
-        shop.frontage == "open" and shop.interior == "full" and shop.yaw == 0,
-        "only the hanabiya configuration is implemented until Task 3"
-    )
-
     -- ===== the owner's envelope =====
     local X0, X1 = shop.envelope.x0, shop.envelope.x1 -- west, east
     -- DEEPENED 2026-08-13, front edge only: z44 -> z36. The shop held about three people, because a
@@ -150,7 +145,11 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
     -- than trusted: a rise that does not divide leaves a final step of the wrong height, which reads
     -- as a stumble in Play and as nothing at all in the explorer.
     local STAIR_RISE = (UPPER_SURFACE - FLOOR) / (STAIR_TREADS + 1)
-    assert(math.abs(STAIR_RISE - 0.8) < 1e-9, `stair rise {STAIR_RISE} is not the intended 0.8`)
+    -- Only a FULL interior builds the stair, so only a full interior is held to its geometry —
+    -- a shallow shell with custom storeys owes nothing to a stair it does not have.
+    if shop.interior == "full" then
+        assert(math.abs(STAIR_RISE - 0.8) < 1e-9, `stair rise {STAIR_RISE} is not the intended 0.8`)
+    end
     local STAIR_RUN = 0.72 -- 48° — steep, which is the point
     local STAIR_W = 3.2 -- OUTER to outer, stringers included
     local STRINGER_T = 0.45
@@ -177,10 +176,12 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
     -- required is a margin and is fine; opening one later is a low beam you cannot see in the
     -- explorer. Strict headroom would allow three covered treads (the third clears by 0.6) — the
     -- third is given away on purpose, because 0.6 studs is not clearance once a body has depth.
-    assert(
-        FLOOR + STAIR_HEAD_CLEAR * STAIR_RISE + 6.0 <= FLOOR + STOREY_H,
-        "the stairwell opens too late — a climber meets the upper floor before the cut"
-    )
+    if shop.interior == "full" then
+        assert(
+            FLOOR + STAIR_HEAD_CLEAR * STAIR_RISE + 6.0 <= FLOOR + STOREY_H,
+            "the stairwell opens too late — a climber meets the upper floor before the cut"
+        )
+    end
     local WELL_Z1 = COUNTER_BACK_Z - STAIR_HEAD_CLEAR * STAIR_RUN
     local WELL_Z0 = COUNTER_BACK_Z - STAIR_TREADS * STAIR_RUN
     -- Hard against the east wall's inner face, and the well is cut a little wider than the stair so a
@@ -253,35 +254,7 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
     -- would be silently dropped anyway, which is how the upper floor stayed pale twice.
     add("FloorSlab", { W, SLAB_T, D }, { CX, FLOOR - SLAB_T / 2, CZ }, timber, "Wood", nil, FRAME_VAR)
 
-    -- ----- the OPEN frontage: six posts, no wall -----
-    local FRONT_POSTS = 5 -- owner's gate: 3 centre posts + 2 corners, down from 4 + 2
-    local postX = {} -- kept so the sign boards register to the BAYS, not to the frontage
-    for i = 1, FRONT_POSTS do
-        local t = (i - 1) / (FRONT_POSTS - 1)
-        local x = flushX(X0 + (X1 - X0) * t)
-        postX[i] = x
-        -- CypressVertical, not plain Wood. Roblox's Wood grain runs along the part's X axis, so on
-        -- a tall thin post it bands ACROSS the timber like a stack of planks. The place already
-        -- carries a vertical-grain variant for exactly this — 20 parts wear it.
-        add(
-            `FrontPost{i}`,
-            { POST_W, STOREY_H, POST_W },
-            { x, FLOOR + STOREY_H / 2, Z0 + POST_W / 2 },
-            timber,
-            "Wood",
-            nil,
-            "CypressVertical"
-        )
-    end
-
-    -- ----- the shopfront: SLIDING DOORS, STANDING OPEN, UNDER SHOJI TRANSOMS -----
-    -- A machiya's shopfront is not a hole — it is a run of sliding doors that have been pushed
-    -- aside for the day. Rendering them open is what says "this shop is trading", and it reads far
-    -- better than an empty gap: you can see what closes.
-    --
-    -- Each bay gets a fixed shoji transom above the head rail (kamoi) and one door leaf slid to
-    -- the bay's west jamb, leaving roughly two-thirds of the opening clear. Leaves alternate which
-    -- jamb they park against, because a whole row stacked the same way reads mechanical.
+    -- ===== frontage constants, shared by BOTH frontage branches =====
     -- THE KAMOI HAS TO CLEAR A PLAYER. The working avatar height is 6 studs (a bare R15 is ~5;
     -- hair adds a stud and players wear it), and this rail spans the whole frontage — at its old
     -- 3.9 you would have walked face-first into the doorway you were meant to enter.
@@ -298,179 +271,286 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
     local LAT_D = 0.2
     local LAT_Z = Z0 + LAT_D / 2 -- inboard of the posts, so the noren still hangs in front
 
-    -- spans the OPEN bays only; the closed ends carry their own head band
-    add(
-        "HeadRail",
-        { postX[FRONT_POSTS - 1] - postX[2], 0.3, 0.32 },
-        { (postX[2] + postX[FRONT_POSTS - 1]) / 2, HEAD_Y + 0.15, FRAME_Z },
-        timber,
-        "Wood",
-        nil,
-        FRAME_VAR
-    )
+    -- ----- the frontage: OPEN (posts and trading bays) or KOSHI (a closed lattice wall) -----
+    local FRONT_POSTS = 5 -- owner's gate: 3 centre posts + 2 corners, down from 4 + 2
+    local postX = {} -- kept so the sign boards register to the BAYS, not to the frontage
+    -- Populated by the open branch only; a kōshi frontage has no bays to close or open, so the
+    -- noren emitter (which walks these) naturally emits nothing there.
+    local CLOSED: { [number]: boolean } = {}
 
-    -- THE TWO OUTER BAYS ARE CLOSED (owner's gate, matching the reference). A machiya shopfront is
-    -- not open end to end — the opening is the middle of the elevation with plastered wall either
-    -- side. It also gives the counter something to sit against.
-    local CLOSED = { [1] = true, [FRONT_POSTS - 1] = true }
-
-    for i = 1, FRONT_POSTS - 1 do
-        local a, b = postX[i], postX[i + 1]
-        local bayW = (b - a) - POST_W
-        local bayC = (a + b) / 2
-
-        if CLOSED[i] then
-            -- render set BACK, so the frame in front of it is what you see
-            local panelH = TRANSOM_TOP - FLOOR
+    if shop.frontage == "open" then
+        -- the OPEN frontage: six posts, no wall
+        for i = 1, FRONT_POSTS do
+            local t = (i - 1) / (FRONT_POSTS - 1)
+            local x = flushX(X0 + (X1 - X0) * t)
+            postX[i] = x
+            -- CypressVertical, not plain Wood. Roblox's Wood grain runs along the part's X axis, so on
+            -- a tall thin post it bands ACROSS the timber like a stack of planks. The place already
+            -- carries a vertical-grain variant for exactly this — 20 parts wear it.
             add(
-                `BayPanel{i}`,
-                { bayW, panelH, 0.36 },
-                { bayC, FLOOR + panelH / 2, Z0 + STUCCO_SETBACK + 0.18 },
-                stucco,
-                STUCCO_MAT,
+                `FrontPost{i}`,
+                { POST_W, STOREY_H, POST_W },
+                { x, FLOOR + STOREY_H / 2, Z0 + POST_W / 2 },
+                timber,
+                "Wood",
                 nil,
-                STUCCO_VAR
+                "CypressVertical"
             )
-            -- the frame: sill, head and two jambs, all standing at the frontage plane
-            local FR = 0.26
+        end
+
+        -- ----- the shopfront: SLIDING DOORS, STANDING OPEN, UNDER SHOJI TRANSOMS -----
+        -- A machiya's shopfront is not a hole — it is a run of sliding doors that have been pushed
+        -- aside for the day. Rendering them open is what says "this shop is trading", and it reads far
+        -- better than an empty gap: you can see what closes.
+        --
+        -- Each bay gets a fixed shoji transom above the head rail (kamoi) and one door leaf slid to
+        -- the bay's west jamb, leaving roughly two-thirds of the opening clear. Leaves alternate which
+        -- jamb they park against, because a whole row stacked the same way reads mechanical.
+        -- (HEAD_Y / TRANSOM_TOP / DOOR_Z / FRAME_* / LAT_* are declared with the shared frontage
+        -- constants above — the kōshi branch builds from the same planes.)
+
+        -- spans the OPEN bays only; the closed ends carry their own head band
+        add(
+            "HeadRail",
+            { postX[FRONT_POSTS - 1] - postX[2], 0.3, 0.32 },
+            { (postX[2] + postX[FRONT_POSTS - 1]) / 2, HEAD_Y + 0.15, FRAME_Z },
+            timber,
+            "Wood",
+            nil,
+            FRAME_VAR
+        )
+
+        -- THE TWO OUTER BAYS ARE CLOSED (owner's gate, matching the reference). A machiya shopfront is
+        -- not open end to end — the opening is the middle of the elevation with plastered wall either
+        -- side. It also gives the counter something to sit against.
+        CLOSED[1] = true
+        CLOSED[FRONT_POSTS - 1] = true
+
+        for i = 1, FRONT_POSTS - 1 do
+            local a, b = postX[i], postX[i + 1]
+            local bayW = (b - a) - POST_W
+            local bayC = (a + b) / 2
+
+            if CLOSED[i] then
+                -- render set BACK, so the frame in front of it is what you see
+                local panelH = TRANSOM_TOP - FLOOR
+                add(
+                    `BayPanel{i}`,
+                    { bayW, panelH, 0.36 },
+                    { bayC, FLOOR + panelH / 2, Z0 + STUCCO_SETBACK + 0.18 },
+                    stucco,
+                    STUCCO_MAT,
+                    nil,
+                    STUCCO_VAR
+                )
+                -- the frame: sill, head and two jambs, all standing at the frontage plane
+                local FR = 0.26
+                add(
+                    `BaySill{i}`,
+                    { bayW + POST_W, FR, FRAME_D2 },
+                    { bayC, FLOOR + FR / 2, FRAME_Z },
+                    timber,
+                    "Wood",
+                    nil,
+                    FRAME_VAR
+                )
+                add(
+                    `BayHead{i}`,
+                    { bayW + POST_W, FR, FRAME_D2 },
+                    { bayC, TRANSOM_TOP - FR / 2, FRAME_Z },
+                    timber,
+                    "Wood",
+                    nil,
+                    FRAME_VAR
+                )
+                for k, jx in { bayC - bayW / 2, bayC + bayW / 2 } do
+                    add(
+                        `BayJamb{i}_{k}`,
+                        { FR, panelH, FRAME_D2 },
+                        { jx, FLOOR + panelH / 2, FRAME_Z },
+                        timber,
+                        "Wood",
+                        nil,
+                        FRAME_VAR
+                    )
+                end
+                -- shoji-like lattice across the panel: a coarse grid, proud of the render
+                local LAT = 0.1
+                local latH = panelH - 2 * FR
+                local latY = FLOOR + FR + latH / 2
+                for k = 1, 4 do
+                    add(
+                        `BayLatV{i}_{k}`,
+                        { LAT, latH, LAT_D },
+                        { bayC - bayW / 2 + bayW * (k / 5), latY, LAT_Z },
+                        timber,
+                        "Wood",
+                        nil,
+                        FRAME_VAR
+                    )
+                end
+                for k = 1, 3 do
+                    add(
+                        `BayLatH{i}_{k}`,
+                        { bayW, LAT, LAT_D },
+                        { bayC, latY - latH / 2 + latH * (k / 4), LAT_Z },
+                        timber,
+                        "Wood",
+                        nil,
+                        FRAME_VAR
+                    )
+                end
+            else
+                local tH = TRANSOM_TOP - HEAD_Y
+                add(`Transom{i}`, { bayW, tH, 0.1 }, { bayC, HEAD_Y + tH / 2, DOOR_Z }, paper, "Fabric")
+                for k = 1, 2 do
+                    add(
+                        `TransomBar{i}_{k}`,
+                        { 0.09, tH, 0.14 },
+                        { bayC - bayW / 4 + (bayW / 2) * (k - 1), HEAD_Y + tH / 2, DOOR_Z },
+                        ink,
+                        "Wood"
+                    )
+                end
+                -- THE SCREEN IS FULL BAY WIDTH AND SLID TWO-THIRDS AWAY, so the opening is 2/3 clear
+                -- and the hidden third-and-a-bit sits BEHIND the closed bay next to it. That is how a
+                -- sliding screen actually works — it does not shrink, it goes somewhere. It parks
+                -- toward whichever neighbouring bay is closed, which is what gives it somewhere to go.
+                local leafW = bayW
+                local openW = bayW
+                local parkWest = CLOSED[i - 1] == true
+                local leafC = if parkWest then (a + POST_W / 2 - openW / 6) else (b - POST_W / 2 + openW / 6)
+                -- The screen RUNS IN A TRACK and closes with a rail top and bottom. Its stiles used
+                -- to end at floor level with no bottom member, so the frame terminated into the floor
+                -- instead of closing against it — which reads as buried, because nothing caps it.
+                local RAIL_T = 0.16
+                local leafY0 = FLOOR + 0.1 -- the track it slides in
+                local leafH = HEAD_Y - leafY0
+                local leafCY = leafY0 + leafH / 2
+                -- The paper is INSET inside its own frame. At full leaf size its edges landed exactly on
+                -- the stiles', so the sheet was visible edge-on — a pane the same size as its sash.
+                -- Real shoji paper is glued behind the frame and stops short of it on every side.
+                add(
+                    `DoorLeaf{i}`,
+                    { leafW - 2 * 0.16, leafH - 2 * RAIL_T, 0.05 },
+                    { leafC, leafCY, DOOR_Z },
+                    paper,
+                    "Fabric"
+                )
+                -- stiles, rails and a proper kumiko grid, all in the frame's dark wood
+                for k, sx in { leafC - leafW / 2 + 0.07, leafC + leafW / 2 - 0.07 } do
+                    add(
+                        `DoorStile{i}_{k}`,
+                        { 0.14, leafH, 0.15 },
+                        { sx, leafCY, DOOR_Z },
+                        timber,
+                        "Wood",
+                        nil,
+                        FRAME_VAR
+                    )
+                end
+                for k, ry in { leafY0 + RAIL_T / 2, HEAD_Y - RAIL_T / 2 } do
+                    add(
+                        `DoorRail{i}_{k}`,
+                        { leafW, RAIL_T, 0.15 },
+                        { leafC, ry, DOOR_Z },
+                        timber,
+                        "Wood",
+                        nil,
+                        FRAME_VAR
+                    )
+                end
+                local LAT_N_V, LAT_N_H = 5, 7
+                for k = 1, LAT_N_V do
+                    add(
+                        `DoorLatV{i}_{k}`,
+                        { 0.075, leafH, 0.13 },
+                        { leafC - leafW / 2 + leafW * (k / (LAT_N_V + 1)), leafCY, DOOR_Z },
+                        timber,
+                        "Wood",
+                        nil,
+                        FRAME_VAR
+                    )
+                end
+                for k = 1, LAT_N_H do
+                    add(
+                        `DoorLatH{i}_{k}`,
+                        { leafW, 0.075, 0.13 },
+                        { leafC, leafY0 + leafH * (k / (LAT_N_H + 1)), DOOR_Z },
+                        timber,
+                        "Wood",
+                        nil,
+                        FRAME_VAR
+                    )
+                end
+            end
+        end
+    else
+        -- ----- the KOSHI frontage: the street wall CLOSES, and nothing opens -----
+        -- The sports-book pattern (design spec): no bays, no doors, no counter behind — a full
+        -- run of floor-to-kamoi lattice standing in front of a rendered wall, the ground-storey
+        -- cousin of the upper storey's mushiko-mado. Same grammar as everywhere else on this
+        -- building: STUCCO SITS BACK, TIMBER STANDS PROUD, front faces exactly on the frontage
+        -- plane and not a hair past it.
+        add(
+            "FrontWall",
+            -- between the side walls, like WallBack — they run the full depth and close the corner
+            { SW - 2 * WALL_T, STOREY_H, WALL_T },
+            { CX, FLOOR + STOREY_H / 2, SZ0 + WALL_T / 2 },
+            stucco,
+            STUCCO_MAT,
+            nil,
+            STUCCO_VAR
+        )
+        -- corner posts, standing where FrontPost1/5 stand on the open frontage
+        for _, cp in { { "West", flushX(X0) }, { "East", flushX(X1) } } do
             add(
-                `BaySill{i}`,
-                { bayW + POST_W, FR, FRAME_D2 },
-                { bayC, FLOOR + FR / 2, FRAME_Z },
+                `KoshiPost{cp[1]}`,
+                { POST_W, STOREY_H, POST_W },
+                { cp[2] :: number, FLOOR + STOREY_H / 2, Z0 + POST_W / 2 },
+                timber,
+                "Wood",
+                nil,
+                "CypressVertical"
+            )
+        end
+        -- the frame the lattice runs in: a sill at the floor, a head band at the kamoi line
+        local FR = 0.26
+        local frameW = (X1 - X0) - 2 * POST_W
+        add(
+            "KoshiSill",
+            { frameW, FR, FRAME_D2 },
+            { CX, FLOOR + FR / 2, FRAME_Z },
+            timber,
+            "Wood",
+            nil,
+            FRAME_VAR
+        )
+        add(
+            "KoshiHead",
+            { frameW, 0.3, FRAME_D2 },
+            { CX, HEAD_Y + 0.15, FRAME_Z },
+            timber,
+            "Wood",
+            nil,
+            FRAME_VAR
+        )
+        -- The lattice: full width, sill to kamoi, at the upper storey's kōshi pitch — KOSHI_N
+        -- is 18 bars over a 12-stud window, 1.5 bars per stud, and the count follows the width
+        -- (integer-derived, so the emitted floats stay arch-stable).
+        local latH = HEAD_Y - (FLOOR + FR)
+        local nBars = math.max(6, math.round(frameW * 1.5))
+        for i = 1, nBars do
+            local t = (i - 0.5) / nBars
+            add(
+                `KoshiFront_{i}`,
+                { KOSHI_T, latH, KOSHI_T },
+                { X0 + POST_W + frameW * t, FLOOR + FR + latH / 2, Z0 + KOSHI_T / 2 },
                 timber,
                 "Wood",
                 nil,
                 FRAME_VAR
             )
-            add(
-                `BayHead{i}`,
-                { bayW + POST_W, FR, FRAME_D2 },
-                { bayC, TRANSOM_TOP - FR / 2, FRAME_Z },
-                timber,
-                "Wood",
-                nil,
-                FRAME_VAR
-            )
-            for k, jx in { bayC - bayW / 2, bayC + bayW / 2 } do
-                add(
-                    `BayJamb{i}_{k}`,
-                    { FR, panelH, FRAME_D2 },
-                    { jx, FLOOR + panelH / 2, FRAME_Z },
-                    timber,
-                    "Wood",
-                    nil,
-                    FRAME_VAR
-                )
-            end
-            -- shoji-like lattice across the panel: a coarse grid, proud of the render
-            local LAT = 0.1
-            local latH = panelH - 2 * FR
-            local latY = FLOOR + FR + latH / 2
-            for k = 1, 4 do
-                add(
-                    `BayLatV{i}_{k}`,
-                    { LAT, latH, LAT_D },
-                    { bayC - bayW / 2 + bayW * (k / 5), latY, LAT_Z },
-                    timber,
-                    "Wood",
-                    nil,
-                    FRAME_VAR
-                )
-            end
-            for k = 1, 3 do
-                add(
-                    `BayLatH{i}_{k}`,
-                    { bayW, LAT, LAT_D },
-                    { bayC, latY - latH / 2 + latH * (k / 4), LAT_Z },
-                    timber,
-                    "Wood",
-                    nil,
-                    FRAME_VAR
-                )
-            end
-        else
-            local tH = TRANSOM_TOP - HEAD_Y
-            add(`Transom{i}`, { bayW, tH, 0.1 }, { bayC, HEAD_Y + tH / 2, DOOR_Z }, paper, "Fabric")
-            for k = 1, 2 do
-                add(
-                    `TransomBar{i}_{k}`,
-                    { 0.09, tH, 0.14 },
-                    { bayC - bayW / 4 + (bayW / 2) * (k - 1), HEAD_Y + tH / 2, DOOR_Z },
-                    ink,
-                    "Wood"
-                )
-            end
-            -- THE SCREEN IS FULL BAY WIDTH AND SLID TWO-THIRDS AWAY, so the opening is 2/3 clear
-            -- and the hidden third-and-a-bit sits BEHIND the closed bay next to it. That is how a
-            -- sliding screen actually works — it does not shrink, it goes somewhere. It parks
-            -- toward whichever neighbouring bay is closed, which is what gives it somewhere to go.
-            local leafW = bayW
-            local openW = bayW
-            local parkWest = CLOSED[i - 1] == true
-            local leafC = if parkWest then (a + POST_W / 2 - openW / 6) else (b - POST_W / 2 + openW / 6)
-            -- The screen RUNS IN A TRACK and closes with a rail top and bottom. Its stiles used
-            -- to end at floor level with no bottom member, so the frame terminated into the floor
-            -- instead of closing against it — which reads as buried, because nothing caps it.
-            local RAIL_T = 0.16
-            local leafY0 = FLOOR + 0.1 -- the track it slides in
-            local leafH = HEAD_Y - leafY0
-            local leafCY = leafY0 + leafH / 2
-            -- The paper is INSET inside its own frame. At full leaf size its edges landed exactly on
-            -- the stiles', so the sheet was visible edge-on — a pane the same size as its sash.
-            -- Real shoji paper is glued behind the frame and stops short of it on every side.
-            add(
-                `DoorLeaf{i}`,
-                { leafW - 2 * 0.16, leafH - 2 * RAIL_T, 0.05 },
-                { leafC, leafCY, DOOR_Z },
-                paper,
-                "Fabric"
-            )
-            -- stiles, rails and a proper kumiko grid, all in the frame's dark wood
-            for k, sx in { leafC - leafW / 2 + 0.07, leafC + leafW / 2 - 0.07 } do
-                add(
-                    `DoorStile{i}_{k}`,
-                    { 0.14, leafH, 0.15 },
-                    { sx, leafCY, DOOR_Z },
-                    timber,
-                    "Wood",
-                    nil,
-                    FRAME_VAR
-                )
-            end
-            for k, ry in { leafY0 + RAIL_T / 2, HEAD_Y - RAIL_T / 2 } do
-                add(
-                    `DoorRail{i}_{k}`,
-                    { leafW, RAIL_T, 0.15 },
-                    { leafC, ry, DOOR_Z },
-                    timber,
-                    "Wood",
-                    nil,
-                    FRAME_VAR
-                )
-            end
-            local LAT_N_V, LAT_N_H = 5, 7
-            for k = 1, LAT_N_V do
-                add(
-                    `DoorLatV{i}_{k}`,
-                    { 0.075, leafH, 0.13 },
-                    { leafC - leafW / 2 + leafW * (k / (LAT_N_V + 1)), leafCY, DOOR_Z },
-                    timber,
-                    "Wood",
-                    nil,
-                    FRAME_VAR
-                )
-            end
-            for k = 1, LAT_N_H do
-                add(
-                    `DoorLatH{i}_{k}`,
-                    { leafW, 0.075, 0.13 },
-                    { leafC, leafY0 + leafH * (k / (LAT_N_H + 1)), DOOR_Z },
-                    timber,
-                    "Wood",
-                    nil,
-                    FRAME_VAR
-                )
-            end
         end
     end
 
@@ -638,112 +718,118 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
     -- north and south of it, and a strip along the east wall that keeps the wall standing on
     -- floor rather than on air. The floor NORTH of the well is the landing the stair arrives on.
     local uy = FLOOR + STOREY_H + SLAB_T / 2
-    add(
-        "UpperFloor",
-        { WELL_X0 - X0, SLAB_T, D },
-        { (X0 + WELL_X0) / 2, uy, CZ },
-        timber,
-        "Wood",
-        nil,
-        FRAME_VAR
-    )
-    add(
-        "UpperFloorNorth",
-        { X1 - WELL_X0, SLAB_T, WELL_Z0 - Z0 },
-        { (WELL_X0 + X1) / 2, uy, (Z0 + WELL_Z0) / 2 },
-        timber,
-        "Wood",
-        nil,
-        FRAME_VAR
-    )
-    add(
-        "UpperFloorSouth",
-        { X1 - WELL_X0, SLAB_T, Z1 - WELL_Z1 },
-        { (WELL_X0 + X1) / 2, uy, (WELL_Z1 + Z1) / 2 },
-        timber,
-        "Wood",
-        nil,
-        FRAME_VAR
-    )
-    -- TUCKED INTO THE WALL, not flush with it. The east wall's inner face and this strip's west
-    -- face both sat on x = STAIR_X1, both looking west into the stairwell — two coplanar faces
-    -- claiming one plane, which flickered exactly at attic-floor level as you climbed the stairs
-    -- and read as a horizontal beam laid against the wall. Starting the strip inside the wall
-    -- hides its face entirely; the wall itself fills the sliver, so nothing opens up.
-    local EDGE_TUCK = 0.08
-    add(
-        "UpperFloorEdge",
-        { X1 - STAIR_X1 - EDGE_TUCK, SLAB_T, WELL_Z1 - WELL_Z0 },
-        { (STAIR_X1 + EDGE_TUCK + X1) / 2, uy, (WELL_Z0 + WELL_Z1) / 2 },
-        timber,
-        "Wood",
-        nil,
-        FRAME_VAR
-    )
-    assert(
-        EDGE_TUCK < WALL_T,
-        "the floor strip is tucked deeper than the wall is thick — it would leave a slot at the well"
-    )
-
-    -- ----- the stair -----
-    -- Treads are edge to edge in plan (run == tread depth), so there is no gap to drop through
-    -- even though the risers are open. Two stringers carry them, pitched at the same angle the
-    -- treads climb. The stair's low end is at +Z, and by the sign convention above a POSITIVE
-    -- angle lowers the +Z end — the same trap that inverted the roof.
-    local stairDeg = math.deg(math.atan2(STAIR_RISE, STAIR_RUN))
-    local stairCX = (STAIR_X0 + STAIR_X1) / 2
-    for k = 1, STAIR_TREADS do
+    if shop.interior ~= "full" then
+        -- SHALLOW/NONE INTERIORS HAVE NO STAIR, SO THEY HAVE NO WELL: the storey floor is one
+        -- uncut board. The four-piece lay-up below exists only to go around a stairwell.
+        add("UpperFloor", { W, SLAB_T, D }, { CX, uy, CZ }, timber, "Wood", nil, FRAME_VAR)
+    else
         add(
-            `StairTread{k}`,
-            { TREAD_W, TREAD_T, STAIR_RUN },
-            { stairCX, FLOOR + k * STAIR_RISE - TREAD_T / 2, COUNTER_BACK_Z - (k - 0.5) * STAIR_RUN },
+            "UpperFloor",
+            { WELL_X0 - X0, SLAB_T, D },
+            { (X0 + WELL_X0) / 2, uy, CZ },
             timber,
             "Wood",
             nil,
-            STAIR_VAR
+            FRAME_VAR
         )
-    end
+        add(
+            "UpperFloorNorth",
+            { X1 - WELL_X0, SLAB_T, WELL_Z0 - Z0 },
+            { (WELL_X0 + X1) / 2, uy, (Z0 + WELL_Z0) / 2 },
+            timber,
+            "Wood",
+            nil,
+            FRAME_VAR
+        )
+        add(
+            "UpperFloorSouth",
+            { X1 - WELL_X0, SLAB_T, Z1 - WELL_Z1 },
+            { (WELL_X0 + X1) / 2, uy, (WELL_Z1 + Z1) / 2 },
+            timber,
+            "Wood",
+            nil,
+            FRAME_VAR
+        )
+        -- TUCKED INTO THE WALL, not flush with it. The east wall's inner face and this strip's west
+        -- face both sat on x = STAIR_X1, both looking west into the stairwell — two coplanar faces
+        -- claiming one plane, which flickered exactly at attic-floor level as you climbed the stairs
+        -- and read as a horizontal beam laid against the wall. Starting the strip inside the wall
+        -- hides its face entirely; the wall itself fills the sliver, so nothing opens up.
+        local EDGE_TUCK = 0.08
+        add(
+            "UpperFloorEdge",
+            { X1 - STAIR_X1 - EDGE_TUCK, SLAB_T, WELL_Z1 - WELL_Z0 },
+            { (STAIR_X1 + EDGE_TUCK + X1) / 2, uy, (WELL_Z0 + WELL_Z1) / 2 },
+            timber,
+            "Wood",
+            nil,
+            FRAME_VAR
+        )
+        assert(
+            EDGE_TUCK < WALL_T,
+            "the floor strip is tucked deeper than the wall is thick — it would leave a slot at the well"
+        )
 
-    -- THE NOSE LINE runs through the back-top corner of every tread, and the stair is laid out so
-    -- that it arrives at the upper floor's WALKING SURFACE exactly at the well's north edge. The
-    -- stringers follow that line, so they land on the floor rather than stopping a step short of
-    -- it — which is what they did, because they were built from the top TREAD instead.
-    local NOSE_Y0 = FLOOR + STAIR_RISE -- the line's height at z = COUNTER_BACK_Z
-    local noseRun = COUNTER_BACK_Z - WELL_Z0
-    assert(
-        math.abs((NOSE_Y0 + noseRun * (STAIR_RISE / STAIR_RUN)) - UPPER_SURFACE) < 1e-9,
-        "the stair does not land flush on the upper floor — the nose line misses the well's edge"
-    )
-    local rad = math.rad(stairDeg)
-    -- Dropped so the stringer's TOP FACE lies on the nose line. Measured vertically, a
-    -- perpendicular half-thickness is t/2 over cos(pitch) — at 48° that is half again as much
-    -- as t/2, and using t/2 directly buries the treads.
-    local stringerCY = (NOSE_Y0 + UPPER_SURFACE) / 2 - (STRINGER_H / 2) / math.cos(rad)
-    -- AND THEN EXTENDED, because the end is cut SQUARE to the run. A stringer whose top face
-    -- reaches the floor still stops short of it in the flesh: the square cut leaves the top corner
-    -- (H/2)*sin(pitch) back down the slope, a gap you can see from the landing and cannot see in
-    -- any number. Lengthening by (H/2)*tan(pitch), all of it at the top, walks that corner onto
-    -- the floor edge; the rest of the end face tucks up under the landing, which is where a real
-    -- stringer dies into its trimmer.
-    local topExtra = (STRINGER_H / 2) * math.tan(rad)
-    -- AND THE SAME ARITHMETIC AT THE FOOT, which was left undone: the square cut put the low end's
-    -- bottom corner at 113.25 against a floor of 113.10, so both stringers HOVERED an eighth of a
-    -- stud above the boards they were supposed to stand on. Bury the corner instead of touching
-    -- it — a joint that merely touches shows a seam the moment anything moves.
-    local STRINGER_BURY = 0.25
-    local footY = NOSE_Y0 - (STRINGER_H / 2) / math.cos(rad) - (STRINGER_H / 2) * math.cos(rad)
-    local bottomExtra = math.max(0, (footY - (FLOOR - STRINGER_BURY)) / math.sin(rad))
-    local stairLen = math.sqrt(noseRun * noseRun + (UPPER_SURFACE - NOSE_Y0) ^ 2) + topExtra + bottomExtra
-    -- Each extension grows the part by its full length but moves the centre by only half, and they
-    -- pull in opposite directions along the slope — so the net shift is their difference, halved.
-    local shift = (topExtra - bottomExtra) / 2
-    for _, s in { { "West", STAIR_X0 + STRINGER_T / 2 }, { "East", STAIR_X1 - STRINGER_T / 2 } } do
-        add(`StairStringer{s[1]}`, { STRINGER_T, STRINGER_H, stairLen }, {
-            s[2] :: number,
-            stringerCY + math.sin(rad) * shift,
-            (COUNTER_BACK_Z + WELL_Z0) / 2 - math.cos(rad) * shift,
-        }, timber, "Wood", rotX(stairDeg), STAIR_VAR)
-    end
+        -- ----- the stair -----
+        -- Treads are edge to edge in plan (run == tread depth), so there is no gap to drop through
+        -- even though the risers are open. Two stringers carry them, pitched at the same angle the
+        -- treads climb. The stair's low end is at +Z, and by the sign convention above a POSITIVE
+        -- angle lowers the +Z end — the same trap that inverted the roof.
+        local stairDeg = math.deg(math.atan2(STAIR_RISE, STAIR_RUN))
+        local stairCX = (STAIR_X0 + STAIR_X1) / 2
+        for k = 1, STAIR_TREADS do
+            add(
+                `StairTread{k}`,
+                { TREAD_W, TREAD_T, STAIR_RUN },
+                { stairCX, FLOOR + k * STAIR_RISE - TREAD_T / 2, COUNTER_BACK_Z - (k - 0.5) * STAIR_RUN },
+                timber,
+                "Wood",
+                nil,
+                STAIR_VAR
+            )
+        end
+
+        -- THE NOSE LINE runs through the back-top corner of every tread, and the stair is laid out so
+        -- that it arrives at the upper floor's WALKING SURFACE exactly at the well's north edge. The
+        -- stringers follow that line, so they land on the floor rather than stopping a step short of
+        -- it — which is what they did, because they were built from the top TREAD instead.
+        local NOSE_Y0 = FLOOR + STAIR_RISE -- the line's height at z = COUNTER_BACK_Z
+        local noseRun = COUNTER_BACK_Z - WELL_Z0
+        assert(
+            math.abs((NOSE_Y0 + noseRun * (STAIR_RISE / STAIR_RUN)) - UPPER_SURFACE) < 1e-9,
+            "the stair does not land flush on the upper floor — the nose line misses the well's edge"
+        )
+        local rad = math.rad(stairDeg)
+        -- Dropped so the stringer's TOP FACE lies on the nose line. Measured vertically, a
+        -- perpendicular half-thickness is t/2 over cos(pitch) — at 48° that is half again as much
+        -- as t/2, and using t/2 directly buries the treads.
+        local stringerCY = (NOSE_Y0 + UPPER_SURFACE) / 2 - (STRINGER_H / 2) / math.cos(rad)
+        -- AND THEN EXTENDED, because the end is cut SQUARE to the run. A stringer whose top face
+        -- reaches the floor still stops short of it in the flesh: the square cut leaves the top corner
+        -- (H/2)*sin(pitch) back down the slope, a gap you can see from the landing and cannot see in
+        -- any number. Lengthening by (H/2)*tan(pitch), all of it at the top, walks that corner onto
+        -- the floor edge; the rest of the end face tucks up under the landing, which is where a real
+        -- stringer dies into its trimmer.
+        local topExtra = (STRINGER_H / 2) * math.tan(rad)
+        -- AND THE SAME ARITHMETIC AT THE FOOT, which was left undone: the square cut put the low end's
+        -- bottom corner at 113.25 against a floor of 113.10, so both stringers HOVERED an eighth of a
+        -- stud above the boards they were supposed to stand on. Bury the corner instead of touching
+        -- it — a joint that merely touches shows a seam the moment anything moves.
+        local STRINGER_BURY = 0.25
+        local footY = NOSE_Y0 - (STRINGER_H / 2) / math.cos(rad) - (STRINGER_H / 2) * math.cos(rad)
+        local bottomExtra = math.max(0, (footY - (FLOOR - STRINGER_BURY)) / math.sin(rad))
+        local stairLen = math.sqrt(noseRun * noseRun + (UPPER_SURFACE - NOSE_Y0) ^ 2) + topExtra + bottomExtra
+        -- Each extension grows the part by its full length but moves the centre by only half, and they
+        -- pull in opposite directions along the slope — so the net shift is their difference, halved.
+        local shift = (topExtra - bottomExtra) / 2
+        for _, s in { { "West", STAIR_X0 + STRINGER_T / 2 }, { "East", STAIR_X1 - STRINGER_T / 2 } } do
+            add(`StairStringer{s[1]}`, { STRINGER_T, STRINGER_H, stairLen }, {
+                s[2] :: number,
+                stringerCY + math.sin(rad) * shift,
+                (COUNTER_BACK_Z + WELL_Z0) / 2 - math.cos(rad) * shift,
+            }, timber, "Wood", rotX(stairDeg), STAIR_VAR)
+        end
+    end -- interior == "full": the well-cut floor and the stair end here
 
     -- ----- the closed upper storey: kōshi lattice to the street, boards elsewhere -----
     -- THE UPPER STOREY HAD NO STREET WALL — just a row of lattice bars with the building's inside
@@ -950,19 +1036,23 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
     -- upper walls' OUTER faces — coplanar and same-facing, so they flickered on the street
     -- elevation. Buried is the intent; flush is a z-fight. The ends still sit a third of a stud
     -- inside each wall, so nothing opens up.
-    local TIE_TUCK = 1 / 12 -- one inch
-    local TIE_T, TIE_H = 0.55, 0.70
-    assert(TIE_TUCK < WALL_T, "the attic tie stops short of the wall it is meant to be buried in")
-    for _, side in { { "West", SX0 + WALL_T + TIE_T / 2 }, { "East", SX1 - WALL_T - TIE_T / 2 } } do
-        add(
-            `AtticTie{side[1]}`,
-            { TIE_T, TIE_H, (SZ1 - SZ0) - 2 * TIE_TUCK },
-            { side[2] :: number, EAVE_Y - TIE_H / 2, (SZ0 + SZ1) / 2 },
-            timber,
-            "Wood",
-            nil,
-            STAIR_VAR
-        )
+    -- Attic framing is INTERIOR: only a full interior has an attic anyone can climb to, so only
+    -- a full interior carries the beams that make it read as framed.
+    if shop.interior == "full" then
+        local TIE_TUCK = 1 / 12 -- one inch
+        local TIE_T, TIE_H = 0.55, 0.70
+        assert(TIE_TUCK < WALL_T, "the attic tie stops short of the wall it is meant to be buried in")
+        for _, side in { { "West", SX0 + WALL_T + TIE_T / 2 }, { "East", SX1 - WALL_T - TIE_T / 2 } } do
+            add(
+                `AtticTie{side[1]}`,
+                { TIE_T, TIE_H, (SZ1 - SZ0) - 2 * TIE_TUCK },
+                { side[2] :: number, EAVE_Y - TIE_H / 2, (SZ0 + SZ1) / 2 },
+                timber,
+                "Wood",
+                nil,
+                STAIR_VAR
+            )
+        end
     end
 
     -- ----- noren: three equal panels PER OPEN BAY -----
@@ -999,164 +1089,183 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
     -- is inviolable at ground level, the hem is at FLOOR + 4.2, and a hair over the line is still
     -- over it. The sway on top of this is clamped for the same reason.
     local NOREN_BELLY = -3.6
-    local segH = NOREN_H / NOREN_SEGS
-    for i = 1, FRONT_POSTS - 1 do
-        if not CLOSED[i] then
-            local a, b = postX[i], postX[i + 1]
-            local openW = (b - a) - POST_W
-            local panelW = openW / NOREN_PER_BAY - 0.16
-            for k = 1, NOREN_PER_BAY do
-                local t = (k - 0.5) / NOREN_PER_BAY
-                local px = a + POST_W / 2 + openW * t
-                -- Hang the chain: start at the rail and walk down, each segment's top sitting on
-                -- the one above so the panel stays joined however far it leans.
-                local hy, hz = NOREN_TOP, Z0 + 0.06
-                local segs = {}
-                for s = 1, NOREN_SEGS do
-                    -- Deterministic, integer-derived variation — no trig on a hash, so the asset
-                    -- hashes identically on arm64 and x86_64 (the CI drift check depends on it).
-                    local lean = NOREN_BELLY * (s / NOREN_SEGS) + ((i * 3 + k) % 3 - 1) * 0.35
-                    local lr = math.rad(lean)
-                    local dy, dz = math.cos(lr) * segH, -math.sin(lr) * segH
-                    table.insert(
-                        segs,
-                        Spec.part(`Seg{s}`, {
-                            Size = { panelW, segH, NOREN_T },
-                            CFrame = Spec.cframe({ px, hy - dy / 2, hz + dz / 2 }, rotX(lean)),
-                            Color = palette.vermilion,
-                            Material = "Fabric",
-                            -- Bare Fabric renders at Roblox's own tile scale, which on a panel
-                            -- this small is a weave the size of a fist. NorenCloth is the same
-                            -- pitch problem MachiyaPlaster solved for the render, and it fails
-                            -- SOFT: a place without the variant just shows plain Fabric.
-                            MaterialVariant = "NorenCloth",
-                            Transparency = NOREN_ALPHA,
-                            Tags = { "NorenSeg" },
-                            CanCollide = false,
-                            CanQuery = false,
-                            CanTouch = false,
-                            CastShadow = false,
-                        })
-                    )
-                    hy, hz = hy - dy, hz + dz
+    -- GENERALIZED FOR THE IDENTITY KIT (Task 3): the colour and the segment count are the
+    -- caller's; the hang itself — per-bay panels, the chain, the still-air pose — stays the
+    -- archetype's. Only meaningful over an OPEN frontage: a kōshi frontage has no doorway to
+    -- screen, and its postX/CLOSED are empty, so this emits nothing there by construction.
+    local function emitNoren(norenColour: { number }, nSegs: number)
+        if shop.frontage ~= "open" then
+            return
+        end
+        local segH = NOREN_H / nSegs
+        for i = 1, FRONT_POSTS - 1 do
+            if not CLOSED[i] then
+                local a, b = postX[i], postX[i + 1]
+                local openW = (b - a) - POST_W
+                local panelW = openW / NOREN_PER_BAY - 0.16
+                for k = 1, NOREN_PER_BAY do
+                    local t = (k - 0.5) / NOREN_PER_BAY
+                    local px = a + POST_W / 2 + openW * t
+                    -- Hang the chain: start at the rail and walk down, each segment's top sitting on
+                    -- the one above so the panel stays joined however far it leans.
+                    local hy, hz = NOREN_TOP, Z0 + 0.06
+                    local segs = {}
+                    for s = 1, nSegs do
+                        -- Deterministic, integer-derived variation — no trig on a hash, so the asset
+                        -- hashes identically on arm64 and x86_64 (the CI drift check depends on it).
+                        local lean = NOREN_BELLY * (s / nSegs) + ((i * 3 + k) % 3 - 1) * 0.35
+                        local lr = math.rad(lean)
+                        local dy, dz = math.cos(lr) * segH, -math.sin(lr) * segH
+                        table.insert(
+                            segs,
+                            Spec.part(`Seg{s}`, {
+                                Size = { panelW, segH, NOREN_T },
+                                CFrame = Spec.cframe({ px, hy - dy / 2, hz + dz / 2 }, rotX(lean)),
+                                Color = norenColour,
+                                Material = "Fabric",
+                                -- Bare Fabric renders at Roblox's own tile scale, which on a panel
+                                -- this small is a weave the size of a fist. NorenCloth is the same
+                                -- pitch problem MachiyaPlaster solved for the render, and it fails
+                                -- SOFT: a place without the variant just shows plain Fabric.
+                                MaterialVariant = "NorenCloth",
+                                Transparency = NOREN_ALPHA,
+                                Tags = { "NorenSeg" },
+                                CanCollide = false,
+                                CanQuery = false,
+                                CanTouch = false,
+                                CastShadow = false,
+                            })
+                        )
+                        hy, hz = hy - dy, hz + dz
+                    end
+                    table.insert(children, Spec.model(`Noren{i}_{k}`, segs))
                 end
-                table.insert(children, Spec.model(`Noren{i}_{k}`, segs))
             end
         end
     end
-
-    -- ----- the counter -----
-    add(
-        "Counter",
-        -- Spans only the OPEN bays now that the outer two are closed, and stands at the BACK of
-        -- the shop so the goods are behind it rather than on the street.
-        --
-        -- MEASURED FROM Z1, NOT Z0. It used to sit at Z0 + 4.6, which was the same place while the
-        -- shop was 8 deep and became a counter marooned in the middle of the street the moment the
-        -- frontage moved north. The counter belongs to the back wall; the customers get the rest.
-        { postX[FRONT_POSTS - 1] - postX[2] - POST_W, COUNTER_H, COUNTER_D },
-        { (postX[2] + postX[FRONT_POSTS - 1]) / 2, FLOOR + COUNTER_H / 2, COUNTER_Z },
-        timber,
-        "Wood",
-        nil,
-        FRAME_VAR
-    )
-
-    -- ----- the sign: ONE FRAMED BOARD -----
-    -- Three separate boards were a workaround for a bug: the glyphs were tiny because SizingMode
-    -- was ignoring PixelsPerStud, and splitting them was the only way to make each one big enough
-    -- to read. With the canvas fixed they no longer need to be split, so the sign is one board
-    -- again — dark ink on a light ground in a plain timber frame, which is what a kanban is.
-    -- Sized to the CHARACTERS, not to the building. At 0.62 of the frontage the board was half
-    -- empty and the name floated in the middle of it. Three glyphs on a 2.6-stud board want about
-    -- 3:1 — the text then fills ~86% of the canvas instead of 60%.
-    local SIGN_H = 2.6
-    local SIGN_W = SIGN_H * 3.0
-    local SIGN_Y = FLOOR + STOREY_H + UPPER_H / 2
-    local SIGN_Z = Z0 - 0.65 -- owner's gate: half a stud further out, so it reads off the facade
-    local FRAME_W = 0.32 -- the surround's member width
-    local FRAME_D = 0.34 -- deeper than the panel, so the frame stands proud of it
-
-    -- TILTED 15 DEGREES, TOP TOWARD THE PATH (owner's gate). A sign flat against the facade is
-    -- read edge-on by anyone standing under it; leaning the top out turns its face toward the
-    -- promenade below. By the rotX sign convention, tipping the TOP toward -Z (north, the street)
-    -- is a NEGATIVE angle.
-    local SIGN_TILT = -15
-    local ST = rotX(SIGN_TILT)
-    -- offsets in the board's own plane, rotated with it, so the frame stays on the board
-    local function signPos(dx: number, dy: number): { number }
-        return { CX + dx, SIGN_Y + ST[5] * dy, SIGN_Z + ST[8] * dy }
+    -- 花火屋's IDENTITY STAYS INLINE (Task 3 brief): the vermilion three-segment noren, the
+    -- counter and the kanban below belong to the firework shop's own full-interior build, not
+    -- to the kit — variant shells get theirs through shop.identity instead.
+    if shop.interior == "full" then
+        emitNoren(palette.vermilion, NOREN_SEGS)
     end
 
-    table.insert(
-        children,
-        Spec.part("Kanban", {
-            Size = { SIGN_W, SIGN_H, 0.11 }, -- owner's gate: half the first pass
-            CFrame = Spec.cframe({ CX, SIGN_Y, SIGN_Z }, ST),
-            -- A WHITE BOARD IN A DARK FRAME, as the reference shows. "The darker wood" meant the
-            -- SURROUND; I applied it to the backing as well and lost the sign. The board is
-            -- plaster and the letters are ink; only the frame is timber.
-            Color = paper,
-            Material = STUCCO_MAT,
-            MaterialVariant = STUCCO_VAR,
-            CanCollide = false,
-            CanQuery = false,
-            CanTouch = false,
-            CastShadow = false,
-            children = {
-                {
-                    name = "Face",
-                    className = "SurfaceGui",
-                    properties = {
-                        Face = "Front", -- -Z, which is north: onto the promenade
-                        -- SIZINGMODE IS THE WHOLE TRICK. It defaults to FixedSize, under which the
-                        -- canvas is CanvasSize (800x600) and PixelsPerStud is IGNORED — which is
-                        -- why an 80px glyph once rendered as a speck. In PixelsPerStud mode the
-                        -- canvas comes from the part, so the character fills its board.
-                        SizingMode = "PixelsPerStud",
-                        PixelsPerStud = 32,
-                        AlwaysOnTop = false,
-                        ZIndexBehavior = "Sibling",
-                    },
-                    children = {
-                        {
-                            name = "Text",
-                            className = "TextLabel",
-                            properties = {
-                                Size = { UDim2 = { { 1, 0 }, { 1, 0 } } },
-                                BackgroundTransparency = 1,
-                                Text = "花火屋",
-                                TextColor3 = ink, -- dark characters on the white board
-                                TextSize = 72,
-                                Font = "GothamBold",
+    -- ----- the counter -----
+    -- FULL INTERIORS ONLY: the counter is shop furniture, and it registers to the open bays —
+    -- a shallow or empty shell has neither the trade nor (under a kōshi frontage) the bays.
+    if shop.interior == "full" then
+        add(
+            "Counter",
+            -- Spans only the OPEN bays now that the outer two are closed, and stands at the BACK of
+            -- the shop so the goods are behind it rather than on the street.
+            --
+            -- MEASURED FROM Z1, NOT Z0. It used to sit at Z0 + 4.6, which was the same place while the
+            -- shop was 8 deep and became a counter marooned in the middle of the street the moment the
+            -- frontage moved north. The counter belongs to the back wall; the customers get the rest.
+            { postX[FRONT_POSTS - 1] - postX[2] - POST_W, COUNTER_H, COUNTER_D },
+            { (postX[2] + postX[FRONT_POSTS - 1]) / 2, FLOOR + COUNTER_H / 2, COUNTER_Z },
+            timber,
+            "Wood",
+            nil,
+            FRAME_VAR
+        )
+
+        -- ----- the sign: ONE FRAMED BOARD (inline identity — still inside the full-interior gate) -----
+        -- Three separate boards were a workaround for a bug: the glyphs were tiny because SizingMode
+        -- was ignoring PixelsPerStud, and splitting them was the only way to make each one big enough
+        -- to read. With the canvas fixed they no longer need to be split, so the sign is one board
+        -- again — dark ink on a light ground in a plain timber frame, which is what a kanban is.
+        -- Sized to the CHARACTERS, not to the building. At 0.62 of the frontage the board was half
+        -- empty and the name floated in the middle of it. Three glyphs on a 2.6-stud board want about
+        -- 3:1 — the text then fills ~86% of the canvas instead of 60%.
+        local SIGN_H = 2.6
+        local SIGN_W = SIGN_H * 3.0
+        local SIGN_Y = FLOOR + STOREY_H + UPPER_H / 2
+        local SIGN_Z = Z0 - 0.65 -- owner's gate: half a stud further out, so it reads off the facade
+        local FRAME_W = 0.32 -- the surround's member width
+        local FRAME_D = 0.34 -- deeper than the panel, so the frame stands proud of it
+
+        -- TILTED 15 DEGREES, TOP TOWARD THE PATH (owner's gate). A sign flat against the facade is
+        -- read edge-on by anyone standing under it; leaning the top out turns its face toward the
+        -- promenade below. By the rotX sign convention, tipping the TOP toward -Z (north, the street)
+        -- is a NEGATIVE angle.
+        local SIGN_TILT = -15
+        local ST = rotX(SIGN_TILT)
+        -- offsets in the board's own plane, rotated with it, so the frame stays on the board
+        local function signPos(dx: number, dy: number): { number }
+            return { CX + dx, SIGN_Y + ST[5] * dy, SIGN_Z + ST[8] * dy }
+        end
+
+        table.insert(
+            children,
+            Spec.part("Kanban", {
+                Size = { SIGN_W, SIGN_H, 0.11 }, -- owner's gate: half the first pass
+                CFrame = Spec.cframe({ CX, SIGN_Y, SIGN_Z }, ST),
+                -- A WHITE BOARD IN A DARK FRAME, as the reference shows. "The darker wood" meant the
+                -- SURROUND; I applied it to the backing as well and lost the sign. The board is
+                -- plaster and the letters are ink; only the frame is timber.
+                Color = paper,
+                Material = STUCCO_MAT,
+                MaterialVariant = STUCCO_VAR,
+                CanCollide = false,
+                CanQuery = false,
+                CanTouch = false,
+                CastShadow = false,
+                children = {
+                    {
+                        name = "Face",
+                        className = "SurfaceGui",
+                        properties = {
+                            Face = "Front", -- -Z, which is north: onto the promenade
+                            -- SIZINGMODE IS THE WHOLE TRICK. It defaults to FixedSize, under which the
+                            -- canvas is CanvasSize (800x600) and PixelsPerStud is IGNORED — which is
+                            -- why an 80px glyph once rendered as a speck. In PixelsPerStud mode the
+                            -- canvas comes from the part, so the character fills its board.
+                            SizingMode = "PixelsPerStud",
+                            PixelsPerStud = 32,
+                            AlwaysOnTop = false,
+                            ZIndexBehavior = "Sibling",
+                        },
+                        children = {
+                            {
+                                name = "Text",
+                                className = "TextLabel",
+                                properties = {
+                                    Size = { UDim2 = { { 1, 0 }, { 1, 0 } } },
+                                    BackgroundTransparency = 1,
+                                    Text = "花火屋",
+                                    TextColor3 = ink, -- dark characters on the white board
+                                    TextSize = 72,
+                                    Font = "GothamBold",
+                                },
                             },
                         },
                     },
                 },
-            },
-        })
-    )
-
-    -- The surround: four plain members, mitre-free, lapped at the corners the way a cheap shop
-    -- sign is actually made.
-    for _, m in
-        {
-            { "KanbanFrameTop", SIGN_W + 2 * FRAME_W, FRAME_W, 0, SIGN_H / 2 + FRAME_W / 2 },
-            { "KanbanFrameBottom", SIGN_W + 2 * FRAME_W, FRAME_W, 0, -(SIGN_H / 2 + FRAME_W / 2) },
-            { "KanbanFrameWest", FRAME_W, SIGN_H, -(SIGN_W / 2 + FRAME_W / 2), 0 },
-            { "KanbanFrameEast", FRAME_W, SIGN_H, SIGN_W / 2 + FRAME_W / 2, 0 },
-        }
-    do
-        add(
-            m[1] :: string,
-            { m[2] :: number, m[3] :: number, FRAME_D },
-            signPos(m[4] :: number, m[5] :: number),
-            timber,
-            "Wood",
-            ST,
-            FRAME_VAR
+            })
         )
-    end
+
+        -- The surround: four plain members, mitre-free, lapped at the corners the way a cheap shop
+        -- sign is actually made.
+        for _, m in
+            {
+                { "KanbanFrameTop", SIGN_W + 2 * FRAME_W, FRAME_W, 0, SIGN_H / 2 + FRAME_W / 2 },
+                { "KanbanFrameBottom", SIGN_W + 2 * FRAME_W, FRAME_W, 0, -(SIGN_H / 2 + FRAME_W / 2) },
+                { "KanbanFrameWest", FRAME_W, SIGN_H, -(SIGN_W / 2 + FRAME_W / 2), 0 },
+                { "KanbanFrameEast", FRAME_W, SIGN_H, SIGN_W / 2 + FRAME_W / 2, 0 },
+            }
+        do
+            add(
+                m[1] :: string,
+                { m[2] :: number, m[3] :: number, FRAME_D },
+                signPos(m[4] :: number, m[5] :: number),
+                timber,
+                "Wood",
+                ST,
+                FRAME_VAR
+            )
+        end
+    end -- interior == "full": counter + kanban (花火屋's inline identity) end here
 
     -- ----- the trigger volume -----
     -- Inset one stud from the frontage. See ShopThreshold.FRONT_INSET for why: flush with the
@@ -1182,7 +1291,294 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
         })
     )
 
-    return Spec.model(shop.name, children)
+    -- ===== the identity kit (Task 3) =====
+    -- shop.identity is OPTIONAL and so is every field inside it — 花火屋 passes nil and must
+    -- emit exactly what it always did (the byte gate on assets/Hanabiya.model.json holds that).
+    -- This is the contract Tasks 4–6 dress their shells through.
+    local identity = shop.identity
+    if identity then
+        if identity.noren then
+            -- the archetype's own hang, in the shop's colour
+            emitNoren(identity.noren.color, identity.noren.segments or 3)
+        end
+        if identity.chochin then
+            -- THE EAVE-CORNER PAIR, 花火屋's pattern (tools/studio/buildHanabiyaChochin.luau,
+            -- owner-tuned LS 0.65/0.9), restated as static specs: a hook under the eave's
+            -- outside corners, the sliced paper barrel with its gradient, ribs, caps, and the
+            -- glyph plates tagged RoundLantern so LanternController and PaperLanternDayNight
+            -- find them. NO TRIG — the barrel profile comes through math.sqrt only (IEEE-exact),
+            -- so the emitted floats are arch-stable for the genmodels drift check.
+            local CLS = 0.65 / 0.9 -- the owner's lantern scale: Rmax 0.9 -> 0.65
+            local Rmax, capR = 0.9 * CLS, 0.30 * CLS
+            local bodyH = 2.8 * CLS
+            local HOOK_DROP = 0.22
+            local CORNER_INSET = 0.35 -- back from the eave's edge, so they hang under it
+            local INK_C = { 0.18, 0.157, 0.118 } -- the recipe's rib/cap ink
+            local METAL_C = { 0.47, 0.478, 0.502 }
+            local PAPER_C = { 0.784, 0.667, 0.561 } -- warm cream, gradient-scaled per slice
+            -- the recipe's barrel silhouette: capR + (Rmax - capR) * sqrt(1 - d^6), d = |2t - 1|
+            local function profileR(tt: number): number
+                local d = math.abs(2 * tt - 1)
+                local d2 = d * d
+                return capR + (Rmax - capR) * math.sqrt(1 - d2 * d2 * d2)
+            end
+            local hangZ = (Z0 - EAVE_OVERHANG) + CORNER_INSET
+            -- The eave is a TILTED slab, so its underside is a plane, not a number: the mid-plane
+            -- drops HISASHI_DROP over EAVE_OVERHANG, and the vertical half-thickness of a tilted
+            -- slab is (t/2) / cos(pitch) = (t/2) * hisashiLen / EAVE_OVERHANG — sqrt, not trig.
+            local midY = FLOOR + STOREY_H - HISASHI_DROP * (Z0 - hangZ) / EAVE_OVERHANG
+            local armY = midY - (EAVE_T / 2) * (hisashiLen / EAVE_OVERHANG) - HOOK_DROP
+            local SLICES = 10
+            local lcY = armY - 0.44 * CLS - 0.06 - bodyH / 2
+            -- The owner ruled the corner hang MAY be low ("it's okay if they're low"): this
+            -- catches a lantern at chest height, not one you merely duck under.
+            local hemY = lcY - bodyH / 2 - 0.13 * CLS
+            assert(hemY - FLOOR >= 5.0, `chōchin hem {hemY} sits under 5 studs off the floor`)
+            local eaveHalfX = (W + 1.0) / 2 -- the Eave part's own extents, not the wall's
+            for _, corner in
+                { { "West", CX - eaveHalfX + CORNER_INSET }, { "East", CX + eaveHalfX - CORNER_INSET } }
+            do
+                local cnm, lx = corner[1] :: string, corner[2] :: number
+                local kids: { any } = {}
+                table.insert(
+                    kids,
+                    Spec.part("Hook", {
+                        Size = { 0.1, HOOK_DROP, 0.1 },
+                        CFrame = Spec.cframe({ lx, armY + HOOK_DROP / 2, hangZ }),
+                        Color = METAL_C,
+                        Material = "Metal",
+                        CanCollide = false,
+                        CanQuery = false,
+                        CanTouch = false,
+                        CastShadow = false,
+                    })
+                )
+                table.insert(
+                    kids,
+                    Spec.part("HangRod", {
+                        Shape = "Cylinder",
+                        Size = { 0.44 * CLS, 0.1, 0.1 },
+                        CFrame = Spec.cframe({ lx, armY - 0.22 * CLS, hangZ }, Spec.ROT.CYL_VERTICAL),
+                        Color = METAL_C,
+                        Material = "Metal",
+                        CanCollide = false,
+                        CanQuery = false,
+                        CanTouch = false,
+                        CastShadow = false,
+                    })
+                )
+                for i = 0, SLICES - 1 do
+                    local tt = (i + 0.5) / SLICES
+                    local r = profileR(tt)
+                    local d = math.abs(2 * tt - 1)
+                    local f = math.clamp(1 - 0.22 * d - (if tt > 0.5 then 0.15 * (2 * tt - 1) else 0), 0.4, 1)
+                    local isBody = i == SLICES // 2
+                    table.insert(
+                        kids,
+                        Spec.part(if isBody then "ChochinBody" else `ChochinSlice_{i}`, {
+                            Shape = "Cylinder",
+                            Size = { bodyH / SLICES * 1.15, 2 * r, 2 * r },
+                            CFrame = Spec.cframe(
+                                { lx, lcY + (tt - 0.5) * bodyH, hangZ },
+                                Spec.ROT.CYL_VERTICAL
+                            ),
+                            Color = { PAPER_C[1] * f, PAPER_C[2] * f, PAPER_C[3] * f },
+                            Material = "Neon",
+                            Transparency = 0.42,
+                            CanCollide = false,
+                            CanQuery = false,
+                            CanTouch = false,
+                            CastShadow = false,
+                            children = if isBody
+                                then {
+                                    {
+                                        name = "ChochinLight",
+                                        className = "PointLight",
+                                        properties = {
+                                            Color = { 1.0, 0.659, 0.376 },
+                                            Brightness = 1.1,
+                                            Range = 10,
+                                            Shadows = false,
+                                        },
+                                    },
+                                }
+                                else nil,
+                        })
+                    )
+                end
+                for j = 1, 8 do
+                    local tt = (j - 0.5) / 8
+                    local r = profileR(tt) + 0.05 * CLS
+                    table.insert(
+                        kids,
+                        Spec.part(`ChochinRib_{j}`, {
+                            Shape = "Cylinder",
+                            Size = { 0.035 * CLS, 2 * r, 2 * r },
+                            CFrame = Spec.cframe(
+                                { lx, lcY + (tt - 0.5) * bodyH, hangZ },
+                                Spec.ROT.CYL_VERTICAL
+                            ),
+                            Color = INK_C,
+                            Material = "Wood",
+                            CanCollide = false,
+                            CanQuery = false,
+                            CanTouch = false,
+                            CastShadow = false,
+                        })
+                    )
+                end
+                for _, cap in { { "CapTop", bodyH / 2 }, { "CapBottom", -bodyH / 2 } } do
+                    table.insert(
+                        kids,
+                        Spec.part(cap[1] :: string, {
+                            Shape = "Cylinder",
+                            Size = { 0.26 * CLS, 0.66 * CLS, 0.66 * CLS },
+                            CFrame = Spec.cframe(
+                                { lx, lcY + (cap[2] :: number), hangZ },
+                                Spec.ROT.CYL_VERTICAL
+                            ),
+                            Color = INK_C,
+                            Material = "Wood",
+                            CanCollide = false,
+                            CanQuery = false,
+                            CanTouch = false,
+                            CastShadow = false,
+                        })
+                    )
+                end
+                -- Glyph plates face ALONG the street (owner's gate on the Studio pair): the
+                -- promenade reads them from both directions; nobody stands inside looking out.
+                for _, pl in { { "GlyphPlateA", -1, 90 }, { "GlyphPlateB", 1, -90 } } do
+                    table.insert(
+                        kids,
+                        Spec.part(pl[1] :: string, {
+                            Size = { 1.2 * CLS, 1.6 * CLS, 0.05 },
+                            CFrame = Spec.cframe(
+                                { lx + (pl[2] :: number) * (Rmax + 0.04), lcY, hangZ },
+                                Spec.yaw(pl[3] :: number)
+                            ),
+                            Transparency = 1,
+                            CanCollide = false,
+                            CanQuery = false,
+                            CanTouch = false,
+                            CastShadow = false,
+                            Tags = { "RoundLantern" },
+                        })
+                    )
+                end
+                table.insert(children, Spec.model(`Chochin{cnm}`, kids))
+            end
+        end
+        if identity.board then
+            -- ONE BLANK BOARD, geometry only (the sports book carries no signage copy — the
+            -- wager-language ruling). On the frontage plane above the kamoi: back face ON the
+            -- plane, the board proud of it the way every timber face is, and aerial over the
+            -- promenade — its underside is the kamoi's 6.8, which clears an avatar.
+            local boardW = math.min(W * 0.55, 10)
+            local boardH = 1.8
+            add(
+                "SignBoard",
+                { boardW, boardH, 0.12 },
+                { CX, HEAD_Y + 0.4 + boardH / 2, Z0 - 0.06 },
+                paper,
+                STUCCO_MAT,
+                nil,
+                STUCCO_VAR
+            )
+        end
+        if identity.glow and shop.interior ~= "none" then
+            -- INTERIOR LIGHTING HOOKS: invisible anchored carriers, one PointLight each. An
+            -- interior of "none" is a sealed shell and gets no hooks — that is the brief's
+            -- ladder: none = shallow minus exactly these.
+            for i, gx in { CX - W / 4, CX + W / 4 } do
+                table.insert(
+                    children,
+                    Spec.part(`InteriorGlow_{i}`, {
+                        Size = { 0.5, 0.5, 0.5 },
+                        CFrame = Spec.cframe({ gx, FLOOR + STOREY_H * 0.6, CZ }),
+                        Transparency = 1,
+                        CanCollide = false,
+                        CanQuery = false,
+                        CanTouch = false,
+                        CastShadow = false,
+                        children = {
+                            {
+                                name = "Glow",
+                                className = "PointLight",
+                                properties = {
+                                    Color = identity.glow.color,
+                                    Brightness = identity.glow.brightness or 1.0,
+                                    Range = 14,
+                                    Shadows = false,
+                                },
+                            },
+                        },
+                    })
+                )
+            end
+        end
+        -- dress is called LAST of the kit so it sees a finished shell, and its parts land under
+        -- their own child model — kit dressing never interleaves with the archetype's parts.
+        if identity.dress then
+            local ctx = {
+                env = {
+                    x0 = X0,
+                    x1 = X1,
+                    z0 = Z0,
+                    z1 = Z1,
+                    floorY = FLOOR,
+                    w = W,
+                    d = D,
+                    cx = CX,
+                    cz = CZ,
+                },
+                palette = palette,
+                consts = { SLAB_T = SLAB_T, COUNTER_H = COUNTER_H, POST_W = POST_W, KOSHI_T = KOSHI_T },
+            }
+            table.insert(children, Spec.model("Dressing", identity.dress(ctx)))
+        end
+    end
+
+    local root = Spec.model(shop.name, children)
+
+    -- ===== the FINAL pass: yaw about the envelope centre =====
+    -- EVERY part turns, including those nested inside child models — the noren panels are
+    -- chains of segments in their own models, exactly the class of part a shallow walk misses
+    -- (see Machiya.spec's allParts note). Positions go through Spec.rotY about (CX, CZ),
+    -- rotations through Spec.rotYMat/matMul. yaw == 0 skips the pass entirely, so an unyawed
+    -- shop's floats are byte-for-byte untouched (the Hanabiya snapshot gate depends on that).
+    if shop.yaw ~= 0 then
+        local function turn(node: any)
+            local cf = node.properties and node.properties.CFrame
+            if cf then
+                local p = Spec.rotY({ cf[1] - CX, cf[2], cf[3] - CZ }, shop.yaw)
+                local r = Spec.matMul(
+                    Spec.rotYMat(shop.yaw),
+                    { cf[4], cf[5], cf[6], cf[7], cf[8], cf[9], cf[10], cf[11], cf[12] }
+                )
+                node.properties.CFrame = {
+                    p[1] + CX,
+                    p[2],
+                    p[3] + CZ,
+                    r[1],
+                    r[2],
+                    r[3],
+                    r[4],
+                    r[5],
+                    r[6],
+                    r[7],
+                    r[8],
+                    r[9],
+                }
+            end
+            for _, c in (node.children or {}) :: { any } do
+                turn(c)
+            end
+        end
+        turn(root)
+    end
+
+    return root
 end
 
 return Machiya

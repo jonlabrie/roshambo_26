@@ -572,3 +572,80 @@ describe("Machiya — the flush rule", function()
         end
     end)
 end)
+
+-- ===== Task 3: the archetype's variants =====
+-- A SYNTHETIC shell, deliberately not a surveyed one: these tests hold the archetype's
+-- branches (frontage/interior/yaw/identity), not any owner's envelope.
+local SHELL = {
+    name = "TestShell",
+    envelope = { x0 = 0, x1 = 16, z0 = 100, z1 = 113, floorY = 113.10 },
+    yaw = 0,
+    frontage = "open",
+    interior = "shallow",
+}
+describe("machiya variants", function()
+    test("shallow interior emits no stair, no attic, no well", function()
+        local m = Machiya.build(ZenDojo.palette, ArenaLayout, SHELL)
+        for _, p in allParts(m) do
+            expect(string.find(p.name, "Stair") == nil).toBe(true)
+            expect(string.find(p.name, "Attic") == nil).toBe(true)
+        end
+    end)
+    test("koshi frontage closes the street wall and opens nothing", function()
+        local closed = table.clone(SHELL)
+        closed.frontage = "koshi"
+        closed.interior = "none"
+        local m = Machiya.build(ZenDojo.palette, ArenaLayout, closed :: any)
+        local sawKoshi = false
+        for _, p in allParts(m) do
+            if string.find(p.name, "KoshiFront") then
+                sawKoshi = true
+            end
+            expect(string.find(p.name, "Counter") == nil).toBe(true)
+        end
+        expect(sawKoshi).toBe(true)
+    end)
+    test("yaw rotates every part about the envelope centre", function()
+        local turned = table.clone(SHELL)
+        turned.yaw = 90
+        local m0 = Machiya.build(ZenDojo.palette, ArenaLayout, SHELL)
+        local m1 = Machiya.build(ZenDojo.palette, ArenaLayout, turned :: any)
+        local a = allParts(m0)[1].properties.CFrame
+        local b = allParts(m1)[1].properties.CFrame
+        -- centre (8, 106.5): x' = cx + (z - cz), z' = cz - (x - cx) for +90°
+        expect(b[1]).toBeCloseTo(8 + (a[3] - 106.5), 0.01)
+        expect(b[3]).toBeCloseTo(106.5 - (a[1] - 8), 0.01)
+    end)
+    -- The brief's yaw test reads part [1], which is the FloorSlab — dead on the envelope
+    -- centre, so a yaw pass that silently did nothing would still pass it. This one holds
+    -- EVERY part, nested noren segments included (the exact class of miss allParts exists
+    -- to catch), and checks the rotation matrix turned too.
+    test("yaw carries EVERY part, nested noren segments included", function()
+        local flat = table.clone(SHELL)
+        flat.interior = "full" -- full interior so the nested Noren models exist
+        local spun = table.clone(flat)
+        spun.yaw = 90
+        local m0 = Machiya.build(ZenDojo.palette, ArenaLayout, flat :: any)
+        local m1 = Machiya.build(ZenDojo.palette, ArenaLayout, spun :: any)
+        -- the nested subject is actually present
+        local sawNoren = false
+        for _, c in m1.children do
+            if string.find(c.name, "Noren") then
+                sawNoren = true
+            end
+        end
+        expect(sawNoren).toBe(true)
+        local A, B = allParts(m0), allParts(m1)
+        expect(#A).toBe(#B)
+        local cx, cz = 8, 106.5
+        for i, pa in A do
+            local ca, cb = pa.properties.CFrame, B[i].properties.CFrame
+            expect(cb[1]).toBeCloseTo(cx + (ca[3] - cz), 0.01)
+            expect(cb[2]).toBeCloseTo(ca[2], 0.01)
+            expect(cb[3]).toBeCloseTo(cz - (ca[1] - cx), 0.01)
+            -- rotation: R' = Ry(90) * R, checked on the top row (r00' = -r20, r02' = r22)
+            expect(cb[4]).toBeCloseTo(-ca[10], 0.01)
+            expect(cb[6]).toBeCloseTo(ca[12], 0.01)
+        end
+    end)
+end)
