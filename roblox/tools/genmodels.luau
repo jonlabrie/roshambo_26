@@ -54,6 +54,7 @@ local OUTPUTS: { [string]: any } = {
     ["FallsDock"] = FallsDock.build(ZenDojo.palette, ArenaLayout),
     ["Karesansui"] = Karesansui.build(ZenDojo.palette, ArenaLayout),
     ["Hanabiya"] = Machiya.build(ZenDojo.palette, ArenaLayout, MachiyaShops.hanabiya),
+    ["MachiyaApparel"] = Machiya.build(ZenDojo.palette, ArenaLayout, MachiyaShops.apparel),
     ["Torii"] = Torii.build(ZenDojo.palette, ArenaLayout),
 }
 

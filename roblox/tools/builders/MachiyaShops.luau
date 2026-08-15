@@ -3,6 +3,8 @@
 -- docs/superpowers/specs/2026-08-15-machiya-row-design.md). EVERY envelope here is
 -- the OWNER'S, measured from a holdout/massing block in Studio and read back as
 -- literals. Do not re-derive them from anything.
+local Spec = require("./Spec")
+
 local MachiyaShops = {}
 
 export type Shop = {
@@ -63,6 +65,206 @@ MachiyaShops.apparel = {
     yaw = 0,
     frontage = "open",
     interior = "shallow",
+    identity = {
+        -- Deep indigo, the traditional apparel-shop noren. NOT from ZenDojo.palette: its only
+        -- blue is `water` { 0.20, 0.35, 0.43 }, a mid teal, not a deep blue — so this is the
+        -- design brief's fallback literal, held here for the owner to retune at the gate.
+        noren = { color = { 0.16, 0.18, 0.32 }, segments = 5 },
+        chochin = true,
+        -- Blank timber kanban above the kamoi — the glyph-pipeline texture is a gate
+        -- follow-up with the owner, not this task.
+        board = true,
+        glow = { color = { 1.0, 0.85, 0.6 }, brightness = 1.2 },
+        dress = function(ctx: any): { any }
+            local env, palette = ctx.env, ctx.palette
+            local FLOOR = env.floorY
+            local out: { any } = {}
+
+            -- The archetype's frontage planes, restated (Machiya.luau): 5 posts at
+            -- t = (i-1)/4 across [x0, x1] make 4 bays; the OUTER two are closed, so the
+            -- two open bays — trivially "the two westmost open bays" — are bays 2 and 3.
+            local bay2CX = env.x0 + env.w * 0.375
+            local bay3CX = env.x0 + env.w * 0.625
+            -- WallBack's INNER face: STUCCO_SETBACK 0.30 + WALL_T 0.5 off z1, the
+            -- archetype's own planes — the shelf registers to the BUILT wall, not to the
+            -- envelope (docs/wiki/practice/roblox-walls-register-to-structure).
+            local wallInnerZ = env.z1 - 0.8
+
+            -- ----- two kimono racks, one per open bay, 1.2 inside the frontage plane -----
+            -- The bays are ADJACENT (6.18 wide each), so the racks are sized to their bay:
+            -- posts 5.7 apart (a 6.9 span at the design's 2.2-wide cloths would have run the
+            -- two racks' members into each other at the shared mid-post), and the cloths are
+            -- THINNED to 1.7 — the constraint's rule: thin it, never push it through a wall
+            -- or a neighbour. Rail and cloth are non-colliding so the open bays STAY doors;
+            -- the posts collide, like furniture you walk around.
+            local rackZ = env.z0 + 1.2
+            local POST = 0.3
+            local POST_H = 5.5
+            local RACK_SPAN = 5.7 -- post centre to post centre
+            for r, rackCX in { bay2CX, bay3CX } do
+                local kids: { any } = {}
+                for _, side in { { "W", -1 }, { "E", 1 } } do
+                    table.insert(
+                        kids,
+                        Spec.part(`RackPost{side[1]}`, {
+                            Size = { POST, POST_H, POST },
+                            CFrame = Spec.cframe({
+                                rackCX + (side[2] :: number) * RACK_SPAN / 2,
+                                FLOOR + POST_H / 2,
+                                rackZ,
+                            }),
+                            Color = palette.timber,
+                            Material = "Wood",
+                        })
+                    )
+                end
+                -- rail ends flush with the post OUTER faces; top flush with the post tops
+                table.insert(
+                    kids,
+                    Spec.part("RackRail", {
+                        Size = { RACK_SPAN + POST, 0.2, 0.2 },
+                        CFrame = Spec.cframe({ rackCX, FLOOR + POST_H - 0.1, rackZ }),
+                        Color = palette.timber,
+                        Material = "Wood",
+                        CanCollide = false, -- at 5.4 it would clothesline a 6-stud avatar entering the bay
+                        CanQuery = false,
+                        CanTouch = false,
+                    })
+                )
+                for i = 1, 3 do
+                    -- hem 1.5 off the floor: hung cloth, not a curtain wall
+                    table.insert(
+                        kids,
+                        Spec.part(`RackCloth_{i}`, {
+                            Size = { 1.7, 3.8, 0.15 },
+                            CFrame = Spec.cframe({ rackCX + (i - 2) * 1.8, FLOOR + 3.4, rackZ }),
+                            Color = if (r + i) % 2 == 0 then palette.vermilion else palette.water,
+                            Material = "Fabric",
+                            CanCollide = false,
+                            CanQuery = false,
+                            CanTouch = false,
+                        })
+                    )
+                end
+                table.insert(out, Spec.model(if r == 1 then "KimonoRackWest" else "KimonoRackEast", kids))
+            end
+
+            -- ----- the counter: 花火屋's rule, 花火屋's number -----
+            -- COUNTER_H from the archetype's consts; 2.0 deep; 60% of the envelope width;
+            -- centre 4.4 off the back wall (COUNTER_STANDOFF, measured to the CENTRE,
+            -- exactly as Machiya.luau does it).
+            local counterW = env.w * 0.6
+            local counterZ = env.z1 - 4.4
+            table.insert(
+                out,
+                Spec.part("Counter", {
+                    Size = { counterW, ctx.consts.COUNTER_H, 2.0 },
+                    CFrame = Spec.cframe({ env.cx, FLOOR + ctx.consts.COUNTER_H / 2, counterZ }),
+                    Color = palette.timber,
+                    Material = "Wood",
+                })
+            )
+
+            -- ----- the fold table, mid-floor -----
+            -- Mid-CUSTOMER-floor: halfway between the rack plane and the counter's front
+            -- face, not the envelope's cz (which sits 1.2 off the counter — a table there
+            -- pokes into it).
+            local TOP_T = 0.2
+            local tableZ = (rackZ + (counterZ - 1.0)) / 2
+            local tKids: { any } = {}
+            table.insert(
+                tKids,
+                Spec.part("TableTop", {
+                    Size = { 4.0, TOP_T, 2.6 },
+                    CFrame = Spec.cframe({ env.cx, FLOOR + 2.5 - TOP_T / 2, tableZ }),
+                    Color = palette.timber,
+                    Material = "Wood",
+                })
+            )
+            local LEG = 0.25
+            local legH = 2.5 - TOP_T
+            for _, corner in { { -1, -1 }, { 1, -1 }, { -1, 1 }, { 1, 1 } } do
+                -- leg outer faces flush with the top's edges (flush-outside-edges)
+                table.insert(
+                    tKids,
+                    Spec.part(`TableLeg_{corner[1]}_{corner[2]}`, {
+                        Size = { LEG, legH, LEG },
+                        CFrame = Spec.cframe({
+                            env.cx + corner[1] * (2.0 - LEG / 2),
+                            FLOOR + legH / 2,
+                            tableZ + corner[2] * (1.3 - LEG / 2),
+                        }),
+                        Color = palette.timber,
+                        Material = "Wood",
+                    })
+                )
+            end
+            for i, st in { { -1.35, 0.45 }, { 0.0, -0.35 }, { 1.35, 0.25 } } do
+                table.insert(
+                    tKids,
+                    Spec.part(`FoldedCloth_{i}`, {
+                        Size = { 0.9, 0.5, 0.6 },
+                        CFrame = Spec.cframe({ env.cx + st[1], FLOOR + 2.5 + 0.25, tableZ + st[2] }),
+                        Color = if i % 2 == 1 then palette.vermilion else palette.water,
+                        Material = "Fabric",
+                    })
+                )
+            end
+            table.insert(out, Spec.model("FoldTable", tKids))
+
+            -- ----- the rear shelf, full counter width, back face ON the wall's inner face -----
+            local SHELF_D = 1.2
+            local shelfZ = wallInnerZ - SHELF_D / 2
+            local sKids: { any } = {}
+            table.insert(
+                sKids,
+                Spec.part("ShelfBoard", {
+                    Size = { counterW, 0.4, SHELF_D },
+                    CFrame = Spec.cframe({ env.cx, FLOOR + 5.5, shelfZ }),
+                    Color = palette.timber,
+                    Material = "Wood",
+                })
+            )
+            -- two brackets under it, against the wall — a board 5.5 up with nothing holding
+            -- it reads as a floater
+            for _, side in { -1, 1 } do
+                table.insert(
+                    sKids,
+                    Spec.part(`ShelfBracket_{side}`, {
+                        Size = { 0.3, 0.3, 1.0 },
+                        CFrame = Spec.cframe({
+                            env.cx + side * (counterW / 2 - 0.7),
+                            FLOOR + 5.5 - 0.2 - 0.15,
+                            wallInnerZ - 0.5,
+                        }),
+                        Color = palette.timber,
+                        Material = "Wood",
+                    })
+                )
+            end
+            for i = 1, 5 do
+                table.insert(
+                    sKids,
+                    Spec.part(`ClothBolt_{i}`, {
+                        Size = { 0.8, 0.8, 0.8 },
+                        CFrame = Spec.cframe({
+                            env.cx + (i - 3) * (counterW - 1.0) / 5,
+                            FLOOR + 5.5 + 0.2 + 0.4,
+                            shelfZ,
+                        }),
+                        Color = if i == 3
+                            then palette.gold
+                            elseif i % 2 == 1 then palette.vermilion
+                            else palette.water,
+                        Material = "Fabric",
+                    })
+                )
+            end
+            table.insert(out, Spec.model("RearShelf", sKids))
+
+            return out
+        end,
+    },
 } :: Shop
 
 -- Machiya_4 -> ACCESSORIES. pivot(24.34,119.59,42.96) size(16.63,14.92,13.24)

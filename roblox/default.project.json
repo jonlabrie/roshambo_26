@@ -59,6 +59,7 @@
                 "FallsDock": { "$path": "assets/FallsDock.model.json" },
                 "Karesansui": { "$path": "assets/Karesansui.model.json" },
                 "Hanabiya": { "$path": "assets/Hanabiya.model.json" },
+                "MachiyaApparel": { "$path": "assets/MachiyaApparel.model.json" },
                 "Torii": { "$path": "assets/Torii.model.json" },
                 "ArenaSpawn": {
                     "$className": "SpawnLocation",
