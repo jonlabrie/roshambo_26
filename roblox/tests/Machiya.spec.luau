@@ -2,10 +2,11 @@
 local harness = require("./harness")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 local Machiya = require("../tools/builders/Machiya")
+local MachiyaShops = require("../tools/builders/MachiyaShops")
 local ZenDojo = require("../src/shared/themes/ZenDojo")
 local ArenaLayout = require("../tools/builders/ArenaLayout")
 
-local model = Machiya.build(ZenDojo.palette, ArenaLayout)
+local model = Machiya.build(ZenDojo.palette, ArenaLayout, MachiyaShops.hanabiya)
 
 -- THE OWNER'S TRANSFORM, read back from the holdout block they placed in Studio 2026-08-05.
 -- These are not proposals; a change here means the building moved.

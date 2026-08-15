@@ -15,197 +15,202 @@ local L = require("./ArenaLayout")
 
 local Machiya = {}
 
--- ===== the owner's envelope =====
-local X0, X1 = -1.67, 16.26 -- west, east
--- DEEPENED 2026-08-13, front edge only: z44 -> z36. The shop held about three people, because a
--- counter 4.6 studs in left barely three studs of floor to stand on. The back is fixed — it is the
--- terrain cut — so the depth had to come off the front, and it does so at the owner's direction:
--- the karesansui is to be reduced to the shōrō's own footprint, which gives the promenade back
--- more than this takes. Until that lands the street is narrower here; the eave's encroachment is
--- still aerial and still clears an avatar, which the tests hold.
-local Z0, Z1 = 36.00, 52.00 -- frontage (north, onto the promenade), back (south, into the cut)
-local FLOOR = 113.10 -- finished floor, = the karesansui datum
+function Machiya.build(palette: any, _layout: any, shop: any): any
+    assert(
+        shop.frontage == "open" and shop.interior == "full" and shop.yaw == 0,
+        "only the hanabiya configuration is implemented until Task 3"
+    )
 
--- THE HOLDOUT'S TOP IS RETIRED (owner: "approximate, and can be safely ignored"). The height now
--- comes from the storeys, and the REAL constraint is the one that always mattered: the shop must
--- stay clearly subordinate to the bell tower. TOP is derived at the bottom of this block and
--- checked against these two numbers, so growing a storey can never quietly close the gap.
---
--- THE TOWER IS A STACK, AND THIS USED TO BE A LITERAL HERE THAT NAMED ITS MIDDLE. It was 136.5 —
--- the top of the Shoro MODEL — while the tower is seven models and the drum storey stands on the
--- shōrō's roof and carries on up. The error was 17 studs and it ran the wrong way: it made the
--- shop look like it was crowding a tower it cleared easily.
---
--- So it is no longer a literal here at all. ArenaLayout.towerTopY is the one authority, and a test
--- rebuilds the tower and checks it — which matters, because the drum's roof was pitched up and
--- given a sōrin on 2026-08-14 and the number moved again, from 153.54 to 168.67.
-local SHORO_TOP = L.towerTopY
--- The OWNER'S number, from the spec: the shop tops "9 studs subordinate to the bell tower, which
--- is the relationship the square depends on." This used to be 5.0 — a floor I invented when the
--- holdout's top was retired, and then quoted back as though it were a gate they had set.
-local MIN_SHORO_GAP = 9.0
+    -- ===== the owner's envelope =====
+    local X0, X1 = shop.envelope.x0, shop.envelope.x1 -- west, east
+    -- DEEPENED 2026-08-13, front edge only: z44 -> z36. The shop held about three people, because a
+    -- counter 4.6 studs in left barely three studs of floor to stand on. The back is fixed — it is the
+    -- terrain cut — so the depth had to come off the front, and it does so at the owner's direction:
+    -- the karesansui is to be reduced to the shōrō's own footprint, which gives the promenade back
+    -- more than this takes. Until that lands the street is narrower here; the eave's encroachment is
+    -- still aerial and still clears an avatar, which the tests hold.
+    local Z0, Z1 = shop.envelope.z0, shop.envelope.z1 -- frontage (north, onto the promenade), back (south, into the cut)
+    local FLOOR = shop.envelope.floorY -- finished floor, = the karesansui datum
 
-local W = X1 - X0
-local D = Z1 - Z0
-local CX, CZ = (X0 + X1) / 2, (Z0 + Z1) / 2
+    -- THE HOLDOUT'S TOP IS RETIRED (owner: "approximate, and can be safely ignored"). The height now
+    -- comes from the storeys, and the REAL constraint is the one that always mattered: the shop must
+    -- stay clearly subordinate to the bell tower. TOP is derived at the bottom of this block and
+    -- checked against these two numbers, so growing a storey can never quietly close the gap.
+    --
+    -- THE TOWER IS A STACK, AND THIS USED TO BE A LITERAL HERE THAT NAMED ITS MIDDLE. It was 136.5 —
+    -- the top of the Shoro MODEL — while the tower is seven models and the drum storey stands on the
+    -- shōrō's roof and carries on up. The error was 17 studs and it ran the wrong way: it made the
+    -- shop look like it was crowding a tower it cleared easily.
+    --
+    -- So it is no longer a literal here at all. ArenaLayout.towerTopY is the one authority, and a test
+    -- rebuilds the tower and checks it — which matters, because the drum's roof was pitched up and
+    -- given a sōrin on 2026-08-14 and the number moved again, from 153.54 to 168.67.
+    local SHORO_TOP = L.towerTopY
+    -- The OWNER'S number, from the spec: the shop tops "9 studs subordinate to the bell tower, which
+    -- is the relationship the square depends on." This used to be 5.0 — a floor I invented when the
+    -- holdout's top was retired, and then quoted back as though it were a gate they had set.
+    local MIN_SHORO_GAP = 9.0
 
--- ===== storey heights, derived from the envelope so they cannot drift out of it =====
-local SLAB_T = 0.6 -- the raised timber floor, recipe §2's deck slab
-local STOREY_H = 9.0 -- ground storey (owner's gate: +3; the shop read squat under its own upper floor)
--- 5.0, up a stud at the owner's gate: at 4.0 a player climbing the stair put their head through
--- the roof, and in first person you could see sky through the ceiling. The attic was simply
--- shorter than a person and nothing measured it. The stud comes from HERE rather than from a
--- lower attic floor because lowering the floor means shortening the ground storey (dropping it
--- alone drops the eave with it and gains nothing) — and at STOREY_H 8.0 the shopfront's shoji
--- transom collapses to zero height, the kamoi being fixed at 6.8 for avatar clearance.
-local UPPER_H = 5.0 -- the closed lattice storey
-local EAVE_Y = FLOOR + STOREY_H + UPPER_H -- where the roof springs
-local ROOF_T = 0.25 -- roof and eave both halved at the owner's gate: a kawara edge, not a slab
-local EAVE_T = 0.25
--- Less the slab thickness. A tilted slab meeting at the ridge puts its upper CORNER above the
--- ridge line by roughly cos(pitch) * thickness/2, so a rise of exactly TOP - EAVE_Y overshoots the
--- owner's top by ~0.1 studs. Trivial against the 9-stud gap to the shōrō, but TOP should mean the
--- top — otherwise the envelope test has to tolerate a fudge, and a tolerated fudge grows.
-local ROOF_RISE = 4.01 -- the pitch, now an input rather than whatever was left under a fixed top
-local TOP = EAVE_Y + ROOF_RISE + ROOF_T -- derived; the slab's corner at the ridge is the true top
--- NOT A CLEARANCE — the two buildings stand 15.9 studs apart in z and nothing overhangs anything.
--- This is about the SKYLINE: the bell tower is meant to read as the tallest thing in the square.
--- The shop tops at 131.36 and clears the tower comfortably. There is no tension here, and the old
--- message said "crowds", which read as a collision and sent me chasing one that does not exist.
-assert(
-    TOP <= SHORO_TOP - MIN_SHORO_GAP,
-    `machiya top {TOP} reads too tall beside the bell tower's {SHORO_TOP}`
-)
+    local W = X1 - X0
+    local D = Z1 - Z0
+    local CX, CZ = (X0 + X1) / 2, (Z0 + Z1) / 2
 
--- The eave overhangs the frontage by this much. THIS IS THE ONE DELIBERATE ENCROACHMENT on the
--- reserved promenade, and it is aerial: its underside sits a full storey up, so nothing at
--- ground level enters the corridor. Without it the building has no shopfront shadow and reads
--- as a shed.
-local EAVE_OVERHANG = 2.5
--- THE MAIN ROOF COVERS THE UPPER STOREY ONLY (owner's gate). It used to spring from the hisashi's
--- outer edge, so one roof plane ran from the ridge all the way out over the shopfront — the
--- building read as a single shed rather than as a two-storey machiya with a shop under a separate
--- eave. Now it overhangs the WALLS by ROOF_EAVE and no further; the hisashi is its own roof.
-local ROOF_EAVE = 0.8
-local ROOF_RIDGE_Z = (Z0 + Z1) / 2
+    -- ===== storey heights, derived from the envelope so they cannot drift out of it =====
+    local SLAB_T = 0.6 -- the raised timber floor, recipe §2's deck slab
+    local STOREY_H = (shop.storeys and shop.storeys.ground) or 9.0 -- ground storey (owner's gate: +3; the shop read squat under its own upper floor)
+    -- 5.0, up a stud at the owner's gate: at 4.0 a player climbing the stair put their head through
+    -- the roof, and in first person you could see sky through the ceiling. The attic was simply
+    -- shorter than a person and nothing measured it. The stud comes from HERE rather than from a
+    -- lower attic floor because lowering the floor means shortening the ground storey (dropping it
+    -- alone drops the eave with it and gains nothing) — and at STOREY_H 8.0 the shopfront's shoji
+    -- transom collapses to zero height, the kamoi being fixed at 6.8 for avatar clearance.
+    local UPPER_H = (shop.storeys and shop.storeys.upper) or 5.0 -- the closed lattice storey
+    local EAVE_Y = FLOOR + STOREY_H + UPPER_H -- where the roof springs
+    local ROOF_T = 0.25 -- roof and eave both halved at the owner's gate: a kawara edge, not a slab
+    local EAVE_T = 0.25
+    -- Less the slab thickness. A tilted slab meeting at the ridge puts its upper CORNER above the
+    -- ridge line by roughly cos(pitch) * thickness/2, so a rise of exactly TOP - EAVE_Y overshoots the
+    -- owner's top by ~0.1 studs. Trivial against the 9-stud gap to the shōrō, but TOP should mean the
+    -- top — otherwise the envelope test has to tolerate a fudge, and a tolerated fudge grows.
+    local ROOF_RISE = 4.01 -- the pitch, now an input rather than whatever was left under a fixed top
+    local TOP = EAVE_Y + ROOF_RISE + ROOF_T -- derived; the slab's corner at the ridge is the true top
+    -- NOT A CLEARANCE — the two buildings stand 15.9 studs apart in z and nothing overhangs anything.
+    -- This is about the SKYLINE: the bell tower is meant to read as the tallest thing in the square.
+    -- The shop tops at 131.36 and clears the tower comfortably. There is no tension here, and the old
+    -- message said "crowds", which read as a collision and sent me chasing one that does not exist.
+    assert(
+        TOP <= SHORO_TOP - MIN_SHORO_GAP,
+        `machiya top {TOP} reads too tall beside the bell tower's {SHORO_TOP}`
+    )
 
--- 0.7, not the recipe's 1.125. Deck posts carry a platform over a drop and are sized for it;
--- a shopfront post is a slender column standing on its own floor, and at 1.125 across a 19-stud
--- frontage the bays read as a fence rather than an opening. (Owner's gate: "too thick".)
-local POST_W = 0.49 -- owner's gate: 70% of 0.7; six posts at deck weight read as a fence
-local GIRDER_H, GIRDER_W = 1.2, 0.825
-local WALL_T = 0.5
--- Concrete carrying MachiyaPlaster (a clone of the unused ZenMortar1 at 1.5 studs/tile). Bare
--- Sandstone renders at Roblox's own tile scale, which on a wall reads as boulders rather than
--- render. The variant is the shop's OWN, so retuning its pitch cannot disturb the cement paths.
-local STUCCO_MAT = "Concrete"
-local STUCCO_VAR = "MachiyaPlaster"
+    -- The eave overhangs the frontage by this much. THIS IS THE ONE DELIBERATE ENCROACHMENT on the
+    -- reserved promenade, and it is aerial: its underside sits a full storey up, so nothing at
+    -- ground level enters the corridor. Without it the building has no shopfront shadow and reads
+    -- as a shed.
+    local EAVE_OVERHANG = 2.5
+    -- THE MAIN ROOF COVERS THE UPPER STOREY ONLY (owner's gate). It used to spring from the hisashi's
+    -- outer edge, so one roof plane ran from the ridge all the way out over the shopfront — the
+    -- building read as a single shed rather than as a two-storey machiya with a shop under a separate
+    -- eave. Now it overhangs the WALLS by ROOF_EAVE and no further; the hisashi is its own roof.
+    local ROOF_EAVE = 0.8
+    local ROOF_RIDGE_Z = (Z0 + Z1) / 2
 
--- STUCCO SITS BACK; TIMBER STANDS PROUD. Everything was flush at the frontage plane, so the frame
--- and the render were coplanar and the timber simply disappeared into the wall. A timber-framed
--- building only reads if the frame is in front of the panel it holds.
-local STUCCO_SETBACK = 0.30
+    -- 0.7, not the recipe's 1.125. Deck posts carry a platform over a drop and are sized for it;
+    -- a shopfront post is a slender column standing on its own floor, and at 1.125 across a 19-stud
+    -- frontage the bays read as a fence rather than an opening. (Owner's gate: "too thick".)
+    local POST_W = 0.49 -- owner's gate: 70% of 0.7; six posts at deck weight read as a fence
+    local GIRDER_H, GIRDER_W = 1.2, 0.825
+    local WALL_T = 0.5
+    -- Concrete carrying MachiyaPlaster (a clone of the unused ZenMortar1 at 1.5 studs/tile). Bare
+    -- Sandstone renders at Roblox's own tile scale, which on a wall reads as boulders rather than
+    -- render. The variant is the shop's OWN, so retuning its pitch cannot disturb the cement paths.
+    local STUCCO_MAT = "Concrete"
+    local STUCCO_VAR = "MachiyaPlaster"
 
--- THE STUCCO BOX. Every render plane is a face of ONE inset box, derived here, because deriving
--- them separately is how the building came apart: the side walls were moved in by the setback
--- while the front, the back and the gables still spanned the full envelope, so each panel was
--- inset on its own axis and oversized on the others. A wall's IN-PLANE dimensions have to shrink
--- with the box too, not just its own offset.
---   SX0/SX1 — the render's west/east faces      SZ1 — its back face
---   SZ0     — the upper storey's street face (the ground storey opens instead)
-local SX0, SX1 = X0 + STUCCO_SETBACK, X1 - STUCCO_SETBACK
-local SZ0, SZ1 = Z0 + STUCCO_SETBACK, Z1 - STUCCO_SETBACK
-local SW = SX1 - SX0 -- the box's width; NOT W
--- Side walls run BETWEEN the box's front and back faces. Running them to Z0 put their front
--- edge exactly on the corner post's front face — proud on one axis and flush on the other reads
--- as flush.
-local SD = SZ1 - SZ0
+    -- STUCCO SITS BACK; TIMBER STANDS PROUD. Everything was flush at the frontage plane, so the frame
+    -- and the render were coplanar and the timber simply disappeared into the wall. A timber-framed
+    -- building only reads if the frame is in front of the panel it holds.
+    local STUCCO_SETBACK = 0.30
 
--- The posts wear CypressVertical and came out darker; the beams they carry were plain Wood and did
--- not match. One variant for every piece of exterior frame.
-local FRAME_VAR = "CypressVertical"
-local KOSHI_T = 0.18
-local COUNTER_H = 3.0 -- ~3 ft. 1.1 was 13 inches: a step, not a counter
-local COUNTER_D = 2.0
--- Back wall to the counter's CENTRE. Pulled a stud forward at the owner's gate so a shopkeeper
--- can stand behind it: 1.6 studs of clearance is a shelf, 2.6 is a place to work.
-local COUNTER_STANDOFF = 4.4
-local COUNTER_Z = Z1 - COUNTER_STANDOFF
-local COUNTER_BACK_Z = COUNTER_Z + COUNTER_D / 2
+    -- THE STUCCO BOX. Every render plane is a face of ONE inset box, derived here, because deriving
+    -- them separately is how the building came apart: the side walls were moved in by the setback
+    -- while the front, the back and the gables still spanned the full envelope, so each panel was
+    -- inset on its own axis and oversized on the others. A wall's IN-PLANE dimensions have to shrink
+    -- with the box too, not just its own offset.
+    --   SX0/SX1 — the render's west/east faces      SZ1 — its back face
+    --   SZ0     — the upper storey's street face (the ground storey opens instead)
+    local SX0, SX1 = X0 + STUCCO_SETBACK, X1 - STUCCO_SETBACK
+    local SZ0, SZ1 = Z0 + STUCCO_SETBACK, Z1 - STUCCO_SETBACK
+    local SW = SX1 - SX0 -- the box's width; NOT W
+    -- Side walls run BETWEEN the box's front and back faces. Running them to Z0 put their front
+    -- edge exactly on the corner post's front face — proud on one axis and flush on the other reads
+    -- as flush.
+    local SD = SZ1 - SZ0
 
--- ===== the stair to the upper storey =====
--- Along the EAST wall, climbing NORTH from the counter's back edge (the owner set its foot there,
--- so it is derived from the counter and moves with it rather than being a second magic number).
--- Deliberately steep and narrow — a machiya's stair is nearer a ladder than a staircase, and one
--- body wide is the honest width for a shop this size.
-local UPPER_SURFACE = FLOOR + STOREY_H + SLAB_T -- what you stand on upstairs
-local STAIR_TREADS = 11
--- The last riser is the upper floor itself, so TREADS+1 risers span the storey. Asserted rather
--- than trusted: a rise that does not divide leaves a final step of the wrong height, which reads
--- as a stumble in Play and as nothing at all in the explorer.
-local STAIR_RISE = (UPPER_SURFACE - FLOOR) / (STAIR_TREADS + 1)
-assert(math.abs(STAIR_RISE - 0.8) < 1e-9, `stair rise {STAIR_RISE} is not the intended 0.8`)
-local STAIR_RUN = 0.72 -- 48° — steep, which is the point
-local STAIR_W = 3.2 -- OUTER to outer, stringers included
-local STRINGER_T = 0.45
-local STRINGER_H = 0.60
--- How deep a tread is let into its stringer. The treads used to run the full width, so their ends
--- finished flush with the stringers' outer faces and the joint read as a butt rather than a
--- housing. Now the stringer stands proud of the tread end by (STRINGER_T - TREAD_HOUSING) and you
--- can see the tread go into it.
-local TREAD_HOUSING = 0.30
-assert(TREAD_HOUSING < STRINGER_T, "a tread housed the full thickness of its stringer cuts it in two")
-local TREAD_W = STAIR_W - 2 * (STRINGER_T - TREAD_HOUSING)
-local TREAD_T = 0.28
--- NOT the frame's CypressVertical. That variant's maps are ROTATED 90° and it exists for flat
--- VERTICAL members — on a tread, which is a horizontal board, the grain ran across the plank
--- instead of along it. CypressWeathered is the unrotated timber the bridge decking wears.
-local STAIR_VAR = "CypressWeathered"
+    -- The posts wear CypressVertical and came out darker; the beams they carry were plain Wood and did
+    -- not match. One variant for every piece of exterior frame.
+    local FRAME_VAR = "CypressVertical"
+    local KOSHI_T = 0.18
+    local COUNTER_H = 3.0 -- ~3 ft. 1.1 was 13 inches: a step, not a counter
+    local COUNTER_D = 2.0
+    -- Back wall to the counter's CENTRE. Pulled a stud forward at the owner's gate so a shopkeeper
+    -- can stand behind it: 1.6 studs of clearance is a shelf, 2.6 is a place to work.
+    local COUNTER_STANDOFF = 4.4
+    local COUNTER_Z = Z1 - COUNTER_STANDOFF
+    local COUNTER_BACK_Z = COUNTER_Z + COUNTER_D / 2
 
--- The stairwell. Its south edge is set by HEADROOM, not by taste: a climber on tread k has their
--- feet at FLOOR + k*RISE and wants a working avatar's 6 studs above that, against an underside at
--- FLOOR + STOREY_H. Treads 1 and 2 pass under it comfortably; the third would clear by about half
--- a stud, which is no clearance at all once a body has depth, so the cut opens at the third.
-local STAIR_HEAD_CLEAR = 2 -- treads that stay under the upper floor
--- The invariant is that no COVERED tread traps a climber. Opening a tread earlier than strictly
--- required is a margin and is fine; opening one later is a low beam you cannot see in the
--- explorer. Strict headroom would allow three covered treads (the third clears by 0.6) — the
--- third is given away on purpose, because 0.6 studs is not clearance once a body has depth.
-assert(
-    FLOOR + STAIR_HEAD_CLEAR * STAIR_RISE + 6.0 <= FLOOR + STOREY_H,
-    "the stairwell opens too late — a climber meets the upper floor before the cut"
-)
-local WELL_Z1 = COUNTER_BACK_Z - STAIR_HEAD_CLEAR * STAIR_RUN
-local WELL_Z0 = COUNTER_BACK_Z - STAIR_TREADS * STAIR_RUN
--- Hard against the east wall's inner face, and the well is cut a little wider than the stair so a
--- climber's shoulders are not clipping the floor edge on the way up.
-local STAIR_X1 = SX1 - WALL_T
-local STAIR_X0 = STAIR_X1 - STAIR_W
-local WELL_X0 = STAIR_X0 - 0.2
+    -- ===== the stair to the upper storey =====
+    -- Along the EAST wall, climbing NORTH from the counter's back edge (the owner set its foot there,
+    -- so it is derived from the counter and moves with it rather than being a second magic number).
+    -- Deliberately steep and narrow — a machiya's stair is nearer a ladder than a staircase, and one
+    -- body wide is the honest width for a shop this size.
+    local UPPER_SURFACE = FLOOR + STOREY_H + SLAB_T -- what you stand on upstairs
+    local STAIR_TREADS = 11
+    -- The last riser is the upper floor itself, so TREADS+1 risers span the storey. Asserted rather
+    -- than trusted: a rise that does not divide leaves a final step of the wrong height, which reads
+    -- as a stumble in Play and as nothing at all in the explorer.
+    local STAIR_RISE = (UPPER_SURFACE - FLOOR) / (STAIR_TREADS + 1)
+    assert(math.abs(STAIR_RISE - 0.8) < 1e-9, `stair rise {STAIR_RISE} is not the intended 0.8`)
+    local STAIR_RUN = 0.72 -- 48° — steep, which is the point
+    local STAIR_W = 3.2 -- OUTER to outer, stringers included
+    local STRINGER_T = 0.45
+    local STRINGER_H = 0.60
+    -- How deep a tread is let into its stringer. The treads used to run the full width, so their ends
+    -- finished flush with the stringers' outer faces and the joint read as a butt rather than a
+    -- housing. Now the stringer stands proud of the tread end by (STRINGER_T - TREAD_HOUSING) and you
+    -- can see the tread go into it.
+    local TREAD_HOUSING = 0.30
+    assert(TREAD_HOUSING < STRINGER_T, "a tread housed the full thickness of its stringer cuts it in two")
+    local TREAD_W = STAIR_W - 2 * (STRINGER_T - TREAD_HOUSING)
+    local TREAD_T = 0.28
+    -- NOT the frame's CypressVertical. That variant's maps are ROTATED 90° and it exists for flat
+    -- VERTICAL members — on a tread, which is a horizontal board, the grain ran across the plank
+    -- instead of along it. CypressWeathered is the unrotated timber the bridge decking wears.
+    local STAIR_VAR = "CypressWeathered"
 
--- inset a coordinate so a post's OUTER face sits flush with the slab edge (recipe standing rule)
-local function flushX(x: number): number
-    if math.abs(x - X0) < 0.01 then
-        return x + POST_W / 2
-    elseif math.abs(x - X1) < 0.01 then
-        return x - POST_W / 2
+    -- The stairwell. Its south edge is set by HEADROOM, not by taste: a climber on tread k has their
+    -- feet at FLOOR + k*RISE and wants a working avatar's 6 studs above that, against an underside at
+    -- FLOOR + STOREY_H. Treads 1 and 2 pass under it comfortably; the third would clear by about half
+    -- a stud, which is no clearance at all once a body has depth, so the cut opens at the third.
+    local STAIR_HEAD_CLEAR = 2 -- treads that stay under the upper floor
+    -- The invariant is that no COVERED tread traps a climber. Opening a tread earlier than strictly
+    -- required is a margin and is fine; opening one later is a low beam you cannot see in the
+    -- explorer. Strict headroom would allow three covered treads (the third clears by 0.6) — the
+    -- third is given away on purpose, because 0.6 studs is not clearance once a body has depth.
+    assert(
+        FLOOR + STAIR_HEAD_CLEAR * STAIR_RISE + 6.0 <= FLOOR + STOREY_H,
+        "the stairwell opens too late — a climber meets the upper floor before the cut"
+    )
+    local WELL_Z1 = COUNTER_BACK_Z - STAIR_HEAD_CLEAR * STAIR_RUN
+    local WELL_Z0 = COUNTER_BACK_Z - STAIR_TREADS * STAIR_RUN
+    -- Hard against the east wall's inner face, and the well is cut a little wider than the stair so a
+    -- climber's shoulders are not clipping the floor edge on the way up.
+    local STAIR_X1 = SX1 - WALL_T
+    local STAIR_X0 = STAIR_X1 - STAIR_W
+    local WELL_X0 = STAIR_X0 - 0.2
+
+    -- inset a coordinate so a post's OUTER face sits flush with the slab edge (recipe standing rule)
+    local function flushX(x: number): number
+        if math.abs(x - X0) < 0.01 then
+            return x + POST_W / 2
+        elseif math.abs(x - X1) < 0.01 then
+            return x - POST_W / 2
+        end
+        return x
     end
-    return x
-end
 
--- row-major rotation about X, for the roof slopes
--- Row-major rotation about X. SIGN CONVENTION, because getting it backwards builds a TROUGH
--- instead of a ridge and the tests cannot see it: row 1 is (0, c, -s), so a point at the slab's
--- +Z end maps to y' = -sin(deg) * L/2. POSITIVE deg therefore LOWERS the +Z end.
--- So: the slope whose +Z end is the RIDGE takes a NEGATIVE angle; the slope whose +Z end is the
--- EAVE takes a positive one. (Shipped inverted once, 2026-08-05 — caught by eye, not by test.)
-local function rotX(deg: number): { number }
-    local r = math.rad(deg)
-    local c, s = math.cos(r), math.sin(r)
-    return { 1, 0, 0, 0, c, -s, 0, s, c }
-end
+    -- row-major rotation about X, for the roof slopes
+    -- Row-major rotation about X. SIGN CONVENTION, because getting it backwards builds a TROUGH
+    -- instead of a ridge and the tests cannot see it: row 1 is (0, c, -s), so a point at the slab's
+    -- +Z end maps to y' = -sin(deg) * L/2. POSITIVE deg therefore LOWERS the +Z end.
+    -- So: the slope whose +Z end is the RIDGE takes a NEGATIVE angle; the slope whose +Z end is the
+    -- EAVE takes a positive one. (Shipped inverted once, 2026-08-05 — caught by eye, not by test.)
+    local function rotX(deg: number): { number }
+        local r = math.rad(deg)
+        local c, s = math.cos(r), math.sin(r)
+        return { 1, 0, 0, 0, c, -s, 0, s, c }
+    end
 
-function Machiya.build(palette: any, _layout: any): any
     local children = {}
     local timber = palette.timber
     -- STUCCO, not boards (owner's gate). Roblox has no plaster material; Sandstone over the
@@ -1177,7 +1182,7 @@ function Machiya.build(palette: any, _layout: any): any
         })
     )
 
-    return Spec.model("Hanabiya", children)
+    return Spec.model(shop.name, children)
 end
 
 return Machiya
