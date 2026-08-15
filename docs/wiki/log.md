@@ -96,3 +96,12 @@ railings & chōchin" residual-thread item; confirmed 6 yamadoro models under
 CLAUDE.md's "Workspace organization" sentence calling `CanyonWorld.Legacy`
 "the frozen 14 `CanyonTeahouses`" corrected to match the verified live place
 (empty, retired to `ServerStorage.RetiredLegacyTeahouses`).
+
+Review fix (same day): the census grep loop missed 2 tools whose basenames
+coincidentally matched unrelated English-word text (`pierce` in "pierce alpha" on
+[[arena-square]], `png` in "color.png" on [[rojo-meshpart-rbxm]]) — actually
+never cited. Added `glyphs/pierce.cjs` and `glyphs/png.cjs` to
+[[studio-tooling]]'s Dormant tools section. Also recorded the Step-4 engines
+check that ran but left no trace: `grep -n engines package.json
+server/package.json` returns no matches in either root — neither declares an
+`engines` field, so there is nothing to drift against `.nvmrc` (24.12.0).

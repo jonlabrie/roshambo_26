@@ -122,6 +122,12 @@ target; safe to leave alone. "Live" = re-runnable / still the current tool for i
   FBX split).
 - `glyphs/rakedtex.cjs` — dependency-free raked-sand texture generator (tileable
   albedo + normal, deterministic LCG).
+- `glyphs/png.cjs` — dependency-free PNG decode/encode (Node built-ins only, 8/16-bit
+  RGB/RGBA/gray/palette in, 8-bit RGBA out); shared I/O library other glyph scripts
+  (e.g. `pierce.cjs`) `require`.
+- `glyphs/pierce.cjs` — bakes sukashibori cut-through alpha into a relief albedo from
+  the Marigold shading map's near-black regions (flood-fill + area-gated transparency);
+  gate-locked threshold from the 2026-07-22 Nanda pass.
 
 **Flags:**
 - `builders/CanopyScatter.luau`'s header says its Studio mirror is
