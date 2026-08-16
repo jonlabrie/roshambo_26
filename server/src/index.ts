@@ -8,6 +8,7 @@ import Round from './models/Round';
 import authRouter from './routes/auth';
 import storeRouter from './routes/store';
 import { createApiV1 } from './routes/apiV1';
+import { createStatsV1 } from './routes/statsV1';
 import { RoundEngine } from './engine/RoundEngine';
 import { ResultsStore } from './engine/ResultsStore';
 import { attachSocketAdapter } from './transports/socketAdapter';
@@ -113,6 +114,10 @@ mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
         const totalRounds = await Round.countDocuments();
         const engine = makeEngine(totalRounds); // legacy roundCount continuity
         app.use('/api/v1', createApiV1(engine, store));
+        // Mounted separately, not inside createApiV1: these boards need neither the engine
+        // nor the store, and are readable without the X-API-Key gate that guards player
+        // mutation.
+        app.use('/api/v1/stats', createStatsV1());
         attachSocketAdapter(io, engine, store);
         httpServer.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);

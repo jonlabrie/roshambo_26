@@ -11,6 +11,8 @@ import PlayerRound from '../models/PlayerRound';
 import { Throw } from '../engine/GameRules';
 import { topByCareer } from '../leaderboards';
 import { openSession, closeSession, touchSessions, SESSION_HEARTBEAT_MS } from '../sessions';
+import { longestStreaks, biggestBanks, heatBoard } from '../stats';
+import { calendarDayUTC, rollingWindow, HOUR_MS } from '../windows';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'roshambo_super_secret_1337';
 
@@ -241,6 +243,32 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
                 });
             } catch (err) {
                 console.error('Error fetching stats:', (err as Error).message);
+            }
+        });
+
+        // The Stats room's surface, for the PWA. Same queries as /api/v1/stats — the wire
+        // shapes differ because the transports do, but the numbers come from one place.
+        //
+        // Takes no argument: the surface is a fixed day-records + hour-heat bundle, not
+        // caller-selected by window, so a signature that accepted and silently discarded a
+        // `{ window }` payload would lie about what it honours (a caller passing
+        // { window: 'week' } would silently get the day board back).
+        socket.on('get-stats-surface', async () => {
+            try {
+                const now = new Date();
+                const w = calendarDayUTC(now);
+                const heat = rollingWindow(now, HOUR_MS);
+                const [streaks, banks, hot] = await Promise.all([
+                    longestStreaks(w, 10),
+                    biggestBanks(w, 10),
+                    heatBoard(heat, 10),
+                ]);
+                socket.emit('stats-surface', {
+                    day: { longestStreaks: streaks, biggestBanks: banks },
+                    heat: { kind: 'heat', qualified: false, leaders: hot },
+                });
+            } catch (err) {
+                console.error('Error fetching stats surface:', (err as Error).message);
             }
         });
 

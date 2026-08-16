@@ -8,6 +8,9 @@ import { RoundEngine } from '../engine/RoundEngine';
 import { ResultsStore } from '../engine/ResultsStore';
 import { attachSocketAdapter } from './socketAdapter';
 import Session from '../models/Session';
+import User from '../models/User';
+import BankEvent from '../models/BankEvent';
+import StreakEvent from '../models/StreakEvent';
 import { SESSION_HEARTBEAT_MS } from '../sessions';
 
 let httpServer: HttpServer;
@@ -209,5 +212,46 @@ describe('socket adapter wire format', () => {
         const updated = waitFor<any>(client, 'player-data');
         client.emit('bank', { deviceId: 'devA' });
         expect((await updated).user).toMatchObject({ totalPoints: 10, pointsAtStake: 0 });
+    });
+
+    describe('get-stats-surface', () => {
+        it('emits the day records and the hour heat board, same queries as /api/v1/stats', async () => {
+            await initPromise;
+            const a = await User.create({ deviceId: 'devA', displayName: 'Ayaka' });
+            await StreakEvent.create({ userId: a._id, length: 5, endedBy: 'LOSS', endedAt: new Date() });
+            await BankEvent.create({ userId: a._id, amount: 30, timestamp: new Date() });
+
+            const surfaceP = waitFor<any>(client, 'stats-surface');
+            client.emit('get-stats-surface');
+            const surface = await surfaceP;
+
+            expect(surface.day.longestStreaks[0]).toMatchObject({ length: 5, endedBy: 'LOSS' });
+            expect(surface.day.biggestBanks[0]).toMatchObject({ amount: 30 });
+            expect(surface.heat).toMatchObject({ kind: 'heat', qualified: false });
+            expect(surface.heat.leaders[0]).toMatchObject({ earned: 30 });
+        });
+
+        // The handler ignores whatever is emitted alongside the event (a caller passing
+        // { window: 'week' } gets exactly the same fixed day/hour surface) — this pins that
+        // the signature does not pretend otherwise by silently accepting and discarding it.
+        it('ignores any payload — the surface is fixed, not caller-selected', async () => {
+            await initPromise;
+            const surfaceP = waitFor<any>(client, 'stats-surface');
+            client.emit('get-stats-surface', { window: 'week' });
+            const surface = await surfaceP;
+            expect(surface.day).toBeDefined();
+            expect(surface.heat.kind).toBe('heat');
+        });
+
+        it('never returns a deviceId', async () => {
+            const a = await User.create({ deviceId: 'secret-device', displayName: 'Ayaka' });
+            await StreakEvent.create({ userId: a._id, length: 5, endedBy: 'LOSS', endedAt: new Date() });
+            await BankEvent.create({ userId: a._id, amount: 30, timestamp: new Date() });
+
+            const surfaceP = waitFor<any>(client, 'stats-surface');
+            client.emit('get-stats-surface');
+            const surface = await surfaceP;
+            expect(JSON.stringify(surface)).not.toContain('secret-device');
+        });
     });
 });
