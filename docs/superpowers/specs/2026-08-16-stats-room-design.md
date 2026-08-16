@@ -251,7 +251,7 @@ mounts that visibly fills one champion at a time.
 - The flex economy and what points buy. Out of scope here.
 - Group creation, membership and invitation UX — groups appear only as a scoping dimension
   over stats.
-- Fixing defect (f). Named as a prerequisite; specced and scheduled separately.
+- Fixing defect (h). Named as a prerequisite; specced and scheduled separately.
 - "Sports book" framing. Barred as product usage (owner, 2026-08-15).
 
 ## 10. Open questions

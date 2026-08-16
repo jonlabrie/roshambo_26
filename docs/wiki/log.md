@@ -171,7 +171,7 @@ Correcting a premise the repo had backwards. The World Throw is **the majority c
 players**, not random — "you against the world" is the product, and the shipped random
 pick is an unfinished implementation, not the source of truth. Crowd-reading is therefore
 skill, and the last-five-rounds HUD exists because that history is predictive. Recorded
-in [[world-throw]]; the divergence is logged as parked defect (f). `CLAUDE.md` asserted
+in [[world-throw]]; the divergence is logged as parked defect (h). `CLAUDE.md` asserted
 the opposite ("not derived from player votes despite the spec") and was corrected in the
 same pass. Also recorded: the game implements **US 8,025,570 B2, owned by Jon Labrie**,
 giving roughly a year of exclusivity as of 2026-08.

@@ -112,7 +112,7 @@ which no test can see.)
   App Runner → re-sync Rojo → start a FRESH Studio session.
 - spec: `docs/superpowers/specs/2026-08-04-round-structure-design.md`
 
-## (f) The World Throw is picked at random, not by majority — PREMISE-BREAKING
+## (h) The World Throw is picked at random, not by majority — PREMISE-BREAKING
 
 - **Where:** `server/src/engine/RoundEngine.ts` picks the World Throw randomly;
   `TEST_MODE=true` substitutes a deterministic R→P→S cycle (dev, and the
@@ -125,7 +125,8 @@ which no test can see.)
 - **Fix sketch:** the data is already there — `Round.distribution` persists the per-round
   R/P/S split. Settlement should derive the World Throw as the argmax of that
   distribution, with an explicit, documented tie-break rule and a decision about the
-  degenerate low-population case (a round with 1–2 players).
+  degenerate low-population case (a round with 1–2 players). Note this SUPERSEDES (e):
+  once the majority rule lands, the TEST_MODE cycle it describes is dead code.
 - **Owner, 2026-08-16:** *"in production the world throw is the majority choice… we have
   to successfully embody 'the majority' as a worthwhile opponent or we'll fail
   entirely."*
