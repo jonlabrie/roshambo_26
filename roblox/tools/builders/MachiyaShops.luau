@@ -766,6 +766,19 @@ MachiyaShops.stats = {
         -- upper storey — cream plaster and sumi, the wall kind's defaults.
         board = { kind = "wall", text = "番付" },
         glow = { color = { 1.0, 0.85, 0.6 }, brightness = 1.2 },
+        -- The cavern's mouth (2026-08-15): a framed opening in the vestibule's
+        -- REAR wall — no door leaf (owner's choice), a noren hung in it instead.
+        -- PER-SHOP CAPABILITY, default off: the other three shells keep their
+        -- solid WallBack byte-identically (the committed-asset gate holds that).
+        -- width 6.0 clear: the tunnel bore recipe nets ~6 studs, and the mouth
+        -- must not pinch the tunnel that will meet it at the wall's outer face.
+        -- The floor runs through at floorY — no step, the tunnel floor meets it
+        -- there. The noren is the shop's own pine green, hung on the VESTIBULE
+        -- side, chained and NorenSeg-tagged so the frontage sway carries it.
+        rearDoor = {
+            width = 6.0,
+            noren = { color = { 0.12, 0.25, 0.18 }, segments = 4 },
+        },
     },
 } :: Shop
 

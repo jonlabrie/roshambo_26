@@ -771,19 +771,103 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
         nil,
         STUCCO_VAR
     )
-    add(
-        "WallBack",
-        -- BETWEEN the side walls, not across them. At the full SW its end faces landed on exactly
-        -- the same planes as the side walls' outer faces, which is the same coplanar-face defect
-        -- the stairwell flickered from — found on the back corners while checking that fix. The
-        -- side walls run the full depth, so they close the corner and nothing opens up.
-        { SW - 2 * WALL_T, STOREY_H, WALL_T },
-        { CX, FLOOR + STOREY_H / 2, SZ1 - WALL_T / 2 },
-        stucco,
-        STUCCO_MAT,
-        nil,
-        STUCCO_VAR
-    )
+    -- The REAR DOORWAY is a per-shop capability (identity.rearDoor), default OFF: every shop
+    -- that doesn't set it emits the solid WallBack below byte-identically (the committed-asset
+    -- gates hold that). Stats opens here into the cavern to be bored behind it: a framed
+    -- opening, NO door leaf (owner's choice) — a noren hangs in it instead (see emitRearNoren).
+    local rearDoor: any = if shop.identity then (shop.identity :: any).rearDoor else nil
+    if rearDoor then
+        -- ----- the rear doorway: the wall opens, the frame registers to the wall's own faces -----
+        -- Clear width is the CALLER'S (the tunnel bore nets ~6 studs and the mouth must not
+        -- pinch it), centred on the shell. Everything else derives from what it touches:
+        --   * the head is the shop's own kamoi line, HEAD_Y — the number every doorway in
+        --     this building clears;
+        --   * the stucco flanks and header sit exactly where WallBack sat (outer face on SZ1,
+        --     WALL_T thick, running to the side walls' inner faces so the corner stays closed);
+        --   * the timber posts and lintel pass THROUGH the wall — outer face flush on the
+        --     wall's outer face (the plane the bore will meet, flush-outside-edges), standing
+        --     FRAME_D2 proud of the inner face into the vestibule, the building's own
+        --     "stucco sits back, timber stands proud" rule;
+        --   * the FLOOR CONTINUES at FLOOR through the opening — the slab already runs to Z1
+        --     and nothing is added at the threshold, because the tunnel floor meets it there.
+        local RD_W = rearDoor.width
+        assert(type(RD_W) == "number" and RD_W > 0, `rearDoor.width {tostring(RD_W)} is not a width`)
+        local RD_LINTEL_H = 0.5
+        local sideW = ((SW - 2 * WALL_T) - (RD_W + 2 * POST_W)) / 2
+        assert(sideW > 0, `rearDoor width {RD_W} + posts leaves no back wall on a {SW}-wide box`)
+        local headH = FLOOR + STOREY_H - (HEAD_Y + RD_LINTEL_H)
+        assert(headH > 0, "the rear lintel reaches the storey top — no header wall remains")
+        local frameD = WALL_T + FRAME_D2 -- through the wall, plus the frame's proud stand
+        local frameZ = SZ1 - frameD / 2 -- outer face flush on the wall's outer face
+        local wallZ = SZ1 - WALL_T / 2 -- the stucco's own plane, = WallBack's
+        for _, flank in
+            {
+                { "WallBackWest", SX0 + WALL_T + sideW / 2 },
+                { "WallBackEast", SX1 - WALL_T - sideW / 2 },
+            }
+        do
+            add(
+                flank[1] :: string,
+                { sideW, STOREY_H, WALL_T },
+                { flank[2] :: number, FLOOR + STOREY_H / 2, wallZ },
+                stucco,
+                STUCCO_MAT,
+                nil,
+                STUCCO_VAR
+            )
+        end
+        add(
+            "WallBackHead",
+            { RD_W + 2 * POST_W, headH, WALL_T },
+            { CX, HEAD_Y + RD_LINTEL_H + headH / 2, wallZ },
+            stucco,
+            STUCCO_MAT,
+            nil,
+            STUCCO_VAR
+        )
+        for _, post in
+            {
+                { "RearDoorPostWest", CX - RD_W / 2 - POST_W / 2 },
+                { "RearDoorPostEast", CX + RD_W / 2 + POST_W / 2 },
+            }
+        do
+            add(
+                post[1] :: string,
+                { POST_W, HEAD_Y - FLOOR, frameD },
+                { post[2] :: number, (FLOOR + HEAD_Y) / 2, frameZ },
+                timber,
+                "Wood",
+                nil,
+                FRAME_VAR
+            )
+        end
+        -- The lintel BEARS on the posts — post outer edge to post outer edge, not floating
+        -- across the opening. CypressWeathered, not the posts' CypressVertical: a horizontal
+        -- member, the distinction the stair timber turned on.
+        add(
+            "RearDoorLintel",
+            { RD_W + 2 * POST_W, RD_LINTEL_H, frameD },
+            { CX, HEAD_Y + RD_LINTEL_H / 2, frameZ },
+            timber,
+            "Wood",
+            nil,
+            STAIR_VAR
+        )
+    else
+        add(
+            "WallBack",
+            -- BETWEEN the side walls, not across them. At the full SW its end faces landed on exactly
+            -- the same planes as the side walls' outer faces, which is the same coplanar-face defect
+            -- the stairwell flickered from — found on the back corners while checking that fix. The
+            -- side walls run the full depth, so they close the corner and nothing opens up.
+            { SW - 2 * WALL_T, STOREY_H, WALL_T },
+            { CX, FLOOR + STOREY_H / 2, SZ1 - WALL_T / 2 },
+            stucco,
+            STUCCO_MAT,
+            nil,
+            STUCCO_VAR
+        )
+    end
 
     -- ----- THE FRAME ON THE FLANKS -----
     -- From the side the building read as one plane of render with no structure in it — the posts
@@ -1385,6 +1469,54 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
             end
         end
     end
+    -- ----- the rear doorway's noren (identity.rearDoor.noren) -----
+    -- The same construction as the frontage hang — per-doorway panels, each a CHAIN of segments
+    -- (cloth is recognised by its bend), the 0.16 slit, the still-air pose the client reads back —
+    -- MIRRORED IN Z and hung on the VESTIBULE side of the rear opening: the frontage hem walks +Z
+    -- (back under the eave, into the shop); this hem walks −Z (into the vestibule, away from the
+    -- wall the tunnel bore will meet), so the walk and the rotation are both negated together and
+    -- the chain stays joined by the same arithmetic. Tagged NorenSeg like the frontage panels:
+    -- NorenSway.client.luau groups by PARENT model and rebuilds with yaw 0, which these panels
+    -- satisfy (±z-facing, rotX only — a test pins the top row at {1,0,0}).
+    local function emitRearNoren(rd: any)
+        local nPanels = rd.noren.panels or NOREN_PER_BAY
+        local nSegs = rd.noren.segments or NOREN_SEGS
+        local segH = NOREN_H / nSegs
+        local panelW = rd.width / nPanels - 0.16
+        -- just off the wall's INNER face, the frontage's own 0.06 standoff mirrored
+        local hangZ = (SZ1 - WALL_T) - 0.06
+        for k = 1, nPanels do
+            local px = (CX - rd.width / 2) + rd.width * (k - 0.5) / nPanels
+            local hy, hz = NOREN_TOP, hangZ
+            local segs = {}
+            for s = 1, nSegs do
+                -- the frontage's own lean and jitter (bay index 0 — this doorway is not a bay)
+                local lean = NOREN_BELLY * (s / nSegs) + (k % 3 - 1) * 0.35
+                local lr = math.rad(lean)
+                -- dz = +sin (the frontage's −sin, mirrored): a negative lean walks −Z here
+                local dy, dz = math.cos(lr) * segH, math.sin(lr) * segH
+                table.insert(
+                    segs,
+                    Spec.part(`Seg{s}`, {
+                        Size = { panelW, segH, NOREN_T },
+                        CFrame = Spec.cframe({ px, hy - dy / 2, hz + dz / 2 }, rotX(-lean)),
+                        Color = rd.noren.color,
+                        Material = "Fabric",
+                        MaterialVariant = "NorenCloth",
+                        Transparency = NOREN_ALPHA,
+                        Tags = { "NorenSeg" },
+                        CanCollide = false,
+                        CanQuery = false,
+                        CanTouch = false,
+                        CastShadow = false,
+                    })
+                )
+                hy, hz = hy - dy, hz + dz
+            end
+            table.insert(children, Spec.model(`RearNoren_{k}`, segs))
+        end
+    end
+
     -- 花火屋's IDENTITY STAYS INLINE (Task 3 brief): the vermilion three-segment noren, the
     -- counter and the kanban below belong to the firework shop's own full-interior build, not
     -- to the kit — variant shells get theirs through shop.identity instead.
@@ -1527,6 +1659,10 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
                 identity.noren.perBay,
                 identity.noren.mon
             )
+        end
+        if identity.rearDoor and identity.rearDoor.noren then
+            -- the rear doorway's own hang — the wall itself opened back in the walls section
+            emitRearNoren(identity.rearDoor)
         end
         if identity.chochin then
             -- THE EAVE-CORNER PAIR, 花火屋's pattern — built by tools/builders/Chochin, the

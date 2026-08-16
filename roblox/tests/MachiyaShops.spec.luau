@@ -765,3 +765,182 @@ describe("stats shell — the two-bay false front", function()
         end
     end)
 end)
+
+describe("stats rear doorway — the cavern's mouth (identity.rearDoor)", function()
+    local shop = MachiyaShops.stats
+    local e = shop.envelope
+    local m = Machiya.build(ZenDojo.palette, ArenaLayout, shop)
+    local parts = allParts(m)
+    -- the shell's own planes, restated from the archetype's constants
+    local S, WALL_T, POST_W = 0.30, 0.5, 0.49
+    local CX = (e.x0 + e.x1) / 2
+    local SZ1 = e.z1 - S -- the stucco box's back face
+    local HEAD = e.floorY + 6.8 -- the kamoi line every doorway in this building clears
+    local STOREY_H = 9.0
+
+    test("the registry names the capability: width 6.0, pine-green noren, 4 segments", function()
+        local rd = shop.identity.rearDoor
+        expect(rd ~= nil).toBe(true)
+        expect(rd.width).toBe(6.0)
+        expect(rd.noren ~= nil).toBe(true)
+        for i = 1, 3 do
+            expect(rd.noren.color[i]).toBe(shop.identity.noren.color[i])
+        end
+        expect(rd.noren.segments).toBe(4)
+    end)
+
+    test("the back wall OPENS: WallBack is replaced by flanks, a header, posts and a lintel", function()
+        expect(find(m, "WallBack") == nil).toBe(true)
+        for _, nm in
+            {
+                "WallBackWest",
+                "WallBackEast",
+                "WallBackHead",
+                "RearDoorPostWest",
+                "RearDoorPostEast",
+                "RearDoorLintel",
+            }
+        do
+            expect(find(m, nm) ~= nil).toBe(true)
+        end
+    end)
+
+    test("the opening is 6.0 clear, centred, and heads at the shop's own kamoi", function()
+        local pw = find(m, "RearDoorPostWest")
+        local pe = find(m, "RearDoorPostEast")
+        -- clear width is post inner face to post inner face
+        local innerW = pw.properties.CFrame[1] + pw.properties.Size[1] / 2
+        local innerE = pe.properties.CFrame[1] - pe.properties.Size[1] / 2
+        expect(innerE - innerW).toBeCloseTo(6.0, 0.001)
+        expect((innerW + innerE) / 2).toBeCloseTo(CX, 0.001)
+        -- posts stand floor to the kamoi; the lintel bears on them
+        for _, p in { pw, pe } do
+            expect(p.properties.CFrame[2] - p.properties.Size[2] / 2).toBeCloseTo(e.floorY, 0.001)
+            expect(p.properties.CFrame[2] + p.properties.Size[2] / 2).toBeCloseTo(HEAD, 0.001)
+        end
+        local lin = find(m, "RearDoorLintel")
+        expect(lin.properties.CFrame[2] - lin.properties.Size[2] / 2).toBeCloseTo(HEAD, 0.001)
+        -- and it spans post outer edge to post outer edge — it bears, it does not float
+        expect(lin.properties.Size[1]).toBeCloseTo(6.0 + 2 * POST_W, 0.001)
+        expect(lin.properties.CFrame[1]).toBeCloseTo(CX, 0.001)
+    end)
+
+    test("every member registers to the wall's own faces — flush outside edges", function()
+        -- stucco pieces sit exactly where WallBack sat: outer face on SZ1, WALL_T thick
+        for _, nm in { "WallBackWest", "WallBackEast", "WallBackHead" } do
+            local p = find(m, nm)
+            expect(p.properties.CFrame[3] + p.properties.Size[3] / 2).toBeCloseTo(SZ1, 0.001)
+            expect(p.properties.Size[3]).toBeCloseTo(WALL_T, 0.001)
+        end
+        -- timber frame: outer face flush on the wall's outer face (the plane the bore meets),
+        -- standing proud of the INNER face into the vestibule
+        for _, nm in { "RearDoorPostWest", "RearDoorPostEast", "RearDoorLintel" } do
+            local p = find(m, nm)
+            expect(p.properties.CFrame[3] + p.properties.Size[3] / 2).toBeCloseTo(SZ1, 0.001)
+            expect(p.properties.CFrame[3] - p.properties.Size[3] / 2 < SZ1 - WALL_T).toBe(true)
+        end
+        -- the flanks MEET the posts (no gap, no overlap)
+        local pw, fw = find(m, "RearDoorPostWest"), find(m, "WallBackWest")
+        expect(fw.properties.CFrame[1] + fw.properties.Size[1] / 2).toBeCloseTo(
+            pw.properties.CFrame[1] - pw.properties.Size[1] / 2,
+            0.001
+        )
+        local pe, fe = find(m, "RearDoorPostEast"), find(m, "WallBackEast")
+        expect(fe.properties.CFrame[1] - fe.properties.Size[1] / 2).toBeCloseTo(
+            pe.properties.CFrame[1] + pe.properties.Size[1] / 2,
+            0.001
+        )
+        -- and the flanks run to the side walls' inner faces, closing the corner as WallBack did
+        expect(fw.properties.CFrame[1] - fw.properties.Size[1] / 2).toBeCloseTo(e.x0 + S + WALL_T, 0.001)
+        expect(fe.properties.CFrame[1] + fe.properties.Size[1] / 2).toBeCloseTo(e.x1 - S - WALL_T, 0.001)
+        -- the header sits ON the lintel and rises to the storey top
+        local hd, lin = find(m, "WallBackHead"), find(m, "RearDoorLintel")
+        expect(hd.properties.CFrame[2] - hd.properties.Size[2] / 2).toBeCloseTo(
+            lin.properties.CFrame[2] + lin.properties.Size[2] / 2,
+            0.001
+        )
+        expect(hd.properties.CFrame[2] + hd.properties.Size[2] / 2).toBeCloseTo(e.floorY + STOREY_H, 0.001)
+        expect(hd.properties.Size[1]).toBeCloseTo(lin.properties.Size[1], 0.001)
+    end)
+
+    test(
+        "the floor runs THROUGH the opening at 113.30 — no step, nothing collidable in the passage",
+        function()
+            -- the slab's top IS the threshold, and it reaches the envelope's back edge
+            local slab = find(m, "FloorSlab")
+            expect(slab.properties.CFrame[2] + slab.properties.Size[2] / 2).toBeCloseTo(e.floorY, 0.001)
+            expect(slab.properties.CFrame[3] + slab.properties.Size[3] / 2).toBeCloseTo(e.z1, 0.001)
+            -- nothing collidable occupies the passage box: clear width, floor to head, through the wall
+            local box = {
+                lo = { CX - 3.0, e.floorY + 0.01, SZ1 - WALL_T - 0.4 },
+                hi = { CX + 3.0, HEAD - 0.01, e.z1 },
+            }
+            for _, p in parts do
+                if p.properties.CanCollide == false then
+                    continue
+                end
+                if p.name == "FloorSlab" then
+                    continue
+                end
+                local lo, hi = rotAABB(p)
+                local pen = math.huge
+                for ax = 1, 3 do
+                    pen = math.min(pen, math.min(hi[ax], box.hi[ax]) - math.max(lo[ax], box.lo[ax]))
+                end
+                expect(pen <= 1e-4).toBe(true)
+            end
+        end
+    )
+
+    test("a pine-green noren hangs in the opening, on the VESTIBULE side, chained and tagged", function()
+        for k = 1, 3 do
+            local panel = find(m, `RearNoren_{k}`)
+            expect(panel ~= nil).toBe(true)
+            local prevZ = nil
+            for s = 1, 4 do
+                local seg = find(panel, `Seg{s}`)
+                expect(seg ~= nil).toBe(true)
+                expect(seg.properties.Tags[1]).toBe("NorenSeg")
+                for i = 1, 3 do
+                    expect(seg.properties.Color[i]).toBe(shop.identity.noren.color[i])
+                end
+                -- the sway client's rebuild assumes yaw 0 (±z-facing panels): top row {1,0,0}
+                local cf = seg.properties.CFrame
+                expect(cf[4]).toBeCloseTo(1, 0.001)
+                expect(cf[5]).toBeCloseTo(0, 0.001)
+                expect(cf[6]).toBeCloseTo(0, 0.001)
+                -- inside the clear opening
+                expect(cf[1] - seg.properties.Size[1] / 2 >= CX - 3.0).toBe(true)
+                expect(cf[1] + seg.properties.Size[1] / 2 <= CX + 3.0).toBe(true)
+                -- on the vestibule side of the wall's inner face
+                expect(cf[3] < SZ1 - WALL_T).toBe(true)
+                -- the hem walks INTO the vestibule (-z), which is what reads as cloth
+                if prevZ then
+                    expect(cf[3] < prevZ).toBe(true)
+                end
+                prevZ = cf[3]
+                expect(seg.properties.CanCollide).toBe(false)
+            end
+            -- the chain hangs from the kamoi: the top segment's top is at HEAD
+            local s1 = find(panel, "Seg1")
+            local _, hi = rotAABB(s1)
+            expect(hi[2]).toBeCloseTo(HEAD, 0.05)
+        end
+    end)
+
+    test("the other three shells are UNTOUCHED: solid WallBack, no rear-door parts", function()
+        -- default-off is the contract; the byte gate on the committed assets is the other half
+        for _, key in { "hanabiya", "apparel", "accessories" } do
+            local other = Machiya.build(ZenDojo.palette, ArenaLayout, (MachiyaShops :: any)[key])
+            expect(find(other, "WallBack") ~= nil).toBe(true)
+            for _, c in other.children do
+                local nm = c.name :: string
+                expect(nm:sub(1, 8) == "RearDoor").toBe(false)
+                expect(nm:sub(1, 9) == "RearNoren").toBe(false)
+                expect(nm:sub(1, 9) == "WallBackW").toBe(false)
+                expect(nm:sub(1, 9) == "WallBackE").toBe(false)
+                expect(nm:sub(1, 9) == "WallBackH").toBe(false)
+            end
+        end
+    end)
+end)
