@@ -190,3 +190,19 @@ head exactly — so the hillside had to be RAISED first, threaded under a roof e
 lowest corner is 127.20 (not the 129.3 a naive bbox read gives). Six bore traps carried to
 [[misc-engine-traps]], the sharpest being that terrain writes are invisible to raycasts
 within the same execution.
+
+## [2026-08-16] decision | throws bind to 1/2/3, and the Stats room is a play space
+
+Two rulings out of the [[stats-room]] spec, both GLOBAL rather than that room's scope, parked
+in [[backlog]]:
+
+**Keyboard throws bind to `1`/`2`/`3`.** A laptop player in first person cannot use the HUD at
+all — the cursor is pinned to screen centre — and [[modal-cursor-grip]] does not transfer,
+because it works only for a temporary modal; holding the cursor free for an always-visible HUD
+would mean never looking around. The owner's first instinct, `R`/`P`/`S`, is unavailable: `S`
+is Roblox's default walk-backward. Numbers are unclaimed (the client uses no Tools or Backpack)
+and, unlike letters, do not move under AZERTY/QWERTZ. The HUD carries the numeral on each tile.
+
+**Players CAN throw from inside the Stats cavern** — the HUD is always visible, so it is a
+study-and-play space, not a trade. The round band stays required: it tells a player reading a
+wall that a round is closing. Also parked: HUD dismiss/recall.

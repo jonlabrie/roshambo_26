@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: open
-updated: 2026-08-15
+updated: 2026-08-16
 ---
 
 # Backlog
@@ -133,3 +133,38 @@ otherwise out of F&F scope (showable as-is).
 - **Lantern telegraph tag rollout** — result lanterns are found by `*Lantern` name;
   a CollectionService tag would make the canyon-wide contract explicit. See
   [[viewing-platform]].
+
+## HUD dismiss/recall, and throwing from the keyboard
+
+Raised by the owner 2026-08-16 while specifying the [[stats-room]], but these are GLOBAL
+play concerns, not that room's scope — they change how every player throws, everywhere.
+
+**Throwing from the keyboard.** A laptop player in first person cannot interact with the
+HUD at all: the cursor is pinned to screen centre. The [[modal-cursor-grip]] recipe does
+NOT transfer — it works because a modal is temporary, and holding the cursor free for an
+always-visible HUD would mean never being able to look around. Keyboard binding is the fix.
+
+⚠ **`R`/`P`/`S` cannot be the bindings.** `S` is Roblox's default walk-backward key, so
+Scissors would reverse the player. `R` and `P` are both free, but the scheme is not.
+
+**RULED (owner, 2026-08-16): `1` / `2` / `3`.** Verified that the client uses **no Tools or
+Backpack**, so the number row is unclaimed. Roblox `KeyCode`s follow physical position, so
+letter bindings move under AZERTY/QWERTZ while numbers do not. The HUD teaches the binding
+itself — each throw tile carries its numeral in the corner:
+
+```
+  ┌─────┐  ┌─────┐  ┌─────┐
+  │1    │  │2    │  │3    │
+  │  ○  │  │  ─  │  │  ∧  │
+  └─────┘  └─────┘  └─────┘
+   ROCK    PAPER   SCISSORS
+```
+
+Bind via `ContextActionService` so the action sinks correctly and can be released while a
+modal or the ledger has focus. Must respect the existing throw gates: the T₀−2s lockout, and
+the fate gate that stops fate-bound players throwing (`main.server.luau`).
+
+**HUD dismiss/recall.** The HUD is always visible. Worth a way to put it away — most
+valuable exactly where the owner noticed it, in a room built for reading walls. Needs a
+recall affordance that cannot itself be lost, and must not break the drum-authoritative
+reveal path ([[round-and-hud]]).

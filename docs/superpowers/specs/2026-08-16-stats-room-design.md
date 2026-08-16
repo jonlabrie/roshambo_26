@@ -262,11 +262,9 @@ mounts that visibly fills one champion at a time.
    is understood without explanation, and because points exist only once banked it already
    folds in judgement — but it rewards volume, and play time varies enormously here in a way
    it does not in sumo, where everyone fights fifteen bouts. Deliberately left open.
-4. **Can a player throw from inside the Stats room?** The band tells them a round is closing;
-   whether they can act on it is unresolved. Allowing it makes the room a genuine study-and-play
-   space and rewards the patient, selective play the design celebrates (§4.4). Forbidding it
-   makes the room a deliberate trade — you go below to learn, and you give up rounds to do it.
-   The second is more honest to "you against the world" but risks players avoiding the room
-   entirely. This decides whether the room needs a throw input at all.
+4. ~~Can a player throw from inside the Stats room?~~ **RESOLVED (owner, 2026-08-16): yes.**
+   The HUD is always visible, so the room is a study-AND-play space and needs no throw input of
+   its own. The round band (§6.3) remains required — it tells a player studying a wall that a
+   round is closing.
 5. Whether the group scoping dimension ranks by sum (favours large groups) or by qualified
    average (favours small ones). Both are defensible; likely both, on separate columns.
