@@ -146,3 +146,11 @@ siting options converged on the old statistics-room mark); Machiya_2 becomes a
 riverside chaya with a service counter and a named ChayaKeeperSlot anchor for a
 future tea-vendor NPC. Build approach: generalize Machiya.luau (snapshot-gated
 refactor) + separate Chaya.luau.
+
+## [2026-08-15] gate | apparel machiya accepted; chochin canonicalized
+
+First shell of the merchant row accepted after three rounds. Carried out of it: the machiya
+archetype is now parameterized (MachiyaShops.luau spec tables, byte-gated against Hanabiya);
+tools/builders/Chochin.luau is the single canonical lantern shared by the kit, drift-guarded by a
+text-parsing test against buildHanabiyaChochin.luau (studio tools cannot require modules); and the
+owner's rule that paths stay uniform while the merchant row varies by tint.

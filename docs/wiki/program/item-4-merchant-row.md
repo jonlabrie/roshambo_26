@@ -35,6 +35,16 @@ itself — the façade shells around it.
 
 ## Gates & decisions
 
+- **2026-08-15 owner gate: the apparel machiya (Machiya_1) ACCEPTED** after three correction
+  rounds — the surveyed envelope overlapped 花火屋 by 3.97 studs (stale massing; east edge now
+  registers to the built west face at a 1.5-stud roji, pinned by a test), the kit chōchin had
+  been restated at half density (now `tools/builders/Chochin.luau`, the canonical canyon lantern,
+  drift-guarded against the studio tool), and the owner hand-placed the kimono racks into the
+  corners (baked as `APPAREL_RACK_OVERRIDES`, reproduced to 0.0008 studs).
+- **2026-08-15 owner rule — lantern variety:** canyon paths stay UNIFORM (they are the wayfinding
+  system); the merchant row VARIES per shop (light tinted barrels; glyph plates never tinted, and
+  a CI floor of 0.55 relative luminance keeps the World Throw glyph legible at night). True red is
+  excluded deliberately — 赤提灯 signals an izakaya.
 - 2026-08-15 owner decision: corridor reservations retired from `ArenaLayout.luau`
   (with their tests) rather than re-derived — see log.
 - 2026-08-13 owner gate: hanabiya done for now, place saved. Dropped, do not re-raise:
