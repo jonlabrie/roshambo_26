@@ -204,3 +204,54 @@ lifetime. A `socket.connected` check before `heartbeats.set` closes it.
 does NOT drop an index already built in a live database. If `roshambo-dev` or `roshambo` has
 already created `userId_1` on `sessions`/`bankevents`, it persists until dropped by hand or by
 `syncIndexes()`. The write-cost saving is only realised on fresh collections.
+
+## ⚠ SECURITY — the `get-stats` socket handler broadcasts deviceIds
+
+Found by the plan-2 whole-branch review, 2026-08-16. **Pre-existing; not introduced by that
+plan, and deliberately not fixed by it.**
+
+`server/src/transports/socketAdapter.ts`'s `get-stats` handler emits `topByCareer` with the
+default `LEADERBOARD_FIELDS`, which **includes `deviceId`**, and emits unprojected `PlayerRound`
+documents as `biggestWins`, which carry it too. A `deviceId` is a **bearer credential** on the
+socket path: `sync-player { deviceId }` grants that account with no further auth.
+
+So any connected socket can call `get-stats`, harvest roughly a hundred other players'
+deviceIds, and then assume those accounts. No authentication at any step.
+
+This is the exact credential the plan-2 stats surface works hard to contain — `nameUsers`
+returns `Map<string,string>` precisely so a future field cannot leak — and that discipline is
+moot while the handler beside it hands the same credential to anyone who asks.
+
+**Why it was not fixed inline:** `src/components/StatsView.tsx` uses `deviceId` as a React key,
+so removing it from the payload is a cross-tree change to the PWA, not a server-only edit. It
+deserves its own decision rather than being smuggled into a stats plan.
+
+**Fix sketch:** give the socket path its own projection without `deviceId` (the API path already
+has one, `API_LEADERBOARD_FIELDS`), project `biggestWins` explicitly rather than emitting whole
+documents, and switch the PWA's list key to the user id. Do it **before plan 3 ships a room that
+advertises these boards** and drives traffic to them.
+
+## Stats surface (plan 2) — notes carried out of the merge
+
+Plan `docs/superpowers/plans/2026-08-16-stats-surface.md` shipped 2026-08-16. Nothing blocking;
+these are things a later reader would otherwise have to rediscover.
+
+- **`/api/v1/stats/records?window=all` emits a `to` 24 hours in the future.** Plan 3 must not
+  print that bound verbatim or "All time" will read as ending tomorrow. It is labelled
+  `windowKind: 'rolling'` because the bound genuinely moves per request — `'calendar'` would be
+  a lie — but the label is imprecise and the echoed `from`/`to` are the honest signal.
+- **The two transports disagree on shape for the same boards.** REST resolves `displayName`;
+  the socket surface still emits raw `userId` ObjectIds. `nameUsers` is private to
+  `statsV1.ts` — export or relocate it before plan 3 duplicates the projection in
+  `socketAdapter.ts`, which is exactly how deviceId leaked the first time.
+- **`window=all` is an unbounded scan** of `StreakEvent`, `BankEvent` and every WIN row of
+  `PlayerRound`, with sorts not served by the range indexes. Fine at fifty players; consider
+  capping it at a season, or adding sort-key indexes, before it matters.
+- **`participationRate` can exceed 1.0** and is deliberately unclamped: `throws` counts
+  PlayerRound rows while `roundsPresent` counts rounds inside session intervals, so lagging
+  presence reporting from a Roblox instance can invert them. Documented in `stats.ts`; a display
+  should decide how to show it rather than be surprised.
+- **`User.index({ currentStreak: -1 })`** costs an index write on every settled player every
+  round, for `liveStreaks`, which has no consumer until plan 3.
+- **The plan doc diverges from the code**: it names a `playerVolume(userId, w)` that was never
+  built. Its three figures are folded into `playerRates` instead, which is the better shape.
