@@ -28,4 +28,7 @@ const PlayerRoundSchema: Schema = new Schema({
 PlayerRoundSchema.index({ deviceId: 1, timestamp: -1 });
 PlayerRoundSchema.index({ userId: 1, timestamp: -1 });
 
+// The "biggest round in this window" records board.
+PlayerRoundSchema.index({ playerResult: 1, timestamp: -1, pointsDelta: -1 });
+
 export default mongoose.model<IPlayerRound>('PlayerRound', PlayerRoundSchema);
