@@ -65,6 +65,13 @@ describe('records — biggest banks', () => {
         await BankEvent.create({ userId: a._id, amount: 9, timestamp: at(12) });
         expect((await biggestBanks(W, 10)).map(r => r.amount)).toEqual([9]);
     });
+
+    it('excludes the bank at exactly `to`, which belongs to the next window', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        await BankEvent.create({ userId: a._id, amount: 999, timestamp: at(20) });
+        await BankEvent.create({ userId: a._id, amount: 9, timestamp: at(12) });
+        expect((await biggestBanks(W, 10)).map(r => r.amount)).toEqual([9]);
+    });
 });
 
 describe('records — biggest rounds', () => {
@@ -82,5 +89,13 @@ describe('records — biggest rounds', () => {
         const rows = await biggestRounds(W, 10);
         expect(rows).toHaveLength(1);
         expect(rows[0].pointsDelta).toBe(3);
+    });
+
+    it('excludes the round at exactly `to`, which belongs to the next window', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        await PlayerRound.create({ userId: a._id, roundId: 'r1', playerThrow: 'R', playerResult: 'WIN', pointsDelta: 999, timestamp: at(20) });
+        await PlayerRound.create({ userId: a._id, roundId: 'r2', playerThrow: 'R', playerResult: 'WIN', pointsDelta: 9, timestamp: at(12) });
+        const rows = await biggestRounds(W, 10);
+        expect(rows.map(r => r.pointsDelta)).toEqual([9]);
     });
 });
