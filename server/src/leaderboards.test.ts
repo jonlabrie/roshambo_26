@@ -80,4 +80,29 @@ describe('windowed earnings', () => {
         const top = await topEarnersInWindow(at(3), at(7), 10);
         expect(top[0].earned).toBe(39);
     });
+
+    it('sorts by in-window earnings, inverting career order when the week demands it', async () => {
+        // Both players bank INSIDE the queried window, so this is a genuine sort contest —
+        // unlike the earlier "not by career" test, where the career leader's only event fell
+        // outside the window and there was nothing for anyone to actually outrank.
+        const careerLeader = await User.create({ deviceId: 'career-leader', lifetimeBanked: 10_000 });
+        const weekLeader = await User.create({ deviceId: 'week-leader', lifetimeBanked: 10 });
+        await BankEvent.create({ userId: careerLeader._id, amount: 50, timestamp: at(4) });
+        await BankEvent.create({ userId: weekLeader._id, amount: 500, timestamp: at(5) });
+
+        const top = await topEarnersInWindow(at(3), at(7), 10);
+        expect(top).toHaveLength(2);
+        expect(top[0].userId.toString()).toBe(weekLeader._id.toString());
+        expect(top[0].earned).toBe(500);
+        expect(top[1].userId.toString()).toBe(careerLeader._id.toString());
+        expect(top[1].earned).toBe(50);
+    });
+
+    it('honours the limit', async () => {
+        for (let i = 0; i < 5; i++) {
+            const earner = await User.create({ deviceId: `earner${i}` });
+            await BankEvent.create({ userId: earner._id, amount: (i + 1) * 10, timestamp: at(5) });
+        }
+        expect(await topEarnersInWindow(at(3), at(7), 3)).toHaveLength(3);
+    });
 });
