@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, beforeEach, afterEach, vi } from 'vitest';
 import { createServer, Server as HttpServer } from 'http';
 import { Server } from 'socket.io';
 import { io as clientIo, Socket as ClientSocket } from 'socket.io-client';
@@ -7,6 +7,7 @@ import { connectTestDb, clearTestDb, disconnectTestDb } from '../test/db';
 import { RoundEngine } from '../engine/RoundEngine';
 import { ResultsStore } from '../engine/ResultsStore';
 import { attachSocketAdapter } from './socketAdapter';
+import Session from '../models/Session';
 
 let httpServer: HttpServer;
 let engine: RoundEngine;
@@ -42,10 +43,20 @@ describe('socket adapter wire format', () => {
     afterEach(async () => {
         client.disconnect();
         // The server's 'disconnect' handler does an async closeSession() write that this
-        // synchronous teardown doesn't wait for. Without a pause here, disconnectTestDb()
-        // in afterAll can tear down the connection while that write is still in flight,
+        // teardown doesn't otherwise wait for. Without waiting here, disconnectTestDb() in
+        // afterAll can tear down the connection while that write is still in flight,
         // surfacing as an unhandled MongoNotConnectedError after the suite reports green.
-        await new Promise(r => setTimeout(r, 50));
+        //
+        // Poll for the actual side effect (every open Session getting endedAt set) rather
+        // than sleeping a guessed duration: a fixed delay either wastes time when the write
+        // is fast, or — under CI load / a busier MongoMemoryServer — is too short and lets
+        // the race back in intermittently, which is worse than the original failure because
+        // it reads as flake. Tests that never opened a session (no sync-player) have no open
+        // Session documents, so this resolves immediately for them.
+        await vi.waitFor(async () => {
+            const stillOpen = await Session.countDocuments({ endedAt: { $exists: false } });
+            expect(stillOpen).toBe(0);
+        }, { timeout: 1000, interval: 10 });
         httpServer.close();
     });
 
