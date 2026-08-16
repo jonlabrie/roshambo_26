@@ -148,7 +148,7 @@ describe('settleRound', () => {
 
 describe('buildCounterUpdate', () => {
     it('counts a win, sets the gate, and tracks the biggest pot', () => {
-        const u = buildCounterUpdate('R', 'WIN', 81);
+        const u = buildCounterUpdate('R', 'WIN', 81, 0);
         expect(u.$inc.roundsPlayed).toBe(1);
         expect(u.$inc.wins).toBe(1);
         expect(u.$inc.throwsR).toBe(1);
@@ -157,7 +157,7 @@ describe('buildCounterUpdate', () => {
     });
 
     it('a SAFE counts a round and a throw but sets no gate', () => {
-        const u = buildCounterUpdate('P', 'SAFE', 27);
+        const u = buildCounterUpdate('P', 'SAFE', 27, 0);
         expect(u.$inc.safes).toBe(1);
         expect(u.$inc.throwsP).toBe(1);
         expect(u.$set.unresolvedWin).toBe(false);
@@ -165,7 +165,7 @@ describe('buildCounterUpdate', () => {
 
     it('a LOSS clears the gate — there is nothing left to decide', () => {
         // the pot is forfeited, so a player cannot be left bound on a decision about zero
-        const u = buildCounterUpdate('S', 'LOSS', 0);
+        const u = buildCounterUpdate('S', 'LOSS', 0, 0);
         expect(u.$inc.losses).toBe(1);
         expect(u.$inc.throwsS).toBe(1);
         expect(u.$set.unresolvedWin).toBe(false);
@@ -173,13 +173,13 @@ describe('buildCounterUpdate', () => {
 
     it('proposes the new pot for bestPot and lets $max arbitrate', () => {
         // the builder never reads the stored best — it proposes, Mongo keeps the larger
-        const u = buildCounterUpdate('R', 'WIN', 3);
+        const u = buildCounterUpdate('R', 'WIN', 3, 0);
         expect(u.$max.bestPot).toBe(3);
     });
 
     it('every round counts exactly one throw', () => {
         for (const t of ['R', 'P', 'S'] as const) {
-            const u = buildCounterUpdate(t, 'SAFE', 0);
+            const u = buildCounterUpdate(t, 'SAFE', 0, 0);
             const thrown = (u.$inc.throwsR ?? 0) + (u.$inc.throwsP ?? 0) + (u.$inc.throwsS ?? 0);
             expect(thrown).toBe(1);
         }
