@@ -154,3 +154,13 @@ archetype is now parameterized (MachiyaShops.luau spec tables, byte-gated agains
 tools/builders/Chochin.luau is the single canonical lantern shared by the kit, drift-guarded by a
 text-parsing test against buildHanabiyaChochin.luau (studio tools cannot require modules); and the
 owner's rule that paths stay uniform while the merchant row varies by tint.
+
+## [2026-08-15] decision | the Stats room: re-sited, renamed, and "sports book" barred
+
+The merchant row's fourth shell moves off Machiya_East (owner: the Overlook undercroft "is
+probably a bad place for it" — and a survey confirmed the old cavern mark at (73,110,19) is open
+air under an elevated deck, not rock). It becomes a small two-bay FALSE FRONT west of the apparel
+shop, x −33.92..−23.92, backing into the south upslope that climbs 115→130 between z36 and z48 —
+real rock for the cavern to be carved at a later item. The room's name is **Stats** (leaderboards
+for individuals, groups, countries); its shopfront reads 番付. "Sports book" is barred as product
+usage — design discussion only. Machiya_East's massing stays parked, unassigned.

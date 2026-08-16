@@ -11,6 +11,14 @@ re-litigate them without new instructions.
 
 ## Copy & theme
 
+- **"Sports book" is BARRED as product usage** (2026-08-15). The room is called **Stats**;
+  its shopfront reads 番付 (banzuke, the Edo ranking list — literally a leaderboard, no
+  wagering sense). The term may be used when DISCUSSING the design of the space, never in
+  shipped names, UI, player-visible identifiers or signage. Same family as the RISK/BANK
+  ruling below: gambling register does not belong in a kid-first experience.
+  **Why:** Roblox proscribes simulated gambling, and the mechanic is deliberately not a wager.
+  **How to apply:** if a name implies betting, rename it before it reaches an asset, a test
+  name, or a sign. See [[item-4-merchant-row]] and [[round-and-hud]].
 - **No wager language near points.** "RISK IT" was struck: the pot mechanic is
   deliberately not a wager, and Roblox proscribes simulated gambling in a kid-first
   experience — the shipped-green RISK/BANK gate was withdrawn over it. See

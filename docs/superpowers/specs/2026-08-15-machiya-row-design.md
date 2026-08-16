@@ -28,13 +28,26 @@ is a closed kōshi teaser until its cavern exists.
 
 Machiya_3 in the massing ≈ 花火屋's own slot; superseded by the built shop.
 
-**Sports book siting (owner's call):** the two candidate sites converge — Machiya_East
-is the frontage, and its future interior bores into the hillside under the western
-Overlook, exactly where the 2026-07-28 canyon-destinations spec put the statistics
-room (73, 110, 19). One destination, both ideas. **The cavern is item 7's work, not
-this item's — no terrain is dug here.** The public-facing name is deferred: "sports
-book" copy must be reconciled with the no-wager-language ruling
-(`docs/wiki/practice/owner-rulings.md`) when signage is authored.
+**AMENDED 2026-08-15 — the Stats room, re-sited and named.** The original siting
+(Machiya_East frontage + a cavern under the western Overlook) is DROPPED. A Studio
+survey found the massing block overlapping the Overlook's deck by 2.64 studs, and the
+old statistics-room mark at (73, 110, 19) sitting in open air beneath an elevated deck
+rather than in rock. The owner's call: "It doesn't need to be beneath the Overlook; as
+a matter of fact that's probably a bad place for it."
+
+It is instead a **small two-bay FALSE FRONT west of the apparel shop** —
+x −33.92..−23.92, frontage z 35.23 (continuous with the row's street line), 8 deep,
+floor 113.30 — standing against the south upslope, which climbs 115.3 → 130.3 between
+z 36 and z 48. That hill is the rock the cavern gets carved into at a later item; only
+the shell's own footprint is levelled here. It faces the existing RiverSquareStair
+approach. Machiya_East's massing stays parked and unassigned.
+
+**Naming (owner ruling, binding):** the room is **Stats** — leaderboards for
+individuals, groups, countries. **"Sports book" is barred as product usage**; it may be
+used only when discussing the design of the space, never in shipped names, UI,
+player-visible identifiers or signage. The shopfront reads 番付 (banzuke, the Edo
+ranking list — literally a leaderboard, with no wagering sense). Same family as the
+no-wager-language ruling in `docs/wiki/practice/owner-rulings.md`.
 
 ## 1. The archetype refactor (Machiya.luau)
 
