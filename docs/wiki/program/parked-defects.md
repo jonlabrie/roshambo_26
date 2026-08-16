@@ -112,30 +112,6 @@ which no test can see.)
   App Runner → re-sync Rojo → start a FRESH Studio session.
 - spec: `docs/superpowers/specs/2026-08-04-round-structure-design.md`
 
-## (h) The World Throw is picked at random, not by majority — PREMISE-BREAKING
-
-- **Where:** `server/src/engine/RoundEngine.ts` picks the World Throw randomly;
-  `TEST_MODE=true` substitutes a deterministic R→P→S cycle (dev, and the
-  playroshambo.com demo).
-- **Why it matters:** the product premise is "you against the world" — the World Throw
-  is meant to be the MAJORITY of player throws (see [[world-throw]]). Random play makes
-  the last-five-rounds HUD information-free, turns crowd-reading from skill into
-  fortune, and invalidates any leaderboard built on the assumption that outcomes
-  reflect judgement. This is not a cosmetic defect; it is the game.
-- **Fix sketch:** the data is already there — `Round.distribution` persists the per-round
-  R/P/S split. Settlement should derive the World Throw as the argmax of that
-  distribution, with an explicit, documented tie-break rule and a decision about the
-  degenerate low-population case (a round with 1–2 players). Note this SUPERSEDES (e):
-  once the majority rule lands, the TEST_MODE cycle it describes is dead code.
-- **Owner, 2026-08-16:** *"in production the world throw is the majority choice… we have
-  to successfully embody 'the majority' as a worthwhile opponent or we'll fail
-  entirely."*
-- **Scheduled 2026-08-16: prerequisite of item 7 (Statistics)**, and gates any SKILL-claiming
-  badge in item 6. Note it is arguably larger than either — it is the core game rule, not a
-  feature of one room.
-- ⚠ **Both deployed environments are affected, and prod is worse than random.**
-  `apprunner.yaml` (the PROD config) sets `TEST_MODE: "true"`, so playroshambo.com runs the
-  deterministic R→P→S cycle — predictable after three rounds. `roshambo_server_dev` is
-  configured via the App Runner API, not `apprunner.yaml`, so its value is NOT in git and
-  needs checking in AWS. One server serves both clients, so the PWA and Roblox share the
-  same World Throw and the same defect; no client work is involved in the fix.
+_(h) — the World Throw picked at random — was FIXED 2026-08-16, see [[world-throw]] and
+`log.md`. It is deliberately NOT active in any deployed environment yet: both prod and dev
+run `TEST_MODE`, which keeps the R→P→S cycle. Defect (e) therefore still stands._

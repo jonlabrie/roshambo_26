@@ -222,3 +222,20 @@ RoundEngine, so the PWA and Roblox share the same World Throw and the same defec
 work is involved. And prod is worse than random: `apprunner.yaml` sets `TEST_MODE: "true"`, so
 playroshambo.com runs the deterministic R→P→S cycle. `roshambo_server_dev`'s value is
 configured via the App Runner API and is not in git — unverified, needs an AWS check.
+
+## [2026-08-16] ship | the World Throw is the crowd
+
+Defect (h) fixed. `GameRules.deriveWorldThrow` derives the World Throw from the round's own
+tally; `RoundEngine` already passed the counts to `pickWorldThrow`, so the composition root
+was the only wiring needed. 9 fixture cases in `worldThrowDerivation`; server 262, Luau 1201
+and PWA 23 all green.
+
+Decisions taken in the fix: it is **plurality, not majority** (with three options a >50%
+majority frequently does not exist); a **tie** picks randomly among the tied only; and below
+**`WORLD_THROW_MIN_PARTICIPANTS` (5, env-tunable)** it falls back to random, because at small
+N a player's own throw is decisive — joining either side of a 2–2 split creates the plurality
+they needed to beat, and a solo player would be permanently SAFE. TEST_MODE keeps the R→P→S
+cycle by owner ruling, so dev stays deterministic; defect (e) therefore still stands, and my
+earlier claim that (h) would supersede it was wrong.
+
+⚠ Fixed is not active: both environments run TEST_MODE, so nothing exercises the rule yet.

@@ -11,7 +11,7 @@ import { createApiV1 } from './routes/apiV1';
 import { RoundEngine } from './engine/RoundEngine';
 import { ResultsStore } from './engine/ResultsStore';
 import { attachSocketAdapter } from './transports/socketAdapter';
-import { Throw } from './engine/GameRules';
+import { Throw, deriveWorldThrow } from './engine/GameRules';
 
 dotenv.config();
 
@@ -44,7 +44,7 @@ const THROWS: Throw[] = ['R', 'P', 'S'];
 // REVEAL's 7 is derived (3.45s drum settle + 3.0s glyph hold + 0.4s fade = 6.85) and
 // does not scale with round length; LOCK's 2 is an HTTP flush window, likewise fixed.
 // Lengthening a round therefore means lengthening OPEN and nothing else.
-function envSeconds(name: string, fallback: number): number {
+function envPositiveNumber(name: string, fallback: number): number {
     const raw = process.env[name];
     if (raw === undefined) return fallback;
     const n = Number(raw);
@@ -56,16 +56,26 @@ function envSeconds(name: string, fallback: number): number {
 }
 
 function makeEngine(initialRoundCount: number): RoundEngine {
-    const openSeconds = envSeconds('ROUND_OPEN_SECONDS', 51);
-    const lockSeconds = envSeconds('ROUND_LOCK_SECONDS', 2);
-    const revealSeconds = envSeconds('ROUND_REVEAL_SECONDS', 7);
+    const openSeconds = envPositiveNumber('ROUND_OPEN_SECONDS', 51);
+    const lockSeconds = envPositiveNumber('ROUND_LOCK_SECONDS', 2);
+    const revealSeconds = envPositiveNumber('ROUND_REVEAL_SECONDS', 7);
+    // Below this many throws the crowd is too small to be a "world" and the rule falls
+    // back to random; tunable without a deploy because the right number depends on how
+    // many players are actually online.
+    const worldThrowMinParticipants = envPositiveNumber('WORLD_THROW_MIN_PARTICIPANTS', 5);
     console.log(`[SYS] round: OPEN ${openSeconds}s / LOCK ${lockSeconds}s / REVEAL ${revealSeconds}s`);
+    console.log(`[SYS] world throw: ${TEST_MODE ? 'TEST_MODE cycle R->P->S' : `crowd plurality, min ${worldThrowMinParticipants} participants`}`);
     return new RoundEngine({
         openSeconds,
         lockSeconds,
         revealSeconds,
-        pickWorldThrow: roundCount =>
-            TEST_MODE ? THROWS[roundCount % 3] : THROWS[Math.floor(Math.random() * 3)],
+        // THE WORLD THROW IS THE CROWD (defect (h), 2026-08-16). TEST_MODE keeps the
+        // deterministic R->P->S cycle so dev and the demo stay predictable; everywhere
+        // else it is derived from the round's own tally. See GameRules.deriveWorldThrow.
+        pickWorldThrow: (roundCount, counts) =>
+            TEST_MODE
+                ? THROWS[roundCount % 3]
+                : deriveWorldThrow(counts, { minParticipants: worldThrowMinParticipants }),
         makeRoundId: () => Math.random().toString(36).substring(2, 9),
         nowMs: () => Date.now(),
     }, initialRoundCount);

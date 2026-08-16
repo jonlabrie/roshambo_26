@@ -1,31 +1,240 @@
 {
     "matchups": [
-        { "player": "R", "world": "R", "result": "SAFE" },
-        { "player": "R", "world": "P", "result": "LOSS" },
-        { "player": "R", "world": "S", "result": "WIN" },
-        { "player": "P", "world": "R", "result": "WIN" },
-        { "player": "P", "world": "P", "result": "SAFE" },
-        { "player": "P", "world": "S", "result": "LOSS" },
-        { "player": "S", "world": "R", "result": "LOSS" },
-        { "player": "S", "world": "P", "result": "WIN" },
-        { "player": "S", "world": "S", "result": "SAFE" }
+        {
+            "player": "R",
+            "world": "R",
+            "result": "SAFE"
+        },
+        {
+            "player": "R",
+            "world": "P",
+            "result": "LOSS"
+        },
+        {
+            "player": "R",
+            "world": "S",
+            "result": "WIN"
+        },
+        {
+            "player": "P",
+            "world": "R",
+            "result": "WIN"
+        },
+        {
+            "player": "P",
+            "world": "P",
+            "result": "SAFE"
+        },
+        {
+            "player": "P",
+            "world": "S",
+            "result": "LOSS"
+        },
+        {
+            "player": "S",
+            "world": "R",
+            "result": "LOSS"
+        },
+        {
+            "player": "S",
+            "world": "P",
+            "result": "WIN"
+        },
+        {
+            "player": "S",
+            "world": "S",
+            "result": "SAFE"
+        }
     ],
     "potProgression": [
-        { "currentPot": 0, "result": "WIN", "nextPot": 1, "delta": 1 },
-        { "currentPot": 1, "result": "WIN", "nextPot": 3, "delta": 3 },
-        { "currentPot": 3, "result": "WIN", "nextPot": 9, "delta": 9 },
-        { "currentPot": 9, "result": "WIN", "nextPot": 27, "delta": 27 },
-        { "currentPot": 27, "result": "WIN", "nextPot": 81, "delta": 81 },
-        { "currentPot": 0, "result": "SAFE", "nextPot": 0, "delta": 0 },
-        { "currentPot": 9, "result": "SAFE", "nextPot": 9, "delta": 0 },
-        { "currentPot": 0, "result": "LOSS", "nextPot": 0, "delta": 0 },
-        { "currentPot": 9, "result": "LOSS", "nextPot": 0, "delta": -9 },
-        { "currentPot": 81, "result": "LOSS", "nextPot": 0, "delta": -81 }
+        {
+            "currentPot": 0,
+            "result": "WIN",
+            "nextPot": 1,
+            "delta": 1
+        },
+        {
+            "currentPot": 1,
+            "result": "WIN",
+            "nextPot": 3,
+            "delta": 3
+        },
+        {
+            "currentPot": 3,
+            "result": "WIN",
+            "nextPot": 9,
+            "delta": 9
+        },
+        {
+            "currentPot": 9,
+            "result": "WIN",
+            "nextPot": 27,
+            "delta": 27
+        },
+        {
+            "currentPot": 27,
+            "result": "WIN",
+            "nextPot": 81,
+            "delta": 81
+        },
+        {
+            "currentPot": 0,
+            "result": "SAFE",
+            "nextPot": 0,
+            "delta": 0
+        },
+        {
+            "currentPot": 9,
+            "result": "SAFE",
+            "nextPot": 9,
+            "delta": 0
+        },
+        {
+            "currentPot": 0,
+            "result": "LOSS",
+            "nextPot": 0,
+            "delta": 0
+        },
+        {
+            "currentPot": 9,
+            "result": "LOSS",
+            "nextPot": 0,
+            "delta": -9
+        },
+        {
+            "currentPot": 81,
+            "result": "LOSS",
+            "nextPot": 0,
+            "delta": -81
+        }
     ],
     "streakRules": [
-        { "result": "WIN", "currentStreak": 0, "nextStreak": 1 },
-        { "result": "WIN", "currentStreak": 4, "nextStreak": 5 },
-        { "result": "SAFE", "currentStreak": 5, "nextStreak": 0 },
-        { "result": "LOSS", "currentStreak": 5, "nextStreak": 0 }
+        {
+            "result": "WIN",
+            "currentStreak": 0,
+            "nextStreak": 1
+        },
+        {
+            "result": "WIN",
+            "currentStreak": 4,
+            "nextStreak": 5
+        },
+        {
+            "result": "SAFE",
+            "currentStreak": 5,
+            "nextStreak": 0
+        },
+        {
+            "result": "LOSS",
+            "currentStreak": 5,
+            "nextStreak": 0
+        }
+    ],
+    "worldThrowDerivation": [
+        {
+            "counts": {
+                "R": 5,
+                "P": 2,
+                "S": 1
+            },
+            "minParticipants": 5,
+            "expect": "R",
+            "why": "clear plurality"
+        },
+        {
+            "counts": {
+                "R": 1,
+                "P": 4,
+                "S": 3
+            },
+            "minParticipants": 5,
+            "expect": "P",
+            "why": "PLURALITY, not >50% \u2014 with three options a true majority often does not exist"
+        },
+        {
+            "counts": {
+                "R": 5,
+                "P": 0,
+                "S": 0
+            },
+            "minParticipants": 5,
+            "expect": "R",
+            "why": "unanimous"
+        },
+        {
+            "counts": {
+                "R": 100,
+                "P": 99,
+                "S": 1
+            },
+            "minParticipants": 5,
+            "expect": "R",
+            "why": "a margin of one still decides it"
+        },
+        {
+            "counts": {
+                "R": 3,
+                "P": 3,
+                "S": 2
+            },
+            "minParticipants": 5,
+            "expectOneOf": [
+                "R",
+                "P"
+            ],
+            "why": "tie for top -> random among the tied only"
+        },
+        {
+            "counts": {
+                "R": 4,
+                "P": 4,
+                "S": 4
+            },
+            "minParticipants": 5,
+            "expectOneOf": [
+                "R",
+                "P",
+                "S"
+            ],
+            "why": "three-way tie"
+        },
+        {
+            "counts": {
+                "R": 2,
+                "P": 1,
+                "S": 1
+            },
+            "minParticipants": 5,
+            "expectOneOf": [
+                "R",
+                "P",
+                "S"
+            ],
+            "why": "below threshold -> random; the crowd is too small to be a world"
+        },
+        {
+            "counts": {
+                "R": 0,
+                "P": 0,
+                "S": 0
+            },
+            "minParticipants": 5,
+            "expectOneOf": [
+                "R",
+                "P",
+                "S"
+            ],
+            "why": "empty round -> random"
+        },
+        {
+            "counts": {
+                "R": 3,
+                "P": 1,
+                "S": 1
+            },
+            "minParticipants": 5,
+            "expect": "R",
+            "why": "exactly at the threshold, so the plurality rule applies"
+        }
     ]
 }

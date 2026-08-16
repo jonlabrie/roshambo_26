@@ -82,7 +82,7 @@ Game rules live in THREE implementations, and all three are held to `shared-fixt
 - Player matches world → **SAFE**: pot preserved, streaks reset to 0
 - World beats player → **LOSS**: pot forfeited, streaks reset
 
-- At round end: the World Throw is chosen and each participant's result is computed and persisted. **The World Throw is DESIGNED to be the MAJORITY of player throws** — "you against the world" is the product premise, and it makes crowd-reading a skill (hence the last-five-rounds HUD). The shipped code has NOT implemented this yet: it picks randomly, or cycles R→P→S under TEST_MODE. Treat the majority rule as design truth and the random pick as an unfinished implementation — this is the one place "the code is the source of truth" does not apply. Per-player `player-data` is then emitted to each device room, and `reveal` broadcasts the round to everyone. See `docs/wiki/world/world-throw.md` and parked defect (h).
+- At round end: the World Throw is chosen and each participant's result is computed and persisted. **The World Throw is DESIGNED to be the MAJORITY of player throws** — "you against the world" is the product premise, and it makes crowd-reading a skill (hence the last-five-rounds HUD). Implemented 2026-08-16 as `GameRules.deriveWorldThrow` — **plurality** (argmax of the round's tally), ties broken randomly among the tied, falling back to random below `WORLD_THROW_MIN_PARTICIPANTS` (5). **`TEST_MODE` still cycles R→P→S**, and BOTH prod and dev run TEST_MODE, so the rule is fixed but not yet exercised anywhere. Per-player `player-data` is then emitted to each device room, and `reveal` broadcasts the round to everyone. See `docs/wiki/world/world-throw.md`.
 
 ### Roblox client (`roblox/`, milestone 2+)
 
