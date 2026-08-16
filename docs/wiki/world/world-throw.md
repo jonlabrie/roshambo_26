@@ -31,11 +31,55 @@ Consequences that follow, and that any design must respect:
 
 ## Patent basis
 
-The game implements **US 8,025,570 B2**, a patent **owned by the owner (Jon Labrie)**,
-which confers roughly a year of exclusivity as of 2026-08. This is load-bearing for
-product strategy, not trivia. Full text:
-`https://ppubs.uspto.gov/api/patents/html/US-8025570-B2?source=USPAT` (the owner's link
-carried a request token that will expire).
+The game implements **US 8,025,570 B2** — "Massively multiplayer game method and system",
+inventor **Jon Edgar Labrie**, filed 2004-02-23, granted 2011-09-27. Google Patents lists it
+as active, expiring **2027-12-11** (⚠ from Google Patents, not verified against USPTO).
+
+**What the claims actually cover.** The claim is broad in most respects: it recites selecting
+an item from a set by three or more players, transmitting to a server, the server designating
+an item "based on all the selected items received", and a *generic cyclic dominance rule-set*
+over an ordered set {X1…Xn} — so it is not limited to rock-paper-scissors, nor to three
+options. That breadth is the patent's strength.
+
+⚠ **The narrow part is how the item is designated, and it says MAJORITY.** Both independent
+claims — **1 and 6** — close with the same limitation:
+
+> "wherein the designated item is the item selected by a **majority of players**"
+
+**The specification offers no alternative method.** Checked 2026-08-16 for the language that
+would open it up ("alternatively", "in another embodiment", "predetermined criteria", "other
+methods", "not limited to") anywhere near the designation step: there is none. Every passage
+reinforces the one method — *"The option chosen by the majority of players is called the
+'Majority' throw."*
+
+**"Plurality" appears in the patent only as the term of art for "more than one"** — "a
+plurality of edge server devices", "a plurality of devices". It is never used to mean "the
+most votes".
+
+**The tension this creates with the implementation.** [[core-loop]] designates by PLURALITY
+(argmax), because with three options a strict majority (>50%) frequently does not exist —
+roughly uniform play puts each option near 33%. Under a literal reading of claim 1 the server
+would have nothing to designate in most rounds. That cuts both ways: it is a genuine question
+mark over whether the claims cover the shipped product, and it is simultaneously the strongest
+argument for construing "majority" broadly, since a construction that renders the invention
+inoperable most of the time is disfavoured.
+
+**⚠ OPEN — needs a patent attorney, not an engineering judgement.** Claim construction is a
+legal question and this underpins the product's exclusivity. Facts worth putting in front of
+counsel, all of which bound the options:
+
+- A **broadening reissue** must be filed within two years of grant (35 U.S.C. §251); grant was
+  2011-09-27, so that window closed in 2013.
+- A **continuation** requires a pending parent application.
+- Expiry is ~16 months out as of 2026-08, which bounds what this is worth spending on.
+
+**Do not quietly align the code to a guess.** `GameRules.deriveWorldThrow` is one pure
+function with fixture cases, so the designation rule is cheap to change once there is advice.
+Changing it on an engineering hunch would be worse than leaving it.
+
+Full text: `https://patents.google.com/patent/US8025570B2/en`. One formula in the rendered
+claim ("0<p<(n+½)") looks garbled in transit and should be read from the original before
+anyone relies on it.
 
 ## As-built
 

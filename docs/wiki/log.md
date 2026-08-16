@@ -239,3 +239,19 @@ cycle by owner ruling, so dev stays deterministic; defect (e) therefore still st
 earlier claim that (h) would supersede it was wrong.
 
 ⚠ Fixed is not active: both environments run TEST_MODE, so nothing exercises the rule yet.
+
+## [2026-08-16] defect | the patent claims MAJORITY, and the game designates by PLURALITY
+
+Read US 8,025,570 B2 at the owner's request, who suspected the patent used "majority" loosely
+where "plurality" was meant. It does not read that way. **Both independent claims (1 and 6)
+recite "wherein the designated item is the item selected by a majority of players"** as a
+limitation, and the specification offers no alternative designation method — none of the usual
+opening language appears near that step. "Plurality" occurs in the patent only in its term-of-
+art sense ("a plurality of devices"), never meaning "the most votes".
+
+The shipped rule is plurality (argmax), because with three options a >50% majority frequently
+does not exist. So a literal claim reading leaves most rounds with nothing to designate — both
+a question over coverage of the actual product, and the best argument for a broad construction.
+
+⚠ OPEN, and legal rather than engineering: needs a patent attorney. Recorded on [[world-throw]]
+with the claim language verbatim. The code is deliberately NOT being changed to match a guess.
