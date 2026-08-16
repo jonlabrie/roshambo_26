@@ -168,3 +168,39 @@ the fate gate that stops fate-bound players throwing (`main.server.luau`).
 valuable exactly where the owner noticed it, in a room built for reading walls. Needs a
 recall affordance that cannot itself be lost, and must not break the drum-authoritative
 reveal path ([[round-and-hud]]).
+
+## Stats data capture — two follow-ups left open at merge
+
+Plan `docs/superpowers/plans/2026-08-16-stats-data-capture.md` shipped 2026-08-16 (12 commits,
+`3f0b39a..4e63eeb`). The final whole-branch review passed it as ready to merge with two items
+deliberately not fixed. Both concern PWA presence and they interact — fix them together.
+
+**1. PWA sessions orphaned by a process death stay open forever.** The stale sweep is now
+scoped to `instanceId: { $exists: true }` so it can never truncate a non-heartbeated transport
+(that was the Critical it fixed). The cost: a PWA session open when the process dies is never
+closed, and `roundsPresent` treats an open session as running to the window end — inflating
+that player's presence. Note the dev backend auto-deploys on every push, so this fires often.
+
+⚠ Do NOT fix this by closing open PWA sessions at boot — that is only safe single-instance and
+would truncate a sibling's live sessions on App Runner. **The safe repair, available now that
+PWA sessions heartbeat every 30s: a sweep of `platform: 'pwa'` sessions whose `lastSeenAt` is
+older than the grace window.** A live session on a sibling instance carries a fresh
+`lastSeenAt` and cannot be selected, so it is instance-independent. It does re-couple the sweep
+to the heartbeat, which the Critical's fix deliberately decoupled — a real design call, not an
+oversight.
+
+Severity note: this is the *repairable* direction of failure. Rows are left un-closed rather
+than wrongly closed, so a backfill can still close them at their last known `lastSeenAt`. The
+bug it replaced overwrote correct intervals unrecoverably.
+
+**2. A disconnect racing `sync-player` leaks a self-refreshing heartbeat entry.**
+`socketAdapter.ts:169-170` vs `:283-284` — if the socket drops while `sync-player` is awaiting
+`resolveUser`/`openSession`, the disconnect handler runs first and finds no `sessionId`, then
+the sync handler registers a heartbeat for a dead socket. That entry refreshes `lastSeenAt`
+forever, so it would defeat follow-up (1) as well as growing the `Map` unbounded over process
+lifetime. A `socket.connected` check before `heartbeats.set` closes it.
+
+**Operational note for whoever deploys this:** removing `index: true` from a Mongoose schema
+does NOT drop an index already built in a live database. If `roshambo-dev` or `roshambo` has
+already created `userId_1` on `sessions`/`bankevents`, it persists until dropped by hand or by
+`syncIndexes()`. The write-cost saving is only realised on fresh collections.
