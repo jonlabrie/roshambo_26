@@ -12,12 +12,21 @@ import { RoundEngine } from './engine/RoundEngine';
 import { ResultsStore } from './engine/ResultsStore';
 import { attachSocketAdapter } from './transports/socketAdapter';
 import { Throw, deriveWorldThrow } from './engine/GameRules';
+import { closeStaleSessions } from './sessions';
 
 dotenv.config();
 
 const TEST_MODE = process.env.TEST_MODE === 'true';
 const PORT = process.env.PORT || 3001;
 const MONGODB_URI = process.env.MONGODB_URI;
+
+// Roblox game servers heartbeat presence at a 30s cadence (same as the throw flush).
+// Two minutes is four missed heartbeats — long enough to survive a hiccup, short enough
+// that a crashed game server does not inflate presence for long.
+const STALE_SESSION_MS = 2 * 60 * 1000;
+// How often the sweep runs. Independent of the staleness window: this is the sweep's own
+// polling cadence, not the grace period a session gets before being considered stale.
+const STALE_SESSION_SWEEP_INTERVAL_MS = 60 * 1000;
 
 console.log(`[SYS] Roshambo Server Init. TEST_MODE: ${TEST_MODE}`);
 
@@ -106,6 +115,12 @@ mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
         httpServer.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);
             setInterval(() => engine.tick(), 1000);
+            // Close sessions whose reporter went silent. See STALE_SESSION_MS /
+            // STALE_SESSION_SWEEP_INTERVAL_MS above for why these values.
+            setInterval(() => {
+                closeStaleSessions(new Date(Date.now() - STALE_SESSION_MS))
+                    .catch(err => console.error('Stale session sweep failed:', (err as Error).message));
+            }, STALE_SESSION_SWEEP_INTERVAL_MS);
         });
     })
     .catch(err => {

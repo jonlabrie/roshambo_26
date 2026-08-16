@@ -7,6 +7,7 @@ import { bankPot } from '../wallet';
 import User, { IUser } from '../models/User';
 import { Throw } from '../engine/GameRules';
 import { topByCareer } from '../leaderboards';
+import { reconcilePresence } from '../sessions';
 import { shellStates, SHELL_IDS, LaunchContext, SHELL_PRICES, MORTAR_PRICES } from '../fireworks';
 import { validateLoadout, validateSizeClass, validatePadPreferences, validateDecorations, validateAccess } from '../loadout';
 import {
@@ -111,6 +112,25 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
         if (!results) { res.status(404).json({ error: 'RESULTS_NOT_READY' }); return; }
         res.set('Cache-Control', 'no-store');
         res.json(results.map(({ user, ...rest }) => rest));
+    });
+
+    // A game server reports its roster. Called on the same cadence as the throw flush.
+    router.post('/instances/:instanceId/presence', async (req, res) => {
+        try {
+            const ids = req.body?.robloxUserIds;
+            if (!Array.isArray(ids)) {
+                res.status(400).json({ error: 'BAD_REQUEST' });
+                return;
+            }
+            const users = await Promise.all(
+                ids.map((robloxUserId: string) => resolveUser({ robloxUserId: String(robloxUserId) }))
+            );
+            const userIds = users.filter((u): u is NonNullable<typeof u> => !!u).map(u => u._id);
+            const result = await reconcilePresence(req.params.instanceId, userIds, new Date());
+            res.json(result);
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
     });
 
     router.get('/players/:robloxUserId', async (req, res) => {

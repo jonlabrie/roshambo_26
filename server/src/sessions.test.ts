@@ -3,7 +3,7 @@ import { connectTestDb, clearTestDb, disconnectTestDb } from './test/db';
 import User from './models/User';
 import Round from './models/Round';
 import Session from './models/Session';
-import { openSession, closeSession, touchSession, roundsPresent } from './sessions';
+import { openSession, closeSession, touchSession, roundsPresent, reconcilePresence, closeStaleSessions } from './sessions';
 
 // Module scope: Task 5 appends a second `describe` to this file and reuses this helper.
 const at = (min: number) => new Date(Date.UTC(2026, 7, 16, 12, min, 0));
@@ -88,5 +88,59 @@ describe('sessions', () => {
         });
         expect(session.startedAt.toISOString()).toBe(at(10).toISOString());
         expect(session.lastSeenAt.toISOString()).toBe(at(10).toISOString());
+    });
+});
+
+describe('presence reconciliation', () => {
+    it('opens sessions for players newly present', async () => {
+        const a = await User.create({ deviceId: 'ra' });
+        const result = await reconcilePresence('inst1', [a._id], at(0));
+        expect(result.opened).toBe(1);
+        expect(await Session.countDocuments({ instanceId: 'inst1', endedAt: { $exists: false } })).toBe(1);
+    });
+
+    it('touches players still present rather than opening a second session', async () => {
+        const a = await User.create({ deviceId: 'ra' });
+        await reconcilePresence('inst1', [a._id], at(0));
+        const result = await reconcilePresence('inst1', [a._id], at(5));
+        expect(result.opened).toBe(0);
+        expect(result.touched).toBe(1);
+        expect(await Session.countDocuments({ instanceId: 'inst1' })).toBe(1);
+    });
+
+    it('closes sessions for players who have left', async () => {
+        const a = await User.create({ deviceId: 'ra' });
+        const b = await User.create({ deviceId: 'rb' });
+        await reconcilePresence('inst1', [a._id, b._id], at(0));
+        const result = await reconcilePresence('inst1', [a._id], at(5));
+        expect(result.closed).toBe(1);
+        const bSession = await Session.findOne({ userId: b._id });
+        expect(bSession?.endedAt?.toISOString()).toBe(at(5).toISOString());
+    });
+
+    it('does not touch sessions belonging to another instance', async () => {
+        const a = await User.create({ deviceId: 'ra' });
+        await reconcilePresence('inst1', [a._id], at(0));
+        await reconcilePresence('inst2', [], at(5));
+        expect(await Session.countDocuments({ instanceId: 'inst1', endedAt: { $exists: false } })).toBe(1);
+    });
+
+    it('closes sessions whose instance stopped reporting, at their lastSeenAt', async () => {
+        const a = await User.create({ deviceId: 'ra' });
+        await reconcilePresence('deadInstance', [a._id], at(0));
+        await Session.updateMany({}, { $set: { lastSeenAt: at(0) } });
+
+        const closed = await closeStaleSessions(at(10));
+        expect(closed).toBe(1);
+        const stored = await Session.findOne({ userId: a._id });
+        // closed at lastSeenAt, NOT at sweep time — the player was not present for those 30 minutes
+        expect(stored?.endedAt?.toISOString()).toBe(at(0).toISOString());
+    });
+
+    it('leaves fresh sessions alone', async () => {
+        const a = await User.create({ deviceId: 'ra' });
+        await reconcilePresence('liveInstance', [a._id], at(20));
+        await Session.updateMany({}, { $set: { lastSeenAt: at(20) } });
+        expect(await closeStaleSessions(at(10))).toBe(0);
     });
 });
