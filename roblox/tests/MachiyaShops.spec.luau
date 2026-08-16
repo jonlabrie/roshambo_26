@@ -188,3 +188,51 @@ describe("per-shop noren panel count", function()
         expect(bays).toBe(2)
     end)
 end)
+
+describe("kanban occlusion guard — the sign must hang in open air", function()
+    -- The owner's finding on the kit's first board: a frameless slab at the kamoi
+    -- line whose whole z-span sat INSIDE the Eave's — top covered, face shaded, a
+    -- cream slab under a cream soffit that read as no sign at all. The archetype's
+    -- header states the intent ("a closed upper storey ... carrying the sign high
+    -- enough to read from the bridge"), and 花火屋's inline kanban already lives
+    -- there. This guard would have caught the defect: the panel's FULL extent
+    -- (rotation-aware) must not intersect the Eave's in y and z, and its bottom
+    -- must clear the Eave's top.
+    local function rotAABB(p)
+        local cf, sz = p.properties.CFrame, p.properties.Size
+        local lo, hi = {}, {}
+        for i = 1, 3 do
+            local r = 3 * (i - 1)
+            local ext = (
+                math.abs(cf[4 + r]) * sz[1]
+                + math.abs(cf[5 + r]) * sz[2]
+                + math.abs(cf[6 + r]) * sz[3]
+            ) / 2
+            lo[i], hi[i] = cf[i] - ext, cf[i] + ext
+        end
+        return lo, hi
+    end
+    for _, shopKey in { "apparel", "accessories" } do
+        local shop = (MachiyaShops :: any)[shopKey]
+        if shop.identity and shop.identity.board then
+            test(("%s's kanban hangs clear of the eave"):format(shopKey), function()
+                local m = Machiya.build(ZenDojo.palette, ArenaLayout, shop)
+                -- the framed construction, 花火屋's names
+                local k = find(m, "Kanban")
+                expect(k ~= nil).toBe(true)
+                -- the occlusion assertion holds whatever the panel is called, so a
+                -- rename can never smuggle the sign back under the soffit
+                local panel = k or find(m, "SignBoard")
+                local eave = find(m, "Eave")
+                expect(panel ~= nil).toBe(true)
+                expect(eave ~= nil).toBe(true)
+                local plo, phi = rotAABB(panel)
+                local elo, ehi = rotAABB(eave)
+                local yOverlap = phi[2] > elo[2] and ehi[2] > plo[2]
+                local zOverlap = phi[3] > elo[3] and ehi[3] > plo[3]
+                expect(yOverlap and zOverlap).toBe(false)
+                expect(plo[2] > ehi[2]).toBe(true) -- bottom above the eave's top: open air
+            end)
+        end
+    end
+end)

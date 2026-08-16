@@ -639,10 +639,12 @@ describe("machiya variants", function()
         expect(find(m, "ChochinEast") ~= nil).toBe(true)
         -- noren: the kit's own colour rides the archetype's hang
         expect(find(m, "Noren2_1") ~= nil).toBe(true)
-        -- board: one BLANK slab — blank means no children (no SurfaceGui, no copy)
-        local board = find(m, "SignBoard")
+        -- board: 花火屋's framed kanban construction on the upper storey, BLANK —
+        -- blank means the panel has no children (no SurfaceGui, no copy)
+        local board = find(m, "Kanban")
         expect(board ~= nil).toBe(true)
         expect(board.children == nil or #board.children == 0).toBe(true)
+        expect(countPrefix(m, "KanbanFrame")).toBe(4)
         -- glow: the interior lighting hooks exist
         local sawGlow = false
         for _, p in allParts(m) do
@@ -662,7 +664,9 @@ describe("machiya variants", function()
         for _, p in allParts(m2) do
             expect(string.find(p.name, "InteriorGlow_") == nil).toBe(true)
         end
-        expect(find(m2, "SignBoard") ~= nil).toBe(true)
+        local sealedBoard = find(m2, "Kanban")
+        expect(sealedBoard ~= nil).toBe(true)
+        expect(sealedBoard.children == nil or #sealedBoard.children == 0).toBe(true)
         expect(find(m2, "ChochinWest") ~= nil).toBe(true)
     end)
     test("koshi + full interior refuses loudly, not with nil arithmetic", function()

@@ -1353,21 +1353,73 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
             end
         end
         if identity.board then
-            -- ONE BLANK BOARD, geometry only (the sports book carries no signage copy — the
-            -- wager-language ruling). On the frontage plane above the kamoi: back face ON the
-            -- plane, the board proud of it the way every timber face is, and aerial over the
-            -- promenade — its underside is the kamoi's 6.8, which clears an avatar.
-            local boardW = math.min(W * 0.55, 10)
-            local boardH = 1.8
-            add(
-                "SignBoard",
-                { boardW, boardH, 0.12 },
-                { CX, HEAD_Y + 0.4 + boardH / 2, Z0 - 0.06 },
-                paper,
-                STUCCO_MAT,
-                nil,
-                STUCCO_VAR
+            -- ONE BLANK FRAMED KANBAN, geometry only — no SurfaceGui, no copy (the sports
+            -- book carries no signage copy — the wager-language ruling; and the owner is
+            -- choosing a naming style separately, so every kit board waits blank).
+            --
+            -- ON THE UPPER STOREY, NOT AT THE KAMOI (owner's finding, accessories gate):
+            -- the kit's first board was a frameless slab at the kamoi line whose whole
+            -- z-span fell INSIDE the Eave's — the eave covered its top and shaded the
+            -- rest, a cream slab under a cream soffit. The archetype's own header says
+            -- where a machiya's sign goes ("a closed upper storey of kōshi lattice
+            -- carrying the sign high enough to read from the bridge"), and 花火屋's
+            -- inline kanban already sits there. This is that construction, generalized:
+            --   panel: 花火屋's 2.6 height and 0.11 thickness; WIDTH sized to the
+            --     FRONTAGE at 花火屋's own ratio (its 7.8 panel on its 17.93-wide
+            --     envelope) — the inline sign is sized to its three characters instead;
+            --   y: centred on the shop's own mushiko-mado band (derived from the
+            --     band, which is itself centred on the upper storey);
+            --   z: proud of the upper wall's front face (SZ0) by 花火屋's own standoff
+            --     — its sign centre hangs at Z0 - 0.65 against a face at Z0 + 0.30,
+            --     i.e. 0.95 proud (derived, not copied blind);
+            --   tilt: 花火屋's -15°, top toward the path, so anyone on the promenade
+            --     reads the face and not the edge;
+            --   frame: the same four lapped members, 0.32 section, 0.34 deep so the
+            --     surround stands proud of the panel.
+            local SIGN_H = 2.6
+            local SIGN_W = W * (7.8 / 17.93)
+            local SIGN_Y = WIN_Y0 + WIN_H / 2
+            local SIGN_Z = SZ0 - 0.95
+            local FRAME_W = 0.32
+            local FRAME_D = 0.34
+            local ST = rotX(-15)
+            -- offsets in the board's own plane, rotated with it, so the frame stays on
+            -- the board — 花火屋's signPos, restated against this shop's centre
+            local function kanbanPos(dx: number, dy: number): { number }
+                return { CX + dx, SIGN_Y + ST[5] * dy, SIGN_Z + ST[8] * dy }
+            end
+            table.insert(
+                children,
+                Spec.part("Kanban", {
+                    Size = { SIGN_W, SIGN_H, 0.11 },
+                    CFrame = Spec.cframe({ CX, SIGN_Y, SIGN_Z }, ST),
+                    Color = paper,
+                    Material = STUCCO_MAT,
+                    MaterialVariant = STUCCO_VAR,
+                    CanCollide = false,
+                    CanQuery = false,
+                    CanTouch = false,
+                    CastShadow = false,
+                })
             )
+            for _, mfr in
+                {
+                    { "KanbanFrameTop", SIGN_W + 2 * FRAME_W, FRAME_W, 0, SIGN_H / 2 + FRAME_W / 2 },
+                    { "KanbanFrameBottom", SIGN_W + 2 * FRAME_W, FRAME_W, 0, -(SIGN_H / 2 + FRAME_W / 2) },
+                    { "KanbanFrameWest", FRAME_W, SIGN_H, -(SIGN_W / 2 + FRAME_W / 2), 0 },
+                    { "KanbanFrameEast", FRAME_W, SIGN_H, SIGN_W / 2 + FRAME_W / 2, 0 },
+                }
+            do
+                add(
+                    mfr[1] :: string,
+                    { mfr[2] :: number, mfr[3] :: number, FRAME_D },
+                    kanbanPos(mfr[4] :: number, mfr[5] :: number),
+                    timber,
+                    "Wood",
+                    ST,
+                    FRAME_VAR
+                )
+            end
         end
         if identity.glow and shop.interior ~= "none" then
             -- INTERIOR LIGHTING HOOKS: invisible anchored carriers, one PointLight each. An
