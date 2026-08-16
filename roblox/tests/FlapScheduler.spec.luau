@@ -67,4 +67,46 @@ describe("FlapScheduler", function()
         expect(s[#s].char).toBe("○")
         expect(s[1].atMs).toBe(100) -- stagger: (3-1)*50ms
     end)
+
+    test("the drum carries minus, colon and slash", function()
+        for _, ch in { "-", ":", "/" } do
+            local plan = FlapScheduler.plan(" ", ch, OPTS)
+            local s = stepsFor(plan, 1)
+            expect(#s > 0).toBe(true)
+            expect(s[#s].char).toBe(ch)
+            expect(s[#s].isFinal).toBe(true)
+        end
+    end)
+
+    test("adding punctuation did not disturb the glyph block wrap", function()
+        -- glyphs stay contiguous at the drum's end so the wrap to space is unchanged
+        expect(#stepsFor(FlapScheduler.plan("\u{2227}", "A", OPTS), 1)).toBe(2)
+    end)
+
+    test("long transitions are capped so the cell never shows a long roll", function()
+        -- A -> Z is 25 raw steps; the cap must shorten it
+        local s = stepsFor(FlapScheduler.plan("A", "Z", OPTS), 1)
+        expect(#s).toBe(9)
+        expect(s[#s].char).toBe("Z")
+        expect(s[#s].isFinal).toBe(true)
+    end)
+
+    test("a capped run is still contiguous on the drum, ending at the target", function()
+        -- the cheat is a jump-in, not a shuffle: the shown chars are the last N before target
+        local s = stepsFor(FlapScheduler.plan("A", "Z", OPTS), 1)
+        expect(s[1].char).toBe("R") -- Z is index 27, 9 back is R (index 18) -> first shown is R
+        expect(s[2].char).toBe("S")
+        expect(s[1].atMs).toBe(0)
+        expect(s[2].atMs).toBe(100)
+    end)
+
+    test("short transitions are untouched by the cap", function()
+        expect(#stepsFor(FlapScheduler.plan("A", "C", OPTS), 1)).toBe(2)
+    end)
+
+    test("maxSteps is configurable", function()
+        local s = stepsFor(FlapScheduler.plan("A", "Z", { stepMs = 100, staggerMs = 50, maxSteps = 3 }), 1)
+        expect(#s).toBe(3)
+        expect(s[#s].char).toBe("Z")
+    end)
 end)
