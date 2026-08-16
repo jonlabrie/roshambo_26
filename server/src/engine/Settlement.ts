@@ -38,7 +38,7 @@ export interface RoundToSettle {
 // Counter/gate deltas for one settled participant. Extracted so the arithmetic is testable
 // without a database. `newPot` is the post-round pot, proposed to $max — the builder never reads
 // the stored bestPot, it just offers a candidate and lets Mongo keep the larger.
-export function buildCounterUpdate(thrown: Throw, result: RoundResult, newPot: number) {
+export function buildCounterUpdate(thrown: Throw, result: RoundResult, newPot: number, forfeited: number) {
     const throwKey = ({ R: 'throwsR', P: 'throwsP', S: 'throwsS' } as const)[thrown];
     return {
         $inc: {
@@ -46,6 +46,9 @@ export function buildCounterUpdate(thrown: Throw, result: RoundResult, newPot: n
             wins: result === 'WIN' ? 1 : 0,
             safes: result === 'SAFE' ? 1 : 0,
             losses: result === 'LOSS' ? 1 : 0,
+            // Capture rate's denominator. Passed in rather than derived here because only the
+            // caller knows the PRE-round pot; by the time we have `newPot` a LOSS has zeroed it.
+            lifetimeForfeited: forfeited,
             [throwKey]: 1,
         } as Record<string, number>,
         // unresolvedWin = "the last scored round was a WIN and the player has not banked since".
@@ -111,7 +114,8 @@ export async function settleRound(data: RoundToSettle): Promise<{ round: GlobalR
                     timestamp: data.timestamp,
                 });
 
-                const counters = buildCounterUpdate(entry.throw, result, pot);
+                const forfeited = result === 'LOSS' ? (user.pointsAtStake || 0) : 0;
+                const counters = buildCounterUpdate(entry.throw, result, pot, forfeited);
                 const updated = (await User.findByIdAndUpdate(user._id, {
                     $set: {
                         pointsAtStake: pot,

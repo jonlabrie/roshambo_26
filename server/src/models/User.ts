@@ -35,6 +35,9 @@ export interface IUser extends Document {
     safes: number;
     losses: number;
     lifetimeBanked: number;
+    // The other half of capture rate: everything ever built and then lost. Monotonic,
+    // like lifetimeBanked. Together they answer "what fraction of what you built did you keep".
+    lifetimeForfeited: number;
     bestPot: number;
     throwsR: number;
     throwsP: number;
@@ -81,6 +84,7 @@ const UserSchema: Schema = new Schema({
     safes: { type: Number, default: 0 },
     losses: { type: Number, default: 0 },
     lifetimeBanked: { type: Number, default: 0 },
+    lifetimeForfeited: { type: Number, default: 0 },
     bestPot: { type: Number, default: 0 },
     throwsR: { type: Number, default: 0 },
     throwsP: { type: Number, default: 0 },

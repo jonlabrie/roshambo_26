@@ -185,3 +185,22 @@ describe('buildCounterUpdate', () => {
         }
     });
 });
+
+describe('buildCounterUpdate — forfeited points', () => {
+    it('records the forfeited pot on a LOSS', () => {
+        const update = buildCounterUpdate('R', 'LOSS', 0, 27);
+        expect(update.$inc.lifetimeForfeited).toBe(27);
+    });
+
+    it('forfeits nothing on a WIN', () => {
+        expect(buildCounterUpdate('R', 'WIN', 3, 0).$inc.lifetimeForfeited).toBe(0);
+    });
+
+    it('forfeits nothing on a SAFE', () => {
+        expect(buildCounterUpdate('R', 'SAFE', 9, 0).$inc.lifetimeForfeited).toBe(0);
+    });
+
+    it('a LOSS from an empty pot forfeits nothing', () => {
+        expect(buildCounterUpdate('R', 'LOSS', 0, 0).$inc.lifetimeForfeited).toBe(0);
+    });
+});
