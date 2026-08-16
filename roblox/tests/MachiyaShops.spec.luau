@@ -63,7 +63,9 @@ describe("MachiyaShops registry", function()
     test("accessories carries the surveyed Machiya_4 envelope", function()
         local s = MachiyaShops.accessories
         expect(s.name).toBe("MachiyaAccessories")
-        expect(s.envelope.x0).toBe(16.02)
+        -- x0 is NOT the survey's 16.02: it registers to 花火屋's built east face at a
+        -- 1.5 roji standoff (see the relationship test below).
+        expect(s.envelope.x0).toBe(17.76)
         expect(s.envelope.x1).toBe(32.65)
         expect(s.envelope.z0).toBe(36.34)
         expect(s.envelope.z1).toBe(49.58)
@@ -114,5 +116,38 @@ describe("apparel registers to the built neighbour", function()
         -- (derive-from-what-it-touches): west face −1.67, minus a 1.5 roji gap —
         -- so this drift class fails loudly forever.
         expect(MachiyaShops.apparel.envelope.x1 + 1.5).toBeCloseTo(MachiyaShops.hanabiya.envelope.x0, 0.001)
+    end)
+end)
+
+describe("accessories shell", function()
+    local m = Machiya.build(ZenDojo.palette, ArenaLayout, MachiyaShops.accessories)
+    local parts = allParts(m)
+    test("subordinate to the tower", function()
+        for _, p in parts do
+            local topY = p.properties.CFrame[2] + p.properties.Size[2] / 2
+            expect(topY <= ArenaLayout.towerTopY - 9.0).toBe(true)
+        end
+    end)
+    test("has a dressing set and it stays inside the envelope", function()
+        local e = MachiyaShops.accessories.envelope
+        local d = find(m, "Dressing")
+        expect(d ~= nil).toBe(true)
+        for _, p in allParts(d) do
+            expect(p.properties.CFrame[1] >= e.x0 and p.properties.CFrame[1] <= e.x1).toBe(true)
+            expect(p.properties.CFrame[3] >= e.z0 and p.properties.CFrame[3] <= e.z1).toBe(true)
+        end
+    end)
+end)
+
+describe("accessories registers to the built neighbour", function()
+    test("west edge is 花火屋's east face plus the 1.5-stud roji", function()
+        -- Same stale-massing class the apparel gate caught, mirrored: the surveyed
+        -- x0 (16.02) ran 0.24 studs INTO 花火屋's built east face (16.26). The shell
+        -- registers to the BUILT edge (derive-from-what-it-touches): east face 16.26,
+        -- plus the same 1.5 roji gap — so this drift class fails loudly forever.
+        expect(MachiyaShops.accessories.envelope.x0 - 1.5).toBeCloseTo(
+            MachiyaShops.hanabiya.envelope.x1,
+            0.001
+        )
     end)
 end)

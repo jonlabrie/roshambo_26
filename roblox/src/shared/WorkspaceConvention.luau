@@ -21,6 +21,7 @@ WorkspaceConvention.DECLARED_STAGE_CHILDREN = {
     "Karesansui",
     "Hanabiya", -- 花火屋, the firework shop machiya (assets/Hanabiya.model.json)
     "MachiyaApparel", -- apparel machiya, merchant row (assets/MachiyaApparel.model.json)
+    "MachiyaAccessories", -- teahouse-accessories machiya, merchant row (assets/MachiyaAccessories.model.json)
     "Torii", -- myōjin gate on the Overlook deck's west edge (assets/Torii.model.json)
     "ArenaSpawn",
 }

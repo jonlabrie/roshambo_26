@@ -325,12 +325,348 @@ MachiyaShops.apparel = {
 -- Front spread 1.18 studs -- under the 1.5 flag threshold but the widest of the
 -- three shells; recorded, not smoothed. floorY = the front's highest hit, 113.21.
 -- Back spread 8.65 (111.59 to 120.24), again reading as the cut, not the floor.
+--
+-- WEST EDGE RE-REGISTERED (same stale-massing class the apparel gate caught,
+-- mirrored): the massing block's surveyed x0 = 16.02 was STALE against the built
+-- neighbour — it ran 0.24 studs into 花火屋 (east face x = 16.26). The block
+-- predates the built shop, and the standing rule is to register to the BUILT
+-- edge, not the survey (derive-from-what-it-touches): x0 = 16.26 + 1.5 = 17.76,
+-- the same 1.5-stud roji as apparel's west side — which also keeps the two
+-- shells' side walls off a shared plane (coplanar-face flicker). x1/z/floorY
+-- stay surveyed.
 MachiyaShops.accessories = {
     name = "MachiyaAccessories",
-    envelope = { x0 = 16.02, x1 = 32.65, z0 = 36.34, z1 = 49.58, floorY = 113.21 },
+    envelope = { x0 = 17.76, x1 = 32.65, z0 = 36.34, z1 = 49.58, floorY = 113.21 },
     yaw = 0,
     frontage = "open",
     interior = "shallow",
+    identity = {
+        -- Warm russet, the teahouse-accessories register (design brief literal).
+        noren = { color = { 0.55, 0.28, 0.18 }, segments = 4 },
+        -- Light moss / green-grey paper — the tint reserved for accessories in the
+        -- palette note above. Rec. 709 luminance 0.688 (0.2126*168 + 0.7152*180 +
+        -- 0.0722*152, /255), the same level as canonical cream's 0.684 and well clear
+        -- of Chochin.LEGIBILITY_FLOOR (0.55); Chochin.spec's guard walks this table.
+        chochin = { paper = { 168, 180, 152 } },
+        -- Blank timber kanban above the kamoi — signage copy is out of scope.
+        board = true,
+        glow = { color = { 1.0, 0.85, 0.6 }, brightness = 1.2 },
+        -- THE MINIATURES ARE THE POINT OF THIS SHOP: shelf-scale previews of the
+        -- Piece B decoration catalog, built from primitives following the real
+        -- builders' silhouettes (StoneLantern.luau's base/post/firebox/cap stack,
+        -- scaled ~1.6/4.95). Everything derives from ctx.env — no world literals.
+        dress = function(ctx: any): { any }
+            local env, palette = ctx.env, ctx.palette
+            local FLOOR = env.floorY
+            local out: { any } = {}
+
+            -- The archetype's own planes (walls-register-to-structure): a wall's
+            -- INNER face sits STUCCO_SETBACK 0.30 + WALL_T 0.5 inside the envelope.
+            local wallInnerW = env.x0 + 0.8
+            local wallInnerE = env.x1 - 0.8
+            local wallInnerBackZ = env.z1 - 0.8
+            -- counter centre at 花火屋's 4.4 standoff (COUNTER_STANDOFF, measured to
+            -- the CENTRE, exactly as Machiya.luau does it)
+            local counterZ = env.z1 - 4.4
+
+            -- ----- miniature builders: the Piece B catalog, in primitives -----
+            -- Ishidōrō form per StoneLantern.luau (base disc / shaft / firebox cube /
+            -- cap disc, cap wider than base), as stacked cylinders + one cube. `s`
+            -- carries the four member dims; shelf minis are non-colliding merchandise
+            -- (54 shelf parts would be waste physics), the plinth hero collides.
+            local function miniLantern(
+                name: string,
+                x: number,
+                y: number,
+                z: number,
+                s: any,
+                solid: boolean?
+            ): any
+                local phys = if solid
+                    then {}
+                    else { CanCollide = false, CanQuery = false, CanTouch = false, CastShadow = false }
+                local function cyl(nm: string, d: number, h: number, cy: number, color: { number })
+                    local p: { [string]: any } = {
+                        Shape = "Cylinder",
+                        Size = { h, d, d },
+                        CFrame = Spec.cframe({ x, cy, z }, Spec.ROT.CYL_VERTICAL),
+                        Color = color,
+                        Material = "Slate",
+                    }
+                    for k, v in phys do
+                        p[k] = v
+                    end
+                    return Spec.part(nm, p)
+                end
+                local baseTop = y + s.base[2]
+                local shaftTop = baseTop + s.shaft[2]
+                local boxTop = shaftTop + s.box
+                local boxProps: { [string]: any } = {
+                    Size = { s.box, s.box, s.box },
+                    CFrame = Spec.cframe({ x, shaftTop + s.box / 2, z }),
+                    Color = palette.gold,
+                    Material = "Neon",
+                    Transparency = 0.2,
+                    children = if solid
+                        then {
+                            {
+                                name = "Glow",
+                                className = "PointLight",
+                                properties = {
+                                    Brightness = 0.6,
+                                    Range = 10,
+                                    Color = { 0.9, 0.75, 0.45 },
+                                    Shadows = false,
+                                },
+                            },
+                        }
+                        else nil,
+                }
+                for k, v in phys do
+                    boxProps[k] = v
+                end
+                return Spec.model(name, {
+                    cyl("Base", s.base[1], s.base[2], y + s.base[2] / 2, palette.gravel),
+                    cyl("Shaft", s.shaft[1], s.shaft[2], baseTop + s.shaft[2] / 2, palette.gravel),
+                    Spec.part("Firebox", boxProps),
+                    cyl("Cap", s.cap[1], s.cap[2], boxTop + s.cap[2] / 2, palette.gravel),
+                })
+            end
+            -- shelf mini, 1.6 tall (brief dims); `squat` trims the shaft to 1.5 total
+            -- where the next board up leaves only 1.6 clear (thin it, never push through)
+            local function lanternDims(squat: boolean)
+                return {
+                    base = { 0.9, 0.25 },
+                    shaft = { 0.3, if squat then 0.5 else 0.6 },
+                    box = 0.55,
+                    cap = { 1.0, 0.2 },
+                }
+            end
+
+            -- ----- the two shelf walls: three boards each on the side walls -----
+            -- Boards register to the BUILT side walls (back face ON the inner face) and
+            -- run the CUSTOMER floor only: clear of the frontage's parked door leaves
+            -- (deepest frontage timber lives inside z0 + 1.3) and stopping shy of the
+            -- counter's front face — running past it would pinch the staff channel
+            -- around the counter's end from 2.18 to under 1 stud.
+            local SHELF_D = 1.2
+            local BOARD_T = 0.4
+            local shelfZ0 = env.z0 + 1.45
+            local shelfZ1 = counterZ - 1.05
+            local shelfLen = shelfZ1 - shelfZ0
+            local shelfCZ = (shelfZ0 + shelfZ1) / 2
+            local half = shelfLen / 2
+            local TIER_STEP = 2.0 -- board centres 2.2 / 4.2 / 6.2 above the floor
+            -- The unit's support: two vertical FRONT standards per wall (floor to the
+            -- top board's top), front faces flush with the board fronts
+            -- (flush-outside-edges); the wall itself carries the back edge. Boards run
+            -- THROUGH the standards at their ends — the mortise read, same intentional
+            -- joinery class as apparel's rail-through-post. Nothing hangs below a
+            -- board, so the tier headroom is the honest 1.6.
+            local STD = 0.3
+            local STD_H = 6.2 + BOARD_T / 2 -- top board's top
+            -- per-shelf stock line, offsets from the shelf's z-centre (mirrored on
+            -- alternating tiers so the two walls don't read as copy-paste):
+            -- lantern A / three rolled flags / lantern B / folding-screen pair.
+            -- stockLimit keeps everything 0.05 clear of the standards' inner faces;
+            -- the line is packed (~0.05 gaps) — a stocked shelf, not a sparse one.
+            local stockLimit = half - STD - 0.05
+            local T_LANT_A = -(stockLimit - 0.55) -- 0.5 cap radius + 0.05 end margin
+            local T_FLAGS = { T_LANT_A + 0.70, T_LANT_A + 1.04, T_LANT_A + 1.38 }
+            local T_LANT_B = T_LANT_A + 2.08
+            local T_HINGE = T_LANT_A + 3.81 -- pair spans hinge ± ~1.18
+
+            for wi, wall in { { "West", wallInnerW, 1 }, { "East", wallInnerE, -1 } } do
+                local wname, innerX, dxSign = wall[1] :: string, wall[2] :: number, wall[3] :: number
+                local boardX = innerX + dxSign * SHELF_D / 2
+                local kids: { any } = {}
+                for _, sside in { -1, 1 } do
+                    table.insert(
+                        kids,
+                        Spec.part(`ShelfStandard_{sside}`, {
+                            Size = { STD, STD_H, STD },
+                            CFrame = Spec.cframe({
+                                boardX + dxSign * (SHELF_D / 2 - STD / 2),
+                                FLOOR + STD_H / 2,
+                                shelfCZ + sside * (half - STD / 2),
+                            }),
+                            Color = palette.timber,
+                            Material = "Wood",
+                        })
+                    )
+                end
+                for tier = 1, 3 do
+                    local boardY = FLOOR + 2.2 + (tier - 1) * TIER_STEP
+                    local surface = boardY + BOARD_T / 2
+                    -- headroom to the next board up bounds this tier's stock; the top
+                    -- tier is open to the storey and carries the full-height pieces
+                    local budget = if tier < 3 then TIER_STEP - BOARD_T - 0.1 else 1.8
+                    table.insert(
+                        kids,
+                        Spec.part(`ShelfBoard_{tier}`, {
+                            Size = { SHELF_D, BOARD_T, shelfLen },
+                            CFrame = Spec.cframe({ boardX, boardY, shelfCZ }),
+                            Color = palette.timber,
+                            Material = "Wood",
+                        })
+                    )
+                    -- mirror the stock line on alternating tiers/walls
+                    local m = if (tier + wi) % 2 == 0 then 1 else -1
+                    local squat = budget < 1.6
+                    for li, lt in { { "A", T_LANT_A }, { "B", T_LANT_B } } do
+                        table.insert(
+                            kids,
+                            miniLantern(
+                                `MiniLantern_{tier}_{li}`,
+                                boardX,
+                                surface,
+                                shelfCZ + m * (lt[2] :: number),
+                                lanternDims(squat)
+                            )
+                        )
+                    end
+                    for fi, ft in T_FLAGS do
+                        table.insert(
+                            kids,
+                            Spec.part(`RolledFlag_{tier}_{fi}`, {
+                                Shape = "Cylinder",
+                                Size = { 1.4, 0.3, 0.3 },
+                                CFrame = Spec.cframe({
+                                    boardX + ({ -0.2, 0.0, 0.2 })[fi],
+                                    surface + 0.7,
+                                    shelfCZ + m * ft,
+                                }, Spec.ROT.CYL_VERTICAL),
+                                Color = ({ palette.vermilion, palette.gold, palette.water })[(fi + tier) % 3 + 1],
+                                Material = "Fabric",
+                                CanCollide = false,
+                                CanQuery = false,
+                                CanTouch = false,
+                                CastShadow = false,
+                            })
+                        )
+                    end
+                    -- the folding screen: two slabs standing in a 15-degree V, hinge
+                    -- edge toward the wall, opening toward the shopper — the way a
+                    -- two-panel byoubu actually stands. Offsets route through
+                    -- Spec.rotY/rotYMat only (arch-stable trig). The leaves' mid-plane
+                    -- edge lines COINCIDE at the fold, so the two 0.08 thicknesses
+                    -- interpenetrate <=0.04 there — the hinge knuckle, intentional
+                    -- joinery (apparel's rail-through-post class).
+                    local scrH = math.min(1.8, budget)
+                    local hingeX = boardX - dxSign * 0.25
+                    local hingeZ = shelfCZ + m * T_HINGE
+                    for si, sl in { { -1, "1" }, { 1, "2" } } do
+                        local zEnd = sl[1] :: number
+                        local yawDeg = 90 - 15 * zEnd * dxSign
+                        local off = Spec.rotY({ -zEnd * 0.6, 0, 0 }, yawDeg)
+                        table.insert(
+                            kids,
+                            Spec.part(`ScreenSlab_{tier}_{si}`, {
+                                Size = { 1.2, scrH, 0.08 },
+                                CFrame = Spec.cframe({
+                                    hingeX + off[1],
+                                    surface + scrH / 2,
+                                    hingeZ + off[3],
+                                }, Spec.rotYMat(yawDeg)),
+                                Color = palette.ivory,
+                                Material = "Fabric",
+                                CanCollide = false,
+                                CanQuery = false,
+                                CanTouch = false,
+                                CastShadow = false,
+                            })
+                        )
+                    end
+                end
+                table.insert(out, Spec.model(`ShelfWall{wname}`, kids))
+            end
+
+            -- ----- the display plinth, centre-floor: the catalog's hero piece -----
+            -- Midway between the frontage clearance line (z0 + 1.2) and the counter's
+            -- front face — the same customer-floor midline apparel's table sits on.
+            local plinthZ = ((env.z0 + 1.2) + (counterZ - 1.0)) / 2
+            local PLINTH = 1.8
+            table.insert(
+                out,
+                Spec.model("DisplayPlinth", {
+                    Spec.part("Plinth", {
+                        Size = { PLINTH, PLINTH, PLINTH },
+                        CFrame = Spec.cframe({ env.cx, FLOOR + PLINTH / 2, plinthZ }),
+                        Color = palette.timber,
+                        Material = "Wood",
+                    }),
+                    miniLantern("HeroLantern", env.cx, FLOOR + PLINTH, plinthZ, {
+                        base = { 1.25, 0.35 },
+                        shaft = { 0.4, 0.8 },
+                        box = 0.75,
+                        cap = { 1.4, 0.3 },
+                    }, true),
+                })
+            )
+
+            -- ----- the counter: 花火屋's rule, 花火屋's number (as apparel) -----
+            local counterW = env.w * 0.6
+            table.insert(
+                out,
+                Spec.part("Counter", {
+                    Size = { counterW, ctx.consts.COUNTER_H, 2.0 },
+                    CFrame = Spec.cframe({ env.cx, FLOOR + ctx.consts.COUNTER_H / 2, counterZ }),
+                    Color = palette.timber,
+                    Material = "Wood",
+                })
+            )
+
+            -- ----- the rear shelf, full counter width, back face ON the wall's inner face -----
+            local shelfZ = wallInnerBackZ - SHELF_D / 2
+            local sKids: { any } = {}
+            table.insert(
+                sKids,
+                Spec.part("ShelfBoard", {
+                    Size = { counterW, 0.4, SHELF_D },
+                    CFrame = Spec.cframe({ env.cx, FLOOR + 5.5, shelfZ }),
+                    Color = palette.timber,
+                    Material = "Wood",
+                })
+            )
+            for _, side in { -1, 1 } do
+                table.insert(
+                    sKids,
+                    Spec.part(`ShelfBracket_{side}`, {
+                        Size = { 0.3, 0.3, 1.0 },
+                        CFrame = Spec.cframe({
+                            env.cx + side * (counterW / 2 - 0.7),
+                            FLOOR + 5.5 - 0.2 - 0.15,
+                            wallInnerBackZ - 0.5,
+                        }),
+                        Color = palette.timber,
+                        Material = "Wood",
+                    })
+                )
+            end
+            -- boxed stock on top — apparel's five-bolt rhythm, in this shop's goods
+            for i = 1, 5 do
+                table.insert(
+                    sKids,
+                    Spec.part(`StockBox_{i}`, {
+                        Size = { 0.8, 0.8, 0.8 },
+                        CFrame = Spec.cframe({
+                            env.cx + (i - 3) * (counterW - 1.0) / 5,
+                            FLOOR + 5.5 + 0.2 + 0.4,
+                            shelfZ,
+                        }),
+                        Color = if i == 3
+                            then palette.gold
+                            elseif i % 2 == 1 then palette.timber
+                            else palette.moss,
+                        Material = "Wood",
+                    })
+                )
+            end
+            table.insert(out, Spec.model("RearShelf", sKids))
+
+            return out
+        end,
+    },
 } :: Shop
 
 -- Machiya_East -> SPORTS BOOK FRONTAGE. pivot(74.27,119.42,47.58)
