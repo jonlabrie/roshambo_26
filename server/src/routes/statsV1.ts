@@ -9,17 +9,35 @@ const LIMIT = 10;
 
 // HEAT gets ROLLING windows, RANK gets CALENDAR ones (see windows.ts). Records are read as
 // calendar periods because they are a standing, not form.
-function recordsWindow(name: string, now: Date): Window | null {
-    if (name === 'day') return calendarDayUTC(now);
-    if (name === 'week') return calendarWeekUTC(now);
-    if (name === 'all') return { from: new Date(0), to: new Date(now.getTime() + DAY_MS) };
+//
+// WHICH IS WHY THE WIRE CARRIES BOTH THE KIND AND THE BOUNDS. `window=day` means two
+// different periods on the two endpoints — the UTC calendar day on /records, the last 24
+// hours on /heat — and a label alone cannot tell them apart, so a display rendering "Today"
+// from both would silently show two different periods under one heading. `windowKind` names
+// which rule was applied and `from`/`to` are the resolved half-open bounds themselves, so a
+// display can print the actual period rather than infer it.
+export type WindowKind = 'calendar' | 'rolling';
+
+interface ResolvedWindow {
+    window: Window;
+    kind: WindowKind;
+}
+
+function recordsWindow(name: string, now: Date): ResolvedWindow | null {
+    if (name === 'day') return { window: calendarDayUTC(now), kind: 'calendar' };
+    if (name === 'week') return { window: calendarWeekUTC(now), kind: 'calendar' };
+    // 'all' is ROLLING, not calendar: its upper bound is derived from `now` rather than from
+    // a period boundary players could name, so it moves with every request.
+    if (name === 'all') {
+        return { window: { from: new Date(0), to: new Date(now.getTime() + DAY_MS) }, kind: 'rolling' };
+    }
     return null;
 }
 
-function heatWindow(name: string, now: Date): Window | null {
-    if (name === 'hour') return rollingWindow(now, HOUR_MS);
-    if (name === 'day') return rollingWindow(now, DAY_MS);
-    if (name === 'week') return rollingWindow(now, WEEK_MS);
+function heatWindow(name: string, now: Date): ResolvedWindow | null {
+    if (name === 'hour') return { window: rollingWindow(now, HOUR_MS), kind: 'rolling' };
+    if (name === 'day') return { window: rollingWindow(now, DAY_MS), kind: 'rolling' };
+    if (name === 'week') return { window: rollingWindow(now, WEEK_MS), kind: 'rolling' };
     return null;
 }
 
@@ -38,11 +56,12 @@ export function createStatsV1(): Router {
 
     router.get('/records', async (req, res) => {
         try {
-            const w = recordsWindow(String(req.query.window ?? ''), new Date());
-            if (!w) {
+            const resolved = recordsWindow(String(req.query.window ?? ''), new Date());
+            if (!resolved) {
                 res.status(400).json({ error: 'BAD_WINDOW', accepts: ['day', 'week', 'all'] });
                 return;
             }
+            const w = resolved.window;
             const [streaks, banks, rounds] = await Promise.all([
                 longestStreaks(w, LIMIT),
                 biggestBanks(w, LIMIT),
@@ -57,6 +76,9 @@ export function createStatsV1(): Router {
             res.set('Cache-Control', 'public, max-age=30');
             res.json({
                 window: String(req.query.window),
+                windowKind: resolved.kind,
+                from: w.from.toISOString(),
+                to: w.to.toISOString(),
                 longestStreaks: streaks.map(r => ({ displayName: name(r.userId), length: r.length, endedBy: r.endedBy })),
                 biggestBanks: banks.map(r => ({ displayName: name(r.userId), amount: r.amount, streakAtBank: r.streakAtBank })),
                 biggestRounds: rounds.map(r => ({ displayName: name(r.userId), points: r.pointsDelta })),
@@ -68,11 +90,12 @@ export function createStatsV1(): Router {
 
     router.get('/heat', async (req, res) => {
         try {
-            const w = heatWindow(String(req.query.window ?? ''), new Date());
-            if (!w) {
+            const resolved = heatWindow(String(req.query.window ?? ''), new Date());
+            if (!resolved) {
                 res.status(400).json({ error: 'BAD_WINDOW', accepts: ['hour', 'day', 'week'] });
                 return;
             }
+            const w = resolved.window;
             const instanceId = String(req.query.instanceId ?? '').trim();
             const scope = instanceId ? await presentIn(instanceId) : undefined;
             const rows = await heatBoard(w, LIMIT, scope);
@@ -84,6 +107,9 @@ export function createStatsV1(): Router {
                 kind: 'heat',
                 qualified: false,
                 window: String(req.query.window),
+                windowKind: resolved.kind,
+                from: w.from.toISOString(),
+                to: w.to.toISOString(),
                 scope: instanceId || 'global',
                 leaders: rows.map(r => ({ displayName: names.get(r.userId.toString()) ?? 'Anonymous', earned: r.earned })),
             });

@@ -42,21 +42,3 @@ export async function earningsInWindow(userId: Types.ObjectId, from: Date, to: D
     ]);
     return row?.earned ?? 0;
 }
-
-// "Who is having the best week" — Heat, in the spec's terms. Deliberately independent of
-// career standing: a newcomer on a tear must be able to top this while ranking nowhere.
-//
-// HALF-OPEN, [from, to), like every other windowed query here.
-export async function topEarnersInWindow(
-    from: Date,
-    to: Date,
-    limit: number
-): Promise<{ userId: Types.ObjectId; earned: number }[]> {
-    const rows = await BankEvent.aggregate([
-        { $match: { timestamp: { $gte: from, $lt: to } } },
-        { $group: { _id: '$userId', earned: { $sum: '$amount' } } },
-        { $sort: { earned: -1 } },
-        { $limit: limit },
-    ]);
-    return rows.map(r => ({ userId: r._id as Types.ObjectId, earned: r.earned as number }));
-}

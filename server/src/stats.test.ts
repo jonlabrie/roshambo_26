@@ -4,7 +4,9 @@ import User from './models/User';
 import BankEvent from './models/BankEvent';
 import StreakEvent from './models/StreakEvent';
 import PlayerRound from './models/PlayerRound';
+import Round from './models/Round';
 import { longestStreaks, biggestBanks, biggestRounds, throwsInWindow, forfeitsInWindow, playerRates, heatBoard, liveStreaks } from './stats';
+import { openSession } from './sessions';
 import { settleRound } from './engine/Settlement';
 import { ThrowEntry } from './engine/RoundEngine';
 
@@ -195,6 +197,63 @@ describe('rates and qualification', () => {
         const rates = await playerRates(a._id, W, 1);
         expect(rates.captureRate).toBeNull();
     });
+
+    it('reports a REAL earned figure for an UNQUALIFIED player, because Volume is never gated', async () => {
+        // Points earned this window is the spec's headline Volume figure (§4.3) and Volume
+        // explicitly requires no qualification. Only pointsPerThrow — the one a leaderboard
+        // would rank on — is withheld below the threshold.
+        const a = await User.create({ deviceId: 'a' });
+        await PlayerRound.create({ userId: a._id, roundId: 'r1', playerThrow: 'R', playerResult: 'WIN', pointsDelta: 1, timestamp: at(12) });
+        await BankEvent.create({ userId: a._id, amount: 40, timestamp: at(13) });
+
+        const rates = await playerRates(a._id, W, 10);
+        expect(rates.qualified).toBe(false);
+        expect(rates.pointsPerThrow).toBeNull();
+        expect(rates.earned).toBe(40);
+    });
+
+    it('counts only in-window banks toward earned', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        await BankEvent.create({ userId: a._id, amount: 9, timestamp: at(9) });   // before `from`
+        await BankEvent.create({ userId: a._id, amount: 5, timestamp: at(12) });
+        await BankEvent.create({ userId: a._id, amount: 99, timestamp: at(20) }); // == `to`
+        expect((await playerRates(a._id, W, 1)).earned).toBe(5);
+    });
+});
+
+describe('participation', () => {
+    // Presence is intervals, throws are rows, and the two are recorded by different paths, so
+    // this ratio is the one figure here that can disagree with itself. See the comment on
+    // PlayerRates.participationRate: it is deliberately NOT clamped.
+    const seedRounds = async (hours: number[]) => {
+        for (const h of hours) {
+            await Round.create({ id: `round-${h}`, worldThrow: 'R', timestamp: at(h) });
+        }
+    };
+
+    it('is throws over rounds-present, a fraction for a player who abstains', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        await openSession({ userId: a._id, platform: 'roblox', instanceId: 'inst-A', startedAt: at(10), lastSeenAt: at(19) });
+        await seedRounds([11, 12, 13, 14]);
+        await PlayerRound.create({ userId: a._id, roundId: 'round-12', playerThrow: 'R', playerResult: 'SAFE', pointsDelta: 0, timestamp: at(12) });
+
+        const rates = await playerRates(a._id, W, 1);
+        expect(rates.roundsPresent).toBe(4);
+        expect(rates.throws).toBe(1);
+        expect(rates.participationRate).toBeCloseTo(0.25, 5);
+    });
+
+    it('is NULL, never Infinity or NaN, when the player was present for no rounds', async () => {
+        // Throws with no session at all — exactly the divide-by-zero a lagging presence
+        // reporter produces. A display can render "—"; it cannot render Infinity.
+        const a = await User.create({ deviceId: 'a' });
+        await PlayerRound.create({ userId: a._id, roundId: 'r1', playerThrow: 'R', playerResult: 'SAFE', pointsDelta: 0, timestamp: at(12) });
+
+        const rates = await playerRates(a._id, W, 1);
+        expect(rates.roundsPresent).toBe(0);
+        expect(rates.throws).toBe(1);
+        expect(rates.participationRate).toBeNull();
+    });
 });
 
 describe('heat', () => {
@@ -226,6 +285,67 @@ describe('heat', () => {
         const here = await User.create({ deviceId: 'here' });
         await BankEvent.create({ userId: here._id, amount: 5000, timestamp: at(12) });
         expect(await heatBoard(W, 10, [])).toEqual([]);
+    });
+
+    // The four below moved here from leaderboards.test.ts when its duplicate windowed-earners
+    // aggregation was deleted in favour of this one. They are the coverage that made that
+    // aggregation trustworthy — the half-open boundary, the per-player sum, the limit and a
+    // real sort contest — and they belong to whichever function still answers the question.
+    it('leaves a bank landing exactly on the window end out of the board, and keeps one on the start', async () => {
+        const early = await User.create({ deviceId: 'onFrom' });
+        const late = await User.create({ deviceId: 'onTo' });
+        await BankEvent.create({ userId: early._id, amount: 7, timestamp: at(10) });     // == from
+        await BankEvent.create({ userId: late._id, amount: 5_000, timestamp: at(20) });  // == to
+        const rows = await heatBoard(W, 10);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].userId.toString()).toBe(early._id.toString());
+    });
+
+    it('adds up several banks by the same player', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        await BankEvent.create({ userId: a._id, amount: 3, timestamp: at(11) });
+        await BankEvent.create({ userId: a._id, amount: 9, timestamp: at(12) });
+        await BankEvent.create({ userId: a._id, amount: 27, timestamp: at(13) });
+        const rows = await heatBoard(W, 10);
+        expect(rows[0].earned).toBe(39);
+    });
+
+    it('sorts by in-window earnings, inverting career order when the window demands it', async () => {
+        // Six players, ALL banking INSIDE the window with distinct in-window totals, so this is
+        // a genuine sort contest. A smaller pool is not enough: empirically Mongo's unsorted
+        // $group output for 4 groups matched the fully-sorted order by chance in roughly 1 run
+        // in 7-8 here, far above what a uniform-random permutation would give. Creation order
+        // (50, 320, 80, 500, 130, 200) is neither ascending nor descending, so neither
+        // 'creation order' nor 'value order' coincides with the target 500, 320, 200, 130, 80, 50.
+        // lifetimeBanked runs OPPOSITE to in-window earnings: p1 has the deepest career total
+        // and the worst window; p4 the shallowest career and the best — the exact inversion
+        // Heat exists to surface.
+        const p1 = await User.create({ deviceId: 'p1', lifetimeBanked: 50_000 });
+        const p2 = await User.create({ deviceId: 'p2', lifetimeBanked: 5_000 });
+        const p3 = await User.create({ deviceId: 'p3', lifetimeBanked: 900 });
+        const p4 = await User.create({ deviceId: 'p4', lifetimeBanked: 10 });
+        const p5 = await User.create({ deviceId: 'p5', lifetimeBanked: 300 });
+        const p6 = await User.create({ deviceId: 'p6', lifetimeBanked: 50 });
+        await BankEvent.create({ userId: p1._id, amount: 50, timestamp: at(11) });
+        await BankEvent.create({ userId: p2._id, amount: 320, timestamp: at(12) });
+        await BankEvent.create({ userId: p3._id, amount: 80, timestamp: at(13) });
+        await BankEvent.create({ userId: p4._id, amount: 500, timestamp: at(11) });
+        await BankEvent.create({ userId: p5._id, amount: 130, timestamp: at(13) });
+        await BankEvent.create({ userId: p6._id, amount: 200, timestamp: at(12) });
+
+        const rows = await heatBoard(W, 10);
+        expect(rows).toHaveLength(6);
+        expect(rows.map(r => r.earned)).toEqual([500, 320, 200, 130, 80, 50]);
+        expect(rows[0].userId.toString()).toBe(p4._id.toString());
+        expect(rows[5].userId.toString()).toBe(p1._id.toString());
+    });
+
+    it('honours the limit', async () => {
+        for (let i = 0; i < 5; i++) {
+            const earner = await User.create({ deviceId: `earner${i}` });
+            await BankEvent.create({ userId: earner._id, amount: (i + 1) * 10, timestamp: at(12) });
+        }
+        expect(await heatBoard(W, 3)).toHaveLength(3);
     });
 });
 

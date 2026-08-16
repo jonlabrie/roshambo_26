@@ -92,8 +92,23 @@ export interface PlayerRates {
     throws: number;
     qualified: boolean;
     minThrows: number;
+    // VOLUME, NOT A RATE, and therefore never gated on `qualified`. `earned` is the spec's
+    // headline Volume figure ("points earned this week", §4.3) and it is obtainable from
+    // nowhere else for the viewer themself — /heat carries it only for the top ten. Both it
+    // and `roundsPresent` fall out of the queries the rates already need, so returning them
+    // costs nothing and saves the caller a round trip. Earnings come from BankEvent; they are
+    // never a sum of PlayerRound.pointsDelta.
+    earned: number;
+    roundsPresent: number;
     pointsPerThrow: number | null;
     captureRate: number | null;
+    // MAY EXCEED 1.0, deliberately unclamped. `throws` counts PlayerRound rows; `roundsPresent`
+    // counts rounds falling inside this player's session intervals. If presence reporting lags
+    // — a Roblox instance whose roster heartbeat is late, or a session opened after the player
+    // had already begun throwing — a player can have more throws than rounds-present and the
+    // ratio goes above 1. Clamping would hide that, so the raw figure travels and a display
+    // decides what to do with it (cap the bar, or say "presence data incomplete"). Null, never
+    // Infinity or NaN, when roundsPresent is zero.
     participationRate: number | null;
 }
 
@@ -119,6 +134,8 @@ export async function playerRates(
         throws,
         qualified,
         minThrows,
+        earned,
+        roundsPresent: present,
         pointsPerThrow: qualified && throws > 0 ? earned / throws : null,
         captureRate: built > 0 ? earned / built : null,
         participationRate: present > 0 ? throws / present : null,

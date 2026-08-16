@@ -7,8 +7,7 @@ import dotenv from 'dotenv';
 import Round from './models/Round';
 import authRouter from './routes/auth';
 import storeRouter from './routes/store';
-import { createApiV1 } from './routes/apiV1';
-import { createStatsV1 } from './routes/statsV1';
+import { mountRoutes } from './routes/mount';
 import { RoundEngine } from './engine/RoundEngine';
 import { ResultsStore } from './engine/ResultsStore';
 import { attachSocketAdapter } from './transports/socketAdapter';
@@ -113,17 +112,10 @@ mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
         })));
         const totalRounds = await Round.countDocuments();
         const engine = makeEngine(totalRounds); // legacy roundCount continuity
-        // ORDER IS LOAD-BEARING. Mounted separately from createApiV1 (these boards need
-        // neither the engine nor the store, and are readable without the X-API-Key gate that
-        // guards player mutation) — but Express matches middleware by REGISTRATION order, not
-        // path specificity, and createApiV1's router.use(requireApiKey) runs unconditionally
-        // for every path under the '/api/v1' prefix, matched route or not. '/api/v1/stats' is
-        // itself prefixed by '/api/v1', so if that mount were registered first, every stats
-        // request would hit requireApiKey and 503/401 before ever reaching this router. Stats
-        // MUST be mounted before the general '/api/v1' router so its more specific prefix is
-        // tried first.
-        app.use('/api/v1/stats', createStatsV1());
-        app.use('/api/v1', createApiV1(engine, store));
+        // The '/api/v1' mounts, in the order they must be registered — see mountRoutes for
+        // why that order is load-bearing. Extracted so the mount-order test binds to this
+        // exact function instead of re-declaring the order alongside it.
+        mountRoutes(app, engine, store);
         attachSocketAdapter(io, engine, store);
         httpServer.listen(PORT, () => {
             console.log(`Server running on port ${PORT}`);

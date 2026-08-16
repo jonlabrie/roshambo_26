@@ -5,8 +5,9 @@ import { connectTestDb, clearTestDb, disconnectTestDb } from '../test/db';
 import User from '../models/User';
 import BankEvent from '../models/BankEvent';
 import StreakEvent from '../models/StreakEvent';
+import { reconcilePresence } from '../sessions';
 import { createStatsV1 } from './statsV1';
-import { createApiV1 } from './apiV1';
+import { mountRoutes } from './mount';
 import { RoundEngine } from '../engine/RoundEngine';
 import { ResultsStore } from '../engine/ResultsStore';
 
@@ -55,6 +56,32 @@ describe('GET /api/v1/stats/records', () => {
         expect(res.status).toBe(400);
     });
 
+    // WHICH "day"? /records?window=day is the UTC CALENDAR day; /heat?window=day is the last
+    // rolling 24 hours. Both echo the same label, so a display rendering "Today" from both
+    // would show two different periods under one heading unless the wire says which rule was
+    // applied and where the bounds actually fell.
+    it('echoes CALENDAR bounds and names the rule that produced them', async () => {
+        const res = await request(app).get('/api/v1/stats/records?window=day');
+        expect(res.body.windowKind).toBe('calendar');
+        expect(res.body.from).toBe('2026-08-16T00:00:00.000Z');
+        expect(res.body.to).toBe('2026-08-17T00:00:00.000Z');
+    });
+
+    it('echoes the calendar WEEK bounds, which start Monday UTC', async () => {
+        const res = await request(app).get('/api/v1/stats/records?window=week');
+        expect(res.body.windowKind).toBe('calendar');
+        // 2026-08-16 is a Sunday; its ISO week began Monday the 10th.
+        expect(res.body.from).toBe('2026-08-10T00:00:00.000Z');
+        expect(res.body.to).toBe('2026-08-17T00:00:00.000Z');
+    });
+
+    it('calls `all` ROLLING, because its upper bound moves with now rather than with a period', async () => {
+        const res = await request(app).get('/api/v1/stats/records?window=all');
+        expect(res.body.windowKind).toBe('rolling');
+        expect(res.body.from).toBe('1970-01-01T00:00:00.000Z');
+        expect(res.body.to).toBe('2026-08-17T12:00:00.000Z');
+    });
+
     it('names the players, so a caller does not need a second round trip', async () => {
         const a = await User.create({ deviceId: 'a', displayName: 'Ayaka' });
         await StreakEvent.create({ userId: a._id, length: 4, endedBy: 'SAFE', endedAt: IN_WINDOW });
@@ -89,9 +116,56 @@ describe('GET /api/v1/stats/heat', () => {
         expect(res.body.leaders).toEqual([]);
     });
 
+    // THE POPULATED CASE. The test above queries an EMPTY room and asserts `leaders: []` —
+    // which is also exactly what a BROKEN composition returns. presentIn reconstructs
+    // ObjectIds from strings and hands them to heatBoard's `$in`; if that shape were wrong, or
+    // if it returned strings, every instance in the game would return an empty board and the
+    // empty-room test would still pass. This one opens a real session, banks inside the
+    // window, and asserts the player comes back with the right figure — and that a player who
+    // is NOT in the instance does not, so it proves SCOPING rather than mere non-emptiness.
+    it('returns the players actually present in the instance, with their window earnings', async () => {
+        const here = await User.create({ deviceId: 'here', displayName: 'Ayaka' });
+        const elsewhere = await User.create({ deviceId: 'elsewhere', displayName: 'Kenshin' });
+        await reconcilePresence('inst-A', [here._id], IN_WINDOW);
+        await reconcilePresence('inst-B', [elsewhere._id], IN_WINDOW);
+        await BankEvent.create({ userId: here._id, amount: 40, timestamp: IN_WINDOW });
+        // Deliberately the BIGGER bank: if scoping failed open, this player would top the board.
+        await BankEvent.create({ userId: elsewhere._id, amount: 5_000, timestamp: IN_WINDOW });
+
+        const res = await request(app).get('/api/v1/stats/heat?window=hour&instanceId=inst-A');
+        expect(res.status).toBe(200);
+        expect(res.body.scope).toBe('inst-A');
+        expect(res.body.leaders).toEqual([{ displayName: 'Ayaka', earned: 40 }]);
+    });
+
+    it('drops a player from the instance board once they have left it', async () => {
+        const gone = await User.create({ deviceId: 'gone', displayName: 'Ayaka' });
+        await reconcilePresence('inst-A', [gone._id], IN_WINDOW);
+        await BankEvent.create({ userId: gone._id, amount: 40, timestamp: IN_WINDOW });
+        await reconcilePresence('inst-A', [], IN_WINDOW);
+
+        const res = await request(app).get('/api/v1/stats/heat?window=hour&instanceId=inst-A');
+        expect(res.body.leaders).toEqual([]);
+    });
+
     it('rejects an unknown window rather than silently choosing one', async () => {
         const res = await request(app).get('/api/v1/stats/heat?window=fortnight');
         expect(res.status).toBe(400);
+    });
+
+    it('echoes ROLLING bounds, so "day" here cannot be mistaken for the calendar day', async () => {
+        const res = await request(app).get('/api/v1/stats/heat?window=day');
+        expect(res.body.windowKind).toBe('rolling');
+        // The last 24 hours from the frozen now, NOT 2026-08-16T00:00Z onward.
+        expect(res.body.from).toBe('2026-08-15T12:00:00.000Z');
+        expect(res.body.to).toBe('2026-08-16T12:00:00.000Z');
+    });
+
+    it('echoes the rolling hour bounds', async () => {
+        const res = await request(app).get('/api/v1/stats/heat?window=hour');
+        expect(res.body.windowKind).toBe('rolling');
+        expect(res.body.from).toBe('2026-08-16T11:00:00.000Z');
+        expect(res.body.to).toBe('2026-08-16T12:00:00.000Z');
     });
 });
 
@@ -133,9 +207,14 @@ describe('GET /api/v1/stats/player/:robloxUserId', () => {
 // not, and Express matches middleware by REGISTRATION order rather than path specificity. If
 // '/api/v1' were mounted before '/api/v1/stats', every stats request — being itself prefixed
 // by '/api/v1' — would hit requireApiKey and get a keyed 401/503 before ever reaching this
-// router. This test builds the app the way index.ts does (stats mounted first) and asserts a
-// keyless 200, so that ordering regressing is a test failure, not a silent prod outage.
-describe('mounted in the real app, in index.ts\'s registration order', () => {
+// router.
+//
+// This test calls mountRoutes — THE SAME FUNCTION index.ts calls — rather than re-declaring
+// the order here. Re-declaring proved only that the property was achievable; the coupling to
+// production was a comment, and comments do not fail CI. index.ts itself cannot be imported
+// (it connects to Mongo and listens at import time), which is why the order lives in
+// routes/mount.ts where both callers can share one definition.
+describe('mounted through mountRoutes, the function index.ts calls', () => {
     it('is reachable without an API key, because /api/v1/stats is mounted before the general /api/v1 router', async () => {
         const engine = new RoundEngine({
             openSeconds: 51, lockSeconds: 2, revealSeconds: 7,
@@ -145,9 +224,7 @@ describe('mounted in the real app, in index.ts\'s registration order', () => {
         const store = new ResultsStore();
         const mountedApp = express();
         mountedApp.use(express.json());
-        // MUST MATCH index.ts EXACTLY: stats before the gated general router.
-        mountedApp.use('/api/v1/stats', createStatsV1());
-        mountedApp.use('/api/v1', createApiV1(engine, store));
+        mountRoutes(mountedApp, engine, store);
 
         // No X-API-Key header, and process.env.API_KEY is unset in this test process — the
         // exact PWA-only-mode condition CLAUDE.md describes, under which requireApiKey would
