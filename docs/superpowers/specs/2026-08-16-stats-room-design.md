@@ -1,7 +1,7 @@
 # Stats Room (番付) — Design
 
 **Date:** 2026-08-16
-**Status:** Draft — awaiting owner review
+**Status:** Approved 2026-08-16 (owner: "the rest looks fine")
 **Program:** friends-family baseline item 4 (`docs/wiki/program/item-4-merchant-row.md`)
 **Foundations:** `docs/wiki/world/core-loop.md`, `docs/wiki/world/world-throw.md`
 
@@ -12,13 +12,23 @@ tunnel from the shop's rear doorway.
 
 ## 1. The premise this rests on
 
-**The World Throw is the majority of player throws** ([[world-throw]]). Everything here
-depends on that: it is what makes crowd-reading a skill rather than fortune, and what
-makes a "best player" question answerable at all.
+**The World Throw is the PLURALITY of player throws** — what the crowd mostly threw
+([[world-throw]]). Everything here depends on that: it is what makes crowd-reading a skill
+rather than fortune, and what makes a "best player" question answerable at all.
 
-**Hard prerequisite.** The shipped server picks the World Throw at random (parked defect
-(f)). Every skill-derived stat in §4 is meaningless until that is fixed. Records, Heat
-and Volume stats (§4.1, §4.3) do not depend on it and can ship first.
+Plurality, **not** majority, and the distinction is load-bearing: with three options a true
+majority (>50%) frequently does not exist, so the rule is argmax. "Majority" is the product
+word, and the word used throughout US 8,025,570 B2 — see the open patent question on
+[[world-throw]]. That question is legal rather than engineering and does not block this
+design.
+
+**Prerequisite status.** Defect (h) is **FIXED** (2026-08-16) — `GameRules.deriveWorldThrow`
+derives the World Throw from the round's own tally. But it is **not active in any deployed
+environment**: prod and dev both run `TEST_MODE`, which keeps the deterministic R→P→S cycle.
+So the skill-derived stats in §4.2 and §4.4 can be BUILT, but cannot be VALIDATED against
+real play until TEST_MODE is off and at least `WORLD_THROW_MIN_PARTICIPANTS` (default 5) are
+throwing. Records, Heat and Volume (§3, §4.1, §4.3) do not depend on any of it and can ship
+regardless.
 
 ## 2. Scope rulings (owner, 2026-08-16)
 
