@@ -175,3 +175,18 @@ in [[world-throw]]; the divergence is logged as parked defect (f). `CLAUDE.md` a
 the opposite ("not derived from player votes despite the spec") and was corrected in the
 same pass. Also recorded: the game implements **US 8,025,570 B2, owned by Jon Labrie**,
 giving roughly a year of exclusivity as of 2026-08.
+
+## [2026-08-16] ship | the Stats cavern is bored, doubled, and its ceiling raised
+
+The 番付 hall exists in rock. Tunnel from MachiyaStats' rear doorway (roof pinned to the
+lintel top so it meets the door without a step), into a chamber the owner then doubled by
+pushing the west wall −38 → −58, then raised 129 → 134. As saved: 40 × 25, floor 114.00,
+~19 clear, 17.9 studs of cover, no breaches. Recorded in [[stats-room]]; the bore is
+reproducible from `tools/studio/boreStatsCavern.luau`, which defaults to a non-destructive
+VERIFY because the owner hand-shaped the mouth after the cut.
+
+There was no rock over the doorway to bore through — natural grade topped out at the door
+head exactly — so the hillside had to be RAISED first, threaded under a roof eave whose true
+lowest corner is 127.20 (not the 129.3 a naive bbox read gives). Six bore traps carried to
+[[misc-engine-traps]], the sharpest being that terrain writes are invisible to raycasts
+within the same execution.

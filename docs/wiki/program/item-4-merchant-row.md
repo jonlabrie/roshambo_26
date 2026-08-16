@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: open
-updated: 2026-08-15
+updated: 2026-08-16
 ---
 
 # Item 4 — Merchant Row
@@ -19,7 +19,8 @@ itself — the façade shells around it.
   as-built reference.
 - **The machiya brainstorm is DONE (2026-08-15)** — see the design spec in Raw layer.
   Street plan: apparel (Machiya_1, wide west) · 花火屋 · accessories (Machiya_4) ·
-  sports book frontage (Machiya_East, cavern deferred to item 7) · riverside chaya +
+  Stats frontage (re-sited west of apparel; its cavern is now BORED — [[stats-room]]) ·
+  riverside chaya +
   DockDeck (Machiya_2 site; counter with a future-NPC keeper slot). Shells are
   façades-with-identity, shallow-enterable (sports book closed-kōshi teaser).
 - Massing references: `ServerStorage.Sandbox_PARKED.MerchantMassing` (per the baseline

@@ -22,6 +22,7 @@ Chronology: [log.md](log.md).
 - [Fireworks](world/fireworks.md) — the fireworks system, launch sites, perf rules and measured floor, monetization decision
 - [Day/Night](world/day-night.md) — cycle foundation, scope ruling, night glyphs, lantern and water-VFX subscribers
 - [Viewing Platform](world/viewing-platform.md) — the twin overlook decks, the hand-carved downcanyon vista, the lantern telegraph
+- [Stats Room](world/stats-room.md) — the 番付 cavern: tunnel, chamber, the berm that had to be built because there was no rock over the door
 - [Switchback Deck](world/switchback-deck.md) — the FW11 hairpin deck, upper-path extension, descent, retaining walls
 - [Falls Dock](world/falls-dock.md) — the composed falls-pool site: dock, yukimi lantern, cherry, uguisu, iris
 - [Paths](world/paths.md) — the wall path network and river trail: registers, builders, tunnels, bridges, trail lighting

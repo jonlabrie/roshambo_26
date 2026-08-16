@@ -5,7 +5,7 @@ updated: 2026-08-16
 
 # The World Throw
 
-The premise of the game, and the thing every stat in the Stats room ultimately measures.
+The premise of the game, and the thing every stat in the [[stats-room]] ultimately measures.
 The mechanics it settles — outcomes, pot, banking, the points fields — are [[core-loop]].
 
 ## What it is

@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-15
+updated: 2026-08-16
 ---
 
 # Misc Engine Traps
@@ -72,6 +72,23 @@ spline through waypoints, snapshot the region, carve Air boxes along it.
   restore the CopyRegion snapshot and STOP — don't chase residue with more FillBlock.
   And don't rely on the snapshot surviving: a Studio Ctrl+Z once swept up CopyRegion +
   bore together.
+- **Terrain writes are INVISIBLE to raycasts in the same execution.** A `FillBlock` then a
+  `Raycast` in one `execute_luau` call reads the OLD surface — a before/after profile came
+  back byte-identical and looked like the fill had silently failed. Always verify in a
+  SEPARATE run. (Stats cavern, 2026-08-16.)
+- **A flat-topped box over a ramping target overshoots** by the ramp's rise across the box
+  depth, and voxel rounding adds more: a berm planned at 126 landed at 128.85 and pierced a
+  roof eave. Use THIN slices (depth ~2, step 0.5) with the top computed at each slice's own z.
+- **A rotated part's lowest point is not `Position.Y - Size.Y/2`.** Compute it from the 8
+  transformed corners. A machiya's sloped `RoofSouth` read 129.3 naively and 127.20 truly —
+  a 2.1-stud error, in the direction that drives terrain through the roof.
+- **Carve PROUD of the intended wall (~1.5).** Boundary boxes have no successor to overlap
+  with, so the finished face erodes inward; a chamber came out ~2 studs short on every edge.
+- **A "clear >= N" filter cannot then report min-clear** — it is self-referential and always
+  reports ~N. Take extents from the filter, then re-measure over an INSET interior.
+- **Rays starting inside partial-occupancy voxels report phantom breaches.** An upward ray
+  from inside sub-threshold material hits nothing and reads as "open to sky". Corroborate any
+  breach claim against a surface raycast before believing it.
 - **DON'T over-sanitize tunnels — organic imperfection is WANTED** (owner,
   2026-07-01). Lumpy walls, an oblique T-junction, an accidental tight squeeze were
   all praised as character. Get the walkable floor + wall/junction right; leave the
