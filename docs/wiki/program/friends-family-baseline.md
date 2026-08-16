@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: open
-updated: 2026-08-15
+updated: 2026-08-16
 ---
 
 # Friends & Family Baseline
@@ -32,11 +32,15 @@ rounds skippable, no penalty) — hangout is the product.
    swappable loadout SLOT ships now, better screens earned/bought later.
 6. **Rewards & flex** — open: server-side milestone badges from existing per-player stats,
    awarded at settlement; flex via teahouse banner-pole flag + avatar ribbon/sash;
-   earn-only. Carries the parked economy-API defects (a)–(c) in [[parked-defects]].
-7. **Statistics** — open: personal → maximal HUD; global/social → the Statistics room in
-   the hillside under the western Overlook (73,110,19) per
-   `docs/superpowers/specs/2026-07-28-canyon-destinations-falls-dock-design.md`; promote
-   this item if the daughter visit comes early.
+   earn-only. Carries the parked economy-API defects (a)–(c) in [[parked-defects]]. Any
+   badge that claims SKILL is also gated on defect (h); volume badges are not.
+7. **Statistics** — open: personal → maximal HUD; global/social → the 番付 room, now BORED
+   west of the apparel shop ([[stats-room]]); the old Overlook siting (73,110,19) is
+   superseded. Walls and stats specced in
+   `docs/superpowers/specs/2026-08-16-stats-room-design.md`. **Blocked on defect (h)** —
+   the World Throw must be the majority before any skill-derived stat means anything;
+   Records/Heat/Volume can ship without it. Promote this item if the daughter visit comes
+   early.
 8. **World finish/hygiene** — open: perch teahouse at the stair summit, access/portal art
    pass, clear `DayNightStartT`/`DayNightLockT`, materials cleanup (duplicate
    MaterialVariant names), run `verifyWorkspaceConvention`, save/publish.

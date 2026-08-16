@@ -206,3 +206,19 @@ and, unlike letters, do not move under AZERTY/QWERTZ. The HUD carries the numera
 **Players CAN throw from inside the Stats cavern** — the HUD is always visible, so it is a
 study-and-play space, not a trade. The round band stays required: it tells a player reading a
 wall that a round is closing. Also parked: HUD dismiss/recall.
+
+## [2026-08-16] decision | defect (h) scheduled; item 7's siting superseded
+
+(h) — the World Throw is random, not the majority — is scheduled as a **prerequisite of item
+7 (Statistics)** and additionally gates any skill-claiming badge in item 6. Flagged on the
+entry that it is arguably larger than either, being the core game rule rather than a feature.
+
+Item 7's text was stale: it still sited the Statistics room under the western Overlook at
+(73,110,19). Superseded — the room is bored west of the apparel shop ([[stats-room]]) and
+specced.
+
+Established while answering "does this affect the PWA too": there is ONE server and one
+RoundEngine, so the PWA and Roblox share the same World Throw and the same defect — no client
+work is involved. And prod is worse than random: `apprunner.yaml` sets `TEST_MODE: "true"`, so
+playroshambo.com runs the deterministic R→P→S cycle. `roshambo_server_dev`'s value is
+configured via the App Runner API and is not in git — unverified, needs an AWS check.

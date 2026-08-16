@@ -130,4 +130,12 @@ which no test can see.)
 - **Owner, 2026-08-16:** *"in production the world throw is the majority choice… we have
   to successfully embody 'the majority' as a worthwhile opponent or we'll fail
   entirely."*
-- ⚠ Not yet scheduled against a program item.
+- **Scheduled 2026-08-16: prerequisite of item 7 (Statistics)**, and gates any SKILL-claiming
+  badge in item 6. Note it is arguably larger than either — it is the core game rule, not a
+  feature of one room.
+- ⚠ **Both deployed environments are affected, and prod is worse than random.**
+  `apprunner.yaml` (the PROD config) sets `TEST_MODE: "true"`, so playroshambo.com runs the
+  deterministic R→P→S cycle — predictable after three rounds. `roshambo_server_dev` is
+  configured via the App Runner API, not `apprunner.yaml`, so its value is NOT in git and
+  needs checking in AWS. One server serves both clients, so the PWA and Roblox share the
+  same World Throw and the same defect; no client work is involved in the fix.
