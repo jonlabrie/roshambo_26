@@ -164,3 +164,14 @@ shop, x −33.92..−23.92, backing into the south upslope that climbs 115→130
 real rock for the cavern to be carved at a later item. The room's name is **Stats** (leaderboards
 for individuals, groups, countries); its shopfront reads 番付. "Sports book" is barred as product
 usage — design discussion only. Machiya_East's massing stays parked, unassigned.
+
+## [2026-08-16] decision | the World Throw is the MAJORITY, and the patent is the owner's
+
+Correcting a premise the repo had backwards. The World Throw is **the majority choice of
+players**, not random — "you against the world" is the product, and the shipped random
+pick is an unfinished implementation, not the source of truth. Crowd-reading is therefore
+skill, and the last-five-rounds HUD exists because that history is predictive. Recorded
+in [[world-throw]]; the divergence is logged as parked defect (f). `CLAUDE.md` asserted
+the opposite ("not derived from player votes despite the spec") and was corrected in the
+same pass. Also recorded: the game implements **US 8,025,570 B2, owned by Jon Labrie**,
+giving roughly a year of exclusivity as of 2026-08.

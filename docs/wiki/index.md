@@ -15,6 +15,8 @@ Chronology: [log.md](log.md).
 - [Canyon](world/canyon.md) — geography, compass, terrain provenance, the W## watercourse, clearing terrain, water taste rulings
 - [Arena Square](world/arena-square.md) — the Shōrō square: karesansui, torii, sōrin, roof mesh, palette, bell sound, drum-caret lore
 - [Bell Engine](world/bell-engine.md) — the water-powered bell engine: drive line, gearing, snail cam, drum, round metronome
+- [Core Loop](world/core-loop.md) — READ FIRST: what the game is — outcomes, 3ⁿ pot, Bank vs Stake, which points field means what, the pointsDelta trap
+- [World Throw](world/world-throw.md) — the majority rule, why crowd-reading is skill, the patent basis, and the random-pick divergence
 - [Round & HUD](world/round-and-hud.md) — OPEN/LOCK/REVEAL timing, the drum-is-authoritative rule, ring/undo/payoff recipes, copy rulings
 - [Hanabiya](world/hanabiya.md) — the fireworks shop: frontage, stair/attic, noren, chōchin, its gates and drops
 - [Fireworks](world/fireworks.md) — the fireworks system, launch sites, perf rules and measured floor, monetization decision

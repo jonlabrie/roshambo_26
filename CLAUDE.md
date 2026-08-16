@@ -9,7 +9,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Wiki (docs/wiki/) — read before relying on memory
 
 `docs/wiki/` is the single authority for project knowledge and work tracking. Read
-`docs/wiki/index.md` at session start before relying on auto-memory. Record project
+`docs/wiki/index.md` at session start before relying on auto-memory. For the game itself —
+outcomes, pot math, Bank vs Stake, what each points field means — read
+`docs/wiki/world/core-loop.md` and `docs/wiki/world/world-throw.md`; those are the
+foundations, and this file only summarises them. Record project
 facts (gates, decisions, statuses, as-built state, standing rules) THERE, following
 `docs/wiki/schema.md` — not in the auto-memory directory. The auto-memory dir holds
 only user/feedback memories about how we work together. Statuses live only under
@@ -22,7 +25,7 @@ Roshambo: a massively multiplayer rock-paper-scissors PWA where players compete 
 
 A demo is live at **playroshambo.com**, running in TEST_MODE (deterministic R→P→S World Throw cycle). The app was originally built with Google's Antigravity IDE and is unfinished.
 
-`requirements.md` is the original spec — the implementation has since diverged from it (e.g., the spec says matching the World Throw is a LOSS; the code treats a match as SAFE with pot preserved). The code is the source of truth.
+`requirements.md` is the original spec — the implementation has since diverged from it (e.g., the spec says matching the World Throw is a LOSS; the code treats a match as SAFE with pot preserved). The code is generally the source of truth, **except on the World Throw rule** (see Architecture below). The game implements **US 8,025,570 B2, a patent owned by Jon Labrie**.
 
 ## Commands
 
@@ -79,7 +82,7 @@ Game rules live in THREE implementations, and all three are held to `shared-fixt
 - Player matches world → **SAFE**: pot preserved, streaks reset to 0
 - World beats player → **LOSS**: pot forfeited, streaks reset
 
-- At round end: World Throw is chosen (random, or deterministic in TEST_MODE — **not** derived from player votes despite the spec), each participant's result is computed and persisted, per-player `player-data` is emitted to their device room, then `reveal` broadcasts the round to everyone.
+- At round end: the World Throw is chosen and each participant's result is computed and persisted. **The World Throw is DESIGNED to be the MAJORITY of player throws** — "you against the world" is the product premise, and it makes crowd-reading a skill (hence the last-five-rounds HUD). The shipped code has NOT implemented this yet: it picks randomly, or cycles R→P→S under TEST_MODE. Treat the majority rule as design truth and the random pick as an unfinished implementation — this is the one place "the code is the source of truth" does not apply. Per-player `player-data` is then emitted to each device room, and `reveal` broadcasts the round to everyone. See `docs/wiki/world/world-throw.md` and parked defect (f).
 
 ### Roblox client (`roblox/`, milestone 2+)
 
