@@ -153,6 +153,7 @@ Entry is from the north at ~x −28. Walls, 40.5 × 26, ceiling 20 studs clear.
 | West (longest wall) | **Skill** — rates, participation study |
 | East | **Judgement / Risk** — capture rate, bank height |
 | North, beside the exit | **The World** — form guide, read on the way out |
+| High band, all four walls | **Round state** — timer and throws (§6.3) |
 
 The form guide sits by the exit deliberately: it is the most *useful* surface in the room
 and should be the last thing seen before returning to the arena.
@@ -166,6 +167,36 @@ needs **no new mechanism** — only per-player data, which the `player-data` / `
 path already delivers. The formal alternative (SurfaceGui in `PlayerGui` with `Adornee`, as
 `LanternController.client.luau:89` does for a BillboardGui) is only needed if a display must
 survive part streaming or take input.
+
+### 6.3 The round band — timer and throw display
+
+**This is a requirement, not a convenience.** The room is buried under ~18 studs of rock,
+out of sight and earshot of the arena. The taiko drum is the round's authoritative signal
+([[round-and-hud]]: "the drum is authoritative"), and a player studying the form guide down
+here cannot hear it. Without a round display, entering the Stats room means silently
+dropping out of the game — which would make the most useful room in the world a trap.
+
+**Form:** larger flap cells than the leaderboard rows (owner, 2026-08-16). Read at distance,
+clatter on change — this is the one display whose *noise* is the point, since it has to pull
+attention from a wall you are reading.
+
+**Placement: a clerestory band, high on the walls, running continuously.** Visible from
+anywhere in the room and from any wall you happen to be facing, and it costs no prime
+display real estate. It also spends the vertical space the ceiling raise just created — the
+hall is 20 studs clear, and the band lives in the top ~4 that nothing else wants.
+
+**Content:**
+
+- phase and seconds remaining (OPEN / LOCK / REVEAL)
+- the World Throw, once revealed
+- your own throw for the round, or its absence — per-viewer, on the same slips treatment as
+  the personal 札 (§6.1), so a player can see at a glance that they have not thrown yet
+
+**Constraint — it must not race the drum.** The existing ruling forbids wiring display
+elements past the drum gate; the result splash, ring glyph and points plate have each done it
+and been corrected. The band derives from the same `drumRest` cue the HUD uses, never from
+the raw wire. A stats-room board that revealed the World Throw a beat before the arena did
+would be the same defect in a new place.
 
 ### 6.2 Visual language, mapped to volatility
 
@@ -231,5 +262,11 @@ mounts that visibly fills one champion at a time.
    is understood without explanation, and because points exist only once banked it already
    folds in judgement — but it rewards volume, and play time varies enormously here in a way
    it does not in sumo, where everyone fights fifteen bouts. Deliberately left open.
-4. Whether the group scoping dimension ranks by sum (favours large groups) or by qualified
+4. **Can a player throw from inside the Stats room?** The band tells them a round is closing;
+   whether they can act on it is unresolved. Allowing it makes the room a genuine study-and-play
+   space and rewards the patient, selective play the design celebrates (§4.4). Forbidding it
+   makes the room a deliberate trade — you go below to learn, and you give up rounds to do it.
+   The second is more honest to "you against the world" but risks players avoiding the room
+   entirely. This decides whether the room needs a throw input at all.
+5. Whether the group scoping dimension ranks by sum (favours large groups) or by qualified
    average (favours small ones). Both are defensible; likely both, on separate columns.
