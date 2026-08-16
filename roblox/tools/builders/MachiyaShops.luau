@@ -13,6 +13,9 @@ export type Shop = {
     yaw: number,
     frontage: "open" | "koshi",
     interior: "full" | "shallow" | "none",
+    -- posts across an open frontage (bays = frontPosts - 1). DEFAULTS to the
+    -- archetype's 5; a shop that doesn't set it emits byte-identically.
+    frontPosts: number?,
     storeys: { ground: number, upper: number }?,
     identity: { [string]: any }?,
 }
@@ -707,41 +710,63 @@ MachiyaShops.accessories = {
     },
 } :: Shop
 
--- Machiya_East -> SPORTS BOOK FRONTAGE. pivot(74.27,119.42,47.58)
--- size(21.40,15.92,13.24) yawDeg -0.20 (within the +/-1 deg tolerance, treated as
--- 0 -- Machiya.luau's local frame is already the world frame here). Footing ring
--- (front is a Sand/Slate mix, no longer a clean grade):
---   NW(63.59,40.92) 109.74  NE(84.99,40.99) 103.41  N_mid(74.29,40.96) 106.63
---   SW(63.55,54.16) 119.73  SE(84.95,54.24) 109.21  S_mid(74.25,54.20) 114.08
---   W_mid(63.57,47.54) 115.16  E_mid(84.97,47.62) 106.03
--- *** CONCERN: front spread (NW/NE/N_mid) is 6.32 studs (103.41 to 109.74) --
--- well past the 1.5-stud flag threshold. This is not the flat promenade grade
--- the other two shells sit on; the ground under this footprint is genuinely
--- uneven, west-to-east as well as north-to-south (W_mid 115.16 vs E_mid 106.03).
--- floorY is set to the front's highest hit, 109.74, by the same rule as the other
--- two shells, but this site's terrain needs the owner's eye before a shell is
--- built here -- NOT resolved with invented terracing. ***
--- *** CONCERN: the envelope's AABB (x[63.57,84.97] y[111.46,127.38] z[40.96,54.20])
--- intersects 18 existing Overlook parts (UpperDeck, GirderUpperDeckX3, and 16
--- railing/barrier pieces) -- workspace:GetPartBoundsInBox around the envelope,
--- Include-filtered to workspace.RoshamboStage.Overlook. The design spec calls for
--- this shell's future interior to bore under the western Overlook, so SOME
--- proximity is intended, but a literal collision with the Overlook's built upper
--- deck is a siting problem for the shell itself, not just its future cavern. The
--- nearest Overlook part strictly outside (west of) the envelope's x0 is
--- RailNUpperDeckB3, east face x=62.27, a 1.30-stud gap. ***
-MachiyaShops.sportsbook = {
-    name = "MachiyaEast",
-    envelope = { x0 = 63.57, x1 = 84.97, z0 = 40.96, z1 = 54.20, floorY = 109.74 },
+-- ===== STATS — the two-bay false front west of the apparel shop (2026-08-15) =====
+-- The Machiya_East siting by the Overlook is DROPPED at the owner's ruling (its
+-- massing block stays parked, unassigned; the survey and its two flagged
+-- concerns live in this file's git history). The shell was re-sited HERE and the
+-- entry RENAMED — not left as a stale dead sibling. It is a small two-bay false
+-- front: a vestibule whose back wall is the hill, for a cavern to be carved into
+-- the terrain behind it at a later item. The room's name is Stats; its sign
+-- reads 番付 — banzuke, the Edo ranking list, literally a leaderboard, carrying
+-- no wagering sense.
+--
+-- ENVELOPE — derived from the BUILT neighbour and the row's own lines, not from
+-- any massing block (derive-from-what-it-touches; the relationship test pins it):
+--   x1 = apparel's x0 (-22.42) - 1.5 = -23.92 — the row's roji, the same gap
+--        apparel and accessories each keep to 花火屋
+--   x0 = x1 - 10 = -33.92 — a 10-stud two-bay frontage
+--   z0 = 35.23 (= apparel's z0) — the street line runs continuous
+--   z1 = z0 + 8 = 43.23 — shallow, it is a facade; the hill climbs fast behind
+--        it (at x -36: 115.3 at z36 -> 130.3 at z48), which is the point — the
+--        back wall stands against rock
+--   floorY = 113.30 (= apparel's) — one promenade grade. The site's own grade
+--        runs ~113.3 at the east end to ~114.9 at the west, so the west end is
+--        buried ~1.6 at floor level until the footprint is cut (a Studio terrain
+--        operation, place-only — not this builder's to emit).
+MachiyaShops.stats = {
+    name = "MachiyaStats",
+    envelope = { x0 = -33.92, x1 = -23.92, z0 = 35.23, z1 = 43.23, floorY = 113.30 },
     yaw = 0,
-    frontage = "koshi",
-    interior = "none",
-    -- The BLANK wall board, and nothing else (owner's signage pass, 2026-08-15):
-    -- `board = true` is the kit's original blank contract — framed panel, no
-    -- SurfaceGui, no copy. The sports book carries no signage copy (the
-    -- wager-language ruling) and its naming style is deliberately out of scope.
-    -- NOT emitted by genmodels: this shell only exists when a task builds it.
-    identity = { board = true },
+    frontage = "open",
+    -- a vestibule, not a shop floor: no counter, no goods, no dress — the
+    -- cavern opens from the back wall later
+    interior = "shallow",
+    -- 3 posts / 2 bays — the archetype's FRONT_POSTS, per-shop since this shell.
+    -- Both bays stay open: a two-bay front has no outer bays to close.
+    frontPosts = 3,
+    identity = {
+        -- Deep pine green. Chosen AGAINST the row: apparel's indigo
+        -- {0.16,0.18,0.32} leans violet, accessories' Prussian navy
+        -- {0.07,0.15,0.32} is its deeper cousin, and 花火屋 is vermilion — the
+        -- row's cloth so far is all blues and reds, which leaves green
+        -- unclaimed and instantly distinct at a glance. Held at the noren
+        -- luminance register the other two dark cloths sit at (~0.19/0.15).
+        noren = { color = { 0.12, 0.25, 0.18 }, segments = 4, mon = "番" },
+        -- Pale celadon paper — green with a slight cool lean (b > r), so it
+        -- rhymes with the pine noren the way apparel's pale indigo rhymes with
+        -- its deep one, while staying off accessories' warm moss {168,180,152}
+        -- (r > b). Rec. 709 luminance 0.732, well clear of
+        -- Chochin.LEGIBILITY_FLOOR (0.55); Chochin.spec's guard walks this.
+        -- corners = "west": ONE lantern, west corner only — the east corner
+        -- sits on the 1.5 roji where a barrel would truly intersect apparel's
+        -- own west lantern (both shops share z0 AND floorY, so the two would
+        -- hang at identical y/z just 1.2 apart against 1.3 of summed radii).
+        chochin = { paper = { 172, 192, 178 }, corners = "west" },
+        -- 番付 on the framed wall kanban, the archetype's own board on the
+        -- upper storey — cream plaster and sumi, the wall kind's defaults.
+        board = { kind = "wall", text = "番付" },
+        glow = { color = { 1.0, 0.85, 0.6 }, brightness = 1.2 },
+    },
 } :: Shop
 
 -- ===== chayaSurvey — record for Task 7 (Chaya.luau), not a Shop table =====

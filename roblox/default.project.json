@@ -61,6 +61,7 @@
                 "Hanabiya": { "$path": "assets/Hanabiya.model.json" },
                 "MachiyaApparel": { "$path": "assets/MachiyaApparel.model.json" },
                 "MachiyaAccessories": { "$path": "assets/MachiyaAccessories.model.json" },
+                "MachiyaStats": { "$path": "assets/MachiyaStats.model.json" },
                 "Torii": { "$path": "assets/Torii.model.json" },
                 "ArenaSpawn": {
                     "$className": "SpawnLocation",

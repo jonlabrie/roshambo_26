@@ -75,21 +75,50 @@ describe("MachiyaShops registry", function()
         expect(s.interior).toBe("shallow")
     end)
 
-    test("sportsbook carries the surveyed Machiya_East envelope", function()
-        local s = MachiyaShops.sportsbook
-        expect(s.name).toBe("MachiyaEast")
-        expect(s.envelope.x0).toBe(63.57)
-        expect(s.envelope.x1).toBe(84.97)
-        expect(s.envelope.z0).toBe(40.96)
-        expect(s.envelope.z1).toBe(54.20)
-        expect(s.envelope.floorY).toBe(109.74)
+    test("stats carries the owner-approved two-bay envelope", function()
+        local s = MachiyaShops.stats
+        expect(s ~= nil).toBe(true)
+        expect(s.name).toBe("MachiyaStats")
+        expect(s.envelope.x0).toBe(-33.92)
+        expect(s.envelope.x1).toBe(-23.92)
+        expect(s.envelope.z0).toBe(35.23)
+        expect(s.envelope.z1).toBe(43.23)
+        expect(s.envelope.floorY).toBe(113.30)
         expect(s.yaw).toBe(0)
-        expect(s.frontage).toBe("koshi")
-        expect(s.interior).toBe("none")
-        -- the owner's signage pass: MachiyaEast KEEPS the blank wall board —
-        -- `board = true` is the blank contract, and naming this shop is
-        -- deliberately out of scope (the wager-language ruling)
-        expect(s.identity ~= nil and s.identity.board == true).toBe(true)
+        expect(s.frontage).toBe("open")
+        expect(s.interior).toBe("shallow")
+        -- the archetype's per-shop post count: 3 posts, 2 bays — a small false front
+        expect(s.frontPosts).toBe(3)
+        -- the sign reads 番付 — banzuke, the Edo ranking list: literally a
+        -- leaderboard, carrying no wagering sense
+        expect(s.identity.board.kind).toBe("wall")
+        expect(s.identity.board.text).toBe("番付")
+        expect(s.identity.noren.mon).toBe("番")
+    end)
+
+    test("the Machiya_East siting is dropped — no registry entry keeps it", function()
+        -- Owner's ruling 2026-08-15: the shell was re-sited west of apparel; the
+        -- old entry was RENAMED and re-sited, not left as a stale dead sibling.
+        expect((MachiyaShops :: any).sportsbook == nil).toBe(true)
+        for _, shop in MachiyaShops :: any do
+            if type(shop) == "table" and shop.envelope then
+                expect(shop.name == "MachiyaEast").toBe(false)
+                expect(shop.envelope.x0 == 63.57).toBe(false)
+            end
+        end
+    end)
+end)
+
+describe("stats registers to the built neighbour", function()
+    test("east edge is apparel's west face minus the 1.5-stud roji", function()
+        -- The same relationship the row's other two neighbour tests pin: the
+        -- shell registers to the BUILT edge (derive-from-what-it-touches) at the
+        -- row's own 1.5 roji — so this drift class fails loudly forever.
+        expect(MachiyaShops.stats.envelope.x1 + 1.5).toBeCloseTo(MachiyaShops.apparel.envelope.x0, 0.001)
+    end)
+    test("the street line is continuous: z0 and floorY ride apparel's", function()
+        expect(MachiyaShops.stats.envelope.z0).toBe(MachiyaShops.apparel.envelope.z0)
+        expect(MachiyaShops.stats.envelope.floorY).toBe(MachiyaShops.apparel.envelope.floorY)
     end)
 end)
 
@@ -521,6 +550,16 @@ describe("shop mon — 丸に文字 on every noren", function()
             monPanelByBay = { ["2"] = 2, ["3"] = 1 },
             diaPx = 74,
         },
+        -- stats: both bays of the two-bay front are open, so the doorways are
+        -- bays 1 and 2; odd panel count centres the crest on each middle panel
+        {
+            key = "stats",
+            char = "番",
+            nPanels = 3,
+            nSegs = 4,
+            monPanelByBay = { ["1"] = 2, ["2"] = 2 },
+            diaPx = 74,
+        },
     }
     for _, case in CASES do
         test(`{case.key}'s noren carries 丸に{case.char} — one per doorway, on the cloth`, function()
@@ -578,12 +617,64 @@ describe("shop mon — 丸に文字 on every noren", function()
     end
 end)
 
-describe("signage — MachiyaEast stays deliberately blank", function()
-    test("a blank childless wall board, framed, hanging in open air", function()
-        local m = Machiya.build(ZenDojo.palette, ArenaLayout, MachiyaShops.sportsbook)
+describe("stats shell — the two-bay false front", function()
+    local shop = MachiyaShops.stats
+    local e = shop.envelope
+    local m = Machiya.build(ZenDojo.palette, ArenaLayout, shop)
+    local parts = allParts(m)
+
+    test("three posts, two bays, BOTH open — no closed ends, no parked leaves", function()
+        -- A two-bay front has no outer bays to close (owner's ruling), and a
+        -- parked sliding leaf needs a CLOSED neighbour to hide its slid-away
+        -- third behind — with none anywhere, the screens ship stored and the
+        -- whole elevation is the opening.
+        local posts, panels, leaves, transoms = 0, 0, 0, 0
+        for _, c in m.children do
+            local n = c.name :: string
+            if n:sub(1, 9) == "FrontPost" then
+                posts += 1
+            elseif n:sub(1, 8) == "BayPanel" then
+                panels += 1
+            elseif n:sub(1, 8) == "DoorLeaf" then
+                leaves += 1
+            elseif n:sub(1, 7) == "Transom" and n:sub(1, 10) ~= "TransomBar" then
+                transoms += 1
+            end
+        end
+        expect(posts).toBe(3)
+        expect(panels).toBe(0)
+        expect(leaves).toBe(0)
+        expect(transoms).toBe(2)
+    end)
+
+    test("the head rail spans the WHOLE frontage — both bays are the opening", function()
+        local hr = find(m, "HeadRail")
+        expect(hr ~= nil).toBe(true)
+        -- corner post centres are inset half a post from the envelope's ends,
+        -- so the open span is W - POST_W (0.49)
+        expect(hr.properties.Size[1]).toBeCloseTo((e.x1 - e.x0) - 0.49, 0.001)
+        expect(hr.properties.CFrame[1]).toBeCloseTo((e.x0 + e.x1) / 2, 0.001)
+    end)
+
+    test("noren hang in BOTH doorways — bays 1 and 2, three panels each", function()
+        for bay = 1, 2 do
+            for k = 1, 3 do
+                expect(find(m, `Noren{bay}_{k}`) ~= nil).toBe(true)
+            end
+        end
+    end)
+
+    test("the wall kanban reads 番付, per-character, framed and contrasting", function()
         local k = find(m, "Kanban")
         expect(k ~= nil).toBe(true)
-        expect(k.children == nil or #k.children == 0).toBe(true)
+        local face = find(k, "Face")
+        expect(face ~= nil).toBe(true)
+        local c1, c2 = find(face, "Char1"), find(face, "Char2")
+        expect(c1 ~= nil).toBe(true)
+        expect(c2 ~= nil).toBe(true)
+        expect(c1.properties.Text).toBe("番")
+        expect(c2.properties.Text).toBe("付")
+        expect(find(face, "Char3") == nil).toBe(true)
         local frames = 0
         for _, c in m.children do
             if (c.name :: string):sub(1, 11) == "KanbanFrame" then
@@ -591,15 +682,86 @@ describe("signage — MachiyaEast stays deliberately blank", function()
             end
         end
         expect(frames).toBe(4)
-        -- the round-2 wall-board occlusion guard, kept for every wall kind: the
-        -- panel's full rotation-aware extent must not intersect the Eave's in
-        -- y AND z, and its bottom must clear the Eave's top — open air
+        -- ink and board must not drift together (the row's contrast rule)
+        local panel = k.properties.Color
+        local inkC = c1.properties.TextColor3
+        expect(math.abs((panel[1] + panel[2] + panel[3]) - (inkC[1] + inkC[2] + inkC[3])) > 1).toBe(true)
+        -- the wall-board occlusion guard: the board hangs in open air above the eave
         local eave = find(m, "Eave")
-        local plo, phi = rotAABB(k)
-        local elo, ehi = rotAABB(eave)
-        local yOverlap = phi[2] > elo[2] and ehi[2] > plo[2]
-        local zOverlap = phi[3] > elo[3] and ehi[3] > plo[3]
-        expect(yOverlap and zOverlap).toBe(false)
+        local plo = rotAABB(k)
+        local _, ehi = rotAABB(eave)
         expect(plo[2] > ehi[2]).toBe(true)
+    end)
+
+    test("ONE chōchin, at the west corner — the roji corner stays bare", function()
+        -- The east corner sits on the 1.5 roji, where a barrel would truly
+        -- intersect apparel's own west lantern (both shops share z0 AND floorY,
+        -- so the pair hangs at identical y/z 1.2 studs apart — sum of barrel
+        -- radii 1.3). One lantern, west corner, no clip.
+        expect(find(m, "ChochinWest") ~= nil).toBe(true)
+        expect(find(m, "ChochinEast") == nil).toBe(true)
+    end)
+
+    test("every part has positive size — the narrow front never emits inverted geometry", function()
+        -- The archetype's mushiko-mado window was 12 studs wide unconditionally;
+        -- on a 10-wide envelope that made NEGATIVE jamb widths. The window now
+        -- follows the stucco box, and this holds the whole model to it.
+        expect(#parts > 0).toBe(true)
+        for _, p in parts do
+            for ax = 1, 3 do
+                expect(p.properties.Size[ax] > 0).toBe(true)
+            end
+        end
+        local jamb = find(m, "UpperWallFrontWest")
+        expect(jamb ~= nil).toBe(true)
+        expect(jamb.properties.Size[1] >= 0.99).toBe(true)
+    end)
+
+    test("full-extent clearances: the roji, the promenade line, the tower", function()
+        for _, p in parts do
+            if p.name == "Threshold" then
+                continue
+            end
+            local lo, hi = rotAABB(p)
+            -- east: nothing reaches past apparel's west face minus 0.8 — the
+            -- ridge/eave overhangs (<= 0.6) stay inside the 1.5 roji
+            expect(hi[1] <= MachiyaShops.apparel.envelope.x0 - 0.8).toBe(true)
+            -- north: at GROUND level nothing crosses the frontage plane at all;
+            -- what does cross is AERIAL only — the tilted eave's AABB corner
+            -- (z0 - 2.52) and the west chōchin's barrel under it (z0 - 2.84),
+            -- the same overhang every accepted shop on the row carries — and
+            -- stays a full storey up (the barrel's own hem guard is floor + 5)
+            if lo[2] < e.floorY + 4.9 then
+                expect(lo[3] >= e.z0 - 1e-6).toBe(true)
+            else
+                expect(lo[3] >= e.z0 - 2.9).toBe(true)
+            end
+            -- subordinate to the tower, same as every shell on the square
+            expect(hi[2] <= ArenaLayout.towerTopY - 9.0).toBe(true)
+        end
+    end)
+
+    test("cross-shop audit: NOTHING intersects the built apparel shop", function()
+        -- rotation-aware AABB of every stats part against every apparel part —
+        -- the neighbour-clip class the corner chōchin would have committed
+        local ma = Machiya.build(ZenDojo.palette, ArenaLayout, MachiyaShops.apparel)
+        local aParts = allParts(ma)
+        for _, sp in parts do
+            if sp.name == "Threshold" then
+                continue
+            end
+            local slo, shi = rotAABB(sp)
+            for _, op in aParts do
+                if op.name == "Threshold" then
+                    continue
+                end
+                local olo, ohi = rotAABB(op)
+                local pen = math.huge
+                for ax = 1, 3 do
+                    pen = math.min(pen, math.min(shi[ax], ohi[ax]) - math.max(slo[ax], olo[ax]))
+                end
+                expect(pen <= 1e-4).toBe(true)
+            end
+        end
     end)
 end)

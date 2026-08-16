@@ -439,11 +439,20 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
     local LAT_Z = Z0 + LAT_D / 2 -- inboard of the posts, so the noren still hangs in front
 
     -- ----- the frontage: OPEN (posts and trading bays) or KOSHI (a closed lattice wall) -----
-    local FRONT_POSTS = 5 -- owner's gate: 3 centre posts + 2 corners, down from 4 + 2
+    -- Owner's gate: 3 centre posts + 2 corners, down from 4 + 2 — and PER-SHOP since the
+    -- stats false front (2026-08-15): a 10-stud two-bay facade carries 3. The default is
+    -- the row's 5, so every shop that doesn't set shop.frontPosts emits byte-identically
+    -- (the committed model.json assets gate that).
+    local FRONT_POSTS = shop.frontPosts or 5
+    assert(FRONT_POSTS >= 3, `frontPosts {FRONT_POSTS} leaves no frontage: 3 posts (2 bays) is the floor`)
     local postX = {} -- kept so the sign boards register to the BAYS, not to the frontage
     -- Populated by the open branch only; a kōshi frontage has no bays to close or open, so the
     -- noren emitter (which walks these) naturally emits nothing there.
     local CLOSED: { [number]: boolean } = {}
+    -- The OPEN span: the first open bay's west post to the last open bay's east post — the
+    -- line the head rail and the counter register to. With the default closed end bays this
+    -- is postX[2]..postX[FRONT_POSTS - 1], exactly what those members always spanned.
+    local OPEN_X0, OPEN_X1 = 0, 0
 
     if shop.frontage == "open" then
         -- the OPEN frontage: six posts, no wall
@@ -476,22 +485,35 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
         -- (HEAD_Y / TRANSOM_TOP / DOOR_Z / FRAME_* / LAT_* are declared with the shared frontage
         -- constants above — the kōshi branch builds from the same planes.)
 
-        -- spans the OPEN bays only; the closed ends carry their own head band
+        -- THE TWO OUTER BAYS ARE CLOSED (owner's gate, matching the reference). A machiya shopfront is
+        -- not open end to end — the opening is the middle of the elevation with plastered wall either
+        -- side. It also gives the counter something to sit against.
+        -- ONLY when there are outer bays to close: a two-bay front (frontPosts 3) has no
+        -- ends to wall off — closing them would close the whole elevation — so BOTH bays
+        -- stay open (the owner's ruling on the stats false front).
+        if FRONT_POSTS - 1 >= 3 then
+            CLOSED[1] = true
+            CLOSED[FRONT_POSTS - 1] = true
+        end
+        local firstOpen, lastOpen
+        for i = 1, FRONT_POSTS - 1 do
+            if not CLOSED[i] then
+                firstOpen = firstOpen or i
+                lastOpen = i
+            end
+        end
+        OPEN_X0, OPEN_X1 = postX[firstOpen], postX[lastOpen + 1]
+
+        -- spans the OPEN bays only; any closed ends carry their own head band
         add(
             "HeadRail",
-            { postX[FRONT_POSTS - 1] - postX[2], 0.3, 0.32 },
-            { (postX[2] + postX[FRONT_POSTS - 1]) / 2, HEAD_Y + 0.15, FRAME_Z },
+            { OPEN_X1 - OPEN_X0, 0.3, 0.32 },
+            { (OPEN_X0 + OPEN_X1) / 2, HEAD_Y + 0.15, FRAME_Z },
             timber,
             "Wood",
             nil,
             FRAME_VAR
         )
-
-        -- THE TWO OUTER BAYS ARE CLOSED (owner's gate, matching the reference). A machiya shopfront is
-        -- not open end to end — the opening is the middle of the elevation with plastered wall either
-        -- side. It also gives the counter something to sit against.
-        CLOSED[1] = true
-        CLOSED[FRONT_POSTS - 1] = true
 
         for i = 1, FRONT_POSTS - 1 do
             local a, b = postX[i], postX[i + 1]
@@ -583,78 +605,87 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
                 -- and the hidden third-and-a-bit sits BEHIND the closed bay next to it. That is how a
                 -- sliding screen actually works — it does not shrink, it goes somewhere. It parks
                 -- toward whichever neighbouring bay is closed, which is what gives it somewhere to go.
-                local leafW = bayW
-                local openW = bayW
-                local parkWest = CLOSED[i - 1] == true
-                local leafC = if parkWest then (a + POST_W / 2 - openW / 6) else (b - POST_W / 2 + openW / 6)
-                -- The screen RUNS IN A TRACK and closes with a rail top and bottom. Its stiles used
-                -- to end at floor level with no bottom member, so the frame terminated into the floor
-                -- instead of closing against it — which reads as buried, because nothing caps it.
-                local RAIL_T = 0.16
-                local leafY0 = FLOOR + 0.1 -- the track it slides in
-                local leafH = HEAD_Y - leafY0
-                local leafCY = leafY0 + leafH / 2
-                -- The paper is INSET inside its own frame. At full leaf size its edges landed exactly on
-                -- the stiles', so the sheet was visible edge-on — a pane the same size as its sash.
-                -- Real shoji paper is glued behind the frame and stops short of it on every side.
-                add(
-                    `DoorLeaf{i}`,
-                    { leafW - 2 * 0.16, leafH - 2 * RAIL_T, 0.05 },
-                    { leafC, leafCY, DOOR_Z },
-                    paper,
-                    "Fabric"
-                )
-                -- stiles, rails and a proper kumiko grid, all in the frame's dark wood
-                for k, sx in { leafC - leafW / 2 + 0.07, leafC + leafW / 2 - 0.07 } do
+                -- AND THAT IS THE CONDITION: with no closed bay on either side (the two-bay front,
+                -- where nothing closes) a full-width leaf parked at either jamb would overhang the
+                -- building's corner or the neighbouring doorway — there is nowhere for it to go. So
+                -- such a bay ships its screens STORED (off-stage, the way amado live in a shutter
+                -- box) and reads fully open; the transom above still says what the opening is.
+                if CLOSED[i - 1] == true or CLOSED[i + 1] == true then
+                    local leafW = bayW
+                    local openW = bayW
+                    local parkWest = CLOSED[i - 1] == true
+                    local leafC = if parkWest
+                        then (a + POST_W / 2 - openW / 6)
+                        else (b - POST_W / 2 + openW / 6)
+                    -- The screen RUNS IN A TRACK and closes with a rail top and bottom. Its stiles used
+                    -- to end at floor level with no bottom member, so the frame terminated into the floor
+                    -- instead of closing against it — which reads as buried, because nothing caps it.
+                    local RAIL_T = 0.16
+                    local leafY0 = FLOOR + 0.1 -- the track it slides in
+                    local leafH = HEAD_Y - leafY0
+                    local leafCY = leafY0 + leafH / 2
+                    -- The paper is INSET inside its own frame. At full leaf size its edges landed exactly on
+                    -- the stiles', so the sheet was visible edge-on — a pane the same size as its sash.
+                    -- Real shoji paper is glued behind the frame and stops short of it on every side.
                     add(
-                        `DoorStile{i}_{k}`,
-                        { 0.14, leafH, 0.15 },
-                        { sx, leafCY, DOOR_Z },
-                        timber,
-                        "Wood",
-                        nil,
-                        FRAME_VAR
+                        `DoorLeaf{i}`,
+                        { leafW - 2 * 0.16, leafH - 2 * RAIL_T, 0.05 },
+                        { leafC, leafCY, DOOR_Z },
+                        paper,
+                        "Fabric"
                     )
-                end
-                for k, ry in { leafY0 + RAIL_T / 2, HEAD_Y - RAIL_T / 2 } do
-                    add(
-                        `DoorRail{i}_{k}`,
-                        { leafW, RAIL_T, 0.15 },
-                        { leafC, ry, DOOR_Z },
-                        timber,
-                        "Wood",
-                        nil,
-                        FRAME_VAR
-                    )
-                end
-                local LAT_N_V, LAT_N_H = 5, 7
-                for k = 1, LAT_N_V do
-                    add(
-                        `DoorLatV{i}_{k}`,
-                        { 0.075, leafH, 0.13 },
-                        { leafC - leafW / 2 + leafW * (k / (LAT_N_V + 1)), leafCY, DOOR_Z },
-                        timber,
-                        "Wood",
-                        nil,
-                        FRAME_VAR
-                    )
-                end
-                for k = 1, LAT_N_H do
-                    add(
-                        `DoorLatH{i}_{k}`,
-                        { leafW, 0.075, 0.13 },
-                        { leafC, leafY0 + leafH * (k / (LAT_N_H + 1)), DOOR_Z },
-                        timber,
-                        "Wood",
-                        nil,
-                        FRAME_VAR
-                    )
-                end
+                    -- stiles, rails and a proper kumiko grid, all in the frame's dark wood
+                    for k, sx in { leafC - leafW / 2 + 0.07, leafC + leafW / 2 - 0.07 } do
+                        add(
+                            `DoorStile{i}_{k}`,
+                            { 0.14, leafH, 0.15 },
+                            { sx, leafCY, DOOR_Z },
+                            timber,
+                            "Wood",
+                            nil,
+                            FRAME_VAR
+                        )
+                    end
+                    for k, ry in { leafY0 + RAIL_T / 2, HEAD_Y - RAIL_T / 2 } do
+                        add(
+                            `DoorRail{i}_{k}`,
+                            { leafW, RAIL_T, 0.15 },
+                            { leafC, ry, DOOR_Z },
+                            timber,
+                            "Wood",
+                            nil,
+                            FRAME_VAR
+                        )
+                    end
+                    local LAT_N_V, LAT_N_H = 5, 7
+                    for k = 1, LAT_N_V do
+                        add(
+                            `DoorLatV{i}_{k}`,
+                            { 0.075, leafH, 0.13 },
+                            { leafC - leafW / 2 + leafW * (k / (LAT_N_V + 1)), leafCY, DOOR_Z },
+                            timber,
+                            "Wood",
+                            nil,
+                            FRAME_VAR
+                        )
+                    end
+                    for k = 1, LAT_N_H do
+                        add(
+                            `DoorLatH{i}_{k}`,
+                            { leafW, 0.075, 0.13 },
+                            { leafC, leafY0 + leafH * (k / (LAT_N_H + 1)), DOOR_Z },
+                            timber,
+                            "Wood",
+                            nil,
+                            FRAME_VAR
+                        )
+                    end
+                end -- a leaf only where a closed neighbour gives it somewhere to park
             end
         end
     else
         -- ----- the KOSHI frontage: the street wall CLOSES, and nothing opens -----
-        -- The sports-book pattern (design spec): no bays, no doors, no counter behind — a full
+        -- The sealed-shell pattern (design spec): no bays, no doors, no counter behind — a full
         -- run of floor-to-kamoi lattice standing in front of a rendered wall, the ground-storey
         -- cousin of the upper storey's mushiko-mado. Same grammar as everywhere else on this
         -- building: STUCCO SITS BACK, TIMBER STANDS PROUD, front faces exactly on the frontage
@@ -1007,7 +1038,13 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
     local UPPER_Y0 = FLOOR + STOREY_H
     local WIN_H = 2.0
     local WIN_Y0 = UPPER_Y0 + (UPPER_H - WIN_H) / 2
-    local WIN_HALF = 6.0 -- the opening reaches WIN_HALF either side of centre
+    -- The opening reaches WIN_HALF either side of centre — 6.0, CAPPED so the window
+    -- follows the stucco box on a narrow front: unconditionally 6.0, a 10-wide envelope
+    -- (stats, SW 9.4) got NEGATIVE jamb widths. SW/2 - WIN_HALF is each jamb, floored at
+    -- 1.0 (twice the wall's own thickness — enough render to read as wall, not trim).
+    -- Every wider shop lands on the literal 6.0 exactly (accessories' SW/2 - 1.0 = 6.145
+    -- is the tightest), so their emitted floats are untouched.
+    local WIN_HALF = math.min(6.0, SW / 2 - 1.0)
     local WIN_X0, WIN_X1 = CX - WIN_HALF, CX + WIN_HALF
     local UF_Z = SZ0 + WALL_T / 2 -- the box's street face; the kōshi and the sign stand proud of it
 
@@ -1051,8 +1088,12 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
         STUCCO_VAR
     )
 
-    -- the kōshi, now filling the window band only
-    local KOSHI_N = 18
+    -- the kōshi, now filling the window band only. The count follows the width at the
+    -- band's own pitch — 18 bars over the full 12-stud window, 1.5 per stud, the same
+    -- integer-derived rule the kōshi frontage uses — so a capped (narrower) window keeps
+    -- the pitch instead of packing 18 bars into less wall. 2 * WIN_HALF * 1.5 is exact
+    -- at the default (2 * 6.0 * 1.5 = 18), so wider shops emit the same 18 bars.
+    local KOSHI_N = math.max(6, math.round(2 * WIN_HALF * 1.5))
     for i = 1, KOSHI_N do
         local t = (i - 0.5) / KOSHI_N
         add(
@@ -1365,8 +1406,8 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
             -- MEASURED FROM Z1, NOT Z0. It used to sit at Z0 + 4.6, which was the same place while the
             -- shop was 8 deep and became a counter marooned in the middle of the street the moment the
             -- frontage moved north. The counter belongs to the back wall; the customers get the rest.
-            { postX[FRONT_POSTS - 1] - postX[2] - POST_W, COUNTER_H, COUNTER_D },
-            { (postX[2] + postX[FRONT_POSTS - 1]) / 2, FLOOR + COUNTER_H / 2, COUNTER_Z },
+            { OPEN_X1 - OPEN_X0 - POST_W, COUNTER_H, COUNTER_D },
+            { (OPEN_X0 + OPEN_X1) / 2, FLOOR + COUNTER_H / 2, COUNTER_Z },
             timber,
             "Wood",
             nil,
@@ -1514,11 +1555,22 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
             local hemY = Chochin.hemY(armY)
             assert(hemY - FLOOR >= 5.0, `chōchin hem {hemY} sits under 5 studs off the floor`)
             local eaveHalfX = (W + 1.0) / 2 -- the Eave part's own extents, not the wall's
+            -- corners (stats, 2026-08-15): "west" | "east" hangs ONE lantern at that
+            -- corner instead of the pair. The stats front's east corner sits on the 1.5
+            -- roji, where a barrel would truly intersect apparel's own west lantern —
+            -- the two shops share z0 AND floorY, so the pair would hang at identical
+            -- y/z just 1.2 apart against 1.3 studs of summed barrel radii. nil keeps
+            -- the pair, byte-identically, for every shop that doesn't opt in.
+            local corners: string? = if type(identity.chochin) == "table"
+                then identity.chochin.corners
+                else nil
             for _, corner in
                 { { "West", CX - eaveHalfX + CORNER_INSET }, { "East", CX + eaveHalfX - CORNER_INSET } }
             do
                 local cnm, lx = corner[1] :: string, corner[2] :: number
-                table.insert(children, Chochin.build(cnm, lx, hangZ, armY, paperRGB255))
+                if corners == nil or string.lower(cnm) == corners then
+                    table.insert(children, Chochin.build(cnm, lx, hangZ, armY, paperRGB255))
+                end
             end
         end
         if identity.board then

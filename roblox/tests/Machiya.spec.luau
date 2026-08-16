@@ -703,6 +703,30 @@ describe("machiya variants", function()
         expect(sealedBoard.children == nil or #sealedBoard.children == 0).toBe(true)
         expect(find(m2, "ChochinWest") ~= nil).toBe(true)
     end)
+    test("frontPosts 3 gives a two-bay front: both bays open, rail spans the frontage", function()
+        -- The stats false front's case, held at the archetype level: the post
+        -- count is per-shop (default 5), and at 3 posts / 2 bays there are no
+        -- outer bays to close and no closed neighbour for a leaf to park behind.
+        local narrow = table.clone(SHELL)
+        narrow.frontPosts = 3
+        local m = Machiya.build(ZenDojo.palette, ArenaLayout, narrow :: any)
+        expect(countPrefix(m, "FrontPost")).toBe(3)
+        expect(countPrefix(m, "BayPanel")).toBe(0)
+        expect(countPrefix(m, "DoorLeaf")).toBe(0)
+        expect(countPrefix(m, "Transom") - countPrefix(m, "TransomBar")).toBe(2)
+        local hr = find(m, "HeadRail")
+        -- corner posts are inset half a post (0.245): the rail spans post 1 to post 3
+        expect(hr.properties.Size[1]).toBeCloseTo(16 - 0.49, 0.001)
+        expect(hr.properties.CFrame[1]).toBeCloseTo(8, 0.001)
+    end)
+    test("the DEFAULT post count is untouched: 5 posts, closed ends, parked leaves", function()
+        -- the inertness proof's test half — the byte gate on the three committed
+        -- model.json assets is the other half
+        local m = Machiya.build(ZenDojo.palette, ArenaLayout, SHELL)
+        expect(countPrefix(m, "FrontPost")).toBe(5)
+        expect(countPrefix(m, "BayPanel")).toBe(2)
+        expect(countPrefix(m, "DoorLeaf")).toBe(2)
+    end)
     test("koshi + full interior refuses loudly, not with nil arithmetic", function()
         local bad = table.clone(SHELL)
         bad.frontage = "koshi"
