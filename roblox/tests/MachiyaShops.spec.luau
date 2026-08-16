@@ -421,36 +421,66 @@ describe("signage — apparel's nobori (the blade was an anachronism)", function
         end
     end)
 
-    test("the WHOLE nobori stands inside the shop's own envelope", function()
-        -- the promenade is inviolable at ground level (the same rule that makes
-        -- NOREN_BELLY negative); with no sway shipped, the still-air pose IS the
-        -- swept extent
+    test("it stands OUT FRONT — beyond the drip line, flanking its own shopfront", function()
+        -- Round-4 rule clarification (owner, verbatim: the promenade "isn't
+        -- exactly 'inviolable' when it comes to e.g. signage — it's simply not
+        -- someplace we want to place buildings"). So the banner stands ON the
+        -- promenade where it can be seen — but BEYOND the eave's drip line
+        -- (z0 - 2.5), never under the soffit: a banner tucked under an overhang
+        -- has the first kanban's exact defect. In x it stays inside its own
+        -- frontage: flanking its shopfront, not a neighbour's.
         for _, p in allParts(nobori) do
             local plo, phi = rotAABB(p)
+            expect(phi[3] <= e.z0 - 2.5 - 0.15).toBe(true) -- beyond the drip, with air
             expect(plo[1] >= e.x0).toBe(true)
             expect(phi[1] <= e.x1).toBe(true)
-            expect(plo[3] >= e.z0 + 0.3).toBe(true)
-            expect(phi[3] <= e.z1).toBe(true)
+        end
+        -- grounded at the surveyed front grade (the NW front probe, 113.30),
+        -- with a tenth of a stud buried against local grade variance
+        local base = find(nobori, "NoboriBase")
+        local blo = rotAABB(base)
+        expect(math.abs(blo[2] - (e.floorY - 0.1)) < 0.01).toBe(true)
+    end)
+
+    test("NOTHING shares its footprint — no eave, hisashi or chōchin above it", function()
+        -- the first kanban's defect, inverted into a guard: open sky. No other
+        -- part of the building may overlap the banner in x AND z at all — which
+        -- proves nothing overhangs it (the eave ends at the drip line it stands
+        -- beyond; the corner chōchin is west of it).
+        local nParts = allParts(nobori)
+        local inSign = {}
+        for _, p in nParts do
+            inSign[p] = true
+        end
+        for _, sp in nParts do
+            local slo, shi = rotAABB(sp)
+            for _, op in allParts(m) do
+                if not inSign[op] and op.name ~= "Threshold" then
+                    local olo, ohi = rotAABB(op)
+                    local xOverlap = math.min(shi[1], ohi[1]) - math.max(slo[1], olo[1]) > 1e-4
+                    local zOverlap = math.min(shi[3], ohi[3]) - math.max(slo[3], olo[3]) > 1e-4
+                    expect(xOverlap and zOverlap).toBe(false)
+                end
+            end
         end
     end)
 
-    test("it clears the noren's FULL client sway and leaves the doorway walkable", function()
-        -- the noren hem's worst case: rest lean 3.6 + 0.35 jitter, times the
-        -- client's (1 + SWAY) = 1.85 amplitude — hem z <= z0 + 0.06 + 2.6*sin(7.31 deg)
-        local hemMaxZ = e.z0 + 0.06 + 2.6 * math.sin(math.rad((3.6 + 0.35) * 1.85))
-        local pole = find(nobori, "NoboriPole")
-        local plo = rotAABB(pole)
-        expect(plo[3] - hemMaxZ >= 0.1).toBe(true)
-        -- the doorway it flanks keeps a walkable clear opening: from the parked
-        -- door leaf's east edge to the nobori's west face, at least 2.2 studs
-        local leaf = find(m, "DoorLeaf2")
-        expect(leaf ~= nil).toBe(true)
-        local leafEast = leaf.properties.CFrame[1] + leaf.properties.Size[1] / 2
-        local narrowest = math.huge
+    test("both doorways and the hugging lane stay clear", function()
+        -- doorways: the open bays span the frontage's middle; the banner fronts
+        -- the CLOSED west bay and must not reach the westmost opening's edge
+        local doorwayWestEdge = -17.6075 + 0.245 -- post2's east face, bay 2's west jamb
+        local lane = math.huge
         for _, p in allParts(nobori) do
-            narrowest = math.min(narrowest, (rotAABB(p))[1])
+            local plo, phi = rotAABB(p)
+            expect(phi[1] < doorwayWestEdge - 0.5).toBe(true)
+            -- the walking lane hugging the frontage: banner stand to the
+            -- frontage plane, measured at ground level (colliding parts only —
+            -- the cloth is walk-through, and hangs aerial anyway)
+            if p.properties.CanCollide ~= false then
+                lane = math.min(lane, e.z0 - phi[3])
+            end
         end
-        expect(narrowest - leafEast >= 2.2).toBe(true)
+        expect(lane >= 2.5).toBe(true)
     end)
 end)
 
@@ -460,12 +490,37 @@ describe("shop mon — 丸に文字 on every noren", function()
     -- cloth: it lives INSIDE the swaying segment as its SurfaceGui, so the
     -- segment's own CFrame — the one NorenSway animates — is literally the
     -- transform that carries it.
+    -- monPanelByBay: which panel of each open bay carries the crest. Odd counts
+    -- centre it; accessories' even pair FLANKS THE CENTRAL POST (owner, round
+    -- 4): bay 2's east panel and bay 3's west panel, a matched set across the
+    -- post between the doorways. diaPx pins the grown ring sizes (round 4:
+    -- apparel's noren dropped to 4 segments so its ring could take the taller
+    -- segment's allowance).
     local CASES = {
-        { key = "hanabiya", char = "花", monPanel = 2, nPanels = 3, nSegs = 3 },
-        { key = "apparel", char = "呉", monPanel = 2, nPanels = 3, nSegs = 5 },
-        -- accessories' pair of wide panels has its doorway centre ON the slit,
-        -- so the mon rides the west panel of each pair (flagged for the gate)
-        { key = "accessories", char = "小", monPanel = 1, nPanels = 2, nSegs = 4 },
+        {
+            key = "hanabiya",
+            char = "花",
+            nPanels = 3,
+            nSegs = 3,
+            monPanelByBay = { ["2"] = 2, ["3"] = 2 },
+            diaPx = 89,
+        },
+        {
+            key = "apparel",
+            char = "呉",
+            nPanels = 3,
+            nSegs = 4,
+            monPanelByBay = { ["2"] = 2, ["3"] = 2 },
+            diaPx = 74,
+        },
+        {
+            key = "accessories",
+            char = "小",
+            nPanels = 2,
+            nSegs = 4,
+            monPanelByBay = { ["2"] = 2, ["3"] = 1 },
+            diaPx = 74,
+        },
     }
     for _, case in CASES do
         test(`{case.key}'s noren carries 丸に{case.char} — one per doorway, on the cloth`, function()
@@ -493,7 +548,7 @@ describe("shop mon — 丸に文字 on every noren", function()
                             -- ON the animated cloth: the host segment is the
                             -- NorenSway-tagged part, second from the top (the
                             -- upper-middle of the panel, where a noren crest sits)
-                            expect(k).toBe(case.monPanel)
+                            expect(k).toBe(case.monPanelByBay[tostring(bay)])
                             expect(si).toBe(2)
                             expect(seg.properties.Tags[1]).toBe("NorenSeg")
                             -- the ring: a circular frame with a stroke, facing the street
@@ -508,7 +563,9 @@ describe("shop mon — 丸に文字 on every noren", function()
                             -- sized to read without covering the panel: the ring
                             -- stays within 62% of the panel's width and inside
                             -- its own segment's face
-                            local diaStuds = ring.properties.Size.UDim2[1][2] / mon.properties.PixelsPerStud
+                            local diaPx = ring.properties.Size.UDim2[1][2]
+                            expect(diaPx).toBe(case.diaPx)
+                            local diaStuds = diaPx / mon.properties.PixelsPerStud
                             expect(diaStuds <= 0.62 * seg.properties.Size[1]).toBe(true)
                             expect(diaStuds <= 0.9 * seg.properties.Size[2]).toBe(true)
                             expect(diaStuds >= 0.25 * seg.properties.Size[1]).toBe(true)

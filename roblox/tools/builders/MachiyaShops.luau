@@ -93,7 +93,11 @@ MachiyaShops.apparel = {
         -- Deep indigo, the traditional apparel-shop noren. NOT from ZenDojo.palette: its only
         -- blue is `water` { 0.20, 0.35, 0.43 }, a mid teal, not a deep blue — so this is the
         -- design brief's fallback literal, held here for the owner to retune at the gate.
-        noren = { color = { 0.16, 0.18, 0.32 }, segments = 5, mon = "呉" },
+        -- segments 5 -> 4 (owner, round 4: "drop the segments to 4 and grow the
+        -- size where we can") — the taller segment lets the mon ring grow from
+        -- 36% to 45% of the panel's width (the ring is capped by its host
+        -- segment's height; see monFace).
+        noren = { color = { 0.16, 0.18, 0.32 }, segments = 4, mon = "呉" },
         -- noren.mon (round 3): 丸に呉 — the ring-and-kanji crest, arguably the
         -- era's primary shop identifier, resist-dyed white on the cloth. One per
         -- doorway, riding the swaying segment (see Machiya.luau's monFace).
@@ -104,14 +108,15 @@ MachiyaShops.apparel = {
         -- Chochin.build's paperRGB255 doc comment. Chochin.spec.luau's legibility guard holds
         -- this (and every other shop tint) to a 0.55 luminance floor.
         chochin = { paper = { 170, 178, 200 } },
-        -- 幟 (owner's round-3 gate, replacing the round-2 blade): the blade was
-        -- an anachronism — a high perpendicular sign reads Shōwa, not Edo/Meiji —
-        -- so the draper advertises the period way, with CLOTH: a banner on a pole
-        -- at the shop mouth, 呉服屋 running down it, one character per swinging
-        -- segment. The cloth takes the shop's own noren indigo (derived — omit
-        -- `panel` and the kit reads identity.noren.color), lettered SHIRONUKI
-        -- white, the resist-dye pairing every real gofukuya nobori wore. The pole
-        -- flanks the centre post's west side, in the west doorway's clear margin.
+        -- 幟 (owner's round-3 gate, replacing the round-2 blade; RESITED round 4):
+        -- the blade was an anachronism — a high perpendicular sign reads Shōwa,
+        -- not Edo/Meiji — so the draper advertises the period way, with CLOTH: a
+        -- banner on a pole, 呉服屋 running down it, one character per swinging
+        -- segment, indigo derived from the shop's own noren, lettered SHIRONUKI
+        -- white. Round 4 moved it OUT FRONT (owner: the promenade bars buildings,
+        -- not signage — "the sign can't really be seen inside the shop"): it now
+        -- stands on the promenade at the frontage's west end, beyond the eave's
+        -- drip line, in front of the closed end bay where it blocks no doorway.
         board = {
             kind = "nobori",
             text = "呉服屋",

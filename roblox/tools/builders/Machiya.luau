@@ -1251,10 +1251,14 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
     -- cloth and not a painted board. Noren SCREEN a shopfront; that is the job.
     local NOREN_ALPHA = 0.1
     -- Total lean from vertical at the hem. Small: a noren hangs, it does not billow. NEGATIVE
-    -- leans the hem toward +Z — back under the eave, INTO the shop. It is tempting to lean it out
-    -- over the street instead, and that pushes the hem 0.05 north of the frontage: the promenade
-    -- is inviolable at ground level, the hem is at FLOOR + 4.2, and a hair over the line is still
-    -- over it. The sway on top of this is clamped for the same reason.
+    -- leans the hem toward +Z — back under the eave, INTO the shop.
+    --
+    -- THE PROMENADE RULE, stated precisely (owner's round-4 clarification): the promenade
+    -- excludes BUILDINGS; signage may stand on it — the nobori does, out front, and this
+    -- hang was once justified by an over-read of that rule ("inviolable at ground level").
+    -- The inward lean is RETAINED anyway, for its own reasons: it is the pose every
+    -- accepted shop shipped with, and moving it moves every model.json byte gate — not
+    -- because a hem a hair over the frontage line would be forbidden.
     local NOREN_BELLY = -3.6
     -- GENERALIZED FOR THE IDENTITY KIT (Task 3): the colour and the segment count are the
     -- caller's; the hang itself — per-bay panels, the chain, the still-air pose — stays the
@@ -1267,25 +1271,34 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
     -- panels automatically at a lower count; the 0.16 slit between panels is the
     -- constant the whole row shares.
     -- monChar (round 3, owner's ruling): ONE 丸に文字 crest per doorway, riding
-    -- the cloth. It attaches to the panel nearest the doorway's centre (the
-    -- middle panel when the count is odd; with an even count the true centre is
-    -- the slit, so it rides the west panel of the pair — flagged for the gate),
-    -- on the SECOND segment from the top: the upper-middle of the hang, where a
-    -- real noren carries its crest, and squarely on a NorenSway-animated part so
-    -- the sway carries the mon. See monFace above for why it must be the
-    -- segment's own SurfaceGui rather than a part in front of the cloth.
+    -- the cloth on the SECOND segment from the top — the upper-middle of the
+    -- hang, where a real noren carries its crest, and squarely on a
+    -- NorenSway-animated part so the sway carries the mon. Odd panel counts
+    -- centre it on the middle panel; with an EVEN count the doorway's true
+    -- centre is the slit, so the crest rides the panel nearest the frontage's
+    -- CENTRAL post (owner, round 4): across the two open bays the pair then
+    -- FLANKS that post, reading as a matched set. See monFace above for why it
+    -- must be the segment's own SurfaceGui rather than a part in front of the
+    -- cloth.
     local function emitNoren(norenColour: { number }, nSegs: number, perBay: number?, monChar: string?)
         if shop.frontage ~= "open" then
             return
         end
         local nPanels = perBay or NOREN_PER_BAY
         local segH = NOREN_H / nSegs
-        local monPanel = math.ceil(nPanels / 2)
+        local centrePostIdx = math.ceil(FRONT_POSTS / 2)
         for i = 1, FRONT_POSTS - 1 do
             if not CLOSED[i] then
                 local a, b = postX[i], postX[i + 1]
                 local openW = (b - a) - POST_W
                 local panelW = openW / nPanels - 0.16
+                -- this bay's crest panel: the middle one, or (even counts) the
+                -- one nearest the central post — bays west of it take their east
+                -- panel, bays east of it their west panel
+                local monPanel = if nPanels % 2 == 1
+                    then math.ceil(nPanels / 2)
+                    elseif i < centrePostIdx then nPanels
+                    else 1
                 for k = 1, nPanels do
                     local t = (k - 0.5) / nPanels
                     local px = a + POST_W / 2 + openW * t
@@ -1624,23 +1637,25 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
                 -- DELETED, not stranded: the owner ruled the type an anachronism for
                 -- this world, so the kit must not keep offering it.
                 --
-                -- SITING (load-bearing): the promenade is inviolable at ground level —
-                -- the same rule that makes NOREN_BELLY negative — so the whole rig
-                -- stands INSIDE the envelope, flanking the frontage's CENTRE post in a
-                -- doorway's clear margin (both doorways' clear thirds meet there: the
-                -- leaves park toward the closed end bays). Everything above the kamoi
-                -- near the frontage belongs to the transom/girder, so the CLOTH stays
-                -- under HEAD_Y and only the bare pole tip rises past it, in the open
-                -- band between the noren plane and the transom.
+                -- SITING (owner's round-4 rule clarification, verbatim: the promenade
+                -- "isn't exactly 'inviolable' when it comes to e.g. signage. It's
+                -- simply not someplace we want to place buildings. The sign can't
+                -- really be seen inside the shop, so let's get it out front."). So the
+                -- banner stands OUT FRONT, on the promenade — flanking the shopfront
+                -- at its END (default west, in front of the CLOSED end bay, so it
+                -- blocks neither doorway) and BEYOND the eave's drip line, never under
+                -- the soffit: a sign tucked under an overhang was the first kanban's
+                -- exact defect. Freed from the kamoi/transom ceiling it stood under
+                -- indoors, the banner takes a real nobori's height.
                 assert(
                     shop.frontage == "open",
-                    "a nobori flanks a doorway: it needs the open frontage's bays"
+                    "a nobori flanks a shopfront's end bay: it needs the open frontage"
                 )
                 local POLE_R = 0.09
-                local POLE_H = 7.5 -- top at FLOOR + 7.5: 0.3 under the front girder's soffit
+                local POLE_H = 9.2
                 local BAR_R = 0.06
                 local CLOTH_W = 1.2 -- along z, hanging from the bar
-                local CLOTH_H = 4.4 -- ~3.7:1, a nobori's proportions
+                local CLOTH_H = 5.2 -- ~4.3:1, a nobori's proportions; hem ~3 off the ground
                 local CLOTH_T = 0.05 -- Roblox's minimum, same as the noren
                 -- one segment PER CHARACTER: the chain is the cloth's bend, and the
                 -- characters ride the segments, bending with it
@@ -1652,24 +1667,33 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
                 end
                 local nSegs = math.max(#chars, 3)
                 local segH = CLOTH_H / nSegs
-                -- x: flanking the centre post (default its west side; b.side = "east"
-                -- mirrors it), a hand's clearance off the post face
-                local centrePost = postX[math.ceil(FRONT_POSTS / 2)]
+                -- x: 1.5 in from the frontage's corner (default the west end;
+                -- b.side = "east" mirrors it) — in front of the closed end bay, clear
+                -- of both doorways, and a full stud inside the eave-corner chōchin's
+                -- barrel in x, so nothing hangs over the banner
                 local sideSign: number = if type(b) == "table" and b.side == "east" then 1 else -1
-                local px = centrePost + sideSign * (POST_W / 2 + 0.25 + POLE_R)
-                -- z: behind the noren's FULL CLIENT SWAY, not just its rest pose. The
-                -- hem's worst case is rest lean (|NOREN_BELLY| + 0.35 jitter) times
-                -- NorenSway's (1 + SWAY) = 1.85: hem z <= Z0 + 0.06 + 2.6*sin(7.31°)
-                -- ~= Z0 + 0.39. The pole's near face sits at Z0 + 0.53 — 0.14 clear of
-                -- cloth that can never reach further — and the whole rig stays short
-                -- of the transom plane (DOOR_Z - 0.05) wherever it rises past HEAD_Y.
-                local pz = Z0 + 0.62
+                local px = (if sideSign < 0 then X0 else X1) - sideSign * 1.5
+                -- z: BEYOND the drip line (Z0 - EAVE_OVERHANG), with air — nothing of
+                -- the building may stand over the banner. The pole is the rig's
+                -- southmost element, planted 0.43 clear of the drip; the bar and cloth
+                -- run NORTH from it, out over the promenade, so the whole rig's
+                -- z-extent tops out at the base's south face, 0.21 short of the drip.
+                local pz = Z0 - EAVE_OVERHANG - 0.43
+                assert(
+                    pz + 0.25 <= Z0 - EAVE_OVERHANG - 0.15,
+                    `nobori base {pz + 0.25} crowds the eave's drip line {Z0 - EAVE_OVERHANG}`
+                )
                 local kids: { any } = {}
                 table.insert(
                     kids,
                     Spec.part("NoboriBase", {
-                        Size = { 0.45, 0.28, 0.45 },
-                        CFrame = Spec.cframe({ px, FLOOR + 0.14, pz }),
+                        -- bottom a tenth of a stud below the shop's FLOOR datum: the
+                        -- stand sits on the promenade's terrain, which the survey
+                        -- probed at exactly floorY on this shop's NW front corner
+                        -- (the nearest probe to this site); the bury absorbs local
+                        -- grade variance instead of floating on it
+                        Size = { 0.5, 0.35, 0.5 },
+                        CFrame = Spec.cframe({ px, FLOOR + 0.075, pz }),
                         Color = timber,
                         Material = "Wood",
                         MaterialVariant = FRAME_VAR,
@@ -1687,16 +1711,17 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
                     })
                 )
                 -- the yokobō: the horizontal top bar a nobori actually hangs from,
-                -- running SOUTH from the pole (into the envelope), the pole tip
-                -- standing proud above it the way a real nobori pole does
+                -- running NORTH from the pole (out over the promenade, away from the
+                -- building), the pole tip standing proud above it the way a real
+                -- nobori pole does
                 local BAR_L = 0.3 + CLOTH_W + 0.15
-                local barY = FLOOR + 6.62 -- bar top 0.12 under the kamoi line
+                local barY = FLOOR + POLE_H - 0.85 -- the tip stands proud above the bar
                 table.insert(
                     kids,
                     Spec.part("NoboriBar", {
                         Shape = "Cylinder",
                         Size = { BAR_L, 2 * BAR_R, 2 * BAR_R },
-                        CFrame = Spec.cframe({ px, barY, pz - BAR_R + BAR_L / 2 }, Spec.ROT.CYL_ALONG_Z),
+                        CFrame = Spec.cframe({ px, barY, pz + BAR_R - BAR_L / 2 }, Spec.ROT.CYL_ALONG_Z),
                         Color = timber,
                         Material = "Wood",
                         MaterialVariant = "CypressWeathered",
@@ -1706,21 +1731,22 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
                         CastShadow = false,
                     })
                 )
-                -- the cloth: hung from the bar's underside, drifting gently WEST into
-                -- the doorway's open air (away from the post it flanks) so it reads as
-                -- cloth. Still-air pose only: NorenSway rebuilds tagged segments as
+                -- the cloth: hung from the bar's underside, drifting gently toward
+                -- the shop's centre (away from the corner and the eave-corner chōchin
+                -- that hangs there) so it reads as cloth. Still-air pose only:
+                -- NorenSway rebuilds tagged segments as
                 -- CFrame.Angles(rx, 0, rz) from the X-euler alone — it assumes yaw-0
                 -- street-facing panels, and these face east/west and lean about Z, so
                 -- adopting it means teaching the client script to preserve yaw: a
                 -- client-script change, which is its own gate. Tagging them today
                 -- would snap the cloth flat on the first frame. So: UNTAGGED.
-                local NOBORI_DRIFT = -2.5 * sideSign -- total lean at the hem, away from the post
+                local NOBORI_DRIFT = -2.5 * sideSign -- total lean at the hem, toward the shop's centre
                 local clothColor: { number } = if type(b) == "table" and b.panel
                     then b.panel.color
                     elseif identity.noren then identity.noren.color
                     else paper
                 local clothInk: { number } = if type(b) == "table" and b.ink then b.ink.color else SHIRO
-                local clothZ = pz + 0.15 + CLOTH_W / 2
+                local clothZ = pz - 0.15 - CLOTH_W / 2
                 local function rotZ(deg: number): { number }
                     local r = math.rad(deg)
                     local c, sn = math.cos(r), math.sin(r)
@@ -1750,8 +1776,8 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
                             -- reads down the promenade from either direction
                             children = if ch
                                 then {
-                                    kanjiFace("FaceEast", ch, "Right", clothInk, 80, 64, false),
-                                    kanjiFace("FaceWest", ch, "Left", clothInk, 80, 64, false),
+                                    kanjiFace("FaceEast", ch, "Right", clothInk, 96, 64, false),
+                                    kanjiFace("FaceWest", ch, "Left", clothInk, 96, 64, false),
                                 }
                                 else nil,
                         })
@@ -1768,7 +1794,7 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
                         kids,
                         Spec.part(`NoboriTie{ti}`, {
                             Size = { math.abs(jx - px) + 0.12, 0.07, 0.18 },
-                            CFrame = Spec.cframe({ (jx + px) / 2, jy, pz + 0.12 }),
+                            CFrame = Spec.cframe({ (jx + px) / 2, jy, pz - 0.12 }),
                             Color = ink,
                             Material = "Fabric",
                             CanCollide = false,
