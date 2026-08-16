@@ -6,16 +6,18 @@ import BankEvent from './models/BankEvent';
 // decremented by every purchase (routes/store.ts, routes/apiV1.ts), so ranking on it means a
 // player who spends on fireworks or a teahouse FALLS DOWN THE BOARD — the leaderboard would
 // punish exactly the economy engagement the game wants. `lifetimeBanked` is monotonic.
+//
+// NO `deviceId`, ON ANY TRANSPORT. A deviceId is a BEARER CREDENTIAL: `sync-player`,
+// `submit-throw`, `bank` and `update-progress` each resolve an account from a client-supplied
+// one, with no further auth. It used to travel on the socket board so the PWA could label rows
+// with its first eight characters — i.e. it rendered other players' credentials as their
+// pseudonyms, and any connected socket could harvest ~100 of them from `get-stats`. The board
+// carries `displayName` instead.
+//
+// There is ONE constant because no consumer may have it. Adding a field for one transport means
+// deliberately adding a second projection, not widening this one — quietly widening a shared
+// list is exactly how deviceId got here.
 export const LEADERBOARD_FIELDS =
-    'deviceId displayName lifetimeBanked totalPoints robloxId identityTier currentStreak bestStreak';
-
-// THE SAME BOARD, MINUS deviceId, for /api/v1. On the socket path a deviceId is a bearer
-// credential — `sync-player { deviceId }` grants that account with no further auth — so it
-// must not travel to a caller that has no business holding one. The two projections are
-// deliberately separate constants rather than one shared list: sharing would mean the next
-// field added for the PWA silently appears on the API too, which is exactly how deviceId
-// got here.
-export const API_LEADERBOARD_FIELDS =
     'displayName lifetimeBanked totalPoints robloxId identityTier currentStreak bestStreak';
 
 export async function topByCareer(

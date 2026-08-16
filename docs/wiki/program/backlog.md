@@ -205,7 +205,7 @@ does NOT drop an index already built in a live database. If `roshambo-dev` or `r
 already created `userId_1` on `sessions`/`bankevents`, it persists until dropped by hand or by
 `syncIndexes()`. The write-cost saving is only realised on fresh collections.
 
-## ⚠ SECURITY — the `get-stats` socket handler broadcasts deviceIds
+## ~~⚠ SECURITY — the `get-stats` socket handler broadcasts deviceIds~~ FIXED 2026-08-16
 
 Found by the plan-2 whole-branch review, 2026-08-16. **Pre-existing; not introduced by that
 plan, and deliberately not fixed by it.**
@@ -255,3 +255,33 @@ these are things a later reader would otherwise have to rediscover.
   round, for `liveStreaks`, which has no consumer until plan 3.
 - **The plan doc diverges from the code**: it names a `playerVolume(userId, w)` that was never
   built. Its three figures are folded into `playerRates` instead, which is the better shape.
+
+## ⚠ SECURITY — socket handlers trust a client-supplied `deviceId` as authentication
+
+Split out of the `get-stats` broadcast fix (2026-08-16), which closed the *harvest* but not the
+*authentication gap underneath it*.
+
+Four handlers in `server/src/transports/socketAdapter.ts` resolve an account directly from a
+`deviceId` in the client's own payload, with no further check:
+
+- `sync-player { deviceId }` — reads the full account
+- `submit-throw { deviceId }` — throws as that account
+- `bank { deviceId }` — **cashes out that account's pot**
+- `update-progress { deviceId, displayName }` — renames that account
+
+So anyone who obtains a `deviceId` by any route has total control of that guest account. The
+board no longer hands them out, but a deviceId also travels in localStorage, in support
+screenshots, over shoulders, and in any future payload someone adds without thinking.
+
+Contrast `userId`, which is set from a JWT-verified handshake (`socketAdapter.ts:51-55`) and is
+NOT client-injectable — that asymmetry is the whole problem: one identity path is authenticated
+and the other is a password sent as a parameter.
+
+**Why it was not fixed with the broadcast:** it is a substantially bigger piece of work
+(guest-session authentication) and touches every socket handler plus the PWA's connection
+lifecycle. Removing the broadcast was the cheap half and stood alone; this does not.
+
+**Fix sketch:** on first `sync-player`, mint a signed session token bound to that deviceId,
+return it, and require it on every subsequent mutating event — so the deviceId identifies and
+the token authenticates. Guests keep working without an account. Do this before the game is
+public; it is currently a total-account-takeover primitive for anyone who learns one string.

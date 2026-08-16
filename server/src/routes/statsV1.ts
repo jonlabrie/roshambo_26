@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Types } from 'mongoose';
 import User from '../models/User';
-import { longestStreaks, biggestBanks, biggestRounds, heatBoard, playerRates } from '../stats';
+import { longestStreaks, biggestBanks, biggestRounds, heatBoard, playerRates, nameUsers } from '../stats';
 import { presentIn } from '../sessions';
 import { rollingWindow, calendarDayUTC, calendarWeekUTC, HOUR_MS, DAY_MS, WEEK_MS, QUALIFY, Window } from '../windows';
 
@@ -39,16 +39,6 @@ function heatWindow(name: string, now: Date): ResolvedWindow | null {
     if (name === 'day') return { window: rollingWindow(now, DAY_MS), kind: 'rolling' };
     if (name === 'week') return { window: rollingWindow(now, WEEK_MS), kind: 'rolling' };
     return null;
-}
-
-// NAME THE PLAYERS HERE. Every board returns user ids; resolving them once server-side saves
-// the caller a second round trip, and — more importantly — keeps the projection in ONE place,
-// so `deviceId` (a bearer credential on the socket path) cannot leak into an API response by
-// someone adding a field to a shared list.
-async function nameUsers(ids: Types.ObjectId[]): Promise<Map<string, string>> {
-    if (ids.length === 0) return new Map();
-    const users = await User.find({ _id: { $in: ids } }).select('displayName');
-    return new Map(users.map(u => [u._id.toString(), u.displayName || 'Anonymous']));
 }
 
 export function createStatsV1(): Router {

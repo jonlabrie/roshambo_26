@@ -11,11 +11,21 @@ beforeEach(clearTestDb);
 describe('topByCareer', () => {
     it('ranks by career earnings, NOT by the spendable wallet', async () => {
         // The spender earned more but bought a teahouse; they must still outrank the hoarder.
-        await User.create({ deviceId: 'spender', lifetimeBanked: 900, totalPoints: 10 });
-        await User.create({ deviceId: 'hoarder', lifetimeBanked: 100, totalPoints: 100 });
+        // Identified by displayName, not deviceId: the board deliberately does not carry a
+        // deviceId on any transport, because it is a bearer credential (see leaderboards.ts).
+        await User.create({ deviceId: 'd1', displayName: 'spender', lifetimeBanked: 900, totalPoints: 10 });
+        await User.create({ deviceId: 'd2', displayName: 'hoarder', lifetimeBanked: 100, totalPoints: 100 });
 
         const leaders = await topByCareer({}, 50);
-        expect(leaders.map(u => u.deviceId)).toEqual(['spender', 'hoarder']);
+        expect(leaders.map(u => u.displayName)).toEqual(['spender', 'hoarder']);
+    });
+
+    it('never returns a deviceId — it is a bearer credential, not a label', async () => {
+        await User.create({ deviceId: 'SECRET-DEVICE', displayName: 'Ayaka', lifetimeBanked: 10 });
+        const leaders = await topByCareer({}, 50);
+        expect(leaders).toHaveLength(1);
+        expect(JSON.stringify(leaders)).not.toContain('SECRET-DEVICE');
+        expect(leaders[0].deviceId).toBeUndefined();
     });
 
     it('honours the limit', async () => {
@@ -26,17 +36,17 @@ describe('topByCareer', () => {
     });
 
     it('filters, so a country board only contains that country', async () => {
-        await User.create({ deviceId: 'us1', country: 'US', lifetimeBanked: 50 });
-        await User.create({ deviceId: 'jp1', country: 'JP', lifetimeBanked: 500 });
+        await User.create({ deviceId: 'd1', displayName: 'us1', country: 'US', lifetimeBanked: 50 });
+        await User.create({ deviceId: 'd2', displayName: 'jp1', country: 'JP', lifetimeBanked: 500 });
 
         const leaders = await topByCareer({ country: 'US' }, 50);
-        expect(leaders.map(u => u.deviceId)).toEqual(['us1']);
+        expect(leaders.map(u => u.displayName)).toEqual(['us1']);
     });
 
     it('treats a player who never banked as zero rather than omitting them', async () => {
-        await User.create({ deviceId: 'never' });
+        await User.create({ deviceId: 'd1', displayName: 'never' });
         const leaders = await topByCareer({}, 50);
-        expect(leaders.map(u => u.deviceId)).toContain('never');
+        expect(leaders.map(u => u.displayName)).toContain('never');
     });
 });
 

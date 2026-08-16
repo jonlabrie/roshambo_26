@@ -52,7 +52,14 @@ export interface AuthUser {
 
 export interface LeaderboardEntry {
     _id?: string
-    deviceId?: string
+    // The player's OWN id, on rows that are not themselves a user (biggestWins rows are
+    // PlayerRound documents, so `_id` is the round and `userId` is the player).
+    userId?: string
+    // What a row is labelled with. There is deliberately no `deviceId` here: it is a bearer
+    // credential on the socket transport — `sync-player`/`bank`/`update-progress` all resolve
+    // an account from a client-supplied one — and this board used to render its first eight
+    // characters as other players' pseudonyms. See server/src/leaderboards.ts.
+    displayName?: string
     // Career earnings, and the basis the server sorts the board by. totalPoints is the
     // spendable wallet and goes DOWN on a purchase, so it must not be what a ranked list
     // displays.

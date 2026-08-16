@@ -11,6 +11,7 @@ import Session from '../models/Session';
 import User from '../models/User';
 import BankEvent from '../models/BankEvent';
 import StreakEvent from '../models/StreakEvent';
+import PlayerRound from '../models/PlayerRound';
 import { SESSION_HEARTBEAT_MS } from '../sessions';
 
 let httpServer: HttpServer;
@@ -212,6 +213,46 @@ describe('socket adapter wire format', () => {
         const updated = waitFor<any>(client, 'player-data');
         client.emit('bank', { deviceId: 'devA' });
         expect((await updated).user).toMatchObject({ totalPoints: 10, pointsAtStake: 0 });
+    });
+
+    describe('get-stats', () => {
+        // deviceId is a BEARER CREDENTIAL on this transport: sync-player, submit-throw, bank and
+        // update-progress all resolve an account straight from a client-supplied deviceId. This
+        // handler is unauthenticated and returns 50 users plus 50 rounds, so leaking the field
+        // here hands any connected socket full control of ~100 other accounts.
+        it('never emits a deviceId, on either list', async () => {
+            await initPromise;
+            const a = await User.create({ deviceId: 'SECRET-DEVICE-A', displayName: 'Ayaka', lifetimeBanked: 900 });
+            await PlayerRound.create({
+                userId: a._id, deviceId: 'SECRET-DEVICE-A', roundId: 'r1',
+                playerThrow: 'R', playerResult: 'WIN', pointsDelta: 81, timestamp: new Date(),
+            });
+
+            const statsP = waitFor<any>(client, 'stats-data');
+            client.emit('get-stats', { timeframe: 'all' });
+            const stats = await statsP;
+
+            expect(stats.topPoints.length).toBeGreaterThan(0);
+            expect(stats.biggestWins.length).toBeGreaterThan(0);
+            expect(JSON.stringify(stats)).not.toContain('SECRET-DEVICE-A');
+            expect(JSON.stringify(stats)).not.toContain('deviceId');
+        });
+
+        it('names the players instead, so a display needs no second lookup', async () => {
+            await initPromise;
+            const a = await User.create({ deviceId: 'devA', displayName: 'Ayaka', lifetimeBanked: 900 });
+            await PlayerRound.create({
+                userId: a._id, roundId: 'r1', playerThrow: 'R',
+                playerResult: 'WIN', pointsDelta: 81, timestamp: new Date(),
+            });
+
+            const statsP = waitFor<any>(client, 'stats-data');
+            client.emit('get-stats', { timeframe: 'all' });
+            const stats = await statsP;
+
+            expect(stats.topPoints[0]).toMatchObject({ displayName: 'Ayaka', lifetimeBanked: 900 });
+            expect(stats.biggestWins[0]).toMatchObject({ displayName: 'Ayaka', pointsDelta: 81 });
+        });
     });
 
     describe('get-stats-surface', () => {

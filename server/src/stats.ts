@@ -191,3 +191,14 @@ export async function liveStreaks(
     const rows = await User.find(filter).sort({ currentStreak: -1 }).limit(limit).select('currentStreak');
     return rows.map(u => ({ userId: u._id as Types.ObjectId, length: u.currentStreak }));
 }
+
+// NAME THE PLAYERS HERE. Every board returns user ids; resolving them once server-side saves
+// the caller a second round trip, and — more importantly — keeps the projection in ONE place.
+// It lives in this module rather than in a route so BOTH transports use the same one: the
+// socket path duplicating a projection is precisely how `deviceId` — a bearer credential —
+// ended up on a public board.
+export async function nameUsers(ids: Types.ObjectId[]): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const users = await User.find({ _id: { $in: ids } }).select('displayName');
+    return new Map(users.map(u => [u._id.toString(), u.displayName || 'Anonymous']));
+}

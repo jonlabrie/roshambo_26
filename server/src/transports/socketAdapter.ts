@@ -11,7 +11,7 @@ import PlayerRound from '../models/PlayerRound';
 import { Throw } from '../engine/GameRules';
 import { topByCareer } from '../leaderboards';
 import { openSession, closeSession, touchSessions, SESSION_HEARTBEAT_MS } from '../sessions';
-import { longestStreaks, biggestBanks, heatBoard } from '../stats';
+import { longestStreaks, biggestBanks, heatBoard, nameUsers } from '../stats';
 import { calendarDayUTC, rollingWindow, HOUR_MS } from '../windows';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'roshambo_super_secret_1337';
@@ -227,13 +227,31 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
                 // spendable wallet — see leaderboards.ts.
                 const topPoints = await topByCareer({}, 50);
 
-                // 3. Biggest Single Wins for timeframe (Only >= 3 points, Top 50)
-                const biggestWins = await PlayerRound.find({
+                // 3. Biggest Single Wins for timeframe (Only >= 3 points, Top 50).
+                // PROJECTED EXPLICITLY. This used to emit whole PlayerRound documents, which
+                // carry `deviceId` — a bearer credential on this transport — to any connected
+                // socket. Selecting fields by name means a column added to PlayerRound later
+                // cannot silently join a public payload.
+                const winRows = await PlayerRound.find({
                     ...(data.timeframe === 'all' ? {} : { timestamp: { $gte: cutoff } }),
                     pointsDelta: { $gte: 3 }
                 })
                     .sort({ pointsDelta: -1 })
-                    .limit(50);
+                    .limit(50)
+                    .select('userId pointsDelta timestamp');
+
+                // Resolve names server-side so the client has something to label a row with now
+                // that it no longer receives a deviceId to truncate.
+                const winNames = await nameUsers(
+                    winRows.map(r => r.userId).filter((id): id is NonNullable<typeof id> => !!id)
+                );
+                const biggestWins = winRows.map(r => ({
+                    _id: r._id,
+                    userId: r.userId,
+                    displayName: r.userId ? winNames.get(r.userId.toString()) ?? 'Anonymous' : 'Anonymous',
+                    pointsDelta: r.pointsDelta,
+                    timestamp: r.timestamp,
+                }));
 
                 socket.emit('stats-data', {
                     timeframe: data.timeframe,

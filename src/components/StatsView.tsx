@@ -27,6 +27,12 @@ interface StatsViewProps {
     setAudioVolume: (volume: number) => void
 }
 
+// A row's label: the player's name if they have set one, otherwise a short, STABLE, non-secret
+// id. Prefers `userId` (the player) over `_id` (which is the round, on payout rows), so two
+// payouts by the same nameless player read as the same person.
+const rowLabel = (e: LeaderboardEntry): string =>
+    e.displayName || (e.userId || e._id || '........').substring(0, 8)
+
 export const StatsView: React.FC<StatsViewProps> = ({
     onBack,
     serverStats,
@@ -236,9 +242,9 @@ export const StatsView: React.FC<StatsViewProps> = ({
                 <div className="space-y-2">
                     {serverStats?.topPoints?.slice(0, 3).map((user: LeaderboardEntry, i: number) => (
                         <LeaderboardRow
-                            key={user.deviceId || i}
+                            key={user._id || i}
                             rank={i + 1}
-                            label={(user.deviceId || '........').substring(0, 8)}
+                            label={rowLabel(user)}
                             value={`${user.lifetimeBanked?.toLocaleString() || 0} PTS`}
                             highlight={i < 3}
                         />
@@ -265,7 +271,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
                         <LeaderboardRow
                             key={win._id || i}
                             rank={i + 1}
-                            label={(win.deviceId || '........').substring(0, 8)}
+                            label={rowLabel(win)}
                             value={`+${win.pointsDelta?.toLocaleString() || 0} PTS`}
                             highlight={i < 1}
                         />
@@ -302,9 +308,9 @@ export const StatsView: React.FC<StatsViewProps> = ({
                 <div className="space-y-2 pb-20">
                     {list?.map((item: LeaderboardEntry, i: number) => (
                         <LeaderboardRow
-                            key={type === 'POINTS' ? (item.deviceId || i) : (item._id || i)}
+                            key={item._id || i}
                             rank={i + 1}
-                            label={(item.deviceId || '........').substring(0, 8)}
+                            label={rowLabel(item)}
                             value={type === 'POINTS' ? `${item.lifetimeBanked?.toLocaleString() || 0} PTS` : `+${item.pointsDelta?.toLocaleString() || 0} PTS`}
                             highlight={i < 3}
                         />

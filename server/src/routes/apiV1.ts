@@ -6,7 +6,7 @@ import { resolveUser } from '../identity';
 import { bankPot } from '../wallet';
 import User, { IUser } from '../models/User';
 import { Throw } from '../engine/GameRules';
-import { topByCareer, API_LEADERBOARD_FIELDS } from '../leaderboards';
+import { topByCareer } from '../leaderboards';
 import { reconcilePresence } from '../sessions';
 import { shellStates, SHELL_IDS, LaunchContext, SHELL_PRICES, MORTAR_PRICES } from '../fireworks';
 import { validateLoadout, validateSizeClass, validatePadPreferences, validateDecorations, validateAccess } from '../loadout';
@@ -457,9 +457,9 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             const filter = scope === 'country'
                 ? { country: String(req.query.country) }
                 : {};
-            // API_LEADERBOARD_FIELDS, not the socket path's projection: no deviceId leaves
+            // One projection, and it carries no deviceId on any transport — see leaderboards.ts.
             // here. See leaderboards.ts.
-            const leaders = await topByCareer(filter, 50, API_LEADERBOARD_FIELDS);
+            const leaders = await topByCareer(filter, 50);
             res.set('Cache-Control', 'public, max-age=30');
             res.json({ scope, leaders });
         } catch (err) {
