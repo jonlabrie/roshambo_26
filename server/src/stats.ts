@@ -139,6 +139,8 @@ export async function heatBoard(
     limit: number,
     userIds?: Types.ObjectId[]
 ): Promise<{ userId: Types.ObjectId; earned: number }[]> {
+    // Explicit on purpose, even though Mongo's own `$in: []` below already matches nothing:
+    // this line is what keeps that behaviour true if the query shape ever changes underneath it.
     if (userIds && userIds.length === 0) return [];
     const match: Record<string, unknown> = { timestamp: { $gte: w.from, $lt: w.to } };
     if (userIds) match.userId = { $in: userIds };
@@ -163,6 +165,8 @@ export async function liveStreaks(
     limit: number,
     userIds?: Types.ObjectId[]
 ): Promise<{ userId: Types.ObjectId; length: number }[]> {
+    // Explicit on purpose, even though Mongo's own `$in: []` below already matches nothing:
+    // this line is what keeps that behaviour true if the query shape ever changes underneath it.
     if (userIds && userIds.length === 0) return [];
     const filter: Record<string, unknown> = { currentStreak: { $gt: 0 } };
     if (userIds) filter._id = { $in: userIds };

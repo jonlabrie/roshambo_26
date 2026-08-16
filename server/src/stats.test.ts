@@ -221,6 +221,12 @@ describe('heat', () => {
         const here = await User.create({ deviceId: 'here' });
         expect(await heatBoard(W, 10, [here._id])).toEqual([]);
     });
+
+    it('an empty restriction means NOBODY, not everybody', async () => {
+        const here = await User.create({ deviceId: 'here' });
+        await BankEvent.create({ userId: here._id, amount: 5000, timestamp: at(12) });
+        expect(await heatBoard(W, 10, [])).toEqual([]);
+    });
 });
 
 describe('live streaks', () => {
@@ -244,5 +250,10 @@ describe('live streaks', () => {
         const rows = await liveStreaks(10, [here._id]);
         expect(rows).toHaveLength(1);
         expect(rows[0].length).toBe(3);
+    });
+
+    it('an empty restriction means NOBODY, not everybody', async () => {
+        await User.create({ deviceId: 'here', currentStreak: 30 });
+        expect(await liveStreaks(10, [])).toEqual([]);
     });
 });
