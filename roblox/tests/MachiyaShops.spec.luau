@@ -151,3 +151,40 @@ describe("accessories registers to the built neighbour", function()
         )
     end)
 end)
+
+describe("per-shop noren panel count", function()
+    -- The owner's round-1 gate correction on accessories: TWO wider panels per
+    -- doorway, not three. perBay is a per-shop identity opt-in; the archetype's
+    -- NOREN_PER_BAY default must keep every non-opting shop (花火屋, apparel)
+    -- byte-for-byte unchanged — the model.json gates hold that side.
+    local function panelsPerBay(m)
+        local counts = {}
+        for _, c in m.children do
+            local bay = string.match(c.name, "^Noren(%d+)_%d+$")
+            if bay then
+                counts[bay] = (counts[bay] or 0) + 1
+            end
+        end
+        return counts
+    end
+    test("accessories emits exactly 2 panels per open bay", function()
+        local m = Machiya.build(ZenDojo.palette, ArenaLayout, MachiyaShops.accessories)
+        local counts = panelsPerBay(m)
+        local bays = 0
+        for _, n in counts do
+            bays += 1
+            expect(n).toBe(2)
+        end
+        expect(bays).toBe(2) -- the open frontage's two doorways
+    end)
+    test("apparel still emits the default count per open bay", function()
+        local m = Machiya.build(ZenDojo.palette, ArenaLayout, MachiyaShops.apparel)
+        local counts = panelsPerBay(m)
+        local bays = 0
+        for _, n in counts do
+            bays += 1
+            expect(n).toBe(3)
+        end
+        expect(bays).toBe(2)
+    end)
+end)

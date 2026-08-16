@@ -1065,7 +1065,7 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
         end
     end
 
-    -- ----- noren: three equal panels PER OPEN BAY -----
+    -- ----- noren: equal panels PER OPEN BAY (three by default; identity can override) -----
     -- They were three panels spread across BOTH bays, so they straddled the middle post and came
     -- out uneven — one wide, one narrow. A noren belongs to its own doorway: each opening gets its
     -- own set of three, sized to that bay, so the panels are identical and the post between them
@@ -1103,18 +1103,25 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
     -- caller's; the hang itself — per-bay panels, the chain, the still-air pose — stays the
     -- archetype's. Only meaningful over an OPEN frontage: a kōshi frontage has no doorway to
     -- screen, and its postX/CLOSED are empty, so this emits nothing there by construction.
-    local function emitNoren(norenColour: { number }, nSegs: number)
+    -- perBay is a PER-SHOP opt-in (identity.noren.perBay, round-1 accessories gate:
+    -- two wider panels per doorway). It DEFAULTS to NOREN_PER_BAY so 花火屋's inline
+    -- call and every non-opting identity stay byte-for-byte unchanged — the
+    -- model.json snapshot gates hold that. The width formula below widens the
+    -- panels automatically at a lower count; the 0.16 slit between panels is the
+    -- constant the whole row shares.
+    local function emitNoren(norenColour: { number }, nSegs: number, perBay: number?)
         if shop.frontage ~= "open" then
             return
         end
+        local nPanels = perBay or NOREN_PER_BAY
         local segH = NOREN_H / nSegs
         for i = 1, FRONT_POSTS - 1 do
             if not CLOSED[i] then
                 local a, b = postX[i], postX[i + 1]
                 local openW = (b - a) - POST_W
-                local panelW = openW / NOREN_PER_BAY - 0.16
-                for k = 1, NOREN_PER_BAY do
-                    local t = (k - 0.5) / NOREN_PER_BAY
+                local panelW = openW / nPanels - 0.16
+                for k = 1, nPanels do
+                    local t = (k - 0.5) / nPanels
                     local px = a + POST_W / 2 + openW * t
                     -- Hang the chain: start at the rail and walk down, each segment's top sitting on
                     -- the one above so the panel stays joined however far it leans.
@@ -1309,7 +1316,7 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
     if identity then
         if identity.noren then
             -- the archetype's own hang, in the shop's colour
-            emitNoren(identity.noren.color, identity.noren.segments or 3)
+            emitNoren(identity.noren.color, identity.noren.segments or 3, identity.noren.perBay)
         end
         if identity.chochin then
             -- THE EAVE-CORNER PAIR, 花火屋's pattern — built by tools/builders/Chochin, the

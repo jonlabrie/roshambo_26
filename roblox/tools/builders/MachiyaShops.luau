@@ -341,8 +341,15 @@ MachiyaShops.accessories = {
     frontage = "open",
     interior = "shallow",
     identity = {
-        -- Warm russet, the teahouse-accessories register (design brief literal).
-        noren = { color = { 0.55, 0.28, 0.18 }, segments = 4 },
+        -- Prussian navy (owner's round-1 gate correction: dark blue, two wide panels
+        -- per door). Chosen AGAINST the neighbour: apparel's indigo {0.16, 0.18, 0.32}
+        -- leans violet because its red sits nearly at its green — this keeps the blue
+        -- channel at apparel's 0.32 but halves the red (0.16 -> 0.07), which kills the
+        -- violet lean, and drops luminance 0.186 -> 0.145 so it reads deeper at a
+        -- glance. Side-by-side same-family risk is the owner's in-situ judgement call.
+        -- perBay = 2: two wider panels per doorway (the archetype's default is 3);
+        -- segments is the vertical drape chain, a different axis, unchanged at 4.
+        noren = { color = { 0.07, 0.15, 0.32 }, segments = 4, perBay = 2 },
         -- Light moss / green-grey paper — the tint reserved for accessories in the
         -- palette note above. Rec. 709 luminance 0.688 (0.2126*168 + 0.7152*180 +
         -- 0.0722*152, /255), the same level as canonical cream's 0.684 and well clear
