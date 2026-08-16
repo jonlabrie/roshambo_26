@@ -12,6 +12,7 @@
 -- them from anything — see docs/superpowers/specs/2026-08-05-hanabiya-shop-design.md §1.
 local Spec = require("./Spec")
 local L = require("./ArenaLayout")
+local Chochin = require("./Chochin")
 
 local Machiya = {}
 
@@ -1311,171 +1312,29 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
             emitNoren(identity.noren.color, identity.noren.segments or 3)
         end
         if identity.chochin then
-            -- THE EAVE-CORNER PAIR, 花火屋's pattern (tools/studio/buildHanabiyaChochin.luau,
-            -- owner-tuned LS 0.65/0.9), restated as static specs: a hook under the eave's
-            -- outside corners, the sliced paper barrel with its gradient, ribs, caps, and the
-            -- glyph plates tagged RoundLantern so LanternController and PaperLanternDayNight
-            -- find them. NO TRIG — the barrel profile comes through math.sqrt only (IEEE-exact),
-            -- so the emitted floats are arch-stable for the genmodels drift check.
-            local CLS = 0.65 / 0.9 -- the owner's lantern scale: Rmax 0.9 -> 0.65
-            local Rmax, capR = 0.9 * CLS, 0.30 * CLS
-            local bodyH = 2.8 * CLS
-            local HOOK_DROP = 0.22
+            -- THE EAVE-CORNER PAIR, 花火屋's pattern — built by tools/builders/Chochin, the
+            -- module reproducing tools/studio/buildHanabiyaChochin.luau (the owner-gated Studio
+            -- tool, LS 0.65/0.9) at full fidelity. This branch does not restate the lantern
+            -- recipe; it only works out WHERE to hang two of them (the eave's outside corners)
+            -- and hands that off to Chochin.build. One recipe, not a redrawn lookalike.
+            local HOOK_DROP = Chochin.HOOK_DROP
             local CORNER_INSET = 0.35 -- back from the eave's edge, so they hang under it
-            local INK_C = { 0.18, 0.157, 0.118 } -- the recipe's rib/cap ink
-            local METAL_C = { 0.47, 0.478, 0.502 }
-            local PAPER_C = { 0.784, 0.667, 0.561 } -- warm cream, gradient-scaled per slice
-            -- the recipe's barrel silhouette: capR + (Rmax - capR) * sqrt(1 - d^6), d = |2t - 1|
-            local function profileR(tt: number): number
-                local d = math.abs(2 * tt - 1)
-                local d2 = d * d
-                return capR + (Rmax - capR) * math.sqrt(1 - d2 * d2 * d2)
-            end
             local hangZ = (Z0 - EAVE_OVERHANG) + CORNER_INSET
             -- The eave is a TILTED slab, so its underside is a plane, not a number: the mid-plane
             -- drops HISASHI_DROP over EAVE_OVERHANG, and the vertical half-thickness of a tilted
             -- slab is (t/2) / cos(pitch) = (t/2) * hisashiLen / EAVE_OVERHANG — sqrt, not trig.
             local midY = FLOOR + STOREY_H - HISASHI_DROP * (Z0 - hangZ) / EAVE_OVERHANG
             local armY = midY - (EAVE_T / 2) * (hisashiLen / EAVE_OVERHANG) - HOOK_DROP
-            local SLICES = 10
-            local lcY = armY - 0.44 * CLS - 0.06 - bodyH / 2
             -- The owner ruled the corner hang MAY be low ("it's okay if they're low"): this
             -- catches a lantern at chest height, not one you merely duck under.
-            local hemY = lcY - bodyH / 2 - 0.13 * CLS
+            local hemY = Chochin.hemY(armY)
             assert(hemY - FLOOR >= 5.0, `chōchin hem {hemY} sits under 5 studs off the floor`)
             local eaveHalfX = (W + 1.0) / 2 -- the Eave part's own extents, not the wall's
             for _, corner in
                 { { "West", CX - eaveHalfX + CORNER_INSET }, { "East", CX + eaveHalfX - CORNER_INSET } }
             do
                 local cnm, lx = corner[1] :: string, corner[2] :: number
-                local kids: { any } = {}
-                table.insert(
-                    kids,
-                    Spec.part("Hook", {
-                        Size = { 0.1, HOOK_DROP, 0.1 },
-                        CFrame = Spec.cframe({ lx, armY + HOOK_DROP / 2, hangZ }),
-                        Color = METAL_C,
-                        Material = "Metal",
-                        CanCollide = false,
-                        CanQuery = false,
-                        CanTouch = false,
-                        CastShadow = false,
-                    })
-                )
-                table.insert(
-                    kids,
-                    Spec.part("HangRod", {
-                        Shape = "Cylinder",
-                        Size = { 0.44 * CLS, 0.1, 0.1 },
-                        CFrame = Spec.cframe({ lx, armY - 0.22 * CLS, hangZ }, Spec.ROT.CYL_VERTICAL),
-                        Color = METAL_C,
-                        Material = "Metal",
-                        CanCollide = false,
-                        CanQuery = false,
-                        CanTouch = false,
-                        CastShadow = false,
-                    })
-                )
-                for i = 0, SLICES - 1 do
-                    local tt = (i + 0.5) / SLICES
-                    local r = profileR(tt)
-                    local d = math.abs(2 * tt - 1)
-                    local f = math.clamp(1 - 0.22 * d - (if tt > 0.5 then 0.15 * (2 * tt - 1) else 0), 0.4, 1)
-                    local isBody = i == SLICES // 2
-                    table.insert(
-                        kids,
-                        Spec.part(if isBody then "ChochinBody" else `ChochinSlice_{i}`, {
-                            Shape = "Cylinder",
-                            Size = { bodyH / SLICES * 1.15, 2 * r, 2 * r },
-                            CFrame = Spec.cframe(
-                                { lx, lcY + (tt - 0.5) * bodyH, hangZ },
-                                Spec.ROT.CYL_VERTICAL
-                            ),
-                            Color = { PAPER_C[1] * f, PAPER_C[2] * f, PAPER_C[3] * f },
-                            Material = "Neon",
-                            Transparency = 0.42,
-                            CanCollide = false,
-                            CanQuery = false,
-                            CanTouch = false,
-                            CastShadow = false,
-                            children = if isBody
-                                then {
-                                    {
-                                        name = "ChochinLight",
-                                        className = "PointLight",
-                                        properties = {
-                                            Color = { 1.0, 0.659, 0.376 },
-                                            Brightness = 1.1,
-                                            Range = 10,
-                                            Shadows = false,
-                                        },
-                                    },
-                                }
-                                else nil,
-                        })
-                    )
-                end
-                for j = 1, 8 do
-                    local tt = (j - 0.5) / 8
-                    local r = profileR(tt) + 0.05 * CLS
-                    table.insert(
-                        kids,
-                        Spec.part(`ChochinRib_{j}`, {
-                            Shape = "Cylinder",
-                            Size = { 0.035 * CLS, 2 * r, 2 * r },
-                            CFrame = Spec.cframe(
-                                { lx, lcY + (tt - 0.5) * bodyH, hangZ },
-                                Spec.ROT.CYL_VERTICAL
-                            ),
-                            Color = INK_C,
-                            Material = "Wood",
-                            CanCollide = false,
-                            CanQuery = false,
-                            CanTouch = false,
-                            CastShadow = false,
-                        })
-                    )
-                end
-                for _, cap in { { "CapTop", bodyH / 2 }, { "CapBottom", -bodyH / 2 } } do
-                    table.insert(
-                        kids,
-                        Spec.part(cap[1] :: string, {
-                            Shape = "Cylinder",
-                            Size = { 0.26 * CLS, 0.66 * CLS, 0.66 * CLS },
-                            CFrame = Spec.cframe(
-                                { lx, lcY + (cap[2] :: number), hangZ },
-                                Spec.ROT.CYL_VERTICAL
-                            ),
-                            Color = INK_C,
-                            Material = "Wood",
-                            CanCollide = false,
-                            CanQuery = false,
-                            CanTouch = false,
-                            CastShadow = false,
-                        })
-                    )
-                end
-                -- Glyph plates face ALONG the street (owner's gate on the Studio pair): the
-                -- promenade reads them from both directions; nobody stands inside looking out.
-                for _, pl in { { "GlyphPlateA", -1, 90 }, { "GlyphPlateB", 1, -90 } } do
-                    table.insert(
-                        kids,
-                        Spec.part(pl[1] :: string, {
-                            Size = { 1.2 * CLS, 1.6 * CLS, 0.05 },
-                            CFrame = Spec.cframe(
-                                { lx + (pl[2] :: number) * (Rmax + 0.04), lcY, hangZ },
-                                Spec.yaw(pl[3] :: number)
-                            ),
-                            Transparency = 1,
-                            CanCollide = false,
-                            CanQuery = false,
-                            CanTouch = false,
-                            CastShadow = false,
-                            Tags = { "RoundLantern" },
-                        })
-                    )
-                end
-                table.insert(children, Spec.model(`Chochin{cnm}`, kids))
+                table.insert(children, Chochin.build(cnm, lx, hangZ, armY))
             end
         end
         if identity.board then
