@@ -1317,6 +1317,14 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
             -- tool, LS 0.65/0.9) at full fidelity. This branch does not restate the lantern
             -- recipe; it only works out WHERE to hang two of them (the eave's outside corners)
             -- and hands that off to Chochin.build. One recipe, not a redrawn lookalike.
+            --
+            -- identity.chochin is `true` (canonical cream, the shop asks for nothing special)
+            -- OR a table `{ paper = {r, g, b} }` (0-255, same units as the Studio tool's PAPER
+            -- literal) tinting the paper barrel only — never the glyph plate, which stays
+            -- untinted so the World Throw glyph keeps its contrast (owner's merchant-row rule:
+            -- paths/canyon-wide lanterns stay uniform; the row varies, shops advertise
+            -- themselves). Chochin.build defaults to canonical cream when this is nil.
+            local paperRGB255 = if type(identity.chochin) == "table" then identity.chochin.paper else nil
             local HOOK_DROP = Chochin.HOOK_DROP
             local CORNER_INSET = 0.35 -- back from the eave's edge, so they hang under it
             local hangZ = (Z0 - EAVE_OVERHANG) + CORNER_INSET
@@ -1334,7 +1342,7 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
                 { { "West", CX - eaveHalfX + CORNER_INSET }, { "East", CX + eaveHalfX - CORNER_INSET } }
             do
                 local cnm, lx = corner[1] :: string, corner[2] :: number
-                table.insert(children, Chochin.build(cnm, lx, hangZ, armY))
+                table.insert(children, Chochin.build(cnm, lx, hangZ, armY, paperRGB255))
             end
         end
         if identity.board then

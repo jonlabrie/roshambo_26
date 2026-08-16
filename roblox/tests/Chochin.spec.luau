@@ -154,3 +154,87 @@ describe("Chochin.hemY", function()
         expect(Chochin.hemY(100) < Chochin.hemY(120)).toBe(true)
     end)
 end)
+
+describe("Chochin.build — per-shop paper tint", function()
+    local function find(node, name)
+        for _, c in node.children do
+            if c.name == name then
+                return c
+            end
+        end
+        return nil
+    end
+
+    test("default (no tint) scales the canonical cream — same gradient factor on every channel", function()
+        local m = Chochin.build("Default", 0, 0, 100)
+        local body = find(m, "ChochinBody")
+        local c = body.properties.Color
+        local fR, fG, fB = c[1] / Chochin.PAPER[1], c[2] / Chochin.PAPER[2], c[3] / Chochin.PAPER[3]
+        expect(fR).toBeCloseTo(fG, 1e-9)
+        expect(fR).toBeCloseTo(fB, 1e-9)
+    end)
+
+    test("a tint replaces the base colour the gradient scales, nothing else", function()
+        -- Compare against the SAME slice's default-cream colour rather than assuming the
+        -- gradient factor f — the centre slice (CENTER_IDX) is not exactly tt=0.5, so f is
+        -- close to but not exactly 1. Both builds share the same tt, so f cancels out: the
+        -- tinted colour must be tint01 * f, where f is recovered from the default build.
+        local tint255 = { 170, 178, 200 }
+        local tint01 = { tint255[1] / 255, tint255[2] / 255, tint255[3] / 255 }
+        local default = Chochin.build("Default2", 0, 0, 100)
+        local tinted = Chochin.build("Tinted", 0, 0, 100, tint255)
+        local defaultC = find(default, "ChochinBody").properties.Color
+        local tintedC = find(tinted, "ChochinBody").properties.Color
+        local f = defaultC[1] / Chochin.PAPER[1]
+        for i = 1, 3 do
+            expect(tintedC[i]).toBeCloseTo(tint01[i] * f, 1e-9)
+        end
+    end)
+
+    test("the glyph plates are NEVER tinted — identical with and without a paper override", function()
+        local plain = Chochin.build("Plain", 0, 0, 100)
+        local tinted = Chochin.build("Tinted2", 0, 0, 100, { 170, 178, 200 })
+        local plateA, plateB = find(plain, "GlyphPlateA"), find(tinted, "GlyphPlateA")
+        -- names differ (model-scoped), so compare properties only
+        expect(plateA.properties).toEqual(plateB.properties)
+        expect(plateA.properties.Tags).toEqual({ "RoundLantern" })
+    end)
+end)
+
+describe("Chochin legibility guard — a tint must not swallow the World Throw glyph at night", function()
+    -- WHY 0.55: the RoundLantern glyph plate sits in front of the paper barrel, untinted, and
+    -- shows the last World Throw — that's the lantern's actual job, not the tint. If a barrel
+    -- goes too dark, the glyph loses contrast against it, and PaperLanternDayNight dims the
+    -- whole lantern further toward night, which only makes a marginal tint worse. Canonical
+    -- cream (Chochin.PAPER) measures ~0.684 — the reference point for "light enough."
+    local MachiyaShops = require("../tools/builders/MachiyaShops")
+    local FLOOR = Chochin.LEGIBILITY_FLOOR
+
+    test("the floor itself is 0.55", function()
+        expect(FLOOR).toBe(0.55)
+    end)
+    test("the canonical cream clears the floor (reference: ~0.684)", function()
+        local lum = Chochin.luminance(Chochin.PAPER)
+        expect(lum >= FLOOR).toBe(true)
+        expect(lum).toBeCloseTo(0.684, 0.01)
+    end)
+
+    -- Walk EVERY Shop entry MachiyaShops defines and check any identity.chochin.paper tint, so a
+    -- future shop (Tasks 5-7) that ships a dark barrel fails CI without anyone having to
+    -- remember to add a new assertion here by hand.
+    for shopKey, shop in MachiyaShops do
+        if
+            type(shop) == "table"
+            and shop.identity
+            and type(shop.identity.chochin) == "table"
+            and shop.identity.chochin.paper
+        then
+            test(("%s's chōchin tint clears the legibility floor"):format(tostring(shopKey)), function()
+                local rgb255 = shop.identity.chochin.paper
+                local rgb01 = { rgb255[1] / 255, rgb255[2] / 255, rgb255[3] / 255 }
+                local lum = Chochin.luminance(rgb01)
+                expect(lum >= FLOOR).toBe(true)
+            end)
+        end
+    end
+end)

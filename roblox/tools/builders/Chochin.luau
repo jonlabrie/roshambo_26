@@ -57,13 +57,40 @@ function Chochin.hemY(armY: number): number
     return armY - 2 * Chochin.ringR - 0.13 * Chochin.LS - Chochin.bodyH - 0.13 * Chochin.LS
 end
 
+-- Relative luminance of a 0-1 RGB tint (standard Rec. 709 weights). Per-shop paper tints must
+-- clear Chochin.LEGIBILITY_FLOOR: the glyph plate carries the RoundLantern tag, so EVERY
+-- lantern in the canyon shows the last World Throw and dims with nightFactor — a dark barrel
+-- would swallow that glyph at night, which is the lantern's actual job, not a colour nicety.
+-- Canonical cream (Chochin.PAPER) measures ~0.684, comfortably above the floor.
+Chochin.LEGIBILITY_FLOOR = 0.55
+function Chochin.luminance(rgb01: { number }): number
+    return 0.2126 * rgb01[1] + 0.7152 * rgb01[2] + 0.0722 * rgb01[3]
+end
+
 -- One lantern: a metal ring draped on a hook, an 18-slice gradient paper barrel with 16 ribs
 -- and ink caps, and two glyph plates tagged RoundLantern. (x, z) is the hang point in the
 -- horizontal plane; armY is the y the ring hangs from (the eave underside minus HOOK_DROP).
+--
+-- paperRGB255 is an OPTIONAL per-shop tint for the paper barrel only — never the glyph plates,
+-- never the ring/ribs/caps ink or metal. It is written in the same 0-255 units as the Studio
+-- tool's own `local PAPER = { 200, 170, 143 }` literal (human-readable RGB), NOT the 0-1 floats
+-- Chochin.PAPER stores internally — this function does the /255 conversion. Omit it (or pass
+-- nil) and the canonical cream (Chochin.PAPER) is used, unchanged — this is the default the
+-- Studio tool, the path lanterns, and 花火屋's place-only lanterns all still get. The per-slice
+-- gradient scaling (the `f` factor below) is unaffected either way; the tint only replaces the
+-- base colour the gradient scales.
+--
+-- LEGIBILITY FLOOR: any tint passed here must keep the barrel light enough that the RoundLantern
+-- glyph (the World Throw) still reads against it at night — see tests/Chochin.spec.luau's
+-- luminance guard, which checks every tint the repo defines against a 0.55 floor.
 -- Returns a Spec model named "Chochin<name>".
-function Chochin.build(name: string, x: number, z: number, armY: number): any
+function Chochin.build(name: string, x: number, z: number, armY: number, paperRGB255: { number }?): any
     local LS, Rmax, bodyH = Chochin.LS, Chochin.Rmax, Chochin.bodyH
     local ringR, tubeR = Chochin.ringR, Chochin.tubeR
+    local paper = Chochin.PAPER
+    if paperRGB255 then
+        paper = { paperRGB255[1] / 255, paperRGB255[2] / 255, paperRGB255[3] / 255 }
+    end
     local kids: { any } = {}
 
     -- the eye under the eave the ring hangs from
@@ -124,7 +151,7 @@ function Chochin.build(name: string, x: number, z: number, armY: number): any
                 Shape = "Cylinder",
                 Size = { bodyH / Chochin.N * 1.15, 2 * r, 2 * r },
                 CFrame = Spec.cframe({ x, y, z }, Spec.ROT.CYL_VERTICAL),
-                Color = { Chochin.PAPER[1] * f, Chochin.PAPER[2] * f, Chochin.PAPER[3] * f },
+                Color = { paper[1] * f, paper[2] * f, paper[3] * f },
                 Material = "Neon",
                 Transparency = Chochin.PAPER_T,
                 CanCollide = false,

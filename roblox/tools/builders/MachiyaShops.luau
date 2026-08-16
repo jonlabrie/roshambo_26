@@ -94,7 +94,13 @@ MachiyaShops.apparel = {
         -- blue is `water` { 0.20, 0.35, 0.43 }, a mid teal, not a deep blue — so this is the
         -- design brief's fallback literal, held here for the owner to retune at the gate.
         noren = { color = { 0.16, 0.18, 0.32 }, segments = 5 },
-        chochin = true,
+        -- Pale indigo chōchin — RHYMES with the noren above rather than matching it: the noren
+        -- is deep so it reads as cloth, but the paper barrel must stay light or the RoundLantern
+        -- glyph (the World Throw) loses contrast against it at night, which is the lantern's
+        -- actual job. 0-255 units, same as the Studio tool's own PAPER literal — see
+        -- Chochin.build's paperRGB255 doc comment. Chochin.spec.luau's legibility guard holds
+        -- this (and every other shop tint) to a 0.55 luminance floor.
+        chochin = { paper = { 170, 178, 200 } },
         -- Blank timber kanban above the kamoi — the glyph-pipeline texture is a gate
         -- follow-up with the owner, not this task.
         board = true,
@@ -295,6 +301,21 @@ MachiyaShops.apparel = {
         end,
     },
 } :: Shop
+
+-- ===== RESERVED CHOCHIN PALETTE for the shops not yet built (Tasks 5-7) =====
+-- The owner's rule: paths and canyon-wide lanterns stay uniform (they're the wayfinding
+-- system, gate-tuned) — the merchant row varies, because shops advertising themselves is what a
+-- merchant street is. Every tint is `identity.chochin = { paper = {r, g, b} }`, 0-255 units
+-- (Chochin.build's paperRGB255 doc comment), and must clear Chochin.LEGIBILITY_FLOOR (0.55
+-- luminance) so the RoundLantern glyph — the World Throw — still reads at night. Recorded here
+-- so Tasks 5-7 don't each invent a palette independently:
+--   accessories -> a light moss/green-grey (not yet chosen; pick something that reads as
+--     "accessories" without drifting toward apparel's indigo or chaya's russet)
+--   chaya (the tea stand, Task 7) -> warm persimmon/russet, keeping the tea-house register warm
+--   花火屋 (Hanabiya) -> stays canonical cream (Chochin.PAPER, no override) — it's the anchor
+--     the rest of the row is read against, not one more variant
+-- True red (赤提灯, akachōchin) is deliberately NOT used anywhere on this row: it conventionally
+-- signals an izakaya, and none of these shops are one.
 
 -- Machiya_4 -> ACCESSORIES. pivot(24.34,119.59,42.96) size(16.63,14.92,13.24)
 -- yawDeg 0.00. Footing ring (Sand on the front/sides, Slate on the back):
