@@ -52,6 +52,16 @@ describe('windowed earnings', () => {
         expect(await earningsInWindow(user._id, at(3), at(7))).toBe(20);
     });
 
+    it('excludes a bank landing exactly on the window end, and includes one on the start', async () => {
+        // [from, to). Adjacent windows tile; a bank on the shared boundary belongs to exactly
+        // one of them, or every weekly total would overlap the next.
+        const user = await User.create({ deviceId: 'w-edge' });
+        await BankEvent.create({ userId: user._id, amount: 5, timestamp: at(3) });   // == from
+        await BankEvent.create({ userId: user._id, amount: 100, timestamp: at(7) }); // == to
+
+        expect(await earningsInWindow(user._id, at(3), at(7))).toBe(5);
+    });
+
     it('is zero for a player who banked nothing in the window', async () => {
         const user = await User.create({ deviceId: 'w2' });
         await BankEvent.create({ userId: user._id, amount: 10, timestamp: at(1) });
@@ -70,6 +80,17 @@ describe('windowed earnings', () => {
         expect(top).toHaveLength(1);
         expect(top[0].userId.toString()).toBe(hot._id.toString());
         expect(top[0].earned).toBe(300);
+    });
+
+    it('leaves a bank landing exactly on the window end out of the board', async () => {
+        const early = await User.create({ deviceId: 'onFrom' });
+        const late = await User.create({ deviceId: 'onTo' });
+        await BankEvent.create({ userId: early._id, amount: 7, timestamp: at(3) });     // == from
+        await BankEvent.create({ userId: late._id, amount: 5_000, timestamp: at(7) });  // == to
+
+        const top = await topEarnersInWindow(at(3), at(7), 10);
+        expect(top).toHaveLength(1);
+        expect(top[0].userId.toString()).toBe(early._id.toString());
     });
 
     it('adds up several banks by the same player', async () => {

@@ -141,7 +141,7 @@ BoardData.OnClientEvent:Connect(function(d)
     end
     setRow(1, "LAST5 " .. tape)
     if d.worldRec then
-        setRow(2, `REC {d.worldRec.points} {d.worldRec.name}`)
+        setRow(2, `REC {d.worldRec.banked} {d.worldRec.name}`)
     end
     if d.hotStreak then
         setRow(3, `HOT {d.hotStreak.streak} {d.hotStreak.name}`)

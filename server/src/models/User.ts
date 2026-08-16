@@ -111,5 +111,8 @@ const UserSchema: Schema = new Schema({
 
 // The standings sort. Without this every leaderboard read is a collection scan.
 UserSchema.index({ lifetimeBanked: -1 });
+// The country board filters AND sorts; the index above can only serve the sort, so a
+// country read would scan every user in that country. This one serves both at once.
+UserSchema.index({ country: 1, lifetimeBanked: -1 });
 
 export default mongoose.model<IUser>('User', UserSchema);

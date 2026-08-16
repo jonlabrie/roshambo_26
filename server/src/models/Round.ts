@@ -24,4 +24,8 @@ const RoundSchema: Schema = new Schema({
     timestamp: { type: Date, default: Date.now }
 });
 
+// Rounds accrue about one a minute (~525k a year) and sessions.roundsPresent queries them by
+// an $or of timestamp ranges. Without this that is a collection scan, per player.
+RoundSchema.index({ timestamp: 1 });
+
 export default mongoose.model<IRound>('Round', RoundSchema);

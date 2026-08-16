@@ -14,7 +14,10 @@ export interface IBankEvent extends Document {
 }
 
 const BankEventSchema: Schema = new Schema({
-    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    // No standalone index here: the { userId: 1, timestamp: -1 } compound below has userId as
+    // its prefix and serves every userId-only lookup, so a second index would be write cost
+    // for nothing.
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     amount: { type: Number, required: true },
     // How long the streak was when they chose to stop. The whole bank-vs-stake story lives
     // in the distribution of this number.

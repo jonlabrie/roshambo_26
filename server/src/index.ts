@@ -12,7 +12,7 @@ import { RoundEngine } from './engine/RoundEngine';
 import { ResultsStore } from './engine/ResultsStore';
 import { attachSocketAdapter } from './transports/socketAdapter';
 import { Throw, deriveWorldThrow } from './engine/GameRules';
-import { closeStaleSessions } from './sessions';
+import { closeStaleSessions, SESSION_HEARTBEAT_MS } from './sessions';
 
 dotenv.config();
 
@@ -20,10 +20,12 @@ const TEST_MODE = process.env.TEST_MODE === 'true';
 const PORT = process.env.PORT || 3001;
 const MONGODB_URI = process.env.MONGODB_URI;
 
-// Roblox game servers heartbeat presence at a 30s cadence (same as the throw flush).
-// Two minutes is four missed heartbeats — long enough to survive a hiccup, short enough
-// that a crashed game server does not inflate presence for long.
-const STALE_SESSION_MS = 2 * 60 * 1000;
+// Presence heartbeats run at SESSION_HEARTBEAT_MS (sessions.ts) — a separate cadence from
+// the Roblox throw flush, which is 5s / 10 picks. Four missed heartbeats is long enough to
+// survive a hiccup, short enough that a crashed game server does not inflate presence for
+// long. Derived from the heartbeat rather than written out, so changing one cannot leave a
+// sweep that fires before the first heartbeat lands.
+const STALE_SESSION_MS = 4 * SESSION_HEARTBEAT_MS;
 // How often the sweep runs. Independent of the staleness window: this is the sweep's own
 // polling cadence, not the grace period a session gets before being considered stale.
 const STALE_SESSION_SWEEP_INTERVAL_MS = 60 * 1000;

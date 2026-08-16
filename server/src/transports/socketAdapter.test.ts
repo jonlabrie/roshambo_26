@@ -8,6 +8,7 @@ import { RoundEngine } from '../engine/RoundEngine';
 import { ResultsStore } from '../engine/ResultsStore';
 import { attachSocketAdapter } from './socketAdapter';
 import Session from '../models/Session';
+import { SESSION_HEARTBEAT_MS } from '../sessions';
 
 let httpServer: HttpServer;
 let engine: RoundEngine;
@@ -164,6 +165,38 @@ describe('socket adapter wire format', () => {
         for (let i = 0; i < 3; i++) { engine.tick(); await new Promise(r => setTimeout(r, 20)); } // close round 2
         const pd = await playerDataP;
         expect(pd.lastResult.result).toBe('LOSS'); // round 2 world is S; P loses to S
+    });
+
+    it('heartbeats the PWA session so the stale sweep cannot mistake a live player for a dead one', async () => {
+        // sync-player fires ONCE per connection. Without a heartbeat a PWA session sits at
+        // its opening lastSeenAt forever, and the sweep used to close it — mid-game — at that
+        // timestamp, collapsing the interval to zero width and zeroing rounds-present for a
+        // player who was still throwing.
+        await initPromise;
+        client.emit('sync-player', { deviceId: 'devA' });
+        await waitFor(client, 'player-data');
+        const opened = await Session.findOne({});
+        expect(opened).not.toBeNull();
+        const before = opened!.lastSeenAt.getTime();
+
+        // Inside the throttle window a tick must write NOTHING: the sync broadcast is once a
+        // second, and a presence write per player per second would cost far more than the
+        // data is worth.
+        engine.tick();
+        await new Promise(r => setTimeout(r, 50));
+        expect((await Session.findById(opened!._id))!.lastSeenAt.getTime()).toBe(before);
+
+        // Past the window it writes. Date.now is faked only across the synchronous tick emit,
+        // so socket.io's own ping timers never see the jump.
+        const heartbeatAt = before + SESSION_HEARTBEAT_MS + 1_000;
+        const clock = vi.spyOn(Date, 'now').mockReturnValue(heartbeatAt);
+        engine.tick();
+        clock.mockRestore();
+        await vi.waitFor(async () => {
+            const stored = await Session.findById(opened!._id);
+            expect(stored!.lastSeenAt.getTime()).toBe(heartbeatAt);
+        }, { timeout: 1000, interval: 10 });
+        expect((await Session.findById(opened!._id))!.endedAt).toBeUndefined();
     });
 
     it('bank moves pot to totalPoints over the socket', async () => {

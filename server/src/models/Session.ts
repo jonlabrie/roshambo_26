@@ -17,9 +17,12 @@ export interface ISession extends Document {
 }
 
 const SessionSchema: Schema = new Schema({
-    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true, index: true },
+    // Neither userId nor instanceId carries a standalone index: each is the PREFIX of a
+    // compound index below, which serves the single-field lookups too. A standalone index on
+    // a prefix is pure write cost.
+    userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
     platform: { type: String, enum: ['pwa', 'roblox'], default: 'pwa' },
-    instanceId: { type: String, index: true },
+    instanceId: { type: String },
     startedAt: { type: Date, default: Date.now },
     // Advanced by heartbeats. A session whose process died is closed at its lastSeenAt by the
     // stale sweep, so an interval never runs to infinity.
@@ -29,5 +32,7 @@ const SessionSchema: Schema = new Schema({
 
 SessionSchema.index({ userId: 1, startedAt: -1 });
 SessionSchema.index({ endedAt: 1, lastSeenAt: 1 });
+// reconcilePresence's roster diff: the open sessions of one instance.
+SessionSchema.index({ instanceId: 1, endedAt: 1 });
 
 export default mongoose.model<ISession>('Session', SessionSchema);

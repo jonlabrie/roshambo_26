@@ -6,7 +6,7 @@ import { resolveUser } from '../identity';
 import { bankPot } from '../wallet';
 import User, { IUser } from '../models/User';
 import { Throw } from '../engine/GameRules';
-import { topByCareer } from '../leaderboards';
+import { topByCareer, API_LEADERBOARD_FIELDS } from '../leaderboards';
 import { reconcilePresence } from '../sessions';
 import { shellStates, SHELL_IDS, LaunchContext, SHELL_PRICES, MORTAR_PRICES } from '../fireworks';
 import { validateLoadout, validateSizeClass, validatePadPreferences, validateDecorations, validateAccess } from '../loadout';
@@ -128,8 +128,22 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
                 res.status(400).json({ error: 'BAD_REQUEST' });
                 return;
             }
+            // VALIDATE BEFORE resolveUser, which UPSERTS. A blanket String() coercion turns
+            // null into the truthy string "null" and mints a User with robloxId: "null" —
+            // permanent pollution of the identity root the leaderboards read from, with
+            // nothing afterwards able to tell that row apart from a real player. Same shape
+            // of guard as POST /bank below. Roblox sends the id as a number, so both forms
+            // are accepted; nothing else is.
+            //
+            // DEDUPED because reconcilePresence snapshots the open sessions before its loop:
+            // the same id twice in one roster would open two sessions for one player.
+            const seen = new Set<string>();
+            for (const raw of ids) {
+                if (typeof raw === 'number' && Number.isFinite(raw)) seen.add(String(raw));
+                else if (typeof raw === 'string' && raw.trim()) seen.add(raw.trim());
+            }
             const users = await Promise.all(
-                ids.map((robloxUserId: string) => resolveUser({ robloxUserId: String(robloxUserId) }))
+                [...seen].map((robloxUserId: string) => resolveUser({ robloxUserId }))
             );
             const userIds = users.filter((u): u is NonNullable<typeof u> => !!u).map(u => u._id);
             const result = await reconcilePresence(req.params.instanceId, userIds, new Date());
@@ -443,7 +457,9 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             const filter = scope === 'country'
                 ? { country: String(req.query.country) }
                 : {};
-            const leaders = await topByCareer(filter, 50);
+            // API_LEADERBOARD_FIELDS, not the socket path's projection: no deviceId leaves
+            // here. See leaderboards.ts.
+            const leaders = await topByCareer(filter, 50, API_LEADERBOARD_FIELDS);
             res.set('Cache-Control', 'public, max-age=30');
             res.json({ scope, leaders });
         } catch (err) {

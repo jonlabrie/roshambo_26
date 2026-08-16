@@ -10,7 +10,7 @@ import Round from '../models/Round';
 import PlayerRound from '../models/PlayerRound';
 import { Throw } from '../engine/GameRules';
 import { topByCareer } from '../leaderboards';
-import { openSession, closeSession } from '../sessions';
+import { openSession, closeSession, touchSessions, SESSION_HEARTBEAT_MS } from '../sessions';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'roshambo_super_secret_1337';
 
@@ -32,6 +32,12 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
     // be deleted without anything else moving.
     let revealPending: string | null = null; // roundId awaiting reveal broadcast
     const settledRounds = new Set<string>();
+    // PWA PRESENCE HEARTBEAT. A Roblox session has its lastSeenAt advanced by the roster
+    // endpoint; a PWA socket has no equivalent — `sync-player` fires ONCE per connection — so
+    // without this every PWA session sits at its opening lastSeenAt and looks dead. Keyed by
+    // socket id, drained on the 1s sync tick below: one bulk write per period for the whole
+    // server rather than a timer and a write per connected socket.
+    const heartbeats = new Map<string, { sessionId: string; lastTouchedMs: number }>();
 
     function broadcastReveal(roundId: string): void {
         const round = store.getGlobal(roundId);
@@ -61,6 +67,22 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
             roundCount: snap.roundCount,
             playerCount: io.engine.clientsCount,
         });
+
+        // Piggybacked on the sync broadcast, but throttled to SESSION_HEARTBEAT_MS per
+        // session — a write a second per player would cost far more than the presence data
+        // is worth.
+        const nowMs = Date.now();
+        const due: string[] = [];
+        for (const entry of heartbeats.values()) {
+            if (nowMs - entry.lastTouchedMs >= SESSION_HEARTBEAT_MS) {
+                entry.lastTouchedMs = nowMs;
+                due.push(entry.sessionId);
+            }
+        }
+        if (due.length > 0) {
+            touchSessions(due, new Date(nowMs))
+                .catch(err => console.error('Session heartbeat failed:', (err as Error).message));
+        }
     });
 
     engine.on('roundClosed', async data => {
@@ -145,6 +167,7 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
                 // is attached to a resolved user, so it is where presence starts.
                 if (!sessionId && user) {
                     sessionId = (await openSession({ userId: user._id, platform: 'pwa' }))._id.toString();
+                    heartbeats.set(socket.id, { sessionId, lastTouchedMs: Date.now() });
                 }
 
                 // Get last 30 rounds for this player
@@ -257,9 +280,18 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
         });
 
         socket.on('disconnect', async () => {
-            if (sessionId) {
-                await closeSession(sessionId, new Date());
-                sessionId = null;
+            heartbeats.delete(socket.id);
+            if (!sessionId) return;
+            const closing = sessionId;
+            sessionId = null;
+            try {
+                await closeSession(closing, new Date());
+            } catch (err) {
+                // Unhandled here would be fatal: node terminates the process on an unhandled
+                // rejection, so a transient Mongo blip at socket close would take the game
+                // server down. The session is left open instead and the sweep is not scoped to
+                // it, so it is repaired by hand or not at all — still the cheaper failure.
+                console.error('Error closing session:', (err as Error).message);
             }
         });
     });

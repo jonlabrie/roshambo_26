@@ -3,6 +3,7 @@ import express from 'express';
 import request from 'supertest';
 import { connectTestDb, clearTestDb, disconnectTestDb } from '../test/db';
 import User from '../models/User';
+import Session from '../models/Session';
 import { RoundEngine } from '../engine/RoundEngine';
 import { ResultsStore } from '../engine/ResultsStore';
 import { settleRound } from '../engine/Settlement';
@@ -329,16 +330,67 @@ describe('/api/v1', () => {
         });
     });
 
+    describe('POST /instances/:instanceId/presence', () => {
+        it('opens one session per rostered player', async () => {
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .post('/api/v1/instances/inst1/presence').set('X-API-Key', API_KEY)
+                .send({ robloxUserIds: ['77', 88] }).expect(200);
+            expect(res.body).toMatchObject({ opened: 2, touched: 0, closed: 0 });
+            expect(await Session.countDocuments({ instanceId: 'inst1' })).toBe(2);
+        });
+
+        it('400s when robloxUserIds is not an array', async () => {
+            await request(makeApp(makeEngine(), new ResultsStore()))
+                .post('/api/v1/instances/inst1/presence').set('X-API-Key', API_KEY)
+                .send({ robloxUserIds: 'nope' }).expect(400);
+        });
+
+        it('drops junk ids rather than minting a User for them', async () => {
+            // resolveUser UPSERTS. A blanket String() coercion turns null into the truthy
+            // string "null" and writes a permanent User with robloxId: "null" into the
+            // collection the leaderboards read from, indistinguishable afterwards from a
+            // real player.
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .post('/api/v1/instances/inst1/presence').set('X-API-Key', API_KEY)
+                .send({ robloxUserIds: [null, '', '   ', {}, true, '77'] }).expect(200);
+            expect(res.body.opened).toBe(1);
+            expect(await User.countDocuments({})).toBe(1);
+            expect(await User.findOne({ robloxId: '77' })).not.toBeNull();
+        });
+
+        it('dedupes a roster that names the same player twice', async () => {
+            // reconcilePresence snapshots the open sessions before its loop, so a duplicate
+            // would open a SECOND session for one player and double their rounds-present.
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .post('/api/v1/instances/inst1/presence').set('X-API-Key', API_KEY)
+                .send({ robloxUserIds: ['77', '77', 77] }).expect(200);
+            expect(res.body.opened).toBe(1);
+            expect(await Session.countDocuments({ instanceId: 'inst1' })).toBe(1);
+        });
+    });
+
     describe('GET /leaderboards', () => {
-        it('world scope: top totalPoints, cacheable 30s', async () => {
-            await User.create({ deviceId: 'devA', displayName: 'WebChamp', totalPoints: 100 });
-            await User.create({ robloxId: '77', identityTier: 'roblox', displayName: 'BloxKid', totalPoints: 50 });
+        it('world scope ranks by career earnings, not the spendable wallet, cacheable 30s', async () => {
+            // lifetimeBanked runs OPPOSITE to totalPoints here: BloxKid banked more over their
+            // career and then spent it, WebChamp is sitting on a bigger wallet having earned
+            // less. Sorting on totalPoints would invert this list, so the assertion fails if
+            // the ordering basis ever regresses to the wallet.
+            await User.create({ deviceId: 'devA', displayName: 'WebChamp', totalPoints: 100, lifetimeBanked: 120 });
+            await User.create({ robloxId: '77', identityTier: 'roblox', displayName: 'BloxKid', totalPoints: 50, lifetimeBanked: 9_000 });
             const res = await request(makeApp(makeEngine(), new ResultsStore()))
                 .get('/api/v1/leaderboards?scope=world').set('X-API-Key', API_KEY).expect(200);
             expect(res.headers['cache-control']).toBe('public, max-age=30');
             expect(res.body.scope).toBe('world');
-            expect(res.body.leaders[0]).toMatchObject({ displayName: 'WebChamp', totalPoints: 100, identityTier: 'guest' });
-            expect(res.body.leaders[1]).toMatchObject({ displayName: 'BloxKid', robloxId: '77' });
+            expect(res.body.leaders[0]).toMatchObject({ displayName: 'BloxKid', robloxId: '77', lifetimeBanked: 9_000 });
+            expect(res.body.leaders[1]).toMatchObject({ displayName: 'WebChamp', totalPoints: 100, identityTier: 'guest' });
+        });
+
+        it('never puts a deviceId on the wire — it is a bearer credential on the socket path', async () => {
+            await User.create({ deviceId: 'secret-device-id', displayName: 'WebChamp', lifetimeBanked: 120 });
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .get('/api/v1/leaderboards?scope=world').set('X-API-Key', API_KEY).expect(200);
+            expect(res.body.leaders[0].deviceId).toBeUndefined();
+            expect(JSON.stringify(res.body)).not.toContain('secret-device-id');
         });
 
         it('country scope filters by country code', async () => {

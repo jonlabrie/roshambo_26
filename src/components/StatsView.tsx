@@ -227,10 +227,10 @@ export const StatsView: React.FC<StatsViewProps> = ({
                 </div>
             </section>
 
-            {/* Leaderboard: High Points (Top 3) */}
+            {/* Leaderboard: Career Earnings (Top 3) */}
             <section className="space-y-3">
                 <div className="flex items-center justify-between px-1">
-                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Top Total Points</h3>
+                    <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.3em]">Top Career Earnings</h3>
                     <Trophy className="w-3 h-3 text-yellow-500" />
                 </div>
                 <div className="space-y-2">
@@ -239,7 +239,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
                             key={user.deviceId || i}
                             rank={i + 1}
                             label={(user.deviceId || '........').substring(0, 8)}
-                            value={`${user.totalPoints?.toLocaleString() || 0} PTS`}
+                            value={`${user.lifetimeBanked?.toLocaleString() || 0} PTS`}
                             highlight={i < 3}
                         />
                     ))}
@@ -290,7 +290,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
 
     const renderSubPage = (type: 'POINTS' | 'WINS') => {
         const list = type === 'POINTS' ? serverStats?.topPoints : serverStats?.biggestWins
-        const title = type === 'POINTS' ? 'Total Points Records' : 'Massive Wins Hall'
+        const title = type === 'POINTS' ? 'Career Earnings Records' : 'Massive Wins Hall'
         const icon = type === 'POINTS' ? <Trophy className="w-4 h-4 text-yellow-500" /> : <Zap className="w-4 h-4 text-blue-500" />
 
         return (
@@ -305,7 +305,7 @@ export const StatsView: React.FC<StatsViewProps> = ({
                             key={type === 'POINTS' ? (item.deviceId || i) : (item._id || i)}
                             rank={i + 1}
                             label={(item.deviceId || '........').substring(0, 8)}
-                            value={type === 'POINTS' ? `${item.totalPoints?.toLocaleString() || 0} PTS` : `+${item.pointsDelta?.toLocaleString() || 0} PTS`}
+                            value={type === 'POINTS' ? `${item.lifetimeBanked?.toLocaleString() || 0} PTS` : `+${item.pointsDelta?.toLocaleString() || 0} PTS`}
                             highlight={i < 3}
                         />
                     ))}

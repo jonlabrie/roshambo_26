@@ -677,7 +677,14 @@ task.spawn(function()
         if res.ok and res.data.leaders then
             local top = res.data.leaders[1]
             if top then
-                worldRec = { points = top.totalPoints, name = filterExternalName(top.displayName or "?") }
+                -- lifetimeBanked, NOT totalPoints: the board is sorted by career earnings
+                -- server-side, and totalPoints is a spendable wallet that drops on every
+                -- purchase -- reading it here would print a number that does not match the
+                -- order the rows arrived in.
+                worldRec = {
+                    banked = top.lifetimeBanked or 0,
+                    name = filterExternalName(top.displayName or "?"),
+                }
             end
             local best, bestName = 0, nil
             for _, l in res.data.leaders do

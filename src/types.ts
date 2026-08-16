@@ -53,6 +53,10 @@ export interface AuthUser {
 export interface LeaderboardEntry {
     _id?: string
     deviceId?: string
+    // Career earnings, and the basis the server sorts the board by. totalPoints is the
+    // spendable wallet and goes DOWN on a purchase, so it must not be what a ranked list
+    // displays.
+    lifetimeBanked?: number
     totalPoints?: number
     pointsDelta?: number
 }

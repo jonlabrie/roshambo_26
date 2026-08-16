@@ -3,7 +3,7 @@ import { connectTestDb, clearTestDb, disconnectTestDb } from './test/db';
 import User from './models/User';
 import Round from './models/Round';
 import Session from './models/Session';
-import { openSession, closeSession, touchSession, roundsPresent, reconcilePresence, closeStaleSessions } from './sessions';
+import { openSession, closeSession, touchSession, touchSessions, roundsPresent, reconcilePresence, closeStaleSessions } from './sessions';
 
 // Module scope: Task 5 appends a second `describe` to this file and reuses this helper.
 const at = (min: number) => new Date(Date.UTC(2026, 7, 16, 12, min, 0));
@@ -78,6 +78,29 @@ describe('sessions', () => {
         expect(stored?.endedAt).toBeUndefined();
     });
 
+    it('excludes a round landing exactly on the window end', async () => {
+        // [from, to) — the round at `to` belongs to the NEXT window. Inclusive at both ends
+        // would count it in both, and every windowed number would overlap its neighbour.
+        const user = await User.create({ deviceId: 'devS8' });
+        const session = await openSession({ userId: user._id, platform: 'pwa' });
+        await Session.findByIdAndUpdate(session._id, { $set: { startedAt: at(0) } });
+
+        await Round.create({ id: 'r-at-from', worldThrow: 'R', timestamp: at(0) });  // included
+        await Round.create({ id: 'r-at-to', worldThrow: 'P', timestamp: at(60) });   // excluded
+
+        expect(await roundsPresent(user._id, at(0), at(60))).toBe(1);
+    });
+
+    it('touches many sessions in one write', async () => {
+        const user = await User.create({ deviceId: 'devS9' });
+        const a = await openSession({ userId: user._id, platform: 'pwa' });
+        const b = await openSession({ userId: user._id, platform: 'pwa' });
+        await touchSessions([a._id.toString(), b._id.toString()], at(45));
+        const stored = await Session.find({ userId: user._id });
+        expect(stored.map(x => x.lastSeenAt.toISOString())).toEqual([at(45).toISOString(), at(45).toISOString()]);
+        expect(stored.every(x => x.endedAt === undefined)).toBe(true);
+    });
+
     it('opens a session with an explicit startedAt/lastSeenAt for a known-time roster path', async () => {
         const user = await User.create({ deviceId: 'devS7' });
         const session = await openSession({
@@ -135,6 +158,31 @@ describe('presence reconciliation', () => {
         const stored = await Session.findOne({ userId: a._id });
         // closed at lastSeenAt, NOT at sweep time — the player was not present for those 30 minutes
         expect(stored?.endedAt?.toISOString()).toBe(at(0).toISOString());
+    });
+
+    it('NEVER closes a PWA session, however silent — the sweep is for reporting instances', async () => {
+        // A PWA session is closed by its socket disconnecting, not by silence. Before this
+        // filter the sweep truncated every live PWA session ~2 minutes in, setting endedAt to
+        // its startedAt and zeroing that player's rounds-present while they were still playing.
+        const a = await User.create({ deviceId: 'pwaPlayer' });
+        const session = await openSession({ userId: a._id, platform: 'pwa' });
+        await Session.updateMany({}, { $set: { startedAt: at(0), lastSeenAt: at(0) } });
+
+        expect(await closeStaleSessions(at(10))).toBe(0);
+        const stored = await Session.findById(session._id);
+        expect(stored?.endedAt).toBeUndefined();
+    });
+
+    it('closes the stale instance session and leaves the silent PWA one open, in the same sweep', async () => {
+        const a = await User.create({ deviceId: 'pwaPlayer' });
+        const b = await User.create({ deviceId: 'bloxPlayer' });
+        const pwa = await openSession({ userId: a._id, platform: 'pwa' });
+        await reconcilePresence('deadInstance', [b._id], at(0));
+        await Session.updateMany({}, { $set: { lastSeenAt: at(0) } });
+
+        expect(await closeStaleSessions(at(10))).toBe(1);
+        expect((await Session.findById(pwa._id))?.endedAt).toBeUndefined();
+        expect((await Session.findOne({ userId: b._id }))?.endedAt?.toISOString()).toBe(at(0).toISOString());
     });
 
     it('leaves fresh sessions alone', async () => {
