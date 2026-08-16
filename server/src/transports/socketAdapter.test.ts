@@ -39,7 +39,15 @@ describe('socket adapter wire format', () => {
         await waitFor(client, 'connect');
     });
 
-    afterEach(() => { client.disconnect(); httpServer.close(); });
+    afterEach(async () => {
+        client.disconnect();
+        // The server's 'disconnect' handler does an async closeSession() write that this
+        // synchronous teardown doesn't wait for. Without a pause here, disconnectTestDb()
+        // in afterAll can tear down the connection while that write is still in flight,
+        // surfacing as an unhandled MongoNotConnectedError after the suite reports green.
+        await new Promise(r => setTimeout(r, 50));
+        httpServer.close();
+    });
 
     it('emits legacy-shaped init on connect', async () => {
         const init = await initPromise;

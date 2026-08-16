@@ -10,6 +10,7 @@ import Round from '../models/Round';
 import PlayerRound from '../models/PlayerRound';
 import { Throw } from '../engine/GameRules';
 import { topByCareer } from '../leaderboards';
+import { openSession, closeSession } from '../sessions';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'roshambo_super_secret_1337';
 
@@ -105,6 +106,8 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
 
     // --- per-connection handlers ---
     io.on('connection', (socket: Socket) => {
+        let sessionId: string | null = null;
+
         // The PWA attaches its 'init' listener BEFORE connecting, so this single
         // synchronous emit preserves the production wire contract exactly.
         const snap = engine.snapshot();
@@ -136,6 +139,12 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
                 if (!user) {
                     console.log(`[SYNC-ERROR] No user found/created for device ${data.deviceId} or userId ${userId}`);
                     return;
+                }
+
+                // One session per connection. sync-player is the first point at which the socket
+                // is attached to a resolved user, so it is where presence starts.
+                if (!sessionId && user) {
+                    sessionId = (await openSession({ userId: user._id, platform: 'pwa' }))._id.toString();
                 }
 
                 // Get last 30 rounds for this player
@@ -244,6 +253,13 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
                 }
             } catch (err) {
                 console.error('Error updating progress:', (err as Error).message);
+            }
+        });
+
+        socket.on('disconnect', async () => {
+            if (sessionId) {
+                await closeSession(sessionId, new Date());
+                sessionId = null;
             }
         });
     });
