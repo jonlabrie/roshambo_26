@@ -86,6 +86,10 @@ describe("MachiyaShops registry", function()
         expect(s.yaw).toBe(0)
         expect(s.frontage).toBe("koshi")
         expect(s.interior).toBe("none")
+        -- the owner's signage pass: MachiyaEast KEEPS the blank wall board —
+        -- `board = true` is the blank contract, and naming this shop is
+        -- deliberately out of scope (the wager-language ruling)
+        expect(s.identity ~= nil and s.identity.board == true).toBe(true)
     end)
 end)
 
@@ -189,50 +193,245 @@ describe("per-shop noren panel count", function()
     end)
 end)
 
-describe("kanban occlusion guard — the sign must hang in open air", function()
-    -- The owner's finding on the kit's first board: a frameless slab at the kamoi
-    -- line whose whole z-span sat INSIDE the Eave's — top covered, face shaded, a
-    -- cream slab under a cream soffit that read as no sign at all. The archetype's
-    -- header states the intent ("a closed upper storey ... carrying the sign high
-    -- enough to read from the bridge"), and 花火屋's inline kanban already lives
-    -- there. This guard would have caught the defect: the panel's FULL extent
-    -- (rotation-aware) must not intersect the Eave's in y and z, and its bottom
-    -- must clear the Eave's top.
-    local function rotAABB(p)
-        local cf, sz = p.properties.CFrame, p.properties.Size
-        local lo, hi = {}, {}
-        for i = 1, 3 do
-            local r = 3 * (i - 1)
-            local ext = (
-                math.abs(cf[4 + r]) * sz[1]
-                + math.abs(cf[5 + r]) * sz[2]
-                + math.abs(cf[6 + r]) * sz[3]
-            ) / 2
-            lo[i], hi[i] = cf[i] - ext, cf[i] + ext
-        end
-        return lo, hi
+-- Rotation-aware world AABB of a part spec: |R| * size / 2 about the centre.
+-- Hoisted from the round-2 occlusion guard so every signage test shares it.
+local function rotAABB(p)
+    local cf, sz = p.properties.CFrame, p.properties.Size
+    local lo, hi = {}, {}
+    for i = 1, 3 do
+        local r = 3 * (i - 1)
+        local ext = (math.abs(cf[4 + r]) * sz[1] + math.abs(cf[5 + r]) * sz[2] + math.abs(cf[6 + r]) * sz[3])
+            / 2
+        lo[i], hi[i] = cf[i] - ext, cf[i] + ext
     end
-    for _, shopKey in { "apparel", "accessories" } do
-        local shop = (MachiyaShops :: any)[shopKey]
-        if shop.identity and shop.identity.board then
-            test(("%s's kanban hangs clear of the eave"):format(shopKey), function()
-                local m = Machiya.build(ZenDojo.palette, ArenaLayout, shop)
-                -- the framed construction, 花火屋's names
-                local k = find(m, "Kanban")
-                expect(k ~= nil).toBe(true)
-                -- the occlusion assertion holds whatever the panel is called, so a
-                -- rename can never smuggle the sign back under the soffit
-                local panel = k or find(m, "SignBoard")
-                local eave = find(m, "Eave")
-                expect(panel ~= nil).toBe(true)
-                expect(eave ~= nil).toBe(true)
-                local plo, phi = rotAABB(panel)
-                local elo, ehi = rotAABB(eave)
-                local yOverlap = phi[2] > elo[2] and ehi[2] > plo[2]
-                local zOverlap = phi[3] > elo[3] and ehi[3] > plo[3]
-                expect(yOverlap and zOverlap).toBe(false)
-                expect(plo[2] > ehi[2]).toBe(true) -- bottom above the eave's top: open air
-            end)
+    return lo, hi
+end
+
+describe("signage — apparel's sode-kanban (blade sign)", function()
+    local shop = MachiyaShops.apparel
+    local e = shop.envelope
+    local m = Machiya.build(ZenDojo.palette, ArenaLayout, shop)
+    local blade = find(m, "SodeKanban")
+
+    test("the blade REPLACES the wall kanban", function()
+        expect(blade ~= nil).toBe(true)
+        expect(find(m, "Kanban") == nil).toBe(true)
+        local frames = 0
+        for _, c in m.children do
+            if (c.name :: string):sub(1, 11) == "KanbanFrame" then
+                frames += 1
+            end
         end
+        expect(frames).toBe(0)
+    end)
+
+    test("it stands PERPENDICULAR to the facade, projecting into the street", function()
+        local board = find(blade, "BladeBoard")
+        expect(board ~= nil).toBe(true)
+        -- thin in x: the board's faces look east/west, down the promenade
+        expect(board.properties.Size[1] < 0.3).toBe(true)
+        expect(board.properties.Size[2] >= 3.5).toBe(true)
+        -- wholly north of the upper wall's street face (the stucco box at z0 + 0.30)
+        local plo, phi = rotAABB(board)
+        expect(phi[3] <= e.z0 + 0.30 + 1e-6).toBe(true)
+        -- and inside the eave's own drip line: no NEW promenade encroachment
+        expect(plo[3] >= e.z0 - 2.5).toBe(true)
+    end)
+
+    test("its lettering is VERTICAL — one label per character, descending, both faces", function()
+        local board = find(blade, "BladeBoard")
+        local chars = { "呉", "服", "屋" }
+        for _, fname in { "FaceEast", "FaceWest" } do
+            local face = find(board, fname)
+            expect(face ~= nil).toBe(true)
+            expect(face.properties.SizingMode).toBe("PixelsPerStud")
+            local prevY = -1
+            for i, ch in chars do
+                local label = find(face, `Char{i}`)
+                expect(label ~= nil).toBe(true)
+                expect(label.properties.Text).toBe(ch)
+                local pos = label.properties.Position.UDim2
+                expect(pos[1][1]).toBe(0) -- one column
+                expect(pos[2][1] > prevY).toBe(true) -- reading DOWN: tategaki
+                prevY = pos[2][1]
+            end
+            expect(find(face, "Char4") == nil).toBe(true)
+        end
+    end)
+
+    test("gold on black lacquer: light characters on a dark board", function()
+        local board = find(blade, "BladeBoard")
+        local label = find(find(board, "FaceEast"), "Char1")
+        local panel = board.properties.Color
+        local inkC = label.properties.TextColor3
+        local diff = (inkC[1] + inkC[2] + inkC[3]) - (panel[1] + panel[2] + panel[3])
+        expect(diff > 1).toBe(true)
+    end)
+
+    test("it clears the avatar, the hisashi and the roof spring", function()
+        local eave = find(m, "Eave")
+        local _, ehi = rotAABB(eave)
+        for _, p in allParts(blade) do
+            local plo, phi = rotAABB(p)
+            -- the WHOLE blade lives above the hisashi: open air, nothing occluded
+            expect(plo[2] > ehi[2]).toBe(true)
+            -- and under the main roof's spring line (floor + storeys = +14)
+            expect(phi[2] < e.floorY + 14.0 - 0.1).toBe(true)
+        end
+        -- the kamoi rule restated for the street: the underside never dips
+        -- below the shop's own 6.8 head clearance
+        local board = find(blade, "BladeBoard")
+        local blo = rotAABB(board)
+        expect(blo[2] >= e.floorY + 6.8).toBe(true)
+    end)
+end)
+
+describe("signage — accessories' kake-kanban (hanging plaque)", function()
+    local shop = MachiyaShops.accessories
+    local e = shop.envelope
+    local m = Machiya.build(ZenDojo.palette, ArenaLayout, shop)
+    local kk = find(m, "KakeKanban")
+    local plaque = kk and find(kk, "Plaque")
+
+    test("the plaque REPLACES the wall kanban", function()
+        expect(kk ~= nil).toBe(true)
+        expect(plaque ~= nil).toBe(true)
+        expect(find(m, "Kanban") == nil).toBe(true)
+        local frames = 0
+        for _, c in m.children do
+            if (c.name :: string):sub(1, 11) == "KanbanFrame" then
+                frames += 1
+            end
+        end
+        expect(frames).toBe(0)
+    end)
+
+    test("it hangs UNDER the eave with real air, above head height", function()
+        local eave = find(m, "Eave")
+        local elo = rotAABB(eave)
+        local plo, phi = rotAABB(plaque)
+        -- clear even of the eave's LOWEST (outer) corner — the occlusion-guard
+        -- defect class, restated for a sign that belongs under the soffit
+        expect(phi[2] + 0.05 < elo[2]).toBe(true)
+        -- the kamoi head-height rule: 6.8 above the floor, same as the doorway
+        expect(plo[2] >= e.floorY + 6.8).toBe(true)
+        -- under the eave: never back over the frontage line, never past the drip
+        expect(phi[3] < e.z0).toBe(true)
+        expect(plo[3] > e.z0 - 2.5).toBe(true)
+    end)
+
+    test("its hooks VISIBLY bridge the plaque to the eave's underside plane", function()
+        local pTop = plaque.properties.CFrame[2] + plaque.properties.Size[2] / 2
+        -- the eave's underside is a tilted PLANE: springs at floor + 9, drops 0.5
+        -- over the 2.5 overhang, minus the slab's vertical half-thickness — the
+        -- same math the chōchin hang derives its arm height from
+        local hisashiLen = math.sqrt(2.5 * 2.5 + 0.5 * 0.5)
+        for _, hn in { "PlaqueHookWest", "PlaqueHookEast" } do
+            local h = find(kk, hn)
+            expect(h ~= nil).toBe(true)
+            local hBot = h.properties.CFrame[2] - h.properties.Size[2] / 2
+            local hTop = h.properties.CFrame[2] + h.properties.Size[2] / 2
+            local hz = h.properties.CFrame[3]
+            local underside = e.floorY + 9.0 - 0.5 * (e.z0 - hz) / 2.5 - (0.25 / 2) * (hisashiLen / 2.5)
+            expect(math.abs(hBot - pTop) < 0.01).toBe(true) -- seated on the plaque
+            expect(math.abs(hTop - underside) < 0.02).toBe(true) -- reaching the soffit
+        end
+    end)
+
+    test("horizontal per-character lettering — 小間物屋, one label each", function()
+        local face = find(plaque, "Face")
+        expect(face ~= nil).toBe(true)
+        expect(face.properties.SizingMode).toBe("PixelsPerStud")
+        local chars = { "小", "間", "物", "屋" }
+        local prevX = -1
+        for i, ch in chars do
+            local label = find(face, `Char{i}`)
+            expect(label ~= nil).toBe(true)
+            expect(label.properties.Text).toBe(ch)
+            local pos = label.properties.Position.UDim2
+            expect(pos[2][1]).toBe(0) -- one row
+            expect(pos[1][1] > prevX).toBe(true) -- reading east: yokogaki
+            prevX = pos[1][1]
+        end
+        expect(find(face, "Char5") == nil).toBe(true)
+    end)
+
+    test("sumi on bare cedar: dark characters on a light board", function()
+        local label = find(find(plaque, "Face"), "Char1")
+        local panel = plaque.properties.Color
+        local inkC = label.properties.TextColor3
+        local diff = (panel[1] + panel[2] + panel[3]) - (inkC[1] + inkC[2] + inkC[3])
+        expect(diff > 1).toBe(true)
+    end)
+end)
+
+describe("signage — full-extent audit: the signs touch NOTHING they don't mount to", function()
+    -- Rotation-aware AABB of every sign part against every other part of its own
+    -- building — eave, roof, walls, noren, chōchin, dressing, all of it. The 1e-4
+    -- tolerance admits the deliberate flush contacts (the blade arms' rear faces
+    -- sit ON the upper wall's street face). The plaque's hooks are its hangers
+    -- and are ALLOWED to meet the Eave — the one excluded pair; the plane test
+    -- above pins the hook tops to the underside so "allowed to meet" can never
+    -- drift into "buried".
+    local function auditClear(m, signName, allowed)
+        local sign = find(m, signName)
+        expect(sign ~= nil).toBe(true)
+        local signParts = allParts(sign)
+        expect(#signParts > 0).toBe(true)
+        local inSign = {}
+        for _, p in signParts do
+            inSign[p] = true
+        end
+        local worst = -math.huge
+        for _, sp in signParts do
+            local slo, shi = rotAABB(sp)
+            for _, op in allParts(m) do
+                if not inSign[op] and not (allowed and allowed[sp.name] == op.name) then
+                    local olo, ohi = rotAABB(op)
+                    local pen = math.huge
+                    for ax = 1, 3 do
+                        pen = math.min(pen, math.min(shi[ax], ohi[ax]) - math.max(slo[ax], olo[ax]))
+                    end
+                    if pen > worst then
+                        worst = pen
+                    end
+                end
+            end
+        end
+        expect(worst <= 1e-4).toBe(true)
     end
+    test("apparel's blade", function()
+        local m = Machiya.build(ZenDojo.palette, ArenaLayout, MachiyaShops.apparel)
+        auditClear(m, "SodeKanban", nil)
+    end)
+    test("accessories' plaque", function()
+        local m = Machiya.build(ZenDojo.palette, ArenaLayout, MachiyaShops.accessories)
+        auditClear(m, "KakeKanban", { PlaqueHookWest = "Eave", PlaqueHookEast = "Eave" })
+    end)
+end)
+
+describe("signage — MachiyaEast stays deliberately blank", function()
+    test("a blank childless wall board, framed, hanging in open air", function()
+        local m = Machiya.build(ZenDojo.palette, ArenaLayout, MachiyaShops.sportsbook)
+        local k = find(m, "Kanban")
+        expect(k ~= nil).toBe(true)
+        expect(k.children == nil or #k.children == 0).toBe(true)
+        local frames = 0
+        for _, c in m.children do
+            if (c.name :: string):sub(1, 11) == "KanbanFrame" then
+                frames += 1
+            end
+        end
+        expect(frames).toBe(4)
+        -- the round-2 wall-board occlusion guard, kept for every wall kind: the
+        -- panel's full rotation-aware extent must not intersect the Eave's in
+        -- y AND z, and its bottom must clear the Eave's top — open air
+        local eave = find(m, "Eave")
+        local plo, phi = rotAABB(k)
+        local elo, ehi = rotAABB(eave)
+        local yOverlap = phi[2] > elo[2] and ehi[2] > plo[2]
+        local zOverlap = phi[3] > elo[3] and ehi[3] > plo[3]
+        expect(yOverlap and zOverlap).toBe(false)
+        expect(plo[2] > ehi[2]).toBe(true)
+    end)
 end)

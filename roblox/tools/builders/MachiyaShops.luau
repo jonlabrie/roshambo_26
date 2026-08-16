@@ -101,9 +101,24 @@ MachiyaShops.apparel = {
         -- Chochin.build's paperRGB255 doc comment. Chochin.spec.luau's legibility guard holds
         -- this (and every other shop tint) to a 0.55 luminance floor.
         chochin = { paper = { 170, 178, 200 } },
-        -- Blank timber kanban above the kamoi — the glyph-pipeline texture is a gate
-        -- follow-up with the owner, not this task.
-        board = true,
+        -- 袖看板 (owner's signage pass, 2026-08-15): the blade sign standing
+        -- perpendicular to the facade at the WEST end of the frontage — the row's
+        -- approach side, and the far corner from 花火屋's roji — lettered 呉服屋
+        -- (gofukuya, the draper) top-to-bottom on both faces. Panel and ink are
+        -- the classic high-end gofukuya pairing and deliberately the row's
+        -- inversion: BLACK LACQUER carrying GOLD, where 花火屋 is sumi on cream
+        -- plaster — light-on-dark against dark-on-light, so the two signs can
+        -- never read as copies. Gold is the palette's own { 0.83, 0.69, 0.40 };
+        -- the lacquer is a literal (no palette black is this deep) on
+        -- SmoothPlastic, which is as close to urushi gloss as base materials get.
+        board = {
+            kind = "blade",
+            text = "呉服屋",
+            vertical = true,
+            side = "west",
+            panel = { color = { 0.09, 0.08, 0.08 }, material = "SmoothPlastic" },
+            ink = { color = { 0.83, 0.69, 0.40 } },
+        },
         glow = { color = { 1.0, 0.85, 0.6 }, brightness = 1.2 },
         dress = function(ctx: any): { any }
             local env, palette = ctx.env, ctx.palette
@@ -355,8 +370,21 @@ MachiyaShops.accessories = {
         -- 0.0722*152, /255), the same level as canonical cream's 0.684 and well clear
         -- of Chochin.LEGIBILITY_FLOOR (0.55); Chochin.spec's guard walks this table.
         chochin = { paper = { 168, 180, 152 } },
-        -- Blank timber kanban above the kamoi — signage copy is out of scope.
-        board = true,
+        -- 掛看板 (owner's signage pass, 2026-08-15): a plaque hung under the eave
+        -- on visible hooks, lettered 小間物屋 (komamonoya, the sundries/notions
+        -- shop). BARE CEDAR carrying SUMI — the palette's cypressWeathered over
+        -- the same CypressWeathered maps the bridge decking wears (the unrotated
+        -- variant: this is a horizontal board, and CypressVertical's rotated
+        -- grain would run across it), with the palette's own ink. Third
+        -- silhouette, third ground: cream plaster (花火屋), black lacquer
+        -- (apparel), bare timber (here) — the owner's "all the same background"
+        -- complaint answered with materials, not tints.
+        board = {
+            kind = "hanging",
+            text = "小間物屋",
+            panel = { color = { 0.85, 0.84, 0.81 }, material = "Wood", variant = "CypressWeathered" },
+            ink = { color = { 0.18, 0.19, 0.22 } },
+        },
         glow = { color = { 1.0, 0.85, 0.6 }, brightness = 1.2 },
         -- THE MINIATURES ARE THE POINT OF THIS SHOP: shelf-scale previews of the
         -- Piece B decoration catalog, built from primitives following the real
@@ -705,6 +733,12 @@ MachiyaShops.sportsbook = {
     yaw = 0,
     frontage = "koshi",
     interior = "none",
+    -- The BLANK wall board, and nothing else (owner's signage pass, 2026-08-15):
+    -- `board = true` is the kit's original blank contract — framed panel, no
+    -- SurfaceGui, no copy. The sports book carries no signage copy (the
+    -- wager-language ruling) and its naming style is deliberately out of scope.
+    -- NOT emitted by genmodels: this shell only exists when a task builds it.
+    identity = { board = true },
 } :: Shop
 
 -- ===== chayaSurvey — record for Task 7 (Chaya.luau), not a Shop table =====

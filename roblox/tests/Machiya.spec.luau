@@ -392,7 +392,7 @@ describe("Machiya — the parts other tasks bind to", function()
         expect(t.properties.CanTouch).toBe(false)
     end)
 
-    test("the sign is one framed board carrying the whole name, facing the promenade", function()
+    test("the sign is one framed board, lettered ONE CHARACTER PER LABEL", function()
         local k = find(model, "Kanban")
         expect(k ~= nil).toBe(true)
         expect(k.properties.CFrame[3] < (Z0 + Z1) / 2).toBe(true)
@@ -403,14 +403,48 @@ describe("Machiya — the parts other tasks bind to", function()
         -- speck and is the only reason the sign was ever split into three boards.
         expect(face.properties.SizingMode).toBe("PixelsPerStud")
         expect(face.properties.PixelsPerStud <= 40).toBe(true)
-        local text = find(face, "Text")
-        expect(text ~= nil).toBe(true)
-        expect(text.properties.Text).toBe("花火屋")
+        -- One TextLabel per character (the owner's signage pass): the packed
+        -- single-label run set the three kanji touching, and no Roblox font can
+        -- space a CJK run — all 53 Enum.Font values fall through to one system
+        -- fallback with identical metrics, so the CELLS are the only spacing
+        -- control that exists.
+        local chars = { "花", "火", "屋" }
+        for i, ch in chars do
+            local label = find(face, `Char{i}`)
+            expect(label ~= nil).toBe(true)
+            expect(label.className).toBe("TextLabel")
+            expect(label.properties.Text).toBe(ch)
+        end
+        expect(find(face, "Char4") == nil).toBe(true)
+        expect(find(face, "Text") == nil).toBe(true)
+    end)
+
+    test("and the characters sit WIDER than the packed single-label run did", function()
+        -- The measured fallback metric: three kanji at size 48 run 99px — a 33px
+        -- advance per character, so at TextSize 72 on a 32 px-per-stud canvas the
+        -- old packed run advanced (33/48)*72/32 = 1.546875 studs centre to centre.
+        -- "Slightly more spacing" is the owner's request; the per-character cells
+        -- must clearly beat the packed advance.
+        local k = find(model, "Kanban")
+        local face = find(k, "Face")
+        local centres = {}
+        for i = 1, 3 do
+            local label = find(face, `Char{i}`)
+            local pos = label.properties.Position.UDim2
+            local size = label.properties.Size.UDim2
+            centres[i] = (pos[1][1] + size[1][1] / 2) * k.properties.Size[1]
+            -- horizontal layout: every cell sits at the same height
+            expect(pos[2][1]).toBe(0)
+        end
+        local packedAdvance = (33 / 48) * 72 / 32
+        for i = 1, 2 do
+            expect(centres[i + 1] - centres[i] > packedAdvance + 0.3).toBe(true)
+        end
     end)
 
     test("the sign's letters CONTRAST with its board, in a frame on all four sides", function()
         local k = find(model, "Kanban")
-        local text = find(find(k, "Face"), "Text")
+        local text = find(find(k, "Face"), "Char1")
         -- Either polarity is fine — the sign began as dark ink on a light board and is now pale
         -- characters on dark wood. What is NOT fine is the two drifting together, which is the
         -- kind of thing that survives review because both values look reasonable on their own.

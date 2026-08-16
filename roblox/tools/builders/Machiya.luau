@@ -16,6 +16,76 @@ local Chochin = require("./Chochin")
 
 local Machiya = {}
 
+-- ===== per-character lettering (owner's signage pass, 2026-08-15) =====
+-- ONE TextLabel PER CHARACTER, each centred in its own equal cell along the
+-- reading axis. Two reasons this beats the single label it replaces:
+--   * spacing — NO Roblox font carries CJK glyphs: all 53 Enum.Font values
+--     return identical metrics for 花火屋 (99x48 px at size 48, measured), i.e.
+--     they all fall through to one system fallback whose run is PACKED. The
+--     cells are the only spacing control that exists for kanji.
+--   * orientation — a vertical (tategaki) sign is the same cells stacked
+--     top-to-bottom; a single label cannot render one at all.
+-- The SurfaceGui carries 花火屋's proven canvas configuration: SizingMode =
+-- PixelsPerStud (the default FixedSize IGNORES PixelsPerStud and renders the
+-- glyphs as specks), a SMALL canvas with a fixed TextSize — TextScaled is
+-- unreliable and TextSize caps near 100px, so big lettering always needs a
+-- small canvas, never a big canvas with big text.
+-- SHARED by 花火屋's inline sign and every identity-kit sign kind, so the
+-- letterforms can never drift apart between the full-interior path and the kit.
+local function kanjiFace(
+    name: string,
+    text: string,
+    face: string,
+    inkColour: { number },
+    textSize: number,
+    pixelsPerStud: number,
+    vertical: boolean
+): any
+    local chars: { string } = {}
+    for _, code in utf8.codes(text) do
+        table.insert(chars, utf8.char(code))
+    end
+    local n = #chars
+    local labels: { any } = {}
+    for i, ch in chars do
+        local position, size
+        if vertical then
+            position = { UDim2 = { { 0, 0 }, { (i - 1) / n, 0 } } }
+            size = { UDim2 = { { 1, 0 }, { 1 / n, 0 } } }
+        else
+            position = { UDim2 = { { (i - 1) / n, 0 }, { 0, 0 } } }
+            size = { UDim2 = { { 1 / n, 0 }, { 1, 0 } } }
+        end
+        table.insert(labels, {
+            name = `Char{i}`,
+            className = "TextLabel",
+            properties = {
+                Position = position,
+                Size = size,
+                BackgroundTransparency = 1,
+                Text = ch,
+                TextColor3 = inkColour,
+                TextSize = textSize,
+                -- moot for kanji (the system fallback ignores it) but pins any
+                -- Latin/kana a future sign mixes in to the sign face we tested
+                Font = "GothamBold",
+            },
+        })
+    end
+    return {
+        name = name,
+        className = "SurfaceGui",
+        properties = {
+            Face = face,
+            SizingMode = "PixelsPerStud",
+            PixelsPerStud = pixelsPerStud,
+            AlwaysOnTop = false,
+            ZIndexBehavior = "Sibling",
+        },
+        children = labels,
+    }
+end
+
 function Machiya.build(palette: any, _layout: any, shop: any): any
     -- A KOSHI FRONTAGE CANNOT CARRY THE FULL INTERIOR. The counter and the noren register to
     -- the OPEN bays (postX), and a kōshi frontage has none — without this gate the combination
@@ -1229,35 +1299,13 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
                 CanTouch = false,
                 CastShadow = false,
                 children = {
-                    {
-                        name = "Face",
-                        className = "SurfaceGui",
-                        properties = {
-                            Face = "Front", -- -Z, which is north: onto the promenade
-                            -- SIZINGMODE IS THE WHOLE TRICK. It defaults to FixedSize, under which the
-                            -- canvas is CanvasSize (800x600) and PixelsPerStud is IGNORED — which is
-                            -- why an 80px glyph once rendered as a speck. In PixelsPerStud mode the
-                            -- canvas comes from the part, so the character fills its board.
-                            SizingMode = "PixelsPerStud",
-                            PixelsPerStud = 32,
-                            AlwaysOnTop = false,
-                            ZIndexBehavior = "Sibling",
-                        },
-                        children = {
-                            {
-                                name = "Text",
-                                className = "TextLabel",
-                                properties = {
-                                    Size = { UDim2 = { { 1, 0 }, { 1, 0 } } },
-                                    BackgroundTransparency = 1,
-                                    Text = "花火屋",
-                                    TextColor3 = ink, -- dark characters on the white board
-                                    TextSize = 72,
-                                    Font = "GothamBold",
-                                },
-                            },
-                        },
-                    },
+                    -- PER-CHARACTER (owner's gate, 2026-08-15: "slightly more spacing").
+                    -- Same canvas configuration as the single label it replaces —
+                    -- Face = Front (-Z, north: onto the promenade), PixelsPerStud 32,
+                    -- TextSize 72, dark ink on the white board — but each kanji is
+                    -- centred in its own third of the board, which opens the packed
+                    -- fallback run to a 2.6-stud advance. See kanjiFace above.
+                    kanjiFace("Face", "花火屋", "Front", ink, 72, 32, false),
                 },
             })
         )
@@ -1353,74 +1401,257 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
             end
         end
         if identity.board then
-            -- ONE BLANK FRAMED KANBAN, geometry only — no SurfaceGui, no copy (the sports
-            -- book carries no signage copy — the wager-language ruling; and the owner is
-            -- choosing a naming style separately, so every kit board waits blank).
-            --
-            -- ON THE UPPER STOREY, NOT AT THE KAMOI (owner's finding, accessories gate):
-            -- the kit's first board was a frameless slab at the kamoi line whose whole
-            -- z-span fell INSIDE the Eave's — the eave covered its top and shaded the
-            -- rest, a cream slab under a cream soffit. The archetype's own header says
-            -- where a machiya's sign goes ("a closed upper storey of kōshi lattice
-            -- carrying the sign high enough to read from the bridge"), and 花火屋's
-            -- inline kanban already sits there. This is that construction, generalized:
-            --   panel: 花火屋's 2.6 height and 0.11 thickness; WIDTH sized to the
-            --     FRONTAGE at 花火屋's own ratio (its 7.8 panel on its 17.93-wide
-            --     envelope) — the inline sign is sized to its three characters instead;
-            --   y: centred on the shop's own mushiko-mado band (derived from the
-            --     band, which is itself centred on the upper storey);
-            --   z: proud of the upper wall's front face (SZ0) by 花火屋's own standoff
-            --     — its sign centre hangs at Z0 - 0.65 against a face at Z0 + 0.30,
-            --     i.e. 0.95 proud (derived, not copied blind);
-            --   tilt: 花火屋's -15°, top toward the path, so anyone on the promenade
-            --     reads the face and not the edge;
-            --   frame: the same four lapped members, 0.32 section, 0.34 deep so the
-            --     surround stands proud of the panel.
-            local SIGN_H = 2.6
-            local SIGN_W = W * (7.8 / 17.93)
-            local SIGN_Y = WIN_Y0 + WIN_H / 2
-            local SIGN_Z = SZ0 - 0.95
-            local FRAME_W = 0.32
-            local FRAME_D = 0.34
-            local ST = rotX(-15)
-            -- offsets in the board's own plane, rotated with it, so the frame stays on
-            -- the board — 花火屋's signPos, restated against this shop's centre
-            local function kanbanPos(dx: number, dy: number): { number }
-                return { CX + dx, SIGN_Y + ST[5] * dy, SIGN_Z + ST[8] * dy }
-            end
-            table.insert(
-                children,
-                Spec.part("Kanban", {
-                    Size = { SIGN_W, SIGN_H, 0.11 },
-                    CFrame = Spec.cframe({ CX, SIGN_Y, SIGN_Z }, ST),
-                    Color = paper,
-                    Material = STUCCO_MAT,
-                    MaterialVariant = STUCCO_VAR,
-                    CanCollide = false,
-                    CanQuery = false,
-                    CanTouch = false,
-                    CastShadow = false,
-                })
-            )
-            for _, mfr in
-                {
-                    { "KanbanFrameTop", SIGN_W + 2 * FRAME_W, FRAME_W, 0, SIGN_H / 2 + FRAME_W / 2 },
-                    { "KanbanFrameBottom", SIGN_W + 2 * FRAME_W, FRAME_W, 0, -(SIGN_H / 2 + FRAME_W / 2) },
-                    { "KanbanFrameWest", FRAME_W, SIGN_H, -(SIGN_W / 2 + FRAME_W / 2), 0 },
-                    { "KanbanFrameEast", FRAME_W, SIGN_H, SIGN_W / 2 + FRAME_W / 2, 0 },
-                }
-            do
-                add(
-                    mfr[1] :: string,
-                    { mfr[2] :: number, mfr[3] :: number, FRAME_D },
-                    kanbanPos(mfr[4] :: number, mfr[5] :: number),
-                    timber,
-                    "Wood",
-                    ST,
-                    FRAME_VAR
+            -- ===== the sign (owner's signage pass, 2026-08-15) =====
+            -- `board = true` is the ORIGINAL contract and still means one blank framed
+            -- wall kanban, emitted byte-identically (the sports book carries no signage
+            -- copy — the wager-language ruling). A TABLE opts a shop into a sign TYPE:
+            -- the owner's finding at this round's gate was that the row read as three
+            -- copies of the same board, and the fix is different SILHOUETTES, not
+            -- different colours —
+            --   kind = "wall"    — 板看板: the framed board on the upper storey (default)
+            --   kind = "blade"   — 袖看板: perpendicular to the facade, projecting into
+            --                      the street, lettered vertically — reads down the
+            --                      promenade where every wall board is edge-on
+            --   kind = "hanging" — 掛看板: a plaque hung under the eave on visible hooks
+            -- text letters it (per-character, kanjiFace above; nil stays blank);
+            -- panel/ink restyle the board and its characters, defaulting to the wall
+            -- board's own cream plaster and sumi.
+            local b: any = identity.board
+            local kind: string = if type(b) == "table" then b.kind or "wall" else "wall"
+            local bText: string? = if type(b) == "table" then b.text else nil
+            local panelColor: { number } = if type(b) == "table" and b.panel then b.panel.color else paper
+            local panelMat: string = if type(b) == "table"
+                    and b.panel
+                    and b.panel.material
+                then b.panel.material
+                else STUCCO_MAT
+            local panelVar: string? = if type(b) == "table" and b.panel then b.panel.variant else STUCCO_VAR
+            local inkColor: { number } = if type(b) == "table" and b.ink then b.ink.color else ink
+
+            if kind == "wall" then
+                -- THE FRAMED WALL KANBAN, ON THE UPPER STOREY (owner's finding,
+                -- accessories gate): the kit's first board was a frameless slab at the
+                -- kamoi line whose whole z-span fell INSIDE the Eave's — the eave
+                -- covered its top and shaded the rest, a cream slab under a cream
+                -- soffit. The archetype's own header says where a machiya's sign goes
+                -- ("a closed upper storey of kōshi lattice carrying the sign high
+                -- enough to read from the bridge"), and 花火屋's inline kanban already
+                -- sits there. This is that construction, generalized:
+                --   panel: 花火屋's 2.6 height and 0.11 thickness; WIDTH sized to the
+                --     FRONTAGE at 花火屋's own ratio (its 7.8 panel on its 17.93-wide
+                --     envelope) — the inline sign is sized to its three characters instead;
+                --   y: centred on the shop's own mushiko-mado band (derived from the
+                --     band, which is itself centred on the upper storey);
+                --   z: proud of the upper wall's front face (SZ0) by 花火屋's own standoff
+                --     — its sign centre hangs at Z0 - 0.65 against a face at Z0 + 0.30,
+                --     i.e. 0.95 proud (derived, not copied blind);
+                --   tilt: 花火屋's -15°, top toward the path, so anyone on the promenade
+                --     reads the face and not the edge;
+                --   frame: the same four lapped members, 0.32 section, 0.34 deep so the
+                --     surround stands proud of the panel.
+                local SIGN_H = 2.6
+                local SIGN_W = W * (7.8 / 17.93)
+                local SIGN_Y = WIN_Y0 + WIN_H / 2
+                local SIGN_Z = SZ0 - 0.95
+                local FRAME_W = 0.32
+                local FRAME_D = 0.34
+                local ST = rotX(-15)
+                -- offsets in the board's own plane, rotated with it, so the frame stays on
+                -- the board — 花火屋's signPos, restated against this shop's centre
+                local function kanbanPos(dx: number, dy: number): { number }
+                    return { CX + dx, SIGN_Y + ST[5] * dy, SIGN_Z + ST[8] * dy }
+                end
+                table.insert(
+                    children,
+                    Spec.part("Kanban", {
+                        Size = { SIGN_W, SIGN_H, 0.11 },
+                        CFrame = Spec.cframe({ CX, SIGN_Y, SIGN_Z }, ST),
+                        Color = panelColor,
+                        Material = panelMat,
+                        MaterialVariant = panelVar,
+                        CanCollide = false,
+                        CanQuery = false,
+                        CanTouch = false,
+                        CastShadow = false,
+                        children = if bText
+                            then { kanjiFace("Face", bText, "Front", inkColor, 72, 32, false) }
+                            else nil,
+                    })
                 )
+                for _, mfr in
+                    {
+                        { "KanbanFrameTop", SIGN_W + 2 * FRAME_W, FRAME_W, 0, SIGN_H / 2 + FRAME_W / 2 },
+                        {
+                            "KanbanFrameBottom",
+                            SIGN_W + 2 * FRAME_W,
+                            FRAME_W,
+                            0,
+                            -(SIGN_H / 2 + FRAME_W / 2),
+                        },
+                        { "KanbanFrameWest", FRAME_W, SIGN_H, -(SIGN_W / 2 + FRAME_W / 2), 0 },
+                        { "KanbanFrameEast", FRAME_W, SIGN_H, SIGN_W / 2 + FRAME_W / 2, 0 },
+                    }
+                do
+                    add(
+                        mfr[1] :: string,
+                        { mfr[2] :: number, mfr[3] :: number, FRAME_D },
+                        kanbanPos(mfr[4] :: number, mfr[5] :: number),
+                        timber,
+                        "Wood",
+                        ST,
+                        FRAME_VAR
+                    )
+                end
+            elseif kind == "blade" then
+                -- 袖看板: a blade standing PERPENDICULAR to the facade, projecting from
+                -- the upper storey out over the hisashi, lettered top-to-bottom on BOTH
+                -- faces — the sign that reads from down the promenade, where every wall
+                -- board is foreshortened to an edge.
+                local BLADE_H = 3.6
+                local BLADE_T = 0.18
+                local ARM = 0.22 -- the two carrying arms' square section
+                local ARM_L = 2.0 -- wall face to the blade's outer (street) edge
+                local WALL_GAP = 0.4 -- board rear edge off the render, clear of proud timber
+                -- x: at one END of the frontage (default west), 1.5 in from the corner —
+                -- inboard enough to clear the eave-corner chōchin's barrel with real air
+                local bx = if type(b) == "table" and b.side == "east" then X1 - 1.5 else X0 + 1.5
+                -- y: the WHOLE blade lives above the hisashi, and its mounting arms
+                -- derive from what they MEET — the upper facade. TWO things bound the
+                -- seat from below:
+                --   * the eave, a tilted slab whose highest point is the +Z (wall-side)
+                --     top edge: mid-plane springs at FLOOR + STOREY_H, plus the slab's
+                --     vertical half-thickness over the pitch (the chōchin hang's own
+                --     sqrt-not-trig math);
+                --   * the upper floor SLAB's exposed edge — the slab spans the full
+                --     envelope, so its edge band (STOREY_H .. STOREY_H + SLAB_T) stands
+                --     0.30 proud of the stucco face the arms mount to; an arm below the
+                --     slab top is buried in it (caught by the full-extent audit).
+                local eaveTopY = FLOOR + STOREY_H + (EAVE_T / 2) * (hisashiLen / EAVE_OVERHANG)
+                local BLADE_CLEAR = 0.35 -- open air between the hisashi and the blade
+                local slabTopY = FLOOR + STOREY_H + SLAB_T
+                local bladeBot = math.max(eaveTopY + BLADE_CLEAR, slabTopY + ARM + 0.1)
+                local bladeTop = bladeBot + BLADE_H
+                -- it must stay under the main roof's spring line, with air
+                assert(
+                    bladeTop + ARM <= EAVE_Y - 0.15,
+                    `blade sign top {bladeTop + ARM} crowds the roof spring {EAVE_Y}`
+                )
+                -- and the kamoi rule, restated for the street: the blade's underside
+                -- must never dip below the shop's own 6.8 head clearance
+                assert(bladeBot >= FLOOR + 6.8, `blade sign underside {bladeBot} is below head height`)
+                local boardZ0 = SZ0 - ARM_L -- outer edge, flush with the arms' ends
+                local boardZ1 = SZ0 - WALL_GAP
+                local kids: { any } = {
+                    Spec.part("BladeBoard", {
+                        Size = { BLADE_T, BLADE_H, ARM_L - WALL_GAP },
+                        CFrame = Spec.cframe({ bx, (bladeBot + bladeTop) / 2, (boardZ0 + boardZ1) / 2 }),
+                        Color = panelColor,
+                        Material = panelMat,
+                        MaterialVariant = panelVar,
+                        CanCollide = false,
+                        CanQuery = false,
+                        CanTouch = false,
+                        CastShadow = false,
+                        -- tategaki on BOTH faces: the promenade runs past it east and west
+                        children = if bText
+                            then {
+                                kanjiFace("FaceEast", bText, "Right", inkColor, 72, 64, true),
+                                kanjiFace("FaceWest", bText, "Left", inkColor, 72, 64, true),
+                            }
+                            else nil,
+                    }),
+                }
+                -- the two carrying arms: rear faces ON the upper wall's street face
+                -- (walls-register-to-structure), outer ends flush with the board's
+                -- outer edge (flush-outside-edges), the board held between them
+                for _, arm in
+                    { { "BladeArmTop", bladeTop + ARM / 2 }, { "BladeArmBottom", bladeBot - ARM / 2 } }
+                do
+                    table.insert(
+                        kids,
+                        Spec.part(arm[1] :: string, {
+                            Size = { ARM, ARM, ARM_L },
+                            CFrame = Spec.cframe({ bx, arm[2] :: number, SZ0 - ARM_L / 2 }),
+                            Color = timber,
+                            Material = "Wood",
+                            MaterialVariant = FRAME_VAR,
+                            CanCollide = false,
+                            CanQuery = false,
+                            CanTouch = false,
+                            CastShadow = false,
+                        })
+                    )
+                end
+                table.insert(children, Spec.model("SodeKanban", kids))
+            else
+                -- 掛看板: a plaque hung under the hisashi on two VISIBLE hooks, over the
+                -- doorway. Under the eave is where a kake-kanban lives — it reads by
+                -- silhouette and proximity, not from across the square — so the
+                -- wall-board occlusion guard inverts here: BELOW the eave with real
+                -- air, and above head height.
+                local PLAQUE_W, PLAQUE_H, PLAQUE_T = 4.4, 1.3, 0.15
+                local HOOK_T = 0.12
+                local HOOK_LEN = 0.4 -- eave underside to plaque top: the visible hang
+                local pz = Z0 - 1.0
+                -- the eave's underside is a tilted PLANE: the mid-plane springs at
+                -- FLOOR + STOREY_H and drops HISASHI_DROP over EAVE_OVERHANG, minus the
+                -- slab's vertical half-thickness — the chōchin hang's own math
+                local undersideY = FLOOR
+                    + STOREY_H
+                    - HISASHI_DROP * (Z0 - pz) / EAVE_OVERHANG
+                    - (EAVE_T / 2) * (hisashiLen / EAVE_OVERHANG)
+                local plaqueTop = undersideY - HOOK_LEN
+                local plaqueBot = plaqueTop - PLAQUE_H
+                -- head height: the kamoi's own 6.8, the number every doorway clears
+                assert(plaqueBot >= FLOOR + 6.8, `hanging plaque underside {plaqueBot} is below head height`)
+                -- and REAL air below even the eave's lowest (outer) corner, so the
+                -- plaque never reads as part of the soffit — the occlusion-guard
+                -- defect class, restated for a sign that belongs under the eave
+                local eaveLoY = (FLOOR + STOREY_H - HISASHI_DROP / 2)
+                    - (HISASHI_DROP + EAVE_T * (EAVE_OVERHANG / hisashiLen)) / 2
+                assert(plaqueTop <= eaveLoY - 0.05, `hanging plaque top {plaqueTop} crowds the eave`)
+                local kids: { any } = {
+                    Spec.part("Plaque", {
+                        Size = { PLAQUE_W, PLAQUE_H, PLAQUE_T },
+                        CFrame = Spec.cframe({ CX, (plaqueTop + plaqueBot) / 2, pz }),
+                        Color = panelColor,
+                        Material = panelMat,
+                        MaterialVariant = panelVar,
+                        CanCollide = false,
+                        CanQuery = false,
+                        CanTouch = false,
+                        CastShadow = false,
+                        children = if bText
+                            then { kanjiFace("Face", bText, "Front", inkColor, 76, 64, false) }
+                            else nil,
+                    }),
+                }
+                -- the hooks: 0.5 in from the plaque's ends, spanning plaque top to the
+                -- underside plane exactly — attached, never buried (the audit holds
+                -- the plaque itself strictly clear; the hooks ARE the contact)
+                for _, hook in { { "PlaqueHookWest", -1 }, { "PlaqueHookEast", 1 } } do
+                    table.insert(
+                        kids,
+                        Spec.part(hook[1] :: string, {
+                            Size = { HOOK_T, HOOK_LEN, HOOK_T },
+                            CFrame = Spec.cframe({
+                                CX + (hook[2] :: number) * (PLAQUE_W / 2 - 0.5),
+                                plaqueTop + HOOK_LEN / 2,
+                                pz,
+                            }),
+                            Color = palette.ironDark,
+                            Material = "Metal",
+                            CanCollide = false,
+                            CanQuery = false,
+                            CanTouch = false,
+                            CastShadow = false,
+                        })
+                    )
+                end
+                table.insert(children, Spec.model("KakeKanban", kids))
             end
         end
+
         if identity.glow and shop.interior ~= "none" then
             -- INTERIOR LIGHTING HOOKS: invisible anchored carriers, one PointLight each. An
             -- interior of "none" is a sealed shell and gets no hooks — that is the brief's
