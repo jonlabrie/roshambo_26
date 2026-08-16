@@ -58,10 +58,11 @@ describe('windowed earnings', () => {
         expect(await earningsInWindow(user._id, at(3), at(7))).toBe(0);
     });
 
-    it('ranks earners within the window, not by career', async () => {
+    it('excludes banks that fall outside the window', async () => {
         const grinder = await User.create({ deviceId: 'grinder', lifetimeBanked: 10_000 });
         const hot = await User.create({ deviceId: 'hot', lifetimeBanked: 10 });
-        // the career leader banked long ago; the hot player banked this week
+        // the career leader banked long ago, outside the queried window; only the hot
+        // player's in-window bank should show up here
         await BankEvent.create({ userId: grinder._id, amount: 9_000, timestamp: at(1) });
         await BankEvent.create({ userId: hot._id, amount: 300, timestamp: at(5) });
 
@@ -82,20 +83,42 @@ describe('windowed earnings', () => {
     });
 
     it('sorts by in-window earnings, inverting career order when the week demands it', async () => {
-        // Both players bank INSIDE the queried window, so this is a genuine sort contest —
-        // unlike the earlier "not by career" test, where the career leader's only event fell
-        // outside the window and there was nothing for anyone to actually outrank.
-        const careerLeader = await User.create({ deviceId: 'career-leader', lifetimeBanked: 10_000 });
-        const weekLeader = await User.create({ deviceId: 'week-leader', lifetimeBanked: 10 });
-        await BankEvent.create({ userId: careerLeader._id, amount: 50, timestamp: at(4) });
-        await BankEvent.create({ userId: weekLeader._id, amount: 500, timestamp: at(5) });
+        // Six players, ALL banking INSIDE the queried window with distinct in-window totals,
+        // so this is a genuine sort contest — unlike "excludes banks that fall outside the
+        // window" above, where the career leader's only event fell outside the window and the
+        // pipeline had only one document to return, so a broken $sort couldn't have been
+        // caught at all. A smaller contestant pool isn't enough either: empirically, Mongo's
+        // unsorted $group output for 4 groups matched the fully-sorted order by pure chance in
+        // roughly 1 of every 7-8 runs in this environment (well above the naive 1-in-24 you'd
+        // expect from a uniform-random permutation) — apparently there is a systematic bias in
+        // how unsorted $group emits small result sets here, not true randomness. Six distinct
+        // groups, created in an order that is neither ascending nor descending by their
+        // in-window earnings (so neither "creation order" nor "value order" coincides with the
+        // target), was verified empirically to fail 20/20 mutation trials.
+        // lifetimeBanked deliberately runs OPPOSITE to in-window earnings below: p1 has the
+        // deepest career total but banks worst this window; p4 has almost no career total but
+        // banks best — the exact inversion the feature exists to surface.
+        const p1 = await User.create({ deviceId: 'p1', lifetimeBanked: 50_000 }); // career leader, worst week
+        const p2 = await User.create({ deviceId: 'p2', lifetimeBanked: 5_000 });
+        const p3 = await User.create({ deviceId: 'p3', lifetimeBanked: 900 });
+        const p4 = await User.create({ deviceId: 'p4', lifetimeBanked: 10 }); // week leader, worst career
+        const p5 = await User.create({ deviceId: 'p5', lifetimeBanked: 300 });
+        const p6 = await User.create({ deviceId: 'p6', lifetimeBanked: 50 });
+        // insertion order (50, 320, 80, 500, 130, 200) is neither ascending nor descending —
+        // the target order below is 500, 320, 200, 130, 80, 50
+        await BankEvent.create({ userId: p1._id, amount: 50, timestamp: at(4) });
+        await BankEvent.create({ userId: p2._id, amount: 320, timestamp: at(5) });
+        await BankEvent.create({ userId: p3._id, amount: 80, timestamp: at(6) });
+        await BankEvent.create({ userId: p4._id, amount: 500, timestamp: at(4) });
+        await BankEvent.create({ userId: p5._id, amount: 130, timestamp: at(6) });
+        await BankEvent.create({ userId: p6._id, amount: 200, timestamp: at(5) });
 
         const top = await topEarnersInWindow(at(3), at(7), 10);
-        expect(top).toHaveLength(2);
-        expect(top[0].userId.toString()).toBe(weekLeader._id.toString());
-        expect(top[0].earned).toBe(500);
-        expect(top[1].userId.toString()).toBe(careerLeader._id.toString());
-        expect(top[1].earned).toBe(50);
+        expect(top).toHaveLength(6);
+        expect(top.map(t => t.earned)).toEqual([500, 320, 200, 130, 80, 50]);
+        // ties the career inversion to specific players, not just the numbers
+        expect(top[0].userId.toString()).toBe(p4._id.toString());
+        expect(top[5].userId.toString()).toBe(p1._id.toString());
     });
 
     it('honours the limit', async () => {
