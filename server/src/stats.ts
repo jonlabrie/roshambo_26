@@ -2,6 +2,7 @@ import { Types } from 'mongoose';
 import BankEvent from './models/BankEvent';
 import StreakEvent from './models/StreakEvent';
 import PlayerRound from './models/PlayerRound';
+import User from './models/User';
 import { Window } from './windows';
 import { earningsInWindow } from './leaderboards';
 import { roundsPresent } from './sessions';
@@ -122,4 +123,50 @@ export async function playerRates(
         captureRate: built > 0 ? earned / built : null,
         participationRate: present > 0 ? throws / present : null,
     };
+}
+
+// HEAT — "who is on a tear right now" (spec §3). Deliberately unqualified and deliberately
+// independent of career standing: a newcomer must be able to top it while ranking nowhere
+// all-time. It is FORM, not standing, and whatever shows it must say so.
+//
+// The optional `userIds` is how a board becomes LOCAL. BankEvent carries no instanceId, and
+// adding one would need a Roblox client change — but it is not needed: presence already knows
+// who is in an instance, so "the leader in this server" means ranking the people currently
+// here by their own window figures. That is also the more honest reading: a player who earned
+// elsewhere and then walked in is genuinely one of the hottest players in the room.
+export async function heatBoard(
+    w: Window,
+    limit: number,
+    userIds?: Types.ObjectId[]
+): Promise<{ userId: Types.ObjectId; earned: number }[]> {
+    if (userIds && userIds.length === 0) return [];
+    const match: Record<string, unknown> = { timestamp: { $gte: w.from, $lt: w.to } };
+    if (userIds) match.userId = { $in: userIds };
+
+    const rows = await BankEvent.aggregate([
+        { $match: match },
+        { $group: { _id: '$userId', earned: { $sum: '$amount' } } },
+        { $sort: { earned: -1 } },
+        { $limit: limit },
+    ]);
+    return rows.map(r => ({ userId: r._id as Types.ObjectId, earned: r.earned as number }));
+}
+
+// THE LIVE BOARD. StreakEvent holds only COMPLETED runs, so a streak in progress — the most
+// exciting number in the game while it lasts — appears in none of the above. This reads the
+// running counter instead. `currentStreak` survives banking (wallet.ts resets only
+// stakingStreak), so a cautious banker riding a long run still shows here.
+//
+// Restricted by `userIds` the same way heatBoard is, so a server can ask "who is on the
+// longest run in THIS room right now".
+export async function liveStreaks(
+    limit: number,
+    userIds?: Types.ObjectId[]
+): Promise<{ userId: Types.ObjectId; length: number }[]> {
+    if (userIds && userIds.length === 0) return [];
+    const filter: Record<string, unknown> = { currentStreak: { $gt: 0 } };
+    if (userIds) filter._id = { $in: userIds };
+
+    const rows = await User.find(filter).sort({ currentStreak: -1 }).limit(limit).select('currentStreak');
+    return rows.map(u => ({ userId: u._id as Types.ObjectId, length: u.currentStreak }));
 }

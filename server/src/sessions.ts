@@ -140,3 +140,10 @@ export async function closeStaleSessions(olderThan: Date): Promise<number> {
     }
     return stale.length;
 }
+
+// WHO IS IN THIS INSTANCE RIGHT NOW. An open session in the instance IS presence — this is the
+// same state reconcilePresence maintains, read rather than written.
+export async function presentIn(instanceId: string): Promise<Types.ObjectId[]> {
+    const rows = await Session.find({ instanceId, endedAt: { $exists: false } }).select('userId');
+    return [...new Set(rows.map(r => r.userId.toString()))].map(id => new Types.ObjectId(id));
+}

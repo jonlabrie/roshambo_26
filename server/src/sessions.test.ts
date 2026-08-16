@@ -3,7 +3,7 @@ import { connectTestDb, clearTestDb, disconnectTestDb } from './test/db';
 import User from './models/User';
 import Round from './models/Round';
 import Session from './models/Session';
-import { openSession, closeSession, touchSession, touchSessions, roundsPresent, reconcilePresence, closeStaleSessions } from './sessions';
+import { openSession, closeSession, touchSession, touchSessions, roundsPresent, reconcilePresence, closeStaleSessions, presentIn } from './sessions';
 
 // Module scope: Task 5 appends a second `describe` to this file and reuses this helper.
 const at = (min: number) => new Date(Date.UTC(2026, 7, 16, 12, min, 0));
@@ -190,5 +190,35 @@ describe('presence reconciliation', () => {
         await reconcilePresence('liveInstance', [a._id], at(20));
         await Session.updateMany({}, { $set: { lastSeenAt: at(20) } });
         expect(await closeStaleSessions(at(10))).toBe(0);
+    });
+});
+
+describe('presentIn', () => {
+    it('returns the players whose session in that instance is still open', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        const b = await User.create({ deviceId: 'b' });
+        await reconcilePresence('inst-A', [a._id, b._id], at(0));
+        const ids = await presentIn('inst-A');
+        expect(ids.map(String).sort()).toEqual([a._id.toString(), b._id.toString()].sort());
+    });
+
+    it('omits players who have left', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        const b = await User.create({ deviceId: 'b' });
+        await reconcilePresence('inst-A', [a._id, b._id], at(0));
+        await reconcilePresence('inst-A', [a._id], at(5));
+        expect((await presentIn('inst-A')).map(String)).toEqual([a._id.toString()]);
+    });
+
+    it('does not leak players from another instance', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        const b = await User.create({ deviceId: 'b' });
+        await reconcilePresence('inst-A', [a._id], at(0));
+        await reconcilePresence('inst-B', [b._id], at(0));
+        expect((await presentIn('inst-A')).map(String)).toEqual([a._id.toString()]);
+    });
+
+    it('returns an empty list for an unknown instance', async () => {
+        expect(await presentIn('nobody-here')).toEqual([]);
     });
 });

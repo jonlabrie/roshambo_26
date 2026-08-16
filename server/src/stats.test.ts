@@ -4,7 +4,7 @@ import User from './models/User';
 import BankEvent from './models/BankEvent';
 import StreakEvent from './models/StreakEvent';
 import PlayerRound from './models/PlayerRound';
-import { longestStreaks, biggestBanks, biggestRounds, throwsInWindow, forfeitsInWindow, playerRates } from './stats';
+import { longestStreaks, biggestBanks, biggestRounds, throwsInWindow, forfeitsInWindow, playerRates, heatBoard, liveStreaks } from './stats';
 import { settleRound } from './engine/Settlement';
 import { ThrowEntry } from './engine/RoundEngine';
 
@@ -194,5 +194,55 @@ describe('rates and qualification', () => {
         await PlayerRound.create({ userId: a._id, roundId: 'r1', playerThrow: 'R', playerResult: 'SAFE', pointsDelta: 0, timestamp: at(12) });
         const rates = await playerRates(a._id, W, 1);
         expect(rates.captureRate).toBeNull();
+    });
+});
+
+describe('heat', () => {
+    it('ranks by window earnings, ignoring career standing', async () => {
+        const veteran = await User.create({ deviceId: 'veteran', lifetimeBanked: 90_000 });
+        const newcomer = await User.create({ deviceId: 'newcomer', lifetimeBanked: 3 });
+        await BankEvent.create({ userId: veteran._id, amount: 10, timestamp: at(12) });
+        await BankEvent.create({ userId: newcomer._id, amount: 400, timestamp: at(12) });
+        const rows = await heatBoard(W, 10);
+        expect(rows.map(r => r.userId.toString())).toEqual([newcomer._id.toString(), veteran._id.toString()]);
+    });
+
+    it('restricted to a set of players, ranks only those players', async () => {
+        const here = await User.create({ deviceId: 'here' });
+        const elsewhere = await User.create({ deviceId: 'elsewhere' });
+        await BankEvent.create({ userId: elsewhere._id, amount: 5000, timestamp: at(12) });
+        await BankEvent.create({ userId: here._id, amount: 5, timestamp: at(12) });
+        const rows = await heatBoard(W, 10, [here._id]);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].userId.toString()).toBe(here._id.toString());
+    });
+
+    it('is empty when the restricted set has banked nothing in the window', async () => {
+        const here = await User.create({ deviceId: 'here' });
+        expect(await heatBoard(W, 10, [here._id])).toEqual([]);
+    });
+});
+
+describe('live streaks', () => {
+    it('ranks players by their running streak, longest first', async () => {
+        await User.create({ deviceId: 'a', currentStreak: 2 });
+        await User.create({ deviceId: 'b', currentStreak: 9 });
+        expect((await liveStreaks(10)).map(r => r.length)).toEqual([9, 2]);
+    });
+
+    it('omits players who are not on a streak', async () => {
+        await User.create({ deviceId: 'a', currentStreak: 0 });
+        await User.create({ deviceId: 'b', currentStreak: 4 });
+        const rows = await liveStreaks(10);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].length).toBe(4);
+    });
+
+    it('restricted to a set of players, ranks only those players', async () => {
+        const here = await User.create({ deviceId: 'here', currentStreak: 3 });
+        await User.create({ deviceId: 'elsewhere', currentStreak: 30 });
+        const rows = await liveStreaks(10, [here._id]);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].length).toBe(3);
     });
 });
