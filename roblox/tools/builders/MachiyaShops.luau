@@ -59,6 +59,23 @@ MachiyaShops.hanabiya = {
 -- front's highest hit, 113.30 -- reads on the same promenade grade as 花火屋's
 -- 113.10. Back spread is 9.26 (111.82 to 121.08): the south edge climbs into the
 -- terrain cut, unevenly -- matches the pattern, not treated as a floor problem.
+-- AS-BUILT OVERRIDES — the owner hand-rotated and moved BOTH kimono racks into
+-- the corners in Studio on 2026-08-15 ("the racks were sort of in the way so
+-- I've rotated them and moved them into the corners"): the round-2 splayed pair
+-- blocked the floor. These are READ-BACK numbers from the live place (Edit
+-- datamodel), not proposals — do not re-derive them, and do NOT symmetrize
+-- them: the two yaws are not mirror images because this is free-hand placement.
+-- Same pattern as the path builders' terminusRock/steps.ranges: data a builder
+-- cannot re-derive is stored, everything else stays derived. `rel` is the
+-- RAIL-CENTRE offset from the ENVELOPE CENTRE (cx, cz), so an envelope nudge
+-- carries the racks with it; the rack internals (posts at ±span/2 along the
+-- rail, cloths spaced between them, all sizes) are still derived and were
+-- verified to land on the owner's per-part reads within 0.001.
+local APPAREL_RACK_OVERRIDES = {
+    { name = "KimonoRackWest", rel = { -6.786, -2.407 }, yaw = -105.86 },
+    { name = "KimonoRackEast", rel = { 6.451, -3.394 }, yaw = 129.97 },
+}
+
 -- EAST EDGE RE-REGISTERED AT THE ROUND-1 GATE: the massing block's surveyed
 -- x1 = 2.30 was STALE against the built neighbour — it ran ~3.97 studs into
 -- 花火屋 (west face x = -1.67). The block predates the built shop, and the
@@ -94,35 +111,30 @@ MachiyaShops.apparel = {
             -- The customer floor's shared lines: counter centre at 花火屋's 4.4 standoff
             -- (COUNTER_STANDOFF, measured to the CENTRE, exactly as Machiya.luau does it),
             -- table midway between the frontage clearance line (z0 + 1.2) and the
-            -- counter's front face. The rack group registers to the table.
+            -- counter's front face.
             local counterZ = env.z1 - 4.4
             local tableZ = ((env.z0 + 1.2) + (counterZ - 1.0)) / 2
 
-            -- ----- two kimono racks flanking the fold table on a diagonal -----
-            -- MOVED OFF THE FRONTAGE at the round-2 gate: standing in the open bays they
-            -- crowded the entrance. One rack either side of the table, splayed 35° and
-            -- mirror-imaged about the table's centre line — each rack's OUTER end swings
-            -- toward the frontage, so the pair opens toward the door and the group reads
-            -- as one display mid-floor, doorways left clear. TWO cloths per rack (the
-            -- owner's round-2 call: three thin ones read banner-ish, not garment-ish),
-            -- width still derived from the rack's own span. Rail and cloth stay
-            -- non-colliding; the posts collide, furniture you walk around. Rotation goes
-            -- through Spec.rotY/rotYMat only — the arch-stable helpers.
+            -- ----- the kimono racks: AS-BUILT, the owner's hand placement -----
+            -- Emitted at APPAREL_RACK_OVERRIDES' rail centres and yaws (see that table's
+            -- comment: read-back 2026-08-15, do not re-derive). Only the placement is
+            -- owner data — the members are still derived from the rack's own span: posts
+            -- at ±span/2 along the rail, two ~1.95 cloths between them (0.1 apart, 0.05
+            -- to each post). Rail and cloth stay non-colliding; the posts collide,
+            -- furniture you walk around. Rotation goes through Spec.rotY/rotYMat only —
+            -- the arch-stable helpers.
             local POST = 0.3
             local POST_H = 5.5
             local RACK_SPAN = 4.4 -- post centre to centre: two ~1.95-wide cloths' worth
             local CLOTH_W = (RACK_SPAN - 0.5) / 2 -- 0.1 between cloths, 0.05 to each post
-            local RACK_DX = 4.5 -- table centre to rack centre; ends clear the walls AND the table
-            local RACK_YAW = 35 -- first attempt, for the owner to judge
-            for _, rk in { { "KimonoRackWest", -1 }, { "KimonoRackEast", 1 } } do
-                local rackName, side = rk[1] :: string, rk[2] :: number
-                local rcx = env.cx + side * RACK_DX
-                local yaw = side * RACK_YAW -- west −35 / east +35: outer ends swing north
-                local rot = Spec.rotYMat(yaw)
+            for ri, rk in APPAREL_RACK_OVERRIDES do
+                local rcx = env.cx + rk.rel[1]
+                local rcz = env.cz + rk.rel[2]
+                local rot = Spec.rotYMat(rk.yaw)
                 -- world position of a point dx along the rack's own long axis
                 local function at(dx: number, y: number): { number }
-                    local o = Spec.rotY({ dx, 0, 0 }, yaw)
-                    return { rcx + o[1], y, tableZ + o[3] }
+                    local o = Spec.rotY({ dx, 0, 0 }, rk.yaw)
+                    return { rcx + o[1], y, rcz + o[3] }
                 end
                 local kids: { any } = {}
                 for _, pside in { { "W", -1 }, { "E", 1 } } do
@@ -152,7 +164,7 @@ MachiyaShops.apparel = {
                         CanTouch = false,
                     })
                 )
-                local cOff = if side == 1 then 1 else 0 -- mirror the colour order too
+                local cOff = ri - 1 -- mirror the colour order between the two racks
                 for i = 1, 2 do
                     -- hem 1.5 off the floor: hung cloth, not a curtain wall
                     table.insert(
@@ -168,7 +180,7 @@ MachiyaShops.apparel = {
                         })
                     )
                 end
-                table.insert(out, Spec.model(rackName, kids))
+                table.insert(out, Spec.model(rk.name, kids))
             end
 
             -- ----- the counter: 花火屋's rule, 花火屋's number -----
