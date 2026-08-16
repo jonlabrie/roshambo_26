@@ -215,11 +215,37 @@ describe('socket adapter wire format', () => {
     });
 
     describe('get-stats-surface', () => {
+        // FROZEN CLOCK, scoped to this describe only — the outer file's own
+        // 'heartbeats the PWA session' test (above) already does its own
+        // vi.spyOn(Date, 'now').mockRestore() dance around engine.tick(), and nesting a
+        // second, differently-scoped fake-timer regime around that would be a needless way
+        // to reintroduce exactly the kind of clock interaction this fix removes.
+        //
+        // Only Date is faked ('toFake: [\'Date\']'): socket.io's own ping/reconnect timers,
+        // this file's `waitFor` helper, and the outer file's `vi.waitFor` teardown poll all
+        // keep running on REAL timers, so only "what time is it" is under test control, not
+        // "how much wall-clock time has passed".
+        //
+        // WHY THIS WAS NEEDED: the handler's rolling heat window is [now-1h, now) computed
+        // from `new Date()` INSIDE the handler at request time (socketAdapter.ts), and `to`
+        // in that window IS that `now` — `$lt: to` excludes a row whose timestamp equals it.
+        // A BankEvent/StreakEvent seeded with a real `new Date()` a moment before the emit is
+        // one millisecond collision away from landing outside that window. Freezing the clock
+        // and seeding at a fixed offset removes the race instead of just making it rarer.
+        beforeEach(() => {
+            vi.useFakeTimers({ toFake: ['Date'] });
+            vi.setSystemTime(new Date('2026-08-16T12:00:00Z'));
+        });
+        afterEach(() => vi.useRealTimers());
+        // 30 minutes before the frozen "now": inside the rolling hour window ([11:00, 12:00))
+        // and inside the calendar day window (all of 2026-08-16 UTC) at once.
+        const IN_WINDOW = new Date('2026-08-16T11:30:00Z');
+
         it('emits the day records and the hour heat board, same queries as /api/v1/stats', async () => {
             await initPromise;
             const a = await User.create({ deviceId: 'devA', displayName: 'Ayaka' });
-            await StreakEvent.create({ userId: a._id, length: 5, endedBy: 'LOSS', endedAt: new Date() });
-            await BankEvent.create({ userId: a._id, amount: 30, timestamp: new Date() });
+            await StreakEvent.create({ userId: a._id, length: 5, endedBy: 'LOSS', endedAt: IN_WINDOW });
+            await BankEvent.create({ userId: a._id, amount: 30, timestamp: IN_WINDOW });
 
             const surfaceP = waitFor<any>(client, 'stats-surface');
             client.emit('get-stats-surface');
@@ -245,8 +271,8 @@ describe('socket adapter wire format', () => {
 
         it('never returns a deviceId', async () => {
             const a = await User.create({ deviceId: 'secret-device', displayName: 'Ayaka' });
-            await StreakEvent.create({ userId: a._id, length: 5, endedBy: 'LOSS', endedAt: new Date() });
-            await BankEvent.create({ userId: a._id, amount: 30, timestamp: new Date() });
+            await StreakEvent.create({ userId: a._id, length: 5, endedBy: 'LOSS', endedAt: IN_WINDOW });
+            await BankEvent.create({ userId: a._id, amount: 30, timestamp: IN_WINDOW });
 
             const surfaceP = waitFor<any>(client, 'stats-surface');
             client.emit('get-stats-surface');
