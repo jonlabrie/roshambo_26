@@ -87,42 +87,53 @@ MachiyaShops.apparel = {
             local FLOOR = env.floorY
             local out: { any } = {}
 
-            -- The archetype's frontage planes, restated (Machiya.luau): 5 posts at
-            -- t = (i-1)/4 across [x0, x1] make 4 bays; the OUTER two are closed, so the
-            -- two open bays — trivially "the two westmost open bays" — are bays 2 and 3.
-            local bay2CX = env.x0 + env.w * 0.375
-            local bay3CX = env.x0 + env.w * 0.625
             -- WallBack's INNER face: STUCCO_SETBACK 0.30 + WALL_T 0.5 off z1, the
             -- archetype's own planes — the shelf registers to the BUILT wall, not to the
             -- envelope (docs/wiki/practice/roblox-walls-register-to-structure).
             local wallInnerZ = env.z1 - 0.8
+            -- The customer floor's shared lines: counter centre at 花火屋's 4.4 standoff
+            -- (COUNTER_STANDOFF, measured to the CENTRE, exactly as Machiya.luau does it),
+            -- table midway between the frontage clearance line (z0 + 1.2) and the
+            -- counter's front face. The rack group registers to the table.
+            local counterZ = env.z1 - 4.4
+            local tableZ = ((env.z0 + 1.2) + (counterZ - 1.0)) / 2
 
-            -- ----- two kimono racks, one per open bay, 1.2 inside the frontage plane -----
-            -- The bays are ADJACENT, so a rack is SIZED FROM ITS BAY, not from a literal —
-            -- the round-1 gate narrowed the envelope and racks sized for the old width
-            -- would have crossed at the shared mid-post. Facing posts keep a 0.2 clear
-            -- gap, and the cloths take what the span holds (the design's 2.2 width never
-            -- fit two adjacent bays; thin it, never push it through a neighbour). Rail
-            -- and cloth are non-colliding so the open bays STAY doors; the posts collide,
-            -- like furniture you walk around.
-            local rackZ = env.z0 + 1.2
+            -- ----- two kimono racks flanking the fold table on a diagonal -----
+            -- MOVED OFF THE FRONTAGE at the round-2 gate: standing in the open bays they
+            -- crowded the entrance. One rack either side of the table, splayed 35° and
+            -- mirror-imaged about the table's centre line — each rack's OUTER end swings
+            -- toward the frontage, so the pair opens toward the door and the group reads
+            -- as one display mid-floor, doorways left clear. TWO cloths per rack (the
+            -- owner's round-2 call: three thin ones read banner-ish, not garment-ish),
+            -- width still derived from the rack's own span. Rail and cloth stay
+            -- non-colliding; the posts collide, furniture you walk around. Rotation goes
+            -- through Spec.rotY/rotYMat only — the arch-stable helpers.
             local POST = 0.3
             local POST_H = 5.5
-            local BAY_W = env.w / 4 -- the frontage's 5 posts make 4 equal bays
-            local RACK_SPAN = BAY_W - POST - 0.2 -- post centre to centre; 0.2 clear between racks
-            local CLOTH_W = (RACK_SPAN - 0.6) / 3 -- 0.1 gaps between cloths, 0.05 to each post
-            for r, rackCX in { bay2CX, bay3CX } do
+            local RACK_SPAN = 4.4 -- post centre to centre: two ~1.95-wide cloths' worth
+            local CLOTH_W = (RACK_SPAN - 0.5) / 2 -- 0.1 between cloths, 0.05 to each post
+            local RACK_DX = 4.5 -- table centre to rack centre; ends clear the walls AND the table
+            local RACK_YAW = 35 -- first attempt, for the owner to judge
+            for _, rk in { { "KimonoRackWest", -1 }, { "KimonoRackEast", 1 } } do
+                local rackName, side = rk[1] :: string, rk[2] :: number
+                local rcx = env.cx + side * RACK_DX
+                local yaw = side * RACK_YAW -- west −35 / east +35: outer ends swing north
+                local rot = Spec.rotYMat(yaw)
+                -- world position of a point dx along the rack's own long axis
+                local function at(dx: number, y: number): { number }
+                    local o = Spec.rotY({ dx, 0, 0 }, yaw)
+                    return { rcx + o[1], y, tableZ + o[3] }
+                end
                 local kids: { any } = {}
-                for _, side in { { "W", -1 }, { "E", 1 } } do
+                for _, pside in { { "W", -1 }, { "E", 1 } } do
                     table.insert(
                         kids,
-                        Spec.part(`RackPost{side[1]}`, {
+                        Spec.part(`RackPost{pside[1]}`, {
                             Size = { POST, POST_H, POST },
-                            CFrame = Spec.cframe({
-                                rackCX + (side[2] :: number) * RACK_SPAN / 2,
-                                FLOOR + POST_H / 2,
-                                rackZ,
-                            }),
+                            CFrame = Spec.cframe(
+                                at((pside[2] :: number) * RACK_SPAN / 2, FLOOR + POST_H / 2),
+                                rot
+                            ),
                             Color = palette.timber,
                             Material = "Wood",
                         })
@@ -133,26 +144,23 @@ MachiyaShops.apparel = {
                     kids,
                     Spec.part("RackRail", {
                         Size = { RACK_SPAN + POST, 0.2, 0.2 },
-                        CFrame = Spec.cframe({ rackCX, FLOOR + POST_H - 0.1, rackZ }),
+                        CFrame = Spec.cframe(at(0, FLOOR + POST_H - 0.1), rot),
                         Color = palette.timber,
                         Material = "Wood",
-                        CanCollide = false, -- at 5.4 it would clothesline a 6-stud avatar entering the bay
+                        CanCollide = false, -- at 5.4 it would clothesline a 6-stud avatar
                         CanQuery = false,
                         CanTouch = false,
                     })
                 )
-                for i = 1, 3 do
+                local cOff = if side == 1 then 1 else 0 -- mirror the colour order too
+                for i = 1, 2 do
                     -- hem 1.5 off the floor: hung cloth, not a curtain wall
                     table.insert(
                         kids,
                         Spec.part(`RackCloth_{i}`, {
                             Size = { CLOTH_W, 3.8, 0.15 },
-                            CFrame = Spec.cframe({
-                                rackCX + (i - 2) * (CLOTH_W + 0.1),
-                                FLOOR + 3.4,
-                                rackZ,
-                            }),
-                            Color = if (r + i) % 2 == 0 then palette.vermilion else palette.water,
+                            CFrame = Spec.cframe(at((i - 1.5) * (CLOTH_W + 0.1), FLOOR + 3.4), rot),
+                            Color = if (i + cOff) % 2 == 1 then palette.vermilion else palette.water,
                             Material = "Fabric",
                             CanCollide = false,
                             CanQuery = false,
@@ -160,15 +168,12 @@ MachiyaShops.apparel = {
                         })
                     )
                 end
-                table.insert(out, Spec.model(if r == 1 then "KimonoRackWest" else "KimonoRackEast", kids))
+                table.insert(out, Spec.model(rackName, kids))
             end
 
             -- ----- the counter: 花火屋's rule, 花火屋's number -----
-            -- COUNTER_H from the archetype's consts; 2.0 deep; 60% of the envelope width;
-            -- centre 4.4 off the back wall (COUNTER_STANDOFF, measured to the CENTRE,
-            -- exactly as Machiya.luau does it).
+            -- COUNTER_H from the archetype's consts; 2.0 deep; 60% of the envelope width.
             local counterW = env.w * 0.6
-            local counterZ = env.z1 - 4.4
             table.insert(
                 out,
                 Spec.part("Counter", {
@@ -180,11 +185,9 @@ MachiyaShops.apparel = {
             )
 
             -- ----- the fold table, mid-floor -----
-            -- Mid-CUSTOMER-floor: halfway between the rack plane and the counter's front
-            -- face, not the envelope's cz (which sits 1.2 off the counter — a table there
-            -- pokes into it).
+            -- Mid-CUSTOMER-floor at the hoisted tableZ, not the envelope's cz (which
+            -- sits 1.2 off the counter — a table there pokes into it).
             local TOP_T = 0.2
-            local tableZ = (rackZ + (counterZ - 1.0)) / 2
             local tKids: { any } = {}
             table.insert(
                 tKids,
