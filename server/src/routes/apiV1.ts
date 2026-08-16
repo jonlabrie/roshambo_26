@@ -389,7 +389,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             if (!robloxUserId) { res.status(400).json({ error: 'BAD_REQUEST' }); return; }
             const user = await resolveUser({ robloxUserId });
             if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
-            const updated = await bankPot(user._id.toString());
+            const updated = await bankPot(user._id.toString(), 'roblox');
             if (!updated) { res.status(409).json({ error: 'NOTHING_STAKED' }); return; }
             res.json({
                 totalPoints: updated.totalPoints,

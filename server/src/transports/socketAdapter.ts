@@ -219,7 +219,7 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
             try {
                 const user = await resolveUser({ userId, deviceId: data.deviceId });
                 if (!user) return;
-                const updated = await bankPot(user._id.toString());
+                const updated = await bankPot(user._id.toString(), 'pwa');
                 if (updated) {
                     socket.emit('player-data', { user: updated, history: await personalHistory(updated) });
                 }
