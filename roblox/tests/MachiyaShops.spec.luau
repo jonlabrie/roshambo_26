@@ -207,85 +207,6 @@ local function rotAABB(p)
     return lo, hi
 end
 
-describe("signage — apparel's sode-kanban (blade sign)", function()
-    local shop = MachiyaShops.apparel
-    local e = shop.envelope
-    local m = Machiya.build(ZenDojo.palette, ArenaLayout, shop)
-    local blade = find(m, "SodeKanban")
-
-    test("the blade REPLACES the wall kanban", function()
-        expect(blade ~= nil).toBe(true)
-        expect(find(m, "Kanban") == nil).toBe(true)
-        local frames = 0
-        for _, c in m.children do
-            if (c.name :: string):sub(1, 11) == "KanbanFrame" then
-                frames += 1
-            end
-        end
-        expect(frames).toBe(0)
-    end)
-
-    test("it stands PERPENDICULAR to the facade, projecting into the street", function()
-        local board = find(blade, "BladeBoard")
-        expect(board ~= nil).toBe(true)
-        -- thin in x: the board's faces look east/west, down the promenade
-        expect(board.properties.Size[1] < 0.3).toBe(true)
-        expect(board.properties.Size[2] >= 3.5).toBe(true)
-        -- wholly north of the upper wall's street face (the stucco box at z0 + 0.30)
-        local plo, phi = rotAABB(board)
-        expect(phi[3] <= e.z0 + 0.30 + 1e-6).toBe(true)
-        -- and inside the eave's own drip line: no NEW promenade encroachment
-        expect(plo[3] >= e.z0 - 2.5).toBe(true)
-    end)
-
-    test("its lettering is VERTICAL — one label per character, descending, both faces", function()
-        local board = find(blade, "BladeBoard")
-        local chars = { "呉", "服", "屋" }
-        for _, fname in { "FaceEast", "FaceWest" } do
-            local face = find(board, fname)
-            expect(face ~= nil).toBe(true)
-            expect(face.properties.SizingMode).toBe("PixelsPerStud")
-            local prevY = -1
-            for i, ch in chars do
-                local label = find(face, `Char{i}`)
-                expect(label ~= nil).toBe(true)
-                expect(label.properties.Text).toBe(ch)
-                local pos = label.properties.Position.UDim2
-                expect(pos[1][1]).toBe(0) -- one column
-                expect(pos[2][1] > prevY).toBe(true) -- reading DOWN: tategaki
-                prevY = pos[2][1]
-            end
-            expect(find(face, "Char4") == nil).toBe(true)
-        end
-    end)
-
-    test("gold on black lacquer: light characters on a dark board", function()
-        local board = find(blade, "BladeBoard")
-        local label = find(find(board, "FaceEast"), "Char1")
-        local panel = board.properties.Color
-        local inkC = label.properties.TextColor3
-        local diff = (inkC[1] + inkC[2] + inkC[3]) - (panel[1] + panel[2] + panel[3])
-        expect(diff > 1).toBe(true)
-    end)
-
-    test("it clears the avatar, the hisashi and the roof spring", function()
-        local eave = find(m, "Eave")
-        local _, ehi = rotAABB(eave)
-        for _, p in allParts(blade) do
-            local plo, phi = rotAABB(p)
-            -- the WHOLE blade lives above the hisashi: open air, nothing occluded
-            expect(plo[2] > ehi[2]).toBe(true)
-            -- and under the main roof's spring line (floor + storeys = +14)
-            expect(phi[2] < e.floorY + 14.0 - 0.1).toBe(true)
-        end
-        -- the kamoi rule restated for the street: the underside never dips
-        -- below the shop's own 6.8 head clearance
-        local board = find(blade, "BladeBoard")
-        local blo = rotAABB(board)
-        expect(blo[2] >= e.floorY + 6.8).toBe(true)
-    end)
-end)
-
 describe("signage — accessories' kake-kanban (hanging plaque)", function()
     local shop = MachiyaShops.accessories
     local e = shop.envelope
@@ -386,6 +307,12 @@ describe("signage — full-extent audit: the signs touch NOTHING they don't moun
         for _, sp in signParts do
             local slo, shi = rotAABB(sp)
             for _, op in allParts(m) do
+                -- the Threshold is the shop's invisible trigger VOLUME, deliberately
+                -- spanning the whole floor to the eave line — customers stand inside
+                -- it; it is not geometry, so standing in it is not a collision
+                if op.name == "Threshold" then
+                    continue
+                end
                 if not inSign[op] and not (allowed and allowed[sp.name] == op.name) then
                     local olo, ohi = rotAABB(op)
                     local pen = math.huge
@@ -400,14 +327,198 @@ describe("signage — full-extent audit: the signs touch NOTHING they don't moun
         end
         expect(worst <= 1e-4).toBe(true)
     end
-    test("apparel's blade", function()
+    test("apparel's nobori", function()
         local m = Machiya.build(ZenDojo.palette, ArenaLayout, MachiyaShops.apparel)
-        auditClear(m, "SodeKanban", nil)
+        auditClear(m, "Nobori", nil)
     end)
     test("accessories' plaque", function()
         local m = Machiya.build(ZenDojo.palette, ArenaLayout, MachiyaShops.accessories)
         auditClear(m, "KakeKanban", { PlaqueHookWest = "Eave", PlaqueHookEast = "Eave" })
     end)
+end)
+
+describe("signage — apparel's nobori (the blade was an anachronism)", function()
+    -- Owner gate, round 3: a high perpendicular blade reads Shōwa, not Edo/Meiji —
+    -- period signage sat at human level and the tsushi-nikai was not display space.
+    -- The replacement is a 幟: a cloth banner on a pole at the shop mouth, 呉服屋
+    -- running down it — a cloth merchant advertising with cloth.
+    local shop = MachiyaShops.apparel
+    local e = shop.envelope
+    local m = Machiya.build(ZenDojo.palette, ArenaLayout, shop)
+    local nobori = find(m, "Nobori")
+
+    test("the nobori REPLACES the blade outright — no blade, no wall kanban", function()
+        expect(nobori ~= nil).toBe(true)
+        expect(find(m, "SodeKanban") == nil).toBe(true)
+        expect(find(m, "Kanban") == nil).toBe(true)
+    end)
+
+    test("pole, top bar, base and ties: the banner's rig is all there", function()
+        expect(find(nobori, "NoboriPole") ~= nil).toBe(true)
+        expect(find(nobori, "NoboriBase") ~= nil).toBe(true)
+        local bar = find(nobori, "NoboriBar")
+        expect(bar ~= nil).toBe(true)
+        -- the bar runs ALONG Z (holding the cloth's top edge), not across the street
+        local blo, bhi = rotAABB(bar)
+        expect(bhi[3] - blo[3] > bhi[1] - blo[1]).toBe(true)
+        expect(bhi[3] - blo[3] > bhi[2] - blo[2]).toBe(true)
+        -- ring/tie attachments down the pole side, riding the chain's own joints
+        local ties = 0
+        for _, c in nobori.children do
+            if (c.name :: string):sub(1, 9) == "NoboriTie" then
+                ties += 1
+            end
+        end
+        expect(ties >= 2).toBe(true)
+    end)
+
+    test("the cloth is a JOINED CHAIN, one character per segment, lettered both faces", function()
+        -- same invariant as the noren chain test: each segment's top sits exactly
+        -- on the bottom of the one above, whatever the lean, so the cloth bends
+        -- instead of tearing — and 呉/服/屋 ride the segments top to bottom
+        local chars = { "呉", "服", "屋" }
+        local prevBottom = nil
+        for i, ch in chars do
+            local seg = find(nobori, `Seg{i}`)
+            expect(seg ~= nil).toBe(true)
+            local cf, sz = seg.properties.CFrame, seg.properties.Size
+            local hh = sz[2] / 2
+            -- up vector from the rotation columns: (r01, r11, r21)
+            local top = { cf[1] + cf[5] * hh, cf[2] + cf[8] * hh, cf[3] + cf[11] * hh }
+            local bottom = { cf[1] - cf[5] * hh, cf[2] - cf[8] * hh, cf[3] - cf[11] * hh }
+            if prevBottom then
+                for ax = 1, 3 do
+                    expect(math.abs(top[ax] - prevBottom[ax]) < 1e-6).toBe(true)
+                end
+            end
+            prevBottom = bottom
+            for _, fname in { "FaceEast", "FaceWest" } do
+                local face = find(seg, fname)
+                expect(face ~= nil).toBe(true)
+                local label = find(face, "Char1")
+                expect(label ~= nil).toBe(true)
+                expect(label.properties.Text).toBe(ch)
+            end
+            -- reading DOWN: each segment sits below the one before
+            if i > 1 then
+                local prev = find(nobori, `Seg{i - 1}`)
+                expect(seg.properties.CFrame[2] < prev.properties.CFrame[2]).toBe(true)
+            end
+        end
+        expect(find(nobori, "Seg4") == nil).toBe(true)
+    end)
+
+    test("still-air BY DESIGN: the cloth is not tagged for NorenSway", function()
+        -- NorenSway rebuilds each tagged segment's orientation as
+        -- CFrame.Angles(rx, 0, az) from the X-euler alone — it assumes yaw-0
+        -- street-facing noren panels. These segments face east/west and lean about
+        -- Z, so adoption would need the client script to learn to preserve yaw —
+        -- a client-script change, which is its own gate. Until then, tagging them
+        -- would SNAP the cloth flat on the first frame, so they ship untagged.
+        for i = 1, 3 do
+            local seg = find(nobori, `Seg{i}`)
+            expect(seg.properties.Tags == nil).toBe(true)
+        end
+    end)
+
+    test("the WHOLE nobori stands inside the shop's own envelope", function()
+        -- the promenade is inviolable at ground level (the same rule that makes
+        -- NOREN_BELLY negative); with no sway shipped, the still-air pose IS the
+        -- swept extent
+        for _, p in allParts(nobori) do
+            local plo, phi = rotAABB(p)
+            expect(plo[1] >= e.x0).toBe(true)
+            expect(phi[1] <= e.x1).toBe(true)
+            expect(plo[3] >= e.z0 + 0.3).toBe(true)
+            expect(phi[3] <= e.z1).toBe(true)
+        end
+    end)
+
+    test("it clears the noren's FULL client sway and leaves the doorway walkable", function()
+        -- the noren hem's worst case: rest lean 3.6 + 0.35 jitter, times the
+        -- client's (1 + SWAY) = 1.85 amplitude — hem z <= z0 + 0.06 + 2.6*sin(7.31 deg)
+        local hemMaxZ = e.z0 + 0.06 + 2.6 * math.sin(math.rad((3.6 + 0.35) * 1.85))
+        local pole = find(nobori, "NoboriPole")
+        local plo = rotAABB(pole)
+        expect(plo[3] - hemMaxZ >= 0.1).toBe(true)
+        -- the doorway it flanks keeps a walkable clear opening: from the parked
+        -- door leaf's east edge to the nobori's west face, at least 2.2 studs
+        local leaf = find(m, "DoorLeaf2")
+        expect(leaf ~= nil).toBe(true)
+        local leafEast = leaf.properties.CFrame[1] + leaf.properties.Size[1] / 2
+        local narrowest = math.huge
+        for _, p in allParts(nobori) do
+            narrowest = math.min(narrowest, (rotAABB(p))[1])
+        end
+        expect(narrowest - leafEast >= 2.2).toBe(true)
+    end)
+end)
+
+describe("shop mon — 丸に文字 on every noren", function()
+    -- The owner's ruling: the crest was arguably the era's primary shop
+    -- identifier. A ring enclosing one kanji, resist-dyed white, riding the
+    -- cloth: it lives INSIDE the swaying segment as its SurfaceGui, so the
+    -- segment's own CFrame — the one NorenSway animates — is literally the
+    -- transform that carries it.
+    local CASES = {
+        { key = "hanabiya", char = "花", monPanel = 2, nPanels = 3, nSegs = 3 },
+        { key = "apparel", char = "呉", monPanel = 2, nPanels = 3, nSegs = 5 },
+        -- accessories' pair of wide panels has its doorway centre ON the slit,
+        -- so the mon rides the west panel of each pair (flagged for the gate)
+        { key = "accessories", char = "小", monPanel = 1, nPanels = 2, nSegs = 4 },
+    }
+    for _, case in CASES do
+        test(`{case.key}'s noren carries 丸に{case.char} — one per doorway, on the cloth`, function()
+            local m = Machiya.build(ZenDojo.palette, ArenaLayout, (MachiyaShops :: any)[case.key])
+            -- the open bays, found by their first panel
+            local bays = {}
+            for _, c in m.children do
+                local bay = string.match(c.name :: string, "^Noren(%d+)_1$")
+                if bay then
+                    table.insert(bays, bay)
+                end
+            end
+            expect(#bays).toBe(2) -- two doorways
+            for _, bay in bays do
+                local mons = 0
+                for k = 1, case.nPanels do
+                    local panel = find(m, `Noren{bay}_{k}`)
+                    expect(panel ~= nil).toBe(true)
+                    for si = 1, case.nSegs do
+                        local seg = find(panel, `Seg{si}`)
+                        expect(seg ~= nil).toBe(true)
+                        local mon = if seg.children then find(seg, "Mon") else nil
+                        if mon then
+                            mons += 1
+                            -- ON the animated cloth: the host segment is the
+                            -- NorenSway-tagged part, second from the top (the
+                            -- upper-middle of the panel, where a noren crest sits)
+                            expect(k).toBe(case.monPanel)
+                            expect(si).toBe(2)
+                            expect(seg.properties.Tags[1]).toBe("NorenSeg")
+                            -- the ring: a circular frame with a stroke, facing the street
+                            expect(mon.properties.Face).toBe("Front")
+                            local ring = find(mon, "Ring")
+                            expect(ring ~= nil).toBe(true)
+                            expect(find(ring, "Circle") ~= nil).toBe(true) -- UICorner
+                            expect(find(ring, "Rim") ~= nil).toBe(true) -- UIStroke
+                            local label = find(ring, "Char1")
+                            expect(label ~= nil).toBe(true)
+                            expect(label.properties.Text).toBe(case.char)
+                            -- sized to read without covering the panel: the ring
+                            -- stays within 62% of the panel's width and inside
+                            -- its own segment's face
+                            local diaStuds = ring.properties.Size.UDim2[1][2] / mon.properties.PixelsPerStud
+                            expect(diaStuds <= 0.62 * seg.properties.Size[1]).toBe(true)
+                            expect(diaStuds <= 0.9 * seg.properties.Size[2]).toBe(true)
+                            expect(diaStuds >= 0.25 * seg.properties.Size[1]).toBe(true)
+                        end
+                    end
+                end
+                expect(mons).toBe(1) -- ONE mon per doorway
+            end
+        end)
+    end
 end)
 
 describe("signage — MachiyaEast stays deliberately blank", function()

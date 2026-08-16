@@ -32,6 +32,37 @@ local Machiya = {}
 -- small canvas, never a big canvas with big text.
 -- SHARED by 花火屋's inline sign and every identity-kit sign kind, so the
 -- letterforms can never drift apart between the full-interior path and the kit.
+-- The one label recipe every sign shares — kanjiFace's cells and the mon's
+-- ringed character are the same TextLabel, so the letterforms cannot fork.
+local function kanjiLabel(
+    name: string,
+    ch: string,
+    position: any,
+    size: any,
+    inkColour: { number },
+    textSize: number
+): any
+    return {
+        name = name,
+        className = "TextLabel",
+        properties = {
+            Position = position,
+            Size = size,
+            BackgroundTransparency = 1,
+            Text = ch,
+            TextColor3 = inkColour,
+            TextSize = textSize,
+            -- moot for kanji (the system fallback ignores it) but pins any
+            -- Latin/kana a future sign mixes in to the sign face we tested
+            Font = "GothamBold",
+        },
+    }
+end
+
+-- Shironuki — resist-dyed white, the colour of lettering and crests on dyed
+-- shop cloth (the nobori's characters, every noren's mon).
+local SHIRO = { 0.92, 0.9, 0.85 }
+
 local function kanjiFace(
     name: string,
     text: string,
@@ -56,21 +87,7 @@ local function kanjiFace(
             position = { UDim2 = { { (i - 1) / n, 0 }, { 0, 0 } } }
             size = { UDim2 = { { 1 / n, 0 }, { 1, 0 } } }
         end
-        table.insert(labels, {
-            name = `Char{i}`,
-            className = "TextLabel",
-            properties = {
-                Position = position,
-                Size = size,
-                BackgroundTransparency = 1,
-                Text = ch,
-                TextColor3 = inkColour,
-                TextSize = textSize,
-                -- moot for kanji (the system fallback ignores it) but pins any
-                -- Latin/kana a future sign mixes in to the sign face we tested
-                Font = "GothamBold",
-            },
-        })
+        table.insert(labels, kanjiLabel(`Char{i}`, ch, position, size, inkColour, textSize))
     end
     return {
         name = name,
@@ -83,6 +100,76 @@ local function kanjiFace(
             ZIndexBehavior = "Sibling",
         },
         children = labels,
+    }
+end
+
+-- ===== 丸に文字 — the shop mon (owner's ruling, 2026-08-15 round 3) =====
+-- A ring enclosing one kanji, arguably the era's PRIMARY shop identifier,
+-- resist-dyed white on the noren. It is built as the host segment's own
+-- SurfaceGui — a circular Frame (UICorner) with a stroked rim (UIStroke) and
+-- one kanjiLabel — and NOT as a part pinned in world space, for a mechanical
+-- reason: NorenSway CFrames the tagged segments every frame, and in Roblox a
+-- part does not inherit its parent's CFrame, while a committed .model.json
+-- cannot express the WeldConstraint refs that would bind one. A SurfaceGui
+-- renders in its part's own frame, so the animated segment's transform IS the
+-- mon's transform — it rides the cloth by construction. No image uploads: the
+-- ring is a corner-rounded frame, the character is the shared label recipe.
+local function monFace(char: string, panelW: number, segH: number): any
+    local PPS = 128 -- a small crest wants a dense canvas to stay crisp
+    -- read from the promenade without covering the panel: within 60% of the
+    -- panel's width, and inside the host segment's own face
+    local dia = math.min(0.6 * panelW, 0.9 * segH)
+    -- WHOLE pixels: a UDim2 offset is Int32 in rbx-dom, and rojo REFUSES a float
+    -- there (found the hard way: `[0, 89.9175]` fails the whole model's parse).
+    -- FLOOR, not round: rounding up can push the ring past the sizing cap above.
+    local diaPx = math.floor(dia * PPS)
+    return {
+        name = "Mon",
+        className = "SurfaceGui",
+        properties = {
+            Face = "Front", -- onto the street, like the cloth it rides
+            SizingMode = "PixelsPerStud",
+            PixelsPerStud = PPS,
+            AlwaysOnTop = false,
+            ZIndexBehavior = "Sibling",
+        },
+        children = {
+            {
+                name = "Ring",
+                className = "Frame",
+                properties = {
+                    AnchorPoint = { Vector2 = { 0.5, 0.5 } },
+                    Position = { UDim2 = { { 0.5, 0 }, { 0.5, 0 } } },
+                    Size = { UDim2 = { { 0, diaPx }, { 0, diaPx } } },
+                    BackgroundTransparency = 1,
+                },
+                children = {
+                    -- full corner radius turns the frame into a circle; the
+                    -- stroke follows it, so the rim IS the ring
+                    {
+                        name = "Circle",
+                        className = "UICorner",
+                        properties = { CornerRadius = { UDim = { 0.5, 0 } } },
+                    },
+                    {
+                        name = "Rim",
+                        className = "UIStroke",
+                        properties = {
+                            Thickness = math.max(3, diaPx * 0.09),
+                            Color = SHIRO,
+                        },
+                    },
+                    kanjiLabel(
+                        "Char1",
+                        char,
+                        { UDim2 = { { 0, 0 }, { 0, 0 } } },
+                        { UDim2 = { { 1, 0 }, { 1, 0 } } },
+                        SHIRO,
+                        math.floor(diaPx * 0.6)
+                    ),
+                },
+            },
+        },
     }
 end
 
@@ -1179,12 +1266,21 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
     -- model.json snapshot gates hold that. The width formula below widens the
     -- panels automatically at a lower count; the 0.16 slit between panels is the
     -- constant the whole row shares.
-    local function emitNoren(norenColour: { number }, nSegs: number, perBay: number?)
+    -- monChar (round 3, owner's ruling): ONE 丸に文字 crest per doorway, riding
+    -- the cloth. It attaches to the panel nearest the doorway's centre (the
+    -- middle panel when the count is odd; with an even count the true centre is
+    -- the slit, so it rides the west panel of the pair — flagged for the gate),
+    -- on the SECOND segment from the top: the upper-middle of the hang, where a
+    -- real noren carries its crest, and squarely on a NorenSway-animated part so
+    -- the sway carries the mon. See monFace above for why it must be the
+    -- segment's own SurfaceGui rather than a part in front of the cloth.
+    local function emitNoren(norenColour: { number }, nSegs: number, perBay: number?, monChar: string?)
         if shop.frontage ~= "open" then
             return
         end
         local nPanels = perBay or NOREN_PER_BAY
         local segH = NOREN_H / nSegs
+        local monPanel = math.ceil(nPanels / 2)
         for i = 1, FRONT_POSTS - 1 do
             if not CLOSED[i] then
                 local a, b = postX[i], postX[i + 1]
@@ -1208,6 +1304,11 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
                             Spec.part(`Seg{s}`, {
                                 Size = { panelW, segH, NOREN_T },
                                 CFrame = Spec.cframe({ px, hy - dy / 2, hz + dz / 2 }, rotX(lean)),
+                                children = if monChar
+                                        and k == monPanel
+                                        and s == 2
+                                    then { monFace(monChar, panelW, segH) }
+                                    else nil,
                                 Color = norenColour,
                                 Material = "Fabric",
                                 -- Bare Fabric renders at Roblox's own tile scale, which on a panel
@@ -1234,7 +1335,9 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
     -- counter and the kanban below belong to the firework shop's own full-interior build, not
     -- to the kit — variant shells get theirs through shop.identity instead.
     if shop.interior == "full" then
-        emitNoren(palette.vermilion, NOREN_SEGS)
+        -- 丸に花 — the firework shop's own crest, the first kanji of its name,
+        -- inline like the rest of its identity (owner's round-3 ruling)
+        emitNoren(palette.vermilion, NOREN_SEGS, nil, "花")
     end
 
     -- ----- the counter -----
@@ -1363,8 +1466,13 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
     local identity = shop.identity
     if identity then
         if identity.noren then
-            -- the archetype's own hang, in the shop's colour
-            emitNoren(identity.noren.color, identity.noren.segments or 3, identity.noren.perBay)
+            -- the archetype's own hang, in the shop's colour — and its mon, if named
+            emitNoren(
+                identity.noren.color,
+                identity.noren.segments or 3,
+                identity.noren.perBay,
+                identity.noren.mon
+            )
         end
         if identity.chochin then
             -- THE EAVE-CORNER PAIR, 花火屋's pattern — built by tools/builders/Chochin, the
@@ -1409,9 +1517,12 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
             -- copies of the same board, and the fix is different SILHOUETTES, not
             -- different colours —
             --   kind = "wall"    — 板看板: the framed board on the upper storey (default)
-            --   kind = "blade"   — 袖看板: perpendicular to the facade, projecting into
-            --                      the street, lettered vertically — reads down the
-            --                      promenade where every wall board is edge-on
+            --   kind = "nobori"  — 幟: a cloth banner on a pole at the shop mouth,
+            --                      lettered down its length — reads down the promenade
+            --                      where every wall board is edge-on. (It replaced a
+            --                      袖看板 blade at the round-3 gate: a high
+            --                      perpendicular blade is Shōwa, not Edo/Meiji, and
+            --                      the rejected kind was deleted, not kept.)
             --   kind = "hanging" — 掛看板: a plaque hung under the eave on visible hooks
             -- text letters it (per-character, kanjiFace above; nil stays blank);
             -- panel/ink restyle the board and its characters, defaulting to the wall
@@ -1502,79 +1613,164 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
                         FRAME_VAR
                     )
                 end
-            elseif kind == "blade" then
-                -- 袖看板: a blade standing PERPENDICULAR to the facade, projecting from
-                -- the upper storey out over the hisashi, lettered top-to-bottom on BOTH
-                -- faces — the sign that reads from down the promenade, where every wall
-                -- board is foreshortened to an edge.
-                local BLADE_H = 3.6
-                local BLADE_T = 0.18
-                local ARM = 0.22 -- the two carrying arms' square section
-                local ARM_L = 2.0 -- wall face to the blade's outer (street) edge
-                local WALL_GAP = 0.4 -- board rear edge off the render, clear of proud timber
-                -- x: at one END of the frontage (default west), 1.5 in from the corner —
-                -- inboard enough to clear the eave-corner chōchin's barrel with real air
-                local bx = if type(b) == "table" and b.side == "east" then X1 - 1.5 else X0 + 1.5
-                -- y: the WHOLE blade lives above the hisashi, and its mounting arms
-                -- derive from what they MEET — the upper facade. TWO things bound the
-                -- seat from below:
-                --   * the eave, a tilted slab whose highest point is the +Z (wall-side)
-                --     top edge: mid-plane springs at FLOOR + STOREY_H, plus the slab's
-                --     vertical half-thickness over the pitch (the chōchin hang's own
-                --     sqrt-not-trig math);
-                --   * the upper floor SLAB's exposed edge — the slab spans the full
-                --     envelope, so its edge band (STOREY_H .. STOREY_H + SLAB_T) stands
-                --     0.30 proud of the stucco face the arms mount to; an arm below the
-                --     slab top is buried in it (caught by the full-extent audit).
-                local eaveTopY = FLOOR + STOREY_H + (EAVE_T / 2) * (hisashiLen / EAVE_OVERHANG)
-                local BLADE_CLEAR = 0.35 -- open air between the hisashi and the blade
-                local slabTopY = FLOOR + STOREY_H + SLAB_T
-                local bladeBot = math.max(eaveTopY + BLADE_CLEAR, slabTopY + ARM + 0.1)
-                local bladeTop = bladeBot + BLADE_H
-                -- it must stay under the main roof's spring line, with air
+            elseif kind == "nobori" then
+                -- 幟: a tall cloth banner on a pole at the shop mouth, the name
+                -- running down it. This REPLACED the sode-kanban blade at the round-3
+                -- gate: a perpendicular blade mounted high reads Shōwa, not Edo/Meiji —
+                -- period signage sat at human level and the tsushi-nikai was
+                -- deliberately not display space. The banner does the blade's
+                -- read-down-the-promenade job (faces east/west), and a cloth merchant
+                -- advertising with cloth is thematically right. The blade branch was
+                -- DELETED, not stranded: the owner ruled the type an anachronism for
+                -- this world, so the kit must not keep offering it.
+                --
+                -- SITING (load-bearing): the promenade is inviolable at ground level —
+                -- the same rule that makes NOREN_BELLY negative — so the whole rig
+                -- stands INSIDE the envelope, flanking the frontage's CENTRE post in a
+                -- doorway's clear margin (both doorways' clear thirds meet there: the
+                -- leaves park toward the closed end bays). Everything above the kamoi
+                -- near the frontage belongs to the transom/girder, so the CLOTH stays
+                -- under HEAD_Y and only the bare pole tip rises past it, in the open
+                -- band between the noren plane and the transom.
                 assert(
-                    bladeTop + ARM <= EAVE_Y - 0.15,
-                    `blade sign top {bladeTop + ARM} crowds the roof spring {EAVE_Y}`
+                    shop.frontage == "open",
+                    "a nobori flanks a doorway: it needs the open frontage's bays"
                 )
-                -- and the kamoi rule, restated for the street: the blade's underside
-                -- must never dip below the shop's own 6.8 head clearance
-                assert(bladeBot >= FLOOR + 6.8, `blade sign underside {bladeBot} is below head height`)
-                local boardZ0 = SZ0 - ARM_L -- outer edge, flush with the arms' ends
-                local boardZ1 = SZ0 - WALL_GAP
-                local kids: { any } = {
-                    Spec.part("BladeBoard", {
-                        Size = { BLADE_T, BLADE_H, ARM_L - WALL_GAP },
-                        CFrame = Spec.cframe({ bx, (bladeBot + bladeTop) / 2, (boardZ0 + boardZ1) / 2 }),
-                        Color = panelColor,
-                        Material = panelMat,
-                        MaterialVariant = panelVar,
+                local POLE_R = 0.09
+                local POLE_H = 7.5 -- top at FLOOR + 7.5: 0.3 under the front girder's soffit
+                local BAR_R = 0.06
+                local CLOTH_W = 1.2 -- along z, hanging from the bar
+                local CLOTH_H = 4.4 -- ~3.7:1, a nobori's proportions
+                local CLOTH_T = 0.05 -- Roblox's minimum, same as the noren
+                -- one segment PER CHARACTER: the chain is the cloth's bend, and the
+                -- characters ride the segments, bending with it
+                local chars: { string } = {}
+                if bText then
+                    for _, code in utf8.codes(bText :: string) do
+                        table.insert(chars, utf8.char(code))
+                    end
+                end
+                local nSegs = math.max(#chars, 3)
+                local segH = CLOTH_H / nSegs
+                -- x: flanking the centre post (default its west side; b.side = "east"
+                -- mirrors it), a hand's clearance off the post face
+                local centrePost = postX[math.ceil(FRONT_POSTS / 2)]
+                local sideSign: number = if type(b) == "table" and b.side == "east" then 1 else -1
+                local px = centrePost + sideSign * (POST_W / 2 + 0.25 + POLE_R)
+                -- z: behind the noren's FULL CLIENT SWAY, not just its rest pose. The
+                -- hem's worst case is rest lean (|NOREN_BELLY| + 0.35 jitter) times
+                -- NorenSway's (1 + SWAY) = 1.85: hem z <= Z0 + 0.06 + 2.6*sin(7.31°)
+                -- ~= Z0 + 0.39. The pole's near face sits at Z0 + 0.53 — 0.14 clear of
+                -- cloth that can never reach further — and the whole rig stays short
+                -- of the transom plane (DOOR_Z - 0.05) wherever it rises past HEAD_Y.
+                local pz = Z0 + 0.62
+                local kids: { any } = {}
+                table.insert(
+                    kids,
+                    Spec.part("NoboriBase", {
+                        Size = { 0.45, 0.28, 0.45 },
+                        CFrame = Spec.cframe({ px, FLOOR + 0.14, pz }),
+                        Color = timber,
+                        Material = "Wood",
+                        MaterialVariant = FRAME_VAR,
+                    })
+                )
+                table.insert(
+                    kids,
+                    Spec.part("NoboriPole", {
+                        Shape = "Cylinder",
+                        Size = { POLE_H, 2 * POLE_R, 2 * POLE_R },
+                        CFrame = Spec.cframe({ px, FLOOR + POLE_H / 2, pz }, Spec.ROT.CYL_VERTICAL),
+                        Color = timber,
+                        Material = "Wood",
+                        MaterialVariant = "CypressVertical",
+                    })
+                )
+                -- the yokobō: the horizontal top bar a nobori actually hangs from,
+                -- running SOUTH from the pole (into the envelope), the pole tip
+                -- standing proud above it the way a real nobori pole does
+                local BAR_L = 0.3 + CLOTH_W + 0.15
+                local barY = FLOOR + 6.62 -- bar top 0.12 under the kamoi line
+                table.insert(
+                    kids,
+                    Spec.part("NoboriBar", {
+                        Shape = "Cylinder",
+                        Size = { BAR_L, 2 * BAR_R, 2 * BAR_R },
+                        CFrame = Spec.cframe({ px, barY, pz - BAR_R + BAR_L / 2 }, Spec.ROT.CYL_ALONG_Z),
+                        Color = timber,
+                        Material = "Wood",
+                        MaterialVariant = "CypressWeathered",
                         CanCollide = false,
                         CanQuery = false,
                         CanTouch = false,
                         CastShadow = false,
-                        -- tategaki on BOTH faces: the promenade runs past it east and west
-                        children = if bText
-                            then {
-                                kanjiFace("FaceEast", bText, "Right", inkColor, 72, 64, true),
-                                kanjiFace("FaceWest", bText, "Left", inkColor, 72, 64, true),
-                            }
-                            else nil,
-                    }),
-                }
-                -- the two carrying arms: rear faces ON the upper wall's street face
-                -- (walls-register-to-structure), outer ends flush with the board's
-                -- outer edge (flush-outside-edges), the board held between them
-                for _, arm in
-                    { { "BladeArmTop", bladeTop + ARM / 2 }, { "BladeArmBottom", bladeBot - ARM / 2 } }
-                do
+                    })
+                )
+                -- the cloth: hung from the bar's underside, drifting gently WEST into
+                -- the doorway's open air (away from the post it flanks) so it reads as
+                -- cloth. Still-air pose only: NorenSway rebuilds tagged segments as
+                -- CFrame.Angles(rx, 0, rz) from the X-euler alone — it assumes yaw-0
+                -- street-facing panels, and these face east/west and lean about Z, so
+                -- adopting it means teaching the client script to preserve yaw: a
+                -- client-script change, which is its own gate. Tagging them today
+                -- would snap the cloth flat on the first frame. So: UNTAGGED.
+                local NOBORI_DRIFT = -2.5 * sideSign -- total lean at the hem, away from the post
+                local clothColor: { number } = if type(b) == "table" and b.panel
+                    then b.panel.color
+                    elseif identity.noren then identity.noren.color
+                    else paper
+                local clothInk: { number } = if type(b) == "table" and b.ink then b.ink.color else SHIRO
+                local clothZ = pz + 0.15 + CLOTH_W / 2
+                local function rotZ(deg: number): { number }
+                    local r = math.rad(deg)
+                    local c, sn = math.cos(r), math.sin(r)
+                    return { c, -sn, 0, sn, c, 0, 0, 0, 1 }
+                end
+                local hx, hy = px, barY - BAR_R
+                local joints: { { number } } = {} -- chain joints, for the ties below
+                for si = 1, nSegs do
+                    local lean = NOBORI_DRIFT * (si / nSegs)
+                    local lr = math.rad(lean)
+                    local dy, dx = math.cos(lr) * segH, math.sin(lr) * segH
+                    local ch = chars[si]
                     table.insert(
                         kids,
-                        Spec.part(arm[1] :: string, {
-                            Size = { ARM, ARM, ARM_L },
-                            CFrame = Spec.cframe({ bx, arm[2] :: number, SZ0 - ARM_L / 2 }),
-                            Color = timber,
-                            Material = "Wood",
-                            MaterialVariant = FRAME_VAR,
+                        Spec.part(`Seg{si}`, {
+                            Size = { CLOTH_T, segH, CLOTH_W },
+                            CFrame = Spec.cframe({ hx + dx / 2, hy - dy / 2, clothZ }, rotZ(lean)),
+                            Color = clothColor,
+                            Material = "Fabric",
+                            MaterialVariant = "NorenCloth",
+                            Transparency = NOREN_ALPHA,
+                            CanCollide = false,
+                            CanQuery = false,
+                            CanTouch = false,
+                            CastShadow = false,
+                            -- one character per segment, on BOTH faces: the banner
+                            -- reads down the promenade from either direction
+                            children = if ch
+                                then {
+                                    kanjiFace("FaceEast", ch, "Right", clothInk, 80, 64, false),
+                                    kanjiFace("FaceWest", ch, "Left", clothInk, 80, 64, false),
+                                }
+                                else nil,
+                        })
+                    )
+                    hx, hy = hx + dx, hy - dy
+                    table.insert(joints, { hx, hy })
+                end
+                -- ring/tie attachments down the pole side, seated ON the chain's own
+                -- joints so they follow the cloth's drift instead of pointing at
+                -- where it used to be
+                for ti, j in joints do
+                    local jx, jy = j[1], j[2]
+                    table.insert(
+                        kids,
+                        Spec.part(`NoboriTie{ti}`, {
+                            Size = { math.abs(jx - px) + 0.12, 0.07, 0.18 },
+                            CFrame = Spec.cframe({ (jx + px) / 2, jy, pz + 0.12 }),
+                            Color = ink,
+                            Material = "Fabric",
                             CanCollide = false,
                             CanQuery = false,
                             CanTouch = false,
@@ -1582,7 +1778,7 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
                         })
                     )
                 end
-                table.insert(children, Spec.model("SodeKanban", kids))
+                table.insert(children, Spec.model("Nobori", kids))
             else
                 -- 掛看板: a plaque hung under the hisashi on two VISIBLE hooks, over the
                 -- doorway. Under the eave is where a kake-kanban lives — it reads by

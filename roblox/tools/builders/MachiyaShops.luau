@@ -93,7 +93,10 @@ MachiyaShops.apparel = {
         -- Deep indigo, the traditional apparel-shop noren. NOT from ZenDojo.palette: its only
         -- blue is `water` { 0.20, 0.35, 0.43 }, a mid teal, not a deep blue — so this is the
         -- design brief's fallback literal, held here for the owner to retune at the gate.
-        noren = { color = { 0.16, 0.18, 0.32 }, segments = 5 },
+        noren = { color = { 0.16, 0.18, 0.32 }, segments = 5, mon = "呉" },
+        -- noren.mon (round 3): 丸に呉 — the ring-and-kanji crest, arguably the
+        -- era's primary shop identifier, resist-dyed white on the cloth. One per
+        -- doorway, riding the swaying segment (see Machiya.luau's monFace).
         -- Pale indigo chōchin — RHYMES with the noren above rather than matching it: the noren
         -- is deep so it reads as cloth, but the paper barrel must stay light or the RoundLantern
         -- glyph (the World Throw) loses contrast against it at night, which is the lantern's
@@ -101,23 +104,18 @@ MachiyaShops.apparel = {
         -- Chochin.build's paperRGB255 doc comment. Chochin.spec.luau's legibility guard holds
         -- this (and every other shop tint) to a 0.55 luminance floor.
         chochin = { paper = { 170, 178, 200 } },
-        -- 袖看板 (owner's signage pass, 2026-08-15): the blade sign standing
-        -- perpendicular to the facade at the WEST end of the frontage — the row's
-        -- approach side, and the far corner from 花火屋's roji — lettered 呉服屋
-        -- (gofukuya, the draper) top-to-bottom on both faces. Panel and ink are
-        -- the classic high-end gofukuya pairing and deliberately the row's
-        -- inversion: BLACK LACQUER carrying GOLD, where 花火屋 is sumi on cream
-        -- plaster — light-on-dark against dark-on-light, so the two signs can
-        -- never read as copies. Gold is the palette's own { 0.83, 0.69, 0.40 };
-        -- the lacquer is a literal (no palette black is this deep) on
-        -- SmoothPlastic, which is as close to urushi gloss as base materials get.
+        -- 幟 (owner's round-3 gate, replacing the round-2 blade): the blade was
+        -- an anachronism — a high perpendicular sign reads Shōwa, not Edo/Meiji —
+        -- so the draper advertises the period way, with CLOTH: a banner on a pole
+        -- at the shop mouth, 呉服屋 running down it, one character per swinging
+        -- segment. The cloth takes the shop's own noren indigo (derived — omit
+        -- `panel` and the kit reads identity.noren.color), lettered SHIRONUKI
+        -- white, the resist-dye pairing every real gofukuya nobori wore. The pole
+        -- flanks the centre post's west side, in the west doorway's clear margin.
         board = {
-            kind = "blade",
+            kind = "nobori",
             text = "呉服屋",
-            vertical = true,
             side = "west",
-            panel = { color = { 0.09, 0.08, 0.08 }, material = "SmoothPlastic" },
-            ink = { color = { 0.83, 0.69, 0.40 } },
         },
         glow = { color = { 1.0, 0.85, 0.6 }, brightness = 1.2 },
         dress = function(ctx: any): { any }
@@ -364,7 +362,7 @@ MachiyaShops.accessories = {
         -- glance. Side-by-side same-family risk is the owner's in-situ judgement call.
         -- perBay = 2: two wider panels per doorway (the archetype's default is 3);
         -- segments is the vertical drape chain, a different axis, unchanged at 4.
-        noren = { color = { 0.07, 0.15, 0.32 }, segments = 4, perBay = 2 },
+        noren = { color = { 0.07, 0.15, 0.32 }, segments = 4, perBay = 2, mon = "小" },
         -- Light moss / green-grey paper — the tint reserved for accessories in the
         -- palette note above. Rec. 709 luminance 0.688 (0.2126*168 + 0.7152*180 +
         -- 0.0722*152, /255), the same level as canonical cream's 0.684 and well clear
