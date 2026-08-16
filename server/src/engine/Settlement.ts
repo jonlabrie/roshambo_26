@@ -4,6 +4,7 @@ import PlayerRound from '../models/PlayerRound';
 import { calculateResult, nextPot, potDelta, nextStreak, Throw, RoundResult } from './GameRules';
 import { ThrowEntry } from './RoundEngine';
 import { resolveUser } from '../identity';
+import StreakEvent from '../models/StreakEvent';
 
 export interface GlobalResult {
     id: string;
@@ -104,7 +105,11 @@ export async function settleRound(data: RoundToSettle): Promise<{ round: GlobalR
                 // would mutate the wallet with no audit row and cause client desync.
                 await PlayerRound.create({
                     deviceId: entry.deviceId,
-                    userId: entry.userId,
+                    // THE RESOLVED user, not entry.userId (the client's claimed JWT id, which is
+                    // absent for a guest playing on a deviceId alone). BankEvent and Session both
+                    // key on the resolved id; a per-user aggregation over PlayerRound that used the
+                    // claimed one would silently omit every guest.
+                    userId: user._id,
                     robloxUserId: entry.robloxUserId,
                     platform: entry.platform,
                     roundId: data.roundId,
@@ -113,6 +118,20 @@ export async function settleRound(data: RoundToSettle): Promise<{ round: GlobalR
                     pointsDelta: delta,
                     timestamp: data.timestamp,
                 });
+
+                // A run just ended. Banking does not end a streak (wallet.ts resets only
+                // stakingStreak), so SAFE and LOSS are the only terminators. Written after the
+                // history row and before the wallet update, matching the existing ordering
+                // rationale: a failure here leaves the player unscored rather than mis-scored.
+                const endedStreak = user.currentStreak || 0;
+                if (result !== 'WIN' && endedStreak > 0) {
+                    await StreakEvent.create({
+                        userId: user._id,
+                        length: endedStreak,
+                        endedBy: result,
+                        endedAt: data.timestamp,
+                    });
+                }
 
                 const forfeited = result === 'LOSS' ? (user.pointsAtStake || 0) : 0;
                 const counters = buildCounterUpdate(entry.throw, result, pot, forfeited);

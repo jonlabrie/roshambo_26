@@ -5,6 +5,7 @@ import Round from '../models/Round';
 import PlayerRound from '../models/PlayerRound';
 import { settleRound, buildCounterUpdate } from './Settlement';
 import { ThrowEntry } from './RoundEngine';
+import StreakEvent from '../models/StreakEvent';
 
 function throwsMap(entries: [string, ThrowEntry][]) { return new Map(entries); }
 
@@ -143,6 +144,64 @@ describe('settleRound', () => {
         // (c) failed participant absent from returned players array
         const absent = result!.players.find(p => p.key === 'roblox:88');
         expect(absent).toBeUndefined();
+    });
+
+    describe('Settlement — capture for the stats surface', () => {
+        it('records the RESOLVED user on PlayerRound, even for a guest with no JWT', async () => {
+            const user = await User.create({ deviceId: 'guest-1' });
+            await settleRound({
+                roundId: 'r-guest', worldThrow: 'S', counts: { R: 1, P: 0, S: 0 },
+                throws: new Map([['guest-1', { deviceId: 'guest-1', platform: 'pwa', throw: 'R', seq: 1 } as ThrowEntry]]),
+                timestamp: new Date(),
+            });
+            const row = await PlayerRound.findOne({ roundId: 'r-guest' });
+            expect(row?.userId?.toString()).toBe(user._id.toString());
+        });
+
+        it('records a completed streak when a run ends in a LOSS', async () => {
+            const user = await User.create({ deviceId: 'streak-1', currentStreak: 4, pointsAtStake: 27 });
+            await settleRound({
+                roundId: 'r-loss', worldThrow: 'P', counts: { R: 1, P: 0, S: 0 },
+                throws: new Map([['streak-1', { deviceId: 'streak-1', platform: 'pwa', throw: 'R', seq: 1 } as ThrowEntry]]),
+                timestamp: new Date(),
+            });
+            const events = await StreakEvent.find({ userId: user._id });
+            expect(events).toHaveLength(1);
+            expect(events[0].length).toBe(4);
+            expect(events[0].endedBy).toBe('LOSS');
+        });
+
+        it('records a completed streak when a run ends in a SAFE', async () => {
+            const user = await User.create({ deviceId: 'streak-2', currentStreak: 6 });
+            await settleRound({
+                roundId: 'r-safe', worldThrow: 'R', counts: { R: 1, P: 0, S: 0 },
+                throws: new Map([['streak-2', { deviceId: 'streak-2', platform: 'pwa', throw: 'R', seq: 1 } as ThrowEntry]]),
+                timestamp: new Date(),
+            });
+            const event = await StreakEvent.findOne({ userId: user._id });
+            expect(event?.length).toBe(6);
+            expect(event?.endedBy).toBe('SAFE');
+        });
+
+        it('records NOTHING when a WIN extends a streak', async () => {
+            const user = await User.create({ deviceId: 'streak-3', currentStreak: 2 });
+            await settleRound({
+                roundId: 'r-win', worldThrow: 'S', counts: { R: 1, P: 0, S: 0 },
+                throws: new Map([['streak-3', { deviceId: 'streak-3', platform: 'pwa', throw: 'R', seq: 1 } as ThrowEntry]]),
+                timestamp: new Date(),
+            });
+            expect(await StreakEvent.countDocuments({ userId: user._id })).toBe(0);
+        });
+
+        it('records NOTHING when a player with no streak loses', async () => {
+            const user = await User.create({ deviceId: 'streak-4', currentStreak: 0 });
+            await settleRound({
+                roundId: 'r-nostreak', worldThrow: 'P', counts: { R: 1, P: 0, S: 0 },
+                throws: new Map([['streak-4', { deviceId: 'streak-4', platform: 'pwa', throw: 'R', seq: 1 } as ThrowEntry]]),
+                timestamp: new Date(),
+            });
+            expect(await StreakEvent.countDocuments({ userId: user._id })).toBe(0);
+        });
     });
 });
 
