@@ -115,6 +115,12 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     });
 
     // A game server reports its roster. Called on the same cadence as the throw flush.
+    //
+    // Cost: unlike every other route here, this does N `resolveUser` identity upserts per
+    // request (one per roster entry) rather than one — accepted only because a Roblox
+    // instance roster is bounded well under 100 players. Inside reconcilePresence, the
+    // open/touch loop is also sequentially awaited, so per-heartbeat latency compounds with
+    // roster size. Revisit both if roster caps ever grow.
     router.post('/instances/:instanceId/presence', async (req, res) => {
         try {
             const ids = req.body?.robloxUserIds;

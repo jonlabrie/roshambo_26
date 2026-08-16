@@ -104,7 +104,7 @@ export async function closeStaleSessions(olderThan: Date): Promise<number> {
     }).select('lastSeenAt');
 
     for (const session of stale) {
-        await Session.findByIdAndUpdate(session._id, { $set: { endedAt: session.lastSeenAt } });
+        await closeSession(session._id.toString(), session.lastSeenAt);
     }
     return stale.length;
 }
