@@ -9,6 +9,7 @@ import User from '../models/User';
 import Round from '../models/Round';
 import PlayerRound from '../models/PlayerRound';
 import { Throw } from '../engine/GameRules';
+import { topByCareer } from '../leaderboards';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'roshambo_super_secret_1337';
 
@@ -188,11 +189,9 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
                     }
                 ]);
 
-                // 2. Highest Point Totals (Top 50 - All Time)
-                const topPoints = await User.find()
-                    .sort({ totalPoints: -1 })
-                    .limit(50)
-                    .select('deviceId displayName totalPoints currentStreak bestStreak');
+                // 2. Highest CAREER earnings (Top 50 - All Time). Was totalPoints, which is a
+                // spendable wallet — see leaderboards.ts.
+                const topPoints = await topByCareer({}, 50);
 
                 // 3. Biggest Single Wins for timeframe (Only >= 3 points, Top 50)
                 const biggestWins = await PlayerRound.find({

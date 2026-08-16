@@ -109,4 +109,7 @@ const UserSchema: Schema = new Schema({
     },
 }, { timestamps: true });
 
+// The standings sort. Without this every leaderboard read is a collection scan.
+UserSchema.index({ lifetimeBanked: -1 });
+
 export default mongoose.model<IUser>('User', UserSchema);

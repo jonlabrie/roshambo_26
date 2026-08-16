@@ -6,6 +6,7 @@ import { resolveUser } from '../identity';
 import { bankPot } from '../wallet';
 import User, { IUser } from '../models/User';
 import { Throw } from '../engine/GameRules';
+import { topByCareer } from '../leaderboards';
 import { shellStates, SHELL_IDS, LaunchContext, SHELL_PRICES, MORTAR_PRICES } from '../fireworks';
 import { validateLoadout, validateSizeClass, validatePadPreferences, validateDecorations, validateAccess } from '../loadout';
 import {
@@ -416,10 +417,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             const filter = scope === 'country'
                 ? { country: String(req.query.country) }
                 : {};
-            const leaders = await User.find(filter)
-                .sort({ totalPoints: -1 })
-                .limit(50)
-                .select('displayName totalPoints robloxId identityTier currentStreak bestStreak');
+            const leaders = await topByCareer(filter, 50);
             res.set('Cache-Control', 'public, max-age=30');
             res.json({ scope, leaders });
         } catch (err) {
