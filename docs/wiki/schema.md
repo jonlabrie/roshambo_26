@@ -44,3 +44,8 @@ outside program/, log format, frontmatter). Then the manual pass:
 - important topics mentioned on 3+ pages but lacking their own page
 
 Run on request, and cheaply at any session close.
+
+**The lint checks STRUCTURE, not CURRENCY.** A page can be internally contradictory and years
+out of date while passing every mechanical check. The manual pass above is the only thing that
+catches that, and it is the part that gets skipped — see [[wiki-currency]] for the mechanism and
+the one rule that would have caught the failures of 2026-08-16.

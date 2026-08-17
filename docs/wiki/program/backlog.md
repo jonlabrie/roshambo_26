@@ -285,3 +285,32 @@ lifecycle. Removing the broadcast was the cheap half and stood alone; this does 
 return it, and require it on every subsequent mutating event — so the deviceId identifies and
 the token authenticates. Guests keep working without an account. Do this before the game is
 public; it is currently a total-account-takeover primitive for anyone who learns one string.
+
+## Plan 3 — the Stats room displays (NEXT, not yet specced)
+
+Decided 2026-08-16; the spec and plan do not exist yet. Everything needed to write them:
+
+**Scope, and the owner's ruling on shape:**
+- **Fold the `BoardController` retarget INTO plan 3** (owner, 2026-08-16) — do not spec it
+  separately. `roblox/src/client/BoardController.client.luau` has no-opped since the jumbotron
+  was removed (T23): it early-returns because `Workspace.RoshamboStage.JumbotronBoard` does not
+  exist. `FlapScheduler` is intact and ready (drum carries `-:/`, nine-step cap, `0b41f83`).
+  The renderer needs a home on the kōsatsu boards before any wall can render.
+- **Displays first, data later** — build against seeded fixtures in Studio rather than waiting
+  for real play. Layout and legibility are what the owner judges, and known-good fixtures are
+  easier to assess than sparse real numbers. ⚠ NOT YET CONFIRMED by the owner; proposed and
+  interrupted. Confirm before building.
+
+**What the walls read from** (all merged and live on dev): `/api/v1/stats/records|heat|player`
+and the `get-stats-surface` socket event. Layout, visual language and the round band are already
+specced in `docs/superpowers/specs/2026-08-16-stats-room-design.md` §6 — plan 3 implements that,
+it does not redesign it.
+
+**Constraints carried in:**
+- `TextLabel.TextSize` caps at 100px and `TextScaled` does not reliably scale up on a SurfaceGui —
+  use `BoardController`'s small-canvas-stretched-large trick or text is unreadable at distance.
+- Per-viewer displays need NO new mechanism: a client-built SurfaceGui parented to a world part
+  is already private to that client. Signpost personal vs public boards physically.
+- The socket surface returns raw `userId` ObjectIds with no names, unlike REST — export
+  `nameUsers` from `stats.ts` rather than duplicating the projection in the client path.
+- Boards will be EMPTY until people play: `StreakEvent`/`BankEvent` start from deploy, no backfill.
