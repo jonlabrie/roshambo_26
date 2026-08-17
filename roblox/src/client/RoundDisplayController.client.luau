@@ -244,16 +244,48 @@ local reelSpent = false
 local shownTape: any = nil
 local pendingTape: any = nil
 
-local function applyTape()
+-- ===== THE CHANGEOVER IS A SHOW, NOT AN EVENT =====
+-- Every cell used to turn on the same frame, which reads as the board being redrawn rather than
+-- as a row of flaps working. They cascade left to right now, and turn half again as slowly as the
+-- clock's digits: the tape is the one thing in the room whose whole job is to be watched, and it
+-- has the time -- it starts at `drumRest`, 3.45s into a 7s REVEAL, and a ten-cell sweep at this
+-- pacing finishes in about 1.3s of the 3.55s left.
+local TAPE_STAGGER = 0.12
+local TAPE_HALF_SECONDS = 0.0825 -- 50% slower than FlapUnit's default
+
+-- A cascade in flight when the next one starts would interleave two sequences on the same cells.
+-- The token lets the newer sweep abandon the older mid-flight rather than fight it.
+local tapeToken = 0
+
+local function applyTape(cascade: boolean?)
     local tape = units.roundTape
     if not tape then
         return
     end
-    for c, unit in tape do
+    tapeToken += 1
+    local token = tapeToken
+    local nth = 0
+    -- Ordered, not `for c, unit in tape`: a dictionary's iteration order is arbitrary, and the
+    -- whole point here is that the cells fire left to right. Column 1 is the viewer's leftmost.
+    for c = 1, RoundDisplay.TAPE_COLUMNS do
+        local unit = tape[c]
         local i = RoundDisplay.tapeIndexFor(c)
-        local entry = i and shownTape and shownTape[i]
-        -- nil is the drum's blank position, which is what a tape shorter than ten throws shows.
-        unit:set(entry and entry.worldThrow or nil)
+        if unit and i then
+            nth += 1
+            local entry = shownTape and shownTape[i]
+            -- nil is the drum's blank position, which is what a tape shorter than ten throws
+            -- shows -- and what every cell shows before a single round has closed.
+            local value = entry and entry.worldThrow or nil
+            if cascade then
+                task.delay((nth - 1) * TAPE_STAGGER, function()
+                    if tapeToken == token then
+                        unit:set(value)
+                    end
+                end)
+            else
+                unit:set(value)
+            end
+        end
     end
 end
 
@@ -298,6 +330,7 @@ local function register(part: Instance)
                     width = col.w,
                     height = spec.h,
                     paint = glyphPainter,
+                    halfSeconds = TAPE_HALF_SECONDS,
                     -- A divider only between two cells that both exist: one bracketing the gap
                     -- would fence off empty board and undo the separation the gap is for.
                     dividerAfter = RoundDisplay.tapeIndexFor(c + 1) ~= nil,
@@ -431,8 +464,9 @@ EventBus.Cue.Event:Connect(function(cue)
             pendingTape = nil
         end
         -- Applied on the cue rather than on arrival: the drum has finished announcing the round
-        -- the tape's newest entry describes.
-        applyTape()
+        -- the tape's newest entry describes. THIS is the one that cascades -- it is the round
+        -- changeover, and the only moment anyone is watching the tape rather than reading it.
+        applyTape(true)
     end
 end)
 
