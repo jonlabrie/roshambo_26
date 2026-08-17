@@ -64,88 +64,232 @@ end
 -- Bold's exact bounds -- so Bold is the heaviest real face and anything above it falls back.
 local BOARD_FONT =
     Font.new("rbxasset://fonts/families/JosefinSans.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
-local GLYPH_FULL = UDim2.fromScale(1, 1)
-local GLYPH_SQUASHED = UDim2.fromScale(1, 0.05)
+-- ===== A REAL SPLIT-FLAP, NOT A SQUASH (owner, 2026-08-17) =====
+-- "You're not actually animating flips, you're just scrolling numbers?" -- correct, and worse
+-- than scrolling: the old cell squashed the CHARACTER vertically and swapped it, so the cell
+-- never split at all.
+--
+-- The mechanism a real board has, and this now has:
+--   * The cell is two clipped halves. Both show the same character, which is centred ON THE SEAM
+--     so its top half falls in the upper clip and its bottom half in the lower one.
+--   * A LEAF sits over them, carrying the outgoing character above the seam and the incoming one
+--     below it -- the two faces of one physical flap.
+--   * Falling: the upper clip is switched to the NEW character immediately and the leaf, hinged
+--     at the seam, closes downward over it -- so the old top is progressively eaten from above
+--     while the new top is revealed behind.
+--   * Landing: the leaf re-opens below the seam carrying the NEW character's bottom half, sweeping
+--     down over the old one, and the lower clip commits at the end.
+--
+-- THE CHARACTER NEVER MOVES. Only the clip window does. That is what separates a flap from a
+-- squash: the ink is still, and a physical edge sweeps across it.
+local HALF_SECONDS = 0.04 -- each half of the flip; a full turn is twice this
+local TILE_COLOR = Color3.fromRGB(244, 238, 222)
+local SEAM_COLOR = Color3.fromRGB(150, 142, 124)
+local INK = Color3.fromRGB(40, 30, 18)
+local PRINTED_INK = Color3.fromRGB(214, 202, 178)
 
-local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { { TextLabel } }
+type Cell = {
+    upper: TextLabel,
+    lower: TextLabel,
+    leaf: Frame,
+    leafLabel: TextLabel,
+    text: string,
+    token: number,
+}
+
+local function label(parent: Instance, cellW: number, cellH: number, anchorY: number, size: number): TextLabel
+    local t = Instance.new("TextLabel")
+    t.BackgroundTransparency = 1
+    t.TextColor3 = INK
+    t.TextScaled = false
+    t.TextSize = size
+    t.FontFace = BOARD_FONT
+    t.TextXAlignment = Enum.TextXAlignment.Center
+    t.TextYAlignment = Enum.TextYAlignment.Center
+    t.Text = " "
+    t.ZIndex = 3
+    -- FULL CELL HEIGHT, CENTRED ON THE SEAM, inside a half-height clip. `anchorY` says which edge
+    -- of the clip the seam is: 1 for the upper half (seam at its bottom), 0 for the lower.
+    t.Size = UDim2.fromOffset(cellW, cellH)
+    t.AnchorPoint = Vector2.new(0.5, 0.5)
+    t.Position = UDim2.fromScale(0.5, anchorY)
+    -- All-caps ride high because the line box reserves descender space; drop them to optical
+    -- centre, exactly as the single-label cell did.
+    local pad = Instance.new("UIPadding")
+    pad.PaddingTop = UDim.new(0.1, 0)
+    pad.Parent = t
+    t.Parent = parent
+    return t
+end
+
+local function clip(parent: Instance, cellW: number, halfH: number, top: boolean, z: number): Frame
+    local f = Instance.new("Frame")
+    f.BackgroundTransparency = 1
+    f.ClipsDescendants = true
+    f.Size = UDim2.fromOffset(cellW, halfH)
+    f.Position = UDim2.fromOffset(0, if top then 0 else halfH)
+    f.ZIndex = z
+    f.Parent = parent
+    return f
+end
+
+local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { { Cell } }
     local gui = Instance.new("SurfaceGui")
     gui.Name = "FlapFace"
     gui.Face = faceEnum
     gui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
     gui.CanvasSize = Vector2.new(cfg.metrics.canvasW, cfg.metrics.canvasH)
     gui.Parent = cfg.part
+
     -- Cumulative column layout. With uniform widths this reduces exactly to the old
-    -- `(c - 1) / cols`, so nothing changes for a board that does not ask for it.
+    -- `(c - 1) / cols`, so nothing changes for a board that does not ask for weights.
     local units, offsets = 0, {}
     for c = 1, cfg.cols do
         offsets[c] = units
         units += (cfg.colWidths and cfg.colWidths[c]) or 1
     end
-    local cellH = 1 / cfg.rows
-    local grid: { { TextLabel } } = {}
+
+    local rowH = cfg.metrics.canvasH / cfg.rows
+    local grid: { { Cell } } = {}
     for r = 1, cfg.rows do
         grid[r] = {}
         for c = 1, cfg.cols do
             local printed = cfg.static and cfg.static[c]
+            local colW = cfg.metrics.canvasW * (((cfg.colWidths and cfg.colWidths[c]) or 1) / units)
+            local tileW = colW * (1 - PAD)
+            local tileH = rowH * (1 - PAD)
+            local halfH = tileH / 2
 
             local tile = Instance.new("Frame")
-            local w = (((cfg.colWidths and cfg.colWidths[c]) or 1) / units)
-            local x = offsets[c] / units
-            tile.Size = UDim2.fromScale(w * (1 - PAD), cellH * (1 - PAD))
-            tile.Position = UDim2.fromScale(x + w * PAD / 2, (r - 1) * cellH + cellH * PAD / 2)
+            tile.Size = UDim2.fromOffset(tileW, tileH)
+            tile.Position = UDim2.fromOffset(
+                cfg.metrics.canvasW * (offsets[c] / units) + colW * PAD / 2,
+                (r - 1) * rowH + rowH * PAD / 2
+            )
             -- A printed column carries no flap face: the separator reads as painted on the frame
             -- between two flaps rather than as a third flap that happens never to move.
             tile.BackgroundTransparency = if printed then 1 else 0
-            tile.BackgroundColor3 = Color3.fromRGB(244, 238, 222)
+            tile.BackgroundColor3 = TILE_COLOR
             tile.BorderSizePixel = 0
             tile.ClipsDescendants = true
             tile.ZIndex = 2
             tile.Parent = gui
 
+            if printed then
+                -- One static label, no halves and no leaf. A painted separator has no mechanism,
+                -- and giving it one would cost seven instances per cell to animate nothing.
+                local t = label(tile, tileW, tileH, 0.5, cfg.metrics.glyphSize)
+                t.Text = printed
+                t.TextColor3 = PRINTED_INK
+                grid[r][c] = {
+                    upper = t,
+                    lower = t,
+                    leaf = tile,
+                    leafLabel = t,
+                    text = printed,
+                    token = 0,
+                    w = tileW,
+                    halfH = halfH,
+                    printed = true,
+                } :: any
+                continue
+            end
+
+            -- The two halves. Each holds a FULL-height label centred on the seam, so the upper
+            -- clip shows the character's top half and the lower clip its bottom half.
+            local upperClip = clip(tile, tileW, halfH, true, 2)
+            local lowerClip = clip(tile, tileW, halfH, false, 2)
+            local upper = label(upperClip, tileW, tileH, 1, cfg.metrics.glyphSize)
+            local lower = label(lowerClip, tileW, tileH, 0, cfg.metrics.glyphSize)
+
+            -- The leaf: the moving flap, above both halves. Hinged at the seam in both
+            -- directions, which is why its AnchorPoint is reassigned mid-flip rather than fixed.
+            local leaf = Instance.new("Frame")
+            leaf.Name = "Leaf"
+            leaf.BackgroundColor3 = TILE_COLOR
+            leaf.BorderSizePixel = 0
+            leaf.ClipsDescendants = true
+            leaf.Visible = false
+            leaf.ZIndex = 3
+            leaf.Size = UDim2.fromOffset(tileW, halfH)
+            leaf.Parent = tile
+            local leafLabel = label(leaf, tileW, tileH, 1, cfg.metrics.glyphSize)
+            leafLabel.ZIndex = 4
+
             local seam = Instance.new("Frame")
-            seam.Visible = not printed
-            seam.Size = UDim2.fromScale(1, 0.035)
-            seam.Position = UDim2.fromScale(0, 0.5)
+            seam.Size = UDim2.fromOffset(tileW, math.max(1, tileH * 0.035))
+            seam.Position = UDim2.fromOffset(0, halfH)
             seam.AnchorPoint = Vector2.new(0, 0.5)
-            seam.BackgroundColor3 = Color3.fromRGB(150, 142, 124)
+            seam.BackgroundColor3 = SEAM_COLOR
             seam.BorderSizePixel = 0
-            seam.ZIndex = 4
+            seam.ZIndex = 5
             seam.Parent = tile
 
-            local glyph = Instance.new("TextLabel")
-            glyph.Size = GLYPH_FULL
-            glyph.BackgroundTransparency = 1
-            glyph.TextColor3 = Color3.fromRGB(40, 30, 18)
-            glyph.TextScaled = false
-            glyph.TextSize = cfg.metrics.glyphSize
-            glyph.FontFace = BOARD_FONT
-            glyph.TextXAlignment = Enum.TextXAlignment.Center
-            glyph.TextYAlignment = Enum.TextYAlignment.Center
-            glyph.Text = printed or " "
-            -- Ink on the dark frame rather than on ivory, so a printed separator reads as part
-            -- of the board and not as a blank flap.
-            glyph.TextColor3 = if printed then Color3.fromRGB(214, 202, 178) else Color3.fromRGB(40, 30, 18)
-            glyph.ZIndex = 3
-            glyph.Parent = tile
-
-            -- All-caps ride high because the line box reserves descender space; drop them to
-            -- optical centre. Sibling of the seam so the padding never shifts the seam.
-            local pad = Instance.new("UIPadding")
-            pad.PaddingTop = UDim.new(0.1, 0)
-            pad.Parent = glyph
-
-            grid[r][c] = glyph
+            grid[r][c] = {
+                upper = upper,
+                lower = lower,
+                leaf = leaf,
+                leafLabel = leafLabel,
+                text = " ",
+                token = 0,
+                w = tileW,
+                halfH = halfH,
+            } :: any
         end
     end
     return grid
 end
 
-local function flapTo(cell: TextLabel, char: string)
-    local squash = TweenService:Create(cell, TweenInfo.new(0.04), { Size = GLYPH_SQUASHED })
-    squash:Play()
-    squash.Completed:Once(function()
-        cell.Text = char
-        TweenService:Create(cell, TweenInfo.new(0.04), { Size = GLYPH_FULL }):Play()
+-- One turn of one flap. Two tweens hinged at the seam: the outgoing face closing down over the
+-- incoming top, then the incoming face opening down over the outgoing bottom.
+local function flapTo(cell: any, char: string)
+    if cell.printed or cell.text == char then
+        return
+    end
+    local outgoing = cell.text
+    cell.text = char
+    cell.token += 1
+    local token = cell.token
+    local leaf, leafLabel = cell.leaf, cell.leafLabel
+
+    -- FALLING. The upper half commits to the new character straight away; the leaf carries the
+    -- OLD one and closes over it, so the new top is revealed from under a descending edge.
+    cell.upper.Text = char
+    leafLabel.Text = outgoing
+    leafLabel.Position = UDim2.fromScale(0.5, 1) -- centred on the leaf's bottom = the seam
+    leaf.AnchorPoint = Vector2.new(0, 1)
+    leaf.Position = UDim2.fromOffset(0, cell.halfH)
+    leaf.Size = UDim2.fromOffset(cell.w, cell.halfH)
+    leaf.Visible = true
+
+    local fall =
+        TweenService:Create(leaf, TweenInfo.new(HALF_SECONDS), { Size = UDim2.fromOffset(cell.w, 0) })
+    fall:Play()
+    fall.Completed:Once(function()
+        -- A newer step overtook this one mid-turn: abandon quietly rather than fight it. At the
+        -- reel's fastest interval flaps genuinely do overlap, and a physical board blurs too.
+        if cell.token ~= token then
+            return
+        end
+        -- LANDING. The leaf now shows the incoming face and opens downward over the old bottom.
+        leafLabel.Text = char
+        leafLabel.Position = UDim2.fromScale(0.5, 0) -- centred on the leaf's top = the seam
+        leaf.AnchorPoint = Vector2.new(0, 0)
+        leaf.Position = UDim2.fromOffset(0, cell.halfH)
+        leaf.Size = UDim2.fromOffset(cell.w, 0)
+        local land = TweenService:Create(
+            leaf,
+            TweenInfo.new(HALF_SECONDS),
+            { Size = UDim2.fromOffset(cell.w, cell.halfH) }
+        )
+        land:Play()
+        land.Completed:Once(function()
+            if cell.token ~= token then
+                return
+            end
+            cell.lower.Text = char
+            leaf.Visible = false
+        end)
     end)
 end
 

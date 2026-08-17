@@ -7,11 +7,13 @@
 -- point -- the same shape appears on the drum, the lanterns, the HUD and here, so a player learns
 -- one vocabulary rather than four.
 --
--- The fold illusion is FlapBoard's, so the two read as the same machine.
---
 -- IT OWNS NO CLOCK. It used to run its own spin loop on a private interval, which is precisely how
--- it ended up 2.45s ahead of the HUD's ring. The caller now hands it a glyph every frame, computed
+-- it ended up 2.45s ahead of the HUD's ring. The caller hands it a glyph every frame, computed
 -- from the same ReelStep the ring uses, so the two cannot drift.
+--
+-- THE MECHANISM IS FlapBoard's, so the two read as one machine: two clipped halves showing a glyph
+-- centred on the seam, and a leaf hinged there carrying the outgoing face above and the incoming
+-- face below. The glyph never moves; only the clip window does.
 local TweenService = game:GetService("TweenService")
 
 local GlyphFlipper = {}
@@ -22,7 +24,7 @@ export type Config = {
     -- Glyphs.render, injected so this module requires nothing (the DI convention every other
     -- client module here follows).
     render: (parent: Instance, symbol: string, coreColor: Color3, outlineColor: Color3?) -> Frame,
-    symbols: { string }, -- the cycle order while spinning
+    symbols: { string },
     faces: { Enum.NormalId }?,
 }
 
@@ -31,64 +33,118 @@ local TILE = Color3.fromRGB(244, 238, 222)
 local SEAM = Color3.fromRGB(150, 142, 124)
 local INK = Color3.fromRGB(40, 30, 18)
 local PAD = 0.08
-local FULL = UDim2.fromScale(1, 1)
-local SQUASHED = UDim2.fromScale(1, 0.05)
--- Paint order under ZIndexBehavior.Global: tile, then the glyph's outline, then its core, then
--- the seam on top of everything.
-local TILE_Z, GLYPH_Z, OUTLINE_Z, CORE_Z, SEAM_Z = 2, 3, 3, 4, 5
-local FLIP_SECONDS = 0.04
+local CANVAS = 512
+local HALF_SECONDS = 0.04 -- each half of the turn; a full flip is twice this
+-- Paint order under ZIndexBehavior.Global: tile and halves, the glyph's outline, its core, the
+-- leaf above all of it, and the seam on top.
+local TILE_Z, GLYPH_Z, OUTLINE_Z, CORE_Z, LEAF_Z, SEAM_Z = 2, 3, 3, 4, 5, 6
 
-local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { [string]: Frame }
+type Face = {
+    upper: { [string]: Frame },
+    lower: { [string]: Frame },
+    leaf: Frame,
+    leafSet: { [string]: Frame },
+    side: number,
+    halfH: number,
+}
+
+-- One glyph set inside one clip. Each frame is FULL-PANEL height centred on the seam, so an upper
+-- clip shows the glyph's top half and a lower clip its bottom half.
+local function glyphSet(parent: Instance, cfg: Config, side: number, anchorY: number): { [string]: Frame }
+    local set: { [string]: Frame } = {}
+    for _, sym in cfg.symbols do
+        local frame = cfg.render(parent, sym, INK, TILE)
+        frame.Name = `Glyph_{sym}`
+        frame.Visible = false
+        frame.ZIndex = GLYPH_Z
+        frame.Size = UDim2.fromOffset(side, side)
+        frame.AnchorPoint = Vector2.new(0.5, 0.5)
+        frame.Position = UDim2.fromScale(0.5, anchorY)
+        -- ZINDEX ON THE LAYERS, NOT JUST THE FRAME. This SurfaceGui renders with
+        -- ZIndexBehavior.Global, where paint order is ZIndex alone and the hierarchy counts for
+        -- nothing -- a child does NOT draw above its parent. Glyphs.render leaves its two
+        -- ImageLabels at the default ZIndex 1, which put them underneath the opaque ivory tile at
+        -- 2: drawn at full size, correctly placed, and completely covered.
+        for _, layer in frame:GetChildren() do
+            if layer:IsA("ImageLabel") then
+                layer.ZIndex = if layer.Name == "Core" then CORE_Z else OUTLINE_Z
+            end
+        end
+        set[sym] = frame
+    end
+    return set
+end
+
+local function clip(parent: Instance, side: number, halfH: number, top: boolean): Frame
+    local f = Instance.new("Frame")
+    f.BackgroundTransparency = 1
+    f.ClipsDescendants = true
+    f.Size = UDim2.fromOffset(side, halfH)
+    f.Position = UDim2.fromOffset(0, if top then 0 else halfH)
+    f.ZIndex = TILE_Z
+    f.Parent = parent
+    return f
+end
+
+local function reveal(set: { [string]: Frame }, symbol: string?)
+    for sym, frame in set do
+        frame.Visible = sym == symbol
+    end
+end
+
+local function buildFace(cfg: Config, faceEnum: Enum.NormalId): Face
     local gui = Instance.new("SurfaceGui")
     gui.Name = "FlapFace"
     gui.Face = faceEnum
     gui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
-    -- Square canvas for a square panel; the glyphs are aspect-locked by Glyphs.render anyway.
-    gui.CanvasSize = Vector2.new(512, 512)
+    gui.CanvasSize = Vector2.new(CANVAS, CANVAS)
     gui.Parent = cfg.part
+
+    local side = CANVAS * (1 - PAD)
+    local halfH = side / 2
 
     local tile = Instance.new("Frame")
     tile.Name = "Tile"
-    tile.Size = UDim2.fromScale(1 - PAD, 1 - PAD)
-    tile.Position = UDim2.fromScale(PAD / 2, PAD / 2)
+    tile.Size = UDim2.fromOffset(side, side)
+    tile.Position = UDim2.fromOffset(CANVAS * PAD / 2, CANVAS * PAD / 2)
     tile.BackgroundColor3 = TILE
     tile.BorderSizePixel = 0
     tile.ClipsDescendants = true
     tile.ZIndex = TILE_Z
     tile.Parent = gui
 
-    -- EVERY GLYPH IS BUILT ONCE AND HIDDEN. Rebuilding image layers per flip would re-decode
-    -- assets seven times a second through the whole spin; visibility is free.
-    local glyphs: { [string]: Frame } = {}
-    for _, sym in cfg.symbols do
-        local frame = cfg.render(tile, sym, INK, TILE)
-        frame.Name = `Glyph_{sym}`
-        frame.Visible = false
-        frame.ZIndex = GLYPH_Z
-        -- ZINDEX ON THE LAYERS, NOT JUST THE FRAME. This SurfaceGui renders with
-        -- ZIndexBehavior.Global, where paint order is ZIndex alone and the hierarchy counts for
-        -- nothing -- a child does NOT draw above its parent. Glyphs.render leaves its two
-        -- ImageLabels at the default ZIndex 1, which put them underneath the opaque ivory tile
-        -- at 2: drawn at full size, correctly placed, and completely covered. The flipper showed
-        -- a blank flap for exactly this reason.
-        for _, layer in frame:GetChildren() do
-            if layer:IsA("ImageLabel") then
-                layer.ZIndex = if layer.Name == "Core" then CORE_Z else OUTLINE_Z
-            end
-        end
-        glyphs[sym] = frame
-    end
+    local upperClip = clip(tile, side, halfH, true)
+    local lowerClip = clip(tile, side, halfH, false)
+
+    local leaf = Instance.new("Frame")
+    leaf.Name = "Leaf"
+    leaf.BackgroundColor3 = TILE
+    leaf.BorderSizePixel = 0
+    leaf.ClipsDescendants = true
+    leaf.Visible = false
+    leaf.ZIndex = LEAF_Z
+    leaf.Size = UDim2.fromOffset(side, halfH)
+    leaf.Parent = tile
 
     local seam = Instance.new("Frame")
-    seam.Size = UDim2.fromScale(1, 0.035)
-    seam.Position = UDim2.fromScale(0, 0.5)
+    seam.Size = UDim2.fromOffset(side, math.max(1, side * 0.035))
+    seam.Position = UDim2.fromOffset(0, halfH)
     seam.AnchorPoint = Vector2.new(0, 0.5)
     seam.BackgroundColor3 = SEAM
     seam.BorderSizePixel = 0
     seam.ZIndex = SEAM_Z
     seam.Parent = tile
 
-    return glyphs
+    return {
+        -- The seam is the upper clip's BOTTOM edge and the lower clip's TOP, so a glyph centred
+        -- on it sits at anchorY 1 above and 0 below.
+        upper = glyphSet(upperClip, cfg, side, 1),
+        lower = glyphSet(lowerClip, cfg, side, 0),
+        leaf = leaf,
+        leafSet = glyphSet(leaf, cfg, side, 1),
+        side = side,
+        halfH = halfH,
+    }
 end
 
 function GlyphFlipper.new(cfg: Config)
@@ -96,6 +152,7 @@ function GlyphFlipper.new(cfg: Config)
         _cfg = cfg,
         _faces = {},
         _shown = nil :: string?,
+        _token = 0,
         _dead = false,
     }, GlyphFlipper)
     for _, face in cfg.faces or { Enum.NormalId.Front } do
@@ -104,26 +161,65 @@ function GlyphFlipper.new(cfg: Config)
     return self
 end
 
--- `symbol` nil means blank: no glyph visible, the flap showing its bare face.
+-- `symbol` nil means blank: the flap showing its bare face, which is what LOCK and the swing use.
 function GlyphFlipper.show(self: any, symbol: string?)
     if self._dead or self._shown == symbol then
         return
     end
+    local outgoing = self._shown
     self._shown = symbol
-    for _, glyphs in self._faces do
-        for sym, frame in glyphs do
-            local squash = TweenService:Create(frame, TweenInfo.new(FLIP_SECONDS), { Size = SQUASHED })
-            if sym == symbol then
-                frame.Size = SQUASHED
-                frame.Visible = true
-                TweenService:Create(frame, TweenInfo.new(FLIP_SECONDS), { Size = FULL }):Play()
-            elseif frame.Visible then
-                squash:Play()
-                squash.Completed:Once(function()
-                    frame.Visible = false
-                end)
-            end
+    self._token += 1
+    local token = self._token
+
+    for _, face in self._faces do
+        -- FALLING. The upper half commits to the incoming glyph at once; the leaf carries the
+        -- outgoing one down over it, hinged at the seam, so the new top is revealed from under a
+        -- descending edge rather than swapped in place.
+        reveal(face.upper, symbol)
+        for _, frame in face.leafSet do
+            frame.Position = UDim2.fromScale(0.5, 1) -- centred on the leaf's bottom = the seam
         end
+        reveal(face.leafSet, outgoing)
+        face.leaf.AnchorPoint = Vector2.new(0, 1)
+        face.leaf.Position = UDim2.fromOffset(0, face.halfH)
+        face.leaf.Size = UDim2.fromOffset(face.side, face.halfH)
+        face.leaf.Visible = true
+
+        local fall = TweenService:Create(
+            face.leaf,
+            TweenInfo.new(HALF_SECONDS),
+            { Size = UDim2.fromOffset(face.side, 0) }
+        )
+        fall:Play()
+        fall.Completed:Once(function()
+            -- A newer glyph overtook this turn: abandon quietly. At the reel's fastest interval
+            -- (0.05s) flaps genuinely do overlap, and a physical board blurs too.
+            if self._dead or self._token ~= token then
+                return
+            end
+            -- LANDING. The leaf turns over to the incoming glyph and opens downward over the old
+            -- bottom half, which commits when it finishes.
+            for _, frame in face.leafSet do
+                frame.Position = UDim2.fromScale(0.5, 0) -- centred on the leaf's top = the seam
+            end
+            reveal(face.leafSet, symbol)
+            face.leaf.AnchorPoint = Vector2.new(0, 0)
+            face.leaf.Position = UDim2.fromOffset(0, face.halfH)
+            face.leaf.Size = UDim2.fromOffset(face.side, 0)
+            local land = TweenService:Create(
+                face.leaf,
+                TweenInfo.new(HALF_SECONDS),
+                { Size = UDim2.fromOffset(face.side, face.halfH) }
+            )
+            land:Play()
+            land.Completed:Once(function()
+                if self._dead or self._token ~= token then
+                    return
+                end
+                reveal(face.lower, symbol)
+                face.leaf.Visible = false
+            end)
+        end)
     end
 end
 
