@@ -112,6 +112,60 @@ for _, b in Layout.BOARDS do
     CollectionService:AddTag(part, Layout.TAG)
     part.Parent = folder
 
+    -- ===== THE FRAME (owner, 2026-08-17) =====
+    -- Every board is cased in a narrow dark-wood moulding: an inch of face, standing an inch
+    -- proud of the board's front-most surface. It sits OUTSIDE the board's footprint rather than
+    -- over it, because the flap grid runs edge to edge -- a frame laid on the face would eat a
+    -- strip of the first and last cell in every row.
+    --
+    -- ONE INCH IS A TWELFTH OF A STUD. A stud is a foot in this world -- the room, its doorways
+    -- and these boards were all sized that way -- so the tempting `1` for "an inch" would have
+    -- been a foot of timber, and `0.5` for "half an inch" six inches of it.
+    local FRAME_W = 1 / 12
+    -- How far the front-most thing on this board stands off its centre. A wall board is flat
+    -- (its flaps are a SurfaceGui), so that is the board's own face; the round display's flaps
+    -- are real parts standing off it, and the shuttered panel's leaves and lock stand off
+    -- further still. The frame is cut to whichever is deepest, so it reads as a case around the
+    -- mechanism rather than a line painted on the wall behind it.
+    local content = Layout.THICKNESS / 2
+    if b.id:sub(1, 5) == "round" then
+        content = 0.37 -- FlapUnit's leaf face: BOARD_T/2 + PANEL_T + LEAF_T/2 + 2*GAP
+    elseif b.shuttered then
+        content = 0.56 -- the padlock's face, which is the front-most iron on a shut panel
+    end
+    local frameD = Layout.THICKNESS / 2 + content + FRAME_W
+    -- Spans from the board's back face to an inch in front of the content, so the frame is a
+    -- single box per side rather than a face and a return.
+    local frameZ = (Layout.THICKNESS / 2 - (content + FRAME_W)) / 2
+
+    -- Darker than the board it surrounds. The board's own dark wood is what the flaps sit on and
+    -- is barely seen; the moulding has to read as trim from across the room, and at an inch wide
+    -- the only thing that can carry it is tone. Plain Wood rather than WoodPlanks: a plank
+    -- texture tiled onto a one-inch face is noise.
+    local FRAME_COLOR = Color3.fromRGB(52, 40, 27)
+
+    local function rail(name: string, size: Vector3, x: number, y: number)
+        local q = Instance.new("Part")
+        q.Name = name
+        q.Anchored = true
+        q.CanCollide = false
+        q.CanQuery = false
+        q.CanTouch = false
+        q.CastShadow = false
+        q.Material = Enum.Material.Wood
+        q.Color = FRAME_COLOR
+        q.Size = size
+        q.CFrame = part.CFrame * CFrame.new(x, y, frameZ)
+        q.Parent = part
+    end
+
+    -- Head and sill run the full outer width; the stiles fill between them. Butt joints, not
+    -- mitres: a mitre is four angled parts to say what four boxes already say at an inch wide.
+    rail("FrameTop", Vector3.new(b.w + FRAME_W * 2, FRAME_W, frameD), 0, b.h / 2 + FRAME_W / 2)
+    rail("FrameBottom", Vector3.new(b.w + FRAME_W * 2, FRAME_W, frameD), 0, -(b.h / 2 + FRAME_W / 2))
+    rail("FrameLeft", Vector3.new(FRAME_W, b.h, frameD), -(b.w / 2 + FRAME_W / 2), 0)
+    rail("FrameRight", Vector3.new(FRAME_W, b.h, frameD), b.w / 2 + FRAME_W / 2, 0)
+
     if b.shuttered then
         -- A CLOSED BOARD, NOT A DARK ONE (spec section 8). The first version was two bare leaves
         -- with a 0.05 gap, and the owner looked straight at it and asked what the blank board
