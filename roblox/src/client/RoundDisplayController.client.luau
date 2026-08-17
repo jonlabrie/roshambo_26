@@ -147,29 +147,34 @@ local function register(part: Instance)
     elseif id == "roundClock" then
         local statics = RoundDisplay.statics()
         local made: { [number]: any } = {}
+        local boardFace: Frame? = nil
         for c, col in Layout.columns(spec) do
             if statics[c] then
-                -- PRINTED, NOT FLIPPED: a fixed separator gets no mechanism at all. Painted
-                -- straight onto the board's own face between the flaps.
-                local clip = surface(
-                    part,
-                    math.floor(FlapUnit.HALF_CANVAS * (col.w / spec.h) * 2),
-                    FlapUnit.HALF_CANVAS * 2
-                )
+                -- PRINTED, NOT FLIPPED: a fixed separator gets no mechanism at all. Painted onto
+                -- the BOARD's own face between the flaps, so it needs no part of its own.
+                --
+                -- ONE surface for the whole board, not one per column. A SurfaceGui always maps
+                -- to the ENTIRE face, so a canvas sized to a single column would stretch that
+                -- column across the whole board.
+                if not boardFace then
+                    boardFace = surface(
+                        part,
+                        math.floor(FlapUnit.HALF_CANVAS * 2 * (spec.w / spec.h)),
+                        FlapUnit.HALF_CANVAS * 2
+                    )
+                end
                 local t = Instance.new("TextLabel")
                 t.BackgroundTransparency = 1
-                t.Size = UDim2.fromScale(1, 1)
                 t.TextSize = FlapUnit.GLYPH_PX
                 t.FontFace = FONT
                 t.TextColor3 = PRINTED_INK
                 t.Text = statics[c]
-                t.Parent = clip
-                clip.Parent.Parent = part
-                -- Position the separator's own surface over its column by giving it a part-sized
-                -- canvas and offsetting the label; simpler than a second part for one colon.
-                t.Position = UDim2.fromScale(0.5 + col.x / spec.w, 0.5)
+                -- The column's own slice of that face: centre from its local X, width from its
+                -- share of the board.
                 t.AnchorPoint = Vector2.new(0.5, 0.5)
+                t.Position = UDim2.fromScale(0.5 + col.x / spec.w, 0.5)
                 t.Size = UDim2.fromScale(col.w / spec.w, 1)
+                t.Parent = boardFace
             else
                 made[c] = FlapUnit.new({
                     board = part,
