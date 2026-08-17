@@ -23,6 +23,32 @@ scale-based cell positions → ~10-stud glyphs readable across the bowl. Code in
 `roblox/src/client/BoardController.client.luau` (commit `bb3ea7c`). Verify rendered
 text via screenshot, not property reads ([[studio-tooling]]).
 
+## `require()` caches per VM — probe `.Source`, not the returned table
+
+Studio's command-bar / plugin VM caches a ModuleScript's *result*. Once anything in that
+VM has `require`d a module, every later `require` in the same session returns the SAME
+table — even after Rojo syncs new source into it. Nothing invalidates it but a Studio
+restart or a Play-mode transition into a fresh VM.
+
+**How this bites:** a diagnostic that reads current values by `require`ing the module
+reports the state at first-require, not the state now. Chasing "some boards didn't take
+the change" 2026-08-17, a probe compared built parts against `require(StatsRoomLayout)`
+and reported the module as un-synced. It was fully synced; the probe was reading a table
+cached when `buildStatsBoards.luau` ran an hour earlier. The real cause was elsewhere
+(the Studio tool had not been re-run, so the PARTS were stale).
+
+**Do this instead:** read `module.Source` and search it for the expected text. Source is
+a live property and is never cached.
+
+```luau
+local m = ReplicatedStorage.RoshamboShared.StatsRoomLayout
+print(m.Source:find("h = 7.2", 1, true) ~= nil)  -- truth; require() may lie
+```
+
+Corollary for any Studio build tool that reads a shared module: **its output can be stale
+in two independent ways** — the source may not have synced, or the VM may be holding an
+old copy. They look identical from the built artefact. See [[studio-tooling]].
+
 ## Flat Beams: width follows the attachment's UP vector
 
 A Beam's WIDTH extends along its **attachment's Up vector**, and `FaceCamera=false`
