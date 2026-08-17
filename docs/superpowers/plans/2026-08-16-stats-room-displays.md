@@ -271,7 +271,7 @@ describe("StatsBoardModel adapters", function()
             displayName = "Ayaka",
             career = { banked = 1240, bestStreak = 6 },
             currentStreak = 2,
-            week = { throws = 142, qualifyAt = 350, qualified = false },
+            week = { throws = 142, minThrows = 350, qualified = false },
         })
         local flat = {}
         for _, sec in s do
@@ -521,7 +521,8 @@ function StatsBoardModel.fudaSections(player: any?): { Section }
     local p = player or {}
     local career, week = p.career or {}, p.week or {}
     local throws = math.floor(tonumber(week.throws) or 0)
-    local qualifyAt = math.floor(tonumber(week.qualifyAt) or 0)
+    -- `minThrows` is the server's name for it (playerRates, server/src/stats.ts:136).
+    local qualifyAt = math.floor(tonumber(week.minThrows) or 0)
     -- Honest progress, per spec §6: "142 / 350 throws", never a blank where a rate would go.
     local progress = if week.qualified
         then StatsBoardModel.figure(throws)
@@ -1463,7 +1464,7 @@ StatsFixtures.PERSONAL = {
     displayName = "Ayaka",
     career = { banked = 12480, bestStreak = 11 },
     currentStreak = 3,
-    week = { throws = 142, qualifyAt = 350, qualified = false, roundsPresent = 210, participationRate = 0.68 },
+    week = { throws = 142, minThrows = 350, qualified = false, roundsPresent = 210, participationRate = 0.68 },
 }
 
 return StatsFixtures
