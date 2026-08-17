@@ -255,3 +255,22 @@ a question over coverage of the actual product, and the best argument for a broa
 
 ⚠ OPEN, and legal rather than engineering: needs a patent attorney. Recorded on [[world-throw]]
 with the claim language verbatim. The code is deliberately NOT being changed to match a guess.
+
+## [2026-08-16] migrate | the working branch is retired; dev deploys from main
+
+`m4b-zendojo-art-pass` served as the long-lived working branch and the dev backend's
+auto-deploy source. Both plan 1 and plan 2 merged into `main`, which is now a descendant of
+it — the branch held nothing `main` lacked — so it was retired and `roshambo_server_dev`
+repointed to `main` (App Runner `update-service`, 2026-08-16). Auto-deploy stays ON, so a
+push to `main` now redeploys dev.
+
+Carried out of doing it: `update-service` REPLACES `SourceConfiguration` rather than merging,
+so a repoint that omits `RuntimeEnvironmentSecrets` drops all three secrets. The call
+round-tripped every field from `describe-service`. Also verified rather than assumed: dev's
+`TEST_MODE` really is `"true"`, matching prod's `apprunner.yaml` — so neither environment has
+ever exercised the majority rule OR the random branch.
+
+Note the drift this retirement marks: the branch was named for a Roblox art pass and ended up
+carrying a statistics backend, a security fix and two server plans. Recorded in
+[[friends-family-baseline]] terms — item 4 is still the board's next item, and the work of
+2026-08-16 was item 7.
