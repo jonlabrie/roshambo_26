@@ -94,6 +94,13 @@ local function surface(part: BasePart, canvasW: number, canvasH: number): Frame
     return clip
 end
 
+-- EVERY LABEL AND GLYPH BUILT, so a live attribute change can reach the ones already on the wall.
+-- Both of these are by-eye numbers being auditioned; reading them only at build time meant a
+-- Studio restart per candidate, which is a poor loop for the one thing an owner has to judge by
+-- looking. Kept as plain lists because they are written once per flap and read only on a change.
+local clockLabels: { TextLabel } = {}
+local glyphFrames: { { frame: Frame, sym: string, side: number, anchorY: number } } = {}
+
 local function textPainter(part: BasePart, canvasW: number, canvasH: number, anchorY: number)
     local clip = surface(part, canvasW, canvasH)
     local t = Instance.new("TextLabel")
@@ -107,6 +114,7 @@ local function textPainter(part: BasePart, canvasW: number, canvasH: number, anc
     t.TextScaled = false
     t.Text = " "
     t.Parent = clip
+    table.insert(clockLabels, t)
     return function(v: string?)
         t.Text = v or " "
     end
@@ -132,12 +140,32 @@ local function glyphPainter(part: BasePart, canvasW: number, canvasH: number, an
         f.Position = UDim2.new(0.5, 0, anchorY, glyphNudge(sym) * side)
         f.Visible = false
         set[sym] = f
+        table.insert(glyphFrames, { frame = f, sym = sym, side = side, anchorY = anchorY })
     end
     return function(v: string?)
         for sym, f in set do
             f.Visible = sym == v
         end
     end
+end
+
+-- LIVE RE-TUNING. Both attributes are read on change and applied to what already exists, so a
+-- font can be auditioned or a glyph nudged without restarting Play.
+workspace:GetAttributeChangedSignal("ClockFont"):Connect(function()
+    local f = clockFont()
+    for _, t in clockLabels do
+        t.FontFace = f
+    end
+end)
+
+for _, sym in RoundDisplay.SYMBOLS do
+    workspace:GetAttributeChangedSignal(`GlyphNudge{sym}`):Connect(function()
+        for _, g in glyphFrames do
+            if g.sym == sym then
+                g.frame.Position = UDim2.new(0.5, 0, g.anchorY, glyphNudge(sym) * g.side)
+            end
+        end
+    end)
 end
 
 local metronome = RoundMetronome.new()
