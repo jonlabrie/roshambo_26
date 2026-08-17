@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-15
+updated: 2026-08-16
 ---
 
 # Owner Rulings
@@ -44,6 +44,8 @@ re-litigate them without new instructions.
 
 ## Process
 
+- **Re-read a page's opening paragraph before committing an update to it.** An event produces
+  an append; superseding needs re-reading text the event did not touch. See [[wiki-currency]].
 - **The owner approves RESULTS, not algorithms** — a past "go" is never standing
   permission for a later bake, and a bake aimed at one zone must never touch another.
   See [[bake-isolation]] and [[destructive-bake-guard]].
