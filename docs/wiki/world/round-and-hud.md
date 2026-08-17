@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-15
+updated: 2026-08-17
 ---
 
 # Round & HUD
@@ -49,6 +49,38 @@ glyph + splash → hold → fade → tape tile, running over the start of the ne
 the only ceiling is the next reveal. Do not try to make the ceremony fit inside
 REVEAL — three separate attempts did, all fighting the fact that the drum has never
 finished inside its own phase.
+
+## The PWA leads Roblox by 3.45s at the reveal (observed 2026-08-17)
+
+Visible for the first time now that both platforms run against **one backend** and their
+countdowns derive from the same absolute deadline. Before that they were different games
+and the comparison could not be made.
+
+**Both platforms sound the beat at the same instant.** The PWA plays its WebAudio gong
+the moment the `reveal` event lands; that is the same moment the Roblox drum is struck.
+The difference is what happens next:
+
+| | names the World Throw at |
+|---|---|
+| PWA | the strike — immediately, in `handleServerReveal` |
+| Roblox | strike + **`DrumStep.SETTLE_SECONDS` = 3.45s** (`STRIKE_SWING 0.45 + SPIN 1.0 + GLIDE 2.0`) |
+
+So one platform waits for its beat to finish and the other names it on the downbeat.
+This is not a fairness problem — the round is closed and throws are locked, and both
+platforms know the result well before the next OPEN — but a PWA player sitting beside a
+Roblox player spoils it for them by three and a half seconds.
+
+**If it is closed, it cannot be closed with a bare delay.** REVEAL is 7s and the PWA holds
+its result overlay for the full `revealMs` from the moment it appears. Delay the reveal by
+3.45s without shrinking the hold and the overlay runs into the next OPEN. Roblox already
+budgets this: 3.45 settle + `RevealBeat.HOLD_SECONDS` 3 + `FADE_SECONDS` 0.4 = 6.85s,
+0.15s of margin — and [[round-and-hud]]'s own beat notes say the beat may overrun the
+boundary and is deliberately allowed to.
+
+The owner's read (2026-08-17): "presumably because there's no 'drum' to wait for. **Yet.**"
+So the intended shape is a PWA element that genuinely takes that long to settle, with the
+result gated on *it* — the same structure as the drum rule, not a copied constant. A bare
+`setTimeout` would be 3.45s of dead screen where Roblox has something turning.
 
 ## The HUD
 
