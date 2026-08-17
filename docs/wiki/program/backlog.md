@@ -332,9 +332,20 @@ orphaned nothing. R1's conclusion stood; that supporting claim did not.
 The whole-branch review raised these; each was ruled deferred rather than guessed at. Two need
 a number only the owner can supply and are in the plan's gate list instead:
 
+- **⚠ THE COUNTDOWN ROLLS THE WRONG WAY** (owner, first Studio look, 2026-08-16). `plan` only
+  rotates FORWARD (`count = (ti - ci) % n`), so a counting-DOWN digit takes the long way round:
+  `3 → 2` is 48 steps forward, the 9-step cap fires, and the cell jumps back to `U` and rolls
+  `U V W X Y Z 0 1 2`. Nine steps at 83ms is ~750ms of motion every second — the digit is
+  rolling three-quarters of each tick and never settles. The review predicted the never-settles
+  symptom from the stagger alone and missed the cause, which is direction, not speed.
+  **Fix: bidirectional shortest-path in `FlapScheduler.plan`, OPT-IN per call.** Opt-in because
+  a real split-flap turns one way only and the arena's big boards should keep that character;
+  it is the countdown specifically that wants the short way round. Requires the item below.
 - **`FlapScheduler` `Opts` are not plumbed through `FlapBoard`**, so the stated per-board roll
   tuning ("a 1-row band wants a snappier roll than a 10-row sheet") is impossible to act on.
-  At the default 60ms stagger the band's seconds digit may never fully settle during OPEN.
+  `FlapBoard` types its injected `plan` as `(current, target) -> steps`, dropping the third
+  `Opts` argument. **This blocks the countdown-direction fix above** — that is what `Opts` is
+  for, and no caller can reach it today.
 - **No perf budget was taken**, though §6.2 asked for one. ~3,700 GUI instances are built on
   every client at join whether or not they enter the room. One line (`gui.MaxDistance`) fixes
   it; the distance is the owner's call.
