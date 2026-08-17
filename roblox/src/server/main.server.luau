@@ -715,6 +715,64 @@ Players.PlayerAdded:Connect(function(player)
     end
 end)
 
+-- FIX 4: names in leaders/recordsWeek/recordsAll/heat are EXTERNAL (player-chosen display
+-- names) and this feed broadcasts to every client, world-visible on the Stats room's walls —
+-- unlike the pushStatsPersonal 404 fallback below, which sends a name Roblox has already
+-- moderated. StatsBoardModel.sanitize is not a substitute: it only uppercases and strips
+-- non-ASCII, so ASCII abuse (still filterable, still offensive) passes straight through.
+--
+-- Cached by raw name so a name that keeps ranking round after round costs one filter call, not
+-- one per 60s cycle. UNBOUNDED on purpose: the key space is the set of names that have ever
+-- ranked into a top-10 (leaderboard, streak/bank/round records, or heat) — small next to the
+-- player population, and this table lives only for the game server's process lifetime anyway.
+local nameFilterCache: { [string]: string } = {}
+local function cachedFilterName(name: string): string
+    local cached = nameFilterCache[name]
+    if cached then
+        return cached
+    end
+    local filtered = filterExternalName(name)
+    nameFilterCache[name] = filtered
+    return filtered
+end
+
+-- Filter only what is RENDERED: no board in the Stats room shows more than 10 rows, so rows
+-- past the 10th are left as-is rather than spent on a filter call nothing will ever display.
+local STATS_BOARD_ROWS = 10
+local function filterTop(list: { any }?): { any }
+    local out = {}
+    for i, row in list or {} do
+        if i <= STATS_BOARD_ROWS then
+            local copy = table.clone(row)
+            copy.displayName = cachedFilterName(row.displayName or "?")
+            table.insert(out, copy)
+        else
+            table.insert(out, row)
+        end
+    end
+    return out
+end
+
+local function filterRecords(records: any?): any?
+    if not records then
+        return records
+    end
+    local copy = table.clone(records)
+    copy.longestStreaks = filterTop(records.longestStreaks)
+    copy.biggestBanks = filterTop(records.biggestBanks)
+    copy.biggestRounds = filterTop(records.biggestRounds)
+    return copy
+end
+
+local function filterHeat(heat: any?): any?
+    if not heat then
+        return heat
+    end
+    local copy = table.clone(heat)
+    copy.leaders = filterTop(heat.leaders)
+    return copy
+end
+
 -- THE STATS ROOM'S FEED. Separate from the BoardData poller above on purpose: that one is the
 -- arena's 30s heartbeat and these are four REST reads whose own Cache-Control is 15-30s, so
 -- pulling them on the same tick would triple the arena's request rate for walls nobody may be
@@ -730,10 +788,12 @@ task.spawn(function()
         -- Each field is independently nil-able: one endpoint failing must leave the other three
         -- boards showing their last good content rather than blanking the whole room.
         lastStats = {
-            leaders = if leaders.ok then leaders.data.leaders else (lastStats and lastStats.leaders),
-            recordsWeek = if week.ok then week.data else (lastStats and lastStats.recordsWeek),
-            recordsAll = if all.ok then all.data else (lastStats and lastStats.recordsAll),
-            heat = if heat.ok then heat.data else (lastStats and lastStats.heat),
+            leaders = if leaders.ok
+                then filterTop(leaders.data.leaders)
+                else (lastStats and lastStats.leaders),
+            recordsWeek = if week.ok then filterRecords(week.data) else (lastStats and lastStats.recordsWeek),
+            recordsAll = if all.ok then filterRecords(all.data) else (lastStats and lastStats.recordsAll),
+            heat = if heat.ok then filterHeat(heat.data) else (lastStats and lastStats.heat),
             tape = lastTape,
         }
         StatsData:FireAllClients(lastStats)
