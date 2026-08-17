@@ -134,6 +134,23 @@ otherwise out of F&F scope (showable as-is).
   a CollectionService tag would make the canyon-wide contract explicit. See
   [[viewing-platform]].
 
+## The PWA's sound toggle needs to be on the main page
+
+Owner, 2026-08-17, right after the reveal bell became audible for the first time: "we're
+probably going to need to make the sound on/off more prominent — on the main page,
+ideally."
+
+Today it is a row in the **Stats view** (`StatsView.tsx`, "Audio Output" with a
+`Volume2`/`VolumeX` icon and a volume slider). Defaults to enabled at 0.5. Nothing on the
+game screen indicates whether sound is on, which is a good way to lose an hour — a player
+who muted it once during testing has no way to notice.
+
+Worth doing together with it: the bell only sounds after a gesture unlocks WebAudio, so
+between page load and first tap the game is legitimately silent. A speaker affordance on
+the main page could carry both states honestly — muted by choice versus not yet unlocked —
+where a bare on/off toggle would show "on" while nothing plays. See
+[[misc-engine-traps]] for why that gap exists.
+
 ## HUD dismiss/recall, and throwing from the keyboard
 
 Raised by the owner 2026-08-16 while specifying the [[stats-room]], but these are GLOBAL
