@@ -11,6 +11,17 @@ local Layout = require(ReplicatedStorage:WaitForChild("RoshamboShared"):WaitForC
 
 local MAX_ADJUST = 2.5
 
+-- STALE-CACHE GUARD. Studio's VM caches a ModuleScript's RESULT, so a session that required
+-- StatsRoomLayout before a Rojo sync keeps handing back the old table no matter what the source
+-- says (see docs/wiki/practice/misc-engine-traps.md). An old copy has no SITES, and this tool
+-- would then fail deep in the build loop. Fail here instead, with the fix in the message.
+if not (Layout.SITES and Layout.FLAPS and Layout.isHorizontal) then
+    error(
+        "[statsBoards] STALE MODULE: this Studio VM has an old StatsRoomLayout cached (no SITES). "
+            .. "Restart Studio, then re-run. Nothing was changed."
+    )
+end
+
 local ok, failures = Layout.check()
 if not ok then
     for _, f in failures do
@@ -21,13 +32,15 @@ end
 
 local world = workspace:FindFirstChild("CanyonWorld") or error("Workspace.CanyonWorld missing")
 local structures = world:FindFirstChild("Structures") or error("CanyonWorld.Structures missing")
-local existing = structures:FindFirstChild("StatsBoards")
-if existing then
-    existing:Destroy()
-end
+-- ATOMIC SWAP: BUILD FIRST, DESTROY LAST.
+--
+-- This tool used to destroy the live folder and then build into its replacement, which meant any
+-- failure in between left the room with NO BOARDS AT ALL -- and that is exactly what happened
+-- 2026-08-17, when a stale cached module errored mid-loop and the owner's next look found an
+-- empty cavern. The new parts are assembled into a detached folder and only swapped in once
+-- every one of them exists, so a failure now costs nothing: the old boards are still standing.
 local folder = Instance.new("Folder")
 folder.Name = "StatsBoards"
-folder.Parent = structures
 
 local rc = RaycastParams.new()
 rc.FilterType = Enum.RaycastFilterType.Include
@@ -106,6 +119,13 @@ for _, b in Layout.BOARDS do
         )
     )
 end
+
+-- Every part exists and nothing threw. NOW take down the old set.
+local existing = structures:FindFirstChild("StatsBoards")
+if existing then
+    existing:Destroy()
+end
+folder.Parent = structures
 
 print("[statsBoards] built " .. #Layout.BOARDS .. " boards")
 for _, line in report do

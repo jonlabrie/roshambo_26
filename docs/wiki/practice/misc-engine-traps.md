@@ -40,6 +40,24 @@ cached when `buildStatsBoards.luau` ran an hour earlier. The real cause was else
 **Do this instead:** read `module.Source` and search it for the expected text. Source is
 a live property and is never cached.
 
+**And make any tool that rebuilds place content ATOMIC — build first, destroy last.**
+The stale cache turns "the tool errored" into "the room is empty" if the tool takes the
+old content down before assembling the new. On 2026-08-17 `buildStatsBoards.luau` did
+exactly that and the owner's next look found a cavern with no boards in it. Assemble
+into a detached folder, then swap:
+
+```luau
+local folder = Instance.new("Folder")   -- unparented; nothing is live yet
+-- ... build every part into `folder`; any error here costs nothing ...
+local existing = structures:FindFirstChild("StatsBoards")
+if existing then existing:Destroy() end
+folder.Parent = structures              -- the only destructive moment, and it cannot fail
+```
+
+Pair it with a guard that fails BEFORE any mutation when the cached module is the old
+one — check for a symbol the new version introduced, and say "restart Studio" in the
+message, because nothing else clears the cache.
+
 ```luau
 local m = ReplicatedStorage.RoshamboShared.StatsRoomLayout
 print(m.Source:find("h = 7.2", 1, true) ~= nil)  -- truth; require() may lie
