@@ -337,6 +337,10 @@ local function playerByUserId(userId: string): Player?
 end
 
 local lastTape: any = {}
+local lastTapeId: string? = nil
+-- Declared up here because the round callback below re-broadcasts it the instant a
+-- round settles, and that callback is wired long before the stats poller is built.
+local lastStats: any = nil
 
 -- FORWARD DECLARATION. The referee's helpers need playerEconomy and PadSites, which are built far
 -- below; but the reveal fan-out just above here has to re-push shell state the moment a round
@@ -356,7 +360,20 @@ local coordinator = RoundCoordinator.new({
         onRound = function(info)
             RoundUpdate:FireAllClients(info)
             if info.tape then
+                -- PUSH THE TAPE THE MOMENT A ROUND SETTLES. It used to ride only on the 60s
+                -- stats poll, which is exactly the round period -- so the poll aliased with the
+                -- round and landed at the same phase offset forever. The owner saw the summary
+                -- board refresh with about four seconds left in every round and nowhere else.
+                -- `onRound` fires on each phase change, but the tape only grows at settlement,
+                -- so this is gated on the newest entry's id rather than on the callback.
+                local newest = info.tape[1] and info.tape[1].id
+                local grew = newest ~= lastTapeId
                 lastTape = info.tape
+                lastTapeId = newest
+                if grew and lastStats then
+                    lastStats.tape = lastTape
+                    StatsData:FireAllClients(lastStats)
+                end
             end
         end,
         -- WHEN CELEBRATIONS COME BACK, FIRE THEM ON THE DRUM, NOT ON THE WIRE. RevealTheater
@@ -778,7 +795,6 @@ end
 -- pulling them on the same tick would triple the arena's request rate for walls nobody may be
 -- standing in front of. 60s is slower than any of the caches and still far finer than the
 -- cadence at which a career board actually moves.
-local lastStats: any = nil
 task.spawn(function()
     while true do
         local leaders = net:getLeaderboards("world")
@@ -797,7 +813,11 @@ task.spawn(function()
             tape = lastTape,
         }
         StatsData:FireAllClients(lastStats)
-        task.wait(60)
+        -- 47, NOT 60. A 60s wait is exactly the round period (OPEN 51 + LOCK 2 +
+        -- REVEAL 7), so the poll would alias with the round and refresh the slow
+        -- boards at the same phase offset forever. 47 still clears the 30s and 15s
+        -- Cache-Control windows on the endpoints it reads.
+        task.wait(47)
     end
 end)
 

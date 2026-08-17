@@ -15,6 +15,7 @@ local Model = require(shared:WaitForChild("StatsBoardModel"))
 local FlapScheduler = require(shared:WaitForChild("FlapScheduler"))
 local StatsFixtures = require(shared:WaitForChild("StatsFixtures"))
 local FlapBoard = require(script.Parent:WaitForChild("FlapBoard"))
+local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local StatsData = remotes:WaitForChild("StatsData") :: RemoteEvent
@@ -29,6 +30,29 @@ end
 local boards: { [Instance]: { board: any, id: string, rows: number, cols: number } } = {}
 local latestStats: any = nil
 local latestPersonal: any = nil
+
+-- ===== THE DRUM GATE, AND WHY THESE TWO BOARDS NEED ONE =====
+--
+-- THE WORLD THROW IS THE PLURALITY OF PLAYER THROWS (GameRules.deriveWorldThrow), so a board
+-- showing "ROCK 45% PAPER 29% SCISSORS 26%" has NAMED the World Throw. `world` carries the
+-- throw outright. Both read the tape, and the tape gains its newest entry at settlement --
+-- about 3.45s before the drum out in the arena comes to rest.
+--
+-- Until 2026-08-17 neither board was gated, and both were safe only by accident: the stats poll
+-- was 60s against a 60s round, so it aliased and happened to land after the drum had settled.
+-- Fixing the aliasing (the owner noticed the summary only ever refreshed with ~4s left in a
+-- round) would have turned that accident into a spoiler on every reveal.
+--
+-- So tape-derived boards paint from `shownTape`, which only advances on the `drumRest` cue --
+-- the same gate LanternController, TheaterController and main.client all hold their reveals on.
+-- A dropped cue costs a round's freshness, never a spoiler.
+local TAPE_BOARDS = { world = true, summary = true }
+local shownTape: any = nil
+local pendingTape: any = nil
+
+local function newestId(tape: any): string?
+    return tape and tape[1] and tape[1].id
+end
 
 local function useFixtures(): boolean
     return workspace:GetAttribute(FIXTURE_ATTR) == true
@@ -45,13 +69,16 @@ local function linesFor(id: string, rows: number, cols: number): { string }?
     elseif id == "judgement" then
         return Model.compose(Model.judgementSections(s and s.recordsWeek), o)
     elseif id == "world" then
-        return Model.compose(Model.worldSections(s and s.tape, s and s.heat), o)
+        -- `shownTape`, not `s.tape`: the drum gate above.
+        local tape = if useFixtures() then StatsFixtures.STATS.tape else shownTape
+        return Model.compose(Model.worldSections(tape, s and s.heat), o)
     elseif id == "fuda" then
         return Model.compose(Model.fudaSections(p), o)
     elseif id == "summary" then
         -- The vestibule's other slip. Reads the same StatsData the walls do -- `tape` is already
         -- in the payload for the form guide, so this board costs one adapter and no new wire.
-        return Model.compose(Model.summarySections(s and s.tape), o)
+        local tape = if useFixtures() then StatsFixtures.STATS.tape else shownTape
+        return Model.compose(Model.summarySections(tape), o)
     end
     return nil
 end
@@ -66,6 +93,14 @@ end
 local function repaintAll()
     for _, entry in boards do
         repaint(entry)
+    end
+end
+
+local function repaintTapeBoards()
+    for _, entry in boards do
+        if TAPE_BOARDS[entry.id] then
+            repaint(entry)
+        end
     end
 end
 
@@ -119,7 +154,27 @@ CollectionService:GetInstanceRemovedSignal(Layout.TAG):Connect(unregister)
 
 StatsData.OnClientEvent:Connect(function(data)
     latestStats = data
+    -- HOLD ONLY A ROUND THE DRUM HAS NOT FINISHED ANNOUNCING. Everything else lands at once:
+    -- the same round's payload with other fields moved, and -- deliberately -- the FIRST payload
+    -- on join, whose newest entry is a round that revealed before this client existed. Holding
+    -- that one for a `drumRest` up to a minute away would leave both boards reading NO DATA YET
+    -- on arrival, which is the section 8 failure the empty state exists to avoid. The residual
+    -- window is a player joining inside the 3.45s between strike and rest who then walks to a
+    -- board within it, and the drum is not visible from either room anyway.
+    if shownTape ~= nil and newestId(data.tape) ~= newestId(shownTape) then
+        pendingTape = data.tape
+    else
+        shownTape = data.tape
+    end
     repaintAll()
+end)
+
+EventBus.Cue.Event:Connect(function(cue)
+    if cue.kind == "drumRest" and pendingTape then
+        shownTape = pendingTape
+        pendingTape = nil
+        repaintTapeBoards()
+    end
 end)
 
 StatsPersonal.OnClientEvent:Connect(function(data)
