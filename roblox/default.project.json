@@ -39,7 +39,9 @@
                 "RevokeUser": { "$className": "RemoteEvent" },
                 "AccessState": { "$className": "RemoteEvent" },
                 "AccessBlocked": { "$className": "RemoteEvent" },
-                "RequestSync": { "$className": "RemoteEvent" }
+                "RequestSync": { "$className": "RemoteEvent" },
+                "StatsData": { "$className": "RemoteEvent" },
+                "StatsPersonal": { "$className": "RemoteEvent" }
             }
         },
         "Workspace": {

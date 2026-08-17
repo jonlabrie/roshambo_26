@@ -125,6 +125,26 @@ function NetworkClient.getLeaderboards(self: any, scope: string): Result
     return self:_request("GET", `/api/v1/leaderboards?scope={scope}`)
 end
 
+-- /api/v1/stats is mounted AHEAD of the X-API-Key gate (server/src/routes/mount.ts) because these
+-- boards read nothing a player could mutate. The key still rides along on _request; it is ignored.
+function NetworkClient.getStatsRecords(self: any, window: string): Result
+    return self:_request("GET", `/api/v1/stats/records?window={window}`)
+end
+
+function NetworkClient.getStatsHeat(self: any, window: string, instanceId: string?): Result
+    local path = `/api/v1/stats/heat?window={window}`
+    -- An EMPTY instanceId must not be sent: the route reads it as a scope and would resolve the
+    -- presence set for the instance named "", returning an empty board instead of the global one.
+    if instanceId and instanceId ~= "" then
+        path ..= `&instanceId={instanceId}`
+    end
+    return self:_request("GET", path)
+end
+
+function NetworkClient.getStatsPlayer(self: any, robloxUserId: string): Result
+    return self:_request("GET", `/api/v1/stats/player/{robloxUserId}`)
+end
+
 function NetworkClient.getTeahouses(self: any, robloxUserId: string): Result
     return self:_request("GET", `/api/v1/players/{robloxUserId}/teahouses`)
 end

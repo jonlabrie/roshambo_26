@@ -95,6 +95,8 @@ local AccessBlocked = remotes:WaitForChild("AccessBlocked") :: RemoteEvent
 local RequestFireworkLaunch = remotes:WaitForChild("RequestFireworkLaunch") :: RemoteEvent
 local FireworkLaunched = remotes:WaitForChild("FireworkLaunched") :: RemoteEvent
 local FireworkState = remotes:WaitForChild("FireworkState") :: RemoteEvent
+local StatsData = remotes:WaitForChild("StatsData") :: RemoteEvent
+local StatsPersonal = remotes:WaitForChild("StatsPersonal") :: RemoteEvent
 local TextService = game:GetService("TextService")
 
 local secretsModule = script.Parent:FindFirstChild("SecretsLocal")
@@ -710,6 +712,56 @@ end)
 Players.PlayerAdded:Connect(function(player)
     if lastBoard then
         BoardData:FireClient(player, lastBoard)
+    end
+end)
+
+-- THE STATS ROOM'S FEED. Separate from the BoardData poller above on purpose: that one is the
+-- arena's 30s heartbeat and these are four REST reads whose own Cache-Control is 15-30s, so
+-- pulling them on the same tick would triple the arena's request rate for walls nobody may be
+-- standing in front of. 60s is slower than any of the caches and still far finer than the
+-- cadence at which a career board actually moves.
+local lastStats: any = nil
+task.spawn(function()
+    while true do
+        local leaders = net:getLeaderboards("world")
+        local week = net:getStatsRecords("week")
+        local all = net:getStatsRecords("all")
+        local heat = net:getStatsHeat("day", nil)
+        -- Each field is independently nil-able: one endpoint failing must leave the other three
+        -- boards showing their last good content rather than blanking the whole room.
+        lastStats = {
+            leaders = if leaders.ok then leaders.data.leaders else (lastStats and lastStats.leaders),
+            recordsWeek = if week.ok then week.data else (lastStats and lastStats.recordsWeek),
+            recordsAll = if all.ok then all.data else (lastStats and lastStats.recordsAll),
+            heat = if heat.ok then heat.data else (lastStats and lastStats.heat),
+            tape = lastTape,
+        }
+        StatsData:FireAllClients(lastStats)
+        task.wait(60)
+    end
+end)
+
+-- The personal slip. Per-player, so it is pushed per-player: on join, and on the same 60s beat.
+local function pushStatsPersonal(player: Player)
+    local res = net:getStatsPlayer(tostring(player.UserId))
+    -- A 404 is the NORMAL state for someone who has never thrown. Send the empty shape rather
+    -- than nothing, so the slip renders its zeros instead of hanging on "no data".
+    StatsPersonal:FireClient(player, if res.ok then res.data else { displayName = player.DisplayName })
+end
+
+Players.PlayerAdded:Connect(function(player)
+    if lastStats then
+        StatsData:FireClient(player, lastStats)
+    end
+    task.spawn(pushStatsPersonal, player)
+end)
+
+task.spawn(function()
+    while true do
+        task.wait(60)
+        for _, player in Players:GetPlayers() do
+            task.spawn(pushStatsPersonal, player)
+        end
     end
 end)
 
