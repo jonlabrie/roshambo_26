@@ -46,6 +46,14 @@ export type Config = {
 local PANEL_T = 0.06 -- static half-panel thickness
 local LEAF_T = 0.05 -- the moving card; thinner, so it clears the panels it sweeps over
 local GAP = 0.012
+-- THE HINGE HAS TO BE A THING YOU CAN SEE. The static halves used to simply touch at y=0 with
+-- nothing between them, so there was no seam at all -- "the hinge is nearly invisible on the
+-- round display and completely invisible on the clock" (owner, 2026-08-17). A real board shows a
+-- dark line there: the gap between the two faces and the rod they hang from. So the halves are
+-- inset to open a gap, and a dark bar sits in it, standing slightly proud so it catches light as
+-- a rod rather than reading as a painted stripe.
+local SEAM_FRACTION = 0.035 -- of cell height
+local SEAM_COLOR = Color3.fromRGB(52, 46, 38)
 local BOARD_T = 0.4 -- StatsRoomLayout.THICKNESS; the board's own depth
 local FACE = Color3.fromRGB(244, 238, 222)
 local CARD = Color3.fromRGB(232, 225, 208) -- the moving card, a shade under the static faces
@@ -96,14 +104,24 @@ function FlapUnit.new(cfg: Config)
     local panelZ = -(BOARD_T / 2 + PANEL_T / 2 + GAP)
     local leafZ = panelZ - (PANEL_T / 2 + LEAF_T / 2 + GAP)
 
+    -- THE HALVES STAY FULL HEIGHT and the rod lies OVER their join. Insetting them to open a gap
+    -- was the obvious move and it silently breaks the painters: they size a full character from
+    -- the panel's height, so shortening the panel shrinks the character and pushes its centre off
+    -- the hinge. The rod covers the join instead, which is what a hinge does anyway.
+    local seam = math.max(0.02, cfg.height * SEAM_FRACTION)
     local upper = makePart("Upper", cfg.board, Vector3.new(cfg.width, halfH, PANEL_T), FACE)
     local lower = makePart("Lower", cfg.board, Vector3.new(cfg.width, halfH, PANEL_T), FACE)
+    -- The rod lives in the 0.012 studs between the panel faces and the cards that sweep over
+    -- them, so its DEPTH is set by that clearance, not chosen. Thin in Z costs nothing: what
+    -- makes a hinge read from across the room is its height and its darkness, not its thickness.
+    local rodT = GAP * 0.8
+    local hinge = makePart("Hinge", cfg.board, Vector3.new(cfg.width, seam, rodT), SEAM_COLOR)
     local leafTop = makePart("LeafTop", cfg.board, Vector3.new(cfg.width, halfH, LEAF_T), CARD)
     local leafBottom = makePart("LeafBottom", cfg.board, Vector3.new(cfg.width, halfH, LEAF_T), CARD)
 
     local self = setmetatable({
         _cfg = cfg,
-        _parts = { upper, lower, leafTop, leafBottom },
+        _parts = { upper, lower, leafTop, leafBottom, hinge },
         -- The hinge: the cell's centre line, standing off the board face. Both leaves pivot here.
         _pivot = CFrame.new(cfg.localX, 0, leafZ),
         _halfH = halfH,
@@ -111,9 +129,13 @@ function FlapUnit.new(cfg: Config)
         _value = nil :: string?,
         _token = 0,
         _dead = false,
-        -- Static halves sit at +/- a quarter cell either side of the hinge.
+        -- Static halves sit at +/- a quarter cell either side of the hinge, touching.
         _upperCF = CFrame.new(cfg.localX, halfH / 2, panelZ),
         _lowerCF = CFrame.new(cfg.localX, -halfH / 2, panelZ),
+        -- On the hinge line, in front of the panel faces and behind the leaves: dead centre of
+        -- the clearance between them. Proud enough to catch light as a rod rather than read as a
+        -- painted stripe, and never intersecting a card mid-turn.
+        _hingeCF = CFrame.new(cfg.localX, 0, panelZ - PANEL_T / 2 - GAP / 2),
         setUpper = cfg.paint(upper, canvasW, HALF_CANVAS, 1),
         setLower = cfg.paint(lower, canvasW, HALF_CANVAS, 0),
         setLeafTop = cfg.paint(leafTop, canvasW, HALF_CANVAS, 1),
@@ -135,6 +157,7 @@ function FlapUnit._place(self: any)
     local base = self._cfg.board.CFrame
     self._parts[1].CFrame = base * self._upperCF
     self._parts[2].CFrame = base * self._lowerCF
+    self._parts[5].CFrame = base * self._hingeCF
     -- At rest the static halves carry the character and BOTH leaves are hidden outright.
     self:_poseTop(-math.pi / 2)
     self:_poseBottom(math.pi / 2)

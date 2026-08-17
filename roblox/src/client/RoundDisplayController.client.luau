@@ -169,10 +169,13 @@ local function register(part: Instance)
                 t.FontFace = FONT
                 t.TextColor3 = PRINTED_INK
                 t.Text = statics[c]
-                -- The column's own slice of that face: centre from its local X, width from its
-                -- share of the board.
+                -- The column's own slice of that face. MINUS, not plus: a SurfaceGui canvas runs
+                -- left-to-right as seen from the front, and the viewer's left is local +X -- so
+                -- canvas fraction and local X run in OPPOSITE directions. Getting this backwards
+                -- put the colon at 0.64 where it belongs at 0.36, directly behind column three's
+                -- flap panels, which is why it read as missing rather than misplaced.
                 t.AnchorPoint = Vector2.new(0.5, 0.5)
-                t.Position = UDim2.fromScale(0.5 + col.x / spec.w, 0.5)
+                t.Position = UDim2.fromScale(0.5 - col.x / spec.w, 0.5)
                 t.Size = UDim2.fromScale(col.w / spec.w, 1)
                 t.Parent = boardFace
             else
