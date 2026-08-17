@@ -40,6 +40,10 @@ export type Config = {
     height: number, -- cell height in studs
     paint: Painter,
     halfSeconds: number?,
+    -- Draw a divider bar on this unit's far side (towards the NEXT column, which is at lower
+    -- local X). The controller sets it where two flap columns meet and nothing else separates
+    -- them -- the two seconds digits had no divider at all and ran together (owner, 2026-08-17).
+    dividerAfter: boolean?,
     -- The character's height as a share of the cell. See halfCanvasFor.
     charFraction: number?,
 }
@@ -65,15 +69,18 @@ local FACE = Color3.fromRGB(244, 238, 222)
 local CARD = Color3.fromRGB(232, 225, 208) -- the moving card, a shade under the static faces
 local DEFAULT_HALF = 0.055
 
--- THE CHARACTER'S SHARE OF THE CELL is what a caller actually wants to choose, and the canvas
--- size falls out of it. TextSize is hard-capped at 100px, so a bigger character cannot be had by
--- asking for more pixels -- only by making the CANVAS smaller, which is the same
--- small-canvas-stretched-large trick the wall boards use.
+-- THE CHARACTER'S SHARE OF THE CELL, and the canvas size falls out of it. TextSize is hard-capped
+-- at 100px, so a bigger character cannot be had by asking for more pixels -- only by making the
+-- CANVAS smaller, the same small-canvas-stretched-large trick the wall boards use.
 --
 --   halfCanvas = GLYPH_PX / (2 * fraction)      -- a full character spans two half-panels
 --
--- 0.6 was the original for everything. The clock asks for 0.9: "numerals/digits on the clock
--- could be 50% larger" (owner, 2026-08-17), and 0.6 x 1.5 = 0.9.
+-- ⚠ THIS IS TEXTSIZE'S SHARE, NOT THE INK'S. A digit's drawn height is only about 0.72 of its
+-- TextSize -- the rest of the em is leading and space for ascenders and descenders that a numeral
+-- does not use. So `fraction` 0.9 draws a digit at roughly 0.65 of the cell, which is why the
+-- clock still read small after being asked for 50% more and getting it. Multiply by ~0.72 to
+-- predict what the eye will see, or set this above 1.0 without alarm: a numeral has no descender
+-- to clip.
 local GLYPH_PX = 96
 local DEFAULT_CHAR_FRACTION = 0.6
 
@@ -134,12 +141,19 @@ function FlapUnit.new(cfg: Config)
     -- makes a hinge read from across the room is its height and its darkness, not its thickness.
     local rodT = GAP * 0.35
     local hinge = makePart("Hinge", cfg.board, Vector3.new(cfg.width, seam, rodT), SEAM_COLOR)
+    -- The vertical divider is the hinge rod's twin: same colour, same depth, same clearance, so
+    -- the two read as one piece of ironmongery framing the cell rather than two decisions.
+    local divider = if cfg.dividerAfter
+        then makePart("Divider", cfg.board, Vector3.new(seam, cfg.height, rodT), SEAM_COLOR)
+        else nil
     local leafTop = makePart("LeafTop", cfg.board, Vector3.new(cfg.width, halfH, LEAF_T), CARD)
     local leafBottom = makePart("LeafBottom", cfg.board, Vector3.new(cfg.width, halfH, LEAF_T), CARD)
 
     local self = setmetatable({
         _cfg = cfg,
         _parts = { upper, lower, leafTop, leafBottom, hinge },
+        _divider = divider,
+        _dividerCF = CFrame.new(cfg.localX - cfg.width / 2, 0, panelZ - PANEL_T / 2 - GAP / 2),
         -- The hinge: the cell's centre line, standing off the board face. Both leaves pivot here.
         _pivot = CFrame.new(cfg.localX, 0, leafZ),
         _halfH = halfH,
@@ -176,6 +190,9 @@ function FlapUnit._place(self: any)
     self._parts[1].CFrame = base * self._upperCF
     self._parts[2].CFrame = base * self._lowerCF
     self._parts[5].CFrame = base * self._hingeCF
+    if self._divider then
+        self._divider.CFrame = base * self._dividerCF
+    end
     -- At rest the static halves carry the character and BOTH leaves are hidden outright.
     self:_poseTop(-math.pi / 2)
     self:_poseBottom(math.pi / 2)
@@ -298,6 +315,9 @@ function FlapUnit.destroy(self: any)
     end
     for _, p in self._parts do
         p:Destroy()
+    end
+    if self._divider then
+        self._divider:Destroy()
     end
     table.clear(self._parts)
 end

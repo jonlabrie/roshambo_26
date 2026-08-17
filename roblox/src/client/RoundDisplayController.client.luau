@@ -59,9 +59,11 @@ local function clockFont(): Font
     return if ok then f else FALLBACK_FONT
 end
 
--- 0.6 x 1.5. The clock's numerals carry the room from any distance; the throw glyph is already
--- four studs of panel and needs no help.
-local CLOCK_CHAR_FRACTION = 0.9
+-- ABOVE 1.0 ON PURPOSE. A digit's drawn height is only ~0.72 of its TextSize (see FlapUnit), so
+-- 0.9 was putting ink at roughly 0.65 of the cell -- which is why the clock still read small after
+-- being given "50% larger" and getting exactly that. 1.2 puts the numeral near 0.86 of the cell.
+-- Safe above 1.0 because a numeral has no descender to clip.
+local CLOCK_CHAR_FRACTION = 1.2
 
 -- Paper is a horizontal bar and the hinge is a horizontal line, so centred on the seam the two
 -- coincide and the bar is bisected by the thing it most resembles. Live-tunable: this is a by-eye
@@ -116,6 +118,15 @@ local function glyphPainter(part: BasePart, canvasW: number, canvasH: number, an
     local set: { [string]: Frame } = {}
     for _, sym in RoundDisplay.SYMBOLS do
         local f = Glyphs.render(clip, sym, INK, FACE)
+        -- NO OUTLINE (owner, 2026-08-17: "the white stroke is unneeded"). Glyphs.render draws a
+        -- wider outline behind the core so a caller can tint the two separately -- the lanterns
+        -- want gilt-on-ink. On an ivory flap face there is nothing for a light keyline to
+        -- separate the glyph FROM, so it just reads as a halo. Hidden rather than tinted to
+        -- match: tinting it to the ink colour would silently fatten every glyph.
+        local outline = f:FindFirstChild("Outline")
+        if outline then
+            outline.Visible = false
+        end
         f.Size = UDim2.fromOffset(side, side)
         f.AnchorPoint = Vector2.new(0.5, 0.5)
         f.Position = UDim2.new(0.5, 0, anchorY, glyphNudge(sym) * side)
@@ -218,6 +229,10 @@ local function register(part: Instance)
                     height = spec.h,
                     paint = textPainter,
                     charFraction = CLOCK_CHAR_FRACTION,
+                    -- A divider only where two FLAP columns meet. The colon already separates
+                    -- what sits either side of it, so a bar there would be a second separator
+                    -- doing the same job.
+                    dividerAfter = c < spec.cols and not statics[c + 1] and not statics[c],
                 })
             end
         end
