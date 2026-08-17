@@ -85,6 +85,17 @@ end
 -- Safe above 1.0 because a numeral has no descender to clip.
 local CLOCK_CHAR_FRACTION = 1.2
 
+-- OPTICAL SEAT FOR THE CLOCK'S FACE, as a fraction of the character's height. NEGATIVE IS UP.
+-- Same problem the wall boards have and the same reason it cannot be one number for both: where
+-- a numeral sits inside its em is a property of the face, and Oswald rides low where
+-- TitilliumWeb does not. Live on `ClockTextNudge`.
+local CLOCK_NUDGE_ATTR = "ClockTextNudge"
+local DEFAULT_CLOCK_NUDGE = -0.03
+local function clockTextNudge(): number
+    local live = workspace:GetAttribute(CLOCK_NUDGE_ATTR)
+    return if typeof(live) == "number" then live else DEFAULT_CLOCK_NUDGE
+end
+
 -- Paper is a horizontal bar and the hinge is a horizontal line, so centred on the seam the two
 -- coincide and the bar is bisected by the thing it most resembles. Live-tunable: this is a by-eye
 -- number and reading it off an attribute beats another sync-and-rejoin per guess.
@@ -118,7 +129,9 @@ end
 -- Both of these are by-eye numbers being auditioned; reading them only at build time meant a
 -- Studio restart per candidate, which is a poor loop for the one thing an owner has to judge by
 -- looking. Kept as plain lists because they are written once per flap and read only on a change.
-local clockLabels: { TextLabel } = {}
+-- Records, not bare labels: a live nudge has to recompute a Position from the label's own anchor
+-- and character height, which a plain list of TextLabels cannot supply.
+local clockLabels: { { label: TextLabel, anchorY: number, charPx: number } } = {}
 local glyphFrames: { { frame: Frame, sym: string, side: number, anchorY: number } } = {}
 
 local function textPainter(part: BasePart, canvasW: number, canvasH: number, anchorY: number)
@@ -127,14 +140,14 @@ local function textPainter(part: BasePart, canvasW: number, canvasH: number, anc
     t.BackgroundTransparency = 1
     t.Size = UDim2.fromOffset(canvasW, canvasH * 2) -- a full character; the panel shows half
     t.AnchorPoint = Vector2.new(0.5, 0.5)
-    t.Position = UDim2.fromScale(0.5, anchorY)
+    t.Position = UDim2.new(0.5, 0, anchorY, clockTextNudge() * canvasH * 2)
     t.TextSize = FlapUnit.GLYPH_PX
     t.FontFace = clockFont()
     t.TextColor3 = INK
     t.TextScaled = false
     t.Text = " "
     t.Parent = clip
-    table.insert(clockLabels, t)
+    table.insert(clockLabels, { label = t, anchorY = anchorY, charPx = canvasH * 2 })
     return function(v: string?)
         t.Text = v or " "
     end
@@ -171,11 +184,13 @@ end
 
 -- LIVE RE-TUNING. Both attributes are read on change and applied to what already exists, so a
 -- font can be auditioned or a glyph nudged without restarting Play.
-for _, attr in { "ClockFont", "ClockFontWeight" } do
+for _, attr in { "ClockFont", "ClockFontWeight", CLOCK_NUDGE_ATTR } do
     workspace:GetAttributeChangedSignal(attr):Connect(function()
         local f = clockFont()
-        for _, t in clockLabels do
-            t.FontFace = f
+        local nudge = clockTextNudge()
+        for _, e in clockLabels do
+            e.label.FontFace = f
+            e.label.Position = UDim2.new(0.5, 0, e.anchorY, nudge * e.charPx)
         end
     end)
 end
