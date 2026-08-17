@@ -24,7 +24,11 @@ export type Config = {
 }
 
 local PAD = 0.08 -- inset fraction within each cell
-local BOARD_FONT = Enum.Font.Merriweather
+-- JosefinSans was the owner's gate pick on 2026-06-07 (`77d8940`, "softer, elegant"). It was
+-- replaced by Merriweather two hours later the same evening (`331f13d`) with no gate note --
+-- an unapproved substitution that then rode into this module with the extraction. Restored
+-- 2026-08-17 at the owner's word: "typeface is wrong, let's see JosefinSans".
+local BOARD_FONT = Enum.Font.JosefinSans
 local GLYPH_FULL = UDim2.fromScale(1, 1)
 local GLYPH_SQUASHED = UDim2.fromScale(1, 0.05)
 
