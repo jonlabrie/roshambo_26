@@ -28,7 +28,11 @@ local PAD = 0.08 -- inset fraction within each cell
 -- replaced by Merriweather two hours later the same evening (`331f13d`) with no gate note --
 -- an unapproved substitution that then rode into this module with the extraction. Restored
 -- 2026-08-17 at the owner's word: "typeface is wrong, let's see JosefinSans".
-local BOARD_FONT = Enum.Font.JosefinSans
+-- FontFace, not the legacy Font enum, because the enum has no weight. Probed against the
+-- bundled family 2026-08-17: Thin..Bold all measure differently, ExtraBold and Heavy return
+-- Bold's exact bounds -- so Bold is the heaviest real face and anything above it falls back.
+local BOARD_FONT =
+    Font.new("rbxasset://fonts/families/JosefinSans.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
 local GLYPH_FULL = UDim2.fromScale(1, 1)
 local GLYPH_SQUASHED = UDim2.fromScale(1, 0.05)
 
@@ -69,7 +73,7 @@ local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { { TextLabel } 
             glyph.TextColor3 = Color3.fromRGB(40, 30, 18)
             glyph.TextScaled = false
             glyph.TextSize = cfg.metrics.glyphSize
-            glyph.Font = BOARD_FONT
+            glyph.FontFace = BOARD_FONT
             glyph.TextXAlignment = Enum.TextXAlignment.Center
             glyph.TextYAlignment = Enum.TextYAlignment.Center
             glyph.Text = " "
