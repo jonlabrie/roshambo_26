@@ -44,13 +44,21 @@ for _, b in Layout.BOARDS do
     local hit = workspace:Raycast(start, axis * (Layout.CAST_BACK + MAX_ADJUST + 2), rc)
     local seated = Layout.seat(nominal, hit and hit.Distance or nil, inward, MAX_ADJUST)
 
+    -- FIX 7: the personal slip and the band read as paper-and-wood against the dark timber
+    -- frames everything else gets — the spec's material contrast IS "this one is yours",
+    -- without a word of copy. `fuda` is the slip itself; the four `band*` segments share the
+    -- treatment (spec: "the band shares that treatment"). A prefix test on `b.id` rather than
+    -- four hardcoded ids, so a fifth band segment or a renamed slip inherits this for free.
+    local isPersonal = b.id == "fuda" or b.id:sub(1, 4) == "band"
     local part = Instance.new("Part")
     part.Name = b.id
     part.Anchored = true
     part.CanCollide = false
     part.CastShadow = false
-    part.Material = Enum.Material.WoodPlanks
-    part.Color = Color3.fromRGB(74, 58, 40) -- dark timber frame; the flap cells supply the ivory
+    part.Material = if isPersonal then Enum.Material.Wood else Enum.Material.WoodPlanks
+    part.Color = if isPersonal
+        then Color3.fromRGB(196, 172, 132) -- pale, paper-and-wood
+        else Color3.fromRGB(74, 58, 40) -- dark timber frame; the flap cells supply the ivory
     part.Size = Vector3.new(b.w, b.h, Layout.THICKNESS)
     local px = if horizontal then b.x else seated
     local pz = if horizontal then seated else b.z
