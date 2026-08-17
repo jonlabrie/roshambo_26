@@ -64,7 +64,17 @@ the defect.
 | | flap | why |
 |---|---|---|
 | Wall boards | **0.615 × 0.72** | `banzuke`'s proportions, which the owner approved |
-| Personal slip | **0.425 × 0.50** | 16 columns inside the vestibule's 7.40-stud wall |
+| Personal slips | **0.34 × 0.40** | 16 columns at 5.44 studs on a 7.40 wall — a stud of quiet either side |
+
+The slip started at 0.425 × 0.50 and was cut a further 20% at the owner's look: the
+first fit *filled* its wall, and a slip that fills its wall reads as a board rather than
+as the small personal thing it is.
+
+**Every board is framed in the same dark wood** (owner, 2026-08-17). The vestibule pair
+briefly got a pale frame, reaching for §6.2's "paper-and-wood against stone" — but the
+paper is the ivory flap face, which every board already has, and the wood is what
+surrounds it. Two frame colours made the room read as two rooms. The slips stay distinct
+by being a finer module, which is the honest difference.
 
 ### Where things go
 

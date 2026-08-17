@@ -70,11 +70,13 @@ for _, b in Layout.BOARDS do
     part.Anchored = true
     part.CanCollide = false
     part.CastShadow = false
-    -- The personal slip and its facing summary board are paper-and-wood against stone (spec
-    -- section 6.2), so they read as a different instrument from the dark wall boards.
-    local personal = b.flap == Layout.FLAPS.slip
-    part.Material = if personal then Enum.Material.Wood else Enum.Material.WoodPlanks
-    part.Color = if personal then Color3.fromRGB(168, 140, 104) else Color3.fromRGB(74, 58, 40)
+    -- EVERY board is framed in the same dark wood (owner, 2026-08-17). The pale frame briefly
+    -- given to the vestibule pair was reaching for spec 6.2's "paper-and-wood against stone" in
+    -- the wrong place: the PAPER is the ivory flap face, which every board already has, and the
+    -- wood is what surrounds it. Two frame colours just made the room look like two rooms. The
+    -- slips stay distinct by being a finer module, which is the honest difference.
+    part.Material = Enum.Material.WoodPlanks
+    part.Color = Color3.fromRGB(74, 58, 40)
     part.Size = Vector3.new(b.w, b.h, Layout.THICKNESS)
     local px = if horizontal then b.x else seated
     local pz = if horizontal then seated else b.z

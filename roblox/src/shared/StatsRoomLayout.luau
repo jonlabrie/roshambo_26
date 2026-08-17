@@ -25,8 +25,11 @@ local StatsRoomLayout = {}
 StatsRoomLayout.FLAPS = {
     -- banzuke's proportions, which the owner approved at the 2026-08-17 gate.
     wall = { w = 0.615, h = 0.72 },
-    -- Sized so 16 columns fit the vestibule's 7.40-stud side wall with a margin.
-    slip = { w = 0.425, h = 0.50 },
+    -- Sized so 16 columns fit the vestibule's 7.40-stud side wall with a margin, then cut a
+    -- further 20% at the owner's look (2026-08-17): the first fit filled the wall, and a slip
+    -- that fills its wall reads as a board rather than as the small personal thing it is.
+    -- 16 x 0.34 = 5.44 wide on a 7.40 wall, so it now sits with a stud of quiet either side.
+    slip = { w = 0.34, h = 0.40 },
 }
 
 -- ===== SITES =====
