@@ -352,6 +352,24 @@ function StatsRoomLayout.seat(
     return nominal + adjust + inward * StatsRoomLayout.STANDOFF
 end
 
+-- Per-column geometry in the board's OWN frame: each column's centre offset along local X, and
+-- its width in studs. The physical flaps need this to place themselves; keeping it here rather
+-- than in the controller means the renderer and the declared width cannot disagree about where
+-- column three begins.
+export type Column = { x: number, w: number }
+function StatsRoomLayout.columns(board: Board): { Column }
+    local units = StatsRoomLayout.widthUnits(board.cols, board.colWidths)
+    local unitW = board.w / units
+    local out: { Column } = {}
+    local cursor = -board.w / 2
+    for c = 1, board.cols do
+        local w = ((board.colWidths and board.colWidths[c]) or 1) * unitW
+        table.insert(out, { x = cursor + w / 2, w = w })
+        cursor += w
+    end
+    return out
+end
+
 function StatsRoomLayout.check(): (boolean, { string })
     local failures: { string } = {}
     for _, b in StatsRoomLayout.BOARDS do

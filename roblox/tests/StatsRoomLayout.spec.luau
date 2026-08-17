@@ -166,6 +166,32 @@ describe("StatsRoomLayout", function()
         expect(byId("skillFuture").shuttered).toBe(true)
     end)
 
+    test("columns tile the board exactly, edge to edge, in order", function()
+        local c = byId("roundClock")
+        local cols = L.columns(c)
+        expect(#cols).toBe(4)
+        -- No gaps and no overlaps: each column starts where the last ended.
+        local cursor = -c.w / 2
+        for _, col in cols do
+            expect(math.abs((col.x - col.w / 2) - cursor) < 1e-6).toBeTruthy()
+            cursor += col.w
+        end
+        expect(math.abs(cursor - c.w / 2) < 1e-6).toBeTruthy()
+    end)
+
+    test("the printed colon's column is half the width of a digit's", function()
+        local cols = L.columns(byId("roundClock"))
+        expect(math.abs(cols[2].w - cols[1].w / 2) < 1e-6).toBeTruthy()
+        expect(math.abs(cols[3].w - cols[1].w) < 1e-6).toBeTruthy()
+    end)
+
+    test("a single-column board is one full-width column centred on the board", function()
+        local cols = L.columns(byId("roundThrow"))
+        expect(#cols).toBe(1)
+        expect(cols[1].x).toBe(0)
+        expect(cols[1].w).toBe(byId("roundThrow").w)
+    end)
+
     test("yaw turns each wall's board face into the room", function()
         expect(L.yawFor("north")).toBe(180)
         expect(L.yawFor("south")).toBe(0)
