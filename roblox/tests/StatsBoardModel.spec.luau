@@ -135,9 +135,18 @@ describe("StatsBoardModel.metrics", function()
         end
     end)
 
-    test("a board with room for it gets the full 90px glyph, as the jumbotron did", function()
-        -- 8 rows x 22 cols on a 12x7 board: cell 150 tall, so 60% of height is the 90px cap.
-        expect(M.metrics(8, 22, 12 / 7).glyphSize).toBe(90)
+    -- READS THE REAL BOARD, deliberately. This test first hardcoded `M.metrics(8, 22, 12 / 7)`
+    -- and broke the moment the board's height changed -- it was asserting against a copy of the
+    -- layout, not the layout. Anything that pins a specific glyph size has to source its
+    -- dimensions from StatsRoomLayout or it is testing a number nobody maintains.
+    test("a board with room for it gets the full 90px glyph", function()
+        local skill
+        for _, b in StatsRoomLayout.BOARDS do
+            if b.id == "skill" then
+                skill = b
+            end
+        end
+        expect(M.metrics(skill.rows, skill.cols, skill.w / skill.h).glyphSize).toBe(90)
     end)
 end)
 

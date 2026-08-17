@@ -25,6 +25,19 @@ StatsRoomLayout.TAG = "StatsBoard"
 StatsRoomLayout.THICKNESS = 0.4
 StatsRoomLayout.STANDOFF = 0.3 -- board centre this far off the wall plane
 
+-- BOARD HEIGHTS ARE 20% SHORTER THAN SURVEYED (owner, 2026-08-17): "the vertical size of the
+-- flaps is wrong for this font, they need to be shorter by about 20%". JosefinSans is geometric
+-- with a small x-height, so its caps left more air in the cell than Merriweather's did.
+--
+-- THE CUT IS ONE THIRD OF A THREE-PART CHANGE and the parts are not separable. The other two are
+-- in StatsBoardModel.metrics: ROW_PX 150 -> 120 (the same 20%) and GLYPH_OF_HEIGHT 0.60 -> 0.75.
+-- Together they shorten the flap and leave the LETTER exactly the size it was. Canvas width is
+-- untouched as well: cutting board height raises the aspect by the reciprocal, so `canvasH *
+-- aspect` is unchanged. Move any one of the three alone and every letter in the room resizes.
+--
+-- Widths and wall positions are untouched -- those came off a terrain survey. Only height moved,
+-- and only downward, so every invariant in check() still holds with more margin than before.
+
 export type Board = {
     id: string,
     wall: string,
@@ -41,15 +54,25 @@ export type Board = {
 -- Exported (not local): FIX 5. RoundBandController renders each segment at its OWN `cols`
 -- attribute now, but this is still the single source of truth a caller reaches for rather than
 -- hand-copying the literal 16 — resizing the band is genuinely a one-line change here now.
-local BAND_Y, BAND_H = 131.0, 2.4
+local BAND_Y, BAND_H = 131.0, 1.92
 StatsRoomLayout.BAND_COLS = 16
 local BAND_COLS = StatsRoomLayout.BAND_COLS
 
 StatsRoomLayout.BOARDS = {
     -- South faces you on entry: the standings (spec section 6).
-    { id = "banzuke", wall = "south", x = -37.90, y = 121.0, z = 84.92, w = 16, h = 9, rows = 10, cols = 26 },
+    {
+        id = "banzuke",
+        wall = "south",
+        x = -37.90,
+        y = 121.0,
+        z = 84.92,
+        w = 16,
+        h = 7.2,
+        rows = 10,
+        cols = 26,
+    },
     -- West, the longest wall: records now, rate ladders later (ruling R4).
-    { id = "skill", wall = "west", x = -57.70, y = 120.5, z = 70.00, w = 12, h = 7, rows = 8, cols = 22 },
+    { id = "skill", wall = "west", x = -57.70, y = 120.5, z = 70.00, w = 12, h = 5.6, rows = 8, cols = 22 },
     {
         id = "skillFuture",
         wall = "west",
@@ -57,18 +80,28 @@ StatsRoomLayout.BOARDS = {
         y = 120.0,
         z = 80.50,
         w = 8,
-        h = 5,
+        h = 4,
         rows = 6,
         cols = 18,
         -- Section 8: shuttered, NOT unlit. A closed kosatsu reads as intentional; a dark one
         -- reads as broken.
         shuttered = true,
     },
-    { id = "judgement", wall = "east", x = -18.13, y = 120.5, z = 70.00, w = 12, h = 7, rows = 8, cols = 22 },
+    {
+        id = "judgement",
+        wall = "east",
+        x = -18.13,
+        y = 120.5,
+        z = 70.00,
+        w = 12,
+        h = 5.6,
+        rows = 8,
+        cols = 22,
+    },
     -- North, west of the mouth: the form guide, last thing seen on the way out.
-    { id = "world", wall = "north", x = -45.00, y = 120.5, z = 62.30, w = 12, h = 7, rows = 6, cols = 22 },
+    { id = "world", wall = "north", x = -45.00, y = 120.5, z = 62.30, w = 12, h = 5.6, rows = 6, cols = 22 },
     -- North, east of the mouth: the personal slip. Paper-and-wood against stone, per-viewer.
-    { id = "fuda", wall = "north", x = -21.60, y = 119.0, z = 62.30, w = 6, h = 6, rows = 7, cols = 16 },
+    { id = "fuda", wall = "north", x = -21.60, y = 119.0, z = 62.30, w = 6, h = 4.8, rows = 7, cols = 16 },
     -- The clerestory band (section 6.3). One line, four segments, the top 4 studs nothing else wants.
     {
         id = "bandNorth",

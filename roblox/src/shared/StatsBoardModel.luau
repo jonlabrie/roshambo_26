@@ -188,8 +188,19 @@ end
 -- FlapBoard) sized from HEIGHT alone: 150 canvas-px per row, a flat 90px glyph, i.e. 60% of
 -- cell height -- and let the glyph EXCEED the cell's width by 3%, which is safe because a
 -- letter's drawn advance is only ~half its point size. Clamping to width was the mistake.
-local ROW_PX = 150 -- canvas px per row; the jumbotron's constant
-local GLYPH_OF_HEIGHT = 0.60 -- 90/150, the gate-tuned proportion
+-- FLAP HEIGHT, RETUNED FOR JOSEFINSANS (owner, 2026-08-17): "the vertical size of the flaps is
+-- wrong for this font, they need to be shorter by about 20%". JosefinSans is geometric with a
+-- small x-height, so its caps leave more air in a cell than Merriweather's did and the flap read
+-- as too tall.
+--
+-- The two numbers move TOGETHER with the 20% board-height cut in StatsRoomLayout, and that is the
+-- whole point: 150 -> 120 canvas px per row is the same 20%, and 0.60 -> 0.75 puts the same 90px
+-- glyph in the shorter cell. Net effect on the wall: the flap loses a fifth of its height and the
+-- LETTER DOES NOT CHANGE SIZE AT ALL. Canvas width is unaffected too -- shrinking board height
+-- raises the aspect by the reciprocal, so `canvasH * aspect` comes out identical.
+-- Change one of the three without the others and the letters resize.
+local ROW_PX = 120 -- canvas px per row (was the jumbotron's 150, less 20%)
+local GLYPH_OF_HEIGHT = 0.75 -- 90/120; holds the glyph at the same size in the shorter cell
 -- The jumbotron ran at 1.03. Kept as the ceiling rather than 1.0 so a board whose columns are
 -- dense for its aspect (`world` at 22 cols on 12 studs, `fuda` at 16 on 6) shrinks its glyph
 -- instead of clipping letters -- ClipsDescendants is on, so overflow is a cut, not a spill.
