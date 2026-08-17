@@ -199,8 +199,8 @@ end
 -- LETTER DOES NOT CHANGE SIZE AT ALL. Canvas width is unaffected too -- shrinking board height
 -- raises the aspect by the reciprocal, so `canvasH * aspect` comes out identical.
 -- Change one of the three without the others and the letters resize.
-local ROW_PX = 92 -- canvas px per row
-local GLYPH_OF_HEIGHT = 0.975 -- 90/92
+local ROW_PX = 84 -- canvas px per row
+local GLYPH_OF_HEIGHT = 1.071 -- 90/84
 -- THE WIDTH CEILING, AND WHY IT IS WELL ABOVE 1.0. A letter's DRAWN advance is only about half
 -- its point size, so a glyph sized wider than its cell still renders whole -- the jumbotron ran
 -- at 1.03 deliberately. The ceiling exists only to stop a genuinely absurd size clipping, since
@@ -211,6 +211,10 @@ local GLYPH_OF_HEIGHT = 0.975 -- 90/92
 -- delivered half of what was asked. Since the flap standardisation every wall board shares one
 -- cell aspect, so this single number governs all of them identically.
 local GLYPH_OF_WIDTH = 1.4
+-- A capital's drawn height as a share of its TextSize. Roughly true across faces and the number
+-- to reach for when predicting what the eye will see -- it is why "30% larger" and "10% larger"
+-- are asked for against ink, while every constant here is expressed against TextSize.
+StatsBoardModel.INK_RATIO = 0.72
 local MAX_CANVAS = 4096
 function StatsBoardModel.metrics(rows: number, cols: number, aspect: number): Metrics
     local canvasH = rows * ROW_PX
@@ -218,6 +222,10 @@ function StatsBoardModel.metrics(rows: number, cols: number, aspect: number): Me
     local over = math.max(canvasW / MAX_CANVAS, canvasH / MAX_CANVAS, 1)
     canvasH, canvasW = math.floor(canvasH / over), math.floor(canvasW / over)
     local cellH, cellW = canvasH / rows, canvasW / cols
+    -- GLYPH_OF_HEIGHT ABOVE 1.0 IS CORRECT, not a slip. `glyphSize` is a TextSize, and a
+    -- capital's DRAWN height is only about INK_RATIO of that -- the rest of the em is leading
+    -- and room for ascenders and descenders. So a TextSize a little taller than the cell puts
+    -- ink at roughly three quarters of it, which is what the eye reads.
     local glyph = math.min(90, math.floor(cellH * GLYPH_OF_HEIGHT), math.floor(cellW * GLYPH_OF_WIDTH))
     return { canvasW = canvasW, canvasH = canvasH, glyphSize = math.max(1, glyph) }
 end

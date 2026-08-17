@@ -82,8 +82,17 @@ Two faces, and they are chosen for different jobs rather than for consistency.
 
 | | face | why |
 |---|---|---|
-| Lettering, all boards | **JosefinSans Bold** | Owner's gate pick 2026-06-07 (`77d8940`). Merriweather replaced it two hours later the same evening with no gate note and rode into the extraction; restored 2026-08-17 when the owner looked at the built room and said the typeface was wrong. |
-| Clock numerals | **Oswald Bold** | Owner, 2026-08-17. JosefinSans is a geometric display face and its numerals are mannered where a clock wants them plain. Oswald is condensed — the classic departure-board answer. |
+| Wall board lettering | **TitilliumWeb Bold** | Owner, 2026-08-17, chosen by eye against JosefinSans and Oswald. |
+| Clock numerals | **Oswald Bold** | Owner, 2026-08-17. Condensed — the classic departure-board answer. |
+
+JosefinSans held the walls until then: gate-picked 2026-06-07 (`77d8940`), quietly replaced
+by Merriweather two hours later the same evening with no gate note, restored on 2026-08-17
+when the owner looked at the built room and said the typeface was wrong, then superseded by
+TitilliumWeb once it could be compared live.
+
+**Two faces for two jobs, and that is deliberate.** The timer shows four big numerals read
+at a glance; the walls show lines of lettering read as text. A condensed display face is
+right for the first and not automatically for the second.
 
 `FontFace`, not the legacy `Font` enum, because the enum carries no weight. Bold is the
 heaviest REAL face in both families: probing all nine `FontWeight` values in Studio,
@@ -99,7 +108,12 @@ not as a broken display.
 fills about half its cell rather than two thirds. If it reads narrow that is the face, not
 a defect: widen the cell or lift `CLOCK_CHAR_FRACTION`.
 
-⚠ **`charFraction` is TextSize's share of the cell, not the ink's.** A digit's drawn height
+⚠ **Optical centring is per-face.** An all-caps line rides high because the line box reserves
+descender space the capitals never use, so it is nudged down — but by how much depends
+entirely on the font's metrics. 0.1 suited JosefinSans and sat TitilliumWeb visibly low.
+Live on `BoardTextNudge`.
+
+⚠ **Every size constant here is a TextSize, and the eye reads INK.** A digit's drawn height
 is only ~0.72 of its TextSize — the rest of the em is leading and room for ascenders and
 descenders a numeral never uses. Setting it above 1.0 is safe and often correct.
 

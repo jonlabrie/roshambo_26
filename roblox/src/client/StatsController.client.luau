@@ -48,7 +48,10 @@ local function weightFor(): Enum.FontWeight
 end
 
 local BOARD_FONT_ATTR = "BoardFont"
-local DEFAULT_BOARD_FAMILY = "JosefinSans"
+-- TITILLIUMWEB is the owner's pick for the walls (2026-08-17), against Oswald on the round
+-- timer. Two faces for two jobs: the timer shows four big numerals read at a glance, the walls
+-- show lines of lettering read as text.
+local DEFAULT_BOARD_FAMILY = "TitilliumWeb"
 local function boardFont(): Font
     local live = workspace:GetAttribute(BOARD_FONT_ATTR)
     local family = if typeof(live) == "string" and live ~= "" then live else DEFAULT_BOARD_FAMILY
@@ -68,11 +71,23 @@ end
 -- Walks the built cells rather than keeping a register of every label: a board is ~200 cells and
 -- the room ~1,050, so a list would be thousands of entries maintained for an operation that
 -- happens when somebody is choosing a font.
+-- How far the caps are nudged down for optical centring, as a fraction of the cell. Entirely a
+-- property of the face: 0.1 suited JosefinSans and sits TitilliumWeb low.
+local TEXT_NUDGE_ATTR = "BoardTextNudge"
+local DEFAULT_TEXT_NUDGE = 0.02
+local function textNudge(): number
+    local live = workspace:GetAttribute(TEXT_NUDGE_ATTR)
+    return if typeof(live) == "number" then live else DEFAULT_TEXT_NUDGE
+end
+
 local function applyBoardFont(part: Instance)
     local f = boardFont()
+    local n = UDim.new(textNudge(), 0)
     for _, d in part:GetDescendants() do
         if d:IsA("TextLabel") then
             d.FontFace = f
+        elseif d:IsA("UIPadding") then
+            d.PaddingTop = n
         end
     end
 end
@@ -189,6 +204,7 @@ local function register(part: Instance)
             -- the canvas matched to whatever is actually there, so glyphs never stretch.
             metrics = Model.metrics(rows, cols, part.Size.X / part.Size.Y),
             plan = FlapScheduler.plan,
+            textNudge = textNudge(),
         }),
     }
     boards[part] = entry
@@ -246,7 +262,7 @@ end)
 -- rejoining. Costs one attribute listener.
 workspace:GetAttributeChangedSignal(FIXTURE_ATTR):Connect(repaintAll)
 
-for _, attr in { BOARD_FONT_ATTR, BOARD_FONT_ATTR .. "Weight" } do
+for _, attr in { BOARD_FONT_ATTR, BOARD_FONT_ATTR .. "Weight", TEXT_NUDGE_ATTR } do
     workspace:GetAttributeChangedSignal(attr):Connect(function()
         for part in boards do
             applyBoardFont(part)

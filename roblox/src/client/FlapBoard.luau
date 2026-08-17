@@ -39,6 +39,8 @@ export type Config = {
     -- flap. These columns get no tile, no seam and no fold: just ink on the dark frame, and the
     -- planner skips them entirely so they can never be asked to turn.
     static: { [number]: string }?,
+    -- Optical-centring nudge as a fraction of the cell. Font-dependent; see DEFAULT_TEXT_NUDGE.
+    textNudge: number?,
     -- Per-column width multipliers, defaulting to 1. Lets a printed separator take half a flap's
     -- width instead of a whole one; the grid is no longer uniform, so cells are positioned
     -- cumulatively rather than by index.
@@ -100,7 +102,20 @@ type Cell = {
     token: number,
 }
 
-local function label(parent: Instance, cellW: number, cellH: number, anchorY: number, size: number): TextLabel
+-- OPTICAL CENTRING, AND IT IS PER-FACE. An all-caps line rides high because the line box reserves
+-- descender space the capitals never use, so it is nudged down. How far depends entirely on the
+-- font's own metrics: 0.1 was tuned for JosefinSans and sits TitilliumWeb visibly low (owner,
+-- 2026-08-17). Passed in rather than baked, and live-tunable by the caller.
+local DEFAULT_TEXT_NUDGE = 0.02
+
+local function label(
+    parent: Instance,
+    cellW: number,
+    cellH: number,
+    anchorY: number,
+    size: number,
+    nudge: number?
+): TextLabel
     local t = Instance.new("TextLabel")
     t.BackgroundTransparency = 1
     t.TextColor3 = INK
@@ -119,7 +134,7 @@ local function label(parent: Instance, cellW: number, cellH: number, anchorY: nu
     -- All-caps ride high because the line box reserves descender space; drop them to optical
     -- centre, exactly as the single-label cell did.
     local pad = Instance.new("UIPadding")
-    pad.PaddingTop = UDim.new(0.1, 0)
+    pad.PaddingTop = UDim.new(nudge or DEFAULT_TEXT_NUDGE, 0)
     pad.Parent = t
     t.Parent = parent
     return t
@@ -181,7 +196,7 @@ local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { { Cell } }
             if printed then
                 -- One static label, no halves and no leaf. A painted separator has no mechanism,
                 -- and giving it one would cost seven instances per cell to animate nothing.
-                local t = label(tile, tileW, tileH, 0.5, cfg.metrics.glyphSize)
+                local t = label(tile, tileW, tileH, 0.5, cfg.metrics.glyphSize, cfg.textNudge)
                 t.Text = printed
                 t.TextColor3 = PRINTED_INK
                 grid[r][c] = {
@@ -201,8 +216,8 @@ local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { { Cell } }
             -- clip shows the character's top half and the lower clip its bottom half.
             local upperClip = clip(tile, tileW, halfH, true, 2)
             local lowerClip = clip(tile, tileW, halfH, false, 2)
-            local upper = label(upperClip, tileW, tileH, 1, cfg.metrics.glyphSize)
-            local lower = label(lowerClip, tileW, tileH, 0, cfg.metrics.glyphSize)
+            local upper = label(upperClip, tileW, tileH, 1, cfg.metrics.glyphSize, cfg.textNudge)
+            local lower = label(lowerClip, tileW, tileH, 0, cfg.metrics.glyphSize, cfg.textNudge)
 
             -- The leaf: the moving flap, above both halves. Hinged at the seam in both
             -- directions, which is why its AnchorPoint is reassigned mid-flip rather than fixed.

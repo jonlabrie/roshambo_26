@@ -121,10 +121,14 @@ describe("StatsBoardModel.metrics", function()
     -- size, so a glyph slightly wider than its cell still renders whole. The gate-tuned
     -- jumbotron ran at 103% of cell width deliberately. Demanding it fit the width forced the
     -- glyph down to ~80% of the size it should be on every taller-than-wide board.
-    test("the glyph never overflows its cell HEIGHT", function()
+    -- THE INK IS WHAT MUST FIT, NOT THE TEXTSIZE. A capital draws at about INK_RATIO of its
+    -- TextSize, so a glyphSize slightly taller than the cell is correct and clips nothing. This
+    -- test used to demand glyphSize <= cellH, which is a stricter rule than the renderer needs
+    -- and would have blocked the owner's last two size increases on a false constraint.
+    test("the drawn ink never overflows its cell height", function()
         for _, case in { { 10, 26, 16 / 9 }, { 7, 16, 1.0 }, { 1, 16, 38 / 2.4 }, { 8, 22, 12 / 7 } } do
             local m = M.metrics(case[1], case[2], case[3])
-            expect(m.glyphSize <= m.canvasH / case[1]).toBeTruthy()
+            expect(m.glyphSize * M.INK_RATIO <= m.canvasH / case[1]).toBeTruthy()
         end
     end)
 
