@@ -101,7 +101,7 @@ end
 -- number and reading it off an attribute beats another sync-and-rejoin per guess.
 local function glyphNudge(sym: string): number
     local live = workspace:GetAttribute(`GlyphNudge{sym}`)
-    return if typeof(live) == "number" then live else (if sym == "P" then 0.06 else 0)
+    return if typeof(live) == "number" then live else (Glyphs.SEAM_NUDGE[sym] or 0)
 end
 
 -- A face carrying a full-height character, of which this panel shows half. `anchorY` 1 centres it

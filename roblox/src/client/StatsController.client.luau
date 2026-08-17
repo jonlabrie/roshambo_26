@@ -192,6 +192,12 @@ end
 local INK = Color3.fromRGB(40, 30, 18)
 local TILE = Color3.fromRGB(244, 238, 222)
 
+-- Live on the same attribute the round display reads, so one setting moves both.
+local function glyphNudge(sym: string): number
+    local live = workspace:GetAttribute(`GlyphNudge{sym}`)
+    return if typeof(live) == "number" then live else (Glyphs.SEAM_NUDGE[sym] or 0)
+end
+
 -- `_cellW` is deliberately unused: the glyph is a SQUARE sized off the cell's height, so that a
 -- ring stays round in a cell that is taller than it is wide. Kept in the signature because it is
 -- FlapBoard's contract, not this builder's choice.
@@ -215,9 +221,14 @@ local function glyphFor(
     end
     -- A FULL-CELL SQUARE CENTRED ON THE SEAM, matching how a character is set: the upper clip
     -- then shows its top half and the lower clip its bottom, and the flip works unchanged.
+    f.Name = `Glyph_{sym}`
     f.Size = UDim2.fromOffset(cellH, cellH)
     f.AnchorPoint = Vector2.new(0.5, 0.5)
-    f.Position = UDim2.fromScale(0.5, anchorY)
+    -- OFF THE SEAM. Paper is a horizontal bar and the seam a horizontal line, so centred it is
+    -- bisected by the thing it most resembles -- the same fault the round display's flipper had,
+    -- inherited here the moment these boards started wearing the same images. One default, in
+    -- Glyphs beside the assets, so the two cannot drift apart.
+    f.Position = UDim2.new(0.5, 0, anchorY, glyphNudge(sym) * cellH)
     f.Visible = false
     -- These surfaces render ZIndexBehavior.Global, where paint order is ZIndex alone and a child
     -- does NOT draw above its parent -- so the layers need lifting clear of the tile themselves.
@@ -316,6 +327,21 @@ end)
 -- Live, so the owner can flip fixtures on and off in Studio and watch the walls change without
 -- rejoining. Costs one attribute listener.
 workspace:GetAttributeChangedSignal(FIXTURE_ATTR):Connect(repaintAll)
+
+for sym in Glyphs.SEAM_NUDGE do
+    workspace:GetAttributeChangedSignal(`GlyphNudge{sym}`):Connect(function()
+        for part in boards do
+            for _, d in part:GetDescendants() do
+                if d:IsA("Frame") and d.Name == `Glyph_{sym}` then
+                    -- The anchor is 1 for an upper half and 0 for a lower; it is already in the
+                    -- frame's own Position, so only the offset is rewritten.
+                    local cellH = d.AbsoluteSize.Y
+                    d.Position = UDim2.new(0.5, 0, d.Position.Y.Scale, glyphNudge(sym) * cellH)
+                end
+            end
+        end
+    end)
+end
 
 for _, attr in { BOARD_FONT_ATTR, BOARD_FONT_ATTR .. "Weight", TEXT_NUDGE_ATTR } do
     workspace:GetAttributeChangedSignal(attr):Connect(function()

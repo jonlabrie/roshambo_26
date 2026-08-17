@@ -36,6 +36,19 @@ Glyphs.NIGHT = {
     },
 }
 
+-- HOW FAR EACH GLYPH SITS OFF A SPLIT-FLAP'S SEAM, as a fraction of the glyph square. Positive
+-- is down.
+--
+-- Paper is a horizontal BAR and the seam is a horizontal LINE, so a glyph centred on the seam is
+-- bisected by the thing it most resembles. Ring and chevron have open centres and read fine
+-- across it, so only P moves. The owner hit this twice -- once on the round display's flipper and
+-- again on the wall boards when they inherited the same images -- which is why the number lives
+-- here, beside the assets, rather than privately in whichever renderer noticed first.
+--
+-- PURE DATA, deliberately: this file's Instance code is confined to the render helpers below so
+-- the module stays Lune-safe, and a nudge read from a workspace attribute belongs to the caller.
+Glyphs.SEAM_NUDGE = { P = 0.06 } :: { [string]: number }
+
 -- Build the glyph as two stacked ImageLabels (outline behind, core in front), each a centred
 -- square (aspect-locked so the ring stays round on a non-square panel). Instance/Color3 live
 -- ONLY here, so the module stays Lune-safe (tests only touch Glyphs.IMAGE).
