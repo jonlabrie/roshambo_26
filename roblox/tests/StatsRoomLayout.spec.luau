@@ -219,14 +219,34 @@ describe("StatsRoomLayout", function()
         expect(L.yawFor("east")).toBe(90)
     end)
 
-    test("seat moves the board to the measured rock, clamped so a bad ray cannot fling it", function()
-        -- inward = +1 (north wall: room lies at greater z). A hit 5 studs along a ray that
-        -- started 3 studs outside the nominal plane means rock 2 studs INTO the room.
-        expect(L.seat(62.0, 5, 1, 2.5)).toBeCloseTo(64.3, 0.001)
-        -- A wild ray is clamped, never obeyed.
-        expect(L.seat(62.0, 30, 1, 2.5)).toBeCloseTo(64.8, 0.001)
-        -- No hit at all: stay nominal, offset by the board's own standoff.
+    -- The ray is cast from CAST_BACK (3) studs INSIDE the room towards the wall, so its distance
+    -- is measured against that 3 rather than from the board.
+    test("seat places the board against the measured rock", function()
+        -- inward = +1 (north wall: the room lies at greater z), plane 62.0.
+        expect(L.seat(62.0, 3, 1, 2.5)).toBeCloseTo(62.3, 0.001) -- rock on the plane
+        expect(L.seat(62.0, 1, 1, 2.5)).toBeCloseTo(64.3, 0.001) -- rock 2 into the room
+        expect(L.seat(62.0, 5, 1, 2.5)).toBeCloseTo(60.3, 0.001) -- rock 2 further out
+    end)
+
+    test("a wild ray is clamped, never obeyed", function()
+        expect(L.seat(62.0, 30, 1, 2.5)).toBeCloseTo(59.8, 0.001)
+        expect(L.seat(62.0, 0, 1, 2.5)).toBeCloseTo(64.8, 0.001)
+    end)
+
+    test("no hit keeps the nominal plane plus the standoff, on either kind of wall", function()
         expect(L.seat(62.0, nil, 1, 2.5)).toBeCloseTo(62.3, 0.001)
+        expect(L.seat(85.22, nil, -1, 2.5)).toBeCloseTo(84.92, 0.001)
+    end)
+
+    -- THE DOUBLE-STANDOFF GUARD. seat() adds the standoff itself and a Board's own x/z already
+    -- carries it from resolve(), so handing a Board coordinate in here stands it off twice --
+    -- exactly what the Studio tool did until 2026-08-17, putting every board 0.6 off its wall.
+    test("seat takes the PLANE; a board's own coordinate is already offset from it", function()
+        local b = byId("banzuke")
+        local plane = L.planeFor(L.SITES[b.site], b.wall)
+        local inward = L.inwardFor(b.wall)
+        expect(math.abs(b.z - (plane + inward * L.STANDOFF)) < 1e-6).toBeTruthy()
+        expect(L.seat(plane, nil, inward, 2.5)).toBeCloseTo(b.z, 0.001)
     end)
 
     test("check() passes on the shipped inventory", function()

@@ -68,7 +68,10 @@ for _, b in Layout.BOARDS do
     local site = Layout.SITES[b.site]
     local inward = Layout.inwardFor(b.wall)
     local horizontal = Layout.isHorizontal(b.wall)
-    local nominal = if horizontal then b.z else b.x
+    -- THE PLANE, not the board's own coordinate: `resolve()` has already added the standoff to
+    -- b.x/b.z, and seat() adds it again -- so passing the board in stood every one of them off
+    -- its wall twice.
+    local plane = Layout.planeFor(site, b.wall)
 
     -- SEAT AGAINST TERRAIN ONLY. The cavern is bored voxels, hand-shaped afterwards, so its
     -- nominal planes are not where the rock is. The vestibule's walls are built geometry at
@@ -76,11 +79,15 @@ for _, b in Layout.BOARDS do
     -- strike, which is strictly worse than the number we already know.
     local hit = nil
     if site.seat then
+        -- FROM INSIDE THE ROOM, TOWARDS THE WALL. The old cast started at the board and travelled
+        -- further into the rock, so it began INSIDE the terrain and registered no entry hit --
+        -- every board reported hit=false and rode its nominal plane. Air is on the room side.
         local axis = if horizontal then Vector3.new(0, 0, inward) else Vector3.new(inward, 0, 0)
-        local start = Vector3.new(b.x, b.y, b.z) - axis * Layout.CAST_BACK
-        hit = workspace:Raycast(start, axis * (Layout.CAST_BACK + MAX_ADJUST + 2), rc)
+        local from = if horizontal then Vector3.new(b.x, b.y, plane) else Vector3.new(plane, b.y, b.z)
+        hit =
+            workspace:Raycast(from + axis * Layout.CAST_BACK, -axis * (Layout.CAST_BACK + MAX_ADJUST + 2), rc)
     end
-    local seated = Layout.seat(nominal, hit and hit.Distance or nil, inward, MAX_ADJUST)
+    local seated = Layout.seat(plane, hit and hit.Distance or nil, inward, MAX_ADJUST)
 
     local part = Instance.new("Part")
     part.Name = b.id
@@ -186,7 +193,7 @@ for _, b in Layout.BOARDS do
             b.w,
             b.h,
             seated,
-            nominal,
+            plane,
             tostring(hit ~= nil)
         )
     )

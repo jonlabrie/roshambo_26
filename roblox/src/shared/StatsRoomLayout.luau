@@ -352,19 +352,28 @@ end)()
 --
 -- Only sites with `seat = true` get this. Built geometry needs no correction and would be moved
 -- by whatever a ray happened to strike.
+-- ⚠ TAKES THE WALL PLANE, NOT A BOARD'S RESOLVED COORDINATE. `resolve()` has already added the
+-- standoff by the time a Board exists, and the tool used to hand that value in here -- so it was
+-- applied twice and every board stood 0.6 off its wall instead of 0.3.
+--
+-- THE RAY IS CAST FROM INSIDE THE ROOM, TOWARDS THE WALL. It used to start at the board and
+-- travel further into the rock, so it began INSIDE the terrain, where a ray registers no entry
+-- hit. Every board reported `hit=false` for as long as that existed and the seating was
+-- decorative -- the boards rode their nominal planes throughout. Air is on the room side.
+--
+--   distance == CAST_BACK  -> rock sits exactly on the nominal plane
+--   distance <  CAST_BACK  -> rock intrudes into the room; the board comes in to meet it
+--   distance >  CAST_BACK  -> rock is further out; the board follows it out
+--
+-- Both found on 2026-08-17 by RUNNING the tool rather than reading a report of it.
 StatsRoomLayout.CAST_BACK = 3.0
-function StatsRoomLayout.seat(
-    nominal: number,
-    hitDistance: number?,
-    inward: number,
-    maxAdjust: number
-): number
+function StatsRoomLayout.seat(plane: number, hitDistance: number?, inward: number, maxAdjust: number): number
     if hitDistance == nil then
-        return nominal + inward * StatsRoomLayout.STANDOFF
+        return plane + inward * StatsRoomLayout.STANDOFF
     end
-    local rock = nominal + inward * (hitDistance - StatsRoomLayout.CAST_BACK)
-    local adjust = math.clamp(rock - nominal, -maxAdjust, maxAdjust)
-    return nominal + adjust + inward * StatsRoomLayout.STANDOFF
+    local rock = plane + inward * (StatsRoomLayout.CAST_BACK - hitDistance)
+    local adjust = math.clamp(rock - plane, -maxAdjust, maxAdjust)
+    return plane + adjust + inward * StatsRoomLayout.STANDOFF
 end
 
 -- Per-column geometry in the board's OWN frame: each column's centre offset along local X, and
