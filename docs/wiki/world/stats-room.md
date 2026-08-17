@@ -108,6 +108,17 @@ not as a broken display.
 fills about half its cell rather than two thirds. If it reads narrow that is the face, not
 a defect: widen the cell or lift `CLOCK_CHAR_FRACTION`.
 
+⚠ **A LIVE-TUNING ATTRIBUTE OUTLIVES THE SESSION AND SILENTLY BEATS THE DEFAULT.** Workspace
+attributes are saved place data, so a value set while auditioning persists — and every one
+of these knobs is written to be overridden by exactly that. On 2026-08-17 the timer came up
+in Inconsolata after Oswald had been made the default, and it read as the code resetting
+itself; the attribute set an hour earlier was simply still there and still winning.
+
+**Before treating a default as broken, check `Workspace` → Attributes for a leftover.**
+Clear the attribute to hand control back to the code. The knobs: `ClockFont`,
+`ClockFontWeight`, `BoardFont`, `BoardFontWeight`, `BoardTextNudge`, `GlyphNudgeP`,
+`StatsFixtures`.
+
 ⚠ **Optical centring is per-face.** An all-caps line rides high because the line box reserves
 descender space the capitals never use, so it is nudged down — but by how much depends
 entirely on the font's metrics. 0.1 suited JosefinSans and sat TitilliumWeb visibly low.

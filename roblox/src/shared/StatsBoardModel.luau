@@ -199,8 +199,8 @@ end
 -- LETTER DOES NOT CHANGE SIZE AT ALL. Canvas width is unaffected too -- shrinking board height
 -- raises the aspect by the reciprocal, so `canvasH * aspect` comes out identical.
 -- Change one of the three without the others and the letters resize.
-local ROW_PX = 84 -- canvas px per row
-local GLYPH_OF_HEIGHT = 1.071 -- 90/84
+local ROW_PX = 81 -- canvas px per row
+local GLYPH_OF_HEIGHT = 1.111 -- 90/81
 -- THE WIDTH CEILING, AND WHY IT IS WELL ABOVE 1.0. A letter's DRAWN advance is only about half
 -- its point size, so a glyph sized wider than its cell still renders whole -- the jumbotron ran
 -- at 1.03 deliberately. The ceiling exists only to stop a genuinely absurd size clipping, since

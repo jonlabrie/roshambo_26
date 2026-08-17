@@ -47,7 +47,11 @@ export type Config = {
     colWidths: { number }?,
 }
 
-local PAD = 0.08 -- inset fraction within each cell
+-- THE DIVISIONS BETWEEN CELLS. Each tile is inset by this fraction, so the dark board showing
+-- through the inset IS the gap -- horizontally between columns and vertically between rows at
+-- once. Halved from 0.08 at the owner's look (2026-08-17): at the larger lettering the grid was
+-- competing with the words rather than framing them.
+local PAD = 0.04
 local DEFAULT_STAGGER_MS = 60 -- matches FlapScheduler's own default
 
 local function toChars(str: string): { string }
