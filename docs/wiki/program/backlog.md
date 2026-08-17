@@ -240,10 +240,11 @@ these are things a later reader would otherwise have to rediscover.
   print that bound verbatim or "All time" will read as ending tomorrow. It is labelled
   `windowKind: 'rolling'` because the bound genuinely moves per request — `'calendar'` would be
   a lie — but the label is imprecise and the echoed `from`/`to` are the honest signal.
-- **The two transports disagree on shape for the same boards.** REST resolves `displayName`;
-  the socket surface still emits raw `userId` ObjectIds. `nameUsers` is private to
-  `statsV1.ts` — export or relocate it before plan 3 duplicates the projection in
-  `socketAdapter.ts`, which is exactly how deviceId leaked the first time.
+- ~~**The two transports disagree on shape for the same boards.**~~ **SUPERSEDED 2026-08-16.**
+  `nameUsers` is exported from `stats.ts:200` and `socketAdapter.ts:14` already imports it — both
+  transports resolve `displayName`. The note was written before the `get-stats` broadcast fix
+  landed and was never re-read afterwards; plan 3 needs no work here. (A textbook instance of
+  [[wiki-currency]]: the fix appended its own note and left this paragraph standing.)
 - **`window=all` is an unbounded scan** of `StreakEvent`, `BankEvent` and every WIN row of
   `PlayerRound`, with sorts not served by the range indexes. Fine at fifty players; consider
   capping it at a season, or adding sort-key indexes, before it matters.
@@ -298,8 +299,23 @@ Decided 2026-08-16; the spec and plan do not exist yet. Everything needed to wri
   The renderer needs a home on the kōsatsu boards before any wall can render.
 - **Displays first, data later** — build against seeded fixtures in Studio rather than waiting
   for real play. Layout and legibility are what the owner judges, and known-good fixtures are
-  easier to assess than sparse real numbers. ⚠ NOT YET CONFIRMED by the owner; proposed and
-  interrupted. Confirm before building.
+  easier to assess than sparse real numbers.
+
+**WRITTEN 2026-08-16: `docs/superpowers/plans/2026-08-16-stats-room-displays.md`** — six tasks,
+not yet executed. It carries seven rulings of its own; three change what a reader of this section
+would expect:
+- `BoardController` is **retired, not retargeted**. There is no kōsatsu anywhere in the place to
+  retarget onto, its `TickerMessage` consumer is redundant, and its documented `RevealTheater`
+  spoiler dies with the file. The renderer is extracted to `FlapBoard.luau` and rehomed on the
+  Stats room's own boards.
+- The form guide shows the **last 10** world throws, not 20 — `apiV1.ts:65` serves `store.tape(10)`
+  and nothing on the wire carries more.
+- The west wall ships **records**, not rate ladders: §7 puts qualified rates in the
+  waits-for-a-population column, so a second west panel is built **shuttered** per §8.
+
+Two spec §6.2 items are deferred with reasons in the plan, not dropped: the 番付 as a printed
+sheet with rank encoded by calligraphy size (a different renderer; the owner decides at the
+Studio gate whether the flap sheet suffices), and the top-three avatar plinths.
 
 **What the walls read from** (all merged and live on dev): `/api/v1/stats/records|heat|player`
 and the `get-stats-surface` socket event. Layout, visual language and the round band are already
