@@ -40,14 +40,21 @@ Glyphs.NIGHT = {
 -- is down.
 --
 -- Paper is a horizontal BAR and the seam is a horizontal LINE, so a glyph centred on the seam is
--- bisected by the thing it most resembles. Ring and chevron have open centres and read fine
--- across it, so only P moves. The owner hit this twice -- once on the round display's flipper and
--- again on the wall boards when they inherited the same images -- which is why the number lives
--- here, beside the assets, rather than privately in whichever renderer noticed first.
+-- bisected by the thing it most resembles. It moves DOWN, clear of the rod.
+--
+-- Scissors moves the other way. The chevron's arms descend to either side of the seam and graze
+-- it, which aliases against the rod as the camera moves -- so it lifts. The ring is the only one
+-- that needs nothing: its stroke crosses the seam perpendicular, where a shared edge reads as
+-- overlap rather than as two lines fighting.
+--
+-- These are gate numbers, tuned by eye against a real rod at real distance, and the owner hit
+-- this fault three times -- the flipper, then the wall boards when they inherited the same
+-- images, then the tape. Which is why they live HERE, beside the assets, rather than privately
+-- in whichever renderer noticed first.
 --
 -- PURE DATA, deliberately: this file's Instance code is confined to the render helpers below so
 -- the module stays Lune-safe, and a nudge read from a workspace attribute belongs to the caller.
-Glyphs.SEAM_NUDGE = { P = 0.06 } :: { [string]: number }
+Glyphs.SEAM_NUDGE = { P = 0.075, S = -0.025 } :: { [string]: number }
 
 -- Build the glyph as two stacked ImageLabels (outline behind, core in front), each a centred
 -- square (aspect-locked so the ring stays round on a non-square panel). Instance/Color3 live

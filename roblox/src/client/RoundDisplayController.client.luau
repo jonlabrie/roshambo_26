@@ -249,8 +249,9 @@ local pendingTape: any = nil
 -- as a row of flaps working. They cascade left to right now, and turn half again as slowly as the
 -- clock's digits: the tape is the one thing in the room whose whole job is to be watched, and it
 -- has the time -- it starts at `drumRest`, 3.45s into a 7s REVEAL, and a ten-cell sweep at this
--- pacing finishes in about 1.3s of the 3.55s left.
-local TAPE_STAGGER = 0.12
+-- pacing finishes in about 2.0s of the 3.55s left. That is the ceiling on slowing it further:
+-- past ~0.33s a cell the sweep runs into the next OPEN.
+local TAPE_STAGGER = 0.18 -- 50% slower than the first pass, at the owner's look
 local TAPE_HALF_SECONDS = 0.0825 -- 50% slower than FlapUnit's default
 
 -- A cascade in flight when the next one starts would interleave two sequences on the same cells.
