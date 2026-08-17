@@ -158,12 +158,14 @@ end
 
 -- LIVE RE-TUNING. Both attributes are read on change and applied to what already exists, so a
 -- font can be auditioned or a glyph nudged without restarting Play.
-workspace:GetAttributeChangedSignal("ClockFont"):Connect(function()
-    local f = clockFont()
-    for _, t in clockLabels do
-        t.FontFace = f
-    end
-end)
+for _, attr in { "ClockFont", "ClockFontWeight" } do
+    workspace:GetAttributeChangedSignal(attr):Connect(function()
+        local f = clockFont()
+        for _, t in clockLabels do
+            t.FontFace = f
+        end
+    end)
+end
 
 for _, sym in RoundDisplay.SYMBOLS do
     workspace:GetAttributeChangedSignal(`GlyphNudge{sym}`):Connect(function()

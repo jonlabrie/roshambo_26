@@ -233,8 +233,10 @@ end)
 -- rejoining. Costs one attribute listener.
 workspace:GetAttributeChangedSignal(FIXTURE_ATTR):Connect(repaintAll)
 
-workspace:GetAttributeChangedSignal(BOARD_FONT_ATTR):Connect(function()
-    for part in boards do
-        applyBoardFont(part)
-    end
-end)
+for _, attr in { BOARD_FONT_ATTR, BOARD_FONT_ATTR .. "Weight" } do
+    workspace:GetAttributeChangedSignal(attr):Connect(function()
+        for part in boards do
+            applyBoardFont(part)
+        end
+    end)
+end
