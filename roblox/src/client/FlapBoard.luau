@@ -213,7 +213,21 @@ local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { { Cell } }
             leaf.ZIndex = 3
             leaf.Size = UDim2.fromOffset(tileW, halfH)
             leaf.Parent = tile
+            -- THE LEAF'S INK FOLDS WITH THE LEAF. Sized in SCALE of the leaf (200%, so it is a
+            -- full cell tall when the leaf is at half height) and TextScaled, so as the leaf
+            -- collapses toward the hinge the character compresses into it. The first version
+            -- pinned the character still and shrank a clip over it, which wipes rather than
+            -- folds -- the owner's word was "unreadable", and that is why.
+            --
+            -- The size constraint is what keeps the handoff invisible: TextScaled alone would
+            -- pick its own size at full height and jump against the static halves, so it is
+            -- capped at exactly the glyph size those halves use.
             local leafLabel = label(leaf, tileW, tileH, 1, cfg.metrics.glyphSize)
+            leafLabel.Size = UDim2.fromScale(1, 2)
+            leafLabel.TextScaled = true
+            local cap = Instance.new("UITextSizeConstraint")
+            cap.MaxTextSize = cfg.metrics.glyphSize
+            cap.Parent = leafLabel
             leafLabel.ZIndex = 4
 
             local seam = Instance.new("Frame")
@@ -253,8 +267,15 @@ local function flapTo(cell: any, char: string)
     local leaf, leafLabel = cell.leaf, cell.leafLabel
 
     -- FALLING. The upper half commits to the new character straight away; the leaf carries the
-    -- OLD one and closes over it, so the new top is revealed from under a descending edge.
+    -- OLD one and folds down over it, so the new top is revealed from under a descending edge.
+    --
+    -- THE LOWER HALF SHOWS THE OUTGOING CHARACTER FOR THE WHOLE FALL, and is set here rather
+    -- than left to the landing tween. It used to commit only when the landing FINISHED, so any
+    -- flip interrupted before then left the bottom half stale -- and at ReelStep's 0.05s interval
+    -- against an 0.08s turn, every flip is interrupted. The owner saw exactly that: "for much of
+    -- the rotation only the top panel is displaying anything, the bottom panel is blank."
     cell.upper.Text = char
+    cell.lower.Text = outgoing
     leafLabel.Text = outgoing
     leafLabel.Position = UDim2.fromScale(0.5, 1) -- centred on the leaf's bottom = the seam
     leaf.AnchorPoint = Vector2.new(0, 1)

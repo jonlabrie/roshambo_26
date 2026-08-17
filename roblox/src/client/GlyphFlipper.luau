@@ -39,6 +39,13 @@ local HALF_SECONDS = 0.04 -- each half of the turn; a full flip is twice this
 -- leaf above all of it, and the seam on top.
 local TILE_Z, GLYPH_Z, OUTLINE_Z, CORE_Z, LEAF_Z, SEAM_Z = 2, 3, 3, 4, 5, 6
 
+-- PER-GLYPH VERTICAL NUDGE, as a fraction of the panel (owner, 2026-08-17: "the Paper glyph needs
+-- to be slightly lower, so that it's entirely on the lower panel instead of split by the hinge").
+-- Paper is a horizontal bar and the hinge is a horizontal line, so centred on the seam the two
+-- coincide and the bar is bisected by the very thing it looks like. Ring and chevron have open
+-- centres and read fine across the hinge, so only P moves. Gate-tunable by eye.
+local NUDGE: { [string]: number } = { P = 0.10 }
+
 type Face = {
     upper: { [string]: Frame },
     lower: { [string]: Frame },
@@ -59,7 +66,7 @@ local function glyphSet(parent: Instance, cfg: Config, side: number, anchorY: nu
         frame.ZIndex = GLYPH_Z
         frame.Size = UDim2.fromOffset(side, side)
         frame.AnchorPoint = Vector2.new(0.5, 0.5)
-        frame.Position = UDim2.fromScale(0.5, anchorY)
+        frame.Position = UDim2.new(0.5, 0, anchorY, (NUDGE[sym] or 0) * side)
         -- ZINDEX ON THE LAYERS, NOT JUST THE FRAME. This SurfaceGui renders with
         -- ZIndexBehavior.Global, where paint order is ZIndex alone and the hierarchy counts for
         -- nothing -- a child does NOT draw above its parent. Glyphs.render leaves its two
@@ -176,10 +183,16 @@ function GlyphFlipper.show(self: any, symbol: string?)
         -- outgoing one down over it, hinged at the seam, so the new top is revealed from under a
         -- descending edge rather than swapped in place.
         reveal(face.upper, symbol)
-        for _, frame in face.leafSet do
-            frame.Position = UDim2.fromScale(0.5, 1) -- centred on the leaf's bottom = the seam
+        for sym, frame in face.leafSet do
+            -- centred on the leaf's bottom = the seam, keeping each glyph's own nudge
+            frame.Position = UDim2.new(0.5, 0, 1, (NUDGE[sym] or 0) * face.side)
         end
         reveal(face.leafSet, outgoing)
+        -- THE LOWER HALF SHOWS THE OUTGOING GLYPH FOR THE WHOLE FALL. It used to commit only
+        -- when the landing FINISHED, so any turn interrupted before then left the bottom blank --
+        -- and at ReelStep's 0.05s interval against an 0.08s turn, every turn is interrupted.
+        -- That is the blank bottom panel the owner saw through most of the spin.
+        reveal(face.lower, outgoing)
         face.leaf.AnchorPoint = Vector2.new(0, 1)
         face.leaf.Position = UDim2.fromOffset(0, face.halfH)
         face.leaf.Size = UDim2.fromOffset(face.side, face.halfH)
@@ -199,8 +212,9 @@ function GlyphFlipper.show(self: any, symbol: string?)
             end
             -- LANDING. The leaf turns over to the incoming glyph and opens downward over the old
             -- bottom half, which commits when it finishes.
-            for _, frame in face.leafSet do
-                frame.Position = UDim2.fromScale(0.5, 0) -- centred on the leaf's top = the seam
+            for sym, frame in face.leafSet do
+                -- centred on the leaf's top = the seam, keeping each glyph's own nudge
+                frame.Position = UDim2.new(0.5, 0, 0, (NUDGE[sym] or 0) * face.side)
             end
             reveal(face.leafSet, symbol)
             face.leaf.AnchorPoint = Vector2.new(0, 0)
