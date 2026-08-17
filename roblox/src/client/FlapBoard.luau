@@ -87,12 +87,15 @@ local TILE_COLOR = Color3.fromRGB(244, 238, 222)
 local SEAM_COLOR = Color3.fromRGB(150, 142, 124)
 local INK = Color3.fromRGB(40, 30, 18)
 local PRINTED_INK = Color3.fromRGB(214, 202, 178)
+-- The falling card: a shade under the face it lifts off, outlined so its edge reads while moving.
+-- Darker than the seam, so a card in flight is distinguishable from the static hinge behind it.
+local CARD_COLOR = Color3.fromRGB(232, 225, 208)
+local EDGE_COLOR = Color3.fromRGB(120, 112, 96)
 
 type Cell = {
     upper: TextLabel,
     lower: TextLabel,
     leaf: Frame,
-    leafLabel: TextLabel,
     text: string,
     token: number,
 }
@@ -185,7 +188,6 @@ local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { { Cell } }
                     upper = t,
                     lower = t,
                     leaf = tile,
-                    leafLabel = t,
                     text = printed,
                     token = 0,
                     w = tileW,
@@ -206,29 +208,33 @@ local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { { Cell } }
             -- directions, which is why its AnchorPoint is reassigned mid-flip rather than fixed.
             local leaf = Instance.new("Frame")
             leaf.Name = "Leaf"
-            leaf.BackgroundColor3 = TILE_COLOR
+            leaf.BackgroundColor3 = CARD_COLOR
             leaf.BorderSizePixel = 0
             leaf.ClipsDescendants = true
             leaf.Visible = false
             leaf.ZIndex = 3
             leaf.Size = UDim2.fromOffset(tileW, halfH)
             leaf.Parent = tile
-            -- THE LEAF'S INK FOLDS WITH THE LEAF. Sized in SCALE of the leaf (200%, so it is a
-            -- full cell tall when the leaf is at half height) and TextScaled, so as the leaf
-            -- collapses toward the hinge the character compresses into it. The first version
-            -- pinned the character still and shrank a clip over it, which wipes rather than
-            -- folds -- the owner's word was "unreadable", and that is why.
+            -- THE LEAF CARRIES NO CHARACTER. Roblox GUI cannot foreshorten: Rotation is 2D about
+            -- Z, there is no non-uniform text scaling and no back faces, so every attempt to
+            -- animate the falling card's ink -- clipped, then scaled -- read as something
+            -- shrinking into a slot rather than a card turning over. At an 0.08s turn nobody
+            -- reads the falling card anyway.
             --
-            -- The size constraint is what keeps the handoff invisible: TextScaled alone would
-            -- pick its own size at full height and jump against the static halves, so it is
-            -- capped at exactly the glyph size those halves use.
-            local leafLabel = label(leaf, tileW, tileH, 1, cfg.metrics.glyphSize)
-            leafLabel.Size = UDim2.fromScale(1, 2)
-            leafLabel.TextScaled = true
-            local cap = Instance.new("UITextSizeConstraint")
-            cap.MaxTextSize = cfg.metrics.glyphSize
-            cap.Parent = leafLabel
-            leafLabel.ZIndex = 4
+            -- So the card is blank and does the one job a card can do here: OCCLUDE and REVEAL.
+            -- What sells it is the leading EDGE sweeping across, which is why the two rules
+            -- below exist -- a tile-coloured card on a tile-coloured cell is invisible without
+            -- them. (Owner's option B, 2026-08-17; real hinged 3D flaps are reserved for the
+            -- round display, where four of them is affordable and 1,050 is not.)
+            -- ONE stroke rather than two edge frames: it outlines the whole card, which is what
+            -- a card in motion actually shows, and costs one instance instead of two across
+            -- 1,050 cells. The card is also a shade darker than the face it lifts off, so it
+            -- reads as a surface rather than as a hole.
+            local stroke = Instance.new("UIStroke")
+            stroke.Thickness = math.max(1, tileH * 0.02)
+            stroke.Color = EDGE_COLOR
+            stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+            stroke.Parent = leaf
 
             local seam = Instance.new("Frame")
             seam.Size = UDim2.fromOffset(tileW, math.max(1, tileH * 0.035))
@@ -243,7 +249,6 @@ local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { { Cell } }
                 upper = upper,
                 lower = lower,
                 leaf = leaf,
-                leafLabel = leafLabel,
                 text = " ",
                 token = 0,
                 w = tileW,
@@ -264,7 +269,7 @@ local function flapTo(cell: any, char: string)
     cell.text = char
     cell.token += 1
     local token = cell.token
-    local leaf, leafLabel = cell.leaf, cell.leafLabel
+    local leaf = cell.leaf
 
     -- FALLING. The upper half commits to the new character straight away; the leaf carries the
     -- OLD one and folds down over it, so the new top is revealed from under a descending edge.
@@ -276,8 +281,6 @@ local function flapTo(cell: any, char: string)
     -- the rotation only the top panel is displaying anything, the bottom panel is blank."
     cell.upper.Text = char
     cell.lower.Text = outgoing
-    leafLabel.Text = outgoing
-    leafLabel.Position = UDim2.fromScale(0.5, 1) -- centred on the leaf's bottom = the seam
     leaf.AnchorPoint = Vector2.new(0, 1)
     leaf.Position = UDim2.fromOffset(0, cell.halfH)
     leaf.Size = UDim2.fromOffset(cell.w, cell.halfH)
@@ -292,9 +295,8 @@ local function flapTo(cell: any, char: string)
         if cell.token ~= token then
             return
         end
-        -- LANDING. The leaf now shows the incoming face and opens downward over the old bottom.
-        leafLabel.Text = char
-        leafLabel.Position = UDim2.fromScale(0.5, 0) -- centred on the leaf's top = the seam
+        -- LANDING. The card re-opens below the hinge and sweeps down over the old bottom half,
+        -- which commits when it finishes.
         leaf.AnchorPoint = Vector2.new(0, 0)
         leaf.Position = UDim2.fromOffset(0, cell.halfH)
         leaf.Size = UDim2.fromOffset(cell.w, 0)
