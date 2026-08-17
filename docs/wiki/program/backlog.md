@@ -317,6 +317,43 @@ Two spec §6.2 items are deferred with reasons in the plan, not dropped: the 番
 sheet with rank encoded by calligraphy size (a different renderer; the owner decides at the
 Studio gate whether the flap sheet suffices), and the top-three avatar plinths.
 
+**BUILT 2026-08-16** on branch `stats-room-displays` — 11 commits, 1252 Luau tests, lint clean.
+The room's code is complete; **nothing is visible until the owner runs
+`roblox/tools/studio/buildStatsBoards.luau` in Studio and saves the place** (the boards are
+place-only geometry, so `rojo build` would drop them). The plan's "Studio gate" section lists
+what to look at.
+
+A correction to the ruling recorded above: **`BoardController` was not the only client consumer
+of `BoardData`** — `main.client.luau:591` has had its own handler all along, so the deletion
+orphaned nothing. R1's conclusion stood; that supporting claim did not.
+
+### Carried out of the branch, unfixed and deliberate
+
+The whole-branch review raised these; each was ruled deferred rather than guessed at. Two need
+a number only the owner can supply and are in the plan's gate list instead:
+
+- **`FlapScheduler` `Opts` are not plumbed through `FlapBoard`**, so the stated per-board roll
+  tuning ("a 1-row band wants a snappier roll than a 10-row sheet") is impossible to act on.
+  At the default 60ms stagger the band's seconds digit may never fully settle during OPEN.
+- **No perf budget was taken**, though §6.2 asked for one. ~3,700 GUI instances are built on
+  every client at join whether or not they enter the room. One line (`gui.MaxDistance`) fixes
+  it; the distance is the owner's call.
+- **Per-player stats fan-out is unbounded**: one `getStatsPlayer` per player every 60s, all in
+  one tick, each triggering four Mongo aggregations. At 40 CCU that is a 40-request burst per
+  minute against a 500/min HttpService budget, for a slip visible only inside one room. Gate on
+  room presence, or spread the fan-out across the interval.
+- **Join-time pushes can be dropped.** `StatsData`/`StatsPersonal` fire from `PlayerAdded`,
+  which runs before the joining client's LocalScripts have connected. Worst case the personal
+  slip shows zeros for up to 60s.
+- **Two pollers both fetch `/leaderboards?scope=world`** (one every 30s, one every 60s), each
+  deriving its own payload from it. Two cached GETs a minute — noted so it is not rediscovered.
+- **`entryLine` truncates an overlong figure from the LEFT**, so a banked total past the column
+  budget would render as a smaller wrong number rather than an overflow marker. Unreachable at
+  current widths (needs ~1.2 billion banked).
+- **Spec §6.2's "longest current streak" heat item** was substituted for points-earned heat.
+  The data exists (`LEADERBOARD_FIELDS` carries `currentStreak`); the substitution is reasonable
+  but was unlisted until now.
+
 **What the walls read from** (all merged and live on dev): `/api/v1/stats/records|heat|player`
 and the `get-stats-surface` socket event. Layout, visual language and the round band are already
 specced in `docs/superpowers/specs/2026-08-16-stats-room-design.md` §6 — plan 3 implements that,
