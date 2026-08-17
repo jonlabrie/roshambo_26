@@ -91,6 +91,35 @@ Corollary for any Studio build tool that reads a shared module: **its output can
 in two independent ways** — the source may not have synced, or the VM may be holding an
 old copy. They look identical from the built artefact. See [[studio-tooling]].
 
+## iOS WebAudio: a third context state, and one unlock attempt is not enough
+
+Two iOS-only holes that let the PWA's reveal bell work perfectly on a laptop and never
+once on an iPhone (2026-08-17).
+
+**`AudioContext.state` can be `'interrupted'` on iOS**, a value the other implementations
+do not have. It is entered on backgrounding, an incoming call, and sometimes on first
+creation. Code that resumes only from `'suspended'` leaves such a context stuck forever:
+
+```ts
+if (ctx.state === 'suspended') ctx.resume()   // WRONG on iOS
+if (ctx.state !== 'running') ctx.resume()     // right
+```
+
+**`resume()` is async, so removing the unlock listeners on the first gesture removes them
+before you know it worked.** On desktop the first attempt always succeeds and the bug is
+invisible; on iOS a failed first attempt then means silence for the whole session. Keep
+listening until `ctx.state === 'running'` is actually observed, and only then unbind.
+
+Also for iOS specifically: bind `click` and `touchend` (long-honoured gestures for audio;
+`pointerdown` is not reliably one), bind in **capture** phase so a `stopPropagation()`
+anywhere in the UI cannot swallow the gesture, and start a one-sample silent buffer
+*inside* the handler — iOS wants a source actually started, not merely a resume.
+
+Related, and the reason this went unnoticed for months: an AudioContext created inside a
+network callback rather than a gesture starts suspended, and scheduling notes into a
+suspended context writes them to a clock that is not advancing, so it fails silently
+rather than throwing. See the PWA bell in `src/hooks/useGameLoop.ts`.
+
 ## Flat Beams: width follows the attachment's UP vector
 
 A Beam's WIDTH extends along its **attachment's Up vector**, and `FaceCamera=false`

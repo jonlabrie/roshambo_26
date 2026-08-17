@@ -212,7 +212,11 @@ export function useGameLoop() {
             audioCtxRef.current = new AudioContextClass()
         }
         const ctx = audioCtxRef.current
-        if (ctx.state === 'suspended') void ctx.resume()
+        // NOT `=== 'suspended'`. iOS Safari has a THIRD state the spec's other implementations
+        // do not: 'interrupted', which it enters after backgrounding, an incoming call, or
+        // sometimes on first creation. Resuming only from 'suspended' left an interrupted
+        // context stuck forever -- the bell worked on desktop and never once on iPhone.
+        if (ctx.state !== 'running') void ctx.resume().catch(() => {})
         return ctx
     }, [])
 
@@ -294,23 +298,50 @@ export function useGameLoop() {
     // So: unlock on the first real gesture, once. iOS additionally requires a source to be
     // STARTED inside the gesture, not merely a resume() -- hence the one-sample silent buffer.
     useEffect(() => {
-        const events = ['pointerdown', 'touchend', 'keydown'] as const
-        const remove = () => events.forEach(e => document.removeEventListener(e, unlock))
+        // `click` and `touchend` are the gestures iOS has always honoured for audio; pointerdown
+        // is not reliably one. CAPTURE phase, so a handler in the throw UI calling
+        // stopPropagation() cannot stop the unlock ever reaching document.
+        const events = ['pointerdown', 'touchend', 'click', 'keydown'] as const
+        const remove = () => events.forEach(e => document.removeEventListener(e, unlock, true))
         function unlock() {
             const ctx = ensureAudioContext()
             if (!ctx) return
-            const src = ctx.createBufferSource()
-            src.buffer = ctx.createBuffer(1, 1, ctx.sampleRate)
-            src.connect(ctx.destination)
-            src.start(0)
-            // Decode the bell now, on the gesture, so the first reveal is not the one that
-            // misses. decodeAudioData needs a running context, which is exactly what we just got.
-            void loadBell(ctx)
-            remove()
+            // iOS wants a source actually STARTED inside the gesture, not merely a resume().
+            try {
+                const src = ctx.createBufferSource()
+                src.buffer = ctx.createBuffer(1, 1, ctx.sampleRate)
+                src.connect(ctx.destination)
+                src.start(0)
+            } catch {
+                // A context too dead to make a one-sample buffer is not worth failing over;
+                // the resume below is the part that matters.
+            }
+            // KEEP LISTENING UNTIL IT ACTUALLY WORKED. The previous version removed the
+            // listeners on the first gesture, before resume() had resolved -- so one failed
+            // attempt meant no audio for the rest of the session. That is survivable on a
+            // desktop where the first try always succeeds, and fatal on iOS where it often
+            // does not.
+            void ctx.resume().then(() => {
+                if (ctx.state === 'running') {
+                    void loadBell(ctx)
+                    remove()
+                }
+            }).catch(() => {})
         }
-        events.forEach(e => document.addEventListener(e, unlock))
+        events.forEach(e => document.addEventListener(e, unlock, true))
         return remove
     }, [ensureAudioContext, loadBell])
+
+    // iOS suspends or interrupts the context when the page goes to the background, and coming
+    // back is not itself a gesture. Nudge it on return; if the nudge is refused the unlock
+    // listeners are still armed, so the next tap picks it up.
+    useEffect(() => {
+        const onVisible = () => {
+            if (document.visibilityState === 'visible') ensureAudioContext()
+        }
+        document.addEventListener('visibilitychange', onVisible)
+        return () => document.removeEventListener('visibilitychange', onVisible)
+    }, [ensureAudioContext])
 
     const handleServerReveal = useCallback((serverRound: ServerRound) => {
         // Trigger SFX
