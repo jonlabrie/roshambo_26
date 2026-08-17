@@ -169,24 +169,26 @@ describe("StatsBoardModel adapters", function()
         expect(s[1].entries[1].figure).toBe("900")
     end)
 
-    test("the form guide reads world throws newest-first as drum glyphs", function()
+    -- THE GLYPH ROW HAS MOVED to the round display's tape -- ten real flaps beside the timer
+    -- (owner, 2026-08-17). What is left here is heat, and these pin that the row did not merely
+    -- get emptied: two surfaces showing the same ten throws would disagree for the ~3.45s the
+    -- drum takes to settle, since one is gated on it and the other is not.
+    test("the form guide is heat alone; the throw row is gone", function()
         local s = M.worldSections({ { worldThrow = "R" }, { worldThrow = "S" } }, nil)
-        expect(s[1].lines[1]).toBe("\u{25CB} \u{2227}")
+        expect(#s).toBe(1)
+        expect(s[1].title:find("HOT", 1, true) ~= nil).toBeTruthy()
     end)
 
-    test("a missing heat board is a section that says so, not an absent section", function()
-        local s = M.worldSections({}, nil)
-        expect(#s).toBe(2)
-        expect(#s[2].entries).toBe(0)
+    test("a tape passed in cannot resurrect a throw row", function()
+        local withTape = M.worldSections({ { worldThrow = "R" } }, nil)
+        local without = M.worldSections(nil, nil)
+        expect(#withTape).toBe(#without)
+        expect(withTape[1].title).toBe(without[1].title)
     end)
 
-    -- FIX 6: at launch there is no tape yet. Before the fix this fell into the `lines` branch's
-    -- no-empty-path and rendered "LAST 0 WORLD THROWS" over a blank row — §8 says no display is
-    -- dark at launch, and a labelled blank row reads as broken rather than empty.
-    test("the empty form guide says so, not '...0 WORLD THROWS' over a blank row", function()
-        local s = M.worldSections({}, nil)
-        expect(s[1].lines[1]).toBe("NO DATA YET")
-        expect(s[1].title:find("0", 1, true)).toBe(nil)
+    test("an empty heat board says so rather than rendering a dark row", function()
+        local lines = M.compose(M.worldSections(nil, nil), { rows = 6, cols = 22 })
+        expect(lines[2]).toBe("NO DATA YET           ")
     end)
 
     test("the personal slip shows progress toward qualification, never a blank", function()

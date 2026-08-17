@@ -230,6 +230,21 @@ local DECLS: { Decl } = {
         y = 129.0,
     },
 
+    -- The tape: the last ten World Throws, on the wall module so the cells match the boards'.
+    -- Sited by two constraints from the owner (2026-08-17) -- "below the timer" and "to the right
+    -- of and on the same lower horizontal line as the larger current throw display" -- so its
+    -- BOTTOM edge is roundThrow's bottom (127.00), which sets y to 127.00 + 0.72/2.
+    {
+        id = "roundTape",
+        site = "cavern",
+        wall = "west",
+        flap = WALL,
+        rows = 1,
+        cols = 10,
+        along = 72.90,
+        y = 127.36,
+    },
+
     -- ===== VESTIBULE =====
     -- MATCHING PAIR, and that is why they share the slip flap and the same grid: the owner asked
     -- for "a matching board on the opposite wall", so they must read as one pair of instruments

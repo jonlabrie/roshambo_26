@@ -23,6 +23,7 @@ local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local RevealTheater = remotes:WaitForChild("RevealTheater") :: RemoteEvent
+local StatsData = remotes:WaitForChild("StatsData") :: RemoteEvent
 
 local INK = Color3.fromRGB(40, 30, 18)
 local FACE = Color3.fromRGB(244, 238, 222)
@@ -155,7 +156,10 @@ end
 
 local function glyphPainter(part: BasePart, canvasW: number, canvasH: number, anchorY: number)
     local clip = surface(part, canvasW, canvasH)
-    local side = canvasH * 2
+    -- SQUARE, AND IT MUST FIT THE NARROWER AXIS. A full character is two half-panels tall, which
+    -- is right for the throw flipper's square cell -- but the tape's cells are wall-module sized,
+    -- taller than they are wide, and a square at full height would be clipped left and right.
+    local side = math.min(canvasW, canvasH * 2)
     local set: { [string]: Frame } = {}
     for _, sym in RoundDisplay.SYMBOLS do
         local f = Glyphs.render(clip, sym, INK, FACE)
@@ -222,6 +226,27 @@ local lastClock: string? = nil
 local contactAt: number? = nil
 local reelSpent = false
 
+-- THE TAPE: the last ten World Throws, newest at the viewer's left.
+--
+-- GATED ON THE DRUM like everything else that names a throw. The server pushes the tape the
+-- moment a round settles, which is ~3.45s before the drum stops -- so a tape applied on arrival
+-- would print the answer while the drum was still turning, in the same room as the flipper that
+-- exists to withhold it. Held until `drumRest`, exactly as StatsController holds the wall boards.
+local shownTape: any = nil
+local pendingTape: any = nil
+
+local function applyTape()
+    local tape = units.roundTape
+    if not tape then
+        return
+    end
+    for c, unit in tape do
+        local entry = shownTape and shownTape[c]
+        -- nil is the drum's blank position, which is what a tape shorter than ten cells shows.
+        unit:set(entry and entry.worldThrow or nil)
+    end
+end
+
 local function board(id: string): Layout.Board?
     for _, b in Layout.BOARDS do
         if b.id == id then
@@ -253,6 +278,20 @@ local function register(part: Instance)
             height = spec.h,
             paint = glyphPainter,
         })
+    elseif id == "roundTape" then
+        local made: { [number]: any } = {}
+        for c, col in Layout.columns(spec) do
+            made[c] = FlapUnit.new({
+                board = part,
+                localX = col.x,
+                width = col.w,
+                height = spec.h,
+                paint = glyphPainter,
+                dividerAfter = c < spec.cols,
+            })
+        end
+        units[id] = made
+        applyTape()
     elseif id == "roundClock" then
         local statics = RoundDisplay.statics()
         local made: { [number]: any } = {}
@@ -355,6 +394,17 @@ RevealTheater.OnClientEvent:Connect(function(r)
     pending = r.worldThrow
 end)
 
+StatsData.OnClientEvent:Connect(function(data)
+    if shownTape == nil then
+        -- First payload on join is history: its newest entry is a round that revealed before this
+        -- client existed, so holding it would leave the tape blank until the next reveal.
+        shownTape = data.tape
+        applyTape()
+    else
+        pendingTape = data.tape
+    end
+end)
+
 EventBus.Cue.Event:Connect(function(cue)
     if cue.kind == "drumRest" then
         rested = true
@@ -362,6 +412,13 @@ EventBus.Cue.Event:Connect(function(cue)
         if pending then
             landed = pending
         end
+        if pendingTape then
+            shownTape = pendingTape
+            pendingTape = nil
+        end
+        -- Applied on the cue rather than on arrival: the drum has finished announcing the round
+        -- the tape's newest entry describes.
+        applyTape()
     end
 end)
 

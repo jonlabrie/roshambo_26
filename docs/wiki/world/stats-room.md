@@ -139,7 +139,14 @@ on both sides, posts embedded outboard so the faces are clean.
 | Personal 札 (`fuda`) | vestibule | interior **west**, face x −33.12 |
 | Summary — players in the last round, R/P/S distribution | vestibule | interior **east**, face x −24.72 |
 | Rotating avatar display — current world/server leaders | cavern | north-**east**, the wall `fuda` vacated |
-| Round display (throw flipper + `0:00` countdown) | cavern | west, replacing the four-segment band |
+
+The **tape** — the last ten World Throws — was a printed row on the form-guide board and moved
+to the round display as real flaps at the owner's word (2026-08-17): "that should be a display
+of its own, up there with the throw display and timer." It is gated on `drumRest` like every
+other surface that names a throw. It had to leave the board rather than be duplicated: the same
+ten throws on two surfaces, one gated on the drum and one not, would visibly disagree for the
+3.45 seconds the drum takes to settle. The form-guide board is heat alone now.
+| Round display — throw flipper, `0:00` countdown, and a ten-flap throw tape | cavern | west, replacing the four-segment band |
 | 番付 standings, records | cavern | south / west / east as specced |
 
 **Neither new board needs server work, which is why they are cheap.** `GlobalResult`

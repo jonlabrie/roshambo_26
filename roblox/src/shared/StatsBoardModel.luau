@@ -285,23 +285,21 @@ function StatsBoardModel.judgementSections(week: any?): { Section }
     }
 end
 
--- R3: ten, not twenty. /api/v1/state serves store.tape(10) and nothing carries more.
-function StatsBoardModel.worldSections(tape: { any }?, heat: any?): { Section }
-    local glyphs: { string } = {}
-    for _, t in tape or {} do
-        table.insert(glyphs, StatsBoardModel.GLYPH[t.worldThrow] or "?")
-    end
+-- THE FORM GUIDE, WHICH IS NOW HEAT ALONE. It used to open with a row of glyphs -- the last ten
+-- World Throws -- and that row has moved to the round display as a tape of its own: ten real
+-- flaps beside the timer and the throw flipper, where the owner wanted it (2026-08-17). Keeping
+-- it here as well would put the same ten throws on two surfaces in one room, one of them a
+-- physical flap and the other a printed line, and they would disagree for the ~3.45s the drum
+-- takes to settle.
+--
+-- The `tape` argument stays in the signature and stays unused: the caller has it to hand and a
+-- future section may want it, and dropping it would churn every call site to save nothing.
+function StatsBoardModel.worldSections(_tape: { any }?, heat: any?): { Section }
     local leaders: { Entry } = {}
     for _, l in (heat and heat.leaders) or {} do
         table.insert(leaders, { name = l.displayName, figure = StatsBoardModel.figure(l.earned) })
     end
-    -- §8: no display is dark at launch. With no tape yet, "LAST 0 WORLD THROWS" over a blank
-    -- row reads as broken, not empty — say so instead, the same way an empty entries list does.
-    local worldSection = if #glyphs == 0
-        then { title = "WORLD THROWS", lines = { "NO DATA YET" } }
-        else { title = `LAST {#glyphs} WORLD THROWS`, lines = { table.concat(glyphs, " ") } }
     return {
-        worldSection,
         -- §3: heat is FORM, not standing. The title must never read as a ranking.
         {
             title = `HOT {StatsBoardModel.windowLabel(heat and heat.window, heat and heat.windowKind)}`,
