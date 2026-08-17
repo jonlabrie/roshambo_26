@@ -84,10 +84,20 @@ describe("StatsRoomLayout", function()
 
     -- Uniform flaps make every cell the same aspect, so the glyph clamp resolves identically
     -- everywhere. This is the whole payoff: no board can read airier than its neighbour again.
-    test("every board renders at the same glyph size", function()
+    -- The payoff of one flap size: every wall board has the same cell aspect, so the glyph rule
+    -- resolves identically on all of them and no board can read airier than its neighbour. The
+    -- round display is excluded -- physical flaps, sized by their own charFraction.
+    test("every wall board renders at the same glyph size", function()
         local StatsBoardModel = require("../src/shared/StatsBoardModel")
+        local sizes = {}
         for _, b in L.BOARDS do
-            expect(StatsBoardModel.metrics(b.rows, b.cols, b.w / b.h).glyphSize).toBe(90)
+            if b.id:sub(1, 5) ~= "round" then
+                table.insert(sizes, StatsBoardModel.metrics(b.rows, b.cols, b.w / b.h).glyphSize)
+            end
+        end
+        expect(#sizes > 1).toBeTruthy()
+        for _, size in sizes do
+            expect(size).toBe(sizes[1])
         end
     end)
 

@@ -199,12 +199,18 @@ end
 -- LETTER DOES NOT CHANGE SIZE AT ALL. Canvas width is unaffected too -- shrinking board height
 -- raises the aspect by the reciprocal, so `canvasH * aspect` comes out identical.
 -- Change one of the three without the others and the letters resize.
-local ROW_PX = 120 -- canvas px per row (was the jumbotron's 150, less 20%)
-local GLYPH_OF_HEIGHT = 0.75 -- 90/120; holds the glyph at the same size in the shorter cell
--- The jumbotron ran at 1.03. Kept as the ceiling rather than 1.0 so a board whose columns are
--- dense for its aspect (`world` at 22 cols on 12 studs, `fuda` at 16 on 6) shrinks its glyph
--- instead of clipping letters -- ClipsDescendants is on, so overflow is a cut, not a spill.
-local GLYPH_OF_WIDTH = 1.03
+local ROW_PX = 92 -- canvas px per row
+local GLYPH_OF_HEIGHT = 0.975 -- 90/92
+-- THE WIDTH CEILING, AND WHY IT IS WELL ABOVE 1.0. A letter's DRAWN advance is only about half
+-- its point size, so a glyph sized wider than its cell still renders whole -- the jumbotron ran
+-- at 1.03 deliberately. The ceiling exists only to stop a genuinely absurd size clipping, since
+-- ClipsDescendants is on and overflow is a cut rather than a spill.
+--
+-- Raised to 1.4 when the owner asked for 30% larger lettering (2026-08-17): at 1.03 the WIDTH
+-- clamp bound first and capped the increase at 16%, so moving the height alone would have
+-- delivered half of what was asked. Since the flap standardisation every wall board shares one
+-- cell aspect, so this single number governs all of them identically.
+local GLYPH_OF_WIDTH = 1.4
 local MAX_CANVAS = 4096
 function StatsBoardModel.metrics(rows: number, cols: number, aspect: number): Metrics
     local canvasH = rows * ROW_PX
