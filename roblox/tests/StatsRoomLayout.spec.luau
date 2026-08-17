@@ -13,24 +13,70 @@ local function byId(id: string): any
 end
 
 describe("StatsRoomLayout", function()
-    test("every board fits inside the bored room on both axes", function()
+    test("every board fits inside ITS OWN site on both axes", function()
         for _, b in L.BOARDS do
+            local site = L.SITES[b.site]
+            expect(site ~= nil).toBeTruthy()
             local halfW = b.w / 2
-            if b.wall == "north" or b.wall == "south" then
-                expect(b.x - halfW >= L.ROOM.xW).toBeTruthy()
-                expect(b.x + halfW <= L.ROOM.xE).toBeTruthy()
+            if L.isHorizontal(b.wall) then
+                expect(b.x - halfW >= site.xW).toBeTruthy()
+                expect(b.x + halfW <= site.xE).toBeTruthy()
             else
-                expect(b.z - halfW >= L.ROOM.zN).toBeTruthy()
-                expect(b.z + halfW <= L.ROOM.zS).toBeTruthy()
+                expect(b.z - halfW >= site.zN).toBeTruthy()
+                expect(b.z + halfW <= site.zS).toBeTruthy()
             end
-            expect(b.y - b.h / 2 >= L.ROOM.floorY).toBeTruthy()
-            expect(b.y + b.h / 2 <= L.ROOM.ceilingY).toBeTruthy()
+            expect(b.y - b.h / 2 >= site.floorY).toBeTruthy()
+            expect(b.y + b.h / 2 <= site.ceilingY).toBeTruthy()
         end
     end)
 
-    test("nothing at door height covers the tunnel mouth", function()
+    -- THE RULE THE MODULE EXISTS FOR. Before the 2026-08-17 inversion a board declared its own
+    -- width and a column count independently, and the flap size fell out of the division --
+    -- which is how one room ended up with flaps from 0.375 to 2.375 studs wide.
+    test("every board is an exact whole number of its own flaps", function()
         for _, b in L.BOARDS do
-            if b.wall == "north" and b.y - b.h / 2 < L.DOOR.top then
+            expect(math.abs(b.w - b.cols * b.flap.w) < 1e-6).toBeTruthy()
+            expect(math.abs(b.h - b.rows * b.flap.h) < 1e-6).toBeTruthy()
+        end
+    end)
+
+    test("there are exactly two flap sizes, and every board uses one of them", function()
+        local seen = {}
+        for _, b in L.BOARDS do
+            seen[`{b.flap.w}x{b.flap.h}`] = true
+        end
+        local n = 0
+        for _ in seen do
+            n += 1
+        end
+        expect(n).toBe(2)
+        expect(seen[`{L.FLAPS.wall.w}x{L.FLAPS.wall.h}`]).toBe(true)
+        expect(seen[`{L.FLAPS.slip.w}x{L.FLAPS.slip.h}`]).toBe(true)
+    end)
+
+    -- Uniform flaps make every cell the same aspect, so the glyph clamp resolves identically
+    -- everywhere. This is the whole payoff: no board can read airier than its neighbour again.
+    test("every board renders at the same glyph size", function()
+        local StatsBoardModel = require("../src/shared/StatsBoardModel")
+        for _, b in L.BOARDS do
+            expect(StatsBoardModel.metrics(b.rows, b.cols, b.w / b.h).glyphSize).toBe(90)
+        end
+    end)
+
+    test("the matching vestibule pair really matches", function()
+        local fuda, summary = byId("fuda"), byId("summary")
+        expect(fuda.flap).toBe(summary.flap)
+        expect(fuda.rows).toBe(summary.rows)
+        expect(fuda.cols).toBe(summary.cols)
+        expect(fuda.y).toBe(summary.y)
+        expect(fuda.wall).toBe("west")
+        expect(summary.wall).toBe("east")
+        expect(fuda.site).toBe("vestibule")
+    end)
+
+    test("nothing at door height covers the cavern's tunnel mouth", function()
+        for _, b in L.BOARDS do
+            if b.site == "cavern" and b.wall == "north" and b.y - b.h / 2 < L.DOOR.top then
                 local clear = b.x - b.w / 2 >= L.DOOR.x + L.DOOR.halfWidth
                     or b.x + b.w / 2 <= L.DOOR.x - L.DOOR.halfWidth
                 expect(clear).toBeTruthy()
@@ -38,19 +84,29 @@ describe("StatsRoomLayout", function()
         end
     end)
 
-    test("the clerestory band crosses the mouth, and is allowed to — it runs above the head", function()
-        local band = byId("bandNorth")
-        expect(band.x - band.w / 2 < L.DOOR.x).toBeTruthy()
-        expect(band.x + band.w / 2 > L.DOOR.x).toBeTruthy()
-        expect(band.y - band.h / 2 >= L.DOOR.top).toBeTruthy()
+    -- Tests the EXEMPTION, not a board that happens to use it. The clerestory band used to span
+    -- the whole north wall and cross the mouth; since the flap standardisation it is only 9.84
+    -- studs and clears the opening by position instead. The rule still has to hold for whatever
+    -- spans that wall next -- the round display is going high on a wall too.
+    test("a board above the door head may cross the mouth; one below it may not", function()
+        local above = { site = "cavern", wall = "north", x = L.DOOR.x, w = 30, h = 2, y = L.DOOR.top + 10 }
+        local below = { site = "cavern", wall = "north", x = L.DOOR.x, w = 30, h = 2, y = L.DOOR.top - 5 }
+        local function crossesAtDoorHeight(b: any): boolean
+            if b.y - b.h / 2 >= L.DOOR.top then
+                return false
+            end
+            return b.x - b.w / 2 < L.DOOR.x + L.DOOR.halfWidth and b.x + b.w / 2 > L.DOOR.x - L.DOOR.halfWidth
+        end
+        expect(crossesAtDoorHeight(above)).toBe(false)
+        expect(crossesAtDoorHeight(below)).toBe(true)
     end)
 
-    test("no two boards on the same wall overlap", function()
+    test("no two boards on the same wall of the same site overlap", function()
         for i, a in L.BOARDS do
             for j, b in L.BOARDS do
-                if j > i and a.wall == b.wall then
-                    local aAxis = if a.wall == "north" or a.wall == "south" then a.x else a.z
-                    local bAxis = if b.wall == "north" or b.wall == "south" then b.x else b.z
+                if j > i and a.site == b.site and a.wall == b.wall then
+                    local aAxis = if L.isHorizontal(a.wall) then a.x else a.z
+                    local bAxis = if L.isHorizontal(b.wall) then b.x else b.z
                     local apart = math.abs(aAxis - bAxis) >= (a.w + b.w) / 2
                     local stacked = math.abs(a.y - b.y) >= (a.h + b.h) / 2
                     expect(apart or stacked).toBeTruthy()

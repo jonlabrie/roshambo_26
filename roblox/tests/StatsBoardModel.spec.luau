@@ -201,6 +201,50 @@ end)
 -- multiplied them together — three shipped boards truncated a title mid-word. This pins the two
 -- modules to each other: every real board, at its real rows/cols, composing the real adapter's
 -- real fixture payload, must not truncate its title line(s).
+describe("StatsBoardModel.summarySections", function()
+    local function figures(sections)
+        local out = {}
+        for _, sec in sections do
+            for _, e in sec.entries or {} do
+                table.insert(out, `{e.name}={e.figure}`)
+            end
+        end
+        return table.concat(out, " ")
+    end
+
+    test("reads the LAST CLOSED round, and says so", function()
+        local s = M.summarySections({
+            { totalPlayers = 42, distribution = { R = 19, P = 12, S = 11 } },
+            { totalPlayers = 9, distribution = { R = 9, P = 0, S = 0 } },
+        })
+        expect(s[1].title).toBe("LAST ROUND")
+        expect(figures(s)).toBe("PLAYERS=42 ROCK=45% PAPER=29% SCISSORS=26%")
+    end)
+
+    test("percentages are of THROWS, not of players present", function()
+        -- 42 present, 10 threw. Rock's share is 5/10, not 5/42.
+        local s = M.summarySections({ { totalPlayers = 42, distribution = { R = 5, P = 3, S = 2 } } })
+        expect(figures(s)).toBe("PLAYERS=42 ROCK=50% PAPER=30% SCISSORS=20%")
+    end)
+
+    test("a settled round where nobody threw shows a dash, not a division by zero", function()
+        local s = M.summarySections({ { totalPlayers = 3, distribution = { R = 0, P = 0, S = 0 } } })
+        expect(figures(s)).toBe("PLAYERS=3 ROCK=- PAPER=- SCISSORS=-")
+    end)
+
+    test("an empty tape says so rather than rendering a dark row", function()
+        local lines = M.compose(M.summarySections({}), { rows = 7, cols = 16 })
+        expect(lines[2]).toBe("NO DATA YET     ")
+    end)
+
+    test("is label:value like the slip it faces, never numbered", function()
+        local s = M.summarySections({ { totalPlayers = 1, distribution = { R = 1, P = 0, S = 0 } } })
+        expect(s[1].numbered).toBe(false)
+        local lines = M.compose(s, { rows = 7, cols = 16 })
+        expect(lines[2]:sub(1, 3)).toBe("PLA")
+    end)
+end)
+
 describe("StatsBoardModel titles fit their real StatsRoomLayout boards", function()
     -- Mirrors StatsController.client.luau's `linesFor` id -> adapter dispatch. `skillFuture` is
     -- shuttered (no content adapter) and the four `band*` segments have no title at all — both
@@ -217,6 +261,8 @@ describe("StatsBoardModel titles fit their real StatsRoomLayout boards", functio
             return M.worldSections(S.tape, S.heat)
         elseif id == "fuda" then
             return M.fudaSections(P)
+        elseif id == "summary" then
+            return M.summarySections(S.tape)
         end
         return nil
     end

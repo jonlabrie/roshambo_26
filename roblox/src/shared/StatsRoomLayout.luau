@@ -1,21 +1,76 @@
 --!strict
--- WHERE THE STATS ROOM'S BOARDS GO. Pure data plus its own invariants, so the placement is
--- checkable under Lune and the Studio tool that builds the parts stays a thin executor.
+-- WHERE THE STATS DISPLAYS GO. Pure data plus its own invariants, so placement is checkable
+-- under Lune and the Studio tool that builds the parts stays a thin executor.
 --
--- The room is PLACE-ONLY geometry (bored terrain, not a Rojo model), so the parts this describes
--- are found at runtime by CollectionService tag — never by path and never by name.
+-- Everything here is PLACE-ONLY geometry (bored terrain and a Rojo model's interior, not parts
+-- Rojo manages), so the boards this describes are found at runtime by CollectionService tag --
+-- never by path and never by name.
+--
+-- ===== THE ONE RULE THIS MODULE EXISTS TO ENFORCE (owner, 2026-08-17) =====
+-- A FLAP IS A PHYSICAL MODULE, AND BOARDS ARE BUILT FROM FLAPS.
+--
+-- The first build had it backwards: every board declared a COLUMN COUNT and inherited its cell
+-- size from whatever its surveyed width happened to be. Flap width came out anywhere from 0.375
+-- studs to 2.375 -- a six-fold spread, in equipment meant to read as one machine, and the cause
+-- of the uneven letter sizes the owner spotted (different cell aspects clamp the glyph
+-- differently, so one board reached 75% of its cell height and another only 56%).
+--
+-- So the grid is the INPUT and the board's dimensions are the RESULT: `w = cols * flap.w`,
+-- `h = rows * flap.h`. A board cannot be declared at a size its flaps do not add up to.
 local StatsRoomLayout = {}
 
--- Measured by tools/studio/boreStatsCavern.luau in VERIFY mode after the owner hand-shaped the
--- cut: the nominal bore is x[-58.00,-17.83] z[62.00,85.22], the floor aliases to ~114 and
--- ROOM_ROOF 135.0 aliases down to a measured 134.00.
-StatsRoomLayout.ROOM = { xW = -58.00, xE = -17.83, zN = 62.00, zS = 85.22, floorY = 114.0, ceilingY = 134.0 }
+-- TWO FLAP SIZES, FOR TWO VIEWING DISTANCES, AND ONLY TWO. Wall boards are read from across a
+-- room; the personal slip is read standing in front of it. Two deliberate modules is a design.
+-- Six accidental ones was the defect. Do not add a third without a viewing distance to justify it.
+StatsRoomLayout.FLAPS = {
+    -- banzuke's proportions, which the owner approved at the 2026-08-17 gate.
+    wall = { w = 0.615, h = 0.72 },
+    -- Sized so 16 columns fit the vestibule's 7.40-stud side wall with a margin.
+    slip = { w = 0.425, h = 0.50 },
+}
 
--- The tunnel meets the north wall here (boreStatsCavern DOOR_X, BORE_W ~7 net after aliasing).
--- halfWidth is deliberately generous: a board that grazes the mouth reads as blocking it.
+-- ===== SITES =====
+--
+-- `seat` says whether the tool should raycast for the real surface before placing. The cavern is
+-- BORED TERRAIN -- 4-stud voxels, hand-shaped afterwards -- so its nominal planes are not where
+-- the rock is. The vestibule's walls are built geometry at exact coordinates, so raycasting there
+-- would find whatever the ray happened to hit and move a board for no reason.
+StatsRoomLayout.SITES = {
+    -- Measured by tools/studio/boreStatsCavern.luau in VERIFY mode after the hand-shaping.
+    cavern = {
+        xW = -58.00,
+        xE = -17.83,
+        zN = 62.00,
+        zS = 85.22,
+        floorY = 114.0,
+        ceilingY = 134.0,
+        seat = true,
+    },
+    -- Interior faces of MachiyaStats' ground floor, read off the built model 2026-08-17:
+    -- WallWest at x -33.37 and WallEast at -24.47, both 0.50 thick, so the clean interior faces
+    -- are -33.12 and -24.72. The run is z 35.53..42.93 and the height is the FloorSlab top
+    -- (113.30) to the UpperFloor underside (122.30). Posts sit embedded outboard of both faces.
+    vestibule = {
+        xW = -33.12,
+        xE = -24.72,
+        zN = 35.53,
+        zS = 42.93,
+        floorY = 113.30,
+        ceilingY = 122.30,
+        seat = false,
+    },
+}
+
+-- Kept as an alias: the cavern was the only site when this module was written, and callers and
+-- tests still say ROOM when they mean it.
+StatsRoomLayout.ROOM = StatsRoomLayout.SITES.cavern
+
+-- The tunnel meets the cavern's north wall here (boreStatsCavern DOOR_X, BORE_W ~7 net after
+-- aliasing). halfWidth is deliberately generous: a board that grazes the mouth reads as blocking
+-- it. Applies to the CAVERN only -- the vestibule's doorway is in a wall no board sits on.
 --
 -- `top` IS WHAT LETS THE CLERESTORY BAND RUN UNBROKEN. The band spans the whole north wall,
--- mouth included, and must — it is the one display that has to be visible from anywhere in the
+-- mouth included, and must -- it is the one display that has to be visible from anywhere in the
 -- room. It clears the opening because it sits at y 131 and the tunnel head is at LINTEL_TOP
 -- 120.60. So the keep-out is a DOORWAY, not a column: it binds only boards that reach below
 -- `top`. Without this the invariant would be either wrong or unsatisfiable.
@@ -25,21 +80,14 @@ StatsRoomLayout.TAG = "StatsBoard"
 StatsRoomLayout.THICKNESS = 0.4
 StatsRoomLayout.STANDOFF = 0.3 -- board centre this far off the wall plane
 
--- BOARD HEIGHTS ARE 20% SHORTER THAN SURVEYED (owner, 2026-08-17): "the vertical size of the
--- flaps is wrong for this font, they need to be shorter by about 20%". JosefinSans is geometric
--- with a small x-height, so its caps left more air in the cell than Merriweather's did.
---
--- THE CUT IS ONE THIRD OF A THREE-PART CHANGE and the parts are not separable. The other two are
--- in StatsBoardModel.metrics: ROW_PX 150 -> 120 (the same 20%) and GLYPH_OF_HEIGHT 0.60 -> 0.75.
--- Together they shorten the flap and leave the LETTER exactly the size it was. Canvas width is
--- untouched as well: cutting board height raises the aspect by the reciprocal, so `canvasH *
--- aspect` is unchanged. Move any one of the three alone and every letter in the room resizes.
---
--- Widths and wall positions are untouched -- those came off a terrain survey. Only height moved,
--- and only downward, so every invariant in check() still holds with more margin than before.
+StatsRoomLayout.BAND_COLS = 16
+local BAND_COLS = StatsRoomLayout.BAND_COLS
+local BAND_Y = 131.0
 
+export type Flap = { w: number, h: number }
 export type Board = {
     id: string,
+    site: string,
     wall: string,
     x: number,
     y: number,
@@ -48,106 +96,165 @@ export type Board = {
     h: number,
     rows: number,
     cols: number,
+    flap: Flap,
     shuttered: boolean?,
 }
 
--- Exported (not local): FIX 5. RoundBandController renders each segment at its OWN `cols`
--- attribute now, but this is still the single source of truth a caller reaches for rather than
--- hand-copying the literal 16 — resizing the band is genuinely a one-line change here now.
-local BAND_Y, BAND_H = 131.0, 1.92
-StatsRoomLayout.BAND_COLS = 16
-local BAND_COLS = StatsRoomLayout.BAND_COLS
+-- A board is DECLARED by its grid and where it sits along its wall; `resolve` below turns that
+-- into world coordinates and derived dimensions. `along` is the centre coordinate on the wall's
+-- own axis -- x for north/south walls, z for east/west ones.
+type Decl = {
+    id: string,
+    site: string,
+    wall: string,
+    flap: Flap,
+    rows: number,
+    cols: number,
+    along: number,
+    y: number,
+    shuttered: boolean?,
+}
 
-StatsRoomLayout.BOARDS = {
-    -- South faces you on entry: the standings (spec section 6).
+local WALL = StatsRoomLayout.FLAPS.wall
+local SLIP = StatsRoomLayout.FLAPS.slip
+
+local DECLS: { Decl } = {
+    -- ===== CAVERN =====
+    -- South faces you on entry: the standings.
     {
         id = "banzuke",
+        site = "cavern",
         wall = "south",
-        x = -37.90,
-        y = 121.0,
-        z = 84.92,
-        w = 16,
-        h = 7.2,
+        flap = WALL,
         rows = 10,
         cols = 26,
+        along = -37.90,
+        y = 121.0,
     },
-    -- West, the longest wall: records now, rate ladders later (ruling R4).
-    { id = "skill", wall = "west", x = -57.70, y = 120.5, z = 70.00, w = 12, h = 5.6, rows = 8, cols = 22 },
+    -- West, the longest wall: records now, rate ladders later.
+    {
+        id = "skill",
+        site = "cavern",
+        wall = "west",
+        flap = WALL,
+        rows = 8,
+        cols = 22,
+        along = 70.00,
+        y = 120.5,
+    },
     {
         id = "skillFuture",
+        site = "cavern",
         wall = "west",
-        x = -57.70,
-        y = 120.0,
-        z = 80.50,
-        w = 8,
-        h = 4,
+        flap = WALL,
         rows = 6,
-        cols = 18,
-        -- Section 8: shuttered, NOT unlit. A closed kosatsu reads as intentional; a dark one
-        -- reads as broken.
+        -- 13, not the 18 it carried before the flap standardisation. At the standard flap 18
+        -- columns is 11.07 studs and `skill` already takes z 63.24..76.77, leaving 8.45 to the
+        -- south wall. This is the shape of thing the inversion is meant to surface: the old
+        -- declaration asked for 18 columns on an 8-stud board and silently got 0.44-stud flaps.
+        cols = 13,
+        along = 81.00,
+        y = 120.0,
+        -- Shuttered, NOT unlit. A closed kosatsu reads as intentional; a dark one reads as broken.
         shuttered = true,
     },
     {
         id = "judgement",
+        site = "cavern",
         wall = "east",
-        x = -18.13,
-        y = 120.5,
-        z = 70.00,
-        w = 12,
-        h = 5.6,
+        flap = WALL,
         rows = 8,
         cols = 22,
+        along = 70.00,
+        y = 120.5,
     },
-    -- North, west of the mouth: the form guide, last thing seen on the way out.
-    { id = "world", wall = "north", x = -45.00, y = 120.5, z = 62.30, w = 12, h = 5.6, rows = 6, cols = 22 },
-    -- North, east of the mouth: the personal slip. Paper-and-wood against stone, per-viewer.
-    { id = "fuda", wall = "north", x = -21.60, y = 119.0, z = 62.30, w = 6, h = 4.8, rows = 7, cols = 16 },
-    -- The clerestory band (section 6.3). One line, four segments, the top 4 studs nothing else wants.
+    -- North, west of the tunnel mouth: the form guide, last thing seen on the way out.
+    {
+        id = "world",
+        site = "cavern",
+        wall = "north",
+        flap = WALL,
+        rows = 6,
+        cols = 22,
+        along = -45.00,
+        y = 120.5,
+    },
+    --
+    -- The cavern's north wall EAST of the mouth is deliberately empty. `fuda` used to sit there
+    -- and has moved to the vestibule; the owner has given the freed wall to a rotating avatar
+    -- display of current leaders, which is its own piece of work (it needs image assets, and
+    -- nothing in this room renders anything but text cells).
+    --
+    -- PLACEHOLDERS, DUE FOR DELETION. The four clerestory band segments are superseded by a
+    -- single round display on the cavern's west wall (owner, 2026-08-16). They stay only so the
+    -- room keeps a round timer in the meantime -- without one, walking in here means silently
+    -- dropping out of the game. Whoever builds the round display deletes these four.
     {
         id = "bandNorth",
+        site = "cavern",
         wall = "north",
-        x = -37.90,
-        y = BAND_Y,
-        z = 62.30,
-        w = 38,
-        h = BAND_H,
+        flap = WALL,
         rows = 1,
         cols = BAND_COLS,
+        along = -37.90,
+        y = BAND_Y,
     },
     {
         id = "bandSouth",
+        site = "cavern",
         wall = "south",
-        x = -37.90,
-        y = BAND_Y,
-        z = 84.92,
-        w = 38,
-        h = BAND_H,
+        flap = WALL,
         rows = 1,
         cols = BAND_COLS,
+        along = -37.90,
+        y = BAND_Y,
     },
     {
         id = "bandWest",
+        site = "cavern",
         wall = "west",
-        x = -57.70,
-        y = BAND_Y,
-        z = 73.60,
-        w = 21,
-        h = BAND_H,
+        flap = WALL,
         rows = 1,
         cols = BAND_COLS,
+        along = 73.60,
+        y = BAND_Y,
     },
     {
         id = "bandEast",
+        site = "cavern",
         wall = "east",
-        x = -18.13,
-        y = BAND_Y,
-        z = 73.60,
-        w = 21,
-        h = BAND_H,
+        flap = WALL,
         rows = 1,
         cols = BAND_COLS,
+        along = 73.60,
+        y = BAND_Y,
     },
-} :: { Board }
+
+    -- ===== VESTIBULE =====
+    -- MATCHING PAIR, and that is why they share the slip flap and the same grid: the owner asked
+    -- for "a matching board on the opposite wall", so they must read as one pair of instruments
+    -- rather than two boards that happen to face each other.
+    {
+        id = "fuda",
+        site = "vestibule",
+        wall = "west",
+        flap = SLIP,
+        rows = 7,
+        cols = 16,
+        along = 39.23,
+        y = 117.5,
+    },
+    {
+        id = "summary",
+        site = "vestibule",
+        wall = "east",
+        flap = SLIP,
+        rows = 7,
+        cols = 16,
+        along = 39.23,
+        y = 117.5,
+    },
+}
 
 -- CFrame.Angles(0, rad(yaw), 0).LookVector == (-sin yaw, 0, -cos yaw), and a SurfaceGui on
 -- NormalId.Front renders on the LookVector face. These are the yaws that turn each wall's face
@@ -163,11 +270,61 @@ function StatsRoomLayout.inwardFor(wall: string): number
     return INWARD[wall] or 1
 end
 
+function StatsRoomLayout.isHorizontal(wall: string): boolean
+    return wall == "north" or wall == "south"
+end
+
+-- The wall's own plane coordinate, before standoff or seating.
+function StatsRoomLayout.planeFor(site: any, wall: string): number
+    if wall == "north" then
+        return site.zN
+    elseif wall == "south" then
+        return site.zS
+    elseif wall == "west" then
+        return site.xW
+    end
+    return site.xE
+end
+
+-- Declaration -> world. The ONLY place a board's dimensions are computed, so a board can never
+-- carry a size its own grid does not produce.
+local function resolve(d: Decl): Board
+    local site = StatsRoomLayout.SITES[d.site]
+    local plane = StatsRoomLayout.planeFor(site, d.wall)
+    local off = plane + StatsRoomLayout.inwardFor(d.wall) * StatsRoomLayout.STANDOFF
+    local horizontal = StatsRoomLayout.isHorizontal(d.wall)
+    return {
+        id = d.id,
+        site = d.site,
+        wall = d.wall,
+        x = if horizontal then d.along else off,
+        y = d.y,
+        z = if horizontal then off else d.along,
+        w = d.cols * d.flap.w,
+        h = d.rows * d.flap.h,
+        rows = d.rows,
+        cols = d.cols,
+        flap = d.flap,
+        shuttered = d.shuttered,
+    }
+end
+
+StatsRoomLayout.BOARDS = (function(): { Board }
+    local out: { Board } = {}
+    for _, d in DECLS do
+        table.insert(out, resolve(d))
+    end
+    return out
+end)()
+
 -- THE BORE ALIASES, SO THE NOMINAL PLANE IS NOT THE ROCK. Terrain is 4-stud voxels and the owner
 -- hand-shaped the cut afterwards, so a board pinned to the nominal wall can end up buried or
 -- floating. The Studio tool casts a ray from `castBack` studs OUTSIDE the plane; this turns the
 -- hit distance into a seated coordinate, clamped so a ray that escapes through a gap cannot fling
 -- a board across the room. A missing hit keeps the nominal plane plus the standoff.
+--
+-- Only sites with `seat = true` get this. Built geometry needs no correction and would be moved
+-- by whatever a ray happened to strike.
 StatsRoomLayout.CAST_BACK = 3.0
 function StatsRoomLayout.seat(
     nominal: number,
@@ -185,29 +342,39 @@ end
 
 function StatsRoomLayout.check(): (boolean, { string })
     local failures: { string } = {}
-    local R = StatsRoomLayout.ROOM
     for _, b in StatsRoomLayout.BOARDS do
+        local site = StatsRoomLayout.SITES[b.site]
+        if not site then
+            table.insert(failures, `{b.id} names an unknown site '{b.site}'`)
+            continue
+        end
         local half = b.w / 2
         local lo, hi, loLim, hiLim
-        if b.wall == "north" or b.wall == "south" then
-            lo, hi, loLim, hiLim = b.x - half, b.x + half, R.xW, R.xE
+        if StatsRoomLayout.isHorizontal(b.wall) then
+            lo, hi, loLim, hiLim = b.x - half, b.x + half, site.xW, site.xE
         else
-            lo, hi, loLim, hiLim = b.z - half, b.z + half, R.zN, R.zS
+            lo, hi, loLim, hiLim = b.z - half, b.z + half, site.zN, site.zS
         end
         if lo < loLim or hi > hiLim then
-            table.insert(failures, `{b.id} runs off the {b.wall} wall`)
+            table.insert(failures, `{b.id} runs off the {b.site} {b.wall} wall`)
         end
-        if b.y - b.h / 2 < R.floorY or b.y + b.h / 2 > R.ceilingY then
-            table.insert(failures, `{b.id} runs through the floor or ceiling`)
+        if b.y - b.h / 2 < site.floorY or b.y + b.h / 2 > site.ceilingY then
+            table.insert(failures, `{b.id} runs through the {b.site} floor or ceiling`)
         end
+        -- The cavern's tunnel mouth. A DOORWAY, not a column: only boards reaching below its head.
         local D = StatsRoomLayout.DOOR
-        if b.wall == "north" and b.y - b.h / 2 < D.top then
+        if b.site == "cavern" and b.wall == "north" and b.y - b.h / 2 < D.top then
             if b.x - half < D.x + D.halfWidth and b.x + half > D.x - D.halfWidth then
                 table.insert(failures, `{b.id} covers the tunnel mouth`)
             end
         end
         if b.rows < 1 or b.cols < 1 then
             table.insert(failures, `{b.id} has an empty grid`)
+        end
+        -- The rule this module exists for. A derived dimension cannot drift, but it CAN be
+        -- broken by someone reaching past resolve(), so it is asserted rather than assumed.
+        if math.abs(b.w - b.cols * b.flap.w) > 1e-6 or math.abs(b.h - b.rows * b.flap.h) > 1e-6 then
+            table.insert(failures, `{b.id} is not an exact multiple of its flap`)
         end
     end
     return #failures == 0, failures

@@ -35,30 +35,33 @@ rc.FilterDescendantsInstances = { workspace.Terrain }
 
 local report: { string } = {}
 for _, b in Layout.BOARDS do
+    local site = Layout.SITES[b.site]
     local inward = Layout.inwardFor(b.wall)
-    local horizontal = b.wall == "north" or b.wall == "south"
+    local horizontal = Layout.isHorizontal(b.wall)
     local nominal = if horizontal then b.z else b.x
-    -- Cast from CAST_BACK studs OUTSIDE the nominal plane, straight along the inward normal.
-    local axis = if horizontal then Vector3.new(0, 0, inward) else Vector3.new(inward, 0, 0)
-    local start = Vector3.new(b.x, b.y, b.z) - axis * Layout.CAST_BACK
-    local hit = workspace:Raycast(start, axis * (Layout.CAST_BACK + MAX_ADJUST + 2), rc)
+
+    -- SEAT AGAINST TERRAIN ONLY. The cavern is bored voxels, hand-shaped afterwards, so its
+    -- nominal planes are not where the rock is. The vestibule's walls are built geometry at
+    -- exact coordinates -- raycasting there would move a board to whatever a ray happened to
+    -- strike, which is strictly worse than the number we already know.
+    local hit = nil
+    if site.seat then
+        local axis = if horizontal then Vector3.new(0, 0, inward) else Vector3.new(inward, 0, 0)
+        local start = Vector3.new(b.x, b.y, b.z) - axis * Layout.CAST_BACK
+        hit = workspace:Raycast(start, axis * (Layout.CAST_BACK + MAX_ADJUST + 2), rc)
+    end
     local seated = Layout.seat(nominal, hit and hit.Distance or nil, inward, MAX_ADJUST)
 
-    -- FIX 7: the personal slip and the band read as paper-and-wood against the dark timber
-    -- frames everything else gets — the spec's material contrast IS "this one is yours",
-    -- without a word of copy. `fuda` is the slip itself; the four `band*` segments share the
-    -- treatment (spec: "the band shares that treatment"). A prefix test on `b.id` rather than
-    -- four hardcoded ids, so a fifth band segment or a renamed slip inherits this for free.
-    local isPersonal = b.id == "fuda" or b.id:sub(1, 4) == "band"
     local part = Instance.new("Part")
     part.Name = b.id
     part.Anchored = true
     part.CanCollide = false
     part.CastShadow = false
-    part.Material = if isPersonal then Enum.Material.Wood else Enum.Material.WoodPlanks
-    part.Color = if isPersonal
-        then Color3.fromRGB(196, 172, 132) -- pale, paper-and-wood
-        else Color3.fromRGB(74, 58, 40) -- dark timber frame; the flap cells supply the ivory
+    -- The personal slip and its facing summary board are paper-and-wood against stone (spec
+    -- section 6.2), so they read as a different instrument from the dark wall boards.
+    local personal = b.flap == Layout.FLAPS.slip
+    part.Material = if personal then Enum.Material.Wood else Enum.Material.WoodPlanks
+    part.Color = if personal then Color3.fromRGB(168, 140, 104) else Color3.fromRGB(74, 58, 40)
     part.Size = Vector3.new(b.w, b.h, Layout.THICKNESS)
     local px = if horizontal then b.x else seated
     local pz = if horizontal then seated else b.z
@@ -88,7 +91,19 @@ for _, b in Layout.BOARDS do
 
     table.insert(
         report,
-        `{b.id}: {b.wall} seated {string.format("%.2f", seated)} (nominal {nominal}) hit={hit ~= nil}`
+        string.format(
+            "%-12s %-10s %-6s %2dx%-3d %6.2fx%-5.2f seated %.2f (nominal %.2f) hit=%s",
+            b.id,
+            b.site,
+            b.wall,
+            b.rows,
+            b.cols,
+            b.w,
+            b.h,
+            seated,
+            nominal,
+            tostring(hit ~= nil)
+        )
     )
 end
 

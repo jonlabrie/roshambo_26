@@ -294,6 +294,46 @@ function StatsBoardModel.worldSections(tape: { any }?, heat: any?): { Section }
     }
 end
 
+-- THE SUMMARY SLIP -- the vestibule board facing the personal 札 across the room. Reads the most
+-- recent tape entry, which the Roblox server already forwards on StatsData: `GlobalResult` has
+-- carried `distribution { R, P, S }` and `totalPlayers` since settlement was written, so this
+-- board needed no server work at all.
+--
+-- LAST ROUND, NOT THIS ONE. The tape's newest entry is the last CLOSED round -- the current
+-- round's throws are still arriving and its distribution would be a partial count that moves
+-- while you read it. The title says so, because a percentage with no period attached invites
+-- exactly the wrong reading.
+function StatsBoardModel.summarySections(tape: { any }?): { Section }
+    local latest = tape and tape[1]
+    if not latest then
+        return { { title = "LAST ROUND", entries = {} } }
+    end
+    local d = latest.distribution or {}
+    local r, p, sc = tonumber(d.R) or 0, tonumber(d.P) or 0, tonumber(d.S) or 0
+    local thrown = r + p + sc
+    -- A round can settle with a player count but no throws (everyone present, nobody committed),
+    -- so the denominator is guarded separately from `totalPlayers`.
+    local function pct(n: number): string
+        if thrown <= 0 then
+            return "-"
+        end
+        return `{math.floor(n / thrown * 100 + 0.5)}%`
+    end
+    return {
+        {
+            title = "LAST ROUND",
+            -- label:value, like the 札 it faces -- not a ranking, so not numbered.
+            numbered = false,
+            entries = {
+                { name = "PLAYERS", figure = StatsBoardModel.figure(latest.totalPlayers) },
+                { name = "ROCK", figure = pct(r) },
+                { name = "PAPER", figure = pct(p) },
+                { name = "SCISSORS", figure = pct(sc) },
+            },
+        },
+    }
+end
+
 function StatsBoardModel.fudaSections(player: any?): { Section }
     local p = player or {}
     local career, week = p.career or {}, p.week or {}

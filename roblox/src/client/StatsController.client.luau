@@ -48,6 +48,10 @@ local function linesFor(id: string, rows: number, cols: number): { string }?
         return Model.compose(Model.worldSections(s and s.tape, s and s.heat), o)
     elseif id == "fuda" then
         return Model.compose(Model.fudaSections(p), o)
+    elseif id == "summary" then
+        -- The vestibule's other slip. Reads the same StatsData the walls do -- `tape` is already
+        -- in the payload for the form guide, so this board costs one adapter and no new wire.
+        return Model.compose(Model.summarySections(s and s.tape), o)
     end
     return nil
 end
