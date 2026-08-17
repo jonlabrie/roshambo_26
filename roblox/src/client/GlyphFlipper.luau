@@ -40,11 +40,20 @@ local HALF_SECONDS = 0.04 -- each half of the turn; a full flip is twice this
 local TILE_Z, GLYPH_Z, OUTLINE_Z, CORE_Z, LEAF_Z, SEAM_Z = 2, 3, 3, 4, 5, 6
 
 -- PER-GLYPH VERTICAL NUDGE, as a fraction of the panel (owner, 2026-08-17: "the Paper glyph needs
--- to be slightly lower, so that it's entirely on the lower panel instead of split by the hinge").
--- Paper is a horizontal bar and the hinge is a horizontal line, so centred on the seam the two
--- coincide and the bar is bisected by the very thing it looks like. Ring and chevron have open
--- centres and read fine across the hinge, so only P moves. Gate-tunable by eye.
-local NUDGE: { [string]: number } = { P = 0.10 }
+-- to be slightly lower, so that it's entirely on the lower panel"; then "a little too low now;
+-- upper part should be just touching the hinge"). Paper is a horizontal bar and the hinge is a
+-- horizontal line, so centred on the seam the two coincide and the bar is bisected by the very
+-- thing it most resembles. Ring and chevron have open centres and read fine across the hinge, so
+-- only P moves.
+--
+-- LIVE-TUNABLE, because this is a by-eye number and reading it off an attribute costs nothing
+-- next to another sync-and-rejoin per guess. Set `workspace:SetAttribute("GlyphNudgeP", 0.06)`
+-- in Studio and re-enter the room; the default below is the value to keep once it looks right.
+local NUDGE_DEFAULT: { [string]: number } = { P = 0.06 }
+local function nudgeFor(sym: string): number
+    local live = workspace:GetAttribute(`GlyphNudge{sym}`)
+    return if typeof(live) == "number" then live else (NUDGE_DEFAULT[sym] or 0)
+end
 
 type Face = {
     upper: { [string]: Frame },
@@ -66,7 +75,7 @@ local function glyphSet(parent: Instance, cfg: Config, side: number, anchorY: nu
         frame.ZIndex = GLYPH_Z
         frame.Size = UDim2.fromOffset(side, side)
         frame.AnchorPoint = Vector2.new(0.5, 0.5)
-        frame.Position = UDim2.new(0.5, 0, anchorY, (NUDGE[sym] or 0) * side)
+        frame.Position = UDim2.new(0.5, 0, anchorY, nudgeFor(sym) * side)
         -- ZINDEX ON THE LAYERS, NOT JUST THE FRAME. This SurfaceGui renders with
         -- ZIndexBehavior.Global, where paint order is ZIndex alone and the hierarchy counts for
         -- nothing -- a child does NOT draw above its parent. Glyphs.render leaves its two
@@ -185,7 +194,7 @@ function GlyphFlipper.show(self: any, symbol: string?)
         reveal(face.upper, symbol)
         for sym, frame in face.leafSet do
             -- centred on the leaf's bottom = the seam, keeping each glyph's own nudge
-            frame.Position = UDim2.new(0.5, 0, 1, (NUDGE[sym] or 0) * face.side)
+            frame.Position = UDim2.new(0.5, 0, 1, nudgeFor(sym) * face.side)
         end
         reveal(face.leafSet, outgoing)
         -- THE LOWER HALF SHOWS THE OUTGOING GLYPH FOR THE WHOLE FALL. It used to commit only
@@ -214,7 +223,7 @@ function GlyphFlipper.show(self: any, symbol: string?)
             -- bottom half, which commits when it finishes.
             for sym, frame in face.leafSet do
                 -- centred on the leaf's top = the seam, keeping each glyph's own nudge
-                frame.Position = UDim2.new(0.5, 0, 0, (NUDGE[sym] or 0) * face.side)
+                frame.Position = UDim2.new(0.5, 0, 0, nudgeFor(sym) * face.side)
             end
             reveal(face.leafSet, symbol)
             face.leaf.AnchorPoint = Vector2.new(0, 0)
