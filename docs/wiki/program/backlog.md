@@ -332,15 +332,26 @@ orphaned nothing. R1's conclusion stood; that supporting claim did not.
 The whole-branch review raised these; each was ruled deferred rather than guessed at. Two need
 a number only the owner can supply and are in the plan's gate list instead:
 
-- **⚠ THE COUNTDOWN ROLLS THE WRONG WAY** (owner, first Studio look, 2026-08-16). `plan` only
-  rotates FORWARD (`count = (ti - ci) % n`), so a counting-DOWN digit takes the long way round:
-  `3 → 2` is 48 steps forward, the 9-step cap fires, and the cell jumps back to `U` and rolls
-  `U V W X Y Z 0 1 2`. Nine steps at 83ms is ~750ms of motion every second — the digit is
-  rolling three-quarters of each tick and never settles. The review predicted the never-settles
-  symptom from the stagger alone and missed the cause, which is direction, not speed.
-  **Fix: bidirectional shortest-path in `FlapScheduler.plan`, OPT-IN per call.** Opt-in because
-  a real split-flap turns one way only and the arena's big boards should keep that character;
-  it is the countdown specifically that wants the short way round. Requires the item below.
+- **⚠ DIGIT CELLS NEED A DIGITS-ONLY DRUM** (owner's ruling, first Studio look, 2026-08-16).
+  Symptom: the band's countdown rolls `U V W X Y Z 0 1 2` to get from 3 to 2 — nine steps at
+  83ms, ~750ms of motion every second, so the digit never settles. Cause as first diagnosed:
+  `plan` only rotates forward, so a counting-down digit takes the long way round the 49-char
+  drum. **That diagnosis was right about the mechanism and wrong about the fix.**
+  A bidirectional shortest-path option was proposed and REJECTED by the owner: *"a drum that is
+  only ever going to show digits should only ever have digits on it. It's a different drum."*
+  A physical split-flap carries one drum PER POSITION — the seconds-units flap has ten digits
+  on it and has never had a `U` to roll past. One universal drum for every cell is the modelling
+  error; shortest-path routing would only have hidden it.
+  **What this implies, and why it is not a one-line change:** a band line is composed as ONE
+  string (`OPEN 43S   YOU ○`) and handed to ONE `plan` call with ONE drum. Per-position drums
+  mean drums are assigned per COLUMN, so a line must become fields-with-drums rather than a
+  single string. `FlapScheduler.plan` already accepts `opts.drum`, so the machinery is half
+  there; the line composition in `RoundBandModel`/`StatsBoardModel` is what has to change.
+  **Ordering is part of the ruling to settle:** a digits drum in ascending `0123456789` still
+  makes `3 → 2` nine steps forward. A countdown field wants its drum ordered so counting down
+  is forward motion; the once-per-round wrap back up to 51 then costs a long roll, which is what
+  a real board does at rollover. Undecided: whether ordering is per-field config or implied by
+  the field's kind.
 - **`FlapScheduler` `Opts` are not plumbed through `FlapBoard`**, so the stated per-board roll
   tuning ("a 1-row band wants a snappier roll than a 10-row sheet") is impossible to act on.
   `FlapBoard` types its injected `plan` as `(current, target) -> steps`, dropping the third
