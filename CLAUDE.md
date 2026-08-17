@@ -124,7 +124,7 @@ REST (Express): `/auth` (register/login, bcrypt + JWT) and `/store` (catalog/pur
 
 ### Frontend: one hook owns everything
 
-`src/hooks/useGameLoop.ts` (~500 lines) is the entire client state layer: socket lifecycle, game state, auth/login, store purchases, audio settings (localStorage-persisted), and WebAudio gong synthesis on reveal. Socket event handlers read mutable refs (`playerThrowRef`, `isLockedRef`, etc.) that mirror state, because the handlers are bound once. The server's authoritative result arrives via `player-data` (`serverResultRef`) and takes precedence over the client's local fallback calculation in `handleServerReveal`.
+`src/hooks/useGameLoop.ts` (~500 lines) is the entire client state layer: socket lifecycle, game state, auth/login, store purchases, audio settings (localStorage-persisted), and the reveal bell. Socket event handlers read mutable refs (`playerThrowRef`, `isLockedRef`, etc.) that mirror state, because the handlers are bound once. The server's authoritative result arrives via `player-data` (`serverResultRef`) and takes precedence over the client's local fallback calculation in `handleServerReveal`.
 
 `src/App.tsx` does view switching with a state enum (`GAME` / `USER_STATS` / `GLOBAL_STATS` / `AUTH` / `STORE`) — no router.
 

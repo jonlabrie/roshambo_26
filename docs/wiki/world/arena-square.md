@@ -53,6 +53,12 @@ Torii, Waterwheel, Overlook, FallsDock, Hanabiya, SwitchbackDeck, ArenaSpawn).
   masters in `~/Desktop/Roshambo Reference/`), `rbxassetid://108417212310624`.
   `BellSoundController.client.luau` clones a one-shot per strike on the `gongHit`
   cue; InverseTapered rolloff min 70; live-tune attrs `BellVolume`/`BellRollOffMin`.
+  **THE PWA PLAYS THE SAME FILE** (owner, 2026-08-17): the same `byodo_bell_strike.wav`
+  master, encoded to AAC at `public/audio/bonsho-strike.m4a`, replacing the FM gong
+  synthesis that shipped with the reveal. Now that one backend serves both platforms and
+  players move between them, two instruments for one beat is a seam. ⚠ The master is
+  filtered HP80 + LP600 to read at DISTANCE through Roblox's 3D rolloff; the PWA is 2D and
+  full-volume, so it may want its own less-filtered cut — judge it on headphones.
 - **Strike VFX cut** (`849bf79`, `c2beffc`): flash, energy rings and water splash all
   removed — the strike is bare and the bell sound carries the moment.
 

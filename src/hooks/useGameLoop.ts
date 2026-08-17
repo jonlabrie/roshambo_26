@@ -216,6 +216,69 @@ export function useGameLoop() {
         return ctx
     }, [])
 
+    // THE BELL IS THE OWNER'S OWN BYODO-IN RECORDING, and it is the SAME FILE Roblox plays
+    // (`rbxassetid://108417212310624`, BellSoundController). Source master:
+    // `byodo_bell_strike.wav` -- 20s mono 48k, cut in the 65ms squeak-to-impact gap and
+    // filtered HP80 + LP600 -- encoded here to AAC for the web.
+    //
+    // This REPLACES the FM+noise gong synthesis that shipped with the reveal. That synth was a
+    // "modern gong" at 200Hz with a 6s decay and sounded nothing like the bell the arena rings;
+    // now that both platforms run one backend and players move between them, two different
+    // instruments for the same beat is a seam, not a variation. It is in git history at 3c04337
+    // if it is ever wanted back.
+    //
+    // NO SYNTHESISED FALLBACK on purpose: if the asset fails to load, the right outcome is
+    // silence and a warning, not a different instrument quietly taking its place.
+    const BELL_URL = '/audio/bonsho-strike.m4a'
+    const bellBufferRef = useRef<AudioBuffer | null>(null)
+    const bellLoadingRef = useRef(false)
+
+    const loadBell = useCallback(async (ctx: AudioContext) => {
+        if (bellBufferRef.current || bellLoadingRef.current) return
+        bellLoadingRef.current = true
+        try {
+            const res = await fetch(BELL_URL)
+            if (!res.ok) throw new Error(`${res.status} ${res.statusText}`)
+            bellBufferRef.current = await ctx.decodeAudioData(await res.arrayBuffer())
+        } catch (e) {
+            console.warn('[SFX] Could not load the bell:', e)
+        } finally {
+            bellLoadingRef.current = false
+        }
+    }, [])
+
+    const playGongSound = useCallback(() => {
+        if (!audioEnabledRef.current) return
+        const ctx = ensureAudioContext()
+        if (!ctx) return
+        if (ctx.state !== 'running') {
+            console.warn('[SFX] audio context is', ctx.state, '- bell skipped until the page is touched')
+            return
+        }
+        const buffer = bellBufferRef.current
+        if (!buffer) {
+            // First reveal can land before the decode finishes. Start it and miss this one beat
+            // rather than block, and every later strike has it.
+            void loadBell(ctx)
+            return
+        }
+        // A FRESH SOURCE PER STRIKE, exactly as BellSoundController clones a one-shot per hit,
+        // so ring tails overlap naturally instead of one strike cutting off the last. The bell
+        // rings for 20s against a 60s round, so overlap is only reachable if the round ever
+        // shortens -- but the behaviour matches the arena either way.
+        const src = ctx.createBufferSource()
+        src.buffer = buffer
+        const gain = ctx.createGain()
+        gain.gain.setValueAtTime(audioVolumeRef.current, ctx.currentTime)
+        src.connect(gain)
+        gain.connect(ctx.destination)
+        src.start()
+        src.onended = () => {
+            src.disconnect()
+            gain.disconnect()
+        }
+    }, [ensureAudioContext, loadBell])
+
     // WEBAUDIO IS SILENT UNTIL THE USER HAS TOUCHED THE PAGE, AND NOTHING HERE EVER DID THAT.
     //
     // The gong has been inaudible since it was added (`3c04337`). The AudioContext was created
@@ -240,98 +303,14 @@ export function useGameLoop() {
             src.buffer = ctx.createBuffer(1, 1, ctx.sampleRate)
             src.connect(ctx.destination)
             src.start(0)
+            // Decode the bell now, on the gesture, so the first reveal is not the one that
+            // misses. decodeAudioData needs a running context, which is exactly what we just got.
+            void loadBell(ctx)
             remove()
         }
         events.forEach(e => document.addEventListener(e, unlock))
         return remove
-    }, [ensureAudioContext])
-
-    // SFX: Modern Gong synthesis (FM + Noise)
-    const playGongSound = useCallback(() => {
-        if (!audioEnabledRef.current) return
-
-        try {
-            const ctx = ensureAudioContext()
-            if (!ctx) return
-
-            // Scheduling into a suspended context is what made this silently do nothing for
-            // months: the notes get written to a clock that is not running. Bail loudly instead.
-            if (ctx.state !== 'running') {
-                console.warn('[SFX] audio context is', ctx.state, '- gong skipped until the page is touched')
-                return
-            }
-
-            const now = ctx.currentTime
-            const duration = 6
-            const masterGain = ctx.createGain()
-
-            masterGain.gain.setValueAtTime(audioVolumeRef.current, now)
-            masterGain.connect(ctx.destination)
-
-            // --- PART A: The Metal Ring (FM Synthesis) ---
-            const frequencies = [200, 203, 196]
-            frequencies.forEach((baseFreq) => {
-                const carrier = ctx.createOscillator()
-                const modulator = ctx.createOscillator()
-                const modGain = ctx.createGain()
-                const layerGain = ctx.createGain()
-
-                carrier.type = 'sine'
-                carrier.frequency.value = baseFreq
-
-                modulator.type = 'sine'
-                modulator.frequency.value = baseFreq * 1.42
-
-                // FM Index: High modulation at start (crash), low at end (hum)
-                const modulationDepth = baseFreq * 2
-                modGain.gain.setValueAtTime(modulationDepth, now)
-                modGain.gain.exponentialRampToValueAtTime(0.1, now + (duration * 0.5))
-
-                // Layer Volume
-                layerGain.gain.setValueAtTime(0, now)
-                layerGain.gain.linearRampToValueAtTime(0.3, now + 0.05)
-                layerGain.gain.exponentialRampToValueAtTime(0.001, now + duration)
-
-                // Connections
-                modulator.connect(modGain)
-                modGain.connect(carrier.frequency)
-                carrier.connect(layerGain)
-                layerGain.connect(masterGain)
-
-                modulator.start(now)
-                carrier.start(now)
-                modulator.stop(now + duration)
-                carrier.stop(now + duration)
-            })
-
-            // --- PART B: The Mallet Thud (Subtractive Synthesis) ---
-            const bufferSize = ctx.sampleRate * 0.1
-            const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate)
-            const output = noiseBuffer.getChannelData(0)
-            for (let i = 0; i < bufferSize; i++) {
-                output[i] = Math.random() * 2 - 1
-            }
-
-            const noise = ctx.createBufferSource()
-            noise.buffer = noiseBuffer
-
-            const noiseFilter = ctx.createBiquadFilter()
-            noiseFilter.type = 'lowpass'
-            noiseFilter.frequency.value = 800
-
-            const noiseGain = ctx.createGain()
-            noiseGain.gain.setValueAtTime(0.5, now)
-            noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.1)
-
-            noise.connect(noiseFilter)
-            noiseFilter.connect(noiseGain)
-            noiseGain.connect(masterGain)
-            noise.start(now)
-
-        } catch (e) {
-            console.warn('[SFX] Could not play gong:', e)
-        }
-    }, [ensureAudioContext])
+    }, [ensureAudioContext, loadBell])
 
     const handleServerReveal = useCallback((serverRound: ServerRound) => {
         // Trigger SFX
