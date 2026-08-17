@@ -41,6 +41,12 @@ export type Config = {
     static: { [number]: string }?,
     -- Optical-centring nudge as a fraction of the cell. Font-dependent; see DEFAULT_TEXT_NUDGE.
     textNudge: number?,
+    -- THE THROW GLYPHS AS IMAGES, not as characters off the drum. Returns a frame for a glyph
+    -- character, or nil for anything else. Injected so this module keeps requiring nothing and
+    -- stays ignorant of Glyphs; built LAZILY, per cell, on first use -- most cells never show a
+    -- glyph, and eagerly giving all 1,050 three image pairs would cost thousands of instances
+    -- to render nothing.
+    glyphFor: ((parent: Instance, char: string, cellW: number, cellH: number, anchorY: number) -> Frame?)?,
     -- Per-column width multipliers, defaulting to 1. Lets a printed separator take half a flap's
     -- width instead of a whole one; the grid is no longer uniform, so cells are positioned
     -- cumulatively rather than by index.
@@ -101,6 +107,8 @@ local EDGE_COLOR = Color3.fromRGB(120, 112, 96)
 type Cell = {
     upper: TextLabel,
     lower: TextLabel,
+    upperClip: Frame,
+    lowerClip: Frame,
     leaf: Frame,
     text: string,
     token: number,
@@ -267,10 +275,13 @@ local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { { Cell } }
             grid[r][c] = {
                 upper = upper,
                 lower = lower,
+                upperClip = upperClip,
+                lowerClip = lowerClip,
                 leaf = leaf,
                 text = " ",
                 token = 0,
                 w = tileW,
+                h = tileH,
                 halfH = halfH,
             } :: any
         end
@@ -278,9 +289,55 @@ local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { { Cell } }
     return grid
 end
 
+-- Put a character on ONE half, as an image if it is a throw glyph and as text otherwise.
+--
+-- WHY IMAGES AT ALL: the drum carries ○ ─ ∧ as characters, but the same three shapes exist as
+-- shared assets (Glyphs.IMAGE) already worn by the drum, the lanterns, the HUD and the round
+-- display's flipper. Drawing them here as font glyphs made the wall boards the one place in the
+-- experience where a throw looked like something else (owner, 2026-08-17).
+--
+-- The frames are cached on the cell and built on first sight of that glyph, so a board that never
+-- shows one never pays for it.
+local function applyChar(cfg: Config, cell: any, half: string, char: string)
+    local target = if half == "upper" then cell.upper else cell.lower
+    local into = if half == "upper" then cell.upperClip else cell.lowerClip
+    local anchorY = if half == "upper" then 1 else 0
+
+    local frame: Frame? = nil
+    if cfg.glyphFor then
+        cell.glyphs = cell.glyphs or {}
+        local perChar = cell.glyphs[char]
+        if perChar == nil then
+            -- `false` marks "asked, and this character is not a glyph", so a text cell is not
+            -- re-tested against the builder on every single turn.
+            local made = cfg.glyphFor(into, char, cell.w, cell.h, anchorY)
+            perChar = made or false
+            cell.glyphs[char] = { [half] = perChar }
+        elseif perChar[half] == nil then
+            perChar[half] = cfg.glyphFor(into, char, cell.w, cell.h, anchorY) or false
+        end
+        local got = cell.glyphs[char][half]
+        frame = if got then got else nil
+    end
+
+    -- Whatever else this half was showing goes away, so a glyph and a letter can never stack.
+    for _, byHalf in cell.glyphs or {} do
+        local f = byHalf[half]
+        if f and f ~= frame then
+            f.Visible = false
+        end
+    end
+    if frame then
+        frame.Visible = true
+        target.Text = " "
+    else
+        target.Text = char
+    end
+end
+
 -- One turn of one flap. Two tweens hinged at the seam: the outgoing face closing down over the
 -- incoming top, then the incoming face opening down over the outgoing bottom.
-local function flapTo(cell: any, char: string)
+local function flapTo(cfg: Config, cell: any, char: string)
     if cell.printed or cell.text == char then
         return
     end
@@ -298,8 +355,8 @@ local function flapTo(cell: any, char: string)
     -- flip interrupted before then left the bottom half stale -- and at ReelStep's 0.05s interval
     -- against an 0.08s turn, every flip is interrupted. The owner saw exactly that: "for much of
     -- the rotation only the top panel is displaying anything, the bottom panel is blank."
-    cell.upper.Text = char
-    cell.lower.Text = outgoing
+    applyChar(cfg, cell, "upper", char)
+    applyChar(cfg, cell, "lower", outgoing)
     leaf.AnchorPoint = Vector2.new(0, 1)
     leaf.Position = UDim2.fromOffset(0, cell.halfH)
     leaf.Size = UDim2.fromOffset(cell.w, cell.halfH)
@@ -329,7 +386,7 @@ local function flapTo(cell: any, char: string)
             if cell.token ~= token then
                 return
             end
-            cell.lower.Text = char
+            applyChar(cfg, cell, "lower", char)
             leaf.Visible = false
         end)
     end)
@@ -363,7 +420,7 @@ function FlapBoard.setRow(self: any, row: number, line: string)
             for _, grid in self._faces do
                 local cell = grid[row][col]
                 if cell then
-                    flapTo(cell, char)
+                    flapTo(self._cfg, cell, char)
                 end
             end
         end)

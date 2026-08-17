@@ -12,6 +12,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local Layout = require(shared:WaitForChild("StatsRoomLayout"))
 local Model = require(shared:WaitForChild("StatsBoardModel"))
+local Glyphs = require(shared:WaitForChild("Glyphs"))
 local FlapScheduler = require(shared:WaitForChild("FlapScheduler"))
 local StatsFixtures = require(shared:WaitForChild("StatsFixtures"))
 local FlapBoard = require(script.Parent:WaitForChild("FlapBoard"))
@@ -176,6 +177,59 @@ local function repaintTapeBoards()
     end
 end
 
+-- THE SAME THREE SHAPES THE WHOLE EXPERIENCE USES. The drum carries ○ ─ ∧ as characters, but
+-- Glyphs.IMAGE is what the taiko drum, the lanterns, the HUD and the round display's flipper all
+-- wear -- so drawing them here as font glyphs made these boards the one place a throw looked like
+-- something else (owner, 2026-08-17).
+--
+-- Returns nil for anything that is not a throw glyph, which is how FlapBoard tells a glyph cell
+-- from a letter cell without knowing what a glyph is.
+local CHAR_TO_SYMBOL: { [string]: string } = {}
+for sym, ch in Model.GLYPH do
+    CHAR_TO_SYMBOL[ch] = sym
+end
+
+local INK = Color3.fromRGB(40, 30, 18)
+local TILE = Color3.fromRGB(244, 238, 222)
+
+-- `_cellW` is deliberately unused: the glyph is a SQUARE sized off the cell's height, so that a
+-- ring stays round in a cell that is taller than it is wide. Kept in the signature because it is
+-- FlapBoard's contract, not this builder's choice.
+local function glyphFor(
+    parent: Instance,
+    char: string,
+    _cellW: number,
+    cellH: number,
+    anchorY: number
+): Frame?
+    local sym = CHAR_TO_SYMBOL[char]
+    if not sym then
+        return nil
+    end
+    local f = Glyphs.render(parent, sym, INK, TILE)
+    -- No outline: on an ivory face there is nothing for a light keyline to separate the glyph
+    -- FROM, so it reads as a halo. Same call the round display makes.
+    local outline = f:FindFirstChild("Outline")
+    if outline then
+        outline.Visible = false
+    end
+    -- A FULL-CELL SQUARE CENTRED ON THE SEAM, matching how a character is set: the upper clip
+    -- then shows its top half and the lower clip its bottom, and the flip works unchanged.
+    f.Size = UDim2.fromOffset(cellH, cellH)
+    f.AnchorPoint = Vector2.new(0.5, 0.5)
+    f.Position = UDim2.fromScale(0.5, anchorY)
+    f.Visible = false
+    -- These surfaces render ZIndexBehavior.Global, where paint order is ZIndex alone and a child
+    -- does NOT draw above its parent -- so the layers need lifting clear of the tile themselves.
+    f.ZIndex = 3
+    for _, layer in f:GetChildren() do
+        if layer:IsA("ImageLabel") then
+            layer.ZIndex = if layer.Name == "Core" then 4 else 3
+        end
+    end
+    return f
+end
+
 local function register(part: Instance)
     if not part:IsA("BasePart") or boards[part] then
         return
@@ -205,6 +259,7 @@ local function register(part: Instance)
             metrics = Model.metrics(rows, cols, part.Size.X / part.Size.Y),
             plan = FlapScheduler.plan,
             textNudge = textNudge(),
+            glyphFor = glyphFor,
         }),
     }
     boards[part] = entry
