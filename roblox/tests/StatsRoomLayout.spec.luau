@@ -171,12 +171,22 @@ describe("StatsRoomLayout", function()
         local cols = L.columns(c)
         expect(#cols).toBe(4)
         -- No gaps and no overlaps: each column starts where the last ended.
-        local cursor = -c.w / 2
+        local cursor = c.w / 2
         for _, col in cols do
-            expect(math.abs((col.x - col.w / 2) - cursor) < 1e-6).toBeTruthy()
-            cursor += col.w
+            expect(math.abs((col.x + col.w / 2) - cursor) < 1e-6).toBeTruthy()
+            cursor -= col.w
         end
-        expect(math.abs(cursor - c.w / 2) < 1e-6).toBeTruthy()
+        expect(math.abs(cursor + c.w / 2) < 1e-6).toBeTruthy()
+    end)
+
+    -- THE DIRECTION IS THE BUG THIS PINS. A part's local +X falls on the viewer's LEFT when they
+    -- face its front, so column 1 -- the leftmost as read -- must have the HIGHEST local X.
+    -- Ascending X printed the clock backwards: "00:0", seconds ticking in the far-left column.
+    test("column 1 is the viewer's leftmost, so local X descends", function()
+        local cols = L.columns(byId("roundClock"))
+        for i = 2, #cols do
+            expect(cols[i].x < cols[i - 1].x).toBeTruthy()
+        end
     end)
 
     test("the printed colon's column is half the width of a digit's", function()

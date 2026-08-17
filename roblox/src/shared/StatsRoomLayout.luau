@@ -356,16 +356,25 @@ end
 -- its width in studs. The physical flaps need this to place themselves; keeping it here rather
 -- than in the controller means the renderer and the declared width cannot disagree about where
 -- column three begins.
+--
+-- COLUMN 1 IS THE VIEWER'S LEFTMOST, AND THAT MEANS LOCAL X RUNS DOWN, NOT UP. Standing in front
+-- of a part's FRONT face you look along its local +Z, so its local +X falls on your LEFT -- a
+-- property of the face, not of which wall the board is on. Laying columns out from -w/2 upward
+-- therefore puts column 1 on the viewer's RIGHT and prints the clock backwards: the owner saw
+-- "00:0", with the seconds ticking down in the far-left column (2026-08-17).
+--
+-- SurfaceGui canvases are unaffected and must not be "fixed" to match: a canvas already runs
+-- left-to-right as seen from the front, which is why the GUI wall boards read correctly.
 export type Column = { x: number, w: number }
 function StatsRoomLayout.columns(board: Board): { Column }
     local units = StatsRoomLayout.widthUnits(board.cols, board.colWidths)
     local unitW = board.w / units
     local out: { Column } = {}
-    local cursor = -board.w / 2
+    local cursor = board.w / 2
     for c = 1, board.cols do
         local w = ((board.colWidths and board.colWidths[c]) or 1) * unitW
-        table.insert(out, { x = cursor + w / 2, w = w })
-        cursor += w
+        table.insert(out, { x = cursor - w / 2, w = w })
+        cursor -= w
     end
     return out
 end

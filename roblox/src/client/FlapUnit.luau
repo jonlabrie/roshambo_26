@@ -56,6 +56,22 @@ local DEFAULT_HALF = 0.055
 local HALF_CANVAS = 80
 local GLYPH_PX = 96
 
+-- A PARKED LEAF MUST BE HIDDEN, NOT MERELY EDGE-ON. These are real parts a twentieth of a stud
+-- thick and over a stud tall; rotated to 90 degrees they stand straight out of the wall like a
+-- fin, plainly visible from anywhere but dead ahead -- and with a face painted on each, showing
+-- last round's top half and this round's bottom. "Edge-on is invisible" is true of a
+-- zero-thickness plane viewed exactly on axis and of nothing else. The owner saw the fins
+-- (2026-08-17). Transparency alone is not enough either: a SurfaceGui on an invisible part still
+-- renders, so the face is disabled with it.
+local function setShown(part: BasePart, shown: boolean)
+    part.Transparency = if shown then 0 else 1
+    for _, child in part:GetChildren() do
+        if child:IsA("SurfaceGui") then
+            child.Enabled = shown
+        end
+    end
+end
+
 local function makePart(name: string, parent: Instance, size: Vector3, color: Color3): Part
     local p = Instance.new("Part")
     p.Name = name
@@ -119,9 +135,11 @@ function FlapUnit._place(self: any)
     local base = self._cfg.board.CFrame
     self._parts[1].CFrame = base * self._upperCF
     self._parts[2].CFrame = base * self._lowerCF
-    -- At rest both leaves are edge-on and invisible; the static halves carry the character.
+    -- At rest the static halves carry the character and BOTH leaves are hidden outright.
     self:_poseTop(-math.pi / 2)
     self:_poseBottom(math.pi / 2)
+    setShown(self._parts[3], false)
+    setShown(self._parts[4], false)
 end
 
 -- LeafTop hinges at the seam and swings its centre from a quarter-cell ABOVE it to edge-on.
@@ -180,6 +198,12 @@ function FlapUnit.set(self: any, value: string?)
     self.setLeafTop(outgoing)
     self.setLeafBottom(value)
 
+    -- Only the card actually in flight is shown. The other is hidden, or it stands out of the
+    -- wall as a fin for the whole turn.
+    self:_poseTop(0)
+    setShown(self._parts[3], true)
+    setShown(self._parts[4], false)
+
     local fall, cleanFall = tweenAngle(
         0,
         -math.pi / 2,
@@ -195,7 +219,12 @@ function FlapUnit.set(self: any, value: string?)
         if self._dead or self._token ~= token then
             return
         end
-        self:_poseTop(-math.pi / 2) -- park it edge-on; LeafBottom takes over from the same place
+        -- Hand over: the falling card goes away entirely and the landing card appears in the
+        -- same place, so the swap happens where neither is showing any face to the room.
+        setShown(self._parts[3], false)
+        self:_poseTop(-math.pi / 2)
+        self:_poseBottom(math.pi / 2)
+        setShown(self._parts[4], true)
         -- LANDING. Linear, not eased: the card is already at speed when it passes edge-on, and a
         -- decelerating second half reads as the flap being lowered rather than falling.
         local land, cleanLand = tweenAngle(
@@ -213,8 +242,10 @@ function FlapUnit.set(self: any, value: string?)
             if self._dead or self._token ~= token then
                 return
             end
+            -- The static half owns the character now, so the card leaves the scene completely.
             self.setLower(value)
-            self:_poseBottom(math.pi / 2) -- back to edge-on; the static half has the character now
+            setShown(self._parts[4], false)
+            self:_poseBottom(math.pi / 2)
         end)
     end)
 end
