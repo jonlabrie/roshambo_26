@@ -34,6 +34,11 @@ describe('socket adapter wire format', () => {
             openSeconds: 2, lockSeconds: 1, revealSeconds: 1,
             pickWorldThrow: () => 'S',
             makeRoundId: () => `round-${++n}`,
+            // MIRRORS PRODUCTION (index.ts). Without nowMs the engine never sets
+            // phaseEndsAtMs, so this harness was building an engine shaped unlike the one
+            // that actually runs — and any test of the absolute phase boundary would have
+            // been asserting against a field production populates and the harness did not.
+            nowMs: () => Date.now(),
         });
         httpServer = createServer();
         const io = new Server(httpServer);
@@ -63,6 +68,62 @@ describe('socket adapter wire format', () => {
             expect(stillOpen).toBe(0);
         }, { timeout: 1000, interval: 10 });
         httpServer.close();
+    });
+
+    // THE PWA AND THE ROBLOX CLIENT MUST READ THE SAME CLOCK (owner, 2026-08-17). The Roblox
+    // path has always received an ABSOLUTE strike time and slews against it; the PWA got only
+    // `timeLeft`, an integer decremented once per server tick, with nothing to correct client
+    // drift against and no countdown at all outside OPEN. Pointed at one backend the two still
+    // disagreed by up to a second. These fields are what close that gap.
+    it('puts an absolute phase boundary and a server timestamp on init', async () => {
+        const init = await initPromise;
+        expect(typeof init.phaseEndsAtMs).toBe('number');
+        expect(typeof init.serverTimeMs).toBe('number');
+        // The boundary must be in the FUTURE relative to the stamp that accompanies it, or a
+        // client subtracting one from the other starts life with a negative countdown.
+        expect(init.phaseEndsAtMs).toBeGreaterThan(init.serverTimeMs);
+        expect(init.durations).toMatchObject({ openMs: 2000, lockMs: 1000, revealMs: 1000 });
+    });
+
+    it('puts the same absolute boundary on every sync tick', async () => {
+        await initPromise;
+        const next = waitFor(client, 'sync');
+        engine.tick();
+        const sync = await next;
+        expect(typeof sync.phaseEndsAtMs).toBe('number');
+        expect(typeof sync.serverTimeMs).toBe('number');
+        expect(sync.durations).toMatchObject({ openMs: 2000, lockMs: 1000, revealMs: 1000 });
+    });
+
+    // The old field stays on the wire. A client that has not been rebuilt still reads it, and
+    // the deployed PWA and the server do not ship together.
+    it('keeps timeLeft alongside the new fields', async () => {
+        const init = await initPromise;
+        expect(typeof init.timeLeft).toBe('number');
+    });
+
+    // LOCK and REVEAL used to publish timeLeft 0, so the PWA went blind for the last third of
+    // every round while the Roblox client kept counting. The boundary is published in every
+    // phase, so a client can show a real countdown throughout.
+    it('publishes a live boundary during LOCK and REVEAL, not a zeroed clock', async () => {
+        await initPromise;
+        // COLLECT rather than race a single listener: socket.io delivery is async, so a
+        // listener attached after a tick still catches that tick's event and the phase read
+        // comes out one step stale.
+        const syncs: any[] = [];
+        client.on('sync', d => syncs.push(d));
+        for (let i = 0; i < 3; i++) {
+            engine.tick();
+            await new Promise(r => setTimeout(r, 20));
+        }
+        const offOpen = syncs.filter(d => d.phase !== 'OPEN');
+        expect(offOpen.length).toBeGreaterThan(0);
+        for (const d of offOpen) {
+            // The old wire sent timeLeft 0 here, so the PWA went blind for the last third of
+            // every round while the Roblox client kept counting.
+            expect(d.timeLeft).toBe(0);
+            expect(d.phaseEndsAtMs).toBeGreaterThan(d.serverTimeMs);
+        }
     });
 
     it('emits legacy-shaped init on connect', async () => {

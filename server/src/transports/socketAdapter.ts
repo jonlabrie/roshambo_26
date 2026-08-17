@@ -62,12 +62,35 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
     });
 
     // --- engine wiring ---
+    // ONE CLOCK FOR BOTH CLIENTS (owner, 2026-08-17). The Roblox path has always been handed an
+    // ABSOLUTE phase boundary and slews against it (RoundScheduleConfig -> RoundMetronome). The
+    // PWA got only `timeLeft`: an integer decremented once per server tick, with no timestamp to
+    // correct client drift against, and forced to 0 outside OPEN so the countdown went blind for
+    // the last third of every round. Pointed at the same backend the two still disagreed.
+    //
+    // `phaseEndsAtMs` and `serverTimeMs` travel TOGETHER on purpose: a client cannot use an
+    // absolute deadline without knowing the server's idea of now, because its own clock may be
+    // minutes off. The pair gives it an offset it can hold and a deadline to subtract from.
+    // `timeLeft` stays on the wire -- the deployed PWA and this server do not ship together.
+    const clockFields = (snap: ReturnType<typeof engine.snapshot>) => {
+        const now = Date.now();
+        return {
+            // Same fallback apiV1 uses: the engine only populates phaseEndsAtMs when it was
+            // given a `nowMs`, and an engine built without one must still publish a usable
+            // deadline rather than an undefined the client would render as NaN.
+            phaseEndsAtMs: snap.phaseEndsAtMs ?? now + snap.secondsLeft * 1000,
+            serverTimeMs: now,
+            durations: engine.durationsMs(),
+        };
+    };
+
     engine.on('tick', snap => {
         io.emit('sync', {
             phase: snap.phase,
             timeLeft: snap.phase === 'OPEN' ? snap.secondsLeft : 0,
             roundCount: snap.roundCount,
             playerCount: io.engine.clientsCount,
+            ...clockFields(snap),
         });
 
         // Piggybacked on the sync broadcast, but throttled to SESSION_HEARTBEAT_MS per
@@ -147,6 +170,9 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
             // OPEN's length, so the PieTimer's countdown ring is calibrated to the
             // actual phase duration instead of a stale literal (same reasoning as revealMs).
             openMs: engine.durationsMs().openMs,
+            // revealMs/openMs above are the same numbers `durations` carries; they predate it
+            // and stay because the deployed client reads them by those names.
+            ...clockFields(snap),
         });
 
         // Player Persistence Sync (ported verbatim from index.ts:364-401)

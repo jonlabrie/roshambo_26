@@ -7,10 +7,29 @@ export type { Throw, Result, RoundData } from '../types'
 export type GameState = 'ACTIVE' | 'REVEAL'
 
 // Use your local IP for mobile access on the same network
+import { blendOffset, secondsLeftAt } from '../lib/roundClock'
+
 const SOCKET_URL = import.meta.env.VITE_SOCKET_URL || ''
+
+// The clock fields the server puts on `init`, `sync` and `active`. All optional: a server
+// older than 2026-08-17 sends only `timeLeft`, and the deployed PWA and the deployed server
+// do not ship together.
+interface ClockPayload {
+    phase?: string
+    serverTimeMs?: number
+    phaseEndsAtMs?: number
+    timeLeft?: number
+}
 
 export function useGameLoop() {
     const [timeLeft, setTimeLeft] = useState(0)
+    // THE CLOCK THE ROBLOX CLIENT HAS ALWAYS HAD. `sync` now carries an absolute phase
+    // deadline and the server's idea of now; these hold the derived offset and deadline so a
+    // local ticker can count down smoothly instead of stepping once per server tick. See
+    // ../lib/roundClock.ts for why the pair is needed rather than the deadline alone.
+    const serverOffsetRef = useRef<number | null>(null)
+    const phaseEndsAtRef = useRef<number | null>(null)
+    const phaseRef = useRef<string>('OPEN')
     const [gameState, setGameState] = useState<GameState>('ACTIVE')
     const [playerThrow, setPlayerThrow] = useState<Throw>(null)
     const [isLocked, setIsLocked] = useState(false)
@@ -343,6 +362,44 @@ export function useGameLoop() {
         }
     }, [])
 
+    // Folds a server payload's clock fields into the refs above. Called from every handler
+    // that carries them (`init`, `sync`, `active`) rather than from one place, because they are
+    // three separate wire messages and only `sync` repeats.
+    //
+    // `timeLeft` remains the FALLBACK, not the primary: a server that predates the absolute
+    // fields still drives the countdown the old way. That matters because the deployed PWA and
+    // the deployed server do not ship together.
+    const applyClock = useCallback((data: ClockPayload) => {
+        if (typeof data.phase === 'string') phaseRef.current = data.phase
+        if (typeof data.serverTimeMs === 'number') {
+            serverOffsetRef.current = blendOffset(serverOffsetRef.current, data.serverTimeMs - Date.now())
+        }
+        if (typeof data.phaseEndsAtMs === 'number') {
+            phaseEndsAtRef.current = data.phaseEndsAtMs
+        } else if (typeof data.timeLeft === 'number') {
+            setTimeLeft(data.timeLeft)
+        }
+    }, [])
+
+    // THE LOCAL TICKER. Counts down from the absolute deadline at 10Hz instead of stepping once
+    // per server tick, so the displayed second changes when it actually elapses rather than when
+    // a packet happens to land. React bails out of a setState that produces an equal value, so
+    // this re-renders once a second despite running ten times.
+    //
+    // Held to OPEN, matching the wire contract the UI was built against: PieTimer is calibrated
+    // to `openMs` and the reveal overlay owns the screen afterwards. The server publishes a live
+    // boundary during LOCK and REVEAL too, so showing a countdown there is now possible — but it
+    // is a visual change, not a clock fix, and belongs to whoever decides the reveal's look.
+    useEffect(() => {
+        const id = setInterval(() => {
+            const endsAt = phaseEndsAtRef.current
+            const offset = serverOffsetRef.current
+            if (endsAt === null || offset === null) return
+            setTimeLeft(phaseRef.current === 'OPEN' ? secondsLeftAt(endsAt, offset, Date.now()) : 0)
+        }, 100)
+        return () => clearInterval(id)
+    }, [])
+
     useEffect(() => {
         const socket = io(SOCKET_URL, {
             auth: { token }
@@ -406,7 +463,7 @@ export function useGameLoop() {
             setGameState('ACTIVE')
             if (typeof data.revealMs === 'number') revealMsRef.current = data.revealMs
             if (typeof data.openMs === 'number') setOpenMs(data.openMs)
-            setTimeLeft(data.timeLeft)
+            applyClock(data)
             setRoundCount(data.roundCount)
 
             const globalHistory = data.history.map((h: ServerRound) => ({
@@ -426,7 +483,7 @@ export function useGameLoop() {
 
         socket.on('sync', (data) => {
             setGameState('ACTIVE')
-            setTimeLeft(data.timeLeft)
+            applyClock(data)
             setRoundCount(data.roundCount)
         })
 
@@ -436,7 +493,7 @@ export function useGameLoop() {
 
         socket.on('active', (data) => {
             setGameState('ACTIVE')
-            setTimeLeft(data.timeLeft)
+            applyClock(data)
             setRoundCount(data.roundCount)
             setPlayerThrow(null)
             setIsLocked(false)
@@ -445,7 +502,7 @@ export function useGameLoop() {
         return () => {
             socket.disconnect()
         }
-    }, [handleServerReveal, token])
+    }, [handleServerReveal, token, applyClock])
 
     // Removal of local interpolation to ensure server is absolute source of truth
     useEffect(() => {
