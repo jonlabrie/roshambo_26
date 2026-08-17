@@ -274,3 +274,20 @@ Note the drift this retirement marks: the branch was named for a Roblox art pass
 carrying a statistics backend, a security fix and two server plans. Recorded in
 [[friends-family-baseline]] terms — item 4 is still the board's next item, and the work of
 2026-08-16 was item 7.
+
+## [2026-08-16] lint | item 4 was recorded as barely started; it is nearly done
+
+[[item-4-merchant-row]] still read "Remaining scope is the row itself — the façade shells around
+it", written when only 花火屋 existed. Four shells have since been built. The owner corrected it
+directly: "item 4 is nearly complete already, only the tea vendor remains, Apparel and
+Accessories are already done."
+
+The page also argued with itself — it stated the machiya brainstorm was DONE and then, three
+bullets later, that deriving a street reservation "at the machiya brainstorm" was "now the next
+step". Superseded per schema rule 2 rather than appended to.
+
+Consequence worth noting: a stale program page caused a real mis-assessment. Earlier the same
+day I read the board and told the owner we had drifted off item 4 onto item 7 — a judgement
+built on a page that understated item 4 by four buildings. Accessories and the Stats false front
+also carry no recorded owner gate despite being built and signed off verbally; that gap is now
+marked on the page rather than left implicit.

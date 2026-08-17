@@ -9,11 +9,25 @@ updated: 2026-08-16
 Item 4 of [[friends-family-baseline]]: a machiya merchant row on the arena promenade —
 4 façade shells plus one WORKING fireworks shop (browse/buy at the counter). The working
 shop already exists: [[hanabiya]] (花火屋), built and owner-gated 2026-08-13 with the place
-saved (`37469b8` names it "the merchant row's first machiya"). Remaining scope is the row
-itself — the façade shells around it.
+saved (`37469b8` names it "the merchant row's first machiya").
+
+**Remaining scope is the riverside chaya — the tea vendor — and nothing else.** (Owner,
+2026-08-16: "item 4 is nearly complete already, only the tea vendor remains, Apparel and
+Accessories are already done.") The shells are built; see Current state.
 
 ## Current state
 
+- **The row is BUILT except the chaya.** As-built, west to east:
+  | Shell | State |
+  |---|---|
+  | Stats false front (番付) | built `824f53e`, rear doorway `f36b05a`; cavern bored — [[stats-room]] |
+  | apparel (Machiya_1) | built, **owner-gated 2026-08-15** (see Gates) |
+  | 花火屋 (working shop) | built, **owner-gated 2026-08-13** — [[hanabiya]] |
+  | accessories (Machiya_4) | built (`bd6f90b` window display, `0db82e5` signage) |
+  | **riverside chaya + DockDeck** | **NOT BUILT — the only remaining scope** |
+  ⚠ Accessories and the Stats false front carry no recorded owner gate; the owner stated both
+  done 2026-08-16. Signage, noren mon and per-shop chōchin tints landed across all of them
+  (`0db82e5`, `90a9eed`, `19e35bc`, `7c59f61`).
 - **[[hanabiya]] is built and working** (interior stair + attic `219509c..565c307`, shop-panel
   cursor fix `322d948`, frontage deepened z44 → z36 `22bcf2e`). It sets the archetype's
   as-built reference.
@@ -31,8 +45,9 @@ itself — the façade shells around it.
   ever read them; their one job (keeping a free 55×30 garden slab out of the streets)
   ended when the panel was pinned to the pavilion's post faces (`17927df`, tested).
   The row builds to `Machiya.luau`'s owner-surveyed envelope (frontage z36); if the
-  row wants a machine-readable street reservation, derive it fresh from the massing
-  at the machiya brainstorm — which is now the next step.
+  row wants a machine-readable street reservation, derive it fresh from the massing.
+  (The brainstorm this once deferred to is DONE — 2026-08-15, above. No reservation was
+  derived, and the row was built without one.)
 
 ## Gates & decisions
 
