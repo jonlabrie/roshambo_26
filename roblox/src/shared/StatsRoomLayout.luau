@@ -38,7 +38,12 @@ export type Board = {
     shuttered: boolean?,
 }
 
-local BAND_Y, BAND_H, BAND_COLS = 131.0, 2.4, 16
+-- Exported (not local): FIX 5. RoundBandController renders each segment at its OWN `cols`
+-- attribute now, but this is still the single source of truth a caller reaches for rather than
+-- hand-copying the literal 16 — resizing the band is genuinely a one-line change here now.
+local BAND_Y, BAND_H = 131.0, 2.4
+StatsRoomLayout.BAND_COLS = 16
+local BAND_COLS = StatsRoomLayout.BAND_COLS
 
 StatsRoomLayout.BOARDS = {
     -- South faces you on entry: the standings (spec section 6).

@@ -18,12 +18,14 @@ local EventBus = require(script.Parent:WaitForChild("EventBus"))
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local RevealTheater = remotes:WaitForChild("RevealTheater") :: RemoteEvent
 
-local segments: { [Instance]: { board: any, cols: number } } = {}
+-- FIX 5: `cols` is READ now (BandModel.line's width and the change-suppression cache both key
+-- off it), not just recorded. `lastLine` moved in here, per segment, so suppression is per-width
+-- rather than a single global that would go stale the moment two segments disagree on `cols`.
+local segments: { [Instance]: { board: any, cols: number, lastLine: string? } } = {}
 local metronome = RoundMetronome.new()
 local pendingWorldThrow: string? = nil
 local worldRested = false
 local ownThrow: string? = nil
-local lastLine: string? = nil
 
 local function register(part: Instance)
     if not part:IsA("BasePart") or segments[part] then
@@ -37,6 +39,7 @@ local function register(part: Instance)
     local cols = tonumber(part:GetAttribute("Cols")) or 1
     segments[part] = {
         cols = cols,
+        lastLine = nil,
         board = FlapBoard.new({
             part = part,
             rows = rows,
@@ -85,8 +88,14 @@ task.spawn(function()
     end
 end)
 
-EventBus.HudPick.Event:Connect(function(sym: string)
-    ownThrow = sym
+-- FIX 3: NOT EventBus.HudPick — that fires on every accepted TAP (including a tap on a
+-- different glyph that leaves the actual pick unchanged, and a second tap on the chosen glyph
+-- that backs the pick out) rather than on every accepted PICK. EventBus.HudState is
+-- main.client.luau's 10Hz publish of its authoritative local state, `inputs.chosen` is the same
+-- field the tap handler itself writes and later sends at lockout, and it is already nil after a
+-- back-out and at round start — so, unlike HudPick, this needs no separate clearing below.
+EventBus.HudState.Event:Connect(function(inputs)
+    ownThrow = inputs.chosen
 end)
 
 RevealTheater.OnClientEvent:Connect(function(r)
@@ -115,23 +124,28 @@ RunService.Heartbeat:Connect(function(dt: number)
     accumulator = 0
     local reading = metronome:read(workspace:GetServerTimeNow())
     if reading and reading.phase == "OPEN" then
-        -- A new OPEN is the round boundary: clear last round's throw, world and own alike.
+        -- A new OPEN is the round boundary: clear last round's world throw. `ownThrow` needs NO
+        -- clearing here (FIX 3) — it now tracks main.client.luau's `chosen`, which HudState
+        -- already reports as nil at round start and after any back-out, so a stale pick from
+        -- this reset racing a fresh pick in early OPEN is no longer possible.
         if worldRested or pendingWorldThrow then
-            pendingWorldThrow, worldRested, ownThrow = nil, false, nil
+            pendingWorldThrow, worldRested = nil, false
         end
     end
-    local line = BandModel.line({
+    local state = {
         phase = reading and reading.phase,
         secondsLeft = reading and reading.secondsLeft,
         worldThrow = pendingWorldThrow,
         worldRested = worldRested,
         ownThrow = ownThrow,
-    }, 16)
-    if line == lastLine then
-        return
-    end
-    lastLine = line
+    }
+    -- FIX 5: per segment, at ITS OWN `cols` — not a hardcoded 16 shared by every segment
+    -- regardless of what its board attribute actually says. The suppression cache moves with it.
     for _, seg in segments do
-        seg.board:setRow(1, line)
+        local line = BandModel.line(state, seg.cols)
+        if line ~= seg.lastLine then
+            seg.lastLine = line
+            seg.board:setRow(1, line)
+        end
     end
 end)
