@@ -52,16 +52,29 @@ local PRINTED_INK = Color3.fromRGB(214, 202, 178)
 -- Only ever used if a live ClockFont names a family that will not construct.
 local FALLBACK_FONT =
     Font.new("rbxasset://fonts/families/JosefinSans.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+-- WEIGHT, LIVE ALONGSIDE THE FAMILY. Hardcoding Bold meant a face could not be compared against
+-- its own Regular -- and for a MONOSPACED family that is the only way to tell a weight exists at
+-- all, since measuring proves nothing: a mono's advance width is fixed by definition, so
+-- Inconsolata returns the same 480 for all nine weights whether or not they differ.
+--
+--   workspace:SetAttribute("ClockFontWeight", "Regular")   -- Thin..Heavy
+local function weightFor(): Enum.FontWeight
+    local live = workspace:GetAttribute("ClockFontWeight")
+    if typeof(live) == "string" then
+        local w = (Enum.FontWeight :: any)[live]
+        if w then
+            return w
+        end
+    end
+    return Enum.FontWeight.Bold
+end
+
 local DEFAULT_CLOCK_FAMILY = "Oswald"
 local function clockFont(): Font
     local live = workspace:GetAttribute("ClockFont")
     local family = if typeof(live) == "string" and live ~= "" then live else DEFAULT_CLOCK_FAMILY
     local ok, f = pcall(function()
-        return Font.new(
-            `rbxasset://fonts/families/{family}.json`,
-            Enum.FontWeight.Bold,
-            Enum.FontStyle.Normal
-        )
+        return Font.new(`rbxasset://fonts/families/{family}.json`, weightFor(), Enum.FontStyle.Normal)
     end)
     return if ok then f else FALLBACK_FONT
 end

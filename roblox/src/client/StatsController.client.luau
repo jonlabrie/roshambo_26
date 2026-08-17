@@ -30,24 +30,37 @@ local StatsPersonal = remotes:WaitForChild("StatsPersonal") :: RemoteEvent
 --
 -- Applies to boards already built. A name that will not construct falls back to the default
 -- rather than erroring, so a typo reads as "nothing changed" and not as a broken wall.
+-- WEIGHT, LIVE ALONGSIDE THE FAMILY. Hardcoding Bold meant a face could not be compared against
+-- its own Regular -- and for a MONOSPACED family that is the only way to tell a weight exists at
+-- all, since measuring proves nothing: a mono's advance width is fixed by definition, so
+-- Inconsolata returns the same 480 for all nine weights whether or not they differ.
+--
+--   workspace:SetAttribute("BoardFontWeight", "Regular")   -- Thin..Heavy
+local function weightFor(): Enum.FontWeight
+    local live = workspace:GetAttribute("BoardFontWeight")
+    if typeof(live) == "string" then
+        local w = (Enum.FontWeight :: any)[live]
+        if w then
+            return w
+        end
+    end
+    return Enum.FontWeight.Bold
+end
+
 local BOARD_FONT_ATTR = "BoardFont"
 local DEFAULT_BOARD_FAMILY = "JosefinSans"
 local function boardFont(): Font
     local live = workspace:GetAttribute(BOARD_FONT_ATTR)
     local family = if typeof(live) == "string" and live ~= "" then live else DEFAULT_BOARD_FAMILY
     local ok, f = pcall(function()
-        return Font.new(
-            `rbxasset://fonts/families/{family}.json`,
-            Enum.FontWeight.Bold,
-            Enum.FontStyle.Normal
-        )
+        return Font.new(`rbxasset://fonts/families/{family}.json`, weightFor(), Enum.FontStyle.Normal)
     end)
     if ok then
         return f
     end
     return Font.new(
         `rbxasset://fonts/families/{DEFAULT_BOARD_FAMILY}.json`,
-        Enum.FontWeight.Bold,
+        weightFor(),
         Enum.FontStyle.Normal
     )
 end
