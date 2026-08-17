@@ -54,6 +54,7 @@ local function register(part: Instance)
             -- The owner's ruling made concrete: digit columns get a digits-only drum, the colon
             -- gets a drum of its own. Nothing here can roll through the alphabet.
             drums = RoundDisplay.drums(),
+            static = RoundDisplay.statics(),
         })
     elseif id == "roundThrow" and not flipper then
         flipper = GlyphFlipper.new({

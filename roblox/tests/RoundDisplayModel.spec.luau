@@ -61,18 +61,22 @@ describe("RoundDisplayModel.DIGITS", function()
         expect(M.DIGITS:match("^[0-9 ]+$") ~= nil).toBeTruthy()
     end)
 
-    test("the colon drum can reach a colon from a blank cell", function()
-        -- FlapBoard starts every cell blank; a single-character drum could never leave it.
-        expect(steps(" ", ":", M.COLON)).toBe(1)
-    end)
-
-    test("assigns a drum per column: digit, colon, digit, digit", function()
+    -- The colon is PAINTED between the digits, not mounted on a flap of its own. So column 2
+    -- carries no drum at all -- the planner skips it, and it cannot be asked to turn.
+    test("the digit columns get a drum and the colon column does not", function()
         local d = M.drums()
-        expect(#d).toBe(4)
         expect(d[1]).toBe(M.DIGITS)
-        expect(d[2]).toBe(M.COLON)
+        expect(d[2]).toBe(nil)
         expect(d[3]).toBe(M.DIGITS)
         expect(d[4]).toBe(M.DIGITS)
+    end)
+
+    test("the colon is declared as a printed column instead", function()
+        local st = M.statics()
+        expect(st[2]).toBe(":")
+        expect(st[1]).toBe(nil)
+        expect(st[3]).toBe(nil)
+        expect(st[4]).toBe(nil)
     end)
 end)
 

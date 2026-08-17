@@ -26,9 +26,11 @@ local RoundDisplayModel = {}
 -- board shows the flaps it passes through.
 RoundDisplayModel.DIGITS = "9876543210 "
 
--- Two characters, not one. FlapBoard starts every cell blank, and a single-character drum could
--- never leave that blank -- the colon would never appear.
-RoundDisplayModel.COLON = " :"
+-- PRINTED ON THE BOARD, NOT MOUNTED ON A DRUM (owner, 2026-08-17): "the colon should be printed
+-- between the minute and seconds columns, not in a flipper column of its own". No real board
+-- puts a fixed separator on a flap. `statics()` hands FlapBoard the column to paint; it carries
+-- no drum at all and the planner skips it, so it can never be asked to turn.
+RoundDisplayModel.COLON = ":"
 
 export type ClockState = { phase: string?, secondsLeft: number? }
 export type ThrowState = {
@@ -38,13 +40,13 @@ export type ThrowState = {
     worldRested: boolean?,
 }
 
-function RoundDisplayModel.drums(): { string }
-    return {
-        RoundDisplayModel.DIGITS,
-        RoundDisplayModel.COLON,
-        RoundDisplayModel.DIGITS,
-        RoundDisplayModel.DIGITS,
-    }
+-- Column 2 is deliberately absent: it is printed, not turned.
+function RoundDisplayModel.drums(): { [number]: string }
+    return { [1] = RoundDisplayModel.DIGITS, [3] = RoundDisplayModel.DIGITS, [4] = RoundDisplayModel.DIGITS }
+end
+
+function RoundDisplayModel.statics(): { [number]: string }
+    return { [2] = RoundDisplayModel.COLON }
 end
 
 local MAX_SECONDS = 599 -- 9:59, the most four columns can honestly say

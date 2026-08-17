@@ -33,6 +33,12 @@ export type Config = {
     -- handed a single character. Absent, the whole line is planned once as before.
     drums: { string }?,
     staggerMs: number?,
+    -- PRINTED COLUMNS, not flipping ones (owner, 2026-08-17): "the colon should be printed
+    -- between the minute and seconds columns, not in a flipper column of its own". A separator
+    -- is painted on the board, not mounted on a drum -- no real board puts a fixed colon on a
+    -- flap. These columns get no tile, no seam and no fold: just ink on the dark frame, and the
+    -- planner skips them entirely so they can never be asked to turn.
+    static: { [number]: string }?,
 }
 
 local PAD = 0.08 -- inset fraction within each cell
@@ -69,10 +75,15 @@ local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { { TextLabel } 
     for r = 1, cfg.rows do
         grid[r] = {}
         for c = 1, cfg.cols do
+            local printed = cfg.static and cfg.static[c]
+
             local tile = Instance.new("Frame")
             tile.Size = UDim2.fromScale(cellW * (1 - PAD), cellH * (1 - PAD))
             tile.Position =
                 UDim2.fromScale((c - 1) * cellW + cellW * PAD / 2, (r - 1) * cellH + cellH * PAD / 2)
+            -- A printed column carries no flap face: the separator reads as painted on the frame
+            -- between two flaps rather than as a third flap that happens never to move.
+            tile.BackgroundTransparency = if printed then 1 else 0
             tile.BackgroundColor3 = Color3.fromRGB(244, 238, 222)
             tile.BorderSizePixel = 0
             tile.ClipsDescendants = true
@@ -80,6 +91,7 @@ local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { { TextLabel } 
             tile.Parent = gui
 
             local seam = Instance.new("Frame")
+            seam.Visible = not printed
             seam.Size = UDim2.fromScale(1, 0.035)
             seam.Position = UDim2.fromScale(0, 0.5)
             seam.AnchorPoint = Vector2.new(0, 0.5)
@@ -97,7 +109,10 @@ local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { { TextLabel } 
             glyph.FontFace = BOARD_FONT
             glyph.TextXAlignment = Enum.TextXAlignment.Center
             glyph.TextYAlignment = Enum.TextYAlignment.Center
-            glyph.Text = " "
+            glyph.Text = printed or " "
+            -- Ink on the dark frame rather than on ivory, so a printed separator reads as part
+            -- of the board and not as a blank flap.
+            glyph.TextColor3 = if printed then Color3.fromRGB(214, 202, 178) else Color3.fromRGB(40, 30, 18)
             glyph.ZIndex = 3
             glyph.Parent = tile
 
@@ -160,8 +175,9 @@ function FlapBoard.setRow(self: any, row: number, line: string)
     if drums then
         local cur, tgt = toChars(current), toChars(line)
         local stagger = self._cfg.staggerMs or DEFAULT_STAGGER_MS
+        local static = self._cfg.static
         for col = 1, self._cfg.cols do
-            local drum = drums[col]
+            local drum = if static and static[col] then nil else drums[col]
             if drum then
                 -- One character in, so every returned step is col 1; the real column index and
                 -- its stagger are applied here.
