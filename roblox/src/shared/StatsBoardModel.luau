@@ -14,7 +14,9 @@ StatsBoardModel.DRUM = " ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789,.!?+%-:/○─∧"
 StatsBoardModel.GLYPH = { R = "○", P = "─", S = "∧" }
 
 export type Entry = { name: string?, figure: string }
-export type Section = { title: string, entries: { Entry }?, lines: { string }? }
+-- `numbered` defaults to true (the leaderboard look: "1. AYAKA ... 1,240"). Set it false for a
+-- section that lists a person's own rows, not a ranking — see `labelLine` (FIX 2).
+export type Section = { title: string, entries: { Entry }?, lines: { string }?, numbered: boolean? }
 export type Opts = { rows: number, cols: number }
 export type Metrics = { canvasW: number, canvasH: number, glyphSize: number }
 
@@ -92,6 +94,17 @@ local function entryLine(rank: number, e: Entry, cols: number): string
     return padRight(`{head} {padRight(StatsBoardModel.sanitize(e.name), nameW)} {fig}`, cols)
 end
 
+-- "BANKED         12,480" — label, then figure hard right, no rank prefix. FIX 2: a numbered
+-- entry ("1. BEST STREAK") eats 3 columns on the rank alone, which is why this exists instead of
+-- reusing entryLine for a section that is a person's own stats rather than a leaderboard. Reuses
+-- the same padRight/trunc/widthOf width math, computed against the REAL `cols` at compose time —
+-- same reason entryLine takes `cols` as a parameter instead of a caller guessing a width.
+local function labelLine(e: Entry, cols: number): string
+    local fig = trunc(e.figure, math.max(1, cols - 1))
+    local labelW = math.max(1, cols - widthOf(fig) - 1)
+    return padRight(`{padRight(StatsBoardModel.sanitize(e.name or ""), labelW)} {fig}`, cols)
+end
+
 function StatsBoardModel.compose(sections: { Section }, o: Opts): { string }
     local lines: { string } = {}
     local function push(s: string)
@@ -110,6 +123,10 @@ function StatsBoardModel.compose(sections: { Section }, o: Opts): { string }
             if #entries == 0 then
                 -- §8: no display is dark at launch. An empty board must SAY it is empty.
                 push("NO DATA YET")
+            elseif sec.numbered == false then
+                for _, e in entries do
+                    push(labelLine(e, o.cols))
+                end
             else
                 for i, e in entries do
                     push(entryLine(i, e, o.cols))
@@ -138,6 +155,23 @@ function StatsBoardModel.windowLabel(window: string?, windowKind: string?): stri
         return "LAST HOUR"
     end
     return "RECENT"
+end
+
+-- A compact suffix for headings that must share a 22-col board with "LONGEST STREAK - " (17
+-- cols, the tightest prefix that uses this). Still derived from window/windowKind, not a literal
+-- that papers over what the payload actually says — `day` still distinguishes calendar/rolling.
+function StatsBoardModel.shortWindowLabel(window: string?, windowKind: string?): string
+    local w, k = window or "", windowKind or ""
+    if w == "all" then
+        return "ALL"
+    elseif w == "week" then
+        return "WEEK"
+    elseif w == "day" then
+        return if k == "calendar" then "TODAY" else "DAY"
+    elseif w == "hour" then
+        return "HOUR"
+    end
+    return "NOW"
 end
 
 -- THE 100px CAP, SOLVED ONCE. TextSize maxes at 100 and TextScaled will not scale up on a
@@ -178,14 +212,17 @@ end
 function StatsBoardModel.skillSections(week: any?, all: any?): { Section }
     return {
         {
-            title = `LONGEST STREAK {StatsBoardModel.windowLabel(
+            title = `LONGEST STREAK - {StatsBoardModel.shortWindowLabel(
                 week and week.window,
                 week and week.windowKind
             )}`,
             entries = streakEntries(week),
         },
         {
-            title = `LONGEST STREAK {StatsBoardModel.windowLabel(all and all.window, all and all.windowKind)}`,
+            title = `LONGEST STREAK - {StatsBoardModel.shortWindowLabel(
+                all and all.window,
+                all and all.windowKind
+            )}`,
             entries = streakEntries(all),
         },
     }
@@ -200,10 +237,10 @@ function StatsBoardModel.judgementSections(week: any?): { Section }
     for _, r in (week and week.biggestRounds) or {} do
         table.insert(rounds, { name = r.displayName, figure = StatsBoardModel.figure(r.points) })
     end
-    local label = StatsBoardModel.windowLabel(week and week.window, week and week.windowKind)
+    local label = StatsBoardModel.shortWindowLabel(week and week.window, week and week.windowKind)
     return {
-        { title = `BIGGEST BANK {label}`, entries = banks },
-        { title = `BIGGEST ROUND {label}`, entries = rounds },
+        { title = `BIGGEST BANK - {label}`, entries = banks },
+        { title = `BIGGEST ROUND - {label}`, entries = rounds },
     }
 end
 
@@ -217,8 +254,13 @@ function StatsBoardModel.worldSections(tape: { any }?, heat: any?): { Section }
     for _, l in (heat and heat.leaders) or {} do
         table.insert(leaders, { name = l.displayName, figure = StatsBoardModel.figure(l.earned) })
     end
+    -- §8: no display is dark at launch. With no tape yet, "LAST 0 WORLD THROWS" over a blank
+    -- row reads as broken, not empty — say so instead, the same way an empty entries list does.
+    local worldSection = if #glyphs == 0
+        then { title = "WORLD THROWS", lines = { "NO DATA YET" } }
+        else { title = `LAST {#glyphs} WORLD THROWS`, lines = { table.concat(glyphs, " ") } }
     return {
-        { title = `LAST {#glyphs} WORLD THROWS`, lines = { table.concat(glyphs, " ") } },
+        worldSection,
         -- §3: heat is FORM, not standing. The title must never read as a ranking.
         {
             title = `HOT {StatsBoardModel.windowLabel(heat and heat.window, heat and heat.windowKind)}`,
@@ -239,11 +281,16 @@ function StatsBoardModel.fudaSections(player: any?): { Section }
     return {
         {
             title = StatsBoardModel.sanitize(p.displayName),
+            -- FIX 2: this is one person's own rows, not a leaderboard of one — no rank prefix.
+            numbered = false,
             entries = {
                 { name = "BANKED", figure = StatsBoardModel.figure(career.banked) },
                 { name = "BEST STREAK", figure = StatsBoardModel.figure(career.bestStreak) },
                 { name = "STREAK NOW", figure = StatsBoardModel.figure(p.currentStreak) },
-                { name = "THROWS THIS WEEK", figure = progress },
+                -- "THROWS", not "THROWS THIS WEEK": the fraction (e.g. 142/350) already reads as
+                -- a weekly quota, and the full label is 17 cols wide before a figure even joins
+                -- it — too wide to survive a 16-col slip regardless of width math.
+                { name = "THROWS", figure = progress },
             },
         },
     }

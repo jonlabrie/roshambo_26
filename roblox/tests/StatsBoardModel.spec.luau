@@ -2,6 +2,8 @@
 local harness = require("./harness")
 local M = require("../src/shared/StatsBoardModel")
 local FlapScheduler = require("../src/shared/FlapScheduler")
+local StatsRoomLayout = require("../src/shared/StatsRoomLayout")
+local StatsFixtures = require("../src/shared/StatsFixtures")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 
 local function width(s: string): number
@@ -141,6 +143,15 @@ describe("StatsBoardModel adapters", function()
         expect(#s[2].entries).toBe(0)
     end)
 
+    -- FIX 6: at launch there is no tape yet. Before the fix this fell into the `lines` branch's
+    -- no-empty-path and rendered "LAST 0 WORLD THROWS" over a blank row — §8 says no display is
+    -- dark at launch, and a labelled blank row reads as broken rather than empty.
+    test("the empty form guide says so, not '...0 WORLD THROWS' over a blank row", function()
+        local s = M.worldSections({}, nil)
+        expect(s[1].lines[1]).toBe("NO DATA YET")
+        expect(s[1].title:find("0", 1, true)).toBe(nil)
+    end)
+
     test("the personal slip shows progress toward qualification, never a blank", function()
         local s = M.fudaSections({
             displayName = "Ayaka",
@@ -155,6 +166,75 @@ describe("StatsBoardModel adapters", function()
             end
         end
         expect(table.concat(flat, "|"):find("142/350") ~= nil).toBeTruthy()
+    end)
+end)
+
+-- FIX 1: StatsBoardModel picks titles and StatsRoomLayout picks column counts, and nothing ever
+-- multiplied them together — three shipped boards truncated a title mid-word. This pins the two
+-- modules to each other: every real board, at its real rows/cols, composing the real adapter's
+-- real fixture payload, must not truncate its title line(s).
+describe("StatsBoardModel titles fit their real StatsRoomLayout boards", function()
+    -- Mirrors StatsController.client.luau's `linesFor` id -> adapter dispatch. `skillFuture` is
+    -- shuttered (no content adapter) and the four `band*` segments have no title at all — both
+    -- excluded below, per the boards this module actually renders titles for.
+    local function sectionsFor(id: string): { M.Section }?
+        local S, P = StatsFixtures.STATS, StatsFixtures.PERSONAL
+        if id == "banzuke" then
+            return M.standingsSections(S.leaders)
+        elseif id == "skill" then
+            return M.skillSections(S.recordsWeek, S.recordsAll)
+        elseif id == "judgement" then
+            return M.judgementSections(S.recordsWeek)
+        elseif id == "world" then
+            return M.worldSections(S.tape, S.heat)
+        elseif id == "fuda" then
+            return M.fudaSections(P)
+        end
+        return nil
+    end
+
+    local function trimRight(s: string): string
+        return (s:gsub("%s+$", ""))
+    end
+
+    for _, b in StatsRoomLayout.BOARDS do
+        if b.id:sub(1, 4) ~= "band" and not b.shuttered then
+            test(`{b.id} (cols={b.cols}): title line(s) are not truncated`, function()
+                local sections = sectionsFor(b.id)
+                expect(sections ~= nil).toBeTruthy()
+                if sections then
+                    for _, sec in sections do
+                        local lines = M.compose({ sec }, { rows = b.rows, cols = b.cols })
+                        local want = trimRight(M.sanitize(sec.title))
+                        expect(trimRight(lines[1])).toBe(want)
+                    end
+                end
+            end)
+        end
+    end
+end)
+
+-- FIX 2: `fudaSections` used to return `entries`, so `compose` numbered the rows and the "N. "
+-- rank prefix ate 3 of the fuda board's 16 columns — "BEST STREAK" rendered as "BEST STREA".
+describe("StatsBoardModel.fudaSections (FIX 2)", function()
+    local FUDA = { rows = 7, cols = 16 }
+
+    test("all four labels survive the fuda board's real 16 cols intact", function()
+        local lines = M.compose(M.fudaSections(StatsFixtures.PERSONAL), FUDA)
+        local joined = table.concat(lines, "\n")
+        for _, label in { "BANKED", "BEST STREAK", "STREAK NOW", "THROWS" } do
+            expect(joined:find(label, 1, true) ~= nil).toBeTruthy()
+        end
+    end)
+
+    test("BEST STREAK specifically — the row the rank prefix used to truncate", function()
+        local lines = M.compose(M.fudaSections(StatsFixtures.PERSONAL), FUDA)
+        expect(lines[3]).toBe("BEST STREAK   11")
+    end)
+
+    test("rows are label-then-value, not numbered", function()
+        local lines = M.compose(M.fudaSections(StatsFixtures.PERSONAL), FUDA)
+        expect(lines[2]).toBe("BANKED    12,480")
     end)
 end)
 
