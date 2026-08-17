@@ -10,7 +10,7 @@ Everything runs on **one Atlas cluster**: production uses the **`roshambo`** dat
 
 A second App Runner service runs the dev backend so Studio/PWA dev needs no local server at all:
 - **Service:** `roshambo_server_dev` → `https://zzaw22ugpq.us-east-1.awsapprunner.com`
-- **Source:** GitHub `m4b-zendojo-art-pass`, **auto-deploy ON** (pushes redeploy dev automatically), configured via the **API** (not `apprunner.yaml`, so it can't inherit prod's `/roshambo/*` secrets).
+- **Source:** GitHub `main`, **auto-deploy ON** (pushes redeploy dev automatically), configured via the **API** (not `apprunner.yaml`, so it can't inherit prod's `/roshambo/*` secrets). *(Was `m4b-zendojo-art-pass`; repointed 2026-08-16 when that branch was retired.)*
 - **Secrets:** `/roshambo/dev/*` SSM SecureStrings (`MONGODB_URI` → `roshambo-dev`, `API_KEY`, `JWT_SECRET`). The prod instance role `RoshamboAppRunnerInstanceRole` already grants these (its `/roshambo/*` wildcard covers `/roshambo/dev/*`).
 - **Env:** `TEST_MODE=true`, `PORT=3001`. Size `0.25 vCPU / 0.5 GB` (pause the service when idle to cut cost).
 - **Roblox:** set `roblox/src/server/SecretsLocal.luau` (gitignored) `baseUrl` to the dev URL above, `apiKey` = the dev `API_KEY`.
@@ -36,6 +36,43 @@ CI separately fails the build if a `.rbxl(x)` file is ever committed.
 2. Go to **Network Access** and add your IP (for initial setup) and `0.0.0.0/0` (for App Runner connectivity).
 3. Create a **Database User** with read/write access.
 4. Copy your **Connection String**. It should look like: `mongodb+srv://<user>:<password>@cluster.abc.mongodb.net/roshambo?retryWrites=true&w=majority`
+
+## ⚠ WHAT A PUSH TO `main` ACTUALLY DEPLOYS (verified 2026-08-17)
+
+Read this before pushing. Two of the three deploy automatically, and the public demo is
+both of them.
+
+| Target | Auto on push? | Serves |
+|---|---|---|
+| Amplify frontend (`roshambo_26`, `dnlwlh7md4i46`) | **YES** | playroshambo.com |
+| App Runner `roshambo_server_dev` (`zzaw22ugpq`) | **YES** | the demo's backend, since 2026-08-17 |
+| App Runner `roshambo_server` (`fiuuwhrqgi`) | no | nothing, currently |
+
+**Do not read `app.enableBranchAutoBuild` and conclude the frontend is gated.** It is
+`false` on this app and the frontend still builds on every push: that field governs
+auto-build for *newly created* branches. The one that governs an existing branch is
+`branch.enableAutoBuild`, which is `true`:
+
+```
+aws amplify get-branch --region us-east-1 --app-id dnlwlh7md4i46 --branch-name main \
+  --query 'branch.enableAutoBuild'
+```
+
+Better still, read the job history — it shows what happened rather than what a field
+implies:
+
+```
+aws amplify list-jobs --region us-east-1 --app-id dnlwlh7md4i46 --branch-name main \
+  --query 'jobSummaries[].{id:jobId,status:status,commit:commitId}' --output table
+```
+
+A commit id in that list that matches a push is proof; a config field is an inference.
+This exact misreading was made and stated as a correction on 2026-08-17, in the same
+session that had already been bitten by trusting a property read over observed behaviour.
+
+**Since 2026-08-17 the demo runs on the DEV database** (`roshambo-dev`), because
+`VITE_SOCKET_URL` points at the dev service so the PWA and the Roblox place share one
+round clock. Production player data in `roshambo` is intact but unserved.
 
 ## 2. Backend: AWS App Runner
 1. **Source**: Select **"Source code repository"** and link your GitHub repo.
