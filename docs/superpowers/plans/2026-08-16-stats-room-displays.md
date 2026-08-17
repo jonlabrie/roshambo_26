@@ -1966,7 +1966,28 @@ Two things the owner should be told to check, because only they can:
    pushed the wall in. The tool prints `seated`, `nominal` and `hit` per board — a board with
    `hit=false` fell back to nominal and is the likely offender.
 2. Whether the band's 16 columns read from the far corner. It is the one number in this plan
-   chosen for feel rather than derived, and it is a one-line change in `StatsRoomLayout`.
+   chosen for feel rather than derived. It is now genuinely a one-line change in
+   `StatsRoomLayout` (`BAND_COLS`) — the controller renders each segment at its own `seg.cols`.
+   As shipped it was NOT: the controller hardcoded 16 while `BAND_COLS` was a non-exported
+   local, so changing it would have resized the flap grid and left the extra columns blank
+   forever. Caught by the whole-branch review and fixed.
+3. Whether the flap roll wants per-board tuning. `FlapBoard` types its injected `plan` as
+   `(current, target) -> steps`, which drops `FlapScheduler.plan`'s third `Opts` argument — so
+   the stated intent that "a 1-row band wants a snappier roll than a 10-row sheet" is currently
+   impossible to act on. At the default 60ms stagger the band's seconds digit starts rolling
+   ~360ms into a tick and can take ~1.1s to settle, so it may never fully settle during OPEN.
+   §6.3 wants clatter, so this may read as correct — but it is a judgement only the owner can
+   make, and they have no knob until `Opts` is plumbed through. Deliberately not guessed at here.
+4. Whether the boards need a draw-distance cap. Five content boards plus four band segments
+   build ~920 cells ≈ 3,700 GUI instances on every client at join, whether or not that player
+   ever enters the room. §6.2 asked for a row-count budget against the measured perf floor and
+   none was taken. The cheap mitigation is one line in `FlapBoard.buildFace` setting
+   `gui.MaxDistance` — but the right distance is a number only the owner can judge, so it is
+   not guessed at here either.
+5. Whether the thin physical clearances survive contact. `fuda` clears the tunnel keep-out by
+   0.32 studs and `skill`/`skillFuture` clear each other by 0.5. Both are stable at runtime —
+   `seat()` only moves a board along its depth axis, never along the wall — but neither leaves
+   slack for a future width bump.
 
 After the gate, save/publish the place — these parts are place-only and `rojo build` drops them.
 
