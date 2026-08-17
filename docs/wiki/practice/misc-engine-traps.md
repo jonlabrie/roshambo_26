@@ -120,6 +120,38 @@ network callback rather than a gesture starts suspended, and scheduling notes in
 suspended context writes them to a clock that is not advancing, so it fails silently
 rather than throwing. See the PWA bell in `src/hooks/useGameLoop.ts`.
 
+## `Glyphs.render` sets no ZIndex, and SurfaceGuis here render Global
+
+`SurfaceGui.ZIndexBehavior` is **`Global`** on this project's surfaces, not `Sibling`.
+Under Global, paint order is `ZIndex` alone and the hierarchy counts for nothing — **a
+child does not draw above its parent.**
+
+`Glyphs.render` leaves its two `ImageLabel` layers at the default `ZIndex = 1`. Drop that
+frame into any container with an opaque background above 1 and the glyph is drawn at full
+size, correctly positioned, `Visible = true` — and completely invisible, because the
+parent is painted over it. That is exactly how the round display's throw flipper showed a
+blank flap on 2026-08-17: an ivory tile at `ZIndex = 2` over glyph images at 1.
+
+**When parenting a `Glyphs.render` frame into anything, set the layers' ZIndex yourself:**
+
+```luau
+local frame = Glyphs.render(tile, sym, ink, tile)
+for _, layer in frame:GetChildren() do
+    if layer:IsA("ImageLabel") then
+        layer.ZIndex = if layer.Name == "Core" then 4 else 3
+    end
+end
+```
+
+The layers are `Name`d `Core` and `Outline` precisely so a caller can address them without
+depending on `GetChildren()` ordering — the same reason the HUD re-tints them.
+
+**Diagnostic note:** every property read said the glyph was fine — visible, full
+`AbsoluteSize`, right position, right colour, right face. Only `ZIndexBehavior` on the
+parent Gui, which nothing in the glyph's own state mentions, explained it. When something
+is provably drawn and still not seen, read the *container's* paint rules before re-checking
+the object.
+
 ## Flat Beams: width follows the attachment's UP vector
 
 A Beam's WIDTH extends along its **attachment's Up vector**, and `FaceCamera=false`

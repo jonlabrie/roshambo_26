@@ -29,6 +29,9 @@ local INK = Color3.fromRGB(40, 30, 18)
 local PAD = 0.08
 local FULL = UDim2.fromScale(1, 1)
 local SQUASHED = UDim2.fromScale(1, 0.05)
+-- Paint order under ZIndexBehavior.Global: tile, then the glyph's outline, then its core, then
+-- the seam on top of everything.
+local TILE_Z, GLYPH_Z, OUTLINE_Z, CORE_Z, SEAM_Z = 2, 3, 3, 4, 5
 local FLIP_SECONDS = 0.04
 -- A big flap turns slower than a text cell. At ~7 faces/second a 5.45s spin is about 38 turns:
 -- clearly in motion, never a blur, and the landing reads as a stop rather than a fade.
@@ -50,7 +53,7 @@ local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { [string]: Fram
     tile.BackgroundColor3 = TILE
     tile.BorderSizePixel = 0
     tile.ClipsDescendants = true
-    tile.ZIndex = 2
+    tile.ZIndex = TILE_Z
     tile.Parent = gui
 
     -- EVERY GLYPH IS BUILT ONCE AND HIDDEN. Rebuilding image layers per flip would re-decode
@@ -60,7 +63,18 @@ local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { [string]: Fram
         local frame = cfg.render(tile, sym, INK, TILE)
         frame.Name = `Glyph_{sym}`
         frame.Visible = false
-        frame.ZIndex = 3
+        frame.ZIndex = GLYPH_Z
+        -- ZINDEX ON THE LAYERS, NOT JUST THE FRAME. This SurfaceGui renders with
+        -- ZIndexBehavior.Global, where paint order is ZIndex alone and the hierarchy counts for
+        -- nothing -- a child does NOT draw above its parent. Glyphs.render leaves its two
+        -- ImageLabels at the default ZIndex 1, which put them underneath the opaque ivory tile
+        -- at 2: drawn at full size, correctly placed, and completely covered. The flipper showed
+        -- a blank flap for exactly this reason.
+        for _, layer in frame:GetChildren() do
+            if layer:IsA("ImageLabel") then
+                layer.ZIndex = if layer.Name == "Core" then CORE_Z else OUTLINE_Z
+            end
+        end
         glyphs[sym] = frame
     end
 
@@ -70,7 +84,7 @@ local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { [string]: Fram
     seam.AnchorPoint = Vector2.new(0, 0.5)
     seam.BackgroundColor3 = SEAM
     seam.BorderSizePixel = 0
-    seam.ZIndex = 4
+    seam.ZIndex = SEAM_Z
     seam.Parent = tile
 
     return glyphs
