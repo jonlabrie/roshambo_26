@@ -27,8 +27,41 @@ local RevealTheater = remotes:WaitForChild("RevealTheater") :: RemoteEvent
 local INK = Color3.fromRGB(40, 30, 18)
 local FACE = Color3.fromRGB(244, 238, 222)
 local PRINTED_INK = Color3.fromRGB(214, 202, 178)
-local FONT =
+-- THE CLOCK'S FACE IS ITS OWN CHOICE, not the wall boards'. JosefinSans is the owner's gate pick
+-- for lettering, but its NUMERALS were rejected on sight (2026-08-17): it is a geometric display
+-- face and its digits are mannered where a clock wants them plain.
+--
+-- LIVE, so faces can be auditioned without a commit per guess:
+--   workspace:SetAttribute("ClockFont", "Inconsolata")
+--
+-- Probed in Studio rather than guessed -- all of these exist as bundled families and all measure
+-- distinctly, so none is silently falling back. Width of "0123456789" at size 100:
+--   RobotoMono 455  Inconsolata 480   -- true monospace: every digit the same width, which is
+--                                        exactly what a physical flap cell is
+--   Oswald     342  TitilliumWeb 370  -- condensed, classic departure-board
+--   DenkOne    427  Bangers      422  -- heavy display
+--   Michroma   677                    -- very wide, technical
+-- RobotoMono is the default because a flap board IS monospaced: one cell, one width, always.
+-- Only ever used if a live ClockFont names a family that will not construct.
+local FALLBACK_FONT =
     Font.new("rbxasset://fonts/families/JosefinSans.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
+local DEFAULT_CLOCK_FAMILY = "RobotoMono"
+local function clockFont(): Font
+    local live = workspace:GetAttribute("ClockFont")
+    local family = if typeof(live) == "string" and live ~= "" then live else DEFAULT_CLOCK_FAMILY
+    local ok, f = pcall(function()
+        return Font.new(
+            `rbxasset://fonts/families/{family}.json`,
+            Enum.FontWeight.Bold,
+            Enum.FontStyle.Normal
+        )
+    end)
+    return if ok then f else FALLBACK_FONT
+end
+
+-- 0.6 x 1.5. The clock's numerals carry the room from any distance; the throw glyph is already
+-- four studs of panel and needs no help.
+local CLOCK_CHAR_FRACTION = 0.9
 
 -- Paper is a horizontal bar and the hinge is a horizontal line, so centred on the seam the two
 -- coincide and the bar is bisected by the thing it most resembles. Live-tunable: this is a by-eye
@@ -67,7 +100,7 @@ local function textPainter(part: BasePart, canvasW: number, canvasH: number, anc
     t.AnchorPoint = Vector2.new(0.5, 0.5)
     t.Position = UDim2.fromScale(0.5, anchorY)
     t.TextSize = FlapUnit.GLYPH_PX
-    t.FontFace = FONT
+    t.FontFace = clockFont()
     t.TextColor3 = INK
     t.TextScaled = false
     t.Text = " "
@@ -157,16 +190,15 @@ local function register(part: Instance)
                 -- to the ENTIRE face, so a canvas sized to a single column would stretch that
                 -- column across the whole board.
                 if not boardFace then
-                    boardFace = surface(
-                        part,
-                        math.floor(FlapUnit.HALF_CANVAS * 2 * (spec.w / spec.h)),
-                        FlapUnit.HALF_CANVAS * 2
-                    )
+                    -- Same canvas scale the digit flaps use, so the separator is set at the size
+                    -- of the numerals it separates rather than at one of its own.
+                    local half = FlapUnit.halfCanvasFor(CLOCK_CHAR_FRACTION)
+                    boardFace = surface(part, math.floor(half * 2 * (spec.w / spec.h)), half * 2)
                 end
                 local t = Instance.new("TextLabel")
                 t.BackgroundTransparency = 1
                 t.TextSize = FlapUnit.GLYPH_PX
-                t.FontFace = FONT
+                t.FontFace = clockFont()
                 t.TextColor3 = PRINTED_INK
                 t.Text = statics[c]
                 -- The column's own slice of that face. MINUS, not plus: a SurfaceGui canvas runs
@@ -185,6 +217,7 @@ local function register(part: Instance)
                     width = col.w,
                     height = spec.h,
                     paint = textPainter,
+                    charFraction = CLOCK_CHAR_FRACTION,
                 })
             end
         end

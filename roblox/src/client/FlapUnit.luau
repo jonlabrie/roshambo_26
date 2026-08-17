@@ -22,7 +22,6 @@
 --   * LeafBottom continues edge-on to flat:    +90 ->   0 degrees, carrying the INCOMING bottom.
 -- Both are edge-on -- and so invisible -- at the same instant and in the same place, which is
 -- what makes the handover impossible to see.
-local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 
 local FlapUnit = {}
@@ -41,28 +40,46 @@ export type Config = {
     height: number, -- cell height in studs
     paint: Painter,
     halfSeconds: number?,
+    -- The character's height as a share of the cell. See halfCanvasFor.
+    charFraction: number?,
 }
 
 local PANEL_T = 0.06 -- static half-panel thickness
 local LEAF_T = 0.05 -- the moving card; thinner, so it clears the panels it sweeps over
-local GAP = 0.012
+-- CLEARANCE BETWEEN THE STATIC FACES AND THE CARDS THAT SWEEP OVER THEM, and the hinge rod has
+-- to fit inside it. At 0.012 the rod's back edge came within 0.0012 studs of the panel face, so
+-- it z-fought with the glyph painted there and flickered as the camera moved (owner, 2026-08-17).
+-- 0.03 leaves the rod ~0.011 clear on both sides, which is a real gap rather than a rounding
+-- error. Nothing else depends on this number; it is pure standoff.
+local GAP = 0.03
 -- THE HINGE HAS TO BE A THING YOU CAN SEE. The static halves used to simply touch at y=0 with
 -- nothing between them, so there was no seam at all -- "the hinge is nearly invisible on the
 -- round display and completely invisible on the clock" (owner, 2026-08-17). A real board shows a
 -- dark line there: the gap between the two faces and the rod they hang from. So the halves are
 -- inset to open a gap, and a dark bar sits in it, standing slightly proud so it catches light as
 -- a rod rather than reading as a painted stripe.
-local SEAM_FRACTION = 0.035 -- of cell height
+local SEAM_FRACTION = 0.0175 -- of cell height; halved at the owner's look -- the first rod was heavy
 local SEAM_COLOR = Color3.fromRGB(52, 46, 38)
 local BOARD_T = 0.4 -- StatsRoomLayout.THICKNESS; the board's own depth
 local FACE = Color3.fromRGB(244, 238, 222)
 local CARD = Color3.fromRGB(232, 225, 208) -- the moving card, a shade under the static faces
 local DEFAULT_HALF = 0.055
 
--- 80 canvas px per HALF panel, so a full character is 160 and a 96px glyph is 0.6 of it -- just
--- under the engine's hard 100px TextSize cap, which is the constraint that sets this number.
-local HALF_CANVAS = 80
+-- THE CHARACTER'S SHARE OF THE CELL is what a caller actually wants to choose, and the canvas
+-- size falls out of it. TextSize is hard-capped at 100px, so a bigger character cannot be had by
+-- asking for more pixels -- only by making the CANVAS smaller, which is the same
+-- small-canvas-stretched-large trick the wall boards use.
+--
+--   halfCanvas = GLYPH_PX / (2 * fraction)      -- a full character spans two half-panels
+--
+-- 0.6 was the original for everything. The clock asks for 0.9: "numerals/digits on the clock
+-- could be 50% larger" (owner, 2026-08-17), and 0.6 x 1.5 = 0.9.
 local GLYPH_PX = 96
+local DEFAULT_CHAR_FRACTION = 0.6
+
+function FlapUnit.halfCanvasFor(fraction: number?): number
+    return math.floor(GLYPH_PX / (2 * (fraction or DEFAULT_CHAR_FRACTION)))
+end
 
 -- A PARKED LEAF MUST BE HIDDEN, NOT MERELY EDGE-ON. These are real parts a twentieth of a stud
 -- thick and over a stud tall; rotated to 90 degrees they stand straight out of the wall like a
@@ -99,7 +116,8 @@ end
 
 function FlapUnit.new(cfg: Config)
     local halfH = cfg.height / 2
-    local canvasW = math.floor(HALF_CANVAS * (cfg.width / halfH))
+    local halfCanvas = FlapUnit.halfCanvasFor(cfg.charFraction)
+    local canvasW = math.floor(halfCanvas * (cfg.width / halfH))
     -- Depths measured forward from the board's front face (local -Z), each clearing the last.
     local panelZ = -(BOARD_T / 2 + PANEL_T / 2 + GAP)
     local leafZ = panelZ - (PANEL_T / 2 + LEAF_T / 2 + GAP)
@@ -114,7 +132,7 @@ function FlapUnit.new(cfg: Config)
     -- The rod lives in the 0.012 studs between the panel faces and the cards that sweep over
     -- them, so its DEPTH is set by that clearance, not chosen. Thin in Z costs nothing: what
     -- makes a hinge read from across the room is its height and its darkness, not its thickness.
-    local rodT = GAP * 0.8
+    local rodT = GAP * 0.35
     local hinge = makePart("Hinge", cfg.board, Vector3.new(cfg.width, seam, rodT), SEAM_COLOR)
     local leafTop = makePart("LeafTop", cfg.board, Vector3.new(cfg.width, halfH, LEAF_T), CARD)
     local leafBottom = makePart("LeafBottom", cfg.board, Vector3.new(cfg.width, halfH, LEAF_T), CARD)
@@ -136,10 +154,10 @@ function FlapUnit.new(cfg: Config)
         -- the clearance between them. Proud enough to catch light as a rod rather than read as a
         -- painted stripe, and never intersecting a card mid-turn.
         _hingeCF = CFrame.new(cfg.localX, 0, panelZ - PANEL_T / 2 - GAP / 2),
-        setUpper = cfg.paint(upper, canvasW, HALF_CANVAS, 1),
-        setLower = cfg.paint(lower, canvasW, HALF_CANVAS, 0),
-        setLeafTop = cfg.paint(leafTop, canvasW, HALF_CANVAS, 1),
-        setLeafBottom = cfg.paint(leafBottom, canvasW, HALF_CANVAS, 0),
+        setUpper = cfg.paint(upper, canvasW, halfCanvas, 1),
+        setLower = cfg.paint(lower, canvasW, halfCanvas, 0),
+        setLeafTop = cfg.paint(leafTop, canvasW, halfCanvas, 1),
+        setLeafBottom = cfg.paint(leafBottom, canvasW, halfCanvas, 0),
     }, FlapUnit)
 
     self:_place()
@@ -284,8 +302,7 @@ function FlapUnit.destroy(self: any)
     table.clear(self._parts)
 end
 
-FlapUnit.HALF_CANVAS = HALF_CANVAS
 FlapUnit.GLYPH_PX = GLYPH_PX
-FlapUnit.RunService = RunService
+FlapUnit.DEFAULT_CHAR_FRACTION = DEFAULT_CHAR_FRACTION
 
 return FlapUnit
