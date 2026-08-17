@@ -178,16 +178,30 @@ end
 -- SurfaceGui, so the canvas is sized SMALL enough that a ~90px glyph is already large relative
 -- to a cell, and the SurfaceGui stretches it across the physical board. Canvas aspect is pinned
 -- to the board's aspect or the stretch would distort the glyphs.
-local TARGET_CELL = 115 -- canvas px on a cell's SMALLER axis
+-- THESE ARE THE JUMBOTRON'S OWN NUMBERS, restored (2026-08-17). The first version of this
+-- function invented its own rule -- size the glyph from `min(cellW, cellH) * 0.78` -- and on
+-- boards whose cells are taller than they are wide that made the glyph about four-fifths the
+-- size it should be, which then rode low in the cell because the tuned UIPadding is a
+-- proportion of the TILE, not of the glyph. That is what the owner saw on the west wall.
+--
+-- The reference implementation (BoardController, gate-tuned 2026-06-07, now retired into
+-- FlapBoard) sized from HEIGHT alone: 150 canvas-px per row, a flat 90px glyph, i.e. 60% of
+-- cell height -- and let the glyph EXCEED the cell's width by 3%, which is safe because a
+-- letter's drawn advance is only ~half its point size. Clamping to width was the mistake.
+local ROW_PX = 150 -- canvas px per row; the jumbotron's constant
+local GLYPH_OF_HEIGHT = 0.60 -- 90/150, the gate-tuned proportion
+-- The jumbotron ran at 1.03. Kept as the ceiling rather than 1.0 so a board whose columns are
+-- dense for its aspect (`world` at 22 cols on 12 studs, `fuda` at 16 on 6) shrinks its glyph
+-- instead of clipping letters -- ClipsDescendants is on, so overflow is a cut, not a spill.
+local GLYPH_OF_WIDTH = 1.03
 local MAX_CANVAS = 4096
 function StatsBoardModel.metrics(rows: number, cols: number, aspect: number): Metrics
-    local ratio = (aspect * rows) / cols -- cellW / cellH, independent of scale
-    local cellH = if ratio >= 1 then TARGET_CELL else TARGET_CELL / ratio
-    local canvasH = cellH * rows
+    local canvasH = rows * ROW_PX
     local canvasW = canvasH * aspect
     local over = math.max(canvasW / MAX_CANVAS, canvasH / MAX_CANVAS, 1)
     canvasH, canvasW = math.floor(canvasH / over), math.floor(canvasW / over)
-    local glyph = math.min(90, math.floor(math.min(canvasW / cols, canvasH / rows) * 0.78))
+    local cellH, cellW = canvasH / rows, canvasW / cols
+    local glyph = math.min(90, math.floor(cellH * GLYPH_OF_HEIGHT), math.floor(cellW * GLYPH_OF_WIDTH))
     return { canvasW = canvasW, canvasH = canvasH, glyphSize = math.max(1, glyph) }
 end
 

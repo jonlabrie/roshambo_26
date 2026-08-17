@@ -115,10 +115,29 @@ describe("StatsBoardModel.metrics", function()
         end
     end)
 
-    test("the glyph fits inside its cell on both axes, so ClipsDescendants never bites", function()
-        local m = M.metrics(7, 16, 1.0)
-        expect(m.glyphSize <= m.canvasW / 16).toBeTruthy()
-        expect(m.glyphSize <= m.canvasH / 7).toBeTruthy()
+    -- THIS TEST USED TO ASSERT THE GLYPH FITS BOTH AXES, AND THAT IS WHAT BROKE THE SIZING.
+    -- Vertical overflow is a real cut -- ClipsDescendants is on -- so height must bound the
+    -- glyph. Horizontal is different: a letter's drawn advance is only about half its point
+    -- size, so a glyph slightly wider than its cell still renders whole. The gate-tuned
+    -- jumbotron ran at 103% of cell width deliberately. Demanding it fit the width forced the
+    -- glyph down to ~80% of the size it should be on every taller-than-wide board.
+    test("the glyph never overflows its cell HEIGHT", function()
+        for _, case in { { 10, 26, 16 / 9 }, { 7, 16, 1.0 }, { 1, 16, 38 / 2.4 }, { 8, 22, 12 / 7 } } do
+            local m = M.metrics(case[1], case[2], case[3])
+            expect(m.glyphSize <= m.canvasH / case[1]).toBeTruthy()
+        end
+    end)
+
+    test("the glyph may exceed its cell WIDTH, but only slightly", function()
+        for _, case in { { 10, 26, 16 / 9 }, { 7, 16, 1.0 }, { 8, 22, 12 / 7 } } do
+            local m = M.metrics(case[1], case[2], case[3])
+            expect(m.glyphSize <= (m.canvasW / case[2]) * 1.031).toBeTruthy()
+        end
+    end)
+
+    test("a board with room for it gets the full 90px glyph, as the jumbotron did", function()
+        -- 8 rows x 22 cols on a 12x7 board: cell 150 tall, so 60% of height is the 90px cap.
+        expect(M.metrics(8, 22, 12 / 7).glyphSize).toBe(90)
     end)
 end)
 
