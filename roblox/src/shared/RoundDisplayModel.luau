@@ -68,7 +68,12 @@ function RoundDisplayModel.clock(state: ClockState): string
         -- stays lit: a bare colon reads as a clock at rest, four blanks read as a broken board.
         return " :  "
     end
-    local secs = math.clamp(math.floor(state.secondsLeft or 0), 0, MAX_SECONDS)
+    -- CEIL, TO MATCH THE HUD. HudController prints `math.ceil(view.secondsLeft)` for both the
+    -- ring and the escalation counter, so flooring here put the wall a full second ahead of the
+    -- ring a player is holding -- two clocks in one room disagreeing (owner, 2026-08-17).
+    -- Ceiling is also the right call on its own terms: a countdown showing 0 while a second of
+    -- play remains is worse than one showing 1 for a fraction too long.
+    local secs = math.clamp(math.ceil(state.secondsLeft or 0), 0, MAX_SECONDS)
     return string.format("%d:%02d", secs // 60, secs % 60)
 end
 

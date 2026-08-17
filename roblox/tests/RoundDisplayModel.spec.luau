@@ -31,6 +31,19 @@ describe("RoundDisplayModel.clock", function()
         expect(M.clock({})).toBe(" :  ")
     end)
 
+    -- FRACTIONS ARE THE ONLY VALUES THAT PIN THE ROUNDING, and every test here used whole
+    -- seconds -- where floor and ceil agree -- so the wall could and did run a second ahead of
+    -- the HUD's ring without a single test noticing.
+    test("rounds UP, the way HudController's ring does", function()
+        expect(M.clock({ phase = "OPEN", secondsLeft = 42.3 })).toBe("0:43")
+        expect(M.clock({ phase = "OPEN", secondsLeft = 42.9 })).toBe("0:43")
+        expect(M.clock({ phase = "OPEN", secondsLeft = 0.2 })).toBe("0:01")
+    end)
+
+    test("reads 0:00 only when the phase is genuinely spent", function()
+        expect(M.clock({ phase = "OPEN", secondsLeft = 0 })).toBe("0:00")
+    end)
+
     test("clamps rather than overflowing its four columns", function()
         expect(M.clock({ phase = "OPEN", secondsLeft = 99999 })).toBe("9:59")
         expect(M.clock({ phase = "OPEN", secondsLeft = -5 })).toBe("0:00")
