@@ -76,6 +76,33 @@ paper is the ivory flap face, which every board already has, and the wood is wha
 surrounds it. Two frame colours made the room read as two rooms. The slips stay distinct
 by being a finer module, which is the honest difference.
 
+### Typography
+
+Two faces, and they are chosen for different jobs rather than for consistency.
+
+| | face | why |
+|---|---|---|
+| Lettering, all boards | **JosefinSans Bold** | Owner's gate pick 2026-06-07 (`77d8940`). Merriweather replaced it two hours later the same evening with no gate note and rode into the extraction; restored 2026-08-17 when the owner looked at the built room and said the typeface was wrong. |
+| Clock numerals | **Oswald Bold** | Owner, 2026-08-17. JosefinSans is a geometric display face and its numerals are mannered where a clock wants them plain. Oswald is condensed — the classic departure-board answer. |
+
+`FontFace`, not the legacy `Font` enum, because the enum carries no weight. Bold is the
+heaviest REAL face in both families: probing all nine `FontWeight` values in Studio,
+`Thin`..`Bold` each measure differently while `ExtraBold` and `Heavy` return `Bold`'s
+exact bounds, so anything above Bold silently falls back.
+
+The clock's family is live on `workspace:SetAttribute("ClockFont", …)` and applies to
+flaps already built, so faces can be auditioned without restarting Play. A name that will
+not construct falls back rather than erroring — so a typo reads as "nothing changed",
+not as a broken display.
+
+⚠ **Oswald is condensed** (342 wide for ten digits against RobotoMono's 455), so a digit
+fills about half its cell rather than two thirds. If it reads narrow that is the face, not
+a defect: widen the cell or lift `CLOCK_CHAR_FRACTION`.
+
+⚠ **`charFraction` is TextSize's share of the cell, not the ink's.** A digit's drawn height
+is only ~0.72 of its TextSize — the rest of the em is leading and room for ascenders and
+descenders a numeral never uses. Setting it above 1.0 is safe and often correct.
+
 ### Where things go
 
 The vestibule's two interior side walls are better real estate than the cavern's

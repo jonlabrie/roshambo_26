@@ -41,11 +41,18 @@ local PRINTED_INK = Color3.fromRGB(214, 202, 178)
 --   Oswald     342  TitilliumWeb 370  -- condensed, classic departure-board
 --   DenkOne    427  Bangers      422  -- heavy display
 --   Michroma   677                    -- very wide, technical
--- RobotoMono is the default because a flap board IS monospaced: one cell, one width, always.
+-- OSWALD is the owner's pick (2026-08-17). My default had been RobotoMono, reasoning that a flap
+-- board IS monospaced -- one cell, one width, always -- which is a good argument about mechanism
+-- and lost to how the face actually looks in the room. Oswald is the classic departure-board
+-- answer and the room is a departure board.
+--
+-- ⚠ IT IS CONDENSED: 342 wide for ten digits against RobotoMono's 455, so a digit fills roughly
+-- half its cell rather than two thirds. If it reads narrow, that is the face and not a bug --
+-- widen the cell or lift CLOCK_CHAR_FRACTION, do not reach for a wider font.
 -- Only ever used if a live ClockFont names a family that will not construct.
 local FALLBACK_FONT =
     Font.new("rbxasset://fonts/families/JosefinSans.json", Enum.FontWeight.Bold, Enum.FontStyle.Normal)
-local DEFAULT_CLOCK_FAMILY = "RobotoMono"
+local DEFAULT_CLOCK_FAMILY = "Oswald"
 local function clockFont(): Font
     local live = workspace:GetAttribute("ClockFont")
     local family = if typeof(live) == "string" and live ~= "" then live else DEFAULT_CLOCK_FAMILY
