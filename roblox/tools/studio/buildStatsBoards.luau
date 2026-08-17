@@ -7,19 +7,36 @@
 -- by `rojo build`, which would drop every part this creates.
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Layout = require(ReplicatedStorage:WaitForChild("RoshamboShared"):WaitForChild("StatsRoomLayout"))
+-- REQUIRE A CLONE, NOT THE MODULE. Studio's VM caches a ModuleScript's RESULT forever, so a
+-- session that required StatsRoomLayout before a Rojo sync keeps getting the OLD table however
+-- current the source is. This bit twice on 2026-08-17: the second time, the tool's own source was
+-- re-read (so new hardware appeared) while the flap size came from cache (so the boards kept
+-- their old dimensions) -- a half-applied change, which is worse than none, because it looks like
+-- the edit simply did not work.
+--
+-- A clone is a DIFFERENT instance, so require() cannot serve it from cache and the source is
+-- evaluated fresh. It is parented alongside the original first so any relative require inside it
+-- still resolves against its real siblings, then destroyed.
+local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
+local Layout
+do
+    local clone = shared:WaitForChild("StatsRoomLayout"):Clone()
+    clone.Name = "StatsRoomLayout_buildStatsBoards_tmp"
+    clone.Parent = shared
+    local ok, result = pcall(require, clone)
+    clone:Destroy()
+    if not ok then
+        error("[statsBoards] StatsRoomLayout failed to load: " .. tostring(result))
+    end
+    Layout = result
+end
 
 local MAX_ADJUST = 2.5
 
--- STALE-CACHE GUARD. Studio's VM caches a ModuleScript's RESULT, so a session that required
--- StatsRoomLayout before a Rojo sync keeps handing back the old table no matter what the source
--- says (see docs/wiki/practice/misc-engine-traps.md). An old copy has no SITES, and this tool
--- would then fail deep in the build loop. Fail here instead, with the fix in the message.
-if not (Layout.SITES and Layout.FLAPS and Layout.isHorizontal) then
-    error(
-        "[statsBoards] STALE MODULE: this Studio VM has an old StatsRoomLayout cached (no SITES). "
-            .. "Restart Studio, then re-run. Nothing was changed."
-    )
+-- Shape check on what the clone gave us. Not a cache guard any more -- the clone above makes
+-- staleness impossible -- just a clear failure if the module is mid-edit or broken.
+if not (Layout.SITES and Layout.FLAPS and Layout.isHorizontal and Layout.BOARDS) then
+    error("[statsBoards] StatsRoomLayout is missing SITES/FLAPS/BOARDS. Nothing was changed.")
 end
 
 local ok, failures = Layout.check()
@@ -182,7 +199,16 @@ if existing then
 end
 folder.Parent = structures
 
-print("[statsBoards] built " .. #Layout.BOARDS .. " boards")
+print(
+    string.format(
+        "[statsBoards] built %d boards | flaps wall %.3fx%.3f  slip %.3fx%.3f",
+        #Layout.BOARDS,
+        Layout.FLAPS.wall.w,
+        Layout.FLAPS.wall.h,
+        Layout.FLAPS.slip.w,
+        Layout.FLAPS.slip.h
+    )
+)
 for _, line in report do
     print("  " .. line)
 end

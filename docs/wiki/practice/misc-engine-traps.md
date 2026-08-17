@@ -37,8 +37,32 @@ and reported the module as un-synced. It was fully synced; the probe was reading
 cached when `buildStatsBoards.luau` ran an hour earlier. The real cause was elsewhere
 (the Studio tool had not been re-run, so the PARTS were stale).
 
-**Do this instead:** read `module.Source` and search it for the expected text. Source is
-a live property and is never cached.
+**THE FIX — require a CLONE.** `require()` caches by INSTANCE, so a clone is a cache
+miss and its source is evaluated fresh. Parent it beside the original first, so any
+relative require inside it still resolves against its real siblings:
+
+```luau
+local clone = shared.StatsRoomLayout:Clone()
+clone.Name = "StatsRoomLayout_tmp"
+clone.Parent = shared              -- siblings resolve
+local ok, mod = pcall(require, clone)
+clone:Destroy()
+```
+
+Every Studio tool that reads a shared module should do this. Guards that check for a
+symbol the new version introduced are NOT enough: the cached copy usually has the symbol
+too, just with stale values. That is the failure below.
+
+**To diagnose without fixing:** read `module.Source` and search it for the expected text.
+Source is a live property and is never cached.
+
+**The half-applied change is the dangerous shape.** A pasted tool's own source is always
+current; only the modules it requires can be stale. On 2026-08-17 that combination
+shipped new shutter hardware (tool source) onto boards that kept their old dimensions
+(cached module) in a single run — so the edit looked simply ignored rather than
+partially applied, and cost two rebuild cycles to spot. **Print the values you depend on**
+at the end of any build tool; a wrong number in the output is instant, where wrong
+geometry is a trip into the world to notice.
 
 **And make any tool that rebuilds place content ATOMIC — build first, destroy last.**
 The stale cache turns "the tool errored" into "the room is empty" if the tool takes the
