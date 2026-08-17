@@ -71,15 +71,32 @@ describe("StatsRoomLayout", function()
         end
     end)
 
+    test("the round display's three elements line up as one instrument", function()
+        local throwPanel, clock, tape = byId("roundThrow"), byId("roundClock"), byId("roundTape")
+        -- Clock's top flush with the flipper's.
+        expect(math.abs((clock.y + clock.h / 2) - (throwPanel.y + throwPanel.h / 2)) < 1e-6).toBeTruthy()
+        -- Tape's bottom flush with the flipper's, and to its right (lower z).
+        expect(math.abs((tape.y - tape.h / 2) - (throwPanel.y - throwPanel.h / 2)) < 1e-6).toBeTruthy()
+        expect(tape.z + tape.w / 2 < throwPanel.z - throwPanel.w / 2).toBeTruthy()
+    end)
+
+    test("the tape is eleven columns wide for ten throws, at twice the wall module", function()
+        local tape = byId("roundTape")
+        expect(tape.cols).toBe(11)
+        expect(tape.flap.w).toBe(L.FLAPS.wall.w * 2)
+        expect(tape.flap.h).toBe(L.FLAPS.wall.h * 2)
+    end)
+
     test("the modules stay few, because each is a viewing distance", function()
         local n = 0
         for _ in L.FLAPS do
             n += 1
         end
-        -- wall (read a list across a room), slip (read up close), round (read at a glance from
-        -- anywhere), throwPanel (the single glyph flipper). Adding a fifth should require a
-        -- reason good enough to change this number on purpose.
-        expect(n).toBe(4)
+        -- wall (read a list across a room), slip (read up close), round (the clock, read at a
+        -- glance from anywhere), tape (twice the wall, to read with the clock), throwPanel (the
+        -- single glyph flipper). Adding one should require a reason good enough to change this
+        -- number on purpose.
+        expect(n).toBe(5)
     end)
 
     -- Uniform flaps make every cell the same aspect, so the glyph clamp resolves identically
@@ -161,7 +178,9 @@ describe("StatsRoomLayout", function()
         expect(throwPanel.wall).toBe("west")
         expect(clock.wall).toBe("west")
         expect(throwPanel.z > clock.z).toBeTruthy()
-        expect(throwPanel.y).toBe(clock.y)
+        -- Not the same CENTRE: they share a TOP edge and are different heights, which the
+        -- alignment test above pins. Centres would only match if the two were equally tall.
+        expect(throwPanel.y + throwPanel.h / 2).toBe(clock.y + clock.h / 2)
         expect(clock.cols).toBe(4) -- 0 : 0 0
         expect(throwPanel.cols).toBe(1) -- a single flipper, not a grid
     end)

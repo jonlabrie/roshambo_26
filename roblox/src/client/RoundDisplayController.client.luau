@@ -90,6 +90,15 @@ local CLOCK_CHAR_FRACTION = 1.2
 -- Same problem the wall boards have and the same reason it cannot be one number for both: where
 -- a numeral sits inside its em is a property of the face, and Oswald rides low where
 -- TitilliumWeb does not. Live on `ClockTextNudge`.
+-- The colon sits low in its column: a colon's dots straddle the baseline region rather than the
+-- cap height the numerals fill, so centring its BOX does not centre what you see. Negative is up.
+local COLON_NUDGE_ATTR = "ClockColonNudge"
+local DEFAULT_COLON_NUDGE = -0.08
+local function colonNudge(): number
+    local live = workspace:GetAttribute(COLON_NUDGE_ATTR)
+    return if typeof(live) == "number" then live else DEFAULT_COLON_NUDGE
+end
+
 local CLOCK_NUDGE_ATTR = "ClockTextNudge"
 local DEFAULT_CLOCK_NUDGE = -0.03
 local function clockTextNudge(): number
@@ -188,7 +197,7 @@ end
 
 -- LIVE RE-TUNING. Both attributes are read on change and applied to what already exists, so a
 -- font can be auditioned or a glyph nudged without restarting Play.
-for _, attr in { "ClockFont", "ClockFontWeight", CLOCK_NUDGE_ATTR } do
+for _, attr in { "ClockFont", "ClockFontWeight", CLOCK_NUDGE_ATTR, COLON_NUDGE_ATTR } do
     workspace:GetAttributeChangedSignal(attr):Connect(function()
         local f = clockFont()
         local nudge = clockTextNudge()
@@ -241,8 +250,9 @@ local function applyTape()
         return
     end
     for c, unit in tape do
-        local entry = shownTape and shownTape[c]
-        -- nil is the drum's blank position, which is what a tape shorter than ten cells shows.
+        local i = RoundDisplay.tapeIndexFor(c)
+        local entry = i and shownTape and shownTape[i]
+        -- nil is the drum's blank position, which is what a tape shorter than ten throws shows.
         unit:set(entry and entry.worldThrow or nil)
     end
 end
@@ -281,14 +291,18 @@ local function register(part: Instance)
     elseif id == "roundTape" then
         local made: { [number]: any } = {}
         for c, col in Layout.columns(spec) do
-            made[c] = FlapUnit.new({
-                board = part,
-                localX = col.x,
-                width = col.w,
-                height = spec.h,
-                paint = glyphPainter,
-                dividerAfter = c < spec.cols,
-            })
+            if RoundDisplay.tapeIndexFor(c) then
+                made[c] = FlapUnit.new({
+                    board = part,
+                    localX = col.x,
+                    width = col.w,
+                    height = spec.h,
+                    paint = glyphPainter,
+                    -- A divider only between two cells that both exist: one bracketing the gap
+                    -- would fence off empty board and undo the separation the gap is for.
+                    dividerAfter = RoundDisplay.tapeIndexFor(c + 1) ~= nil,
+                })
+            end
         end
         units[id] = made
         applyTape()
@@ -322,7 +336,7 @@ local function register(part: Instance)
                 -- put the colon at 0.64 where it belongs at 0.36, directly behind column three's
                 -- flap panels, which is why it read as missing rather than misplaced.
                 t.AnchorPoint = Vector2.new(0.5, 0.5)
-                t.Position = UDim2.fromScale(0.5 - col.x / spec.w, 0.5)
+                t.Position = UDim2.fromScale(0.5 - col.x / spec.w, 0.5 + colonNudge())
                 t.Size = UDim2.fromScale(col.w / spec.w, 1)
                 t.Parent = boardFace
             else

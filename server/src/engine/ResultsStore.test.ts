@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ResultsStore } from './ResultsStore';
+import { ResultsStore, TAPE_LENGTH } from './ResultsStore';
 import { GlobalResult, SettledPlayer } from './Settlement';
 
 function round(id: string): GlobalResult {
@@ -8,6 +8,33 @@ function round(id: string): GlobalResult {
 function player(key: string, instanceId?: string): SettledPlayer {
     return { key, platform: 'roblox', robloxUserId: key, instanceId, result: 'WIN', delta: 1, totalPoints: 1, pot: 1, streak: 1, user: {} as any };
 }
+
+
+// THE COUPLING THAT WAS NOT ONE. The store's capacity and the length /api/v1/state advertises
+// were independent numbers, and they disagreed for as long as both existed: the store kept 5
+// while /state asked it for 10, so a ten-cell tape could only ever fill five. Neither side was
+// wrong on its own terms, which is why nothing caught it.
+describe('tape capacity vs what the wire advertises', () => {
+    it('retains at least a full tape, with room for the round now settling', () => {
+        const store = new ResultsStore();
+        for (let i = 0; i < TAPE_LENGTH + 5; i++) store.storeRound(round(`r${i}`), []);
+        expect(store.tape(TAPE_LENGTH)).toHaveLength(TAPE_LENGTH);
+    });
+
+    it('returns the tape newest-first, which is the order the cells are read in', () => {
+        const store = new ResultsStore();
+        for (let i = 0; i < TAPE_LENGTH; i++) store.storeRound(round(`r${i}`), []);
+        const tape = store.tape(TAPE_LENGTH);
+        expect(tape[0].id).toBe(`r${TAPE_LENGTH - 1}`);
+        expect(tape[TAPE_LENGTH - 1].id).toBe('r0');
+    });
+
+    it('is short, not padded, before enough rounds have been played', () => {
+        const store = new ResultsStore();
+        store.storeRound(round('only'), []);
+        expect(store.tape(TAPE_LENGTH)).toHaveLength(1);
+    });
+});
 
 describe('ResultsStore', () => {
     it('stores and retrieves global results by roundId', () => {

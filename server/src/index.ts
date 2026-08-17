@@ -92,7 +92,7 @@ function makeEngine(initialRoundCount: number): RoundEngine {
     }, initialRoundCount);
 }
 
-const store = new ResultsStore(5);
+const store = new ResultsStore(); // see TAPE_LENGTH — must exceed what /state advertises
 
 app.use('/auth', authRouter);
 app.use('/store', storeRouter);

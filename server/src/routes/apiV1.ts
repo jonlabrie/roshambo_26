@@ -1,5 +1,6 @@
 import express, { Router } from 'express';
 import { RoundEngine } from '../engine/RoundEngine';
+import { TAPE_LENGTH } from '../engine/ResultsStore';
 import { ResultsStore } from '../engine/ResultsStore';
 import { requireApiKey } from '../middleware/apiKey';
 import { resolveUser } from '../identity';
@@ -62,7 +63,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             serverTime: now,
             durations: engine.durationsMs(),
             roundCount: snap.roundCount,
-            tape: store.tape(10),
+            tape: store.tape(TAPE_LENGTH),
         });
     });
 

@@ -97,6 +97,31 @@ local DrumStep = require("../src/shared/DrumStep")
 
 -- The flipper must move in step with the HUD's ring, so these pin the SHAPE the ring has:
 -- blank through LOCK and the swing, cycling from contact, stopping only on the drum.
+describe("RoundDisplayModel tape columns", function()
+    test("eleven columns carry ten throws, newest first", function()
+        local seen = {}
+        for c = 1, M.TAPE_COLUMNS do
+            local i = M.tapeIndexFor(c)
+            if i then
+                table.insert(seen, i)
+            end
+        end
+        expect(#seen).toBe(10)
+        for n = 1, 10 do
+            expect(seen[n]).toBe(n)
+        end
+    end)
+
+    -- The gap exists because cell 1 duplicates the big flipper. Without it the eleven read as
+    -- one run and the newest throw looks counted twice.
+    test("column 2 is the gap and shows nothing", function()
+        expect(M.tapeIndexFor(M.TAPE_GAP_COLUMN)).toBe(nil)
+        expect(M.tapeIndexFor(1)).toBe(1)
+        expect(M.tapeIndexFor(3)).toBe(2)
+        expect(M.tapeIndexFor(11)).toBe(10)
+    end)
+end)
+
 describe("RoundDisplayModel.throwState", function()
     test("holds the previous round's throw through OPEN", function()
         local s = M.throwState({ phase = "OPEN", previousThrow = "R" })

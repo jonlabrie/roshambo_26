@@ -35,6 +35,9 @@ StatsRoomLayout.FLAPS = {
     -- anywhere in the room, because a player studying a wall down here cannot hear the drum.
     -- ~2-stud digits, at the wall module's proportions.
     round = { w = 2.05, h = 2.40 },
+    -- The tape's own module, exactly twice the wall's (owner, 2026-08-17). It reads across the
+    -- room like the clock beside it, not like a line of board text.
+    tape = { w = 1.23, h = 1.44 },
     -- The throw flipper is ONE flap, so its module is its own size. It is not a grid of cells --
     -- it renders the Glyphs image pair, not characters -- but declaring it here keeps the rule
     -- that every board's dimensions come from a named module rather than a number typed inline.
@@ -133,6 +136,7 @@ type Decl = {
 local WALL = StatsRoomLayout.FLAPS.wall
 local SLIP = StatsRoomLayout.FLAPS.slip
 local ROUND = StatsRoomLayout.FLAPS.round
+local TAPE = StatsRoomLayout.FLAPS.tape
 local THROW = StatsRoomLayout.FLAPS.throwPanel
 
 local DECLS: { Decl } = {
@@ -227,22 +231,28 @@ local DECLS: { Decl } = {
         -- one: 3.5 modules of wall, not 4.
         colWidths = { 1, 0.5, 1, 1 },
         along = 71.20,
-        y = 129.0,
+        -- TOP EDGE FLUSH WITH THE FLIPPER'S (owner, 2026-08-17). roundThrow's top is 131.00 and
+        -- this is 2.40 tall, so its centre is 131.00 - 1.20.
+        y = 129.80,
     },
 
     -- The tape: the last ten World Throws, on the wall module so the cells match the boards'.
     -- Sited by two constraints from the owner (2026-08-17) -- "below the timer" and "to the right
     -- of and on the same lower horizontal line as the larger current throw display" -- so its
     -- BOTTOM edge is roundThrow's bottom (127.00), which sets y to 127.00 + 0.72/2.
+    -- ELEVEN COLUMNS FOR TEN THROWS. Column 2 is an empty gap, and it is there to break a
+    -- genuine ambiguity: cell 1 always shows the same glyph as the big flipper beside it, which
+    -- is NOT how the HUD reads, so without a break the two look like one run of eleven. The gap
+    -- says "this one is the current throw; those nine are what came before" without any copy.
     {
         id = "roundTape",
         site = "cavern",
         wall = "west",
-        flap = WALL,
+        flap = TAPE,
         rows = 1,
-        cols = 10,
-        along = 72.90,
-        y = 127.36,
+        cols = 11,
+        along = 69.235,
+        y = 127.72,
     },
 
     -- ===== VESTIBULE =====

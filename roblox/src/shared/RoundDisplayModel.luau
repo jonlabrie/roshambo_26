@@ -57,6 +57,22 @@ function RoundDisplayModel.statics(): { [number]: string }
     return { [2] = RoundDisplayModel.COLON }
 end
 
+-- ===== THE TAPE'S GAP =====
+-- Eleven columns carry ten throws, with column 2 left empty. Cell 1 always shows the same glyph
+-- as the big flipper beside it -- which is NOT how the HUD reads -- so without a break the two
+-- run together as one sequence of eleven and the newest throw appears to be counted twice. The
+-- gap says "this one is now; those nine are what came before" and needs no copy to do it.
+RoundDisplayModel.TAPE_COLUMNS = 11
+RoundDisplayModel.TAPE_GAP_COLUMN = 2
+
+-- Which entry of the tape a column shows, or nil for the gap. Newest is 1.
+function RoundDisplayModel.tapeIndexFor(col: number): number?
+    if col == RoundDisplayModel.TAPE_GAP_COLUMN then
+        return nil
+    end
+    return if col < RoundDisplayModel.TAPE_GAP_COLUMN then col else col - 1
+end
+
 local MAX_SECONDS = 599 -- 9:59, the most four columns can honestly say
 
 -- Four columns: minutes, colon, tens, units. The minutes digit never moves at a 60s round; it is
