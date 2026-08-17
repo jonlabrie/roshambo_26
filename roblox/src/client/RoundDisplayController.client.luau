@@ -448,6 +448,18 @@ StatsData.OnClientEvent:Connect(function(data)
         -- client existed, so holding it would leave the tape blank until the next reveal.
         shownTape = data.tape
         applyTape()
+        -- AND THE FLIPPER TAKES ITS THROW FROM THE SAME ENTRY. `landed` is otherwise only ever
+        -- set by drumRest, so a player walking in mid-round found the big display blank until the
+        -- round they had just watched finished -- for up to a minute, and while the tape beside it
+        -- was already showing that very throw in its first cell. The two are meant to agree; one
+        -- of them was simply waiting for an event the other did not need.
+        --
+        -- No new exposure: cell 1 of the tape is this same value and is already accepted on join
+        -- for the same reason -- it describes a round that revealed before this client existed.
+        if landed == nil then
+            local newest = data.tape and data.tape[1]
+            landed = newest and newest.worldThrow or nil
+        end
     else
         pendingTape = data.tape
     end
