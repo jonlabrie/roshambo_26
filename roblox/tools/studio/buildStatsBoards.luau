@@ -89,7 +89,34 @@ for _, b in Layout.BOARDS do
     part.Parent = folder
 
     if b.shuttered then
-        -- Section 8: a closed board, not a dark one. Two leaves meeting at the centre.
+        -- A CLOSED BOARD, NOT A DARK ONE (spec section 8). The first version was two bare leaves
+        -- with a 0.05 gap, and the owner looked straight at it and asked what the blank board
+        -- was -- which is the exact failure section 8 exists to prevent. It needs to read as
+        -- SHUT from across the room, so: a real recessed seam, strap hinges on the outer stiles,
+        -- and a hasp and padlock across the joint.
+        --
+        -- Every dimension is a proportion of the board. `skillFuture` is 8.0 x 4.32 today and
+        -- will not stay that size once the rate ladders it is reserved for arrive.
+        local SEAM = b.w * 0.018 -- recess between the leaves; shows the dark board 0.25 behind
+        local BORDER = b.h * 0.04 -- dark frame left proud around the leaves
+        local FACE = -(Layout.THICKNESS / 2 + 0.13) -- leaves stand this far off the board face
+        local IRON = Color3.fromRGB(38, 34, 30)
+
+        local function iron(name: string, size: Vector3, offset: Vector3): Part
+            local q = Instance.new("Part")
+            q.Name = name
+            q.Anchored = true
+            q.CanCollide = false
+            q.CastShadow = false
+            q.Material = Enum.Material.Metal
+            q.Color = IRON
+            q.Size = size
+            q.CFrame = part.CFrame * CFrame.new(offset)
+            q.Parent = part
+            return q
+        end
+
+        local leafW = (b.w - SEAM) / 2 - BORDER
         for i, sign in { -1, 1 } do
             local leaf = Instance.new("Part")
             leaf.Name = `Shutter{i}`
@@ -98,10 +125,36 @@ for _, b in Layout.BOARDS do
             leaf.CastShadow = false
             leaf.Material = Enum.Material.WoodPlanks
             leaf.Color = Color3.fromRGB(96, 78, 56)
-            leaf.Size = Vector3.new(b.w / 2 - 0.05, b.h - 0.1, 0.25)
-            leaf.CFrame = part.CFrame * CFrame.new(sign * b.w / 4, 0, -(Layout.THICKNESS / 2 + 0.13))
+            leaf.Size = Vector3.new(leafW, b.h - BORDER * 2, 0.25)
+            leaf.CFrame = part.CFrame * CFrame.new(sign * (SEAM / 2 + leafW / 2), 0, FACE)
             leaf.Parent = part
+
+            -- Strap hinges: two per leaf, on the OUTER stile, reaching in across the leaf so the
+            -- eye reads a door that swings outward from the middle.
+            for _, ty in { 0.30, -0.30 } do
+                iron(
+                    `Hinge{i}`,
+                    Vector3.new(leafW * 0.42, b.h * 0.075, 0.06),
+                    Vector3.new(sign * (b.w / 2 - BORDER - leafW * 0.21), b.h * ty, FACE - 0.155)
+                )
+            end
         end
+
+        -- Hasp across the joint, with its staple and a padlock hanging below. This is the part
+        -- that says SHUT rather than merely blank: a plate spanning the seam cannot be read as
+        -- an empty surface.
+        iron("Hasp", Vector3.new(b.w * 0.20, b.h * 0.075, 0.07), Vector3.new(0, 0, FACE - 0.16))
+        iron("HaspStaple", Vector3.new(b.w * 0.045, b.h * 0.11, 0.09), Vector3.new(0, 0, FACE - 0.17))
+        iron(
+            "LockBody",
+            Vector3.new(b.w * 0.055, b.h * 0.085, 0.10),
+            Vector3.new(0, -b.h * 0.095, FACE - 0.18)
+        )
+        iron(
+            "LockShackle",
+            Vector3.new(b.w * 0.030, b.h * 0.060, 0.05),
+            Vector3.new(0, -b.h * 0.038, FACE - 0.18)
+        )
     end
 
     table.insert(
