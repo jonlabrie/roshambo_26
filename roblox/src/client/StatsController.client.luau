@@ -22,9 +22,10 @@ local StatsData = remotes:WaitForChild("StatsData") :: RemoteEvent
 local StatsPersonal = remotes:WaitForChild("StatsPersonal") :: RemoteEvent
 
 local FIXTURE_ATTR = "StatsFixtures"
--- The band ids belong to RoundBandModel's driver, not to this file. Same tag, different clock.
-local function isBand(id: string): boolean
-    return id:sub(1, 4) == "band"
+-- The round display's own parts belong to RoundDisplayController, not to this file. Same tag,
+-- different clock entirely: these walls repaint on a 60s data poll, that one ticks every frame.
+local function isRoundDisplay(id: string): boolean
+    return id:sub(1, 5) == "round"
 end
 
 local boards: { [Instance]: { board: any, id: string, rows: number, cols: number } } = {}
@@ -109,7 +110,7 @@ local function register(part: Instance)
         return
     end
     local id = part:GetAttribute("BoardId")
-    if typeof(id) ~= "string" or isBand(id) then
+    if typeof(id) ~= "string" or isRoundDisplay(id) then
         return
     end
     -- A shuttered board is CLOSED, not broken (spec section 8) — it gets no renderer at all, so

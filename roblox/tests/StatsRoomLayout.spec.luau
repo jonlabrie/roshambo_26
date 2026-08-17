@@ -40,18 +40,31 @@ describe("StatsRoomLayout", function()
         end
     end)
 
-    test("there are exactly two flap sizes, and every board uses one of them", function()
-        local seen = {}
-        for _, b in L.BOARDS do
-            seen[`{b.flap.w}x{b.flap.h}`] = true
+    -- The invariant that actually matters: no board may invent a size. Every one has to come
+    -- from a NAMED module in FLAPS, so adding a size is a deliberate edit to a short list with
+    -- a stated purpose per entry, not a number typed inline in a board declaration.
+    test("every board's module is one declared in FLAPS", function()
+        local declared = {}
+        for name, f in L.FLAPS do
+            declared[`{f.w}x{f.h}`] = name
         end
+        for _, b in L.BOARDS do
+            local key = `{b.flap.w}x{b.flap.h}`
+            if not declared[key] then
+                error(`{b.id} uses an undeclared module {key}`)
+            end
+        end
+    end)
+
+    test("the modules stay few, because each is a viewing distance", function()
         local n = 0
-        for _ in seen do
+        for _ in L.FLAPS do
             n += 1
         end
-        expect(n).toBe(2)
-        expect(seen[`{L.FLAPS.wall.w}x{L.FLAPS.wall.h}`]).toBe(true)
-        expect(seen[`{L.FLAPS.slip.w}x{L.FLAPS.slip.h}`]).toBe(true)
+        -- wall (read a list across a room), slip (read up close), round (read at a glance from
+        -- anywhere), throwPanel (the single glyph flipper). Adding a fifth should require a
+        -- reason good enough to change this number on purpose.
+        expect(n).toBe(4)
     end)
 
     -- Uniform flaps make every cell the same aspect, so the glyph clamp resolves identically
@@ -115,18 +128,22 @@ describe("StatsRoomLayout", function()
         end
     end)
 
-    test("the band runs on all four walls, at one height, one row, one width", function()
-        local band = {}
+    -- The round display supersedes the four clerestory band segments (owner, 2026-08-16): one
+    -- unit, west wall, glyph beside countdown. `roundThrow` sits at the higher z because a
+    -- viewer inside the room faces west, which puts +z on their left.
+    test("the round display is one unit on the west wall, glyph left of the clock", function()
+        local throwPanel, clock = byId("roundThrow"), byId("roundClock")
+        expect(throwPanel.wall).toBe("west")
+        expect(clock.wall).toBe("west")
+        expect(throwPanel.z > clock.z).toBeTruthy()
+        expect(throwPanel.y).toBe(clock.y)
+        expect(clock.cols).toBe(4) -- 0 : 0 0
+        expect(throwPanel.cols).toBe(1) -- a single flipper, not a grid
+    end)
+
+    test("the clerestory band is gone, not merely unused", function()
         for _, b in L.BOARDS do
-            if b.id:sub(1, 4) == "band" then
-                table.insert(band, b)
-            end
-        end
-        expect(#band).toBe(4)
-        for _, b in band do
-            expect(b.rows).toBe(1)
-            expect(b.cols).toBe(band[1].cols)
-            expect(b.y).toBe(band[1].y)
+            expect(b.id:sub(1, 4) ~= "band").toBeTruthy()
         end
     end)
 

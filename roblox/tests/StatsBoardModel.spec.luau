@@ -247,8 +247,8 @@ end)
 
 describe("StatsBoardModel titles fit their real StatsRoomLayout boards", function()
     -- Mirrors StatsController.client.luau's `linesFor` id -> adapter dispatch. `skillFuture` is
-    -- shuttered (no content adapter) and the four `band*` segments have no title at all — both
-    -- excluded below, per the boards this module actually renders titles for.
+    -- shuttered, and the `round*` parts belong to RoundDisplayController — they render a clock
+    -- and a glyph, not sections with titles, so this module has no adapter for them by design.
     local function sectionsFor(id: string): { M.Section }?
         local S, P = StatsFixtures.STATS, StatsFixtures.PERSONAL
         if id == "banzuke" then
@@ -272,7 +272,7 @@ describe("StatsBoardModel titles fit their real StatsRoomLayout boards", functio
     end
 
     for _, b in StatsRoomLayout.BOARDS do
-        if b.id:sub(1, 4) ~= "band" and not b.shuttered then
+        if b.id:sub(1, 5) ~= "round" and not b.shuttered then
             test(`{b.id} (cols={b.cols}): title line(s) are not truncated`, function()
                 local sections = sectionsFor(b.id)
                 expect(sections ~= nil).toBeTruthy()

@@ -30,6 +30,15 @@ StatsRoomLayout.FLAPS = {
     -- that fills its wall reads as a board rather than as the small personal thing it is.
     -- 16 x 0.34 = 5.44 wide on a 7.40 wall, so it now sits with a stud of quiet either side.
     slip = { w = 0.34, h = 0.40 },
+    -- A THIRD SIZE, and the viewing distance justifies it. Wall boards are for reading a list,
+    -- slips for reading up close; this is the one element that must be legible at a glance from
+    -- anywhere in the room, because a player studying a wall down here cannot hear the drum.
+    -- ~2-stud digits, at the wall module's proportions.
+    round = { w = 2.05, h = 2.40 },
+    -- The throw flipper is ONE flap, so its module is its own size. It is not a grid of cells --
+    -- it renders the Glyphs image pair, not characters -- but declaring it here keeps the rule
+    -- that every board's dimensions come from a named module rather than a number typed inline.
+    throwPanel = { w = 4.0, h = 4.0 },
 }
 
 -- ===== SITES =====
@@ -72,20 +81,17 @@ StatsRoomLayout.ROOM = StatsRoomLayout.SITES.cavern
 -- aliasing). halfWidth is deliberately generous: a board that grazes the mouth reads as blocking
 -- it. Applies to the CAVERN only -- the vestibule's doorway is in a wall no board sits on.
 --
--- `top` IS WHAT LETS THE CLERESTORY BAND RUN UNBROKEN. The band spans the whole north wall,
--- mouth included, and must -- it is the one display that has to be visible from anywhere in the
--- room. It clears the opening because it sits at y 131 and the tunnel head is at LINTEL_TOP
--- 120.60. So the keep-out is a DOORWAY, not a column: it binds only boards that reach below
--- `top`. Without this the invariant would be either wrong or unsatisfiable.
+-- `top` MAKES THE KEEP-OUT A DOORWAY RATHER THAN A COLUMN: it binds only boards that reach
+-- below the tunnel head (LINTEL_TOP 120.60), so anything mounted high may pass over the mouth.
+-- Written for the clerestory band, which spanned the whole north wall; that band is gone, but
+-- the rule outlives it -- the round display is mounted high too, and the north wall above the
+-- mouth is the obvious home for whatever comes next. A test exercises the exemption directly
+-- rather than through whichever board happens to use it.
 StatsRoomLayout.DOOR = { x = -28.92, halfWidth = 4.0, top = 121.0 }
 
 StatsRoomLayout.TAG = "StatsBoard"
 StatsRoomLayout.THICKNESS = 0.4
 StatsRoomLayout.STANDOFF = 0.3 -- board centre this far off the wall plane
-
-StatsRoomLayout.BAND_COLS = 16
-local BAND_COLS = StatsRoomLayout.BAND_COLS
-local BAND_Y = 131.0
 
 export type Flap = { w: number, h: number }
 export type Board = {
@@ -120,6 +126,8 @@ type Decl = {
 
 local WALL = StatsRoomLayout.FLAPS.wall
 local SLIP = StatsRoomLayout.FLAPS.slip
+local ROUND = StatsRoomLayout.FLAPS.round
+local THROW = StatsRoomLayout.FLAPS.throwPanel
 
 local DECLS: { Decl } = {
     -- ===== CAVERN =====
@@ -188,49 +196,29 @@ local DECLS: { Decl } = {
     -- display of current leaders, which is its own piece of work (it needs image assets, and
     -- nothing in this room renders anything but text cells).
     --
-    -- PLACEHOLDERS, DUE FOR DELETION. The four clerestory band segments are superseded by a
-    -- single round display on the cavern's west wall (owner, 2026-08-16). They stay only so the
-    -- room keeps a round timer in the meantime -- without one, walking in here means silently
-    -- dropping out of the game. Whoever builds the round display deletes these four.
+    -- ===== THE ROUND DISPLAY (owner, 2026-08-16/17) =====
+    -- ONE unit, high on the west wall, replacing the four clerestory band segments that held
+    -- this ground. Glyph left, countdown right, as one instrument -- so `roundThrow` sits at the
+    -- HIGHER z: a viewer inside the room faces west, which puts +z on their left.
     {
-        id = "bandNorth",
-        site = "cavern",
-        wall = "north",
-        flap = WALL,
-        rows = 1,
-        cols = BAND_COLS,
-        along = -37.90,
-        y = BAND_Y,
-    },
-    {
-        id = "bandSouth",
-        site = "cavern",
-        wall = "south",
-        flap = WALL,
-        rows = 1,
-        cols = BAND_COLS,
-        along = -37.90,
-        y = BAND_Y,
-    },
-    {
-        id = "bandWest",
+        id = "roundThrow",
         site = "cavern",
         wall = "west",
-        flap = WALL,
+        flap = THROW,
         rows = 1,
-        cols = BAND_COLS,
-        along = 73.60,
-        y = BAND_Y,
+        cols = 1,
+        along = 78.10,
+        y = 129.0,
     },
     {
-        id = "bandEast",
+        id = "roundClock",
         site = "cavern",
-        wall = "east",
-        flap = WALL,
+        wall = "west",
+        flap = ROUND,
         rows = 1,
-        cols = BAND_COLS,
-        along = 73.60,
-        y = BAND_Y,
+        cols = 4,
+        along = 71.20,
+        y = 129.0,
     },
 
     -- ===== VESTIBULE =====
