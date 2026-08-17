@@ -21,6 +21,49 @@ local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local StatsData = remotes:WaitForChild("StatsData") :: RemoteEvent
 local StatsPersonal = remotes:WaitForChild("StatsPersonal") :: RemoteEvent
 
+-- THE WALL BOARDS' FACE, live so it can be auditioned the way the clock's was. Oswald won the
+-- round timer on sight (owner, 2026-08-17) and the wall boards are still to be judged -- but they
+-- are a different job: the timer shows four big numerals read at a glance, these show lines of
+-- lettering read as text, and a condensed display face is not automatically right for both.
+--
+--   workspace:SetAttribute("BoardFont", "Oswald")
+--
+-- Applies to boards already built. A name that will not construct falls back to the default
+-- rather than erroring, so a typo reads as "nothing changed" and not as a broken wall.
+local BOARD_FONT_ATTR = "BoardFont"
+local DEFAULT_BOARD_FAMILY = "JosefinSans"
+local function boardFont(): Font
+    local live = workspace:GetAttribute(BOARD_FONT_ATTR)
+    local family = if typeof(live) == "string" and live ~= "" then live else DEFAULT_BOARD_FAMILY
+    local ok, f = pcall(function()
+        return Font.new(
+            `rbxasset://fonts/families/{family}.json`,
+            Enum.FontWeight.Bold,
+            Enum.FontStyle.Normal
+        )
+    end)
+    if ok then
+        return f
+    end
+    return Font.new(
+        `rbxasset://fonts/families/{DEFAULT_BOARD_FAMILY}.json`,
+        Enum.FontWeight.Bold,
+        Enum.FontStyle.Normal
+    )
+end
+
+-- Walks the built cells rather than keeping a register of every label: a board is ~200 cells and
+-- the room ~1,050, so a list would be thousands of entries maintained for an operation that
+-- happens when somebody is choosing a font.
+local function applyBoardFont(part: Instance)
+    local f = boardFont()
+    for _, d in part:GetDescendants() do
+        if d:IsA("TextLabel") then
+            d.FontFace = f
+        end
+    end
+end
+
 local FIXTURE_ATTR = "StatsFixtures"
 -- The round display's own parts belong to RoundDisplayController, not to this file. Same tag,
 -- different clock entirely: these walls repaint on a 60s data poll, that one ticks every frame.
@@ -137,6 +180,9 @@ local function register(part: Instance)
     }
     boards[part] = entry
     repaint(entry)
+    -- Also here, not just on the changed signal: a board built AFTER the attribute was set would
+    -- otherwise come up in the default face while its neighbours wore the chosen one.
+    applyBoardFont(part)
 end
 
 local function unregister(part: Instance)
@@ -186,3 +232,9 @@ end)
 -- Live, so the owner can flip fixtures on and off in Studio and watch the walls change without
 -- rejoining. Costs one attribute listener.
 workspace:GetAttributeChangedSignal(FIXTURE_ATTR):Connect(repaintAll)
+
+workspace:GetAttributeChangedSignal(BOARD_FONT_ATTR):Connect(function()
+    for part in boards do
+        applyBoardFont(part)
+    end
+end)
