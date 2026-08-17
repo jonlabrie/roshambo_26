@@ -16,14 +16,13 @@ local RoundDisplay = require(shared:WaitForChild("RoundDisplayModel"))
 local RoundMetronome = require(shared:WaitForChild("RoundMetronome"))
 local FlapScheduler = require(shared:WaitForChild("FlapScheduler"))
 local Glyphs = require(shared:WaitForChild("Glyphs"))
+local DrumStep = require(shared:WaitForChild("DrumStep"))
 local FlapBoard = require(script.Parent:WaitForChild("FlapBoard"))
 local GlyphFlipper = require(script.Parent:WaitForChild("GlyphFlipper"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local RevealTheater = remotes:WaitForChild("RevealTheater") :: RemoteEvent
-
-local SYMBOLS = { "R", "P", "S" }
 
 local clock: any = nil -- FlapBoard over roundClock
 local flipper: any = nil -- GlyphFlipper over roundThrow
@@ -36,6 +35,14 @@ local landed: string? = nil
 local pending: string? = nil
 local rested = false
 local lastClock: string? = nil
+
+-- CONTACT, LATCHED THE WAY THE HUD LATCHES IT (HudController's `reelStartedAt`). Derived from the
+-- REVEAL phase edge plus the shu-moku's swing, NOT from the `gongHit` cue -- that cue can drop,
+-- which is the entire reason main.client carries a reveal-safety fallback, and a dropped cue would
+-- leave this flap blank for the whole settle. `reelSpent` stops a re-arm after the drum has
+-- answered, since "REVEAL and no answer yet" and "REVEAL, answered" look identical from here.
+local contactAt: number? = nil
+local reelSpent = false
 
 local function register(part: Instance)
     if not part:IsA("BasePart") then
@@ -60,7 +67,7 @@ local function register(part: Instance)
         flipper = GlyphFlipper.new({
             part = part,
             render = Glyphs.render,
-            symbols = SYMBOLS,
+            symbols = RoundDisplay.SYMBOLS,
         })
     end
 end
@@ -117,50 +124,62 @@ end)
 EventBus.Cue.Event:Connect(function(cue)
     if cue.kind == "drumRest" then
         rested = true
+        contactAt, reelSpent = nil, true -- the drum has answered; the reel's job is done
         if pending then
             landed = pending
         end
     end
 end)
 
--- Half-second cadence: fine enough that the seconds digit is never visibly stale, coarse enough
--- that the flaps are not asked to re-plan mid-roll. Both elements suppress unchanged output, so
--- a still second costs one string compare.
+-- THE STATE TICK at 10Hz, matching the cadence HudController's `render` runs at -- fast enough to
+-- catch a phase edge without a visible lag, and all the clock's seconds field needs.
 local accumulator = 0
+local function currentPhase(): string?
+    local reading = metronome:read(workspace:GetServerTimeNow())
+    return reading and reading.phase, reading and reading.secondsLeft
+end
+
 RunService.Heartbeat:Connect(function(dt: number)
     accumulator += dt
-    if accumulator < 0.5 then
+    if accumulator < 0.1 then
         return
     end
     accumulator = 0
 
-    local reading = metronome:read(workspace:GetServerTimeNow())
-    local phase = reading and reading.phase
+    local phase, secondsLeft = currentPhase()
 
-    -- A new OPEN is the round boundary: last round's announcement is over, and the flipper holds
-    -- what the drum landed it on until this round's own reveal.
-    if phase == "OPEN" and (rested or pending) then
-        rested, pending = false, nil
+    if phase == "OPEN" then
+        -- A fresh round: the reel is armed again but does not run during OPEN.
+        if rested or pending or contactAt or reelSpent then
+            rested, pending, contactAt, reelSpent = false, nil, nil, false
+        end
+    elseif phase == "REVEAL" and not reelSpent and contactAt == nil then
+        contactAt = os.clock() + DrumStep.STRIKE_SWING_SECONDS
     end
 
     if clock then
-        local line = RoundDisplay.clock({ phase = phase, secondsLeft = reading and reading.secondsLeft })
+        local line = RoundDisplay.clock({ phase = phase, secondsLeft = secondsLeft })
         if line ~= lastClock then
             lastClock = line
             clock:setRow(1, line)
         end
     end
+end)
 
-    if flipper then
-        local s = RoundDisplay.throwState({
-            phase = phase,
-            previousThrow = landed,
-            worldThrow = pending,
-            worldRested = rested,
-        })
-        flipper:spin(s.spinning)
-        if not s.spinning then
-            flipper:show(s.glyph)
-        end
+-- THE REEL AT FRAME RATE, and for the same reason the HUD's is: ReelStep's fastest interval is
+-- 0.05s, which the 10Hz tick above cannot resolve -- driven from it the flap would cycle at half
+-- speed and stutter. `show` is latched, so the frames between changes cost one comparison.
+RunService.RenderStepped:Connect(function()
+    if not flipper then
+        return
     end
+    local reading = metronome:read(workspace:GetServerTimeNow())
+    local s = RoundDisplay.throwState({
+        phase = reading and reading.phase,
+        previousThrow = landed,
+        worldThrow = pending,
+        worldRested = rested,
+        contactElapsed = if contactAt then os.clock() - contactAt else nil,
+    })
+    flipper:show(s.glyph)
 end)

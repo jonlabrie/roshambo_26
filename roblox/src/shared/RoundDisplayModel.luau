@@ -7,7 +7,12 @@
 -- taiko drum that is the round's authoritative signal. Without a round display, walking in here
 -- means silently dropping out of the game. It supersedes the four clerestory band segments,
 -- which existed only to hold that ground until this landed.
+local ReelStep = require("./ReelStep")
+local DrumStep = require("./DrumStep")
+
 local RoundDisplayModel = {}
+
+RoundDisplayModel.SYMBOLS = { "R", "P", "S" }
 
 -- ===== THE DIGIT DRUM (owner's ruling, 2026-08-17) =====
 -- "A drum that is only ever going to show digits should only ever have digits on it. It's a
@@ -38,6 +43,9 @@ export type ThrowState = {
     previousThrow: string?,
     worldThrow: string?,
     worldRested: boolean?,
+    -- Seconds since CONTACT (the bell, `DrumStep.STRIKE_SWING_SECONDS` after REVEAL opens).
+    -- Negative while the shu-moku is still swinging, nil when the reel is not armed.
+    contactElapsed: number?,
 }
 
 -- Column 2 is deliberately absent: it is printed, not turned.
@@ -64,21 +72,47 @@ function RoundDisplayModel.clock(state: ClockState): string
     return string.format("%d:%02d", secs // 60, secs % 60)
 end
 
--- Holds LAST round's throw through OPEN, turns from the moment the countdown expires, and lands
--- only when the drum outside has come to rest.
+-- THE SAME REEL THE HUD'S RING RUNS, not an imitation of it (owner, 2026-08-17: the flipper
+-- "should go blank at the same time the round timer disappears in the HUD, should start flipping
+-- at the same time the HUD does (as the drum spins) and should come to rest at the same time as
+-- the drum/HUD"). Driving it from `ReelStep` is how that holds by construction rather than by two
+-- sets of constants drifting apart.
 --
--- LANDING IS THE `drumRest` CUE AND NOTHING ELSE. `worldThrow` arrives on RevealTheater about
--- 3.45s before the drum stops; naming it then is the spoiler five other displays in this project
--- have each had to be corrected for. Making `worldRested` a parameter is how this one cannot.
-function RoundDisplayModel.throwState(state: ThrowState): { glyph: string?, spinning: boolean }
+-- The first version began turning at the END OF OPEN, which is 2.45s ahead of the ring: LOCK's two
+-- seconds plus the shu-moku's 0.45s swing. `DrumStep` warns about exactly this half-second half of
+-- the error -- "anything animating ALONGSIDE the wheel wants TURN_SECONDS... mixing them puts an
+-- animation 0.45s ahead of the thing it is standing in for, which is exactly how the reel first
+-- shipped." It is how this shipped too.
+--
+-- So: hold last round's throw through OPEN; go BLANK the moment the countdown does, and stay blank
+-- through LOCK and the swing; cycle from contact; and stop only when the drum has rested.
+--
+-- TWO PROPERTIES ARE LOAD-BEARING, both inherited from ReelStep and both tested. The cycle never
+-- stops on its own -- it decelerates to a plateau, because a cycle that ran out before the drum
+-- rested would be sitting on a glyph that is NOT the World Throw, which reads as an answer and is
+-- worse than an early one because it is the WRONG one. And the cycling glyph is a function of
+-- elapsed time alone: it is never handed the answer, so it cannot leak it.
+function RoundDisplayModel.throwState(state: ThrowState): { glyph: string?, reeling: boolean }
+    if state.worldRested and state.worldThrow then
+        return { glyph = state.worldThrow, reeling = false }
+    end
     local phase = state.phase
     if phase ~= "LOCK" and phase ~= "REVEAL" then
-        return { glyph = state.previousThrow, spinning = false }
+        return { glyph = state.previousThrow, reeling = false }
     end
-    if phase == "REVEAL" and state.worldRested and state.worldThrow then
-        return { glyph = state.worldThrow, spinning = false }
+    local elapsed = state.contactElapsed
+    if elapsed == nil or elapsed < 0 then
+        -- LOCK, and the swing. Blank on purpose, so the flipper starts with the bell and the
+        -- wheel rather than filling a gap ahead of both.
+        return { glyph = nil, reeling = false }
     end
-    return { glyph = state.previousThrow, spinning = true }
+    -- TURN_SECONDS, not SETTLE_SECONDS: this stands in for the wheel, and the wheel's travel
+    -- begins at contact. Against SETTLE the curve would pace a 3.45s journey the drum makes in
+    -- 3.0s from here, and plateau early.
+    return {
+        glyph = ReelStep.symbolAt(RoundDisplayModel.SYMBOLS, elapsed, DrumStep.TURN_SECONDS),
+        reeling = true,
+    }
 end
 
 return RoundDisplayModel

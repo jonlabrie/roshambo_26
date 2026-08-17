@@ -80,35 +80,89 @@ describe("RoundDisplayModel.DIGITS", function()
     end)
 end)
 
+local DrumStep = require("../src/shared/DrumStep")
+
+-- The flipper must move in step with the HUD's ring, so these pin the SHAPE the ring has:
+-- blank through LOCK and the swing, cycling from contact, stopping only on the drum.
 describe("RoundDisplayModel.throwState", function()
-    -- Shows LAST round's throw until the countdown runs out, then turns until the drum lands it.
     test("holds the previous round's throw through OPEN", function()
         local s = M.throwState({ phase = "OPEN", previousThrow = "R" })
         expect(s.glyph).toBe("R")
-        expect(s.spinning).toBe(false)
+        expect(s.reeling).toBe(false)
     end)
 
-    test("turns from the moment the countdown expires", function()
-        expect(M.throwState({ phase = "LOCK", previousThrow = "R" }).spinning).toBe(true)
-        expect(M.throwState({ phase = "REVEAL", previousThrow = "R" }).spinning).toBe(true)
+    -- Owner: it "should go blank at the same time the round timer disappears in the HUD".
+    test("goes blank the moment the countdown does, and stays blank through LOCK", function()
+        local s = M.throwState({ phase = "LOCK", previousThrow = "R" })
+        expect(s.glyph).toBe(nil)
+        expect(s.reeling).toBe(false)
     end)
 
-    -- THE DRUM RULE. Landing is not a timer: it is the drumRest cue and nothing else.
-    test("keeps turning through REVEAL until the drum has rested", function()
-        local s =
-            M.throwState({ phase = "REVEAL", previousThrow = "R", worldThrow = "S", worldRested = false })
-        expect(s.spinning).toBe(true)
-        expect(s.glyph).toBe("R") -- still last round's, never the new one
+    -- The shu-moku's swing is 0.45s of REVEAL during which the wheel has not moved. The ring is
+    -- black for it; so is this. Starting at REVEAL's edge would run 0.45s ahead of the drum, and
+    -- starting at the end of OPEN -- which the first version did -- runs 2.45s ahead.
+    test("stays blank through the swing, when contact is still in the future", function()
+        local s = M.throwState({ phase = "REVEAL", previousThrow = "R", contactElapsed = -0.3 })
+        expect(s.glyph).toBe(nil)
+        expect(s.reeling).toBe(false)
+    end)
+
+    test("cycles from contact", function()
+        local s = M.throwState({ phase = "REVEAL", previousThrow = "R", contactElapsed = 0.5 })
+        expect(s.reeling).toBe(true)
+        expect(s.glyph == "R" or s.glyph == "P" or s.glyph == "S").toBeTruthy()
+    end)
+
+    -- INHERITED FROM ReelStep AND LOAD-BEARING: a cycle that ran out before the drum rested would
+    -- be sitting on a glyph that is not the World Throw -- an answer, and the wrong one.
+    test("never stops cycling on its own, however long the drum takes", function()
+        for _, t in { 3.0, 6.0, 12.0 } do
+            expect(M.throwState({ phase = "REVEAL", contactElapsed = t }).reeling).toBe(true)
+        end
+    end)
+
+    -- THE DRUM RULE. Landing is the drumRest cue and nothing else.
+    test("keeps cycling through REVEAL until the drum has rested", function()
+        local s = M.throwState({
+            phase = "REVEAL",
+            previousThrow = "R",
+            worldThrow = "S",
+            worldRested = false,
+            contactElapsed = 1.0,
+        })
+        expect(s.reeling).toBe(true)
+        expect(s.glyph ~= nil).toBeTruthy()
     end)
 
     test("lands on the new throw once the drum rests", function()
-        local s =
-            M.throwState({ phase = "REVEAL", previousThrow = "R", worldThrow = "S", worldRested = true })
-        expect(s.spinning).toBe(false)
+        local s = M.throwState({
+            phase = "REVEAL",
+            previousThrow = "R",
+            worldThrow = "S",
+            worldRested = true,
+            contactElapsed = 2.0,
+        })
+        expect(s.reeling).toBe(false)
         expect(s.glyph).toBe("S")
     end)
 
     test("shows blank when there is no previous round to show", function()
         expect(M.throwState({ phase = "OPEN" }).glyph).toBe(nil)
+    end)
+
+    -- The cycling glyph is a function of elapsed time alone; it is never handed the answer, so it
+    -- cannot leak one. Two different worldThrows must produce identical cycling output.
+    test("cannot leak the answer while cycling", function()
+        local a =
+            M.throwState({ phase = "REVEAL", worldThrow = "R", worldRested = false, contactElapsed = 0.7 })
+        local b =
+            M.throwState({ phase = "REVEAL", worldThrow = "S", worldRested = false, contactElapsed = 0.7 })
+        expect(a.glyph).toBe(b.glyph)
+    end)
+
+    test("paces against the wheel's travel, not the strike-to-rest window", function()
+        -- TURN_SECONDS is contact-to-rest (3.0); SETTLE_SECONDS includes the 0.45 swing (3.45).
+        expect(DrumStep.TURN_SECONDS < DrumStep.SETTLE_SECONDS).toBeTruthy()
+        expect(DrumStep.TURN_SECONDS).toBe(DrumStep.SETTLE_SECONDS - DrumStep.STRIKE_SWING_SECONDS)
     end)
 end)

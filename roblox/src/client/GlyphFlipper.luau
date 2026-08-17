@@ -7,7 +7,11 @@
 -- point -- the same shape appears on the drum, the lanterns, the HUD and here, so a player learns
 -- one vocabulary rather than four.
 --
--- The fold illusion is FlapBoard's: a Y-squash tween, so the two read as the same machine.
+-- The fold illusion is FlapBoard's, so the two read as the same machine.
+--
+-- IT OWNS NO CLOCK. It used to run its own spin loop on a private interval, which is precisely how
+-- it ended up 2.45s ahead of the HUD's ring. The caller now hands it a glyph every frame, computed
+-- from the same ReelStep the ring uses, so the two cannot drift.
 local TweenService = game:GetService("TweenService")
 
 local GlyphFlipper = {}
@@ -33,9 +37,6 @@ local SQUASHED = UDim2.fromScale(1, 0.05)
 -- the seam on top of everything.
 local TILE_Z, GLYPH_Z, OUTLINE_Z, CORE_Z, SEAM_Z = 2, 3, 3, 4, 5
 local FLIP_SECONDS = 0.04
--- A big flap turns slower than a text cell. At ~7 faces/second a 5.45s spin is about 38 turns:
--- clearly in motion, never a blur, and the landing reads as a stop rather than a fade.
-local SPIN_INTERVAL = 0.14
 
 local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { [string]: Frame }
     local gui = Instance.new("SurfaceGui")
@@ -95,7 +96,6 @@ function GlyphFlipper.new(cfg: Config)
         _cfg = cfg,
         _faces = {},
         _shown = nil :: string?,
-        _spinning = false,
         _dead = false,
     }, GlyphFlipper)
     for _, face in cfg.faces or { Enum.NormalId.Front } do
@@ -127,31 +127,8 @@ function GlyphFlipper.show(self: any, symbol: string?)
     end
 end
 
--- Continuous motion from the moment the countdown expires until the drum lands it. The CALLER
--- decides when to stop -- `:show()` on the drumRest cue -- so this can never outrun the drum by
--- landing on its own schedule.
-function GlyphFlipper.spin(self: any, on: boolean)
-    if self._dead or self._spinning == on then
-        return
-    end
-    self._spinning = on
-    if not on then
-        return
-    end
-    task.spawn(function()
-        local i = 0
-        while self._spinning and not self._dead do
-            i += 1
-            local syms = self._cfg.symbols
-            self:show(syms[(i % #syms) + 1])
-            task.wait(SPIN_INTERVAL)
-        end
-    end)
-end
-
 function GlyphFlipper.destroy(self: any)
     self._dead = true
-    self._spinning = false
     for _, gui in self._cfg.part:GetChildren() do
         if gui:IsA("SurfaceGui") and gui.Name == "FlapFace" then
             gui:Destroy()
