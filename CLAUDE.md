@@ -139,7 +139,9 @@ Three swappable arena renderers selected by `visualTier` in App.tsx:
 
 ### Mobile/iOS caveats
 
-Recent work centers on iOS Safari: video playback persistence, audio unlock/mute, and viewport scrolling (see recent commits). Be careful with changes to `VideoArena.tsx` and the AudioContext handling in `useGameLoop.ts` — they contain Safari-specific workarounds.
+Recent work centers on iOS Safari: video playback persistence, viewport scrolling, and the audio **mute/volume** settings. Be careful with changes to `VideoArena.tsx` and the AudioContext handling in `useGameLoop.ts`.
+
+**Corrected 2026-08-17:** this line used to claim audio *unlock* was among the work done. It was not — there was no gesture unlock at all, and the gong had been inaudible since it was added (`3c04337`), because its AudioContext was created inside a socket callback and so started suspended. A one-shot `pointerdown`/`touchend`/`keydown` unlock now exists in `useGameLoop.ts`; the Safari-specific parts are the `webkitAudioContext` fallback and the one-sample silent buffer iOS needs started inside the gesture.
 
 ## Deployment
 

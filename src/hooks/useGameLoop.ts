@@ -204,23 +204,61 @@ export function useGameLoop() {
         return rulesCalculateResult(player, world)
     }, [])
 
+    const ensureAudioContext = useCallback((): AudioContext | null => {
+        if (!audioCtxRef.current) {
+            const AudioContextClass = window.AudioContext
+                || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+            if (!AudioContextClass) return null
+            audioCtxRef.current = new AudioContextClass()
+        }
+        const ctx = audioCtxRef.current
+        if (ctx.state === 'suspended') void ctx.resume()
+        return ctx
+    }, [])
+
+    // WEBAUDIO IS SILENT UNTIL THE USER HAS TOUCHED THE PAGE, AND NOTHING HERE EVER DID THAT.
+    //
+    // The gong has been inaudible since it was added (`3c04337`). The AudioContext was created
+    // lazily inside playGongSound, which only ever runs from a socket `reveal` event -- never a
+    // user gesture -- so the browser started it `suspended`. The resume() beside it is called
+    // from that same network callback, which is not a gesture either, so it does not unlock.
+    //
+    // And even where a resume eventually succeeded it was too late: `now = ctx.currentTime` was
+    // read and the whole six-second envelope scheduled immediately after, while the context was
+    // still suspended and its clock not advancing. The gong was scheduled into a timeline that
+    // had not started.
+    //
+    // So: unlock on the first real gesture, once. iOS additionally requires a source to be
+    // STARTED inside the gesture, not merely a resume() -- hence the one-sample silent buffer.
+    useEffect(() => {
+        const events = ['pointerdown', 'touchend', 'keydown'] as const
+        const remove = () => events.forEach(e => document.removeEventListener(e, unlock))
+        function unlock() {
+            const ctx = ensureAudioContext()
+            if (!ctx) return
+            const src = ctx.createBufferSource()
+            src.buffer = ctx.createBuffer(1, 1, ctx.sampleRate)
+            src.connect(ctx.destination)
+            src.start(0)
+            remove()
+        }
+        events.forEach(e => document.addEventListener(e, unlock))
+        return remove
+    }, [ensureAudioContext])
+
     // SFX: Modern Gong synthesis (FM + Noise)
     const playGongSound = useCallback(() => {
         if (!audioEnabledRef.current) return
 
         try {
-            if (!audioCtxRef.current) {
-                const AudioContextClass = window.AudioContext
-                    || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-                if (!AudioContextClass) return
-                audioCtxRef.current = new AudioContextClass()
-            }
-
-            const ctx = audioCtxRef.current
+            const ctx = ensureAudioContext()
             if (!ctx) return
 
-            if (ctx.state === 'suspended') {
-                ctx.resume()
+            // Scheduling into a suspended context is what made this silently do nothing for
+            // months: the notes get written to a clock that is not running. Bail loudly instead.
+            if (ctx.state !== 'running') {
+                console.warn('[SFX] audio context is', ctx.state, '- gong skipped until the page is touched')
+                return
             }
 
             const now = ctx.currentTime
@@ -293,7 +331,7 @@ export function useGameLoop() {
         } catch (e) {
             console.warn('[SFX] Could not play gong:', e)
         }
-    }, [])
+    }, [ensureAudioContext])
 
     const handleServerReveal = useCallback((serverRound: ServerRound) => {
         // Trigger SFX
