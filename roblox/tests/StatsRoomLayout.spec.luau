@@ -33,11 +33,26 @@ describe("StatsRoomLayout", function()
     -- THE RULE THE MODULE EXISTS FOR. Before the 2026-08-17 inversion a board declared its own
     -- width and a column count independently, and the flap size fell out of the division --
     -- which is how one room ended up with flaps from 0.375 to 2.375 studs wide.
-    test("every board is an exact whole number of its own flaps", function()
+    test("every board's size is exactly its modules, summed", function()
         for _, b in L.BOARDS do
-            expect(math.abs(b.w - b.cols * b.flap.w) < 1e-6).toBeTruthy()
+            local units = L.widthUnits(b.cols, b.colWidths)
+            expect(math.abs(b.w - units * b.flap.w) < 1e-6).toBeTruthy()
             expect(math.abs(b.h - b.rows * b.flap.h) < 1e-6).toBeTruthy()
         end
+    end)
+
+    -- A printed separator is not a flap and should not take a flap's worth of wall. The width is
+    -- still DERIVED -- it is the sum of the column weights rather than a plain multiplication --
+    -- so a board still cannot be declared at a size its own columns do not add up to.
+    test("the printed colon column is half a flap wide, and the board is 3.5 modules", function()
+        local c = byId("roundClock")
+        expect(c.colWidths).toEqual({ 1, 0.5, 1, 1 })
+        expect(L.widthUnits(c.cols, c.colWidths)).toBe(3.5)
+        expect(math.abs(c.w - 3.5 * L.FLAPS.round.w) < 1e-6).toBeTruthy()
+    end)
+
+    test("a board without column weights is still a plain multiple", function()
+        expect(L.widthUnits(26, nil)).toBe(26)
     end)
 
     -- The invariant that actually matters: no board may invent a size. Every one has to come

@@ -106,6 +106,11 @@ export type Board = {
     rows: number,
     cols: number,
     flap: Flap,
+    -- Per-column width MULTIPLIERS, defaulting to 1 each. A printed separator is not a flap and
+    -- should not occupy a flap's worth of wall (owner, 2026-08-17: the colon column "should be
+    -- narrower by 50%"). The board's width is the SUM of these times the module, so the rule that
+    -- dimensions are derived still holds -- it is just no longer a plain multiplication.
+    colWidths: { number }?,
     shuttered: boolean?,
 }
 
@@ -121,6 +126,7 @@ type Decl = {
     cols: number,
     along: number,
     y: number,
+    colWidths: { number }?,
     shuttered: boolean?,
 }
 
@@ -217,6 +223,9 @@ local DECLS: { Decl } = {
         flap = ROUND,
         rows = 1,
         cols = 4,
+        -- The colon is printed, not flipped, so it takes half a flap's width rather than a whole
+        -- one: 3.5 modules of wall, not 4.
+        colWidths = { 1, 0.5, 1, 1 },
         along = 71.20,
         y = 129.0,
     },
@@ -279,6 +288,17 @@ end
 
 -- Declaration -> world. The ONLY place a board's dimensions are computed, so a board can never
 -- carry a size its own grid does not produce.
+function StatsRoomLayout.widthUnits(cols: number, colWidths: { number }?): number
+    if not colWidths then
+        return cols
+    end
+    local total = 0
+    for i = 1, cols do
+        total += colWidths[i] or 1
+    end
+    return total
+end
+
 local function resolve(d: Decl): Board
     local site = StatsRoomLayout.SITES[d.site]
     local plane = StatsRoomLayout.planeFor(site, d.wall)
@@ -291,11 +311,12 @@ local function resolve(d: Decl): Board
         x = if horizontal then d.along else off,
         y = d.y,
         z = if horizontal then off else d.along,
-        w = d.cols * d.flap.w,
+        w = StatsRoomLayout.widthUnits(d.cols, d.colWidths) * d.flap.w,
         h = d.rows * d.flap.h,
         rows = d.rows,
         cols = d.cols,
         flap = d.flap,
+        colWidths = d.colWidths,
         shuttered = d.shuttered,
     }
 end
@@ -364,7 +385,8 @@ function StatsRoomLayout.check(): (boolean, { string })
         end
         -- The rule this module exists for. A derived dimension cannot drift, but it CAN be
         -- broken by someone reaching past resolve(), so it is asserted rather than assumed.
-        if math.abs(b.w - b.cols * b.flap.w) > 1e-6 or math.abs(b.h - b.rows * b.flap.h) > 1e-6 then
+        local units = StatsRoomLayout.widthUnits(b.cols, b.colWidths)
+        if math.abs(b.w - units * b.flap.w) > 1e-6 or math.abs(b.h - b.rows * b.flap.h) > 1e-6 then
             table.insert(failures, `{b.id} is not an exact multiple of its flap`)
         end
     end

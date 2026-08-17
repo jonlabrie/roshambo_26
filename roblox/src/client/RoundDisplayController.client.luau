@@ -44,6 +44,18 @@ local lastClock: string? = nil
 local contactAt: number? = nil
 local reelSpent = false
 
+-- Read back from the layout rather than duplicated here: the tool writes only BoardId/Rows/Cols
+-- as attributes, and a second copy of the weights is a second thing to keep in step.
+local function boardColWidths(part: BasePart): { number }?
+    local id = part:GetAttribute("BoardId")
+    for _, b in Layout.BOARDS do
+        if b.id == id then
+            return b.colWidths
+        end
+    end
+    return nil
+end
+
 local function register(part: Instance)
     if not part:IsA("BasePart") then
         return
@@ -62,6 +74,9 @@ local function register(part: Instance)
             -- gets a drum of its own. Nothing here can roll through the alphabet.
             drums = RoundDisplay.drums(),
             static = RoundDisplay.statics(),
+            -- The board's own column weights, so the renderer's grid and the layout's declared
+            -- width can never disagree about how wide the printed colon is.
+            colWidths = boardColWidths(part),
         })
     elseif id == "roundThrow" and not flipper then
         flipper = GlyphFlipper.new({

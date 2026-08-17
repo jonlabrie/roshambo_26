@@ -39,6 +39,10 @@ export type Config = {
     -- flap. These columns get no tile, no seam and no fold: just ink on the dark frame, and the
     -- planner skips them entirely so they can never be asked to turn.
     static: { [number]: string }?,
+    -- Per-column width multipliers, defaulting to 1. Lets a printed separator take half a flap's
+    -- width instead of a whole one; the grid is no longer uniform, so cells are positioned
+    -- cumulatively rather than by index.
+    colWidths: { number }?,
 }
 
 local PAD = 0.08 -- inset fraction within each cell
@@ -70,7 +74,14 @@ local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { { TextLabel } 
     gui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
     gui.CanvasSize = Vector2.new(cfg.metrics.canvasW, cfg.metrics.canvasH)
     gui.Parent = cfg.part
-    local cellW, cellH = 1 / cfg.cols, 1 / cfg.rows
+    -- Cumulative column layout. With uniform widths this reduces exactly to the old
+    -- `(c - 1) / cols`, so nothing changes for a board that does not ask for it.
+    local units, offsets = 0, {}
+    for c = 1, cfg.cols do
+        offsets[c] = units
+        units += (cfg.colWidths and cfg.colWidths[c]) or 1
+    end
+    local cellH = 1 / cfg.rows
     local grid: { { TextLabel } } = {}
     for r = 1, cfg.rows do
         grid[r] = {}
@@ -78,9 +89,10 @@ local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { { TextLabel } 
             local printed = cfg.static and cfg.static[c]
 
             local tile = Instance.new("Frame")
-            tile.Size = UDim2.fromScale(cellW * (1 - PAD), cellH * (1 - PAD))
-            tile.Position =
-                UDim2.fromScale((c - 1) * cellW + cellW * PAD / 2, (r - 1) * cellH + cellH * PAD / 2)
+            local w = (((cfg.colWidths and cfg.colWidths[c]) or 1) / units)
+            local x = offsets[c] / units
+            tile.Size = UDim2.fromScale(w * (1 - PAD), cellH * (1 - PAD))
+            tile.Position = UDim2.fromScale(x + w * PAD / 2, (r - 1) * cellH + cellH * PAD / 2)
             -- A printed column carries no flap face: the separator reads as painted on the frame
             -- between two flaps rather than as a third flap that happens never to move.
             tile.BackgroundTransparency = if printed then 1 else 0
