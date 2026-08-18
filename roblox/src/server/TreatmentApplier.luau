@@ -121,6 +121,9 @@ function TreatmentApplier:_buildBuilding(
         self._structureOps,
         prefabName
     ) :: Model
+    -- fresh clone, so every bay starts homed (no ShojiOpen attribute yet); applyShoji parks each
+    -- screen where the loadout left it.
+    self._structureOps.applyShoji(model, teahouse.loadout.shojiOpen)
     model.Name = "Structure"
     -- (no ScaleTo: sizes are authored per-size prefabs, not a scaled base)
     if not treatment.lit then

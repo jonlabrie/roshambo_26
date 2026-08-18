@@ -1485,8 +1485,11 @@ SetBackDoor.OnServerEvent:Connect(function(player, payload)
         -- merge into a NEW copy of the occupied size's loadout (don't alias the stash pre-persist)
         local newLoadout = table.clone(house.loadout)
         newLoadout.wallBays = newWallBays
-        -- live, server-authoritative re-render (replicates to every client)
+        -- live, server-authoritative re-render (replicates to every client). Same structure
+        -- instance as last render, so applyShoji's attribute-diff keeps every open screen where
+        -- the player left it rather than snapping every screen shut.
         StructureOps.applyBays(structure, WallBays.resolve(manifest.bays, newWallBays))
+        StructureOps.applyShoji(structure, newLoadout.shojiOpen)
         house.loadout = newLoadout
         -- rebuild paths (RequestPurchase upgrade, SetDisplay, buy-to-claim) render from this stash,
         -- not from playerHouse; keep it in sync or the next rebuild reverts this door.
