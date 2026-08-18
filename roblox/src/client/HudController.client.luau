@@ -107,7 +107,11 @@ local TOUCH = UserInputService.TouchEnabled and not UserInputService.KeyboardEna
 -- pixel offset guessed against a desktop viewport is wrong on every phone. Numbers only this file
 -- uses stay here.
 local JUMP_CLEARANCE = HudLayout.JUMP_CLEARANCE
-local EDGE = HudLayout.EDGE
+-- ⚠ `HudLayout.EDGE` IS NO LONGER READ IN THIS FILE, and that is not an invitation to shrink it.
+-- The toast was its last reader here and moved onto the throw cluster on 2026-08-18 (see the
+-- Toast section). The constant is still load-bearing elsewhere: `HudLayout.CLUSTER_TOP_FROM_BOTTOM`
+-- and OnboardingController's static-anchor band both add it, so changing it there still drags
+-- those toward the live buttons — the unsafe direction this file's EDGE_BOTTOM exists to avoid.
 -- The cluster's own bottom margin — deliberately a SEPARATE constant from EDGE, not a smaller
 -- EDGE, even though EDGE's only other surviving read in this file is the toast's TOP offset (the
 -- throw cluster/bank button/ring/plate all register horizontally off `1 - JUMP_CLEARANCE`, never
@@ -1366,11 +1370,24 @@ local FLASH_PERIOD = 0.5
 -- ===== Toast: the transient notice that replaced the persistent prose ticker =====
 local toast = Instance.new("TextLabel")
 toast.Name = "Toast"
-toast.AnchorPoint = Vector2.new(0.5, 0)
--- The plate has vacated top-centre entirely (first for the right margin, then the bottom row),
--- so there is nothing left to offset against up here. Sits at EDGE, the band the plate vacated.
-toast.Position = UDim2.new(0.5, 0, 0, EDGE)
-toast.Size = UDim2.new(0.5, 0, 0, 26)
+-- ⚠ OVER THE THROW BUTTONS, NOT TOP-CENTRE (owner, 2026-08-18). It sat at top-centre, which is
+-- exactly where the familiar flies: the bird's whole premise is that the space above a player's
+-- head is the one region never occluded by another avatar, and the toast was occluding it from
+-- the front. A win spirals UP into the notice announcing it.
+--
+-- The throw cluster is the right home precisely because it is dead ground in that moment: the
+-- round has just resolved, nobody needs a throw button for several seconds, and the toast is gone
+-- well before they do. Covering a live control would be unacceptable; covering one that is
+-- briefly inert is free real estate.
+--
+-- Registered off the SAME expression the ring uses (`1 - JUMP_CLEARANCE`, and the button row's own
+-- bottom edge at `EDGE_BOTTOM + AREA_H - BTN_H`), so it tracks the cluster if the cluster moves
+-- rather than needing its own copy of the layout.
+toast.AnchorPoint = Vector2.new(1, 1)
+toast.Position = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE_BOTTOM + AREA_H - BTN_H))
+toast.Size = UDim2.fromOffset(AREA_W, BTN_H)
+-- Above the buttons it covers, and above their halos.
+toast.ZIndex = 20
 toast.AutomaticSize = Enum.AutomaticSize.Y -- a long notice wraps and grows rather than clipping
 toast.BackgroundColor3 = WASHI
 toast.BackgroundTransparency = 0.05
@@ -1378,6 +1395,7 @@ toast.BorderSizePixel = 0
 toast.TextColor3 = INK_CREAM
 toast.TextSize = 15
 toast.TextWrapped = true
+toast.TextXAlignment = Enum.TextXAlignment.Center
 toast.Font = Enum.Font.Gotham
 toast.Text = ""
 toast.Visible = false
