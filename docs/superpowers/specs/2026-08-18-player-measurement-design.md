@@ -231,12 +231,16 @@ first, so they are sequenced rather than parallel:
   a prerequisite for gate 1 but is its own piece of work, with its own design questions (how
   many bots, what patterns, how legible).
 - Season resets, decay, promotion/relegation between registers.
+- **Tournament windows** — player- and group-created timed competitions to create and join
+  (owner, 2026-08-18: "should be a thing, but beyond the scope here"). Recorded on the backlog.
 
 ## 10. Open questions
 
-- **Which window does the 番付 rank?** Rolling 7-day is assumed throughout; a calendar week
-  gives a shared reset moment ("the board turns over Sunday") at the cost of a partial first
-  day. Not decided.
+- ~~Which window does the 番付 rank?~~ **DECIDED (owner, 2026-08-18): a ROLLING 7 days.** The
+  calendar week's advantage was a shared reset moment; the cost is that a Monday boundary wipes
+  a run that started on Sunday evening, so *when* you play matters as much as how well.
+  Rolling rewards dropping in at any hour and lets a hot streak count the moment it happens.
+  This overrides the standing "RANK uses calendar windows" comment in `windows.ts`.
 - **Does NERVE use median or mode of `streakAtBank`?** Median is stated above; mode may read
   better to a player ("you usually bank at 3"). Cheap to change; decide at the Studio gate.
 - **What happens to a qualified player who stops playing?** They age out of a rolling window

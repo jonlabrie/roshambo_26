@@ -12,6 +12,12 @@
 
 ## Global Constraints
 
+- **Every window in this plan is a ROLLING 7 DAYS**, `rollingWindow(now, WEEK_MS)` — never
+  `calendarWeekUTC`. Owner, 2026-08-18: a rolling window rewards dropping in at any hour and
+  lets a lucky streak count immediately, where a calendar boundary can wipe a run that started
+  on the wrong evening. This **overrides the standing comment in `windows.ts`** ("RANK uses
+  calendar windows"), which Task 1 corrects. The board and the 札 must use the SAME window, or
+  a player qualifies on one surface and not the other.
 - **A rate board must never render an unqualified player.** Qualification is `throws >= 360` inside the window. `QUALIFY.week` becomes 360; `month`/`career` stay 1000.
 - **The READ column is withheld entirely while `TEST_MODE` is on.** Under TEST_MODE the World Throw is a fixed R→P→S cycle, so a win rate measures who spotted the pattern. This is an operational gate — a server flag on the wire — NOT a per-round one. Recording per-round derivation provenance is the honest long-term answer and belongs to the out-of-scope "make the world real" work; doing it here would mean a `Round` schema change and a per-row join. **Say so in the code comment**; do not silently simplify.
 - **Never sum `PlayerRound.pointsDelta` for earnings.** On a WIN it records the new POT, not the gain. Earnings come from `BankEvent.amount`. The single exception already in the codebase is `forfeitsInWindow`, which filters to LOSS rows where the column *is* the forfeited pot.
@@ -104,6 +110,19 @@ In `server/src/windows.ts`, change `week: 350` to:
     // REVEAL 7 = 60s exactly, so 360 throws is 360 MINUTES. "Play six hours in a week and you
     // are on the board" is a rule a player can hold, and it is printed on the board itself.
     week: 360,
+```
+
+- [ ] **Step 3b: Correct the window doctrine while you are in the file**
+
+`windows.ts` says "RANK uses calendar windows — a standing has to name a period players can
+agree on." The owner ruled otherwise on 2026-08-18. Replace that comment:
+
+```ts
+// RANK uses a ROLLING window (owner, 2026-08-18). The calendar argument was that a standing
+// should name a period players agree on — but a Monday boundary wipes a run that started on
+// Sunday evening, and it makes WHEN you play matter as much as how well. Rolling rewards
+// dropping in at any hour and lets a hot streak count the moment it happens.
+// `calendarDayUTC`/`calendarWeekUTC` stay: records boards still name a day.
 ```
 
 - [ ] **Step 4: Add the query and the rate**
@@ -474,7 +493,7 @@ In `server/src/routes/statsV1.ts`:
 
     router.get('/board', async (req, res) => {
         try {
-            const w = calendarWeekUTC(new Date());
+            const w = rollingWindow(new Date(), WEEK_MS);
             const minThrows = Number(req.query.minThrows) || QUALIFY.week;
             const rows = await qualifiedBoard(w, minThrows, 10);
             const names = await nameUsers(rows.map(r => r.userId));
@@ -499,7 +518,9 @@ In `server/src/routes/statsV1.ts`:
     });
 ```
 
-In the existing `/player/:robloxUserId` handler, after `rates`:
+In the existing `/player/:robloxUserId` handler — **and change its `calendarWeekUTC(new Date())`
+to `rollingWindow(new Date(), WEEK_MS)` in the same edit**, so the 札 and the board agree about
+who is qualified — after `rates`:
 
 ```ts
             const nerve = median(await bankDepths(w, user._id));
@@ -736,7 +757,7 @@ function StatsBoardModel.banzukeSections(board: any?, leaders: { any }?): { Sect
         end
         return {
             { title = "CAREER BANKED", entries = entries },
-            { title = `RANKED AT {b.minThrows or 360} THROWS/WK`, entries = {} },
+            { title = `{b.minThrows or 360} THROWS PUTS YOU HERE`, entries = {} },
         }
     end
     local entries: { Entry } = {}
@@ -749,9 +770,9 @@ function StatsBoardModel.banzukeSections(board: any?, leaders: { any }?): { Sect
     -- that a blind player scores 33 -- and every reader is in that position the first time. A
     -- second section with no entries renders as a bare line under the ranking. Only when the
     -- read column is actually showing: without it the line explains a column that is not there.
-    local sections = { { title = "PTS/THROW - WEEK", entries = entries } }
+    local sections = { { title = "POINTS PER THROW - 7 DAYS", entries = entries } }
     if b.worldIsCrowd then
-        table.insert(sections, { title = "WORLD TAKES 33 IN 100", entries = {} })
+        table.insert(sections, { title = "LUCK ALONE WINS 33 IN 100", entries = {} })
     end
     return sections
 end
@@ -769,17 +790,17 @@ function StatsBoardModel.depthSections(depths: { number }?): { Section }
         local bars = if max > 0 then math.floor(n / max * 5 + 0.5) else 0
         table.insert(entries, { name = tostring(i) .. string.rep("#", bars), figure = tostring(n) })
     end
-    return { { title = "BANKS AT", entries = entries } }
+    return { { title = "BANK AFTER", entries = entries } }
 end
 ```
 
 Extend `fudaSections` with three rows after `THROWS`, using the same `Entry` shape:
 
 ```lua
-                { name = "READ", figure = if p.week and p.week.winRate then pct(p.week.winRate) else "-" },
-                { name = "PTS/THROW", figure = if p.week and p.week.pointsPerThrow
+                { name = "BEAT WORLD", figure = if p.week and p.week.winRate then pct(p.week.winRate) else "-" },
+                { name = "PER THROW", figure = if p.week and p.week.pointsPerThrow
                     then string.format("%.1f", p.week.pointsPerThrow) else "-" },
-                { name = "BANKS AT", figure = if p.week and p.week.nerve
+                { name = "YOU BANK AT", figure = if p.week and p.week.nerve
                     then StatsBoardModel.figure(p.week.nerve) else "-" },
 ```
 

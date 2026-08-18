@@ -85,6 +85,30 @@ on a known root, and emit a WARNING for an unresolvable partial. Adding `server/
 Not urgent — the check is a floor, not a net, and [[wiki-currency]] says so. Recorded so the
 limitation is known rather than assumed away.
 
+## Tournament windows — player- and group-created competitions
+
+Owner, 2026-08-18, while settling the measurement basis: *"I think timed 'tournament windows'
+should be a thing for individuals and groups to be able to create and join, but that's beyond
+the scope here."* Explicitly out of scope for
+`docs/superpowers/specs/2026-08-18-player-measurement-design.md` and recorded so it is not lost.
+
+**What already exists that this would build on.** Every stats query in `server/src/stats.ts`
+takes a `Window { from, to }` and nothing else — `qualifiedBoard(w, minThrows, limit)` would
+rank a tournament exactly as it ranks a rolling week, with no new aggregation. That is the whole
+reason the vocabulary in `server/src/windows.ts` was centralised, and it means a tournament is
+mostly a *membership and lifecycle* problem, not a statistics one.
+
+**What it would need.** A tournament record (owner, window, invited/joined set, whether it is
+open or private); a way to create and join one in-world; a board that can show a window other
+than the room's default; and a decision on qualification — the 360-throw floor is derived for a
+7-day window and would be wrong for a 2-hour tournament, where the honest floor is far lower and
+the result correspondingly noisier. **A short tournament cannot measure skill** (see the spec's
+§2(e): at 60 throws a blind player's win rate lands anywhere between 23% and 43%), so a
+tournament is a *contest*, not a ranking, and its copy must not pretend otherwise.
+
+Interacts with teahouse access control (the invite-by-username machinery already resolves and
+persists userIds, capped at 50) and with the F&F out-of-scope guest-pass work.
+
 ## Meta-game spec (approved — the design ceiling for the economy)
 
 `docs/superpowers/specs/2026-07-04-roshambo-metagame-design.md`, approved `4d9b9c6`,
