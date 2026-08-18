@@ -39,7 +39,7 @@ rounds skippable, no penalty) — hangout is the product.
    awarded at settlement; flex via teahouse banner-pole flag + avatar ribbon/sash;
    earn-only. Carries the parked economy-API defects (a)–(c) in [[parked-defects]]. Any badge that claims
    SKILL depends on (h) being ACTIVE, not merely fixed; volume badges do not.
-7. **Statistics** — open: personal → maximal HUD; global/social → the 番付 room, now BORED
+7. **Statistics** — open (measurement BUILT 2026-08-18, awaiting the Studio gate): personal → maximal HUD; global/social → the 番付 room, now BORED
    west of the apparel shop ([[stats-room]]); the old Overlook siting (73,110,19) is
    superseded. Walls and stats specced in
    `docs/superpowers/specs/2026-08-16-stats-room-design.md`. Defect (h) is FIXED (2026-08-16) — the

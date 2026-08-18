@@ -396,3 +396,24 @@ Owner looked and passed it ("looks fine"). The pre-gate risk — two adjacent co
 different drums at once — does not read as a defect. Item 7's drum thread is closed; the
 remaining item-7 work is the deferred §6.2 pair (the printed 番付 sheet, the avatar plinths).
 See [[stats-room]].
+
+## [2026-08-18] ship | The room learns to say who is playing best
+
+Item 7's measurement basis, built end to end from
+`docs/superpowers/specs/2026-08-18-player-measurement-design.md`: READ (wins ÷ throws, baseline
+33.3%), YIELD (banked ÷ throws, what the banzuke ranks on) and NERVE (median `streakAtBank`,
+never ranked). All three read rows the server already wrote — no schema change.
+
+Qualification is 360 throws in a **rolling** 7 days: six hours exactly, and above the ~356 the
+standard error needs. The rolling ruling overrides `windows.ts`'s "RANK uses calendar windows".
+The read column is gated on `TEST_MODE` being off and ships blank until it is. `skillFuture`
+un-shutters to carry the room's bank-depth histogram; the 札 gains `RANK 14 OF 22`.
+
+The design rests on simulation, and corrected a wrong first pass: staking is +EV at the margin,
+but an always-staker realises nothing, so EV never selects a stopping point. Bank-vs-Stake is a
+real decision, and the owner was right that points-per-throw measures something batting average
+cannot — a blind-but-bold player out-earns a skilled-but-timid one 85% of the time.
+
+422 server tests, 1394 Luau. **Not yet gated** — the owner has not seen it in Studio, and
+`skillFuture` opening is a geometry change needing `buildStatsBoards.luau` re-run and the place
+saved. See [[stats-room]].

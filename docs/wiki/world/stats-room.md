@@ -174,6 +174,40 @@ costs rung 1 nothing.
 is what lets one renderer serve both. `FlapScheduler.plan` caches each drum's character array and
 reverse index, because a per-transition caller plans one cell per call rather than one line.
 
+### What the boards measure (built 2026-08-18, not yet gated)
+
+Three numbers, from rows the server already wrote — no schema change, no new capture. Basis and
+evidence: `docs/superpowers/specs/2026-08-18-player-measurement-design.md`.
+
+| board says | is | source |
+|---|---|---|
+| `BEAT WORLD` | wins ÷ throws. A blind player scores **33.3%** exactly, so anything above is edge | `PlayerRound.playerResult` |
+| `PER THROW` | points banked ÷ throws — **what the banzuke ranks on** | `BankEvent.amount` |
+| `YOU BANK AT` | median `streakAtBank` — how deep you ride before collecting | `BankEvent.streakAtBank` |
+
+**Yield ranks; the read sits beside it.** Yield is the only figure that captures the compounding
+— a strong reader riding deep earns many times what a blind one riding as deep does, a gap win
+rate alone shows as a few percentage points. The read column is what says whether someone is up
+there on skill or on nerve.
+
+**Bank depth is never ranked.** A leaderboard of "who rides deepest" crowns the player who rides
+past their own read and banks nothing. It is a histogram on `skillFuture` (which is no longer
+shuttered) and one row on the 札.
+
+**Two gates, and both must hold before the read column renders:**
+
+1. `TEST_MODE` off — otherwise the World Throw is a fixed R→P→S cycle and a win rate measures who
+   spotted the pattern. **Closed in every environment today**, so the column ships blank.
+2. **360 throws in a rolling 7 days** to appear at all. Rounds are 60s exactly, so that is six
+   hours of throwing. Printed on the board as the rule: `360 THROWS PUTS YOU HERE`.
+
+⚠ **The window is ROLLING, not calendar** (owner, 2026-08-18) — a Monday boundary would wipe a
+run that started Sunday evening. This overrides the older "RANK uses calendar windows" doctrine;
+records boards stay calendar, because "biggest bank of the day" names a day.
+
+The 札 carries `RANK 14 OF 22`, because the banzuke is ten rows and the reader who most wants to
+know is the one in eleventh.
+
 ### Where things go
 
 The vestibule's two interior side walls are better real estate than the cavern's
