@@ -76,6 +76,17 @@ paper is the ivory flap face, which every board already has, and the wood is wha
 surrounds it. Two frame colours made the room read as two rooms. The slips stay distinct
 by being a finer module, which is the honest difference.
 
+**And every board is CASED in an inch of it** (owner, 2026-08-17). Four rails per board,
+a shade darker than the board itself (RGB 52,40,27, plain `Wood` — a plank texture tiled
+onto a one-inch face is noise), built by `tools/studio/buildStatsBoards.luau`. An inch is
+a *twelfth* of a stud here. The rails sit OUTSIDE the board's footprint, never over it:
+the flap grid runs edge to edge, so a frame laid on the face would eat a strip of the
+first and last cell in every row. Depth is cut to whatever stands furthest forward on
+that board — the board face for a GUI board, `FlapUnit`'s leaf face (0.37) for the round
+display, the padlock (0.56) for the shuttered panel — so the moulding reads as a case
+around the mechanism rather than a line painted on the wall behind it. Place-only parts:
+save/publish, never `rojo build`.
+
 ### Typography
 
 Two faces, and they are chosen for different jobs rather than for consistency.

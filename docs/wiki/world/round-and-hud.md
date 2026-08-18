@@ -115,6 +115,17 @@ half a facet) — not a time constant. The glyph reel is `ReelStep.luau`.
 - Standing check for any client-file dispatch: no gate can see the Roblox UI —
   reconcile every `HudLayout.X` read against real exports; 970 green tests say
   nothing about rendering.
+- **The centred "CHOOSE A THROW" panel is gone (owner, 2026-08-17: "it's just
+  annoying").** It was the only sinking element on the HUD that was not a control,
+  and it covered mid-screen at the moment the canyon is worth watching. Urgency now
+  lives entirely in the ring: red at `HudModel.ESCALATE_AT` (5 s, unchanged) plus the
+  countdown digit BLINKING on a half-second beat — `RingTimer.flashLit(secondsLeft,
+  0.5)`, phase-locked to the count itself rather than a wall clock, so each digit
+  arrives lit and goes dark halfway through its own second. The blink is gated on
+  `view.escalate`, NOT on the ring's red: the arming rule (preference switch, uniform
+  three-round backoff, silence once a throw is chosen) survives its carrier. The red
+  stays a fact about time and is never gated. `EventBus.DismissEscalation` is deleted
+  with the panel that fired it; `declinedThisRound` is now set by a back-out alone.
 
 ## Raw layer
 

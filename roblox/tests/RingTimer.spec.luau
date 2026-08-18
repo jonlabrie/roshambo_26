@@ -157,3 +157,37 @@ describe("RingTimer — the segmented ring is gone", function()
         expect((RingTimer :: any).segmentWidth).toBe(nil)
     end)
 end)
+
+describe("RingTimer.flashLit — the last five digits blink", function()
+    test("each digit is lit for the first half of its own second", function()
+        -- The displayed digit is ceil(secondsLeft), so a digit's life runs from x.999 down to
+        -- x.000. Lit for its first half-second, dark for its second: the blink is phase-locked
+        -- to the count rather than to a wall clock, so every digit starts the same way.
+        expect(RingTimer.flashLit(4.9, 0.5)).toBe(true)
+        expect(RingTimer.flashLit(4.6, 0.5)).toBe(true)
+        expect(RingTimer.flashLit(4.4, 0.5)).toBe(false)
+        expect(RingTimer.flashLit(4.1, 0.5)).toBe(false)
+    end)
+
+    test("the blink is the same in every second of the window", function()
+        for _, whole in { 5, 4, 3, 2, 1 } do
+            expect(RingTimer.flashLit(whole - 0.2, 0.5)).toBe(true)
+            expect(RingTimer.flashLit(whole - 0.8, 0.5)).toBe(false)
+        end
+    end)
+
+    test("the period is a parameter, not a hardcoded half-second", function()
+        -- A quarter-second period gives four states per second; the caller owns the tempo.
+        expect(RingTimer.flashLit(4.9, 0.25)).toBe(true)
+        expect(RingTimer.flashLit(4.6, 0.25)).toBe(false)
+        expect(RingTimer.flashLit(4.4, 0.25)).toBe(true)
+        expect(RingTimer.flashLit(4.1, 0.25)).toBe(false)
+    end)
+
+    test("a nonsense period leaves the digit lit rather than dark", function()
+        -- Failing OFF would hide the countdown entirely. A caller that passes zero gets a
+        -- steady digit, which is the pre-flash behaviour and never worse than it.
+        expect(RingTimer.flashLit(4.3, 0)).toBe(true)
+        expect(RingTimer.flashLit(4.3, -1)).toBe(true)
+    end)
+end)

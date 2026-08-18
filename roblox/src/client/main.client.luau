@@ -779,15 +779,6 @@ EventBus.HudPick.Event:Connect(function(value: string)
     publish()
 end)
 
--- The escalation overlay's own tap. A dismissal is not a decline in spirit, but the escalation
--- rule only cares that the player answered — HudModel.applyTap's "back out" branch already reads
--- `declinedThisRound` to mean "silenced for the round" (Task 2 widened the comment, not the
--- field), so this reuses it rather than adding a second flag the model would also have to check.
-EventBus.DismissEscalation.Event:Connect(function()
-    declinedThisRound = true
-    publish()
-end)
-
 -- No optimistic wallet edit: the pot indicator clears when ProfileUpdate lands with the banked
 -- wallet, and guessing here would flash the pot to 0 and back if the request failed.
 EventBus.HudBank.Event:Connect(function()

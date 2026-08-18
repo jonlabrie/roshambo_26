@@ -136,15 +136,8 @@ local TILE_GAP = if TOUCH then 4 else 6
 -- Size uses it too, so it is pulled out here rather than left as a repeated inline expression.
 local TAPE_W = TAPE_N * (TILE + TILE_GAP) - TILE_GAP
 local BADGE = if TOUCH then 7 else 9
-local ROW_GAP = HudLayout.ROW_GAP
 local AREA_W = 3 * BTN_W + 2 * BTN_GAP
 local AREA_H = if TOUCH then HudLayout.AREA_H_TOUCH else HudLayout.AREA_H
--- How far the bank+throws+tape cluster's own TOP edge sits from the screen bottom, at this tier —
--- the escalation overlay (below) clamps against this so it can never sit on top of the bank
--- button on a short viewport.
-local CLUSTER_TOP_FROM_BOTTOM = if TOUCH
-    then HudLayout.CLUSTER_TOP_FROM_BOTTOM_TOUCH
-    else HudLayout.CLUSTER_TOP_FROM_BOTTOM
 local TOAST_SECONDS = 4
 local TOAST_MAX = 6
 
@@ -1138,8 +1131,8 @@ end)
 -- The PWA's PieTimer, rebuilt. Roblox has no SVG and no radial fill, so the sweep is a track
 -- circle and two gradient-cut half-discs — RingTimer owns the angles, this owns the instances
 -- and paints what it is told. Green while there is time, red at HudModel.ESCALATE_AT, which is
--- the SAME constant the escalation prompt reads: two signals about one fact must not turn
--- urgent at different moments.
+-- the SAME constant the escalation rule reads: two signals about one fact must not turn urgent
+-- at different moments. The digit's blink (see "Escalation", below) is the second of them.
 --
 -- It takes the HAMBURGER's old slot: inboard-left of the throw cluster, bottom-aligned with the
 -- button row — `throwArea` spans [EDGE_BOTTOM, EDGE_BOTTOM + AREA_H] from the gui's bottom edge,
@@ -1177,7 +1170,7 @@ ring.Size = UDim2.fromOffset(RING_D, RING_D)
 -- The backing (owner's gate, design §5 "The ring sits on a backing"): a thin arc had nothing to
 -- hold it against the moving canyon. WASHI at 0.3 — exactly the hamburger's own fill before Task
 -- 5 deleted it (`ledgerButton.BackgroundColor3 = WASHI, BackgroundTransparency = 0.3`), and the
--- SAME fill the plate, the bank button and the escalation prompt all use. The ring replaced the
+-- SAME fill the plate and the bank button use. The ring replaced the
 -- hamburger, so it inherits its treatment rather than borrowing IVORY_DIM — that colour is the
 -- throw buttons' DISABLED state (see `-- starts disabled` below and `paintThrows`'s can't-throw
 -- branch), and painting the ring with it would read as a permanently greyed-out button beside
@@ -1351,142 +1344,24 @@ end)
 -- The bottom-edge hairline is gone (spec §7): the ring is the round's clock now, and with the
 -- hairline gone the cluster no longer needs to clear it — see EDGE_BOTTOM, above.
 
--- ===== Escalation: a large centred count, shown only when HudModel says so =====
--- THE ONE SINKING ELEMENT that is not a control. Everything else on this surface stays
--- Active = false, because every sinking pixel is a permanent hole in the camera-drag surface.
--- This is the exception the owner asked for: "the worst thing that could happen is it gets
--- thrown into a user's view in the middle of watching fireworks." It is small, it exists only in
--- the last few seconds of a round and only when armed, and dismissing it is the entire point.
--- The arming rule lives in HudModel and is never second-guessed here.
+-- ===== Escalation: the last five seconds, INSIDE the HUD =====
+-- THE CENTRED "CHOOSE A THROW" PANEL IS GONE (owner, 2026-08-17): "it's just annoying". It was
+-- the one sinking element on this surface that was not a control, and it put a plate over the
+-- middle of the screen at the exact moment the canyon is worth looking at -- the failure its own
+-- comment used to warn about ("thrown into a user's view in the middle of watching fireworks")
+-- turned out to be the ordinary case, not the worst one.
 --
--- Halved from the previous branch's 154/92/30/84/24 (count/prompt heights and text sizes): the
--- footprint shrinks, not the prompt's legibility, so the prompt drops 24 -> 16 rather than 12.
--- Content box (ESCALATION_H minus the 24px the UIPadding below eats, 12 top + 12 bottom) must fit
--- escalationCount's height + escalationPrompt's height + a visible gap between them:
---   count  [0, 46]   (was TextSize 84/height 92, now 42/46)
---   gap    [46, 54]  (8px, unchanged from the previous branch)
---   prompt [54, 74]  (was TextSize 24/height 30, now 16/20)
--- Content box needed = 74, so ESCALATION_H = 74 + 24 = 98, not the naively-halved 77 (77 - 24 =
--- 53 content px, which doesn't even fit the two labels with zero gap: 46 + 20 = 66 > 53).
-local ESCALATION_H = 98 -- kept as a named constant: updateEscalationPosition needs it too, below
-
--- WIDTH IS THE LEVER, not height. The height cannot halve: 42px of count plus a 16px prompt plus
--- 12px padding all round has a hard floor of 98. The width had no such floor — it was 80% of the
--- screen to hold ~130px of content, which on a landscape phone is a 675px panel for a two-line
--- message. A fixed width sized to the content is what actually makes this stop dominating the
--- view, which is what the owner asked for: "the worst thing that could happen is it gets thrown
--- into a user's view in the middle of watching fireworks."
--- 210 verified against its content box (210 - 24 = 186px): "CHOOSE A THROW" at 16px GothamBold is
--- ~126-146px (14 characters; c.f. undoLabel's own measured ~8-9px/char for GothamBold), which
--- clears with 40-60px to spare. escalationPrompt also carries TextScaled + a MaxTextSize
--- constraint below as a floor, not because 210 is expected to be tight — the same belt-and-braces
--- pattern undoLabel uses — so a font-metrics surprise shrinks the text instead of truncating it.
-local ESCALATION_W = 210
-
-local escalation = Instance.new("TextButton")
-escalation.Name = "Escalation"
-escalation.Text = ""
-escalation.AutoButtonColor = false
-escalation.Selectable = false
-escalation.AnchorPoint = Vector2.new(0.5, 0.5)
--- Y is set by `updateEscalationPosition`, below, not a bare fromScale(0.5, 0.42): that fraction
--- is the resting position on a tall screen, but on a short landscape phone it collides with the
--- bank button. See `updateEscalationPosition` for the clamp.
-escalation.Position = UDim2.fromScale(0.5, 0.42)
--- Fixed width (ESCALATION_W, above) sized to the content, not a screen fraction — see the
--- arithmetic there. Fixed height is ESCALATION_H, derived above from its two children's content
--- box. If either child's TextSize/height or the padding below changes, re-run that arithmetic or
--- the two labels overlap inside the unchanged content box. AnchorPoint (0.5, 0.5) plus a
--- Scale-0.5 X position (both offset components below are Y-only) keeps a fixed-width frame
--- centred exactly the same as a scale-width one.
-escalation.Size = UDim2.fromOffset(ESCALATION_W, ESCALATION_H)
--- Opaque backing, not a stroke on the text. The count and prompt used to float over open
--- canyon with strokes standing in for contrast (see the spec's §3) — a real backing plate
--- instead, same as every other readable surface in this HUD.
-escalation.BackgroundColor3 = WASHI
-escalation.BackgroundTransparency = 0.1
-escalation.Visible = false
-escalation.Parent = gui
-corner(escalation, 10)
-do
-    local pad = Instance.new("UIPadding")
-    pad.PaddingLeft = UDim.new(0, 12)
-    pad.PaddingRight = UDim.new(0, 12)
-    pad.PaddingTop = UDim.new(0, 12)
-    pad.PaddingBottom = UDim.new(0, 12)
-    pad.Parent = escalation
-end
-
-local escalationCount = Instance.new("TextLabel")
-escalationCount.Name = "Count"
-escalationCount.Active = false
-escalationCount.Size = UDim2.new(1, 0, 0, 46)
-escalationCount.BackgroundTransparency = 1
-escalationCount.TextColor3 = INK_CREAM
-escalationCount.TextSize = 42
-escalationCount.Font = Enum.Font.GothamBlack
-escalationCount.Text = ""
-escalationCount.Parent = escalation
--- No UIStroke on the label. Contrast comes from the opaque WASHI backing on `escalation` above
--- (see the spec's §3) — a stroke here would outline every glyph instead.
-
-local escalationPrompt = Instance.new("TextLabel")
-escalationPrompt.Name = "Prompt"
-escalationPrompt.Active = false
-escalationPrompt.AnchorPoint = Vector2.new(0.5, 1)
-escalationPrompt.Position = UDim2.fromScale(0.5, 1)
-escalationPrompt.Size = UDim2.new(1, 0, 0, 20)
-escalationPrompt.BackgroundTransparency = 1
-escalationPrompt.TextColor3 = INK_CREAM
-escalationPrompt.TextSize = 16
-escalationPrompt.Font = Enum.Font.GothamBold
-escalationPrompt.Text = "CHOOSE A THROW"
-escalationPrompt.Parent = escalation
--- Belt-and-braces, same pattern as `undoLabel` above: 16px comfortably fits the 186px content
--- box by estimate (see ESCALATION_W above), but TextScaled + a MaxTextSize constraint means a
--- font-metrics surprise shrinks the text instead of truncating it, and never grows past 16px.
-escalationPrompt.TextScaled = true
-do
-    local constraint = Instance.new("UITextSizeConstraint")
-    constraint.MaxTextSize = 16
-    constraint.Parent = escalationPrompt
-end
--- No UIStroke on the label — same rationale as escalationCount above.
-
-local escalationScale = Instance.new("UIScale")
-escalationScale.Parent = escalation
-
--- Tapping dismisses it for the rest of the round. Dismissing and backing out mean the same thing
--- to the escalation rule (HudModel.applyTap already widened `declinedThisRound` to cover both), so
--- this does NOT introduce a new field — main.client.luau sets the existing one.
-escalation.MouseButton1Down:Connect(function()
-    pressDepress(escalationScale)
-end)
-escalation.MouseButton1Click:Connect(function()
-    EventBus.DismissEscalation:Fire()
-end)
-
--- Clamp the overlay's Y against the cluster instead of trusting the 0.42 scale fraction on every
--- viewport. `gui.AbsoluteSize.Y` already excludes the topbar inset (ScreenGui's default
--- IgnoresGuiInset = false), so it is the same H a hand check against a device's reported
--- viewport height would use. Resting position is 0.42 * H; the clamp keeps the overlay's own
--- BOTTOM edge at least ESCALATION_MARGIN above the cluster's top edge (CLUSTER_TOP_FROM_BOTTOM,
--- from the bottom of the screen), and the smaller of the two wins. On a tall screen the clamp
--- never binds, so this reduces to the original 0.42 fraction; on a short landscape phone it
--- lifts the overlay clear of the bank button instead of trusting a fraction that only ever held
--- at the reviewer's own reference height.
-local ESCALATION_MARGIN = ROW_GAP -- the same "cluster row" gap used everywhere else in this file
-local function updateEscalationPosition()
-    local h = gui.AbsoluteSize.Y
-    if h <= 0 then
-        return -- not laid out yet; AbsoluteSize firing again once it is will re-run this
-    end
-    local resting = 0.42 * h
-    local clamped = h - CLUSTER_TOP_FROM_BOTTOM - ESCALATION_MARGIN - ESCALATION_H / 2
-    escalation.Position = UDim2.new(0.5, 0, 0, math.min(resting, clamped))
-end
-updateEscalationPosition()
-gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(updateEscalationPosition)
+-- The urgency did not go with it. The ring already turns red at HudModel.ESCALATE_AT; the digit
+-- inside it now BLINKS as well, on a half-second beat (RingTimer.flashLit, driven by the
+-- countdown itself so the blink is phase-locked to the digits). Same fact, same moment, in the
+-- corner the player is already reading rather than across their view.
+--
+-- IT STILL OBEYS HudModel's ARMING RULE. The blink is gated on `view.escalate`, not on the
+-- ring's own red: that is what keeps the ledger's "escalation prompts" switch meaningful, keeps
+-- the uniform backoff (three ignored rounds and it goes quiet) doing its job for the many people
+-- in the canyon who are not playing, and stops the nag the instant a throw is chosen. The red
+-- stays purely a fact about time and is never gated.
+local FLASH_PERIOD = 0.5
 
 -- ===== Toast: the transient notice that replaced the persistent prose ticker =====
 local toast = Instance.new("TextLabel")
@@ -2007,10 +1882,16 @@ local function render(inputs: any, aux: any)
     -- glyph that faded would read as the answer going away before one had arrived.
     setRingGlyph(shown, worldThrow ~= nil and aux.worldThrowFading == true)
 
-    escalation.Visible = view.escalate
-    if view.escalate then
-        escalationCount.Text = tostring(math.ceil(view.secondsLeft))
-    end
+    -- The blink, in place of the panel that used to say the same thing across the middle of the
+    -- screen. Transparency rather than a second colour: red already means "the last five
+    -- seconds", and a digit alternating between two inks would read as two different states
+    -- instead of one urgent one. Driven from `view.secondsLeft` (RingTimer.flashLit), so the
+    -- beat is phase-locked to the count -- each digit arrives lit and goes dark halfway through
+    -- its own second.
+    ringCount.TextTransparency = if view.escalate
+            and not RingTimer.flashLit(view.secondsLeft, FLASH_PERIOD)
+        then 1
+        else 0
 
     -- The picker is the only HUD element gated on WHERE the player is standing. Everything else in
     -- this cluster is about the round; this is about the ground under their feet.

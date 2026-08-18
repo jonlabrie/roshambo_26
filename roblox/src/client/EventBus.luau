@@ -26,10 +26,6 @@ local NAMES = {
     "HudPreference",
     "Onboard",
     "OnboardShown",
-    -- Fired by the escalation overlay's own tap (the one sinking element on the minimal HUD).
-    -- main.client.luau folds it into `declinedThisRound` — dismissing and backing out mean the
-    -- same thing to the escalation rule, so this does not carry a payload of its own.
-    "DismissEscalation",
     -- The result splash (SplashController). Fired from main.client.luau's `maybeShowReveal`, on the
     -- SAME `drumRest` gate as the tape tile — never from RevealResult directly, which would spoil
     -- the wheel ~3s early. The drum is authoritative: nothing may reflect the world's throw

@@ -291,3 +291,12 @@ day I read the board and told the owner we had drifted off item 4 onto item 7 â€
 built on a page that understated item 4 by four buildings. Accessories and the Stats false front
 also carry no recorded owner gate despite being built and signed off verbally; that gap is now
 marked on the page rather than left implicit.
+
+## [2026-08-17] drop | Centred escalation panel removed; the ring's digit blinks instead
+
+Owner: "dump the 'choose a throw' alert in the middle of the screen; it's just
+annoying" â€” and asked for the last five (red) digits to flash at a half-second
+interval. `RingTimer.flashLit` (pure, tested) drives it off the countdown, so the
+blink is phase-locked to the digits. Arming rule unchanged in [[round-and-hud]].
+Same session: every Stats board cased in an inch of dark moulding ([[stats-room]]).
+

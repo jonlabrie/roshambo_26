@@ -65,4 +65,25 @@ function RingTimer.isWarning(secondsLeft: number, escalateAt: number): boolean
     return secondsLeft <= escalateAt
 end
 
+-- Whether the blinking countdown digit is LIT at this instant (owner, 2026-08-17). The
+-- centre-screen "CHOOSE A THROW" panel is gone -- it interrupted a game most people are watching
+-- rather than playing -- so the last five seconds have to carry the urgency inside the HUD. Red
+-- was already there; this adds the blink.
+--
+-- DRIVEN BY THE COUNTDOWN, NOT BY A WALL CLOCK. `secondsLeft` is the same number the digit is
+-- rendered from, so the blink is phase-locked to the count: each digit appears lit, goes dark
+-- halfway through its own second, and the next digit arrives lit again. A free-running timer
+-- would drift against the digits and blink whenever it happened to, which reads as a fault
+-- rather than as a beat. It also keeps this pure -- no os.clock, no state to reset between
+-- rounds, and testable at an exact instant.
+--
+-- A NONSENSE PERIOD LEAVES THE DIGIT LIT. Failing the other way would hide the countdown
+-- outright; lit is exactly the pre-flash behaviour, so the worst a bad caller can do is nothing.
+function RingTimer.flashLit(secondsLeft: number, periodSeconds: number): boolean
+    if periodSeconds <= 0 then
+        return true
+    end
+    return (secondsLeft % (periodSeconds * 2)) > periodSeconds
+end
+
 return RingTimer

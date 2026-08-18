@@ -2,9 +2,15 @@
 -- Minimal-HUD view model. Pure: no Roblox globals, no I/O, so it runs under Lune.
 --
 -- The escalation rule is the delicate part. Roshambo is an ambient game — most people in the
--- canyon at any moment are not playing, they are hanging out. An ungated "CHOOSE A THROW" alarm
--- would fire at them every single round, forever, and turn the calmest part of the game into an
--- alarm clock.
+-- canyon at any moment are not playing, they are hanging out. An ungated urgency signal would
+-- fire at them every single round, forever, and turn the calmest part of the game into an alarm
+-- clock.
+--
+-- WHAT `escalate` DRIVES CHANGED ON 2026-08-17 AND THE RULE DID NOT. It used to raise a centred
+-- "CHOOSE A THROW" panel; the owner had that removed ("it's just annoying") and the signal is
+-- now the countdown digit blinking inside the HUD's own ring (HudController, RingTimer.flashLit).
+-- Quieter carrier, same question, same arming — a signal that fires at a bystander every round
+-- is an alarm clock wherever it is drawn.
 --
 -- The rule is a UNIFORM backoff: anyone stays armed for three consecutive ignored rounds, then
 -- goes silent, and re-arms the instant they throw again. "New arrival", "threw last round" and
@@ -39,10 +45,10 @@ export type Inputs = {
     chosen: string?,
     undoPrompt: string?,
     sent: boolean,
-    -- Set by a back-out OR by dismissing the escalation prompt, cleared when OPEN reopens.
-    -- One field, two gestures, because they mean the same thing to this rule: the player has
-    -- answered the question the prompt asks. It silences the prompt and NOTHING else — throws
-    -- stay live, and a throw after a dismissal is an ordinary throw.
+    -- Set by a back-out, cleared when OPEN reopens: the player has answered the question the
+    -- prompt asks. It silences the prompt and NOTHING else — throws stay live, and a throw
+    -- after a back-out is an ordinary throw. It once carried a second gesture, the centred
+    -- panel's dismiss tap; that panel is gone, and the field kept the meaning both shared.
     declinedThisRound: boolean,
 }
 
