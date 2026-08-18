@@ -67,6 +67,24 @@ ship, and none has a design decision pending — they are implementation debt.
 - **Two same-tick persist debounces on different screens still cost two PUTs** (the
   second folds the first's value in rather than losing it — correct, not optimal).
 
+## The wiki lint's citation check has a partial-path blind spot
+
+Found 2026-08-18, the day after the check shipped. `world/core-loop.md` carried a live wrong
+claim — that the shipped leaderboards rank by `totalPoints` — while citing
+`transports/socketAdapter.ts` and `routes/apiV1.ts`. Neither citation was seen, because
+`CITE_RE` anchors on a known repo root (`roblox|server|src|tools|docs|shared-fixtures`) and both
+are written relative to `server/src/`. The claim was caught by reading the code for another
+reason, which is exactly the path the check exists to replace.
+
+**Fix sketch, and the trade it carries.** Broadening the regex to any `dir/file.ext` would match
+these, but an unresolvable partial would then raise a *dead code citation* error on prose that
+was never a path. The measured version: broaden the pattern, keep ERROR only for paths anchored
+on a known root, and emit a WARNING for an unresolvable partial. Adding `server/src/` and
+`roblox/src/` to `CITE_PREFIXES` is needed either way.
+
+Not urgent — the check is a floor, not a net, and [[wiki-currency]] says so. Recorded so the
+limitation is known rather than assumed away.
+
 ## Meta-game spec (approved — the design ceiling for the economy)
 
 `docs/superpowers/specs/2026-07-04-roshambo-metagame-design.md`, approved `4d9b9c6`,

@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-16
+updated: 2026-08-18
 ---
 
 # The Core Loop
@@ -60,9 +60,14 @@ leaderboard:
   reached, not what was kept.
 
 ⚠ **Do not rank players by `totalPoints`.** It is a wallet, so a player who spends on
-fireworks or a teahouse *falls down the board* — the current leaderboards
-(`transports/socketAdapter.ts`, `routes/apiV1.ts`) do exactly this and it penalises
-engagement with the economy. `lifetimeBanked` is the correct basis for standings.
+fireworks or a teahouse *falls down the board*. `lifetimeBanked` is the correct basis for
+standings.
+
+**Corrected 2026-08-18:** this warning used to say the shipped leaderboards "do exactly this".
+They do not — `server/src/leaderboards.ts` sorts `topByCareer` by `lifetimeBanked`, and has
+since 2026-08-16, the day this page was written. The rule stands; the accusation was stale on
+arrival. (`totalPoints` does still travel in `LEADERBOARD_FIELDS`, which is what makes ranking
+by it an easy mistake to make — that is the live hazard, not the current sort.)
 
 ## Trap: `pointsDelta` is not an increment
 
