@@ -148,7 +148,7 @@ on both sides, posts embedded outboard so the faces are clean.
 | Display | Site | Wall |
 |---|---|---|
 | Personal 札 (`fuda`) | vestibule | interior **west**, face x −33.12 |
-| Summary — players in the last round, R/P/S distribution | vestibule | interior **east**, face x −24.72 |
+| Summary — the round's throw, players, R/P/S distribution | vestibule | interior **east**, face x −24.72 |
 | Rotating avatar display — current world/server leaders | cavern | north-**east**, the wall `fuda` vacated |
 
 The **tape** — the last ten World Throws — was a printed row on the form-guide board and moved
@@ -159,6 +159,16 @@ ten throws on two surfaces, one gated on the drum and one not, would visibly dis
 3.45 seconds the drum takes to settle. The form-guide board is heat alone now.
 | Round display — throw flipper, `0:00` countdown, and a ten-flap throw tape | cavern | west, replacing the four-segment band |
 | 番付 standings, records | cavern | south / west / east as specced |
+
+**The summary board names the throw** (owner, 2026-08-17): the World Throw glyph rides the
+far right of its TOP line, in the same ○ ─ ∧ images the drum, lanterns, HUD and round display
+wear. Its four rows were all *about* the throw without ever saying it, leaving a reader to infer
+it from percentages. Carried by `Section.titleRight` — a raw string joined AFTER `sanitize`,
+because the glyphs are multibyte and the sanitizer must stay byte-wise (display names are
+external input; `utf8.codes` does not survive malformed bytes). The title yields to the glyph if
+a board is ever too narrow for both. Safe against the drum for the same reason the percentages
+are: this is the last CLOSED round, and `StatsController` holds a tape whose newest entry the
+drum has not finished announcing.
 
 **Neither new board needs server work, which is why they are cheap.** `GlobalResult`
 already carries `distribution: { R, P, S }` and `totalPlayers`, and the ten-round tape

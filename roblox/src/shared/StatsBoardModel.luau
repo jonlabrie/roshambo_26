@@ -16,7 +16,17 @@ StatsBoardModel.GLYPH = { R = "○", P = "─", S = "∧" }
 export type Entry = { name: string?, figure: string }
 -- `numbered` defaults to true (the leaderboard look: "1. AYAKA ... 1,240"). Set it false for a
 -- section that lists a person's own rows, not a ranking — see `labelLine` (FIX 2).
-export type Section = { title: string, entries: { Entry }?, lines: { string }?, numbered: boolean? }
+-- `titleRight` is a raw string set hard right on the TITLE line and NOT sanitized -- it exists
+-- for the throw glyphs, which are multibyte and would come back as dots from a sanitizer that
+-- must stay byte-wise (display names are external input; utf8.codes does not survive malformed
+-- bytes). Nothing external ever reaches it: the only caller picks from StatsBoardModel.GLYPH.
+export type Section = {
+    title: string,
+    entries: { Entry }?,
+    lines: { string }?,
+    numbered: boolean?,
+    titleRight: string?,
+}
 export type Opts = { rows: number, cols: number }
 export type Metrics = { canvasW: number, canvasH: number, glyphSize: number }
 
@@ -113,7 +123,15 @@ function StatsBoardModel.compose(sections: { Section }, o: Opts): { string }
         end
     end
     for _, sec in sections do
-        push(StatsBoardModel.sanitize(sec.title))
+        local title = StatsBoardModel.sanitize(sec.title)
+        local right = sec.titleRight
+        if right and right ~= "" then
+            -- The title yields, not the glyph: a title cut short still reads, a glyph pushed off
+            -- the end is simply absent. Same rule entryLine follows for a figure.
+            local w = widthOf(right)
+            title = padRight(trunc(title, math.max(0, o.cols - w)), math.max(0, o.cols - w)) .. right
+        end
+        push(title)
         if sec.lines then
             for _, l in sec.lines do
                 push(l)
@@ -336,6 +354,16 @@ function StatsBoardModel.summarySections(tape: { any }?): { Section }
     return {
         {
             title = "LAST ROUND",
+            -- THE THROW ITSELF, hard right on the title line (owner, 2026-08-17). The four rows
+            -- below are all ABOUT the World Throw without ever naming it; a reader had to infer
+            -- it from the percentages, which is the one thing this board could simply say. It
+            -- goes on the title line rather than in a fifth row because that is where the eye
+            -- lands first, and because the row grid is a slip's, not a headline's.
+            --
+            -- Reading it here is safe: this is the last CLOSED round, and StatsController holds a
+            -- tape whose newest entry the drum has not finished announcing (`drumRest`), so the
+            -- glyph cannot outrun the drum any more than the percentages beneath it can.
+            titleRight = StatsBoardModel.GLYPH[tostring(latest.worldThrow)],
             -- label:value, like the 札 it faces -- not a ranking, so not numbered.
             numbered = false,
             entries = {

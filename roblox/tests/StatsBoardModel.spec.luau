@@ -254,6 +254,66 @@ describe("StatsBoardModel.summarySections", function()
         local lines = M.compose(s, { rows = 7, cols = 16 })
         expect(lines[2]:sub(1, 3)).toBe("PLA")
     end)
+
+    test("the round's throw rides the far right of the TOP line", function()
+        -- Owner, 2026-08-17. The board already reports what the crowd threw; the World Throw
+        -- itself is the fact the percentages are about, and it belongs on the title line where a
+        -- reader looks first -- not buried in a fifth row.
+        local s = M.summarySections({
+            { totalPlayers = 42, worldThrow = "R", distribution = { R = 19, P = 12, S = 11 } },
+        })
+        expect(s[1].titleRight).toBe(M.GLYPH.R)
+        local lines = M.compose(s, { rows = 7, cols = 16 })
+        expect(lines[1]).toBe("LAST ROUND     " .. M.GLYPH.R)
+    end)
+
+    test("every throw gets its own glyph, and nothing else does", function()
+        for sym, glyph in M.GLYPH do
+            local s = M.summarySections({ { totalPlayers = 1, worldThrow = sym, distribution = {} } })
+            expect(s[1].titleRight).toBe(glyph)
+        end
+        local unknown = M.summarySections({ { totalPlayers = 1, worldThrow = "X", distribution = {} } })
+        expect(unknown[1].titleRight).toBe(nil)
+    end)
+
+    test("a round with no throw recorded leaves the title line alone", function()
+        -- A settled round always has one, but the tape is external data and the title must not
+        -- sprout a stray column because a field went missing.
+        local s = M.summarySections({ { totalPlayers = 3, distribution = { R = 1, P = 1, S = 1 } } })
+        expect(s[1].titleRight).toBe(nil)
+        local lines = M.compose(s, { rows = 7, cols = 16 })
+        expect(lines[1]).toBe("LAST ROUND      ")
+    end)
+
+    test("an empty tape has no throw to show", function()
+        expect(M.summarySections({})[1].titleRight).toBe(nil)
+    end)
+end)
+
+describe("StatsBoardModel.compose — titleRight", function()
+    test("it sits hard right on the title line, past the sanitizer", function()
+        -- The glyphs are multibyte and `sanitize` is byte-wise (it has to be: a display name is
+        -- external input and utf8.codes does not survive malformed bytes), so a glyph put in the
+        -- title itself would come out as dots. titleRight is joined AFTER sanitizing.
+        local lines = M.compose({ { title = "LAST ROUND", entries = {}, titleRight = M.GLYPH.S } }, {
+            rows = 3,
+            cols = 16,
+        })
+        expect(lines[1]).toBe("LAST ROUND     " .. M.GLYPH.S)
+    end)
+
+    test("a long title is cut to make room rather than pushing the glyph off", function()
+        local lines = M.compose(
+            { { title = "A VERY LONG TITLE INDEED", entries = {}, titleRight = M.GLYPH.P } },
+            { rows = 2, cols = 12 }
+        )
+        expect(lines[1]).toBe("A VERY LONG" .. M.GLYPH.P)
+    end)
+
+    test("no titleRight leaves the line exactly as it was", function()
+        local lines = M.compose({ { title = "LAST ROUND", entries = {} } }, { rows = 2, cols = 16 })
+        expect(lines[1]).toBe("LAST ROUND      ")
+    end)
 end)
 
 describe("StatsBoardModel titles fit their real StatsRoomLayout boards", function()
@@ -290,8 +350,15 @@ describe("StatsBoardModel titles fit their real StatsRoomLayout boards", functio
                 if sections then
                     for _, sec in sections do
                         local lines = M.compose({ sec }, { rows = b.rows, cols = b.cols })
-                        local want = trimRight(M.sanitize(sec.title))
-                        expect(trimRight(lines[1])).toBe(want)
+                        local title = M.sanitize(sec.title)
+                        local right = sec.titleRight or ""
+                        -- The title survives whole, the glyph (where a section has one) rides the
+                        -- far right, and there is nothing but spaces in between. Comparing the
+                        -- trimmed line to the title outright would fail any titled section that
+                        -- also carries a titleRight, which is not truncation.
+                        expect(lines[1]:sub(1, #title)).toBe(title)
+                        expect(lines[1]:sub(#lines[1] - #right + 1)).toBe(right)
+                        expect(trimRight(lines[1]:sub(#title + 1, #lines[1] - #right))).toBe("")
                     end
                 end
             end)
