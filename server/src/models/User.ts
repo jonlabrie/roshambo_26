@@ -39,6 +39,11 @@ export interface IUser extends Document {
     // like lifetimeBanked. Together they answer "what fraction of what you built did you keep".
     lifetimeForfeited: number;
     bestPot: number;
+    // EARNED, NEVER REVOKED. Append-only via $addToSet, so settling the same round twice cannot
+    // duplicate an id and nothing a player does — including spending every point they own — can
+    // take a grade away. That is the whole reason grade is built on milestones rather than on a
+    // rate (which needs sample) or on time played (which punishes leaving).
+    milestones: string[];
     throwsR: number;
     throwsP: number;
     throwsS: number;
@@ -86,6 +91,7 @@ const UserSchema: Schema = new Schema({
     lifetimeBanked: { type: Number, default: 0 },
     lifetimeForfeited: { type: Number, default: 0 },
     bestPot: { type: Number, default: 0 },
+    milestones: { type: [String], default: [] },
     throwsR: { type: Number, default: 0 },
     throwsP: { type: Number, default: 0 },
     throwsS: { type: Number, default: 0 },

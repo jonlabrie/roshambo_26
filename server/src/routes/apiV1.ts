@@ -1,4 +1,7 @@
 import express, { Router } from 'express';
+import { gradeFor } from '../engine/Milestones';
+import { throwsInWindow } from '../stats';
+import { rollingWindow, WEEK_MS, QUALIFY } from '../windows';
 import { RoundEngine } from '../engine/RoundEngine';
 import { TAPE_LENGTH } from '../engine/ResultsStore';
 import { ResultsStore } from '../engine/ResultsStore';
@@ -170,6 +173,20 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             // Roblox has already moderated a DisplayName, and the room's broadcast path filters
             // it again through `cachedFilterName` before it reaches a wall, so storing it raw is
             // safe on both counts.
+            // THE ONE WINDOWED MILESTONE, awarded here rather than at settlement because it needs a
+            // 7-day throw count and settling a round must not run a per-player aggregation for
+            // every participant. Checked once per session instead of sixty times an hour. Once
+            // earned it is permanent like every other one: a player who qualifies one week and
+            // then plays less does not lose it.
+            if (!(user.milestones || []).includes('presence.qualified')) {
+                const thrown = await throwsInWindow(user._id, rollingWindow(new Date(), WEEK_MS));
+                if (thrown >= QUALIFY.week) {
+                    await User.findByIdAndUpdate(user._id, { $addToSet: { milestones: 'presence.qualified' } });
+                    user.milestones = [...(user.milestones || []), 'presence.qualified'];
+                }
+            }
+            const grade = gradeFor((user.milestones || []).length);
+
             const name = typeof req.query.name === 'string' ? req.query.name.slice(0, 64) : undefined;
             const set: Record<string, unknown> = {};
             if (country && user.country !== country) set.country = country;
@@ -184,6 +201,10 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             res.json({
                 robloxUserId: req.params.robloxUserId,
                 displayName: user.displayName,
+                grade: grade.index,
+                gradeName: grade.name,
+                band: grade.band,
+                milestones: user.milestones || [],
                 identityTier: user.identityTier,
                 ...buildProfilePayload(user),
             });

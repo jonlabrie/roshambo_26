@@ -1,4 +1,5 @@
 import User, { IUser } from '../models/User';
+import { earnedFor } from './Milestones';
 import Round from '../models/Round';
 import PlayerRound from '../models/PlayerRound';
 import { calculateResult, nextPot, potDelta, nextStreak, Throw, RoundResult } from './GameRules';
@@ -152,6 +153,28 @@ export async function settleRound(data: RoundToSettle): Promise<{ round: GlobalR
                     },
                     $max: counters.$max,
                 }, { new: true })) || user;
+
+                // AGAINST THE POST-WRITE STATE. `updated` already carries this round's bestPot,
+                // lifetimeBanked and bestStreak, so a pot reached THIS round earns its milestone
+                // now rather than one round late.
+                //
+                // $addToSet, not $push: settling the same round twice must not duplicate an id,
+                // and a duplicate would silently inflate a grade.
+                const earned = earnedFor({
+                    bestPot: updated.bestPot || 0,
+                    lifetimeBanked: updated.lifetimeBanked || 0,
+                    bestStreak: updated.bestStreak || 0,
+                    // Windowed presence is NOT known here and is not worth a per-player
+                    // aggregation on every round; `presence.qualified` is awarded on the join
+                    // call instead, where the user is already loaded.
+                    weekThrows: 0,
+                    hasBanked: (updated.lifetimeBanked || 0) > 0,
+                    hasWon: result === 'WIN' || (updated.bestStreak || 0) > 0,
+                });
+                const fresh = earned.filter(id => !(updated.milestones || []).includes(id));
+                if (fresh.length > 0) {
+                    await User.findByIdAndUpdate(user._id, { $addToSet: { milestones: { $each: fresh } } });
+                }
 
                 return {
                     key,

@@ -203,6 +203,50 @@ describe('settleRound', () => {
             expect(await StreakEvent.countDocuments({ userId: user._id })).toBe(0);
         });
     });
+
+    describe('milestones are earned at settlement', () => {
+        // R beats S. Seeding pointsAtStake: 3 means this win takes the pot to 9 and earns `pot.9`
+        // in the same round it is reached — which is what "from the post-write state" means.
+        const winsToNine = (roundId: string) => settleRound({
+            roundId,
+            worldThrow: 'S',
+            counts: { R: 1, P: 1, S: 1 },
+            throws: throwsMap([
+                ['pwa:devA', { throw: 'R', seq: 1, platform: 'pwa', deviceId: 'devA' }],
+                ['roblox:77', { throw: 'S', seq: 1, platform: 'roblox', robloxUserId: '77', instanceId: 'job-1' }],
+                ['roblox:88', { throw: 'P', seq: 1, platform: 'roblox', robloxUserId: '88', instanceId: 'job-1' }],
+            ]),
+            timestamp: new Date(),
+        });
+
+        it('awards milestones from the post-write state, so a pot earns its badge the round it is reached', async () => {
+            const user = await User.create({ deviceId: 'devA', pointsAtStake: 3 });
+            await winsToNine('r1');
+            const after = await User.findById(user._id);
+            expect(after?.milestones).toContain('first.win');
+            expect(after?.milestones).toContain('pot.9');
+        });
+
+        it('never awards the same milestone twice, however many rounds settle', async () => {
+            const user = await User.create({ deviceId: 'devA', pointsAtStake: 3 });
+            await winsToNine('r1');
+            await winsToNine('r2');
+            const ids = (await User.findById(user._id))?.milestones ?? [];
+            expect(new Set(ids).size).toBe(ids.length);
+        });
+
+        it('a player who only ever loses earns nothing', async () => {
+            const user = await User.create({ deviceId: 'devB' });
+            await settleRound({
+                roundId: 'r1',
+                worldThrow: 'R',
+                counts: { R: 1, P: 0, S: 1 },
+                throws: throwsMap([['pwa:devB', { throw: 'S', seq: 1, platform: 'pwa', deviceId: 'devB' }]]),
+                timestamp: new Date(),
+            });
+            expect((await User.findById(user._id))?.milestones).toEqual([]);
+        });
+    });
 });
 
 describe('buildCounterUpdate', () => {

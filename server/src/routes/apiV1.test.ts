@@ -3,6 +3,7 @@ import express from 'express';
 import request from 'supertest';
 import { connectTestDb, clearTestDb, disconnectTestDb } from '../test/db';
 import User from '../models/User';
+import PlayerRound from '../models/PlayerRound';
 import Session from '../models/Session';
 import { RoundEngine } from '../engine/RoundEngine';
 import { ResultsStore } from '../engine/ResultsStore';
@@ -174,6 +175,29 @@ describe('/api/v1', () => {
     });
 
     describe('GET /players/:robloxUserId', () => {
+        it('carries the grade, so other clients can render plumage', async () => {
+            await User.create({ robloxId: '12345', identityTier: 'roblox', milestones: ['first.win', 'pot.9'] });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const res = await request(app)
+                .get('/api/v1/players/12345').set('X-API-Key', API_KEY).expect(200);
+            expect(res.body.grade).toBe(2);
+            expect(res.body.gradeName).toBe('9th kyu');
+            expect(res.body.band).toBe(1);
+        });
+
+        it('awards the one WINDOWED milestone here, where the user is already loaded', async () => {
+            const u = await User.create({ robloxId: '12345', identityTier: 'roblox' });
+            for (let i = 0; i < 360; i++) {
+                await PlayerRound.create({
+                    userId: u._id, roundId: `r${i}`, playerThrow: 'R',
+                    playerResult: 'LOSS', pointsDelta: 0, timestamp: new Date(),
+                });
+            }
+            const app = makeApp(makeEngine(), new ResultsStore());
+            await request(app).get('/api/v1/players/12345').set('X-API-Key', API_KEY).expect(200);
+            expect((await User.findById(u._id))?.milestones).toContain('presence.qualified');
+        });
+
         it('records the Roblox display name, so boards can stop saying Anonymous', async () => {
             const app = makeApp(makeEngine(), new ResultsStore());
             await request(app)
