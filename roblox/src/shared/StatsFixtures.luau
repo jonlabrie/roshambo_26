@@ -10,6 +10,20 @@ local function streak(name: string, length: number)
 end
 
 StatsFixtures.STATS = {
+    board = {
+        minThrows = 360,
+        worldIsCrowd = true,
+        rows = {
+            { displayName = "AYAKA", pointsPerThrow = 4.12, winRate = 0.44, throws = 802 },
+            { displayName = "KENJI", pointsPerThrow = 2.41, winRate = 0.41, throws = 512 },
+            { displayName = "MOMO", pointsPerThrow = 1.98, winRate = 0.38, throws = 480 },
+            { displayName = "HARU", pointsPerThrow = 1.20, winRate = 0.31, throws = 431 },
+            { displayName = "SORA", pointsPerThrow = 0.64, winRate = 0.29, throws = 366 },
+        },
+    },
+    -- A plausible shape, not a flat one: most players collect early and the tail is thin. A
+    -- flat histogram would look fine in Studio and tell us nothing about whether the bars read.
+    depths = { 41, 33, 22, 12, 6, 3, 1, 1 },
     leaders = {
         { displayName = "Ayaka", lifetimeBanked = 12480 },
         { displayName = "kenshin_the_unbanked", lifetimeBanked = 9310 },
@@ -60,7 +74,19 @@ StatsFixtures.PERSONAL = {
     displayName = "Ayaka",
     career = { banked = 12480, bestStreak = 11 },
     currentStreak = 3,
-    week = { throws = 142, minThrows = 350, qualified = false, roundsPresent = 210, participationRate = 0.68 },
+    -- QUALIFIED, unlike the first fixture: an unqualified slip renders four dashes and shows
+    -- nothing about the new rows' layout, which is the whole point of looking in Studio.
+    week = {
+        throws = 412,
+        minThrows = 360,
+        qualified = true,
+        roundsPresent = 560,
+        participationRate = 0.74,
+        winRate = 0.41,
+        pointsPerThrow = 2.41,
+        nerve = 3,
+        standing = { rank = 14, of = 22 },
+    },
 }
 
 return StatsFixtures

@@ -191,8 +191,11 @@ describe("StatsRoomLayout", function()
         end
     end)
 
-    test("the reserved skill panel is shuttered, not merely absent (spec section 8)", function()
-        expect(byId("skillFuture").shuttered).toBe(true)
+    -- SUPERSEDED 2026-08-18: it was shuttered while it waited for a population to rank. It now
+    -- carries the room's bank-depth histogram, which needs no qualification -- choosing when to
+    -- collect is real player behaviour even under TEST_MODE.
+    test("the reserved skill panel has opened, and carries the depth histogram", function()
+        expect(byId("skillFuture").shuttered).toBe(nil)
     end)
 
     test("columns tile the board exactly, edge to edge, in order", function()

@@ -176,8 +176,11 @@ local DECLS: { Decl } = {
         cols = 13,
         along = 81.00,
         y = 120.0,
-        -- Shuttered, NOT unlit. A closed kosatsu reads as intentional; a dark one reads as broken.
-        shuttered = true,
+        -- Was shuttered while it waited for a population to rank. It now carries the room's
+        -- bank-depth histogram, which needs no qualification at all -- choosing when to collect
+        -- is real player behaviour even under TEST_MODE. 13 columns cannot hold a ranked line
+        -- (`1. AYAKA   2.4 41%` needs ~18), which is why the banzuke took the 26-column south
+        -- wall and the shape-of-the-room board took this one.
     },
     {
         id = "judgement",

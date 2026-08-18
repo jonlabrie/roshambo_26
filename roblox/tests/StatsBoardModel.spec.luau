@@ -317,13 +317,16 @@ describe("StatsBoardModel.compose — titleRight", function()
 end)
 
 describe("StatsBoardModel titles fit their real StatsRoomLayout boards", function()
-    -- Mirrors StatsController.client.luau's `linesFor` id -> adapter dispatch. `skillFuture` is
-    -- shuttered, and the `round*` parts belong to RoundDisplayController — they render a clock
-    -- and a glyph, not sections with titles, so this module has no adapter for them by design.
+    -- Mirrors StatsController.client.luau's `linesFor` id -> adapter dispatch, and must keep
+    -- mirroring it: this is what caught `skillFuture` opening without an adapter. The `round*`
+    -- parts belong to RoundDisplayController — they render a clock and a glyph, not sections
+    -- with titles, so this module has no adapter for them by design.
     local function sectionsFor(id: string): { M.Section }?
         local S, P = StatsFixtures.STATS, StatsFixtures.PERSONAL
         if id == "banzuke" then
-            return M.standingsSections(S.leaders)
+            return M.banzukeSections(S.board, S.leaders)
+        elseif id == "skillFuture" then
+            return M.depthSections(S.depths)
         elseif id == "skill" then
             return M.skillSections(S.recordsWeek, S.recordsAll)
         elseif id == "judgement" then
@@ -393,5 +396,91 @@ end)
 describe("StatsBoardModel drum parity", function()
     test("the model's drum copy matches FlapScheduler's, or cells land on wrong glyphs", function()
         expect(M.DRUM).toBe(FlapScheduler.DRUM)
+    end)
+end)
+
+describe("banzukeSections", function()
+    local BOARD = {
+        minThrows = 360,
+        worldIsCrowd = true,
+        rows = {
+            { displayName = "AYAKA", pointsPerThrow = 2.41, winRate = 0.41, throws = 512 },
+            { displayName = "KENJI", pointsPerThrow = 0.98, winRate = 0.36, throws = 402 },
+        },
+    }
+    local O = { rows = 10, cols = 26 }
+    local function blockOf(board, leaders)
+        return table.concat(M.compose(M.banzukeSections(board, leaders), O), "\n")
+    end
+
+    test("ranks by yield with the read beside it", function()
+        local all = blockOf(BOARD, nil)
+        for _, want in { "AYAKA", "2.4", "41%", "KENJI" } do
+            expect(string.find(all, want, 1, true) ~= nil).toBe(true)
+        end
+    end)
+
+    test("prints the baseline, because a bare 41% means nothing to a first-time reader", function()
+        expect(string.find(blockOf(BOARD, nil), "33 IN 100", 1, true) ~= nil).toBe(true)
+    end)
+
+    test("drops the baseline line with the column it explains", function()
+        local closed = { minThrows = 360, worldIsCrowd = false, rows = { BOARD.rows[1] } }
+        expect(string.find(blockOf(closed, nil), "33 IN 100", 1, true) == nil).toBe(true)
+    end)
+
+    test("withholds the read column entirely when the world is a test cycle", function()
+        local closed = { minThrows = 360, worldIsCrowd = false, rows = { BOARD.rows[1] } }
+        expect(string.find(blockOf(closed, nil), "%%") == nil).toBe(true)
+    end)
+
+    test("falls back to career standings, naming the rule, when nobody qualifies", function()
+        local empty = { minThrows = 360, worldIsCrowd = true, rows = {} }
+        local all = blockOf(empty, { { displayName = "AYAKA", lifetimeBanked = 12480 } })
+        expect(string.find(all, "360", 1, true) ~= nil).toBe(true)
+        expect(string.find(all, "AYAKA", 1, true) ~= nil).toBe(true)
+    end)
+
+    test("survives a nil board entirely — the room renders before the first poll lands", function()
+        expect(#M.compose(M.banzukeSections(nil, nil), O)).toBe(10)
+    end)
+end)
+
+describe("fudaSections standing", function()
+    local O = { rows = 10, cols = 16 }
+    test("shows where you stand among the qualified", function()
+        local p = {
+            displayName = "AYAKA",
+            career = {},
+            week = { throws = 400, minThrows = 360, qualified = true, standing = { rank = 14, of = 22 } },
+        }
+        local all = table.concat(M.compose(M.fudaSections(p), O), "\n")
+        expect(string.find(all, "14 OF 22", 1, true) ~= nil).toBe(true)
+    end)
+
+    test("a player short of the floor gets a dash, not a rank of zero", function()
+        local p = {
+            displayName = "AYAKA",
+            career = {},
+            week = { throws = 142, minThrows = 360, qualified = false },
+        }
+        local all = table.concat(M.compose(M.fudaSections(p), O), "\n")
+        expect(string.find(all, " 0 OF ", 1, true) == nil).toBe(true)
+    end)
+end)
+
+describe("depthSections", function()
+    local O = { rows = 6, cols = 13 }
+    test("renders a bar per depth, scaled to the largest bucket", function()
+        local lines = M.compose(M.depthSections({ 4, 8, 2, 0, 0, 0, 0, 0 }), O)
+        expect(#lines).toBe(6)
+        local function hashes(l: string): number
+            return #(string.gsub(l, "[^#]", ""))
+        end
+        expect(hashes(lines[3]) >= hashes(lines[2])).toBe(true)
+    end)
+
+    test("an empty room renders without dividing by zero", function()
+        expect(#M.compose(M.depthSections({ 0, 0, 0 }), O)).toBe(6)
     end)
 end)

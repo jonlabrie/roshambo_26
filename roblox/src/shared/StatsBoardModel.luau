@@ -35,6 +35,14 @@ for _, code in utf8.codes(StatsBoardModel.DRUM) do
     ALLOWED[utf8.char(code)] = true
 end
 
+-- A percentage as a whole number, or a BLANK when there is no figure -- never "-", which reads
+-- as "zero percent" on a board where every other row carries a number. Named apart from
+-- `summarySections`' own local `pct`, which answers a different question (percentage OF THROWS,
+-- dash when nobody threw) and would otherwise shadow this one.
+local function percentOrBlank(v: number?): string
+    return if v == nil then "" else `{math.floor(v * 100 + 0.5)}%`
+end
+
 local function chars(s: string): { string }
     local out: { string } = {}
     for _, code in utf8.codes(s) do
@@ -376,6 +384,67 @@ function StatsBoardModel.summarySections(tape: { any }?): { Section }
     }
 end
 
+-- THE BANZUKE. Ranked on yield; the read carried BESIDE it, never blended in. Yield is the only
+-- figure that captures the compounding the design measures -- a strong reader riding deep earns
+-- many times what a blind one riding to the same depth does, a gap win rate alone renders as a
+-- few percentage points -- and the read column is what tells a reader whether someone is up
+-- there on skill or on nerve.
+function StatsBoardModel.banzukeSections(board: any?, leaders: { any }?): { Section }
+    local b = board or {}
+    local rows = b.rows or {}
+    if #rows == 0 then
+        -- NEVER EMPTY. Before anyone has thrown six hours the wall shows career standings and
+        -- says what the ranking is waiting for: a blank board reads as broken, and the rule is
+        -- the one thing a new player most wants to know.
+        local careerEntries: { Entry } = {}
+        for _, l in leaders or {} do
+            table.insert(
+                careerEntries,
+                { name = l.displayName, figure = StatsBoardModel.figure(l.lifetimeBanked) }
+            )
+        end
+        return {
+            { title = "CAREER BANKED", entries = careerEntries },
+            { title = `{b.minThrows or 360} THROWS PUTS YOU HERE`, entries = {} },
+        }
+    end
+    local entries: { Entry } = {}
+    for _, r in rows do
+        local read = if b.worldIsCrowd then percentOrBlank(r.winRate) else ""
+        local yield = string.format("%.1f", tonumber(r.pointsPerThrow) or 0)
+        table.insert(entries, {
+            name = r.displayName,
+            figure = if read == "" then yield else `{yield} {read}`,
+        })
+    end
+    local sections: { Section } = { { title = "POINTS PER THROW - 7 DAYS", entries = entries } }
+    if b.worldIsCrowd then
+        -- THE BASELINE, PRINTED. "41%" means nothing to a reader who does not know that a blind
+        -- player scores 33 -- and every reader is in that position the first time. A section
+        -- with no entries renders as a bare line under the ranking. Only when the read column is
+        -- actually showing: without it the line explains a column that is not there.
+        table.insert(sections, { title = "LUCK ALONE WINS 33 IN 100", entries = {} })
+    end
+    return sections
+end
+
+-- NERVE AS A SHAPE, NOT A RANKING. Index 1 is depth 1; the last bucket is "this deep or more".
+-- A leaderboard here would crown whoever rides past their own read and banks nothing.
+function StatsBoardModel.depthSections(depths: { number }?): { Section }
+    local d = depths or {}
+    local most = 0
+    for _, n in d do
+        most = math.max(most, n)
+    end
+    local entries: { Entry } = {}
+    for i, n in d do
+        -- Guard the empty room: with no banks at all every bar is zero-width, not an error.
+        local bars = if most > 0 then math.floor(n / most * 5 + 0.5) else 0
+        table.insert(entries, { name = tostring(i) .. string.rep("#", bars), figure = tostring(n) })
+    end
+    return { { title = "BANK AFTER", entries = entries } }
+end
+
 function StatsBoardModel.fudaSections(player: any?): { Section }
     local p = player or {}
     local career, week = p.career or {}, p.week or {}
@@ -398,6 +467,23 @@ function StatsBoardModel.fudaSections(player: any?): { Section }
                 -- a weekly quota, and the full label is 17 cols wide before a figure even joins
                 -- it — too wide to survive a 16-col slip regardless of width math.
                 { name = "THROWS", figure = progress },
+                { name = "BEAT WORLD", figure = if week.winRate then percentOrBlank(week.winRate) else "-" },
+                {
+                    name = "PER THROW",
+                    figure = if week.pointsPerThrow then string.format("%.1f", week.pointsPerThrow) else "-",
+                },
+                {
+                    name = "YOU BANK AT",
+                    figure = if week.nerve then StatsBoardModel.figure(week.nerve) else "-",
+                },
+                -- WHERE YOU STAND, and the whole reason it is on the slip rather than the wall:
+                -- the banzuke is ten rows, so most of the room never sees its own name there.
+                -- "14 OF 22" and not "14/22" -- a slash reads as the progress fraction directly
+                -- above ("142/360") and would be taken for one.
+                {
+                    name = "RANK",
+                    figure = if week.standing then `{week.standing.rank} OF {week.standing.of}` else "-",
+                },
             },
         },
     }
