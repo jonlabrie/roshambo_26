@@ -78,6 +78,19 @@ function ShojiRun.ordinalOf(bayNumbers: { number }, raw: any): number?
     return nil
 end
 
+-- The precision a travel is PERSISTED at. `shojiOpen` shares one 4096-byte loadout document with
+-- everything else a teahouse remembers, and a rejected loadout fails the WHOLE write, not just the
+-- shoji part of it -- so a wall of full-float travels ("0.7333333333333333") is a real risk to
+-- every other saved setting. Three decimals is 6 millistuds of a 6-stud bay: far below what anyone
+-- can see, and it caps each entry at eight characters or so. Junk reads as closed, same posture as
+-- ShojiRun.clamp, for the same reason.
+function ShojiRun.quantize(open: number): number
+    if typeof(open) ~= "number" or open ~= open or open == math.huge or open == -math.huge then
+        return 0
+    end
+    return math.floor(open * 1000 + 0.5) / 1000
+end
+
 -- Which way a hold sends a screen. Not a function of position alone: a screen at rest in the
 -- LAST bay of a run has no +1 to travel into, and a barely-open screen should keep going the
 -- way it was already going rather than reverse under the player's finger.

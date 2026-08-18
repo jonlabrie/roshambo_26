@@ -193,3 +193,17 @@ describe("ShojiRun.ordinalOf — the wire carries a RAW bay number, the run carr
         expect(ShojiRun.ordinalOf({ 1, 2 }, nil :: any)).toBe(nil)
     end)
 end)
+
+describe("ShojiRun.quantize — a travel small enough to fit the loadout budget", function()
+    test("three decimal places is the persisted precision", function()
+        expect(ShojiRun.quantize(0.1234567)).toBe(0.123)
+        expect(ShojiRun.quantize(-0.9876)).toBe(-0.988)
+        expect(ShojiRun.quantize(2)).toBe(2)
+    end)
+
+    test("junk quantizes to closed, same posture as clamp", function()
+        expect(ShojiRun.quantize(0 / 0)).toBe(0)
+        expect(ShojiRun.quantize(math.huge)).toBe(0)
+        expect(ShojiRun.quantize(nil :: any)).toBe(0)
+    end)
+end)

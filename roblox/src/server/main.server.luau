@@ -995,7 +995,9 @@ local function persistShojiNow(target: ShojiPersistTarget)
         local finalOpen = if typeof(finalAttr) == "number" then finalAttr else 0
         local existingSide = house.loadout.shojiOpen and house.loadout.shojiOpen[target.side]
         local resolvedList = ShojiRun.resolve(existingSide, target.count)
-        resolvedList[target.index] = ShojiRun.clamp(target.index, target.count, finalOpen)
+        -- quantized, not raw: see ShojiRun.quantize -- `shojiOpen` shares one 4096-byte loadout
+        -- document with every other teahouse setting, and a rejected document loses ALL of them.
+        resolvedList[target.index] = ShojiRun.quantize(ShojiRun.clamp(target.index, target.count, finalOpen))
         -- merge into a NEW copy of the occupied size's loadout (don't alias the stash pre-persist)
         local newShojiOpen = table.clone(house.loadout.shojiOpen or {})
         newShojiOpen[target.side] = resolvedList
@@ -1066,7 +1068,7 @@ local function flushShojiForUid(uid: string)
         end
         local finalAttr = target.bay:GetAttribute("ShojiOpen")
         local finalOpen = if typeof(finalAttr) == "number" then finalAttr else 0
-        resolvedList[target.index] = ShojiRun.clamp(target.index, target.count, finalOpen)
+        resolvedList[target.index] = ShojiRun.quantize(ShojiRun.clamp(target.index, target.count, finalOpen))
         wroteAny = true
     end
     if not wroteAny then
@@ -1080,11 +1082,21 @@ local function flushShojiForUid(uid: string)
         e.teahouses[house.size] = newLoadout
     end
     local size = house.size -- captured now; the thunk below never re-reads playerHouse[uid]
-    handlerQueue:run(uid, function()
-        local persisted = net:setTeahouse(uid, size, newLoadout)
-        if not persisted.ok then
-            warn(`[SHOJI] setTeahouse (flush) failed for {uid}/{size}: {tostring(persisted.error)}`)
-        end
+    -- DEFERRED, not queued inline (2026-08-18 final review). handlerQueue drains its lane on a
+    -- freshly spawned thread, which runs synchronously up to its first yield -- and the first
+    -- thing this thunk does is a yielding HTTP PUT. Queueing it here therefore parked
+    -- PlayerRemoving inside setTeahouse, delaying siteCoordinator:onLeave (the pad release) a few
+    -- lines below by the transport's own latency, or by its full timeout when the backend is sick.
+    -- The write itself has no deadline; the pad release does, because the next player to walk up
+    -- to that pad is waiting on it. Everything the thunk needs is already captured above, so the
+    -- delay costs it nothing.
+    task.defer(function()
+        handlerQueue:run(uid, function()
+            local persisted = net:setTeahouse(uid, size, newLoadout)
+            if not persisted.ok then
+                warn(`[SHOJI] setTeahouse (flush) failed for {uid}/{size}: {tostring(persisted.error)}`)
+            end
+        end)
     end)
 end
 
@@ -1601,7 +1613,7 @@ Players.PlayerRemoving:Connect(function(player)
     end
     playerPrefs[uid] = nil
     -- drop this uid's not-yet-run mutations FIRST -- flushShojiForUid below queues at most one
-    -- fresh write, AFTER this call, so it is never at risk of being wiped by it.
+    -- fresh write, and defers even that, so it is never at risk of being wiped by this call.
     handlerQueue:clear(uid)
     -- flush every pending debounced shoji persist for this uid into ONE write NOW (2026-08-18
     -- review round 2 fix), before playerHouse[uid] is cleared below. flushShojiForUid reads the
@@ -1822,7 +1834,15 @@ local function runShojiSlide(player: Player, uid: string, slide: ShojiSlide, dir
         -- TARGET only -- see StructureOps.applyShoji/syncShojiBay's own docs on why ShojiOpen and
         -- ShojiApplied are split: a stepped, replicated PivotTo every tick would fight whatever the
         -- client controller tweens from this same attribute.
-        slide.bay:SetAttribute("ShojiOpen", nextOpen)
+        --
+        -- Only when it actually MOVED (2026-08-18 final review). Once the clamp has pinned a screen
+        -- at either end of its run, every further tick recomputed the identical number; writing it
+        -- anyway replicated an attribute change to every client in the place ~60 times a second,
+        -- each one waking their tween, for as long as a player kept leaning on G against a
+        -- fully-open screen. There is no reason a hold that changes nothing should cost anything.
+        if nextOpen ~= openNow then
+            slide.bay:SetAttribute("ShojiOpen", nextOpen)
+        end
     end
     if shojiSlides[uid] == slide then
         shojiSlides[uid] = nil
