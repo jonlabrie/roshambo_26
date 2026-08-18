@@ -20,8 +20,25 @@ local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local BirdFlight = require(shared:WaitForChild("BirdFlight"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
+local CollectionService = game:GetService("CollectionService")
+
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local FamiliarRoster = remotes:WaitForChild("FamiliarRoster") :: RemoteEvent
+
+-- ===== PERCHING (owner's numbers, 2026-08-18) =====
+-- A resting familiar belongs in the world, not orbiting a head: "it'll look like a bad cartoon
+-- where everyone just got knocked on the head". Perches are tagged attachments emitted by the
+-- builders (roofs, decks, teahouse railings) and swept onto place-only geometry (path railings,
+-- bridges, hero trees).
+local PERCH_RADIUS = 20 -- how far from its OWNER a bird will look for somewhere to sit
+-- A perch is held for a random span in this band, then the bird moves. Re-picked RANDOMLY from
+-- everything in range, so it sometimes returns to the one it just left — which is what a real
+-- bird does and what stops the movement reading as a patrol.
+local HOLD_MIN, HOLD_MAX = 10, 60
+-- Past this the bird gives up its perch and flies to catch up. Without it, an owner who walks off
+-- leaves their familiar behind on the far side of the canyon.
+local LEASH = 70
+local FLY_SPEED = 34 -- studs/sec toward wherever it is going
 
 -- LOD. Both numbers are GUESSES until measured on the A13, which is the device that governs the
 -- floor -- they are named and commented rather than inlined so the Studio gate can move them.
@@ -45,6 +62,9 @@ folder.Parent = workspace
 
 type Bird = {
     part: BasePart,
+    pos: Vector3,
+    perch: Attachment?,
+    holdUntil: number,
     wingL: BasePart,
     wingR: BasePart,
     tail: BasePart,
@@ -100,6 +120,9 @@ local function makeBird(userId: string): Bird
 
     return {
         part = body,
+        pos = Vector3.zero,
+        perch = nil,
+        holdUntil = 0,
         wingL = wingL,
         wingR = wingR,
         tail = tail,
@@ -120,6 +143,39 @@ local function characterRoot(userId: string): BasePart?
     return nil
 end
 
+-- Which perches are spoken for on THIS client. Deliberately client-local: two players' birds may
+-- double up across machines, and nobody can see both screens. Paying for agreement would mean a
+-- server round-trip for a decoration.
+local taken: { [Attachment]: boolean } = {}
+
+local function perchIsGone(a: Attachment): boolean
+    -- ⚠ StreamingEnabled IS ON. A distant railing can be streamed out mid-flight, so a perch must
+    -- be re-checked rather than trusted — a cached CFrame lands the bird on remembered air.
+    return a.Parent == nil or not a:IsDescendantOf(workspace)
+end
+
+local function pickPerch(ownerPos: Vector3): Attachment?
+    local near: { Attachment } = {}
+    for _, a in CollectionService:GetTagged("FamiliarPerch") do
+        if a:IsA("Attachment") and not perchIsGone(a) and not taken[a] then
+            if (a.WorldPosition - ownerPos).Magnitude <= PERCH_RADIUS then
+                table.insert(near, a)
+            end
+        end
+    end
+    if #near == 0 then
+        return nil
+    end
+    return near[math.random(#near)]
+end
+
+local function release(b: Bird)
+    if b.perch then
+        taken[b.perch] = nil
+        b.perch = nil
+    end
+end
+
 FamiliarRoster.OnClientEvent:Connect(function(next_: { [string]: any })
     roster = next_ or {}
     for userId, entry in roster do
@@ -136,6 +192,7 @@ FamiliarRoster.OnClientEvent:Connect(function(next_: { [string]: any })
     -- the roster, so a stale entry is a stale bird.
     for userId, b in birds do
         if not roster[userId] then
+            release(b)
             b.part:Destroy()
             birds[userId] = nil
         end
@@ -186,7 +243,7 @@ EventBus.Cue.Event:Connect(function(cue)
     end
 end)
 
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(dt)
     local camera = workspace.CurrentCamera
     local eye = camera and camera.CFrame.Position
     local now = os.clock()
@@ -206,28 +263,72 @@ RunService.RenderStepped:Connect(function()
         b.part.Transparency = 0
         b.wingL.Transparency, b.wingR.Transparency, b.tail.Transparency = 0, 0, 0
 
-        -- NO EXPIRY. The state persists until the next round replaces it, so a result is
-        -- readable long after the moment it happened — see BirdFlight's header.
+        -- NO EXPIRY on a result. The state persists until the next round replaces it.
         local elapsed = now - b.since
-        -- Past DETAIL_DISTANCE the bird holds a fixed offset instead of flying: at that range the
-        -- motion is a few pixels and the per-frame trig is the whole cost.
-        local o = if far > DETAIL_DISTANCE
-            then BirdFlight.offsetFor("RESTING", 0, b.seed)
-            else BirdFlight.offsetFor(b.state, elapsed, b.seed)
-        -- FACE THE WAY IT IS GOING. A bird flying sideways is the thing that most stops it
-        -- reading as a bird, and the heading falls straight out of the orbit's tangent.
-        local ahead = BirdFlight.offsetFor(b.state, elapsed + 0.08, b.seed)
-        local here = root.CFrame * CFrame.new(o.x, o.y, o.z)
-        local there = root.CFrame * CFrame.new(ahead.x, ahead.y, ahead.z)
-        local base = if (there.Position - here.Position).Magnitude > 0.01
-            then CFrame.lookAt(here.Position, there.Position)
-            else here
+        local resting = b.state ~= "WIN" and b.state ~= "LOSS"
+
+        -- ===== WHERE IS IT TRYING TO BE =====
+        local target: Vector3
+        if not resting then
+            -- A result takes the bird off its perch entirely: it is doing something, not sitting.
+            release(b)
+            local o = BirdFlight.offsetFor(b.state, elapsed, b.seed)
+            target = (root.CFrame * CFrame.new(o.x, o.y, o.z)).Position
+        else
+            if b.perch and perchIsGone(b.perch) then
+                release(b)
+            end
+            -- Give up a perch when it has been held long enough, or when the owner has walked far
+            -- enough that staying would strand the bird.
+            if
+                b.perch and (now > b.holdUntil or (root.Position - b.perch.WorldPosition).Magnitude > LEASH)
+            then
+                release(b)
+            end
+            if not b.perch then
+                local found = pickPerch(root.Position)
+                if found then
+                    b.perch = found
+                    taken[found] = true
+                    b.holdUntil = now + HOLD_MIN + math.random() * (HOLD_MAX - HOLD_MIN)
+                end
+            end
+            if b.perch then
+                -- Sit ON the anchor, not in it.
+                target = b.perch.WorldPosition + Vector3.new(0, 0.2, 0)
+            else
+                -- ⚠ NOWHERE TO SIT: fall back to the orbit rather than freezing. This is also
+                -- what keeps a bird OUT of buildings (owner: birds do not go inside) — indoors
+                -- there are no perches, so a bird that already has one simply keeps it and waits
+                -- outside; only a bird with none at all follows its owner in.
+                local o = BirdFlight.offsetFor("RESTING", elapsed, b.seed)
+                target = (root.CFrame * CFrame.new(o.x, o.y, o.z)).Position
+            end
+        end
+
+        -- ===== FLY THERE =====
+        -- One speed-capped lerp does the whole job: leaving a perch, crossing to another, and
+        -- settling all read as flight without a scripted path.
+        if b.pos.Magnitude == 0 then
+            b.pos = target
+        end
+        local step = math.min(1, (FLY_SPEED * dt) / math.max(0.01, (target - b.pos).Magnitude))
+        local nextPos = b.pos:Lerp(target, step)
+        local travelled = (nextPos - b.pos).Magnitude
+        local heading = if travelled > 0.001 then (nextPos - b.pos).Unit else Vector3.zAxis
+        b.pos = nextPos
+
+        local base = CFrame.lookAt(b.pos, b.pos + heading)
         b.part.CFrame = base
 
         if far <= DETAIL_DISTANCE then
-            -- One flap cycle, and it stops when the bird perches — a bird sitting on a shoulder
-            -- with its wings going is the tell that this is a box with decorations on it.
-            local flap = if b.state == "SAFE" and elapsed > 1.2 then 0 else math.sin(now * 14 + b.seed) * 0.7
+            -- Wings follow what the bird is DOING: hard while climbing, barely moving while sunk,
+            -- and STILL once it has settled on a perch. A perched bird with its wings going is the
+            -- tell that this is a box with decorations on it.
+            local landed = resting and b.perch ~= nil and travelled < 0.05
+            local beat = if b.state == "WIN" then 18 elseif b.state == "LOSS" then 7 else 12
+            local depth = if b.state == "WIN" then 0.9 elseif b.state == "LOSS" then 0.35 else 0.7
+            local flap = if landed then 0 else math.sin(now * beat + b.seed) * depth
             b.wingL.CFrame = base * CFrame.new(-0.26, 0.06, 0) * CFrame.Angles(0, 0, flap)
             b.wingR.CFrame = base * CFrame.new(0.26, 0.06, 0) * CFrame.Angles(0, 0, -flap)
             b.tail.CFrame = base * CFrame.new(0, 0.04, 0.5)
@@ -238,6 +339,7 @@ end)
 Players.PlayerRemoving:Connect(function(player)
     local b = birds[tostring(player.UserId)]
     if b then
+        release(b)
         b.part:Destroy()
         birds[tostring(player.UserId)] = nil
     end

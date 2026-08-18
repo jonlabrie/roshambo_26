@@ -142,16 +142,35 @@ function PadOps.new(mountCF: CFrame, parent: Instance)
 
             -- cap/mid rails butt BETWEEN the corner newels (span shrunk by a newel at each end)
             -- so they meet the posts flush instead of piercing through them
-            local function member(name: string, cy: number, w: number, h: number, color: Color3)
+            local function member(name: string, cy: number, w: number, h: number, color: Color3): BasePart
                 local ox, oz = mx + edge.nx * (w / 2), mz + edge.nz * (w / 2) -- inset so outer face is flush
                 local span = math.max(0, length - 2 * NEWEL_W)
                 if alongX then
-                    box(name, ox, cy, oz, span, h, w, color, Enum.Material.Wood, true)
-                else
-                    box(name, ox, cy, oz, w, h, span, color, Enum.Material.Wood, true)
+                    return box(name, ox, cy, oz, span, h, w, color, Enum.Material.Wood, true)
                 end
+                return box(name, ox, cy, oz, w, h, span, color, Enum.Material.Wood, true)
             end
-            member("RailCap", CAP_TOP - CAP_H / 2, CAP_W, CAP_H, CAP_COLOR)
+            local cap = member("RailCap", CAP_TOP - CAP_H / 2, CAP_W, CAP_H, CAP_COLOR)
+
+            -- ===== FAMILIAR PERCHES, EMITTED HERE AND NOT SWEPT =====
+            -- A deck railing is rebuilt every time a teahouse materialises on a pad, which is
+            -- every claim of every session — so a perch stamped onto this cap in Studio would
+            -- survive exactly until the next player claimed the pad. Emitting it with the rail is
+            -- the only way it lasts, and it costs three lines.
+            --
+            -- Two per edge, which puts a handful of birds around a claimed deck without turning
+            -- the railing into a wire of them.
+            for i = 1, 2 do
+                local t = (i - 0.5) / 2 - 0.5
+                local span = math.max(0, length - 2 * NEWEL_W)
+                local a = Instance.new("Attachment")
+                a.Name = "FamiliarPerch_rail"
+                a.CFrame = if alongX
+                    then CFrame.new(span * t, CAP_H / 2, 0)
+                    else CFrame.new(0, CAP_H / 2, span * t)
+                a.Parent = cap
+                CollectionService:AddTag(a, "FamiliarPerch")
+            end
             member("RailMid", MID_Y, MID_W, MID_H, RAIL_WOOD)
 
             local isSide = edge.nx ~= 0 -- left/right edges own the corners
