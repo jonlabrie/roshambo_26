@@ -784,6 +784,18 @@ local function filterRecords(records: any?): any?
     return copy
 end
 
+-- The board arrives already named and already gated by the server; the only thing left to strip
+-- is anything a client has no business holding. Its own filter rather than folded into
+-- filterRecords so a future field on either cannot silently ride along on the other.
+local function filterBoard(board: any?): any?
+    if not board then
+        return board
+    end
+    local copy = table.clone(board)
+    copy.rows = filterTop(board.rows)
+    return copy
+end
+
 local function filterHeat(heat: any?): any?
     if not heat then
         return heat
@@ -804,6 +816,7 @@ task.spawn(function()
         local week = net:getStatsRecords("week")
         local all = net:getStatsRecords("all")
         local heat = net:getStatsHeat("day", nil)
+        local board = net:getStatsBoard()
         -- Each field is independently nil-able: one endpoint failing must leave the other three
         -- boards showing their last good content rather than blanking the whole room.
         lastStats = {
@@ -813,6 +826,8 @@ task.spawn(function()
             recordsWeek = if week.ok then filterRecords(week.data) else (lastStats and lastStats.recordsWeek),
             recordsAll = if all.ok then filterRecords(all.data) else (lastStats and lastStats.recordsAll),
             heat = if heat.ok then filterHeat(heat.data) else (lastStats and lastStats.heat),
+            board = if board.ok then filterBoard(board.data) else (lastStats and lastStats.board),
+            depths = if board.ok then board.data.depths else (lastStats and lastStats.depths),
             tape = lastTape,
         }
         StatsData:FireAllClients(lastStats)

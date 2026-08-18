@@ -141,6 +141,14 @@ function NetworkClient.getStatsHeat(self: any, window: string, instanceId: strin
     return self:_request("GET", path)
 end
 
+-- No window parameter: the board is the rolling week by definition and the route decides. Taking
+-- one would invite a caller to ask for a window the 360-throw floor was never derived for --
+-- that floor separates a +5-point edge from luck over ~356 throws, and means nothing over an
+-- afternoon.
+function NetworkClient.getStatsBoard(self: any): Result
+    return self:_request("GET", "/api/v1/stats/board")
+end
+
 function NetworkClient.getStatsPlayer(self: any, robloxUserId: string): Result
     return self:_request("GET", `/api/v1/stats/player/{robloxUserId}`)
 end
