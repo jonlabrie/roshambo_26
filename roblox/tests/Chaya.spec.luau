@@ -357,8 +357,13 @@ describe("Chaya — rougher, and open to the air", function()
         local thatch = findPrefix(m, "Thatch")
         expect(#thatch == 2).toBe(true)
         for _, t in thatch do
+            -- Grass is the BaseMaterial the variant is registered against (a part only wears a
+            -- variant when its Material matches), and the honest fallback where the variant
+            -- does not load: a thatched roof reading as grass is the right kind of wrong.
             expect(t.properties.Material).toBe("Grass")
+            expect(t.properties.MaterialVariant).toBe("Thatch")
         end
+        expect(find(m, "RidgeBundle").properties.MaterialVariant).toBe("Thatch")
         expect(#findPrefix(m, "Rafter") >= 6).toBe(true)
         expect(find(m, "RidgeBundle") ~= nil).toBe(true)
     end)

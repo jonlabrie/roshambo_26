@@ -10,7 +10,8 @@
 -- The builders also tint each variant via the part Color (see ZenDojo.palette). Idempotent.
 --
 -- Source materials: CypressWeathered=Wood059(gray), BronzePatina=Metal058C,
--- SlateTile=RoofingTiles013A, IronDark=Metal046B, MossyPaddle=Wood065.
+-- SlateTile=RoofingTiles013A, IronDark=Metal046B, MossyPaddle=Wood065,
+-- Thatch=ThatchedRoof002A (added 2026-08-17 for the riverside chaya).
 local MaterialService = game:GetService("MaterialService")
 
 local SPECS = {
@@ -113,6 +114,22 @@ local SPECS = {
         normal = "rbxassetid://108776054419159",
         metal = "rbxassetid://103690182987939",
         rough = "rbxassetid://140223765351870",
+    },
+    {
+        -- The chaya's roof. A REAL SCAN, replacing the tinted stock Grass the first cut used
+        -- (owner supplied ThatchedRoof002A, 2026-08-17). Uploaded through the same localhost
+        -- pipeline as everything above; NormalGL, no metalness -- straw is not a conductor.
+        --
+        -- BaseMaterial Grass because that is what the builder's thatch parts already set, and
+        -- because it is the honest fallback: on a device that drops the variant, a thatched
+        -- roof reading as grass is the right kind of wrong.
+        name = "Thatch",
+        base = Enum.Material.Grass,
+        tile = 4.0, -- start point: the strands want to read as bundles at roof scale, not fuzz
+        color = "rbxassetid://102878390036756", -- ThatchedRoof002A
+        normal = "rbxassetid://100832278941433",
+        metal = "",
+        rough = "rbxassetid://131775858308283",
     },
 }
 

@@ -175,7 +175,10 @@ function Chaya.build(palette: any, _layout: any): any
     -- dressed CypressWeathered the shōrō and the falls dock wear. That variant is the
     -- canyon's resort joinery, and this is a tea stand on a beach.
     local board = { 0.55, 0.45, 0.33 }
-    local straw = { 0.76, 0.66, 0.44 }
+    -- NEAR-NEUTRAL, because part.Color MULTIPLIES the variant's ColorMap and the scan
+    -- already carries thatch's colour. The 0.76/0.66/0.44 this was before is what you paint
+    -- when there is no map underneath; over one it would darken the straw to mud.
+    local straw = { 0.94, 0.90, 0.82 }
     local indigo = { 0.20, 0.26, 0.36 }
 
     local function part(name: string, props: { [string]: any })
@@ -420,6 +423,7 @@ function Chaya.build(palette: any, _layout: any): any
             Size = { roofW, THATCH_T, SLOPE_LEN },
             CFrame = Spec.cframe({ cx, (EAVE_Y + RIDGE_Y) / 2, zc }, rot),
             Material = "Grass",
+            MaterialVariant = "Thatch",
             Color = straw,
         })
         for i = 1, 5 do
@@ -489,7 +493,8 @@ function Chaya.build(palette: any, _layout: any): any
         Size = { roofW, 0.75, 0.75 },
         CFrame = Spec.cframe({ cx, RIDGE_Y + 0.2, Chaya.RIDGE_Z }),
         Material = "Grass",
-        Color = { 0.68, 0.58, 0.38 },
+        MaterialVariant = "Thatch",
+        Color = { 0.86, 0.80, 0.68 }, -- the ridge bundle is fresher straw than the field
     })
 
     -- ----- the front: a rail, a half-noren, a rolled blind and one chōchin -----
