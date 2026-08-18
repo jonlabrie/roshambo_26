@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: open
-updated: 2026-08-16
+updated: 2026-08-17
 ---
 
 # Friends & Family Baseline
@@ -27,8 +27,9 @@ rounds skippable, no penalty) — hangout is the product.
 3. **Fireworks core** — closed 2026-08-13: loop verified in-game end to end (owner bought
    shells, consumed them at the Overlook, `ishibana` available/unavailable at the right
    moments); the fireworks shop owner-gated the same day (fixes `322d948`, `22bcf2e`).
-4. **Merchant row** — open, nearly done: the shells are built (Stats front, apparel, 花火屋,
-   accessories); only the **riverside chaya (tea vendor)** remains. [[item-4-merchant-row]].
+4. **Merchant row** — closed 2026-08-17: every shell built and gated (Stats front, apparel,
+   花火屋, accessories, and the riverside chaya + its dock — [[chaya]]).
+   [[item-4-merchant-row]].
 5. **Shoji** — open: open/half/close, ideally grab-slide (fallback prompt-cycled);
    swappable loadout SLOT ships now, better screens earned/bought later.
 6. **Rewards & flex** — open: server-side milestone badges from existing per-player stats,

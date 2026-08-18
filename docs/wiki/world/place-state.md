@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-15
+updated: 2026-08-17
 ---
 
 # Place State
@@ -30,7 +30,10 @@ Everything below marked *verified* was checked live via the Studio MCP on 2026-0
 - `RoshamboStage`: Waterwheel, Overlook, ThrowDrum, Hanabiya, Karesansui, BonshoRig,
   SwitchbackDeck, BellDrive, FallsDock, BonshoBell, Torii, Shoro, ArenaSpawn,
   ShoroRoof, RanmaCarvings — matches the Rojo declaration; the once-noted stray
-  top-level ShoroRoof/BonshoBell dupes are gone (0 found).
+  top-level ShoroRoof/BonshoBell dupes are gone (0 found). Since 2026-08-15 the
+  declaration has also gained MachiyaApparel, MachiyaAccessories, MachiyaStats and
+  **Chaya** ([[chaya]], saved 2026-08-17) — a new stage child needs a Rojo RESTART, not
+  just a plugin reconnect, because `rojo serve` reads the project file once at startup.
 - `CanyonWorld`: Arena (incl. `W##_*_Rocks/_VFX`, `FallsLanding`), Paths
   (`PathRailings` 5,186 descendants, `PathLanterns` 2,599), Structures (incl.
   `Chochin_Hanabiya`), **Legacy (empty — the 14 legacy teahouses were retired to
@@ -46,12 +49,18 @@ Everything below marked *verified* was checked live via the Studio MCP on 2026-0
   (−2,0) (verified).
 - MaterialService variants (verified): `NorenCloth`, `BronzePatinaFine` — plus the
   RakedSand/RakedGravelRings/ZenGardenStone/CypressWeathered/CypressVertical family
-  referenced by builders. A mistyped or duplicate variant name fails SILENTLY.
+  referenced by builders, and **`Thatch`** (ThatchedRoof002A, added and saved 2026-08-17
+  for [[chaya]]; BaseMaterial Grass, StudsPerTile 4.0). A mistyped or duplicate variant
+  name fails SILENTLY. Every one of them is rebuilt by
+  `tools/studio/setupCenterpieceMaterials.luau`, which bakes the uploaded asset ids.
 
 ## ServerStorage inventory (verified 2026-08-15)
 
 - **Parked, restorable**: `Sandbox_PARKED` (incl. `MerchantMassing` ×6 — the
-  [[item-4-merchant-row]] massing reference — and `PadRefs`),
+  [[item-4-merchant-row]] massing reference, of which `Machiya_2` and `DockDeck` are now
+  SUPERSEDED history rather than instructions: the ground under them could not carry what
+  they described, and the chaya was built at the waterline instead ([[chaya]]) — and
+  `PadRefs`),
   `Sandbox_PARKED_2026_08_01`, `Scaffolding_PARKED`, `WorkspaceStrays_PARKED`,
   `FireworkBench_PARKED` ([[fireworks]]), `ParkedFoliage`
   (`MossTransitions_2026_08_01`, `MuhlyKit_2026_07_31`, `MarginCull_2026_07_30`).

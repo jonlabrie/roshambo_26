@@ -307,3 +307,14 @@ square despite ~8,400 GUI instances and no MaxDistance cull — the parked perf 
 not owed. Physical flaps read ragged at ~30 fps: half-turns (0.055 s / 0.0825 s) are
 shorter than two frames. See [[stats-room]].
 
+## [2026-08-17] ship | Riverside chaya + dock shipped — item 4 closed
+
+The merchant row's last shell, owner-gated with the place saved. A pavilion, not a
+machiya: round posts, real thatch (ThatchedRoof002A) with rolled edges, a counter
+splitting the floor, stools at it and an endai bench at the rail, `ChayaKeeperSlot`
+standing empty for an NPC that does not exist yet. Built at the waterline —
+`Machiya_2` and `DockDeck` are superseded, not deleted. The chōchin is red by owner
+ruling, bounded by the legibility floor rather than by the row's no-red rule.
+Five looks, and the frame was rebuilt entirely at the third ("the engineering is
+suspect"). See [[chaya]] and [[item-4-merchant-row]].
+
