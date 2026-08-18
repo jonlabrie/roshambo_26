@@ -152,3 +152,44 @@ describe("ShojiRun.resolve — a stored map becomes one number per bay", functio
         expect(ShojiRun.resolve("nope" :: any, 3)).toEqual({ 0, 0, 0 })
     end)
 end)
+
+describe("ShojiRun.isSlidable — only a bay RESOLVED to shoji has a screen to slide", function()
+    test("the applied state, not the presence of a variant, is the gate", function()
+        -- applyBays hides a variant by transparency, never by removing it, so a solid bay still
+        -- answers FindFirstChild("Shoji"). This is the rule that stops a "Slide open" prompt
+        -- appearing on every solid wall in the game.
+        expect(ShojiRun.isSlidable("shoji")).toBe(true)
+        expect(ShojiRun.isSlidable("solid")).toBe(false)
+        expect(ShojiRun.isSlidable("door")).toBe(false)
+    end)
+
+    test("an unwritten or junk BayState is not slidable", function()
+        -- a bay applyBays skipped (missing variant, unknown state) carries no attribute at all;
+        -- the safe reading of "I don't know" is "no prompt, no hold"
+        expect(ShojiRun.isSlidable(nil)).toBe(false)
+        expect(ShojiRun.isSlidable(true)).toBe(false)
+        expect(ShojiRun.isSlidable(3)).toBe(false)
+        expect(ShojiRun.isSlidable("Shoji")).toBe(false)
+    end)
+end)
+
+describe("ShojiRun.ordinalOf — the wire carries a RAW bay number, the run carries ordinals", function()
+    test("a raw bay number becomes its position within the run", function()
+        -- Bay_back_2 and Bay_back_5 are the only shoji bays of that wall: they are ordinals 1 and 2
+        expect(ShojiRun.ordinalOf({ 2, 5 }, 2)).toBe(1)
+        expect(ShojiRun.ordinalOf({ 2, 5 }, 5)).toBe(2)
+    end)
+
+    test("a bay outside the run has no ordinal, and never borrows a neighbour's", function()
+        expect(ShojiRun.ordinalOf({ 2, 5 }, 3)).toBe(nil)
+        expect(ShojiRun.ordinalOf({}, 1)).toBe(nil)
+    end)
+
+    test("junk on the wire resolves to nothing rather than an ordinal", function()
+        expect(ShojiRun.ordinalOf({ 1, 2 }, "1" :: any)).toBe(nil)
+        expect(ShojiRun.ordinalOf({ 1, 2 }, 1.5)).toBe(nil)
+        expect(ShojiRun.ordinalOf({ 1, 2 }, 0)).toBe(nil)
+        expect(ShojiRun.ordinalOf({ 1, 2 }, 0 / 0)).toBe(nil)
+        expect(ShojiRun.ordinalOf({ 1, 2 }, nil :: any)).toBe(nil)
+    end)
+end)

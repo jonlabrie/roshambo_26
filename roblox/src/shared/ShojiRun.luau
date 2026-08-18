@@ -38,6 +38,46 @@ function ShojiRun.clamp(index: number, count: number, open: number?): number
     return math.clamp(open, lo, hi)
 end
 
+-- Whether a bay's RESOLVED state gives it a screen to slide. The gate reads the `BayState`
+-- attribute StructureOps.applyBays writes as it applies each bay -- NOT whether the bay owns a
+-- `Shoji` variant, which every bay of a stock prefab does. applyBays hides a variant by setting
+-- Transparency = 1, never by removing it, so a bay showing its Solid panel still answers
+-- FindFirstChild("Shoji"); reading membership that way put a "Slide open" prompt on nearly every
+-- wall in the game and let the server slide an invisible, non-colliding leaf behind it (2026-08-18
+-- final review, critical). Anything that is not exactly the string "shoji" -- a bay applyBays
+-- skipped and so never stamped, a stale value, junk -- is not slidable, because a prompt that
+-- should not exist is worse than a prompt that is briefly missing.
+--
+-- This gates PROMPTS and HOLD ACCEPTANCE only. Run MEMBERSHIP and ordinals stay "the bays that
+-- carry a Shoji variant" (see ShojiRun.ordinalOf and StructureOps.applyShoji): that is what the
+-- prefab's grooves were authored against and what a persisted `shojiOpen` index means, so toggling
+-- one bay between solid and shoji must not renumber a player's saved screen positions.
+function ShojiRun.isSlidable(bayState: any): boolean
+    return bayState == "shoji"
+end
+
+-- A raw `Bay_<side>_<n>` number resolved against the run it belongs to. `bayNumbers` is that
+-- side's shoji-bearing bay numbers in ascending order; the answer is the position within it, or
+-- nil for a bay that is not part of the run at all.
+--
+-- The SlideShoji wire carries the RAW number, not this ordinal (2026-08-18 final review): the
+-- client can only count the bays whose `Shoji` child has already replicated to it, while the
+-- server sees them all, so in the window after a live rebuild the client's ordinal n named the
+-- server's ordinal n+1 and a press slid the neighbouring screen. Raw numbers are the one naming
+-- both sides agree on unconditionally; the mapping to an ordinal happens HERE, on the server,
+-- which is the side that can always see the whole wall.
+function ShojiRun.ordinalOf(bayNumbers: { number }, raw: any): number?
+    if typeof(raw) ~= "number" or raw ~= raw or raw % 1 ~= 0 or raw < 1 then
+        return nil
+    end
+    for ordinal, n in bayNumbers do
+        if n == raw then
+            return ordinal
+        end
+    end
+    return nil
+end
+
 -- Which way a hold sends a screen. Not a function of position alone: a screen at rest in the
 -- LAST bay of a run has no +1 to travel into, and a barely-open screen should keep going the
 -- way it was already going rather than reverse under the player's finger.

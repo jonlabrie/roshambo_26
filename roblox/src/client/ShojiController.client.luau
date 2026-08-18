@@ -11,6 +11,16 @@
 -- for the whole hold and then jump at the end, because that attribute doesn't move until the hold
 -- is over.
 --
+-- A THIRD attribute decides whether a bay gets a prompt AT ALL: `BayState`, written by
+-- StructureOps.applyBays as it applies each bay (2026-08-18 final review, critical). Do NOT go
+-- back to `bay:FindFirstChild("Shoji")` for that question. applyBays hides a variant by setting
+-- Transparency = 1, never by removing it, so EVERY bay of a stock prefab answers that lookup --
+-- and WallBays.defaultState is `solid` for every side except the front. Gating on presence put a
+-- "Slide open" prompt on most of the walls in the game, anchored to a visible solid panel, and a
+-- hold on one slid an invisible non-colliding leaf. The rule lives in ShojiRun.isSlidable, shared
+-- with the server, which gates hold ACCEPTANCE on the same attribute rather than trusting that
+-- this controller was willing to ask.
+--
 -- Lifecycle, copied in SHAPE from BackDoorController.client.luau, which solved the hard part of
 -- this once already -- see its own header for the full "why RemoteEvents aren't ordered against
 -- replication" story. One structural difference from that controller: BackDoorController binds to
@@ -24,15 +34,16 @@
 -- under its stable site folder (MaterializedSite_<padId>) on every buy/upgrade/edit, so binding
 -- prompts at event-arrival time would be racy and could silently miss a teahouse.
 --
--- One level deeper than BackDoorController's late-arrival handling: there, a bay's INDEX is its
--- own raw `Bay_back_<i>` number, so a late-arriving bay only ever adds itself. Here, the `index`
--- fired to the server is the bay's ORDINAL WITHIN ITS SIDE'S SHOJI RUN -- the bays of that side
--- that carry a `Shoji` variant, in ascending Bay_<side>_<n> order, exactly as
--- StructureOps.applyShoji and main.server.luau's collectShojiRun collect it -- so a late-arriving
--- bay (or a bay whose OWN `Shoji` child hasn't replicated in yet) can change every OTHER bay's
--- ordinal on that side. `rebuildSide` below always recomputes and rebinds a side's entire run from
--- scratch rather than patching one bay in place, so a late arrival never leaves a stale ordinal
--- pointed at the wrong screen.
+-- The unit of state here is ONE BAY, watched independently of every other bay on its wall. It used
+-- to be a whole side, rebuilt from scratch on every arrival, because the number this controller
+-- fired to the server was the bay's ORDINAL within its side's shoji run -- so a bay arriving late
+-- renumbered every other bay after it. The wire now carries the RAW `Bay_<side>_<n>` number and
+-- the SERVER maps it to a run ordinal (ShojiRun.ordinalOf), for a correctness reason rather than a
+-- tidiness one: this client can only count the bays whose `Shoji` child has replicated to it,
+-- while the server always sees the whole wall, so during that window the client's ordinal n named
+-- the server's ordinal n+1 and a press slid the NEIGHBOURING screen. With raw numbers, a late
+-- arrival can only ever add itself, so nothing about one bay depends on another and there is no
+-- hand-copied run collector left on this side of the wire to drift.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local TweenService = game:GetService("TweenService")
 
@@ -57,12 +68,11 @@ local function runAxisVector(side: string): Vector3?
     local axis = ShojiRun.runAxis(side)
     return if axis then Vector3.new(axis.x, axis.y, axis.z) else nil
 end
-local SIDES = { "front", "back", "left", "right" }
 
 type BayEntry = {
     padId: string,
     side: string,
-    ordinal: number,
+    bayNumber: number, -- the raw <n> of Bay_<side>_<n>, which is what goes over the wire
     bay: Model,
     leaf: Model,
     prompt: ProximityPrompt,
@@ -75,6 +85,19 @@ type BayEntry = {
     attrConn: RBXScriptConnection,
 }
 
+-- One per Bay_<side>_<n> model of a bound structure, whether or not it currently has a screen.
+-- `stateConn` is the whole point of watching a bay with no entry: a bay toggled from solid to
+-- shoji at runtime (the back-door editor re-applies a whole wall live) has to GAIN its prompt
+-- without waiting for the structure to be rebuilt, and one toggled the other way has to lose it.
+type BayWatch = {
+    bay: Model,
+    side: string,
+    bayNumber: number,
+    stateConn: RBXScriptConnection,
+    shojiConn: RBXScriptConnection?, -- armed only while the bay's own `Shoji` child is still absent
+    entry: BayEntry?,
+}
+
 type PadState = {
     padId: string,
     folder: Instance,
@@ -82,14 +105,14 @@ type PadState = {
     folderRemovedConn: RBXScriptConnection?,
     structure: Model?,
     structureConn: RBXScriptConnection?,
-    bays: { [string]: BayEntry }, -- keyed "<side>_<ordinal>"
-    pendingShojiWatchers: { [Model]: RBXScriptConnection }, -- bays still missing their Shoji child
+    watches: { [Model]: BayWatch },
+    entries: { [string]: BayEntry }, -- keyed "<side>_<bayNumber>", for the ShojiState reply
 }
 
 local pads: { [string]: PadState } = {}
 
-local function bayKey(side: string, ordinal: number): string
-    return side .. "_" .. ordinal
+local function bayKey(side: string, bayNumber: number): string
+    return side .. "_" .. bayNumber
 end
 
 -- A screen already open should not offer to open further -- the prompt only ever knows "shut" vs
@@ -119,28 +142,6 @@ local function anchorPart(bay: Model): BasePart?
     return bay:FindFirstChildWhichIsA("BasePart", true)
 end
 
--- The same bay-run collection StructureOps.applyShoji/main.server.luau's collectShojiRun use:
--- Bay_<side>_<n> models that carry a `Shoji` variant, ascending by n. Kept in sync BY HAND with
--- those, because the server's `index` names nothing on this client unless the list is identical.
-local function collectRun(structure: Model, side: string): { { rawIndex: number, bay: Model } }
-    local list: { { rawIndex: number, bay: Model } } = {}
-    for _, c in structure:GetChildren() do
-        if c:IsA("Model") then
-            local s, idxStr = c.Name:match("^Bay_(%a+)_(%d+)$")
-            if s == side then
-                local shoji = c:FindFirstChild("Shoji")
-                if shoji and shoji:IsA("Model") then
-                    table.insert(list, { rawIndex = tonumber(idxStr) :: number, bay = c })
-                end
-            end
-        end
-    end
-    table.sort(list, function(a, b)
-        return a.rawIndex < b.rawIndex
-    end)
-    return list
-end
-
 local function destroyBayEntry(entry: BayEntry)
     if entry.holding then
         -- (2026-08-18 review fix) An active hold on THIS bay from THIS client: destroying the
@@ -148,7 +149,12 @@ local function destroyBayEntry(entry: BayEntry)
         -- ShojiState handler below), so without this the server never hears the hold stopped and
         -- keeps sliding a screen nothing is rendering anymore, until the player wanders out of
         -- reach. Fire the release ourselves before tearing anything down.
-        SlideShoji:FireServer({ padId = entry.padId, side = entry.side, index = entry.ordinal, held = false })
+        SlideShoji:FireServer({
+            padId = entry.padId,
+            side = entry.side,
+            bay = entry.bayNumber,
+            held = false,
+        })
         entry.holding = false
     end
     if entry.tween then
@@ -178,7 +184,7 @@ local function createBayEntry(
     padId: string,
     structure: Model,
     side: string,
-    ordinal: number,
+    bayNumber: number,
     bay: Model
 ): BayEntry?
     local leafChild = bay:FindFirstChild("Shoji")
@@ -224,7 +230,7 @@ local function createBayEntry(
     local entry = {} :: BayEntry
     entry.padId = padId
     entry.side = side
-    entry.ordinal = ordinal
+    entry.bayNumber = bayNumber
     entry.bay = bay
     entry.leaf = leaf
     entry.homePivot = homePivot
@@ -252,11 +258,11 @@ local function createBayEntry(
 
     prompt.PromptButtonHoldBegan:Connect(function()
         entry.holding = true
-        SlideShoji:FireServer({ padId = padId, side = side, index = ordinal, held = true })
+        SlideShoji:FireServer({ padId = padId, side = side, bay = bayNumber, held = true })
     end)
     prompt.PromptButtonHoldEnded:Connect(function()
         entry.holding = false
-        SlideShoji:FireServer({ padId = padId, side = side, index = ordinal, held = false })
+        SlideShoji:FireServer({ padId = padId, side = side, bay = bayNumber, held = false })
     end)
 
     entry.attrConn = bay:GetAttributeChangedSignal("ShojiOpen"):Connect(function()
@@ -268,71 +274,104 @@ local function createBayEntry(
     return entry
 end
 
--- Recompute and rebind this side's ENTIRE run from the structure's current children. Called on
--- first bind and on every later ChildAdded that could have changed the run's membership, rather
--- than patching one bay in place, because a late arrival can shift every OTHER bay's ordinal.
-local function rebuildSide(padState: PadState, structure: Model, side: string)
-    for key, entry in padState.bays do
-        if entry.side == side then
-            destroyBayEntry(entry)
-            padState.bays[key] = nil
+-- Bring ONE bay's prompt into agreement with what that bay currently IS. Called on first sight of
+-- the bay, whenever its `BayState` changes, and when its `Shoji` child finally replicates. A bay
+-- only earns a prompt when its resolved state is shoji AND the leaf to slide has actually arrived;
+-- anything else tears down whatever it had. Idempotent, so every one of those triggers can fire in
+-- the same tick without churning the prompt.
+local function refreshBay(padState: PadState, structure: Model, watch: BayWatch)
+    local leaf = watch.bay:FindFirstChild("Shoji")
+    local hasLeaf = leaf ~= nil and leaf:IsA("Model")
+    -- A bay model can replicate before its own descendants do (a replicated subtree's children can
+    -- land after its root's ChildAdded fires on the client, per BackDoorController's own note), so
+    -- a shoji bay may briefly have no leaf. Watch once for it; the arrival re-runs this function.
+    if hasLeaf then
+        if watch.shojiConn then
+            watch.shojiConn:Disconnect()
+            watch.shojiConn = nil
         end
-    end
-    local run = collectRun(structure, side)
-    for ordinal, item in run do
-        local entry = createBayEntry(padState.padId, structure, side, ordinal, item.bay)
-        if entry then
-            padState.bays[bayKey(side, ordinal)] = entry
-        end
-    end
-    -- A Bay_<side>_<n> model can itself have replicated before its OWN `Shoji` descendant does
-    -- (a replicated subtree's descendants can land after its root's ChildAdded fires on the
-    -- client, per BackDoorController's own note) -- such a bay is silently excluded from `run`
-    -- above (same as a bay with no shoji variant at all, an entirely ordinary shape). Watch it
-    -- once for that child; when it lands, this side's whole run is rebuilt again so the newcomer
-    -- gets counted and every following ordinal shifts correctly.
-    --
-    -- Deduped per BAY INSTANCE in `padState.pendingShojiWatchers` (2026-08-18 review fix): without
-    -- this, a wall that rebuilds twice while a bay is still streaming in got a FRESH watcher on
-    -- every rebuildSide call, on top of whichever one from the previous call was still armed and
-    -- waiting on the same bay -- every one of them would fire on arrival, each triggering its own
-    -- full-side rebuild in the same tick. A bay already being watched is skipped outright; there
-    -- is nothing to refresh, since the watcher fires on the CHILD landing, not on anything about
-    -- this rebuild.
-    for _, c in structure:GetChildren() do
-        if c:IsA("Model") then
-            local s = c.Name:match("^Bay_(%a+)_%d+$")
-            if s == side and not c:FindFirstChild("Shoji") and padState.pendingShojiWatchers[c] == nil then
-                local watched = c
-                local conn: RBXScriptConnection
-                conn = watched.ChildAdded:Connect(function(child)
-                    if child.Name == "Shoji" then
-                        padState.pendingShojiWatchers[watched] = nil
-                        conn:Disconnect()
-                        rebuildSide(padState, structure, side)
-                    end
-                end)
-                padState.pendingShojiWatchers[watched] = conn
+    elseif watch.shojiConn == nil then
+        watch.shojiConn = watch.bay.ChildAdded:Connect(function(child)
+            if child.Name == "Shoji" then
+                refreshBay(padState, structure, watch)
             end
+        end)
+    end
+
+    local want = hasLeaf and ShojiRun.isSlidable(watch.bay:GetAttribute("BayState"))
+    local key = bayKey(watch.side, watch.bayNumber)
+    if want and watch.entry == nil then
+        local entry = createBayEntry(padState.padId, structure, watch.side, watch.bayNumber, watch.bay)
+        if entry then
+            watch.entry = entry
+            padState.entries[key] = entry
         end
+    elseif not want and watch.entry ~= nil then
+        destroyBayEntry(watch.entry)
+        watch.entry = nil
+        padState.entries[key] = nil
     end
 end
 
--- Drop every late-arrival watcher this pad has armed (structure switch, or its site folder losing
--- its Structure with no replacement): each one is on a bay belonging to a structure that is now
--- dead or about to be, so none of them should fire a rebuild for a side that's about to be, or
--- just was, rebuilt from scratch anyway.
-local function clearPendingWatchers(padState: PadState)
-    for bay, conn in padState.pendingShojiWatchers do
-        conn:Disconnect()
-        padState.pendingShojiWatchers[bay] = nil
+local function destroyWatch(padState: PadState, watch: BayWatch)
+    watch.stateConn:Disconnect()
+    if watch.shojiConn then
+        watch.shojiConn:Disconnect()
+        watch.shojiConn = nil
     end
+    if watch.entry then
+        destroyBayEntry(watch.entry)
+        padState.entries[bayKey(watch.side, watch.bayNumber)] = nil
+        watch.entry = nil
+    end
+    padState.watches[watch.bay] = nil
+end
+
+local function clearWatches(padState: PadState)
+    for _, watch in padState.watches do
+        destroyWatch(padState, watch)
+    end
+    padState.watches = {}
+    padState.entries = {}
+end
+
+-- Start (or re-run) the watch on one Bay_<side>_<n> model. Deduped per bay INSTANCE: a structure
+-- whose ChildAdded fires again for a bay already seen must not stack a second `BayState` listener
+-- on it, each firing its own refresh in the same tick.
+local function watchBay(padState: PadState, structure: Model, child: Instance)
+    if not child:IsA("Model") then
+        return
+    end
+    local side, numStr = child.Name:match("^Bay_(%a+)_(%d+)$")
+    if side == nil or numStr == nil then
+        return
+    end
+    if ShojiRun.runAxis(side) == nil then
+        return -- a side with no run direction has nothing this controller can slide
+    end
+    local bay = child :: Model
+    local existing = padState.watches[bay]
+    if existing ~= nil then
+        refreshBay(padState, structure, existing)
+        return
+    end
+    local watch = {} :: BayWatch
+    watch.bay = bay
+    watch.side = side
+    watch.bayNumber = tonumber(numStr) :: number
+    watch.shojiConn = nil
+    watch.entry = nil
+    watch.stateConn = bay:GetAttributeChangedSignal("BayState"):Connect(function()
+        refreshBay(padState, structure, watch)
+    end)
+    padState.watches[bay] = watch
+    refreshBay(padState, structure, watch)
 end
 
 -- Bind to whichever Structure currently lives under this pad's site folder. Idempotent per
 -- structure instance, same discipline as BackDoorController.bindStructure: switching to a
--- genuinely new structure drops every bay entry (they belonged to the dead structure) and
--- rebuilds all four sides from scratch.
+-- genuinely new structure drops every bay watch (they belonged to the dead structure) and
+-- rebuilds them from the newcomer's own children.
 local function bindStructure(padState: PadState, structure: Model)
     if padState.structure == structure then
         return
@@ -341,25 +380,25 @@ local function bindStructure(padState: PadState, structure: Model)
         padState.structureConn:Disconnect()
         padState.structureConn = nil
     end
-    for _, entry in padState.bays do
-        destroyBayEntry(entry)
-    end
-    padState.bays = {}
-    clearPendingWatchers(padState)
+    clearWatches(padState)
     padState.structure = structure
-    for _, side in SIDES do
-        rebuildSide(padState, structure, side)
+    for _, child in structure:GetChildren() do
+        watchBay(padState, structure, child)
     end
     -- A replicated subtree's descendants can land after the Structure root's own ChildAdded
     -- fires on the client, so a Bay_<side>_<n> may still be arriving after the sweep above.
     padState.structureConn = structure.ChildAdded:Connect(function(child)
-        if child:IsA("Model") then
-            local side = child.Name:match("^Bay_(%a+)_%d+$")
-            if side and ShojiRun.runAxis(side) then
-                rebuildSide(padState, structure, side)
-            end
-        end
+        watchBay(padState, structure, child)
     end)
+end
+
+local function unbindStructure(padState: PadState)
+    if padState.structureConn then
+        padState.structureConn:Disconnect()
+        padState.structureConn = nil
+    end
+    clearWatches(padState)
+    padState.structure = nil
 end
 
 -- Watch one site folder (MaterializedSite_<padId>) for whichever Structure lives under it. This
@@ -379,8 +418,8 @@ local function watchFolder(padId: string, folder: Instance)
             folderRemovedConn = nil,
             structure = nil,
             structureConn = nil,
-            bays = {},
-            pendingShojiWatchers = {},
+            watches = {},
+            entries = {},
         }
         pads[padId] = padState
     end
@@ -394,16 +433,7 @@ local function watchFolder(padId: string, folder: Instance)
     end)
     padState.folderRemovedConn = folder.ChildRemoved:Connect(function(child)
         if child == padState.structure then
-            if padState.structureConn then
-                padState.structureConn:Disconnect()
-                padState.structureConn = nil
-            end
-            for _, entry in padState.bays do
-                destroyBayEntry(entry)
-            end
-            padState.bays = {}
-            clearPendingWatchers(padState)
-            padState.structure = nil
+            unbindStructure(padState :: PadState)
         end
     end)
     -- Covers the event-after-replication order: the Structure may already be there by the time
@@ -429,25 +459,26 @@ end
 sitesFolder.ChildAdded:Connect(bindSite)
 
 -- The server never trusts that a prompt fired -- only that the player could plausibly reach the
--- bay -- so a hold this client thinks it started can be refused (ShojiState.accepted == false)
--- without ShojiOpen ever changing. An acceptance needs no action here: the attribute listener
--- above already renders whatever the hold loop writes. A refusal does, though -- the player is
--- still physically holding G, HoldDuration is 60s, and the built-in progress ring would keep
--- filling for up to a minute with nothing moving, which reads as the game being stuck. Toggling
--- Enabled off and back on cancels an in-progress hold (Roblox fires PromptButtonHoldEnded for it)
--- and re-arms the prompt for a fresh attempt once the player is back in reach.
+-- bay, and that the bay's own `BayState` really is shoji -- so a hold this client thinks it
+-- started can be refused (ShojiState.accepted == false) without ShojiOpen ever changing. An
+-- acceptance needs no action here: the attribute listener above already renders whatever the hold
+-- loop writes. A refusal does, though -- the player is still physically holding G, HoldDuration is
+-- 60s, and the built-in progress ring would keep filling for up to a minute with nothing moving,
+-- which reads as the game being stuck. Toggling Enabled off and back on cancels an in-progress
+-- hold (Roblox fires PromptButtonHoldEnded for it) and re-arms the prompt for a fresh attempt once
+-- the player is back in reach.
 ShojiState.OnClientEvent:Connect(function(payload)
     if typeof(payload) ~= "table" or payload.accepted ~= false then
         return
     end
     local padId = payload.padId
     local side = payload.side
-    local index = payload.index
-    if typeof(padId) ~= "string" or typeof(side) ~= "string" or typeof(index) ~= "number" then
+    local bayNumber = payload.bay
+    if typeof(padId) ~= "string" or typeof(side) ~= "string" or typeof(bayNumber) ~= "number" then
         return
     end
     local padState = pads[padId]
-    local entry = padState and padState.bays[bayKey(side, index)]
+    local entry = padState and padState.entries[bayKey(side, bayNumber)]
     if entry == nil then
         return
     end

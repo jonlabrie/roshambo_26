@@ -895,7 +895,13 @@ type ShojiSlide = {
     alive: boolean,
     padId: string,
     side: string,
-    index: number, -- ordinal within the run (see collectShojiRun below), NOT the Bay_<side>_<n> number
+    -- BOTH namings of the same screen, deliberately. `bayNumber` is the raw <n> of Bay_<side>_<n>:
+    -- the ONLY thing that crosses the SlideShoji wire, and so what a release/supersede is matched
+    -- on. `index` is its ordinal within the side's shoji run (see collectShojiRun below), derived
+    -- server-side by ShojiRun.ordinalOf, and is what the run arithmetic and the persisted
+    -- `shojiOpen` list are indexed by. See ShojiRun.ordinalOf for why the wire is not the ordinal.
+    bayNumber: number,
+    index: number,
     bay: Model,
     structure: Model, -- for StructureOps.syncShojiBay's world-direction lookup at hold end
     count: number,
@@ -1691,10 +1697,16 @@ local SLIDE_RATE = 1 / 1.2 -- bay-widths per second
 local SHOJI_REACH = 12 + 4
 local SHOJI_PERSIST_QUIET = 2 -- seconds of quiet after a hold ends before persisting
 
--- The same bay-run collection StructureOps.applyShoji uses (Bay_<side>_<n> models that carry a
--- `Shoji` variant, ascending by n) -- kept in sync BY HAND with that function's own collection
--- loop, because a client's `index` (its ordinal within this list) names nothing unless the server
--- builds the identical list.
+-- The same bay-run collection StructureOps.applyShoji uses: Bay_<side>_<n> models that carry a
+-- `Shoji` variant, ascending by n. MEMBERSHIP IS DELIBERATELY THE VARIANT, NOT THE RESOLVED STATE
+-- (`BayState`). The prefab's grooves were authored per member of this list and a persisted
+-- `shojiOpen` index means a position in it, so a player toggling one bay between solid and shoji
+-- must not renumber their saved screen positions. Whether a member can actually be SLID is a
+-- separate question, asked of `BayState` through ShojiRun.isSlidable at the point of the hold.
+--
+-- The client no longer builds a copy of this list (2026-08-18 final review): it fires the raw
+-- Bay_<side>_<n> number and the mapping to an ordinal happens here, via ShojiRun.ordinalOf,
+-- because only the server is guaranteed to see every bay. See that function's own note.
 local function collectShojiRun(structure: Model, side: string): { { bayIndex: number, bay: Model } }
     local list: { { bayIndex: number, bay: Model } } = {}
     for _, c in structure:GetChildren() do
@@ -1806,104 +1818,130 @@ local function runShojiSlide(player: Player, uid: string, slide: ShojiSlide, dir
     scheduleShojiPersist(uid, slide.padId, slide.side, slide.index, slide.count, slide.bay)
 end
 
+-- NOT wrapped in handlerQueue (2026-08-18 final review). This handler does no HTTP and touches
+-- nothing the queue exists to protect: `shojiSlides` is per-uid and it never reads `playerHouse`.
+-- What it IS, is latency-critical -- a release has to land the moment the player lets go. The lane
+-- is strict FIFO and a yielding thunk suspends it, so with the handler inside it a release could
+-- queue behind the debounced `net:setTeahouse` PUT from a screen the player had already finished
+-- with, and the screen kept sliding for the whole round trip: roughly ten studs of overshoot after
+-- letting go. Worse, HandlerQueue.run refuses at MAX_PENDING and returns false, so a busy lane
+-- could drop a release outright and leave a screen sliding until the player walked out of reach.
+-- The one thing here that yields -- the persist -- still goes through the queue, from inside
+-- persistShojiNow, exactly like every other write in this file.
 SlideShoji.OnServerEvent:Connect(function(player, payload)
-    handlerQueue:run(tostring(player.UserId), function()
-        local uid = tostring(player.UserId)
-        local padId = if typeof(payload) == "table" then payload.padId else nil
-        local side = if typeof(payload) == "table" then payload.side else nil
-        local index = if typeof(payload) == "table" then payload.index else nil
-        local held = if typeof(payload) == "table" then payload.held else nil
-        if typeof(padId) ~= "string" or typeof(side) ~= "string" or typeof(held) ~= "boolean" then
-            return -- ill-typed request
-        end
-        if typeof(index) ~= "number" or index % 1 ~= 0 or index < 1 then
-            return -- ill-typed / non-integer / non-positive index
-        end
+    local uid = tostring(player.UserId)
+    local padId = if typeof(payload) == "table" then payload.padId else nil
+    local side = if typeof(payload) == "table" then payload.side else nil
+    -- the RAW Bay_<side>_<n> number, not a run ordinal (see ShojiRun.ordinalOf)
+    local bayNumber = if typeof(payload) == "table" then payload.bay else nil
+    local held = if typeof(payload) == "table" then payload.held else nil
+    if typeof(padId) ~= "string" or typeof(side) ~= "string" or typeof(held) ~= "boolean" then
+        return -- ill-typed request
+    end
+    if typeof(bayNumber) ~= "number" or bayNumber % 1 ~= 0 or bayNumber < 1 then
+        return -- ill-typed / non-integer / non-positive bay number
+    end
 
-        if not held then
-            local slide = shojiSlides[uid]
-            if slide ~= nil and slide.padId == padId and slide.side == side and slide.index == index then
-                slide.alive = false -- runShojiSlide notices next tick, unwinds, and persists
-            end
-            -- a release that doesn't match the active hold (stale/superseded) is simply ignored
-            return
+    if not held then
+        local slide = shojiSlides[uid]
+        if slide ~= nil and slide.padId == padId and slide.side == side and slide.bayNumber == bayNumber then
+            slide.alive = false -- runShojiSlide notices next tick, unwinds, and persists
         end
+        -- a release that doesn't match the active hold (stale/superseded) is simply ignored
+        return
+    end
 
-        -- a further held=true for the screen already being held is a no-op: nothing stops a
-        -- client resending held=true every frame, and re-latching from the current position each
-        -- time would reproduce the reverse-under-your-finger bug the latch exists to prevent
-        -- (2026-08-18 review fix). Only a hold on a DIFFERENT screen supersedes the active one.
-        local existing = shojiSlides[uid]
-        if
-            existing ~= nil
-            and existing.padId == padId
-            and existing.side == side
-            and existing.index == index
-        then
-            return
-        end
+    -- a further held=true for the screen already being held is a no-op: nothing stops a
+    -- client resending held=true every frame, and re-latching from the current position each
+    -- time would reproduce the reverse-under-your-finger bug the latch exists to prevent
+    -- (2026-08-18 review fix). Only a hold on a DIFFERENT screen supersedes the active one.
+    local existing = shojiSlides[uid]
+    if
+        existing ~= nil
+        and existing.padId == padId
+        and existing.side == side
+        and existing.bayNumber == bayNumber
+    then
+        return
+    end
 
-        -- find the live structure this bay belongs to (F2/F4: a streaming/rebuild race just
-        -- means there is nothing to slide, same posture as SetBackDoor above)
-        local siteFolder = sitesFolder:FindFirstChild("MaterializedSite_" .. padId)
-        local structure = siteFolder and siteFolder:FindFirstChild("Structure")
-        if structure == nil then
-            return
-        end
-        local run = collectShojiRun(structure, side)
-        local count = #run
-        local entry = run[index]
-        if entry == nil then
-            return -- index outside this side's shoji run: ill-typed / stale client, no message
-        end
+    -- find the live structure this bay belongs to (F2/F4: a streaming/rebuild race just
+    -- means there is nothing to slide, same posture as SetBackDoor above)
+    local siteFolder = sitesFolder:FindFirstChild("MaterializedSite_" .. padId)
+    local structure = siteFolder and siteFolder:FindFirstChild("Structure")
+    if structure == nil then
+        return
+    end
+    local run = collectShojiRun(structure, side)
+    local count = #run
+    -- raw bay number -> ordinal within THIS wall's run, decided here because the server is the
+    -- side that can always see every bay (ShojiRun.ordinalOf's own note has the failure)
+    local bayNumbers = table.create(count)
+    for i, e in run do
+        bayNumbers[i] = e.bayIndex
+    end
+    local index = ShojiRun.ordinalOf(bayNumbers, bayNumber)
+    if index == nil then
+        return -- not a shoji bay of this side: ill-typed / stale client, no message
+    end
+    local entry = run[index]
 
-        local pos = shojiReachPosition(entry.bay)
-        local reachable = pos ~= nil and withinShojiReach(player, pos)
-        local openAttr = entry.bay:GetAttribute("ShojiOpen")
-        local openNow = if typeof(openAttr) == "number" then openAttr else 0
-        if not reachable then
-            -- the server never trusts that a prompt fired -- only that the player could
-            -- plausibly reach it. Tell the HOLDER only, so a refused hold doesn't leave their
-            -- prompt looking stuck; the attribute itself is untouched.
-            if player:IsDescendantOf(Players) then
-                ShojiState:FireClient(
-                    player,
-                    { padId = padId, side = side, index = index, open = openNow, accepted = false }
-                )
-            end
-            return
-        end
+    -- The bay's RESOLVED state, never merely the presence of its `Shoji` variant, which every bay
+    -- of a stock prefab has (2026-08-18 final review, critical -- see ShojiRun.isSlidable). The
+    -- server does not trust that a prompt fired, or that the client was willing to ask: a solid
+    -- bay is not slidable no matter what arrives on the wire, and sliding one would move an
+    -- invisible non-colliding leaf behind the panel the player is looking at, then persist it.
+    if not ShojiRun.isSlidable(entry.bay:GetAttribute("BayState")) then
+        return
+    end
 
-        -- a hold on a DIFFERENT screen supersedes the first: end it exactly like a release would
-        -- (its own persist debounce still fires for whatever IT was sliding). `existing`, if
-        -- non-nil here, is guaranteed to be a DIFFERENT screen -- the guard above already returned
-        -- on an exact match.
-        if existing ~= nil then
-            existing.alive = false
-        end
-
-        -- latched HERE, ONCE, per ShojiRun.directionFrom's own docs
-        local direction = ShojiRun.directionFrom(index, count, openNow)
-        local slide: ShojiSlide = {
-            alive = true,
-            padId = padId,
-            side = side,
-            index = index,
-            bay = entry.bay,
-            structure = structure,
-            count = count,
-        }
-        shojiSlides[uid] = slide
-
+    local pos = shojiReachPosition(entry.bay)
+    local reachable = pos ~= nil and withinShojiReach(player, pos)
+    local openAttr = entry.bay:GetAttribute("ShojiOpen")
+    local openNow = if typeof(openAttr) == "number" then openAttr else 0
+    if not reachable then
+        -- the server never trusts that a prompt fired -- only that the player could
+        -- plausibly reach it. Tell the HOLDER only, so a refused hold doesn't leave their
+        -- prompt looking stuck; the attribute itself is untouched.
         if player:IsDescendantOf(Players) then
             ShojiState:FireClient(
                 player,
-                { padId = padId, side = side, index = index, open = openNow, accepted = true }
+                { padId = padId, side = side, bay = bayNumber, open = openNow, accepted = false }
             )
         end
+        return
+    end
 
-        task.spawn(runShojiSlide, player, uid, slide, direction)
-    end)
+    -- a hold on a DIFFERENT screen supersedes the first: end it exactly like a release would
+    -- (its own persist debounce still fires for whatever IT was sliding). `existing`, if
+    -- non-nil here, is guaranteed to be a DIFFERENT screen -- the guard above already returned
+    -- on an exact match.
+    if existing ~= nil then
+        existing.alive = false
+    end
+
+    -- latched HERE, ONCE, per ShojiRun.directionFrom's own docs
+    local direction = ShojiRun.directionFrom(index, count, openNow)
+    local slide: ShojiSlide = {
+        alive = true,
+        padId = padId,
+        side = side,
+        bayNumber = bayNumber,
+        index = index,
+        bay = entry.bay,
+        structure = structure,
+        count = count,
+    }
+    shojiSlides[uid] = slide
+
+    if player:IsDescendantOf(Players) then
+        ShojiState:FireClient(
+            player,
+            { padId = padId, side = side, bay = bayNumber, open = openNow, accepted = true }
+        )
+    end
+
+    task.spawn(runShojiSlide, player, uid, slide, direction)
 end)
 
 RequestPurchase.OnServerEvent:Connect(function(player, payload)

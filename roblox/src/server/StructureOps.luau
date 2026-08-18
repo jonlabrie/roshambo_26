@@ -94,6 +94,19 @@ function StructureOps.applyBays(model: Model, bays: { { side: string, index: num
         elseif not shownModel then
             warn(`[StructureOps] applyBays: bay '{bayName}' missing '{shownName}' variant`)
         else
+            -- The bay's RESOLVED state, stamped where everyone downstream can read it (2026-08-18
+            -- final review, critical). Nothing else in the place can answer "is this bay actually a
+            -- shoji screen right now": the loop below hides a variant by transparency, never by
+            -- removing it, so a solid bay still owns (and answers FindFirstChild for) its Shoji
+            -- model. ShojiController gated its prompts on that presence and the SlideShoji handler
+            -- gated its holds on it, which put a "Slide open" prompt on nearly every wall in the
+            -- game -- WallBays.defaultState is `solid` for every side but the front -- and let the
+            -- server slide, sync and persist an invisible non-colliding leaf behind the panel the
+            -- player was looking at. Attributes replicate, so one write here serves both sides of
+            -- the wire; both read it through ShojiRun.isSlidable. Written only on a bay that was
+            -- actually applied: a warned-and-skipped bay above keeps its authored default, and
+            -- claiming a state for it would be a lie a prompt would act on.
+            bay:SetAttribute("BayState", b.state)
             for _, variant in bay:GetChildren() do
                 if variant:IsA("Model") then
                     local vis = variant == shownModel
