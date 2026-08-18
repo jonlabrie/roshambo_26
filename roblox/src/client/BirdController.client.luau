@@ -263,9 +263,10 @@ RunService.RenderStepped:Connect(function(dt)
         b.part.Transparency = 0
         b.wingL.Transparency, b.wingR.Transparency, b.tail.Transparency = 0, 0, 0
 
-        -- NO EXPIRY on a result. The state persists until the next round replaces it.
+        -- A result LAPSES after BirdFlight.RESULT_HOLD and the bird goes back to the world; a
+        -- reveal also resets it regardless. Holding until the next round read as hovering.
         local elapsed = now - b.since
-        local resting = b.state ~= "WIN" and b.state ~= "LOSS"
+        local resting = BirdFlight.stateAfter(b.state, elapsed) == "RESTING"
 
         -- ===== WHERE IS IT TRYING TO BE =====
         local target: Vector3

@@ -16,9 +16,11 @@
 -- happened to be watching that player at the instant the drum rested -- "if you weren't looking at
 -- an avatar right as the drum came to a rest, you'll miss it."
 --
--- So a result has a short ENTRY animation and then a HELD POSE that persists until the NEXT ROUND
--- replaces it. That is what makes the flock readable as a whole: walk the arena between rounds and
--- you can see who won and who lost, at a glance, without a HUD.
+-- So a result has a short ENTRY animation and then a HELD POSE. It first held until the next round
+-- -- about a minute -- and that was too far the other way (owner, 2026-08-18): "after the bird
+-- flies to me to indicate a result, it just keeps hovering until the next round. Feels too long."
+-- RESULT_HOLD is the settled answer: long enough that glancing over a few seconds later still
+-- tells you what happened, short enough that the bird gets back to living in the world.
 --
 -- ⚠ FOUR STATES, AND ONLY TWO OF THEM HAVE A BEHAVIOUR (owner, 2026-08-18).
 --
@@ -40,6 +42,19 @@ local BirdFlight = {}
 -- ENTRY is the length of the ANIMATION, not the length of the state: the state itself persists
 -- until the next result replaces it.
 BirdFlight.ENTRY = { WIN = 2.4, LOSS = 1.8 } :: { [string]: number }
+
+-- How long a WIN or LOSS is worn before the bird goes back to the world. Owner's number.
+BirdFlight.RESULT_HOLD = 15
+
+-- The state a bird is ACTUALLY in, given how long it has been in the one it was given. Results
+-- lapse; RESTING does not. A reveal also resets every bird to RESTING regardless, so this only
+-- decides what happens between rounds.
+function BirdFlight.stateAfter(state: string, elapsed: number): string
+    if (state == "WIN" or state == "LOSS") and elapsed > BirdFlight.RESULT_HOLD then
+        return "RESTING"
+    end
+    return state
+end
 
 export type Point = { x: number, y: number, z: number }
 
