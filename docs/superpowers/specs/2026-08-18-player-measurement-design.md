@@ -79,6 +79,27 @@ one, by win rate:
 At 60 throws a **blind** player's observed win rate lands between 23% and 43% nine times in
 ten. One lucky hour makes someone look like the best player alive.
 
+**(f) The ×3 multiplier is correct and was checked, not assumed** (owner, 2026-08-18: keep it).
+The neutral multiplier is `1/q` where `q = p_win/(p_win+p_loss)` — exactly **2** for a blind
+player. Simulated median points/throw, blind, 350 throws:
+
+| bank after | ×1.5 | ×2 | ×2.5 | ×3 | ×4 |
+|---|---|---|---|---|---|
+| 1 win | 0.33 | 0.33 | 0.33 | 0.33 | 0.33 |
+| 5 wins | 0.06 | **0.18** | 0.45 | 0.93 | 2.93 |
+| 7 wins | 0.03 | **0.18** | 0.70 | 2.08 | 11.70 |
+
+At ×2 the column is flat: depth makes no difference and the Bank/Stake decision is deleted.
+Below it, riding is a mistake. Raising it buys nothing structural — **the cliff does not move**
+(40% of blind players bank zero at depth 7 and 64% at depth 8, identically at ×2, ×3 and ×4),
+because the cliff is set by win/loss odds and session length, not by the payoff. ×4 only
+inflates figures into `entryLine`'s left-truncation hazard.
+
+**Do not re-litigate this without new evidence.** The one real alternative, recorded so it is
+not rediscovered: ×2 would make any gain from riding *pure* skill expression, since a blind
+player is indifferent to depth. Declined because it makes the game's most dramatic mechanic
+pointless for the majority, and for a twenty-minute session the ride is the fun.
+
 ## 3. The three numbers
 
 | | definition | window | source | built? |
