@@ -318,3 +318,10 @@ ruling, bounded by the legibility floor rather than by the row's no-red rule.
 Five looks, and the frame was rebuilt entirely at the third ("the engineering is
 suspect"). See [[chaya]] and [[item-4-merchant-row]].
 
+## [2026-08-18] ship | Socket identity moves to the connection; deviceId stops being a password
+
+The guest-auth gap closed: the server names the device, signs a token for it, and the
+token rides the handshake — no socket message names an account any more. Owner ruled a
+hard cut rather than migrating existing guests. One rollout crutch left in the PWA, to
+delete after the prod server is deployed. See [[backlog]].
+

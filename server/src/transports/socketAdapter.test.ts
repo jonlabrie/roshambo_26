@@ -13,6 +13,9 @@ import BankEvent from '../models/BankEvent';
 import StreakEvent from '../models/StreakEvent';
 import PlayerRound from '../models/PlayerRound';
 import { SESSION_HEARTBEAT_MS } from '../sessions';
+import jwt from 'jsonwebtoken';
+
+const JWT_SECRET = process.env.JWT_SECRET || 'roshambo_super_secret_1337';
 
 let httpServer: HttpServer;
 let engine: RoundEngine;
@@ -21,6 +24,16 @@ let initPromise: Promise<any>;
 
 function waitFor<T>(socket: ClientSocket, event: string): Promise<T> {
     return new Promise(resolve => socket.once(event, resolve));
+}
+
+// A guest, the way the wire now works: the SERVER names the device and signs a token for it,
+// and the socket carries that identity from then on. Tests that used to open with
+// `sync-player { deviceId: 'devA' }` were asserting the hole this closed, so they claim here
+// and read back the id the server chose.
+async function claimDevice(sock: ClientSocket): Promise<string> {
+    const claimed = waitFor<any>(sock, 'device-claimed');
+    sock.emit('claim-device');
+    return (await claimed).deviceId;
 }
 
 describe('socket adapter wire format', () => {
@@ -162,10 +175,11 @@ describe('socket adapter wire format', () => {
 
     it('full round: submit-throw -> reveal with distribution -> player-data with lastResult', async () => {
         await initPromise;
-        client.emit('sync-player', { deviceId: 'devA' });
+        await claimDevice(client);
+        client.emit('sync-player');
         await waitFor(client, 'player-data');
 
-        client.emit('submit-throw', { deviceId: 'devA', throw: 'R' }); // R beats S -> WIN
+        client.emit('submit-throw', { throw: 'R' }); // R beats S -> WIN
         await new Promise(r => setTimeout(r, 50)); // let the emit land
 
         const revealP = waitFor<any>(client, 'reveal');
@@ -192,10 +206,11 @@ describe('socket adapter wire format', () => {
         // awaits both promises CONCURRENTLY and can't observe which landed
         // first — this records arrival order via listeners registered up front.
         await initPromise;
-        client.emit('sync-player', { deviceId: 'devA' });
+        await claimDevice(client);
+        client.emit('sync-player');
         await waitFor(client, 'player-data'); // initial sync-player reply, not part of the round broadcast
 
-        client.emit('submit-throw', { deviceId: 'devA', throw: 'R' }); // R beats S -> WIN
+        client.emit('submit-throw', { throw: 'R' }); // R beats S -> WIN
         await new Promise(r => setTimeout(r, 50)); // let the emit land
 
         const order: string[] = [];
@@ -217,12 +232,13 @@ describe('socket adapter wire format', () => {
 
     it('buffers a throw submitted during REVEAL and enters it next round', async () => {
         await initPromise;
-        client.emit('sync-player', { deviceId: 'devA' });
+        await claimDevice(client);
+        client.emit('sync-player');
         await waitFor(client, 'player-data');
 
         // OPEN and LOCK both accept submissions now — only REVEAL rejects (and buffers).
         for (let i = 0; i < 3; i++) engine.tick(); // OPEN -> LOCK -> REVEAL
-        client.emit('submit-throw', { deviceId: 'devA', throw: 'P' });
+        client.emit('submit-throw', { throw: 'P' });
         await new Promise(r => setTimeout(r, 50));
 
         engine.tick(); // REVEAL -> next OPEN (replay drains the buffer)
@@ -238,7 +254,8 @@ describe('socket adapter wire format', () => {
         // timestamp, collapsing the interval to zero width and zeroing rounds-present for a
         // player who was still throwing.
         await initPromise;
-        client.emit('sync-player', { deviceId: 'devA' });
+        await claimDevice(client);
+        client.emit('sync-player');
         await waitFor(client, 'player-data');
         const opened = await Session.findOne({});
         expect(opened).not.toBeNull();
@@ -267,13 +284,105 @@ describe('socket adapter wire format', () => {
     it('bank moves pot to totalPoints over the socket', async () => {
         await initPromise;
         const User = (await import('../models/User')).default;
-        await User.create({ deviceId: 'devA', totalPoints: 1, pointsAtStake: 9 });
-        client.emit('sync-player', { deviceId: 'devA' });
+        const devA = await claimDevice(client);
+        await User.findOneAndUpdate({ deviceId: devA }, { $set: { totalPoints: 1, pointsAtStake: 9 } });
+        client.emit('sync-player');
         await waitFor(client, 'player-data');
 
         const updated = waitFor<any>(client, 'player-data');
-        client.emit('bank', { deviceId: 'devA' });
+        client.emit('bank');
         expect((await updated).user).toMatchObject({ totalPoints: 10, pointsAtStake: 0 });
+    });
+
+    // ===== identity comes from the CONNECTION, never from a payload =====
+    // Until 2026-08-18 every mutating handler resolved an account straight out of
+    // `data.deviceId`, so anyone who learned one string owned that account: they could read
+    // it, throw as it, rename it and cash out its pot. The deviceId was an identifier being
+    // used as a password. It now identifies and a signed token authenticates, and the token
+    // rides the handshake so a handler cannot be handed an account name at all.
+    describe('device identity', () => {
+        function connect(auth: Record<string, unknown>): ClientSocket {
+            const port = (httpServer.address() as AddressInfo).port;
+            return clientIo(`http://localhost:${port}`, { auth, forceNew: true });
+        }
+
+        async function claim(sock: ClientSocket): Promise<{ deviceId: string; deviceToken: string }> {
+            const claimed = waitFor<any>(sock, 'device-claimed');
+            sock.emit('claim-device');
+            return claimed;
+        }
+
+        it('mints a device the SERVER named, with a token that verifies', async () => {
+            const { deviceId, deviceToken } = await claim(client);
+            expect(typeof deviceId).toBe('string');
+            expect(deviceId.length).toBeGreaterThan(16); // not a client-chosen 'devA'
+            const decoded = jwt.verify(deviceToken, JWT_SECRET) as any;
+            expect(decoded.typ).toBe('device');
+            expect(decoded.did).toBe(deviceId);
+        });
+
+        it('a payload deviceId names nobody', async () => {
+            await initPromise;
+            const victim = await User.create({ deviceId: 'victim-device', totalPoints: 500 });
+            // No token on this socket at all: the old wire would have handed the account over.
+            client.emit('sync-player', { deviceId: 'victim-device' });
+            await new Promise(r => setTimeout(r, 120));
+            const fresh = await User.findById(victim._id);
+            expect(fresh!.totalPoints).toBe(500);
+            const created = await User.countDocuments({});
+            expect(created).toBe(1); // no guest conjured from the payload either
+        });
+
+        it('the token carries the account across a reconnect', async () => {
+            const { deviceToken, deviceId } = await claim(client);
+            const first = waitFor<any>(client, 'player-data');
+            client.emit('sync-player');
+            await first;
+            await User.findOneAndUpdate({ deviceId }, { $set: { totalPoints: 42 } });
+
+            const again = connect({ deviceToken });
+            await waitFor(again, 'connect');
+            const data = waitFor<any>(again, 'player-data');
+            again.emit('sync-player');
+            expect((await data).user.totalPoints).toBe(42);
+            again.disconnect();
+        });
+
+        it('refuses a token this server did not sign', async () => {
+            await initPromise;
+            const forged = jwt.sign({ typ: 'device', did: 'someone-elses-device' }, 'not-the-secret');
+            const sock = connect({ deviceToken: forged });
+            await waitFor(sock, 'connect');
+            sock.emit('sync-player');
+            await new Promise(r => setTimeout(r, 120));
+            expect(await User.countDocuments({})).toBe(0);
+            sock.disconnect();
+        });
+
+        it('banks the socket\'s own pot, whatever the payload asks for', async () => {
+            const { deviceId } = await claim(client);
+            const mine = waitFor<any>(client, 'player-data');
+            client.emit('sync-player');
+            await mine;
+            await User.findOneAndUpdate({ deviceId }, { $set: { pointsAtStake: 10, totalPoints: 0 } });
+            const victim = await User.create({ deviceId: 'victim-device', pointsAtStake: 900, totalPoints: 0 });
+
+            client.emit('bank', { deviceId: 'victim-device' });
+            await new Promise(r => setTimeout(r, 150));
+
+            const theirs = await User.findById(victim._id);
+            expect(theirs!.pointsAtStake).toBe(900); // untouched
+            expect(theirs!.totalPoints).toBe(0);
+            const ours = await User.findOne({ deviceId });
+            expect(ours!.totalPoints).toBe(10); // our own pot, banked
+        });
+
+        it('tells a socket with no device that it needs one', async () => {
+            await initPromise;
+            const needed = waitFor<any>(client, 'device-required');
+            client.emit('sync-player');
+            await needed; // the client's cue to claim, rather than a silent no-op
+        });
     });
 
     describe('get-stats', () => {

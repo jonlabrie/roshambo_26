@@ -274,35 +274,35 @@ these are things a later reader would otherwise have to rediscover.
 - **The plan doc diverges from the code**: it names a `playerVolume(userId, w)` that was never
   built. Its three figures are folded into `playerRates` instead, which is the better shape.
 
-## ⚠ SECURITY — socket handlers trust a client-supplied `deviceId` as authentication
+## ~~⚠ SECURITY — socket handlers trust a client-supplied `deviceId` as authentication~~ FIXED 2026-08-18
 
-Split out of the `get-stats` broadcast fix (2026-08-16), which closed the *harvest* but not the
-*authentication gap underneath it*.
+Four handlers in `server/src/transports/socketAdapter.ts` resolved an account straight out of
+`data.deviceId` with no further check: `sync-player` read it, `submit-throw` threw as it,
+`update-progress` renamed it, and `bank` **cashed out its pot**. A deviceId is an identifier —
+it sits in localStorage, travels in support screenshots and over shoulders — and it was being
+used as a password, so anyone who learned one string owned that account outright. The JWT path
+beside it was already done correctly, and that asymmetry was the whole bug.
 
-Four handlers in `server/src/transports/socketAdapter.ts` resolve an account directly from a
-`deviceId` in the client's own payload, with no further check:
+**The fix moves identity to the CONNECTION.** The server mints the deviceId itself on a new
+`claim-device` event and signs a device token (`{ typ: 'device', did }`, same secret as user
+JWTs, `typ` checked so neither can be replayed as the other). The token rides the socket
+handshake beside the user JWT; the middleware sets `socket.deviceId` from it; the handlers read
+that and nothing else. Closing it at the connection rather than per-handler is what makes it a
+class fix — a future handler cannot be handed an account name, because messages no longer carry
+one. `device-required` tells a socket with no device to claim one rather than failing silently.
 
-- `sync-player { deviceId }` — reads the full account
-- `submit-throw { deviceId }` — throws as that account
-- `bank { deviceId }` — **cashes out that account's pot**
-- `update-progress { deviceId, displayName }` — renames that account
+**Standing rule this leaves behind: identity comes from the connection, never from a payload.**
 
-So anyone who obtains a `deviceId` by any route has total control of that guest account. The
-board no longer hands them out, but a deviceId also travels in localStorage, in support
-screenshots, over shoulders, and in any future payload someone adds without thinking.
+**Owner ruling 2026-08-18 — HARD CUT, no migration.** Guest points and streaks from before the
+change are orphaned: an existing deviceId cannot be presented for adoption, because a stolen one
+would be adopted just as readily. The alternative (claim-on-first-sight) was offered and
+declined.
 
-Contrast `userId`, which is set from a JWT-verified handshake (`socketAdapter.ts:51-55`) and is
-NOT client-injectable — that asymmetry is the whole problem: one identity path is authenticated
-and the other is a password sent as a parameter.
-
-**Why it was not fixed with the broadcast:** it is a substantially bigger piece of work
-(guest-session authentication) and touches every socket handler plus the PWA's connection
-lifecycle. Removing the broadcast was the cheap half and stood alone; this does not.
-
-**Fix sketch:** on first `sync-player`, mint a signed session token bound to that deviceId,
-return it, and require it on every subsequent mutating event — so the deviceId identifies and
-the token authenticates. Guests keep working without an account. Do this before the game is
-public; it is currently a total-account-takeover primitive for anyone who learns one string.
+**One crutch to remove.** Amplify rebuilds the PWA on push while the prod App Runner service is
+deployed by hand, so a new client meets an old server for a while. `useGameLoop.ts` therefore
+still sends the legacy `deviceId` payload *while it holds no token* — an old server answers
+that, a new one ignores it. **Delete both the legacy `sync-player` emit in the connect handler
+and the `deviceId` fallback in the throw payload once the prod server has the claim handler.**
 
 ## Plan 3 — the Stats room displays (NEXT, not yet specced)
 

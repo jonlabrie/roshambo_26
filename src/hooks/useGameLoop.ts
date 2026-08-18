@@ -69,7 +69,17 @@ export function useGameLoop() {
     })
 
     // Identity / Persistence
+    //
+    // THE DEVICE ID IS AN IDENTIFIER; THE TOKEN IS THE PASSWORD (2026-08-18). Until this
+    // landed the client invented its own deviceId and sent it in every payload, and the
+    // server took that as proof of who it was -- so the string in localStorage below WAS the
+    // account. Now the server names the device and signs a token for it, the token rides the
+    // socket handshake, and no message names an account at all.
     const deviceIdRef = useRef<string | null>(localStorage.getItem('roshambo_device_id'))
+    const deviceTokenRef = useRef<string | null>(localStorage.getItem('roshambo_device_token'))
+    // One claim per connection, however many prompts arrive: a second claim would mint a
+    // second guest and silently abandon the first.
+    const claimSentRef = useRef(false)
     const isSyncedRef = useRef(false)
     const socketRef = useRef<Socket | null>(null)
     const playerThrowRef = useRef<Throw>(null)
@@ -85,14 +95,10 @@ export function useGameLoop() {
     // server's default (7s) but should never be the number in use.
     const revealMsRef = useRef(7000)
 
-    // Initialize Device ID if missing
-    useEffect(() => {
-        if (!deviceIdRef.current) {
-            const id = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15)
-            localStorage.setItem('roshambo_device_id', id)
-            deviceIdRef.current = id
-        }
-    }, [])
+    // NO LOCAL MINTING. A client-chosen id was only ever meaningful because the server
+    // believed it; the server issues one now, on `claim-device`, together with the token that
+    // proves it. Any id already in localStorage is from the old scheme and is kept ONLY for
+    // the rollout crutch below -- see the connect handler.
 
     // Fetch Catalog
     useEffect(() => {
@@ -183,13 +189,13 @@ export function useGameLoop() {
 
     // Emit throw when locked
     useEffect(() => {
-        if (isLocked && playerThrow && socketRef.current && deviceIdRef.current) {
-            const payload: { deviceId: string; throw: Throw; token?: string } = {
-                deviceId: deviceIdRef.current,
-                throw: playerThrow
-            }
-            if (token) {
-                payload.token = token
+        if (isLocked && playerThrow && socketRef.current) {
+            // THE THROW, AND NOTHING THAT NAMES AN ACCOUNT. Identity is on the handshake.
+            // `deviceId` is still attached while we have no token, purely for the rollout
+            // window against an old server (see the connect handler); a new server ignores it.
+            const payload: { throw: Throw; deviceId?: string } = { throw: playerThrow }
+            if (!deviceTokenRef.current && deviceIdRef.current) {
+                payload.deviceId = deviceIdRef.current
             }
             socketRef.current.emit('submit-throw', payload)
         }
@@ -450,15 +456,49 @@ export function useGameLoop() {
 
     useEffect(() => {
         const socket = io(SOCKET_URL, {
-            auth: { token }
+            // Both credentials ride the handshake, and neither is ever put in a payload.
+            auth: { token, deviceToken: deviceTokenRef.current }
         })
         socketRef.current = socket
 
         socket.on('connect', () => {
             console.log('[SOCKET] Connected. Ready to sync...')
+            claimSentRef.current = false
+            if (deviceTokenRef.current) {
+                socket.emit('sync-player')
+                return
+            }
+            claimSentRef.current = true
+            socket.emit('claim-device')
+            // ROLLOUT CRUTCH, REMOVE ONCE THE PROD SERVER HAS THE CLAIM HANDLER. Amplify
+            // rebuilds this app on push while the prod App Runner service is deployed by
+            // hand, so a new client WILL meet an old server for a while. An old server
+            // ignores `claim-device` and answers the legacy sync; a new one ignores the
+            // legacy payload and answers the claim. Sending both keeps the demo playable
+            // through the window without weakening either.
             if (deviceIdRef.current) {
                 socket.emit('sync-player', { deviceId: deviceIdRef.current })
             }
+        })
+
+        // The server has named this device and signed for it. Store both, put the token on
+        // the socket so a RECONNECT carries it (socket.io re-reads `auth` each attempt), and
+        // sync as the account it just gave us.
+        socket.on('device-claimed', (data: { deviceId: string; deviceToken: string }) => {
+            if (!data?.deviceId || !data?.deviceToken) return
+            deviceIdRef.current = data.deviceId
+            deviceTokenRef.current = data.deviceToken
+            localStorage.setItem('roshambo_device_id', data.deviceId)
+            localStorage.setItem('roshambo_device_token', data.deviceToken)
+            socket.auth = { token, deviceToken: data.deviceToken }
+            socket.emit('sync-player')
+        })
+
+        // The server saw a socket with no device. Claim one -- once.
+        socket.on('device-required', () => {
+            if (claimSentRef.current) return
+            claimSentRef.current = true
+            socket.emit('claim-device')
         })
 
         socket.on('stats-data', (data) => {
@@ -523,9 +563,9 @@ export function useGameLoop() {
 
             setHistory(globalHistory)
 
-            // Re-emit sync-player if we already have deviceId but weren't synced
-            if (deviceIdRef.current && !isSyncedRef.current) {
-                socket.emit('sync-player', { deviceId: deviceIdRef.current })
+            // Re-emit sync-player if the handshake identified us but we never synced
+            if (deviceTokenRef.current && !isSyncedRef.current) {
+                socket.emit('sync-player')
             }
         })
 
@@ -558,7 +598,7 @@ export function useGameLoop() {
     }, [])
 
     const bank = () => {
-        if (pointsAtStake > 0 && socketRef.current && deviceIdRef.current) {
+        if (pointsAtStake > 0 && socketRef.current) {
             // Optimistic Update
             const earnings = pointsAtStake
             setTotalPoints(prev => prev + earnings)
@@ -566,7 +606,7 @@ export function useGameLoop() {
             setStakingStreak(0)
             setPointsAtStake(0)
 
-            socketRef.current.emit('bank', { deviceId: deviceIdRef.current })
+            socketRef.current.emit('bank')
             setActionMessage(`Bank ${earnings.toLocaleString()} pts`)
             setTimeout(() => setActionMessage(null), 2000)
         }

@@ -1,5 +1,6 @@
 import { Server, Socket } from 'socket.io';
 import jwt from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 import { RoundEngine, ThrowEntry } from '../engine/RoundEngine';
 import { ResultsStore } from '../engine/ResultsStore';
 import { settleRound, SettledPlayer } from '../engine/Settlement';
@@ -47,6 +48,20 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
     }
 
     // --- auth middleware (moved verbatim from index.ts:52-64) ---
+    //
+    // IDENTITY COMES FROM THE CONNECTION, NEVER FROM A PAYLOAD (2026-08-18).
+    //
+    // Until this landed, four handlers resolved an account straight out of `data.deviceId`:
+    // sync-player read it, submit-throw threw as it, update-progress renamed it, and bank
+    // CASHED OUT ITS POT. A deviceId is an identifier — it lives in localStorage, travels in
+    // support screenshots and over shoulders — and it was being used as a password, so anyone
+    // who learned one string owned that account outright. The JWT path beside it was already
+    // done correctly, and that asymmetry was the whole bug.
+    //
+    // A device now proves itself the same way a user does: a signed token on the handshake.
+    // Putting it on the CONNECTION rather than in each message is the part that closes the
+    // class rather than four instances of it — a future handler cannot be handed an account
+    // name, because messages no longer carry one.
     io.use((socket, next) => {
         const token = socket.handshake.auth.token;
         if (token) {
@@ -56,6 +71,17 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
                 (socket as any).isAuthenticated = true;
             } catch {
                 console.log('Socket Auth failed: Invalid token');
+            }
+        }
+        const deviceToken = socket.handshake.auth.deviceToken;
+        if (deviceToken) {
+            try {
+                // `typ` is checked explicitly so a USER token — same secret, different claim
+                // set — can never be replayed as a device, and vice versa.
+                const d = jwt.verify(deviceToken, JWT_SECRET) as { typ?: string; did?: string };
+                if (d.typ === 'device' && d.did) (socket as any).deviceId = d.did;
+            } catch {
+                console.log('Socket Auth failed: Invalid device token');
             }
         }
         next();
@@ -175,19 +201,45 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
             ...clockFields(snap),
         });
 
-        // Player Persistence Sync (ported verbatim from index.ts:364-401)
-        socket.on('sync-player', async (data: { deviceId: string }) => {
-            const userId = (socket as any).userId;
-            const isAuthenticated = (socket as any).isAuthenticated;
+        // A NEW GUEST, NAMED BY THE SERVER. The client used to invent its own deviceId and
+        // the server took it on faith, so an "identity" was whatever string arrived. Here the
+        // id is minted with the token that authenticates it, and the pair goes back once.
+        //
+        // Deliberately NOT a migration path: an existing deviceId cannot be presented for
+        // adoption, because a stolen one would be adopted just as readily. The owner ruled a
+        // hard cut on 2026-08-18 — guest points and streaks from before this change are
+        // orphaned rather than handed to whoever asks for them first.
+        socket.on('claim-device', async () => {
+            try {
+                const deviceId = randomUUID();
+                const user = await resolveUser({ deviceId });
+                if (!user) return;
+                (socket as any).deviceId = deviceId;
+                socket.join(deviceId);
+                const deviceToken = jwt.sign({ typ: 'device', did: deviceId }, JWT_SECRET);
+                socket.emit('device-claimed', { deviceId, deviceToken });
+            } catch (err) {
+                console.error('[CLAIM-ERROR]', (err as Error).message);
+            }
+        });
 
-            if (!data.deviceId && !userId) return;
-            socket.join(data.deviceId); // Join a room for this device to allow targeted emits
+        // Player Persistence Sync (ported verbatim from index.ts:364-401)
+        socket.on('sync-player', async () => {
+            const userId = (socket as any).userId;
+            const deviceId = (socket as any).deviceId;
+
+            if (!deviceId && !userId) {
+                // Not a silent no-op: the client's cue to claim a device and try again.
+                socket.emit('device-required');
+                return;
+            }
+            if (deviceId) socket.join(deviceId); // targeted emits land here
 
             try {
-                const user = await resolveUser({ userId, deviceId: data.deviceId });
+                const user = await resolveUser({ userId, deviceId });
 
                 if (!user) {
-                    console.log(`[SYNC-ERROR] No user found/created for device ${data.deviceId} or userId ${userId}`);
+                    console.log(`[SYNC-ERROR] No user found/created for device ${deviceId} or userId ${userId}`);
                     return;
                 }
 
@@ -201,25 +253,29 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
                 // Get last 30 rounds for this player
                 const history = await personalHistory(user);
 
-                console.log(`[SYNC-DATA] ${data.deviceId} (ID: ${user._id}): Pts=${user.totalPoints}, Pot=${user.pointsAtStake}, Streak=${user.stakingStreak}`);
+                console.log(`[SYNC-DATA] ${deviceId ?? userId} (ID: ${user._id}): Pts=${user.totalPoints}, Pot=${user.pointsAtStake}, Streak=${user.stakingStreak}`);
                 socket.emit('player-data', { user, history });
             } catch (err) {
                 console.error('[SYNC-CRITICAL] Error syncing player:', (err as Error).message);
                 // Resilience fallback: keep the client unblocked even if the DB read fails.
                 socket.emit('player-data', {
-                    user: { deviceId: data.deviceId, totalPoints: 0, bestStreak: 0, currentStreak: 0, stakingStreak: 0 },
+                    user: { deviceId, totalPoints: 0, bestStreak: 0, currentStreak: 0, stakingStreak: 0 },
                     history: []
                 });
             }
         });
 
-        socket.on('submit-throw', (data: { deviceId: string; throw: Throw }) => {
-            if (!data?.deviceId || !['R', 'P', 'S'].includes(data.throw)) return;
+        // The payload carries the THROW and nothing else. Any `deviceId` a client still sends
+        // (an older build, mid-rollout) is ignored rather than trusted.
+        socket.on('submit-throw', (data: { throw: Throw }) => {
+            const deviceId = (socket as any).deviceId;
+            const userId = (socket as any).userId;
+            if ((!deviceId && !userId) || !['R', 'P', 'S'].includes(data?.throw)) return;
             const entry: ThrowEntry = {
                 throw: data.throw, seq: ++seqCounter, platform: 'pwa',
-                deviceId: data.deviceId, userId: (socket as any).userId,
+                deviceId, userId,
             };
-            const key = `pwa:${data.deviceId}`;
+            const key = `pwa:${deviceId ?? userId}`;
             const r = engine.submitThrow(key, entry);
             if (!r.accepted && r.reason === 'PICKS_CLOSED') pendingNextRound.set(key, entry);
         });
@@ -316,11 +372,12 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
             }
         });
 
-        socket.on('bank', async (data: { deviceId: string }) => {
+        socket.on('bank', async () => {
             const userId = (socket as any).userId;
-            if (!data?.deviceId && !userId) return;
+            const deviceId = (socket as any).deviceId;
+            if (!deviceId && !userId) return;
             try {
-                const user = await resolveUser({ userId, deviceId: data.deviceId });
+                const user = await resolveUser({ userId, deviceId });
                 if (!user) return;
                 const updated = await bankPot(user._id.toString(), 'pwa');
                 if (updated) {
@@ -332,14 +389,14 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
         });
 
         // Update Player Progress (Restricted) (ported verbatim from index.ts:510-531)
-        socket.on('update-progress', async (data: { deviceId: string; displayName?: string }) => {
+        socket.on('update-progress', async (data: { displayName?: string }) => {
             const userId = (socket as any).userId;
-            const isAuthenticated = (socket as any).isAuthenticated;
+            const deviceId = (socket as any).deviceId;
 
-            if (!data.deviceId && !userId) return;
+            if (!deviceId && !userId) return;
 
             try {
-                const user = await resolveUser({ userId, deviceId: data.deviceId });
+                const user = await resolveUser({ userId, deviceId });
                 const update: any = {};
                 if (data.displayName) update.displayName = data.displayName;
 
