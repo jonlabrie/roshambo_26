@@ -29,6 +29,26 @@ local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
+local HudLayout =
+    require(game:GetService("ReplicatedStorage"):WaitForChild("RoshamboShared"):WaitForChild("HudLayout"))
+
+-- ⚠ OVER THE THROW CLUSTER, NOT MID-SCREEN (owner, 2026-08-18). This sat at 0.42 of screen height
+-- and 0.8 of its width, directly over the avatar — and now directly over the FAMILIAR, whose whole
+-- premise is that the space above a player's head is the one region never occluded. A win spiralled
+-- up into the notice announcing it.
+--
+-- The throw cluster is the right home because that ground is dead in this exact moment: the round
+-- has just resolved, nobody needs a throw button for several seconds, and the splash is gone well
+-- before they do. Covering a live control would be unacceptable; covering a briefly inert one is
+-- free. Registered off the same expressions the cluster itself uses, so it tracks it.
+local BACKING_W = 320
+local BACKING_MIN_W = 240
+
+local TOUCH = game:GetService("UserInputService").TouchEnabled
+local SPLASH_BTN_H = if TOUCH then HudLayout.BTN_H_TOUCH else HudLayout.BTN_H
+local SPLASH_AREA_H = if TOUCH then HudLayout.AREA_H_TOUCH else HudLayout.AREA_H
+local SPLASH_AREA_W = 3 * SPLASH_BTN_H + 2 * (if TOUCH then 8 else 10)
+local SPLASH_EDGE_BOTTOM = 6
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
@@ -46,8 +66,6 @@ local HOLD_SECONDS = 2
 local FADE_SECONDS = 0.4
 local BACKING_TRANSPARENCY = 0 -- opaque: contrast comes from this, never a UIStroke on the text
 local STROKE_TRANSPARENCY = 0.1
-local BACKING_W = 320
-local BACKING_MIN_W = 240
 
 local gui = Instance.new("ScreenGui")
 gui.Name = "RoshamboSplash"
@@ -61,10 +79,14 @@ gui.Parent = playerGui
 local backing = Instance.new("Frame")
 backing.Name = "Backing"
 backing.Active = false
-backing.AnchorPoint = Vector2.new(0.5, 0.5)
-backing.Position = UDim2.fromScale(0.5, 0.42) -- slightly above dead-centre: canyon eye-level, not
+backing.AnchorPoint = Vector2.new(1, 1)
+backing.Position =
+    UDim2.new(1 - HudLayout.JUMP_CLEARANCE, 0, 1, -(SPLASH_EDGE_BOTTOM + SPLASH_AREA_H - SPLASH_BTN_H)) -- the throw button row's own bottom edge; was fromScale(0.5, 0.42), which
 -- stacked on the throw cluster below it
-backing.Size = UDim2.fromScale(0.8, 0)
+-- As wide as the throw cluster, but never narrower than the existing legibility floor: on touch
+-- the cluster is only ~148px and a 36px headline in that is unreadable. Where the floor wins the
+-- box simply overhangs the cluster to the LEFT, which is empty screen, not another control.
+backing.Size = UDim2.fromOffset(math.max(SPLASH_AREA_W, BACKING_MIN_W), 0)
 backing.AutomaticSize = Enum.AutomaticSize.Y
 backing.BackgroundColor3 = WASHI
 backing.BackgroundTransparency = 1 -- starts hidden; `showSplash` reveals it

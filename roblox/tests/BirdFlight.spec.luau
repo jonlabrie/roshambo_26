@@ -10,34 +10,50 @@ describe("BirdFlight", function()
         end
     end)
 
-    test("WIN rises — the only state whose height increases", function()
+    test("WIN rises, and STAYS up for the rest of the round", function()
         local a = BirdFlight.offsetFor("WIN", 0.1, 7)
         local b = BirdFlight.offsetFor("WIN", 1.5, 7)
         expect(b.y > a.y).toBe(true)
+        -- the point of the change: a result is a standing display, not a flourish. Long after the
+        -- entry animation it is still visibly high.
+        for _, t in { 5, 20, 55 } do
+            expect(BirdFlight.offsetFor("WIN", t, 7).y > 6).toBe(true)
+        end
     end)
 
-    test("SAFE settles onto a perch and STAYS there", function()
+    test("SAFE settles onto a perch and STAYS there all round", function()
         local a = BirdFlight.offsetFor("SAFE", 1.5, 7)
-        local b = BirdFlight.offsetFor("SAFE", 2.0, 7)
+        local b = BirdFlight.offsetFor("SAFE", 40, 7)
         expect(BirdFlight.distance(a, b) < 0.05).toBe(true)
         -- shoulder height, not overhead: a landed bird is the whole point
         expect(a.y < 3).toBe(true)
     end)
 
-    test("LOSS darts away and comes back", function()
-        local away = BirdFlight.offsetFor("LOSS", 0.5, 7)
-        local back = BirdFlight.offsetFor("LOSS", BirdFlight.DURATION.LOSS, 7)
-        local idle = BirdFlight.offsetFor("IDLE", BirdFlight.DURATION.LOSS, 7)
-        expect(BirdFlight.magnitude(away) > 8).toBe(true)
-        -- lands back ON the idle orbit, so nothing snaps when the state expires
-        expect(BirdFlight.distance(back, idle) < 1.5).toBe(true)
+    test("LOSS bolts, then SINKS and stays low", function()
+        expect(BirdFlight.magnitude(BirdFlight.offsetFor("LOSS", 0.5, 7)) > 8).toBe(true)
+        for _, t in { 5, 20, 55 } do
+            expect(BirdFlight.offsetFor("LOSS", t, 7).y < 1.6).toBe(true)
+        end
     end)
 
-    test("every state returns to IDLE when its beat is over", function()
-        for _, s in { "WIN", "SAFE", "LOSS" } do
-            expect(BirdFlight.stateAfter(s, BirdFlight.DURATION[s] + 0.01)).toBe("IDLE")
-            expect(BirdFlight.stateAfter(s, 0.1)).toBe(s)
+    test("a loss never looks like a player who has not thrown yet", function()
+        -- Returning to the idle orbit would make those two states identical, which is the reason
+        -- LOSS holds low rather than simply coming home.
+        for _, t in { 5, 20, 55 } do
+            local lost = BirdFlight.offsetFor("LOSS", t, 7)
+            local idle = BirdFlight.offsetFor("IDLE", t, 7)
+            expect(BirdFlight.distance(lost, idle) > 1.5).toBe(true)
         end
+    end)
+
+    test("all four holds are distinguishable by HEIGHT alone, at a glance, across a room", function()
+        local win = BirdFlight.offsetFor("WIN", 30, 7).y
+        local idle = BirdFlight.offsetFor("IDLE", 30, 7).y
+        local safe = BirdFlight.offsetFor("SAFE", 30, 7).y
+        local loss = BirdFlight.offsetFor("LOSS", 30, 7).y
+        expect(win > idle + 3).toBe(true)
+        expect(idle > safe).toBe(true)
+        expect(safe > loss).toBe(true)
     end)
 
     test("is deterministic per seed, so two clients draw the same bird", function()

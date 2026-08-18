@@ -187,8 +187,9 @@ RunService.RenderStepped:Connect(function()
         b.part.Transparency = 0
         b.wingL.Transparency, b.wingR.Transparency, b.tail.Transparency = 0, 0, 0
 
+        -- NO EXPIRY. The state persists until the next round replaces it, so a result is
+        -- readable long after the moment it happened — see BirdFlight's header.
         local elapsed = now - b.since
-        b.state = BirdFlight.stateAfter(b.state, elapsed)
         -- Past DETAIL_DISTANCE the bird holds a fixed offset instead of flying: at that range the
         -- motion is a few pixels and the per-frame trig is the whole cost.
         local o = if far > DETAIL_DISTANCE
