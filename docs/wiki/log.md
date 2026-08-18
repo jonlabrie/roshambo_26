@@ -369,3 +369,23 @@ citation exempted with `<!-- lint-ok -->`.
 The finding worth keeping is in [[wiki-currency]]: a deferred-work note and the event that
 expires it live in different files, so no update trigger can fire. Citation dates are what bridge
 them. The 12 remaining warnings are advisory and unworked.
+
+## [2026-08-18] decision | The wall boards get a drum ladder, chosen per transition
+
+The clock's 2026-08-17 fix — a drum bolted to each column — does not transfer to the wall boards,
+because a clock column has a fixed kind and a leaderboard column does not. Owner's ruling: choose
+the drum from the TRANSITION, as a ladder of three, smallest-carrying-both wins —
+`DIGITS` (10) → `FIGURES` (17) → `DRUM` (49). `FlapBoard.drums` now takes a table or a function,
+so one renderer serves both kinds of display.
+
+The arithmetic that shaped it, and that a first answer got wrong: `maxSteps` caps a roll at 9, and
+a smaller drum does not remove the cap, only fires it less. `7 → 3` is 45 steps on the full drum
+and still 11 on a 15-character numeric one — capped either way, no gain. At ten characters it is
+6, and the greatest distance possible is exactly the cap, so no digit roll is ever truncated.
+Hence digits on a rung of their own. `FIGURES` carries what the boards print (`,` `-` `%` `/`
+space) plus `+` and `.` as headroom at the owner's call.
+
+Carried alongside: `FlapScheduler.plan` caches each drum's character array and reverse index —
+free when callers planned a line at a time, but the ladder plans one cell per call, taking a
+10×40 repaint from 10 index builds to 400. 1382 Luau tests. Built, not yet gated: the owner has
+not looked at it in Studio. See [[stats-room]].

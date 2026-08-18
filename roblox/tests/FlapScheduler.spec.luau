@@ -110,3 +110,70 @@ describe("FlapScheduler", function()
         expect(s[#s].char).toBe("Z")
     end)
 end)
+
+-- ===== THE DRUM LADDER (owner, 2026-08-18) =====
+-- The wall boards ran every cell on the 49-character drum, so ~82% of changed cells hit the
+-- 9-step cap and rolled the alphabet to reach a digit. The clock's fix (a drum bolted per
+-- COLUMN) does not transfer: a clock column has a fixed kind, a leaderboard column does not.
+-- So the drum is chosen from the TRANSITION -- the smallest drum carrying both characters.
+describe("FlapScheduler.drumFor", function()
+    test("digit to digit takes the digits drum", function()
+        expect(FlapScheduler.drumFor("7", "3")).toBe(FlapScheduler.DIGITS)
+    end)
+
+    test("on the digits drum the cap never fires, so a roll is honest end to end", function()
+        -- Max distance on a 10-character drum is 9, which is the cap -- so no digit
+        -- transition is ever truncated and jump-cut. 7 -> 3 is (3-7) mod 10 = 6.
+        local s = stepsFor(
+            FlapScheduler.plan("7", "3", { stepMs = 100, staggerMs = 50, drum = FlapScheduler.DIGITS }),
+            1
+        )
+        expect(#s).toBe(6)
+        expect(s[#s].char).toBe("3")
+        for _, step in s do
+            expect(string.find(FlapScheduler.DIGITS, step.char, 1, true) ~= nil).toBe(true)
+        end
+    end)
+
+    test("a comma meeting a digit takes the figures drum, not the alphabet", function()
+        -- 1,234 -> 12,345 walks the comma across a column; without this that one cell
+        -- rolls letters mid-number beside neighbours that do not.
+        expect(FlapScheduler.drumFor(",", "3")).toBe(FlapScheduler.FIGURES)
+    end)
+
+    test("percent, slash, minus and space are all on the figures drum", function()
+        for _, ch in { "%", "/", "-", " " } do
+            expect(FlapScheduler.drumFor(ch, "0")).toBe(FlapScheduler.FIGURES)
+        end
+    end)
+
+    test("plus and period ride the figures drum as headroom", function()
+        -- Owner's ruling: nothing prints these today; they are reserved so a signed delta
+        -- or a decimal costs no digit motion when it arrives.
+        expect(FlapScheduler.drumFor("+", "1")).toBe(FlapScheduler.FIGURES)
+        expect(FlapScheduler.drumFor(".", "1")).toBe(FlapScheduler.FIGURES)
+    end)
+
+    test("a letter falls all the way to the full drum", function()
+        expect(FlapScheduler.drumFor("A", "3")).toBe(FlapScheduler.DRUM)
+        expect(FlapScheduler.drumFor("A", "B")).toBe(FlapScheduler.DRUM)
+    end)
+
+    test("a throw glyph falls to the full drum", function()
+        expect(FlapScheduler.drumFor("○", " ")).toBe(FlapScheduler.DRUM)
+    end)
+
+    test("the ladder is ordered smallest-first, so digits never pay for punctuation", function()
+        expect(#FlapScheduler.DIGITS < #FlapScheduler.FIGURES).toBe(true)
+        expect(#FlapScheduler.FIGURES < #FlapScheduler.DRUM).toBe(true)
+    end)
+
+    test("every digits character is on the figures drum, and every figures character on the full", function()
+        for _, code in utf8.codes(FlapScheduler.DIGITS) do
+            expect(string.find(FlapScheduler.FIGURES, utf8.char(code), 1, true) ~= nil).toBe(true)
+        end
+        for _, code in utf8.codes(FlapScheduler.FIGURES) do
+            expect(string.find(FlapScheduler.DRUM, utf8.char(code), 1, true) ~= nil).toBe(true)
+        end
+    end)
+end)

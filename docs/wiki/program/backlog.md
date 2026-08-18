@@ -354,34 +354,42 @@ that `fuda` vacated ([[stats-room]]).
 The whole-branch review raised these; each was ruled deferred rather than guessed at. Two need
 a number only the owner can supply and are in the plan's gate list instead:
 
-- **⚠ THE WALL BOARDS ARE STILL ON THE 49-CHARACTER DRUM.** The digit half of this shipped
-  2026-08-17 and is CLOSED: the round display carries per-column drums,
-  `RoundDisplayModel.DIGITS` is `"9876543210 "` (descending, so counting down is one step
-  forward; blank last, so `0 → blank` at round end and `blank → 9` at round start are each one
-  step too), the colon is PRINTED via `statics()` rather than mounted on a flap, and `FlapBoard`
-  does pass `Opts` through — `plan: (current, target, opts: any?)`, called per column with
-  `{ drum = drum }`. Any older note claiming those are open was written before that landed.
+- ~~**⚠ THE WALL BOARDS ARE STILL ON THE 49-CHARACTER DRUM**~~ **BUILT 2026-08-18, awaiting the
+  owner's look.** The clock half closed 2026-08-17 (per-column drums, `RoundDisplayModel.DIGITS`
+  descending, the colon printed via `statics()`); the walls closed with a different mechanism,
+  because the clock's does not transfer. A clock column has a fixed KIND — column 3 is always a
+  tens digit — so a drum can be bolted to the position. A wall column has no kind:
+  `1. JONNY        1,234` holds a digit in one row, a space in the next and a letter in the
+  third, and it all moves when the window changes.
 
-  What is left: `StatsController` builds the wall boards with **no `drums` key**, so they take
-  `FlapBoard`'s whole-line path on the full drum. **The round display's fix does not transfer**,
-  and the reason is worth keeping — a clock column has a FIXED KIND, so a drum can be bolted to
-  it; a leaderboard column does not (`1. JONNY        1,234` holds a digit in one row, a space in
-  the next, a letter in the third, and it all moves when the window changes). There is no
-  per-column kind to bolt anything to.
+  **Owner's ruling, 2026-08-18: pick the drum from the TRANSITION, and make it a LADDER** —
+  `FlapScheduler.drumFor(cur, tgt)` returns the smallest drum carrying both characters, over
+  `DIGITS` (10) → `FIGURES` (17) → `DRUM` (49). `FlapBoard.drums` now takes a table OR a
+  function, so the round display keeps its bolted-per-column table and the walls pass the policy.
 
-  **Owner's direction, 2026-08-18: choose the drum from the TRANSITION, not the column** — if a
-  cell is going digit-to-digit, run it on the numeric drum; otherwise the full one. That needs
-  `FlapBoard`'s `drums` to accept a FUNCTION `(col, cur, tgt) -> string?` beside the existing
-  table, so the round display keeps its table and the walls pass a policy.
+  **Why a ladder and not one numeric drum** — the arithmetic, because it is not obvious and
+  cost a wrong first answer: `maxSteps` caps a roll at 9, and a smaller drum does not remove the
+  cap, only fires it less. `7 → 3` is 45 steps on the full drum and **still 11** on a 15-character
+  numeric one, capped either way. On a TEN-character drum it is 6, and the greatest distance
+  possible is 9 — exactly the cap — so **no digit transition is ever truncated** and the jump-cut
+  cheat goes quiet. Every character added to a rung is paid for by every transition using it,
+  which is why digits get a rung to themselves.
 
-  Open, and the owner's call: **what else rides the numeric drum.** A comma is needed —
-  `1,234 → 12,345` walks a comma across columns, and if `,` is not on the numeric drum that one
-  cell falls back to the full drum and rolls the alphabet mid-number beside neighbours that do
-  not. Plus, minus and any other figure punctuation are undecided.
+  **`FIGURES` = `0123456789+-.,%/ `** — the punctuation the boards actually print
+  (`StatsBoardModel.figure` emits `,` and a leading `-`; `pct` adds `%` and a bare `-` for a
+  round with no throws; the weekly quota adds `/`; padding adds the space) plus `+` and `.` as
+  headroom at the owner's call: nothing emits them today, and reserving them costs nothing on
+  rung 1 when a signed delta or a decimal arrives.
 
-  Watch for at the Studio look: two adjacent columns rolling on different drums at once. It
-  already happens between the clock and the tape and reads fine there, but it is the thing that
-  would say the idea was wrong.
+  Carried in the same change: `FlapScheduler.plan` now **caches each drum's character array and
+  reverse index**. It rebuilt both on every call, which was free while callers planned a whole
+  line at a time — the ladder makes a caller plan one cell per call, taking a 10×40 board repaint
+  from 10 index builds to 400.
+
+  Still to look at in Studio: two adjacent columns rolling on different drums at once. It already
+  happens between the clock and the tape and reads fine there, but it is what would say the idea
+  was wrong.
+
 - ~~**No perf budget was taken**~~ **SUPERSEDED 2026-08-17 by measurement.** The owner walked
   the finished room on the A13: load inside is neither better nor worse than the arena square
   outside, at ~8,400 GUI instances with no cull. **No budget work is owed, and the `MaxDistance`

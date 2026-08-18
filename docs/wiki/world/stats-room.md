@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-17
+updated: 2026-08-18
 ---
 
 # Stats Room (番付) — the cavern
@@ -138,6 +138,41 @@ Live on `BoardTextNudge`.
 ⚠ **Every size constant here is a TextSize, and the eye reads INK.** A digit's drawn height
 is only ~0.72 of its TextSize — the rest of the em is leading and room for ascenders and
 descenders a numeral never uses. Setting it above 1.0 is safe and often correct.
+
+### The drums
+
+Every flap cell rolls forward through a character drum, and which drum it uses is settled
+differently on the two kinds of display here — because the two kinds differ in a way that
+decides it.
+
+**The round display bolts a drum to each COLUMN.** Its column 3 is always a tens digit, so the
+drum is a property of the position, exactly as on a physical board where the seconds flap has ten
+digits on it and has never had a `U` to roll past. `RoundDisplayModel.DIGITS` is `"9876543210 "`
+— descending, so counting down is one step forward; blank last, so `0 → blank` at round end and
+`blank → 9` at round start are each one step too.
+
+**The wall boards choose from the TRANSITION** (owner, 2026-08-18), because their columns have no
+fixed kind: `1. JONNY        1,234` holds a digit in one row, a space in the next and a letter in
+the third, and it all moves when the window changes. `FlapScheduler.drumFor(cur, tgt)` returns the
+smallest drum carrying both characters, over a three-rung ladder:
+
+| rung | drum | carries |
+|---|---|---|
+| 1 | `0123456789` | digit-to-digit — the overwhelming majority |
+| 2 | `0123456789+-.,%/ ` | a figure meeting its punctuation, e.g. the comma walking across `1,234 → 12,345` |
+| 3 | the full 49 | names, labels, throw glyphs |
+
+⚠ **A SMALLER DRUM DOES NOT REMOVE THE 9-STEP CAP, IT ONLY FIRES IT LESS — and the shrink has to
+be big to pay.** `7 → 3` is 45 steps on the full drum and **still 11** on a 15-character numeric
+one, capped either way. At TEN characters it is 6, and the greatest distance possible is 9 —
+exactly the cap — so no digit transition is ever truncated and the jump-cut cheat goes quiet.
+This is why digits get a rung to themselves: every character added to a rung is paid for by every
+transition that uses it. `+` and `.` sit on rung 2 as headroom (nothing prints them today) which
+costs rung 1 nothing.
+
+`FlapBoard.drums` accepts a table (bolted per column) or a function (chosen per transition), which
+is what lets one renderer serve both. `FlapScheduler.plan` caches each drum's character array and
+reverse index, because a per-transition caller plans one cell per call rather than one line.
 
 ### Where things go
 

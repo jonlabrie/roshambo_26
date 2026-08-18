@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-17
+updated: 2026-08-18
 ---
 
 # Arena Square

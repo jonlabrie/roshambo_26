@@ -269,6 +269,15 @@ local function register(part: Instance)
             -- the canvas matched to whatever is actually there, so glyphs never stretch.
             metrics = Model.metrics(rows, cols, part.Size.X / part.Size.Y),
             plan = FlapScheduler.plan,
+            -- THE DRUM COMES FROM THE TRANSITION, NOT THE COLUMN (owner, 2026-08-18). The round
+            -- display bolts a drum to each column because its columns have a fixed kind; these
+            -- do not -- a name column holds a letter on one row and a space on the next, and a
+            -- figure column holds a digit, a comma or a `%` depending on the board and the
+            -- window. So the ladder picks the smallest drum carrying both characters, which
+            -- keeps a digit-to-digit roll on ten characters where the 9-step cap never fires.
+            drums = function(_col, current, target)
+                return FlapScheduler.drumFor(current, target)
+            end,
             textNudge = textNudge(),
             glyphFor = glyphFor,
         }),

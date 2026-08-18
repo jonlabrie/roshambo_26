@@ -31,7 +31,14 @@ export type Config = {
     -- When present, each column is planned against its OWN drum and the columns are staggered
     -- here rather than by the scheduler, which cannot know a column's real index when it is
     -- handed a single character. Absent, the whole line is planned once as before.
-    drums: { string }?,
+    --
+    -- A TABLE OR A FUNCTION, because two kinds of board need two answers (owner, 2026-08-18).
+    -- A table bolts a drum to a column, which is what the round display wants: its column 3 is
+    -- always a tens digit, so the drum is a property of the position. A wall board has no such
+    -- property -- `1. JONNY        1,234` puts a digit, a space and a letter in the same column
+    -- on three different rows -- so it passes a FUNCTION and the drum is chosen per transition
+    -- (see `FlapScheduler.drumFor`). Returning nil from either skips the column.
+    drums: ({ string } | (col: number, current: string, target: string) -> string?)?,
     staggerMs: number?,
     -- PRINTED COLUMNS, not flipping ones (owner, 2026-08-17): "the colon should be printed
     -- between the minute and seconds columns, not in a flipper column of its own". A separator
@@ -431,12 +438,19 @@ function FlapBoard.setRow(self: any, row: number, line: string)
         local cur, tgt = toChars(current), toChars(line)
         local stagger = self._cfg.staggerMs or DEFAULT_STAGGER_MS
         local static = self._cfg.static
+        local pick = if typeof(drums) == "function" then drums else nil
         for col = 1, self._cfg.cols do
-            local drum = if static and static[col] then nil else drums[col]
+            local c, t = cur[col] or " ", tgt[col] or " "
+            -- A printed column is skipped before the drum is chosen: it carries no drum at all,
+            -- so asking a policy function about it would be asking about ink.
+            local drum = if static and static[col]
+                then nil
+                elseif pick then pick(col, c, t)
+                else (drums :: any)[col]
             if drum then
                 -- One character in, so every returned step is col 1; the real column index and
                 -- its stagger are applied here.
-                for _, step in self._cfg.plan(cur[col] or " ", tgt[col] or " ", { drum = drum }) do
+                for _, step in self._cfg.plan(c, t, { drum = drum }) do
                     schedule(col, step.atMs + (col - 1) * stagger, step.char)
                 end
             end
