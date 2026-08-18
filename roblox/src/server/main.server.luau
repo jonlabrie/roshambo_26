@@ -888,20 +888,39 @@ end
 -- padId + the occupied SIZE + that size's loadout (the merge target for wallBays edits).
 local playerHouse: { [string]: { padId: string, size: string, loadout: any } } = {}
 
--- SHOJI (task 5): one active hold-to-slide loop per uid, plus a generation counter so a debounced
--- persist can tell whether it has been superseded by a newer hold-end before it fires. Declared up
--- here (not beside the SlideShoji handler further down) because PlayerRemoving, which runs long
--- before that handler in the file, needs to stop a leaving player's loop immediately.
+-- SHOJI (task 5): one active hold-to-slide loop per uid. Declared up here (not beside the
+-- SlideShoji handler further down) because PlayerRemoving, which runs long before that handler in
+-- the file, needs to stop a leaving player's loop immediately and flush any pending persist.
 type ShojiSlide = {
     alive: boolean,
     padId: string,
     side: string,
     index: number, -- ordinal within the run (see collectShojiRun below), NOT the Bay_<side>_<n> number
     bay: Model,
+    structure: Model, -- for StructureOps.syncShojiBay's world-direction lookup at hold end
     count: number,
 }
 local shojiSlides: { [string]: ShojiSlide } = {}
+
+-- The debounced persist-on-hold-end target, one per SLIDE (uid + padId + side + index), not one
+-- per uid (2026-08-18 review fix: a shared per-uid counter let sliding screen B within the quiet
+-- window cancel screen A's still-pending write with no error and no trace). `shojiPersistGen` is
+-- this generation counter, keyed by that composite key; `shojiPendingPersist` holds the latest
+-- target awaiting each key's debounce, so PlayerRemoving can flush it immediately instead of
+-- leaving it to wake up later and find playerHouse[uid] already gone.
+type ShojiPersistTarget = {
+    uid: string,
+    padId: string,
+    side: string,
+    index: number,
+    count: number,
+    bay: Model,
+}
 local shojiPersistGen: { [string]: number } = {}
+local shojiPendingPersist: { [string]: ShojiPersistTarget } = {}
+local function shojiSlideKey(uid: string, padId: string, side: string, index: number): string
+    return `{uid}\1{padId}\1{side}\1{index}`
+end
 
 -- B4: the default placement for a build path whose loadout carries none yet (uniform rule:
 -- every build site renders `loadout.placement or CENTERED_PLACEMENT`).
@@ -946,6 +965,53 @@ local function echoEconomy(player: Player, uid: string)
         portalOwned = e.portalOwned,
         deckDecorations = e.deckDecorations,
     })
+end
+
+-- Persist ONE shoji slide's final travel, occupant-only: clone the loadout, set
+-- shojiOpen[side][index] to the bay's live ShojiOpen attribute, net:setTeahouse, mirror into
+-- playerEconomy -- the same three-step shape SetBackDoor uses further down (stash, mirror,
+-- persist), for the same reason: rebuild paths render from the stash, not from playerHouse. A
+-- visitor's slide (playerHouse[uid] absent, or occupying a different pad) writes nothing at all:
+-- no error, no message, it simply is not theirs to keep. Declared here (well before the
+-- SlideShoji handler itself) because PlayerRemoving needs to call it directly to flush a pending
+-- debounced persist before playerHouse[uid] is cleared.
+local function persistShojiNow(target: {
+    uid: string,
+    padId: string,
+    side: string,
+    index: number,
+    count: number,
+    bay: Model,
+})
+    local uid = target.uid
+    handlerQueue:run(uid, function()
+        local house = playerHouse[uid]
+        if house == nil or house.padId ~= target.padId then
+            return -- a visitor's slide is not theirs to keep
+        end
+        if not target.bay:IsDescendantOf(workspace) then
+            return -- structure gone (rebuild/leave race): nothing live to read
+        end
+        local finalAttr = target.bay:GetAttribute("ShojiOpen")
+        local finalOpen = if typeof(finalAttr) == "number" then finalAttr else 0
+        local existingSide = house.loadout.shojiOpen and house.loadout.shojiOpen[target.side]
+        local resolvedList = ShojiRun.resolve(existingSide, target.count)
+        resolvedList[target.index] = ShojiRun.clamp(target.index, target.count, finalOpen)
+        -- merge into a NEW copy of the occupied size's loadout (don't alias the stash pre-persist)
+        local newShojiOpen = table.clone(house.loadout.shojiOpen or {})
+        newShojiOpen[target.side] = resolvedList
+        local newLoadout = table.clone(house.loadout)
+        newLoadout.shojiOpen = newShojiOpen
+        house.loadout = newLoadout
+        local e = playerEconomy[uid]
+        if e ~= nil and e.teahouses ~= nil then
+            e.teahouses[house.size] = newLoadout
+        end
+        local persisted = net:setTeahouse(uid, house.size, newLoadout)
+        if not persisted.ok then
+            warn(`[SHOJI] setTeahouse failed for {uid}/{house.size}: {tostring(persisted.error)}`)
+        end
+    end)
 end
 
 -- ============================ FIREWORKS: THE REFEREE ============================
@@ -1434,17 +1500,30 @@ end)
 Players.PlayerRemoving:Connect(function(player)
     local uid = tostring(player.UserId)
     -- stop a leaving player's shoji hold immediately rather than waiting for the loop's own
-    -- next-tick IsDescendantOf(Players) check; its persist debounce still runs (playerHouse is
-    -- cleared below, so that persist will find nothing to write — best-effort, same posture as
-    -- every other mid-session-loss case in this file).
+    -- next-tick IsDescendantOf(Players) check to catch up.
     local activeSlide = shojiSlides[uid]
     if activeSlide ~= nil then
         activeSlide.alive = false
     end
     playerPrefs[uid] = nil
+    -- drop this uid's not-yet-run mutations FIRST -- the shoji flush below re-queues fresh work
+    -- AFTER this call, so it is never at risk of being wiped by it.
+    handlerQueue:clear(uid)
+    -- flush every pending debounced shoji persist for this uid NOW, before playerHouse[uid] is
+    -- cleared below (2026-08-18 review fix): a persist that woke up later, on its own 2s timer,
+    -- would find the house already gone and silently drop the write. handlerQueue:run resumes
+    -- synchronously up to its first yield (task.spawn), so as long as playerHouse[uid] is still
+    -- valid AT THIS POINT -- which it is, one line above the nil below -- each flushed persist's
+    -- read of it succeeds before this function ever gets to clearing it.
+    for key, target in shojiPendingPersist do
+        if target.uid == uid then
+            shojiPendingPersist[key] = nil
+            shojiPersistGen[key] = nil
+            persistShojiNow(target)
+        end
+    end
     playerHouse[uid] = nil
     playerEconomy[uid] = nil
-    handlerQueue:clear(uid)
     recomputeAllAccess()
     local action = siteCoordinator:onLeave(uid)
     if action then
@@ -1589,11 +1668,10 @@ local function withinShojiReach(player: Player, pos: Vector3): boolean
     return root ~= nil and (root.Position - pos).Magnitude <= SHOJI_REACH
 end
 
--- Persist, occupant-only: a debounced write of `bay`'s live ShojiOpen into the occupant's stash,
--- the same three-step shape SetBackDoor uses just above (stash, mirror into playerEconomy,
--- persist) for the same reason -- rebuild paths render from the stash, not from playerHouse.
--- A visitor's hold end writes nothing at all: no error, no message, their slide simply is not
--- theirs to keep.
+-- Schedule (debounce), keyed per SLIDE TARGET -- not per uid (2026-08-18 review fix; see the
+-- shojiPersistGen/shojiPendingPersist declarations above). Two releases of the SAME screen inside
+-- the quiet window still collapse to one write, which is the debounce doing its job; two DIFFERENT
+-- screens no longer cancel each other.
 local function scheduleShojiPersist(
     uid: string,
     padId: string,
@@ -1602,49 +1680,30 @@ local function scheduleShojiPersist(
     count: number,
     bay: Model
 )
-    local gen = (shojiPersistGen[uid] or 0) + 1
-    shojiPersistGen[uid] = gen
+    local key = shojiSlideKey(uid, padId, side, index)
+    local gen = (shojiPersistGen[key] or 0) + 1
+    shojiPersistGen[key] = gen
+    shojiPendingPersist[key] =
+        { uid = uid, padId = padId, side = side, index = index, count = count, bay = bay }
     task.delay(SHOJI_PERSIST_QUIET, function()
-        if shojiPersistGen[uid] ~= gen then
-            return -- superseded by a newer hold-end within the quiet window
+        if shojiPersistGen[key] ~= gen then
+            return -- superseded by a newer hold-end on THIS SAME screen within the quiet window
         end
-        handlerQueue:run(uid, function()
-            local house = playerHouse[uid]
-            if house == nil or house.padId ~= padId then
-                return -- a visitor's slide is not theirs to keep
-            end
-            if not bay:IsDescendantOf(workspace) then
-                return -- structure gone (rebuild/leave race): nothing live to read
-            end
-            local finalAttr = bay:GetAttribute("ShojiOpen")
-            local finalOpen = if typeof(finalAttr) == "number" then finalAttr else 0
-            local existingSide = house.loadout.shojiOpen and house.loadout.shojiOpen[side]
-            local resolvedList = ShojiRun.resolve(existingSide, count)
-            resolvedList[index] = ShojiRun.clamp(index, count, finalOpen)
-            -- merge into a NEW copy of the occupied size's loadout (don't alias the stash
-            -- pre-persist), same discipline SetBackDoor uses above
-            local newShojiOpen = table.clone(house.loadout.shojiOpen or {})
-            newShojiOpen[side] = resolvedList
-            local newLoadout = table.clone(house.loadout)
-            newLoadout.shojiOpen = newShojiOpen
-            house.loadout = newLoadout
-            local e = playerEconomy[uid]
-            if e ~= nil and e.teahouses ~= nil then
-                e.teahouses[house.size] = newLoadout
-            end
-            local persisted = net:setTeahouse(uid, house.size, newLoadout)
-            if not persisted.ok then
-                warn(`[SHOJI] setTeahouse failed for {uid}/{house.size}: {tostring(persisted.error)}`)
-            end
-        end)
+        shojiPersistGen[key] = nil
+        local target = shojiPendingPersist[key]
+        shojiPendingPersist[key] = nil
+        if target ~= nil then
+            persistShojiNow(target)
+        end
     end)
 end
 
 -- The hold loop: NOT run through handlerQueue (parking a multi-second loop in a player's lane
 -- would block every other mutating handler of theirs for the duration of the hold). It never
 -- touches anything handlerQueue exists to protect either -- no HTTP, only a replicated attribute
--- -- until it ends, at which point scheduleShojiPersist is the one thing that yields, and it goes
--- through the queue itself, same as every other persist in this file.
+-- -- until it ends, at which point StructureOps.syncShojiBay (a live Instance write, but no HTTP)
+-- and scheduleShojiPersist (the one thing that yields) run, and the latter goes through the queue
+-- itself, same as every other persist in this file.
 local function runShojiSlide(player: Player, uid: string, slide: ShojiSlide, direction: number)
     local last = os.clock()
     while slide.alive do
@@ -1668,10 +1727,21 @@ local function runShojiSlide(player: Player, uid: string, slide: ShojiSlide, dir
         local current = slide.bay:GetAttribute("ShojiOpen")
         local openNow = if typeof(current) == "number" then current else 0
         local nextOpen = ShojiRun.clamp(slide.index, slide.count, openNow + direction * SLIDE_RATE * dt)
+        -- TARGET only -- see StructureOps.applyShoji/syncShojiBay's own docs on why ShojiOpen and
+        -- ShojiApplied are split: a stepped, replicated PivotTo every tick would fight whatever the
+        -- client controller tweens from this same attribute.
         slide.bay:SetAttribute("ShojiOpen", nextOpen)
     end
     if shojiSlides[uid] == slide then
         shojiSlides[uid] = nil
+    end
+    -- reconcile the server's OWN geometry to the final target ONCE, here, at hold end -- not per
+    -- step. These are anchored scenery parts: server-side collision and every server raycast see
+    -- ONLY what this call moves, nothing the loop wrote to the attribute above. Guarded the same
+    -- way the loop itself was: a structure that died mid-hold (rebuild/leave race) leaves nothing
+    -- live to move.
+    if slide.bay:IsDescendantOf(workspace) then
+        StructureOps.syncShojiBay(slide.structure, slide.side, slide.bay)
     end
     scheduleShojiPersist(uid, slide.padId, slide.side, slide.index, slide.count, slide.bay)
 end
@@ -1696,6 +1766,20 @@ SlideShoji.OnServerEvent:Connect(function(player, payload)
                 slide.alive = false -- runShojiSlide notices next tick, unwinds, and persists
             end
             -- a release that doesn't match the active hold (stale/superseded) is simply ignored
+            return
+        end
+
+        -- a further held=true for the screen already being held is a no-op: nothing stops a
+        -- client resending held=true every frame, and re-latching from the current position each
+        -- time would reproduce the reverse-under-your-finger bug the latch exists to prevent
+        -- (2026-08-18 review fix). Only a hold on a DIFFERENT screen supersedes the active one.
+        local existing = shojiSlides[uid]
+        if
+            existing ~= nil
+            and existing.padId == padId
+            and existing.side == side
+            and existing.index == index
+        then
             return
         end
 
@@ -1730,9 +1814,10 @@ SlideShoji.OnServerEvent:Connect(function(player, payload)
             return
         end
 
-        -- a second hold from the same player supersedes the first: end it exactly like a release
-        -- would (its own persist debounce still fires for whatever IT was sliding)
-        local existing = shojiSlides[uid]
+        -- a hold on a DIFFERENT screen supersedes the first: end it exactly like a release would
+        -- (its own persist debounce still fires for whatever IT was sliding). `existing`, if
+        -- non-nil here, is guaranteed to be a DIFFERENT screen -- the guard above already returned
+        -- on an exact match.
         if existing ~= nil then
             existing.alive = false
         end
@@ -1745,6 +1830,7 @@ SlideShoji.OnServerEvent:Connect(function(player, payload)
             side = side,
             index = index,
             bay = entry.bay,
+            structure = structure,
             count = count,
         }
         shojiSlides[uid] = slide

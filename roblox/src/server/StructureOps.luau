@@ -145,11 +145,19 @@ local SHOJI_RUN_AXIS_LOCAL: { [string]: Vector3 } = {
 -- This is an entirely ORDINARY shape (the small teahouse has no side screens at all) so it is
 -- skipped SILENTLY -- warning here would fire on every materialize of every such teahouse.
 --
+-- TWO attributes, not one (2026-08-18 review fix). `ShojiOpen` is the TARGET -- what the screen is
+-- sliding to, freely rewritten many times a second by the SlideShoji hold loop in main.server.luau
+-- without ever touching an Instance. `ShojiApplied` is where the server's own geometry actually
+-- is. This function is the only thing that ever moves a leaf, and it does so by the DIFFERENCE
+-- between `open` (the resolved target) and `ShojiApplied` (what was last actually applied) -- NOT
+-- `ShojiOpen`, which the hold loop may have already dragged far ahead of the geometry. Applying the
+-- delta against `ShojiOpen` instead would read the target as its own basis and move nothing.
+--
 -- Idempotent, and safe to call more than once on the same model (a re-render after a door edit,
 -- for instance): each leaf's HOME is not cached anywhere -- the model this runs against can be
 -- destroyed and rebuilt out from under a module-level cache -- so home is instead read back from
--- the bay's own `ShojiOpen` attribute (absent means 0, i.e. the leaf is at home). A call moves the
--- leaf by the DIFFERENCE between the new travel and whatever the attribute already says, so
+-- the bay's own `ShojiApplied` attribute (absent means 0, i.e. the leaf is at home). A call moves
+-- the leaf by the DIFFERENCE between the new travel and whatever that attribute already says, so
 -- calling twice with the same shojiOpen is a no-op and repeated calls never accumulate drift.
 -- A missing/unrecognised side is warned and skipped, same failure posture as applyBays (F2/F4).
 function StructureOps.applyShoji(model: Model, shojiOpen: { [string]: any }?)
@@ -201,16 +209,50 @@ function StructureOps.applyShoji(model: Model, shojiOpen: { [string]: any }?)
             local worldDir = structurePivot:VectorToWorldSpace(localAxis)
             for ordinal, entry in list do
                 local open = resolved[ordinal]
-                local prevAttr = entry.bay:GetAttribute("ShojiOpen")
-                local prevOpen = if typeof(prevAttr) == "number" then prevAttr else 0
-                local deltaStuds = ShojiRun.displacement(open) - ShojiRun.displacement(prevOpen)
+                local prevAppliedAttr = entry.bay:GetAttribute("ShojiApplied")
+                local prevApplied = if typeof(prevAppliedAttr) == "number" then prevAppliedAttr else 0
+                local deltaStuds = ShojiRun.displacement(open) - ShojiRun.displacement(prevApplied)
                 if deltaStuds ~= 0 then
                     entry.shoji:PivotTo(entry.shoji:GetPivot() + worldDir * deltaStuds)
                 end
                 entry.bay:SetAttribute("ShojiOpen", open)
+                entry.bay:SetAttribute("ShojiApplied", open)
             end
         end
     end
+end
+
+-- Reconciles ONE bay's rendered leaf with its OWN live `ShojiOpen` attribute -- the target the
+-- SlideShoji hold loop has been freely rewriting, tick by tick, without moving anything. Called
+-- once, at hold end, NOT per step (a stepped, replicated CFrame would fight the client's tween of
+-- the attribute, which is the entire reason `ShojiOpen` and `ShojiApplied` are split in the first
+-- place). Unlike `applyShoji`, which resolves an externally supplied loadout for an ENTIRE side
+-- (defaulting every bay the caller didn't mention to closed), this touches exactly the one bay
+-- named, leaving every other screen's last-applied position untouched -- during a hold only this
+-- bay's target has moved, and a whole-side reconcile would have to know every other bay's target
+-- too, which nothing here has reason to reach for.
+function StructureOps.syncShojiBay(model: Model, side: string, bay: Model)
+    local localAxis = SHOJI_RUN_AXIS_LOCAL[side]
+    if not localAxis then
+        warn(`[StructureOps] syncShojiBay: unrecognised side '{side}'`)
+        return
+    end
+    local shojiVariant = bay:FindFirstChild("Shoji")
+    if not (shojiVariant and shojiVariant:IsA("Model")) then
+        warn(`[StructureOps] syncShojiBay: bay '{bay.Name}' has no Shoji variant`)
+        return
+    end
+    local shoji = shojiVariant :: Model
+    local targetAttr = bay:GetAttribute("ShojiOpen")
+    local target = if typeof(targetAttr) == "number" then targetAttr else 0
+    local appliedAttr = bay:GetAttribute("ShojiApplied")
+    local applied = if typeof(appliedAttr) == "number" then appliedAttr else 0
+    local deltaStuds = ShojiRun.displacement(target) - ShojiRun.displacement(applied)
+    if deltaStuds ~= 0 then
+        local worldDir = model:GetPivot():VectorToWorldSpace(localAxis)
+        shoji:PivotTo(shoji:GetPivot() + worldDir * deltaStuds)
+    end
+    bay:SetAttribute("ShojiApplied", target)
 end
 
 function StructureOps.recolor(m: Model, role: string, rgb: { number })
