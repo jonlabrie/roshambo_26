@@ -49,18 +49,15 @@ end
 -- which are pitched about X and are excluded wherever that would matter.
 local function bounds(p: any): (number, number, number, number, number, number)
     local cf, s = p.properties.CFrame, p.properties.Size
-    local ex, ey, ez = s[1] / 2, s[2] / 2, s[3] / 2
-    -- A STOOD-UP CYLINDER MEASURES DIFFERENTLY. Its long axis is local X, and CYL_VERTICAL
-    -- aims that at world Y -- so Size.X is the post's HEIGHT and Size.Y/Z are its diameter.
-    -- Reading the size straight off would give every post a third-of-a-stud head and a
-    -- ten-stud girth, which is the shape of a fallen log.
-    if p.properties.Shape == "Cylinder" and cf[5] == -1 then
-        -- CYL_VERTICAL: the long axis (Size.X) aims at world Y
-        ex, ey, ez = s[2] / 2, s[1] / 2, s[3] / 2
-    elseif p.properties.Shape == "Cylinder" and cf[6] == 1 then
-        -- CYL_ALONG_Z: the long axis aims at world Z, and the local Z at world X
-        ex, ey, ez = s[3] / 2, s[2] / 2, s[1] / 2
-    end
+    -- ORIENTED, not naive. Half this model is rotated: the posts are stood-up cylinders whose
+    -- long axis is their local X, the sudare lies along Z, the verge rolls run up the roof
+    -- pitch at an angle that is no axis at all. Reading Size straight off gives a post a
+    -- third-of-a-stud head and a ten-stud girth. Each world extent is the row of the rotation
+    -- matrix dotted with the half-size, absolute — the standard box-AABB.
+    local hx, hy, hz = s[1] / 2, s[2] / 2, s[3] / 2
+    local ex = math.abs(cf[4]) * hx + math.abs(cf[5]) * hy + math.abs(cf[6]) * hz
+    local ey = math.abs(cf[7]) * hx + math.abs(cf[8]) * hy + math.abs(cf[9]) * hz
+    local ez = math.abs(cf[10]) * hx + math.abs(cf[11]) * hy + math.abs(cf[12]) * hz
     return cf[1] - ex, cf[1] + ex, cf[2] - ey, cf[2] + ey, cf[3] - ez, cf[3] + ez
 end
 
@@ -161,6 +158,89 @@ describe("Chaya — the counter splits the floor", function()
             local dz = g.properties.CFrame[3] - cf[3]
             expect(math.sqrt(dx * dx + dz * dz) <= 6).toBe(true)
         end
+    end)
+end)
+
+describe("Chaya — somewhere to sit, and somewhere to be served", function()
+    -- Owner, 2026-08-17: "could someone actually sit and be served in that spot? Feels like
+    -- it's tight for a customer." They could not. The bench faced the river with its back
+    -- six inches off a 36-inch counter -- standing-service height -- so the keeper would have
+    -- been serving over the back of a sitter's head. The answer is both seats, each honest
+    -- about its job: stools pulled up to the counter, and the endai bench out at the rail.
+
+    test("three round stools stand at the counter, at stool height", function()
+        local stools = findPrefix(m, "Stool")
+        expect(#stools).toBe(3)
+        local floorTop = select(4, bounds(find(m, "ChayaBoard_1")))
+        for _, s in stools do
+            expect(s.properties.Shape).toBe("Cylinder")
+            local _, _, _, y1 = bounds(s)
+            local h = y1 - floorTop
+            -- 2 studs is 24 inches against a 36-inch counter: a foot of reach, which is what
+            -- a counter stool is. An 18-inch bench seat at the same counter is not.
+            expect(h >= 1.8 and h <= 2.2).toBe(true)
+        end
+    end)
+
+    test("a stool is close enough to the counter to be served at", function()
+        local counterFront = select(5, bounds(find(m, "CounterTop")))
+        for _, s in findPrefix(m, "Stool") do
+            local _, _, _, _, _, sz1 = bounds(s)
+            expect(counterFront - sz1 <= 0.8).toBe(true)
+        end
+    end)
+
+    test("the bench is out at the rail, facing the water, clear of everything", function()
+        local bench = find(m, "Bench")
+        local _, _, _, _, bz0, bz1 = bounds(bench)
+        local rail = find(m, "FrontRail")
+        local _, _, _, _, _, rz1 = bounds(rail)
+        expect(bz0 > rz1).toBe(true) -- inboard of the front rail
+        for _, s in findPrefix(m, "Stool") do
+            expect(intersects(bench, s)).toBe(false)
+        end
+        for _, p in findPrefix(m, "PostChaya") do
+            expect(intersects(bench, p)).toBe(false) -- it used to run through the middle post
+        end
+    end)
+
+    test("nobody sits on a cushion that is under the furniture", function()
+        for _, c in findPrefix(m, "Cushion") do
+            expect(intersects(c, find(m, "Bench"))).toBe(false)
+            for _, s in findPrefix(m, "Stool") do
+                expect(intersects(c, s)).toBe(false)
+            end
+        end
+    end)
+end)
+
+describe("Chaya — the thatch is bundled, not cut", function()
+    test("every edge of the roof is rolled", function()
+        -- Owner, 2026-08-17: "it would be nice if we could round the edges somehow, right now
+        -- it reads as a block of thatch." A Roblox part is a box, so the roll is real
+        -- geometry: a bundle along each eave and each verge, which is how a thatcher finishes
+        -- an edge anyway.
+        expect(#findPrefix(m, "EaveRoll") == 2).toBe(true)
+        expect(#findPrefix(m, "VergeRoll") == 4).toBe(true)
+        for _, r in findPrefix(m, "EaveRoll") do
+            expect(r.properties.Shape).toBe("Cylinder")
+            expect(r.properties.MaterialVariant).toBe("Thatch")
+        end
+        for _, r in findPrefix(m, "VergeRoll") do
+            expect(r.properties.Shape).toBe("Cylinder")
+            expect(r.properties.MaterialVariant).toBe("Thatch")
+        end
+    end)
+
+    test("the eave rolls sit on the eave lines, not somewhere near them", function()
+        local zs = {}
+        for _, r in findPrefix(m, "EaveRoll") do
+            local _, _, _, _, z0, z1 = bounds(r)
+            table.insert(zs, (z0 + z1) / 2)
+        end
+        table.sort(zs)
+        expect(math.abs(zs[1] - Chaya.ROOF_Z0) < 0.3).toBe(true)
+        expect(math.abs(zs[2] - (2 * Chaya.RIDGE_Z - Chaya.ROOF_Z0)) < 0.3).toBe(true)
     end)
 end)
 

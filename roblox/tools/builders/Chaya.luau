@@ -386,23 +386,44 @@ function Chaya.build(palette: any, _layout: any): any
     end
 
     -- ----- the customers' side: a bench and two cushions, facing the water -----
-    -- PULLED IN TO THE COUNTER (owner, 2026-08-17). It sat mid-floor with a bay of empty
-    -- boards behind it; at 10.4 its back is half a stud off the counter's front face, which
-    -- is where you sit to be served and leaves the north edge clear for standing at the rail.
-    beam("Bench", { 5.0, 0.3, 1.3 }, { -47.0, Chaya.FLOOR + 1.35, 10.4 }, board)
+    -- TWO KINDS OF SEAT, because they do different jobs (owner, 2026-08-17: "could someone
+    -- actually sit and be served in that spot?" -- they could not).
+    --
+    -- The ENDAI bench is for sitting with your cup: 18 inches of seat, out at the front rail,
+    -- facing the river. Pulling it in to the counter, as the last pass did, put a sitter's
+    -- back six inches from a 36-inch counter with the keeper serving over their head. It sits
+    -- at 8.7 rather than hard against the rail because the middle north post is at 7.0-7.66
+    -- and the bench used to run straight through it.
+    beam("Bench", { 5.0, 0.3, 1.3 }, { -47.0, Chaya.FLOOR + 1.35, 8.7 }, board)
     for i, lx in { -49.2, -44.8 } do
         part(`BenchLeg_{i}`, {
             Shape = "Cylinder",
             Size = { 1.2, 0.3, 0.3 },
-            CFrame = Spec.cframe({ lx, Chaya.FLOOR + 0.6, 10.4 }, Spec.ROT.CYL_VERTICAL),
+            CFrame = Spec.cframe({ lx, Chaya.FLOOR + 0.6, 8.7 }, Spec.ROT.CYL_VERTICAL),
             Material = "Wood",
             Color = timber,
         })
     end
-    for i, cx in { -50.6, -43.0 } do
+    -- The STOOLS are for being served at: log rounds, 24 inches of seat against a 36-inch
+    -- counter, pulled up close enough to set a cup down without standing. Three of them, in
+    -- the bays between the posts. Rough sawn rounds rather than joinery -- this is the vendor
+    -- who never had a crest painted.
+    local STOOL_H, STOOL_D = 2.0, 1.2
+    for i, sx in { -48.6, -46.5, -44.4 } do
+        part(`Stool_{i}`, {
+            Shape = "Cylinder",
+            Size = { STOOL_H, STOOL_D, STOOL_D },
+            CFrame = Spec.cframe({ sx, Chaya.FLOOR + STOOL_H / 2, 10.6 }, Spec.ROT.CYL_VERTICAL),
+            Material = "Wood",
+            Color = board,
+        })
+    end
+    -- Cushions to the ends, out of the strip people walk and sit in. In the middle they were
+    -- furniture nobody could reach without stepping over something.
+    for i, cx in { -50.8, -42.2 } do
         part(`Cushion_{i}`, {
             Size = { 1.5, 0.18, 1.5 },
-            CFrame = Spec.cframe({ cx, Chaya.FLOOR + 0.09, 8.6 }),
+            CFrame = Spec.cframe({ cx, Chaya.FLOOR + 0.09, 9.5 }),
             Material = "Fabric",
             Color = indigo,
         })
@@ -485,6 +506,45 @@ function Chaya.build(palette: any, _layout: any): any
             CFrame = Spec.cframe(pos, rot),
             Material = "Wood",
             Color = timber,
+        })
+    end
+
+    -- ROLLED EDGES (owner, 2026-08-17): "it would be nice if we could round the edges
+    -- somehow, right now it reads as a block of thatch." A Roblox part is a box and there is
+    -- no bevel, so the roll is real geometry -- a bundle along each eave and each verge,
+    -- which is how a thatcher finishes an edge anyway. It is the silhouette that was reading
+    -- as a slab, so this is where the fix has to land.
+    local ROLL_R = 0.42
+    for i, ez in { ROOF_Z0, ROOF_Z1 } do
+        part(`EaveRoll_{i}`, {
+            Shape = "Cylinder",
+            Size = { roofW, ROLL_R * 2, ROLL_R * 2 },
+            CFrame = Spec.cframe({ cx, EAVE_Y - THATCH_T / 2, ez }),
+            Material = "Grass",
+            MaterialVariant = "Thatch",
+            Color = straw,
+        })
+    end
+    -- The verges: one roll up each slope at each gable end, run as a segment between the
+    -- eave corner and the ridge so it lies on the pitch whatever the pitch becomes.
+    local verges = {
+        { X0 - ROOF_OVERHANG_X, ROOF_Z0 },
+        { X1 + ROOF_OVERHANG_X, ROOF_Z0 },
+        { X0 - ROOF_OVERHANG_X, ROOF_Z1 },
+        { X1 + ROOF_OVERHANG_X, ROOF_Z1 },
+    }
+    for i, v in verges do
+        local pos, len, rot = Spec.segment(
+            { v[1], EAVE_Y - THATCH_T / 2, v[2] },
+            { v[1], RIDGE_Y - THATCH_T / 2, Chaya.RIDGE_Z }
+        )
+        part(`VergeRoll_{i}`, {
+            Shape = "Cylinder",
+            Size = { len, ROLL_R * 2, ROLL_R * 2 },
+            CFrame = Spec.cframe(pos, rot),
+            Material = "Grass",
+            MaterialVariant = "Thatch",
+            Color = straw,
         })
     end
 
