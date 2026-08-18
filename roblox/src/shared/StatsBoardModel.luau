@@ -440,7 +440,10 @@ function StatsBoardModel.depthSections(depths: { number }?): { Section }
     for i, n in d do
         -- Guard the empty room: with no banks at all every bar is zero-width, not an error.
         local bars = if most > 0 then math.floor(n / most * 5 + 0.5) else 0
-        table.insert(entries, { name = tostring(i) .. string.rep("#", bars), figure = tostring(n) })
+        -- The last bucket is "this deep OR MORE" and has to say so, or it reads as exactly that
+        -- depth and the tail looks like it vanished.
+        local label = if i == #d then `{i}+` else tostring(i)
+        table.insert(entries, { name = label .. string.rep("#", bars), figure = tostring(n) })
     end
     return { { title = "BANK AFTER", entries = entries } }
 end

@@ -267,7 +267,11 @@ local DECLS: { Decl } = {
         site = "vestibule",
         wall = "west",
         flap = SLIP,
-        rows = 7,
+        -- 9, not 7: the slip gained READ, PER THROW, YOU BANK AT and RANK on 2026-08-18 and a
+        -- 7-row board dropped the last two SILENTLY. 9 x 0.40 = 3.60 tall on a 9.00 wall, so it
+        -- is still comfortably a slip rather than a board -- which is what the owner's earlier
+        -- 20% cut was protecting.
+        rows = 9,
         cols = 16,
         along = 39.23,
         y = 117.5,
@@ -277,7 +281,13 @@ local DECLS: { Decl } = {
         site = "vestibule",
         wall = "east",
         flap = SLIP,
-        rows = 7,
+        -- MATCHES `fuda` BY INVARIANT, not by coincidence — the vestibule pair is one piece of
+        -- equipment on two facing walls, and a test enforces it. It grew with `fuda` on
+        -- 2026-08-18 and now composes 5 lines onto 9 rows: four blank flaps at the bottom. That
+        -- is what a real split-flap board does with rows it is not using, and it is the price of
+        -- the symmetry. If it reads as unfinished, the fix is to cut a row from `fuda`, not to
+        -- break the pair.
+        rows = 9,
         cols = 16,
         along = 39.23,
         y = 117.5,

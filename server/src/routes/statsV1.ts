@@ -151,7 +151,10 @@ export function createStatsV1(): Router {
                     winRate: open ? r.winRate : null,
                     throws: r.throws,
                 })),
-                depths: depthHistogram(await bankDepths(w), 8),
+                // FIVE buckets, because the board that shows them is six rows and the last row is the
+                // title. Folding at 5+ is honest: a blind player who rides past 7 banks nothing at
+                // all, so the deep tail is thin by construction rather than by cropping.
+                depths: depthHistogram(await bankDepths(w), 5),
             });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });

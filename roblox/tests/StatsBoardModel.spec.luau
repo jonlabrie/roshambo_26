@@ -341,6 +341,33 @@ describe("StatsBoardModel titles fit their real StatsRoomLayout boards", functio
         return nil
     end
 
+    -- CONTENT FITS, not just titles. `compose` truncates to `rows` SILENTLY, so a section list
+    -- that outgrows its board loses its last lines with no error and no warning — and the lines
+    -- it loses are the ones most recently added, which are the ones someone is looking for.
+    -- Caught exactly that on 2026-08-18: `fuda` is 7 rows, the slip had grown to 9 lines, and
+    -- `RANK` (added that day, at the owner's request) fell off the bottom. The title-fit test
+    -- beside this one passed throughout, because the TITLE was fine.
+    for _, b in StatsRoomLayout.BOARDS do
+        if b.id:sub(1, 5) ~= "round" then
+            test(`{b.id} ({b.rows} rows): every line it composes actually fits`, function()
+                local sections = sectionsFor(b.id)
+                expect(sections ~= nil).toBeTruthy()
+                if sections then
+                    local wanted = 0
+                    for _, sec in sections do
+                        wanted += 1 + #(sec.entries or {})
+                    end
+                    if wanted > b.rows then
+                        error(
+                            `{b.id} composes {wanted} lines onto a {b.rows}-row board — `
+                                .. `{wanted - b.rows} would be silently dropped`
+                        )
+                    end
+                end
+            end)
+        end
+    end
+
     local function trimRight(s: string): string
         return (s:gsub("%s+$", ""))
     end

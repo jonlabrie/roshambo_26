@@ -282,7 +282,8 @@ describe('GET /stats/board', () => {
         await BankEvent.create({ userId: a._id, amount: 1, streakAtBank: 1, timestamp: IN_WINDOW });
         await BankEvent.create({ userId: a._id, amount: 9, streakAtBank: 3, timestamp: IN_WINDOW });
         const res = await request(app).get('/api/v1/stats/board');
-        expect(res.body.depths).toEqual([1, 0, 1, 0, 0, 0, 0, 0]);
+        // FIVE buckets, matching the six-row board that renders them; the last is "5 or more".
+        expect(res.body.depths).toEqual([1, 0, 1, 0, 0]);
     });
 
     it('never emits a raw userId', async () => {

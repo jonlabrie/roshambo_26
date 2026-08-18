@@ -23,7 +23,7 @@ StatsFixtures.STATS = {
     },
     -- A plausible shape, not a flat one: most players collect early and the tail is thin. A
     -- flat histogram would look fine in Studio and tell us nothing about whether the bars read.
-    depths = { 41, 33, 22, 12, 6, 3, 1, 1 },
+    depths = { 41, 33, 22, 12, 9 },
     leaders = {
         { displayName = "Ayaka", lifetimeBanked = 12480 },
         { displayName = "kenshin_the_unbanked", lifetimeBanked = 9310 },
