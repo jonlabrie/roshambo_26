@@ -76,6 +76,10 @@ Chaya.ROOF_Z0 = ROOF_Z0
 Chaya.RIDGE_Z = (ROOF_Z0 + ROOF_Z1) / 2
 local EAVE_Y = 121.2
 local RIDGE_Y = 124.0
+-- The roof's own two heights, exported: they are the slab's MID-PLANE at each end, which is
+-- where the edge rolls' centrelines belong (see the roll block in build).
+Chaya.EAVE_Y = EAVE_Y
+Chaya.RIDGE_Y = RIDGE_Y
 local ROOF_OVERHANG_X = 0.7
 local THATCH_T = 0.7
 local RAFTER_EXTRA = 0.6 -- how far a rafter runs past the thatch it carries: the tail
@@ -515,29 +519,42 @@ function Chaya.build(palette: any, _layout: any): any
     -- which is how a thatcher finishes an edge anyway. It is the silhouette that was reading
     -- as a slab, so this is where the fix has to land.
     local ROLL_R = 0.42
+    -- ON THE SLAB'S MID-PLANE, NOT UNDER IT (owner, 2026-08-17: "their centerlines appear to
+    -- be aligned with the bottom edges"). They were: placed at EAVE_Y - THATCH_T/2, each roll
+    -- hung off the underside like a pipe rather than wrapping the edge of the thatch. EAVE_Y
+    -- and RIDGE_Y ARE the slab's centreline heights by construction, so the roll simply takes
+    -- them and swallows the edge from both faces.
+    --
+    -- AND THEY OVERSHOOT EACH OTHER AT THE CORNERS by a full radius, so an eave run ends on
+    -- the verge roll's OUTSIDE face and vice versa. Ending on each other's centrelines left a
+    -- quarter-round notch at all four corners -- exactly where the eye reads the silhouette.
     for i, ez in { ROOF_Z0, ROOF_Z1 } do
         part(`EaveRoll_{i}`, {
             Shape = "Cylinder",
-            Size = { roofW, ROLL_R * 2, ROLL_R * 2 },
-            CFrame = Spec.cframe({ cx, EAVE_Y - THATCH_T / 2, ez }),
+            Size = { roofW + 2 * ROLL_R, ROLL_R * 2, ROLL_R * 2 },
+            CFrame = Spec.cframe({ cx, EAVE_Y, ez }),
             Material = "Grass",
             MaterialVariant = "Thatch",
             Color = straw,
         })
     end
     -- The verges: one roll up each slope at each gable end, run as a segment between the
-    -- eave corner and the ridge so it lies on the pitch whatever the pitch becomes.
+    -- eave corner and the ridge so it lies on the pitch whatever the pitch becomes. The eave
+    -- end starts a radius PAST the eave line, for the same corner reason.
     local verges = {
-        { X0 - ROOF_OVERHANG_X, ROOF_Z0 },
-        { X1 + ROOF_OVERHANG_X, ROOF_Z0 },
-        { X0 - ROOF_OVERHANG_X, ROOF_Z1 },
-        { X1 + ROOF_OVERHANG_X, ROOF_Z1 },
+        { X0 - ROOF_OVERHANG_X, ROOF_Z0, -1 },
+        { X1 + ROOF_OVERHANG_X, ROOF_Z0, -1 },
+        { X0 - ROOF_OVERHANG_X, ROOF_Z1, 1 },
+        { X1 + ROOF_OVERHANG_X, ROOF_Z1, 1 },
     }
     for i, v in verges do
-        local pos, len, rot = Spec.segment(
-            { v[1], EAVE_Y - THATCH_T / 2, v[2] },
-            { v[1], RIDGE_Y - THATCH_T / 2, Chaya.RIDGE_Z }
-        )
+        local slopeZ = math.cos(PITCH)
+        local slopeY = math.sin(PITCH)
+        local pos, len, rot = Spec.segment({
+            v[1],
+            EAVE_Y - ROLL_R * slopeY,
+            v[2] + v[3] * ROLL_R * slopeZ,
+        }, { v[1], RIDGE_Y, Chaya.RIDGE_Z })
         part(`VergeRoll_{i}`, {
             Shape = "Cylinder",
             Size = { len, ROLL_R * 2, ROLL_R * 2 },

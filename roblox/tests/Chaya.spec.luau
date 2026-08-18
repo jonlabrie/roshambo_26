@@ -232,6 +232,54 @@ describe("Chaya — the thatch is bundled, not cut", function()
         end
     end)
 
+    test("the rolls wrap the roof's edge rather than hanging off its underside", function()
+        -- Owner, 2026-08-17: "their centerlines appear to be aligned with the bottom edges of
+        -- the thatched roof." They were -- the rolls were placed at the slab's bottom face,
+        -- so each read as a pipe stuck under the eave instead of as the edge of the thatch
+        -- itself. A roll's centreline belongs on the slab's own mid-plane, which is what the
+        -- eave and ridge heights ARE by construction.
+        for _, r in findPrefix(m, "EaveRoll") do
+            local _, _, y0, y1 = bounds(r)
+            expect(math.abs((y0 + y1) / 2 - Chaya.EAVE_Y) < 0.05).toBe(true)
+        end
+        for _, r in findPrefix(m, "VergeRoll") do
+            local _, _, y0, y1 = bounds(r)
+            -- a verge climbs the pitch: its own centre sits midway between the two heights
+            local mid = (Chaya.EAVE_Y + Chaya.RIDGE_Y) / 2
+            expect(math.abs((y0 + y1) / 2 - mid) < 0.35).toBe(true)
+        end
+    end)
+
+    test("the rolls meet at the corners on their OUTSIDE faces, not their centres", function()
+        -- They used to stop on each other's centrelines, which leaves a quarter-round notch
+        -- at every corner of the roof -- the one place the eye goes to read the silhouette.
+        local ex0, ex1 = math.huge, -math.huge
+        for _, r in findPrefix(m, "EaveRoll") do
+            local x0, x1 = bounds(r)
+            ex0, ex1 = math.min(ex0, x0), math.max(ex1, x1)
+        end
+        for _, r in findPrefix(m, "VergeRoll") do
+            local x0, x1 = bounds(r)
+            -- the eave run reaches the verge roll's far side, so the corner is filled
+            expect(x0 >= ex0 - 0.01 and x1 <= ex1 + 0.01).toBe(true)
+        end
+        -- The other way round on the slope axis: a verge runs DOWN past the eave roll's outer
+        -- face, so the corner is filled from both directions rather than mitred. Coverage, not
+        -- containment -- two rounded bundles meeting always bulge a little past each other,
+        -- and that bulge IS the corner.
+        local ez0, ez1 = math.huge, -math.huge
+        for _, r in findPrefix(m, "EaveRoll") do
+            local _, _, _, _, z0, z1 = bounds(r)
+            ez0, ez1 = math.min(ez0, z0), math.max(ez1, z1)
+        end
+        for _, r in findPrefix(m, "VergeRoll") do
+            local _, _, _, _, z0, z1 = bounds(r)
+            local reachesNorth = z0 <= ez0 + 0.01
+            local reachesSouth = z1 >= ez1 - 0.01
+            expect(reachesNorth or reachesSouth).toBe(true)
+        end
+    end)
+
     test("the eave rolls sit on the eave lines, not somewhere near them", function()
         local zs = {}
         for _, r in findPrefix(m, "EaveRoll") do
