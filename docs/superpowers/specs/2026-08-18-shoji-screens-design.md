@@ -11,7 +11,8 @@ screens can become an earnable item later.
   slides persist, a visitor's do not**.
 - Movement is **hold-to-slide** on a proximity prompt, not grab-drag and not a state cycle.
 - Side bays get the same treatment as front and back.
-- The variant slot ships with a single default entry; the catalog waits.
+- The variant slot ships as the F&F spec asks — but the survey below found it already
+  built, so this item proves it works rather than building it again.
 
 ## 1. What already exists — and why this item is smaller than it reads
 
