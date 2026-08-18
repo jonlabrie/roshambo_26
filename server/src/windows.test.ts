@@ -42,7 +42,7 @@ describe('windows', () => {
     });
 
     it('qualification thresholds are ordered and non-trivial', () => {
-        expect(QUALIFY.week).toBeGreaterThan(0);
+        expect(QUALIFY.week).toBe(360); // six hours, and above the ~356 the maths needs
         expect(QUALIFY.month).toBeGreaterThan(QUALIFY.week);
         expect(QUALIFY.career).toBeGreaterThanOrEqual(QUALIFY.month);
     });

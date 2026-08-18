@@ -5,7 +5,7 @@ import BankEvent from './models/BankEvent';
 import StreakEvent from './models/StreakEvent';
 import PlayerRound from './models/PlayerRound';
 import Round from './models/Round';
-import { longestStreaks, biggestBanks, biggestRounds, throwsInWindow, forfeitsInWindow, playerRates, heatBoard, liveStreaks } from './stats';
+import { longestStreaks, biggestBanks, biggestRounds, throwsInWindow, forfeitsInWindow, playerRates, heatBoard, liveStreaks, winsInWindow, bankDepths, median, depthHistogram, qualifiedBoard, playerStanding } from './stats';
 import { openSession } from './sessions';
 import { settleRound } from './engine/Settlement';
 import { ThrowEntry } from './engine/RoundEngine';
@@ -375,5 +375,143 @@ describe('live streaks', () => {
     it('an empty restriction means NOBODY, not everybody', async () => {
         await User.create({ deviceId: 'here', currentStreak: 30 });
         expect(await liveStreaks(10, [])).toEqual([]);
+    });
+});
+
+describe('READ — win rate', () => {
+    it('counts WIN rows against all throws in the window', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        const results = ['WIN', 'WIN', 'SAFE', 'LOSS'];
+        for (let i = 0; i < results.length; i++) {
+            await PlayerRound.create({ userId: a._id, roundId: `r${i}`, playerThrow: 'R', playerResult: results[i], pointsDelta: 0, timestamp: at(12) });
+        }
+        expect(await winsInWindow(a._id, W)).toBe(2);
+        const rates = await playerRates(a._id, W, 4);
+        expect(rates.winRate).toBeCloseTo(0.5);
+    });
+
+    it('is null for an UNQUALIFIED player, because it is the figure a board ranks on', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        await PlayerRound.create({ userId: a._id, roundId: 'r1', playerThrow: 'R', playerResult: 'WIN', pointsDelta: 1, timestamp: at(12) });
+        const rates = await playerRates(a._id, W, 360);
+        expect(rates.qualified).toBe(false);
+        expect(rates.winRate).toBeNull();
+    });
+
+    it('excludes rows outside the window', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        await PlayerRound.create({ userId: a._id, roundId: 'r1', playerThrow: 'R', playerResult: 'WIN', pointsDelta: 1, timestamp: at(9) });
+        expect(await winsInWindow(a._id, W)).toBe(0);
+    });
+});
+
+describe('NERVE — bank depth', () => {
+    const bank = (u: any, streakAtBank: number, amount = 1) =>
+        BankEvent.create({ userId: u._id, amount, streakAtBank, timestamp: at(12) });
+
+    it('median of an odd sample is the middle value', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        for (const d of [1, 5, 3]) await bank(a, d);
+        expect(median(await bankDepths(W, a._id))).toBe(3);
+    });
+
+    it('median of an even sample is the midpoint', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        for (const d of [2, 4]) await bank(a, d);
+        expect(median(await bankDepths(W, a._id))).toBe(3);
+    });
+
+    it('is null when a player has banked nothing — never 0, which would read as "banks instantly"', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        expect(median(await bankDepths(W, a._id))).toBeNull();
+    });
+
+    it('without a userId it covers the whole room', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        const b = await User.create({ deviceId: 'b' });
+        await bank(a, 1); await bank(b, 7);
+        expect((await bankDepths(W)).length).toBe(2);
+    });
+
+    it('the histogram buckets by depth and folds everything deeper into the last bucket', () => {
+        expect(depthHistogram([1, 1, 2, 6, 7, 9], 5)).toEqual([2, 1, 0, 0, 3]);
+    });
+
+    it('the histogram ignores a nonsense depth of 0 rather than crashing', () => {
+        expect(depthHistogram([0, 1], 3)).toEqual([1, 0, 0]);
+    });
+});
+
+describe('the banzuke — qualified board', () => {
+    const throwsFor = async (u: any, n: number, wins: number) => {
+        for (let i = 0; i < n; i++) {
+            await PlayerRound.create({
+                userId: u._id, roundId: `r${i}`, playerThrow: 'R',
+                playerResult: i < wins ? 'WIN' : 'LOSS',
+                pointsDelta: 0, timestamp: at(12),
+            });
+        }
+    };
+
+    it('ranks by points per throw, and carries win rate beside it', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        const b = await User.create({ deviceId: 'b' });
+        await throwsFor(a, 10, 5); await BankEvent.create({ userId: a._id, amount: 20, streakAtBank: 2, timestamp: at(12) });
+        await throwsFor(b, 10, 3); await BankEvent.create({ userId: b._id, amount: 50, streakAtBank: 4, timestamp: at(12) });
+        const rows = await qualifiedBoard(W, 10, 10);
+        expect(rows.map(r => String(r.userId))).toEqual([String(b._id), String(a._id)]);
+        expect(rows[0].pointsPerThrow).toBeCloseTo(5.0);
+        expect(rows[1].winRate).toBeCloseTo(0.5);
+    });
+
+    it('excludes a player below the throw floor, however well they did', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        await throwsFor(a, 3, 3);
+        await BankEvent.create({ userId: a._id, amount: 900, streakAtBank: 6, timestamp: at(12) });
+        expect(await qualifiedBoard(W, 10, 10)).toEqual([]);
+    });
+
+    it('includes a qualified player who has banked nothing, at zero', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        await throwsFor(a, 10, 4);
+        const rows = await qualifiedBoard(W, 10, 10);
+        expect(rows).toHaveLength(1);
+        expect(rows[0].pointsPerThrow).toBe(0);
+        expect(rows[0].winRate).toBeCloseTo(0.4);
+    });
+
+    it('tells a player where they stand, even when the board cannot show them', async () => {
+        const users = [];
+        for (const d of ['a', 'b', 'c']) {
+            const u = await User.create({ deviceId: d });
+            await throwsFor(u, 10, 5);
+            users.push(u);
+        }
+        await BankEvent.create({ userId: users[2]._id, amount: 90, streakAtBank: 4, timestamp: at(12) });
+        await BankEvent.create({ userId: users[0]._id, amount: 30, streakAtBank: 2, timestamp: at(12) });
+        expect(await playerStanding(users[2]._id, W, 10)).toEqual({ rank: 1, of: 3 });
+        expect(await playerStanding(users[1]._id, W, 10)).toEqual({ rank: 3, of: 3 });
+    });
+
+    it('has no standing for an unqualified player — null, never a rank of 0', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        await throwsFor(a, 3, 3);
+        expect(await playerStanding(a._id, W, 10)).toBeNull();
+    });
+
+    it('counts only qualified players in the field', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        const b = await User.create({ deviceId: 'b' });
+        await throwsFor(a, 10, 5);
+        await throwsFor(b, 2, 2);
+        expect(await playerStanding(a._id, W, 10)).toEqual({ rank: 1, of: 1 });
+    });
+
+    it('honours the limit', async () => {
+        for (const d of ['a', 'b', 'c']) {
+            const u = await User.create({ deviceId: d });
+            await throwsFor(u, 10, 5);
+        }
+        expect(await qualifiedBoard(W, 10, 2)).toHaveLength(2);
     });
 });
