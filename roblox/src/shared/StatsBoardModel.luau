@@ -419,15 +419,27 @@ function StatsBoardModel.banzukeSections(board: any?, leaders: { any }?): { Sect
                 { name = l.displayName, figure = StatsBoardModel.figure(l.lifetimeBanked) }
             )
         end
-        -- THE RULE LEADS. It used to sit after the standings, and `topByCareer` fetches fifty
-        -- names onto a ten-row board -- so the one line explaining why the ranking is empty was
-        -- exactly the line guaranteed to be truncated away. The owner went looking for it and it
-        -- was not there.
+        -- TWO BOARDS, AND THE RULE BELONGS TO THE FIRST (owner, 2026-08-18). It read
+        -- "360 THROWS PUTS YOU HERE" directly above "CAREER BANKED", which promises entry to the
+        -- wrong list: career banked has no entry requirement at all -- bank once and you are on
+        -- it -- and what 360 throws actually buys is a place on the points-per-throw ranking,
+        -- which is a different board that simply has nobody on it yet.
         --
-        -- `lines = {}` and not `entries = {}`: compose prints "NO DATA YET" for a section with no
-        -- entries, which is right for a board with nothing to show and wrong for a bare caption.
+        -- So the ranking names itself, says how to get on it, and the career list keeps its own
+        -- heading underneath as the standing that IS available meanwhile.
+        --
+        -- Carried as `lines`, not `entries`: compose prints "NO DATA YET" for a section with an
+        -- empty entries list, which is right for a board with nothing to show and wrong here,
+        -- where the caption already says what is missing and why.
+        --
+        -- BOTH HEADINGS LEAD. `topByCareer` fetches fifty names onto a ten-row board, so anything
+        -- placed after the career list is guaranteed to be truncated away -- which is exactly
+        -- what happened to the first version of this line.
         return {
-            { title = `{b.minThrows or 360} THROWS PUTS YOU HERE`, lines = {} },
+            {
+                title = "POINTS PER THROW - 7 DAYS",
+                lines = { `THROW {b.minThrows or 360} A WEEK TO RANK` },
+            },
             { title = "CAREER BANKED", entries = careerEntries },
         }
     end

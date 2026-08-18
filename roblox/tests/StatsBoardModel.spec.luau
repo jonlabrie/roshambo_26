@@ -503,6 +503,37 @@ describe("banzukeSections", function()
         expect(string.find(blockOf(BOARD, nil), "NO DATA YET", 1, true) == nil).toBe(true)
     end)
 
+    test("the entry rule belongs to the ranking, not to the career list beneath it", function()
+        -- The rule sat directly above "CAREER BANKED" and so read as the way onto THAT list,
+        -- which is wrong twice over: career banked has no entry requirement, and 360 throws buys
+        -- a place on the points-per-throw ranking, which is a different board entirely.
+        local lines = M.compose(
+            M.banzukeSections(
+                { minThrows = 360, worldIsCrowd = true, rows = {} },
+                { { displayName = "AYAKA", lifetimeBanked = 12480 } }
+            ),
+            O
+        )
+        local idxRank, idxRule, idxCareer
+        for i, l in lines do
+            if string.find(l, "POINTS PER THROW", 1, true) then
+                idxRank = i
+            elseif string.find(l, "360", 1, true) then
+                idxRule = i
+            elseif string.find(l, "CAREER BANKED", 1, true) then
+                idxCareer = i
+            end
+        end
+        expect(idxRank ~= nil).toBeTruthy()
+        expect(idxRule ~= nil).toBeTruthy()
+        expect(idxCareer ~= nil).toBeTruthy()
+        if idxRank and idxRule and idxCareer then
+            -- the rule sits directly under the ranking it describes, and both above the career list
+            expect(idxRule).toBe(idxRank + 1)
+            expect(idxCareer > idxRule).toBe(true)
+        end
+    end)
+
     test("the rule survives a full career list — it leads, so it cannot be truncated away", function()
         -- The fallback used to put the rule AFTER the standings. `topByCareer` fetches 50 and
         -- the board is 10 rows, so the line the owner most needed to see was the one guaranteed
@@ -512,7 +543,7 @@ describe("banzukeSections", function()
             table.insert(many, { displayName = `PLAYER{i}`, lifetimeBanked = 1000 - i })
         end
         local all = blockOf({ minThrows = 360, worldIsCrowd = true, rows = {} }, many)
-        expect(string.find(all, "360 THROWS PUTS YOU HERE", 1, true) ~= nil).toBe(true)
+        expect(string.find(all, "360", 1, true) ~= nil).toBe(true)
         expect(string.find(all, "CAREER BANKED", 1, true) ~= nil).toBe(true)
     end)
 
