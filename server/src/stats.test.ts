@@ -5,7 +5,7 @@ import BankEvent from './models/BankEvent';
 import StreakEvent from './models/StreakEvent';
 import PlayerRound from './models/PlayerRound';
 import Round from './models/Round';
-import { longestStreaks, biggestBanks, biggestRounds, throwsInWindow, forfeitsInWindow, playerRates, heatBoard, liveStreaks, winsInWindow, bankDepths, median, depthHistogram, qualifiedBoard, playerStanding } from './stats';
+import { longestStreaks, biggestBanks, biggestRounds, throwsInWindow, forfeitsInWindow, playerRates, heatBoard, liveStreaks, winsInWindow, bankDepths, median, depthHistogram, qualifiedBoard, playerStanding, livePots } from './stats';
 import { openSession } from './sessions';
 import { settleRound } from './engine/Settlement';
 import { ThrowEntry } from './engine/RoundEngine';
@@ -513,5 +513,36 @@ describe('the banzuke — qualified board', () => {
             await throwsFor(u, 10, 5);
         }
         expect(await qualifiedBoard(W, 10, 2)).toHaveLength(2);
+    });
+});
+
+
+describe('FORM — what is riding right now', () => {
+    it('ranks live pots highest first, and ignores players holding nothing', async () => {
+        const a = await User.create({ deviceId: 'a', pointsAtStake: 27 });
+        const b = await User.create({ deviceId: 'b', pointsAtStake: 243 });
+        await User.create({ deviceId: 'c', pointsAtStake: 0 });
+        const rows = await livePots(10);
+        expect(rows.map(r => r.pot)).toEqual([243, 27]);
+        expect(String(rows[0].userId)).toBe(String(b._id));
+        expect(String(rows[1].userId)).toBe(String(a._id));
+    });
+
+    it('needs no qualification at all — a pot is an event, not an estimate', async () => {
+        // One throw old, no history, no sample. Still the most interesting thing in the room.
+        const a = await User.create({ deviceId: 'a', pointsAtStake: 9 });
+        expect((await livePots(10)).map(r => r.pot)).toEqual([9]);
+    });
+
+    it('honours the limit', async () => {
+        for (const d of ['a', 'b', 'c']) await User.create({ deviceId: d, pointsAtStake: 3 });
+        expect(await livePots(2)).toHaveLength(2);
+    });
+
+    it('can be scoped to the players actually in one instance', async () => {
+        const a = await User.create({ deviceId: 'a', pointsAtStake: 81 });
+        await User.create({ deviceId: 'b', pointsAtStake: 243 });
+        const rows = await livePots(10, [a._id]);
+        expect(rows.map(r => r.pot)).toEqual([81]);
     });
 });

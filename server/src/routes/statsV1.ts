@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { Types } from 'mongoose';
 import User from '../models/User';
-import { longestStreaks, biggestBanks, biggestRounds, heatBoard, playerRates, nameUsers, qualifiedBoard, playerStanding, bankDepths, median, depthHistogram } from '../stats';
+import { longestStreaks, biggestBanks, biggestRounds, heatBoard, playerRates, nameUsers, qualifiedBoard, playerStanding, bankDepths, median, depthHistogram, livePots, liveStreaks } from '../stats';
 import { presentIn } from '../sessions';
 import { rollingWindow, calendarDayUTC, calendarWeekUTC, HOUR_MS, DAY_MS, WEEK_MS, QUALIFY, Window } from '../windows';
 
@@ -124,6 +124,18 @@ export function createStatsV1(): Router {
     // one to make the column appear.
     const worldIsCrowd = () => process.env.TEST_MODE !== 'true';
 
+    // Named and projected here rather than in the handler so the two live boards cannot drift
+    // apart, and so neither can ever emit a raw userId by being spread.
+    const liveBoards = async () => {
+        const [pots, runs] = await Promise.all([livePots(LIMIT), liveStreaks(LIMIT)]);
+        const names = await nameUsers([...pots.map(p => p.userId), ...runs.map(r => r.userId)]);
+        const named = (id: Types.ObjectId) => names.get(String(id)) ?? 'Anonymous';
+        return {
+            pots: pots.map(p => ({ displayName: named(p.userId), pot: p.pot })),
+            runs: runs.map(r => ({ displayName: named(r.userId), length: r.length })),
+        };
+    };
+
     router.get('/board', async (req, res) => {
         try {
             // ROLLING seven days, matching /player below. If these two ever disagree a player
@@ -155,6 +167,12 @@ export function createStatsV1(): Router {
                 // title. Folding at 5+ is honest: a blind player who rides past 7 banks nothing at
                 // all, so the deep tail is thin by construction rather than by cropping.
                 depths: depthHistogram(await bankDepths(w), 5),
+                // FORM, AND IT CARRIES NO WINDOW AND NO FLOOR. A pot riding right now and a run
+                // in progress are EVENTS, exactly true the moment they happen — unlike every
+                // rate above them, which is an inference and needs 360 throws before it means
+                // anything. This is what the room can show on its first evening with three
+                // players in it, and it is what the entrance wall leads with.
+                ...(await liveBoards()),
             });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });

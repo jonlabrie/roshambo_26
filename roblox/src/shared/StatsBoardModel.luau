@@ -405,13 +405,23 @@ end
 -- many times what a blind one riding to the same depth does, a gap win rate alone renders as a
 -- few percentage points -- and the read column is what tells a reader whether someone is up
 -- there on skill or on nerve.
-function StatsBoardModel.banzukeSections(board: any?, leaders: { any }?): { Section }
+function StatsBoardModel.banzukeSections(board: any?, leaders: { any }?, rows: number?): { Section }
     local b = board or {}
-    local rows = b.rows or {}
-    if #rows == 0 then
-        -- NEVER EMPTY. Before anyone has thrown six hours the wall shows career standings and
-        -- says what the ranking is waiting for: a blank board reads as broken, and the rule is
-        -- the one thing a new player most wants to know.
+    local boardRows = b.rows or {}
+    -- HOW MANY NAMES ACTUALLY FIT, computed rather than hoped. The server sends ten and this
+    -- board was demoted to six rows on 2026-08-18; without this the CAPTION -- the line that
+    -- makes a percentage readable, or explains why the ranking is empty -- is what compose drops,
+    -- because it comes after the list. That is the third time captions have been truncated away
+    -- here, so the arithmetic is explicit now instead of implicit in the row count.
+    local capacity = rows or 10
+    local function fit(list: { Entry }, headerLines: number): { Entry }
+        local room = math.max(0, capacity - headerLines)
+        if #list <= room then
+            return list
+        end
+        return table.move(list, 1, room, 1, {})
+    end
+    if #boardRows == 0 then
         local careerEntries: { Entry } = {}
         for _, l in leaders or {} do
             table.insert(
@@ -422,29 +432,19 @@ function StatsBoardModel.banzukeSections(board: any?, leaders: { any }?): { Sect
         -- TWO BOARDS, AND THE RULE BELONGS TO THE FIRST (owner, 2026-08-18). It read
         -- "360 THROWS PUTS YOU HERE" directly above "CAREER BANKED", which promises entry to the
         -- wrong list: career banked has no entry requirement at all -- bank once and you are on
-        -- it -- and what 360 throws actually buys is a place on the points-per-throw ranking,
-        -- which is a different board that simply has nobody on it yet.
-        --
-        -- So the ranking names itself, says how to get on it, and the career list keeps its own
-        -- heading underneath as the standing that IS available meanwhile.
-        --
-        -- Carried as `lines`, not `entries`: compose prints "NO DATA YET" for a section with an
-        -- empty entries list, which is right for a board with nothing to show and wrong here,
-        -- where the caption already says what is missing and why.
-        --
-        -- BOTH HEADINGS LEAD. `topByCareer` fetches fifty names onto a ten-row board, so anything
-        -- placed after the career list is guaranteed to be truncated away -- which is exactly
-        -- what happened to the first version of this line.
+        -- it -- and what 360 throws buys is a place on the points-per-throw ranking, a different
+        -- board that simply has nobody on it yet.
         return {
             {
                 title = "POINTS PER THROW - 7 DAYS",
                 lines = { `THROW {b.minThrows or 360} A WEEK TO RANK` },
             },
-            { title = "CAREER BANKED", entries = careerEntries },
+            -- three header lines above: ranking title, rule, and this one
+            { title = "CAREER BANKED", entries = fit(careerEntries, 3) },
         }
     end
     local entries: { Entry } = {}
-    for _, r in rows do
+    for _, r in boardRows do
         local read = if b.worldIsCrowd then percentOrBlank(r.winRate) else ""
         local yield = string.format("%.1f", tonumber(r.pointsPerThrow) or 0)
         table.insert(entries, {
@@ -452,15 +452,51 @@ function StatsBoardModel.banzukeSections(board: any?, leaders: { any }?): { Sect
             figure = if read == "" then yield else `{yield} {read}`,
         })
     end
-    local sections: { Section } = { { title = "POINTS PER THROW - 7 DAYS", entries = entries } }
+    -- THE BASELINE, PRINTED. "41%" means nothing to a reader who does not know a blind player
+    -- scores 33, and every reader is in that position the first time. Only when the read column
+    -- is actually showing: without it the line explains a column that is not there.
+    local headerLines = if b.worldIsCrowd then 2 else 1
+    local sections: { Section } =
+        { { title = "POINTS PER THROW - 7 DAYS", entries = fit(entries, headerLines) } }
     if b.worldIsCrowd then
-        -- THE BASELINE, PRINTED. "41%" means nothing to a reader who does not know that a blind
-        -- player scores 33 -- and every reader is in that position the first time. A section
-        -- with no entries renders as a bare line under the ranking. Only when the read column is
-        -- actually showing: without it the line explains a column that is not there.
         table.insert(sections, { title = "LUCK ALONE WINS 33 IN 100", lines = {} })
     end
     return sections
+end
+
+-- ===== FORM: WHAT IS RIDING RIGHT NOW =====
+-- The entrance wall's pair, and the reason they carry no window, no floor and no baseline: every
+-- rate in this module is an INFERENCE and needs 360 throws before it means anything, but a pot on
+-- the table is an EVENT. It is exactly true the moment it happens and it works on the first
+-- evening with three players in the room (owner, 2026-08-18).
+--
+-- An empty room gets its own words rather than compose's "NO DATA YET". The data ARRIVED; it says
+-- the room is quiet. That is a fact about the game, not a gap in the feed, and the difference
+-- matters on the one wall everybody sees on the way in.
+function StatsBoardModel.potsSections(pots: { any }?): { Section }
+    local rows = pots or {}
+    if #rows == 0 then
+        return { { title = "RIDING NOW", lines = { "NOBODY IS RIDING" } } }
+    end
+    local entries: { Entry } = {}
+    for _, p in rows do
+        table.insert(entries, { name = p.displayName, figure = StatsBoardModel.figure(p.pot) })
+    end
+    return { { title = "RIDING NOW", entries = entries } }
+end
+
+-- The quieter half of the pair. A streak says how far someone has come; the pot beside it says
+-- what they stand to lose, which is why that one is wider and leads (owner, 2026-08-18).
+function StatsBoardModel.runsSections(runs: { any }?): { Section }
+    local rows = runs or {}
+    if #rows == 0 then
+        return { { title = "ON A RUN", lines = { "NO RUNS YET" } } }
+    end
+    local entries: { Entry } = {}
+    for _, r in rows do
+        table.insert(entries, { name = r.displayName, figure = StatsBoardModel.figure(r.length) })
+    end
+    return { { title = "ON A RUN", entries = entries } }
 end
 
 -- NERVE AS A SHAPE, NOT A RANKING. Index 1 is depth 1; the last bucket is "this deep or more".

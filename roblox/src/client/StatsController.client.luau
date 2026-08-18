@@ -135,10 +135,14 @@ local function linesFor(id: string, rows: number, cols: number): { string }?
     local o = { rows = rows, cols = cols }
     local s = if useFixtures() then StatsFixtures.STATS else latestStats
     local p = if useFixtures() then StatsFixtures.PERSONAL else latestPersonal
-    if id == "banzuke" then
+    if id == "pots" then
+        return Model.compose(Model.potsSections(s and s.pots), o)
+    elseif id == "runs" then
+        return Model.compose(Model.runsSections(s and s.runs), o)
+    elseif id == "banzuke" then
         -- `standingsSections` is not dead: `banzukeSections` falls back to it, by hand, while
         -- nobody has thrown the qualifying hours. Do not delete it.
-        return Model.compose(Model.banzukeSections(s and s.board, s and s.leaders), o)
+        return Model.compose(Model.banzukeSections(s and s.board, s and s.leaders, rows), o)
     elseif id == "skillFuture" then
         return Model.compose(Model.depthSections(s and s.depths), o)
     elseif id == "skill" then

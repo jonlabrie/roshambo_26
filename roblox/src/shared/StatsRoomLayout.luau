@@ -142,15 +142,56 @@ local THROW = StatsRoomLayout.FLAPS.throwPanel
 local DECLS: { Decl } = {
     -- ===== CAVERN =====
     -- South faces you on entry: the standings.
+    -- ===== THE SOUTH WALL: WHAT IS HAPPENING RIGHT NOW (owner, 2026-08-18) =====
+    --
+    -- THE INVERSION. This wall faces you as you come out of the tunnel -- the loudest surface in
+    -- the building -- and it used to hold the qualified ranking, which needs 360 throws a week
+    -- and is therefore empty almost always. That was backwards. Owner: "winning is something
+    -- that happens in the moment, not as a summary at the end of a week... more who is on a roll
+    -- and less who is the GOAT."
+    --
+    -- A rate is an INFERENCE and needs sample. A live pot is an EVENT: someone is holding 243
+    -- points right now and has to decide. It is exactly true, needs no qualification, and works
+    -- on the first evening with three players in the room.
+    --
+    -- POTS LEAD AND ARE WIDER (owner): a streak says how far someone has come, a pot says what
+    -- they stand to lose, and only the second has a decision attached.
+    --
+    -- Side by side, both at eye level. The wall runs x[-58.00, -17.83] = 40.17: 13.53 + 3.0 gap
+    -- + 8.61 = 25.14 of content, leaving 7.5 of quiet at each end.
+    {
+        id = "pots",
+        site = "cavern",
+        wall = "south",
+        flap = WALL,
+        rows = 8,
+        cols = 22,
+        along = -43.74,
+        y = 123.5,
+    },
+    {
+        id = "runs",
+        site = "cavern",
+        wall = "south",
+        flap = WALL,
+        rows = 8,
+        cols = 14,
+        along = -29.67,
+        y = 123.5,
+    },
+    -- DEMOTED, NOT DELETED. The standings keep the entrance wall but drop below the live pair
+    -- and lose half their height: they are the slow long view, and they read as a footnote to
+    -- what is happening now, which is the correct relationship. Centred under both.
+    -- Spans y 115.20..118.80 against the live boards' 120.12..125.88 -- 1.32 of clear air.
     {
         id = "banzuke",
         site = "cavern",
         wall = "south",
         flap = WALL,
-        rows = 10,
+        rows = 6,
         cols = 26,
         along = -37.90,
-        y = 121.0,
+        y = 117.5,
     },
     -- West, the longest wall: records now, rate ladders later.
     {

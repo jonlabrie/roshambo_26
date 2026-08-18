@@ -232,6 +232,31 @@ export async function heatBoard(
 //
 // Restricted by `userIds` the same way heatBoard is, so a server can ask "who is on the
 // longest run in THIS room right now".
+// FORM, AND WHY IT NEEDS NO FLOOR AT ALL. Every rate on this page is an INFERENCE — "is this
+// player better than chance?" — and inference needs sample, which is where the 360-throw floor
+// comes from and why a rate board is empty for a week. A live pot is not an inference. It is an
+// EVENT: someone is holding 243 points right now and has to decide. It is exactly true the moment
+// it happens, it needs no qualification, and it works on the first evening with three players in
+// the room. Owner, 2026-08-18: "winning is something that happens in the moment, not as a summary
+// at the end of a week."
+//
+// This is the counterpart to `liveStreaks` and deliberately the louder of the two: a streak says
+// how far someone has come, a pot says what they stand to lose, and the second is the one with a
+// decision attached.
+export async function livePots(
+    limit: number,
+    userIds?: Types.ObjectId[]
+): Promise<{ userId: Types.ObjectId; pot: number }[]> {
+    // Explicit, like liveStreaks: Mongo's `$in: []` already matches nothing, and this line keeps
+    // that true if the query shape changes underneath it.
+    if (userIds && userIds.length === 0) return [];
+    const filter: Record<string, unknown> = { pointsAtStake: { $gt: 0 } };
+    if (userIds) filter._id = { $in: userIds };
+
+    const rows = await User.find(filter).sort({ pointsAtStake: -1 }).limit(limit).select('pointsAtStake');
+    return rows.map(u => ({ userId: u._id as Types.ObjectId, pot: u.pointsAtStake }));
+}
+
 export async function liveStreaks(
     limit: number,
     userIds?: Types.ObjectId[]

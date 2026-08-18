@@ -10,6 +10,22 @@ local function streak(name: string, length: number)
 end
 
 StatsFixtures.STATS = {
+    pots = {
+        { displayName = "AYAKA", pot = 729 },
+        { displayName = "KENJI", pot = 243 },
+        { displayName = "MOMO", pot = 27 },
+        { displayName = "HARU", pot = 9 },
+        { displayName = "SORA", pot = 3 },
+        { displayName = "TAKU", pot = 1 },
+    },
+    runs = {
+        { displayName = "AYAKA", length = 6 },
+        { displayName = "KENJI", length = 5 },
+        { displayName = "MOMO", length = 3 },
+        { displayName = "HARU", length = 2 },
+        { displayName = "SORA", length = 1 },
+        { displayName = "TAKU", length = 1 },
+    },
     board = {
         minThrows = 360,
         worldIsCrowd = true,

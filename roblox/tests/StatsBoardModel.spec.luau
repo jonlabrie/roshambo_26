@@ -334,10 +334,14 @@ describe("StatsBoardModel titles fit their real StatsRoomLayout boards", functio
     -- mirroring it: this is what caught `skillFuture` opening without an adapter. The `round*`
     -- parts belong to RoundDisplayController — they render a clock and a glyph, not sections
     -- with titles, so this module has no adapter for them by design.
-    local function sectionsFor(id: string): { M.Section }?
+    local function sectionsFor(id: string, rows: number): { M.Section }?
         local S, P = StatsFixtures.STATS, StatsFixtures.PERSONAL
-        if id == "banzuke" then
-            return M.banzukeSections(S.board, S.leaders)
+        if id == "pots" then
+            return M.potsSections(S.pots)
+        elseif id == "runs" then
+            return M.runsSections(S.runs)
+        elseif id == "banzuke" then
+            return M.banzukeSections(S.board, S.leaders, rows)
         elseif id == "skillFuture" then
             return M.depthSections(S.depths)
         elseif id == "skill" then
@@ -363,7 +367,7 @@ describe("StatsBoardModel titles fit their real StatsRoomLayout boards", functio
     for _, b in StatsRoomLayout.BOARDS do
         if b.id:sub(1, 5) ~= "round" then
             test(`{b.id} ({b.rows} rows): every line it composes actually fits`, function()
-                local sections = sectionsFor(b.id)
+                local sections = sectionsFor(b.id, b.rows)
                 expect(sections ~= nil).toBeTruthy()
                 if sections then
                     local wanted = 0
@@ -388,7 +392,7 @@ describe("StatsBoardModel titles fit their real StatsRoomLayout boards", functio
     for _, b in StatsRoomLayout.BOARDS do
         if b.id:sub(1, 5) ~= "round" and not b.shuttered then
             test(`{b.id} (cols={b.cols}): title line(s) are not truncated`, function()
-                local sections = sectionsFor(b.id)
+                local sections = sectionsFor(b.id, b.rows)
                 expect(sections ~= nil).toBeTruthy()
                 if sections then
                     for _, sec in sections do
@@ -645,6 +649,56 @@ describe("fudaSections content", function()
     test("drops bank depth — dubious on a personal board (owner, 2026-08-18)", function()
         local all = table.concat(M.compose(M.fudaSections(P), O), "\n")
         expect(string.find(all, "BANK AT", 1, true) == nil).toBe(true)
+    end)
+end)
+
+describe("the live boards — form, not standing", function()
+    local POTS = { rows = 8, cols = 22 }
+    local RUNS = { rows = 8, cols = 14 }
+
+    test("pots rank highest first and need no qualification line", function()
+        local all = table.concat(
+            M.compose(
+                M.potsSections({
+                    { displayName = "AYAKA", pot = 243 },
+                    { displayName = "KENJI", pot = 27 },
+                }),
+                POTS
+            ),
+            "\n"
+        )
+        expect(string.find(all, "RIDING NOW", 1, true) ~= nil).toBe(true)
+        expect(string.find(all, "243", 1, true) ~= nil).toBe(true)
+        -- nothing here is an inference, so nothing here mentions a throw floor
+        expect(string.find(all, "360", 1, true) == nil).toBe(true)
+    end)
+
+    test("an empty room says nobody is riding, not NO DATA YET", function()
+        -- "No data" is wrong: the data arrived and it says the room is quiet. That is a fact
+        -- about the game, not a gap in the feed.
+        local all = table.concat(M.compose(M.potsSections({}), POTS), "\n")
+        expect(string.find(all, "NO DATA YET", 1, true) == nil).toBe(true)
+        expect(string.find(all, "NOBODY IS RIDING", 1, true) ~= nil).toBe(true)
+    end)
+
+    test("runs fit the narrow board beside the pots", function()
+        local lines = M.compose(M.runsSections({ { displayName = "AYAKA", length = 5 } }), RUNS)
+        local row = nil
+        for _, l in lines do
+            if string.find(l, "AYAKA", 1, true) then
+                row = l
+            end
+        end
+        expect(row ~= nil).toBeTruthy()
+        if row then
+            expect(#row <= RUNS.cols).toBe(true)
+            expect(string.match(row, "5%s*$") ~= nil).toBe(true)
+        end
+    end)
+
+    test("a quiet room on the runs board says so too", function()
+        local all = table.concat(M.compose(M.runsSections({}), RUNS), "\n")
+        expect(string.find(all, "NO RUNS YET", 1, true) ~= nil).toBe(true)
     end)
 end)
 

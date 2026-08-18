@@ -293,3 +293,27 @@ describe('GET /stats/board', () => {
         expect(JSON.stringify(res.body)).not.toContain(String(a._id));
     });
 });
+
+
+describe('GET /stats/board — what is riding right now', () => {
+    it('carries live pots and live runs, named, needing no qualification', async () => {
+        await User.create({ deviceId: 'a', displayName: 'Ayaka', pointsAtStake: 243, currentStreak: 5 });
+        await User.create({ deviceId: 'b', displayName: 'Kenji', pointsAtStake: 27, currentStreak: 3 });
+        const res = await request(app).get('/api/v1/stats/board');
+        expect(res.status).toBe(200);
+        expect(res.body.pots).toEqual([
+            { displayName: 'Ayaka', pot: 243 },
+            { displayName: 'Kenji', pot: 27 },
+        ]);
+        expect(res.body.runs).toEqual([
+            { displayName: 'Ayaka', length: 5 },
+            { displayName: 'Kenji', length: 3 },
+        ]);
+    });
+
+    it('never emits a raw userId on the live boards either', async () => {
+        const a = await User.create({ deviceId: 'a', displayName: 'Ayaka', pointsAtStake: 9, currentStreak: 2 });
+        const res = await request(app).get('/api/v1/stats/board');
+        expect(JSON.stringify(res.body)).not.toContain(String(a._id));
+    });
+});
