@@ -58,11 +58,16 @@ end
 
 -- A stored side map (a list of travels, one per bay) resolved against the run actually built.
 -- Extra entries are dropped and missing ones read as closed, so a house that changed size does
--- not hang a screen off the end of a shorter wall.
-function ShojiRun.resolve(stored: { number }?, count: number): { number }
+-- not hang a screen off the end of a shorter wall. `stored` itself may be junk -- a stray boolean
+-- or number left by an older document shape, not a list at all -- and that reads as entirely
+-- absent (every screen closed), the same as `nil`, rather than indexing into it and erroring:
+-- junk in one slot is already closed by `clamp`, so junk in the WHOLE slot should read no
+-- differently.
+function ShojiRun.resolve(stored: any, count: number): { number }
+    local list = if typeof(stored) == "table" then stored else nil
     local out = table.create(count, 0)
     for i = 1, count do
-        local v = if stored ~= nil then stored[i] else nil
+        local v = if list ~= nil then list[i] else nil
         out[i] = ShojiRun.clamp(i, count, v)
     end
     return out

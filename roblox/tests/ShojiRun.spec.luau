@@ -127,4 +127,12 @@ describe("ShojiRun.resolve — a stored map becomes one number per bay", functio
     test("junk in a slot is closed, not an error", function()
         expect(ShojiRun.resolve({ "x" :: any, 1 }, 2)).toEqual({ 0, 0 })
     end)
+
+    test("junk in the WHOLE slot -- not a list at all -- is closed, not an error", function()
+        -- a stray boolean/number/string from an older document shape, in place of the per-bay
+        -- list; must read as fully absent rather than indexing into it and throwing
+        expect(ShojiRun.resolve(true :: any, 3)).toEqual({ 0, 0, 0 })
+        expect(ShojiRun.resolve(5 :: any, 3)).toEqual({ 0, 0, 0 })
+        expect(ShojiRun.resolve("nope" :: any, 3)).toEqual({ 0, 0, 0 })
+    end)
 end)

@@ -115,10 +115,25 @@ function StructureOps.applyBays(model: Model, bays: { { side: string, index: num
     end
 end
 
--- Which world axis a side's shoji screens slide along: front/back bays step along X, left/right
--- along Z. Mirrors tools/studio/trackShojiBays.luau's RUN_AXIS -- the Studio tool that cut the
--- channels this moves leaves through -- so runtime and authoring agree on which axis is "open".
-local SHOJI_RUN_AXIS: { [string]: string } = { front = "X", back = "X", left = "Z", right = "Z" }
+-- Which axis of the STRUCTURE's own LOCAL frame a side's shoji screens slide along: front/back
+-- bays step along local X, left/right along local Z. This mirrors
+-- tools/studio/trackShojiBays.luau's RUN_AXIS in spirit, but that tool applies its axis in WORLD
+-- space because it runs on an unplaced prefab sitting in ServerStorage, where local and world
+-- agree. applyShoji never gets that luxury -- it only ever runs on an already-placed structure
+-- (TreatmentApplier calls it straight after structureBuilder.build has pivoted the model onto its
+-- pad; SetBackDoor calls it on a live, already-placed structure) -- so a fixed WORLD axis here
+-- would push every screen off the wall plane by an amount that grows with the pad's yaw and the
+-- size of the slide. Caught in review round 1: on a pad yawed ~12.7 degrees, a plain world-X delta
+-- for a 6-stud (one bay-width) slide landed the leaf ~1.3 studs off the wall, and an 18-stud
+-- three-bay stack drifted ~4 studs off. The fix is to convert the LOCAL run axis to a world
+-- direction via the structure's own placed pivot (CFrame:VectorToWorldSpace), every call, rather
+-- than assuming world axes ever line up with the wall.
+local SHOJI_RUN_AXIS_LOCAL: { [string]: Vector3 } = {
+    front = Vector3.new(1, 0, 0),
+    back = Vector3.new(1, 0, 0),
+    left = Vector3.new(0, 0, 1),
+    right = Vector3.new(0, 0, 1),
+}
 
 -- Slide each side's shoji screens to the travel recorded in `shojiOpen` (a per-side list of
 -- bay-widths; see ShojiRun). A SIDE'S RUN IS ONLY THE BAYS THAT CARRY A `Shoji` VARIANT, in
@@ -127,6 +142,8 @@ local SHOJI_RUN_AXIS: { [string]: string } = { front = "X", back = "X", left = "
 -- position within that subset, not its raw bay index. A bay modelled with no Shoji variant (this
 -- prefab's plain Bay_left_*/Bay_right_* wall segments, say) earns no ordinal and must not be
 -- counted, or every real screen would be shifted one channel deeper than the geometry expects.
+-- This is an entirely ORDINARY shape (the small teahouse has no side screens at all) so it is
+-- skipped SILENTLY -- warning here would fire on every materialize of every such teahouse.
 --
 -- Idempotent, and safe to call more than once on the same model (a re-render after a door edit,
 -- for instance): each leaf's HOME is not cached anywhere -- the model this runs against can be
@@ -135,7 +152,7 @@ local SHOJI_RUN_AXIS: { [string]: string } = { front = "X", back = "X", left = "
 -- leaf by the DIFFERENCE between the new travel and whatever the attribute already says, so
 -- calling twice with the same shojiOpen is a no-op and repeated calls never accumulate drift.
 -- A missing/unrecognised side is warned and skipped, same failure posture as applyBays (F2/F4).
-function StructureOps.applyShoji(model: Model, shojiOpen: { [string]: { number } }?)
+function StructureOps.applyShoji(model: Model, shojiOpen: { [string]: any }?)
     local bySide: { [string]: { { index: number, bay: Model, shoji: Model } } } = {}
     for _, c in model:GetChildren() do
         if c:IsA("Model") then
@@ -154,26 +171,41 @@ function StructureOps.applyShoji(model: Model, shojiOpen: { [string]: { number }
         end
     end
 
+    -- the structure's OWN placed frame, not the leaf's: a side-wall leaf is itself yawed 90
+    -- degrees by how the prefab was authored, so ITS local X is not the wall's run direction --
+    -- the structure's frame is the one every bay's coordinates were authored against.
+    local structurePivot = model:GetPivot()
+
     for side, list in bySide do
         table.sort(list, function(a, b)
             return a.index < b.index
         end)
-        local runAxis = SHOJI_RUN_AXIS[side]
-        if not runAxis then
+        local localAxis = SHOJI_RUN_AXIS_LOCAL[side]
+        if not localAxis then
             warn(`[StructureOps] applyShoji: unrecognised side '{side}'`)
         else
             local count = #list
-            local resolved = ShojiRun.resolve(shojiOpen and shojiOpen[side], count)
+            local storedSide = if shojiOpen then shojiOpen[side] else nil
+            -- shojiOpen[side] should be a per-bay list or absent. Anything else -- a stray
+            -- boolean/number left by an older document shape -- is malformed data that should
+            -- not exist, so (unlike the silent skip above) this DOES warn: ShojiRun.resolve
+            -- would already treat it as absent, but the warning is what tells us the data is
+            -- bad rather than just "this house has no shoji open".
+            if storedSide ~= nil and typeof(storedSide) ~= "table" then
+                warn(
+                    `[StructureOps] applyShoji: shojiOpen.{side} is a {typeof(storedSide)}, not a list; treating as closed`
+                )
+                storedSide = nil
+            end
+            local resolved = ShojiRun.resolve(storedSide, count)
+            local worldDir = structurePivot:VectorToWorldSpace(localAxis)
             for ordinal, entry in list do
                 local open = resolved[ordinal]
                 local prevAttr = entry.bay:GetAttribute("ShojiOpen")
                 local prevOpen = if typeof(prevAttr) == "number" then prevAttr else 0
                 local deltaStuds = ShojiRun.displacement(open) - ShojiRun.displacement(prevOpen)
                 if deltaStuds ~= 0 then
-                    local delta = if runAxis == "X"
-                        then Vector3.new(deltaStuds, 0, 0)
-                        else Vector3.new(0, 0, deltaStuds)
-                    entry.shoji:PivotTo(entry.shoji:GetPivot() + delta)
+                    entry.shoji:PivotTo(entry.shoji:GetPivot() + worldDir * deltaStuds)
                 end
                 entry.bay:SetAttribute("ShojiOpen", open)
             end
