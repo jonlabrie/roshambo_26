@@ -45,6 +45,11 @@ function ChoreographyMachine.revealCues(reveal: any, opts: Opts): { Cue }
             idx = #cues + 1,
             kind = "consequence",
             userId = userId,
+            -- THE RESULT TRAVELS, not just the effect chosen from it. An effect is swappable data
+            -- -- that is what EffectRegistry is for -- and LOSS's pool is empty, so a listener
+            -- reading the effect cannot distinguish a loss from an unknown effect. `r.result` is
+            -- already in hand; carrying it decouples every consumer from the effect catalog.
+            result = r.result,
             effect = opts.selectEffect(r.result, { worldThrow = reveal.worldThrow }),
         }
     end

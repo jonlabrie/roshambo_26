@@ -53,6 +53,21 @@ describe("ChoreographyMachine.revealCues", function()
         whiffed = { ["11"] = true },
     }
 
+    test("a consequence cue names the RESULT, not just the effect it selected", function()
+        -- LOSS selects nil from an empty pool, so a listener inferring the outcome from the effect
+        -- cannot tell a loss from an unknown effect -- and it would be coupled to the effect
+        -- catalog, which is exactly what EffectRegistry exists to prevent.
+        local cues = Choreo.revealCues(reveal, OPTS)
+        local seen = {}
+        for _, c in cues do
+            if c.kind == "consequence" then
+                seen[c.userId] = c.result
+            end
+        end
+        expect(seen["9"]).toBe("WIN")
+        expect(seen["10"]).toBe("LOSS")
+    end)
+
     test("base cues fire at t=0 and consequences are staggered", function()
         local cues = Choreo.revealCues(reveal, OPTS)
         expect(cues[1].atMs).toBe(0)
