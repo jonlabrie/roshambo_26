@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: open
-updated: 2026-08-16
+updated: 2026-08-18
 ---
 
 # Backlog
@@ -48,6 +48,24 @@ Raw layer: `docs/superpowers/specs/2026-07-05-roshambo-structure-builder-design.
 (`7e2eca6`) and the 2026-07-13..19 specs/plans (b1/b2/b3/b4, home-portal,
 deck-decoration-framework, teahouse-access-control) under `docs/superpowers/`; ledger
 `.superpowers/sdd/progress.md`.
+
+## Sliding shoji — deferred from the 2026-08-18 ship
+
+Item 5 of [[friends-family-baseline]] shipped 2026-08-18 (see [[teahouses]]). Its final
+whole-branch review ruled five things deferred rather than guessed at; none block the
+ship, and none has a design decision pending — they are implementation debt.
+
+- **The client cancels and recreates a `Tween` on every server write** for a moving
+  screen, instead of lerping in `RenderStepped`.
+- **No one-holder-per-bay latch** — two players holding the same screen at once fight
+  each other's writes.
+- **The hold loop does not re-check `BayState` mid-hold** — a wall re-applied to
+  `solid` while a stranger is mid-slide keeps sliding until they release.
+- **The Studio tool (`trackShojiBays.luau`) keeps its own axis tables** rather than
+  reading `ShojiRun.runAxis`, the class of drift risk [[duplicated-server-constants]]
+  warns about.
+- **Two same-tick persist debounces on different screens still cost two PUTs** (the
+  second folds the first's value in rather than losing it — correct, not optimal).
 
 ## Meta-game spec (approved — the design ceiling for the economy)
 

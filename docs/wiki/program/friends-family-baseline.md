@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: open
-updated: 2026-08-17
+updated: 2026-08-18
 ---
 
 # Friends & Family Baseline
@@ -30,8 +30,11 @@ rounds skippable, no penalty) — hangout is the product.
 4. **Merchant row** — closed 2026-08-17: every shell built and gated (Stats front, apparel,
    花火屋, accessories, and the riverside chaya + its dock — [[chaya]]).
    [[item-4-merchant-row]].
-5. **Shoji** — open: open/half/close, ideally grab-slide (fallback prompt-cycled);
-   swappable loadout SLOT ships now, better screens earned/bought later.
+5. **Shoji** — closed 2026-08-18: hold-to-slide (grab-slide, not the prompt-cycle
+   fallback), N−1-bay travel, owner-persists/visitor-does-not. Both owner gates passed
+   the same day — channel geometry ("sills on L teahouse look fine", place saved) and
+   the play loop ("looks good"). The swappable loadout slot was found already wired
+   end to end (placeholder art only); see [[teahouses]].
 6. **Rewards & flex** — open: server-side milestone badges from existing per-player stats,
    awarded at settlement; flex via teahouse banner-pole flag + avatar ribbon/sash;
    earn-only. Carries the parked economy-API defects (a)–(c) in [[parked-defects]]. Any badge that claims
@@ -77,6 +80,7 @@ nits (owner: "I would put it into production today").
 - spec: `docs/superpowers/specs/2026-07-30-friends-family-baseline-design.md`
 - item ledgers: `.superpowers/sdd/2026-07-30-foliage-finish/`,
   `.superpowers/sdd/2026-08-02-play-hud/` (+ revision/round-two/three/four),
-  `.superpowers/sdd/2026-08-05-fireworks-core/`, `.superpowers/sdd/2026-08-05-hanabiya-shop/`
+  `.superpowers/sdd/2026-08-05-fireworks-core/`, `.superpowers/sdd/2026-08-05-hanabiya-shop/`,
+  `.superpowers/sdd/2026-08-18-shoji-screens/`
 - the round restructure that shipped alongside item 2:
   `docs/superpowers/specs/2026-08-04-round-structure-design.md` (`830d2b8..00bf8f8`)

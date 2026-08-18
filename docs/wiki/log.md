@@ -334,3 +334,19 @@ Pre-existing, found while chasing a report of it. It also read
 never migrated into an account either. Both fixed; the migration now travels as the
 signed device token. See [[backlog]].
 
+## [2026-08-18] ship | Sliding shoji — item 5 closed
+
+Every shoji bay's leaf now moves in its own channel (`trackShojiBays.luau`, idempotent)
+and slides by holding a `ProximityPrompt`, clamped only to its run's ends — a whole run
+can stack into one bay, so an N-bay wall opens at most N−1 bays. Server-authoritative
+(`ShojiOpen` target / `ShojiApplied` actual, both attributes); the owner's positions
+persist through the existing loadout PUT (`shojiOpen`), a visitor's do not. The
+swappable variant slot the item asked for was found already wired end to end from a
+prior ship — placeholder art only, catalog/UI work stays on [[backlog]].
+
+Two owner gates passed the same day: the channel geometry ("sills on L teahouse look
+fine", place saved) and the play loop ("looks good" — prompts, slide, stacking,
+direction). Five non-blocking implementation items carried to [[backlog]]. See
+[[teahouses]]; spec `2026-08-18-shoji-screens-design.md`, plan
+`2026-08-18-shoji-screens.md`, commits `021d745..95375f3`.
+
