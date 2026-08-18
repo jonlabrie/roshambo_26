@@ -159,8 +159,26 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
             if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
             const country = typeof req.query.country === 'string' ? req.query.country : undefined;
-            if (country && user.country !== country) {
-                await User.findByIdAndUpdate(user._id, { $set: { country } });
+            // THE ONLY PLACE A ROBLOX PLAYER'S NAME IS RECORDED. Nothing else on the Roblox path
+            // ever wrote `displayName` — it was written by PWA registration and the PWA's
+            // update-progress and nowhere else — so every Roblox player's User row had no name
+            // and every board naming them fell through to 'Anonymous': the banzuke, records,
+            // heat, and the player's own slip. Found 2026-08-18 by the owner reading their own
+            // fuda. This is the join-time call every Roblox player already makes, and the name
+            // rides it exactly as `country` does.
+            //
+            // Roblox has already moderated a DisplayName, and the room's broadcast path filters
+            // it again through `cachedFilterName` before it reaches a wall, so storing it raw is
+            // safe on both counts.
+            const name = typeof req.query.name === 'string' ? req.query.name.slice(0, 64) : undefined;
+            const set: Record<string, unknown> = {};
+            if (country && user.country !== country) set.country = country;
+            // Guarded on a NON-EMPTY name: an absent or blank query must never blank a stored
+            // one, or a single request without it wipes the board.
+            if (name && user.displayName !== name) set.displayName = name;
+            if (Object.keys(set).length > 0) {
+                await User.findByIdAndUpdate(user._id, { $set: set });
+                Object.assign(user, set);
             }
             res.set('Cache-Control', 'no-store');
             res.json({

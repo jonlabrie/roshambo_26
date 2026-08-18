@@ -174,6 +174,30 @@ describe('/api/v1', () => {
     });
 
     describe('GET /players/:robloxUserId', () => {
+        it('records the Roblox display name, so boards can stop saying Anonymous', async () => {
+            const app = makeApp(makeEngine(), new ResultsStore());
+            await request(app)
+                .get('/api/v1/players/12345?name=Ayaka').set('X-API-Key', API_KEY).expect(200);
+            const u = await User.findOne({ robloxId: '12345' });
+            expect(u?.displayName).toBe('Ayaka');
+        });
+
+        it('updates a name that has changed', async () => {
+            await User.create({ robloxId: '12345', identityTier: 'roblox', displayName: 'Old' });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            await request(app)
+                .get('/api/v1/players/12345?name=New').set('X-API-Key', API_KEY).expect(200);
+            expect((await User.findOne({ robloxId: '12345' }))?.displayName).toBe('New');
+        });
+
+        it('never clears a stored name when the query omits it', async () => {
+            await User.create({ robloxId: '12345', identityTier: 'roblox', displayName: 'Ayaka' });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            await request(app)
+                .get('/api/v1/players/12345').set('X-API-Key', API_KEY).expect(200);
+            expect((await User.findOne({ robloxId: '12345' }))?.displayName).toBe('Ayaka');
+        });
+
         it('returns (and creates) the wallet, recording optional country', async () => {
             const app = makeApp(makeEngine(), new ResultsStore());
             const res = await request(app)

@@ -192,6 +192,27 @@ describe("NetworkClient.getInstanceResults", function()
 end)
 
 describe("NetworkClient.getPlayer", function()
+    test("carries the player's display name, percent-encoded", function()
+        local m = makeDeps({
+            { ok = true, statusCode = 200, body = "{}" },
+            { ok = true, statusCode = 200, body = "{}" },
+        })
+        local net = NetworkClient.new({ baseUrl = "http://x", apiKey = "k" }, m.deps)
+        net:getPlayer("9", "US", "Ayaka")
+        expect(m.calls[1].url).toBe("http://x/api/v1/players/9?country=US&name=Ayaka")
+        -- Spaces and non-ASCII are both legal in a Roblox DisplayName and would otherwise
+        -- produce a malformed URL.
+        net:getPlayer("9", nil, "Ayaka \u{7530}")
+        expect(m.calls[2].url).toBe("http://x/api/v1/players/9?name=Ayaka%20%E7%94%B0")
+    end)
+
+    test("an empty display name is omitted rather than sent blank", function()
+        local m = makeDeps({ { ok = true, statusCode = 200, body = "{}" } })
+        local net = NetworkClient.new({ baseUrl = "http://x", apiKey = "k" }, m.deps)
+        net:getPlayer("9", nil, "")
+        expect(m.calls[1].url).toBe("http://x/api/v1/players/9")
+    end)
+
     test("plain fetch and country-recording variant", function()
         local f = makeDeps({
             { ok = true, statusCode = 200, body = '{"robloxUserId":"9","totalPoints":5}' },

@@ -109,10 +109,35 @@ function NetworkClient.getInstanceResults(self: any, instanceId: string, roundId
     return self:_request("GET", `/api/v1/instances/{instanceId}/rounds/{roundId}/results`)
 end
 
-function NetworkClient.getPlayer(self: any, robloxUserId: string, country: string?): Result
+-- Percent-encode a query value. `HttpService:UrlEncode` would do this, but this module takes
+-- every side effect by injection and requires no Roblox service, so it runs under Lune -- and a
+-- Roblox DisplayName legally carries spaces and non-ASCII, either of which makes a malformed URL.
+-- Byte-wise `gsub` is correct for UTF-8 precisely because percent-encoding is defined per byte.
+local function urlEncode(value: string): string
+    return (
+        string.gsub(value, "[^%w%-%.%_%~]", function(c)
+            return string.format("%%%02X", string.byte(c))
+        end)
+    )
+end
+
+-- THE NAME RIDES THE JOIN CALL. Nothing on the Roblox path ever recorded a display name, so
+-- every board naming a Roblox player showed "Anonymous" -- found 2026-08-18 by the owner reading
+-- their own slip. This is the request every player already makes on join, and the name travels
+-- exactly as `country` does rather than earning an endpoint of its own.
+function NetworkClient.getPlayer(self: any, robloxUserId: string, country: string?, name: string?): Result
     local path = `/api/v1/players/{robloxUserId}`
+    local query: { string } = {}
     if country then
-        path ..= `?country={country}`
+        table.insert(query, `country={country}`)
+    end
+    -- An EMPTY name is omitted, never sent blank: the server guards against blanking a stored
+    -- name, and sending one anyway would lean on that guard instead of not asking for it.
+    if name and name ~= "" then
+        table.insert(query, `name={urlEncode(name)}`)
+    end
+    if #query > 0 then
+        path ..= "?" .. table.concat(query, "&")
     end
     return self:_request("GET", path)
 end

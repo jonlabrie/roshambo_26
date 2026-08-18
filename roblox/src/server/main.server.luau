@@ -478,7 +478,7 @@ Players.PlayerAdded:Connect(function(player)
         pcall(function()
             country = LocalizationService:GetCountryRegionForPlayerAsync(player)
         end)
-        local res = net:getPlayer(tostring(player.UserId), country)
+        local res = net:getPlayer(tostring(player.UserId), country, player.DisplayName)
         if res.ok then
             hudPrefs[tostring(player.UserId)] = HudPrefs.fromProfile(res.data)
             hudSeenBeats[tostring(player.UserId)] = if type(res.data.seenBeats) == "table"
