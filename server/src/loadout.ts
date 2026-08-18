@@ -4,7 +4,7 @@ export const MAX_LOADOUT_BYTES = 4096;
 export const MAX_SIZECLASS_LEN = 16;
 export const MAX_CLASSES = 8;
 
-const LOADOUT_KEYS = new Set(['baseStyle', 'colorScheme', 'shoji', 'tatami', 'flags', 'wallArt', 'wallBays', 'placement']);
+const LOADOUT_KEYS = new Set(['baseStyle', 'colorScheme', 'shoji', 'tatami', 'flags', 'wallArt', 'wallBays', 'placement', 'shojiOpen']);
 
 export const KNOWN_SIDES = new Set(['front', 'back', 'left', 'right']);
 export const WALLBAY_STATES = new Set(['solid', 'shoji', 'door']);
@@ -25,6 +25,28 @@ export function validateWallBays(value: unknown): Check {
             if (typeof s !== 'string' || !WALLBAY_STATES.has(s)) {
                 return { ok: false, error: 'BAD_WALLBAYS' };
             }
+        }
+    }
+    return { ok: true };
+}
+
+// Where each shoji screen has been slid, in bay-widths from its own bay: { front: [0, 1, -1] }.
+// The REAL limit is the run's own length (a four-bay wall lets its first screen travel +3 and no
+// more), and that lives in ShojiRun on the Roblox side, which knows how many bays were built.
+// This is the storage guard: it refuses what no run of any size could produce, so nonsense never
+// reaches the database, and leaves the exact clamp to the code that knows the wall.
+export function validateShojiOpen(value: unknown): Check {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return { ok: false, error: 'BAD_SHOJI_OPEN' };
+    }
+    for (const [side, travels] of Object.entries(value as Record<string, unknown>)) {
+        if (!KNOWN_SIDES.has(side)) return { ok: false, error: 'BAD_SHOJI_OPEN' };
+        if (!Array.isArray(travels) || travels.length > MAX_BAYS_PER_SIDE) {
+            return { ok: false, error: 'BAD_SHOJI_OPEN' };
+        }
+        for (const t of travels) {
+            if (typeof t !== 'number' || !Number.isFinite(t)) return { ok: false, error: 'BAD_SHOJI_OPEN' };
+            if (Math.abs(t) >= MAX_BAYS_PER_SIDE) return { ok: false, error: 'BAD_SHOJI_OPEN' };
         }
     }
     return { ok: true };
@@ -105,6 +127,10 @@ export function validateLoadout(loadout: unknown): Check {
     if (obj.wallBays !== undefined) {
         const wb = validateWallBays(obj.wallBays);
         if (!wb.ok) return wb;
+    }
+    if (obj.shojiOpen !== undefined) {
+        const so = validateShojiOpen(obj.shojiOpen);
+        if (!so.ok) return so;
     }
     if (obj.placement !== undefined) {
         const p = validatePlacement(obj.placement);

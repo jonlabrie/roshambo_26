@@ -7,6 +7,7 @@ import {
     validatePlacement,
     validateDecorations,
     validateAccess,
+    validateShojiOpen,
     MAX_CLASSES,
     MAX_BAYS_PER_SIDE,
 } from './loadout';
@@ -224,5 +225,50 @@ describe('validateAccess', () => {
     it('rejects over the cap', () => {
         const many = Array.from({ length: 51 }, (_, i) => i + 1);
         expect(validateAccess({ mode: 'private', invited: many })).toEqual({ ok: false, error: 'BAD_ACCESS' });
+    });
+});
+
+describe('validateShojiOpen', () => {
+    it('accepts a per-side list of travels', () => {
+        expect(validateShojiOpen({ front: [0, 1, -1], back: [0] }).ok).toBe(true);
+    });
+
+    it('accepts an empty map (every screen closed)', () => {
+        expect(validateShojiOpen({}).ok).toBe(true);
+    });
+
+    it('rejects an unknown side', () => {
+        expect(validateShojiOpen({ roof: [0] }).ok).toBe(false);
+    });
+
+    it('rejects more entries than a wall can have bays', () => {
+        expect(validateShojiOpen({ front: new Array(MAX_BAYS_PER_SIDE + 1).fill(0) }).ok).toBe(false);
+    });
+
+    it('rejects values no run could produce', () => {
+        // the true limit is the run's own length and lives in ShojiRun; this only refuses nonsense
+        expect(validateShojiOpen({ front: [MAX_BAYS_PER_SIDE] }).ok).toBe(false);
+        expect(validateShojiOpen({ front: [Number.NaN] }).ok).toBe(false);
+        expect(validateShojiOpen({ front: [Number.POSITIVE_INFINITY] }).ok).toBe(false);
+    });
+
+    it('rejects a non-list side and a non-object map', () => {
+        expect(validateShojiOpen({ front: 'open' }).ok).toBe(false);
+        expect(validateShojiOpen([0, 1]).ok).toBe(false);
+    });
+
+    it('travels are continuous, not just whole bays', () => {
+        expect(validateShojiOpen({ front: [0.5, -1.25] }).ok).toBe(true);
+    });
+});
+
+describe('validateLoadout with shojiOpen', () => {
+    it('accepts a loadout carrying one', () => {
+        expect(validateLoadout({ baseStyle: 'teahouse-1story', shojiOpen: { front: [1, 0] } }).ok).toBe(true);
+    });
+
+    it('rejects the whole loadout when it is malformed', () => {
+        // half-applying a bad map would leave a house in a state nobody chose
+        expect(validateLoadout({ baseStyle: 'teahouse-1story', shojiOpen: { front: ['x'] } }).ok).toBe(false);
     });
 });
