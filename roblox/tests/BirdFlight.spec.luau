@@ -6,7 +6,7 @@ local describe, test, expect = harness.describe, harness.test, harness.expect
 describe("BirdFlight", function()
     test("idle orbits without drifting away", function()
         for t = 0, 10, 0.25 do
-            expect(BirdFlight.magnitude(BirdFlight.offsetFor("IDLE", t, 7)) < 6).toBe(true)
+            expect(BirdFlight.magnitude(BirdFlight.offsetFor("RESTING", t, 7)) < 6).toBe(true)
         end
     end)
 
@@ -21,12 +21,12 @@ describe("BirdFlight", function()
         end
     end)
 
-    test("SAFE settles onto a perch and STAYS there all round", function()
-        local a = BirdFlight.offsetFor("SAFE", 1.5, 7)
-        local b = BirdFlight.offsetFor("SAFE", 40, 7)
-        expect(BirdFlight.distance(a, b) < 0.05).toBe(true)
-        -- shoulder height, not overhead: a landed bird is the whole point
-        expect(a.y < 3).toBe(true)
+    test("SAFE has NO behaviour — nothing changed, so the bird does not change", function()
+        for _, t in { 1, 10, 40 } do
+            expect(
+                BirdFlight.distance(BirdFlight.offsetFor("SAFE", t, 7), BirdFlight.offsetFor("RESTING", t, 7))
+            ).toBe(0)
+        end
     end)
 
     test("LOSS bolts, then SINKS and stays low", function()
@@ -41,25 +41,23 @@ describe("BirdFlight", function()
         -- LOSS holds low rather than simply coming home.
         for _, t in { 5, 20, 55 } do
             local lost = BirdFlight.offsetFor("LOSS", t, 7)
-            local idle = BirdFlight.offsetFor("IDLE", t, 7)
+            local idle = BirdFlight.offsetFor("RESTING", t, 7)
             expect(BirdFlight.distance(lost, idle) > 1.5).toBe(true)
         end
     end)
 
-    test("all four holds are distinguishable by HEIGHT alone, at a glance, across a room", function()
+    test("the three holds that differ are separable by HEIGHT alone, across a room", function()
         local win = BirdFlight.offsetFor("WIN", 30, 7).y
-        local idle = BirdFlight.offsetFor("IDLE", 30, 7).y
-        local safe = BirdFlight.offsetFor("SAFE", 30, 7).y
+        local resting = BirdFlight.offsetFor("RESTING", 30, 7).y
         local loss = BirdFlight.offsetFor("LOSS", 30, 7).y
-        expect(win > idle + 3).toBe(true)
-        expect(idle > safe).toBe(true)
-        expect(safe > loss).toBe(true)
+        expect(win > resting + 3).toBe(true)
+        expect(resting > loss + 1.5).toBe(true)
     end)
 
     test("is deterministic per seed, so two clients draw the same bird", function()
-        local a = BirdFlight.offsetFor("IDLE", 3.3, 7)
-        local b = BirdFlight.offsetFor("IDLE", 3.3, 7)
-        local other = BirdFlight.offsetFor("IDLE", 3.3, 8)
+        local a = BirdFlight.offsetFor("RESTING", 3.3, 7)
+        local b = BirdFlight.offsetFor("RESTING", 3.3, 7)
+        local other = BirdFlight.offsetFor("RESTING", 3.3, 8)
         expect(BirdFlight.distance(a, b)).toBe(0)
         expect(BirdFlight.distance(a, other) > 0).toBe(true)
     end)

@@ -104,7 +104,7 @@ local function makeBird(userId: string): Bird
         wingR = wingR,
         tail = tail,
         seed = seedFor(userId),
-        state = "IDLE",
+        state = "RESTING",
         since = os.clock(),
         band = 0,
     }
@@ -154,12 +154,31 @@ end)
 -- is ALREADY past the drum. The first version of this file stashed consequences and waited for a
 -- `drumRest` that had therefore already fired, and the bird never reacted at all. Consuming the
 -- cue directly is both correct and gated; re-gating it is what broke it.
+--
+-- ⚠ EVERY BIRD RESETS TO RESTING AT THE START OF EACH REVEAL, and this is what makes "no entry" a
+-- real state rather than a forgotten one. A held result with nothing to end it left a player who
+-- won an hour ago with a bird still circling triumphantly (owner, 2026-08-18). `heroTileLand` is
+-- the reveal's own opening cue and arrives at atMs 0, ahead of every staggered consequence, so
+-- clearing on it is clearing exactly one reveal's worth of state at exactly the right moment.
+--
+-- SAFE therefore needs no case at all: it simply never moves a bird off RESTING. Nothing changed,
+-- so the bird does not change.
 EventBus.Cue.Event:Connect(function(cue)
-    if cue.kind ~= "consequence" or not cue.userId or not cue.result then
+    if cue.kind == "heroTileLand" then
+        for _, b in birds do
+            b.state = "RESTING"
+            b.since = os.clock()
+        end
+        return
+    end
+    if cue.kind ~= "consequence" or not cue.userId then
         return
     end
     -- `cue.result`, never `cue.effect`: LOSS's pool is empty, so an effect-derived reading cannot
     -- tell a loss from an unknown effect.
+    if cue.result ~= "WIN" and cue.result ~= "LOSS" then
+        return
+    end
     local b = birds[cue.userId]
     if b then
         b.state = cue.result
@@ -193,7 +212,7 @@ RunService.RenderStepped:Connect(function()
         -- Past DETAIL_DISTANCE the bird holds a fixed offset instead of flying: at that range the
         -- motion is a few pixels and the per-frame trig is the whole cost.
         local o = if far > DETAIL_DISTANCE
-            then BirdFlight.offsetFor("IDLE", 0, b.seed)
+            then BirdFlight.offsetFor("RESTING", 0, b.seed)
             else BirdFlight.offsetFor(b.state, elapsed, b.seed)
         -- FACE THE WAY IT IS GOING. A bird flying sideways is the thing that most stops it
         -- reading as a bird, and the heading falls straight out of the orbit's tangent.
