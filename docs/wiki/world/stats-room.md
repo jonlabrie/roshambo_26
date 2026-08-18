@@ -139,6 +139,45 @@ Live on `BoardTextNudge`.
 is only ~0.72 of its TextSize — the rest of the em is leading and room for ascenders and
 descenders a numeral never uses. Setting it above 1.0 is safe and often correct.
 
+### The south wall leads with FORM, not standing (owner, 2026-08-18)
+
+**The inversion.** The wall you face on leaving the tunnel held the qualified ranking, which needs
+360 throws a week and is therefore empty almost always. Owner: *"winning is something that happens
+in the moment, not as a summary at the end of a week... more who is on a roll and less who is the
+GOAT."*
+
+⚠ **The distinction that had been collapsed, and it governs every board here.** A rate is an
+**inference** — "is this player better than chance?" — and inference needs sample. That is the
+entire reason the 360 floor exists and why a rate board is blank for a week. A live pot is an
+**event**: someone is holding 243 points right now and has to decide. It is exactly true the
+moment it happens, needs no qualification, and works on the first evening with three players in
+the room.
+
+| board | grid | shows | floor |
+|---|---|---|---|
+| `pots` | 8×22 | `livePots` — who is riding, highest first | **none** |
+| `runs` | 8×14 | `liveStreaks` — who is on a run | **none** |
+| `banzuke` | 6×26 | points per throw + read, qualified; career banked until anyone is | 360 throws / 7 days |
+
+**Pots lead and are wider** (owner): a streak says how far someone has come, a pot says what they
+stand to lose, and only the second has a decision attached. Both sit at eye level (y 123.5); the
+standings are demoted to a strip beneath (y 117.5) — same wall, and the slow view reads as a
+footnote to the live one, which is the correct relationship.
+
+`liveStreaks` had been written, indexed and consumed by **nothing** — `User.index({ currentStreak:
+-1 })` was paying a write on every settled player every round for a query no board read. That it
+already existed is the sign the design had drifted rather than merely differed.
+
+**An empty room says `NOBODY IS RIDING`, not `NO DATA YET`.** The data arrived; it says the room is
+quiet. That is a fact about the game, not a gap in the feed.
+
+⚠ **CAPTIONS MUST LEAD, OR THEY ARE TRUNCATED AWAY.** `compose` silently cuts to the board's row
+count, and a caption placed after a list is the first thing lost. This has now happened three
+times — the entry rule under the career list, the baseline under the ranking, and the 札's RANK
+row. `banzukeSections` therefore takes the board's row count and **sizes its list to fit** rather
+than hoping. A test composes every board's real sections at its real dimensions and fails if one
+line would be dropped.
+
 ### The drums
 
 Every flap cell rolls forward through a character drum, and which drum it uses is settled

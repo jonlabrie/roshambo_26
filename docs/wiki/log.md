@@ -417,3 +417,21 @@ cannot — a blind-but-bold player out-earns a skilled-but-timid one 85% of the 
 422 server tests, 1394 Luau. **Not yet gated** — the owner has not seen it in Studio, and
 `skillFuture` opening is a geometry change needing `buildStatsBoards.luau` re-run and the place
 saved. See [[stats-room]].
+
+## [2026-08-18] decision | The entrance wall shows what is happening now
+
+Owner, reading the built room: *"winning is something that happens in the moment, not as a summary
+at the end of a week... more who is on a roll and less who is the GOAT."*
+
+The south wall — the first surface you face leaving the tunnel — held the qualified ranking, which
+needs 360 throws a week and is empty almost always. It now leads with `pots` (live, riding now) and
+`runs` (live streaks) side by side, standings demoted to a strip beneath. `livePots` was written for
+it; `liveStreaks` already existed, already indexed, and had no consumer at all.
+
+The rule this settles: **a rate is an inference and needs sample; a pot on the table is an event and
+needs none.** Every floor in the room applies to the first kind only. See [[stats-room]].
+
+Also corrected the same day, all owner-spotted: the entry rule was captioning the wrong board
+(career banked has no entry requirement); "PER THROW" of what; STREAK NOW → CURRENT STREAK; bank
+depth came off the personal slip as "a dubious stat"; throw shares now read to a tenth, because
+whole percents hide the ties the World Throw is decided by.
