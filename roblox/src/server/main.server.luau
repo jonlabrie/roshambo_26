@@ -975,14 +975,7 @@ end
 -- no error, no message, it simply is not theirs to keep. Declared here (well before the
 -- SlideShoji handler itself) because PlayerRemoving needs to call it directly to flush a pending
 -- debounced persist before playerHouse[uid] is cleared.
-local function persistShojiNow(target: {
-    uid: string,
-    padId: string,
-    side: string,
-    index: number,
-    count: number,
-    bay: Model,
-})
+local function persistShojiNow(target: ShojiPersistTarget)
     local uid = target.uid
     handlerQueue:run(uid, function()
         local house = playerHouse[uid]
@@ -1010,6 +1003,81 @@ local function persistShojiNow(target: {
         local persisted = net:setTeahouse(uid, house.size, newLoadout)
         if not persisted.ok then
             warn(`[SHOJI] setTeahouse failed for {uid}/{house.size}: {tostring(persisted.error)}`)
+        end
+    end)
+end
+
+-- Collapses every pending shoji persist for a LEAVING uid into ONE loadout write (2026-08-18
+-- review round 2 fix). handlerQueue is a strict per-uid FIFO: a loop that called persistShojiNow
+-- once per pending target only ran the FIRST one synchronously -- its HTTP call yields, marks the
+-- lane "running", and every later target for the same uid was merely enqueued behind it. By the
+-- time the lane actually drained to them, PlayerRemoving had already gone on to null
+-- playerHouse[uid] a few lines later, so each queued-but-not-yet-run target found no house and
+-- silently wrote nothing: exactly the multi-screen case the composite persist key exists to
+-- support, undone by the very flush meant to protect it.
+--
+-- The fix is not to reorder the clearing -- there is no placement of handlerQueue:clear /
+-- playerHouse[uid] = nil relative to N separate handlerQueue:run calls that makes all N safe,
+-- because only the FIRST ever runs before the rest of this function continues. It is to make it
+-- ONE call: read playerHouse[uid] ONCE, HERE, before any queueing happens, merge every pending
+-- target's final ShojiOpen into a single cloned loadout, and close over that already-built
+-- loadout (and size) as plain captured locals in a single queued thunk -- never re-reading
+-- playerHouse[uid] from inside it. That makes the clearing order irrelevant: there is nothing left
+-- in the thunk that a later `nil` could invalidate. One HTTP call also costs less than N against a
+-- budget the round loop shares.
+local function flushShojiForUid(uid: string)
+    local targets: { ShojiPersistTarget } = {}
+    for key, target in shojiPendingPersist do
+        if target.uid == uid then
+            table.insert(targets, target)
+            shojiPendingPersist[key] = nil
+            shojiPersistGen[key] = nil -- so a debounce that later wakes cannot write a second time
+        end
+    end
+    if #targets == 0 then
+        return
+    end
+    local house = playerHouse[uid]
+    if house == nil then
+        return -- a visitor's slide is not theirs to keep
+    end
+    -- resolve each SIDE's list at most once, even if several targets share a side, so a second
+    -- target on the same wall sets its own index into the SAME resolved list rather than each
+    -- target clobbering the other's write with its own fresh resolve
+    local newShojiOpen = table.clone(house.loadout.shojiOpen or {})
+    local resolvedBySide: { [string]: { number } } = {}
+    local wroteAny = false
+    for _, target in targets do
+        if target.padId ~= house.padId or not target.bay:IsDescendantOf(workspace) then
+            continue -- stale: occupancy moved on, or the structure died (rebuild/leave race)
+        end
+        local resolvedList = resolvedBySide[target.side]
+        if resolvedList == nil then
+            local existingSide = house.loadout.shojiOpen and house.loadout.shojiOpen[target.side]
+            resolvedList = ShojiRun.resolve(existingSide, target.count)
+            resolvedBySide[target.side] = resolvedList
+            newShojiOpen[target.side] = resolvedList
+        end
+        local finalAttr = target.bay:GetAttribute("ShojiOpen")
+        local finalOpen = if typeof(finalAttr) == "number" then finalAttr else 0
+        resolvedList[target.index] = ShojiRun.clamp(target.index, target.count, finalOpen)
+        wroteAny = true
+    end
+    if not wroteAny then
+        return -- every pending target turned out stale; nothing left to persist
+    end
+    local newLoadout = table.clone(house.loadout)
+    newLoadout.shojiOpen = newShojiOpen
+    house.loadout = newLoadout
+    local e = playerEconomy[uid]
+    if e ~= nil and e.teahouses ~= nil then
+        e.teahouses[house.size] = newLoadout
+    end
+    local size = house.size -- captured now; the thunk below never re-reads playerHouse[uid]
+    handlerQueue:run(uid, function()
+        local persisted = net:setTeahouse(uid, size, newLoadout)
+        if not persisted.ok then
+            warn(`[SHOJI] setTeahouse (flush) failed for {uid}/{size}: {tostring(persisted.error)}`)
         end
     end)
 end
@@ -1506,22 +1574,14 @@ Players.PlayerRemoving:Connect(function(player)
         activeSlide.alive = false
     end
     playerPrefs[uid] = nil
-    -- drop this uid's not-yet-run mutations FIRST -- the shoji flush below re-queues fresh work
-    -- AFTER this call, so it is never at risk of being wiped by it.
+    -- drop this uid's not-yet-run mutations FIRST -- flushShojiForUid below queues at most one
+    -- fresh write, AFTER this call, so it is never at risk of being wiped by it.
     handlerQueue:clear(uid)
-    -- flush every pending debounced shoji persist for this uid NOW, before playerHouse[uid] is
-    -- cleared below (2026-08-18 review fix): a persist that woke up later, on its own 2s timer,
-    -- would find the house already gone and silently drop the write. handlerQueue:run resumes
-    -- synchronously up to its first yield (task.spawn), so as long as playerHouse[uid] is still
-    -- valid AT THIS POINT -- which it is, one line above the nil below -- each flushed persist's
-    -- read of it succeeds before this function ever gets to clearing it.
-    for key, target in shojiPendingPersist do
-        if target.uid == uid then
-            shojiPendingPersist[key] = nil
-            shojiPersistGen[key] = nil
-            persistShojiNow(target)
-        end
-    end
+    -- flush every pending debounced shoji persist for this uid into ONE write NOW (2026-08-18
+    -- review round 2 fix), before playerHouse[uid] is cleared below. flushShojiForUid reads the
+    -- house and builds the merged loadout synchronously, before queueing anything, so the order
+    -- of the two nils below no longer matters to it.
+    flushShojiForUid(uid)
     playerHouse[uid] = nil
     playerEconomy[uid] = nil
     recomputeAllAccess()
