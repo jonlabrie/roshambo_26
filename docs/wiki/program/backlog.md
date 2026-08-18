@@ -302,11 +302,15 @@ change are orphaned: an existing deviceId cannot be presented for adoption, beca
 would be adopted just as readily. The alternative (claim-on-first-sight) was offered and
 declined.
 
-**One crutch to remove.** Amplify rebuilds the PWA on push while the prod App Runner service is
-deployed by hand, so a new client meets an old server for a while. `useGameLoop.ts` therefore
-still sends the legacy `deviceId` payload *while it holds no token* — an old server answers
-that, a new one ignores it. **Delete both the legacy `sync-player` emit in the connect handler
-and the `deviceId` fallback in the throw payload once the prod server has the claim handler.**
+**Verified live 2026-08-18**: claim, throw, win and bank all confirmed against the demo's
+backend by the owner after a hard reload, and by a socket probe that took a pot to 3 over two
+rounds. The rollout crutch (a legacy `deviceId` payload sent while the client held no token)
+is REMOVED — it existed only for the window where a new client could meet an old server, and
+no old server serves anything now.
+
+**What the PWA still keeps in localStorage**: `roshambo_device_token` (the credential) and
+`roshambo_device_id` (an identifier, written from what the server sends back, read only by the
+account-migration call).
 
 ## Plan 3 — the Stats room displays (NEXT, not yet specced)
 

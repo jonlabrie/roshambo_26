@@ -97,8 +97,8 @@ export function useGameLoop() {
 
     // NO LOCAL MINTING. A client-chosen id was only ever meaningful because the server
     // believed it; the server issues one now, on `claim-device`, together with the token that
-    // proves it. Any id already in localStorage is from the old scheme and is kept ONLY for
-    // the rollout crutch below -- see the connect handler.
+    // proves it. `roshambo_device_id` is written from what the server sends back and is read
+    // by nothing but the account-migration call -- it identifies, it no longer authenticates.
 
     // Fetch Catalog
     useEffect(() => {
@@ -190,14 +190,8 @@ export function useGameLoop() {
     // Emit throw when locked
     useEffect(() => {
         if (isLocked && playerThrow && socketRef.current) {
-            // THE THROW, AND NOTHING THAT NAMES AN ACCOUNT. Identity is on the handshake.
-            // `deviceId` is still attached while we have no token, purely for the rollout
-            // window against an old server (see the connect handler); a new server ignores it.
-            const payload: { throw: Throw; deviceId?: string } = { throw: playerThrow }
-            if (!deviceTokenRef.current && deviceIdRef.current) {
-                payload.deviceId = deviceIdRef.current
-            }
-            socketRef.current.emit('submit-throw', payload)
+            // THE THROW, AND NOTHING THAT NAMES AN ACCOUNT. Identity rides the handshake.
+            socketRef.current.emit('submit-throw', { throw: playerThrow })
         }
     }, [isLocked, playerThrow, token])
 
@@ -470,15 +464,6 @@ export function useGameLoop() {
             }
             claimSentRef.current = true
             socket.emit('claim-device')
-            // ROLLOUT CRUTCH, REMOVE ONCE THE PROD SERVER HAS THE CLAIM HANDLER. Amplify
-            // rebuilds this app on push while the prod App Runner service is deployed by
-            // hand, so a new client WILL meet an old server for a while. An old server
-            // ignores `claim-device` and answers the legacy sync; a new one ignores the
-            // legacy payload and answers the claim. Sending both keeps the demo playable
-            // through the window without weakening either.
-            if (deviceIdRef.current) {
-                socket.emit('sync-player', { deviceId: deviceIdRef.current })
-            }
         })
 
         // The server has named this device and signed for it. Store both, put the token on
