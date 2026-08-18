@@ -76,16 +76,32 @@ describe("ShojiRun.grooveOffset — one channel per screen, centred on the wall"
 end)
 
 describe("ShojiRun.directionFrom — which way a hold sends a screen", function()
-    test("a closed screen opens, an open one shuts", function()
-        expect(ShojiRun.directionFrom(0)).toBe(1)
-        expect(ShojiRun.directionFrom(0.4)).toBe(1)
-        expect(ShojiRun.directionFrom(0.5)).toBe(-1)
-        expect(ShojiRun.directionFrom(2)).toBe(-1)
+    test("a screen mostly open comes home", function()
+        expect(ShojiRun.directionFrom(1, 4, 0.5)).toBe(-1)
+        expect(ShojiRun.directionFrom(1, 4, 2)).toBe(-1)
+        expect(ShojiRun.directionFrom(4, 4, -2)).toBe(1)
     end)
 
-    test("it reads the DISTANCE from home, so a screen slid either way comes back", function()
-        expect(ShojiRun.directionFrom(-0.4)).toBe(1)
-        expect(ShojiRun.directionFrom(-2)).toBe(1)
+    test("a screen barely open keeps going the way it started", function()
+        -- reversing under the player's finger is the thing this rule exists to prevent
+        expect(ShojiRun.directionFrom(2, 4, 0.4)).toBe(1)
+        expect(ShojiRun.directionFrom(2, 4, -0.4)).toBe(-1)
+    end)
+
+    test("a screen at rest opens toward the far end of its run", function()
+        expect(ShojiRun.directionFrom(1, 4, 0)).toBe(1)
+        expect(ShojiRun.directionFrom(3, 4, 0)).toBe(1)
+    end)
+
+    test("the LAST screen in a run opens back down it, not into a wall", function()
+        -- +1 from the last bay is clamped to nothing, so a rule that returns it here hands
+        -- the player a prompt that does nothing when held
+        expect(ShojiRun.directionFrom(4, 4, 0)).toBe(-1)
+        expect(ShojiRun.directionFrom(2, 2, 0)).toBe(-1)
+    end)
+
+    test("a one-bay run still answers, even though nothing can move", function()
+        expect(ShojiRun.directionFrom(1, 1, 0)).toBe(-1)
     end)
 end)
 
