@@ -20,6 +20,7 @@
                 "RevealTheater": { "$className": "RemoteEvent" },
                 "FateResolved": { "$className": "RemoteEvent" },
                 "BoardData": { "$className": "RemoteEvent" },
+                "FamiliarRoster": { "$className": "RemoteEvent" },
                 "RequestFireworkLaunch": { "$className": "RemoteEvent" },
                 "FireworkLaunched": { "$className": "RemoteEvent" },
                 "FireworkState": { "$className": "RemoteEvent" },

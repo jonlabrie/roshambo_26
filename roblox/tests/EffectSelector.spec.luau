@@ -35,8 +35,11 @@ describe("EffectSelector", function()
                 return 0.99
             end,
         })
-        expect(s:select("SAFE", {})).toBe("umbrellaPop")
         expect(s:select("REVEAL", {})).toBe("waterHammer")
+        -- SAFE emptied 2026-08-18: `umbrellaPop` drew a featureless disc the owner read as a
+        -- cloud, and the familiar's perch carries SAFE now. Empty pool -> nil, same contract the
+        -- parked fates rely on.
+        expect(s:select("SAFE", {})).toBe(nil)
     end)
 
     test("unknown slot returns nil", function()
@@ -61,14 +64,20 @@ describe("EffectRegistry — fates are parked", function()
         end
     end)
 
-    test("the celebrations are untouched", function()
+    test("the celebrations that remain are untouched", function()
         local selector = EffectSelector.new(EffectRegistry, {
             random = function()
                 return 0
             end,
         })
-        for _, slot in { "REVEAL", "WIN", "SAFE", "BANK" } do
+        -- SAFE joined LOSS as a deliberately empty pool on 2026-08-18 — both outcomes are carried
+        -- by the familiar now, not by a one-off effect. WIN keeps its petals as a flourish
+        -- ALONGSIDE the bird: petals were never the problem, being the only thing was.
+        for _, slot in { "REVEAL", "WIN", "BANK" } do
             expect(selector:select(slot, {}) ~= nil).toBe(true)
+        end
+        for _, slot in { "SAFE", "LOSS" } do
+            expect(selector:select(slot, {})).toBe(nil)
         end
     end)
 end)

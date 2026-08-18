@@ -5,7 +5,6 @@
 -- FateController; UI toasts by main.client.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local Choreo = require(shared:WaitForChild("ChoreographyMachine"))
@@ -46,31 +45,6 @@ local function petals(character: Model)
     end)
 end
 
-local function umbrella(character: Model)
-    local head = character:FindFirstChild("Head") :: BasePart?
-    if not head then
-        return
-    end
-    local canopy = Instance.new("Part")
-    canopy.Shape = Enum.PartType.Cylinder
-    canopy.Anchored = true
-    canopy.CanCollide = false
-    canopy.Color = Color3.fromRGB(179, 74, 58)
-    canopy.Size = Vector3.new(0.4, 0.5, 0.5)
-    canopy.CFrame = head.CFrame * CFrame.new(0, 3, 0) * CFrame.Angles(0, 0, math.rad(90))
-    canopy.Parent = workspace
-    TweenService:Create(canopy, TweenInfo.new(0.25, Enum.EasingStyle.Back), { Size = Vector3.new(0.4, 6, 6) })
-        :Play()
-    task.delay(2, function()
-        TweenService
-            :Create(canopy, TweenInfo.new(0.3), { Size = Vector3.new(0.4, 0.5, 0.5), Transparency = 1 })
-            :Play()
-        task.delay(0.35, function()
-            canopy:Destroy()
-        end)
-    end)
-end
-
 local function execute(cue: any)
     EventBus.Cue:Fire(cue)
     if cue.kind == "consequence" then
@@ -79,9 +53,12 @@ local function execute(cue: any)
             return
         end
         if cue.effect == "growPetals" then
-            petals(character) -- the grow itself is server-side (replicated scale)
-        elseif cue.effect == "umbrellaPop" then
-            umbrella(character)
+            -- PETALS ONLY. This used to be annotated "the grow itself is server-side (replicated
+            -- scale)", which stopped being true when `applyGrow` was deleted -- it scaled the
+            -- winner 1.6x on all four body axes and the owner did not like how it read. The rise
+            -- of the familiar replaces it; see BirdController. Petals were never the problem,
+            -- being the ONLY thing was.
+            petals(character)
         end
         -- fate* effects are consumed by FateController via the same Cue event
     end

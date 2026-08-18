@@ -76,6 +76,7 @@ local ProfileUpdate = remotes:WaitForChild("ProfileUpdate") :: RemoteEvent
 local RevealTheater = remotes:WaitForChild("RevealTheater") :: RemoteEvent
 local FateResolved = remotes:WaitForChild("FateResolved") :: RemoteEvent
 local BoardData = remotes:WaitForChild("BoardData") :: RemoteEvent
+local FamiliarRoster = remotes:WaitForChild("FamiliarRoster") :: RemoteEvent
 local SetPadPreference = remotes:WaitForChild("SetPadPreference") :: RemoteEvent
 local PreferenceState = remotes:WaitForChild("PreferenceState") :: RemoteEvent
 local SetBackDoor = remotes:WaitForChild("SetBackDoor") :: RemoteEvent
@@ -239,6 +240,20 @@ end
 -- The default/merge RULE itself lives in shared/HudPrefs.luau, not here: this file is
 -- Roblox-runtime only and Lune never loads it, so a bug in the merge (the exact failure this was
 -- built to prevent — see HudPrefs.luau's header) would be invisible to every test this repo has.
+-- ===== THE FAMILIAR ROSTER =====
+-- Plumage is SOCIAL -- the whole point is that other people see your grade -- so every client
+-- needs every PRESENT player's band, not just their own.
+--
+-- THE WHOLE ROSTER, NOT A DELTA. It is one small table for the players actually here, it is sent
+-- only on events that are already rare (join, leave, a grade change at settlement, and most
+-- rounds change nobody's), and a late-joining client needs the full picture anyway. A delta
+-- protocol here would be complexity bought with nothing.
+local familiarRoster: { [string]: any } = {}
+
+local function pushFamiliarRoster()
+    FamiliarRoster:FireAllClients(familiarRoster)
+end
+
 local hudPrefs: { [string]: HudPrefs.Prefs } = {}
 
 -- Absent = the profile's own defaults, both ON. The stored row is returned BY REFERENCE for reads;
@@ -485,6 +500,14 @@ Players.PlayerAdded:Connect(function(player)
                 then res.data.seenBeats
                 else {}
             seedCounters(tostring(player.UserId), res.data.counters)
+            -- The join call already carries grade/gradeName/band, so the roster costs no request
+            -- of its own.
+            familiarRoster[tostring(player.UserId)] = {
+                grade = res.data.grade,
+                gradeName = res.data.gradeName,
+                band = res.data.band,
+            }
+            pushFamiliarRoster()
             profiles:applyServer(tostring(player.UserId), {
                 totalPoints = res.data.totalPoints,
                 pointsAtStake = res.data.pointsAtStake,
@@ -684,6 +707,10 @@ end)
 
 Players.PlayerRemoving:Connect(function(player)
     fates:remove(tostring(player.UserId))
+    -- Drop them from the roster and tell everyone, or their bird outlives them on every other
+    -- client: BirdController keys on the roster, not on Players, so a stale entry is a stale bird.
+    familiarRoster[tostring(player.UserId)] = nil
+    pushFamiliarRoster()
     hudPrefs[tostring(player.UserId)] = nil
     ledgerCounters[tostring(player.UserId)] = nil
     lastLedgerFetch[tostring(player.UserId)] = nil
