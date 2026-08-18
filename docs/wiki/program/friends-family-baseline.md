@@ -39,13 +39,27 @@ rounds skippable, no penalty) — hangout is the product.
    awarded at settlement; flex via teahouse banner-pole flag + avatar ribbon/sash;
    earn-only. Carries the parked economy-API defects (a)–(c) in [[parked-defects]]. Any badge that claims
    SKILL depends on (h) being ACTIVE, not merely fixed; volume badges do not.
-7. **Statistics** — open (measurement BUILT 2026-08-18, awaiting the Studio gate): personal → maximal HUD; global/social → the 番付 room, now BORED
-   west of the apparel shop ([[stats-room]]); the old Overlook siting (73,110,19) is
-   superseded. Walls and stats specced in
-   `docs/superpowers/specs/2026-08-16-stats-room-design.md`. Defect (h) is FIXED (2026-08-16) — the
-   World Throw now derives from the crowd — but is not active while both environments run
-   TEST_MODE, so skill-derived stats still cannot be validated against real play. Promote this item if the daughter visit comes
-   early.
+7. **Statistics** — closed 2026-08-18 ("let's close Item 7 for now; we'll revisit in the
+   future with clearer thoughts"). The 番付 room is built, measured and saved: READ / YIELD /
+   NERVE from rows the server already wrote, qualification at 360 throws over a rolling week,
+   and the south wall inverted to lead with LIVE pots and runs rather than a ranking that is
+   empty almost always ([[stats-room]]). Spec
+   `docs/superpowers/specs/2026-08-18-player-measurement-design.md`, plan
+   `docs/superpowers/plans/2026-08-18-player-measurement.md`.
+   **Closed with loose ends, all on [[backlog]], none blocking:**
+   - ⚠ **The standings board still ranks on points-per-throw behind a floor derived for win
+     rate.** Raised 2026-08-18 by the owner ("~356 throws... not simply READ?") and never
+     settled — the conversation moved to the form inversion instead. At 360 throws yield
+     discriminates a +5-point player at 71–82% against READ's 90%, and twenty *identical* blind
+     players over 360 throws produce a winner earning 2.5× the median by chance alone. **This is
+     the first thing to pick up on revisit.**
+   - The READ column ships blank in every environment: gate 1 (TEST_MODE off) is closed.
+   - Spec §6.2's printed 番付 sheet and the top-three avatar plinths remain deferred; the
+     rotating avatar display has a home (the cavern's freed north-east wall) and no assets.
+   - The ticker-vs-flapper question for the remaining wall boards (owner: "probably") is
+     undecided.
+   - A records display (lifetime / month / week / day / hour) is captured, and the room has no
+     free wall left to put one on.
 8. **World finish/hygiene** — open: perch teahouse at the stair summit, access/portal art
    pass, clear `DayNightStartT`/`DayNightLockT`, materials cleanup (duplicate
    MaterialVariant names), run `verifyWorkspaceConvention`, save/publish.

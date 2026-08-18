@@ -288,8 +288,12 @@ avatar display can read it straight off `StatsData.leaders`.
 The avatar display closes a deferral rather than adding scope: the design spec §6.2 asked
 for "avatar plinths, top three only", and the plan deferred them for want of a home.
 
-**Still open:** whether the cavern's remaining wall boards become horizontal ticker tape
-rather than flappers (owner, "probably"). Not decided, not built.
+**Still open** (item 7 closed 2026-08-18 with these named, not solved): whether the cavern's
+remaining wall boards become horizontal ticker tape rather than flappers (owner, "probably"); the
+rotating avatar display, which has this wall and no assets; and spec §6.2's printed 番付 sheet with
+rank encoded by calligraphy size. See [[friends-family-baseline]] item 7 for the full list,
+including the one that matters most — the standings board ranks on points-per-throw behind a floor
+derived for win rate.
 
 ## Performance — measured on the A13, 2026-08-17
 

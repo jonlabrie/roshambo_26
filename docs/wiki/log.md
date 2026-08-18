@@ -435,3 +435,21 @@ Also corrected the same day, all owner-spotted: the entry rule was captioning th
 (career banked has no entry requirement); "PER THROW" of what; STREAK NOW → CURRENT STREAK; bank
 depth came off the personal slip as "a dubious stat"; throw shares now read to a tenth, because
 whole percents hide the ties the World Throw is decided by.
+
+## [2026-08-18] gate | Item 7 closed — statistics, with loose ends named
+
+Owner: *"let's close Item 7 for now; we'll revisit in the future with clearer thoughts."*
+
+Built and saved: the three measures (READ / YIELD / NERVE) over rows the server already wrote,
+qualification at 360 throws on a rolling week, the drum ladder, the south-wall inversion to live
+pots and runs, and a display-name fix that had every Roblox player reading as "Anonymous" on every
+board since the client shipped.
+
+Closed deliberately incomplete. The loose end worth naming here rather than burying: **the
+standings board ranks on points-per-throw behind a floor derived for win rate**, which the owner
+caught and which the form inversion overtook before it was settled. At 360 throws yield separates a
++5-point player at 71–82% where READ manages 90%, and twenty identical blind players produce a
+winner earning 2.5× the median on luck alone. Either the ranked column changes or the floor does.
+Recorded on [[friends-family-baseline]] as the first thing to pick up.
+
+The board is now items **6 (rewards & flex)** and **8 (world finish/hygiene)**.
