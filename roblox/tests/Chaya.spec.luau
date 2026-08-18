@@ -238,13 +238,17 @@ describe("Chaya — the thatch is bundled, not cut", function()
         -- so each read as a pipe stuck under the eave instead of as the edge of the thatch
         -- itself. A roll's centreline belongs on the slab's own mid-plane, which is what the
         -- eave and ridge heights ARE by construction.
+        -- and NO LIP: a roll that stands proud of the roof's top face reads as a rim running
+        -- round the building rather than as the edge of the thatch itself.
         for _, r in findPrefix(m, "EaveRoll") do
-            local _, _, y0, y1 = bounds(r)
-            expect(math.abs((y0 + y1) / 2 - Chaya.EAVE_Y) < 0.05).toBe(true)
+            local _, _, y0, y1, z0, z1 = bounds(r)
+            local mid = (y0 + y1) / 2
+            expect(mid < Chaya.EAVE_Y).toBe(true) -- dropped below the slab's centreline
+            expect(mid > Chaya.EAVE_Y - 0.4).toBe(true) -- but still ON the edge, not under it
+            expect(y1 <= Chaya.roofTopAt((z0 + z1) / 2) + 0.01).toBe(true)
         end
         for _, r in findPrefix(m, "VergeRoll") do
             local _, _, y0, y1 = bounds(r)
-            -- a verge climbs the pitch: its own centre sits midway between the two heights
             local mid = (Chaya.EAVE_Y + Chaya.RIDGE_Y) / 2
             expect(math.abs((y0 + y1) / 2 - mid) < 0.35).toBe(true)
         end
@@ -263,20 +267,23 @@ describe("Chaya — the thatch is bundled, not cut", function()
             -- the eave run reaches the verge roll's far side, so the corner is filled
             expect(x0 >= ex0 - 0.01 and x1 <= ex1 + 0.01).toBe(true)
         end
-        -- The other way round on the slope axis: a verge runs DOWN past the eave roll's outer
-        -- face, so the corner is filled from both directions rather than mitred. Coverage, not
-        -- containment -- two rounded bundles meeting always bulge a little past each other,
-        -- and that bulge IS the corner.
-        local ez0, ez1 = math.huge, -math.huge
-        for _, r in findPrefix(m, "EaveRoll") do
-            local _, _, _, _, z0, z1 = bounds(r)
-            ez0, ez1 = math.min(ez0, z0), math.max(ez1, z1)
-        end
+        -- On the slope axis it is the other way about: the verge DIES INTO the eave roll. It
+        -- must reach the eave roll's centreline -- short of that leaves the notch -- and must
+        -- not poke out past its surface, which is the wonk that overshooting produced.
+        local eaves = findPrefix(m, "EaveRoll")
         for _, r in findPrefix(m, "VergeRoll") do
-            local _, _, _, _, z0, z1 = bounds(r)
-            local reachesNorth = z0 <= ez0 + 0.01
-            local reachesSouth = z1 >= ez1 - 0.01
-            expect(reachesNorth or reachesSouth).toBe(true)
+            local _, _, _, _, vz0, vz1 = bounds(r)
+            local ok = false
+            for _, e in eaves do
+                local _, _, _, _, ez0, ez1 = bounds(e)
+                local axis = (ez0 + ez1) / 2
+                if vz0 <= axis + 0.01 and vz0 >= ez0 - 0.01 then
+                    ok = true -- north corner: reaches the axis, stays inside the surface
+                elseif vz1 >= axis - 0.01 and vz1 <= ez1 + 0.01 then
+                    ok = true -- south corner, same test mirrored
+                end
+            end
+            expect(ok).toBe(true)
         end
     end)
 

@@ -96,9 +96,22 @@ local PITCH = math.atan(RISE / HALF_RUN)
 
 -- The underside of the thatch at a world z. Exported because the keeper's headroom is a
 -- test, and a test that hard-codes 121.2 stops checking the moment the roof is re-pitched.
+-- HALF the thickness, measured vertically. EAVE_Y and RIDGE_Y are the slab's CENTRELINE, so
+-- its faces are half a thickness either side of it -- and the perpendicular half-thickness
+-- becomes THATCH_T/2/cos(pitch) when read straight up. This subtracted a WHOLE thickness
+-- until 2026-08-17: harmless where it was used (a headroom check that was simply stricter
+-- than it needed to be), and wrong the moment `roofTopAt` was derived from it, which put the
+-- roof's top face exactly on its own centreline and hid a real lip from the test meant to
+-- catch one.
 function Chaya.roofUndersideAt(z: number): number
     local run = math.max(math.min(z - ROOF_Z0, ROOF_Z1 - z), 0)
-    return EAVE_Y + SLOPE * run - THATCH_T / math.cos(PITCH)
+    return EAVE_Y + SLOPE * run - THATCH_T / 2 / math.cos(PITCH)
+end
+
+-- The upper face at a world z. The edge rolls must not stand proud of this: a roll that does
+-- reads as a lip running round the roof rather than as the roof's own edge (owner, 2026-08-17).
+function Chaya.roofTopAt(z: number): number
+    return Chaya.roofUndersideAt(z) + THATCH_T / math.cos(PITCH)
 end
 
 -- ===== baked post feet — one terrain probe each, 2026-08-17 =====
@@ -519,7 +532,14 @@ function Chaya.build(palette: any, _layout: any): any
     -- which is how a thatcher finishes an edge anyway. It is the silhouette that was reading
     -- as a slab, so this is where the fix has to land.
     local ROLL_R = 0.42
-    -- ON THE SLAB'S MID-PLANE, NOT UNDER IT (owner, 2026-08-17: "their centerlines appear to
+    -- TWO INCHES BELOW THE MID-PLANE (owner, 2026-08-17): "the rolls need to drop a couple of
+    -- inches to eliminate the 'lip' above the roof they're showing now." A roll of this radius
+    -- centred on the slab's centreline stands proud of the top face, which reads as a rim
+    -- running round the building. Dropped, it tucks under the top and bulges below instead --
+    -- also the right way round for a rolled eave, where the bundle's weight hangs beneath the
+    -- course it finishes.
+    local ROLL_DROP = 2 * IN
+    -- ON THE SLAB'S EDGE, NOT UNDER IT (owner, 2026-08-17: "their centerlines appear to
     -- be aligned with the bottom edges"). They were: placed at EAVE_Y - THATCH_T/2, each roll
     -- hung off the underside like a pipe rather than wrapping the edge of the thatch. EAVE_Y
     -- and RIDGE_Y ARE the slab's centreline heights by construction, so the roll simply takes
@@ -532,7 +552,7 @@ function Chaya.build(palette: any, _layout: any): any
         part(`EaveRoll_{i}`, {
             Shape = "Cylinder",
             Size = { roofW + 2 * ROLL_R, ROLL_R * 2, ROLL_R * 2 },
-            CFrame = Spec.cframe({ cx, EAVE_Y, ez }),
+            CFrame = Spec.cframe({ cx, EAVE_Y - ROLL_DROP, ez }),
             Material = "Grass",
             MaterialVariant = "Thatch",
             Color = straw,
@@ -541,20 +561,23 @@ function Chaya.build(palette: any, _layout: any): any
     -- The verges: one roll up each slope at each gable end, run as a segment between the
     -- eave corner and the ridge so it lies on the pitch whatever the pitch becomes. The eave
     -- end starts a radius PAST the eave line, for the same corner reason.
+    -- EACH VERGE DIES INTO THE EAVE ROLL rather than running past it. Overshooting put a
+    -- tilted cap out beyond the eave roll's own surface at all four corners, which is the
+    -- wonk the owner saw; ending the centreline ON the eave roll's axis buries that cap
+    -- inside it completely, since the two rolls share a radius. The eave course then runs
+    -- unbroken through the corner and the verge tucks into it, which is how the edge gets
+    -- finished in straw as well as in geometry.
     local verges = {
-        { X0 - ROOF_OVERHANG_X, ROOF_Z0, -1 },
-        { X1 + ROOF_OVERHANG_X, ROOF_Z0, -1 },
-        { X0 - ROOF_OVERHANG_X, ROOF_Z1, 1 },
-        { X1 + ROOF_OVERHANG_X, ROOF_Z1, 1 },
+        { X0 - ROOF_OVERHANG_X, ROOF_Z0 },
+        { X1 + ROOF_OVERHANG_X, ROOF_Z0 },
+        { X0 - ROOF_OVERHANG_X, ROOF_Z1 },
+        { X1 + ROOF_OVERHANG_X, ROOF_Z1 },
     }
     for i, v in verges do
-        local slopeZ = math.cos(PITCH)
-        local slopeY = math.sin(PITCH)
-        local pos, len, rot = Spec.segment({
-            v[1],
-            EAVE_Y - ROLL_R * slopeY,
-            v[2] + v[3] * ROLL_R * slopeZ,
-        }, { v[1], RIDGE_Y, Chaya.RIDGE_Z })
+        local pos, len, rot = Spec.segment(
+            { v[1], EAVE_Y - ROLL_DROP, v[2] },
+            { v[1], RIDGE_Y - ROLL_DROP, Chaya.RIDGE_Z }
+        )
         part(`VergeRoll_{i}`, {
             Shape = "Cylinder",
             Size = { len, ROLL_R * 2, ROLL_R * 2 },
