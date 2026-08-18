@@ -330,79 +330,64 @@ no old server serves anything now.
 `roshambo_device_id` (an identifier, written from what the server sends back, read only by the
 account-migration call).
 
-## Plan 3 — the Stats room displays (NEXT, not yet specced)
+## Stats room displays (plan 3) — SHIPPED; one thread left open
 
-Decided 2026-08-16; the spec and plan do not exist yet. Everything needed to write them:
+Plan `docs/superpowers/plans/2026-08-16-stats-room-displays.md` shipped 2026-08-16..17. The
+boards are built, the place is saved, and the owner has walked the room on the A13. The
+as-built — siting, flap modules, typography, framing, the live-tuning attribute trap — lives on
+[[stats-room]], which is the page to read. This entry keeps only what did NOT ship.
 
-**Scope, and the owner's ruling on shape:**
-- **Fold the `BoardController` retarget INTO plan 3** (owner, 2026-08-16) — do not spec it
-  separately. `roblox/src/client/BoardController.client.luau` has no-opped since the jumbotron
-  was removed (T23): it early-returns because `Workspace.RoshamboStage.JumbotronBoard` does not
-  exist. `FlapScheduler` is intact and ready (drum carries `-:/`, nine-step cap, `0b41f83`).
-  The renderer needs a home on the kōsatsu boards before any wall can render.
-- **Displays first, data later** — build against seeded fixtures in Studio rather than waiting
-  for real play. Layout and legibility are what the owner judges, and known-good fixtures are
-  easier to assess than sparse real numbers.
-
-**WRITTEN 2026-08-16: `docs/superpowers/plans/2026-08-16-stats-room-displays.md`** — six tasks,
-not yet executed. It carries seven rulings of its own; three change what a reader of this section
-would expect:
-- `BoardController` is **retired, not retargeted**. There is no kōsatsu anywhere in the place to
-  retarget onto, its `TickerMessage` consumer is redundant, and its documented `RevealTheater`
-  spoiler dies with the file. The renderer is extracted to `FlapBoard.luau` and rehomed on the
-  Stats room's own boards.
-- The form guide shows the **last 10** world throws, not 20 — `apiV1.ts:65` serves `store.tape(10)`
-  and nothing on the wire carries more.
-- The west wall ships **records**, not rate ladders: §7 puts qualified rates in the
-  waits-for-a-population column, so a second west panel is built **shuttered** per §8.
+`BoardController` was **retired, not retargeted** (`3bc7580`): there was no kōsatsu in the place
+to retarget onto. The renderer was extracted to `FlapBoard.luau` and rehomed on the Stats room's
+own boards. (A supporting claim in that ruling was wrong, and is corrected rather than left
+standing: `BoardController` was not the only client consumer of `BoardData` — `main.client.luau`
+has had its own handler all along, so the deletion orphaned nothing. The conclusion held; the
+reason given for it did not.)
 
 Two spec §6.2 items are deferred with reasons in the plan, not dropped: the 番付 as a printed
-sheet with rank encoded by calligraphy size (a different renderer; the owner decides at the
-Studio gate whether the flap sheet suffices), and the top-three avatar plinths.
-
-**BUILT 2026-08-16** on branch `stats-room-displays` — 11 commits, 1252 Luau tests, lint clean.
-The room's code is complete; **nothing is visible until the owner runs
-`roblox/tools/studio/buildStatsBoards.luau` in Studio and saves the place** (the boards are
-place-only geometry, so `rojo build` would drop them). The plan's "Studio gate" section lists
-what to look at.
-
-A correction to the ruling recorded above: **`BoardController` was not the only client consumer
-of `BoardData`** — `main.client.luau:591` has had its own handler all along, so the deletion
-orphaned nothing. R1's conclusion stood; that supporting claim did not.
+sheet with rank encoded by calligraphy size (a different renderer; the owner decides whether the
+flap sheet suffices), and the top-three avatar plinths — which now have a home, the cavern wall
+that `fuda` vacated ([[stats-room]]).
 
 ### Carried out of the branch, unfixed and deliberate
 
 The whole-branch review raised these; each was ruled deferred rather than guessed at. Two need
 a number only the owner can supply and are in the plan's gate list instead:
 
-- **⚠ DIGIT CELLS NEED A DIGITS-ONLY DRUM** (owner's ruling, first Studio look, 2026-08-16).
-  Symptom: the band's countdown rolls `U V W X Y Z 0 1 2` to get from 3 to 2 — nine steps at
-  83ms, ~750ms of motion every second, so the digit never settles. Cause as first diagnosed:
-  `plan` only rotates forward, so a counting-down digit takes the long way round the 49-char
-  drum. **That diagnosis was right about the mechanism and wrong about the fix.**
-  A bidirectional shortest-path option was proposed and REJECTED by the owner: *"a drum that is
-  only ever going to show digits should only ever have digits on it. It's a different drum."*
-  A physical split-flap carries one drum PER POSITION — the seconds-units flap has ten digits
-  on it and has never had a `U` to roll past. One universal drum for every cell is the modelling
-  error; shortest-path routing would only have hidden it.
-  **What this implies, and why it is not a one-line change:** a band line is composed as ONE
-  string (`OPEN 43S   YOU ○`) and handed to ONE `plan` call with ONE drum. Per-position drums
-  mean drums are assigned per COLUMN, so a line must become fields-with-drums rather than a
-  single string. `FlapScheduler.plan` already accepts `opts.drum`, so the machinery is half
-  there; the line composition in `RoundBandModel`/`StatsBoardModel` is what has to change.
-  **Ordering is part of the ruling to settle:** a digits drum in ascending `0123456789` still
-  makes `3 → 2` nine steps forward. A countdown field wants its drum ordered so counting down
-  is forward motion; the once-per-round wrap back up to 51 then costs a long roll, which is what
-  a real board does at rollover. Undecided: whether ordering is per-field config or implied by
-  the field's kind.
-- **`FlapScheduler` `Opts` are not plumbed through `FlapBoard`**, so the stated per-board roll
-  tuning ("a 1-row band wants a snappier roll than a 10-row sheet") is impossible to act on.
-  `FlapBoard` types its injected `plan` as `(current, target) -> steps`, dropping the third
-  `Opts` argument. **This blocks the countdown-direction fix above** — that is what `Opts` is
-  for, and no caller can reach it today.
-- **No perf budget was taken**, though §6.2 asked for one. ~3,700 GUI instances are built on
-  every client at join whether or not they enter the room. One line (`gui.MaxDistance`) fixes
-  it; the distance is the owner's call.
+- **⚠ THE WALL BOARDS ARE STILL ON THE 49-CHARACTER DRUM.** The digit half of this shipped
+  2026-08-17 and is CLOSED: the round display carries per-column drums,
+  `RoundDisplayModel.DIGITS` is `"9876543210 "` (descending, so counting down is one step
+  forward; blank last, so `0 → blank` at round end and `blank → 9` at round start are each one
+  step too), the colon is PRINTED via `statics()` rather than mounted on a flap, and `FlapBoard`
+  does pass `Opts` through — `plan: (current, target, opts: any?)`, called per column with
+  `{ drum = drum }`. Any older note claiming those are open was written before that landed.
+
+  What is left: `StatsController` builds the wall boards with **no `drums` key**, so they take
+  `FlapBoard`'s whole-line path on the full drum. **The round display's fix does not transfer**,
+  and the reason is worth keeping — a clock column has a FIXED KIND, so a drum can be bolted to
+  it; a leaderboard column does not (`1. JONNY        1,234` holds a digit in one row, a space in
+  the next, a letter in the third, and it all moves when the window changes). There is no
+  per-column kind to bolt anything to.
+
+  **Owner's direction, 2026-08-18: choose the drum from the TRANSITION, not the column** — if a
+  cell is going digit-to-digit, run it on the numeric drum; otherwise the full one. That needs
+  `FlapBoard`'s `drums` to accept a FUNCTION `(col, cur, tgt) -> string?` beside the existing
+  table, so the round display keeps its table and the walls pass a policy.
+
+  Open, and the owner's call: **what else rides the numeric drum.** A comma is needed —
+  `1,234 → 12,345` walks a comma across columns, and if `,` is not on the numeric drum that one
+  cell falls back to the full drum and rolls the alphabet mid-number beside neighbours that do
+  not. Plus, minus and any other figure punctuation are undecided.
+
+  Watch for at the Studio look: two adjacent columns rolling on different drums at once. It
+  already happens between the clock and the tape and reads fine there, but it is the thing that
+  would say the idea was wrong.
+- ~~**No perf budget was taken**~~ **SUPERSEDED 2026-08-17 by measurement.** The owner walked
+  the finished room on the A13: load inside is neither better nor worse than the arena square
+  outside, at ~8,400 GUI instances with no cull. **No budget work is owed, and the `MaxDistance`
+  idea is parked** ([[stats-room]]). If it ever comes off the shelf, note that `MaxDistance`
+  stops the GUIs being DRAWN, not being BUILT — the join-time instance cost needs construction
+  gated on room presence, which is the same fix the fan-out below wants.
 - **Per-player stats fan-out is unbounded**: one `getStatsPlayer` per player every 60s, all in
   one tick, each triggering four Mongo aggregations. At 40 CCU that is a 40-request burst per
   minute against a 500/min HttpService budget, for a slip visible only inside one room. Gate on

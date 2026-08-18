@@ -79,3 +79,56 @@ test('page with no inbound wikilink is a warning, not an error', () => {
   assert.deepEqual(errors, []);
   assert.ok(warnings.some((w) => w.includes('loner') && w.includes('orphan')));
 });
+
+// ===== currency checks (see docs/wiki/practice/wiki-currency.md) =====
+// These need a repo and git, so both are injected: `gitDate` maps an absolute path to a
+// commit date, `repoRoot` is where a cited path is resolved from. Absent injection the
+// checks no-op, which is why every test above still passes untouched.
+
+test('page committed after its own updated: date is an error', () => {
+  const root = makeWiki(CLEAN);
+  const { errors } = lint(root, { gitDate: (p) => (p.endsWith('dojo.md') ? '2026-08-17' : '') });
+  assert.ok(errors.some((e) => e.includes('world/dojo.md') && e.includes('committed 2026-08-17')));
+});
+
+test('page committed on its updated: date is fine', () => {
+  const root = makeWiki(CLEAN);
+  const { errors } = lint(root, { gitDate: () => '2026-08-15' });
+  assert.deepEqual(errors, []);
+});
+
+test('a cited repo path that does not exist is an error', () => {
+  const wiki = structuredClone(CLEAN);
+  wiki.pages['world/dojo.md'] = FM('world') + '# Dojo\nBuilt by `src/shared/Ghost.luau`. See [[board]].\n';
+  const { errors } = lint(makeWiki(wiki), { repoRoot: process.cwd() });
+  assert.ok(errors.some((e) => e.includes('dead code citation') && e.includes('Ghost.luau')));
+});
+
+test('cited code changed after the page was updated is a warning', () => {
+  const wiki = structuredClone(CLEAN);
+  wiki.pages['world/dojo.md'] = FM('world') + '# Dojo\nSee `tools/wiki/lint.mjs`. See [[board]].\n';
+  const { errors, warnings } = lint(makeWiki(wiki), {
+    repoRoot: process.cwd(),
+    gitDate: (p) => (p.endsWith('lint.mjs') ? '2026-08-18' : '2026-08-15'),
+  });
+  assert.deepEqual(errors, []);
+  assert.ok(warnings.some((w) => w.includes('re-read') && w.includes('lint.mjs')));
+});
+
+test('cited code older than the page is silent', () => {
+  const wiki = structuredClone(CLEAN);
+  wiki.pages['world/dojo.md'] = FM('world') + '# Dojo\nSee `tools/wiki/lint.mjs`. See [[board]].\n';
+  const { warnings } = lint(makeWiki(wiki), {
+    repoRoot: process.cwd(),
+    gitDate: (p) => (p.endsWith('lint.mjs') ? '2026-08-01' : '2026-08-15'),
+  });
+  assert.ok(!warnings.some((w) => w.includes('re-read')));
+});
+
+test('a deliberately-absent citation is exempted by lint-ok on its line', () => {
+  const wiki = structuredClone(CLEAN);
+  wiki.pages['world/dojo.md'] =
+    FM('world') + '# Dojo\n`src/shared/Ghost.luau` never existed <!-- lint-ok -->\nSee [[board]].\n';
+  const { errors } = lint(makeWiki(wiki), { repoRoot: process.cwd() });
+  assert.ok(!errors.some((e) => e.includes('dead code citation')));
+});

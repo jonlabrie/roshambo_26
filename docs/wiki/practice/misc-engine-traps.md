@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-16
+updated: 2026-08-18
 ---
 
 # Misc Engine Traps
@@ -17,11 +17,15 @@ recipe. Each cost real time once.
 
 **How to get large SurfaceGui text:** make the `CanvasSize` SMALL so a ≤100px glyph is
 already large *relative to the canvas*; the SurfaceGui (SizingMode=FixedSize) then
-stretches that small canvas across the big world part. Jumbotron (168×96 studs):
-CanvasSize ≈ `#rows*150 × (that*168/96)`, fixed `TextSize=90`, `TextScaled=false`,
-scale-based cell positions → ~10-stud glyphs readable across the bowl. Code in
-`roblox/src/client/BoardController.client.luau` (commit `bb3ea7c`). Verify rendered
-text via screenshot, not property reads ([[studio-tooling]]).
+stretches that small canvas across the big world part. The jumbotron that taught this
+(168×96 studs) used CanvasSize ≈ `#rows*150 × (that*168/96)`, fixed `TextSize=90`,
+`TextScaled=false`, scale-based cell positions → ~10-stud glyphs across the bowl.
+
+The jumbotron and its `BoardController` are both **retired** (`3bc7580`); the technique
+was extracted with the renderer and now lives in `roblox/src/client/FlapBoard.luau`,
+which still sets `TextScaled = false` with an explicit `TextSize` against a canvas sized
+from its own metrics. Verify rendered text via screenshot, not property reads
+([[studio-tooling]]).
 
 ## `require()` caches per VM — probe `.Source`, not the returned table
 

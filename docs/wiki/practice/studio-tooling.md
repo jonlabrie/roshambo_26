@@ -131,7 +131,7 @@ target; safe to leave alone. "Live" = re-runnable / still the current tool for i
 
 **Flags:**
 - `builders/CanopyScatter.luau`'s header says its Studio mirror is
-  `tools/studio/scatterCanopy.luau` — **that file does not exist** anywhere in the
+  `tools/studio/scatterCanopy.luau` — **that file does not exist** anywhere in the <!-- lint-ok: named to say it is missing -->
   repo or its git history; the mirror was never committed, or was renamed to
   `studio/placeCanopyHeroes.luau` without updating the header comment.
 - `studio/draftPathMarkers.luau` — its own header calls it a superseded legacy

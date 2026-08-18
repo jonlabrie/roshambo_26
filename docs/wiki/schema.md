@@ -45,7 +45,27 @@ outside program/, log format, frontmatter). Then the manual pass:
 
 Run on request, and cheaply at any session close.
 
-**The lint checks STRUCTURE, not CURRENCY.** A page can be internally contradictory and years
-out of date while passing every mechanical check. The manual pass above is the only thing that
-catches that, and it is the part that gets skipped — see [[wiki-currency]] for the mechanism and
-the one rule that would have caught the failures of 2026-08-16.
+### Currency checks (added 2026-08-18)
+
+Three checks put a floor under the manual pass, by noticing when the GROUND under a page moved
+after the page last claimed to be current:
+
+- **`updated:` must not lag the page's own last commit** (error). Editing a page and forgetting
+  to bump the date is how `world/arena-square.md` carried a 2026-08-17 addition under a
+  2026-08-15 stamp.
+- **A cited repo path must exist** (error) — the same defect as a dead wikilink, pointed at the
+  code. `program/backlog.md` cited `BoardController.client.luau` for two days after it was
+  retired. Where a page names a path in order to say it is GONE, put `<!-- lint-ok: why -->` on
+  that line.
+- **Cited code committed after the page's `updated:`** (warning, reading `re-read —`). Not
+  "wrong": *go look*. Roughly half of these want only a refreshed line number.
+
+**These are a floor, not a substitute.** They cannot read prose, they flag PAGES rather than
+paragraphs, and they only see claims that cite a path. A page can still be internally
+contradictory and years out of date while passing every mechanical check — the manual pass above
+remains the only thing that catches that, and it is the part that gets skipped. See
+[[wiki-currency]] for the mechanism.
+
+⚠ Bumping `updated:` silences a warning without reading anything. That escape hatch is
+deliberate — the value is turning invisible rot into a visible prompt — but it means a date bump
+with no re-read is a lie the lint will believe.

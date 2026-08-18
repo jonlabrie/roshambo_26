@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-15
+updated: 2026-08-17
 ---
 
 # Arena Square
@@ -12,7 +12,7 @@ Rojo-managed hero props under `Workspace.RoshamboStage` (verified 2026-08-15: Sh
 ShoroRoof, BonshoRig, BonshoBell, BellDrive, ThrowDrum, RanmaCarvings, Karesansui,
 Torii, Waterwheel, Overlook, FallsDock, Hanabiya, SwitchbackDeck, ArenaSpawn).
 
-## As built (through 2026-08-14, all owner-gated and pushed)
+## As built — all owner-gated and pushed
 
 - **Karesansui = the bell tower's own floor** (`17927df`, owner's gate 2026-08-14,
   reference Chion-in). Panel is the post OUTER square `x −12.2..8.2, z −10.2..10.2`,

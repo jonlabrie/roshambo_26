@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-16
+updated: 2026-08-18
 ---
 
 # Why Wiki Pages Go Stale (and what the lint cannot catch)
@@ -52,9 +52,32 @@ skipped — which is why it caught none of these.
 next / still to do" sentence before committing.** Those are claims with an expiry date, and they
 are never where the new fact lands.
 
-Cheap mechanical assist, not yet built: have the lint flag any `program/` page whose body
-contains a forward-looking phrase — "next step", "remaining scope", "is now", "still to" — and
-require the editing session to confirm it is still true. Noisy by design; these pages are few,
-and this is the exact class the structural checks miss.
+## The mechanical assist — built 2026-08-18, and not the one proposed
 
-⚠ That lint rule is PROPOSED, not implemented.
+The proposal here was to flag forward-looking PHRASES ("next step", "remaining scope"). What was
+built instead flags **moved GROUND**, because the phrase scan turned out to be the weaker signal:
+grepping the program shelf for those phrases returned five hits, of which four were prose about
+something else. The rot is not reliably announced in the wording.
+
+What is: a page's claims cite files, and those files have commit dates. `tools/wiki/lint.mjs`
+now errors when a page's `updated:` lags its own last commit, errors on a cited repo path that
+does not exist, and warns `re-read —` when cited code was committed after the page's `updated:`.
+Details and the `<!-- lint-ok -->` exemption are in [schema.md](../schema.md).
+
+First run: **5 errors, 13 warnings across 50 pages** — a usable volume rather than noise. It
+found every one of the failures this page was written about, and one it was not: `program/backlog.md`
+had spent two days describing the digits-drum defect as open and its `Opts` blocker as unplumbed,
+when both had been fixed the following day. That entry was again *appended to* — a "BUILT" note
+was added beneath a heading still reading "NEXT, not yet specced" — which is this page's exact
+mechanism, surviving the page that documented it.
+
+**The generalisation that adds:** a deferred-work note rots differently from an as-built page.
+The `world/` shelf stayed current because superseding is natural when the thing itself changes —
+you rewrite the page because you are looking at it. A backlog entry is written ONCE, at merge, as
+a dump of what was not done, and the event that expires it happens somewhere else entirely: a
+later session fixes the deferred thing and has no reason to know the note exists. **The note and
+its expiry live in different files, so no trigger can fire.** The citation check is what bridges
+them — the fix touches the code, the code's date moves, the page that cites it gets flagged.
+
+⚠ Bumping `updated:` clears a warning without reading anything. The check converts invisible rot
+into a visible prompt; it cannot make anyone read.

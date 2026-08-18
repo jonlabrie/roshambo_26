@@ -350,3 +350,22 @@ direction). Five non-blocking implementation items carried to [[backlog]]. See
 [[teahouses]]; spec `2026-08-18-shoji-screens-design.md`, plan
 `2026-08-18-shoji-screens.md`, commits `021d745..95375f3`.
 
+
+## [2026-08-18] lint | The wiki grows currency checks, having gone stale again
+
+An audit prompted by the wiki producing stale advice for the second time in three days: the
+backlog described the digits-drum defect as open and its `Opts` blocker as unplumbed, when both
+had been fixed the day after that entry was written. Mechanical lint had been clean throughout —
+it checks structure, and none of these are structural.
+
+`tools/wiki/lint.mjs` gains three currency checks (details in `schema.md`): `updated:` may not
+lag a page's own last commit; a cited repo path must exist; and cited code committed after a
+page's `updated:` warns `re-read —`. First run over 50 pages: 5 errors, 13 warnings. All five
+errors fixed — `program/backlog.md`'s Plan-3 section rewritten as shipped, `world/arena-square.md`
+and `practice/misc-engine-traps.md` re-dated and re-read (the SurfaceGui text recipe rehomed from
+the retired `BoardController` to `FlapBoard`), `practice/studio-tooling.md`'s deliberately-absent
+citation exempted with `<!-- lint-ok -->`.
+
+The finding worth keeping is in [[wiki-currency]]: a deferred-work note and the event that
+expires it live in different files, so no update trigger can fire. Citation dates are what bridge
+them. The 12 remaining warnings are advisory and unworked.
