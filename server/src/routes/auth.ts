@@ -11,10 +11,28 @@ const generateToken = (userId: string) => {
     return jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: '30d' });
 };
 
+// A guest's device, proved rather than asserted (2026-08-18). This route used to take a bare
+// `deviceId` from the form body and hand over whatever guest owned it — points, streaks and all
+// — to anyone who could type the string in. It is the same hole the socket handlers had, in the
+// REST path, and it has to close the same way: the client presents the signed device token it
+// was issued, and only a token this server signed identifies a device.
+const deviceFromToken = (deviceToken: unknown): string | null => {
+    if (typeof deviceToken !== 'string' || !deviceToken) return null;
+    try {
+        const d = jwt.verify(deviceToken, JWT_SECRET) as { typ?: string; did?: string };
+        return d.typ === 'device' && d.did ? d.did : null;
+    } catch {
+        return null;
+    }
+};
+
 // Register
 router.post('/register', async (req, res) => {
     try {
-        const { email, password, displayName, deviceId } = req.body;
+        const { email, password, displayName } = req.body;
+        // NOTE the asymmetry with what this used to accept: `req.body.deviceId` is ignored
+        // outright. A caller that still sends one simply gets a fresh account.
+        const deviceId = deviceFromToken(req.body.deviceToken);
 
         // Check if user exists
         const existingUser = await User.findOne({ email });
@@ -81,7 +99,12 @@ router.post('/login', async (req, res) => {
 // Real implementation would verify the token from Google/Meta/Apple
 router.post('/sso', async (req, res) => {
     try {
-        const { provider, providerId, email, displayName, deviceId } = req.body;
+        const { provider, providerId, email, displayName } = req.body;
+        // Same rule as /register: a device is identified by a token this server signed, never
+        // by a string in the body. (This route is still the stubbed SSO the client has never
+        // called — its provider assertion is unverified — but there is no reason to leave a
+        // second copy of the closed hole lying in it.)
+        const deviceId = deviceFromToken(req.body.deviceToken);
 
         const query: any = {};
         if (provider === 'google') query.googleId = providerId;

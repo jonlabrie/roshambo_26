@@ -4,6 +4,8 @@ import { ArrowLeft, Mail, Lock, LogIn, Chrome, Cloud, Facebook, Instagram } from
 import { cn } from '../lib/utils'
 import type { AuthUser } from '../types'
 
+const API_URL = import.meta.env.VITE_SOCKET_URL || ''
+
 interface AuthViewProps {
     onBack: () => void
     onAuthSuccess: (token: string, user: AuthUser) => void
@@ -25,11 +27,21 @@ export const AuthView: React.FC<AuthViewProps> = ({ onBack, onAuthSuccess, initi
 
         try {
             const endpoint = mode === 'LOGIN' ? '/auth/login' : '/auth/register'
+            // THE DEVICE TOKEN, NOT THE DEVICE ID (2026-08-18). Registering used to send
+            // `localStorage.getItem('deviceId')` -- a key this app has never written (it uses
+            // `roshambo_device_id`), so guest progress never actually migrated -- and the
+            // server used to take that string as proof of who the guest was. It now takes the
+            // signed token the server itself issued, so the account inherits the guest's
+            // points only when the browser can prove it IS that guest.
             const body = mode === 'LOGIN'
                 ? { email, password }
-                : { email, password, displayName, deviceId: localStorage.getItem('deviceId') }
+                : { email, password, displayName, deviceToken: localStorage.getItem('roshambo_device_token') }
 
-            const response = await fetch(`${window.location.protocol}//${window.location.hostname}:3001${endpoint}`, {
+            // THE DEPLOYED SITE HAS NO :3001. This posted to
+            // `${protocol}//${hostname}:3001` -- the local dev server's port, left over from
+            // the laptop -- so on playroshambo.com every registration died as a network error
+            // ("Load Failed" on iOS). The same env var every other call in this app uses.
+            const response = await fetch(`${API_URL}${endpoint}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(body)

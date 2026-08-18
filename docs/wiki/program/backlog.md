@@ -292,6 +292,10 @@ class fix — a future handler cannot be handed an account name, because message
 one. `device-required` tells a socket with no device to claim one rather than failing silently.
 
 **Standing rule this leaves behind: identity comes from the connection, never from a payload.**
+`/auth/register` and `/auth/sso` had the same hole in the REST path — a bare `deviceId` in the
+form body claimed whatever guest owned it — and close the same way: they take the signed device
+token instead, so an account inherits a guest's points only when the browser can prove it IS
+that guest (2026-08-18).
 
 **Owner ruling 2026-08-18 — HARD CUT, no migration.** Guest points and streaks from before the
 change are orphaned: an existing deviceId cannot be presented for adoption, because a stolen one

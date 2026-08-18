@@ -325,3 +325,12 @@ token rides the handshake — no socket message names an account any more. Owner
 hard cut rather than migrating existing guests. One rollout crutch left in the PWA, to
 delete after the prod server is deployed. See [[backlog]].
 
+## [2026-08-18] defect | Registration has never worked on the deployed site
+
+`AuthView.tsx` posted to `${protocol}//${hostname}:3001` — the laptop's dev port — so on
+playroshambo.com every registration died as a network error ("Load Failed" on iOS).
+Pre-existing, found while chasing a report of it. It also read
+`localStorage.getItem('deviceId')`, a key this app has never written, so guest progress
+never migrated into an account either. Both fixed; the migration now travels as the
+signed device token. See [[backlog]].
+
