@@ -595,6 +595,14 @@ function Chaya.build(palette: any, _layout: any): any
         Material = "Grass",
         MaterialVariant = "Thatch",
         Color = { 0.86, 0.80, 0.68 }, -- the ridge bundle is fresher straw than the field
+        -- A thatched ridge is the best perch on the building, and the chaya sits alone by the
+        -- water where a bird reads clearly against the falls. The cylinder's long axis is LOCAL X,
+        -- so the perches spread along X and sit on its top (+Y) face.
+        children = {
+            Spec.perch("ridge", { -roofW * 0.28, 0.38, 0 }),
+            Spec.perch("ridge", { 0, 0.38, 0 }),
+            Spec.perch("ridge", { roofW * 0.28, 0.38, 0 }),
+        },
     })
 
     -- ----- the front: a rail, a half-noren, a rolled blind and one chōchin -----

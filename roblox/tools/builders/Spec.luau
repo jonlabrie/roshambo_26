@@ -47,6 +47,26 @@ function Spec.meshPart(name: string, props: { [string]: any }): PartSpec
     return { name = name, className = "MeshPart", properties = properties, children = kids }
 end
 
+-- A FAMILIAR PERCH: the invisible anchor a bird lands on, emitted BY THE BUILDER rather than
+-- swept in Studio.
+--
+-- ⚠ WHY THE BUILDER AND NOT THE SWEEP. Rojo owns every RoshamboStage prop, so an attachment
+-- stamped onto one in Studio is destroyed by the next sync. Emitted here it lives in git,
+-- regenerates with the prop it belongs to, and is covered by the model.json drift check --
+-- strictly better than sweeping, not a workaround for it. The sweep is only for geometry nothing
+-- regenerates (path railings, the bridges, hero trees).
+--
+-- THE KIND RIDES THE NAME (`FamiliarPerch_rail`) rather than an attribute, because `genmodels`
+-- maps className/properties/children only and does not plumb attributes. A name needs no pipeline
+-- change, greps cleanly, and reads the same whether the perch was emitted or swept.
+function Spec.perch(kind: string, offset: { number }): PartSpec
+    return {
+        name = `FamiliarPerch_{kind}`,
+        className = "Attachment",
+        properties = { CFrame = Spec.cframe(offset), Tags = { "FamiliarPerch" } },
+    }
+end
+
 function Spec.model(name: string, children: { PartSpec }): PartSpec
     return { name = name, className = "Model", properties = {}, children = children }
 end

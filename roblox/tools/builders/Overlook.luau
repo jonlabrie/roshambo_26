@@ -21,10 +21,24 @@ local function barSeg(
     y: number,
     ch: number,
     cw: number,
-    color: { number }
+    color: { number },
+    perches: number?
 )
     local dx, dz = p1[1] - p0[1], p1[2] - p0[2]
     local size = if math.abs(dx) >= math.abs(dz) then { math.abs(dx), ch, cw } else { cw, ch, math.abs(dz) }
+    -- Perches sit ON the cap's top face, spread evenly along it. `perches` is nil for every bar
+    -- that is not a cap rail: a bird does not land on a mid-rail or a baluster.
+    local kids = nil
+    if perches and perches > 0 then
+        kids = {}
+        local long = math.max(math.abs(dx), math.abs(dz))
+        for i = 1, perches do
+            local t = (i - 0.5) / perches - 0.5
+            local along = long * t
+            local off = if math.abs(dx) >= math.abs(dz) then { along, ch / 2, 0 } else { 0, ch / 2, along }
+            table.insert(kids, Spec.perch("rail", off))
+        end
+    end
     table.insert(
         children,
         Spec.part(name, {
@@ -32,6 +46,7 @@ local function barSeg(
             CFrame = Spec.cframe({ (p0[1] + p1[1]) / 2, y, (p0[2] + p1[2]) / 2 }),
             Color = color,
             Material = "Wood",
+            children = kids,
         })
     )
 end
@@ -79,7 +94,9 @@ local function railRun(
     local capY = deckTopY + railH
     local midY = deckTopY + railH - 1.1
     for si, seg in splitRun(a, b, vertical, gapC, gapH) do
-        barSeg(children, `{name}Cap{si}`, seg[1], seg[2], capY, 0.3, 0.6, CAP_DARK) -- flat top cap (dark/black)
+        -- Two perches per cap run: enough that a long deck edge reads as having birds on it,
+        -- few enough that it is not a row of pigeons.
+        barSeg(children, `{name}Cap{si}`, seg[1], seg[2], capY, 0.3, 0.6, CAP_DARK, 2) -- flat top cap (dark/black)
         barSeg(children, `{name}Mid{si}`, seg[1], seg[2], midY, 0.25, 0.42, timber) -- mid rail
     end
     local _, len = Spec.segment({ a[1], capY, a[2] }, { b[1], capY, b[2] })
@@ -149,6 +166,9 @@ local function hanjiLantern(
             CFrame = Spec.cframe({ x, baseY + h + 0.09, z }),
             Color = palette.ink,
             Material = "Wood",
+            -- A newel cap is the most bird-like surface in the world: a post top at the corner of
+            -- a railing, which is where a real bird would actually sit.
+            children = { Spec.perch("post", { 0, 0.09, 0 }) },
         })
     )
 end

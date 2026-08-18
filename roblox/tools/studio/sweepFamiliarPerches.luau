@@ -24,10 +24,33 @@ local CollectionService = game:GetService("CollectionService")
 
 local TAG = "FamiliarPerch"
 
+-- ⚠ THE KIND RIDES THE NAME (`FamiliarPerch_rail`), matching `Spec.perch` in the builders. The
+-- builder path cannot use an attribute -- `genmodels` maps className/properties/children and does
+-- not plumb attributes -- so both paths use the name and a perch reads the same whether it was
+-- emitted or swept.
+
 -- One perch roughly every this many studs of railing. Path rails are ~1.62 studs each and there
 -- are 1250 of them; one perch per segment would be a row of birds along every path in the canyon.
 -- GUESS, and the first thing to change after a look.
 local RAIL_SPACING = 14
+
+-- ⚠ MATCH BY PATTERN, NOT BY EXACT NAME. The first version matched "RailCap" literally and missed
+-- almost everything, because this world suffixes: the Overlook has `RailNUpperDeckCap1` and six
+-- `Newel...Cap` post tops, Bridge3 has `RailCapN_1..20`, SwitchbackDeck has `RailEastCap` and
+-- `StairCapN`. Only the canyon path railings use a bare `Rail`.
+--
+-- Newel caps are IN, at the owner's call: a post top at the corner of a railing is the most
+-- bird-like surface in the world. Mid-rails and balusters are out -- a bird does not land on those.
+local PERCHABLE = {
+    -- "Cap" ANYWHERE after the prefix, not anchored to the tail: Bridge3 names its cap rails
+    -- `RailCapN_1..20`, which an anchored pattern rejects. Mid-rails and balusters still never
+    -- match, which is the only thing the pattern has to get right.
+    { pat = "^Rail.*Cap", kind = "rail" },
+    { pat = "^Newel.*Cap$", kind = "post" },
+    { pat = "^StairCap", kind = "rail" },
+    { pat = "^Rail$", kind = "rail" }, -- the canyon path railings
+    { pat = "^HandCable$", kind = "rail" }, -- the suspension bridge's hand line
+}
 
 -- Ground plants a bird would not land on. Everything else under Foliage.Heroes is a tree.
 local NOT_A_TREE = { "Iris", "Reed", "Fern", "Weed", "Grass" }
@@ -55,30 +78,43 @@ end
 
 local function perch(parent: BasePart, localCF: CFrame, kind: string)
     local a = Instance.new("Attachment")
-    a.Name = "FamiliarPerch"
+    a.Name = `FamiliarPerch_{kind}`
     a.CFrame = localCF
     a.Parent = parent
-    a:SetAttribute("PerchKind", kind)
     CollectionService:AddTag(a, TAG)
 end
 
-local made = { rail = 0, branch = 0 }
+local made: { [string]: number } = { rail = 0, post = 0, branch = 0 }
 
--- ===== RAILINGS =====
--- Sampled ALONG EACH RUN rather than globally: runs are the natural unit (one stair, one bridge
+local function kindFor(name: string): string?
+    for _, rule in PERCHABLE do
+        if string.match(name, rule.pat) then
+            return rule.kind
+        end
+    end
+    return nil
+end
+
+-- ===== RAILINGS, POSTS AND CABLES =====
+-- Sampled ALONG EACH RUN rather than globally: a run is the natural unit (one stair, one bridge
 -- span), and sampling globally would cluster perches wherever the descendant order happened to be
--- dense. The rail's own top face is the landing surface, so the anchor sits half its height up.
-local function sweepRails(root: Instance, partName: string)
-    local runs: { [Instance]: { BasePart } } = {}
+-- dense. A post cap is never sampled away — there are few of them and each one is a good perch.
+local function sweep(root: Instance)
+    local runs: { [string]: { BasePart } } = {}
     for _, d in root:GetDescendants() do
-        if d:IsA("BasePart") and d.Name == partName then
-            local run = d.Parent :: Instance
-            runs[run] = runs[run] or {}
-            table.insert(runs[run], d)
+        if d:IsA("BasePart") then
+            local kind = kindFor(d.Name)
+            if kind == "post" then
+                perch(d, CFrame.new(0, d.Size.Y / 2, 0), "post")
+                made.post += 1
+            elseif kind then
+                local key = `{d.Parent and d.Parent:GetFullName() or "?"}|{kind}`
+                runs[key] = runs[key] or {}
+                table.insert(runs[key], d)
+            end
         end
     end
     for _, segs in runs do
-        -- Longest-axis length stands in for segment length; rails are long thin boxes.
         local len = 0
         for _, p in segs do
             len += math.max(p.Size.X, p.Size.Z)
@@ -93,16 +129,9 @@ local function sweepRails(root: Instance, partName: string)
     end
 end
 
-local paths = world:FindFirstChild("Paths")
-if paths then
-    sweepRails(paths, "Rail")
-end
--- The two hand-built landings carry the PadOps naming but are NOT regenerated, so they are ours.
-for _, landing in { world:FindFirstChild("Arena"), world:FindFirstChild("Structures") } do
-    if landing then
-        sweepRails(landing, "RailCap")
-    end
-end
+-- ⚠ CanyonWorld ONLY. RoshamboStage is Rojo-owned and its perches are emitted by the builders
+-- (`Spec.perch`); sweeping there would be undone by the next sync.
+sweep(world)
 
 -- ===== TREES =====
 -- ⚠ DERIVED FROM THE BOUNDING BOX, NOT AUTHORED. The spec assumed ~7 species templates; the place
@@ -142,13 +171,14 @@ end
 
 print(
     string.format(
-        "[perches] cleared %d, made %d (rail %d, branch %d). Spacing %d studs.",
+        "[perches] cleared %d, made %d (rail %d, post %d, branch %d). Spacing %d studs.",
         cleared,
-        made.rail + made.branch,
+        made.rail + made.post + made.branch,
         made.rail,
+        made.post,
         made.branch,
         RAIL_SPACING
     )
 )
-print("[perches] Roofs are Rojo-owned and deck railings are runtime-built — neither is swept here.")
+print("[perches] RoshamboStage props emit their own via Spec.perch; deck railings via PadOps.")
 print("[perches] SAVE THE PLACE — these attachments are place-only.")

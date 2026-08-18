@@ -412,6 +412,18 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
         if variant then
             props.MaterialVariant = variant
         end
+        -- A ROOF RIDGE IS A PERCH, and it is the one the owner asked for first: standing in the
+        -- square you should see birds on the roofs. Emitted by the builder because Rojo owns every
+        -- RoshamboStage prop — an attachment stamped on this in Studio dies at the next sync.
+        -- Three along the ridge, so a roofline reads as occupied rather than as having one bird
+        -- balanced in the middle of it.
+        if name == "Ridge" then
+            local kids = {}
+            for i = 1, 3 do
+                table.insert(kids, Spec.perch("ridge", { size[1] * ((i - 2) * 0.3), size[2] / 2, 0 }))
+            end
+            props.children = kids
+        end
         table.insert(children, Spec.part(name, props))
     end
 
