@@ -11,6 +11,9 @@ screens can become an earnable item later.
   slides persist, a visitor's do not**.
 - Movement is **hold-to-slide** on a proximity prompt, not grab-drag and not a state cycle.
 - Side bays get the same treatment as front and back.
+- **Every screen gets its own channel**, so a whole run can tuck into one bay — and that
+  bay may be any bay on the wall, not just an end. No pocket (tobukuro): the stack stays
+  visible, parked wherever the player left it.
 - The variant slot ships as the F&F spec asks — but the survey below found it already
   built, so this item proves it works rather than building it again.
 
@@ -24,11 +27,17 @@ Surveyed from the live place, 2026-08-18 (`ServerStorage.StructurePrefabs`, Stud
 | `teahouse-1story-m` | 3 front, 3 back, 2 per side | 6.00 | 5.90 | −5.88 / −5.68 / −5.48 |
 | `teahouse-1story-l` | 4 front, 4 back, 3 per side | 6.00 | 5.90 | −9.20 / −9.00 / −8.80 / −9.20 |
 
-**The panels are already built as a sliding run.** Every panel in a run sits on its own
-depth track, stepped 0.20 apart, on a 6.00 pitch with a 5.90-wide panel. A screen slid
-exactly one bay-width parks over its neighbour and clears its own opening completely, and
-the depth offsets mean panels pass each other rather than clip. **No art pass is required
-by this item** — the geometry is finished; only the motion is missing.
+**The panels are NOT yet a sliding run, though they look like one from the numbers.** A
+first read of the depths (−9.20 / −9.00 / −8.80 / −9.20 across the L's front) suggested a
+track per panel. A closer look says otherwise: *within* a bay every part shares one plane —
+paper, kumiko, rails, stiles and glow all at −9.20 for `Bay_front_1` — and the variation
+between bays is 0.20 of inconsistent authoring against a 0.40-thick wall, which puts bay 1
+on the wall's outer face, bay 2 at its centre, bay 3 on its inner face and bay 4 back on the
+outer. Two of the L's four panels share a plane and would collide if slid past each other.
+
+Channels have to be authored deliberately, and that is the one piece of geometry work this
+item carries (§2.1). Everything else about the panels — width, pitch, the parts that make up
+a leaf — is finished and correct.
 
 Each bay is `Bay_<side>_<index>`, a Model holding three variant Models (`Solid`, `Shoji`,
 `Door`); `StructureOps.applyBays` shows one and hides the other two by transparency, driven
@@ -51,18 +60,40 @@ built. This item does not have to build it, and should not pretend to.
 One number per shoji bay: **`open`, the panel's travel in bay-widths**, positive toward
 increasing local X.
 
-- **Range** is `[-1, 1]`, clamped further by the run's ends: a screen cannot slide past the
-  first or last bay position of its side. `0` is closed (home), `±1` is fully open — the
-  panel parked over a neighbour — and everything between is a partly-open screen.
-- **No panel-vs-panel collision exists to model.** Every panel in a run has its own depth
-  track, so two panels sharing a position is a legal, physically correct stack.
-- **An N-bay run opens at most N−1 bays**, and that is a consequence rather than a rule:
-  the screen at the end of the run has nowhere to send its panel. "Open the whole front" is
-  therefore not a state, and nothing in the UI should imply it is.
+- **The only limit is the run itself.** A screen may slide anywhere between the first and
+  last bay positions of its wall — for a four-bay run, that is three bay-widths of travel in
+  one direction if it starts at an end. There is no per-screen cap: a cap would say "park
+  over your neighbour and no further", and the owner's ruling is that a whole run may tuck
+  into a single bay (2026-08-18).
+- **That bay may be any bay on the wall.** The stack is wherever the players put it, which
+  is why no bay is special and no end is privileged.
+- **No panel-vs-panel collision exists to model** — once §2.1's channels are authored, every
+  panel in a run has its own, so any number of them sharing a bay position is a legal stack.
+- **An N-bay run opens at most N−1 bays.** The panels have to be somewhere, and with no
+  pocket to hide them the fullest opening is every screen stacked in one bay: 18 of the L's
+  24 feet, 12 of the M's 18, 6 of the S's 12. "Open the whole wall" is not a state, and
+  nothing in the UI should imply it is.
 
-Travel is capped at one bay-width because that is what "park over your neighbour" means; a
-two-bay slide is geometrically legal (separate tracks) but reads as a panel drifting past
-the house. `MAX_TRAVEL` is a constant, not a law.
+### 2.1 Channels — the one piece of geometry work
+
+Each bay's leaf moves to a deliberate track: **groove `i` of an N-bay run sits at
+`wallCentre + (i - (N+1)/2) * 0.20`**, so the stack is centred on the wall's mid-plane and a
+0.16-deep stile has 0.04 of clearance from its neighbour.
+
+| run | grooves | span | vs the 0.40 wall |
+|---|---|---|---|
+| S (2 bays) | 2 | 0.40 | flush |
+| M (3 bays) | 3 | 0.60 | 0.10 proud each face |
+| L (4 bays) | 4 | 0.80 | 0.20 proud each face |
+
+0.20 is kept as the pitch because it is what the prefabs already use, so no leaf changes
+size or shape — each one only moves in z. The **rails deepen** to span their run's groove
+stack (0.16 → 0.40/0.60/0.80 in z), which is what makes a multi-track sill read as joinery
+rather than as a panel floating off the wall. On the L that sill stands two inches proud of
+each face; that is a threshold you step over, and it is correct for a wide run.
+
+Rails become **one sill per side**, not one per bay: a continuous member is what the eye
+expects along a run, and it stops four abutting rails from disagreeing at their joins.
 
 ## 3. Authority and replication
 
@@ -124,8 +155,11 @@ shojiOpen = { front = { 0, 1 }, back = { 0, 0 }, left = { 0 }, right = { 0.5 } }
 ```
 
 Validated server-side beside `validateWallBays`, by the same rules: known sides only, at
-most `MAX_BAYS_PER_SIDE` entries, every entry a finite number in `[-1, 1]`. A malformed map
-is rejected whole, and a rejected map leaves the house at its defaults rather than half
+most `MAX_BAYS_PER_SIDE` entries, every entry a finite number within
+`[-(MAX_BAYS_PER_SIDE - 1), MAX_BAYS_PER_SIDE - 1]` — the widest a run could ever be. The
+real limit is the run's own length and belongs in `ShojiRun`, which knows how many bays the
+wall has; the validator's job is only to refuse nonsense before it is stored. A malformed
+map is rejected whole, and a rejected map leaves the house at its defaults rather than half
 applied — the failure mode `validateWallBays` already chose.
 
 ## 6. The variant slot — already built, so this item only proves it
@@ -153,6 +187,12 @@ is blocked by anything in this design.
   `ShojiOpen` attribute.
 - `roblox/tests/ShojiRun.spec.luau`.
 
+**New (Studio, place-only work)**
+- `roblox/tools/studio/trackShojiBays.luau` — re-tracks each run's leaves onto the §2.1
+  grooves and deepens each side's sill into one continuous member. Idempotent: it computes
+  every z from the run's bay count rather than nudging what it finds, so running it twice
+  changes nothing. Place must be SAVED afterwards.
+
 **Modified**
 - `roblox/src/server/StructureOps.luau` — apply saved offsets when showing a `Shoji`
   variant; expose the bay models the prompt binder needs. No change to the texture path —
@@ -168,9 +208,12 @@ is blocked by anything in this design.
 
 Most of this is testable without Roblox, and the parts that are not are deliberately thin.
 
-- **`ShojiRun` (Lune)**: clamps to `[-1, 1]`; refuses travel past the run's ends; the
-  N−1 rule holds for runs of 2, 3 and 4; offset → displacement is exactly `open * 6.00`;
-  a malformed or missing offset resolves to closed rather than erroring.
+- **`ShojiRun` (Lune)**: a screen clamps to its run's ends and no tighter — the third bay
+  of a four-bay run can travel −2 and +1; every screen in a run may occupy one bay position
+  at once, from any starting arrangement; the stacked bay may be any bay, including an
+  interior one; offset → displacement is exactly `open * 6.00`; a malformed or missing
+  offset resolves to closed rather than erroring; and the channel formula in §2.1 puts N
+  grooves symmetrically about the wall's mid-plane for N of 2, 3 and 4.
 - **The variant slot (Lune)**: a loadout with `shoji = "shoji.plain"` resolves to a texture
   operation on the shoji target — a guard on a path that has no art in it yet and would
   otherwise rot silently.
@@ -201,6 +244,11 @@ Most of this is testable without Roblox, and the parts that are not are delibera
   several prompts at once. `MaxActivationDistance` and `RequiresLineOfSight` need tuning at
   the owner look; if it stays noisy, one prompt per *run* rather than per bay is the
   fallback.
-- **The `l` prefab reuses a depth track** (bays 1 and 4 both at −9.20). They are 18 apart
-  and cannot meet within a one-bay travel cap, so this is safe today and would stop being
-  safe if `MAX_TRAVEL` ever rose above 2.
+- **The L's sill stands 0.20 proud of each wall face**, because four grooves need 0.80 and
+  the wall is 0.40. That is the design working as intended — a wide run has a deep
+  threshold — but it is the one place this item changes a teahouse's silhouette, and it
+  wants an owner look on the L specifically rather than on the S.
+- **Re-tracking the prefabs is place-only work.** `StructurePrefabs` lives in ServerStorage,
+  not in git, so the channel edit must be a committed Studio tool that is idempotent and
+  re-runnable, and the place must be saved after it runs. An unsaved re-track looks exactly
+  like a successful one until the next session.
