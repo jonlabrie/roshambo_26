@@ -267,12 +267,14 @@ local DECLS: { Decl } = {
         site = "vestibule",
         wall = "west",
         flap = SLIP,
-        -- 9, not 7: the slip gained READ, PER THROW, YOU BANK AT and RANK on 2026-08-18 and a
-        -- 7-row board dropped the last two SILENTLY. 9 x 0.40 = 3.60 tall on a 9.00 wall, so it
-        -- is still comfortably a slip rather than a board -- which is what the owner's earlier
-        -- 20% cut was protecting.
-        rows = 9,
-        cols = 16,
+        -- 8 x 18, up from 7 x 16, and both dimensions were forced by content (2026-08-18).
+        -- ROWS: the slip gained BEAT WORLD, POINTS/THROW and RANK, and a 7-row board dropped the
+        -- last of them SILENTLY. Eight is exactly what it composes -- no slack, by choice.
+        -- COLS: "CURRENT STREAK" plus a two-digit streak is 17 characters, and 16 truncated it.
+        -- 18 x 0.34 = 6.12 on a 7.40 wall, so the quiet either side narrows from ~1.0 to ~0.64 --
+        -- the price of the owner's wording, and still visibly a slip rather than a board.
+        rows = 8,
+        cols = 18,
         along = 39.23,
         y = 117.5,
     },
@@ -282,13 +284,11 @@ local DECLS: { Decl } = {
         wall = "east",
         flap = SLIP,
         -- MATCHES `fuda` BY INVARIANT, not by coincidence — the vestibule pair is one piece of
-        -- equipment on two facing walls, and a test enforces it. It grew with `fuda` on
-        -- 2026-08-18 and now composes 5 lines onto 9 rows: four blank flaps at the bottom. That
-        -- is what a real split-flap board does with rows it is not using, and it is the price of
-        -- the symmetry. If it reads as unfinished, the fix is to cut a row from `fuda`, not to
-        -- break the pair.
-        rows = 9,
-        cols = 16,
+        -- equipment on two facing walls, and a test enforces it. It composes 7 lines onto 8 rows,
+        -- and two of those seven are deliberate blanks (owner, 2026-08-18: the board had dead
+        -- space, so give it structure rather than pretending the space is not there).
+        rows = 8,
+        cols = 18,
         along = 39.23,
         y = 117.5,
     },

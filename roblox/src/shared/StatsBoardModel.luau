@@ -28,6 +28,12 @@ export type Section = {
     titleRight: string?,
 }
 export type Opts = { rows: number, cols: number }
+
+-- A DELIBERATE BLANK ROW. Not `{ name = "", figure = "" }`: that goes through `sanitize`, whose
+-- fallback for a missing display name is the string "ANON", so an empty entry prints the word
+-- ANON across the board. Compared by IDENTITY in `compose`, so no caller's real content can
+-- collide with it.
+StatsBoardModel.SPACER = { name = "", figure = "" }
 export type Metrics = { canvasW: number, canvasH: number, glyphSize: number }
 
 local ALLOWED: { [string]: boolean } = {}
@@ -151,7 +157,11 @@ function StatsBoardModel.compose(sections: { Section }, o: Opts): { string }
                 push("NO DATA YET")
             elseif sec.numbered == false then
                 for _, e in entries do
-                    push(labelLine(e, o.cols))
+                    if e == StatsBoardModel.SPACER then
+                        push("")
+                    else
+                        push(labelLine(e, o.cols))
+                    end
                 end
             else
                 for i, e in entries do
@@ -353,12 +363,16 @@ function StatsBoardModel.summarySections(tape: { any }?): { Section }
     local thrown = r + p + sc
     -- A round can settle with a player count but no throws (everyone present, nobody committed),
     -- so the denominator is guarded separately from `totalPlayers`.
+    -- ONE DECIMAL (owner, 2026-08-18). A near-even round is the interesting one and whole
+    -- percents flatten it: 101/99/101 of 301 reads as "34 33 34" whole, hiding that two of them
+    -- tied. The World Throw is decided by exactly that margin.
     local function pct(n: number): string
         if thrown <= 0 then
             return "-"
         end
-        return `{math.floor(n / thrown * 100 + 0.5)}%`
+        return string.format("%.1f%%", n / thrown * 100)
     end
+    local BLANK = StatsBoardModel.SPACER
     return {
         {
             title = "LAST ROUND",
@@ -375,7 +389,9 @@ function StatsBoardModel.summarySections(tape: { any }?): { Section }
             -- label:value, like the 札 it faces -- not a ranking, so not numbered.
             numbered = false,
             entries = {
+                BLANK,
                 { name = "PLAYERS", figure = StatsBoardModel.figure(latest.totalPlayers) },
+                BLANK,
                 { name = "ROCK", figure = pct(r) },
                 { name = "PAPER", figure = pct(p) },
                 { name = "SCISSORS", figure = pct(sc) },
@@ -403,9 +419,16 @@ function StatsBoardModel.banzukeSections(board: any?, leaders: { any }?): { Sect
                 { name = l.displayName, figure = StatsBoardModel.figure(l.lifetimeBanked) }
             )
         end
+        -- THE RULE LEADS. It used to sit after the standings, and `topByCareer` fetches fifty
+        -- names onto a ten-row board -- so the one line explaining why the ranking is empty was
+        -- exactly the line guaranteed to be truncated away. The owner went looking for it and it
+        -- was not there.
+        --
+        -- `lines = {}` and not `entries = {}`: compose prints "NO DATA YET" for a section with no
+        -- entries, which is right for a board with nothing to show and wrong for a bare caption.
         return {
+            { title = `{b.minThrows or 360} THROWS PUTS YOU HERE`, lines = {} },
             { title = "CAREER BANKED", entries = careerEntries },
-            { title = `{b.minThrows or 360} THROWS PUTS YOU HERE`, entries = {} },
         }
     end
     local entries: { Entry } = {}
@@ -423,7 +446,7 @@ function StatsBoardModel.banzukeSections(board: any?, leaders: { any }?): { Sect
         -- player scores 33 -- and every reader is in that position the first time. A section
         -- with no entries renders as a bare line under the ranking. Only when the read column is
         -- actually showing: without it the line explains a column that is not there.
-        table.insert(sections, { title = "LUCK ALONE WINS 33 IN 100", entries = {} })
+        table.insert(sections, { title = "LUCK ALONE WINS 33 IN 100", lines = {} })
     end
     return sections
 end
@@ -465,20 +488,22 @@ function StatsBoardModel.fudaSections(player: any?): { Section }
             entries = {
                 { name = "BANKED", figure = StatsBoardModel.figure(career.banked) },
                 { name = "BEST STREAK", figure = StatsBoardModel.figure(career.bestStreak) },
-                { name = "STREAK NOW", figure = StatsBoardModel.figure(p.currentStreak) },
-                -- "THROWS", not "THROWS THIS WEEK": the fraction (e.g. 142/350) already reads as
+                { name = "CURRENT STREAK", figure = StatsBoardModel.figure(p.currentStreak) },
+                -- "THROWS", not "THROWS THIS WEEK": the fraction (e.g. 142/360) already reads as
                 -- a weekly quota, and the full label is 17 cols wide before a figure even joins
-                -- it — too wide to survive a 16-col slip regardless of width math.
+                -- it — too wide to survive the slip regardless of width math.
                 { name = "THROWS", figure = progress },
                 { name = "BEAT WORLD", figure = if week.winRate then percentOrBlank(week.winRate) else "-" },
+                -- "PER THROW" of WHAT (owner, 2026-08-18). The slash keeps it inside the label
+                -- budget, where "POINTS PER THROW" would leave no room for the figure.
                 {
-                    name = "PER THROW",
+                    name = "POINTS/THROW",
                     figure = if week.pointsPerThrow then string.format("%.1f", week.pointsPerThrow) else "-",
                 },
-                {
-                    name = "YOU BANK AT",
-                    figure = if week.nerve then StatsBoardModel.figure(week.nerve) else "-",
-                },
+                -- BANK DEPTH IS DELIBERATELY ABSENT (owner, 2026-08-18): "a dubious stat for a
+                -- personal board". It lives on as the room-wide histogram, where it describes a
+                -- crowd's habit instead of implying a personal score. `nerve` still travels on
+                -- the wire, for that board and for anything later that wants it.
                 -- WHERE YOU STAND, and the whole reason it is on the slip rather than the wall:
                 -- the banzuke is ten rows, so most of the room never sees its own name there.
                 -- "14 OF 22" and not "14/22" -- a slash reads as the progress fraction directly

@@ -229,18 +229,18 @@ describe("StatsBoardModel.summarySections", function()
             { totalPlayers = 9, distribution = { R = 9, P = 0, S = 0 } },
         })
         expect(s[1].title).toBe("LAST ROUND")
-        expect(figures(s)).toBe("PLAYERS=42 ROCK=45% PAPER=29% SCISSORS=26%")
+        expect(figures(s)).toBe("= PLAYERS=42 = ROCK=45.2% PAPER=28.6% SCISSORS=26.2%")
     end)
 
     test("percentages are of THROWS, not of players present", function()
         -- 42 present, 10 threw. Rock's share is 5/10, not 5/42.
         local s = M.summarySections({ { totalPlayers = 42, distribution = { R = 5, P = 3, S = 2 } } })
-        expect(figures(s)).toBe("PLAYERS=42 ROCK=50% PAPER=30% SCISSORS=20%")
+        expect(figures(s)).toBe("= PLAYERS=42 = ROCK=50.0% PAPER=30.0% SCISSORS=20.0%")
     end)
 
     test("a settled round where nobody threw shows a dash, not a division by zero", function()
         local s = M.summarySections({ { totalPlayers = 3, distribution = { R = 0, P = 0, S = 0 } } })
-        expect(figures(s)).toBe("PLAYERS=3 ROCK=- PAPER=- SCISSORS=-")
+        expect(figures(s)).toBe("= PLAYERS=3 = ROCK=- PAPER=- SCISSORS=-")
     end)
 
     test("an empty tape says so rather than rendering a dark row", function()
@@ -251,8 +251,21 @@ describe("StatsBoardModel.summarySections", function()
     test("is label:value like the slip it faces, never numbered", function()
         local s = M.summarySections({ { totalPlayers = 1, distribution = { R = 1, P = 0, S = 0 } } })
         expect(s[1].numbered).toBe(false)
-        local lines = M.compose(s, { rows = 7, cols = 16 })
-        expect(lines[2]:sub(1, 3)).toBe("PLA")
+        -- Line 2 is now a deliberate blank (owner, 2026-08-18), so assert the SHAPE of the
+        -- PLAYERS row wherever it lands rather than pinning it to an index and a width.
+        local lines = M.compose(s, { rows = 8, cols = 18 })
+        local players = nil
+        for _, l in lines do
+            if string.find(l, "PLAYERS", 1, true) then
+                players = l
+            end
+        end
+        expect(players ~= nil).toBeTruthy()
+        if players then
+            -- label hard left, figure hard right, no "1. " rank prefix
+            expect(string.sub(players, 1, 7)).toBe("PLAYERS")
+            expect(string.match(players, "1%s*$") ~= nil).toBe(true)
+        end
     end)
 
     test("the round's throw rides the far right of the TOP line", function()
@@ -397,26 +410,49 @@ describe("StatsBoardModel titles fit their real StatsRoomLayout boards", functio
 end)
 
 -- FIX 2: `fudaSections` used to return `entries`, so `compose` numbered the rows and the "N. "
--- rank prefix ate 3 of the fuda board's 16 columns — "BEST STREAK" rendered as "BEST STREA".
+-- rank prefix ate 3 of the fuda board's columns — "BEST STREAK" rendered as "BEST STREA".
 describe("StatsBoardModel.fudaSections (FIX 2)", function()
-    local FUDA = { rows = 7, cols = 16 }
+    local FUDA = { rows = 8, cols = 18 }
 
-    test("all four labels survive the fuda board's real 16 cols intact", function()
+    test("all four labels survive the fuda board's real width intact", function()
         local lines = M.compose(M.fudaSections(StatsFixtures.PERSONAL), FUDA)
         local joined = table.concat(lines, "\n")
-        for _, label in { "BANKED", "BEST STREAK", "STREAK NOW", "THROWS" } do
+        for _, label in { "BANKED", "BEST STREAK", "CURRENT STREAK", "THROWS" } do
             expect(joined:find(label, 1, true) ~= nil).toBeTruthy()
         end
     end)
 
     test("BEST STREAK specifically — the row the rank prefix used to truncate", function()
         local lines = M.compose(M.fudaSections(StatsFixtures.PERSONAL), FUDA)
-        expect(lines[3]).toBe("BEST STREAK   11")
+        -- Shape, not a pinned width: this row broke twice on a column-count change, which is
+        -- what it was never meant to be testing. The defect it guards is the "N. " rank prefix
+        -- eating the label, so assert the label survives whole and the figure is hard right.
+        local row = nil
+        for _, l in lines do
+            if string.find(l, "BEST STREAK", 1, true) then
+                row = l
+            end
+        end
+        expect(row ~= nil).toBeTruthy()
+        if row then
+            expect(string.sub(row, 1, 11)).toBe("BEST STREAK")
+            expect(string.match(row, "11%s*$") ~= nil).toBe(true)
+        end
     end)
 
     test("rows are label-then-value, not numbered", function()
         local lines = M.compose(M.fudaSections(StatsFixtures.PERSONAL), FUDA)
-        expect(lines[2]).toBe("BANKED    12,480")
+        local row = nil
+        for _, l in lines do
+            if string.find(l, "BANKED", 1, true) then
+                row = l
+            end
+        end
+        expect(row ~= nil).toBeTruthy()
+        if row then
+            expect(string.sub(row, 1, 6)).toBe("BANKED")
+            expect(string.match(row, "12,480%s*$") ~= nil).toBe(true)
+        end
     end)
 end)
 
@@ -461,6 +497,25 @@ describe("banzukeSections", function()
         expect(string.find(blockOf(closed, nil), "%%") == nil).toBe(true)
     end)
 
+    test("the baseline is a bare line, not a section that reports NO DATA YET", function()
+        -- `compose` pushes "NO DATA YET" for a section with an empty `entries` list, so the
+        -- baseline has to carry `lines = {}` instead. Caught in Studio 2026-08-18.
+        expect(string.find(blockOf(BOARD, nil), "NO DATA YET", 1, true) == nil).toBe(true)
+    end)
+
+    test("the rule survives a full career list — it leads, so it cannot be truncated away", function()
+        -- The fallback used to put the rule AFTER the standings. `topByCareer` fetches 50 and
+        -- the board is 10 rows, so the line the owner most needed to see was the one guaranteed
+        -- to fall off the bottom. This is the regression test for that.
+        local many = {}
+        for i = 1, 50 do
+            table.insert(many, { displayName = `PLAYER{i}`, lifetimeBanked = 1000 - i })
+        end
+        local all = blockOf({ minThrows = 360, worldIsCrowd = true, rows = {} }, many)
+        expect(string.find(all, "360 THROWS PUTS YOU HERE", 1, true) ~= nil).toBe(true)
+        expect(string.find(all, "CAREER BANKED", 1, true) ~= nil).toBe(true)
+    end)
+
     test("falls back to career standings, naming the rule, when nobody qualifies", function()
         local empty = { minThrows = 360, worldIsCrowd = true, rows = {} }
         local all = blockOf(empty, { { displayName = "AYAKA", lifetimeBanked = 12480 } })
@@ -493,6 +548,72 @@ describe("fudaSections standing", function()
         }
         local all = table.concat(M.compose(M.fudaSections(p), O), "\n")
         expect(string.find(all, " 0 OF ", 1, true) == nil).toBe(true)
+    end)
+end)
+
+describe("summarySections spacing and precision", function()
+    local O = { rows = 8, cols = 18 }
+    -- 332/336/332 of 1000: two throws tied at 33.2% and the winner clear of them by four
+    -- tenths. At whole percents this prints 33 / 34 / 33 and the tie disappears.
+    local TAPE = { { worldThrow = "P", totalPlayers = 1000, distribution = { R = 332, P = 336, S = 332 } } }
+
+    test("reads a tenth of a percent, because 33 and 33 and 33 hides which one won", function()
+        local all = table.concat(M.compose(M.summarySections(TAPE), O), "\n")
+        expect(string.find(all, "33.2%", 1, true) ~= nil).toBe(true)
+    end)
+
+    test("breathes: a blank under the title and another under PLAYERS", function()
+        local lines = M.compose(M.summarySections(TAPE), O)
+        local function blank(l: string): boolean
+            return string.match(l, "^%s*$") ~= nil
+        end
+        expect(blank(lines[2])).toBe(true)
+        expect(string.find(lines[3], "PLAYERS", 1, true) ~= nil).toBe(true)
+        expect(blank(lines[4])).toBe(true)
+        expect(string.find(lines[5], "ROCK", 1, true) ~= nil).toBe(true)
+    end)
+end)
+
+describe("fudaSections content", function()
+    local O = { rows = 8, cols = 18 }
+    local P = {
+        displayName = "AYAKA",
+        career = { banked = 12480, bestStreak = 11 },
+        currentStreak = 11,
+        week = {
+            throws = 412,
+            minThrows = 360,
+            qualified = true,
+            winRate = 0.41,
+            pointsPerThrow = 2.41,
+            nerve = 3,
+            standing = { rank = 14, of = 22 },
+        },
+    }
+
+    test("says POINTS/THROW, not the ambiguous PER THROW", function()
+        local all = table.concat(M.compose(M.fudaSections(P), O), "\n")
+        expect(string.find(all, "POINTS/THROW", 1, true) ~= nil).toBe(true)
+    end)
+
+    test("says CURRENT STREAK, and a two-digit streak still fits", function()
+        local lines = M.compose(M.fudaSections(P), O)
+        local found = nil
+        for _, l in lines do
+            if string.find(l, "CURRENT STREAK", 1, true) then
+                found = l
+            end
+        end
+        expect(found ~= nil).toBe(true)
+        if found then
+            expect(#found <= O.cols).toBe(true)
+            expect(string.find(found, "11", 1, true) ~= nil).toBe(true)
+        end
+    end)
+
+    test("drops bank depth — dubious on a personal board (owner, 2026-08-18)", function()
+        local all = table.concat(M.compose(M.fudaSections(P), O), "\n")
+        expect(string.find(all, "BANK AT", 1, true) == nil).toBe(true)
     end)
 end)
 
