@@ -532,13 +532,13 @@ function Chaya.build(palette: any, _layout: any): any
     -- which is how a thatcher finishes an edge anyway. It is the silhouette that was reading
     -- as a slab, so this is where the fix has to land.
     local ROLL_R = 0.42
-    -- TWO INCHES BELOW THE MID-PLANE (owner, 2026-08-17): "the rolls need to drop a couple of
-    -- inches to eliminate the 'lip' above the roof they're showing now." A roll of this radius
-    -- centred on the slab's centreline stands proud of the top face, which reads as a rim
-    -- running round the building. Dropped, it tucks under the top and bulges below instead --
-    -- also the right way round for a rolled eave, where the bundle's weight hangs beneath the
-    -- course it finishes.
-    local ROLL_DROP = 2 * IN
+    -- ONE INCH BELOW THE MID-PLANE. Centred on the slab's centreline a roll of this radius
+    -- stands proud of the top face and reads as a rim running round the building; the owner
+    -- asked for two inches down, looked, and sent it back up one (2026-08-17). At an inch it
+    -- still tucks under the top face and still bulges below -- the right way round for a
+    -- rolled eave, where the bundle's weight hangs beneath the course it finishes -- without
+    -- pulling the edge off the roof it belongs to.
+    local ROLL_DROP = 1 * IN
     -- ON THE SLAB'S EDGE, NOT UNDER IT (owner, 2026-08-17: "their centerlines appear to
     -- be aligned with the bottom edges"). They were: placed at EAVE_Y - THATCH_T/2, each roll
     -- hung off the underside like a pipe rather than wrapping the edge of the thatch. EAVE_Y
