@@ -300,3 +300,10 @@ interval. `RingTimer.flashLit` (pure, tested) drives it off the countdown, so th
 blink is phase-locked to the digits. Arming rule unchanged in [[round-and-hud]].
 Same session: every Stats board cased in an inch of dark moulding ([[stats-room]]).
 
+## [2026-08-17] audit | Stats room measured on the A13: costs what the arena square costs
+
+Owner walked the finished room on the F&F floor device. Load flat against the arena
+square despite ~8,400 GUI instances and no MaxDistance cull — the parked perf budget is
+not owed. Physical flaps read ragged at ~30 fps: half-turns (0.055 s / 0.0825 s) are
+shorter than two frames. See [[stats-room]].
+

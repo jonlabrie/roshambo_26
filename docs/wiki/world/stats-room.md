@@ -183,6 +183,21 @@ for "avatar plinths, top three only", and the plan deferred them for want of a h
 **Still open:** whether the cavern's remaining wall boards become horizontal ticker tape
 rather than flappers (owner, "probably"). Not decided, not built.
 
+## Performance — measured on the A13, 2026-08-17
+
+Owner walked the finished room on the Samsung A13 (the device that governs the F&F floor):
+**CPU/GPU load in the room is neither better nor worse than the arena square outside**, with
+roughly 8,400 GUI instances across the wall boards and no `MaxDistance` cull. No budget work is
+owed; the cull idea can stay parked.
+
+Open, cosmetic: **the physical flaps (clock, tape, throw flipper) read as ragged there.** That is
+arithmetic, not load. `FlapUnit`'s half-turn is `DEFAULT_HALF` 0.055 s and the tape's is 0.0825 s
+— at the ~30 fps the A13 holds, a half spans **under two frames**, so a tween has nowhere to
+interpolate and the swing reads as a jump-cut. Lengthening the halves for the clock and tape is a
+constant each; the throw flipper is different, because during the reel it is driven at
+`ReelStep`'s interval and a longer turn there means MORE abandoned mid-turns (blur), not a
+smoother one. Owner's verdict for now: "they read, essentially."
+
 ## Owner gates
 
 - **2026-08-16** — bore accepted ("Tunnel looks good"), place saved.
