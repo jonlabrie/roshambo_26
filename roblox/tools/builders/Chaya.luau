@@ -33,7 +33,14 @@ local Chaya = {}
 -- beach behind climbs from 111.8 to 113.6. There is a channel off the west corner — at
 -- (−54, 5) the bed drops to 102 with only 8 studs of water above it — which is why the
 -- footprint starts at x −52 and the chaya's own north edge holds back to z 7.
-local X0, X1 = -52.0, -41.0 -- 11 wide, shared by both structures
+local X0, X1 = -52.0, -41.0 -- the chaya, 11 wide
+-- THE DOCK RUNS 4 STUDS FURTHER EAST THAN THE CHAYA (owner, 2026-08-17): "the dock should
+-- extend 4 studs further to the east, which should provide a kind of step up from the sand
+-- onto it." It does, and the ground does the work: the beach at x -37 probes 112.45 to
+-- 113.00 against a deck top of 112.6, so the east edge meets the sand within half a stud
+-- and you walk on rather than climb on. That is also why only the dock widens -- the chaya
+-- stays 11 so the pair still reads as one object from the water.
+local DOCK_X1 = -37.0
 local DOCK_Z0, DOCK_Z1 = -3.0, 7.0 -- 10 deep, out over the river
 local CHAYA_Z0, CHAYA_Z1 = 7.0, 17.0 -- 10 deep, on the beach
 Chaya.DECK_TOP = 112.6 -- 2.68 clear of the water: a landing, not a jetty
@@ -85,12 +92,15 @@ local DOCK_POSTS = {
     { -51.55, -2.55, 101.97 }, -- Slate, 7.91 of water above it
     { -46.50, -2.55, 101.92 },
     { -41.45, -2.55, 101.89 },
+    { -37.45, -2.55, 106.91 }, -- the east column, added with the 4-stud extension
     { -51.55, 2.00, 101.99 },
     { -46.50, 2.00, 101.76 },
     { -41.45, 2.00, 108.54 }, -- the bed shelves up sharply toward the east bank
+    { -37.45, 2.00, 112.06 }, -- Grass: ashore already, half way along the extension
     { -51.55, 6.55, 111.09 }, -- Sand: the south row is ashore
     { -46.50, 6.55, 111.97 },
     { -41.45, 6.55, 112.33 },
+    { -37.45, 6.55, 113.00 }, -- the sand here stands 0.40 ABOVE the deck: the step-on
 }
 
 Chaya.MIN_POST = MIN_POST
@@ -110,11 +120,18 @@ local CHAYA_POSTS = {
 Chaya.CHAYA_POSTS = CHAYA_POSTS
 
 -- ===== the fittings =====
-local COUNTER_Z = 11.5
+-- TWO STUDS SOUTH of where it was first built (owner, 2026-08-17). It buys the customers'
+-- side the room a bench and two cushions actually need, and it costs the keeper's side --
+-- which is correct for a stand: the working strip behind a yatai counter is narrow, and the
+-- gear that will not fit in it hangs off the rear posts instead.
+local COUNTER_Z = 13.5
 local COUNTER_D = 1.8
 local COUNTER_TOP = Chaya.FLOOR + 3.0 -- sized to a keeper standing behind it, per 花火屋
 local SLOT_Z0 = COUNTER_Z + COUNTER_D / 2 -- the slot starts at the counter's own back face
-local SLOT_D = 3.8
+-- The clear strip between the counter's back face and the rear posts. Shoulder room is the
+-- measurement that matters for somewhere to STAND -- an avatar is about a stud deep and two
+-- wide -- so the slot keeps its 4 studs across and takes the depth that is left.
+local SLOT_D = 1.9
 local SLOT_H = 6.0
 local RAIL_Y = Chaya.FLOOR + 4.2 -- the noren rail: head height across the front
 
@@ -160,15 +177,15 @@ function Chaya.build(palette: any, _layout: any): any
     -- laid across it with daylight between, tops flush with the frame. The board width is
     -- held exact and the remainder spread evenly across the gaps, so a deck never ends on a
     -- ripped board.
-    local function deck(prefix: string, z0: number, z1: number, top: number)
-        local w, d = X1 - X0, z1 - z0
-        local cx, cz = (X0 + X1) / 2, (z0 + z1) / 2
+    local function deck(prefix: string, x0: number, x1: number, z0: number, z1: number, top: number)
+        local w, d = x1 - x0, z1 - z0
+        local cx, cz = (x0 + x1) / 2, (z0 + z1) / 2
         local frameY = top - FRAME_H / 2
         local innerW = w - 2 * FRAME_T
         for _, f in
             {
-                { "West", X0 + FRAME_T / 2, cz, FRAME_T, d },
-                { "East", X1 - FRAME_T / 2, cz, FRAME_T, d },
+                { "West", x0 + FRAME_T / 2, cz, FRAME_T, d },
+                { "East", x1 - FRAME_T / 2, cz, FRAME_T, d },
                 { "North", cx, z0 + FRAME_T / 2, innerW, FRAME_T },
                 { "South", cx, z1 - FRAME_T / 2, innerW, FRAME_T },
             }
@@ -195,22 +212,22 @@ function Chaya.build(palette: any, _layout: any): any
     end
 
     -- ----- the dock, out over the river -----
-    deck("Dock", DOCK_Z0, DOCK_Z1, Chaya.DECK_TOP)
+    deck("Dock", X0, DOCK_X1, DOCK_Z0, DOCK_Z1, Chaya.DECK_TOP)
     local dockSlab = Chaya.DECK_TOP - FRAME_H
     for i, p in DOCK_POSTS do
         post(`PostDock_{i}`, p[1], p[2], p[3], dockSlab, POST_D_DOCK)
     end
-    for i, z in { DOCK_POSTS[1][2], DOCK_POSTS[4][2], DOCK_POSTS[7][2] } do
+    for i, z in { DOCK_POSTS[1][2], DOCK_POSTS[5][2], DOCK_POSTS[9][2] } do
         beam(
             `DockGirder_{i}`,
-            { X1 - X0, GIRDER_H, GIRDER_W },
-            { (X0 + X1) / 2, dockSlab - GIRDER_H / 2, z },
+            { DOCK_X1 - X0, GIRDER_H, GIRDER_W },
+            { (X0 + DOCK_X1) / 2, dockSlab - GIRDER_H / 2, z },
             timber
         )
     end
 
     -- ----- the chaya floor, on the beach -----
-    deck("Chaya", CHAYA_Z0, CHAYA_Z1, Chaya.FLOOR)
+    deck("Chaya", X0, X1, CHAYA_Z0, CHAYA_Z1, Chaya.FLOOR)
     local floorSlab = Chaya.FLOOR - FRAME_H
     -- THE POSTS RUN THROUGH. A pavilion's posts carry the roof as well as the floor, so
     -- these are one stick from the sand to the eave plate rather than stubs under a deck
@@ -270,7 +287,7 @@ function Chaya.build(palette: any, _layout: any): any
     part("Brazier", {
         Shape = "Cylinder",
         Size = { 1.0, 1.4, 1.4 },
-        CFrame = Spec.cframe({ -49.4, Chaya.FLOOR + 0.5, 12.9 }, Spec.ROT.CYL_VERTICAL),
+        CFrame = Spec.cframe({ -49.4, Chaya.FLOOR + 0.5, 14.9 }, Spec.ROT.CYL_VERTICAL),
         Material = "Metal",
         MaterialVariant = "IronDark",
         Color = palette.ironDark,
@@ -278,14 +295,14 @@ function Chaya.build(palette: any, _layout: any): any
     part("BrazierCoals", {
         Shape = "Cylinder",
         Size = { 0.12, 1.05, 1.05 },
-        CFrame = Spec.cframe({ -49.4, Chaya.FLOOR + 0.92, 12.9 }, Spec.ROT.CYL_VERTICAL),
+        CFrame = Spec.cframe({ -49.4, Chaya.FLOOR + 0.92, 14.9 }, Spec.ROT.CYL_VERTICAL),
         Material = "Neon",
         Color = { 0.85, 0.42, 0.18 },
     })
     part("Kettle", {
         Shape = "Ball",
         Size = { 0.95, 0.95, 0.95 },
-        CFrame = Spec.cframe({ -49.4, Chaya.FLOOR + 1.45, 12.9 }),
+        CFrame = Spec.cframe({ -49.4, Chaya.FLOOR + 1.45, 14.9 }),
         Material = "Metal",
         MaterialVariant = "IronDark",
         Color = { 0.30, 0.29, 0.28 },
@@ -293,7 +310,7 @@ function Chaya.build(palette: any, _layout: any): any
     part("KettleSpout", {
         Shape = "Cylinder",
         Size = { 0.55, 0.22, 0.22 },
-        CFrame = Spec.cframe({ -48.9, Chaya.FLOOR + 1.55, 12.9 }),
+        CFrame = Spec.cframe({ -48.9, Chaya.FLOOR + 1.55, 14.9 }),
         Material = "Metal",
         MaterialVariant = "IronDark",
         Color = { 0.30, 0.29, 0.28 },
@@ -313,7 +330,7 @@ function Chaya.build(palette: any, _layout: any): any
         part(`CupStack_{i}`, {
             Shape = "Cylinder",
             Size = { 0.5, 0.5, 0.5 },
-            CFrame = Spec.cframe({ cx, COUNTER_TOP + 0.25, 12.1 }, Spec.ROT.CYL_VERTICAL),
+            CFrame = Spec.cframe({ cx, COUNTER_TOP + 0.25, 14.1 }, Spec.ROT.CYL_VERTICAL),
             Material = "Slate",
             Color = { 0.82, 0.80, 0.74 },
         })

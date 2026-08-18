@@ -72,7 +72,7 @@ describe("Chaya — the round posts the owner asked for", function()
         -- round, not square." A box post is the default a builder falls into, so this is
         -- pinned rather than trusted.
         local posts = findPrefix(m, "Post")
-        expect(#posts >= 12).toBe(true) -- 6 under the dock, 6 under the chaya
+        expect(#posts >= 12).toBe(true) -- 12 under the dock, 6 under the chaya
         for _, p in posts do
             expect(p.properties.Shape).toBe("Cylinder")
         end
@@ -119,8 +119,11 @@ describe("Chaya — the counter splits the floor", function()
     test("the keeper's slot is a place a person fits, and nothing is standing in it", function()
         local slot = find(m, "ChayaKeeperSlot")
         local s = slot.properties.Size
+        -- Across is the measurement that matters: an avatar is about two studs wide and one
+        -- deep, and the strip behind a yatai counter is narrow by design (the counter moved
+        -- two studs south at the owner's look, 2026-08-17).
         expect(s[1] >= 3.5).toBe(true)
-        expect(s[3] >= 3.5).toBe(true)
+        expect(s[3] >= 1.6).toBe(true)
         expect(s[2] >= 6.0).toBe(true) -- head height, in studs-as-feet
         expect(slot.properties.Transparency).toBe(1)
         expect(slot.properties.CanCollide).toBe(false)
@@ -288,7 +291,7 @@ describe("Chaya — it stays on the ground it was surveyed against", function()
         -- placed by arithmetic rather than by the survey.
         for _, p in allParts(m) do
             local x0, x1, _, _, z0, z1 = bounds(p)
-            expect(x0 > -56 and x1 < -37).toBe(true)
+            expect(x0 > -56 and x1 < -36).toBe(true)
             expect(z0 > -6 and z1 < 21).toBe(true)
         end
     end)
