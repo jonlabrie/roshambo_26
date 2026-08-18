@@ -34,8 +34,8 @@
 | file | responsibility | change |
 |---|---|---|
 | `server/src/windows.ts` | time windows + qualification thresholds | `QUALIFY.week` 350 → 360 |
-| `server/src/stats.ts` | all stats aggregations | + `winsInWindow`, `winRate` on `PlayerRates`, `bankDepths`, `median`, `depthHistogram`, `qualifiedBoard` |
-| `server/src/routes/statsV1.ts` | REST surface for the room | `/player` gains `winRate` + `nerve`; new `/board` |
+| `server/src/stats.ts` | all stats aggregations | + `winsInWindow`, `winRate` on `PlayerRates`, `bankDepths`, `median`, `depthHistogram`, `rankedField`, `qualifiedBoard`, `playerStanding` |
+| `server/src/routes/statsV1.ts` | REST surface for the room | `/player` gains `winRate`, `nerve`, `standing`; new `/board` |
 | `roblox/src/server/NetworkClient.luau` | the room's REST client | + `getStatsBoard` |
 | `roblox/src/server/main.server.luau` | the 47s stats poll that feeds `StatsData` | + `filterBoard`, two fields |
 | `roblox/src/shared/StatsBoardModel.luau` | pure board composition | + `banzukeSections`, `depthSections`; `fudaSections` gains three rows |
@@ -293,7 +293,8 @@ git commit -m "feat(server): NERVE — the distribution of where players choose 
 
 **Interfaces:**
 - Produces: `qualifiedBoard(w, minThrows, limit): Promise<BoardRow[]>` where
-  `BoardRow = { userId, throws, wins, banked, pointsPerThrow, winRate }`
+  `BoardRow = { userId, throws, wins, banked, pointsPerThrow, winRate }`;
+  `playerStanding(userId, w, minThrows): Promise<{ rank: number, of: number } | null>`
 - Consumes: `PlayerRound`, `BankEvent`
 
 - [ ] **Step 1: Write the failing tests**
@@ -337,6 +338,35 @@ describe('the 番付 — qualified board', () => {
         expect(rows[0].winRate).toBeCloseTo(0.4);
     });
 
+    it('tells a player where they stand, even when the board cannot show them', async () => {
+        // The board is ten rows; the point of standing is the player in eleventh place.
+        const users = [];
+        for (const d of ['a', 'b', 'c']) {
+            const u = await User.create({ deviceId: d });
+            await throws(u, 10, 5);
+            users.push(u);
+        }
+        // c banks most, a next, b nothing -> ranks c, a, b
+        await BankEvent.create({ userId: users[2]._id, amount: 90, streakAtBank: 4, timestamp: at(12) });
+        await BankEvent.create({ userId: users[0]._id, amount: 30, streakAtBank: 2, timestamp: at(12) });
+        expect(await playerStanding(users[2]._id, W, 10)).toEqual({ rank: 1, of: 3 });
+        expect(await playerStanding(users[1]._id, W, 10)).toEqual({ rank: 3, of: 3 });
+    });
+
+    it('has no standing for an unqualified player — null, never a rank of 0', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        await throws(a, 3, 3);
+        expect(await playerStanding(a._id, W, 10)).toBeNull();
+    });
+
+    it('counts only qualified players in the field', async () => {
+        const a = await User.create({ deviceId: 'a' });
+        const b = await User.create({ deviceId: 'b' });
+        await throws(a, 10, 5);
+        await throws(b, 2, 2); // short of the floor
+        expect(await playerStanding(a._id, W, 10)).toEqual({ rank: 1, of: 1 });
+    });
+
     it('honours the limit', async () => {
         for (const d of ['a', 'b', 'c']) {
             const u = await User.create({ deviceId: d });
@@ -372,7 +402,7 @@ export interface BoardRow {
 // earns 37.5/throw where a blind player riding to 7 earns 2.1, a gap win rate renders as 43%
 // against 33% -- and the read column is what tells a reader whether someone is up there on
 // skill or on nerve. Blending them into one score would destroy exactly that.
-export async function qualifiedBoard(w: Window, minThrows: number, limit: number): Promise<BoardRow[]> {
+async function rankedField(w: Window, minThrows: number): Promise<BoardRow[]> {
     const counts = await PlayerRound.aggregate([
         { $match: { timestamp: { $gte: w.from, $lt: w.to } } },
         {
@@ -407,8 +437,25 @@ export async function qualifiedBoard(w: Window, minThrows: number, limit: number
                 winRate: c.wins / c.throws,
             };
         })
-        .sort((a, b) => b.pointsPerThrow - a.pointsPerThrow || b.winRate - a.winRate)
-        .slice(0, limit);
+        .sort((a, b) => b.pointsPerThrow - a.pointsPerThrow || b.winRate - a.winRate);
+}
+
+export async function qualifiedBoard(w: Window, minThrows: number, limit: number): Promise<BoardRow[]> {
+    return (await rankedField(w, minThrows)).slice(0, limit);
+}
+
+// WHERE ONE PLAYER STANDS, which is not answerable from the board: the board is ten rows and the
+// player who most wants to know is the one in eleventh. Null rather than a rank of 0 for an
+// unqualified player -- a 0 would sort and render as a position, and "you are 0th" is worse than
+// no answer. `of` counts the qualified field only, so it matches what the ranking means.
+export async function playerStanding(
+    userId: Types.ObjectId,
+    w: Window,
+    minThrows: number
+): Promise<{ rank: number; of: number } | null> {
+    const field = await rankedField(w, minThrows);
+    const i = field.findIndex(r => String(r.userId) === String(userId));
+    return i === -1 ? null : { rank: i + 1, of: field.length };
 }
 ```
 
@@ -524,11 +571,12 @@ who is qualified — after `rates`:
 
 ```ts
             const nerve = median(await bankDepths(w, user._id));
+            const standing = await playerStanding(user._id, w, QUALIFY.week);
             // ... then in the response body, replace `week: rates` with:
-            week: { ...rates, winRate: worldIsCrowd() ? rates.winRate : null, nerve },
+            week: { ...rates, winRate: worldIsCrowd() ? rates.winRate : null, nerve, standing },
 ```
 
-Add the imports (`qualifiedBoard`, `bankDepths`, `median`, `depthHistogram`, `nameUsers`).
+Add the imports (`qualifiedBoard`, `playerStanding`, `bankDepths`, `median`, `depthHistogram`, `nameUsers`).
 
 - [ ] **Step 4: Run the tests and watch them pass**
 
@@ -708,6 +756,20 @@ describe("banzukeSections", function()
     end)
 end)
 
+describe("fudaSections standing", function()
+    test("shows where you stand among the qualified", function()
+        local p = { displayName = "AYAKA", career = {}, week = { throws = 400, minThrows = 360, qualified = true, standing = { rank = 14, of = 22 } } }
+        local all = table.concat(StatsBoardModel.compose(StatsBoardModel.fudaSections(p), { rows = 10, cols = 16 }), "\n")
+        expect(string.find(all, "14 OF 22", 1, true) ~= nil).toBe(true)
+    end)
+
+    test("a player short of the floor gets a dash, not a rank of zero", function()
+        local p = { displayName = "AYAKA", career = {}, week = { throws = 142, minThrows = 360, qualified = false } }
+        local all = table.concat(StatsBoardModel.compose(StatsBoardModel.fudaSections(p), { rows = 10, cols = 16 }), "\n")
+        expect(string.find(all, " 0 OF ", 1, true) == nil).toBe(true)
+    end)
+end)
+
 describe("depthSections", function()
     test("renders a bar per depth, scaled to the largest bucket", function()
         local lines = StatsBoardModel.compose(StatsBoardModel.depthSections({ 4, 8, 2, 0, 0, 0, 0, 0 }), { rows = 6, cols = 13 })
@@ -802,9 +864,15 @@ Extend `fudaSections` with three rows after `THROWS`, using the same `Entry` sha
                     then string.format("%.1f", p.week.pointsPerThrow) else "-" },
                 { name = "YOU BANK AT", figure = if p.week and p.week.nerve
                     then StatsBoardModel.figure(p.week.nerve) else "-" },
+                -- WHERE YOU STAND, and the whole reason it is on the slip rather than the wall:
+                -- the banzuke is ten rows, so most of the room never sees its own name there.
+                -- "14 OF 22" and not "14/22" -- a slash reads as the progress fraction two rows
+                -- up ("142/360") and would be taken for one.
+                { name = "RANK", figure = if p.week and p.week.standing
+                    then `{p.week.standing.rank} OF {p.week.standing.of}` else "-" },
 ```
 
-Update `StatsFixtures.PERSONAL.week` to `minThrows = 360` and add `winRate = 0.41, pointsPerThrow = 2.41, nerve = 3`; add `StatsFixtures.STATS.board` and `.depths` matching Task 4's shape.
+Update `StatsFixtures.PERSONAL.week` to `minThrows = 360` and add `winRate = 0.41, pointsPerThrow = 2.41, nerve = 3, standing = { rank = 14, of = 22 }`; add `StatsFixtures.STATS.board` and `.depths` matching Task 4's shape.
 
 - [ ] **Step 4: Run the tests and watch them pass**
 

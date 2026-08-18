@@ -179,7 +179,7 @@ Existing boards (`roblox/src/shared/StatsRoomLayout.luau`) and what changes:
 | `skillFuture` | cavern · west | 6×13 | **shuttered** | **the room's bank-depth histogram** — `streakAtBank` distribution. Needs neither gate: choosing when to bank is real player behaviour even under TEST_MODE. Opens when it ships. |
 | `judgement` | cavern · east | 8×22 | biggest bank, biggest round | unchanged |
 | `world` | cavern · north | 6×22 | heat / form | unchanged |
-| `fuda` | vestibule · west | 16 cols | personal, with `142 / 350` | adds READ · YIELD · NERVE; progress becomes `142 / 360` |
+| `fuda` | vestibule · west | 16 cols | personal, with `142 / 350` | adds READ · YIELD · NERVE · **RANK**; progress becomes `142 / 360` |
 | `summary` | vestibule · east | | last round | unchanged |
 
 ⚠ `skillFuture` is **13 columns wide**, which cannot hold a ranked line (`1. AYAKA   2.4 41%`
@@ -190,6 +190,21 @@ the 番付 takes the 26-column south wall rather than the reserved panel.
 it opens when the histogram ships. **The visible sign that the world became real is elsewhere:
 the READ column appearing on the 番付**, which cannot render until gate 1 opens. That is the
 moment worth staging, and it lands on the board a visitor faces on entry.
+
+### Where you stand (owner, 2026-08-18)
+
+A banzuke in sumo lists **everyone**, top to bottom. Ours is ten rows on a 26-column wall, so at
+fifty players forty never see their own name — and the person who most wants to know where they
+stand is precisely the one in eleventh place.
+
+So the 札 carries `RANK 14 OF 22`: the player's position in the qualified field, and the size of
+that field. It is on the slip rather than the wall because it is the one figure that is different
+for every reader, and a per-viewer display needs no new mechanism — a client-built SurfaceGui is
+already private to that client.
+
+`of` counts the **qualified field only**, so it means the same thing the ranking does. An
+unqualified player has **no rank at all** — null, rendered as a dash, never a 0. "You are 0th" is
+worse than no answer, and the throws row directly above already says what is missing.
 
 ## 8. What is honest to reward (item 6)
 
