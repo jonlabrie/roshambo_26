@@ -354,8 +354,8 @@ that `fuda` vacated ([[stats-room]]).
 The whole-branch review raised these; each was ruled deferred rather than guessed at. Two need
 a number only the owner can supply and are in the plan's gate list instead:
 
-- ~~**⚠ THE WALL BOARDS ARE STILL ON THE 49-CHARACTER DRUM**~~ **BUILT 2026-08-18, awaiting the
-  owner's look.** The clock half closed 2026-08-17 (per-column drums, `RoundDisplayModel.DIGITS`
+- ~~**⚠ THE WALL BOARDS ARE STILL ON THE 49-CHARACTER DRUM**~~ **CLOSED 2026-08-18, owner-gated
+  ("looks fine").** The clock half closed 2026-08-17 (per-column drums, `RoundDisplayModel.DIGITS`
   descending, the colon printed via `statics()`); the walls closed with a different mechanism,
   because the clock's does not transfer. A clock column has a fixed KIND — column 3 is always a
   tens digit — so a drum can be bolted to the position. A wall column has no kind:
@@ -386,9 +386,8 @@ a number only the owner can supply and are in the plan's gate list instead:
   line at a time — the ladder makes a caller plan one cell per call, taking a 10×40 board repaint
   from 10 index builds to 400.
 
-  Still to look at in Studio: two adjacent columns rolling on different drums at once. It already
-  happens between the clock and the tape and reads fine there, but it is what would say the idea
-  was wrong.
+  The risk flagged before the gate — two adjacent columns rolling on different drums at once —
+  was looked at and does not read as a defect.
 
 - ~~**No perf budget was taken**~~ **SUPERSEDED 2026-08-17 by measurement.** The owner walked
   the finished room on the A13: load inside is neither better nor worse than the arena square

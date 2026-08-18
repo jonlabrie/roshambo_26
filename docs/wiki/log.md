@@ -389,3 +389,10 @@ Carried alongside: `FlapScheduler.plan` caches each drum's character array and r
 free when callers planned a line at a time, but the ladder plans one cell per call, taking a
 10×40 repaint from 10 index builds to 400. 1382 Luau tests. Built, not yet gated: the owner has
 not looked at it in Studio. See [[stats-room]].
+
+## [2026-08-18] gate | Drum ladder accepted on the wall boards
+
+Owner looked and passed it ("looks fine"). The pre-gate risk — two adjacent columns rolling on
+different drums at once — does not read as a defect. Item 7's drum thread is closed; the
+remaining item-7 work is the deferred §6.2 pair (the printed 番付 sheet, the avatar plinths).
+See [[stats-room]].

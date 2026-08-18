@@ -151,7 +151,7 @@ digits on it and has never had a `U` to roll past. `RoundDisplayModel.DIGITS` is
 — descending, so counting down is one step forward; blank last, so `0 → blank` at round end and
 `blank → 9` at round start are each one step too.
 
-**The wall boards choose from the TRANSITION** (owner, 2026-08-18), because their columns have no
+**The wall boards choose from the TRANSITION** (owner, 2026-08-18; gated the same day), because their columns have no
 fixed kind: `1. JONNY        1,234` holds a digit in one row, a space in the next and a letter in
 the third, and it all moves when the window changes. `FlapScheduler.drumFor(cur, tgt)` returns the
 smallest drum carrying both characters, over a three-rung ladder:
