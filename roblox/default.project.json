@@ -27,6 +27,8 @@
                 "PreferenceState": { "$className": "RemoteEvent" },
                 "SetBackDoor": { "$className": "RemoteEvent" },
                 "BackDoorState": { "$className": "RemoteEvent" },
+                "SlideShoji": { "$className": "RemoteEvent" },
+                "ShojiState": { "$className": "RemoteEvent" },
                 "RequestPurchase": { "$className": "RemoteEvent" },
                 "EconomyState": { "$className": "RemoteEvent" },
                 "SetDisplay": { "$className": "RemoteEvent" },
