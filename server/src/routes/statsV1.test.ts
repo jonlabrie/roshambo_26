@@ -4,6 +4,7 @@ import request from 'supertest';
 import { connectTestDb, clearTestDb, disconnectTestDb } from '../test/db';
 import User from '../models/User';
 import BankEvent from '../models/BankEvent';
+import PlayerRound from '../models/PlayerRound';
 import StreakEvent from '../models/StreakEvent';
 import { reconcilePresence } from '../sessions';
 import { createStatsV1 } from './statsV1';
@@ -232,5 +233,62 @@ describe('mounted through mountRoutes, the function index.ts calls', () => {
         const res = await request(mountedApp).get('/api/v1/stats/records?window=day');
         expect(res.status).toBe(200);
         expect(res.body.window).toBe('day');
+    });
+});
+
+describe('GET /stats/board', () => {
+    const TEST_MODE_WAS = process.env.TEST_MODE;
+    afterEach(() => {
+        if (TEST_MODE_WAS === undefined) delete process.env.TEST_MODE;
+        else process.env.TEST_MODE = TEST_MODE_WAS;
+    });
+
+    const throwsFor = async (u: any, n: number, wins: number) => {
+        for (let i = 0; i < n; i++) {
+            await PlayerRound.create({
+                userId: u._id, roundId: `r${i}`, playerThrow: 'R',
+                playerResult: i < wins ? 'WIN' : 'LOSS',
+                pointsDelta: 0, timestamp: IN_WINDOW,
+            });
+        }
+    };
+
+    it('names users, withholds the read while the world is a test cycle, and carries the floor', async () => {
+        process.env.TEST_MODE = 'true';
+        const a = await User.create({ deviceId: 'a', displayName: 'Ayaka', robloxId: '1' });
+        await throwsFor(a, 10, 10);
+        await BankEvent.create({ userId: a._id, amount: 30, streakAtBank: 3, timestamp: IN_WINDOW });
+        const res = await request(app).get('/api/v1/stats/board?minThrows=10');
+        expect(res.status).toBe(200);
+        expect(res.body.worldIsCrowd).toBe(false);
+        expect(res.body.rows[0].displayName).toBe('Ayaka');
+        expect(res.body.rows[0].pointsPerThrow).toBeCloseTo(3.0);
+        expect(res.body.rows[0].winRate).toBeNull();
+        expect(res.body.minThrows).toBe(360);
+    });
+
+    it('sends the read once the world is the crowd', async () => {
+        process.env.TEST_MODE = 'false';
+        const a = await User.create({ deviceId: 'a', displayName: 'Ayaka', robloxId: '1' });
+        await throwsFor(a, 10, 4);
+        const res = await request(app).get('/api/v1/stats/board?minThrows=10');
+        expect(res.body.worldIsCrowd).toBe(true);
+        expect(res.body.rows[0].winRate).toBeCloseTo(0.4);
+    });
+
+    it('carries the room-wide bank-depth histogram', async () => {
+        process.env.TEST_MODE = 'false';
+        const a = await User.create({ deviceId: 'a', displayName: 'Ayaka', robloxId: '1' });
+        await BankEvent.create({ userId: a._id, amount: 1, streakAtBank: 1, timestamp: IN_WINDOW });
+        await BankEvent.create({ userId: a._id, amount: 9, streakAtBank: 3, timestamp: IN_WINDOW });
+        const res = await request(app).get('/api/v1/stats/board');
+        expect(res.body.depths).toEqual([1, 0, 1, 0, 0, 0, 0, 0]);
+    });
+
+    it('never emits a raw userId', async () => {
+        const a = await User.create({ deviceId: 'a', displayName: 'Ayaka', robloxId: '1' });
+        await throwsFor(a, 10, 4);
+        const res = await request(app).get('/api/v1/stats/board?minThrows=10');
+        expect(JSON.stringify(res.body)).not.toContain(String(a._id));
     });
 });
