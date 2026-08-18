@@ -1578,6 +1578,26 @@ Players.PlayerRemoving:Connect(function(player)
     local activeSlide = shojiSlides[uid]
     if activeSlide ~= nil then
         activeSlide.alive = false
+        -- ...and fold that in-flight hold into the pending persists RIGHT HERE, before flushing
+        -- (2026-08-18 final review). Killing the loop is not the same as saving where it got to:
+        -- the loop only reaches its own scheduleShojiPersist on its NEXT tick, which is after this
+        -- function has returned and nulled playerHouse[uid], so the target it schedules then finds
+        -- no house and is silently discarded. Disconnecting mid-hold therefore always lost the
+        -- write -- live geometry right, database stale. The bay's `ShojiOpen` attribute already
+        -- holds the final travel (the loop stopped writing the instant `alive` went false, and
+        -- flushShojiForUid reads it synchronously below), so this target is complete as it stands.
+        -- The loop's own later scheduleShojiPersist for the same screen is then a no-op: the flush
+        -- has already cleared this key's generation, and by then there is no house to write to.
+        local key = shojiSlideKey(uid, activeSlide.padId, activeSlide.side, activeSlide.index)
+        shojiPersistGen[key] = (shojiPersistGen[key] or 0) + 1
+        shojiPendingPersist[key] = {
+            uid = uid,
+            padId = activeSlide.padId,
+            side = activeSlide.side,
+            index = activeSlide.index,
+            count = activeSlide.count,
+            bay = activeSlide.bay,
+        }
     end
     playerPrefs[uid] = nil
     -- drop this uid's not-yet-run mutations FIRST -- flushShojiForUid below queues at most one
