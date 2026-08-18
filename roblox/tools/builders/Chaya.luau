@@ -144,18 +144,19 @@ local CHAYA_POSTS = {
 Chaya.CHAYA_POSTS = CHAYA_POSTS
 
 -- ===== the fittings =====
--- TWO STUDS SOUTH of where it was first built (owner, 2026-08-17). It buys the customers'
--- side the room a bench and two cushions actually need, and it costs the keeper's side --
--- which is correct for a stand: the working strip behind a yatai counter is narrow, and the
--- gear that will not fit in it hangs off the rear posts instead.
-local COUNTER_Z = 13.5
+-- ONE STUD SOUTH of where it was first built. It went two at the owner's first look and
+-- came back one at the second (2026-08-17): "I had you move the counter too far south -- no
+-- room for an NPC back there." At 12.5 the customers' side keeps the room the bench needs
+-- and the keeper's strip is 2.8 clear between the counter's back face and the rear posts,
+-- which is a place a character can stand rather than a slot they are wedged into.
+local COUNTER_Z = 12.5
 local COUNTER_D = 1.8
 local COUNTER_TOP = Chaya.FLOOR + 3.0 -- sized to a keeper standing behind it, per 花火屋
 local SLOT_Z0 = COUNTER_Z + COUNTER_D / 2 -- the slot starts at the counter's own back face
--- The clear strip between the counter's back face and the rear posts. Shoulder room is the
--- measurement that matters for somewhere to STAND -- an avatar is about a stud deep and two
--- wide -- so the slot keeps its 4 studs across and takes the depth that is left.
-local SLOT_D = 1.9
+-- The clear strip between the counter's back face and the rear posts, less a hair so the
+-- slot never touches a post. Four studs across is shoulder room; the depth is whatever the
+-- counter leaves, and at 2.8 a keeper can turn around in it.
+local SLOT_D = 2.8
 local SLOT_H = 6.0
 local RAIL_Y = Chaya.FLOOR + 4.2 -- the noren rail: head height across the front
 
@@ -325,7 +326,7 @@ function Chaya.build(palette: any, _layout: any): any
     part("Brazier", {
         Shape = "Cylinder",
         Size = { 1.0, 1.4, 1.4 },
-        CFrame = Spec.cframe({ -49.4, Chaya.FLOOR + 0.5, 14.9 }, Spec.ROT.CYL_VERTICAL),
+        CFrame = Spec.cframe({ -49.4, Chaya.FLOOR + 0.5, 14.2 }, Spec.ROT.CYL_VERTICAL),
         Material = "Metal",
         MaterialVariant = "IronDark",
         Color = palette.ironDark,
@@ -333,14 +334,14 @@ function Chaya.build(palette: any, _layout: any): any
     part("BrazierCoals", {
         Shape = "Cylinder",
         Size = { 0.12, 1.05, 1.05 },
-        CFrame = Spec.cframe({ -49.4, Chaya.FLOOR + 0.92, 14.9 }, Spec.ROT.CYL_VERTICAL),
+        CFrame = Spec.cframe({ -49.4, Chaya.FLOOR + 0.92, 14.2 }, Spec.ROT.CYL_VERTICAL),
         Material = "Neon",
         Color = { 0.85, 0.42, 0.18 },
     })
     part("Kettle", {
         Shape = "Ball",
         Size = { 0.95, 0.95, 0.95 },
-        CFrame = Spec.cframe({ -49.4, Chaya.FLOOR + 1.45, 14.9 }),
+        CFrame = Spec.cframe({ -49.4, Chaya.FLOOR + 1.45, 14.2 }),
         Material = "Metal",
         MaterialVariant = "IronDark",
         Color = { 0.30, 0.29, 0.28 },
@@ -348,7 +349,7 @@ function Chaya.build(palette: any, _layout: any): any
     part("KettleSpout", {
         Shape = "Cylinder",
         Size = { 0.55, 0.22, 0.22 },
-        CFrame = Spec.cframe({ -48.9, Chaya.FLOOR + 1.55, 14.9 }),
+        CFrame = Spec.cframe({ -48.9, Chaya.FLOOR + 1.55, 14.2 }),
         Material = "Metal",
         MaterialVariant = "IronDark",
         Color = { 0.30, 0.29, 0.28 },
@@ -375,19 +376,22 @@ function Chaya.build(palette: any, _layout: any): any
         part(`CupStack_{i}`, {
             Shape = "Cylinder",
             Size = { 0.5, 0.5, 0.5 },
-            CFrame = Spec.cframe({ cx, COUNTER_TOP + 0.25, 14.1 }, Spec.ROT.CYL_VERTICAL),
+            CFrame = Spec.cframe({ cx, COUNTER_TOP + 0.25, 13.0 }, Spec.ROT.CYL_VERTICAL),
             Material = "Slate",
             Color = { 0.82, 0.80, 0.74 },
         })
     end
 
     -- ----- the customers' side: a bench and two cushions, facing the water -----
-    beam("Bench", { 5.0, 0.3, 1.3 }, { -47.0, Chaya.FLOOR + 1.35, 8.8 }, board)
+    -- PULLED IN TO THE COUNTER (owner, 2026-08-17). It sat mid-floor with a bay of empty
+    -- boards behind it; at 10.4 its back is half a stud off the counter's front face, which
+    -- is where you sit to be served and leaves the north edge clear for standing at the rail.
+    beam("Bench", { 5.0, 0.3, 1.3 }, { -47.0, Chaya.FLOOR + 1.35, 10.4 }, board)
     for i, lx in { -49.2, -44.8 } do
         part(`BenchLeg_{i}`, {
             Shape = "Cylinder",
             Size = { 1.2, 0.3, 0.3 },
-            CFrame = Spec.cframe({ lx, Chaya.FLOOR + 0.6, 8.8 }, Spec.ROT.CYL_VERTICAL),
+            CFrame = Spec.cframe({ lx, Chaya.FLOOR + 0.6, 10.4 }, Spec.ROT.CYL_VERTICAL),
             Material = "Wood",
             Color = timber,
         })
@@ -395,7 +399,7 @@ function Chaya.build(palette: any, _layout: any): any
     for i, cx in { -50.6, -43.0 } do
         part(`Cushion_{i}`, {
             Size = { 1.5, 0.18, 1.5 },
-            CFrame = Spec.cframe({ cx, Chaya.FLOOR + 0.09, 9.6 }),
+            CFrame = Spec.cframe({ cx, Chaya.FLOOR + 0.09, 8.6 }),
             Material = "Fabric",
             Color = indigo,
         })
