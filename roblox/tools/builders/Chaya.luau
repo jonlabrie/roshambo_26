@@ -78,6 +78,12 @@ local EAVE_Y = 121.2
 local RIDGE_Y = 124.0
 local ROOF_OVERHANG_X = 0.7
 local THATCH_T = 0.7
+local RAFTER_EXTRA = 0.6 -- how far a rafter runs past the thatch it carries: the tail
+local RAFTER_T = 0.22
+-- How far a rafter's centre sits below the thatch's. Named because the lantern hangs off a
+-- rafter TAIL and has to find it: derived from the plane's centre without this, the hang
+-- point lands half a stud high, up on the thatch line where there is no timber at all.
+local RAFTER_DROP = THATCH_T / 2 + RAFTER_T / 2
 local HALF_RUN = Chaya.RIDGE_Z - ROOF_Z0
 local RISE = RIDGE_Y - EAVE_Y
 local SLOPE = RISE / HALF_RUN
@@ -111,6 +117,17 @@ local DOCK_POSTS = {
 }
 
 Chaya.MIN_POST = MIN_POST
+-- THE LANTERN IS RED (owner, 2026-08-17): "Yes, I know red means alcohol and we're serving
+-- tea, but red is punchy." That overrides the row's own 2026-08-15 rule excluding true red
+-- as izakaya signalling — the owner's call, and recorded as one.
+--
+-- IT DOES NOT OVERRIDE THE LEGIBILITY FLOOR, which is not a colour nicety: every chōchin in
+-- the canyon carries the World Throw glyph on an untinted plate in front of the paper, and
+-- PaperLanternDayNight dims the whole lantern toward night. Below Chochin.LEGIBILITY_FLOOR
+-- (0.55 relative luminance) the glyph loses its ground and the lantern stops doing its job.
+-- This is the reddest paper that clears it: full red, green at half, luminance 0.584. A
+-- deeper crimson would measure ~0.32 and swallow the glyph after dark.
+Chaya.LANTERN_PAPER = { 255, 124, 84 }
 -- Exported so the tests can hold each emitted post against the ground it was probed on,
 -- rather than against a second copy of these numbers.
 Chaya.DOCK_POSTS = DOCK_POSTS
@@ -404,7 +421,7 @@ function Chaya.build(palette: any, _layout: any): any
         for i = 1, 5 do
             local rx = X0 + (X1 - X0) * (i - 1) / 4
             part(`Rafter{plane[1]}_{i}`, {
-                Size = { 0.22, 0.22, SLOPE_LEN + 0.6 },
+                Size = { RAFTER_T, RAFTER_T, SLOPE_LEN + RAFTER_EXTRA },
                 CFrame = Spec.cframe({ rx, (EAVE_Y + RIDGE_Y) / 2 - THATCH_T / 2 - 0.11, zc }, rot),
                 Material = "Wood",
                 Color = timber,
@@ -517,13 +534,18 @@ function Chaya.build(palette: any, _layout: any): any
             Color = { 0.68, 0.60, 0.44 },
         })
     end
-    -- ONE lantern, on the canonical recipe (Chochin.build) rather than a redrawn lookalike.
-    -- Its paper takes a straw tint in keeping with the thatch; the tint clears
-    -- Chochin.LEGIBILITY_FLOOR, which it must — every chōchin in the canyon carries the
-    -- World Throw glyph, and a dark barrel would swallow it at night.
+    -- ONE lantern, on the canonical recipe (Chochin.build) rather than a redrawn lookalike,
+    -- HUNG OFF A RAFTER TAIL (owner, 2026-08-17) — the easternmost one, which is the corner
+    -- you walk in at from the sand. The hang point is DERIVED from the rafter's own geometry
+    -- rather than eyeballed: the tail is the low end of the north plane, so it is the plane's
+    -- centre walked back along the slope by half a rafter. Re-pitch the roof and the lantern
+    -- follows it down.
     -- Chochin.build prefixes the name itself ("Chaya" -> ChochinChaya), the same way the
     -- row's own lanterns read ChochinWest / ChochinEast in the place.
-    table.insert(children, Chochin.build("Chaya", -42.2, 6.2, EAVE_Y - 0.6, { 214, 186, 140 }))
+    local half = (SLOPE_LEN + RAFTER_EXTRA) / 2
+    local tailY = (EAVE_Y + RIDGE_Y) / 2 - RAFTER_DROP - half * math.sin(PITCH)
+    local tailZ = (ROOF_Z0 + Chaya.RIDGE_Z) / 2 - half * math.cos(PITCH)
+    table.insert(children, Chochin.build("Chaya", X1, tailZ, tailY - 0.12, Chaya.LANTERN_PAPER))
 
     return Spec.model("Chaya", children)
 end

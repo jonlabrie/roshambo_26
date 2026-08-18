@@ -391,6 +391,42 @@ describe("Chaya — rougher, and open to the air", function()
         expect(Chaya.ROOF_Z0 < cz0 - 1.5).toBe(true)
     end)
 
+    test("the chōchin is red, and as red as the glyph will allow", function()
+        -- Owner's ruling, 2026-08-17, overriding the row's no-true-red rule. What it cannot
+        -- override is the legibility floor: the paper sits behind an untinted plate carrying
+        -- the World Throw, so a barrel darker than 0.55 relative luminance swallows the glyph
+        -- at night. This pins the tint on the right side of that line, since the Chochin
+        -- guard only walks MachiyaShops and would never see this one.
+        local Chochin = require("../tools/builders/Chochin")
+        local rgb = Chaya.LANTERN_PAPER
+        expect(rgb[1] > rgb[2] and rgb[2] > rgb[3]).toBe(true) -- it is a red, not a cream
+        local lum = Chochin.luminance({ rgb[1] / 255, rgb[2] / 255, rgb[3] / 255 })
+        expect(lum >= Chochin.LEGIBILITY_FLOOR).toBe(true)
+    end)
+
+    test("and it hangs off a rafter tail, not off thin air", function()
+        local hook = find(m, "Hook")
+        expect(hook ~= nil).toBe(true)
+        local hx, _, _, hy1, hz0, hz1 = bounds(hook)
+        local hz = (hz0 + hz1) / 2
+        local near = false
+        for _, r in findPrefix(m, "RafterNorth") do
+            local cf = r.properties.CFrame
+            local half = r.properties.Size[3] / 2
+            -- the tail is the plane's LOW end: walk both ends and take the lower
+            local ay, az = cf[2] + cf[9] * half, cf[3] + cf[12] * half
+            local by, bz = cf[2] - cf[9] * half, cf[3] - cf[12] * half
+            local ty, tz = ay, az
+            if by < ay then
+                ty, tz = by, bz
+            end
+            if math.abs(hx - cf[1]) < 0.5 and math.abs(hz - tz) < 0.5 and math.abs(hy1 - ty) < 0.5 then
+                near = true
+            end
+        end
+        expect(near).toBe(true)
+    end)
+
     test("a half-noren hangs at the front, and one chōchin", function()
         expect(#findPrefix(m, "Noren") == 3).toBe(true)
         for _, n in findPrefix(m, "Noren") do
