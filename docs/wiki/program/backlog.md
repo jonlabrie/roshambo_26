@@ -85,6 +85,50 @@ on a known root, and emit a WARNING for an unresolvable partial. Adding `server/
 Not urgent — the check is a floor, not a net, and [[wiki-currency]] says so. Recorded so the
 limitation is known rather than assumed away.
 
+## A records display — points earned across every window
+
+Owner, 2026-08-18, after the south-wall inversion: *"we'll need a records display, e.g. lifetime
+points earned, points earned in a month, week, day, hour, consecutive rounds played (sounds
+dangerous, but...)"*. Not scheduled; captured with what it would cost.
+
+**Most of it is nearly free.** `heatBoard(w, limit, userIds?)` already ranks players by points
+earned in an arbitrary `Window`, and `earningsInWindow` already computes one player's. Lifetime is
+`User.lifetimeBanked`, monotonic and already on `LEADERBOARD_FIELDS`. So hour / day / week are a
+window argument and a board, not new machinery — which is exactly what centralising the window
+vocabulary in `server/src/windows.ts` was for.
+
+Two gaps: **there is no month helper** (`calendarMonthUTC` alongside the day and week ones, or a
+rolling 30), and **earnings must come from `BankEvent`, never from summing `PlayerRound.pointsDelta`
+— that column records the new POT on a win, so a naive sum overstates badly ([[core-loop]]).
+
+**⚠ CONSECUTIVE ROUNDS PLAYED IS THE ONE THAT ISN'T FREE, AND THE OWNER'S OWN "sounds dangerous"
+IS THE RIGHT INSTINCT.** Two separate problems:
+
+1. **It is not tracked and would need new capture.** `roundsPresent` counts rounds inside session
+   intervals and `throws` counts PlayerRound rows; neither is a *run*. A consecutive counter has to
+   be incremented and reset at settlement, like `currentStreak` but keyed on participation rather
+   than winning.
+2. **It contradicts a stated design principle of the program.** [[friends-family-baseline]]'s bar
+   reads: *"Roshambo is an ambient game (~1 throw/min, rounds skippable, no penalty) — hangout is
+   the product."* A consecutive-rounds record makes leaving cost something. That is precisely the
+   mechanic that converts an ambient game into a compulsive one, and this is a kid-first
+   experience.
+
+   Note the game already has a "do not stop" pressure that is about SKILL — the pot, which punishes
+   riding too long and rewards reading the room. Consecutive-rounds-played adds a second one that
+   is purely about TIME. The first is the game; the second is a treadmill.
+
+   If it is wanted anyway, the safer shape is a **one-off milestone badge** ("played 50 rounds
+   without a break") rather than a leaderboard to defend — earn-once cannot be lost, so it never
+   punishes leaving. A ranked board would.
+
+**Where it goes is an open problem: the room has no free wall.** After the inversion the cavern
+holds `pots`/`runs`/`banzuke` (south), `skill` + `skillFuture` (west), `judgement` (east), `world`
+(north), plus the round display; the vestibule holds `fuda` and `summary`. A records display must
+displace something or the room needs more surface. `judgement` (east, 8×22) is the closest fit by
+subject — it already carries biggest bank and biggest round — but 8 rows will not hold five windows
+plus its existing two sections.
+
 ## Tournament windows — player- and group-created competitions
 
 Owner, 2026-08-18, while settling the measurement basis: *"I think timed 'tournament windows'
