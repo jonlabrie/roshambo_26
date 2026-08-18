@@ -128,12 +128,16 @@ end
 -- three-bay stack drifted ~4 studs off. The fix is to convert the LOCAL run axis to a world
 -- direction via the structure's own placed pivot (CFrame:VectorToWorldSpace), every call, rather
 -- than assuming world axes ever line up with the wall.
-local SHOJI_RUN_AXIS_LOCAL: { [string]: Vector3 } = {
-    front = Vector3.new(1, 0, 0),
-    back = Vector3.new(1, 0, 0),
-    left = Vector3.new(0, 0, 1),
-    right = Vector3.new(0, 0, 1),
-}
+--
+-- The axis-per-side rule itself lives in ShojiRun.runAxis (2026-08-18 review fix) -- the shared,
+-- Lune-tested module -- not a local copy here: ShojiController.client.luau needs the identical
+-- rule and a hand-copy on each side of the wire is exactly the kind of drift that pushed a screen
+-- off its own wall plane in the first place. This wraps its plain {x,y,z} in a Vector3 at the
+-- Roblox boundary.
+local function runAxisVector(side: string): Vector3?
+    local axis = ShojiRun.runAxis(side)
+    return if axis then Vector3.new(axis.x, axis.y, axis.z) else nil
+end
 
 -- Slide each side's shoji screens to the travel recorded in `shojiOpen` (a per-side list of
 -- bay-widths; see ShojiRun). A SIDE'S RUN IS ONLY THE BAYS THAT CARRY A `Shoji` VARIANT, in
@@ -188,7 +192,7 @@ function StructureOps.applyShoji(model: Model, shojiOpen: { [string]: any }?)
         table.sort(list, function(a, b)
             return a.index < b.index
         end)
-        local localAxis = SHOJI_RUN_AXIS_LOCAL[side]
+        local localAxis = runAxisVector(side)
         if not localAxis then
             warn(`[StructureOps] applyShoji: unrecognised side '{side}'`)
         else
@@ -232,7 +236,7 @@ end
 -- bay's target has moved, and a whole-side reconcile would have to know every other bay's target
 -- too, which nothing here has reason to reach for.
 function StructureOps.syncShojiBay(model: Model, side: string, bay: Model)
-    local localAxis = SHOJI_RUN_AXIS_LOCAL[side]
+    local localAxis = runAxisVector(side)
     if not localAxis then
         warn(`[StructureOps] syncShojiBay: unrecognised side '{side}'`)
         return

@@ -56,6 +56,28 @@ function ShojiRun.directionFrom(index: number, count: number, open: number): num
     return if index < count then 1 else -1
 end
 
+export type Vec = { x: number, y: number, z: number }
+
+-- Which axis of the STRUCTURE's own LOCAL frame a side's shoji screens slide along: front/back
+-- bays step along local X, left/right along local Z. Plain {x,y,z}, not a Vector3 -- a Roblox
+-- global absent under Lune, same reason LaunchSites.Vec is a plain table -- so callers convert at
+-- the Roblox boundary (Vector3.new(axis.x, axis.y, axis.z)). This is the ONE place this rule
+-- lives: StructureOps.luau (server) and ShojiController.client.luau both read it here rather than
+-- keeping their own copy, because a drift between them would push a screen off its own wall
+-- plane on one side of the wire but not the other.
+local RUN_AXIS_LOCAL: { [string]: Vec } = {
+    front = { x = 1, y = 0, z = 0 },
+    back = { x = 1, y = 0, z = 0 },
+    left = { x = 0, y = 0, z = 1 },
+    right = { x = 0, y = 0, z = 1 },
+}
+
+-- nil for an unrecognised side -- callers already have their own posture for that (a warn-and-
+-- skip on the server, a silent skip on the client, same as an ordinary Shoji-less bay).
+function ShojiRun.runAxis(side: string): Vec?
+    return RUN_AXIS_LOCAL[side]
+end
+
 -- A stored side map (a list of travels, one per bay) resolved against the run actually built.
 -- Extra entries are dropped and missing ones read as closed, so a house that changed size does
 -- not hang a screen off the end of a shorter wall. `stored` itself may be junk -- a stray boolean

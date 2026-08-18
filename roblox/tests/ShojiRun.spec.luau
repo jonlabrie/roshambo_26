@@ -113,6 +113,22 @@ describe("ShojiRun.displacement — travel in bay-widths becomes studs", functio
     end)
 end)
 
+describe("ShojiRun.runAxis — the one place the per-side run direction lives", function()
+    test("front and back run along local X", function()
+        expect(ShojiRun.runAxis("front")).toEqual({ x = 1, y = 0, z = 0 })
+        expect(ShojiRun.runAxis("back")).toEqual({ x = 1, y = 0, z = 0 })
+    end)
+
+    test("left and right run along local Z", function()
+        expect(ShojiRun.runAxis("left")).toEqual({ x = 0, y = 0, z = 1 })
+        expect(ShojiRun.runAxis("right")).toEqual({ x = 0, y = 0, z = 1 })
+    end)
+
+    test("an unrecognised side answers nil, not a guess", function()
+        expect(ShojiRun.runAxis("up")).toBe(nil)
+    end)
+end)
+
 describe("ShojiRun.resolve — a stored map becomes one number per bay", function()
     test("missing entries are closed", function()
         expect(ShojiRun.resolve(nil, 3)).toEqual({ 0, 0, 0 })

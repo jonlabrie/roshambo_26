@@ -48,18 +48,19 @@ local ShojiRun = require(shared:WaitForChild("ShojiRun"))
 -- server's own tick rate). Linear, not eased: this is a continuous hold, not a one-shot flourish.
 local TWEEN_INFO = TweenInfo.new(0.12, Enum.EasingStyle.Linear)
 
--- Mirrors StructureOps.SHOJI_RUN_AXIS_LOCAL (a server-only module the client cannot require):
--- front/back bays run along the structure's local X, left/right along local Z. Keep these two
--- tables in sync by hand -- a mismatch here would tween a screen off its own wall plane.
-local SHOJI_RUN_AXIS_LOCAL: { [string]: Vector3 } = {
-    front = Vector3.new(1, 0, 0),
-    back = Vector3.new(1, 0, 0),
-    left = Vector3.new(0, 0, 1),
-    right = Vector3.new(0, 0, 1),
-}
+-- ShojiRun.runAxis is the ONE source for "front/back run along local X, left/right along local Z"
+-- (2026-08-18 review fix: this used to be a hand-copy of StructureOps.SHOJI_RUN_AXIS_LOCAL, and a
+-- server-only module the client can't require anyway). It returns a plain {x,y,z} -- Vector3 is a
+-- Roblox global, absent from the Lune runtime that module is tested under -- wrapped into a
+-- Vector3 here, at the Roblox boundary.
+local function runAxisVector(side: string): Vector3?
+    local axis = ShojiRun.runAxis(side)
+    return if axis then Vector3.new(axis.x, axis.y, axis.z) else nil
+end
 local SIDES = { "front", "back", "left", "right" }
 
 type BayEntry = {
+    padId: string,
     side: string,
     ordinal: number,
     bay: Model,
@@ -69,6 +70,7 @@ type BayEntry = {
     worldDir: Vector3,
     value: NumberValue,
     tween: Tween?,
+    holding: boolean, -- this CLIENT currently has an accepted-or-pending hold in flight on it
     valueConn: RBXScriptConnection,
     attrConn: RBXScriptConnection,
 }
@@ -81,6 +83,7 @@ type PadState = {
     structure: Model?,
     structureConn: RBXScriptConnection?,
     bays: { [string]: BayEntry }, -- keyed "<side>_<ordinal>"
+    pendingShojiWatchers: { [Model]: RBXScriptConnection }, -- bays still missing their Shoji child
 }
 
 local pads: { [string]: PadState } = {}
@@ -139,6 +142,15 @@ local function collectRun(structure: Model, side: string): { { rawIndex: number,
 end
 
 local function destroyBayEntry(entry: BayEntry)
+    if entry.holding then
+        -- (2026-08-18 review fix) An active hold on THIS bay from THIS client: destroying the
+        -- prompt does NOT raise PromptButtonHoldEnded the way toggling Enabled does (see the
+        -- ShojiState handler below), so without this the server never hears the hold stopped and
+        -- keeps sliding a screen nothing is rendering anymore, until the player wanders out of
+        -- reach. Fire the release ourselves before tearing anything down.
+        SlideShoji:FireServer({ padId = entry.padId, side = entry.side, index = entry.ordinal, held = false })
+        entry.holding = false
+    end
     if entry.tween then
         entry.tween:Cancel()
     end
@@ -178,7 +190,7 @@ local function createBayEntry(
     if anchor == nil then
         return nil
     end
-    local localAxis = SHOJI_RUN_AXIS_LOCAL[side]
+    local localAxis = runAxisVector(side)
     if not localAxis then
         return nil
     end
@@ -190,15 +202,27 @@ local function createBayEntry(
     -- review note.
     local worldDir = structure:GetPivot():VectorToWorldSpace(localAxis)
     local open = currentOpen(bay)
-    -- Home is derived ONCE, here, from wherever the leaf happens to be right now (a bind mid-hold
-    -- -- a late joiner, a reconnect -- is real) and never re-derived on a later change, which
-    -- would accumulate drift over repeated slides.
-    local homePivot = leaf:GetPivot() + worldDir * (-ShojiRun.displacement(open))
+    -- Home MUST be derived from `ShojiApplied`, not `ShojiOpen` (2026-08-18 review fix, critical).
+    -- `ShojiOpen` is the TARGET, rewritten many times a second by a hold; the leaf's actual pose
+    -- only ever moves at materialize and at hold END, when the server reconciles it and writes
+    -- `ShojiApplied` to match. During somebody ELSE's hold, `ShojiOpen` and the leaf's real pose
+    -- are the same number only when nobody is holding -- a bind mid-hold (a late joiner, a
+    -- reconnect, this side's own rebuild racing a stranger's hold) would read a target of, say,
+    -- 0.9 against a leaf still sitting at 0.1, and cache a home 4.8 studs off. Nothing snaps at
+    -- that instant because the algebra cancels; every render after it is simply wrong for this
+    -- client alone, until the whole structure rebuilds. `ShojiApplied` is read ONCE, here, for
+    -- this derivation and nothing else -- it must NOT be re-read on a later change (the server
+    -- writes it at every hold end; re-deriving home there would shift the screen by its own
+    -- travel). Render below still comes only from `ShojiOpen`.
+    local appliedAttr = bay:GetAttribute("ShojiApplied")
+    local applied = if typeof(appliedAttr) == "number" then appliedAttr else 0
+    local homePivot = leaf:GetPivot() + worldDir * (-ShojiRun.displacement(applied))
 
     local value = Instance.new("NumberValue")
     value.Value = open
 
     local entry = {} :: BayEntry
+    entry.padId = padId
     entry.side = side
     entry.ordinal = ordinal
     entry.bay = bay
@@ -207,6 +231,7 @@ local function createBayEntry(
     entry.worldDir = worldDir
     entry.value = value
     entry.tween = nil
+    entry.holding = false
 
     entry.valueConn = value.Changed:Connect(function(v: number)
         entry.leaf:PivotTo(entry.homePivot + entry.worldDir * ShojiRun.displacement(v))
@@ -226,9 +251,11 @@ local function createBayEntry(
     entry.prompt = prompt
 
     prompt.PromptButtonHoldBegan:Connect(function()
+        entry.holding = true
         SlideShoji:FireServer({ padId = padId, side = side, index = ordinal, held = true })
     end)
     prompt.PromptButtonHoldEnded:Connect(function()
+        entry.holding = false
         SlideShoji:FireServer({ padId = padId, side = side, index = ordinal, held = false })
     end)
 
@@ -264,20 +291,41 @@ local function rebuildSide(padState: PadState, structure: Model, side: string)
     -- above (same as a bay with no shoji variant at all, an entirely ordinary shape). Watch it
     -- once for that child; when it lands, this side's whole run is rebuilt again so the newcomer
     -- gets counted and every following ordinal shifts correctly.
+    --
+    -- Deduped per BAY INSTANCE in `padState.pendingShojiWatchers` (2026-08-18 review fix): without
+    -- this, a wall that rebuilds twice while a bay is still streaming in got a FRESH watcher on
+    -- every rebuildSide call, on top of whichever one from the previous call was still armed and
+    -- waiting on the same bay -- every one of them would fire on arrival, each triggering its own
+    -- full-side rebuild in the same tick. A bay already being watched is skipped outright; there
+    -- is nothing to refresh, since the watcher fires on the CHILD landing, not on anything about
+    -- this rebuild.
     for _, c in structure:GetChildren() do
         if c:IsA("Model") then
             local s = c.Name:match("^Bay_(%a+)_%d+$")
-            if s == side and not c:FindFirstChild("Shoji") then
+            if s == side and not c:FindFirstChild("Shoji") and padState.pendingShojiWatchers[c] == nil then
                 local watched = c
                 local conn: RBXScriptConnection
                 conn = watched.ChildAdded:Connect(function(child)
                     if child.Name == "Shoji" then
+                        padState.pendingShojiWatchers[watched] = nil
                         conn:Disconnect()
                         rebuildSide(padState, structure, side)
                     end
                 end)
+                padState.pendingShojiWatchers[watched] = conn
             end
         end
+    end
+end
+
+-- Drop every late-arrival watcher this pad has armed (structure switch, or its site folder losing
+-- its Structure with no replacement): each one is on a bay belonging to a structure that is now
+-- dead or about to be, so none of them should fire a rebuild for a side that's about to be, or
+-- just was, rebuilt from scratch anyway.
+local function clearPendingWatchers(padState: PadState)
+    for bay, conn in padState.pendingShojiWatchers do
+        conn:Disconnect()
+        padState.pendingShojiWatchers[bay] = nil
     end
 end
 
@@ -297,6 +345,7 @@ local function bindStructure(padState: PadState, structure: Model)
         destroyBayEntry(entry)
     end
     padState.bays = {}
+    clearPendingWatchers(padState)
     padState.structure = structure
     for _, side in SIDES do
         rebuildSide(padState, structure, side)
@@ -306,7 +355,7 @@ local function bindStructure(padState: PadState, structure: Model)
     padState.structureConn = structure.ChildAdded:Connect(function(child)
         if child:IsA("Model") then
             local side = child.Name:match("^Bay_(%a+)_%d+$")
-            if side and SHOJI_RUN_AXIS_LOCAL[side] then
+            if side and ShojiRun.runAxis(side) then
                 rebuildSide(padState, structure, side)
             end
         end
@@ -331,6 +380,7 @@ local function watchFolder(padId: string, folder: Instance)
             structure = nil,
             structureConn = nil,
             bays = {},
+            pendingShojiWatchers = {},
         }
         pads[padId] = padState
     end
@@ -352,6 +402,7 @@ local function watchFolder(padId: string, folder: Instance)
                 destroyBayEntry(entry)
             end
             padState.bays = {}
+            clearPendingWatchers(padState)
             padState.structure = nil
         end
     end)
