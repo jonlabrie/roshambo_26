@@ -24,6 +24,7 @@ WorkspaceConvention.DECLARED_STAGE_CHILDREN = {
     "MachiyaAccessories", -- teahouse-accessories machiya, merchant row (assets/MachiyaAccessories.model.json)
     "MachiyaStats", -- 番付, the Stats two-bay false front west of apparel (assets/MachiyaStats.model.json)
     "Torii", -- myōjin gate on the Overlook deck's west edge (assets/Torii.model.json)
+    "Chaya", -- riverside tea stand + its dock, east of the river square (assets/Chaya.model.json)
     "ArenaSpawn",
 }
 

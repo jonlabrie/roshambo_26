@@ -21,6 +21,7 @@ local Karesansui = require("./builders/Karesansui")
 local Machiya = require("./builders/Machiya")
 local MachiyaShops = require("./builders/MachiyaShops")
 local Torii = require("./builders/Torii")
+local Chaya = require("./builders/Chaya")
 local ArenaLayout = require("./builders/ArenaLayout")
 local ZenDojo = require("../src/shared/themes/ZenDojo")
 
@@ -58,6 +59,7 @@ local OUTPUTS: { [string]: any } = {
     ["MachiyaAccessories"] = Machiya.build(ZenDojo.palette, ArenaLayout, MachiyaShops.accessories),
     ["MachiyaStats"] = Machiya.build(ZenDojo.palette, ArenaLayout, MachiyaShops.stats),
     ["Torii"] = Torii.build(ZenDojo.palette, ArenaLayout),
+    ["Chaya"] = Chaya.build(ZenDojo.palette, ArenaLayout),
 }
 
 if not fs.isDir("assets") then
