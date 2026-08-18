@@ -54,6 +54,13 @@ local BOARD_T, BOARD_W = 2 * IN, 5 * IN -- 2x5 decking, laid flat
 -- daylight between the boards is the whole difference between "laid" and "milled".
 local BOARD_GAP = 1.6 * IN
 local GIRDER_H, GIRDER_W = 0.9, 0.6
+-- POST -> GIRDER -> JOIST -> BOARD, and each tier crosses the one below it. The first cut
+-- of this builder skipped the joists and laid the girders PARALLEL to the boards, which
+-- carried nothing: an 11-stud board spanned frame to frame on faith. The owner called the
+-- engineering suspect on sight (2026-08-17) and was right. Joists run north-south, boards
+-- east-west across them, and no board spans more than JOIST_PITCH between supports.
+local JOIST_W, JOIST_H = 0.3, 0.33
+local JOIST_PITCH = 2.5
 
 -- ROUND POSTS, NOT SQUARE (owner, 2026-08-17). Every post that carries the dock or the
 -- chaya floor is a stood-up cylinder — Roblox's cylinder runs along its local X, so each
@@ -198,6 +205,17 @@ function Chaya.build(palette: any, _layout: any): any
             )
         end
         local innerD = d - 2 * FRAME_T
+
+        -- Joists first: they are what the boards land on. Spaced no wider than JOIST_PITCH
+        -- and stepped evenly across the span, so the two outermost sit hard against the
+        -- frame and the edge boards are carried like every other one.
+        local nJ = math.max(2, math.ceil(w / JOIST_PITCH) + 1)
+        local jy = top - BOARD_T - JOIST_H / 2
+        for i = 1, nJ do
+            local jx = x0 + JOIST_W / 2 + (w - JOIST_W) * (i - 1) / (nJ - 1)
+            beam(`{prefix}Joist_{i}`, { JOIST_W, JOIST_H, innerD }, { jx, jy, cz }, timber)
+        end
+
         local n = math.floor((innerD + BOARD_GAP) / (BOARD_W + BOARD_GAP))
         local pitch = innerD / n
         local first = z0 + FRAME_T + pitch / 2
@@ -213,22 +231,25 @@ function Chaya.build(palette: any, _layout: any): any
 
     -- ----- the dock, out over the river -----
     deck("Dock", X0, DOCK_X1, DOCK_Z0, DOCK_Z1, Chaya.DECK_TOP)
-    local dockSlab = Chaya.DECK_TOP - FRAME_H
+    -- The girders hang under the joists, and the posts stop under the girders — so the load
+    -- path is one straight line from a board to the riverbed rather than three tiers sharing
+    -- a level and meeting nothing.
+    local dockGirderTop = Chaya.DECK_TOP - BOARD_T - JOIST_H
     for i, p in DOCK_POSTS do
-        post(`PostDock_{i}`, p[1], p[2], p[3], dockSlab, POST_D_DOCK)
+        post(`PostDock_{i}`, p[1], p[2], p[3], dockGirderTop - GIRDER_H, POST_D_DOCK)
     end
     for i, z in { DOCK_POSTS[1][2], DOCK_POSTS[5][2], DOCK_POSTS[9][2] } do
         beam(
             `DockGirder_{i}`,
             { DOCK_X1 - X0, GIRDER_H, GIRDER_W },
-            { (X0 + DOCK_X1) / 2, dockSlab - GIRDER_H / 2, z },
+            { (X0 + DOCK_X1) / 2, dockGirderTop - GIRDER_H / 2, z },
             timber
         )
     end
 
     -- ----- the chaya floor, on the beach -----
     deck("Chaya", X0, X1, CHAYA_Z0, CHAYA_Z1, Chaya.FLOOR)
-    local floorSlab = Chaya.FLOOR - FRAME_H
+    local chayaGirderTop = Chaya.FLOOR - BOARD_T - JOIST_H
     -- THE POSTS RUN THROUGH. A pavilion's posts carry the roof as well as the floor, so
     -- these are one stick from the sand to the eave plate rather than stubs under a deck
     -- with a second set standing on it — which is both how it is built and why it reads
@@ -240,7 +261,7 @@ function Chaya.build(palette: any, _layout: any): any
         beam(
             `ChayaGirder_{i}`,
             { X1 - X0, GIRDER_H, GIRDER_W },
-            { (X0 + X1) / 2, floorSlab - GIRDER_H / 2, z },
+            { (X0 + X1) / 2, chayaGirderTop - GIRDER_H / 2, z },
             timber
         )
         -- the eave plate the rafters land on, at the same two post rows
@@ -316,7 +337,14 @@ function Chaya.build(palette: any, _layout: any): any
         Color = { 0.30, 0.29, 0.28 },
     })
 
-    beam("CaddyShelf", { 5.0, 0.25, 0.4 }, { -46.5, Chaya.FLOOR + 4.0, 16.55 }, board)
+    -- Spans post to post. At 5.0 it crossed the middle post and hung off nothing at either
+    -- end, which is the same fault as the blind.
+    beam(
+        "CaddyShelf",
+        { CHAYA_POSTS[3][1] - CHAYA_POSTS[1][1] + 0.7, 0.25, 0.4 },
+        { -46.5, Chaya.FLOOR + 4.0, 16.55 },
+        board
+    )
     for i = 1, 4 do
         part(`Caddy_{i}`, {
             Shape = "Cylinder",
@@ -383,6 +411,58 @@ function Chaya.build(palette: any, _layout: any): any
             })
         end
     end
+    -- THE ROOF FRAME, which the first cut simply did not have: the two thatch planes met at
+    -- a ridge line with nothing along it and nothing under it. A tie beam spans plate to
+    -- plate over each post column, a king post stands on each one, and the ridge purlin runs
+    -- the length of the building on their heads — so the thatch has something to sit on and
+    -- the eye can follow the load down a post into the sand.
+    -- The tie is wider than the king post that stands on it: a post whose foot overhangs
+    -- its own beam is exactly the kind of detail that reads as suspect.
+    local TIE_W, TIE_H = 0.45, 0.4
+    local PURLIN_H = 0.4
+    local tieTop = EAVE_Y + TIE_H
+    local purlinBottom = RIDGE_Y - 0.35 - PURLIN_H
+    for i, p in CHAYA_POSTS do
+        if i <= 3 then -- one per column; the rows share it
+            local zc = (CHAYA_POSTS[1][2] + CHAYA_POSTS[4][2]) / 2
+            local zd = CHAYA_POSTS[4][2] - CHAYA_POSTS[1][2] + 0.7
+            beam(`TieBeam_{i}`, { TIE_W, TIE_H, zd }, { p[1], EAVE_Y + TIE_H / 2, zc }, timber)
+            part(`KingPost_{i}`, {
+                Shape = "Cylinder",
+                Size = { purlinBottom - tieTop, 0.34, 0.34 },
+                CFrame = Spec.cframe(
+                    { p[1], (tieTop + purlinBottom) / 2, Chaya.RIDGE_Z },
+                    Spec.ROT.CYL_VERTICAL
+                ),
+                Material = "Wood",
+                Color = timber,
+            })
+        end
+    end
+    beam(
+        "RidgePurlin",
+        { X1 - X0, PURLIN_H, 0.4 },
+        { cx, purlinBottom + PURLIN_H / 2, Chaya.RIDGE_Z },
+        timber
+    )
+    -- Knee braces at the four corner posts. A pavilion with no walls has nothing else
+    -- resisting a sideways push, and they are the detail that makes an open frame read as
+    -- built rather than assembled.
+    for i, c in { { -51.67, 7.33, 1 }, { -41.33, 7.33, -1 }, { -51.67, 16.67, 1 }, { -41.33, 16.67, -1 } } do
+        local px, pz, dir = c[1], c[2], c[3]
+        local pos, len, rot = Spec.segment(
+            { px + dir * 0.3, EAVE_Y - 1.6, pz },
+            { px + dir * 1.7, EAVE_Y - 0.25, pz }
+        )
+        part(`KneeBrace_{i}`, {
+            Shape = "Cylinder",
+            Size = { len, 0.3, 0.3 },
+            CFrame = Spec.cframe(pos, rot),
+            Material = "Wood",
+            Color = timber,
+        })
+    end
+
     part("RidgeBundle", {
         Shape = "Cylinder",
         Size = { roofW, 0.75, 0.75 },
@@ -411,15 +491,32 @@ function Chaya.build(palette: any, _layout: any): any
             Transparency = 0.1,
         })
     end
-    -- A sudare rolled up under the west eave: the weather side, and the only thing here
-    -- that could ever be let down.
+    -- A sudare rolled up on the west side: the weather side, and the only thing here that
+    -- could ever be let down. IT NEEDS SOMETHING TO HANG FROM — the first cut left 5.4 of
+    -- blind floating in the middle of a 9.3 bay, reaching neither post, and the owner saw it
+    -- from across the room. Now a beam spans the two west posts and the roll is slung under
+    -- it, lashed at each end.
+    local bayZ0, bayZ1 = CHAYA_POSTS[1][2], CHAYA_POSTS[4][2]
+    local bayLen = bayZ1 - bayZ0
+    local blindX = X0 + 0.45
+    local beamY = EAVE_Y - 1.1
+    beam("SudareBeam", { 0.3, 0.3, bayLen }, { blindX, beamY, (bayZ0 + bayZ1) / 2 }, timber)
     part("Sudare", {
         Shape = "Cylinder",
-        Size = { 5.4, 0.5, 0.5 },
-        CFrame = Spec.cframe({ X0 + 0.35, EAVE_Y - 0.55, 11.4 }, Spec.ROT.CYL_ALONG_Z),
+        Size = { bayLen, 0.55, 0.55 },
+        CFrame = Spec.cframe({ blindX, beamY - 0.15 - 0.275, (bayZ0 + bayZ1) / 2 }, Spec.ROT.CYL_ALONG_Z),
         Material = "Fabric",
         Color = { 0.72, 0.63, 0.44 },
     })
+    for i, lz in { bayZ0 + 0.6, bayZ1 - 0.6 } do
+        part(`SudareTie_{i}`, {
+            Size = { 0.12, 0.9, 0.12 },
+            CFrame = Spec.cframe({ blindX, beamY - 0.3, lz }),
+            Material = "Fabric",
+            MaterialVariant = "HempRope",
+            Color = { 0.68, 0.60, 0.44 },
+        })
+    end
     -- ONE lantern, on the canonical recipe (Chochin.build) rather than a redrawn lookalike.
     -- Its paper takes a straw tint in keeping with the thatch; the tint clears
     -- Chochin.LEGIBILITY_FLOOR, which it must — every chōchin in the canyon carries the

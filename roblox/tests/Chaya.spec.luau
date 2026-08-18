@@ -55,7 +55,11 @@ local function bounds(p: any): (number, number, number, number, number, number)
     -- Reading the size straight off would give every post a third-of-a-stud head and a
     -- ten-stud girth, which is the shape of a fallen log.
     if p.properties.Shape == "Cylinder" and cf[5] == -1 then
+        -- CYL_VERTICAL: the long axis (Size.X) aims at world Y
         ex, ey, ez = s[2] / 2, s[1] / 2, s[3] / 2
+    elseif p.properties.Shape == "Cylinder" and cf[6] == 1 then
+        -- CYL_ALONG_Z: the long axis aims at world Z, and the local Z at world X
+        ex, ey, ez = s[3] / 2, s[2] / 2, s[1] / 2
     end
     return cf[1] - ex, cf[1] + ex, cf[2] - ey, cf[2] + ey, cf[3] - ez, cf[3] + ez
 end
@@ -223,6 +227,117 @@ describe("Chaya — the dock it is butted against", function()
         local _, _, _, _, _, dz1 = bounds(dockS)
         local _, _, _, _, cz0, _ = bounds(chayaN)
         expect(math.abs(cz0 - dz1) < 0.001).toBe(true)
+    end)
+end)
+
+describe("Chaya — the engineering holds up", function()
+    -- Owner, 2026-08-17: "your chaya looks great but the engineering is suspect." It was.
+    -- Boards ran the full width of both decks with nothing under them, the girders were
+    -- laid PARALLEL to the boards (so they carried nothing), the roof had no ridge member,
+    -- and the rolled blind hung off nothing at all. These pin the frame that fixed it.
+
+    for _, deck in { "Dock", "Chaya" } do
+        test(`{deck} boards are carried by joists, not spanning on faith`, function()
+            local joists = findPrefix(m, deck .. "Joist")
+            expect(#joists >= 4).toBe(true)
+            local xs = {}
+            for _, j in joists do
+                -- a joist runs ACROSS the boards: long in z, narrow in x
+                local jx0, jx1, _, _, jz0, jz1 = bounds(j)
+                expect(jz1 - jz0 > jx1 - jx0).toBe(true)
+                table.insert(xs, (jx0 + jx1) / 2)
+            end
+            table.sort(xs)
+            for i = 2, #xs do
+                -- no board spans further than this between supports
+                expect(xs[i] - xs[i - 1] <= 3.0).toBe(true)
+            end
+            -- and the outermost joists reach the frame, so the edge boards are carried too
+            local fw = find(m, deck .. "FrameWest")
+            local fe = find(m, deck .. "FrameEast")
+            expect(xs[1] - select(1, bounds(fw)) <= 3.0).toBe(true)
+            expect(select(2, bounds(fe)) - xs[#xs] <= 3.0).toBe(true)
+        end)
+
+        test(`{deck} joists bear on the girders beneath them`, function()
+            local joist = find(m, deck .. "Joist_1")
+            local girder = find(m, deck .. "Girder_1")
+            expect(joist ~= nil and girder ~= nil).toBe(true)
+            local _, _, jy0 = bounds(joist)
+            local _, _, _, gy1 = bounds(girder)
+            expect(math.abs(jy0 - gy1) < 0.01).toBe(true)
+        end)
+    end
+
+    test("the dock's girders stand on the tops of its posts", function()
+        -- The chaya's posts run THROUGH to the eave, so its girders cross them; the dock's
+        -- stop under the deck and must actually carry it.
+        local girder = find(m, "DockGirder_1")
+        local _, _, gy0 = bounds(girder)
+        local carried = 0
+        for _, p in findPrefix(m, "PostDock") do
+            local _, _, _, py1 = bounds(p)
+            if math.abs(py1 - gy0) < 0.01 then
+                carried += 1
+            end
+        end
+        expect(carried >= 4).toBe(true)
+    end)
+
+    test("the roof has a ridge member, and something holds it up", function()
+        local purlin = find(m, "RidgePurlin")
+        expect(purlin ~= nil).toBe(true)
+        local px0, px1, py0 = bounds(purlin)
+        expect(px1 - px0 >= 10).toBe(true) -- it runs the length of the building
+        local kings = findPrefix(m, "KingPost")
+        expect(#kings >= 2).toBe(true)
+        for _, k in kings do
+            local _, _, ky0, ky1 = bounds(k)
+            expect(math.abs(ky1 - py0) < 0.02).toBe(true) -- head under the purlin
+            local seated = false
+            for _, tie in findPrefix(m, "TieBeam") do
+                local tx0, tx1, _, ty1, tz0, tz1 = bounds(tie)
+                local kx0, kx1, _, _, kz0, kz1 = bounds(k)
+                if
+                    math.abs(ky0 - ty1) < 0.02
+                    and kx0 >= tx0 - 0.01
+                    and kx1 <= tx1 + 0.01
+                    and kz0 >= tz0 - 0.01
+                    and kz1 <= tz1 + 0.01
+                then
+                    seated = true
+                end
+            end
+            expect(seated).toBe(true) -- foot on a tie beam, not in the air
+        end
+    end)
+
+    test("the tie beams reach from plate to plate", function()
+        local ties = findPrefix(m, "TieBeam")
+        expect(#ties >= 2).toBe(true)
+        for _, tie in ties do
+            local _, _, _, _, z0, z1 = bounds(tie)
+            expect(z1 - z0 >= 9).toBe(true)
+        end
+    end)
+
+    test("the sudare runs the full bay and hangs from a beam", function()
+        -- It used to float in mid-air by the west end, reaching neither post: 5.4 of blind
+        -- in a 9.3 bay, with nothing above it. The owner spotted it from across the room.
+        local blind = find(m, "Sudare")
+        local hangs = find(m, "SudareBeam")
+        expect(blind ~= nil and hangs ~= nil).toBe(true)
+        local _, _, _, by1, bz0, bz1 = bounds(blind)
+        local _, _, hy0, _, hz0, hz1 = bounds(hangs)
+        expect(bz1 - bz0 >= 9).toBe(true) -- post to post
+        expect(hz1 - hz0 >= 9).toBe(true)
+        expect(hy0 - by1 <= 0.4 and hy0 - by1 >= -0.01).toBe(true) -- slung right under it
+    end)
+
+    test("the rear shelf lands on the rear posts", function()
+        local shelf = find(m, "CaddyShelf")
+        local x0, x1 = bounds(shelf)
+        expect(x0 <= -51.5 and x1 >= -41.3).toBe(true)
     end)
 end)
 
