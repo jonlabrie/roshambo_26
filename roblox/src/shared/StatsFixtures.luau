@@ -88,6 +88,7 @@ StatsFixtures.STATS = {
 
 StatsFixtures.PERSONAL = {
     displayName = "Ayaka",
+    gradeName = "3rd kyu",
     career = { banked = 12480, bestStreak = 11 },
     currentStreak = 3,
     -- QUALIFIED, unlike the first fixture: an unqualified slip renders four dashes and shows

@@ -753,6 +753,9 @@ end
 
 local escalationSwitch = makePrefSwitch("EscalationPrompts", "Escalation prompts", 0)
 local resultSplashSwitch = makePrefSwitch("ResultSplash", "Result splash", 1)
+-- The grade/rank bars over other players' heads. Off is a legitimate taste — it is information
+-- ABOUT OTHER PEOPLE floating in your view, unlike the two above it, which are about you.
+local statusBarsSwitch = makePrefSwitch("StatusBars", "Player status bars", 2)
 
 -- ===== Layout =====
 local feedTabOpen = false
@@ -851,6 +854,7 @@ local live = { pot = 0, streak = 0, points = 0 }
 local bestStreak = 0
 local escalationPrompts = true
 local resultSplash = true
+local statusBars = true
 -- nil until main.client.luau has seen its first drum-rest reveal this session — drives
 -- `lastRoundCard`'s visibility in `render()` (see that card's section, in the LIFETIME card).
 local lastRound: {
@@ -870,6 +874,7 @@ end
 local function paintSwitch()
     paintOne(escalationSwitch, escalationPrompts)
     paintOne(resultSplashSwitch, resultSplash)
+    paintOne(statusBarsSwitch, statusBars)
 end
 
 local function render()
@@ -1014,6 +1019,12 @@ resultSplashSwitch.button.MouseButton1Click:Connect(function()
     EventBus.HudPreference:Fire({ resultSplash = resultSplash })
 end)
 
+statusBarsSwitch.button.MouseButton1Click:Connect(function()
+    statusBars = not statusBars
+    paintSwitch()
+    EventBus.HudPreference:Fire({ statusBars = statusBars })
+end)
+
 EventBus.LedgerState.Event:Connect(function(state)
     if state.counters then
         counters = state.counters
@@ -1024,6 +1035,9 @@ EventBus.LedgerState.Event:Connect(function(state)
     bestStreak = state.bestStreak or bestStreak
     if type(state.escalationPrompts) == "boolean" then
         escalationPrompts = state.escalationPrompts
+    end
+    if type(state.statusBars) == "boolean" then
+        statusBars = state.statusBars
     end
     if type(state.resultSplash) == "boolean" then
         resultSplash = state.resultSplash

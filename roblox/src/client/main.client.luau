@@ -213,6 +213,7 @@ end
 -- Carried by ProfileUpdate. ON until the first one lands, which is the profile's own default.
 local escalationPrompts = true
 local resultSplash = true
+local statusBars = true
 
 -- THE ROUND'S PICK STATE. `chosen` is the player's commitment and `sent` is the wire's, and
 -- they are separate on purpose: the pick is held here until the lockout (HudModel.sendAtLockout)
@@ -571,6 +572,7 @@ local function publishLedger()
         bestStreak = wallet.bestStreak,
         escalationPrompts = escalationPrompts,
         resultSplash = resultSplash,
+        statusBars = statusBars,
         lastRound = lastRound,
     })
 end
@@ -816,6 +818,12 @@ EventBus.HudPreference.Event:Connect(function(body)
         if type(body.escalationPrompts) == "boolean" then
             escalationPrompts = body.escalationPrompts
         end
+        if type(body.statusBars) == "boolean" then
+            statusBars = body.statusBars
+            -- StatusBarController watches this attribute rather than the bus: it is a separate
+            -- LocalScript with no other reason to talk to this file.
+            workspace:SetAttribute("RoshamboStatusBars", statusBars)
+        end
         if type(body.resultSplash) == "boolean" then
             resultSplash = body.resultSplash
         end
@@ -1030,6 +1038,13 @@ ProfileUpdate.OnClientEvent:Connect(function(p)
     end
     if type(p.resultSplash) == "boolean" then
         resultSplash = p.resultSplash
+    end
+    if type(p.statusBars) == "boolean" then
+        statusBars = p.statusBars
+        -- Mirrored to the attribute here as well as on a local toggle: this is the path the
+        -- SERVER's stored preference arrives on, and without it a player who turned the bars off
+        -- last session would see them again on every join.
+        workspace:SetAttribute("RoshamboStatusBars", statusBars)
     end
     if type(p.counters) == "table" then
         counters = p.counters

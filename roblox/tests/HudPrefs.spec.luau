@@ -8,7 +8,7 @@ describe("HudPrefs.merge", function()
         -- the sabotage case: a merge that discards `current` and returns a fresh default table
         -- would pass this by coincidence (both start true), so the DEFAULTS start already
         -- disagrees with what the patch sets.
-        local current = { escalationPrompts = true, resultSplash = true }
+        local current = { escalationPrompts = true, resultSplash = true, statusBars = true }
         local next = HudPrefs.merge(current, { resultSplash = false })
         expect(next.resultSplash).toBe(false)
         expect(next.escalationPrompts).toBe(true)
@@ -16,7 +16,7 @@ describe("HudPrefs.merge", function()
 
     test("a patch naming only escalationPrompts leaves resultSplash untouched", function()
         -- the mirror: neither key may be privileged over the other
-        local current = { escalationPrompts = true, resultSplash = true }
+        local current = { escalationPrompts = true, resultSplash = true, statusBars = true }
         local next = HudPrefs.merge(current, { escalationPrompts = false })
         expect(next.escalationPrompts).toBe(false)
         expect(next.resultSplash).toBe(true)
@@ -30,7 +30,7 @@ describe("HudPrefs.merge", function()
     end)
 
     test("a non-boolean value in the patch is ignored, not coerced", function()
-        local current = { escalationPrompts = true, resultSplash = true }
+        local current = { escalationPrompts = true, resultSplash = true, statusBars = true }
         local next = HudPrefs.merge(current, { resultSplash = "false" :: any })
         expect(next.resultSplash).toBe(true)
     end)
@@ -42,7 +42,7 @@ describe("HudPrefs.merge", function()
     end)
 
     test("does not mutate current — a caller holding the old table must not see it change", function()
-        local current = { escalationPrompts = true, resultSplash = true }
+        local current = { escalationPrompts = true, resultSplash = true, statusBars = true }
         local next = HudPrefs.merge(current, { resultSplash = false })
         expect(current.resultSplash).toBe(true)
         expect(next == current).toBe(false)
@@ -67,5 +67,21 @@ describe("HudPrefs.DEFAULTS", function()
     test("both keys are true", function()
         expect(HudPrefs.DEFAULTS.escalationPrompts).toBe(true)
         expect(HudPrefs.DEFAULTS.resultSplash).toBe(true)
+    end)
+    test("a patch naming only statusBars leaves the other two untouched", function()
+        -- One remote carries every preference, so a body naming one must never reset the others.
+        local current = { escalationPrompts = false, resultSplash = true, statusBars = true }
+        local next = HudPrefs.merge(current, { statusBars = false })
+        expect(next.statusBars).toBe(false)
+        expect(next.escalationPrompts).toBe(false)
+        expect(next.resultSplash).toBe(true)
+    end)
+
+    test("statusBars defaults ON, and an absent field on the wire reads as ON", function()
+        -- No migration was run, so a row written before this field existed must show the feature
+        -- rather than silently hide it.
+        expect(HudPrefs.DEFAULTS.statusBars).toBe(true)
+        expect(HudPrefs.fromProfile({}).statusBars).toBe(true)
+        expect(HudPrefs.fromProfile({ statusBars = false }).statusBars).toBe(false)
     end)
 end)

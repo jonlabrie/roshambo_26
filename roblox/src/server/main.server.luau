@@ -333,6 +333,7 @@ local function fireProfile(player: Player, source: string)
             unresolvedWin = row.unresolvedWin,
             escalationPrompts = prefsFor(tostring(player.UserId)).escalationPrompts,
             resultSplash = prefsFor(tostring(player.UserId)).resultSplash,
+            statusBars = prefsFor(tostring(player.UserId)).statusBars,
             counters = ledgerCounters[tostring(player.UserId)],
             -- NOT `or {}`. This fires from the reveal ("local") and reconciliation ("reconciled")
             -- paths too, which run whether or not the join fetch ever succeeded — so substituting
@@ -632,6 +633,9 @@ SetHudPreference.OnServerEvent:Connect(function(player, body)
     if type(body.resultSplash) == "boolean" then
         payload.resultSplash = body.resultSplash
     end
+    if type(body.statusBars) == "boolean" then
+        payload.statusBars = body.statusBars
+    end
     if type(body.seenBeat) == "string" then
         payload.seenBeat = body.seenBeat
     end
@@ -658,7 +662,7 @@ SetHudPreference.OnServerEvent:Connect(function(player, body)
         -- the database does not hold.
         local prevPref = hudPrefs[uid]
         local prevBeats = hudSeenBeats[uid]
-        if payload.escalationPrompts ~= nil or payload.resultSplash ~= nil then
+        if payload.escalationPrompts ~= nil or payload.resultSplash ~= nil or payload.statusBars ~= nil then
             -- MERGED onto the current row via the shared rule (see HudPrefs.luau), never inline
             -- and never replacing it: one remote carries every preference and a body naming only
             -- one of them must not silently reset another to its default.
@@ -867,11 +871,31 @@ task.spawn(function()
 end)
 
 -- The personal slip. Per-player, so it is pushed per-player: on join, and on the same 60s beat.
+--
+-- ⚠ IT ALSO FEEDS THE ROSTER, AT NO EXTRA COST. The status bars over a player's head need that
+-- player's GRADE and RANK, and this response already carries both — so harvesting them here means
+-- the bars refresh on a beat that already exists rather than adding a per-player request per
+-- round. Rank moves as OTHER people play, so it genuinely needs refreshing; grade only ever
+-- increases and only for its owner, which is why a join-time snapshot was enough for it alone.
 local function pushStatsPersonal(player: Player)
     local res = net:getStatsPlayer(tostring(player.UserId))
     -- A 404 is the NORMAL state for someone who has never thrown. Send the empty shape rather
     -- than nothing, so the slip renders its zeros instead of hanging on "no data".
     StatsPersonal:FireClient(player, if res.ok then res.data else { displayName = player.DisplayName })
+    if res.ok then
+        local d = res.data
+        local standing = d.week and d.week.standing
+        local entry = familiarRoster[tostring(player.UserId)] or {}
+        entry.grade = d.grade or entry.grade
+        entry.gradeName = d.gradeName or entry.gradeName
+        entry.band = d.band or entry.band
+        -- ABSENT, not zero, when unqualified: the bar's absence is itself information — this
+        -- player has not put in the 360 throws to be measured at all.
+        entry.rank = standing and standing.rank or nil
+        entry.of = standing and standing.of or nil
+        familiarRoster[tostring(player.UserId)] = entry
+        pushFamiliarRoster()
+    end
 end
 
 Players.PlayerAdded:Connect(function(player)

@@ -31,6 +31,7 @@ export function buildProfilePayload(user: IUser) {
         unresolvedWin: user.unresolvedWin ?? false,
         escalationPrompts: user.escalationPrompts ?? true,
         resultSplash: user.resultSplash ?? true,
+        statusBars: user.statusBars ?? true,
         seenBeats: user.seenBeats ?? [],
         counters: {
             roundsPlayed: user.roundsPlayed ?? 0,
@@ -220,6 +221,9 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             const set: Record<string, unknown> = {};
             if (typeof req.body?.escalationPrompts === 'boolean') {
                 set.escalationPrompts = req.body.escalationPrompts;
+            }
+            if (typeof req.body?.statusBars === 'boolean') {
+                set.statusBars = req.body.statusBars;
             }
             if (typeof req.body?.resultSplash === 'boolean') {
                 set.resultSplash = req.body.resultSplash;

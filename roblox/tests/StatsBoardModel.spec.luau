@@ -563,6 +563,22 @@ describe("banzukeSections", function()
     end)
 end)
 
+describe("fudaSections grade", function()
+    local O = { rows = 8, cols = 18 }
+    test("the grade rides the name line, without costing a row", function()
+        local p = { displayName = "AYAKA", career = {}, gradeName = "3rd kyu", week = {} }
+        local lines = M.compose(M.fudaSections(p), O)
+        expect(string.find(lines[1], "AYAKA", 1, true) ~= nil).toBe(true)
+        expect(string.find(lines[1], "3RD KYU", 1, true) ~= nil).toBe(true)
+    end)
+
+    test("an unranked player gets no grade on the line rather than the word unranked", function()
+        local p = { displayName = "AYAKA", career = {}, gradeName = "unranked", week = {} }
+        local lines = M.compose(M.fudaSections(p), O)
+        expect(string.find(lines[1], "UNRANKED", 1, true) == nil).toBe(true)
+    end)
+end)
+
 describe("fudaSections standing", function()
     local O = { rows = 10, cols = 16 }
     test("shows where you stand among the qualified", function()

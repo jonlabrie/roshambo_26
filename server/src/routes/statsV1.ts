@@ -4,6 +4,7 @@ import User from '../models/User';
 import { longestStreaks, biggestBanks, biggestRounds, heatBoard, playerRates, nameUsers, qualifiedBoard, playerStanding, bankDepths, median, depthHistogram, livePots, liveStreaks } from '../stats';
 import { presentIn } from '../sessions';
 import { rollingWindow, calendarDayUTC, calendarWeekUTC, HOUR_MS, DAY_MS, WEEK_MS, QUALIFY, Window } from '../windows';
+import { gradeFor } from '../engine/Milestones';
 
 const LIMIT = 10;
 
@@ -182,7 +183,7 @@ export function createStatsV1(): Router {
     router.get('/player/:robloxUserId', async (req, res) => {
         try {
             const w = rollingWindow(new Date(), WEEK_MS);
-            const user = await User.findOne({ robloxId: String(req.params.robloxUserId) }).select('_id displayName currentStreak bestStreak lifetimeBanked');
+            const user = await User.findOne({ robloxId: String(req.params.robloxUserId) }).select('_id displayName currentStreak bestStreak lifetimeBanked milestones');
             if (!user) {
                 res.status(404).json({ error: 'NOT_FOUND' });
                 return;
@@ -193,8 +194,16 @@ export function createStatsV1(): Router {
                 playerStanding(user._id, w, QUALIFY.week),
             ]);
             res.set('Cache-Control', 'private, max-age=15');
+            // THE GRADE RIDES THE PERSONAL SLIP, and this is the only place a player can read it.
+            // Milestones are earned silently at settlement; without this the whole progression is
+            // invisible to the person who earned it and the bird's plumage band is five colours
+            // with no key.
+            const grade = gradeFor((user.milestones || []).length);
             res.json({
                 displayName: user.displayName || 'Anonymous',
+                grade: grade.index,
+                gradeName: grade.name,
+                milestones: (user.milestones || []).length,
                 career: {
                     banked: user.lifetimeBanked ?? 0,
                     bestStreak: user.bestStreak ?? 0,

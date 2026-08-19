@@ -336,8 +336,27 @@ EventBus.Cue.Event:Connect(function(cue)
     end
 end)
 
+-- ===== THE ONE TIME PROGRESSION INTERRUPTS YOU =====
+-- Milestones are earned silently at settlement and grades change silently with them, so without
+-- this the whole ladder is invisible to the person climbing it — the only outward sign is a bird
+-- whose colour band nobody has been told the meaning of.
+--
+-- ⚠ IT ANNOUNCES A GRADE, NOT A MILESTONE. Grading up happens perhaps once a session and is worth
+-- a line; earning `pot.81` happens constantly and would be noise. The slip carries the standing.
+--
+-- ⚠ AND IT ONLY EVER FIRES ON AN INCREASE. `nil -> unranked` on the first push of a session is not
+-- an achievement, and a payload that arrives out of order must not congratulate someone twice.
+local lastGrade: number? = nil
+
 StatsPersonal.OnClientEvent:Connect(function(data)
     latestPersonal = data
+    local grade = tonumber(data and data.grade)
+    if grade and lastGrade and grade > lastGrade then
+        EventBus.Toast:Fire(string.upper(tostring(data.gradeName or "")))
+    end
+    if grade then
+        lastGrade = grade
+    end
     repaintAll()
 end)
 

@@ -29,6 +29,7 @@ export interface IUser extends Document {
     // Show the big centred result splash (spec: docs/superpowers/specs/2026-08-03-play-hud-round-two-
     // design.md §2) after a round settles. Default ON, a second preference beside escalationPrompts.
     resultSplash: boolean;
+    statusBars: boolean;
     seenBeats: string[];
     roundsPlayed: number;
     wins: number;
@@ -83,6 +84,7 @@ const UserSchema: Schema = new Schema({
     escalationPrompts: { type: Boolean, default: true },
     confirmThrows: { type: Boolean, default: true },
     resultSplash: { type: Boolean, default: true },
+    statusBars: { type: Boolean, default: true },
     seenBeats: { type: [String], default: [] },
     roundsPlayed: { type: Number, default: 0 },
     wins: { type: Number, default: 0 },

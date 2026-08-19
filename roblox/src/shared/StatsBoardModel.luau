@@ -531,6 +531,12 @@ function StatsBoardModel.fudaSections(player: any?): { Section }
     return {
         {
             title = StatsBoardModel.sanitize(p.displayName),
+            -- THE GRADE RIDES THE NAME LINE (2026-08-18), not a row of its own. The slip composes
+            -- exactly eight lines onto an eight-row board, and a name with a rank beside it is
+            -- what a banzuke entry looks like anyway. `titleRight` yields the TITLE when the two
+            -- do not fit, which is the right way round: a truncated name still reads, a missing
+            -- grade is simply absent.
+            titleRight = if p.gradeName and p.gradeName ~= "unranked" then string.upper(p.gradeName) else nil,
             -- FIX 2: this is one person's own rows, not a leaderboard of one — no rank prefix.
             numbered = false,
             entries = {

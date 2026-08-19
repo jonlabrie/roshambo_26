@@ -317,3 +317,23 @@ describe('GET /stats/board — what is riding right now', () => {
         expect(JSON.stringify(res.body)).not.toContain(String(a._id));
     });
 });
+
+describe('GET /stats/player — the grade', () => {
+    it('carries the grade, which is the only place a player can read it', async () => {
+        await User.create({
+            robloxId: '55', identityTier: 'roblox', displayName: 'Ayaka',
+            milestones: ['first.win', 'first.bank', 'pot.9'],
+        });
+        const res = await request(app).get('/api/v1/stats/player/55');
+        expect(res.status).toBe(200);
+        expect(res.body.grade).toBe(3);
+        expect(res.body.gradeName).toBe('8th kyu');
+        expect(res.body.milestones).toBe(3);
+    });
+
+    it('an unranked player says so rather than showing a blank', async () => {
+        await User.create({ robloxId: '56', identityTier: 'roblox', displayName: 'New' });
+        const res = await request(app).get('/api/v1/stats/player/56');
+        expect(res.body.gradeName).toBe('unranked');
+    });
+});
