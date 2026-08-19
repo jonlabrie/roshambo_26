@@ -59,6 +59,7 @@ local ThemeManifest = require(shared:WaitForChild("ThemeManifest"))
 local ZenDojo = require(shared:WaitForChild("themes"):WaitForChild("ZenDojo"))
 local FateRegistry = require(shared:WaitForChild("FateRegistry"))
 local HudPrefs = require(shared:WaitForChild("HudPrefs"))
+local Kamon = require(shared:WaitForChild("Kamon"))
 local PreferenceEditor = require(shared:WaitForChild("PreferenceEditor"))
 local BackDoorEditor = require(shared:WaitForChild("BackDoorEditor"))
 local WallBays = require(shared:WaitForChild("WallBays"))
@@ -1335,6 +1336,7 @@ local function rebuildClaimedPad(uid: string)
         kind = "structure",
         loadout = teaLoadout,
         lit = true,
+        crest = Kamon.forUserId(uid),
         portalOwned = e.portalOwned,
         deckDecorations = e.deckDecorations,
     }
@@ -2211,6 +2213,7 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
                         kind = "structure",
                         loadout = teaLoadout,
                         lit = true,
+                        crest = Kamon.forUserId(uid),
                         portalOwned = e.portalOwned,
                         deckDecorations = e.deckDecorations,
                     }
@@ -2288,6 +2291,7 @@ SetDisplay.OnServerEvent:Connect(function(player, payload)
                     kind = "structure",
                     loadout = teaLoadout,
                     lit = true,
+                    crest = Kamon.forUserId(uid),
                     portalOwned = e.portalOwned,
                     deckDecorations = e.deckDecorations,
                 }
@@ -2410,6 +2414,7 @@ SetPlacement.OnServerEvent:Connect(function(player, payload)
             kind = "structure",
             loadout = fresh,
             lit = true,
+            crest = Kamon.forUserId(uid),
             portalOwned = e.portalOwned,
             deckDecorations = e.deckDecorations,
         }

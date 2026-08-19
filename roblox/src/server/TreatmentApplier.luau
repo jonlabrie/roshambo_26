@@ -171,6 +171,120 @@ function TreatmentApplier:_buildDecorations(
     end
 end
 
+-- ===== THE NOBORI — the owner's flag, and their crest on it =====
+-- Item 6's stated flex: a banner-pole flag at the teahouse. A nobori is the right form — a tall
+-- narrow banner reads from across the canyon where a doorway noren does not.
+--
+-- ⚠ BUILT PER OWNER, NOT AUTHORED INTO THE PREFAB. The teahouse prefabs are shared by everyone,
+-- and a crest is not: a flag in the prefab would fly one house's mon over every house. The crest
+-- arrives on the TREATMENT, computed at the call site, so this file stays the thin adapter it
+-- says it is and needs no Kamon dependency of its own.
+--
+-- ⚠ ONLY ON A LIT DECK. A vacant pad flying somebody's crest would say a house is home when it is
+-- not, and the shoji glow already carries occupancy — this must agree with it.
+local FLAG_INK = Color3.fromRGB(28, 26, 24)
+local FLAG_CLOTH = Color3.fromRGB(228, 220, 202)
+
+-- Draws a crest from Kamon's three primitives — ring, disc, bar — into a SurfaceGui. Kept local:
+-- one caller today, and the catalog's whole point is that these three cover every crest, so this
+-- stays short. Extract it when a second surface (noren, alcove scroll) wants one.
+local function drawCrest(gui: SurfaceGui, crest: any, cellPx: number)
+    for _, sh in crest.shapes or {} do
+        local f = Instance.new("Frame")
+        f.BorderSizePixel = 0
+        f.AnchorPoint = Vector2.new(0.5, 0.5)
+        f.Position = UDim2.fromOffset(cellPx / 2 + (sh.x or 0) * cellPx, cellPx / 2 + (sh.y or 0) * cellPx)
+        if sh.kind == "bar" then
+            f.Size = UDim2.fromOffset(math.max(1, sh.w * cellPx), math.max(1, sh.h * cellPx))
+            f.BackgroundColor3 = FLAG_INK
+            f.Rotation = sh.rot or 0
+        else
+            local d = math.max(2, sh.r * 2 * cellPx)
+            f.Size = UDim2.fromOffset(d, d)
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0.5, 0)
+            corner.Parent = f
+            if sh.kind == "disc" then
+                f.BackgroundColor3 = FLAG_INK
+            else
+                f.BackgroundTransparency = 1
+                local stroke = Instance.new("UIStroke")
+                stroke.Thickness = math.max(1, sh.t * cellPx)
+                stroke.Color = FLAG_INK
+                stroke.Parent = f
+            end
+        end
+        f.Parent = gui
+    end
+end
+
+function TreatmentApplier:_buildNobori(
+    padId: string,
+    deckCF12: { number },
+    deckSize: string,
+    teaDx: number,
+    crest: any,
+    staging: Instance
+)
+    local deckCF = CFrame.new(table.unpack(deckCF12))
+    local fp = self._sizeClasses.deckFootprint(deckSize)
+    -- FRONT corner, on the side the teahouse is NOT on — the same auto-swap the portal control
+    -- uses, mirrored to the front so the flag meets you on the approach rather than hiding behind
+    -- the building. Deck-local: -Z is the front/view edge.
+    local onLeft = teaDx > 0
+    local x = if onLeft then fp.minX + 1.2 else fp.maxX - 1.2
+    local z = fp.minZ + 1.2
+
+    local model = Instance.new("Model")
+    model.Name = "Nobori"
+
+    local POLE_H = 9
+    local pole = Instance.new("Part")
+    pole.Name = "Pole"
+    pole.Shape = Enum.PartType.Cylinder
+    pole.Size = Vector3.new(POLE_H, 0.18, 0.18)
+    pole.Anchored = true
+    pole.CanCollide = false
+    pole.CastShadow = false
+    pole.Color = Color3.fromRGB(96, 78, 56)
+    pole.Material = Enum.Material.Wood
+    pole.CFrame = deckCF * CFrame.new(x, POLE_H / 2, z) * CFrame.Angles(0, 0, math.rad(90))
+    pole.Parent = model
+
+    -- The cloth hangs from near the top, to ONE side of the pole, which is what makes a nobori a
+    -- nobori rather than a flag on a flagpole.
+    local CLOTH_W, CLOTH_H = 1.7, 5.4
+    local side = if onLeft then 1 else -1
+    local cloth = Instance.new("Part")
+    cloth.Name = "Cloth"
+    cloth.Size = Vector3.new(CLOTH_W, CLOTH_H, 0.06)
+    cloth.Anchored = true
+    cloth.CanCollide = false
+    cloth.CastShadow = false
+    cloth.Color = FLAG_CLOTH
+    cloth.Material = Enum.Material.Fabric
+    cloth.CFrame = deckCF * CFrame.new(x + side * (CLOTH_W / 2 + 0.12), POLE_H - CLOTH_H / 2 - 0.5, z)
+    cloth.Parent = model
+
+    if crest and crest.shapes then
+        local PPS = 96
+        local gui = Instance.new("SurfaceGui")
+        gui.Name = "Crest"
+        gui.Face = Enum.NormalId.Front
+        gui.SizingMode = Enum.SurfaceGuiSizingMode.PixelsPerStud
+        gui.PixelsPerStud = PPS
+        gui.AlwaysOnTop = false
+        gui.Parent = cloth
+        -- 1.2 studs, matching the throw glyph already on these lanterns (GlyphPlateA is 1.20 on
+        -- its narrow axis). That size is the benchmark: it was tuned until it read.
+        drawCrest(gui, crest, math.floor(1.2 * PPS))
+    end
+
+    model:SetAttribute("padId", padId)
+    model:SetAttribute("crestId", crest and crest.id)
+    model.Parent = staging
+end
+
 -- The home-portal deck control: a small tagged fixture on the deck railing (placeholder art).
 -- Built only for an owner's lit deck that has the portal; PortalController wires its prompt.
 function TreatmentApplier:_buildPortalControl(
@@ -273,6 +387,23 @@ function TreatmentApplier:apply(padId: string, spec: any, treatment: any, deckSi
         end)
         if not okDecor then
             warn(`[DECOR] decoration step failed for {padId}: {decorErr}; deck without props`)
+        end
+    end
+    -- THE FLAG. Only for a lit deck: a vacant pad flying somebody's crest would say a house is
+    -- home when it is not, and the shoji glow already carries occupancy — the two must agree.
+    -- Fault-isolated like every other optional fixture: a bad crest must never blank the deck.
+    if treatment.lit == true and treatment.crest ~= nil then
+        local teaDxFlag = (
+            teahouse
+            and teahouse.placement
+            and teahouse.placement.offset
+            and teahouse.placement.offset[1]
+        ) or 0
+        local okFlag, flagErr = pcall(function()
+            self:_buildNobori(padId, deckCF12, deckSize, teaDxFlag, treatment.crest, staging)
+        end)
+        if not okFlag then
+            warn(`[NOBORI] flag build failed for {padId}: {flagErr}`)
         end
     end
     if treatment.portalOwned == true and treatment.lit == true then
