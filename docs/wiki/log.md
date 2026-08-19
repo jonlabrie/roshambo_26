@@ -453,3 +453,25 @@ winner earning 2.5× the median on luck alone. Either the ranked column changes 
 Recorded on [[friends-family-baseline]] as the first thing to pick up.
 
 The board is now items **6 (rewards & flex)** and **8 (world finish/hygiene)**.
+
+## [2026-08-18] ship | Familiars — the bird that reads your round
+
+Item 6's mobile half, built end to end: milestones and a 15-grade ladder on the server, a bird per
+player with four states, and 326 perches across the canyon. Not a new design — the metagame spec
+approved 2026-07-04 specified familiars as *"the mobile status display complementing the teahouse's
+static one"*, with these exact reactions and plumage from milestone banks. Its one blocker, a dusk
+cycle, had already shipped. Four things were re-derived in conversation before anyone read it,
+which is why [[familiars]] opens by saying so.
+
+Also fixed on the way: round results had no legible visual at all (a loss showed nothing, a safe
+drew a disc the owner read as a cloud), the result splash sat over the avatar and the bird, the
+chōchin had come untethered from their crosspoles, and every Roblox player was named "Anonymous"
+on every board because nothing on that path ever wrote a display name.
+
+Three rulings worth carrying forward, all owner's: grade counts MILESTONES not rates or time (an
+event needs no sample and cannot be lost by logging off); SAFE gets no behaviour at all; and birds
+rest on the world, not on your head — *"it'll look like a bad cartoon where everyone just got
+knocked on the head."*
+
+Item 6 stays OPEN: the static half (nobori, crest, scrolls) is unbuilt and the spec is explicit
+that it cannot close without it.

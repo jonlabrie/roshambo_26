@@ -35,10 +35,14 @@ rounds skippable, no penalty) — hangout is the product.
    the same day — channel geometry ("sills on L teahouse look fine", place saved) and
    the play loop ("looks good"). The swappable loadout slot was found already wired
    end to end (placeholder art only); see [[teahouses]].
-6. **Rewards & flex** — open: server-side milestone badges from existing per-player stats,
-   awarded at settlement; flex via teahouse banner-pole flag + avatar ribbon/sash;
-   earn-only. Carries the parked economy-API defects (a)–(c) in [[parked-defects]]. Any badge that claims
-   SKILL depends on (h) being ACTIVE, not merely fixed; volume badges do not.
+6. **Rewards & flex** — open, MOBILE HALF BUILT 2026-08-18. Milestones, the 15-grade ladder and
+   the familiar all ship ([[familiars]]); the round-result legibility defect that prompted it is
+   fixed. **Cannot close on this alone**: the static half — nobori, crest on the noren, scrolls in
+   the alcove — is unbuilt, and it is the piece that gives a visitor a reason to enter someone
+   else's teahouse. Also thin: plumage is band colour only, and the progression is invisible to
+   the player who earned it. Carries the parked economy-API defects (a)–(c) in [[parked-defects]].
+   Any badge that claims SKILL depends on (h) being ACTIVE, not merely fixed; volume badges do
+   not — which is exactly why grade is built on milestones rather than on a rate.
 7. **Statistics** — closed 2026-08-18 ("let's close Item 7 for now; we'll revisit in the
    future with clearer thoughts"). The 番付 room is built, measured and saved: READ / YIELD /
    NERVE from rows the server already wrote, qualification at 360 throws over a rolling week,

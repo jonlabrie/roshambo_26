@@ -22,7 +22,13 @@ their thing, and come back.
 
 ## 2. Where perches come from
 
-Two sources, split on a line that matters: **who owns the geometry's lifetime.**
+**⚠ CORRECTED 2026-08-18 BY SURVEY.** This section first described TWO sources split by lifetime.
+The place has **three**, and the third is the one that matters most — see §2c. It also assumed the
+railing part was named `RailCap`; the canyon's 1,250 path railings are named `Rail`, and every
+other railing in the world SUFFIXES (`RailNUpperDeckCap1`, `RailCapN_1`), so matching must be by
+pattern, not by exact name.
+
+Three sources, split on a line that matters: **who owns the geometry's lifetime.**
 
 ### 2a. Named surfaces, swept (hand-built and static geometry)
 
@@ -46,9 +52,12 @@ picked up by running it again.
 
 ### 2b. Per-template authoring (trees)
 
-Trees are already typed and instanced: `ServerStorage.FoliageKit` holds one template per species
-(`ConiferA/B/C`, `MapleRed`, `MapleGold`, `BroadleafMid`, `BlushAccent`) and
-`tools/studio/placeCanopyHeroes.luau` stamps clones into `CanyonWorld.Foliage.Heroes`.
+⚠ **CORRECTED BY SURVEY.** `FoliageKit` holds **78** templates, not the ~7 assumed here, and the
+40 instances under `CanyonWorld.Foliage.Heroes` carry names that do not map cleanly onto them
+(`SugiC`, `DockHero_1`, `Hero_11_PineNiwakiA`). Authoring per template is still the better answer,
+but it is a much larger job than one line implied — so the sweep currently **derives** two perches
+per tree from its bounding box at 62% height. That is a deliberate approximation to let the idea
+be looked at; replace it with authored anchors if birds in trees read well.
 
 **So perches are authored ONCE PER TEMPLATE and every instance inherits them** — a branch fork, an
 outer bough, two or three per species. Seven templates, and it propagates across the whole canyon.
@@ -59,7 +68,7 @@ they will not have them. Re-stamping is `placeCanopyHeroes`'s own `MODE = "place
 would discard any hand-dragging done since. **The tool must therefore also be able to graft
 attachments onto existing clones by species**, which is cheaper and non-destructive.
 
-### 2c. ⚠ THE SPLIT THAT MATTERS: builder-emitted vs swept
+### 2c. ⚠ THE SPLIT THAT MATTERS: THREE LIFETIMES, AND THE SWEEP OWNS ONE
 
 **A perch stamped onto geometry a builder regenerates will vanish the next time it runs.**
 `PadOps.buildRailing` runs whenever a teahouse materialises on a pad, which is every claim, every
@@ -68,10 +77,22 @@ pad.
 
 So the rule is:
 
-- **Geometry a builder owns → the BUILDER emits the perch.** One line in `PadOps.buildRailing`
-  alongside the `RailCap` it already creates. Regeneration then carries perches with it for free.
-- **Hand-built and static geometry → the sweep.** Canyon path railings, the shōrō, the machiya
-  row, the chaya, the Overlook.
+1. **ROJO-OWNED → the builder emits it into the model.json.** Every roof, plus the Overlook and
+   SwitchbackDeck: `Hanabiya`, `MachiyaApparel/Accessories/Stats`, `Chaya`, `Overlook`,
+   `SwitchbackDeck` are all `RoshamboStage` children built from `assets/*.model.json`. An
+   attachment stamped on one in Studio is destroyed by the next sync. `Spec.perch(kind, offset)`
+   emits it; `lune run tools/genmodels` regenerates; the committed JSON is drift-checked in CI.
+   **This is strictly better than sweeping** — it lives in git and regenerates with the prop.
+2. **RUNTIME-BUILDER-OWNED → the builder emits it too.** `PadOps.buildRailing` builds the teahouse
+   **engawa railing** and runs on every pad claim, so a swept perch there survives until the next
+   player claims that pad. Two per railed edge; the back edge is left open by `PadBuilder` and has
+   no rail.
+3. **PLACE-ONLY → the sweep.** Canyon path railings, the two hand-built landings, both bridges,
+   and the hero trees. Nothing regenerates these.
+
+⚠ **Rojo ownership does NOT preclude perches** — it precludes *sweeping* them. That distinction
+was muddled when this spec was first written and cost a round trip. `Chochin.luau` has emitted a
+`Tags` property through `genmodels` for months; tagging from a builder was already solved.
 
 Getting this backwards produces the worst kind of bug: it works when tested and silently degrades
 in normal play.
