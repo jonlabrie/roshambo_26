@@ -1,12 +1,12 @@
 ---
 shelf: practice
-updated: 2026-08-15
+updated: 2026-08-19
 ---
 
 # Blender Pipeline
 
-The asset pipelines that feed Roblox from outside the engine: Blender→FBX import, the
-in-engine procedural river technique, and the SDF glyph rasteriser. Tools live in
+The asset pipelines that feed Roblox from outside the engine: Blender→FBX import (static
+and SKINNED), the in-engine procedural river technique, and the SDF glyph rasteriser. Tools live in
 `roblox/tools/blender/`, `roblox/tools/textures/`, and `roblox/tools/glyphs/`.
 
 ## Blender → Roblox FBX
@@ -98,6 +98,72 @@ set (all parts share ONE material so a single Image Texture node is the bake tar
 the WHOLE object, THEN cut it into parts** — voxel remesh needs enclosed volume;
 splitting open shells first makes the remesh return almost no geometry (a 1293-poly
 roof became 42). Cut the watertight solid with `bpy.ops.mesh.bisect(..., use_fill=True)`.
+
+## Skinned meshes — a rig Roblox will drive
+
+Verified end to end 2026-08-19. Everything below is measured, not reasoned.
+
+**Why this matters more than it looks: bones are ordinary runtime instances.** A skinned
+`MeshPart`'s `Bone` children have a writable `Transform`, so **all motion stays in Luau** —
+no Animation assets, no Animation Editor, no upload round-trip per timing tweak, and the
+work stays testable under Lune. Authored clips are the opposite trade, and they fight a
+procedural layer that has to aim at a *specific* perch. Model the pose that is seen most;
+let code produce the rest.
+
+**Studio's 3D Importer accepts a custom, non-R15 armature.** Measured on a vendor bird: 17
+Maya joints in → **16 `Bone` instances out**, hierarchy preserved, parented under the
+MeshPart, `MeshPart.HasSkinnedMesh == true`. (The missing one carried no weights and was
+dropped deliberately — see the flags.) This was the open question that gated the whole
+approach; it is closed.
+
+**Export flags, beyond the §1 unit fix (which still applies):**
+
+```python
+bpy.ops.export_scene.fbx(filepath=fbx, use_selection=False,
+    apply_unit_scale=True, global_scale=0.01, apply_scale_options='FBX_SCALE_NONE',
+    object_types={'MESH', 'ARMATURE'},
+    use_mesh_modifiers=False,       # keep the armature modifier LIVE — do NOT bake it
+    add_leaf_bones=False,           # Roblox does not want them
+    use_armature_deform_only=True,  # drops bones carrying no weight
+    bake_anim=False,
+    mesh_smooth_type='FACE', path_mode='COPY', embed_textures=False,
+    axis_forward='-Z', axis_up='Y')
+```
+
+⚠ **`use_mesh_modifiers=True` silently destroys the rig.** It applies the armature modifier
+and writes a static mesh; the import then *succeeds* and simply has no bones.
+
+**Verify with a bone-drive test, never by looking.** Read a leaf bone's
+`TransformedWorldCFrame`, set an ancestor's `Transform`, read it again. Measured: rotating
+the neck bone 45° moved the head-tip bone **0.1390 studs** and the tail-tip bone — a
+different branch — **exactly 0.0000**. Non-zero *on* the chain and zero *off* it is what
+proves weights and hierarchy are sound. A screenshot proves neither.
+
+**⚠ Maya-sourced meshes: IGNORE VERTEX COLOURS at import.** The vendor sparrow carries a
+`colorSet0` layer whose values run 0.0–0.15 — a baked lighting/AO pass, not colour. Roblox
+multiplies vertex colours into the surface, so importing it renders the mesh near-black and
+reads for an hour as a broken material.
+
+**Axis conversion from Maya** (+X forward, +Y up, +Z width): Blender's exporter convention
+wants the model facing −Y, so put `rotation_euler = (90°, 0, 270°)` on the **armature**
+object and let the mesh follow as its child. Euler XYZ applies Rz@Ry@Rx, so that composes
+to +X→−Y and +Y→+Z.
+
+**`bpy.ops.export_scene.fbx` fails under the Blender MCP with `use_selection=True`** —
+that context has no `selected_objects`. Load only what you want into an empty scene and
+export with `use_selection=False`, or wrap the call in a `temp_override` carrying a real
+window.
+
+**"Rigged" in a vendor listing means "has a skeleton", not "has motion."** The purchased
+collection contains **zero** actions. That is fine here — we drive bones from code — but do
+not buy a pack expecting animation.
+
+**Vendor source stays out of the repo**, same as the niwaki: it lives in
+`~/Desktop/Roshambo Reference/models/birds/`. Only derived, reduced output is committed.
+The generator that authors our own birds parametrically is
+`roblox/tools/blender/bird_familiar.py` — a species is a dict of proportions, so a new bird
+is a data edit rather than a new sculpt.
+
 
 ## Procedural river (in-engine, no Blender)
 

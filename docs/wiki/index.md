@@ -57,7 +57,7 @@ Chronology: [log.md](log.md).
 - [Image Moderation](practice/image-moderation.md) — the green-palmate-leaf takedown, upload URL/approval mechanics, safe recolour rules
 - [Build Recipes](practice/build-recipes.md) — CONSULT FIRST for canyon paths/decks/walls/railings/lanterns: the recipe doc, builders, ishidan style, cobble technique, terrain PBR
 - [Studio Tooling](practice/studio-tooling.md) — Studio UI locations, Rojo patch-by-name, Studio MCP quirks (return values, camera lock, datamodels)
-- [Blender Pipeline](practice/blender-pipeline.md) — FBX unit/pivot/material traps, the bake recipe, the procedural river technique, the waterfall VFX recipe, the SDF glyph pipeline
+- [Blender Pipeline](practice/blender-pipeline.md) — FBX unit/pivot/material traps, the SKINNED-mesh recipe (bones are drivable from Luau), the bake recipe, the procedural river technique, the waterfall VFX recipe, the SDF glyph pipeline
 - [Misc Engine Traps](practice/misc-engine-traps.md) — SurfaceGui TextSize, flat beams, tunnel boring, genmodels arch portability, teahouse floor-vs-pivot
 
 ## systems — infra pointers

@@ -490,3 +490,31 @@ repointing the frontend are on [[deploy]].
 
 Cost Explorer is not enabled on the account, so these are estimates reasoned from instance sizes
 rather than figures off a bill.
+
+## [2026-08-19] decision | Familiar birds go to bought models, and the skinned-mesh path is verified
+
+The greybox familiar (four parts, procedurally animated) was never going to be a bird. Asked how
+far it could go, the answer was that the mesh is the cheap part and the rig, the unwrap and the
+textures are not — so a $25 TurboSquid pack ("Rigged Low Poly Bird Collection" 1603819, Standard
+License, ~17 birds, 41k faces total) buys more than it costs. Vendor source lives in
+`~/Desktop/Roshambo Reference/models/birds/`, never the repo, same as the niwaki.
+
+**Owner rulings this session**, all on the mesh:
+- The familiar is a **roster, not one bird** — uguisu first, karasu second.
+- **Life size, maybe slightly larger.** The uguisu is 0.583 studs / 7 inches nose to tail.
+  ⚠ This invalidates the tuning in `roblox/src/shared/BirdFlight.luau` — `PERCH_RADIUS`, the
+  orbit radii and the three hold heights were all set against the old ~1.4-stud bird.
+- **The bind pose is FOLDED**, not spread — *"nobody cares what a flying bird's wings look
+  like."* Perched is ~90% of viewing time, so perched is the pose that gets modelled accurately
+  and flight is what the rig approximates. This inverts the usual convention deliberately.
+- Feet are **anisodactyl** (two toes forward, one back); the neck barely pinches; the head sits
+  in the back line rather than proud of it.
+
+**The probe passed.** Studio's importer takes a custom non-R15 armature, and `Bone.Transform` is
+drivable from Luau — which is the finding that matters, because it means motion stays in code
+rather than in uploaded animation assets. Recipe, flags and the bone-drive test on
+[[blender-pipeline]]. Probe artefact parked at `Workspace.Sandbox.sparrow_probe` (place-only).
+
+Next is the retarget: the purchased sparrow's rig and unwrap, our uguisu's proportions. The
+parametric generator `roblox/tools/blender/bird_familiar.py` survives as the SPEC — six passes of
+owner art direction encoded as numbers — rather than as the shipped mesh.
