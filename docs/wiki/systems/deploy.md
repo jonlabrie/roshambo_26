@@ -8,6 +8,34 @@ updated: 2026-08-16
 Where Roshambo code runs and how it gets there. Full topology + step-by-step AWS
 setup: `README_DEPLOY.md`; day-to-day commands: CLAUDE.md "Commands"/"Deployment".
 
+
+## ⚠ PROD IS PAUSED (2026-08-18)
+
+`roshambo_server` (`fiuuwhrqgi`) is **PAUSED**, not deleted. It was `RUNNING` at 1 vCPU / 2 GB —
+four times the dev service — and serving nothing: Amplify's `VITE_SOCKET_URL` points at
+`zzaw22ugpq`, which is dev, so no traffic has reached prod at all.
+
+App Runner bills **provisioned memory 24/7 whether or not anything calls the service**, adding
+vCPU only when requests arrive. So an idle 2 GB instance is a standing monthly charge — larger,
+by several times, than every build a heavy day of pushing produces.
+
+**To bring it back:**
+
+```
+aws apprunner resume-service --region us-east-1 \
+  --service-arn arn:aws:apprunner:us-east-1:198886313292:service/roshambo_server/0c7a58eea5624ebb843b7a4a05dc54d9
+```
+
+The service, its URL and its configuration all survive a pause; only compute stops. Auto-deploy
+was already **off** on prod, so nothing about the push flow changes.
+
+⚠ **Anything that assumed prod was reachable is now wrong.** Nothing does today, but a future
+cutover must resume it BEFORE repointing `VITE_SOCKET_URL`.
+
+⚠ **Cost Explorer is not enabled on this account**, which is why the numbers above are reasoned
+from instance sizes rather than read off a bill. Enabling it takes a day to backfill and would
+replace the estimate with the fact.
+
 ## As built
 
 - **Cloud dev backend is the default.** App Runner service `roshambo_server_dev`

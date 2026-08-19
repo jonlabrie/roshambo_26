@@ -475,3 +475,18 @@ knocked on the head."*
 
 Item 6 stays OPEN: the static half (nobori, crest, scrolls) is unbuilt and the spec is explicit
 that it cannot close without it.
+
+## [2026-08-18] decision | Production App Runner paused — it was idle at 4x the dev size
+
+Asked what a push costs. The builds are pennies (two auto-builds per push: App Runner dev at ~4
+minutes, Amplify main), but the question surfaced something larger: `roshambo_server` was RUNNING
+at 1 vCPU / 2 GB and serving nothing, since Amplify points `VITE_SOCKET_URL` at the DEV service.
+App Runner bills provisioned memory around the clock regardless of traffic, so an idle 2 GB
+instance costs several times more per month than a heavy day of pushing.
+
+Paused, not deleted — URL and configuration survive, `resume-service` brings it back, and prod
+never had auto-deploy on so the push flow is unchanged. Resume command and the caveat about
+repointing the frontend are on [[deploy]].
+
+Cost Explorer is not enabled on the account, so these are estimates reasoned from instance sizes
+rather than figures off a bill.
