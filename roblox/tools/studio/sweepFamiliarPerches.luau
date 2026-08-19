@@ -50,6 +50,9 @@ local PERCHABLE = {
     { pat = "^StairCap", kind = "rail" },
     { pat = "^Rail$", kind = "rail" }, -- the canyon path railings
     { pat = "^HandCable$", kind = "rail" }, -- the suspension bridge's hand line
+    -- The chochin crosspoles line every path in the canyon and are exactly what a bird would
+    -- choose: a thin horizontal arm out over open ground, right next to a light (owner).
+    { pat = "^CrossArm$", kind = "rail" },
 }
 
 -- Ground plants a bird would not land on. Everything else under Foliage.Heroes is a tree.
