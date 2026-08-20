@@ -65,6 +65,62 @@ describe("BirdFlight", function()
         expect(resting > loss + 1.5).toBe(true)
     end)
 
+    test("wing lift NEVER exceeds the measured ceiling", function()
+        -- Measured in Blender: the wing panel's reach saturates at 0.181 studs against a 0.072
+        -- folded half-width, and past ~50 degrees the flank stretches into a cape rather than a
+        -- wing. 30 is where it still reads. Nothing may exceed it, in any state, ever.
+        for _, flying in { true, false } do
+            for t = 0, 40, 0.1 do
+                local a = BirdFlight.wingAngle(t, 7, flying)
+                expect(a >= 0).toBe(true)
+                expect(a <= BirdFlight.WING_MAX_DEG).toBe(true)
+            end
+        end
+    end)
+
+    test("a flying bird beats its wings continuously", function()
+        local high, low = 0, 99
+        for t = 0, 4, 0.02 do
+            local a = BirdFlight.wingAngle(t, 7, true)
+            high = math.max(high, a)
+            low = math.min(low, a)
+        end
+        expect(high > BirdFlight.WING_MAX_DEG * 0.8).toBe(true)
+        expect(low < BirdFlight.WING_MAX_DEG * 0.25).toBe(true)
+    end)
+
+    test("a PERCHED bird is still most of the time, and flutters occasionally", function()
+        -- Owner, 2026-08-19: "even a perched bird flutters its wings occasionally, and certainly
+        -- when arriving or leaving a perch." Occasionally is the operative word -- a bird that
+        -- flutters constantly reads as distressed, not resting.
+        local moving, samples = 0, 0
+        local peak = 0
+        for t = 0, 120, 0.05 do
+            local a = BirdFlight.wingAngle(t, 7, false)
+            samples += 1
+            if a > 1.0 then
+                moving += 1
+            end
+            peak = math.max(peak, a)
+        end
+        local share = moving / samples
+        expect(share > 0.02).toBe(true) -- it does happen
+        expect(share < 0.25).toBe(true) -- but it is not what the bird is doing
+        expect(peak > 6).toBe(true) -- and when it happens you can see it
+    end)
+
+    test("wing lift is deterministic per seed, and seeds differ", function()
+        expect(BirdFlight.wingAngle(3.3, 7, false)).toBe(BirdFlight.wingAngle(3.3, 7, false))
+        local differs = false
+        for t = 0, 60, 0.25 do
+            if BirdFlight.wingAngle(t, 7, false) ~= BirdFlight.wingAngle(t, 8, false) then
+                differs = true
+                break
+            end
+        end
+        expect(differs).toBe(true)
+    end)
+
     test("is deterministic per seed, so two clients draw the same bird", function()
         local a = BirdFlight.offsetFor("RESTING", 3.3, 7)
         local b = BirdFlight.offsetFor("RESTING", 3.3, 7)

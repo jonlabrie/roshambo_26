@@ -86,6 +86,51 @@ function BirdFlight.magnitude(p: Point): number
 end
 
 function BirdFlight.distance(a: Point, b: Point): number
+    -- ⚠ THE WING LIFT CEILING IS 30 DEGREES, AND IT IS A MEASUREMENT, NOT A PREFERENCE.
+    -- The mesh carries a FOLDED wing, and a folded wing is short: there is no hidden wing area in
+    -- there to unfold, so lifting it stretches flank surface rather than opening a wing. Measured in
+    -- Blender, the panel's reach saturates -- 0.072 studs folded, 0.109 at 30 deg, 0.146 at 50,
+    -- 0.171 at 70, 0.181 at 90, and 70->90 buys 0.009. Past ~50 it reads as a cape. A full spread
+    -- would need a SEPARATE spread-wing mesh shown only in flight; see [[familiars]].
+    -- A Blender bone constraint cannot carry this -- constraints do not survive FBX -- so the limit
+    -- lives here, and the test pins it.
+    BirdFlight.WING_MAX_DEG = 30
+
+    local FLAP_RATE = 16.0 -- rad/sec in flight; ~2.5 beats a second
+    local FLUTTER_PERIOD = 9.0 -- average gap between perched flutters
+    local FLUTTER_BURST = 0.7 -- and how long one lasts
+    local FLUTTER_PEAK = 0.55 -- a resting flutter is a twitch, not a display
+
+    -- Deterministic 0..1 hash, so flutters are not metronomic but two clients still agree.
+    local function hash01(n: number): number
+        local h = math.sin(n * 12.9898) * 43758.5453
+        return h - math.floor(h)
+    end
+
+    -- How far the wings are lifted, in DEGREES, as a pure function of time and seed.
+    --
+    -- ⚠ A PERCHED BIRD IS STILL MOST OF THE TIME. Owner, 2026-08-19: "even a perched bird flutters
+    -- its wings occasionally, and certainly when arriving or leaving a perch." Occasionally is the
+    -- load-bearing word -- constant fluttering reads as a distressed bird, not a resting one, so the
+    -- perched case is zero except for short bursts a few seconds apart.
+    function BirdFlight.wingAngle(elapsed: number, seed: number, flying: boolean): number
+        if flying then
+            local beat = 0.5 - 0.5 * math.cos(elapsed * FLAP_RATE + seed)
+            return math.clamp(beat * BirdFlight.WING_MAX_DEG, 0, BirdFlight.WING_MAX_DEG)
+        end
+        local phase = elapsed / FLUTTER_PERIOD + seed
+        local idx = math.floor(phase)
+        local start = 0.15 + hash01(idx + seed * 7.31) * 0.6
+        local t = (phase - idx - start) * FLUTTER_PERIOD
+        if t < 0 or t > FLUTTER_BURST then
+            return 0
+        end
+        local envelope = math.sin(math.pi * t / FLUTTER_BURST) -- in and out, no snap
+        local beat = 0.5 - 0.5 * math.cos(t * 40) -- quick beats inside it
+        local lift = FLUTTER_PEAK * envelope * beat * BirdFlight.WING_MAX_DEG
+        return math.clamp(lift, 0, BirdFlight.WING_MAX_DEG)
+    end
+
     return BirdFlight.magnitude({ x = a.x - b.x, y = a.y - b.y, z = a.z - b.z })
 end
 
@@ -123,6 +168,51 @@ function BirdFlight.offsetFor(state: string, elapsed: number, seed: number): Poi
         return if k < 0.35 then lerp(idle, away, k / 0.35) else lerp(away, low, (k - 0.35) / 0.65)
     end
     return idle
+end
+
+-- ⚠ THE WING LIFT CEILING IS 30 DEGREES, AND IT IS A MEASUREMENT, NOT A PREFERENCE.
+-- The mesh carries a FOLDED wing, and a folded wing is short: there is no hidden wing area in
+-- there to unfold, so lifting it stretches flank surface rather than opening a wing. Measured in
+-- Blender, the panel's reach saturates -- 0.072 studs folded, 0.109 at 30 deg, 0.146 at 50,
+-- 0.171 at 70, 0.181 at 90, and 70->90 buys 0.009. Past ~50 it reads as a cape. A full spread
+-- would need a SEPARATE spread-wing mesh shown only in flight; see [[familiars]].
+-- A Blender bone constraint cannot carry this -- constraints do not survive FBX -- so the limit
+-- lives here, and the test pins it.
+BirdFlight.WING_MAX_DEG = 30
+
+local FLAP_RATE = 16.0 -- rad/sec in flight; ~2.5 beats a second
+local FLUTTER_PERIOD = 9.0 -- average gap between perched flutters
+local FLUTTER_BURST = 0.7 -- and how long one lasts
+local FLUTTER_PEAK = 0.55 -- a resting flutter is a twitch, not a display
+
+-- Deterministic 0..1 hash, so flutters are not metronomic but two clients still agree.
+local function hash01(n: number): number
+    local h = math.sin(n * 12.9898) * 43758.5453
+    return h - math.floor(h)
+end
+
+-- How far the wings are lifted, in DEGREES, as a pure function of time and seed.
+--
+-- ⚠ A PERCHED BIRD IS STILL MOST OF THE TIME. Owner, 2026-08-19: "even a perched bird flutters
+-- its wings occasionally, and certainly when arriving or leaving a perch." Occasionally is the
+-- load-bearing word -- constant fluttering reads as a distressed bird, not a resting one, so the
+-- perched case is zero except for short bursts a few seconds apart.
+function BirdFlight.wingAngle(elapsed: number, seed: number, flying: boolean): number
+    if flying then
+        local beat = 0.5 - 0.5 * math.cos(elapsed * FLAP_RATE + seed)
+        return math.clamp(beat * BirdFlight.WING_MAX_DEG, 0, BirdFlight.WING_MAX_DEG)
+    end
+    local phase = elapsed / FLUTTER_PERIOD + seed
+    local idx = math.floor(phase)
+    local start = 0.15 + hash01(idx + seed * 7.31) * 0.6
+    local t = (phase - idx - start) * FLUTTER_PERIOD
+    if t < 0 or t > FLUTTER_BURST then
+        return 0
+    end
+    local envelope = math.sin(math.pi * t / FLUTTER_BURST) -- in and out, no snap
+    local beat = 0.5 - 0.5 * math.cos(t * 40) -- quick beats inside it
+    local lift = FLUTTER_PEAK * envelope * beat * BirdFlight.WING_MAX_DEG
+    return math.clamp(lift, 0, BirdFlight.WING_MAX_DEG)
 end
 
 return BirdFlight
