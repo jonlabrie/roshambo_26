@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: open
-updated: 2026-08-18
+updated: 2026-08-20
 ---
 
 # Friends & Family Baseline
@@ -43,6 +43,12 @@ rounds skippable, no penalty) — hangout is the product.
    the player who earned it. Carries the parked economy-API defects (a)–(c) in [[parked-defects]].
    Any badge that claims SKILL depends on (h) being ACTIVE, not merely fixed; volume badges do
    not — which is exactly why grade is built on milestones rather than on a rate.
+   **2026-08-20: the familiar is now a real bird.** A skinned, textured, rigged uguisu is in the
+   place and verified — owner: *"it looks right, and it looks good"* ([[familiars]]). NOT yet
+   wired: `BirdController` still builds four parts, so nothing in play uses it. Three changes
+   stand between the asset and the game — clone the MeshPart instead of building parts, drive
+   `bill_lower`/`wing_R`/`wing_L` from `BirdFlight.wingAngle`, and replace `BAND_COLOR` (a
+   textured MeshPart does not tint via `p.Color`), which is a DESIGN decision and not a port.
 7. **Statistics** — closed 2026-08-18 ("let's close Item 7 for now; we'll revisit in the
    future with clearer thoughts"). The 番付 room is built, measured and saved: READ / YIELD /
    NERVE from rows the server already wrote, qualification at 360 throws over a rolling week,

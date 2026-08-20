@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-19
+updated: 2026-08-20
 ---
 
 # Blender Pipeline
@@ -186,6 +186,15 @@ and let Blender recompute.
 Splitting a bill along its gape leaves upper and lower vertices at identical coordinates.
 Classify by the faces a vertex belongs to — average which side of the plane its `link_faces`
 sit on — or both twins land in the same group and the split does nothing visible.
+
+**5. ⚠ DO NOT POSITION AN IMPORTED MODEL WITH `PivotTo` — the importer bakes a ROTATION into
+the MeshPart's `CFrame` with a compensating rotation in `PivotOffset`.** Setting the pivot to an
+identity rotation therefore hands the *part* the inverse, and the bird renders lying on its back
+while the geometry inside was upright all along. The tell is the Size vector: an upright bird
+reads width × height × length (0.148 × 0.315 × 0.552); if height and length are swapped the
+geometry really is rotated, and if they are not, the placement is at fault. **Set
+`part.CFrame` directly.** Same importer behaviour as the pivot-POSITION leftovers in §2 — this is
+the rotation half of it, and it cost a full round of wrong diagnosis.
 
 **Splitting a closed shell needs its holes filled or the model shows its own interior.**
 `bisect_plane` (geom restricted to the region, or it cuts the whole model) → `split_edges` →

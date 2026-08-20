@@ -549,3 +549,29 @@ append-only, so it is corrected here rather than edited.**
   mesh costs more per bird than four parts, so if anything these come DOWN.
 
 Four retarget traps found the same day are now written up on [[blender-pipeline]].
+
+## [2026-08-20] ship | The uguisu is in the world — skinned, textured, rigged, drivable
+
+Owner gate: *"it looks right, and it looks good."* The four-part greybox familiar is superseded
+by a real bird — `rbxassetid://114444614583565`, 0.148 × 0.315 × 0.552 studs, 2,688 triangles,
+19 bones, feet at the origin. As-built on [[familiars]]; pipeline and traps on
+[[blender-pipeline]].
+
+Built by retargeting a purchased sparrow rather than modelling from scratch, which was the right
+trade twice over: the rig, the leg weighting and the unwrap are most of what a bought model is
+worth, and the parametric generator that preceded it survives as the SPEC those changes aimed at
+— six passes of owner art direction encoded as numbers.
+
+**Verified in the place, not assumed:** `HasSkinnedMesh` true, and all three new bones drive —
+`bill_lower`, `wing_R`, `wing_L` each moved a witness bone 0.0311 studs for a 30° rotation of a
+0.06-stud probe, which is exactly 0.06 × 2·sin(15°). A leaf bone's own `TransformedWorldCFrame`
+does NOT reflect its own `Transform`, so the first test read 0.0000 and was wrong about the bones
+rather than the bones being wrong — hang a temporary child bone off it and watch that instead.
+
+Two things that read as defects and were not. The bird arrived apparently lying on its back: the
+geometry was upright and `PivotTo` was at fault (fifth trap, [[blender-pipeline]]). And both
+probes sat inside the Hanabiya's upper storey — nothing perched them, they were parked at
+coordinates I chose badly. Both now sit in `Workspace.Sandbox` 12 studs above ArenaSpawn with
+nothing within 5 studs. Place-only; neither is Rojo-owned and neither belongs in RoshamboStage.
+
+⚠ The mesh is NOT wired into play. `BirdController` still builds four parts.
