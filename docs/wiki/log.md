@@ -518,3 +518,34 @@ rather than in uploaded animation assets. Recipe, flags and the bone-drive test 
 Next is the retarget: the purchased sparrow's rig and unwrap, our uguisu's proportions. The
 parametric generator `roblox/tools/blender/bird_familiar.py` survives as the SPEC — six passes of
 owner art direction encoded as numbers — rather than as the shipped mesh.
+
+## [2026-08-19] defect | CORRECTION — the familiar's orbit numbers are AVATAR-relative, not bird-relative
+
+The 2026-08-19 entry above says the life-size ruling "invalidates the tuning in
+`roblox/src/shared/BirdFlight.luau` — `PERCH_RADIUS`, the orbit radii and the three hold heights
+were all set against the old ~1.4-stud bird." **That is wrong in three ways and log entries are
+append-only, so it is corrected here rather than edited.**
+
+- **The orbit radii and hold heights do not scale with the bird at all.** `BirdController`
+  line ~276 adds `BirdFlight.offsetFor(...)` to the OWNER'S `HumanoidRootPart` position. RESTING
+  `r=2.6 y=3.2`, WIN `r=3.4 y=8.2`, LOSS `r=2.0 y=0.9` describe where the bird sits around a
+  five-stud avatar. A smaller bird orbits the same place; it is simply smaller.
+- **`PERCH_RADIUS` is in `BirdController`, not `BirdFlight`**, and it is how far from its owner a
+  bird looks for a perch — also unrelated to bird size.
+- **The old bird was ~0.78 studs long**, not 1.4. The 1.4 figure was the first draft of the
+  parametric generator, which never shipped.
+
+**What the mesh swap ACTUALLY breaks**, which the wrong claim was hiding:
+
+- **`BAND_COLOR` tinting.** The controller sets `p.Color` on four parts to show grade band. A
+  textured MeshPart does not tint that way — a SurfaceAppearance overrides `Color`. Grade bands
+  need another mechanism, and the standing design answer is ornament (crest, tail streamer) on
+  separate tinted pieces rather than recolouring the bird, which keeps an uguisu an uguisu.
+- **Perch seating.** `target = perch.WorldPosition + Vector3.new(0, 0.2, 0)` was set for a body
+  part 0.38 studs tall. It depends on where the mesh's ORIGIN sits — keep the origin at the feet
+  through export and this goes to ~0.
+- **The controller builds four parts at runtime** and must clone a MeshPart template instead.
+- LOD (`DRAW_DISTANCE 90` / `DETAIL_DISTANCE 45`) is a judgement call, not arithmetic — a skinned
+  mesh costs more per bird than four parts, so if anything these come DOWN.
+
+Four retarget traps found the same day are now written up on [[blender-pipeline]].

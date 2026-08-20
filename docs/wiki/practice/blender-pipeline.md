@@ -158,6 +158,41 @@ window.
 collection contains **zero** actions. That is fine here — we drive bones from code — but do
 not buy a pack expecting animation.
 
+### Retargeting a vendor rig — four traps, all found the hard way
+
+Reshaping a purchased rigged mesh into a different species is cheap; four things about doing it
+in script are not obvious, and each cost a full diagnostic round trip.
+
+**1. A vendor file ships with a STORED POSE, and rescaling the armature DATA detonates it.**
+The sparrow carried pose-channel transforms on 7 bones. `Armature.transform()` rescales the REST
+bones but leaves pose channels in the original units, so a 0.017 scale turned a small leg offset
+into a 60× explosion and the bird collapsed into a needle. Either transform the OBJECT (which
+scales pose and rest together) or clear every `pose_bone.matrix_basis` afterwards. **Clear them
+again after EVERY rest-bone edit** — entering and leaving edit mode re-exposes the same defect.
+
+**2. Setting `matrix_world` on a still-parented object computes a compensating `matrix_basis`.**
+The mesh silently kept the vendor's 0.1669 scale and 90° rotation and rendered at a sixth size
+with the armature modifier looking guilty. It was not: toggling `show_viewport` on the modifier
+gave identical dimensions either way, which is what isolated it. Zero the basis explicitly after
+setting `matrix_parent_inverse`.
+
+**3. Stale CUSTOM SPLIT NORMALS shade a crease with no matching silhouette kink.** The mesh
+carries a `custom_normal` attribute baked by the vendor; move vertices even 0.03 studs and it no
+longer describes the surface it is attached to. The symptom is a visible shading break that
+survives every geometry fix, because the geometry was never wrong. `me.attributes.remove(...)`
+and let Blender recompute.
+
+**4. `split_edges` leaves COINCIDENT vertex pairs, so a position test cannot separate them.**
+Splitting a bill along its gape leaves upper and lower vertices at identical coordinates.
+Classify by the faces a vertex belongs to — average which side of the plane its `link_faces`
+sit on — or both twins land in the same group and the split does nothing visible.
+
+**Splitting a closed shell needs its holes filled or the model shows its own interior.**
+`bisect_plane` (geom restricted to the region, or it cuts the whole model) → `split_edges` →
+`holes_fill` on every boundary edge → `recalc_face_normals`. Verify with counts, not by looking:
+0 boundary edges and 0 non-manifold edges means watertight. Stop the cut SHORT of the hinge so
+the two halves stay joined at the back — that gives a real hinge and leaves no hole in the body.
+
 **Vendor source stays out of the repo**, same as the niwaki: it lives in
 `~/Desktop/Roshambo Reference/models/birds/`. Only derived, reduced output is committed.
 The generator that authors our own birds parametrically is

@@ -1,13 +1,46 @@
 ---
 shelf: program
 status: open
-updated: 2026-08-18
+updated: 2026-08-19
 ---
 
 # Backlog
 
 Future work captured with enough context to restart cold. Nothing here is scheduled; the
 active program is [[friends-family-baseline]]. Ordering within this page is arbitrary.
+
+## A spooky area at the WEST END of the canyon — fireflies and fog in the trees
+
+Owner, 2026-08-19, parking the ground-fog question: *"I think we're going to do a little spooky
+area up at the west end of the canyon, with fireflies and fog in the trees up there."*
+
+**Atmosphere CANNOT do this and it is worth knowing before anyone tries.** `Lighting.Atmosphere`
+is a single global object — no zones — and it has **no height falloff**, so it cannot be dense at
+ground level and clear above. The place already runs one (Density 0.34 / Offset 0.15 / Haze 1.90 /
+Glare 0.25), and the legacy `FogStart 180` / `FogEnd 900` beside it is **inert**: once an
+Atmosphere exists the legacy fog properties are ignored.
+
+Two techniques that DO work, both already proven in this repo:
+
+- **Per-client atmosphere crossfade.** Lighting changes made from a LocalScript are client-only,
+  so Density/Haze/Color can be lerped as a player crosses into a region. Caveat: it changes that
+  player's WHOLE view, not the region — standing outside looking in, you see your own atmosphere
+  painted over the far zone. Fine for enclosed places, wrong where you can see between zones.
+- **Ground fog from flat particles.** The waterfall recipe on [[blender-pipeline]] carries the
+  trick: `Orientation = VelocityPerpendicular` + `EmissionDirection = Top` + `Speed 0.6-1.0` +
+  `Acceleration = 0` + `SpreadAngle = 0` makes a quad lie FLAT instead of billboarding. Two traps
+  recorded there apply directly — near-zero Speed goes invisible under `VelocityPerpendicular`
+  (it needs a velocity to orient against), and `ParticleEmitter` has no phase offset, so emitters
+  pulse in lockstep unless Rate AND Lifetime differ.
+
+⚠ **Treat this as a PERF change that happens to look nice.** Large overlapping transparent quads
+near the camera are close to worst case for mobile fill rate, and the A13 gate (item 2.5) is the
+constraint, not the technique. In its favour: `StreamingEnabled` means distant emitters never
+load, and Workspace already carries 111 ParticleEmitters at an acceptable baseline. Scope it to
+specific spots rather than blanket coverage.
+
+Fireflies are the cheap half — few, small, bright, additive — and want the [[day-night]] cycle
+to gate them to dusk.
 
 ## Teahouse access control — core SHIPPED, extensions remain
 
