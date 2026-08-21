@@ -25,6 +25,19 @@ local CollectionService = game:GetService("CollectionService")
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local FamiliarRoster = remotes:WaitForChild("FamiliarRoster") :: RemoteEvent
 
+-- THE BIRD IS A SKINNED MeshPart CLONED FROM A TEMPLATE, and it has to be a clone: `Bone`s are
+-- ordinary child instances, so `AssetService:CreateMeshPartAsync` cannot rebuild them from a
+-- MeshId -- it returns bare geometry. The template ships as a committed .rbxm via Rojo, the same
+-- route as BonshoBell and ShoroRoof ([[rojo-meshpart-rbxm]]).
+local birdAssets = ReplicatedStorage:WaitForChild("RoshamboBirds", 20)
+local TEMPLATE = birdAssets and birdAssets:FindFirstChild("Uguisu") :: BasePart?
+if not TEMPLATE then
+    -- ⚠ DO NOT let a missing asset take the client down. Familiars are decoration; the round
+    -- still has to be playable without them.
+    warn("[BirdController] no ReplicatedStorage.RoshamboBirds.Uguisu -- familiars disabled")
+    return
+end
+
 -- ===== PERCHING (owner's numbers, 2026-08-18) =====
 -- A resting familiar belongs in the world, not orbiting a head: "it'll look like a bad cartoon
 -- where everyone just got knocked on the head". Perches are tagged attachments emitted by the
@@ -40,21 +53,35 @@ local HOLD_MIN, HOLD_MAX = 10, 60
 local LEASH = 70
 local FLY_SPEED = 34 -- studs/sec toward wherever it is going
 
+-- ===== SONG =====
+-- The clips are the DOCK UGUISU'S, already uploaded and moderation-cleared ([[falls-dock]]).
+-- Same species, so the same recordings are correct -- but the dock bird carries an owner gate
+-- from 2026-07-28 that this must not trample: "Birds are ephemeral... this bird lives here and
+-- you have to be close to hear it." A familiar singing freely would make that bird ordinary.
+--
+-- Three things keep them apart. The familiar sings ONLY on a win, so it is an event and not
+-- ambience. Its rolloff is far tighter than the dock's 12-55, so it is intimate rather than a
+-- landmark you can hear across the pool. And it is quieter.
+local SONG = { 74571915778017, 93957494294947, 133151225815336 }
+local SONG_VOLUME = 0.38 -- the dock bird runs 0.6; this must not compete with it
+local SONG_ROLLOFF_MIN, SONG_ROLLOFF_MAX = 6, 26
+-- ⚠ EVERY WINNER WINS AT THE SAME INSTANT -- more so under TEST_MODE, where the World Throw
+-- cycles R->P->S and a whole crowd can throw the same winning hand. Fifty birds opening together
+-- is a cacophony, so each waits a random beat and only a few sing at all.
+local SONG_STAGGER = 2.2 -- seconds of jitter before a bird decides to sing
+local SONG_CHANCE = 0.45 -- and not every winner does
+local MAX_CONCURRENT_SONGS = 6
+
 -- LOD. Both numbers are GUESSES until measured on the A13, which is the device that governs the
 -- floor -- they are named and commented rather than inlined so the Studio gate can move them.
 local DRAW_DISTANCE = 90 -- beyond this the bird stops updating and hides
 local DETAIL_DISTANCE = 45 -- beyond this it stops animating and simply holds position
 
--- Five bands, not fifteen grades: fifteen visually distinct birds is neither achievable nor
--- legible across an arena. Index 0 is unranked.
-local BAND_COLOR = {
-    [0] = Color3.fromRGB(150, 146, 138),
-    [1] = Color3.fromRGB(196, 180, 148),
-    [2] = Color3.fromRGB(206, 158, 96),
-    [3] = Color3.fromRGB(196, 108, 72),
-    [4] = Color3.fromRGB(150, 84, 152),
-    [5] = Color3.fromRGB(228, 196, 96),
-}
+-- ⚠ GRADE BANDS ARE SET ASIDE (owner, 2026-08-21): "birds simply aren't large enough for it to
+-- matter, unless we design our own kind of (presumably larger) bird, like a raven/crow to carry
+-- it." The four-part greybox tinted every part by band; a textured MeshPart does not tint that
+-- way, and repainting an uguisu purple or gold stops it being an uguisu. The roster still carries
+-- `band` and it is still stored on the bird -- nothing consumes it yet, deliberately.
 
 local folder = Instance.new("Folder")
 folder.Name = "Familiars"
@@ -65,9 +92,9 @@ type Bird = {
     pos: Vector3,
     perch: Attachment?,
     holdUntil: number,
-    wingL: BasePart,
-    wingR: BasePart,
-    tail: BasePart,
+    billLower: Bone?,
+    wingL: Bone?,
+    wingR: Bone?,
     seed: number,
     state: string,
     since: number,
@@ -81,56 +108,57 @@ local function seedFor(userId: string): number
     return (n % 997) / 997 * math.pi * 2
 end
 
--- FOUR PARTS, NOT A MESH. A body, two wings and a tail is enough silhouette to read as a bird at
--- arena distance, and it needs no uploaded asset — which matters because a mesh is a gate the
--- owner has to pass before any of this can be looked at. Same trick the chochin uses: a
--- SpecialMesh sphere squashed into an oblong body.
-local function piece(name: string, size: Vector3, parent: Instance): BasePart
-    local p = Instance.new("Part")
-    p.Name = name
-    p.Size = size
-    p.Anchored = true
-    p.CanCollide = false
-    p.CanQuery = false
-    p.CanTouch = false
-    p.CastShadow = false
-    p.Material = Enum.Material.SmoothPlastic
-    p.Parent = parent
-    return p
-end
-
 local function makeBird(userId: string): Bird
-    local model = Instance.new("Model")
-    model.Name = `Familiar_{userId}`
-    model.Parent = folder
+    local part = TEMPLATE:Clone() :: BasePart
+    part.Name = `Familiar_{userId}`
+    part.Parent = folder
 
-    local body = piece("Body", Vector3.new(0.42, 0.38, 0.78), model)
-    local mesh = Instance.new("SpecialMesh")
-    mesh.MeshType = Enum.MeshType.Sphere
-    mesh.Parent = body
-
-    -- Wings are WEDGES: a flat plate reads as a plank, a wedge reads as a wing even head-on.
-    local wingL = piece("WingL", Vector3.new(0.06, 0.30, 0.62), model)
-    local wingR = piece("WingR", Vector3.new(0.06, 0.30, 0.62), model)
-    local tail = piece("Tail", Vector3.new(0.05, 0.20, 0.34), model)
-
-    for _, p in { body, wingL, wingR, tail } do
-        p.Color = BAND_COLOR[0]
+    local function bone(name: string): Bone?
+        return part:FindFirstChild(name, true) :: Bone?
     end
 
     return {
-        part = body,
+        part = part,
         pos = Vector3.zero,
         perch = nil,
         holdUntil = 0,
-        wingL = wingL,
-        wingR = wingR,
-        tail = tail,
+        billLower = bone("bill_lower"),
+        wingL = bone("wing_L"),
+        wingR = bone("wing_R"),
         seed = seedFor(userId),
         state = "RESTING",
         since = os.clock(),
         band = 0,
     }
+end
+
+local singing = 0
+
+local function sing(b: Bird)
+    if singing >= MAX_CONCURRENT_SONGS or math.random() > SONG_CHANCE then
+        return
+    end
+    singing += 1
+    local s = Instance.new("Sound")
+    s.SoundId = `rbxassetid://{SONG[math.random(#SONG)]}`
+    s.Volume = SONG_VOLUME
+    s.RollOffMode = Enum.RollOffMode.InverseTapered
+    s.RollOffMinDistance = SONG_ROLLOFF_MIN
+    s.RollOffMaxDistance = SONG_ROLLOFF_MAX
+    s.PlaybackSpeed = 0.97 + math.random() * 0.06 -- the dock scheduler's jitter, same reason
+    s.Parent = b.part
+    s.Ended:Once(function()
+        singing -= 1
+        s:Destroy()
+    end)
+    -- A clip that never fires Ended (failed load, moderation) would leak a slot forever.
+    task.delay(8, function()
+        if s.Parent then
+            singing -= 1
+            s:Destroy()
+        end
+    end)
+    s:Play()
 end
 
 local function characterRoot(userId: string): BasePart?
@@ -185,8 +213,6 @@ FamiliarRoster.OnClientEvent:Connect(function(next_: { [string]: any })
             birds[userId] = b
         end
         b.band = tonumber(entry.band) or 0
-        local c = BAND_COLOR[math.clamp(b.band, 0, 5)]
-        b.part.Color, b.wingL.Color, b.wingR.Color, b.tail.Color = c, c, c, c
     end
     -- A bird whose player left must go, or it hangs in the air forever: this controller keys on
     -- the roster, so a stale entry is a stale bird.
@@ -240,6 +266,16 @@ EventBus.Cue.Event:Connect(function(cue)
     if b then
         b.state = cue.result
         b.since = os.clock()
+        if cue.result == "WIN" then
+            local at = b.since
+            task.delay(math.random() * SONG_STAGGER, function()
+                -- Only if the win is still the bird's current state: a reveal reset, or the
+                -- player leaving, must not produce a song from nowhere.
+                if birds[cue.userId] == b and b.state == "WIN" and b.since == at then
+                    sing(b)
+                end
+            end)
+        end
     end
 end)
 
@@ -251,17 +287,14 @@ RunService.RenderStepped:Connect(function(dt)
         local root = characterRoot(userId)
         if not root then
             b.part.Transparency = 1
-            b.wingL.Transparency, b.wingR.Transparency, b.tail.Transparency = 1, 1, 1
             continue
         end
         local far = if eye then (root.Position - eye).Magnitude else 0
         if far > DRAW_DISTANCE then
             b.part.Transparency = 1
-            b.wingL.Transparency, b.wingR.Transparency, b.tail.Transparency = 1, 1, 1
             continue
         end
         b.part.Transparency = 0
-        b.wingL.Transparency, b.wingR.Transparency, b.tail.Transparency = 0, 0, 0
 
         -- A result LAPSES after BirdFlight.RESULT_HOLD and the bird goes back to the world; a
         -- reveal also resets it regardless. Holding until the next round read as hovering.
@@ -295,8 +328,10 @@ RunService.RenderStepped:Connect(function(dt)
                 end
             end
             if b.perch then
-                -- Sit ON the anchor, not in it.
-                target = b.perch.WorldPosition + Vector3.new(0, 0.2, 0)
+                -- Sit ON the anchor. The mesh carries its ORIGIN AT THE FEET, so the perch
+                -- position is the bird's position -- the old +0.2 fudge the four-part bird
+                -- needed (its origin sat at the body centre) is gone.
+                target = b.perch.WorldPosition
             else
                 -- ⚠ NOWHERE TO SIT: fall back to the orbit rather than freezing. This is also
                 -- what keeps a bird OUT of buildings (owner: birds do not go inside) — indoors
@@ -323,16 +358,30 @@ RunService.RenderStepped:Connect(function(dt)
         b.part.CFrame = base
 
         if far <= DETAIL_DISTANCE then
-            -- Wings follow what the bird is DOING: hard while climbing, barely moving while sunk,
-            -- and STILL once it has settled on a perch. A perched bird with its wings going is the
-            -- tell that this is a box with decorations on it.
+            -- ===== BONES =====
+            -- A skinned MeshPart's `Bone`s are ordinary instances with a writable `Transform`, so
+            -- every bit of motion stays here in Luau -- no Animation assets, no upload round-trip
+            -- per timing tweak. The angles come from `BirdFlight`, which is pure and Lune-tested.
+            --
+            -- ⚠ WING LIFT IS CLAMPED TO 30 DEGREES INSIDE `wingAngle`, and that ceiling is a
+            -- MEASUREMENT: the mesh carries a folded wing, and past ~50 degrees it stretches the
+            -- flank into a cape rather than opening a wing.
             local landed = resting and b.perch ~= nil and travelled < 0.05
-            local beat = if b.state == "WIN" then 18 elseif b.state == "LOSS" then 7 else 12
-            local depth = if b.state == "WIN" then 0.9 elseif b.state == "LOSS" then 0.35 else 0.7
-            local flap = if landed then 0 else math.sin(now * beat + b.seed) * depth
-            b.wingL.CFrame = base * CFrame.new(-0.26, 0.06, 0) * CFrame.Angles(0, 0, flap)
-            b.wingR.CFrame = base * CFrame.new(0.26, 0.06, 0) * CFrame.Angles(0, 0, -flap)
-            b.tail.CFrame = base * CFrame.new(0, 0.04, 0.5)
+            local lift = math.rad(BirdFlight.wingAngle(now, b.seed, not landed))
+            if b.wingR then
+                b.wingR.Transform = CFrame.Angles(0, 0, -lift)
+            end
+            if b.wingL then
+                b.wingL.Transform = CFrame.Angles(0, 0, lift)
+            end
+            -- The bill opens only on a WIN: the bird is singing about it. A LOSS keeps it shut.
+            if b.billLower then
+                local gape = 0
+                if b.state == "WIN" and not resting then
+                    gape = math.rad(14) * (0.5 - 0.5 * math.cos(now * 11 + b.seed))
+                end
+                b.billLower.Transform = CFrame.Angles(-gape, 0, 0)
+            end
         end
     end
 end)

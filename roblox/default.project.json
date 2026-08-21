@@ -8,6 +8,10 @@
         },
         "ReplicatedStorage": {
             "RoshamboShared": { "$path": "src/shared" },
+            "RoshamboBirds": {
+                "$className": "Folder",
+                "Uguisu": { "$path": "assets/meshes/Uguisu.rbxm" }
+            },
             "RoshamboRemotes": {
                 "$className": "Folder",
                 "SubmitPick": { "$className": "RemoteEvent" },
