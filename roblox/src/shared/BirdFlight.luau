@@ -65,11 +65,33 @@ export type Point = { x: number, y: number, z: number }
 -- A resting familiar belongs in the WORLD -- perched on a railing, a branch, a roof ridge -- near
 -- its owner and ready to react, not orbiting them. Until that exists this is a holding pattern in
 -- the most literal sense.
+-- ⚠ WIN IS A SHOULDER PERCH AS OF 2026-08-21, AND IT OVERTURNS THE VERTICAL GRAMMAR ABOVE.
+-- Owner, having seen the real mesh in play: "it's really small, almost unreadable as a bird at
+-- all... perch on the player's shoulder, chirp out one of the three songs while hopping back and
+-- forth on its legs. Then I can see if it reads at all as a bird and not some oversized insect."
+--
+-- This is a DIAGNOSTIC first and a behaviour second. A life-size bird is 0.55 studs against a
+-- 5-stud avatar, and at the WIN orbit's 8.2 studs it is a speck. Height cannot rescue something
+-- too small to identify -- legibility has to come before occlusion, because an unreadable bird
+-- communicates nothing at any height.
+--
+-- ⚠ IF THE ANSWER IS "SCALE THE BIRD UP" RATHER THAN "BRING IT CLOSER", REVERT THIS and restore
+-- the high orbit: the crowd-occlusion argument for vertical separation is still sound, and it is
+-- what the LOSS and RESTING holds still rely on.
+local SHOULDER = { x = 0.62, y = 1.05, z = -0.18 }
+local HOP_PERIOD = 0.62 -- one hop; a small bird's is quick
+local HOP_HEIGHT = 0.13
+local HOP_SHUFFLE = 0.09 -- side to side across the shoulder, because a hop turns the bird
+
 local HOLD = {
     RESTING = { r = 2.6, y = 3.2, speed = 1.1 },
+    -- Kept though offsetFor no longer uses it: this is the high orbit to restore if the
+    -- shoulder-perch diagnostic says the fix was scale, not proximity.
     WIN = { r = 3.4, y = 8.2, speed = 2.0 },
     LOSS = { r = 2.0, y = 0.9, speed = 0.55 },
 }
+BirdFlight.HOLD_WIN_ORBIT_Y = HOLD.WIN.y
+
 local function orbit(t: number, seed: number, o: { r: number, y: number, speed: number }): Point
     local a = t * o.speed + seed
     return { x = math.cos(a) * o.r, y = o.y + math.sin(a * 1.7) * 0.25, z = math.sin(a) * o.r }
@@ -140,21 +162,24 @@ function BirdFlight.offsetFor(state: string, elapsed: number, seed: number): Poi
     -- SAFE is deliberately absent and falls through to RESTING: nothing changed, so the bird does
     -- not change either.
     if state == "WIN" then
-        -- SPIRALS UP AND STAYS UP. The entry climbs with a real spiral -- radius and speed both
-        -- rising, several revolutions -- and then holds a high, quick orbit for the rest of the
-        -- round, visibly above everyone who did not win.
+        -- LANDS ON THE SHOULDER AND HOPS. The flight in is a quick arc from wherever the bird
+        -- was; after that it stays put and hops, which is the read the owner is testing for.
+        local hop = elapsed / HOP_PERIOD
+        local bob = math.abs(math.sin(hop * math.pi)) * HOP_HEIGHT
+        -- The shuffle alternates sides every hop rather than oscillating smoothly: a bird
+        -- re-plants its feet, it does not sway.
+        local side = (math.floor(hop) % 2 == 0) and 1 or -1
+        local perch = {
+            x = SHOULDER.x + side * HOP_SHUFFLE,
+            y = SHOULDER.y + bob,
+            z = SHOULDER.z,
+        }
         local k = math.min(1, elapsed / BirdFlight.ENTRY.WIN)
-        local high = orbit(elapsed, seed, HOLD.WIN)
         if k >= 1 then
-            return high
+            return perch
         end
         local ease = 1 - (1 - k) * (1 - k) * (1 - k)
-        local climbing = orbit(elapsed * (1 + 1.6 * k), seed, {
-            r = HOLD.RESTING.r + (HOLD.WIN.r - HOLD.RESTING.r) * ease,
-            y = HOLD.RESTING.y + (HOLD.WIN.y - HOLD.RESTING.y) * ease,
-            speed = HOLD.RESTING.speed,
-        })
-        return climbing
+        return lerp(idle, perch, ease)
     elseif state == "LOSS" then
         -- BOLTS, THEN SINKS. Out fast and wide -- the pot was lost, not the companion -- then
         -- back to a low, slow orbit around the knees, where it stays. Low is the whole point: an

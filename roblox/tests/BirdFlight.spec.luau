@@ -10,15 +10,36 @@ describe("BirdFlight", function()
         end
     end)
 
-    test("WIN rises, and stays up long enough to be noticed", function()
-        local a = BirdFlight.offsetFor("WIN", 0.1, 7)
-        local b = BirdFlight.offsetFor("WIN", 1.5, 7)
-        expect(b.y > a.y).toBe(true)
-        -- A result must outlast the instant it happened -- glancing over a few seconds later
+    test("WIN lands on the shoulder and stays there", function()
+        -- ⚠ This REPLACES "WIN rises". Owner, 2026-08-21, on seeing the real mesh in play: at
+        -- 0.55 studs against a 5-stud avatar it read as an insect at the old 8.2-stud orbit.
+        -- Legibility beats occlusion — an unreadable bird communicates nothing at any height.
+        local settled = BirdFlight.offsetFor("WIN", 3, 7)
+        expect(settled.y > 0.9 and settled.y < 1.4).toBe(true)
+        expect(math.abs(settled.x) > 0.4).toBe(true) -- off to one side, on a shoulder
+        -- A result must outlast the instant it happened — glancing over a few seconds later
         -- should still tell you what happened.
         for _, t in { 3, 8, 14 } do
-            expect(BirdFlight.offsetFor("WIN", t, 7).y > 6).toBe(true)
+            local p = BirdFlight.offsetFor("WIN", t, 7)
+            expect(p.y > 0.9 and p.y < 1.4).toBe(true)
         end
+    end)
+
+    test("WIN hops rather than sitting still", function()
+        local low, high = 99, 0
+        local left, right = false, false
+        for t = 2, 6, 0.02 do
+            local p = BirdFlight.offsetFor("WIN", t, 7)
+            low, high = math.min(low, p.y), math.max(high, p.y)
+            if p.x < 0.62 then
+                left = true
+            end
+            if p.x > 0.62 then
+                right = true
+            end
+        end
+        expect(high - low > 0.08).toBe(true) -- it bobs
+        expect(left and right).toBe(true) -- and shuffles to both sides of the shoulder
     end)
 
     test("a result LAPSES, so a bird does not wear it until the next round", function()
@@ -58,9 +79,13 @@ describe("BirdFlight", function()
     end)
 
     test("the three holds that differ are separable by HEIGHT alone, across a room", function()
-        local win = BirdFlight.offsetFor("WIN", 10, 7).y
+        local win = BirdFlight.HOLD_WIN_ORBIT_Y
         local resting = BirdFlight.offsetFor("RESTING", 10, 7).y
         local loss = BirdFlight.offsetFor("LOSS", 10, 7).y
+        -- ⚠ WIN now perches on the shoulder, so this no longer describes the shipped WIN — it
+        -- pins the HIGH ORBIT that is kept in reserve, and the RESTING/LOSS separation that is
+        -- still live. If the shoulder diagnostic fails and the orbit comes back, this test is
+        -- already asserting the right thing.
         expect(win > resting + 3).toBe(true)
         expect(resting > loss + 1.5).toBe(true)
     end)

@@ -69,7 +69,11 @@ local SONG_ROLLOFF_MIN, SONG_ROLLOFF_MAX = 6, 26
 -- cycles R->P->S and a whole crowd can throw the same winning hand. Fifty birds opening together
 -- is a cacophony, so each waits a random beat and only a few sing at all.
 local SONG_STAGGER = 2.2 -- seconds of jitter before a bird decides to sing
-local SONG_CHANCE = 0.45 -- and not every winner does
+-- Every winner's OWN bird sings — it has just landed on their shoulder and the song is the
+-- point. Other people's birds sing sometimes, which is what keeps a crowd from becoming a wall
+-- of noise. The stagger still applies to both.
+local SONG_CHANCE_OWN = 1.0
+local SONG_CHANCE_OTHER = 0.3
 local MAX_CONCURRENT_SONGS = 6
 
 -- LOD. Both numbers are GUESSES until measured on the A13, which is the device that governs the
@@ -134,8 +138,10 @@ end
 
 local singing = 0
 
-local function sing(b: Bird)
-    if singing >= MAX_CONCURRENT_SONGS or math.random() > SONG_CHANCE then
+local function sing(b: Bird, isOwn: boolean)
+    local chance = if isOwn then SONG_CHANCE_OWN else SONG_CHANCE_OTHER
+    -- The owner's own bird is never crowded out: it bypasses the concurrency ceiling.
+    if not isOwn and (singing >= MAX_CONCURRENT_SONGS or math.random() > chance) then
         return
     end
     singing += 1
@@ -272,7 +278,7 @@ EventBus.Cue.Event:Connect(function(cue)
                 -- Only if the win is still the bird's current state: a reveal reset, or the
                 -- player leaving, must not produce a song from nowhere.
                 if birds[cue.userId] == b and b.state == "WIN" and b.since == at then
-                    sing(b)
+                    sing(b, cue.userId == tostring(Players.LocalPlayer.UserId))
                 end
             end)
         end
@@ -354,7 +360,20 @@ RunService.RenderStepped:Connect(function(dt)
         local heading = if travelled > 0.001 then (nextPos - b.pos).Unit else Vector3.zAxis
         b.pos = nextPos
 
-        local base = CFrame.lookAt(b.pos, b.pos + heading)
+        -- FACING. A bird crossing the arena faces where it is going; a PERCHED one has a travel
+        -- vector of nearly zero, so it would snap to a default axis and read as broken. On the
+        -- shoulder it looks where its host looks, turned slightly outward so it is in profile
+        -- rather than nose-on -- a bird is only identifiable from the side.
+        local base: CFrame
+        if b.state == "WIN" and not resting then
+            base = CFrame.new(b.pos)
+                * (root.CFrame - root.CFrame.Position)
+                * CFrame.Angles(0, math.rad(-28), 0)
+        elseif travelled > 0.001 then
+            base = CFrame.lookAt(b.pos, b.pos + heading)
+        else
+            base = CFrame.new(b.pos) * (b.part.CFrame - b.part.CFrame.Position)
+        end
         b.part.CFrame = base
 
         if far <= DETAIL_DISTANCE then
@@ -366,8 +385,13 @@ RunService.RenderStepped:Connect(function(dt)
             -- ⚠ WING LIFT IS CLAMPED TO 30 DEGREES INSIDE `wingAngle`, and that ceiling is a
             -- MEASUREMENT: the mesh carries a folded wing, and past ~50 degrees it stretches the
             -- flank into a cape rather than opening a wing.
-            local landed = resting and b.perch ~= nil and travelled < 0.05
-            local lift = math.rad(BirdFlight.wingAngle(now, b.seed, not landed))
+            -- FLYING IS A FACT ABOUT MOVEMENT, NOT ABOUT STATE. Keying this off `resting` was
+            -- wrong the moment WIN became a shoulder perch: the bird is not resting, but it is
+            -- sitting on someone's shoulder hopping, and beating its wings at full flight rate
+            -- there reads as a bird about to take off. Anything essentially stationary --
+            -- perched, or hopping on a shoulder -- gets the occasional flutter instead.
+            local flying = travelled > 0.05
+            local lift = math.rad(BirdFlight.wingAngle(now, b.seed, flying))
             if b.wingR then
                 b.wingR.Transform = CFrame.Angles(0, 0, -lift)
             end
@@ -378,7 +402,9 @@ RunService.RenderStepped:Connect(function(dt)
             if b.billLower then
                 local gape = 0
                 if b.state == "WIN" and not resting then
-                    gape = math.rad(14) * (0.5 - 0.5 * math.cos(now * 11 + b.seed))
+                    -- Chirping: short open-shut pulses rather than a held gape.
+                    local pulse = math.sin(now * 9 + b.seed)
+                    gape = math.rad(16) * math.max(0, pulse) ^ 2
                 end
                 b.billLower.Transform = CFrame.Angles(-gape, 0, 0)
             end
