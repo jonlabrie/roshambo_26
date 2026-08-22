@@ -154,6 +154,11 @@ local function makeBird(userId: string): Bird
     part.CanTouch = false
     part.CastShadow = false
     part.Massless = true
+    -- ⚠ NEVER INHERIT THE TEMPLATE'S ROTATION. Studio's importer leaves an arbitrary rotation on
+    -- the MeshPart -- UguisuBody arrived with LookVector (0, 1, 0), nose straight up -- and the
+    -- perched branch below PRESERVES whatever rotation a bird already has. A fresh clone would
+    -- therefore keep the importer's attitude forever, which is exactly what the owner saw.
+    part.CFrame = CFrame.new(part.Position)
     part.Parent = folder
 
     -- The wings ride as their own part, CFramed onto the body every frame. Both halves were
@@ -449,7 +454,15 @@ RunService.RenderStepped:Connect(function(dt)
         elseif travelled > 0.001 then
             base = CFrame.lookAt(b.pos, b.pos + heading)
         else
-            base = CFrame.new(b.pos) * (b.part.CFrame - b.part.CFrame.Position)
+            -- ⚠ A PERCHED BIRD STANDS LEVEL. This used to preserve the bird's existing
+            -- rotation, so a bird arriving in a steep dive stayed nose-down on its perch, and a
+            -- freshly cloned one kept whatever attitude the importer baked in. Keep the YAW --
+            -- it should still face where it last flew -- and drop the pitch and roll.
+            local f = b.part.CFrame.LookVector
+            local flat = Vector3.new(f.X, 0, f.Z)
+            base = if flat.Magnitude > 1e-4
+                then CFrame.lookAt(b.pos, b.pos + flat.Unit)
+                else CFrame.new(b.pos)
         end
         b.part.CFrame = base
 
