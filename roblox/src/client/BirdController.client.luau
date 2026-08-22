@@ -30,12 +30,34 @@ local FamiliarRoster = remotes:WaitForChild("FamiliarRoster") :: RemoteEvent
 -- MeshId -- it returns bare geometry. The template ships as a committed .rbxm via Rojo, the same
 -- route as BonshoBell and ShoroRoof ([[rojo-meshpart-rbxm]]).
 local birdAssets = ReplicatedStorage:WaitForChild("RoshamboBirds", 20)
-local TEMPLATE = birdAssets and birdAssets:FindFirstChild("Uguisu") :: BasePart?
+local asset = birdAssets and birdAssets:FindFirstChild("UguisuBody")
+local wingAsset = birdAssets and birdAssets:FindFirstChild("UguisuWings")
+-- ⚠ ACCEPT EITHER A MeshPart OR THE MODEL THE IMPORTER WRAPS IT IN. Studio's 3D Importer emits a
+-- Model containing the MeshPart plus an AnimationController and an InitialPoses folder, and which
+-- of the two gets saved to the .rbxm depends on what was right-clicked. Requiring one shape makes
+-- the asset pipeline depend on a click, so take the MeshPart wherever it is.
+local function meshOf(a: Instance?): BasePart?
+    if not a then
+        return nil
+    end
+    return (if a:IsA("BasePart") then a else a:FindFirstChildWhichIsA("MeshPart", true)) :: BasePart?
+end
+local TEMPLATE = meshOf(asset)
+-- ⚠ THE WINGS ARE A SEPARATE PART, AND THAT IS THE WHOLE MECHANISM. Owner, 2026-08-22: the wings
+-- "should completely disappear when the bird is perched/at rest". Nothing on a bound wing can do
+-- that -- `Bone.Transform` DISCARDS SCALE (measured: set 0.06, reads back 1.0), and at the best
+-- fold 93 of 208 wing vertices are still outside the body. Transparency on a separate MeshPart is
+-- complete and unarguable, and the wings stay SKINNED so they keep the two-bone fold and the flap.
+local WING_TEMPLATE = meshOf(wingAsset)
 if not TEMPLATE then
     -- ⚠ DO NOT let a missing asset take the client down. Familiars are decoration; the round
-    -- still has to be playable without them.
-    warn("[BirdController] no ReplicatedStorage.RoshamboBirds.Uguisu -- familiars disabled")
+    -- still has to be playable without them. A missing WINGS template is survivable on its own —
+    -- the bird simply never flies with them — so it is warned about but not fatal.
+    warn("[BirdController] no RoshamboBirds.UguisuBody -- familiars disabled")
     return
+end
+if not WING_TEMPLATE then
+    warn("[BirdController] no RoshamboBirds.UguisuWings -- familiars will not spread wings")
 end
 
 -- ===== PERCHING (owner's numbers, 2026-08-18) =====
@@ -97,8 +119,11 @@ type Bird = {
     perch: Attachment?,
     holdUntil: number,
     billLower: Bone?,
+    wings: BasePart?,
     wingL: Bone?,
     wingR: Bone?,
+    wristL: Bone?,
+    wristR: Bone?,
     seed: number,
     flyingSince: number?, -- when this flight began, or nil while perched: the wings OPEN over
     state: string, -- time and the ease has to start from the launch, not from os.clock()
@@ -116,20 +141,61 @@ end
 local function makeBird(userId: string): Bird
     local part = TEMPLATE:Clone() :: BasePart
     part.Name = `Familiar_{userId}`
+    -- The importer's AnimationController and InitialPoses folder ride along on a Model-shaped
+    -- template. We drive Bone.Transform directly, so they are dead weight on every bird.
+    for _, c in part:GetChildren() do
+        if not c:IsA("Bone") then
+            c:Destroy()
+        end
+    end
+    part.Anchored = true
+    part.CanCollide = false
+    part.CanQuery = false
+    part.CanTouch = false
+    part.CastShadow = false
+    part.Massless = true
     part.Parent = folder
 
+    -- The wings ride as their own part, CFramed onto the body every frame. Both halves were
+    -- exported around the SAME origin, so matching pivots is all the mating they need.
+    local wings: BasePart? = nil
+    if WING_TEMPLATE then
+        local w = WING_TEMPLATE:Clone() :: BasePart
+        w.Name = `FamiliarWings_{userId}`
+        for _, c in w:GetChildren() do
+            if not c:IsA("Bone") then
+                c:Destroy()
+            end
+        end
+        w.Anchored = true
+        w.CanCollide = false
+        w.CanQuery = false
+        w.CanTouch = false
+        w.CastShadow = false
+        w.Massless = true
+        w.Transparency = 1 -- a bird is born perched
+        w.Parent = folder
+        wings = w
+    end
+
     local function bone(name: string): Bone?
-        return part:FindFirstChild(name, true) :: Bone?
+        local host: Instance? = if string.find(name, "wing") or string.find(name, "wrist")
+            then wings
+            else part
+        return host and host:FindFirstChild(name, true) :: Bone?
     end
 
     return {
         part = part,
+        wings = wings,
         pos = Vector3.zero,
         perch = nil,
         holdUntil = 0,
         billLower = bone("bill_lower"),
         wingL = bone("wing_L"),
         wingR = bone("wing_R"),
+        wristL = bone("wrist_L"),
+        wristR = bone("wrist_R"),
         seed = seedFor(userId),
         flyingSince = nil,
         state = "RESTING",
@@ -228,6 +294,9 @@ FamiliarRoster.OnClientEvent:Connect(function(next_: { [string]: any })
         if not roster[userId] then
             release(b)
             b.part:Destroy()
+            if b.wings then
+                b.wings:Destroy()
+            end
             birds[userId] = nil
         end
     end
@@ -295,11 +364,17 @@ RunService.RenderStepped:Connect(function(dt)
         local root = characterRoot(userId)
         if not root then
             b.part.Transparency = 1
+            if b.wings then
+                b.wings.Transparency = 1
+            end
             continue
         end
         local far = if eye then (root.Position - eye).Magnitude else 0
         if far > DRAW_DISTANCE then
             b.part.Transparency = 1
+            if b.wings then
+                b.wings.Transparency = 1
+            end
             continue
         end
         b.part.Transparency = 0
@@ -378,20 +453,17 @@ RunService.RenderStepped:Connect(function(dt)
         end
         b.part.CFrame = base
 
+        -- ⚠ THE WINGS PART TRACKS THE BODY EVERY FRAME. Both halves were exported around the
+        -- same origin, so setting the wings' CFrame to the body's mates them exactly -- there is
+        -- no offset to compute, and none to get wrong.
+        if b.wings then
+            b.wings.CFrame = base
+        end
+
         if far <= DETAIL_DISTANCE then
-            -- ===== BONES =====
-            -- A skinned MeshPart's `Bone`s are ordinary instances with a writable `Transform`, so
-            -- every bit of motion stays here in Luau -- no Animation assets, no upload round-trip
-            -- per timing tweak. The angles come from `BirdFlight`, which is pure and Lune-tested.
-            --
-            -- ⚠ WING LIFT IS CLAMPED TO 30 DEGREES INSIDE `wingAngle`, and that ceiling is a
-            -- MEASUREMENT: the mesh carries a folded wing, and past ~50 degrees it stretches the
-            -- flank into a cape rather than opening a wing.
-            -- FLYING IS A FACT ABOUT MOVEMENT, NOT ABOUT STATE. Keying this off `resting` was
-            -- wrong the moment WIN became a shoulder perch: the bird is not resting, but it is
-            -- sitting on someone's shoulder hopping, and beating its wings at full flight rate
-            -- there reads as a bird about to take off. Anything essentially stationary --
-            -- perched, or hopping on a shoulder -- gets the occasional flutter instead.
+            -- FLYING IS A FACT ABOUT MOVEMENT, NOT ABOUT STATE. A bird hopping on a shoulder is
+            -- not resting, but it is not flying either, and beating its wings there reads as a
+            -- bird about to take off.
             local flying = travelled > 0.05
             if flying then
                 if not b.flyingSince then
@@ -400,31 +472,34 @@ RunService.RenderStepped:Connect(function(dt)
             else
                 b.flyingSince = nil
             end
-            -- ⚠ THE WINGS ARE SCALED, NOT HIDDEN. The spread wing is bound into the same skinned
-            -- mesh as the folded one, so there is nothing to toggle: collapsing the bone draws
-            -- every wing vertex back inside the flank and leaves the MODELLED folded wing --
-            -- which is the accurate one -- as all that shows.
+
+            -- ⚠ TRANSPARENCY IS THE HIDING MECHANISM, and it is the only one that works. Bone
+            -- scale is discarded by Roblox and folding leaves 93 of 208 verts outside the body,
+            -- so a perched bird's wings are hidden rather than tucked (owner, 2026-08-22).
             local since = if b.flyingSince then now - b.flyingSince else 0
             local open = BirdFlight.wingExtension(since, b.seed, flying)
+            if b.wings then
+                b.wings.Transparency = if open <= 0 then 1 else 0
+            end
+
+            local shoulder, wrist = BirdFlight.foldAngles(open)
             local lift = math.rad(BirdFlight.wingAngle(now, b.seed, flying))
-            local scale = CFrame.new()
-                * CFrame.fromMatrix(
-                    Vector3.zero,
-                    Vector3.new(open, 0, 0),
-                    Vector3.new(0, open, 0),
-                    Vector3.new(0, 0, open)
-                )
             if b.wingR then
-                b.wingR.Transform = CFrame.Angles(0, 0, -lift) * scale
+                b.wingR.Transform = CFrame.Angles(0, 0, math.rad(shoulder) - lift)
             end
             if b.wingL then
-                b.wingL.Transform = CFrame.Angles(0, 0, lift) * scale
+                b.wingL.Transform = CFrame.Angles(0, 0, math.rad(-shoulder) + lift)
             end
-            -- The bill opens only on a WIN: the bird is singing about it. A LOSS keeps it shut.
+            if b.wristR then
+                b.wristR.Transform = CFrame.Angles(0, 0, math.rad(wrist))
+            end
+            if b.wristL then
+                b.wristL.Transform = CFrame.Angles(0, 0, math.rad(-wrist))
+            end
+
             if b.billLower then
                 local gape = 0
                 if b.state == "WIN" and not resting then
-                    -- Chirping: short open-shut pulses rather than a held gape.
                     local pulse = math.sin(now * 9 + b.seed)
                     gape = math.rad(16) * math.max(0, pulse) ^ 2
                 end
@@ -439,6 +514,9 @@ Players.PlayerRemoving:Connect(function(player)
     if b then
         release(b)
         b.part:Destroy()
+        if b.wings then
+            b.wings:Destroy()
+        end
         birds[tostring(player.UserId)] = nil
     end
 end)

@@ -107,29 +107,50 @@ describe("BirdFlight", function()
         end
     end)
 
-    test("a perched bird's wings are COLLAPSED, a flying bird's are OPEN", function()
-        -- ⚠ The bird has TWO wings and they never coexist: a folded one sculpted into the flank
-        -- for the ~90% perched case, and a spread one that only exists in flight. Perching does
-        -- not fold the spread wing -- one rigid bone cannot shorten, and swept back it just swings
-        -- forward past the head. It COLLAPSES instead, drawing every wing vertex to the shoulder
-        -- so the modelled folded wing is what shows.
-        expect(BirdFlight.wingExtension(0, 7, false) <= BirdFlight.WING_TUCKED + 0.001).toBe(true)
+    test("a perched bird's wings are FOLDED, a flying bird's are SPREAD", function()
+        -- ⚠ Owner, 2026-08-22: the wings "should completely disappear when the bird is
+        -- perched/at rest". Folding alone cannot achieve that -- measured, 93 of 208 wing verts
+        -- stay outside the body at the best fold -- so the wings are a separate MeshPart and the
+        -- controller drives its Transparency. This function only owns the OPENNESS.
+        expect(BirdFlight.wingExtension(0, 7, false)).toBe(0)
+        expect(BirdFlight.wingExtension(99, 7, false)).toBe(0)
         for t = 0, 20, 0.05 do
-            local e = BirdFlight.wingExtension(t, 7, false)
+            local e = BirdFlight.wingExtension(t, 7, true)
             expect(e >= 0).toBe(true)
             expect(e <= 1).toBe(true)
         end
     end)
 
     test("wings OPEN over time rather than snapping", function()
+        -- Owner: wings "only unfold when the bird takes flight ... quickly fold in and disappear
+        -- when it lands". Opening is eased; closing is instant, which is why there is no
+        -- corresponding close-over-time assertion.
         local first = BirdFlight.wingExtension(0, 7, true)
         local mid = BirdFlight.wingExtension(BirdFlight.WING_OPEN_TIME * 0.5, 7, true)
         local done = BirdFlight.wingExtension(BirdFlight.WING_OPEN_TIME * 2, 7, true)
         expect(first < mid).toBe(true)
         expect(mid < done).toBe(true)
         expect(done > 0.99).toBe(true)
-        -- and a collapsed wing must never be caught part-open at rest
-        expect(BirdFlight.wingExtension(99, 7, false)).toBe(BirdFlight.WING_TUCKED)
+    end)
+
+    test("fold angles run from FULLY FOLDED to FULLY SPREAD and never past", function()
+        -- ⚠ These are MEASURED angles, verified in Roblox through Bone.Transform, not guesses:
+        -- shoulder -70 / wrist -110 draws the wing in against the flank, 0/0 is full spread.
+        local s0, w0 = BirdFlight.foldAngles(0)
+        expect(s0).toBe(BirdFlight.FOLD_SHOULDER)
+        expect(w0).toBe(BirdFlight.FOLD_WRIST)
+        local s1, w1 = BirdFlight.foldAngles(1)
+        expect(s1).toBe(0)
+        expect(w1).toBe(0)
+        -- monotonic, and clamped outside 0..1 so a bad caller cannot hyperextend a wing
+        local prev = BirdFlight.FOLD_SHOULDER - 1
+        for k = 0, 1.0001, 0.05 do
+            local sh = BirdFlight.foldAngles(math.min(1, k))
+            expect(sh >= prev).toBe(true)
+            prev = sh
+        end
+        expect(BirdFlight.foldAngles(-5)).toBe(BirdFlight.FOLD_SHOULDER)
+        expect(BirdFlight.foldAngles(5)).toBe(0)
     end)
 
     test("a flying bird beats its wings continuously", function()

@@ -171,8 +171,11 @@ end
 -- (its reach saturated at 0.181 studs and past ~50 degrees it read as a cape), and nothing lifts
 -- that geometry any more. A real spread wing wants a real beat.
 BirdFlight.WING_MAX_DEG = 55
-BirdFlight.WING_TUCKED = 0.06 -- bone scale when perched; measured to sit inside the flank
-BirdFlight.WING_OPEN_TIME = 0.28 -- seconds from tucked to full spread
+-- The FOLD, in degrees per bone. Measured in Blender and verified in Roblox: at these angles the
+-- wing draws in against the flank; at 0/0 it is fully spread.
+BirdFlight.FOLD_SHOULDER = -70
+BirdFlight.FOLD_WRIST = -110
+BirdFlight.WING_OPEN_TIME = 0.28 -- seconds from folded to full spread
 
 local FLAP_RATE = 16.0 -- rad/sec in flight; ~2.5 beats a second
 local FLUTTER_PERIOD = 9.0 -- average gap between perched flutters
@@ -185,22 +188,35 @@ local function hash01(n: number): number
     return h - math.floor(h)
 end
 
--- How far the wings are OPEN, as a bone scale: WING_TUCKED perched, 1.0 in flight.
+-- How far the wings are OPEN: 0 folded, 1 fully spread. The controller turns this into the two
+-- fold angles and into the wings part's Transparency.
 --
--- ⚠ THE OPENING IS EASED, NOT SNAPPED. A wing that pops to full span in one frame reads as a
--- glitch; over WING_OPEN_TIME it reads as the bird spreading them, and the launch it accompanies
--- hides the rest. Closing IS instant, on purpose: a bird that has landed has already folded, and
--- easing it shut would leave the wings half-open on a perched bird -- the one pose the modelled
--- folded wing exists to prevent.
+-- ⚠ THIS USED TO RETURN A BONE SCALE AND THAT WAS UNSHIPPABLE. `Bone.Transform` DISCARDS SCALE in
+-- Roblox -- measured, set 0.06 and it reads back 1.0000, because a bone transform is rigid by
+-- definition. Rotation and translation survive; scale cannot. The tests passed anyway, because
+-- they only asserted the number this function returned and never that Roblox honoured it.
+--
+-- ⚠ AND FOLDING ALONE CANNOT HIDE A WING. Measured: at the best fold, 93 of 208 wing vertices are
+-- still outside the body. The wings are therefore a SEPARATE MeshPart whose Transparency the
+-- controller drives -- owner, 2026-08-22: wings "should completely disappear when the bird is
+-- perched/at rest... only unfold when the bird takes flight".
+--
+-- Opening is eased with per-bird jitter so fifty birds do not spread as one. Closing is INSTANT,
+-- on purpose: the owner asked for wings that "quickly fold in and disappear when it lands", and
+-- easing shut would leave a perched bird holding its wings half-open.
 function BirdFlight.wingExtension(elapsed: number, seed: number, flying: boolean): number
     if not flying then
-        return BirdFlight.WING_TUCKED
+        return 0
     end
-    -- Per-bird jitter on the opening, so fifty birds launching together do not spread as one.
     local span = BirdFlight.WING_OPEN_TIME * (0.85 + 0.30 * hash01(seed))
     local k = math.min(1, math.max(0, elapsed / span))
-    local ease = 1 - (1 - k) * (1 - k) * (1 - k)
-    return BirdFlight.WING_TUCKED + (1 - BirdFlight.WING_TUCKED) * ease
+    return 1 - (1 - k) * (1 - k) * (1 - k)
+end
+
+-- The two fold angles for a given openness, in DEGREES. Folded at 0, spread at 1.
+function BirdFlight.foldAngles(open: number): (number, number)
+    local k = math.min(1, math.max(0, open))
+    return BirdFlight.FOLD_SHOULDER * (1 - k), BirdFlight.FOLD_WRIST * (1 - k)
 end
 
 -- How far the wings are lifted, in DEGREES, as a pure function of time and seed.

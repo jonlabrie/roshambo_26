@@ -10,7 +10,8 @@
             "RoshamboShared": { "$path": "src/shared" },
             "RoshamboBirds": {
                 "$className": "Folder",
-                "Uguisu": { "$path": "assets/meshes/Uguisu.rbxm" }
+                "UguisuBody": { "$path": "assets/meshes/UguisuBody.rbxm" },
+                "UguisuWings": { "$path": "assets/meshes/UguisuWings.rbxm" }
             },
             "RoshamboRemotes": {
                 "$className": "Folder",
