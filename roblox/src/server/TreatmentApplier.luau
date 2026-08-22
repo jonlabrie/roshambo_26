@@ -5,6 +5,11 @@
 -- deck; embed/void corners get none), shuttering the structure when not lit. Roblox
 -- datatypes -> not Lune-testable; proven by the visual gate. A thin adapter:
 -- the builders/ops/catalog are injected.
+-- ⚠ KamonDraw is the RENDERER ONLY. The note below still holds: WHOSE crest this is arrives on
+-- the treatment, computed at the call site, so this file never decides affiliation. Drawing one
+-- is a different dependency from choosing one.
+local KamonDraw = require("../shared/KamonDraw")
+
 local TreatmentApplier = {}
 TreatmentApplier.__index = TreatmentApplier
 
@@ -182,41 +187,11 @@ end
 --
 -- ⚠ ONLY ON A LIT DECK. A vacant pad flying somebody's crest would say a house is home when it is
 -- not, and the shoji glow already carries occupancy — this must agree with it.
-local FLAG_INK = Color3.fromRGB(28, 26, 24)
-local FLAG_CLOTH = Color3.fromRGB(228, 220, 202)
+local FLAG_CLOTH = KamonDraw.CLOTH
 
--- Draws a crest from Kamon's three primitives — ring, disc, bar — into a SurfaceGui. Kept local:
--- one caller today, and the catalog's whole point is that these three cover every crest, so this
--- stays short. Extract it when a second surface (noren, alcove scroll) wants one.
-local function drawCrest(gui: SurfaceGui, crest: any, cellPx: number)
-    for _, sh in crest.shapes or {} do
-        local f = Instance.new("Frame")
-        f.BorderSizePixel = 0
-        f.AnchorPoint = Vector2.new(0.5, 0.5)
-        f.Position = UDim2.fromOffset(cellPx / 2 + (sh.x or 0) * cellPx, cellPx / 2 + (sh.y or 0) * cellPx)
-        if sh.kind == "bar" then
-            f.Size = UDim2.fromOffset(math.max(1, sh.w * cellPx), math.max(1, sh.h * cellPx))
-            f.BackgroundColor3 = FLAG_INK
-            f.Rotation = sh.rot or 0
-        else
-            local d = math.max(2, sh.r * 2 * cellPx)
-            f.Size = UDim2.fromOffset(d, d)
-            local corner = Instance.new("UICorner")
-            corner.CornerRadius = UDim.new(0.5, 0)
-            corner.Parent = f
-            if sh.kind == "disc" then
-                f.BackgroundColor3 = FLAG_INK
-            else
-                f.BackgroundTransparency = 1
-                local stroke = Instance.new("UIStroke")
-                stroke.Thickness = math.max(1, sh.t * cellPx)
-                stroke.Color = FLAG_INK
-                stroke.Parent = f
-            end
-        end
-        f.Parent = gui
-    end
-end
+-- Crest drawing lives in Kamon.draw as of 2026-08-22 — the sashimono is the second surface the
+-- note that used to sit here anticipated.
+local drawCrest = KamonDraw.draw
 
 function TreatmentApplier:_buildNobori(
     padId: string,
