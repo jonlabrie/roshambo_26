@@ -188,6 +188,58 @@ local function hash01(n: number): number
     return h - math.floor(h)
 end
 
+-- ===== IDLE =====
+-- ⚠ A PERCHED BIRD IS ~90% OF VIEWING TIME AND IT WAS DOING NOTHING AT ALL (owner, 2026-08-22:
+-- "the bird does nothing while perched"). This is the cheapest sign of life in the whole
+-- familiar, and it is worth more than the flight it sits between.
+--
+-- ⚠ THE HEAD SNAPS AND HOLDS. It does not sweep. A bird's head jumps to a new angle in about a
+-- tenth of a second, holds for a second or two, and jumps again -- a smooth pan reads as a
+-- security camera, not an animal. A test pins that the head is STILL for most of any sample,
+-- which is the property that makes it read as a bird.
+BirdFlight.HEAD_YAW_MAX = 62 -- degrees; a small bird turns further than this, but past it the
+BirdFlight.HEAD_PITCH_MAX = 18 -- neck geometry shears rather than rotates
+local LOOK_HOLD = 1.55 -- average seconds between head moves
+local LOOK_SNAP = 0.11 -- and how long the move itself takes
+local TAIL_PERIOD = 5.2 -- warblers flick the tail constantly; this is the average gap
+local TAIL_STROKE = 0.28 -- one flick, down and back
+local TAIL_MAX = 9 -- degrees
+
+-- Where a perched bird is looking, and what its tail is doing, at time `elapsed`.
+-- Returns head yaw, head pitch and tail pitch, all in DEGREES. Pure and seed-deterministic, so
+-- two clients watching the same bird see the same idle.
+function BirdFlight.idlePose(elapsed: number, seed: number): (number, number, number)
+    -- Slots of ~LOOK_HOLD, each with its own target. Jittered per slot so the rhythm is not a
+    -- metronome, which is the other way a fake idle gives itself away.
+    local phase = elapsed / LOOK_HOLD + seed
+    local slot = math.floor(phase)
+    local function target(i: number): (number, number)
+        local a = hash01(i * 1.37 + seed * 5.11)
+        local b = hash01(i * 2.71 + seed * 3.19)
+        return (a * 2 - 1) * BirdFlight.HEAD_YAW_MAX, (b * 2 - 1) * BirdFlight.HEAD_PITCH_MAX
+    end
+    local fromYaw, fromPitch = target(slot - 1)
+    local toYaw, toPitch = target(slot)
+    -- The snap happens at the START of the slot; the rest of the slot is a hold.
+    local into = (phase - slot) * LOOK_HOLD
+    local k = math.min(1, math.max(0, into / LOOK_SNAP))
+    local ease = 1 - (1 - k) * (1 - k) * (1 - k)
+    local yaw = fromYaw + (toYaw - fromYaw) * ease
+    local pitch = fromPitch + (toPitch - fromPitch) * ease
+
+    -- The tail flick is on its own clock, so it does not always land with a head turn.
+    local tphase = elapsed / TAIL_PERIOD + seed * 0.61
+    local tslot = math.floor(tphase)
+    local start = 0.1 + hash01(tslot + seed * 9.7) * 0.7
+    local tinto = (tphase - tslot - start) * TAIL_PERIOD
+    local tail = 0
+    if tinto >= 0 and tinto <= TAIL_STROKE then
+        -- one stroke: down and back, never a wag
+        tail = math.sin(math.pi * tinto / TAIL_STROKE) * TAIL_MAX
+    end
+    return yaw, pitch, tail
+end
+
 -- How far the wings are OPEN: 0 folded, 1 fully spread. The controller turns this into the two
 -- fold angles and into the wings part's Transparency.
 --

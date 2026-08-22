@@ -124,6 +124,9 @@ type Bird = {
     wingR: Bone?,
     wristL: Bone?,
     wristR: Bone?,
+    head: Bone?,
+    neck: Bone?,
+    tail: Bone?,
     seed: number,
     flyingSince: number?, -- when this flight began, or nil while perched: the wings OPEN over
     state: string, -- time and the ease has to start from the launch, not from os.clock()
@@ -201,6 +204,12 @@ local function makeBird(userId: string): Bird
         wingR = bone("wing_R"),
         wristL = bone("wrist_L"),
         wristR = bone("wrist_R"),
+        -- joint4 carries the head, joint3 the neck below it, joint8 the tail base. Splitting a
+        -- head turn across TWO bones is what keeps the neck from shearing: the neck takes the
+        -- lead and the head follows, which is also the order a real bird moves in.
+        head = bone("joint4"),
+        neck = bone("joint3"),
+        tail = bone("joint8"),
         seed = seedFor(userId),
         flyingSince = nil,
         state = "RESTING",
@@ -515,6 +524,23 @@ RunService.RenderStepped:Connect(function(dt)
             end
             if b.wristL then
                 b.wristL.Transform = CFrame.Angles(0, 0, math.rad(-wrist))
+            end
+
+            -- ===== IDLE =====
+            -- ⚠ ONLY WHILE PERCHED. A bird in the air is not looking around; it is going
+            -- somewhere, and a head snapping about mid-flight reads as a glitch.
+            local idleYaw, idlePitch, idleTail = 0, 0, 0
+            if not flying then
+                idleYaw, idlePitch, idleTail = BirdFlight.idlePose(now, b.seed)
+            end
+            if b.neck then
+                b.neck.Transform = CFrame.Angles(math.rad(idlePitch * 0.35), math.rad(idleYaw * 0.4), 0)
+            end
+            if b.head then
+                b.head.Transform = CFrame.Angles(math.rad(idlePitch * 0.65), math.rad(idleYaw * 0.6), 0)
+            end
+            if b.tail then
+                b.tail.Transform = CFrame.Angles(math.rad(idleTail), 0, 0)
             end
 
             if b.billLower then

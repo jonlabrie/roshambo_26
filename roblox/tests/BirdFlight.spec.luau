@@ -196,6 +196,76 @@ describe("BirdFlight", function()
         expect(differs).toBe(true)
     end)
 
+    test("a perched bird's head SNAPS and HOLDS rather than sweeping", function()
+        -- ⚠ THIS IS THE WHOLE POINT OF THE IDLE. A bird does not pan its head smoothly; it
+        -- snaps to a new angle, holds it, and snaps again. A sinusoidal sweep reads as a
+        -- security camera. So the head must be STILL for most of any sample.
+        local moving, samples = 0, 0
+        local prev = nil
+        for t = 0, 60, 1 / 30 do
+            local yaw = BirdFlight.idlePose(t, 7)
+            if prev ~= nil and math.abs(yaw - prev) > 0.20 then
+                moving += 1
+            end
+            prev = yaw
+            samples += 1
+        end
+        local share = moving / samples
+        expect(share > 0.01).toBe(true) -- it does move
+        expect(share < 0.30).toBe(true) -- but it is mostly holding a pose
+    end)
+
+    test("the head never turns further than a bird's neck allows", function()
+        for t = 0, 120, 0.05 do
+            local yaw, pitch = BirdFlight.idlePose(t, 7)
+            expect(math.abs(yaw) <= BirdFlight.HEAD_YAW_MAX + 0.001).toBe(true)
+            expect(math.abs(pitch) <= BirdFlight.HEAD_PITCH_MAX + 0.001).toBe(true)
+        end
+    end)
+
+    test("the head actually visits several distinct angles", function()
+        -- A "snap and hold" that always returns to the same spot is a twitch, not looking around.
+        local seen = {}
+        for t = 0, 60, 0.25 do
+            local yaw = BirdFlight.idlePose(t, 7)
+            seen[math.floor(yaw / 6)] = true
+        end
+        local n = 0
+        for _ in pairs(seen) do
+            n += 1
+        end
+        expect(n >= 4).toBe(true)
+    end)
+
+    test("the tail flicks: rare, brief, and always a downward stroke", function()
+        -- Warblers flick the tail constantly, and it is one of the cheapest signs of life. It
+        -- must not read as a wag: the stroke goes one way and returns.
+        local flicking, samples, peak = 0, 0, 0
+        for t = 0, 120, 1 / 30 do
+            local _, _, tail = BirdFlight.idlePose(t, 7)
+            expect(tail >= -0.001).toBe(true) -- one direction only
+            if tail > 0.5 then
+                flicking += 1
+            end
+            peak = math.max(peak, tail)
+            samples += 1
+        end
+        expect(flicking / samples < 0.15).toBe(true)
+        expect(peak > 3).toBe(true)
+    end)
+
+    test("idle is deterministic per seed, and two birds do not idle in lockstep", function()
+        expect(BirdFlight.idlePose(3.3, 7)).toBe(BirdFlight.idlePose(3.3, 7))
+        local differs = false
+        for t = 0, 60, 0.25 do
+            if BirdFlight.idlePose(t, 7) ~= BirdFlight.idlePose(t, 8) then
+                differs = true
+                break
+            end
+        end
+        expect(differs).toBe(true)
+    end)
+
     test("is deterministic per seed, so two clients draw the same bird", function()
         local a = BirdFlight.offsetFor("RESTING", 3.3, 7)
         local b = BirdFlight.offsetFor("RESTING", 3.3, 7)
