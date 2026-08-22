@@ -264,6 +264,23 @@ local function sing(b: Bird, isOwn: boolean)
     s:Play()
 end
 
+-- ⚠ MEASURE THE SHOULDER, DO NOT GUESS IT. BirdFlight's SHOULDER constant put the bird's feet
+-- 0.189 studs (2.3 inches) above the arm and inboard of it -- owner, 2026-08-22: "still at least
+-- 3 inches above my shoulder". Measured on a live R15: RightUpperArm top sits at y +0.811,
+-- x +1.128 from the HumanoidRootPart, and neither number is a constant across avatars -- R6,
+-- R15 and scaled bodies all differ. Take it from the character when the part is there.
+local function shoulderSeat(character: Model): Vector3?
+    local arm = character:FindFirstChild("RightUpperArm") or character:FindFirstChild("Right Arm")
+    local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+    if not (arm and arm:IsA("BasePart") and root) then
+        return nil
+    end
+    local top = arm.Position + Vector3.new(0, arm.Size.Y * 0.5, 0)
+    local local_ = root.CFrame:PointToObjectSpace(top)
+    -- a shade inboard of the arm's outer face so the bird stands ON it, not on its edge
+    return Vector3.new(local_.X - arm.Size.X * 0.18, local_.Y, local_.Z)
+end
+
 local function characterRoot(userId: string): BasePart?
     for _, pl in Players:GetPlayers() do
         if tostring(pl.UserId) == userId then
@@ -419,6 +436,18 @@ RunService.RenderStepped:Connect(function()
             -- A result takes the bird off its perch entirely: it is doing something, not sitting.
             release(b)
             local o = BirdFlight.offsetFor(b.state, elapsed, b.seed)
+            if b.state == "WIN" then
+                -- Keep BirdFlight's HOP (the x shuffle and y bob) but re-base it on the seat
+                -- measured off this avatar, rather than on its guessed constant.
+                local seat = root.Parent and shoulderSeat(root.Parent :: Model)
+                if seat then
+                    o = {
+                        x = seat.X + (o.x - BirdFlight.SHOULDER_X),
+                        y = seat.Y + (o.y - BirdFlight.SHOULDER_Y),
+                        z = seat.Z + o.z,
+                    }
+                end
+            end
             target = (root.CFrame * CFrame.new(o.x, o.y, o.z)).Position
         else
             if b.perch and perchIsGone(b.perch) then
@@ -509,8 +538,12 @@ RunService.RenderStepped:Connect(function()
         -- vector of nearly zero, so it would snap to a default axis and read as broken. On the
         -- shoulder it looks where its host looks, turned slightly outward so it is in profile
         -- rather than nose-on -- a bird is only identifiable from the side.
+        -- ⚠ THE WIN FACING APPLIED DURING THE WHOLE APPROACH, so the bird flew to the shoulder
+        -- already turned outboard -- owner: "it look like it was flying sideways as part of it's
+        -- pathfinding to the avatar". A bird faces where it is GOING until it lands; the shoulder
+        -- pose is an arrival pose, not a travel one.
         local base: CFrame
-        if b.state == "WIN" and not resting then
+        if b.state == "WIN" and not resting and k >= 1 then
             base = CFrame.new(b.pos)
                 * (root.CFrame - root.CFrame.Position)
                 * CFrame.Angles(0, math.rad(BirdFlight.SHOULDER_YAW), 0)

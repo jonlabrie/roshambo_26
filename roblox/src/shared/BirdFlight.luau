@@ -93,6 +93,7 @@ BirdFlight.SHOULDER_YAW = -46 -- degrees outboard; also puts the bird in profile
 -- Exported so the hop test can assert about the SHAPE of the hop without hardcoding the offset,
 -- which would then need editing every time the perch is retuned.
 BirdFlight.SHOULDER_X = SHOULDER.x
+BirdFlight.SHOULDER_Y = SHOULDER.y
 local HOP_PERIOD = 0.62 -- one hop; a small bird's is quick
 local HOP_HEIGHT = 0.13
 local HOP_SHUFFLE = 0.09 -- side to side across the shoulder, because a hop turns the bird
