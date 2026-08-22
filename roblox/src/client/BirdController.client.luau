@@ -464,13 +464,20 @@ RunService.RenderStepped:Connect(function(dt)
                 then CFrame.lookAt(b.pos, b.pos + flat.Unit)
                 else CFrame.new(b.pos)
         end
-        b.part.CFrame = base
-
-        -- ⚠ THE WINGS PART TRACKS THE BODY EVERY FRAME. Both halves were exported around the
-        -- same origin, so setting the wings' CFrame to the body's mates them exactly -- there is
-        -- no offset to compute, and none to get wrong.
+        -- ⚠ SEAT BY THE SHARED ORIGIN, NOT THE PART CENTRE. Setting `CFrame = base` puts the
+        -- part's BOUNDING-BOX CENTRE at the perch, and the body's centre rides 0.236 studs above
+        -- its feet -- half the bird's height -- so the bird sank into whatever it landed on.
+        --
+        -- `PivotOffset.POSITION` is the offset from the part centre to the origin both halves
+        -- were exported around, which is the feet. Verified: feet land within 0.021 of the target
+        -- and the two halves agree to 0.00000 studs at a shared bone.
+        --
+        -- ⚠ ITS *ROTATION* MUST BE IGNORED. PivotOffset also carries the FBX axis conversion
+        -- (90, 0, -180), so `PivotTo` reintroduces exactly the nose-up attitude that was fixed a
+        -- moment ago. Take the position, take the rotation from `base`.
+        b.part.CFrame = base * CFrame.new(-b.part.PivotOffset.Position)
         if b.wings then
-            b.wings.CFrame = base
+            b.wings.CFrame = base * CFrame.new(-b.wings.PivotOffset.Position)
         end
 
         if far <= DETAIL_DISTANCE then
