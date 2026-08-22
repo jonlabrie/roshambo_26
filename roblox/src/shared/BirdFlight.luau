@@ -78,10 +78,18 @@ export type Point = { x: number, y: number, z: number }
 -- ⚠ IF THE ANSWER IS "SCALE THE BIRD UP" RATHER THAN "BRING IT CLOSER", REVERT THIS and restore
 -- the high orbit: the crowd-occlusion argument for vertical separation is still sound, and it is
 -- what the LOSS and RESTING holds still rely on.
--- ⚠ PUSHED OUT AND FORWARD 2026-08-21: at x=0.62 the tail feathers disappeared into the avatar's
--- head about half the time (owner). A tail is ~0.3 studs of the bird's 0.83 and it trails BEHIND
--- the perch point, so the offset has to clear the head by more than the bird's own width.
-local SHOULDER = { x = 0.86, y = 1.02, z = -0.42 }
+-- ⚠ THE Z SIGN CAUGHT ME OUT: in Roblox -Z IS FORWARD, so the z = -0.42 that shipped here put
+-- the bird 0.42 studs IN FRONT of the shoulder, hovering off the body -- owner, 2026-08-22:
+-- "perched in mid-air, about 6 inches up and forward of my shoulder". The comment that used to
+-- sit here claimed it was BEHIND. It did clear the tail from the avatar's head, but only by
+-- accident, by moving the whole bird away.
+--
+-- The bird now sits ON the shoulder, and the tail is cleared the right way instead: by yawing it
+-- further outboard (see SHOULDER_YAW) so the tail swings away from the head rather than the whole
+-- bird standing off.
+local SHOULDER = { x = 0.86, y = 1.00, z = -0.06 }
+BirdFlight.SHOULDER_YAW = -46 -- degrees outboard; also puts the bird in profile, which is the
+-- only angle a small bird is identifiable from
 -- Exported so the hop test can assert about the SHAPE of the hop without hardcoding the offset,
 -- which would then need editing every time the perch is retuned.
 BirdFlight.SHOULDER_X = SHOULDER.x

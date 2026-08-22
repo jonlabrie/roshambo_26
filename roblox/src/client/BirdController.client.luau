@@ -482,7 +482,16 @@ RunService.RenderStepped:Connect(function()
         local dist = leg.Magnitude
         local k = if b.flightFor > 0 then math.min(1, (now - b.flightAt) / b.flightFor) else 1
         local prev = b.pos
-        if dist < 0.02 then
+        if k >= 1 then
+            -- ⚠ ONCE ARRIVED, TRACK THE LIVE TARGET, NOT THE COMMITTED ONE. The flight model
+            -- commits to a route and only replans when the destination moves more than 0.35
+            -- studs -- which is right for perch-to-perch travel, and WRONG the moment the bird
+            -- lands somewhere that moves. The WIN shoulder perch hops (bob 0.13, shuffle 0.09):
+            -- all under the threshold, so the bird froze at the spot it first arrived at and the
+            -- victory dance never played (owner, 2026-08-22). It also could not follow a player
+            -- who walked. Arrival ends the flight; after that the bird simply IS at its target.
+            b.pos = target
+        elseif dist < 0.02 then
             b.pos = to
         else
             local along, side, rise = BirdFlight.flightPoint(k, dist, b.flightShape)
@@ -504,7 +513,7 @@ RunService.RenderStepped:Connect(function()
         if b.state == "WIN" and not resting then
             base = CFrame.new(b.pos)
                 * (root.CFrame - root.CFrame.Position)
-                * CFrame.Angles(0, math.rad(-28), 0)
+                * CFrame.Angles(0, math.rad(BirdFlight.SHOULDER_YAW), 0)
         elseif travelled > 0.001 then
             base = CFrame.lookAt(b.pos, b.pos + heading)
         else

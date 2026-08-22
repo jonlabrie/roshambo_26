@@ -17,9 +17,10 @@ describe("BirdFlight", function()
         local settled = BirdFlight.offsetFor("WIN", 3, 7)
         expect(settled.y > 0.9 and settled.y < 1.4).toBe(true)
         expect(math.abs(settled.x) > 0.7).toBe(true) -- well off to one side, clear of the head
-        -- ⚠ and BEHIND the head: the tail trails backwards from the perch point, so a shoulder
-        -- offset that only clears sideways still buries the tail in the avatar.
-        expect(settled.z < -0.25).toBe(true)
+        -- ⚠ ON the shoulder, not hovering off it. This used to assert z < -0.25, which encoded a
+        -- sign error: Roblox -Z is FORWARD, so that put the bird in front of the avatar rather
+        -- than behind it, floating. The tail is cleared by yawing outboard, not by standing off.
+        expect(math.abs(settled.z) < 0.20).toBe(true)
         -- A result must outlast the instant it happened — glancing over a few seconds later
         -- should still tell you what happened.
         for _, t in { 3, 8, 14 } do
