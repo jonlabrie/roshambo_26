@@ -575,3 +575,33 @@ coordinates I chose badly. Both now sit in `Workspace.Sandbox` 12 studs above Ar
 nothing within 5 studs. Place-only; neither is Rojo-owned and neither belongs in RoshamboStage.
 
 ⚠ The mesh is NOT wired into play. `BirdController` still builds four parts.
+
+## [2026-08-22] ship | The familiar flies, folds, sings and looks around
+
+A long build over three days, and the shape of it changed several times under contact with
+Roblox's limits. The bird is now a two-part skinned mesh with a real flight model and an idle.
+As-built on [[familiars]]; engine limits and importer traps on [[blender-pipeline]].
+
+**What Roblox would not do, each found after being designed around:** `Bone.Transform` discards
+scale; a single rigid bone cannot shorten and so cannot fold; and geometry cannot be hidden by
+moving it. The wings are therefore a separate MeshPart with `Transparency = 1` — the only
+mechanism that satisfies the owner's "completely disappear when perched" — and still skinned, so
+they keep a two-bone fold.
+
+**Owner rulings this session:** wings vanish entirely at rest and only unfold for flight; grade
+bands are set aside ("birds simply aren't large enough for it to matter, unless we design our own
+kind of (presumably larger) bird, like a raven/crow to carry it"); flight needs takeoff/cruise/
+landing phases and paths that are not beelines; the victory hop is a weight shift between feet
+rather than the whole bird sliding.
+
+**On my own accuracy.** I twice reported a fold "scored zero" and was wrong both times — once
+measuring a single vertex, once sampling a body mesh that had already been freed, so every lookup
+returned zero. Measured properly, that fold left 84% of the wing outside the body. Separately, a
+shipped test asserted a minimum duration against the very constant it was testing, so zeroing the
+constant still passed. Mutation testing caught that one. The pattern worth carrying: **a metric
+that is satisfiable in a way you did not intend is worse than no metric**, and the way to find out
+is to break the code deliberately and check the right test fails.
+
+⚠ Not addressed, and a genuine conflict in the asks: the owner suggested wing flutter while
+perched, but the wings are hidden then. `BirdFlight.wingAngle` still computes a perched flutter
+nothing can see.

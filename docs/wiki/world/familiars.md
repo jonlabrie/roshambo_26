@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-20
+updated: 2026-08-22
 ---
 
 # Familiars — the bird that reads your round
@@ -123,29 +123,56 @@ separate tinted pieces** — crest, tail streamer — rather than a recoloured b
 better answer anyway: it keeps an uguisu an uguisu at every grade instead of producing five
 differently-painted birds.
 
-### The bill opens; the wings barely do
+### The bill opens, and the bird has TWO wings
 
 The bill is **split into two mandibles** — bisected along the gape, both halves capped, watertight
 (0 boundary edges, 0 non-manifold), +44 triangles. The cut stops short of the jaw so the halves
-stay joined at the back: a real hinge, and no hole in the head. `bill_lower` drives it; gape at
-the tip measures 0.0099 / 0.0168 / 0.0224 studs at 12° / 22° / 32°.
+stay joined at the back: a real hinge, and no hole in the head. Gape at the tip measures
+0.0099 / 0.0168 / 0.0224 studs at 12° / 22° / 32°.
 
-⚠ **WING LIFT IS CAPPED AT 30°, AND THE NUMBER IS A MEASUREMENT.** The mesh carries a FOLDED
-wing, and a folded wing is short — there is no hidden wing area to unfold, so lifting it stretches
-flank surface instead of opening a wing. Reach saturates: 0.072 studs folded, 0.109 at 30°, 0.146
-at 50°, 0.171 at 70°, 0.181 at 90° — and 70→90 buys 0.009. Past ~50° it reads as a **cape**.
-`BirdFlight.WING_MAX_DEG` holds the limit and a test pins it, because a Blender bone constraint
-cannot survive FBX. **A real spread needs a separate spread-wing mesh shown only in flight**; the
-30° cap buys the flare and the flutter, not flight.
+⚠ **THE BIRD HAS TWO WINGS AND THEY NEVER COEXIST.** A **folded** wing is sculpted into the flank
+and painted with its covert edge — that is the accurate one, and it is what shows for the ~90% of
+the time the bird is perched. A **spread** wing lives in a SEPARATE MeshPart (`UguisuWings`,
+824 tris, `wing_R`/`wing_L` + `wrist_R`/`wrist_L`) and exists only in flight. Because they are
+never both visible, neither compromises for the other. The folded wing is not the compromise —
+the spread one is the approximation.
 
-Wings use SOFT WEIGHTS, not a split — unlike the bill. The bill needed cutting because its two
-mandibles met at a single shared apex vertex, and no weighting separates a point from itself. A
-wing has no such point, and an attempted split produced 16 non-manifold edges. Owner on the
-behaviour: *"even a perched bird flutters its wings occasionally, and certainly when arriving or
-leaving a perch"* — so `BirdFlight.wingAngle` is zero except for short jittered bursts, with a
-test asserting the wings move between 2% and 25% of the time.
+⚠ **THE WINGS ARE A SEPARATE PART BECAUSE NOTHING ELSE CAN HIDE THEM.** Owner ruling
+2026-08-22: they "should completely disappear when the bird is perched/at rest". Three approaches
+were built and failed — bone scale (Roblox discards it), folding (93 of 208 verts stay outside the
+body), and translating inside (a 0.22-long folded wing only fits a 0.22-wide body if perfectly
+aligned). `Transparency = 1` is the only complete answer. All three failures are on
+[[blender-pipeline]] so nobody rebuilds them.
 
-## Still thin
+Two bones per wing, hinged at 46% of span: **0.467 studs spread → 0.093 folded**, inside the
+0.112 body half-width. Verified in Roblox, not only in Blender.
+
+### Flight, and the idle that matters more
+
+⚠ **A FLIGHT IS A SHAPED PATH OVER A MINIMUM DURATION**, not a lerp. The original
+`Lerp(target, speedCappedStep)` at 34 studs/sec caused three separate symptoms from one line: no
+ramp, a **slide** along rails (a short hop finished inside two frames, so the branch that turns
+the bird never ran long enough to see), and invisible wings (0.6s crossings against a 0.28s
+unfold). Now: `FLIGHT_MIN_TIME` 0.85s, `CRUISE_SPEED` **11** — a real songbird's ~33 is 40
+body-lengths/sec at this size and reads as teleporting, so believable speed is the wrong target.
+Three phases, with `along` computed as the **integral of a speed profile** tied to the phase
+boundaries so position and phase cannot disagree. Three path shapes: DIRECT, ARC, CIRCLE (the
+owner's "half circle around the perch while spotting the landing zone").
+
+⚠ **PERCHED IS ~90% OF VIEWING TIME AND IT WAS INERT.** The idle is the cheapest sign of life in
+the whole familiar. **The head snaps and holds** — a smooth pan reads as a security camera — and
+42% of moves are **checks**: go look, come straight back, which is what stops the bird reading as
+slowly rotating over time. Plus a tail flick on its own clock.
+
+The victory hop is a **weight shift**, not a slide: the bird stays put, the feet alternate on the
+two independent leg chains the vendor rig provided, and the body rolls toward whichever foot is
+planted. A bird never lifts both feet while perched, and a test pins it.
+
+⚠ **THE SHOULDER SEAT IS MEASURED OFF THE AVATAR, NOT A CONSTANT.** `RightUpperArm`'s top sits at
+y +0.811, x +1.128 from the HumanoidRootPart on a stock R15 — and R6, R15 and scaled bodies all
+differ, so no constant could be right.
+
+## Still thin## Still thin
 
 - **Plumage is band colour only.** The spec describes a lengthening tail streamer, a crest and a
   night glow off `nightFactor`; none is built, so "you wear your grade" currently reads as a

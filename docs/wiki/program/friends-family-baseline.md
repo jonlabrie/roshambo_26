@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: open
-updated: 2026-08-20
+updated: 2026-08-22
 ---
 
 # Friends & Family Baseline
@@ -43,6 +43,12 @@ rounds skippable, no penalty) — hangout is the product.
    the player who earned it. Carries the parked economy-API defects (a)–(c) in [[parked-defects]].
    Any badge that claims SKILL depends on (h) being ACTIVE, not merely fixed; volume badges do
    not — which is exactly why grade is built on milestones rather than on a rate.
+   **2026-08-22: the familiar flies, folds, sings and looks around** — two-part skinned mesh,
+   three-phase flight with non-beeline paths, a snap-and-hold idle with check moves, and a
+   weight-shift victory hop. Wired into play and owner-gated ("looking good enough for now").
+   ⚠ Grade bands are SET ASIDE, not solved — a 7-inch bird cannot carry status at arena
+   distance, and the owner's answer is a larger bird (raven/crow) rather than a colour scheme.
+   That leaves item 6's REWARD half unproven even though its display half now works.
    **2026-08-20: the familiar is now a real bird.** A skinned, textured, rigged uguisu is in the
    place and verified — owner: *"it looks right, and it looks good"* ([[familiars]]). NOT yet
    wired: `BirdController` still builds four parts, so nothing in play uses it. Three changes

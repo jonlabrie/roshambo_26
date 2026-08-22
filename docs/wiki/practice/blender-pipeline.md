@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-20
+updated: 2026-08-22
 ---
 
 # Blender Pipeline
@@ -201,6 +201,52 @@ the rotation half of it, and it cost a full round of wrong diagnosis.
 `holes_fill` on every boundary edge → `recalc_face_normals`. Verify with counts, not by looking:
 0 boundary edges and 0 non-manifold edges means watertight. Stop the cut SHORT of the hinge so
 the two halves stay joined at the back — that gives a real hinge and leaves no hole in the body.
+
+### ⚠ Roblox's limits on a skinned rig — three things that DO NOT work
+
+Found the hard way building the familiar, each after being designed around:
+
+**`Bone.Transform` DISCARDS SCALE.** Measured: set a bone's Transform to a CFrame carrying scale
+0.06 and read it back — the CFrame itself carries 0.06, the property returns 1.0000, and the
+rendered part does not change size at any value. A bone transform is *rigid* by definition;
+rotation and translation survive, scale cannot. A whole "collapse the wings to hide them" design
+was built and committed on the assumption it worked, and its tests passed because they only
+asserted the number the function returned, never that Roblox honoured it.
+
+**A single rigid bone cannot shorten, so it cannot FOLD anything.** Swept back 88°, a wing's tip
+still reached 0.37 studs against a 0.112-stud body half-width — it swings forward past the head
+rather than tucking. A real wing folds at the wrist. **Two bones per wing** (shoulder + wrist,
+hinged at ~46% of span) does work: 0.467 spread → 0.093 folded, verified in Roblox.
+
+**Geometry cannot be hidden by moving it.** Folding plus translating still left 93 of 208 wing
+vertices outside the body. If something must vanish completely, it has to be a **separate
+MeshPart** with `Transparency = 1`. That part can still be skinned, so it keeps its bones.
+
+### ⚠ An imported MeshPart's CFrame and PivotOffset are IMPORTER ARTEFACTS
+
+This trap bit three times in one file, wearing a different hat each time:
+
+- **`PivotTo` bakes a rotation.** (§5 above.)
+- **A clone inherits the template's rotation.** `UguisuBody` imported with LookVector `(0, 1, 0)`
+  — nose straight up. Any code that reads a part's existing CFrame as a baseline inherits it. Set
+  an explicit rotation on clone; never carry one forward.
+- **`PivotOffset` carries the FBX axis conversion** — measured `(90, 0, -180)` on every part from
+  a single export. So `PivotTo(identity)` restores the nose-up attitude you just fixed.
+
+**The rule:** read POSITION from `PivotOffset` when you need the authored origin — that is
+genuinely useful, it is the offset from the bbox centre to the point the mesh was exported around
+— and never inherit either one's ROTATION. Take rotation from whatever you are aiming the object
+with.
+
+**Seat by the authored origin, not the bounding-box centre.** `part.CFrame = target` puts the
+CENTRE there. The uguisu's centre rides 0.236 studs above its feet, more than half its height, so
+every perched bird sank into its perch. `target * CFrame.new(-part.PivotOffset.Position)` puts the
+authored origin there instead — measured accurate to 0.021 studs, and two halves of a split mesh
+then agree to 0.00000 studs at a shared bone.
+
+**Splitting one skinned mesh into two parts** (body + wings) works and keeps both skinned. Export
+both seated on the SAME origin — seat the rig once, on one half, and let the other inherit it —
+or they mate with an offset that looks like a rigging bug.
 
 **Vendor source stays out of the repo**, same as the niwaki: it lives in
 `~/Desktop/Roshambo Reference/models/birds/`. Only derived, reduced output is committed.
