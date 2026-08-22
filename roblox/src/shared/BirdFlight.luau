@@ -95,8 +95,13 @@ BirdFlight.SHOULDER_YAW = -46 -- degrees outboard; also puts the bird in profile
 BirdFlight.SHOULDER_X = SHOULDER.x
 BirdFlight.SHOULDER_Y = SHOULDER.y
 local HOP_PERIOD = 0.62 -- one hop; a small bird's is quick
-local HOP_HEIGHT = 0.13
-local HOP_SHUFFLE = 0.09 -- side to side across the shoulder, because a hop turns the bird
+local HOP_HEIGHT = 0.05
+-- ⚠ THE HOP NO LONGER MOVES THE BIRD. It used to translate the whole body 0.09 studs each way
+-- across the shoulder, which read as sliding rather than hopping (owner, 2026-08-22: "change it
+-- from the whole bird hopping left to right to it simply hopping between left and right legs
+-- while staying in place"). The bird now stays put and the LEGS do the work -- see legPose.
+local LIFT_FRACTION = 0.34 -- how much of each beat a foot spends off the perch
+local BODY_ROLL = 4.5 -- degrees of lean toward the planted side
 
 local HOLD = {
     RESTING = { r = 2.6, y = 3.2, speed = 1.1 },
@@ -136,14 +141,7 @@ function BirdFlight.offsetFor(state: string, elapsed: number, seed: number): Poi
         -- was; after that it stays put and hops, which is the read the owner is testing for.
         local hop = elapsed / HOP_PERIOD
         local bob = math.abs(math.sin(hop * math.pi)) * HOP_HEIGHT
-        -- The shuffle alternates sides every hop rather than oscillating smoothly: a bird
-        -- re-plants its feet, it does not sway.
-        local side = (math.floor(hop) % 2 == 0) and 1 or -1
-        local perch = {
-            x = SHOULDER.x + side * HOP_SHUFFLE,
-            y = SHOULDER.y + bob,
-            z = SHOULDER.z,
-        }
+        local perch = { x = SHOULDER.x, y = SHOULDER.y + bob, z = SHOULDER.z }
         local k = math.min(1, elapsed / BirdFlight.ENTRY.WIN)
         if k >= 1 then
             return perch
@@ -195,6 +193,28 @@ local FLUTTER_PEAK = 0.55 -- a resting flutter is a twitch, not a display
 local function hash01(n: number): number
     local h = math.sin(n * 12.9898) * 43758.5453
     return h - math.floor(h)
+end
+
+-- How much each foot is lifted (0 planted, 1 fully up) and how far the body leans, in degrees.
+--
+-- ⚠ A BIRD NEVER LIFTS BOTH FEET WHILE PERCHED -- that is letting go of the branch, and a test
+-- pins it. The feet alternate on the hop clock, each spending only a third of its beat in the
+-- air, and the body ROLLS toward whichever foot is planted. That roll is what makes this read as
+-- weight shifting rather than as legs twitching independently of the bird above them.
+function BirdFlight.legPose(elapsed: number, seed: number): (number, number, number)
+    local phase = elapsed / HOP_PERIOD + seed * 0.37
+    local beat = math.floor(phase)
+    local into = phase - beat
+    local lift = 0
+    if into < LIFT_FRACTION then
+        lift = math.sin(math.pi * into / LIFT_FRACTION)
+    end
+    local leftUp = (beat % 2 == 0)
+    local l = if leftUp then lift else 0
+    local r = if leftUp then 0 else lift
+    -- lean AWAY from the raised foot, i.e. onto the one still holding on
+    local roll = (if leftUp then -1 else 1) * lift * BODY_ROLL
+    return l, r, roll
 end
 
 -- ===== FLIGHT =====

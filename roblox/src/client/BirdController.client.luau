@@ -130,6 +130,9 @@ type Bird = {
     head: Bone?,
     neck: Bone?,
     tail: Bone?,
+    hipL: Bone?,
+    hipR: Bone?,
+    root: Bone?,
     seed: number,
     flyingSince: number?,
     flightFrom: Vector3?, -- a flight is a PATH between two points, so both ends must be held
@@ -219,6 +222,11 @@ local function makeBird(userId: string): Bird
         head = bone("joint4"),
         neck = bone("joint3"),
         tail = bone("joint8"),
+        -- The two leg chains: joint12 -> joint13 -> joint14 and joint25 -> joint13.001 -> ...
+        -- Rotating the HIP swings the whole leg, which is the lift; the knee would only fold it.
+        hipL = bone("joint12"),
+        hipR = bone("joint25"),
+        root = bone("joint1"),
         seed = seedFor(userId),
         flyingSince = nil,
         flightFrom = nil,
@@ -611,6 +619,31 @@ RunService.RenderStepped:Connect(function()
             end
             if b.wristL then
                 b.wristL.Transform = CFrame.Angles(0, 0, math.rad(-wrist))
+            end
+
+            -- ===== FEET =====
+            -- ⚠ A HOP IS A WEIGHT SHIFT, NOT A SLIDE. The bird used to translate sideways across
+            -- the shoulder, which read as sliding; now it stays put and alternates feet, leaning
+            -- onto whichever one is still holding the perch (owner, 2026-08-22).
+            if b.state == "WIN" and not resting and not flying then
+                local liftL, liftR, roll = BirdFlight.legPose(now, b.seed)
+                if b.hipL then
+                    b.hipL.Transform = CFrame.Angles(math.rad(liftL * 26), 0, 0)
+                end
+                if b.hipR then
+                    b.hipR.Transform = CFrame.Angles(math.rad(liftR * 26), 0, 0)
+                end
+                if b.root then
+                    b.root.Transform = CFrame.Angles(0, 0, math.rad(roll))
+                end
+            elseif b.hipL then
+                b.hipL.Transform = CFrame.new()
+                if b.hipR then
+                    b.hipR.Transform = CFrame.new()
+                end
+                if b.root then
+                    b.root.Transform = CFrame.new()
+                end
             end
 
             -- ===== IDLE =====

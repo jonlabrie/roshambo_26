@@ -29,25 +29,75 @@ describe("BirdFlight", function()
         end
     end)
 
-    test("WIN hops rather than sitting still", function()
+    test("WIN still BOBS, even though it no longer shuffles", function()
+        -- ⚠ REPLACES a test that asserted the bird shuffled left and right across the shoulder.
+        -- That behaviour was removed on the owner's note that it "might make it look worse" — the
+        -- legs hop now (see legPose) and the body only rises and falls.
         local low, high = 99, 0
-        -- The exported constant, not a sampled position: sampling lands on ONE SIDE of the hop,
-        -- so the comparison would be against an edge rather than the centre and the test would
-        -- pass or fail on floating-point luck.
-        local centre = BirdFlight.SHOULDER_X
-        local left, right = false, false
-        for t = 2, 6, 0.02 do
+        for t = BirdFlight.ENTRY.WIN + 0.5, 10, 0.02 do
             local p = BirdFlight.offsetFor("WIN", t, 7)
             low, high = math.min(low, p.y), math.max(high, p.y)
-            if p.x < centre then
-                left = true
+        end
+        expect(high - low > 0.02).toBe(true)
+        expect(high - low < 0.12).toBe(true) -- a bob, not a bounce
+    end)
+
+    test("the victory hop stays IN PLACE — the bird does not shuffle sideways", function()
+        -- ⚠ Owner, 2026-08-22: "change it from the whole bird hopping left to right to it simply
+        -- hopping between left and right legs while staying in place". The old hop translated the
+        -- whole bird 0.09 studs each way, which read as sliding on the shoulder.
+        local xs = {}
+        -- sample AFTER the fly-in lerp has finished, or the approach itself moves x
+        for t = BirdFlight.ENTRY.WIN + 0.5, 10, 0.02 do
+            xs[#xs + 1] = BirdFlight.offsetFor("WIN", t, 7).x
+        end
+        local lo, hi = xs[1], xs[1]
+        for _, v in ipairs(xs) do
+            lo, hi = math.min(lo, v), math.max(hi, v)
+        end
+        expect(hi - lo < 0.01).toBe(true)
+    end)
+
+    test("the feet ALTERNATE, and never both leave the perch at once", function()
+        local bothUp, oneUp, samples = 0, 0, 0
+        local sawLeft, sawRight = false, false
+        for t = 0, 30, 1 / 60 do
+            local l, r = BirdFlight.legPose(t, 7)
+            expect(l >= 0 and l <= 1).toBe(true)
+            expect(r >= 0 and r <= 1).toBe(true)
+            if l > 0.35 and r > 0.35 then
+                bothUp += 1
             end
-            if p.x > centre then
-                right = true
+            if l > 0.35 or r > 0.35 then
+                oneUp += 1
+            end
+            if l > 0.5 then
+                sawLeft = true
+            end
+            if r > 0.5 then
+                sawRight = true
+            end
+            samples += 1
+        end
+        expect(bothUp).toBe(0) -- a bird that lifts both feet has let go of the branch
+        expect(sawLeft and sawRight).toBe(true) -- it really does alternate
+        expect(oneUp / samples < 0.55).toBe(true) -- and a hop is quick, not a permanent limp
+    end)
+
+    test("the body ROLLS toward whichever foot is planted", function()
+        -- The weight shift is what makes a hop-in-place read as weight rather than a twitch.
+        local worst = 0
+        for t = 0, 30, 1 / 60 do
+            local l, r, roll = BirdFlight.legPose(t, 7)
+            worst = math.max(worst, math.abs(roll))
+            if l > 0.6 then
+                expect(roll < 0.01).toBe(true) -- left foot up => lean right
+            elseif r > 0.6 then
+                expect(roll > -0.01).toBe(true)
             end
         end
-        expect(high - low > 0.08).toBe(true) -- it bobs
-        expect(left and right).toBe(true) -- and shuffles to both sides of the shoulder
+        expect(worst > 1).toBe(true)
+        expect(worst < 12).toBe(true)
     end)
 
     test("a result LAPSES, so a bird does not wear it until the next round", function()
