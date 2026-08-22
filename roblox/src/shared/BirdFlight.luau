@@ -188,6 +188,100 @@ local function hash01(n: number): number
     return h - math.floor(h)
 end
 
+-- ===== FLIGHT =====
+-- ⚠ THE BIRD USED TO SLIDE. Movement was a speed-capped lerp straight at the target: full speed
+-- on frame one, dead stop on arrival, no arc. Owner, 2026-08-22: "flying very fast between
+-- perches, there doesn't seem to be a smooth ramp... literally looks like the bird is sliding
+-- sideways down the rail." Three separate faults, all from that one line —
+--   * no ramp, because a speed cap has no acceleration;
+--   * the SLIDE, because a short hop finished inside one or two frames, so the branch that turns
+--     the bird to face its heading never got to run for long enough to see;
+--   * invisible wings, because a 20-stud crossing took ~0.6s and the wings need 0.28s to open.
+--
+-- So a flight is now a SHAPED PATH over a MINIMUM DURATION, in three phases.
+BirdFlight.FLIGHT_MIN_TIME = 0.85 -- even a hop to the next spot on the same rail takes this long
+BirdFlight.CRUISE_SPEED = 11 -- studs/sec. A real songbird does ~33, which at 0.83 studs long is
+-- 40 body-lengths a second and reads as teleporting. Believable speed is the wrong target here.
+local TAKEOFF_END = 0.20
+local LANDING_START = 0.68 -- landing is the LONGEST phase: the flare is what sells the arrival
+
+-- Which phase of a flight, given progress 0..1.
+function BirdFlight.flightPhase(k: number): string
+    if k < TAKEOFF_END then
+        return "TAKEOFF"
+    elseif k < LANDING_START then
+        return "CRUISE"
+    end
+    return "LANDING"
+end
+
+-- How long a flight of this distance should take. The floor is what stops a short hop finishing
+-- before the eye can register it.
+function BirdFlight.flightDuration(distance: number): number
+    return BirdFlight.FLIGHT_MIN_TIME + math.max(0, distance) / BirdFlight.CRUISE_SPEED
+end
+
+-- Which shape this bird flies on its Nth flight. Deterministic, so two clients agree.
+function BirdFlight.flightShape(seed: number, index: number): string
+    local r = hash01(index * 3.41 + seed * 11.7)
+    if r < 0.34 then
+        return "ARC"
+    elseif r < 0.55 then
+        return "CIRCLE"
+    end
+    return "DIRECT"
+end
+
+-- Where along the flight the bird is, at progress k.
+-- Returns `along` (0..1 of the straight line between perches), `side` and `rise` (studs off it).
+--
+-- ⚠ THE EASE IS DELIBERATELY ASYMMETRIC. A bird leaves a perch hard and arrives slowly: it
+-- accelerates in a couple of wingbeats, then bleeds speed into a flare. A symmetric smoothstep
+-- reads as a lift on rails.
+function BirdFlight.flightPoint(k: number, distance: number, shape: string): (number, number, number)
+    local t = math.min(1, math.max(0, k))
+    -- ⚠ `along` IS THE INTEGRAL OF A SPEED PROFILE, not an eased position curve, and it is tied
+    -- to the phase boundaries so the two can never disagree. Speed ramps 0 -> 1 across TAKEOFF,
+    -- holds through CRUISE, and bleeds 1 -> 0 across LANDING. That makes the bird start from rest
+    -- (it is sitting on a perch) and arrive slowly (a flare), which is what "no smooth ramp" was
+    -- asking for. Closed form rather than a numeric integral: this runs per bird per frame.
+    --   s(u) = u^2(3-2u)      smoothstep
+    --   ∫₀ˣ s = x³ - x⁴/2
+    local a, bnd = TAKEOFF_END, LANDING_START
+    local total = a * 0.5 + (bnd - a) + (1 - bnd) * 0.5
+    local dist
+    if t < a then
+        local x = t / a
+        dist = a * (x * x * x - 0.5 * x * x * x * x)
+    elseif t < bnd then
+        dist = a * 0.5 + (t - a)
+    else
+        local x = (t - bnd) / (1 - bnd)
+        local w = 1 - x
+        dist = a * 0.5 + (bnd - a) + (1 - bnd) * (0.5 - (w * w * w) + 0.5 * (w * w * w * w))
+    end
+    local along = dist / total
+
+    -- RISE: every flight bows upward, so none of them is a flat drag across the ground.
+    local bow = math.min(2.6, 0.16 * distance + 0.35)
+    local risePeak = 0.5
+    if shape == "ARC" then
+        bow = math.min(4.5, 0.30 * distance + 0.6)
+        risePeak = 0.42 -- climbs early, then a long glide down
+    end
+    local rp = if t < risePeak then t / risePeak * 0.5 else 0.5 + (t - risePeak) / (1 - risePeak) * 0.5
+    local rise = math.sin(math.pi * rp) * bow
+
+    -- SIDE: only CIRCLE leaves the straight line. Owner: "maybe sometimes a half circle around
+    -- the perch while spotting the landing zone" -- so the swing peaks LATE, near the target.
+    local side = 0
+    if shape == "CIRCLE" then
+        local radius = math.min(6.0, 0.42 * distance + 1.2)
+        side = math.sin(math.pi * t ^ 0.75) * radius
+    end
+    return along, side, rise
+end
+
 -- ===== IDLE =====
 -- ⚠ A PERCHED BIRD IS ~90% OF VIEWING TIME AND IT WAS DOING NOTHING AT ALL (owner, 2026-08-22:
 -- "the bird does nothing while perched"). This is the cheapest sign of life in the whole

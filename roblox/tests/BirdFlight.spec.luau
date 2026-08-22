@@ -292,6 +292,101 @@ describe("BirdFlight", function()
         expect(differs).toBe(true)
     end)
 
+    test("a flight has THREE PHASES, in order, and always all three", function()
+        -- Owner, 2026-08-22: "there needs to be phases - takeoff, flight, landing". A bird that
+        -- simply translates between perches reads as sliding, which is exactly what it did.
+        local seen = {}
+        local order = {}
+        for k = 0, 1.0001, 0.005 do
+            local ph = BirdFlight.flightPhase(math.min(1, k))
+            if order[#order] ~= ph then
+                table.insert(order, ph)
+            end
+            seen[ph] = true
+        end
+        expect(#order).toBe(3)
+        expect(order[1]).toBe("TAKEOFF")
+        expect(order[2]).toBe("CRUISE")
+        expect(order[3]).toBe("LANDING")
+    end)
+
+    test("a flight RAMPS: it is slow at both ends and quick in the middle", function()
+        -- ⚠ THE ORIGINAL DEFECT. A speed-capped lerp is at full speed on frame one and stops
+        -- dead on arrival — owner: "flying very fast between perches, there doesn't seem to be a
+        -- smooth ramp". Speed here is d(along)/dk, so it must be near zero at both ends.
+        local function speedAt(k)
+            local h = 0.002
+            local a = BirdFlight.flightPoint(math.max(0, k - h), 20, "DIRECT")
+            local b = BirdFlight.flightPoint(math.min(1, k + h), 20, "DIRECT")
+            return (b - a) / (2 * h)
+        end
+        local launch, mid, arrive = speedAt(0.01), speedAt(0.5), speedAt(0.99)
+        expect(launch < mid * 0.5).toBe(true)
+        expect(arrive < mid * 0.5).toBe(true)
+        -- and it never runs backwards
+        local prev = -1
+        for k = 0, 1.0001, 0.01 do
+            local along = BirdFlight.flightPoint(math.min(1, k), 20, "DIRECT")
+            expect(along >= prev - 1e-6).toBe(true)
+            prev = along
+        end
+    end)
+
+    test("a flight starts and ends EXACTLY on its perches", function()
+        for _, shape in { "DIRECT", "ARC", "CIRCLE" } do
+            for _, d in { 3, 12, 40 } do
+                local a0, s0, r0 = BirdFlight.flightPoint(0, d, shape)
+                local a1, s1, r1 = BirdFlight.flightPoint(1, d, shape)
+                expect(math.abs(a0) < 1e-6).toBe(true)
+                expect(math.abs(s0) < 1e-6).toBe(true)
+                expect(math.abs(r0) < 1e-6).toBe(true)
+                expect(math.abs(a1 - 1) < 1e-6).toBe(true)
+                expect(math.abs(s1) < 1e-6).toBe(true)
+                expect(math.abs(r1) < 1e-6).toBe(true)
+            end
+        end
+    end)
+
+    test("the path is NOT a beeline — it rises, and sometimes swings wide", function()
+        -- Owner: "the flight has to be more than a straight beeline ... sometimes a gently arc
+        -- upwards then down to land, maybe sometimes a half circle around the perch".
+        local function peak(shape, which)
+            local best = 0
+            for k = 0, 1, 0.01 do
+                local _, side, rise = BirdFlight.flightPoint(k, 20, shape)
+                best = math.max(best, math.abs(if which == "side" then side else rise))
+            end
+            return best
+        end
+        expect(peak("DIRECT", "rise") > 0.5).toBe(true) -- even the plain one arcs
+        expect(peak("ARC", "rise") > peak("DIRECT", "rise")).toBe(true)
+        expect(peak("CIRCLE", "side") > 3).toBe(true) -- and this one goes around
+        expect(peak("DIRECT", "side") < 0.001).toBe(true)
+    end)
+
+    test("even a SHORT hop takes long enough to be seen", function()
+        -- A hop to the next spot on the same rail used to finish in a frame or two, which is why
+        -- it read as the bird sliding sideways down the rail rather than flying.
+        -- ⚠ ASSERT AN ABSOLUTE, NOT THE CONSTANT. Comparing against FLIGHT_MIN_TIME is vacuous:
+        -- zero the constant and the test still passes while every hop becomes a slide again.
+        expect(BirdFlight.flightDuration(0.5) > 0.6).toBe(true)
+        expect(BirdFlight.flightDuration(0) > 0.6).toBe(true)
+        expect(BirdFlight.flightDuration(40) > BirdFlight.flightDuration(4)).toBe(true)
+    end)
+
+    test("flight shape varies, and is deterministic per bird", function()
+        expect(BirdFlight.flightShape(7, 3)).toBe(BirdFlight.flightShape(7, 3))
+        local kinds = {}
+        for i = 1, 60 do
+            kinds[BirdFlight.flightShape(7, i)] = true
+        end
+        local n = 0
+        for _ in pairs(kinds) do
+            n += 1
+        end
+        expect(n >= 2).toBe(true)
+    end)
+
     test("is deterministic per seed, so two clients draw the same bird", function()
         local a = BirdFlight.offsetFor("RESTING", 3.3, 7)
         local b = BirdFlight.offsetFor("RESTING", 3.3, 7)

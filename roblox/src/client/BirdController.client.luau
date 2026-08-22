@@ -73,7 +73,6 @@ local HOLD_MIN, HOLD_MAX = 10, 60
 -- Past this the bird gives up its perch and flies to catch up. Without it, an owner who walks off
 -- leaves their familiar behind on the far side of the canyon.
 local LEASH = 70
-local FLY_SPEED = 34 -- studs/sec toward wherever it is going
 
 -- ===== SONG =====
 -- The clips are the DOCK UGUISU'S, already uploaded and moderation-cleared ([[falls-dock]]).
@@ -85,8 +84,12 @@ local FLY_SPEED = 34 -- studs/sec toward wherever it is going
 -- ambience. Its rolloff is far tighter than the dock's 12-55, so it is intimate rather than a
 -- landmark you can hear across the pool. And it is quieter.
 local SONG = { 74571915778017, 93957494294947, 133151225815336 }
-local SONG_VOLUME = 0.38 -- the dock bird runs 0.6; this must not compete with it
-local SONG_ROLLOFF_MIN, SONG_ROLLOFF_MAX = 6, 26
+-- Raised from 0.38 on the owner's ear, 2026-08-22. The old value was set to stay under the
+-- falls-dock uguisu's 0.6, but that bird is AMBIENCE across a pool while this one is singing on
+-- your shoulder — the thing it must not do is drown the dock bird out at the dock, and the tight
+-- rolloff below already handles that. Being too quiet to hear was the worse failure.
+local SONG_VOLUME = 0.85
+local SONG_ROLLOFF_MIN, SONG_ROLLOFF_MAX = 9, 34
 -- ⚠ EVERY WINNER WINS AT THE SAME INSTANT -- more so under TEST_MODE, where the World Throw
 -- cycles R->P->S and a whole crowd can throw the same winning hand. Fifty birds opening together
 -- is a cacophony, so each waits a random beat and only a few sing at all.
@@ -128,7 +131,13 @@ type Bird = {
     neck: Bone?,
     tail: Bone?,
     seed: number,
-    flyingSince: number?, -- when this flight began, or nil while perched: the wings OPEN over
+    flyingSince: number?,
+    flightFrom: Vector3?, -- a flight is a PATH between two points, so both ends must be held
+    flightTo: Vector3?,
+    flightAt: number,
+    flightFor: number,
+    flightShape: string,
+    flightNo: number, -- when this flight began, or nil while perched: the wings OPEN over
     state: string, -- time and the ease has to start from the launch, not from os.clock()
     since: number,
     band: number,
@@ -212,6 +221,12 @@ local function makeBird(userId: string): Bird
         tail = bone("joint8"),
         seed = seedFor(userId),
         flyingSince = nil,
+        flightFrom = nil,
+        flightTo = nil,
+        flightAt = 0,
+        flightFor = 0,
+        flightShape = "DIRECT",
+        flightNo = 0,
         state = "RESTING",
         since = os.clock(),
         band = 0,
@@ -370,7 +385,7 @@ EventBus.Cue.Event:Connect(function(cue)
     end
 end)
 
-RunService.RenderStepped:Connect(function(dt)
+RunService.RenderStepped:Connect(function()
     local camera = workspace.CurrentCamera
     local eye = camera and camera.CFrame.Position
     local now = os.clock()
@@ -440,16 +455,46 @@ RunService.RenderStepped:Connect(function(dt)
         end
 
         -- ===== FLY THERE =====
-        -- One speed-capped lerp does the whole job: leaving a perch, crossing to another, and
-        -- settling all read as flight without a scripted path.
+        -- ⚠ A FLIGHT IS A PATH, NOT A LERP. This was `b.pos:Lerp(target, speedCappedStep)`,
+        -- which is at full speed on frame one, stops dead on arrival, and travels in a straight
+        -- line -- so a hop along a rail finished inside two frames and read as the bird SLIDING.
+        -- Now the bird commits to a route when the target moves, and flies it: takeoff, cruise,
+        -- landing, over a duration with a floor, along a shaped path (see BirdFlight).
         if b.pos.Magnitude == 0 then
             b.pos = target
+            b.flightTo = target
         end
-        local step = math.min(1, (FLY_SPEED * dt) / math.max(0.01, (target - b.pos).Magnitude))
-        local nextPos = b.pos:Lerp(target, step)
-        local travelled = (nextPos - b.pos).Magnitude
-        local heading = if travelled > 0.001 then (nextPos - b.pos).Unit else Vector3.zAxis
-        b.pos = nextPos
+
+        local committed = b.flightTo
+        if not committed or (target - committed).Magnitude > 0.35 then
+            -- new destination: plan a fresh flight from wherever the bird actually is
+            b.flightFrom = b.pos
+            b.flightTo = target
+            b.flightNo += 1
+            b.flightAt = now
+            b.flightFor = BirdFlight.flightDuration((target - b.pos).Magnitude)
+            b.flightShape = BirdFlight.flightShape(b.seed, b.flightNo)
+        end
+
+        local from = b.flightFrom or b.pos
+        local to = b.flightTo or target
+        local leg = to - from
+        local dist = leg.Magnitude
+        local k = if b.flightFor > 0 then math.min(1, (now - b.flightAt) / b.flightFor) else 1
+        local prev = b.pos
+        if dist < 0.02 then
+            b.pos = to
+        else
+            local along, side, rise = BirdFlight.flightPoint(k, dist, b.flightShape)
+            local fwd = leg.Unit
+            -- lateral axis: horizontal and square to the leg, so a CIRCLE swings around the
+            -- perch rather than corkscrewing through the ground
+            local lat = fwd:Cross(Vector3.yAxis)
+            lat = if lat.Magnitude > 1e-4 then lat.Unit else Vector3.xAxis
+            b.pos = from + fwd * (along * dist) + lat * side + Vector3.yAxis * rise
+        end
+        local travelled = (b.pos - prev).Magnitude
+        local heading = if travelled > 0.001 then (b.pos - prev).Unit else Vector3.zAxis
 
         -- FACING. A bird crossing the arena faces where it is going; a PERCHED one has a travel
         -- vector of nearly zero, so it would snap to a default axis and read as broken. On the
