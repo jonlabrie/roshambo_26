@@ -78,7 +78,13 @@ export type Point = { x: number, y: number, z: number }
 -- ⚠ IF THE ANSWER IS "SCALE THE BIRD UP" RATHER THAN "BRING IT CLOSER", REVERT THIS and restore
 -- the high orbit: the crowd-occlusion argument for vertical separation is still sound, and it is
 -- what the LOSS and RESTING holds still rely on.
-local SHOULDER = { x = 0.62, y = 1.05, z = -0.18 }
+-- ⚠ PUSHED OUT AND FORWARD 2026-08-21: at x=0.62 the tail feathers disappeared into the avatar's
+-- head about half the time (owner). A tail is ~0.3 studs of the bird's 0.83 and it trails BEHIND
+-- the perch point, so the offset has to clear the head by more than the bird's own width.
+local SHOULDER = { x = 0.86, y = 1.02, z = -0.42 }
+-- Exported so the hop test can assert about the SHAPE of the hop without hardcoding the offset,
+-- which would then need editing every time the perch is retuned.
+BirdFlight.SHOULDER_X = SHOULDER.x
 local HOP_PERIOD = 0.62 -- one hop; a small bird's is quick
 local HOP_HEIGHT = 0.13
 local HOP_SHUFFLE = 0.09 -- side to side across the shoulder, because a hop turns the bird
@@ -108,51 +114,6 @@ function BirdFlight.magnitude(p: Point): number
 end
 
 function BirdFlight.distance(a: Point, b: Point): number
-    -- ⚠ THE WING LIFT CEILING IS 30 DEGREES, AND IT IS A MEASUREMENT, NOT A PREFERENCE.
-    -- The mesh carries a FOLDED wing, and a folded wing is short: there is no hidden wing area in
-    -- there to unfold, so lifting it stretches flank surface rather than opening a wing. Measured in
-    -- Blender, the panel's reach saturates -- 0.072 studs folded, 0.109 at 30 deg, 0.146 at 50,
-    -- 0.171 at 70, 0.181 at 90, and 70->90 buys 0.009. Past ~50 it reads as a cape. A full spread
-    -- would need a SEPARATE spread-wing mesh shown only in flight; see [[familiars]].
-    -- A Blender bone constraint cannot carry this -- constraints do not survive FBX -- so the limit
-    -- lives here, and the test pins it.
-    BirdFlight.WING_MAX_DEG = 30
-
-    local FLAP_RATE = 16.0 -- rad/sec in flight; ~2.5 beats a second
-    local FLUTTER_PERIOD = 9.0 -- average gap between perched flutters
-    local FLUTTER_BURST = 0.7 -- and how long one lasts
-    local FLUTTER_PEAK = 0.55 -- a resting flutter is a twitch, not a display
-
-    -- Deterministic 0..1 hash, so flutters are not metronomic but two clients still agree.
-    local function hash01(n: number): number
-        local h = math.sin(n * 12.9898) * 43758.5453
-        return h - math.floor(h)
-    end
-
-    -- How far the wings are lifted, in DEGREES, as a pure function of time and seed.
-    --
-    -- ⚠ A PERCHED BIRD IS STILL MOST OF THE TIME. Owner, 2026-08-19: "even a perched bird flutters
-    -- its wings occasionally, and certainly when arriving or leaving a perch." Occasionally is the
-    -- load-bearing word -- constant fluttering reads as a distressed bird, not a resting one, so the
-    -- perched case is zero except for short bursts a few seconds apart.
-    function BirdFlight.wingAngle(elapsed: number, seed: number, flying: boolean): number
-        if flying then
-            local beat = 0.5 - 0.5 * math.cos(elapsed * FLAP_RATE + seed)
-            return math.clamp(beat * BirdFlight.WING_MAX_DEG, 0, BirdFlight.WING_MAX_DEG)
-        end
-        local phase = elapsed / FLUTTER_PERIOD + seed
-        local idx = math.floor(phase)
-        local start = 0.15 + hash01(idx + seed * 7.31) * 0.6
-        local t = (phase - idx - start) * FLUTTER_PERIOD
-        if t < 0 or t > FLUTTER_BURST then
-            return 0
-        end
-        local envelope = math.sin(math.pi * t / FLUTTER_BURST) -- in and out, no snap
-        local beat = 0.5 - 0.5 * math.cos(t * 40) -- quick beats inside it
-        local lift = FLUTTER_PEAK * envelope * beat * BirdFlight.WING_MAX_DEG
-        return math.clamp(lift, 0, BirdFlight.WING_MAX_DEG)
-    end
-
     return BirdFlight.magnitude({ x = a.x - b.x, y = a.y - b.y, z = a.z - b.z })
 end
 
@@ -195,15 +156,23 @@ function BirdFlight.offsetFor(state: string, elapsed: number, seed: number): Poi
     return idle
 end
 
--- ⚠ THE WING LIFT CEILING IS 30 DEGREES, AND IT IS A MEASUREMENT, NOT A PREFERENCE.
--- The mesh carries a FOLDED wing, and a folded wing is short: there is no hidden wing area in
--- there to unfold, so lifting it stretches flank surface rather than opening a wing. Measured in
--- Blender, the panel's reach saturates -- 0.072 studs folded, 0.109 at 30 deg, 0.146 at 50,
--- 0.171 at 70, 0.181 at 90, and 70->90 buys 0.009. Past ~50 it reads as a cape. A full spread
--- would need a SEPARATE spread-wing mesh shown only in flight; see [[familiars]].
--- A Blender bone constraint cannot carry this -- constraints do not survive FBX -- so the limit
--- lives here, and the test pins it.
-BirdFlight.WING_MAX_DEG = 30
+-- ⚠ THE BIRD HAS TWO WINGS AND THEY NEVER COEXIST. A FOLDED wing is sculpted into the flank and
+-- painted with its covert edge -- that is the accurate one, and it is what shows for the ~90% of
+-- the time the bird is perched. A SPREAD wing is bound to `wing_R`/`wing_L` and exists only in
+-- flight. Because they are never both visible, neither has to compromise for the other.
+--
+-- ⚠ PERCHING DOES NOT FOLD THE SPREAD WING -- IT COLLAPSES IT. One rigid bone can rotate but
+-- cannot SHORTEN, and a real wing folds at the wrist; swept back 88 degrees the tip still reached
+-- 0.37 studs against a 0.112 body half-width, swinging forward past the head instead of tucking.
+-- Scaling the bone draws every wing vertex home to the shoulder: measured, scale 0.06 puts the
+-- tip at 0.078 -- inside the body -- so the modelled folded wing is all that remains.
+--
+-- The old 30-degree lift ceiling is GONE. It was measured against the folded wing's stretch limit
+-- (its reach saturated at 0.181 studs and past ~50 degrees it read as a cape), and nothing lifts
+-- that geometry any more. A real spread wing wants a real beat.
+BirdFlight.WING_MAX_DEG = 55
+BirdFlight.WING_TUCKED = 0.06 -- bone scale when perched; measured to sit inside the flank
+BirdFlight.WING_OPEN_TIME = 0.28 -- seconds from tucked to full spread
 
 local FLAP_RATE = 16.0 -- rad/sec in flight; ~2.5 beats a second
 local FLUTTER_PERIOD = 9.0 -- average gap between perched flutters
@@ -214,6 +183,24 @@ local FLUTTER_PEAK = 0.55 -- a resting flutter is a twitch, not a display
 local function hash01(n: number): number
     local h = math.sin(n * 12.9898) * 43758.5453
     return h - math.floor(h)
+end
+
+-- How far the wings are OPEN, as a bone scale: WING_TUCKED perched, 1.0 in flight.
+--
+-- ⚠ THE OPENING IS EASED, NOT SNAPPED. A wing that pops to full span in one frame reads as a
+-- glitch; over WING_OPEN_TIME it reads as the bird spreading them, and the launch it accompanies
+-- hides the rest. Closing IS instant, on purpose: a bird that has landed has already folded, and
+-- easing it shut would leave the wings half-open on a perched bird -- the one pose the modelled
+-- folded wing exists to prevent.
+function BirdFlight.wingExtension(elapsed: number, seed: number, flying: boolean): number
+    if not flying then
+        return BirdFlight.WING_TUCKED
+    end
+    -- Per-bird jitter on the opening, so fifty birds launching together do not spread as one.
+    local span = BirdFlight.WING_OPEN_TIME * (0.85 + 0.30 * hash01(seed))
+    local k = math.min(1, math.max(0, elapsed / span))
+    local ease = 1 - (1 - k) * (1 - k) * (1 - k)
+    return BirdFlight.WING_TUCKED + (1 - BirdFlight.WING_TUCKED) * ease
 end
 
 -- How far the wings are lifted, in DEGREES, as a pure function of time and seed.

@@ -42,6 +42,13 @@ UGUISU = {
 SPECIES = {"uguisu": UGUISU}
 
 # --- landmarks, measured off the retargeted mesh -----------------------------------------
+# ⚠ THESE ARE ABSOLUTE COORDINATES, AND THE MESH CAN BE RESCALED UNDER THEM. Every landmark below
+# was measured on a bird whose body ran LANDMARK_REF_LENGTH studs nose to tail. Scale the mesh and
+# the vertices move while these numbers do not — the eye ends up inside the body and the
+# supercilium paints across the breast, which is exactly what a 1.5x scale-up produced on
+# 2026-08-21. `bake()` therefore measures the mesh and rescales every landmark to match, so the
+# numbers here always mean what they meant when they were measured.
+LANDMARK_REF_LENGTH = 0.552
 EYE = (0.0290, 0.1290, 0.2660)        # (|x|, y, z) — mirrored, so only |x| is used
 EYE_R = 0.0076
 # The brow sits DIRECTLY over the line. v1 left a 0.015 gap of body colour between them, which
@@ -73,9 +80,12 @@ def _seg_dist(py, pz, a, b):
     return np.hypot(py - (ay + t * dy), pz - (az + t * dz))
 
 
-def shade(P, N, pal):
+def shade(P, N, pal, S=1.0):
     """P (M,3) positions, N (M,3) normals -> (M,3) linear RGB. Vectorised."""
     C = {k: _srgb_to_linear(v) for k, v in pal.items()}
+    # Work in REFERENCE space: undo the mesh's scale so every landmark constant below is
+    # comparable to the coordinates it was measured in.
+    P = P / S
     x, y, z = np.abs(P[:, 0]), P[:, 1], P[:, 2]
     M = len(y)
     out = np.zeros((M, 3))
@@ -145,12 +155,105 @@ def shade(P, N, pal):
     return np.clip(out, 0.0, 1.0)
 
 
-def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES):
+def uv_occupancy(me, res=512, pad=1):
+    """Boolean map of which texels a mesh's UV islands already claim."""
+    me.calc_loop_triangles()
+    uvl = me.uv_layers[0].data
+    occ = np.zeros((res, res), dtype=bool)
+    for tri in me.loop_triangles:
+        uv = np.array([uvl[l].uv[:] for l in tri.loops]) * res
+        x0 = max(0, int(np.floor(uv[:, 0].min())) - pad)
+        x1 = min(res, int(np.ceil(uv[:, 0].max())) + pad + 1)
+        y0 = max(0, int(np.floor(uv[:, 1].min())) - pad)
+        y1 = min(res, int(np.ceil(uv[:, 1].max())) + pad + 1)
+        if x1 > x0 and y1 > y0:
+            occ[y0:y1, x0:x1] = True
+    return occ
+
+
+def find_free_uv_block(me, w, h, res=512):
+    """Lowest-left free rectangle in a mesh's UV space, or None.
+
+    ⚠ THIS EXISTS BECAUSE HARDCODING A REGION SILENTLY CORRUPTED THE BIRD. The spread wing was
+    given a fixed patch at u,v = 0.06..0.36 without checking the vendor unwrap, and that patch was
+    97.9% occupied — so the wing bake, which runs second, painted straight over one side of the
+    torso. It read as texel bleed and was not: bleed is symmetric, and this was on one flank only,
+    because that is where those islands happened to sit (owner, 2026-08-21, from a top view).
+    """
+    occ = uv_occupancy(me, res)
+    I = np.zeros((res + 1, res + 1), dtype=np.int32)
+    I[1:, 1:] = np.cumsum(np.cumsum(occ.astype(np.int32), axis=0), axis=1)
+    bw, bh = int(w * res), int(h * res)
+    for b in range(0, res - bh, 4):
+        for a in range(0, res - bw, 4):
+            c, d = a + bw, b + bh
+            if I[d, c] - I[b, c] - I[d, a] + I[b, a] == 0:
+                return (a / res, b / res, w, h)
+    return None
+
+
+def shade_wing(P, N, pal, S=1.0):
+    """FLAT per surface — dark above, pale below, and nothing else.
+
+    ⚠ DO NOT PUT GRADIENTS HERE. Earlier passes shaded the wing with a span gradient, a tip
+    darkening and a pale trailing edge, and every one of them aliased into visible stripes: the
+    wing gets a small corner of the atlas, its scalloped trailing edge distorts UVs at each notch,
+    and the dilation then smears the result. A wing is seen in motion and usually at distance, so
+    flat colour costs nothing and cannot band. The GEOMETRY carries the feather read — the
+    scallops and the separated primaries — which is where that work belongs.
+    """
+    C = {k: _srgb_to_linear(v) for k, v in pal.items()}
+    up = _smooth(-0.10, 0.10, N[:, 2])
+    return np.clip(C["wing_tail"] * up[:, None] + C["flank"] * (1 - up)[:, None], 0.0, 1.0)
+
+
+def _raster(me, uvl, co, no, img, hit, res, shader, pal, S=1.0):
+    for tri in me.loop_triangles:
+        uv = np.array([uvl[l].uv[:] for l in tri.loops]) * res
+        vi = list(tri.vertices)
+        x0 = max(0, int(np.floor(uv[:, 0].min())) - 1)
+        x1 = min(res, int(np.ceil(uv[:, 0].max())) + 2)
+        y0 = max(0, int(np.floor(uv[:, 1].min())) - 1)
+        y1 = min(res, int(np.ceil(uv[:, 1].max())) + 2)
+        if x1 <= x0 or y1 <= y0:
+            continue
+        gx, gy = np.meshgrid(np.arange(x0, x1) + 0.5, np.arange(y0, y1) + 0.5)
+        ax, ay = uv[0]
+        bx, by = uv[1]
+        cx, cy = uv[2]
+        den = (by - cy) * (ax - cx) + (cx - bx) * (ay - cy)
+        if abs(den) < 1e-12:
+            continue
+        w0 = ((by - cy) * (gx - cx) + (cx - bx) * (gy - cy)) / den
+        w1 = ((cy - ay) * (gx - cx) + (ax - cx) * (gy - cy)) / den
+        w2 = 1.0 - w0 - w1
+        inside = (w0 >= -0.004) & (w1 >= -0.004) & (w2 >= -0.004)
+        if not inside.any():
+            continue
+        W = np.stack([w0[inside], w1[inside], w2[inside]], axis=1)
+        P = W @ co[vi]
+        fn = np.array(tri.normal[:])
+        vn = W @ no[vi]
+        vl = np.linalg.norm(vn, axis=1, keepdims=True)
+        vn = vn / np.where(vl == 0, 1, vl)
+        blend = _smooth(0.85, 0.45, vn @ fn)[:, None]
+        N = vn * (1 - blend) + fn[None, :] * blend
+        n = np.linalg.norm(N, axis=1, keepdims=True)
+        N = N / np.where(n == 0, 1, n)
+        img[gy[inside].astype(int), gx[inside].astype(int)] = shader(P, N, pal, S)
+        hit[gy[inside].astype(int), gx[inside].astype(int)] = True
+
+
+def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name=None):
     ob = bpy.data.objects[obj_name]
     me = ob.data
     uv_name = uv_name or me.uv_layers[0].name
     uvl = me.uv_layers[uv_name].data
     me.calc_loop_triangles()
+
+    # HOW BIG IS THIS BIRD, relative to the one the landmarks were measured on?
+    ys = [v.co.y for v in me.vertices]
+    S = (max(ys) - min(ys)) / LANDMARK_REF_LENGTH
 
     img = np.zeros((res, res, 3), dtype=np.float64)
     hit = np.zeros((res, res), dtype=bool)
@@ -203,8 +306,28 @@ def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES):
         N = vn * (1 - blend) + fn[None, :] * blend
         n = np.linalg.norm(N, axis=1, keepdims=True)
         N = N / np.where(n == 0, 1, n)
-        img[gy[inside].astype(int), gx[inside].astype(int)] = shade(P, N, pal)
+        img[gy[inside].astype(int), gx[inside].astype(int)] = shade(P, N, pal, S)
         hit[gy[inside].astype(int), gx[inside].astype(int)] = True
+
+    # The spread wing shares this atlas — one upload for the whole bird, and the wing cannot be
+    # left unpainted or it renders as whatever the dilation smeared there.
+    if wing_name and wing_name in bpy.data.objects:
+        wme = bpy.data.objects[wing_name].data
+        # ⚠ GUARD. Refuse to bake a wing whose UVs sit on top of the body's — that corruption is
+        # invisible in the atlas and only shows as odd banding on one flank of the model.
+        body_occ = uv_occupancy(me, 512)
+        wing_occ = uv_occupancy(wme, 512, pad=0)
+        clash = int((body_occ & wing_occ).sum())
+        if clash > 0:
+            raise RuntimeError(
+                f"wing UVs overlap the body's by {clash} texels — the wing bake would paint over "
+                f"the bird. Place the wing with find_free_uv_block(body_mesh, w, h).")
+        wme.calc_loop_triangles()
+        _raster(wme, wme.uv_layers[0].data,
+                np.array([v.co[:] for v in wme.vertices]),
+                np.array([v.normal[:] for v in wme.vertices]),
+                img, hit, res, shade_wing, pal, S)
+        filled = int(hit.sum())
 
     # DILATE. Bilinear sampling at a UV island's edge reaches past it; without padding every
     # seam shows a dark fringe on the model.
@@ -230,6 +353,6 @@ def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES):
     px = np.concatenate([img, np.ones((res, res, 1))], axis=2).astype(np.float32)
     bi.pixels.foreach_set(px.ravel())
     bi.update()
-    return {"image": name, "res": res, "texels_painted": filled,
+    return {"image": name, "res": res, "landmark_scale": round(S, 4), "texels_painted": filled,
             "coverage_pct": round(100.0 * filled / (res * res), 2),
             "tris": len(me.loop_triangles)}

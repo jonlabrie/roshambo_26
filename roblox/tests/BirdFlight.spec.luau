@@ -16,7 +16,10 @@ describe("BirdFlight", function()
         -- Legibility beats occlusion — an unreadable bird communicates nothing at any height.
         local settled = BirdFlight.offsetFor("WIN", 3, 7)
         expect(settled.y > 0.9 and settled.y < 1.4).toBe(true)
-        expect(math.abs(settled.x) > 0.4).toBe(true) -- off to one side, on a shoulder
+        expect(math.abs(settled.x) > 0.7).toBe(true) -- well off to one side, clear of the head
+        -- ⚠ and BEHIND the head: the tail trails backwards from the perch point, so a shoulder
+        -- offset that only clears sideways still buries the tail in the avatar.
+        expect(settled.z < -0.25).toBe(true)
         -- A result must outlast the instant it happened — glancing over a few seconds later
         -- should still tell you what happened.
         for _, t in { 3, 8, 14 } do
@@ -27,14 +30,18 @@ describe("BirdFlight", function()
 
     test("WIN hops rather than sitting still", function()
         local low, high = 99, 0
+        -- The exported constant, not a sampled position: sampling lands on ONE SIDE of the hop,
+        -- so the comparison would be against an edge rather than the centre and the test would
+        -- pass or fail on floating-point luck.
+        local centre = BirdFlight.SHOULDER_X
         local left, right = false, false
         for t = 2, 6, 0.02 do
             local p = BirdFlight.offsetFor("WIN", t, 7)
             low, high = math.min(low, p.y), math.max(high, p.y)
-            if p.x < 0.62 then
+            if p.x < centre then
                 left = true
             end
-            if p.x > 0.62 then
+            if p.x > centre then
                 right = true
             end
         end
@@ -90,10 +97,7 @@ describe("BirdFlight", function()
         expect(resting > loss + 1.5).toBe(true)
     end)
 
-    test("wing lift NEVER exceeds the measured ceiling", function()
-        -- Measured in Blender: the wing panel's reach saturates at 0.181 studs against a 0.072
-        -- folded half-width, and past ~50 degrees the flank stretches into a cape rather than a
-        -- wing. 30 is where it still reads. Nothing may exceed it, in any state, ever.
+    test("wing lift NEVER exceeds the ceiling", function()
         for _, flying in { true, false } do
             for t = 0, 40, 0.1 do
                 local a = BirdFlight.wingAngle(t, 7, flying)
@@ -101,6 +105,31 @@ describe("BirdFlight", function()
                 expect(a <= BirdFlight.WING_MAX_DEG).toBe(true)
             end
         end
+    end)
+
+    test("a perched bird's wings are COLLAPSED, a flying bird's are OPEN", function()
+        -- ⚠ The bird has TWO wings and they never coexist: a folded one sculpted into the flank
+        -- for the ~90% perched case, and a spread one that only exists in flight. Perching does
+        -- not fold the spread wing -- one rigid bone cannot shorten, and swept back it just swings
+        -- forward past the head. It COLLAPSES instead, drawing every wing vertex to the shoulder
+        -- so the modelled folded wing is what shows.
+        expect(BirdFlight.wingExtension(0, 7, false) <= BirdFlight.WING_TUCKED + 0.001).toBe(true)
+        for t = 0, 20, 0.05 do
+            local e = BirdFlight.wingExtension(t, 7, false)
+            expect(e >= 0).toBe(true)
+            expect(e <= 1).toBe(true)
+        end
+    end)
+
+    test("wings OPEN over time rather than snapping", function()
+        local first = BirdFlight.wingExtension(0, 7, true)
+        local mid = BirdFlight.wingExtension(BirdFlight.WING_OPEN_TIME * 0.5, 7, true)
+        local done = BirdFlight.wingExtension(BirdFlight.WING_OPEN_TIME * 2, 7, true)
+        expect(first < mid).toBe(true)
+        expect(mid < done).toBe(true)
+        expect(done > 0.99).toBe(true)
+        -- and a collapsed wing must never be caught part-open at rest
+        expect(BirdFlight.wingExtension(99, 7, false)).toBe(BirdFlight.WING_TUCKED)
     end)
 
     test("a flying bird beats its wings continuously", function()

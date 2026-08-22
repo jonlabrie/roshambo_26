@@ -100,7 +100,8 @@ type Bird = {
     wingL: Bone?,
     wingR: Bone?,
     seed: number,
-    state: string,
+    flyingSince: number?, -- when this flight began, or nil while perched: the wings OPEN over
+    state: string, -- time and the ease has to start from the launch, not from os.clock()
     since: number,
     band: number,
 }
@@ -130,6 +131,7 @@ local function makeBird(userId: string): Bird
         wingL = bone("wing_L"),
         wingR = bone("wing_R"),
         seed = seedFor(userId),
+        flyingSince = nil,
         state = "RESTING",
         since = os.clock(),
         band = 0,
@@ -391,12 +393,32 @@ RunService.RenderStepped:Connect(function(dt)
             -- there reads as a bird about to take off. Anything essentially stationary --
             -- perched, or hopping on a shoulder -- gets the occasional flutter instead.
             local flying = travelled > 0.05
+            if flying then
+                if not b.flyingSince then
+                    b.flyingSince = now
+                end
+            else
+                b.flyingSince = nil
+            end
+            -- ⚠ THE WINGS ARE SCALED, NOT HIDDEN. The spread wing is bound into the same skinned
+            -- mesh as the folded one, so there is nothing to toggle: collapsing the bone draws
+            -- every wing vertex back inside the flank and leaves the MODELLED folded wing --
+            -- which is the accurate one -- as all that shows.
+            local since = if b.flyingSince then now - b.flyingSince else 0
+            local open = BirdFlight.wingExtension(since, b.seed, flying)
             local lift = math.rad(BirdFlight.wingAngle(now, b.seed, flying))
+            local scale = CFrame.new()
+                * CFrame.fromMatrix(
+                    Vector3.zero,
+                    Vector3.new(open, 0, 0),
+                    Vector3.new(0, open, 0),
+                    Vector3.new(0, 0, open)
+                )
             if b.wingR then
-                b.wingR.Transform = CFrame.Angles(0, 0, -lift)
+                b.wingR.Transform = CFrame.Angles(0, 0, -lift) * scale
             end
             if b.wingL then
-                b.wingL.Transform = CFrame.Angles(0, 0, lift)
+                b.wingL.Transform = CFrame.Angles(0, 0, lift) * scale
             end
             -- The bill opens only on a WIN: the bird is singing about it. A LOSS keeps it shut.
             if b.billLower then
