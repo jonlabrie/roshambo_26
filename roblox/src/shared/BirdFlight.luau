@@ -199,8 +199,14 @@ end
 -- which is the property that makes it read as a bird.
 BirdFlight.HEAD_YAW_MAX = 62 -- degrees; a small bird turns further than this, but past it the
 BirdFlight.HEAD_PITCH_MAX = 18 -- neck geometry shears rather than rotates
-local LOOK_HOLD = 1.55 -- average seconds between head moves
+BirdFlight.LOOK_HOLD = 1.55 -- average seconds between head moves
+local LOOK_HOLD = BirdFlight.LOOK_HOLD
 local LOOK_SNAP = 0.11 -- and how long the move itself takes
+-- ⚠ A CHECK IS A LOOK THAT COMES STRAIGHT BACK. Owner, 2026-08-22: "head twists left to check
+-- something, then immediately returns to where it was." Without it every move commits to a new
+-- heading and the bird reads as slowly rotating over time rather than REACTING to things.
+local CHECK_CHANCE = 0.42
+local CHECK_HOLD = 0.30 -- how long it looks before returning
 local TAIL_PERIOD = 5.2 -- warblers flick the tail constantly; this is the average gap
 local TAIL_STROKE = 0.28 -- one flick, down and back
 local TAIL_MAX = 9 -- degrees
@@ -213,19 +219,48 @@ function BirdFlight.idlePose(elapsed: number, seed: number): (number, number, nu
     -- metronome, which is the other way a fake idle gives itself away.
     local phase = elapsed / LOOK_HOLD + seed
     local slot = math.floor(phase)
-    local function target(i: number): (number, number)
+    local function isCheck(i: number): boolean
+        return hash01(i * 4.13 + seed * 7.77) < CHECK_CHANCE
+    end
+    local function draw(i: number): (number, number)
         local a = hash01(i * 1.37 + seed * 5.11)
         local b = hash01(i * 2.71 + seed * 3.19)
         return (a * 2 - 1) * BirdFlight.HEAD_YAW_MAX, (b * 2 - 1) * BirdFlight.HEAD_PITCH_MAX
     end
-    local fromYaw, fromPitch = target(slot - 1)
-    local toYaw, toPitch = target(slot)
-    -- The snap happens at the START of the slot; the rest of the slot is a hold.
+    -- Where the head RESTS at the end of slot i. A check ends where it began, so it inherits the
+    -- last committed pose -- walk back to find it, bounded so this stays a pure O(1)-ish lookup.
+    local function restPose(i: number): (number, number)
+        for back = 0, 8 do
+            if not isCheck(i - back) then
+                return draw(i - back)
+            end
+        end
+        return draw(i - 8)
+    end
+
+    local fromYaw, fromPitch = restPose(slot - 1)
     local into = (phase - slot) * LOOK_HOLD
-    local k = math.min(1, math.max(0, into / LOOK_SNAP))
-    local ease = 1 - (1 - k) * (1 - k) * (1 - k)
-    local yaw = fromYaw + (toYaw - fromYaw) * ease
-    local pitch = fromPitch + (toPitch - fromPitch) * ease
+    local yaw, pitch
+
+    if isCheck(slot) then
+        -- OUT, hold briefly, BACK. The return is the whole point.
+        local toYaw, toPitch = draw(slot)
+        local outK = math.min(1, math.max(0, into / LOOK_SNAP))
+        local backStart = LOOK_SNAP + CHECK_HOLD
+        local backK = math.min(1, math.max(0, (into - backStart) / LOOK_SNAP))
+        local eOut = 1 - (1 - outK) * (1 - outK) * (1 - outK)
+        local eBack = 1 - (1 - backK) * (1 - backK) * (1 - backK)
+        local peakYaw = fromYaw + (toYaw - fromYaw) * eOut
+        local peakPitch = fromPitch + (toPitch - fromPitch) * eOut
+        yaw = peakYaw + (fromYaw - peakYaw) * eBack
+        pitch = peakPitch + (fromPitch - peakPitch) * eBack
+    else
+        local toYaw, toPitch = restPose(slot)
+        local k = math.min(1, math.max(0, into / LOOK_SNAP))
+        local ease = 1 - (1 - k) * (1 - k) * (1 - k)
+        yaw = fromYaw + (toYaw - fromYaw) * ease
+        pitch = fromPitch + (toPitch - fromPitch) * ease
+    end
 
     -- The tail flick is on its own clock, so it does not always land with a head turn.
     local tphase = elapsed / TAIL_PERIOD + seed * 0.61

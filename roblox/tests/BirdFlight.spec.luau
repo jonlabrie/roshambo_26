@@ -215,6 +215,32 @@ describe("BirdFlight", function()
         expect(share < 0.30).toBe(true) -- but it is mostly holding a pose
     end)
 
+    test("some head moves are CHECKS — go look, then come straight back", function()
+        -- ⚠ Owner, 2026-08-22: "head twists left to check something, then immediately returns to
+        -- where it was." Without this every move is a commitment to a new heading, and the bird
+        -- reads as slowly rotating over time rather than reacting to things.
+        local checks = 0
+        local window = BirdFlight.LOOK_HOLD
+        for slot = 1, 80 do
+            local t0 = slot * window
+            local before = BirdFlight.idlePose(t0 - 0.02, 7)
+            local after = BirdFlight.idlePose(t0 + window - 0.02, 7)
+            -- widest excursion anywhere inside the slot
+            local far = before
+            for u = 0, window, window / 24 do
+                local y = BirdFlight.idlePose(t0 + u, 7)
+                if math.abs(y - before) > math.abs(far - before) then
+                    far = y
+                end
+            end
+            if math.abs(after - before) < 1.0 and math.abs(far - before) > 12 then
+                checks += 1
+            end
+        end
+        expect(checks >= 4).toBe(true) -- they happen
+        expect(checks <= 50).toBe(true) -- but they are not every move
+    end)
+
     test("the head never turns further than a bird's neck allows", function()
         for t = 0, 120, 0.05 do
             local yaw, pitch = BirdFlight.idlePose(t, 7)
