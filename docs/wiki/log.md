@@ -605,3 +605,25 @@ is to break the code deliberately and check the right test fails.
 ⚠ Not addressed, and a genuine conflict in the asks: the owner suggested wing flutter while
 perched, but the wings are hidden then. `BirdFlight.wingAngle` still computes a perched flutter
 nothing can see.
+
+## [2026-08-22] decision | Grade moves off the bird and onto a sashimono — first look is "a bit much"
+
+Grade bands were set aside on the familiar ("birds simply aren't large enough for it to matter,
+unless we design our own kind of (presumably larger) bird, like a raven/crow to carry it"). The
+owner then proposed bars beside the player, and on recalling the **sashimono** — the back banner
+worn in a holder on the armour for battlefield identification — that became the vehicle: a crest
+for identity, pips for grade. Built same evening; most of it already existed, since
+`Kamon.forUserId` is deterministic and the familiar roster already carries `band`.
+
+⚠ **NOT GATED.** Owner's first look: *"It kinda looks cool but feels like a bit much."* That is a
+reaction, not a ruling, and the next session should treat the current proportions (pole 4.2
+studs, cloth 1.5 × 2.1, 14° lean) as a starting point to argue down rather than a spec. "A bit
+much" most likely means SIZE, but could equally mean that a banner on every player at all times
+is too constant a presence — worth asking which before shrinking anything.
+
+Open, and named by the owner: grade display was described as *"(optionally)"* shown, which if it
+means a player toggle is a settings surface rather than a rendering change.
+
+Also recorded: `Kamon` is Lune-tested and therefore **must name no Roblox type**. Lifting the
+crest renderer into it broke the whole test run at require time; the renderer lives in
+`KamonDraw` beside it instead. Same rule as [[familiars]]' BirdFlight and DoomEscalation.
