@@ -264,6 +264,18 @@ describe("BirdFlight", function()
         expect(outer > high * 0.6).toBe(true)
     end)
 
+    test("a flutter stays readable on a 30fps phone", function()
+        -- ⚠ THE PRODUCT IS PHONES AND TABLETS (friends-and-family baseline: kid-first, touch).
+        -- A flex is an up AND a down, so it needs frames to resolve as motion rather than strobe.
+        -- Under about five frames per flex at 30fps the peaks fall between samples, the three
+        -- flexes come out visibly uneven, and "quicker" stops buying anything.
+        --
+        -- This is the floor that decides HOW the flutter gets faster: shortening the burst is
+        -- capped here, so past this point the only honest way to speed it up is fewer flexes.
+        local framesPerFlex = (BirdFlight.FLUTTER_BURST / BirdFlight.FLUTTER_CYCLES) * 30
+        expect(framesPerFlex >= 5).toBe(true)
+    end)
+
     test("a flutter starts, ends and PASSES THROUGH fully folded", function()
         expect(BirdFlight.flutterExtension(0, 7)).toBe(0)
         expect(BirdFlight.flutterExtension(-1, 7)).toBe(0)

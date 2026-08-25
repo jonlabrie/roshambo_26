@@ -199,11 +199,11 @@ local FLAP_RATE = 16.0 -- rad/sec in flight; ~2.5 beats a second
 
 -- THE PERCHED FLUTTER. Owner, 2026-08-25: "a quick 'half unfold/refold' cycle a couple of times
 -- that might read as a flutter", fired on events "plus a longer idle period".
-BirdFlight.FLUTTER_BURST = 0.7 -- how long one flutter lasts
+BirdFlight.FLUTTER_BURST = 0.5 -- how long one flutter lasts
 -- Three, not two: at two the motion read as slightly too slow to be a flutter (owner,
 -- 2026-08-25, "three 'flexes' instead of two in the same amount of time"). The BURST is unchanged,
 -- so this is purely a rate increase.
-local FLUTTER_CYCLES = 3
+BirdFlight.FLUTTER_CYCLES = 3
 local FLUTTER_OPEN = 0.35 -- a HALF unfold, and the reach is held where two flexes had it
 local IDLE_FLUTTER_GAP = 22.0 -- background rate, jittered; was 9.0 and free-running
 
@@ -491,7 +491,7 @@ function BirdFlight.flutterExtension(t: number, seed: number): number
     -- reach of its neighbours, which reads as one flex with a stutter either side rather than
     -- three. The root pulls the shoulders up while still tapering both ends to zero.
     local envelope = math.sin(math.pi * u) ^ 0.5
-    local cycle = 0.5 - 0.5 * math.cos(2 * math.pi * FLUTTER_CYCLES * u)
+    local cycle = 0.5 - 0.5 * math.cos(2 * math.pi * BirdFlight.FLUTTER_CYCLES * u)
     local reach = FLUTTER_OPEN * (0.85 + 0.30 * hash01(seed)) -- fifty birds, fifty flutters
     return reach * envelope * cycle
 end
