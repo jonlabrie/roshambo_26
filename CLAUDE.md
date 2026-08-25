@@ -2,6 +2,16 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+> ⚠ **THIS FILE IS NOT AUTHORITATIVE FOR REPO OR SYSTEM STATE.** It is orientation — how to work
+> here, what the commands are, where things roughly live. It goes stale silently, because nothing
+> checks it. **`docs/wiki/` is the authority** for project facts (as-built, gates, decisions,
+> statuses, standing rules), and for anything live — deployed services, branches, URLs, place
+> contents — **the authority is the system itself: query it.** Do not repeat a claim from this file
+> as fact in front of the owner; verify it first, and fix the line here when it turns out wrong.
+>
+> This warning was earned: on 2026-08-25 the deploy note below still named a working branch that
+> no longer existed, and it was quoted back to the owner as fact.
+
 ## Working Preferences
 
 - **TDD**: Write a failing test first, then the implementation. Both TypeScript codebases have Vitest suites (`server/`: `npm test`; repo root: `npm test`, scoped to `src/` by `vite.config.ts` so it does not pick up the server's).
@@ -45,7 +55,16 @@ npm start          # node dist/index.js
 npm test           # vitest (also: npm run test:watch)
 ```
 
-**Studio/PWA dev needs no local server**: the cloud dev backend (App Runner service `roshambo_server_dev`, see `README_DEPLOY.md` §0a) **auto-deploys every push** to the working branch (`m4b-zendojo-art-pass`) and is what `roblox/src/server/SecretsLocal.luau` points at — a push takes a few minutes to go live, and it changes the running dev backend immediately.
+**Studio/PWA dev needs no local server**: the cloud dev backend (App Runner service `roshambo_server_dev`, see `README_DEPLOY.md` §0a) is what `roblox/src/server/SecretsLocal.luau` points at, and a push to its tracked branch changes the running dev backend within minutes. ⚠ **Verify the branch and the auto-deploy flag before relying on either** — this line previously named `m4b-zendojo-art-pass` long after the tracked branch had become `main`. The service, its branch and its URL are queryable, and the query is the answer:
+
+```bash
+ARN=$(aws apprunner list-services --region us-east-1 \
+  --query "ServiceSummaryList[?ServiceName=='roshambo_server_dev'].ServiceArn" --output text)
+aws apprunner describe-service --region us-east-1 --service-arn "$ARN" \
+  --query 'Service.{url:ServiceUrl,branch:SourceConfiguration.CodeRepository.SourceCodeVersion.Value,autoDeploy:SourceConfiguration.AutoDeploymentsEnabled}'
+```
+
+Match its `url` against `SecretsLocal.luau`'s `baseUrl` to confirm it is the one Studio actually talks to.
 
 Full local stack (server + frontend on :8080, backed by MongoDB Atlas — no local database), only for testing un-pushed server code:
 ```bash
