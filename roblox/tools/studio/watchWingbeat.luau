@@ -11,10 +11,13 @@
 --   so the loop is a SHAPE you can look at rather than a blur you have to infer. This is the mode
 --   that answers "does the tip trace a loop, do both wings rise together, is 45° too much".
 --
---   FLIGHT (Play only) — DOES IT READ? A second, test-only bird flying the Overlook upper deck's
---   north rail ↔ south rail (~30 studs), pausing at each end, forever. Stand EAST of the deck and
---   the flight is side-on, which is the angle where a vertical beat and a fore-aft sweep look most
---   different.
+--   FLIGHT (Edit or Play) — DOES IT READ? A second, test-only bird flying the Overlook upper
+--   deck's north rail ↔ south rail (~30 studs), pausing at each end, forever. View from EAST of
+--   the deck: side-on is the angle where a vertical beat and a fore-aft sweep look most different.
+--
+--   ⚠ EDIT IS THE EASIER PATH and the one to reach for. No Play, no datamodel to choose, no
+--   streaming, and the camera flies free. In Play this MUST run on the client (see the guard
+--   below), which means finding Studio's Test-tab Client/Server toggle.
 --
 -- ⚠ EVERYTHING LANDS IN ONE FOLDER IN Workspace.Sandbox, the sanctioned home for throwaway rigs
 -- ([[rojo-and-place]]). Nothing touches RoshamboStage or CanyonWorld. Delete the folder and every
@@ -39,11 +42,14 @@ local FOLDER_NAME = "WingbeatWatch"
 -- screen. The real familiars have no such problem because BirdController is a LocalScript and
 -- builds its birds client-side -- `Workspace.Familiars` does not exist on the server at all.
 -- Better to refuse loudly than to print "FLIGHT: 30.2 studs" at someone staring at an empty rail.
-if RunService:IsRunning() and RunService:IsServer() then
+local IN_PLAY = RunService:IsRunning()
+if IN_PLAY and RunService:IsServer() then
     error(
-        "watchWingbeat: run this from the CLIENT context, not the Server. "
-            .. "Use the command bar's context dropdown in Play. Server-built parts are subject to "
-            .. "StreamingEnabled and will not appear; the real familiars are client-built too."
+        "watchWingbeat: this ran on the SERVER, where StreamingEnabled means you will never see it "
+            .. "(the real familiars are client-built -- Workspace.Familiars does not exist on the "
+            .. "server at all). Either switch the datamodel to Client -- in current Studio that is "
+            .. "the Test tab's 'Current: Client/Server' toggle, NOT the command bar -- or just stop "
+            .. "Play and run this in EDIT, which needs no context at all and is the easier path."
     )
 end
 
@@ -236,18 +242,6 @@ local function overlookPair(): (Attachment?, Attachment?)
 end
 
 local function runFlight()
-    -- ⚠ FLIGHT MUST NOT RUN IN EDIT. It borrows two perches by REMOVING their FamiliarPerch tag,
-    -- and in Edit a tag change is a change to the SAVED PLACE -- if the run is interrupted, or the
-    -- folder is deleted from outside so the restoring connection never fires, those perches are
-    -- permanently gone from the pool. That happened: four Overlook perches were found untagged in
-    -- the place afterwards and had to be repaired by hand. In Play the same edit is discarded when
-    -- the session ends, which makes the borrow safe.
-    if not RunService:IsRunning() then
-        error(
-            "watchWingbeat: FLIGHT mode requires Play — it borrows perch tags, and in Edit that "
-                .. "edits the saved place. Use ISOLATED in Edit, or press Play first."
-        )
-    end
     local a, b = overlookPair()
     assert(a and b, "watchWingbeat: could not find an Overlook upper-deck N/S rail pair")
     local from, to = (a :: Attachment).WorldPosition, (b :: Attachment).WorldPosition
@@ -256,9 +250,18 @@ local function runFlight()
     -- controller's `taken` table covers every bird that client renders — but a real familiar could
     -- still CLAIM one of these and sit in the middle of the demo. Untagging removes them from
     -- pickPerch's candidate list; the tags are restored when the rig folder is deleted.
-    local borrowed = { a :: Attachment, b :: Attachment }
-    for _, at in borrowed do
-        CollectionService:RemoveTag(at, "FamiliarPerch")
+    -- ⚠ ONLY BORROW IN PLAY, AND THE REASON IS SYMMETRIC. In PLAY a real familiar could claim one
+    -- of these two and sit in the middle of the demo, so the tags come off -- and that edit dies
+    -- with the session, so it costs nothing. In EDIT there are no familiars at all (BirdController
+    -- is a LocalScript and never runs), so there is nothing to exclude AND the tag change would be
+    -- a change to the SAVED PLACE. Four Overlook perches were lost exactly that way before this
+    -- check existed: borrowed in Edit, never given back, silently missing from every bird's pool.
+    local borrowed: { Attachment } = {}
+    if IN_PLAY then
+        borrowed = { a :: Attachment, b :: Attachment }
+        for _, at in borrowed do
+            CollectionService:RemoveTag(at, "FamiliarPerch")
+        end
     end
 
     local body, wings, bones = spawnBird()
