@@ -598,6 +598,58 @@ describe("BirdFlight", function()
         end
     end)
 
+    test("a takeoff CLIMBS OUT, it does not go up like a rocket and then turn", function()
+        -- Owner, 2026-08-25: "on takeoff, the bird rises almost vertically first, then changes
+        -- vector... the bird should be heading more or less along an arc heading towards its
+        -- destination right from the start."
+        --
+        -- ⚠ THE CAUSE WAS TWO CLOCKS. `along` is the integral of a speed profile, so it is
+        -- deliberately near-zero at the start (the bird is launching from rest on a perch), while
+        -- `rise` was a function of raw t and climbed immediately. At 10% of the flight that put the
+        -- bird 2x higher than it was far along. Driving rise off ALONG instead ties the arc to
+        -- where the bird has got to rather than how long it has been going.
+        for _, shape in { "DIRECT", "ARC", "CIRCLE" } do
+            for _, d in { 20, 40 } do
+                local worst, worstAt = 0, 0
+                for i = 1, 99 do
+                    local k = i / 100
+                    local along, _, rise = BirdFlight.flightPoint(k, d, shape)
+                    local horizontal = along * d
+                    if horizontal > 1e-6 then
+                        local gradient = rise / horizontal
+                        if gradient > worst then
+                            worst, worstAt = gradient, k
+                        end
+                    end
+                end
+                -- a climb steeper than 45 degrees anywhere reads as a rocket, not a bird
+                expect(worst < 1.0).toBe(true)
+                expect(worstAt >= 0).toBe(true)
+            end
+        end
+    end)
+
+    test("the legs TUCK in flight and are down again before touchdown", function()
+        -- Owner, 2026-08-25: "the fixed legs make it look like a plane flying with the wheels
+        -- down; it would be much better if the legs were tucked up under the body in flight, then
+        -- extended right before landing."
+        expect(BirdFlight.legTuck(0)).toBe(0) -- standing on the perch
+        expect(BirdFlight.legTuck(1)).toBe(0) -- standing on the next one
+        local peak, peakAt = 0, 0
+        for i = 0, 100 do
+            local v = BirdFlight.legTuck(i / 100)
+            expect(v >= 0 and v <= 1).toBe(true)
+            if v > peak then
+                peak, peakAt = v, i / 100
+            end
+        end
+        expect(peak > 0.99).toBe(true) -- fully tucked at some point
+        expect(peakAt > 0.15 and peakAt < 0.85).toBe(true) -- and that point is mid-flight
+        -- ⚠ GEAR DOWN BEFORE THE WHEELS TOUCH, not at the moment they do
+        expect(BirdFlight.legTuck(0.95) < 0.5).toBe(true)
+        expect(BirdFlight.legTuck(0.30) > 0.9).toBe(true) -- and up shortly after takeoff
+    end)
+
     test("the path is NOT a beeline — it rises, and sometimes swings wide", function()
         -- Owner: "the flight has to be more than a straight beeline ... sometimes a gently arc
         -- upwards then down to land, maybe sometimes a half circle around the perch".

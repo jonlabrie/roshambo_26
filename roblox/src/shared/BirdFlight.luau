@@ -220,6 +220,11 @@ local TURN_MIN_DEG = 35 -- under this it reads as a twitch rather than a decisio
 local TURN_MAX_DEG = 110 -- over it, as a spin
 local TURN_HOP = 0.06 -- barely above the victory hop's 0.05; both feet leave together
 local IDLE_TURN_GAP = 18.0
+
+-- Legs are up by just after takeoff and down again well before touchdown.
+BirdFlight.LEG_TUCK_DEG = 100
+local TUCK_IN_END = 0.22
+local TUCK_OUT_START = 0.78
 -- Openness at which the wing is fully opaque. Takeoff crosses this in ~40ms, so flight is
 -- unaffected; it exists so a PERCHED flutter fades in instead of popping.
 local WING_FADE_IN = 0.15
@@ -333,7 +338,15 @@ function BirdFlight.flightPoint(k: number, distance: number, shape: string): (nu
         bow = math.min(4.5, 0.30 * distance + 0.6)
         risePeak = 0.42 -- climbs early, then a long glide down
     end
-    local rp = if t < risePeak then t / risePeak * 0.5 else 0.5 + (t - risePeak) / (1 - risePeak) * 0.5
+    -- ⚠ THE ARC IS A FUNCTION OF ALONG, NOT OF t, AND THAT IS THE WHOLE DIFFERENCE. `along` is the
+    -- integral of a speed profile, so it is near zero at the start -- the bird launches from rest
+    -- on a perch. Driving the climb off raw t while horizontal progress crawled put the bird, at
+    -- 10% of the flight, twice as high as it was far along: it went up like a rocket and then
+    -- turned toward the target (owner, 2026-08-25). Tying rise to DISTANCE COVERED makes the climb
+    -- proportional to progress, which is what an arc is.
+    local rp = if along < risePeak
+        then along / risePeak * 0.5
+        else 0.5 + (along - risePeak) / (1 - risePeak) * 0.5
     local rise = math.sin(math.pi * rp) * bow
 
     -- SIDE: only CIRCLE leaves the straight line. Owner: "maybe sometimes a half circle around
@@ -341,7 +354,7 @@ function BirdFlight.flightPoint(k: number, distance: number, shape: string): (nu
     local side = 0
     if shape == "CIRCLE" then
         local radius = math.min(6.0, 0.42 * distance + 1.2)
-        side = math.sin(math.pi * t ^ 0.75) * radius
+        side = math.sin(math.pi * along ^ 0.75) * radius -- along, for the same reason as rise
     end
     return along, side, rise
 end
@@ -526,6 +539,23 @@ end
 
 -- How far this turn goes, in SIGNED degrees. Jittered in both magnitude and side, because a fixed
 -- quarter-turn reads as a mechanism and a bird that only ever turns one way reads as broken.
+-- How far the legs are tucked, 0 (standing) to 1 (folded up into the belly), across a flight.
+--
+-- ⚠ MEASURED, 2026-08-25: rotating the hip +100 degrees about its local X lifts the foot 0.280
+-- studs, from y -0.281 to -0.001, and puts EVERY joint of the leg chain inside the body's bounding
+-- box (protrusion 0.000). At rest the foot protrudes 0.045 below, which is correct -- feet should
+-- show on a perch. So no knee fold is needed: the hip alone folds the whole leg into the flank.
+--
+-- Owner, 2026-08-25: "the fixed legs make it look like a plane flying with the wheels down... then
+-- extended right before landing". Gear down BEFORE touchdown, not at it.
+function BirdFlight.legTuck(k: number): number
+    local t = math.clamp(k, 0, 1)
+    local up = math.clamp(t / TUCK_IN_END, 0, 1)
+    local down = math.clamp((1 - t) / (1 - TUCK_OUT_START), 0, 1)
+    local v = math.min(up, down)
+    return v * v * (3 - 2 * v)
+end
+
 function BirdFlight.turnAmount(seed: number, index: number): number
     local mag = TURN_MIN_DEG + (TURN_MAX_DEG - TURN_MIN_DEG) * hash01(index * 5.13 + seed * 2.71)
     return if hash01(index * 9.41 + seed * 4.07) < 0.5 then -mag else mag

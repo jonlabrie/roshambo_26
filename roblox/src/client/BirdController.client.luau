@@ -713,7 +713,22 @@ RunService.RenderStepped:Connect(function()
             -- ⚠ A HOP IS A WEIGHT SHIFT, NOT A SLIDE. The bird used to translate sideways across
             -- the shoulder, which read as sliding; now it stays put and alternates feet, leaning
             -- onto whichever one is still holding the perch (owner, 2026-08-22).
-            if b.state == "WIN" and not resting and not flying then
+            -- ⚠ GEAR UP. A flying bird with its legs down reads as "a plane flying with the
+            -- wheels down" (owner, 2026-08-25). Measured: +100 degrees at the hip folds the whole
+            -- leg chain inside the body's bounding box, so no knee bone is needed. Both hips take
+            -- the SAME sign, which is the convention the victory hop already uses.
+            if flying then
+                local tuck = math.rad(BirdFlight.legTuck(k) * BirdFlight.LEG_TUCK_DEG)
+                if b.hipL then
+                    b.hipL.Transform = CFrame.Angles(tuck, 0, 0)
+                end
+                if b.hipR then
+                    b.hipR.Transform = CFrame.Angles(tuck, 0, 0)
+                end
+                if b.root then
+                    b.root.Transform = CFrame.new()
+                end
+            elseif b.state == "WIN" and not resting then
                 local liftL, liftR, roll = BirdFlight.legPose(now, b.seed)
                 if b.hipL then
                     b.hipL.Transform = CFrame.Angles(math.rad(liftL * 26), 0, 0)

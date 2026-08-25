@@ -263,7 +263,20 @@ local function runFlight()
         local dst = if legNo % 2 == 0 then to else from
 
         if phase == "PERCH" then
-            seat(body, wings, CFrame.lookAt(src, src + (dst - src).Unit * Vector3.new(1, 0, 1)))
+            -- ⚠ DO NOT SNAP TO THE NEXT DESTINATION ON ARRIVAL. This used to face `dst` from the
+            -- first perched frame, and since legNo had already flipped, dst was where the bird had
+            -- just come FROM -- a clean 180 the instant it landed (owner, 2026-08-25). A bird lands
+            -- facing the way it was going, stands, and THEN turns to leave. Tool-only: the game's
+            -- perched branch keeps its yaw and never had this.
+            local departing = (dst - src) * Vector3.new(1, 0, 1)
+            local arriving = if legNo == 0 then departing else -departing
+            local yawFrom = math.atan2(-arriving.X, -arriving.Z)
+            local yawTo = math.atan2(-departing.X, -departing.Z)
+            local delta = (yawTo - yawFrom + math.pi) % (2 * math.pi) - math.pi
+            local turnStart = PAUSE_AT_ENDS * 0.45
+            local q = math.clamp((clock - turnStart) / math.max(1e-3, PAUSE_AT_ENDS - turnStart), 0, 1)
+            local yaw = yawFrom + delta * (q * q * (3 - 2 * q))
+            seat(body, wings, CFrame.new(src) * CFrame.Angles(0, yaw, 0))
             pose(bones, 0, 0, 0)
             wings.Transparency = 1
             if clock >= PAUSE_AT_ENDS then
