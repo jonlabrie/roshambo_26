@@ -135,6 +135,13 @@ type Bird = {
     root: Bone?,
     seed: number,
     flyingSince: number?,
+    -- A perched flutter is EVENT-TRIGGERED (landing, winning) with a slow idle rate underneath
+    -- it (owner, 2026-08-25). The controller owns WHEN; BirdFlight owns the shape.
+    flutterSince: number?,
+    flutterNo: number,
+    nextFlutterAt: number,
+    wasFlying: boolean,
+    lastState: string,
     flightFrom: Vector3?, -- a flight is a PATH between two points, so both ends must be held
     flightTo: Vector3?,
     flightAt: number,
@@ -229,6 +236,11 @@ local function makeBird(userId: string): Bird
         root = bone("joint1"),
         seed = seedFor(userId),
         flyingSince = nil,
+        flutterSince = nil,
+        flutterNo = 0,
+        nextFlutterAt = os.clock() + BirdFlight.nextFlutterGap(seedFor(userId), 0),
+        wasFlying = false,
+        lastState = "RESTING",
         flightFrom = nil,
         flightTo = nil,
         flightAt = 0,
@@ -597,13 +609,38 @@ RunService.RenderStepped:Connect(function()
                 b.flyingSince = nil
             end
 
+            -- ===== FLUTTER TRIGGERS =====
+            -- ⚠ A FLUTTER IS AN EVENT, NOT A METRONOME. Owner, 2026-08-25: "event triggered plus
+            -- a longer idle period". Landing is the honest trigger -- a bird settles as it
+            -- arrives -- and a win fires one too, for the case where the familiar is ALREADY on
+            -- the shoulder and so never lands. Starting is GUARDED: on a won round both triggers
+            -- fire in the same frame, and restarting a running burst would read as a hitch.
+            local running = b.flutterSince ~= nil and (now - (b.flutterSince or 0)) < BirdFlight.FLUTTER_BURST
+            local landed = b.wasFlying and not flying
+            local justWon = b.state == "WIN" and b.lastState ~= "WIN"
+            if not running and not flying and (landed or justWon or now >= b.nextFlutterAt) then
+                b.flutterSince = now
+                b.flutterNo += 1
+                b.nextFlutterAt = now + BirdFlight.nextFlutterGap(b.seed, b.flutterNo)
+            end
+            b.wasFlying = flying
+            b.lastState = b.state
+
             -- ⚠ TRANSPARENCY IS THE HIDING MECHANISM, and it is the only one that works. Bone
             -- scale is discarded by Roblox and folding leaves 93 of 208 verts outside the body,
             -- so a perched bird's wings are hidden rather than tucked (owner, 2026-08-22).
-            local since = if b.flyingSince then now - b.flyingSince else 0
-            local open = BirdFlight.wingExtension(since, b.seed, flying)
+            --
+            -- Openness comes from a DIFFERENT source depending on what the bird is doing: in
+            -- flight it is the takeoff ease, perched it is the flutter burst. Both feed the same
+            -- fade, so a perched wing appears BY unfolding instead of popping into view.
+            local open
+            if flying then
+                open = BirdFlight.wingExtension(now - (b.flyingSince or now), b.seed, true)
+            else
+                open = BirdFlight.flutterExtension(now - (b.flutterSince or -99), b.seed)
+            end
             if b.wings then
-                b.wings.Transparency = if open <= 0 then 1 else 0
+                b.wings.Transparency = BirdFlight.wingTransparency(open)
             end
 
             local shoulder, wrist = BirdFlight.foldAngles(open)

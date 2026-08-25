@@ -185,9 +185,16 @@ BirdFlight.FOLD_WRIST = -110
 BirdFlight.WING_OPEN_TIME = 0.28 -- seconds from folded to full spread
 
 local FLAP_RATE = 16.0 -- rad/sec in flight; ~2.5 beats a second
-local FLUTTER_PERIOD = 9.0 -- average gap between perched flutters
-local FLUTTER_BURST = 0.7 -- and how long one lasts
-local FLUTTER_PEAK = 0.55 -- a resting flutter is a twitch, not a display
+
+-- THE PERCHED FLUTTER. Owner, 2026-08-25: "a quick 'half unfold/refold' cycle a couple of times
+-- that might read as a flutter", fired on events "plus a longer idle period".
+BirdFlight.FLUTTER_BURST = 0.7 -- how long one flutter lasts
+local FLUTTER_CYCLES = 2 -- "a couple of times"
+local FLUTTER_OPEN = 0.50 -- a HALF unfold; the envelope trims the peak to about 0.35
+local IDLE_FLUTTER_GAP = 22.0 -- background rate, jittered; was 9.0 and free-running
+-- Openness at which the wing is fully opaque. Takeoff crosses this in ~40ms, so flight is
+-- unaffected; it exists so a PERCHED flutter fades in instead of popping.
+local WING_FADE_IN = 0.15
 
 -- Deterministic 0..1 hash, so flutters are not metronomic but two clients still agree.
 local function hash01(n: number): number
@@ -436,21 +443,51 @@ end
 -- load-bearing word -- constant fluttering reads as a distressed bird, not a resting one, so the
 -- perched case is zero except for short bursts a few seconds apart.
 function BirdFlight.wingAngle(elapsed: number, seed: number, flying: boolean): number
-    if flying then
-        local beat = 0.5 - 0.5 * math.cos(elapsed * FLAP_RATE + seed)
-        return math.clamp(beat * BirdFlight.WING_MAX_DEG, 0, BirdFlight.WING_MAX_DEG)
-    end
-    local phase = elapsed / FLUTTER_PERIOD + seed
-    local idx = math.floor(phase)
-    local start = 0.15 + hash01(idx + seed * 7.31) * 0.6
-    local t = (phase - idx - start) * FLUTTER_PERIOD
-    if t < 0 or t > FLUTTER_BURST then
+    if not flying then
         return 0
     end
-    local envelope = math.sin(math.pi * t / FLUTTER_BURST) -- in and out, no snap
-    local beat = 0.5 - 0.5 * math.cos(t * 40) -- quick beats inside it
-    local lift = FLUTTER_PEAK * envelope * beat * BirdFlight.WING_MAX_DEG
-    return math.clamp(lift, 0, BirdFlight.WING_MAX_DEG)
+    local beat = 0.5 - 0.5 * math.cos(elapsed * FLAP_RATE + seed)
+    return math.clamp(beat * BirdFlight.WING_MAX_DEG, 0, BirdFlight.WING_MAX_DEG)
+end
+
+-- How far open the wings are during a perched flutter, given seconds SINCE THAT FLUTTER BEGAN.
+-- 0 outside the burst, and 0 again at its midpoint -- the refold is half the point.
+--
+-- ⚠ THIS DRIVES THE FOLD CHANNEL, NOT THE LIFT CHANNEL, AND THAT IS THE WHOLE FIX. The flutter
+-- used to be a lift burst inside `wingAngle`, which nothing could ever see: `wingExtension`
+-- returns 0 whenever the bird is not flying, and Transparency follows openness, so the wings were
+-- invisible for the entire burst. Unfolding is what makes the wing appear, so the flutter has to
+-- BE an unfold. Half open, twice, per the owner (2026-08-25).
+--
+-- WHEN a flutter happens is the CONTROLLER's business -- it fires them on landing and on a win,
+-- and otherwise on `nextFlutterGap`. This function owns only the shape.
+function BirdFlight.flutterExtension(t: number, seed: number): number
+    if t <= 0 or t >= BirdFlight.FLUTTER_BURST then
+        return 0
+    end
+    local u = t / BirdFlight.FLUTTER_BURST
+    local envelope = math.sin(math.pi * u) -- in and out, no snap at either end
+    local cycle = 0.5 - 0.5 * math.cos(2 * math.pi * FLUTTER_CYCLES * u)
+    local reach = FLUTTER_OPEN * (0.85 + 0.30 * hash01(seed)) -- fifty birds, fifty flutters
+    return reach * envelope * cycle
+end
+
+-- Seconds until the NEXT idle flutter. Longer than the old 9-second free-run, because landing and
+-- winning now fire flutters directly and a bird that also twitches every nine seconds reads as
+-- distressed rather than resting.
+function BirdFlight.nextFlutterGap(seed: number, index: number): number
+    return IDLE_FLUTTER_GAP * (0.7 + 0.9 * hash01(index * 3.77 + seed * 7.31))
+end
+
+-- Wing Transparency for a given openness.
+--
+-- ⚠ NOT BINARY, and the reason is geometric: at the best fold 93 of 208 wing verts are still
+-- OUTSIDE the body, so the wings are hidden by Transparency rather than by being tucked. Flipping
+-- it at open > 0 therefore pops a fully-formed tucked wing into existence in one frame -- fine
+-- mid-takeoff where motion covers it, glaring on a stationary perched bird. Landing still snaps
+-- shut, because `wingExtension` drops openness to 0 in a single step.
+function BirdFlight.wingTransparency(open: number): number
+    return 1 - math.clamp(open / WING_FADE_IN, 0, 1)
 end
 
 return BirdFlight

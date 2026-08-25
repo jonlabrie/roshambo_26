@@ -215,31 +215,92 @@ describe("BirdFlight", function()
         expect(low < BirdFlight.WING_MAX_DEG * 0.25).toBe(true)
     end)
 
-    test("a PERCHED bird is still most of the time, and flutters occasionally", function()
-        -- Owner, 2026-08-19: "even a perched bird flutters its wings occasionally, and certainly
-        -- when arriving or leaving a perch." Occasionally is the operative word -- a bird that
-        -- flutters constantly reads as distressed, not resting.
-        local moving, samples = 0, 0
-        local peak = 0
+    test("a PERCHED bird does not BEAT its wings -- lift is a flight thing", function()
+        -- ⚠ THE PERCHED FLUTTER USED TO LIVE HERE, AND WAS UNOBSERVABLE. `wingExtension` returns
+        -- 0 whenever the bird is not flying, and Transparency follows openness -- so the wings
+        -- were invisible for the whole burst and the lift rotated something nobody could see.
+        -- Two channels fighting: one hid the wing, the other animated it.
+        --
+        -- ⚠ SWEEP, DO NOT SPOT-CHECK. Two sampled instants both passed against the OLD fluttering
+        -- implementation, because they happened to fall between bursts -- the same shape of
+        -- vacuous assertion that let a zeroed FLIGHT_MIN_TIME through in this file a week ago.
         for t = 0, 120, 0.05 do
-            local a = BirdFlight.wingAngle(t, 7, false)
-            samples += 1
-            if a > 1.0 then
-                moving += 1
-            end
-            peak = math.max(peak, a)
+            expect(BirdFlight.wingAngle(t, 7, false)).toBe(0)
         end
-        local share = moving / samples
-        expect(share > 0.02).toBe(true) -- it does happen
-        expect(share < 0.25).toBe(true) -- but it is not what the bird is doing
-        expect(peak > 6).toBe(true) -- and when it happens you can see it
     end)
 
-    test("wing lift is deterministic per seed, and seeds differ", function()
-        expect(BirdFlight.wingAngle(3.3, 7, false)).toBe(BirdFlight.wingAngle(3.3, 7, false))
+    test("a flutter is a COUPLE of half-unfolds, not one big spread", function()
+        -- Owner, 2026-08-25: "a quick 'half unfold/refold' cycle a couple of times that might
+        -- read as a flutter". Driving the FOLD channel is what makes it visible at all -- the
+        -- wing appears BECAUSE it is unfolding, rather than being revealed and then rotated.
+        local peaks, prev, rising = 0, -1, false
+        local high = 0
+        for t = 0, BirdFlight.FLUTTER_BURST, 0.005 do
+            local e = BirdFlight.flutterExtension(t, 7)
+            high = math.max(high, e)
+            if e > prev then
+                rising = true
+            elseif rising and e < prev then
+                peaks += 1
+                rising = false
+            end
+            prev = e
+        end
+        expect(peaks).toBe(2) -- a couple of them, refolding in between
+        expect(high > 0.25).toBe(true) -- far enough out to read as a flutter
+        expect(high < 0.6).toBe(true) -- but a HALF unfold, not a spread
+    end)
+
+    test("a flutter starts, ends and PASSES THROUGH fully folded", function()
+        expect(BirdFlight.flutterExtension(0, 7)).toBe(0)
+        expect(BirdFlight.flutterExtension(-1, 7)).toBe(0)
+        expect(BirdFlight.flutterExtension(BirdFlight.FLUTTER_BURST, 7)).toBe(0)
+        expect(BirdFlight.flutterExtension(BirdFlight.FLUTTER_BURST + 5, 7)).toBe(0)
+        -- refolds to nothing in the MIDDLE too, which is what makes it a cycle and not a bump
+        expect(BirdFlight.flutterExtension(BirdFlight.FLUTTER_BURST * 0.5, 7) < 0.02).toBe(true)
+    end)
+
+    test("wings FADE IN over the first sliver of opening rather than popping", function()
+        -- ⚠ At the best fold, 93 of 208 wing verts are still OUTSIDE the body: the wings are
+        -- hidden by Transparency, NOT by geometry. So a binary flip pops a fully-tucked wing into
+        -- existence in a single frame -- on a stationary perched bird, exactly where the viewer
+        -- is looking. Flight is untouched; takeoff crosses this band in about 40ms, and landing
+        -- still snaps shut because openness goes to 0 in one step.
+        expect(BirdFlight.wingTransparency(0)).toBe(1)
+        expect(BirdFlight.wingTransparency(1)).toBe(0)
+        expect(BirdFlight.wingTransparency(-1)).toBe(1)
+        expect(BirdFlight.wingTransparency(5)).toBe(0)
+        local prev = 2
+        for k = 0, 1, 0.02 do
+            local a = BirdFlight.wingTransparency(k)
+            expect(a <= prev).toBe(true)
+            prev = a
+        end
+        expect(BirdFlight.wingTransparency(0.3)).toBe(0) -- opaque well before half open
+        -- ⚠ AND IT IS GENUINELY A FADE. Every assertion above this line also passes against the
+        -- BINARY version it replaced -- verified by mutation, which is the only way that gets
+        -- found. A partly-open wing must be partly transparent, and that is the whole change.
+        local mid = BirdFlight.wingTransparency(0.05)
+        expect(mid > 0).toBe(true)
+        expect(mid < 1).toBe(true)
+    end)
+
+    test("idle flutters are RARE and jittered on top of the triggered ones", function()
+        -- Owner, 2026-08-25: "event triggered plus a longer idle period". Landing and winning
+        -- fire a flutter outright -- the controller owns those -- so this is only the background
+        -- rate, and it is deliberately slower than the 9s it used to free-run at.
+        local lo, hi = math.huge, 0
+        for i = 1, 200 do
+            local g = BirdFlight.nextFlutterGap(7, i)
+            lo, hi = math.min(lo, g), math.max(hi, g)
+        end
+        expect(lo > 9).toBe(true) -- longer than the old period, in every draw
+        expect(hi < 60).toBe(true) -- but still inside the time someone stands and watches
+        expect(hi > lo * 1.15).toBe(true) -- jittered rather than metronomic
+        expect(BirdFlight.nextFlutterGap(7, 3)).toBe(BirdFlight.nextFlutterGap(7, 3))
         local differs = false
-        for t = 0, 60, 0.25 do
-            if BirdFlight.wingAngle(t, 7, false) ~= BirdFlight.wingAngle(t, 8, false) then
+        for i = 1, 50 do
+            if BirdFlight.nextFlutterGap(7, i) ~= BirdFlight.nextFlutterGap(8, i) then
                 differs = true
                 break
             end
