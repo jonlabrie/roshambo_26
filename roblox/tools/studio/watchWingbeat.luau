@@ -33,6 +33,20 @@ local RunService = game:GetService("RunService")
 
 local FOLDER_NAME = "WingbeatWatch"
 
+-- ⚠ RUN THIS ON THE CLIENT. In Play, the command bar has a context dropdown (Client / Server) and
+-- it does NOT default to Client. Run on the server and the tool reports success while you see
+-- nothing: the parts are made server-side, `StreamingEnabled` is on, and they never reach your
+-- screen. The real familiars have no such problem because BirdController is a LocalScript and
+-- builds its birds client-side -- `Workspace.Familiars` does not exist on the server at all.
+-- Better to refuse loudly than to print "FLIGHT: 30.2 studs" at someone staring at an empty rail.
+if RunService:IsRunning() and RunService:IsServer() then
+    error(
+        "watchWingbeat: run this from the CLIENT context, not the Server. "
+            .. "Use the command bar's context dropdown in Play. Server-built parts are subject to "
+            .. "StreamingEnabled and will not appear; the real familiars are client-built too."
+    )
+end
+
 -- ⚠ REQUIRE A CLONE, NOT THE MODULE. Studio's command-bar VM caches a ModuleScript's RESULT, so
 -- once anything in this session has required BirdFlight, every later require returns the same
 -- table however many times Rojo has synced since ([[misc-engine-traps]]). Parent the clone beside
@@ -222,6 +236,18 @@ local function overlookPair(): (Attachment?, Attachment?)
 end
 
 local function runFlight()
+    -- ⚠ FLIGHT MUST NOT RUN IN EDIT. It borrows two perches by REMOVING their FamiliarPerch tag,
+    -- and in Edit a tag change is a change to the SAVED PLACE -- if the run is interrupted, or the
+    -- folder is deleted from outside so the restoring connection never fires, those perches are
+    -- permanently gone from the pool. That happened: four Overlook perches were found untagged in
+    -- the place afterwards and had to be repaired by hand. In Play the same edit is discarded when
+    -- the session ends, which makes the borrow safe.
+    if not RunService:IsRunning() then
+        error(
+            "watchWingbeat: FLIGHT mode requires Play — it borrows perch tags, and in Edit that "
+                .. "edits the saved place. Use ISOLATED in Edit, or press Play first."
+        )
+    end
     local a, b = overlookPair()
     assert(a and b, "watchWingbeat: could not find an Overlook upper-deck N/S rail pair")
     local from, to = (a :: Attachment).WorldPosition, (b :: Attachment).WorldPosition
