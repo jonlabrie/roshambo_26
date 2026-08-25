@@ -120,6 +120,14 @@ local function spawnBird(): (BasePart, BasePart, { [string]: Bone })
             bones[name] = b
         end
     end
+    -- ⚠ THE HIPS LIVE ON THE BODY, NOT THE WINGS, and the tool needs them or it cannot show the
+    -- landing gear at all -- which it could not, until 2026-08-25.
+    for _, name in { "joint12", "joint25" } do
+        local b = body:FindFirstChild(name, true)
+        if b and b:IsA("Bone") then
+            bones[name] = b
+        end
+    end
     return body, wings, bones
 end
 
@@ -308,6 +316,12 @@ local function runFlight()
             seat(body, wings, CFrame.new(src) * CFrame.Angles(0, yaw, 0))
             pose(bones, 0, 0, 0)
             wings.Transparency = 1
+            if bones.joint12 then
+                bones.joint12.Transform = CFrame.new()
+            end
+            if bones.joint25 then
+                bones.joint25.Transform = CFrame.new()
+            end
             if clock >= PAUSE_AT_ENDS then
                 phase, clock = "FLY", 0
             end
@@ -333,6 +347,14 @@ local function runFlight()
         local beatX, beatZ = BirdFlight.beatPose(clock, 0, true)
         wings.Transparency = BirdFlight.wingTransparency(open)
         pose(bones, open, beatX, beatZ)
+        -- gear up, same as BirdController: the tool is only useful if it shows what the game does
+        local tuck = math.rad(BirdFlight.legTuck(k) * BirdFlight.LEG_TUCK_DEG)
+        if bones.joint12 then
+            bones.joint12.Transform = CFrame.Angles(tuck, 0, 0)
+        end
+        if bones.joint25 then
+            bones.joint25.Transform = CFrame.Angles(tuck, 0, 0)
+        end
         seat(body, wings, CFrame.lookAt(pos, pos + unit))
 
         if k >= 1 then
