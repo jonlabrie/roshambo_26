@@ -60,6 +60,7 @@ local ZenDojo = require(shared:WaitForChild("themes"):WaitForChild("ZenDojo"))
 local FateRegistry = require(shared:WaitForChild("FateRegistry"))
 local HudPrefs = require(shared:WaitForChild("HudPrefs"))
 local Kamon = require(shared:WaitForChild("Kamon"))
+local KamonDraw = require(shared:WaitForChild("KamonDraw"))
 local PreferenceEditor = require(shared:WaitForChild("PreferenceEditor"))
 local BackDoorEditor = require(shared:WaitForChild("BackDoorEditor"))
 local WallBays = require(shared:WaitForChild("WallBays"))
@@ -1301,6 +1302,7 @@ local applier = TreatmentApplier.new({
     deckPlacement = DeckPlacement,
     decorationLayout = DecorationLayout,
     decorationCatalog = DecorationCatalog,
+    kamonDraw = KamonDraw,
 })
 
 -- Rebuild the player's claimed pad at its currently-resolved sizes/placement, threading the

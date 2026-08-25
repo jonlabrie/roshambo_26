@@ -8,7 +8,12 @@
 -- ⚠ KamonDraw is the RENDERER ONLY. The note below still holds: WHOSE crest this is arrives on
 -- the treatment, computed at the call site, so this file never decides affiliation. Drawing one
 -- is a different dependency from choosing one.
-local KamonDraw = require("../shared/KamonDraw")
+--
+-- ⚠ AND IT IS INJECTED, NOT REQUIRED. This was `require("../shared/KamonDraw")` for three days:
+-- correct on disk, nonsense in the DataModel, where src/server is ServerScriptService.Roshambo
+-- and src/shared is ReplicatedStorage.RoshamboShared. It threw at require time and took the whole
+-- server with it. This file is a thin adapter and everything else it uses is injected already;
+-- KamonDraw is no different. Guarded by tests/RequireConvention.spec.
 
 local TreatmentApplier = {}
 TreatmentApplier.__index = TreatmentApplier
@@ -25,6 +30,7 @@ export type Deps = {
     deckPlacement: any, -- pure per-size deck-pivot lookup (DeckPlacement)
     decorationLayout: any, -- pure DecorationLayout.resolve
     decorationCatalog: any, -- DecorationCatalog (footprint pure; build is Roblox-only)
+    kamonDraw: any, -- KamonDraw: CLOTH/INK + draw(gui, crest, cellPx). Renderer, not chooser.
 }
 
 function TreatmentApplier.new(deps: Deps)
@@ -40,6 +46,7 @@ function TreatmentApplier.new(deps: Deps)
         _deckPlacement = deps.deckPlacement,
         _decorationLayout = deps.decorationLayout,
         _decorationCatalog = deps.decorationCatalog,
+        _kamonDraw = deps.kamonDraw,
         _folders = {} :: { [string]: Folder },
     }, TreatmentApplier)
 end
@@ -187,11 +194,8 @@ end
 --
 -- ⚠ ONLY ON A LIT DECK. A vacant pad flying somebody's crest would say a house is home when it is
 -- not, and the shoji glow already carries occupancy — this must agree with it.
-local FLAG_CLOTH = KamonDraw.CLOTH
-
--- Crest drawing lives in Kamon.draw as of 2026-08-22 — the sashimono is the second surface the
--- note that used to sit here anticipated.
-local drawCrest = KamonDraw.draw
+-- Cloth colour and crest drawing both come off the injected KamonDraw at the use site, since the
+-- module is no longer in scope at file level (see the require note at the top).
 
 function TreatmentApplier:_buildNobori(
     padId: string,
@@ -236,7 +240,7 @@ function TreatmentApplier:_buildNobori(
     cloth.Anchored = true
     cloth.CanCollide = false
     cloth.CastShadow = false
-    cloth.Color = FLAG_CLOTH
+    cloth.Color = self._kamonDraw.CLOTH
     cloth.Material = Enum.Material.Fabric
     cloth.CFrame = deckCF * CFrame.new(x + side * (CLOTH_W / 2 + 0.12), POLE_H - CLOTH_H / 2 - 0.5, z)
     cloth.Parent = model
@@ -252,7 +256,7 @@ function TreatmentApplier:_buildNobori(
         gui.Parent = cloth
         -- 1.2 studs, matching the throw glyph already on these lanterns (GlyphPlateA is 1.20 on
         -- its narrow axis). That size is the benchmark: it was tuned until it read.
-        drawCrest(gui, crest, math.floor(1.2 * PPS))
+        self._kamonDraw.draw(gui, crest, math.floor(1.2 * PPS))
     end
 
     model:SetAttribute("padId", padId)
