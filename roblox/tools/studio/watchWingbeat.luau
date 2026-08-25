@@ -280,7 +280,12 @@ local function runFlight()
         local unit = if flat.Magnitude > 1e-4 then flat.Unit else Vector3.new(0, 0, 1)
         local lateral = Vector3.new(-unit.Z, 0, unit.X)
         local dy = if legNo % 2 == 0 then climb else -climb
-        local pos = src + unit * along + lateral * side + Vector3.new(0, rise + dy * k, 0)
+        -- ⚠ `along` IS A FRACTION (0..1), NOT STUDS. flightPoint returns `dist / total`, and
+        -- BirdController spends it as `fwd * (along * dist)`. Dropping the `* distance` here made
+        -- the bird advance at most ONE stud across a thirty-stud flight while `rise` -- which IS
+        -- in studs -- lifted it 2.6, so it bobbed up and down over the departure rail and read as
+        -- hovering motionless. Two values in one return tuple, different units, no type to catch it.
+        local pos = src + unit * (along * distance) + lateral * side + Vector3.new(0, rise + dy * k, 0)
 
         local open = BirdFlight.wingExtension(clock, 0, true)
         local beatX, beatZ = BirdFlight.beatPose(clock, 0, true)
