@@ -322,6 +322,80 @@ describe("BirdFlight", function()
         expect(differs).toBe(true)
     end)
 
+    test("a perch turn is a real turn -- neither a twitch nor a spin", function()
+        -- Owner, 2026-08-25: "a short hop that changes the direction the bird is facing".
+        local sawLeft, sawRight = false, false
+        for i = 1, 200 do
+            local d = BirdFlight.turnAmount(7, i)
+            local m = math.abs(d)
+            expect(m >= 35).toBe(true) -- under this it reads as a twitch, not a decision
+            expect(m <= 110).toBe(true) -- over it, as a spin
+            if d < 0 then
+                sawLeft = true
+            else
+                sawRight = true
+            end
+        end
+        expect(sawLeft).toBe(true)
+        expect(sawRight).toBe(true) -- it turns BOTH ways
+        expect(BirdFlight.turnAmount(7, 3)).toBe(BirdFlight.turnAmount(7, 3))
+        local differs = false
+        for i = 1, 50 do
+            if BirdFlight.turnAmount(7, i) ~= BirdFlight.turnAmount(8, i) then
+                differs = true
+                break
+            end
+        end
+        expect(differs).toBe(true)
+    end)
+
+    test("the turn HOPS: off the perch and back onto it, peaking mid-turn", function()
+        local p0, h0 = BirdFlight.turnPose(0)
+        expect(p0).toBe(0)
+        expect(h0).toBe(0)
+        local p1, h1 = BirdFlight.turnPose(BirdFlight.TURN_TIME)
+        expect(p1).toBe(1)
+        expect(h1).toBe(0) -- ⚠ back DOWN at the end, or the bird is left floating
+        local pLate, hLate = BirdFlight.turnPose(BirdFlight.TURN_TIME + 9)
+        expect(pLate).toBe(1)
+        expect(hLate).toBe(0)
+
+        local prev, peak, peakAt = -1, -1, 0
+        for t = 0, BirdFlight.TURN_TIME, 0.002 do
+            local p, h = BirdFlight.turnPose(t)
+            expect(p >= prev).toBe(true) -- one way only; backtracking reads as a stumble
+            prev = p
+            if h > peak then
+                peak, peakAt = h, t / BirdFlight.TURN_TIME
+            end
+        end
+        expect(peak > 0.03).toBe(true) -- a hop you can actually see
+        expect(peak < 0.12).toBe(true) -- but not a launch
+        expect(peakAt > 0.3).toBe(true) -- and airborne in the MIDDLE of the turn
+        expect(peakAt < 0.7).toBe(true)
+    end)
+
+    test("idle turns are rare, jittered, and never in lockstep with flutters", function()
+        local lo, hi = math.huge, 0
+        for i = 1, 200 do
+            local g = BirdFlight.nextTurnGap(7, i)
+            lo, hi = math.min(lo, g), math.max(hi, g)
+        end
+        expect(lo > 6).toBe(true)
+        expect(hi < 60).toBe(true)
+        expect(hi > lo * 1.15).toBe(true)
+        expect(BirdFlight.nextTurnGap(7, 3)).toBe(BirdFlight.nextTurnGap(7, 3))
+        -- ⚠ TURNS AND FLUTTERS MUST DRIFT AGAINST EACH OTHER. Sharing a period would fire them
+        -- together every time and read as one compound move rather than two habits.
+        local same = 0
+        for i = 1, 50 do
+            if math.abs(BirdFlight.nextTurnGap(7, i) - BirdFlight.nextFlutterGap(7, i)) < 1e-6 then
+                same += 1
+            end
+        end
+        expect(same).toBe(0)
+    end)
+
     test("a perched bird's head SNAPS and HOLDS rather than sweeping", function()
         -- ⚠ THIS IS THE WHOLE POINT OF THE IDLE. A bird does not pan its head smoothly; it
         -- snaps to a new angle, holds it, and snaps again. A sinusoidal sweep reads as a

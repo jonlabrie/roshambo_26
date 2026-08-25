@@ -142,6 +142,13 @@ type Bird = {
     nextFlutterAt: number,
     wasFlying: boolean,
     lastState: string,
+    -- A perch turn. `turnFrom`/`turnTo` are ABSOLUTE yaws in radians, captured once when the turn
+    -- starts -- see the note on BirdFlight.turnPose for why an incremental turn would spin.
+    turnSince: number?,
+    turnFrom: number,
+    turnTo: number,
+    turnNo: number,
+    nextTurnAt: number,
     flightFrom: Vector3?, -- a flight is a PATH between two points, so both ends must be held
     flightTo: Vector3?,
     flightAt: number,
@@ -241,6 +248,11 @@ local function makeBird(userId: string): Bird
         nextFlutterAt = os.clock() + BirdFlight.nextFlutterGap(seedFor(userId), 0),
         wasFlying = false,
         lastState = "RESTING",
+        turnSince = nil,
+        turnFrom = 0,
+        turnTo = 0,
+        turnNo = 0,
+        nextTurnAt = os.clock() + BirdFlight.nextTurnGap(seedFor(userId), 0),
         flightFrom = nil,
         flightTo = nil,
         flightAt = 0,
@@ -562,6 +574,31 @@ RunService.RenderStepped:Connect(function()
         -- already turned outboard -- owner: "it look like it was flying sideways as part of it's
         -- pathfinding to the avatar". A bird faces where it is GOING until it lands; the shoulder
         -- pose is an arrival pose, not a travel one.
+        -- ===== PERCH TURN =====
+        -- ⚠ ABSOLUTE ANGLES, NOT AN OFFSET. The perched branch below derives its heading by
+        -- reading the bird's OWN LookVector back each frame. Adding a turn to that every frame
+        -- would feed the result back in and compound into a spin, so `turnFrom`/`turnTo` are
+        -- captured once, here, and interpolated between.
+        --
+        -- ⚠ AND THE THREE PERCH MOTIONS MUST NOT OVERLAP. A turn on top of a flutter or the
+        -- victory hop reads as one confused compound move rather than two separate habits.
+        -- Only on a REAL perch, too: a bird pivoting on someone's shoulder is not a bird.
+        local turning = b.turnSince ~= nil and (now - (b.turnSince or 0)) < BirdFlight.TURN_TIME
+        if far <= DETAIL_DISTANCE and travelled <= 0.001 and b.perch then
+            local flutterRunning = b.flutterSince ~= nil
+                and (now - (b.flutterSince or 0)) < BirdFlight.FLUTTER_BURST
+            local hopping = b.state == "WIN" and not resting
+            if not turning and not flutterRunning and not hopping and now >= b.nextTurnAt then
+                local f = b.part.CFrame.LookVector
+                b.turnFrom = math.atan2(-f.X, -f.Z)
+                b.turnTo = b.turnFrom + math.rad(BirdFlight.turnAmount(b.seed, b.turnNo))
+                b.turnSince = now
+                b.turnNo += 1
+                b.nextTurnAt = now + BirdFlight.nextTurnGap(b.seed, b.turnNo)
+                turning = true
+            end
+        end
+
         local base: CFrame
         if b.state == "WIN" and not resting and k >= 1 then
             base = CFrame.new(b.pos)
@@ -574,11 +611,19 @@ RunService.RenderStepped:Connect(function()
             -- rotation, so a bird arriving in a steep dive stayed nose-down on its perch, and a
             -- freshly cloned one kept whatever attitude the importer baked in. Keep the YAW --
             -- it should still face where it last flew -- and drop the pitch and roll.
-            local f = b.part.CFrame.LookVector
-            local flat = Vector3.new(f.X, 0, f.Z)
-            base = if flat.Magnitude > 1e-4
-                then CFrame.lookAt(b.pos, b.pos + flat.Unit)
-                else CFrame.new(b.pos)
+            if turning then
+                -- Driven from the captured pair, so the self-read above cannot compound it. The
+                -- hop returns to zero at the end, which is what puts the bird back on the rail.
+                local p, hop = BirdFlight.turnPose(now - (b.turnSince or 0))
+                local yaw = b.turnFrom + (b.turnTo - b.turnFrom) * p
+                base = CFrame.new(b.pos + Vector3.new(0, hop, 0)) * CFrame.Angles(0, yaw, 0)
+            else
+                local f = b.part.CFrame.LookVector
+                local flat = Vector3.new(f.X, 0, f.Z)
+                base = if flat.Magnitude > 1e-4
+                    then CFrame.lookAt(b.pos, b.pos + flat.Unit)
+                    else CFrame.new(b.pos)
+            end
         end
         -- ⚠ SEAT BY THE SHARED ORIGIN, NOT THE PART CENTRE. Setting `CFrame = base` puts the
         -- part's BOUNDING-BOX CENTRE at the perch, and the body's centre rides 0.236 studs above

@@ -206,6 +206,13 @@ BirdFlight.FLUTTER_BURST = 0.7 -- how long one flutter lasts
 local FLUTTER_CYCLES = 3
 local FLUTTER_OPEN = 0.35 -- a HALF unfold, and the reach is held where two flexes had it
 local IDLE_FLUTTER_GAP = 22.0 -- background rate, jittered; was 9.0 and free-running
+
+-- THE PERCH TURN. Owner, 2026-08-25: "a short hop that changes the direction the bird is facing".
+BirdFlight.TURN_TIME = 0.25
+local TURN_MIN_DEG = 35 -- under this it reads as a twitch rather than a decision
+local TURN_MAX_DEG = 110 -- over it, as a spin
+local TURN_HOP = 0.06 -- barely above the victory hop's 0.05; both feet leave together
+local IDLE_TURN_GAP = 18.0
 -- Openness at which the wing is fully opaque. Takeoff crosses this in ~40ms, so flight is
 -- unaffected; it exists so a PERCHED flutter fades in instead of popping.
 local WING_FADE_IN = 0.15
@@ -494,6 +501,36 @@ end
 -- distressed rather than resting.
 function BirdFlight.nextFlutterGap(seed: number, index: number): number
     return IDLE_FLUTTER_GAP * (0.7 + 0.9 * hash01(index * 3.77 + seed * 7.31))
+end
+
+-- How far this turn goes, in SIGNED degrees. Jittered in both magnitude and side, because a fixed
+-- quarter-turn reads as a mechanism and a bird that only ever turns one way reads as broken.
+function BirdFlight.turnAmount(seed: number, index: number): number
+    local mag = TURN_MIN_DEG + (TURN_MAX_DEG - TURN_MIN_DEG) * hash01(index * 5.13 + seed * 2.71)
+    return if hash01(index * 9.41 + seed * 4.07) < 0.5 then -mag else mag
+end
+
+-- Progress (0..1) and hop height (studs) for a turn, given seconds since it began.
+--
+-- ⚠ THE CALLER MUST DRIVE THIS FROM ABSOLUTE STORED ANGLES, not by adding an offset to the bird's
+-- current facing. The perched branch of the controller derives its heading by reading the bird's
+-- OWN LookVector back each frame, so an incremental turn would compound into a spin. Capture
+-- `from` and `to` once when the turn starts and interpolate between them.
+function BirdFlight.turnPose(t: number): (number, number)
+    if t <= 0 then
+        return 0, 0
+    end
+    if t >= BirdFlight.TURN_TIME then
+        return 1, 0 -- ⚠ hop returns to ZERO, or the bird is left standing in the air
+    end
+    local u = t / BirdFlight.TURN_TIME
+    return u * u * (3 - 2 * u), math.sin(math.pi * u) * TURN_HOP
+end
+
+-- Seconds until the next idle turn. Deliberately NOT a multiple of the flutter gap: two habits on
+-- a shared period would always fire together and read as one compound move.
+function BirdFlight.nextTurnGap(seed: number, index: number): number
+    return IDLE_TURN_GAP * (0.65 + 0.95 * hash01(index * 6.29 + seed * 1.87))
 end
 
 -- Wing Transparency for a given openness.
