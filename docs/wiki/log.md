@@ -765,3 +765,22 @@ them and restoring on cleanup — safe in Play, where the edit dies with the ses
 is a change to the saved place. Four Overlook perches were found untagged (322 of 326) and repaired
 by hand. **A tool that mutates shared state needs its failure path designed, not just its happy
 path.** It no longer touches tags outside Play, where there are no familiars to exclude anyway.
+
+## [2026-08-25] drop | The worn sashimono is out — "a bit on the nose" for a social experience
+
+Owner: *"I'm not digging the sashimono; it's a bit on the nose for an experience meant to be social
+as much as anything else."* The back banner built 2026-08-22 (`39ad15f`) is **dropped as a worn
+prop**. Do not re-raise it in that form.
+
+⚠ **The objection is to the MARTIAL FRAMING, not to the proportions.** The 2026-08-22 log recorded
+"a bit much" as possibly meaning size, and left that open. It did not: a sashimono is battlefield
+identification, and the program bar for this game is *hangout is the product* — so the costume is
+what jars, and shrinking it would not have helped. The open question from that entry is now closed
+by the harder answer.
+
+**Still true, and still unsolved:** grade has nowhere to live. Bands on the bird were set aside
+2026-08-21 (a 7-inch bird cannot carry status at arena distance); the worn banner is now out; and
+item 6's REWARD half stays unproven while its display half works. The owner's next proposal is a
+HUD treatment — something hovering beside or above the avatar rather than worn.
+
+Also gated this session: **45 degrees of wing beat is final** ("45 degrees of beat is fine").

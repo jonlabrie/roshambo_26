@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: open
-updated: 2026-08-22
+updated: 2026-08-25
 ---
 
 # Friends & Family Baseline
@@ -43,6 +43,11 @@ rounds skippable, no penalty) — hangout is the product.
    the player who earned it. Carries the parked economy-API defects (a)–(c) in [[parked-defects]].
    Any badge that claims SKILL depends on (h) being ACTIVE, not merely fixed; volume badges do
    not — which is exactly why grade is built on milestones rather than on a rate.
+   **2026-08-25: the worn sashimono is DROPPED** — owner: *"a bit on the nose for an
+   experience meant to be social as much as anything else."* The objection is the martial
+   framing, not the size, so shrinking it was never the fix. Grade therefore still has
+   nowhere to live: not on the bird (too small), not worn. A HUD treatment beside or above
+   the avatar is the owner's next proposal and is unbuilt.
    **2026-08-22: the familiar flies, folds, sings and looks around** — two-part skinned mesh,
    three-phase flight with non-beeline paths, a snap-and-hold idle with check moves, and a
    weight-shift victory hop. Wired into play and owner-gated ("looking good enough for now").
