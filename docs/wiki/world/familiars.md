@@ -170,9 +170,44 @@ also translating away. A bug can live indefinitely in the states you never hold 
 — the flutter was the first thing to hold a partial fold in view, and it exposed it on the first
 gate. Tests now state the fold as a **direction** rather than repeating two magic numbers.
 
-Since the flap uses that same axis, the in-flight beat is also a fore-and-aft sweep rather than a
-vertical flap. ⚠ unverified whether that is worth changing; it is a plausible part of why the owner
-reported early on that the wings were hard to see in flight.
+### The beat, the arc and the gear — all measured, gated 2026-08-25
+
+⚠ **THE BEAT HAD NO VERTICAL COMPONENT AT ALL.** It spent its whole amplitude on the same local Z
+the fold uses, which is horizontal — so the bird sculled rather than flew, and the wing visibly
+SHORTENED each stroke, because rotating in the horizontal plane foreshortens the span (tip x 0.431
+→ 0.335 at 40°). Measured per axis, wingtip travel over ±60°:
+
+| bone axis | vertical | fore-aft | |
+|---|---|---|---|
+| local X | **0.712** | 0.000 | the lift axis, unused until now |
+| local Y | 0.000 | 0.000 | runs along the span; moves the tip not at all |
+| local Z | 0.000 | **0.712** | what the beat was using for everything |
+
+**The fore-aft sweep is not a bug — it is half of a real beat.** Owner: *"in actual flight it's
+both."* Correct, and the pairing runs the other way: the DOWNSTROKE is the power stroke and sweeps
+forward as it descends, the upstroke recovering back and up. So the fix was to ADD the missing axis
+**90° out of phase** — sin for the stroke, cos for the sweep — making the tip trace an inclined
+ellipse. In phase they would draw a straight diagonal and retrace it: a line, not a loop, and worse
+than the single axis it replaced. Vertical 45°, fore-aft 13°, so the sweep TILTS the loop rather
+than carrying it.
+
+⚠ **MIRRORING DIFFERS PER AXIS.** local X does NOT mirror — the same sign raises both wings; local
+Z does. Guessing would have had one wing rise while the other fell.
+
+⚠ **THE ARC MUST KEY OFF DISTANCE COVERED, NOT TIME ELAPSED.** `along` is the integral of a speed
+profile and is near zero at the start, because the bird launches from rest on a perch — while
+`rise` was a function of raw `t` and climbed immediately. At 10% of a 30-stud flight that is 0.76
+studs forward against 1.64 up: the bird went up like a rocket and then turned toward the target
+(owner). Rise and CIRCLE's side-swing now key off `along`, so the climb is proportional to
+progress. Endpoints and peak heights are unchanged; only the schedule moves.
+
+⚠ **GEAR UP.** Fixed legs read as *"a plane flying with the wheels down"*. Measured: **+100° at the
+hip** lifts the foot 0.280 studs, from y −0.281 to −0.001, and puts EVERY joint of the leg chain
+inside the body's bounding box (protrusion 0.000) — so the hip alone folds the leg into the flank
+and no knee bone is needed. At rest the foot protrudes 0.045 below, which is correct: feet should
+show on a perch. Up by 22% of the flight, down from 78%, so it extends BEFORE touchdown.
+
+**Owner gate 2026-08-25: "bird is looking good, let's roll with those settings."**
 
 ### Flight, and the idle that matters more
 
@@ -249,6 +284,9 @@ differ, so no constant could be right.
 `roblox/tools/studio/watchWingbeat.luau` (⚠ **the only way to gate a beat change** — flights are on
 a 10–60s random hold, so watching one side-on otherwise means loitering and hoping; ISOLATED parks
 a bird in front of the camera at a fraction of speed with the wingtip path traced, FLIGHT sends a
-test-only bird back and forth along the Overlook's upper deck, north rail ↔ south rail, 30 studs),
+test-only bird back and forth along the Overlook's upper deck, north rail ↔ south rail, 30 studs.
+⚠ **RUN IT IN EDIT** — no Play, no datamodel to choose, no StreamingEnabled, free camera. In Play
+it must run on the CLIENT: server-built parts never reach the screen, which is why the real
+familiars work at all — `Workspace.Familiars` does not exist on the server),
 `roblox/src/shared/ChoreographyMachine.luau`, `server/src/engine/Milestones.ts`,
 `roblox/tools/studio/sweepFamiliarPerches.luau`, `roblox/tools/builders/Spec.luau`

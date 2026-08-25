@@ -721,3 +721,47 @@ silently is worse than a command that cannot.
 longer makes it live. Testing a `server/` change against Studio now needs an explicit
 `start-deployment`, or you test the previous build and believe it is the new one — a silent failure
 that looks exactly like "my change did nothing".
+
+## [2026-08-25] gate | The bird flies properly — arc, gear, and a beat with a vertical axis
+
+Owner: *"bird is looking good, let's roll with those settings."* As-built on [[familiars]].
+
+Three findings from the first watched flight, all measured rather than guessed after the fold sign
+proved a coin-flip that would have been lost:
+
+**The beat had no vertical component.** It spent its whole amplitude on the same horizontal axis
+the fold uses, so the bird sculled — and the wing visibly shortened each stroke, because rotating
+in the horizontal plane foreshortens the span. local X moves the tip 0.712 studs vertically and
+0.000 fore-aft; local Z the exact reverse; local Y, which runs along the span, moves it not at all.
+
+**The owner's correction changed the fix.** *"In actual flight it's both."* Right — a real beat is
+compound, so the answer was to ADD the missing axis 90° out of phase rather than replace the wrong
+one. Downstroke sweeps forward as it descends; the upstroke recovers back and up. In phase, the two
+would trace a straight diagonal and retrace it — a line, not a loop, and worse than what it
+replaced.
+
+**The arc keyed off the wrong clock.** `along` is a speed integral, near zero at launch because the
+bird starts at rest on a perch; `rise` was a function of raw time and climbed immediately. At 10%
+of a flight: 0.76 studs forward, 1.64 up. Rise now keys off distance covered, which is what an arc
+is.
+
+**And the legs stayed down.** +100° at the hip folds the whole leg chain inside the body's bounding
+box, so no knee bone is needed; at rest the foot protrudes 0.045, which is correct.
+
+⚠ **A diagnostic had to be built before any of this could be gated**, because flights are on a
+10–60s random hold to a random perch — a change to the beat was literally unwatchable.
+[[familiars]] carries how to run it, and the short version is RUN IT IN EDIT.
+
+**On three failed handoffs of that tool, because the pattern is the lesson.** It was handed over
+three times and failed three times: verified that its pieces existed but not that they composed (a
+0..1 fraction spent as studs); verified in one datamodel while the owner ran it in another (server
+parts never reach the screen under StreamingEnabled); and finally, a stripped-down probe left
+running and described as the tool, carrying two bugs the tool did not have. **Each time the thing
+verified was ADJACENT to the thing shipped.** What held was running the real file end to end and
+reading coordinates back over a full round trip.
+
+⚠ **And it damaged the place before that was noticed.** FLIGHT borrowed two perches by untagging
+them and restoring on cleanup — safe in Play, where the edit dies with the session, but in EDIT it
+is a change to the saved place. Four Overlook perches were found untagged (322 of 326) and repaired
+by hand. **A tool that mutates shared state needs its failure path designed, not just its happy
+path.** It no longer touches tags outside Play, where there are no familiars to exclude anyway.
