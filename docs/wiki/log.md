@@ -784,3 +784,31 @@ item 6's REWARD half stays unproven while its display half works. The owner's ne
 HUD treatment — something hovering beside or above the avatar rather than worn.
 
 Also gated this session: **45 degrees of wing beat is final** ("45 degrees of beat is fine").
+
+## [2026-08-25] decision | The avatar must stay culture-neutral — a Chinese-themed area is planned
+
+Owner, 2026-08-25: *"I'm worried about heaping too much Japanese cultural signifiers onto an
+avatar, because I'm thinking the next expansion area will be Chinese-themed, and I don't think we
+want too much of Japan leaking into the Chinese area."*
+
+⚠ **THIS IS A STANDING CONSTRAINT ON EVERYTHING WORN OR CARRIED, not a note about one prop.** The
+avatar TRAVELS between themed areas; the architecture does not. So the two have different rules:
+
+| | lives in | may be culturally specific? |
+|---|---|---|
+| **architecture** — noren, nobori, teahouse, lanterns | one area | **yes** — that is the point of the area |
+| **avatar and anything on or around it** | every area | **no** — it walks into the next theme |
+
+**Consequence for grade, and it is structural:** identity and rank must DECOUPLE. The `kamon` is a
+Japanese family crest — culturally located, so it belongs to architecture and should stay there.
+Grade travels with the player, so its carrier has to read without Japanese (or Chinese) coding at
+all.
+
+**And it cannot depend on owning a teahouse.** Owner: *"let's not assume everyone has a teahouse,
+and... linking a teahouse flex or display to a specific player isn't straightforward."* So the
+static half of item 6 cannot be the only answer to flex — a mobile channel is required, not
+optional.
+
+⚠ This retires a whole class of answers that looked fine an hour ago: worn crests, the sashimono in
+any form, and anything else that hangs a Japanese signifier on a body that will shortly walk into
+a Chinese-themed area.
