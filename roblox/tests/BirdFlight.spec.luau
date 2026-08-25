@@ -148,12 +148,12 @@ describe("BirdFlight", function()
         expect(resting > loss + 1.5).toBe(true)
     end)
 
-    test("wing lift NEVER exceeds the ceiling", function()
+    test("neither beat axis ever exceeds its ceiling", function()
         for _, flying in { true, false } do
             for t = 0, 40, 0.1 do
-                local a = BirdFlight.wingAngle(t, 7, flying)
-                expect(a >= 0).toBe(true)
-                expect(a <= BirdFlight.WING_MAX_DEG).toBe(true)
+                local vertical, foreAft = BirdFlight.beatPose(t, 7, flying)
+                expect(math.abs(vertical) <= BirdFlight.WING_BEAT_DEG + 1e-9).toBe(true)
+                expect(math.abs(foreAft) <= BirdFlight.WING_SWEEP_DEG + 1e-9).toBe(true)
             end
         end
     end)
@@ -213,15 +213,52 @@ describe("BirdFlight", function()
         expect(BirdFlight.foldAngles(5)).toBe(0)
     end)
 
-    test("a flying bird beats its wings continuously", function()
-        local high, low = 0, 99
+    test("a beat goes UP as well as down -- it is not a one-sided sweep", function()
+        -- ⚠ MEASURED AXES, 2026-08-25. local X lifts the tip (0.712 studs of vertical travel
+        -- over +/-60 deg, and ZERO fore-aft); local Z sweeps it fore-and-aft (0.712 fore-aft, ZERO
+        -- vertical); local Y runs along the span and moves the tip not at all. The beat used to
+        -- put its whole amplitude on Z, so the bird sculled instead of flying.
+        local up, down = 0, 0
         for t = 0, 4, 0.02 do
-            local a = BirdFlight.wingAngle(t, 7, true)
-            high = math.max(high, a)
-            low = math.min(low, a)
+            local vertical = BirdFlight.beatPose(t, 7, true)
+            up = math.min(up, vertical)
+            down = math.max(down, vertical)
         end
-        expect(high > BirdFlight.WING_MAX_DEG * 0.8).toBe(true)
-        expect(low < BirdFlight.WING_MAX_DEG * 0.25).toBe(true)
+        expect(down > BirdFlight.WING_BEAT_DEG * 0.9).toBe(true)
+        expect(up < -BirdFlight.WING_BEAT_DEG * 0.9).toBe(true)
+    end)
+
+    test("the tip traces a LOOP: forward on the downstroke, back on the upstroke", function()
+        -- Owner, 2026-08-25: "in actual flight it's both - forward and up, backward and down".
+        -- Right that it is compound; the pairing runs the other way, because the DOWNSTROKE is the
+        -- power stroke and sweeps forward as it descends, the upstroke recovering back and up.
+        --
+        -- ⚠ THIS IS THE ASSERTION THAT MAKES IT A LOOP RATHER THAN A LINE. Fore-aft must track
+        -- the DIRECTION of vertical travel, not its position -- in phase, the two would trace a
+        -- straight diagonal and retrace it, which reads worse than the single axis it replaced.
+        local dt = 0.0005
+        local checked = 0
+        for t = 0, 2, 0.01 do
+            local v0 = BirdFlight.beatPose(t, 7, true)
+            local v1 = BirdFlight.beatPose(t + dt, 7, true)
+            local _, foreAft = BirdFlight.beatPose(t, 7, true)
+            if math.abs(v1 - v0) > 1e-7 then
+                checked += 1
+                if v1 > v0 then
+                    expect(foreAft <= 1e-9).toBe(true) -- descending -> forward (negative Z)
+                else
+                    expect(foreAft >= -1e-9).toBe(true) -- ascending -> back
+                end
+            end
+        end
+        expect(checked > 100).toBe(true) -- the sweep actually exercised both halves
+    end)
+
+    test("fore-aft is the SECONDARY component, not an equal partner", function()
+        -- A real beat is dominated by vertical excursion; the fore-aft sweep is what tilts the
+        -- loop, not what carries it. Equal amplitudes read as a circular paddle.
+        expect(BirdFlight.WING_SWEEP_DEG < BirdFlight.WING_BEAT_DEG * 0.5).toBe(true)
+        expect(BirdFlight.WING_SWEEP_DEG > 0).toBe(true)
     end)
 
     test("a PERCHED bird does not BEAT its wings -- lift is a flight thing", function()
@@ -234,7 +271,9 @@ describe("BirdFlight", function()
         -- implementation, because they happened to fall between bursts -- the same shape of
         -- vacuous assertion that let a zeroed FLIGHT_MIN_TIME through in this file a week ago.
         for t = 0, 120, 0.05 do
-            expect(BirdFlight.wingAngle(t, 7, false)).toBe(0)
+            local vertical, foreAft = BirdFlight.beatPose(t, 7, false)
+            expect(vertical).toBe(0)
+            expect(foreAft).toBe(0)
         end
     end)
 

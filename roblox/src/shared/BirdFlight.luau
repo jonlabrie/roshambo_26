@@ -177,7 +177,14 @@ end
 -- The old 30-degree lift ceiling is GONE. It was measured against the folded wing's stretch limit
 -- (its reach saturated at 0.181 studs and past ~50 degrees it read as a cape), and nothing lifts
 -- that geometry any more. A real spread wing wants a real beat.
-BirdFlight.WING_MAX_DEG = 55
+-- ⚠ TWO AXES, MEASURED 2026-08-25, not guessed. Sweeping each bone axis and logging the wingtip
+-- in the bird's own frame: local X moves it 0.712 studs VERTICALLY and 0.000 fore-aft; local Z
+-- moves it 0.712 FORE-AFT and 0.000 vertically; local Y runs along the span and does not move the
+-- tip at all. The beat used to put its entire amplitude on Z, so the bird sculled rather than
+-- flew -- and the wing visibly SHORTENED each stroke, because rotating in the horizontal plane
+-- foreshortens the span (0.431 -> 0.335 at 40 degrees).
+BirdFlight.WING_BEAT_DEG = 45 -- vertical, the stroke that carries the beat
+BirdFlight.WING_SWEEP_DEG = 13 -- fore-aft, which TILTS the loop rather than carrying it
 -- The FOLD, in degrees per bone. Measured in Blender and verified in Roblox: at these angles the
 -- wing draws in against the flank; at 0/0 it is fully spread.
 --
@@ -463,12 +470,26 @@ end
 -- its wings occasionally, and certainly when arriving or leaving a perch." Occasionally is the
 -- load-bearing word -- constant fluttering reads as a distressed bird, not a resting one, so the
 -- perched case is zero except for short bursts a few seconds apart.
-function BirdFlight.wingAngle(elapsed: number, seed: number, flying: boolean): number
+-- The wingbeat, as TWO bone angles in degrees: vertical (local X, positive = DOWN) and fore-aft
+-- (local Z, negative = FORWARD). Both zero when perched.
+--
+-- ⚠ THEY ARE 90 DEGREES OUT OF PHASE, AND THAT IS THE WHOLE POINT. Owner, 2026-08-25: "in actual
+-- flight it's both - forward and up, backward and down". Compound, yes -- and the pairing runs the
+-- other way, because the DOWNSTROKE is the power stroke and sweeps forward as it descends, the
+-- upstroke recovering back and up. So fore-aft tracks the DIRECTION of vertical travel (its
+-- derivative), not its position: sin for the stroke, cos for the sweep. In phase, the tip would
+-- trace a straight diagonal and retrace it -- a line, not a loop, and worse than the single axis
+-- this replaced.
+--
+-- ⚠ MIRRORING DIFFERS PER AXIS, also measured: local X does NOT mirror (-30 raises BOTH wings),
+-- local Z DOES (forward is -Z on the right, +Z on the left). Guessing would have had one wing
+-- rise while the other fell.
+function BirdFlight.beatPose(elapsed: number, seed: number, flying: boolean): (number, number)
     if not flying then
-        return 0
+        return 0, 0
     end
-    local beat = 0.5 - 0.5 * math.cos(elapsed * FLAP_RATE + seed)
-    return math.clamp(beat * BirdFlight.WING_MAX_DEG, 0, BirdFlight.WING_MAX_DEG)
+    local p = elapsed * FLAP_RATE + seed
+    return BirdFlight.WING_BEAT_DEG * math.sin(p), -BirdFlight.WING_SWEEP_DEG * math.cos(p)
 end
 
 -- How far open the wings are during a perched flutter, given seconds SINCE THAT FLUTTER BEGAN.

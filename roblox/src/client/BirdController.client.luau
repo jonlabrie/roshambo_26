@@ -689,12 +689,18 @@ RunService.RenderStepped:Connect(function()
             end
 
             local shoulder, wrist = BirdFlight.foldAngles(open)
-            local lift = math.rad(BirdFlight.wingAngle(now, b.seed, flying))
+            -- ⚠ THE BEAT USES BOTH BONE AXES, AND THEY MIRROR DIFFERENTLY -- measured, not
+            -- assumed. local X lifts the tip and does NOT mirror: the same sign raises both wings.
+            -- local Z sweeps fore-aft and DOES mirror, which is exactly why the fold already runs
+            -- `shoulder` on the right and `-shoulder` on the left. Mirroring X too would have one
+            -- wing rise while the other fell.
+            local beatX, beatZ = BirdFlight.beatPose(now, b.seed, flying)
+            local zRight = math.rad(shoulder + beatZ)
             if b.wingR then
-                b.wingR.Transform = CFrame.Angles(0, 0, math.rad(shoulder) - lift)
+                b.wingR.Transform = CFrame.Angles(math.rad(beatX), 0, zRight)
             end
             if b.wingL then
-                b.wingL.Transform = CFrame.Angles(0, 0, math.rad(-shoulder) + lift)
+                b.wingL.Transform = CFrame.Angles(math.rad(beatX), 0, -zRight)
             end
             if b.wristR then
                 b.wristR.Transform = CFrame.Angles(0, 0, math.rad(wrist))
