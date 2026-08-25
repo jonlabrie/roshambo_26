@@ -180,8 +180,19 @@ end
 BirdFlight.WING_MAX_DEG = 55
 -- The FOLD, in degrees per bone. Measured in Blender and verified in Roblox: at these angles the
 -- wing draws in against the flank; at 0/0 it is fully spread.
-BirdFlight.FOLD_SHOULDER = -70
-BirdFlight.FOLD_WRIST = -110
+--
+-- ⚠ THE SIGN WAS INVERTED FOR THREE DAYS AND NOTHING COULD SHOW IT. These bones rotate about a
+-- local Z that runs VERTICAL, so the fold is a horizontal sweep fore-and-aft -- and at -70/-110 it
+-- swept FORWARD, past the head. Measured on the live bird, part-local -Z being forward, with the
+-- wingtip at the flutter's peak: spread rests at z -0.123, the old fold reached z -0.391 (0.27
+-- studs beyond the head), the corrected fold reaches z +0.146 (back over the body).
+--
+-- It survived because the only two poses anyone had ever SEEN are the two where the sign cannot
+-- matter: fully spread is 0 degrees either way, and fully folded is Transparency 1. The flutter is
+-- the first thing to hold a partial fold in view, and it exposed it immediately (owner,
+-- 2026-08-25: "extended forward, towards the head - actually passing it").
+BirdFlight.FOLD_SHOULDER = 70
+BirdFlight.FOLD_WRIST = 110
 BirdFlight.WING_OPEN_TIME = 0.28 -- seconds from folded to full spread
 
 local FLAP_RATE = 16.0 -- rad/sec in flight; ~2.5 beats a second
@@ -189,8 +200,11 @@ local FLAP_RATE = 16.0 -- rad/sec in flight; ~2.5 beats a second
 -- THE PERCHED FLUTTER. Owner, 2026-08-25: "a quick 'half unfold/refold' cycle a couple of times
 -- that might read as a flutter", fired on events "plus a longer idle period".
 BirdFlight.FLUTTER_BURST = 0.7 -- how long one flutter lasts
-local FLUTTER_CYCLES = 2 -- "a couple of times"
-local FLUTTER_OPEN = 0.50 -- a HALF unfold; the envelope trims the peak to about 0.35
+-- Three, not two: at two the motion read as slightly too slow to be a flutter (owner,
+-- 2026-08-25, "three 'flexes' instead of two in the same amount of time"). The BURST is unchanged,
+-- so this is purely a rate increase.
+local FLUTTER_CYCLES = 3
+local FLUTTER_OPEN = 0.35 -- a HALF unfold, and the reach is held where two flexes had it
 local IDLE_FLUTTER_GAP = 22.0 -- background rate, jittered; was 9.0 and free-running
 -- Openness at which the wing is fully opaque. Takeoff crosses this in ~40ms, so flight is
 -- unaffected; it exists so a PERCHED flutter fades in instead of popping.
@@ -466,7 +480,10 @@ function BirdFlight.flutterExtension(t: number, seed: number): number
         return 0
     end
     local u = t / BirdFlight.FLUTTER_BURST
-    local envelope = math.sin(math.pi * u) -- in and out, no snap at either end
+    -- ⚠ FLATTENED (^0.5). A plain sine envelope over THREE flexes makes the middle one twice the
+    -- reach of its neighbours, which reads as one flex with a stutter either side rather than
+    -- three. The root pulls the shoulders up while still tapering both ends to zero.
+    local envelope = math.sin(math.pi * u) ^ 0.5
     local cycle = 0.5 - 0.5 * math.cos(2 * math.pi * FLUTTER_CYCLES * u)
     local reach = FLUTTER_OPEN * (0.85 + 0.30 * hash01(seed)) -- fifty birds, fifty flutters
     return reach * envelope * cycle

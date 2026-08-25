@@ -184,20 +184,29 @@ describe("BirdFlight", function()
         expect(done > 0.99).toBe(true)
     end)
 
+    test("the fold sweeps the wing BACKWARD over the body, never forward past the head", function()
+        -- ⚠ MEASURED ON THE LIVE BIRD, 2026-08-25, not guessed. These bones turn about a local Z
+        -- that runs vertical, so the fold is a horizontal fore-and-aft sweep. Wingtip in
+        -- part-local space, where -Z is forward: spread rests at z -0.123; the fold as shipped
+        -- (-70/-110) reached z -0.391, a quarter-stud PAST the head; corrected (+70/+110) it
+        -- reaches z +0.146, back over the body. A POSITIVE fold is the one that tucks.
+        expect(BirdFlight.FOLD_SHOULDER > 0).toBe(true)
+        expect(BirdFlight.FOLD_WRIST > 0).toBe(true)
+    end)
+
     test("fold angles run from FULLY FOLDED to FULLY SPREAD and never past", function()
-        -- ⚠ These are MEASURED angles, verified in Roblox through Bone.Transform, not guesses:
-        -- shoulder -70 / wrist -110 draws the wing in against the flank, 0/0 is full spread.
         local s0, w0 = BirdFlight.foldAngles(0)
         expect(s0).toBe(BirdFlight.FOLD_SHOULDER)
         expect(w0).toBe(BirdFlight.FOLD_WRIST)
         local s1, w1 = BirdFlight.foldAngles(1)
         expect(s1).toBe(0)
         expect(w1).toBe(0)
-        -- monotonic, and clamped outside 0..1 so a bad caller cannot hyperextend a wing
-        local prev = BirdFlight.FOLD_SHOULDER - 1
+        -- monotonic TOWARD ZERO, and clamped outside 0..1 so a bad caller cannot hyperextend a
+        -- wing. Stated as magnitude so it holds whichever way the fold sweeps.
+        local prev = math.abs(BirdFlight.FOLD_SHOULDER) + 1
         for k = 0, 1.0001, 0.05 do
-            local sh = BirdFlight.foldAngles(math.min(1, k))
-            expect(sh >= prev).toBe(true)
+            local sh = math.abs((BirdFlight.foldAngles(math.min(1, k))))
+            expect(sh <= prev).toBe(true)
             prev = sh
         end
         expect(BirdFlight.foldAngles(-5)).toBe(BirdFlight.FOLD_SHOULDER)
@@ -246,9 +255,13 @@ describe("BirdFlight", function()
             end
             prev = e
         end
-        expect(peaks).toBe(2) -- a couple of them, refolding in between
+        expect(peaks).toBe(3) -- owner, 2026-08-25: three, because two read as too slow
         expect(high > 0.25).toBe(true) -- far enough out to read as a flutter
         expect(high < 0.6).toBe(true) -- but a HALF unfold, not a spread
+        -- ⚠ AND THE THREE MUST BE COMPARABLE. A plain sine envelope gives the middle flex twice
+        -- the reach of its neighbours, which reads as one flex with a stutter either side.
+        local outer = BirdFlight.flutterExtension(BirdFlight.FLUTTER_BURST / 6, 7)
+        expect(outer > high * 0.6).toBe(true)
     end)
 
     test("a flutter starts, ends and PASSES THROUGH fully folded", function()
@@ -256,8 +269,9 @@ describe("BirdFlight", function()
         expect(BirdFlight.flutterExtension(-1, 7)).toBe(0)
         expect(BirdFlight.flutterExtension(BirdFlight.FLUTTER_BURST, 7)).toBe(0)
         expect(BirdFlight.flutterExtension(BirdFlight.FLUTTER_BURST + 5, 7)).toBe(0)
-        -- refolds to nothing in the MIDDLE too, which is what makes it a cycle and not a bump
-        expect(BirdFlight.flutterExtension(BirdFlight.FLUTTER_BURST * 0.5, 7) < 0.02).toBe(true)
+        -- refolds to nothing BETWEEN flexes too, which is what makes it a cycle and not a bump.
+        -- Three flexes put the troughs at thirds, so the midpoint is now a PEAK, not a trough.
+        expect(BirdFlight.flutterExtension(BirdFlight.FLUTTER_BURST / 3, 7) < 0.02).toBe(true)
     end)
 
     test("wings FADE IN over the first sliver of opening rather than popping", function()
