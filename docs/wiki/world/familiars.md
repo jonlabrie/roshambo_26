@@ -246,5 +246,9 @@ differ, so no constant could be right.
 ## Raw layer
 
 `roblox/src/shared/BirdFlight.luau` (pure, Lune-tested), `roblox/src/client/BirdController.client.luau`,
+`roblox/tools/studio/watchWingbeat.luau` (⚠ **the only way to gate a beat change** — flights are on
+a 10–60s random hold, so watching one side-on otherwise means loitering and hoping; ISOLATED parks
+a bird in front of the camera at a fraction of speed with the wingtip path traced, FLIGHT sends a
+test-only bird back and forth along the Overlook's upper deck, north rail ↔ south rail, 30 studs),
 `roblox/src/shared/ChoreographyMachine.luau`, `server/src/engine/Milestones.ts`,
 `roblox/tools/studio/sweepFamiliarPerches.luau`, `roblox/tools/builders/Spec.luau`
