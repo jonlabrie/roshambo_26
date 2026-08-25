@@ -627,3 +627,64 @@ means a player toggle is a settings surface rather than a rendering change.
 Also recorded: `Kamon` is Lune-tested and therefore **must name no Roblox type**. Lifting the
 crest renderer into it broke the whole test run at require time; the renderer lives in
 `KamonDraw` beside it instead. Same rule as [[familiars]]' BirdFlight and DoomEscalation.
+
+## [2026-08-25] ship | The perch comes alive — flutter, turn — and a fold that had been backwards all along
+
+Three perch motions now, where there was one: the look-around idle, a **flutter**, and a **turn**.
+Owner: *"It's really looking good, there's some real life there."* As-built on [[familiars]].
+
+**The flutter had existed since 2026-08-19 and had never once been visible.** It lived in
+`wingAngle` — the LIFT channel — while `wingExtension` returns 0 whenever the bird is not flying
+and Transparency follows openness. So the wings were transparent for every burst while the lift
+rotated something nobody could see: two channels fighting, one hiding the wing and the other
+animating it. The owner's fix — *"a quick 'half unfold/refold' cycle a couple of times"* — moves it
+onto the fold channel, which is also the visibility channel, so the wing appears BECAUSE it is
+unfolding. Then three flexes rather than two, then 0.7s → 0.5s.
+
+**And the first flutter gate found a bug three days older than the flutter.** Holding a partial
+fold still and in view revealed that the fold swept the wing FORWARD, past the head — the sign on
+both fold constants was inverted. Measured on the live bird rather than guessed: spread rests at
+tip z −0.123, the shipped fold reached −0.391, the corrected fold reaches +0.146.
+
+⚠ **The transferable part is why nothing could have caught it.** The only two poses anyone had ever
+seen are exactly the two where the sign cannot matter — fully spread is 0° either way, and fully
+folded is `Transparency = 1`. Takeoff crosses the wrong region in 0.28s while the bird translates
+away. **A bug can live indefinitely in the states you never hold still and look at.** Tests now
+state the fold as a direction rather than repeating two magic numbers.
+
+**Owner rulings this session:** wings may be visible while perched after all, since a flutter is a
+half-unfold (an amendment to their own 2026-08-22 "completely disappear" ruling, made when asking
+for the flutter); three flexes, not two; a turn is a short hop that changes facing.
+
+**A floor, set by the product rather than the animation.** 0.5s is as quick as the flutter goes: a
+flex is an up and a down, and at 0.5s each of three gets five frames on a 30fps phone. Below that
+the peaks fall between samples and the flexes come out uneven. Pinned by a test, so the next person
+to reach for "quicker" is told rather than finding out on a device.
+
+**On my own tests.** Three of the assertions I wrote this session were vacuous and I only found out
+by deliberately breaking the code: a spot-checked `wingAngle` that passed against the very
+implementation it was replacing (both sampled instants fell between bursts), a transparency test
+that passed against the binary version it existed to replace, and — caught before shipping — a
+guard that would have stopped biting if it read its own constant on both sides. Same shape as the
+`FLIGHT_MIN_TIME` test a week ago. **Mutation testing is not optional on this file.**
+
+## [2026-08-25] defect | A string require killed the whole server, and no test could see it
+
+`TreatmentApplier` carried `require("../shared/KamonDraw")` from `39ad15f` (the sashimono split).
+Correct on disk — Lune resolved it, all 1465 tests passed, selene was clean — and nonsense in the
+DataModel, where `src/server` is `ServerScriptService.Roshambo` and `src/shared` is
+`ReplicatedStorage.RoshamboShared`. There is no `shared` sibling to walk to.
+
+`main.server` threw while loading and **everything after that line never ran**: no round clock, no
+server contact, and a trail of "Infinite yield on TeahouseSites" from client controllers waiting on
+a folder the server never got far enough to create. Owner found it in play: *"I don't seem to be in
+contact with the server."*
+
+Fixed by injecting KamonDraw like every other collaborator that thin adapter uses. Guarded by
+`tests/RequireConvention.spec`, which walks `src/` and fails any string require crossing the
+shared/client/server roots; relative requires WITHIN a root stay legal. The guard strips comments
+before scanning — its first version flagged the note documenting this very bug.
+
+⚠ **The class matters more than the instance.** Three days of play would have caught this; a test
+run never would. Cross-runtime path resolution is invisible to a test suite that runs in only one
+of the two runtimes.

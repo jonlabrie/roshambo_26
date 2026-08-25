@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-18
+updated: 2026-08-25
 ---
 
 # Misc Engine Traps
@@ -94,6 +94,40 @@ print(m.Source:find("h = 7.2", 1, true) ~= nil)  -- truth; require() may lie
 Corollary for any Studio build tool that reads a shared module: **its output can be stale
 in two independent ways** — the source may not have synced, or the VM may be holding an
 old copy. They look identical from the built artefact. See [[studio-tooling]].
+
+## A string require that crosses `src/` roots resolves under Lune and dies in Roblox
+
+⚠ **AND IT TAKES THE WHOLE SERVER WITH IT, SILENTLY**, because the failure is at require time.
+
+`src/server`, `src/client` and `src/shared` are **siblings on disk and nowhere near each other in
+the DataModel**: `ServerScriptService.Roshambo`, the player's `PlayerScripts`, and
+`ReplicatedStorage.RoshamboShared`. So `require("../shared/X")` from a server module is a correct
+filesystem path and a nonexistent instance path — there is no `shared` sibling to walk to.
+
+| | |
+|---|---|
+| legal | relative requires **within** a root — `themes/ZenDojo` → `../ThemeManifest` is a real parent in both runtimes, and nine modules rely on it |
+| illegal | any string require crossing between the three roots |
+| the form to use | `require(shared:WaitForChild("X"))` — an INSTANCE reference, which is what every entry script already does |
+
+**How it bit (2026-08-22 → 25):** `TreatmentApplier` was given `require("../shared/KamonDraw")`
+when the crest renderer was split out for the sashimono. Lune resolved it, all 1465 tests passed,
+selene was clean. In Studio `main.server` threw while loading and **everything after that line
+never ran** — no round clock, no server contact, and a trail of "Infinite yield on TeahouseSites"
+from client controllers waiting on a folder the server never got far enough to create. Three days
+of play would have caught it; a test run never would.
+
+**THE FIX for a module is injection, not a service lookup.** Modules here take their dependencies
+([[derive-from-what-it-touches]] is the same instinct); only entry scripts resolve instances.
+
+**Guarded** by `tests/RequireConvention.spec`, which walks `src/` and fails any crossing require,
+naming the file and path. ⚠ It **strips comments before scanning** — its first version flagged the
+warning note that documents this bug, and a guard that punishes documenting a trap is worse than
+no guard.
+
+⚠ **The class is larger than this instance: cross-runtime path resolution is invisible to a test
+suite that runs in only one of the two runtimes.** Anything resolved by name rather than by value
+deserves the same suspicion.
 
 ## iOS WebAudio: a third context state, and one unlock attempt is not enough
 

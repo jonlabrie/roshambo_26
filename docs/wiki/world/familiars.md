@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-22
+updated: 2026-08-25
 ---
 
 # Familiars — the bird that reads your round
@@ -147,6 +147,33 @@ aligned). `Transparency = 1` is the only complete answer. All three failures are
 Two bones per wing, hinged at 46% of span: **0.467 studs spread → 0.093 folded**, inside the
 0.112 body half-width. Verified in Roblox, not only in Blender.
 
+**Amended 2026-08-25:** "completely disappear" now means *at rest*, not *while perched*. A perched
+bird flutters (below), and a flutter is a half-unfold — so the wings are visible for half a second
+at a time on a perch. Transparency still returns to 1 the instant the burst ends. The owner made
+this amendment themselves when asking for the flutter; it is not drift.
+
+⚠ **THE FOLD SWEEPS HORIZONTALLY, AND ITS SIGN WAS WRONG FOR THREE DAYS.** `wing_*`/`wrist_*` turn
+about a local Z that runs **vertical**, so folding is a fore-and-aft sweep, not an up-and-down
+flap. At the shipped `-70/-110` it swept the wrong way. Measured on the live bird, wingtip in
+part-local space where `-Z` is forward:
+
+| pose | tip z |
+|---|---|
+| spread (rest) | −0.123 |
+| fold as shipped (−70/−110) | **−0.391** — a quarter-stud past the head |
+| fold corrected (+70/+110) | **+0.146** — back over the body |
+
+⚠ **AND NOTHING COULD HAVE SHOWN IT, which is the transferable part.** The only two poses anyone
+had ever seen are exactly the two where the sign cannot matter: fully spread is 0° either way, and
+fully folded is `Transparency = 1`. Takeoff crosses the wrong region in 0.28s while the bird is
+also translating away. A bug can live indefinitely in the states you never hold still and look at
+— the flutter was the first thing to hold a partial fold in view, and it exposed it on the first
+gate. Tests now state the fold as a **direction** rather than repeating two magic numbers.
+
+Since the flap uses that same axis, the in-flight beat is also a fore-and-aft sweep rather than a
+vertical flap. ⚠ unverified whether that is worth changing; it is a plausible part of why the owner
+reported early on that the wings were hard to see in flight.
+
 ### Flight, and the idle that matters more
 
 ⚠ **A FLIGHT IS A SHAPED PATH OVER A MINIMUM DURATION**, not a lerp. The original
@@ -160,9 +187,42 @@ boundaries so position and phase cannot disagree. Three path shapes: DIRECT, ARC
 owner's "half circle around the perch while spotting the landing zone").
 
 ⚠ **PERCHED IS ~90% OF VIEWING TIME AND IT WAS INERT.** The idle is the cheapest sign of life in
-the whole familiar. **The head snaps and holds** — a smooth pan reads as a security camera — and
-42% of moves are **checks**: go look, come straight back, which is what stops the bird reading as
-slowly rotating over time. Plus a tail flick on its own clock.
+the whole familiar. There are now **three perch motions**, and they are mutually exclusive — two at
+once read as one confused compound move rather than two habits.
+
+| motion | what it is | when |
+|---|---|---|
+| **look around** | head snaps and holds; 42% of moves are **checks** (go look, come straight back) | continuous |
+| **flutter** | three half-unfolds in 0.5s | on landing, on a win, else every ~22s |
+| **turn** | a 0.25s hop that lands facing 35–110° off, either way | every ~18s, real perches only |
+
+**The head snaps and holds** — a smooth pan reads as a security camera — and the checks are what
+stop the bird reading as slowly rotating over time. Plus a tail flick on its own clock.
+
+⚠ **THE FLUTTER IS A FOLD, NOT A LIFT — and for its first three days it was neither.** It lived in
+`wingAngle` (the lift channel) while `wingExtension` returns 0 whenever the bird is not flying and
+Transparency follows openness: the wings were invisible for every burst and the lift rotated
+something nobody could see. Two channels fighting, one hiding the wing and the other animating it.
+Moving it onto the fold channel — the owner's "half unfold/refold" — makes the wing appear *because*
+it is unfolding.
+
+⚠ **0.5s IS A FLOOR, AND IT IS SET BY PHONES.** A flex is an up AND a down, so it needs frames to
+resolve as motion rather than strobe. At 0.5s each of the three flexes gets five frames on a 30fps
+phone; below that the peaks fall between samples and the flexes come out visibly uneven. Past this
+point the only honest way to go quicker is FEWER flexes, not a shorter burst. Pinned by a test, so
+the next person to reach for "quicker" is told rather than discovering it on a device.
+
+⚠ **WING TRANSPARENCY IS A FADE, NOT A FLIP.** At the best fold 93 of 208 verts sit outside the
+body, so the wings are hidden by Transparency rather than by being tucked — flipping at `open > 0`
+pops a fully-formed tucked wing into existence in one frame. Invisible mid-takeoff where motion
+covers it; glaring on a stationary bird. It fades over `open ∈ [0, 0.15]`, which takeoff crosses in
+~40ms, and landing still snaps shut because openness drops to 0 in a single step.
+
+⚠ **THE TURN MUST BE DRIVEN FROM ABSOLUTE ANGLES.** The perched branch derives its heading by
+reading the bird's own `LookVector` back each frame, so a turn applied as a per-frame offset feeds
+its own output back in and compounds into a **spin**. `turnFrom`/`turnTo` are captured once when
+the turn fires. The two idle gaps (~18s turn, ~22s flutter) are deliberately not multiples, so the
+habits drift instead of firing together; a test pins that they never coincide.
 
 The victory hop is a **weight shift**, not a slide: the bird stays put, the feet alternate on the
 two independent leg chains the vendor rig provided, and the body rolls toward whichever foot is
@@ -172,7 +232,7 @@ planted. A bird never lifts both feet while perched, and a test pins it.
 y +0.811, x +1.128 from the HumanoidRootPart on a stock R15 — and R6, R15 and scaled bodies all
 differ, so no constant could be right.
 
-## Still thin## Still thin
+## Still thin
 
 - **Plumage is band colour only.** The spec describes a lengthening tail streamer, a crest and a
   night glow off `nightFactor`; none is built, so "you wear your grade" currently reads as a
