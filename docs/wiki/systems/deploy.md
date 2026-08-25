@@ -1,6 +1,6 @@
 ---
 shelf: systems
-updated: 2026-08-19
+updated: 2026-08-25
 ---
 
 # Deploy
@@ -36,15 +36,52 @@ cutover must resume it BEFORE repointing `VITE_SOCKET_URL`.
 from instance sizes rather than read off a bill. Enabling it takes a day to backfill and would
 replace the estimate with the fact.
 
+## ⚠ NOTHING AUTO-DEPLOYS ANY MORE (2026-08-25)
+
+Owner ruling. **A push to `main` now builds nothing on AWS.** Both auto-deploys are off:
+
+| | was | now | how |
+|---|---|---|---|
+| App Runner `roshambo_server_dev` | auto-deploy ON, branch `main` | **OFF** | `update-service`, full `SourceConfiguration` round-tripped |
+| Amplify `roshambo_26` (`dnlwlh7md4i46`) | auto-build ON, branch `main` | **OFF** | `update-branch --no-enable-auto-build` |
+
+**Why.** Neither service supports path filters, so both rebuilt on every push regardless of what
+changed. The push that prompted this was 15 `roblox/` files and 7 `docs/` — **zero** frontend,
+**zero** server — and it redeployed the backend and rebuilt the frontend anyway. Worse than
+waste: the App Runner redeploy bounces the dev backend *that Studio is talking to*, so pushing
+during a session disturbs the thing being tested.
+
+GitHub Actions are unaffected and stay on — they are already path-filtered (`roblox/**`,
+`server/**`, `src/**`) and run in 20–60s. ⚠ Their filter applies to the **whole push range**, not
+per commit, so a batch containing one `roblox/` commit runs `roblox-ci` once even if the rest are
+docs. That is correct: it tests the tree actually pushed.
+
+**To deploy the dev backend** (after any `server/` change):
+
+```bash
+aws apprunner start-deployment --region us-east-1 \
+  --service-arn arn:aws:apprunner:us-east-1:198886313292:service/roshambo_server_dev/a90bf91c601c4ef2910d7d48aa318398
+```
+
+**To deploy the frontend** (after any `src/` or `public/` change):
+
+```bash
+aws amplify start-job --region us-east-1 --app-id dnlwlh7md4i46 \
+  --branch-name main --job-type RELEASE
+```
+
+⚠ **THE TRADE THIS BUYS, AND ITS COST.** Pushing server code no longer makes it live. Anyone
+testing a server change against Studio must deploy explicitly and wait a few minutes, or they will
+test the previous build and believe it is the new one. That failure is silent and looks exactly
+like "my change did nothing".
+
 ## As built
 
 - **Cloud dev backend is the default.** App Runner service `roshambo_server_dev`
   (`https://zzaw22ugpq.us-east-1.awsapprunner.com`), source GitHub branch **`main`**
   (repointed 2026-08-16 from the retired `m4b-zendojo-art-pass`; service id
-  `a90bf91c601c4ef2910d7d48aa318398`, region `us-east-1`), auto-deploy **ON** — every
-  push to that branch redeploys
-  the dev backend within a few minutes and changes what Studio/PWA dev talks to
-  immediately (`roblox/src/server/SecretsLocal.luau`, gitignored, points at it).
+  `a90bf91c601c4ef2910d7d48aa318398`, region `us-east-1`), auto-deploy **OFF as of
+  2026-08-25** (see below). `roblox/src/server/SecretsLocal.luau` (gitignored) points at it.
   **Studio/PWA dev needs no local server** — `docker-compose up` / `server: npm run
   dev` are only for testing un-pushed server code before it reaches the dev service.
 - Dev is configured via the App Runner **API**, not `apprunner.yaml`, so it can't
@@ -69,9 +106,12 @@ replace the estimate with the fact.
 
 ## Gates & decisions
 
+- 2026-08-25 owner ruling: **both AWS auto-deploys off** — a push to `main` builds
+  nothing on AWS. See the section above for why and for the two deploy commands.
 - 2026-07-23 correction: never tell the user to start a local server for
-  Studio/PWA testing — the cloud dev backend already covers it and auto-deploys on
-  push.
+  Studio/PWA testing — the cloud dev backend already covers it. ⚠ SUPERSEDED IN PART
+  2026-08-25: it no longer auto-deploys, so reaching it now takes an explicit
+  `start-deployment`. The rule against local servers stands; the "on push" part does not.
 
 ## Raw layer
 

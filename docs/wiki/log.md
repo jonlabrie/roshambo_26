@@ -688,3 +688,36 @@ before scanning — its first version flagged the note documenting this very bug
 ⚠ **The class matters more than the instance.** Three days of play would have caught this; a test
 run never would. Cross-runtime path resolution is invisible to a test suite that runs in only one
 of the two runtimes.
+
+## [2026-08-25] decision | Nothing auto-deploys any more, and CLAUDE.md stopped claiming to be authoritative
+
+Owner: *"pushing keeps triggering CI builds which I think aren't actually needed?"* Correct, for
+the two that cost anything. Both AWS auto-deploys are now **off** ([[deploy]]).
+
+Neither App Runner nor Amplify supports path filters, so both rebuilt on every push to `main`
+whatever changed. The push that prompted the question was 15 `roblox/` files and 7 `docs/` — zero
+frontend, zero server — and it redeployed the backend and rebuilt the frontend regardless. The
+App Runner half was worse than waste: that service **is** the dev backend Studio talks to, so
+pushing during a session bounced the thing under test.
+
+GitHub Actions stay on. They are already path-filtered and take 20–60s. Worth knowing: their
+filter applies to the whole PUSH RANGE, not per commit, so a batch containing one `roblox/` commit
+runs `roblox-ci` once even if everything else is docs — which is right, since it tests the tree
+actually pushed.
+
+**The owner's larger correction, and it landed.** Asked which service Studio pointed at, I quoted
+CLAUDE.md. Owner: *"CLAUDE.md is not authoritative for repo/system state - the wiki is - and
+CLAUDE.md should clearly state that it is not authoritative."* On checking, CLAUDE.md still named
+the dev backend's branch as `m4b-zendojo-art-pass` — retired on 2026-08-16, nine days earlier —
+and implied the dev service builds from `apprunner.yaml`, which it does not (it is API-configured).
+
+⚠ **This page and [[deploy]] were both already correct.** The wiki had the branch, the retirement,
+the API-not-yaml detail, and the `update-service`-replaces-wholesale warning that made today's
+change safe. The only stale source was the one file nothing checks. CLAUDE.md now opens by saying
+so, and its deploy note carries the `aws` QUERY rather than an answer — a fact that goes stale
+silently is worse than a command that cannot.
+
+⚠ **The cost of the change, recorded so it is not discovered the hard way:** pushing server code no
+longer makes it live. Testing a `server/` change against Studio now needs an explicit
+`start-deployment`, or you test the previous build and believe it is the new one — a silent failure
+that looks exactly like "my change did nothing".
