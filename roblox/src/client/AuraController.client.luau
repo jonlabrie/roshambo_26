@@ -229,11 +229,20 @@ function attachEmbers(player: Player, character: Model)
         if not root or not row or row.highlight.Adornee ~= character then
             return
         end
-        local a = row.attachment or Instance.new("Attachment")
+        -- ⚠ BUILD FRESH, NEVER REUSE THE CACHED PAIR. The attachment hangs off HumanoidRootPart,
+        -- so a respawn DESTROYS it and the emitter with it — and `row.attachment` is then a stale
+        -- reference to a destroyed instance whose Parent is locked. Reparenting it throws. Pooling
+        -- is about not churning on every state change, which is per-round; a respawn is rare, and
+        -- paying for two Instance.new there is far cheaper than the silent loss of the whole
+        -- effect. Old ones are destroyed first so nothing is orphaned on the previous body.
+        if row.attachment then
+            row.attachment:Destroy()
+        end
+        local a = Instance.new("Attachment")
         a.Name = "StreakAuraOrigin"
         a.Position = Vector3.new(0, footOffset(character), 0)
         a.Parent = root
-        local e = row.emitter or buildEmitter()
+        local e = buildEmitter()
         e.Parent = a
         row.attachment, row.emitter = a, e
         apply(player.UserId, row) -- re-apply: the row may already be lit and waiting for an emitter
@@ -267,11 +276,8 @@ Players.PlayerRemoving:Connect(function(player)
     local row = rows[player.UserId]
     if row then
         row.highlight:Destroy() -- ⚠ a Highlight outside Workspace STILL counts toward the 255 cap
-        if row.emitter then
-            row.emitter:Destroy()
-        end
         if row.attachment then
-            row.attachment:Destroy()
+            row.attachment:Destroy() -- takes the emitter with it; the emitter is its child
         end
         rows[player.UserId] = nil
     end
