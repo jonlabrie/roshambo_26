@@ -277,8 +277,24 @@ two independent leg chains the vendor rig provided, and the body rolls toward wh
 planted. A bird never lifts both feet while perched, and a test pins it.
 
 ⚠ **THE SHOULDER SEAT IS MEASURED OFF THE AVATAR, NOT A CONSTANT.** `RightUpperArm`'s top sits at
-y +0.811, x +1.128 from the HumanoidRootPart on a stock R15 — and R6, R15 and scaled bodies all
-differ, so no constant could be right.
+y +0.847, x +1.117 from the HumanoidRootPart on a stock R15 (arm 0.943 × 1.213 × 0.759) — and R6,
+R15 and scaled bodies all differ, so no constant could be right.
+
+**Gated 2026-08-26**, after three corrections, and every number is a PROPORTION of the arm so a
+scaled avatar gets the same result:
+
+| | | why |
+|---|---|---|
+| `SEAT_INBOARD` | 0.42 of arm width | the middle of the shoulder; `arm.Position` is the arm's CENTRE, and 0.18 left the bird out over the arm |
+| `SEAT_LIFT` | 0.031 of arm height | ⚠ a part's top FACE is not the visible shoulder — the mesh and any layered clothing sit proud of it, so at 0 the feet sank in. 0.45 inches on a stock R15 |
+| `SHOULDER_YAW` | 0 | faces forward with the avatar |
+
+⚠ **THE VICTORY SONG FIRES ON THE LANDING, AND NO TIMER CAN REPLACE THAT.** Three attempts said
+otherwise: a random 0–2.2s, then `ENTRY.WIN` + stagger, then this. Both timers sang before the bird
+arrived, and the reason is structural — the bird FLIES in, and `flightDuration` is 0.85s plus
+distance over cruise speed, so twenty studs needs 2.65s and across the canyon needs far more. **Any
+constant is wrong for every distance but one.** The cue arms the song; the update loop fires it at
+the instant the dance begins, where "has it landed" is true rather than estimated.
 
 ## Still thin
 
