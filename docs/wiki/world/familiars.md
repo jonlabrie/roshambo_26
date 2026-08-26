@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-25
+updated: 2026-08-26
 ---
 
 # Familiars — the bird that reads your round
@@ -21,7 +21,7 @@ a dusk cycle — which shipped as [[day-night]]. Specs:
 | state | the bird | why |
 |---|---|---|
 | **WIN** | spirals up, holds a high quick orbit | the only motion that rises |
-| **LOSS** | bolts wide, then sinks to a low slow orbit | down, in a grammar where up means won |
+| **LOSS** | nothing at all | ⚠ ruled out 2026-08-26 — see below |
 | **SAFE** | nothing at all | safe means nothing changed, so the bird does not change |
 | **RESTING** | perched on the world | no entry, or a result that has lapsed |
 
@@ -29,8 +29,21 @@ a dusk cycle — which shipped as [[day-night]]. Specs:
 never occluded by another avatar, so height is what survives a crowd of fifty on a phone — colour
 and detail do not. A test pins that the three differing holds are separable **by height alone**.
 
-⚠ **A LOSS MUST NOT COME HOME to the resting orbit** — that would make "lost" and "has not thrown"
-identical. It sinks and stays low.
+⚠ **THE LOSS ANIMATION IS RETIRED (2026-08-26).** Owner: *"no bird animation for a loss or tie."*
+`stateAfter` resolves LOSS to RESTING immediately, so the bird never leaves its perch and a loss is
+indistinguishable from a SAFE or from not having thrown.
+
+**That last part was previously forbidden**, and the rule is worth stating as retired rather than
+deleting: from 2026-08-18 the page read *"A LOSS MUST NOT COME HOME to the resting orbit — that
+would make 'lost' and 'has not thrown' identical."* True, and now beside the point. The bolt-and-
+sink was watched in play on 2026-08-25 and rejected — *"not in the same visual class as a bird
+dancing on your shoulder"* — and the distinction was judged not worth an animation the next day.
+⚠ Do NOT reinstate a low orbit to restore the distinction; that needs a new decision, not a
+rediscovered constant. The old configuration (r 2.0, y 0.9, speed 0.55) is recorded in
+`BirdFlight` as a comment for the same reason.
+
+**Only a WIN moves the bird now.** The vertical grammar that opened this page — up means won, down
+means lost — survives only in the reserved high orbit, which nothing uses.
 
 **A result lapses after 15 seconds** (`BirdFlight.RESULT_HOLD`). Two corrections got here: the
 first version played a 2–3s flourish, which the owner missed unless watching at the instant the

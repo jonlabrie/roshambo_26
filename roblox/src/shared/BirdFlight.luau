@@ -41,7 +41,7 @@ local BirdFlight = {}
 
 -- ENTRY is the length of the ANIMATION, not the length of the state: the state itself persists
 -- until the next result replaces it.
-BirdFlight.ENTRY = { WIN = 2.4, LOSS = 1.8 } :: { [string]: number }
+BirdFlight.ENTRY = { WIN = 2.4 } :: { [string]: number }
 
 -- How long a WIN or LOSS is worn before the bird goes back to the world. Owner's number.
 BirdFlight.RESULT_HOLD = 15
@@ -49,8 +49,20 @@ BirdFlight.RESULT_HOLD = 15
 -- The state a bird is ACTUALLY in, given how long it has been in the one it was given. Results
 -- lapse; RESTING does not. A reveal also resets every bird to RESTING regardless, so this only
 -- decides what happens between rounds.
+-- ⚠ A LOSS IS NEVER WORN AT ALL as of 2026-08-26. Owner: "no bird animation for a loss or tie."
+-- Only a WIN takes the bird off its perch now, so LOSS resolves to RESTING immediately rather than
+-- after RESULT_HOLD, and the controller's perch branch keeps the bird where it was.
+--
+-- ⚠ THIS RETIRES "A LOSS MUST NOT COME HOME", a rule that stood from 2026-08-18 on the grounds that
+-- letting a loss return to the resting orbit would make "lost" and "has not thrown" identical. That
+-- was true and is now beside the point: the owner has ruled the distinction is not worth an
+-- animation. Do not reinstate the low orbit to restore the distinction — it was looked at in play
+-- and rejected as "not in the same visual class as a bird dancing on your shoulder".
 function BirdFlight.stateAfter(state: string, elapsed: number): string
-    if (state == "WIN" or state == "LOSS") and elapsed > BirdFlight.RESULT_HOLD then
+    if state == "LOSS" then
+        return "RESTING"
+    end
+    if state == "WIN" and elapsed > BirdFlight.RESULT_HOLD then
         return "RESTING"
     end
     return state
@@ -115,7 +127,11 @@ local HOLD = {
     -- Kept though offsetFor no longer uses it: this is the high orbit to restore if the
     -- shoulder-perch diagnostic says the fix was scale, not proximity.
     WIN = { r = 3.4, y = 8.2, speed = 2.0 },
-    LOSS = { r = 2.0, y = 0.9, speed = 0.55 },
+    -- ⚠ NO LOSS ENTRY. A loss has no animation at all as of 2026-08-26 (owner: "no bird animation
+    -- for a loss or tie"), so there is no orbit to configure. The old low orbit -- r 2.0, y 0.9,
+    -- speed 0.55 -- is recorded here rather than kept: it was watched in play and rejected as "not
+    -- in the same visual class as a bird dancing on your shoulder", and reinstating it needs a new
+    -- decision, not a rediscovered constant.
 }
 BirdFlight.HOLD_WIN_ORBIT_Y = HOLD.WIN.y
 
@@ -141,7 +157,8 @@ end
 function BirdFlight.offsetFor(state: string, elapsed: number, seed: number): Point
     local idle = orbit(elapsed, seed, HOLD.RESTING)
 
-    -- SAFE is deliberately absent and falls through to RESTING: nothing changed, so the bird does
+    -- SAFE and LOSS are deliberately absent and fall through to RESTING: nothing changed for a
+    -- SAFE, and a LOSS gets no animation at all (owner, 2026-08-26). The bird does
     -- not change either.
     if state == "WIN" then
         -- LANDS ON THE SHOULDER AND HOPS. The flight in is a quick arc from wherever the bird
@@ -155,17 +172,6 @@ function BirdFlight.offsetFor(state: string, elapsed: number, seed: number): Poi
         end
         local ease = 1 - (1 - k) * (1 - k) * (1 - k)
         return lerp(idle, perch, ease)
-    elseif state == "LOSS" then
-        -- BOLTS, THEN SINKS. Out fast and wide -- the pot was lost, not the companion -- then
-        -- back to a low, slow orbit around the knees, where it stays. Low is the whole point: an
-        -- idle-orbit return would make "lost" and "has not thrown yet" look identical.
-        local low = orbit(elapsed, seed, HOLD.LOSS)
-        local k = math.min(1, elapsed / BirdFlight.ENTRY.LOSS)
-        if k >= 1 then
-            return low
-        end
-        local away = orbit(elapsed, seed, { r = 15, y = HOLD.RESTING.y + 3.5, speed = 2.4 })
-        return if k < 0.35 then lerp(idle, away, k / 0.35) else lerp(away, low, (k - 0.35) / 0.65)
     end
     return idle
 end

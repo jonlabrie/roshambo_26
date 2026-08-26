@@ -107,9 +107,12 @@ describe("BirdFlight", function()
     test("a result LAPSES, so a bird does not wear it until the next round", function()
         -- It used to hold for the whole ~60s round, which the owner found too long: the bird just
         -- hovered instead of going back to living in the world.
-        for _, s in { "WIN", "LOSS" } do
-            expect(BirdFlight.stateAfter(s, BirdFlight.RESULT_HOLD - 1)).toBe(s)
-            expect(BirdFlight.stateAfter(s, BirdFlight.RESULT_HOLD + 1)).toBe("RESTING")
+        expect(BirdFlight.stateAfter("WIN", BirdFlight.RESULT_HOLD - 1)).toBe("WIN")
+        expect(BirdFlight.stateAfter("WIN", BirdFlight.RESULT_HOLD + 1)).toBe("RESTING")
+        -- ⚠ A LOSS IS NEVER WORN AT ALL, so it does not lapse — it never starts. Owner, 2026-08-26:
+        -- "no bird animation for a loss or tie."
+        for _, t in { 0, 1, BirdFlight.RESULT_HOLD - 1, BirdFlight.RESULT_HOLD + 1, 999 } do
+            expect(BirdFlight.stateAfter("LOSS", t)).toBe("RESTING")
         end
         -- resting never lapses into anything
         expect(BirdFlight.stateAfter("RESTING", 9999)).toBe("RESTING")
@@ -123,33 +126,43 @@ describe("BirdFlight", function()
         end
     end)
 
-    test("LOSS bolts, then SINKS and stays low", function()
-        expect(BirdFlight.magnitude(BirdFlight.offsetFor("LOSS", 0.5, 7)) > 8).toBe(true)
-        for _, t in { 3, 8, 14 } do
-            expect(BirdFlight.offsetFor("LOSS", t, 7).y < 1.6).toBe(true)
+    test("a LOSS does NOTHING — the bird carries on exactly as if nothing happened", function()
+        -- ⚠ REPLACES "LOSS bolts, then SINKS and stays low". The bolt-and-sink was watched in play
+        -- and rejected: "not in the same visual class as a bird dancing on your shoulder" (owner,
+        -- 2026-08-25), then ruled out entirely the next day — "no bird animation for a loss or tie".
+        -- LOSS now behaves exactly like SAFE, which has always been the do-nothing case.
+        for _, t in { 0, 0.5, 3, 8, 14, 60 } do
+            expect(
+                BirdFlight.distance(BirdFlight.offsetFor("LOSS", t, 7), BirdFlight.offsetFor("RESTING", t, 7))
+            ).toBe(0)
+            expect(
+                BirdFlight.distance(BirdFlight.offsetFor("LOSS", t, 7), BirdFlight.offsetFor("SAFE", t, 7))
+            ).toBe(0)
         end
     end)
 
-    test("a loss never looks like a player who has not thrown yet", function()
-        -- Returning to the idle orbit would make those two states identical, which is the reason
-        -- LOSS holds low rather than simply coming home.
+    test("⚠ RETIRED RULE: a loss now DOES look like a player who has not thrown yet", function()
+        -- This test used to assert the exact opposite, and the rule behind it stood from
+        -- 2026-08-18: letting a loss return to the resting orbit would make "lost" and "has not
+        -- thrown" identical. That was true, and the owner has ruled the distinction is not worth an
+        -- animation (2026-08-26). Kept, inverted, rather than deleted — so that anyone about to
+        -- reinstate the low orbit to restore the distinction finds out here that it was a decision
+        -- rather than an oversight.
         for _, t in { 3, 8, 14 } do
             local lost = BirdFlight.offsetFor("LOSS", t, 7)
             local idle = BirdFlight.offsetFor("RESTING", t, 7)
-            expect(BirdFlight.distance(lost, idle) > 1.5).toBe(true)
+            expect(BirdFlight.distance(lost, idle)).toBe(0)
         end
     end)
 
-    test("the three holds that differ are separable by HEIGHT alone, across a room", function()
+    test("the reserved WIN orbit is still separable from RESTING by height alone", function()
+        -- ⚠ ONLY TWO HOLDS DIFFER NOW, not three. WIN perches on the shoulder and LOSS does nothing
+        -- at all, so this pins the HIGH ORBIT kept in reserve against RESTING — if the shoulder
+        -- perch is ever abandoned and the orbit comes back, this is already asserting the right
+        -- thing. The RESTING/LOSS half it used to carry is gone with the LOSS animation.
         local win = BirdFlight.HOLD_WIN_ORBIT_Y
         local resting = BirdFlight.offsetFor("RESTING", 10, 7).y
-        local loss = BirdFlight.offsetFor("LOSS", 10, 7).y
-        -- ⚠ WIN now perches on the shoulder, so this no longer describes the shipped WIN — it
-        -- pins the HIGH ORBIT that is kept in reserve, and the RESTING/LOSS separation that is
-        -- still live. If the shoulder diagnostic fails and the orbit comes back, this test is
-        -- already asserting the right thing.
         expect(win > resting + 3).toBe(true)
-        expect(resting > loss + 1.5).toBe(true)
     end)
 
     test("neither beat axis ever exceeds its ceiling", function()

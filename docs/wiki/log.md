@@ -878,3 +878,29 @@ treat the built aura as answering seniority — it does not.
 ⚠ **Owner ruling on the floor: 2, not 3.** *"Let the kids dress up if they want."* The floor is an
 access decision, not a tuning number: it decides who is allowed to be seen at all. That supersedes
 the rarity argument in `StreakAura` and its spec, both of which reasoned the other way.
+
+## [2026-08-26] drop | The loss animation is gone, and the victory bird faces forward
+
+Owner: *"no bird animation for a loss or tie."* LOSS now resolves to RESTING immediately, so the
+bird never leaves its perch on a loss. Only a WIN moves it.
+
+⚠ **This retires "A LOSS MUST NOT COME HOME"**, a rule that stood from 2026-08-18 on the grounds
+that a loss returning to the resting orbit would make "lost" and "has not thrown" identical. The
+reasoning was sound; the owner has ruled the distinction is not worth an animation. The bolt-and-
+sink was watched the day before and rejected as *"not in the same visual class as a bird dancing on
+your shoulder"*. **Do not reinstate the low orbit to restore the distinction** — the old
+configuration is kept as a comment precisely so that bringing it back requires a decision rather
+than a rediscovery. The four tests that encoded the old behaviour were inverted rather than deleted,
+for the same reason.
+
+**The deeper thing this settles.** The vertical grammar that the familiar was designed around — up
+means won, down means lost — is now effectively gone. It broke first on 2026-08-21, when WIN moved
+from a high orbit to the shoulder because a 7-inch bird at 8.2 studs read as an insect: PROXIMITY
+BEAT HEIGHT. LOSS was the last thing still living under the old rule, orbiting where nothing was
+legible. Both halves have now been decided the same way, a week apart, and the second only because
+the first was watched properly.
+
+**Also gated this session:** the victory bird faces FORWARD with the avatar (superseding a 46-degree
+outboard yaw whose two justifications both failed — the owner prefers forward, and forward clears
+the tail from the head better than the yaw that claimed to), and its perch moves to the middle of
+the shoulder rather than out over the arm.
