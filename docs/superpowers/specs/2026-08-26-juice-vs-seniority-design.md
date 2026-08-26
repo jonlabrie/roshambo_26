@@ -7,12 +7,17 @@ measuring the wrong thing."* Two candidates were named — **juice** (points on 
 
 **Verdict: NO. Seniority does not get a carrier.** It is already in grade, and grade already has an
 answer. The owner's observation is correct and the arithmetic below confirms it exactly — but the
-fault is in the *juice* half, not a missing seniority half. This document answers the seniority
-question closed, and opens one owner decision on juice.
+fault is in the *juice* half, not a missing seniority half.
 
-**Status:** design-thread recommendation. The seniority half is a closed argument. The juice half
-is an OWNER DECISION and nothing should be built for it until it is ruled on — the aura is gated
-(2026-08-26) and this proposes changing the number it reads.
+⚠ **The juice half took a wrong turn first, and §4 is the part worth reading.** This document
+originally proposed re-keying the aura to `pointsAtStake`; the owner rejected it on the spot
+because a risk-level display **discourages play**. That rejection generalises into a standing rule
+— *the aura must be neutral on Bank vs Stake* — which retires three metrics including the one
+currently shipped, and it is the most transferable thing here.
+
+**Status:** design-thread recommendation. §1–3 (seniority) is a closed argument. §4 is a recorded
+owner rejection plus the rule it produced. §5 is a PROPOSAL and nothing should be built for it
+until it is ruled on — the aura is gated (2026-08-26) and this changes the number it reads.
 
 ---
 
@@ -94,99 +99,124 @@ the milestones that already exist. A signal everyone displays carries no informa
 same failure as one nobody displays, arrived at from the other side. The rarity complaint would be
 *inverted*, not solved.
 
-## 4. Where the density problem actually lives: the aura is measuring the wrong number.
+## 4. `pointsAtStake` is NOT the number — and the rule that says why
 
-The owner offered two diagnoses. The second is the right one, and it is a juice problem.
+⚠ **REJECTED BY THE OWNER, 2026-08-26, and the rejection is more important than the proposal was.**
+This document first argued for re-keying the aura to `pointsAtStake` on density grounds. Owner:
+*"pointsAtStake is NOT the number; I don't want to lean into 'current risk level' being what kids
+are relying on for flex because it DISCOURAGES PLAY. If you get to an impressive AURA level, why
+risk it, and why bank it?"*
 
-⚠ **`currentStreak` is wrong in both directions, and the code says so plainly:**
+Correct, and the failure is worse than stated. **Rounds are skippable and unthrown players are
+never settled** — `settleRound` iterates `data.throws` only (`server/src/engine/Settlement.ts:89`),
+so a player who stops throwing keeps their pot, their streak and their aura indefinitely. Under a
+pot-keyed aura the glow-optimal strategy is therefore: reach a deep pot, then **stop playing**.
+Every available action dims you — bank clears the pot, a loss clears the pot — and the only move
+that never dims you is leaving the game. An aura that pays people to go idle in the arena is a
+worse outcome than an aura almost nobody can display.
 
-- **Banking leaves it running.** `bank` sets `pointsAtStake: 0` and `stakingStreak: 0` and does not
-  touch `currentStreak` (`server/src/wallet.ts:20`). A player who banks a 5-run has **zero on the
-  line and a full-strength aura.** For a display whose stated subject is *juice*, that is backwards.
-- **A SAFE kills it while the pot survives.** `nextPot` preserves the pot on SAFE
-  (`GameRules.ts:11-16`); `nextStreak` returns 0 for anything but a WIN (`GameRules.ts:27-28`). A
-  player sitting on a pot of 27 who matches the world **goes dark with 27 points still at risk.**
+### ⚠ THE STANDING RULE: THE AURA MUST BE NEUTRAL ON BANK vs STAKE
 
-Both are exactly "measuring the right thing badly". The 2026-08-26 switch from `stakingStreak` to
-`currentStreak` was made for a sound reason — *"banking is THE decision in Roshambo, and tying the
-reward to not-banking punished the action the whole loop is built around"* — but it fixed the
-incentive by picking a number that no longer describes exposure at all.
+Bank-or-Stake is the only real decision in Roshambo (`docs/wiki/world/core-loop.md`). **Any metric that either branch
+of that decision changes puts a thumb on the scale of the choice the game exists to pose.** Three
+instances of the same error, now:
 
-**`pointsAtStake` is the number the design has been reaching for.** It is the pot: the thing the
-HUD already shows, the thing Bank-or-Stake is a decision *about*, and the only field that is
-literally "points on the line right now".
-
-**And it fixes the density for free, without touching the floor.** Steady state over
-{pot = 0, pot > 0}: entered on a WIN (p ≈ 0.30), left on a LOSS (p ≈ 0.30) or a bank. Ignoring
-banking that is π(pot > 0) ≈ 0.50; with realistic banking it stays comfortably above ~0.35.
-
-| | glowing on 30 players | shape |
+| metric | what it pays you to do | verdict |
 |---|---|---|
-| `currentStreak ≥ 2` (today) | ~3 | flat — a lottery |
-| `pointsAtStake > 0` | ~12–15 | a pyramid |
+| `stakingStreak` | never bank | dropped 2026-08-26 — *"banking is THE decision"* |
+| `pointsAtStake` | never bank **and never throw** | dropped 2026-08-26, this document |
+| `currentStreak` (shipped) | never throw once you are glowing | ⚠ see below — the same trap, weaker |
 
-The pyramid is the part that matters. Depth decays by p(win)/(p(win)+p(loss)) ≈ 0.5 per 3ⁿ tier, so
-of ~12 live pots roughly 6 sit at 1, 3 at 3, 1.5 at 9, under 1 at 27+. **Many faint, few blazing,
-one spectacular** — the density curve a status effect wants, and it falls out of the pot ladder
-rather than being tuned in. The tiers are also the game's own vocabulary: 1, 3, 9, 27, 81.
+**Test every future proposal against both branches before anything else.** If banking lowers it,
+it discourages banking. If losing lowers it, it discourages throwing — because not throwing is
+always available and always safe. A metric must be untouched by both.
 
-**It does not punish banking; it reframes what the glow means.** Under a pot reading the aura stops
-being a reward for virtue and becomes a **public disclosure of exposure** — not *look how good I
-am* but *look how much I have riding*. Banking then trades the glow for the points, which is
-precisely the trade the game is built on, and the glow going out is the drama rather than a
-penalty. A player who banks 81 in front of a crowd that could see the 81 has done something
-legible; today they bank invisibly and keep glowing for a run that costs them nothing.
+### ⚠ This indicts the shipped aura too, and that is a finding, not a footnote
 
-**Everything gated on 2026-08-26 survives.** The rendering does not change: embers from the feet,
-`LockedToPart`, `emitRate` and `pulsePeriod` carrying the magnitude, fill as a faint floor, colour
-third. Only the input changes — `AuraController.client.luau:321-322` reads `entry.currentStreak`
-from the roster; it would read `entry.pointsAtStake` instead, and the optimistic local update at
-:348 would call the already-mirrored `GameRules.nextPot` rather than incrementing by hand. Same
-plumbing, one field, and the curve in `StreakAura.poseFor` re-domained from a 2..8 streak to a
-1..81 pot (log₃, so each tier is one even step).
+`currentStreak` is decision-neutral on banking — which is exactly why 2026-08-26 chose it, and that
+part was right. But it is **not** neutral on throwing. A player glowing at a 6-streak preserves that
+glow forever by not throwing, and any throw risks it. The trap is weaker than the pot version (a
+streak is not visibly money, and the aura is rare enough that few players are ever in the trap) but
+it is the same shape, and it is live in the gated build. Not urgent; worth knowing before the next
+change to that file.
 
-⚠ **This is a change to a feature the owner has already gated, so it is not mine to make.**
+## 5. What a safe metric has to look like
 
-## 5. Where seniority's real deficit is — and it is private, not public
+The constraint set is now tight enough to be generative. A carrier must be:
 
-The argument for seniority that does survive is the one the log states: *"it is also the half that
-answers 'why should a new player ever see one'"*. That instinct is right about a problem, but
-misidentifies which one. `docs/wiki/world/familiars.md` already records it under **Still thin**:
+1. **Decision-neutral** — unchanged by banking, unchanged by losing (§4).
+2. **Dense, with a gradient** — a meaningful share of the arena lit, most faintly, few brightly.
+   This is the owner's original complaint and it is unanswered by everything so far.
+3. **Not a rank** — not monotonic-and-durable, or it becomes the badge that failed four times (§2).
+4. **Reachable tonight** — a new player must be able to have one, or the display is tenure.
 
-> *"The progression is invisible to its owner — milestones are earned silently and grades change
-> silently. Nothing announces a grade-up and nothing prints the grade."*
+Constraints 1 and 3 look contradictory and that is the whole difficulty. Anything that can go DOWN
+creates a hold trap; anything that cannot go down is a rank. **The way out is a metric that decays
+with TIME rather than with outcomes** — earned by acting, lost by not acting. That inverts the trap:
+standing still is what dims you, and playing is the only thing that keeps you lit.
 
-A player who hits `run.3` gets a milestone, possibly a grade, possibly a familiar unlock — **and is
-told nothing.** That is the actual hole, and it is a *private acknowledgement* problem, not a
-public display problem. Fixing it needs a grade-up moment and somewhere a player can read their own
-standing; it needs no worn carrier, so it collides with none of the four rejections and none of the
-culture constraint.
+### Recommended: the decaying session peak — *how hot you have been running*
 
-That work is the next item in the design thread's queue (*"grade has no public display"*), and this
-document hands it a sharpened brief: **the first thing that item owes is the private half.**
+**The highest pot you have REACHED recently, fading over time.** Not the pot you hold — the pot you
+got to.
+
+| constraint | how it holds |
+|---|---|
+| decision-neutral | ⚠ **banking does not touch it and neither does losing.** You reached 27; that happened. Whether you then banked it or rode it into the ground is the aura's business not at all — which is exactly right, because that is the player's decision to make unpressured. |
+| no hold trap | only winning raises it; only **time** lowers it. Going idle fades you out. |
+| dense, with a gradient | it retains through losses, so it is strictly denser than the live pot — and it inherits the 3ⁿ ladder, so many players sit at 1–3 and a 27 is rare and unmistakable. |
+| not a rank | it is gone by tomorrow. A veteran and a newcomer both start the evening dark. |
+| reachable tonight | ⚠ this is the honest answer to *"why should a new player ever see one"* — better than seniority's, because the newcomer does not merely see one, they can **have** one within the hour. |
+
+And it is a flex in the word's real sense: *"I hit 27 tonight"* is something another player would
+want. Scale the glow steeply — log₃, so each 3ⁿ tier is one even step — so a pot of 1 barely
+registers and a deep run is unmistakable. A presence indicator is not a flex; a magnitude is.
+
+**⚠ The cost, stated plainly: this is NOT free, unlike seniority.** `bestPot` is an all-time `$max`
+with no date (`Settlement.ts:62`), so a *windowed* peak is new data. The cheap shape is a
+`potPeak` + `potPeakAt` pair written in the same settlement update that already computes `nextPot`,
+with the client decaying it locally from the timestamp — one extra field pair on an existing write,
+and it rides the roster push that already carries `currentStreak`. That is a small change, but it
+is a real one and it should be priced before it is agreed, not after.
+
+**What is unchanged either way:** the rendering gated on 2026-08-26 — embers from the feet,
+`LockedToPart`, `emitRate` and `pulsePeriod` carrying the magnitude, fill a faint floor, colour
+third. Every proposal here changes the input number and nothing else.
+
+### Considered and rejected
+
+- **Recent points banked (decaying).** Fails constraint 1 from the other side: banking is the only
+  way to raise it, so it pays you to bank early and often. An opposite thumb is still a thumb.
+- **Rounds thrown recently.** Decision-neutral and dense, but it measures attendance. Nobody flexes
+  showing up.
+- **Keeping `currentStreak` and lowering the floor further.** The floor is already 2; the density is
+  intrinsic to the metric (§3), and floor 1 means "won last round" — a third of the arena, flat, no
+  gradient, and the hold trap gets more common rather than less.
 
 ## Owner decisions required
 
-1. ⚠ **Re-key the aura from `currentStreak` to `pointsAtStake`?** Rendering unchanged; input and
-   curve domain change. This supersedes the 2026-08-26 metric choice, so it needs an explicit
-   ruling — not an inference from this document. If yes, it wants a spec and a plan before code.
-2. If yes: does the floor stay at 2 (i.e. **pot ≥ 3**, hiding the one-win pot), or does **any live
-   pot glow** (pot ≥ 1)? The 2026-08-25 ruling — *"let the kids dress up if they want"* — argues
-   for pot ≥ 1, and the pyramid above assumes it. It is an access decision, as that ruling
-   established, so it is the owner's.
+1. ⚠ **Is the decaying session peak the right shape** — *how hot you have been running* rather than
+   *what you have on the line*? This is the open question, and the one thing this document should
+   not decide alone.
+2. If yes: the fade window. It sets how much of the arena is lit at once, so it is the density dial
+   — long enough that a good run still shows when you walk up to someone, short enough that it
+   cannot be hoarded. It wants watching in play, not arguing in a document.
+3. If yes: does it need the floor ruling at all? *"Let the kids dress up if they want"*
+   (2026-08-25) argues every reached pot glows faintly, with the magnitude doing the work.
 
 ## Not proposed
 
-- **No seniority aura, no second aura, no second channel on the existing one.** Answered above.
+- **No seniority aura, no second aura, no second channel on the existing one.** Answered in §1–3.
 - **No leader halo.** Still deferred on item 7's ranking basis, unchanged.
-- **No change to the roster broadcast cadence.** It is already per-round for `currentStreak`; a
-  pot field rides the same push.
 - **No change to grade, milestones or the unlock model.** They already carry seniority correctly.
+- **No fix to the shipped aura's own hold trap on its own.** Recorded in §4; it rides whatever
+  decision comes out of this, rather than becoming a separate change.
 
 ## Raw layer
 
 `server/src/engine/Milestones.ts` (RUN_STEPS, gradeFor), `server/src/engine/GameRules.ts`
-(nextPot, nextStreak), `server/src/wallet.ts` (bank), `roblox/src/shared/StreakAura.luau`,
+(nextPot, nextStreak), `server/src/engine/Settlement.ts` (settleRound, bestPot `$max`),
+`server/src/wallet.ts` (bank), `roblox/src/shared/StreakAura.luau`,
 `roblox/src/client/AuraController.client.luau`,
 `docs/superpowers/specs/2026-08-25-streak-aura-design.md` (superseded on rarity, see §3),
 `docs/wiki/log.md` 2026-08-25 / 2026-08-26 entries, `docs/wiki/world/core-loop.md`,
