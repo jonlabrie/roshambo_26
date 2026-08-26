@@ -56,6 +56,17 @@ N_SCALLOP = 9          # tips along the trailing edge
 FEATHER_THICK = 0.0045        # a feather is a vane, not a plank
 AOA_RISE = 0.026              # leading edge above trailing (owner: "forward part... above")
 AOA_WASHOUT = 0.45
+# The chord the AoA rise was sized against — the station where the taper begins. Past it the tilt
+# scales down with the chord so the ANGLE holds; inboard of it nothing changes.
+AOA_REF_CHORD = 0.195
+
+# ⚠ THIS FILE DOES NOT REPRODUCE THE SHIPPED UGUISU WING, and that was discovered the hard way on
+# 2026-08-26. Measured off the committed mesh, the wing sits at a uniform 23.9-degree angle of
+# attack across its span; the formula below yields about 8 at the root. The shipped asset was
+# reshaped after this script ran, by a step nobody wrote down, so the script is the ORIGIN of that
+# wing and not its definition. The tip fix therefore had to be applied to the MESH -- reshaping
+# vertices in `uguisu_retarget.blend` -- and this file was edited only so a future rebuild starts
+# from the corrected planform. ⚠ Do not assume re-running `build()` reproduces what is in the game.
 
 
 def build(name="UguisuWing", span=0.47, scale=1.0, uv_region=(0.06, 0.06, 0.30)):
@@ -95,11 +106,19 @@ def build(name="UguisuWing", span=0.47, scale=1.0, uv_region=(0.06, 0.06, 0.30))
         notch = (0.5 - 0.5 * math.cos(2.0 * phase)) * depth
         trail += notch
         base_z = zr + AOA_RISE * 0.5 * (1.0 - (1.0 - AOA_WASHOUT) * u)
+        # ⚠ THE TILT SCALES WITH THE LOCAL CHORD, so what stays constant is the ANGLE of attack
+        # rather than an absolute rise. `AOA_RISE` is a vertical offset, and it was sized against
+        # the untapered tip chord of 0.114. Once the tip narrowed to 0.044 the same rise happened
+        # over a third of the distance: the tip's angle went from 6 degrees to 15 and it visibly
+        # TURNED DOWN (owner, 2026-08-26). Clamped at 1 so every station inboard of the taper --
+        # where the chord is wider than the reference -- is left exactly as it was and gated.
+        chord = abs(trail - lead)
+        aoa_scale = min(1.0, chord / AOA_REF_CHORD)
         rows = []
         for k in range(4):
             f = k / 3.0
             y = lead + (trail - lead) * f
-            tilt = (0.5 - f) * AOA_RISE * (1.0 - (1.0 - AOA_WASHOUT) * u)
+            tilt = (0.5 - f) * AOA_RISE * (1.0 - (1.0 - AOA_WASHOUT) * u) * aoa_scale
             camber = math.sin(math.pi * min(1.0, f * 1.4)) * 0.006 * (1.0 - 0.6 * u)
             rows.append((x, y, base_z + tilt + camber))
         cols.append(rows)

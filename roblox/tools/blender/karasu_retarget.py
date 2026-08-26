@@ -205,6 +205,8 @@ KARASU = {
         "thickness": 0.009,
         "aoa_rise": 0.048,
         "aoa_washout": 0.45,
+        # chord the rise was sized against (the station where the taper begins, pre chord_scale)
+        "aoa_ref_chord": 0.348,
         # (t, leading_y, trailing_y, z_rise)
         # ⚠ THE LAST FOUR STATIONS CONVERGE, AND THEY DID NOT USED TO. The plan ended at t=1.00
         # with a 0.188 chord and the loft caps the outermost column flat, so the wing finished in a
@@ -631,11 +633,17 @@ def build_spread_wings(spec=KARASU):
             trail += (0.5 - 0.5 * math.cos(2.0 * phase)) * depth
             base_z = w["root_z"] + zr + w["aoa_rise"] * 0.5 * \
                 (1.0 - (1.0 - w["aoa_washout"]) * u)
+            # ⚠ TILT SCALES WITH THE LOCAL CHORD — see spread_wing.py for the full reasoning.
+            # `aoa_rise` is an absolute vertical offset sized against the untapered tip chord; once
+            # the tip narrows, the same rise over a shorter chord steepens the angle and the tip
+            # turns down. Here it was worse than the uguisu: 8 degrees becoming 19.
+            chord = abs(trail - lead)
+            aoa_scale = min(1.0, chord / w.get("aoa_ref_chord", chord))
             rows = []
             for k in range(ROWS):
                 f = k / (ROWS - 1.0)
                 y = w["root_y"] + lead + (trail - lead) * f
-                tilt = (0.5 - f) * w["aoa_rise"] * (1.0 - (1.0 - w["aoa_washout"]) * u)
+                tilt = (0.5 - f) * w["aoa_rise"] * (1.0 - (1.0 - w["aoa_washout"]) * u) * aoa_scale
                 camber = math.sin(math.pi * min(1.0, f * 1.4)) * 0.012 * (1.0 - 0.6 * u)
                 rows.append((x, y, base_z + tilt + camber))
             cols.append(rows)
