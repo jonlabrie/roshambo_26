@@ -958,3 +958,56 @@ over cruise speed, so a bird twenty studs away needs 2.65s and one across the ca
 **Any constant is wrong for every distance but one.** The song is now armed by the cue and fired in
 the update loop at the instant the dance begins, where "has it landed" is simply true rather than
 estimated.
+
+## [2026-08-26] ship | The karasu is built — second bird of the roster, life size, waiting on import
+
+The crow familiar is modelled, rigged, textured and verified, and stops at the import gate: the
+asset thread does not touch Studio ([[parallel-threads]]). Body 0.328 × 1.640 × 0.897 studs and
+2,666 triangles, wings 2.446 studs tip to tip and 856, one 19-bone rig shared by both parts, feet
+at the origin. As-built and the import instructions on [[familiars]]; the traps on
+[[blender-pipeline]].
+
+**Owner ruling this session: life size, 1.64 studs / 19.7 inches** — three times the uguisu. It
+follows the two standing rulings rather than inventing one, and it hands the main thread real work:
+`SEAT_INBOARD`/`SEAT_LIFT` are proportions of the avatar's arm, not the bird's, so they will not
+seat a bird three times longer without retuning.
+
+⚠ **The crow was expected to be cheap for a reason that turned out not to be the reason.** The
+brief was that its purchased model already has the wing bones the sparrow lacked — true, and
+irrelevant: the uguisu never needed them, because it builds `wing_*`/`wrist_*` itself on a separate
+spread-wing part, and what makes those bones work is their AXES rather than their existence. They
+are deleted and rebuilt. What the purchase *did* buy, measured rather than assumed, is a body
+unwrap with **23 overlapping texels out of 108,504 and zero mirrored** — which is what makes a
+shade-as-a-function-of-3D-position bake legal at all — and a crow's head and bill, which no amount
+of reshaping turns a sparrow into. The conclusion held; the reasoning did not.
+
+**And it was not a data edit.** `bird_familiar.py` keeps species as a dict of proportions and
+`bake_bird_texture.py` keeps palette as named colours, both true — but the generator never shipped
+a bird (it survives as the SPEC), the crow ships its wings SPREAD and welded into the body where we
+need them folded, its tail is 48 triangles of alpha card against a plain ColorMap, and it has no
+jaw. The palette transferred; the shading LAW did not, because an uguisu is defined by two field
+marks and a karasu has none — `shade_corvid` is its own function rather than `shade` with two flags
+off.
+
+**A crow is not black, and painting it black was wrong.** The first palette ran 28–88 and rendered
+as a silhouette — accurate as a photograph, useless as a familiar, which has to stay legible across
+a crowded arena on a phone. Lifted ~35%, with countershading carried by HUE (cool blue-violet
+mantle over warmer duller underparts) rather than by lightness. Two lines do the rest of the work:
+the covert edge, because the folded wing is deliberately low-relief geometry and its edge has to be
+drawn, and a catchlight, because a crow's eye is as dark as its head and without one the face is a
+blank.
+
+**A wing is not a comb — and neither is a tail, nor a folded wing.** `spread_wing.py` recorded this
+for the spread wing in August; the karasu met it twice more in one session. A tail of seven
+graduated blades stepped into a visible staircase at 1.64 studs, and a folded wing of one covert
+plus three primaries read as loose slats. Same fix both times: one continuous surface whose OUTLINE
+identifies it. The uguisu escapes it only by being a third the size.
+
+**On my own accuracy.** The brief said the crow ships "two 465-vertex eyeballs" needing cleanup.
+They are 465-vertex FEET — weighted to the leg chains, not the head. The cleanup was still needed
+(920 triangles each against a 1,352-triangle body, decimated to 130) but it is a different job than
+the one described, and it changed which end of the bird got the attention.
+
+**Also fixed while here:** the uguisu's retarget existed only as a `.blend` on one machine, so
+bird #2 had to rediscover every step from prose. `roblox/tools/blender/karasu_retarget.py` is
+re-runnable end to end and is the standard for bird #3.

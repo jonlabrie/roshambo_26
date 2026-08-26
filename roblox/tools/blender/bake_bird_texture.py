@@ -39,7 +39,74 @@ UGUISU = {
     "leg":         (168, 136, 110),
     "gape":        (58, 42, 38),      # the interior faces the split exposed
 }
-SPECIES = {"uguisu": UGUISU}
+# --- karasu ---------------------------------------------------------------------------
+# ⚠ A CROW IS NOT A PALETTE EDIT, AND SAYING SO EARLY SAVES THE NEXT BIRD. What transfers from
+# the uguisu is the MACHINERY -- the triangle rasteriser, the adaptive face/vertex normal blend,
+# the dilation pass, the UV-clash guard -- and the idea that colour is a function of 3D position.
+# What does not transfer is the shading LAW, because the two birds are marked differently: an
+# uguisu is defined by a pale supercilium over a dark eye-line, and a karasu has no field marks
+# at all. `shade_corvid` is therefore its own function rather than `shade` with two flags off;
+# cramming both into one would make both harder to read and neither easier to change.
+#
+# ⚠ AND IT IS NOT ACTUALLY BLACK. A hashibutogarasu photographs near-black, but painting it that
+# way gives a bird with no internal contrast that reads as a hole in the screen at arena
+# distance -- the one thing a familiar cannot be, since the whole point is that it is legible
+# across a crowded arena. Everything below sits in the 40-110 range and reads as black under
+# game lighting while keeping its form. The countershading runs COOL-over-WARM rather than
+# dark-over-pale: a crow's gloss is blue-violet on the mantle and its underparts are duller and
+# browner, so hue does the work that lightness does on the uguisu.
+KARASU = {
+    # ⚠ THESE ARE THE SECOND SET. The first ran 28-88 and, rendered, the bird was a silhouette --
+    # correct-looking as a photograph and useless as a familiar, which has to stay legible across
+    # a crowded arena on a phone. Everything is lifted ~35% here; it still reads as a black bird
+    # because the HUE relationships carry it, and now it holds its form.
+    "dorsal":      (66, 68, 86),      # mantle: cool blue-black
+    "crown":       (52, 53, 66),      # crown and nape, darker and flatter
+    "wing_tail":   (76, 79, 104),     # flight feathers carry the most gloss
+    "ventral":     (80, 77, 79),      # breast and belly: warmer, duller charcoal
+    "flank":       (70, 68, 75),
+    "throat":      (60, 59, 64),      # the hackles a hashibutogarasu wears on its throat
+    "covert":      (62, 64, 82),      # the folded wing panel, a shade cooler than the mantle
+    "covert_edge": (104, 108, 138),   # ⚠ THE ONE LINE THAT MAKES THE WING READ. The folded wing
+                                      # here is deliberately low-relief geometry, so its edge has
+                                      # to be drawn. Same finding as the uguisu, and it matters
+                                      # more on a bird with no other markings at all.
+    "eye":         (20, 19, 19),
+    "catchlight":  (190, 192, 200),   # a crow's eye is as dark as its head; without a highlight
+                                      # the face is a blank. The only bright value in the palette.
+    "bill":        (42, 42, 48),      # heavy, matte, and the same colour top and bottom -- what
+    "bill_gloss":  (72, 73, 86),      # separates the mandibles is the culmen highlight and the
+    "leg":         (40, 40, 44),      # dark gape line between them, not two colours
+    "gape":        (84, 54, 54),
+}
+
+# `landmarks` are in the FINAL mesh's own coordinates. `ref_length` is the nose-to-tail span they
+# were measured at, and bake() rescales them if the mesh it is handed differs -- see the warning
+# on LANDMARK_REF_LENGTH below, which was written after a 1.5x scale-up painted the supercilium
+# across the breast.
+SPECIES = {
+    "uguisu": {"palette": UGUISU, "shader": "warbler", "ref_length": 0.552},
+    "karasu": {"palette": KARASU, "shader": "corvid", "ref_length": 1.640,
+               # ⚠ DERIVED, NOT TRANSCRIBED. Every one of these comes from
+               # `karasu_retarget.landmarks_final()`, which maps that module's build-coordinate
+               # proportions through the same rescale the mesh got. Re-run it after any change
+               # to KARASU rather than editing numbers here: a landmark that stops describing
+               # the geometry it draws is exactly how the uguisu's supercilium ended up painted
+               # across its breast.
+               "landmarks": {
+                   "eye": (0.062, 0.560, 0.836), "eye_r": 0.024,
+                   "catchlight": (0.062, 0.5705, 0.8455), "catchlight_r": 0.0092,
+                   # the folded wing plate's own top edge
+                   "covert_edge_y": (-0.4346, -0.3092, -0.1837, -0.0917,
+                                     0.0170, 0.1509, 0.2763, 0.3851),
+                   "covert_edge_z": (0.2767, 0.3194, 0.3645, 0.4180,
+                                     0.4724, 0.5937, 0.6522, 0.6857),
+                   "covert_back_y": -0.4546, "covert_front_y": 0.3951,
+                   "gape_p": (0.0, 0.7364, 0.7990), "gape_n": (0.0, 0.0599, 0.9982),
+                   "bill_y": 0.6286, "throat_y": (0.280, 0.500), "leg_z": 0.230,
+                   "tail_root_y": -0.2004,
+               }},
+}
 
 # --- landmarks, measured off the retargeted mesh -----------------------------------------
 # ⚠ THESE ARE ABSOLUTE COORDINATES, AND THE MESH CAN BE RESCALED UNDER THEM. Every landmark below
@@ -155,6 +222,96 @@ def shade(P, N, pal, S=1.0):
     return np.clip(out, 0.0, 1.0)
 
 
+def shade_corvid(P, N, pal, S=1.0, lm=None):
+    """The karasu. A SEPARATE LAW from `shade`, not the same one with flags off.
+
+    An uguisu is defined by two marks -- a pale supercilium over a dark eye-line -- and a karasu
+    has none at all. So the whole problem inverts: the warbler shader spends its effort placing
+    marks, and this one spends it manufacturing enough internal contrast that an all-black bird
+    is not a hole in the screen. Three things do that work:
+
+      1. COUNTERSHADING BY HUE, NOT BY LIGHTNESS. A crow's gloss is blue-violet on the mantle and
+         its underparts are duller and browner. Cool-over-warm at nearly equal lightness reads as
+         a black bird with form; light-over-dark reads as a magpie.
+      2. THE COVERT EDGE LINE. The folded wing here is deliberately low-relief geometry -- it is
+         shrink-wrapped to the flank so it does not read as a plate bolted on -- so its edge has
+         to be drawn. The uguisu found the same thing with modelled creases; on a bird with no
+         other markings it is the single most load-bearing line in the texture.
+      3. A CATCHLIGHT. A crow's eye is as dark as its head, so a correctly-coloured eye is
+         invisible and the face reads as a blank. The highlight is the only bright value in the
+         whole palette, and it is what makes the bird look at you.
+
+    ⚠ NO GRADIENTS ALONG THE WING OR TAIL. Same ruling as `shade_wing`: they alias into visible
+    stripes wherever UVs distort, and the geometry already carries the feather read.
+    """
+    C = {k: _srgb_to_linear(v) for k, v in pal.items()}
+    P = P / S
+    x, y, z = np.abs(P[:, 0]), P[:, 1], P[:, 2]
+
+    # 1. countershading off the NORMAL, not off height -- a bird's underside follows the surface
+    #    facing the ground, which is what the normal already encodes.
+    dorsal = _smooth(-0.45, 0.55, N[:, 2])
+    gloss = _smooth(0.10, -0.45, y)                      # toward the tail: more blue gloss
+    upper = C["dorsal"] * (1 - gloss)[:, None] + C["wing_tail"] * gloss[:, None]
+    crown = _smooth(0.40, 0.56, y)
+    upper = upper * (1 - crown)[:, None] + C["crown"] * crown[:, None]
+    flankish = _smooth(0.18, 0.58, dorsal)
+    lower = C["ventral"] * (1 - flankish)[:, None] + C["flank"] * flankish[:, None]
+    out = lower * (1 - dorsal)[:, None] + upper * dorsal[:, None]
+
+    # 1b. throat hackles -- a hashibutogarasu wears them, and they break up the underside
+    t0, t1 = lm["throat_y"]
+    hack = _smooth(t0, t0 + 0.08, y) * (1.0 - _smooth(t1 - 0.08, t1, y)) * (1.0 - dorsal)
+    out = out * (1 - hack)[:, None] + C["throat"] * hack[:, None]
+
+    # 2. THE FOLDED WING. Interpolating the plate's own stations rather than fitting a line means
+    #    the painted edge cannot drift from the geometry it is drawing.
+    edge_z = np.interp(y, lm["covert_edge_y"], lm["covert_edge_z"],
+                       left=lm["covert_edge_z"][0], right=lm["covert_edge_z"][-1])
+    span = (_smooth(lm["covert_back_y"], lm["covert_back_y"] + 0.10, y)
+            * (1.0 - _smooth(lm["covert_front_y"] - 0.09, lm["covert_front_y"], y))
+            * _smooth(0.020, 0.045, x))
+    panel = _smooth(0.010, -0.010, z - edge_z) * span * dorsal
+    out = out * (1 - panel)[:, None] + C["covert"] * panel[:, None]
+    line = (1.0 - _smooth(0.003, 0.010, np.abs(z - edge_z))) * span
+    out = out * (1 - line)[:, None] + C["covert_edge"] * line[:, None]
+
+    # 3. eye, then the catchlight on top of it
+    e, cl = lm["eye"], lm["catchlight"]
+    de = np.sqrt((x - e[0]) ** 2 + (y - e[1]) ** 2 + (z - e[2]) ** 2)
+    we = 1.0 - _smooth(lm["eye_r"] * 0.60, lm["eye_r"], de)
+    out = out * (1 - we)[:, None] + C["eye"] * we[:, None]
+    # ⚠ THE CATCHLIGHT IS MEASURED IN THE EYE'S OWN PLANE, NOT IN 3D. As a 3D ball it has to be
+    # centred exactly on a curved surface to touch it at all, and at r = 0.008 on a head 0.15
+    # wide it simply missed -- the bird came out with a flat black hole for an eye. Gating the
+    # 2D (y, z) offset on "wherever the eye is painted" puts it on the eye by construction.
+    d2 = np.sqrt((y - cl[1]) ** 2 + (z - cl[2]) ** 2)
+    wc = (1.0 - _smooth(lm["catchlight_r"] * 0.40, lm["catchlight_r"], d2)) * (we > 0.45)
+    out = out * (1 - wc)[:, None] + C["catchlight"] * wc[:, None]
+
+    # 4. bill. Both mandibles are the same colour on a corvid -- what separates them is the
+    #    highlight along the culmen ridge and the dark line of the gape between them.
+    gp, gn = np.array(lm["gape_p"]), np.array(lm["gape_n"])
+    sd = (P - gp) @ gn
+    bill = _smooth(lm["bill_y"] - 0.010, lm["bill_y"] + 0.030, y)
+    out = out * (1 - bill)[:, None] + C["bill"] * bill[:, None]
+    # a wide ramp on purpose: the bill is low-poly, and a tight one bands on its facets
+    ridge = bill * _smooth(0.40, 0.95, N[:, 2]) * (1.0 - _smooth(0.030, 0.075, x))
+    out = out * (1 - ridge)[:, None] + C["bill_gloss"] * ridge[:, None]
+    # ⚠ THE GAPE IS THE INSIDE OF THE MOUTH AND NOTHING ELSE. A loose test here (|sd| < 0.010,
+    # |Nz| > 0.35) also caught the bill's outer top and bottom, which meet near the gape line,
+    # and painted a red stripe along the culmen. The interior faces lie ON the plane and face
+    # almost straight up or down; both bounds are tight for that reason.
+    inner = (bill > 0.6) & (np.abs(sd) < 0.0035) & (np.abs(N[:, 2]) > 0.72)
+    out = np.where(inner[:, None], C["gape"], out)
+
+    # 5. legs and feet
+    leg = _smooth(lm["leg_z"] + 0.05, lm["leg_z"] - 0.03, z) * \
+        ((y > -0.16) & (y < 0.22)).astype(float)
+    out = out * (1 - leg)[:, None] + C["leg"] * leg[:, None]
+    return np.clip(out, 0.0, 1.0)
+
+
 def uv_occupancy(me, res=512, pad=1):
     """Boolean map of which texels a mesh's UV islands already claim."""
     me.calc_loop_triangles()
@@ -207,7 +364,7 @@ def shade_wing(P, N, pal, S=1.0):
     return np.clip(C["wing_tail"] * up[:, None] + C["flank"] * (1 - up)[:, None], 0.0, 1.0)
 
 
-def _raster(me, uvl, co, no, img, hit, res, shader, pal, S=1.0):
+def _raster(me, uvl, co, no, img, hit, res, shader, pal, S=1.0, lm=None):
     for tri in me.loop_triangles:
         uv = np.array([uvl[l].uv[:] for l in tri.loops]) * res
         vi = list(tri.vertices)
@@ -244,6 +401,10 @@ def _raster(me, uvl, co, no, img, hit, res, shader, pal, S=1.0):
         hit[gy[inside].astype(int), gx[inside].astype(int)] = True
 
 
+SHADERS = {"warbler": lambda P, N, pal, S, lm: shade(P, N, pal, S),
+           "corvid": shade_corvid}
+
+
 def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name=None):
     ob = bpy.data.objects[obj_name]
     me = ob.data
@@ -252,14 +413,17 @@ def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name
     me.calc_loop_triangles()
 
     # HOW BIG IS THIS BIRD, relative to the one the landmarks were measured on?
+    sp = SPECIES[species]
+    lm = sp.get("landmarks")
+    shader = SHADERS[sp["shader"]]
     ys = [v.co.y for v in me.vertices]
-    S = (max(ys) - min(ys)) / LANDMARK_REF_LENGTH
+    S = (max(ys) - min(ys)) / sp.get("ref_length", LANDMARK_REF_LENGTH)
 
     img = np.zeros((res, res, 3), dtype=np.float64)
     hit = np.zeros((res, res), dtype=bool)
     co = np.array([v.co[:] for v in me.vertices])
     no = np.array([v.normal[:] for v in me.vertices])
-    pal = SPECIES[species]
+    pal = sp["palette"]
 
     for tri in me.loop_triangles:
         uv = np.array([uvl[l].uv[:] for l in tri.loops]) * res
@@ -306,7 +470,7 @@ def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name
         N = vn * (1 - blend) + fn[None, :] * blend
         n = np.linalg.norm(N, axis=1, keepdims=True)
         N = N / np.where(n == 0, 1, n)
-        img[gy[inside].astype(int), gx[inside].astype(int)] = shade(P, N, pal, S)
+        img[gy[inside].astype(int), gx[inside].astype(int)] = shader(P, N, pal, S, lm)
         hit[gy[inside].astype(int), gx[inside].astype(int)] = True
 
     # The spread wing shares this atlas — one upload for the whole bird, and the wing cannot be
@@ -326,7 +490,7 @@ def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name
         _raster(wme, wme.uv_layers[0].data,
                 np.array([v.co[:] for v in wme.vertices]),
                 np.array([v.normal[:] for v in wme.vertices]),
-                img, hit, res, shade_wing, pal, S)
+                img, hit, res, shade_wing, pal, S)  # flat per surface -- see shade_wing
         filled = int(hit.sum())
 
     # DILATE. Bilinear sampling at a UV island's edge reaches past it; without padding every

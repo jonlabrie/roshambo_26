@@ -296,6 +296,103 @@ distance over cruise speed, so twenty studs needs 2.65s and across the canyon ne
 constant is wrong for every distance but one.** The cue arms the song; the update loop fires it at
 the instant the dance begins, where "has it landed" is true rather than estimated.
 
+## The karasu — the second bird, built 2026-08-26
+
+Owner ruling 2026-08-19 was *"uguisu first, karasu second"*, and 2026-08-25 made the roster
+**unlocks** rather than a grade ladder — so this is the first bird a player can earn the right to
+choose. It is not wired into play; it is built, verified and waiting on import.
+
+| | |
+|---|---|
+| Body | 0.328 × 1.640 × 0.897 studs, **2,666 triangles** |
+| Wings | 2.446 studs tip to tip, **856 triangles** (`KarasuWings`, separate part) |
+| Bones | **19**, one rig shared by both parts |
+| Origin | **feet at z = 0**, centred in x/y — same contract as the uguisu |
+| Source | `karasu_body.fbx`, `karasu_wings.fbx`, `karasu_colormap.png` in `~/Desktop/Roshambo Reference/models/birds/probe/` |
+| Rebuilt by | `roblox/tools/blender/karasu_retarget.py` — `run()`, `verify_rig()`, `bake_and_finish()` |
+
+⚠ **LIFE SIZE, AND THAT IS THREE TIMES THE UGUISU.** Owner-chosen 2026-08-26: 1.64 studs / 19.7
+inches, a hashibutogarasu (~50cm), against the uguisu's 0.552. It follows two standing rulings
+rather than inventing one — *"life size, maybe slightly larger"* (2026-08-19) and *"a presumably
+larger bird, like a raven/crow to carry it"* (2026-08-22). **The consequence is real work for the
+main thread:** `SEAT_INBOARD` / `SEAT_LIFT` are proportions of the avatar's arm, not of the bird,
+so a bird three times longer than the shipped one will not seat correctly without retuning, and
+`PERCH_RADIUS` and the flight tuning were both set looking at a 7-inch bird.
+
+⚠ **THE WINGSPAN IS THE DIAL MOST LIKELY TO WANT THE OWNER'S EYE.** It ships at **1.49× body
+length**. A live crow is 2.0× (50cm long, ~100cm span) and the shipped uguisu is 1.13× — so the
+uguisu too came in well under life proportion and was gated as good. 1.49 is deliberately between
+them. `KARASU["wing_spread"]["span"]` is the number.
+
+### What the purchase actually bought — and what it did not
+
+Retargeted from the same TurboSquid collection as the uguisu. ⚠ **The reason it was cheap is not
+the reason anyone expected.** The crow does ship the wing bones the sparrow lacked
+(`Shoulder → Arm → ForeArm` per side) — but that was never the blocker: the uguisu builds
+`wing_*`/`wrist_*` from scratch on its own spread-wing part, and what makes those bones work is
+not that they exist but their AXES. They are **deleted and rebuilt** here.
+
+What it did buy, measured rather than assumed:
+
+- **A clean body unwrap** — 108,504 texels at 512², **23 overlapping (0.0%) and zero mirrored**.
+  That is what makes `bake_bird_texture`'s shade-as-a-function-of-position legal on the mesh at
+  all, and it is most of what a bought model is worth.
+- **A real crow head and bill**, which is the half of the silhouette a sparrow cannot become.
+
+What had to be built anyway: the folded wing (the crow ships wings SPREAD and welded into the
+body), the tail (48 triangles of alpha card, and we ship a plain ColorMap so an alpha card is an
+opaque rectangle), the jaw (no `bill_lower`, one closed shell), and the whole rig's naming.
+
+⚠ **THE CROW'S OWN TAIL BONE IS NAMED `joint1`, AND SO IS THE ROOT'S TARGET NAME.** A one-pass
+rename makes Blender silently produce `joint1.001`, and the root `BirdController` looks up is then
+the tail. Renamed through a temporary namespace.
+
+⚠ **THE LEG SIDES WERE INVERTED IN THE FIRST DRAFT OF THE MAP.** Measured off the shipped uguisu:
+in armature-local space (bird facing +Y) `joint12` sits at x −0.038 and `joint25` at x +0.088, and
+the bird's right when facing +Y is +X — so **joint25 is the right leg**. Getting it backwards is
+invisible at rest and shows only in the victory hop, where the body rolls toward the planted foot.
+
+### Verified by driving the rig, not by looking
+
+`verify_rig()` rotates each driven bone and measures what moved. On-chain displacement against
+off-chain, in studs:
+
+| bone | on chain | off chain |
+|---|---|---|
+| `joint4` head | 0.1167 | **0.0000** tail |
+| `joint8` tail | 0.2865 | **0.0000** head |
+| `joint3` neck | 0.1299 | **0.0000** tail |
+| `bill_lower` | 0.0249 | **0.0000** rest of bird |
+| `wing_R` | 0.8011 | **0.0000** left wing |
+| `wrist_R` | 0.5277 outboard | **0.0000** inboard of the hinge |
+
+⚠ **AND THE WING AXES MATCH THE UGUISU'S MEASURED TABLE**, which is the check that actually
+matters: `BirdController`'s beat and fold are written against two measured facts that only hold if
+the bone roll is right. Rotating 40° about local **X** lifts the right tip +0.7413 and the left
+tip +0.7413 — *the same sign raises both, local X does not mirror*. About local **Z** it sweeps
+them +0.7984 and −0.7060 — *opposite, local Z does mirror*. Local X moves the tip only vertically
+and local Z only fore-and-aft, exactly as measured on the uguisu.
+
+### ⚠ Import instructions — this is the hand-off, and one step is not optional
+
+The asset thread does not touch Studio ([[parallel-threads]]). For the main thread:
+
+1. Import `karasu_body.fbx` and `karasu_wings.fbx`. **Do not rescale** — unlike the uguisu (built
+   at 0.828 and scaled to 0.552 in Studio, which is why its recorded numbers never quite agree),
+   this one is 1:1 at its final size.
+2. ⚠ **DELETE THE SurfaceAppearance THE IMPORTER CREATES AND USE `TextureID` INSTEAD.** The FBX
+   carries a ColorMap and nothing else, and a **ColorMap-only SurfaceAppearance on opaque geometry
+   renders warm and shiny** — Roblox substitutes its own defaults for the missing channels
+   ([[material-and-mesh-traps]] §8). On a black bird that is glaring. The uguisu ships as a
+   `TextureID` for exactly this reason.
+3. ⚠ **Set `part.CFrame` directly — never `PivotTo`.** The importer bakes a rotation into the
+   MeshPart's CFrame with a compensating one in `PivotOffset`, so an identity pivot lays the bird
+   on its back ([[blender-pipeline]]).
+4. Confirm `HasSkinnedMesh` and run a bone-drive test in the place before gating.
+
+Not yet done, and both are code rather than asset work: nothing selects a bird per player, and the
+seat/perch constants above are still tuned for the uguisu.
+
 ## Still thin
 
 - **Plumage is band colour only.** The spec describes a lengthening tail streamer, a crest and a

@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-22
+updated: 2026-08-26
 ---
 
 # Blender Pipeline
@@ -149,10 +149,30 @@ wants the model facing −Y, so put `rotation_euler = (90°, 0, 270°)` on the *
 object and let the mesh follow as its child. Euler XYZ applies Rz@Ry@Rx, so that composes
 to +X→−Y and +Y→+Z.
 
-**`bpy.ops.export_scene.fbx` fails under the Blender MCP with `use_selection=True`** —
-that context has no `selected_objects`. Load only what you want into an empty scene and
-export with `use_selection=False`, or wrap the call in a `temp_override` carrying a real
-window.
+**⚠ THE BLENDER MCP'S CONTEXT BREAKS THREE DIFFERENT OPERATORS, ALL THE SAME WAY.** The MCP
+execs code in a context with no window, so any operator that reaches for one fails — and each
+failure looks like a different bug until you have seen all three:
+
+- **`bpy.ops.export_scene.fbx(use_selection=True)`** — that context has no `selected_objects`.
+- **`bpy.ops.import_scene.fbx`** on a file containing an ARMATURE — the importer calls
+  `mode_set(mode='EDIT')` while building the skeleton and dies with *"Context missing active
+  object"*. Setting `view_layer.objects.active` first does **not** fix it.
+- **`bpy.ops.object.mode_set`** itself, so `armature.data.edit_bones` is unreachable and no bone
+  can be renamed, added or re-rolled.
+
+**One fix covers all three** — wrap the call in a `temp_override` carrying a real window:
+
+```python
+win = bpy.context.window_manager.windows[0]
+scr = win.screen
+area = next((a for a in scr.areas if a.type == 'VIEW_3D'), scr.areas[0])
+with bpy.context.temp_override(window=win, screen=scr, area=area, region=area.regions[-1],
+                               scene=bpy.context.scene, view_layer=bpy.context.view_layer):
+    bpy.ops.import_scene.fbx(filepath=fbx)
+```
+
+For export you can also just load only what you want into an empty scene and pass
+`use_selection=False`.
 
 **"Rigged" in a vendor listing means "has a skeleton", not "has motion."** The purchased
 collection contains **zero** actions. That is fine here — we drive bones from code — but do
@@ -253,6 +273,64 @@ or they mate with an offset that looks like a rigging bug.
 The generator that authors our own birds parametrically is
 `roblox/tools/blender/bird_familiar.py` — a species is a dict of proportions, so a new bird
 is a data edit rather than a new sculpt.
+
+⚠ **THE RETARGET ITSELF MUST BE A SCRIPT, AND THE UGUISU'S WAS NOT.** Its retarget existed only
+as `probe/uguisu_retarget.blend` on one machine, so the second bird had to rediscover every step
+from prose. `roblox/tools/blender/karasu_retarget.py` is the karasu's, and it is re-runnable
+end to end: `run()` goes vendor blend → two rigged meshes, `verify_rig()` proves the rig by
+driving it, `bake_and_finish()` writes both FBXs, the ColorMap and the working blend. Treat that
+as the standard for bird #3.
+
+### Authoring traps found building the karasu (2026-08-26)
+
+**⚠ A WING IS NOT A COMB — AND NEITHER IS A TAIL, NOR A FOLDED WING.** `spread_wing.py` records
+this for the spread wing: separate radiating feathers fan apart faster than they are wide, so
+every gap opens into a triangle. The karasu met the identical failure twice more. A tail built
+from seven overlapping graduated blades (the way the uguisu's is) stepped into a visible
+**staircase** at 1.64 studs, and a folded wing built as a covert plate plus three separate
+primaries read as **loose slats laid over the tail**. Both fixes are the same one: ONE
+continuous surface whose OUTLINE does the identifying. The uguisu gets away with blades only
+because it is a third the size and the steps fall inside a texel — so this scales in, and bird
+#3 should start from one surface rather than rediscover it.
+
+**⚠ A FOLDED WING MUST BE SHRINK-WRAPPED TO THE FLANK, AND A NEAREST-VERTEX PROBE IS NOT GOOD
+ENOUGH.** Placed at a constant x against a round body, the plate stands off as a flat fin with
+daylight behind it — obvious from directly above and invisible from the side. RAYCAST the body
+at every vertex (`obj.ray_cast`); a 555-vertex body is far too sparse to sample by proximity.
+Then taper the standoff to **zero at the plate's top, bottom and leading edges** so those die
+into the flank and only the trailing edge breaks the silhouette — the [[flush-outside-edges]]
+rule, applied to a feather group.
+
+**⚠ AND CHECK THE PLATE'S TOP EDGE CLEARS THE BACK LINE.** At two stations it equalled the
+body's own `zmax`, so the left and right plates met along the spine and the bird grew a Y-shaped
+crease down its back. The mantle has to show between the two wings.
+
+**⚠ A PLANAR UV PROJECTION COLLAPSES A TWO-SIDED PLATE'S SHELLS ONTO EACH OTHER.** Every plate
+here — tail, folded wing, wing membrane — is closed and two-sided, and projecting it down one
+axis puts its inward- and outward-facing shells on the same texels. The bake then paints both
+and the last triangle wins, which showed as **pale rectangular patches** where the inward shell
+had overwritten the outward one (they get opposite countershading, so they are not the same
+colour). `spread_wing.py` already carried the fix for one wing — *"upper and lower shells split
+the region's height, with a gap so bilinear sampling cannot pull one into the other"* — and it
+applies to every plate.
+
+**⚠ CREATE A BMESH CUSTOM-DATA LAYER BEFORE THE OP, NOT AFTER.** Adding a layer reallocates
+custom data, so writes through references taken beforehand land nowhere. The tag reported success
+and read back as zero on every face.
+
+**⚠ `bmesh.ops.holes_fill` UNDER-REPORTS THE FACES IT CREATED.** It returned ONE face for two
+holes it demonstrably closed (0 boundary edges afterwards). Tag fill faces by GEOMETRY — a fill
+face is exactly one all of whose vertices lie on the cut plane — not by the op's return value.
+
+**⚠ AND DO NOT FIND THE GAPE BY A GEOMETRIC GUESS EITHER.** "Forward of the hinge and facing up
+or down" also catches the OUTSIDE of the bill's top and bottom, which meet near the gape line.
+That reprojected the whole bill into the gape's texture block and painted a raw red stripe down
+the culmen of a bird that is meant to be black.
+
+**⚠ A SILENT UV CAP IS A SILENT RESOLUTION LOSS.** A vendor unwrap already claims ~41% of the
+atlas in fragments, so a block request that does not fit is normal. `UVAllocator` steps the size
+down rather than failing — and RECORDS what it actually gave, because "no silent caps" applies to
+texture space as much as to coverage.
 
 
 ## Procedural river (in-engine, no Blender)
