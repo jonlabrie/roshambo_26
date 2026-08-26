@@ -17,6 +17,7 @@
 -- warnings). One per present player stays far inside it. A Highlight parked OUTSIDE Workspace still
 -- counts, so leavers are destroyed rather than stashed.
 local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
@@ -36,6 +37,8 @@ local HUE_COOL, HUE_HOT = 0.11, 0.02
 
 type Row = {
     highlight: Highlight,
+    attachment: Attachment?,
+    emitter: ParticleEmitter?,
     streak: number,
     visibility: string,
 }
@@ -84,14 +87,31 @@ local function apply(userId: number, row: Row)
     })
     if not show then
         h.Enabled = false
+        if row.emitter then
+            row.emitter.Enabled = false
+        end
         return
     end
     local fill, outline, heat = StreakAura.poseFor(row.streak)
+    local tint = Color3.fromHSV(HUE_COOL + (HUE_HOT - HUE_COOL) * heat, 0.85, 1)
     h.FillTransparency = fill
-    h.OutlineTransparency = outline
-    h.FillColor = Color3.fromHSV(HUE_COOL + (HUE_HOT - HUE_COOL) * heat, 0.85, 1)
-    h.OutlineColor = h.FillColor
+    -- ⚠ THE RIM PULSES, and its TEMPO carries the streak. Brightness cannot be read off a lone
+    -- player -- the owner could not tell the levels apart in the singular -- but a beat can be
+    -- counted. `pulse` returns 0..1, and a fainter rim is a HIGHER transparency, so it subtracts.
+    local beat = StreakAura.pulse(os.clock(), row.streak)
+    h.OutlineTransparency = math.clamp(outline - (1 - outline) * 0.45 * beat, 0, 1)
+    h.FillColor = tint
+    h.OutlineColor = tint
     h.Enabled = true
+
+    -- ⚠ THE PARTICLES ARE THE SIGNAL NOW. A Highlight alone read as an editor selection washing the
+    -- avatar out ("not very compelling", owner) -- and rate is countable where transparency is not.
+    local emitter = row.emitter
+    if emitter then
+        emitter.Rate = StreakAura.emitRate(row.streak)
+        emitter.Color = ColorSequence.new(tint)
+        emitter.Enabled = true
+    end
 end
 
 local function rowFor(player: Player): Row
@@ -105,15 +125,57 @@ local function rowFor(player: Player): Row
     -- always-visible glow through geometry would be a wallhack for "who is winning".
     h.DepthMode = Enum.HighlightDepthMode.Occluded
     h.Enabled = false
-    local row: Row = { highlight = h, streak = 0, visibility = StreakAura.VISIBILITY.PUBLIC }
+    local row: Row = {
+        highlight = h,
+        attachment = nil,
+        emitter = nil,
+        streak = 0,
+        visibility = StreakAura.VISIBILITY.PUBLIC,
+    }
     rows[player.UserId] = row
     return row
+end
+
+-- ⚠ POOLED LIKE THE HIGHLIGHT, for the same measured reason: toggling `Enabled` is far cheaper
+-- than creating, and a streak ends on every SAFE and every LOSS. The emitter rides an Attachment on
+-- the root part so it follows the avatar without parenting anything to a limb that may be swapped.
+local function buildEmitter(): ParticleEmitter
+    local e = Instance.new("ParticleEmitter")
+    e.Name = "StreakAuraEmbers"
+    -- No Texture set: the engine default always exists, where a hardcoded rbxasset id is a guess
+    -- that fails silently as an invisible emitter.
+    e.Rate = 0
+    e.Lifetime = NumberRange.new(0.7, 1.2)
+    e.Speed = NumberRange.new(1.5, 3)
+    e.SpreadAngle = Vector2.new(12, 12)
+    e.Acceleration = Vector3.new(0, 4, 0) -- embers RISE; falling ones would read as damage
+    e.Size = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.18),
+        NumberSequenceKeypoint.new(1, 0),
+    })
+    e.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.35),
+        NumberSequenceKeypoint.new(1, 1),
+    })
+    e.LightEmission = 0.75
+    e.Enabled = false
+    return e
 end
 
 local function adorn(player: Player, character: Model)
     local row = rowFor(player)
     row.highlight.Adornee = character
     row.highlight.Parent = character
+    local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+    if root then
+        local a = row.attachment or Instance.new("Attachment")
+        a.Name = "StreakAuraOrigin"
+        a.Position = Vector3.new(0, -0.5, 0)
+        a.Parent = root
+        local e = row.emitter or buildEmitter()
+        e.Parent = a
+        row.attachment, row.emitter = a, e
+    end
     apply(player.UserId, row)
 end
 
@@ -135,7 +197,13 @@ Players.PlayerAdded:Connect(track)
 Players.PlayerRemoving:Connect(function(player)
     local row = rows[player.UserId]
     if row then
-        row.highlight:Destroy()
+        row.highlight:Destroy() -- ⚠ a Highlight outside Workspace STILL counts toward the 255 cap
+        if row.emitter then
+            row.emitter:Destroy()
+        end
+        if row.attachment then
+            row.attachment:Destroy()
+        end
         rows[player.UserId] = nil
     end
     friendCache[player.UserId] = nil
@@ -213,3 +281,15 @@ end)
 -- an override) is the owner's to set, and inventing one here would be inventing a moment nobody
 -- asked for. The obvious first use is a client-side HIDE cap when too many players glow at once on
 -- a phone; the number that should trigger it is unmeasured. See the plan's amendment.
+
+-- ⚠ THE PULSE NEEDS A CLOCK, and this loop is the only per-frame cost in the file. It re-applies
+-- only rows whose glow is currently on, and does nothing at all when the arena is dark -- which,
+-- even with the floor at 2, is most of the time.
+RunService.Heartbeat:Connect(function()
+    for _, player in Players:GetPlayers() do
+        local row = rows[player.UserId]
+        if row and row.highlight.Enabled then
+            apply(player.UserId, row)
+        end
+    end
+end)

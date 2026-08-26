@@ -6,21 +6,35 @@
 -- entire test run at require time — that is exactly what happened to `Kamon`, whose renderer had to
 -- be split out into `KamonDraw`. `heat` is a number; the controller turns it into a colour.
 --
--- ⚠ RARITY IS THE DESIGN. About a third of players win any given round, so a 3-streak is roughly
--- 1 in 27 and a 5-streak 1 in 240: the arena is dark most of the time and the glow is scarce
--- exactly when it is impressive. Four worn answers were rejected before this one, and the worn
--- sashimono failed on precisely this axis — everyone wore one at once. Lowering MIN_STREAK turns
--- this back into that.
+-- ⚠ THE FLOOR IS AN ACCESS DECISION, NOT A TUNING NUMBER. This module first argued the opposite:
+-- that rarity was the design, a 3-streak being ~1 in 27 so the arena stays dark. The owner's answer
+-- on seeing it in play was "who cares about auras if only 2 or 3 are ever even visible on your
+-- server?" Scarcity does stop clutter — but a signal almost nobody can display is a lottery, not a
+-- flex. Owner ruling 2026-08-25: the floor is 2. "Let the kids dress up if they want."
+--
+-- ⚠ AND THE SIGNAL IS MOTION, NOT BRIGHTNESS. Owner: "the differences in color are not obvious (at
+-- least, not in the singular)". Exactly right, and it is a flaw in the channel rather than the
+-- palette: a transparency ramp is only readable COMPARATIVELY, and with the floor this low a lone
+-- glowing player is the ordinary case. Rate and tempo can be read off one body — you count them.
+-- So `emitRate` and `pulsePeriod` carry the streak, and the fill is only a faint floor under them.
 local StreakAura = {}
 
-StreakAura.MIN_STREAK = 3
+StreakAura.MIN_STREAK = 2
 local SATURATE_AT = 8 -- a 12-streak and a 30-streak look the same
 
 -- Endpoints, floor -> saturated. Fill carries the signal; outline supports it; heat is decoration.
 -- ⚠ Colour is deliberately the THIRD channel: a colourblind player must read the aura from fill
 -- and outline alone, and the program bar is kid-first on phones.
-local FILL_NEAR, FILL_FAR = 0.85, 0.55
-local OUTLINE_NEAR, OUTLINE_FAR = 0.6, 0.15
+-- ⚠ THE FILL IS DELIBERATELY FAINT. A Highlight is what Studio uses for selection and hover, and at
+-- strength it reads as an editor affordance washing the avatar out — which is why the first version
+-- was "not very compelling" (owner). It is a floor under the particles now, not the effect itself.
+local FILL_NEAR, FILL_FAR = 0.95, 0.85
+local OUTLINE_NEAR, OUTLINE_FAR = 0.7, 0.3
+
+-- Particles per second, floor -> saturated. Countable, which is the whole point.
+local RATE_NEAR, RATE_FAR = 6, 40
+-- Seconds per pulse of the rim. A tempo is countable where a brightness is not.
+local PERIOD_NEAR, PERIOD_FAR = 1.6, 0.7
 
 StreakAura.VISIBILITY = { HIDDEN = "HIDDEN", FRIENDS = "FRIENDS", PUBLIC = "PUBLIC" }
 
@@ -46,14 +60,43 @@ function StreakAura.visible(streak: number): boolean
     return streak >= StreakAura.MIN_STREAK
 end
 
+-- 0..1 across the streak range, saturating. The shared curve behind every channel.
+local function heatFor(streak: number): number
+    if not StreakAura.visible(streak) then
+        return 0
+    end
+    local span = math.max(1, SATURATE_AT - StreakAura.MIN_STREAK)
+    return math.clamp((streak - StreakAura.MIN_STREAK) / span, 0, 1)
+end
+
 -- Fill transparency, outline transparency, and heat (0..1) for a streak.
 function StreakAura.poseFor(streak: number): (number, number, number)
     if not StreakAura.visible(streak) then
         return 1, 1, 0
     end
-    local span = math.max(1, SATURATE_AT - StreakAura.MIN_STREAK)
-    local heat = math.clamp((streak - StreakAura.MIN_STREAK) / span, 0, 1)
+    local heat = heatFor(streak)
     return FILL_NEAR + (FILL_FAR - FILL_NEAR) * heat, OUTLINE_NEAR + (OUTLINE_FAR - OUTLINE_NEAR) * heat, heat
+end
+
+-- Particles per second. ⚠ THE PRIMARY CHANNEL, because it is the one a viewer can read off a single
+-- player: you count a trickle against a stream. Transparency needed a second player beside you.
+function StreakAura.emitRate(streak: number): number
+    if not StreakAura.visible(streak) then
+        return 0
+    end
+    return RATE_NEAR + (RATE_FAR - RATE_NEAR) * heatFor(streak)
+end
+
+-- Seconds per pulse of the rim: slower at the floor, quicker as the run deepens.
+function StreakAura.pulsePeriod(streak: number): number
+    return PERIOD_NEAR + (PERIOD_FAR - PERIOD_NEAR) * heatFor(streak)
+end
+
+-- The rim's 0..1 brightness multiplier at a moment. Never below zero and never above one, so a
+-- caller can multiply it into a transparency without clamping again.
+function StreakAura.pulse(elapsed: number, streak: number): number
+    local period = math.max(0.05, StreakAura.pulsePeriod(streak))
+    return 0.5 - 0.5 * math.cos(2 * math.pi * elapsed / period)
 end
 
 -- Does THIS viewer see THIS subject's aura?
