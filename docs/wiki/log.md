@@ -1011,3 +1011,31 @@ the one described, and it changed which end of the bird got the attention.
 **Also fixed while here:** the uguisu's retarget existed only as a `.blend` on one machine, so
 bird #2 had to rediscover every step from prose. `roblox/tools/blender/karasu_retarget.py` is
 re-runnable end to end and is the standard for bird #3.
+
+## [2026-08-26] decision | The asset thread is retired after one task — the split half has to be able to ship
+
+Owner: *"let's collapse this thread back to the main one."* Blender work returns to the main thread.
+Contract updated on [[parallel-threads]]; nothing is lost, because the pipeline is a re-runnable
+script (`roblox/tools/blender/karasu_retarget.py`) rather than a `.blend` on one machine.
+
+It was set up as the best parallel candidate in the project and the reasoning looked sound — a
+different tool, a different directory, no Studio, no place file. **Two things broke it, and both
+generalise past this repo.**
+
+**A split only pays while the owner is doing something else.** [[parallel-threads]] already said the
+constraint is the place file and the owner, and that more threads do not widen the gate. It stopped
+one step short: when both halves of a feature must land before anything ships, the owner stops
+being a *gate* and becomes the **message bus** — relaying the merge, relaying the import, carrying
+context between sessions by hand. The karasu ended in a four-step hand-off of which the owner could
+execute none directly.
+
+**And the thread built ahead of the constraint.** Nothing selects a bird per player; the unlock
+model was decided 2026-08-25 and is unbuilt. So bird #2 is inventory, not progress on item 6, which
+needs roster selection and a public display of grade — both code, both main's. ⚠ An isolated thread
+is structurally prone to this: it cannot see the queue it is not blocking on, so "what can this
+thread do independently" quietly replaces "what is next". The independence that makes a thread
+parallelisable is the same property that lets it work on the wrong thing. I should have said this
+at the START of the session rather than at the end of it.
+
+**The test before splitting again:** can the split half SHIP without the other half? The design
+thread passes. The asset thread did not.

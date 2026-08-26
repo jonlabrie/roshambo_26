@@ -5,9 +5,8 @@ updated: 2026-08-26
 
 # Parallel Threads
 
-Three Claude sessions run against this repo at once, in git worktrees under `.worktrees/`
-(gitignored). This page is the contract between them. **Read it before starting work in any
-thread.**
+Claude sessions run against this repo in git worktrees under `.worktrees/` (gitignored). This
+page is the contract between them. **Read it before starting work in any thread.**
 
 ## The threads
 
@@ -15,7 +14,7 @@ thread.**
 |---|---|---|---|
 | **main** | the repo root | `main` | ⚠ the PLACE FILE and Studio. All implementation. All gating. |
 | **design** | `.worktrees/design` | `thread/design` | `docs/superpowers/specs/`, `docs/superpowers/plans/`. **No code, ever.** |
-| **assets** | `.worktrees/assets` | `thread/assets` | `roblox/tools/blender/`, `roblox/assets/` |
+| ~~assets~~ | — | — | ⚠ **RETIRED 2026-08-26** — folded back into main, see below |
 
 ## ⚠ Why the split is by HALF, not by feature
 
@@ -35,8 +34,8 @@ at, it stops and hands over. That is the whole rule.
 
 ## Rules
 
-1. **Never work in a thread that does not own the file.** If the asset thread needs a change in
-   `src/`, it writes the request into its branch's notes and main makes it.
+1. **Never work in a thread that does not own the file.** If a thread needs a change outside what
+   it owns, it writes the request into its branch's notes and main makes it.
 2. **Rebase on `main` before merging**, and merge to `main` through the main thread — so one place
    holds the integration.
 3. ⚠ **`docs/wiki/log.md` WILL conflict every time.** It is append-only and every thread writes to
@@ -70,27 +69,54 @@ Its queue, in order:
 - **fireworks catalog** — the data half is code; the look half is main's.
 - **HUD stats pages.**
 
-## The asset thread specifically
+## ⚠ The asset thread was retired on its first task, and the reason generalises
 
-Owns the Blender pipeline and the committed `.rbxm` assets. **The best parallel candidate in the
-project**: a different tool, a different directory, no Studio, no place file — the uguisu took three
-days without touching anything another thread wanted.
+It ran once, built the karasu ([[familiars]]), and was folded back into main the same day at the
+owner's call: *"let's collapse this thread back to the main one."* Blender work now happens in the
+main thread like everything else. Nothing about the pipeline is lost — it lives in
+`roblox/tools/blender/karasu_retarget.py`, which is re-runnable end to end, plus the traps on
+[[blender-pipeline]].
 
-⚠ It still needs main for **import and gating**, which is the one hand-off. Recipe and traps:
-[[blender-pipeline]]; as-built: [[familiars]].
+It looked like the best parallel candidate in the project, and on paper it was: a different tool, a
+different directory, no Studio, no place file. **The paper argument was wrong for a reason worth
+keeping.**
 
-Its queue: **the karasu first** — the crow's own purchased model already has the wing bones the
-sparrow lacked, the generator keeps species as a data dict and the bake keeps palette as named
-colours, so it is much closer to a data edit than the uguisu was. Then the rest of the roster,
-which grade unlocks. ⚠ A crane is a different silhouette, not a palette edit — do not price it like
-the crow.
+⚠ **A SPLIT ONLY PAYS WHILE THE OWNER IS DOING SOMETHING ELSE.** This page already said the
+constraint is the place file and the owner, and that more threads "do not widen the gate" — but it
+stopped one step short. When a feature's two halves BOTH have to land before anything ships, the
+owner stops being a gate and becomes the **message bus** between two sessions: relaying a merge,
+relaying an import, carrying context from one to the other by hand. The karasu ended with a
+four-step hand-off, of which the owner could execute none directly. Parallel wall-clock is worth
+nothing if it is spent on the one person who has to be present for both halves.
+
+⚠ **AND THE THREAD BUILT AHEAD OF THE CONSTRAINT.** Nothing selects a bird per player. The unlock
+model was decided 2026-08-25 and is unbuilt, so a second bird is *inventory*, not progress on item
+6 — which needs roster selection and a public display of grade, both code. An isolated thread is
+structurally prone to this: it cannot see the queue it is not blocking on, so "what can this thread
+do independently" quietly replaces "what is next". **The independence that makes a thread
+parallelisable is the same property that lets it work on the wrong thing.**
+
+**The test before splitting again:** can the split half SHIP without the other half? The design
+thread passes — a spec is finished when it is written, and deciding earlier is worth more than
+typing faster. The asset thread did not: a mesh nobody can select is not a deliverable.
+
+⚠ **Do not re-create an asset thread for "the rest of the roster."** That was its queue and it is
+not a reason. A crane is a different silhouette, not a palette edit — and the crow itself, sold
+internally as nearly a data edit, still needed a folded wing, a solid tail, a split bill and a full
+rig rename ([[familiars]]). Build birds when a bird is the thing blocking something, in whichever
+thread is holding the work.
 
 ## Cleanup
 
 ```bash
+git worktree remove .worktrees/assets      # done 2026-08-26; merge the branch FIRST
 git worktree remove .worktrees/design      # only when the thread is finished for good
 git worktree list                          # what exists right now
 ```
+
+⚠ **Merge before removing, and merge from the main worktree.** A branch cannot be checked out in
+two worktrees at once, so the retiring thread physically cannot merge itself — `git checkout main`
+fails inside its own worktree. Commit, then let main do the merge, then remove.
 
 A worktree with uncommitted work refuses to be removed. That refusal is information — look at
 what is in it before forcing anything.
