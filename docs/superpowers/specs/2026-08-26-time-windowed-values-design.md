@@ -146,6 +146,60 @@ is 1,440 rounds a day multiplied by the room.
 aggregation on join is what makes it survive a rejoin or a hop between PWA and Roblox. Only add
 stored fields if a measured need appears. Recommended: **do not store it.**
 
+### 3a. ⚠ "Session" was the wrong word — there is no boundary, only a half-life
+
+Owner, 2026-08-26: *"what's a session? Just the time from login? Or can it extend over multiple
+play sessions?"* The question exposes a bad name. The juice spec said **"decaying session peak"**
+while describing a mechanism with no session in it. Three different things were being conflated:
+
+| model | rule | behaviour |
+|---|---|---|
+| **login session** | resets at logout | a hard boundary |
+| **rolling window** | `max` over `[now − W, now]` | a hard **cliff** — the peak vanishes in one frame when it ages out |
+| **decay** | `heat = f(peak, now − peakAt)` | a continuous fade, no boundary at all |
+
+**The login session is decisively wrong**, and `server/src/models/Session.ts` is what settles it. A
+`Session` row is scoped by **`platform` AND `instanceId`**, and it is closed at `lastSeenAt` by a
+stale sweep when a process dies. So under a session-scoped display:
+
+- ⚠ **A Roblox server hop zeroes your glow.** New `instanceId`, new session. So does walking from
+  the PWA into Roblox.
+- ⚠ **A dropped phone connection zeroes it.** The program bar is kid-first on phones, and a status
+  display destroyed by a network blip is broken rather than strict.
+- ⚠ **And it re-creates the trap we just spent two rulings removing.** If the glow dies at logout,
+  the game pays you to stay logged in — the same shape as *never bank* and *never throw*, aimed at
+  children this time. Any hard boundary makes crossing it costly, and therefore makes not crossing
+  it rational.
+
+**The rolling window is also wrong, but only visually.** A `max` over a window is correct
+arithmetic and a terrible animation: the moment the 27 ages past `W`, the glow drops to nothing
+between two frames. A status effect that vanishes instantly reads as a bug, not as a decision.
+
+**So: pure decay, and the window survives only as the seed at join.**
+
+```
+join   → the best pot in the last W, AND its timestamp  → seed (peak, peakAt)
+         (sort pointsDelta desc, limit 1 — not a bare $max, because the TIMESTAMP is needed)
+win    → given a new pot P: if f(P, 0) > f(peak, now − peakAt), replace with (P, now)
+render → heat = f(peak, now − peakAt), every frame, pure arithmetic, no traffic
+```
+
+⚠ **The replace rule matters and is easy to get wrong.** It is NOT "keep the larger pot" — a stale
+27 must eventually yield to a fresh 3, or the display is a session peak again by the back door.
+Compare the two *decayed* values, never the raw ones. That comparison is the pure function, and it
+is what the Lune test should pin.
+
+**Which answers the owner's question directly: it extends across play sessions, and it needs no
+concept of one.** Come back after a coffee and you are still faintly lit; come back tomorrow and
+you are dark. Nothing resets, nothing has an edge to fall off, and no boundary is worth gaming.
+
+**The half-life is the density dial.** Too short and it collapses back into the live pot — sparse,
+which was the original complaint. Too long and everyone is lit, it saturates, and it becomes tenure
+— which is the rank failure from §2 of the juice spec. A round is 60s and an evening's play is
+tens of minutes, so **~20 minutes is offered as a starting point to argue down from**, in the spirit
+of every other number on this project: a peak from half an hour ago at half strength, from an hour
+ago at a quarter, gone by morning. ⚠ **It wants watching in play. Do not settle it in a document.**
+
 **One semantic worth stating before it surprises someone:** a `$max` over the window measures the
 peak *reached within that window*. A player who won up to 27 just before the window opened and has
 held it since shows a lower peak than the pot they are actually sitting on. That is the honest

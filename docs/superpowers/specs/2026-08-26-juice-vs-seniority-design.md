@@ -155,7 +155,12 @@ creates a hold trap; anything that cannot go down is a rank. **The way out is a 
 with TIME rather than with outcomes** — earned by acting, lost by not acting. That inverts the trap:
 standing still is what dims you, and playing is the only thing that keeps you lit.
 
-### Recommended: the decaying session peak — *how hot you have been running*
+### Recommended: the decaying peak — *how hot you have been running*
+
+⚠ **Not a "session" peak.** This document first called it that, and the name was wrong in a way
+that mattered — see "What counts as recently" below and
+`docs/superpowers/specs/2026-08-26-time-windowed-values-design.md` §3a. There is no session
+boundary anywhere in this design.
 
 **The highest pot you have REACHED recently, fading over time.** Not the pot you hold — the pot you
 got to.
@@ -198,12 +203,13 @@ third. Every proposal here changes the input number and nothing else.
 
 ## Owner decisions required
 
-1. ⚠ **Is the decaying session peak the right shape** — *how hot you have been running* rather than
+1. ⚠ **Is the decaying peak the right shape** — *how hot you have been running* rather than
    *what you have on the line*? This is the open question, and the one thing this document should
    not decide alone.
-2. If yes: the fade window. It sets how much of the arena is lit at once, so it is the density dial
-   — long enough that a good run still shows when you walk up to someone, short enough that it
-   cannot be hoarded. It wants watching in play, not arguing in a document.
+2. If yes: the **half-life**. It sets how much of the arena is lit at once, so it is the density
+   dial — long enough that a good run still shows when you walk up to someone, short enough that it
+   cannot be hoarded. **~20 minutes is offered as a starting point to argue down from, not a spec.**
+   It wants watching in play, not arguing in a document.
 3. If yes: does it need the floor ruling at all? *"Let the kids dress up if they want"*
    (2026-08-25) argues every reached pot glows faintly, with the magnitude doing the work.
 
