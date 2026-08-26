@@ -812,3 +812,38 @@ optional.
 ⚠ This retires a whole class of answers that looked fine an hour ago: worn crests, the sashimono in
 any form, and anything else that hangs a Japanese signifier on a body that will shortly walk into
 a Chinese-themed area.
+
+## [2026-08-25] decision | Grade's reward is the UNLOCK; auras carry live state instead
+
+Owner rejected grade-as-a-bird-ladder — *"a player may prefer a smaller bird to a larger one,
+independent of their actual grade or standing"* — and proposed the better shape: **the five birds
+are UNLOCKS**, each becoming available to choose as a player progresses.
+
+⚠ **That resolves the tension the sashimono could not.** Status becomes OPT-IN: you signal it by
+flying a rare bird, which you could only have if you earned it, and you are free not to. A badge
+everyone must wear is a ranking; a rare thing you may choose is a flex. Same information, opposite
+social feel — and it is why every worn answer failed.
+
+**The consequence, stated so nobody treats it as an oversight:** grade has NO guaranteed public
+display. A 5th dan flying an uguisu reads as ungraded. That is the deliberate cost of opt-in.
+
+**Auras carry live state instead**, on a different clock — owner's proposal. Specced at
+`docs/superpowers/specs/2026-08-25-streak-aura-design.md`; not planned, not built. It shows
+`stakingStreak` (the run still at risk — banking resets it, `currentStreak` survives), and rarity
+is automatic: a 3-streak is ~1 in 27, a 5-streak ~1 in 240, so the arena is dark most of the time
+and the glow is scarce exactly when it is impressive. The banner failed on this axis; the aura wins
+on it.
+
+**Measured for the spec:** the Highlight cap is **255 per client**, not the old 31 — 50 players
+fits. ⚠ Overflow is **SILENT**: 300 created, zero warnings. And toggling `Enabled` is ~50× cheaper
+per operation than creating (0.12ms for 100 flips vs 3.09ms for 50 creates), so an aura that flicks
+on and off must POOL its Highlights and never churn them.
+
+⚠ **One real dependency:** the client cannot see anyone else's streak. `familiarRoster` carries
+grade/gradeName/band only, so `stakingStreak` has to join the payload and the broadcast becomes
+per-round.
+
+⚠ **The leader halo is deferred, and not for effort.** It would crown whoever tops a board that
+still ranks on points-per-throw behind a floor derived for win rate — where twenty identical blind
+players produce a winner by chance alone. A quiet board showing a noisy ranking is survivable; a
+glowing crown broadcasts noise as achievement. Item 7's basis is the prerequisite.
