@@ -465,12 +465,24 @@ local coordinator = RoundCoordinator.new({
                     bestStreak = math.max(row.streak, (existing or { bestStreak = 0 }).bestStreak),
                     unresolvedWin = existing ~= nil and existing.unresolvedWin,
                 })
+                -- ⚠ MERGE, NEVER REPLACE: the entry also carries grade/gradeName/band/rank set
+                -- elsewhere. And this is AUTHORITATIVE BUT LATE -- reconciliation lands on the next
+                -- round's OPEN -- which is why AuraController also derives a streak optimistically
+                -- from the reveal. Do not "fix" that by making the aura wait for this: a glow that
+                -- lingers a round after a LOSS is a lie, and worse than one that starts late.
+                local rosterEntry = familiarRoster[row.robloxUserId]
+                if rosterEntry then
+                    rosterEntry.stakingStreak = row.streak
+                end
                 local player = playerByUserId(row.robloxUserId)
                 if player then
                     pushStats(player)
                     fireProfile(player, "reconciled")
                 end
             end
+            -- ONE push for the whole batch. Pushing inside the loop sends the entire roster once
+            -- per reconciled player, which at fifty players is fifty broadcasts of one table.
+            pushFamiliarRoster()
         end,
     },
 })
@@ -509,6 +521,11 @@ Players.PlayerAdded:Connect(function(player)
                 grade = res.data.grade,
                 gradeName = res.data.gradeName,
                 band = res.data.band,
+                -- The aura needs both halves of every OTHER player: how deep their staked run is,
+                -- and whether they have allowed anyone to see it. The roster is the only thing
+                -- every client holds about everyone, so both ride here.
+                stakingStreak = res.data.stakingStreak,
+                auraVisibility = HudPrefs.fromProfile(res.data).auraVisibility,
             }
             pushFamiliarRoster()
             profiles:applyServer(tostring(player.UserId), {
@@ -640,6 +657,12 @@ SetHudPreference.OnServerEvent:Connect(function(player, body)
     end
     if type(body.seenBeat) == "string" then
         payload.seenBeat = body.seenBeat
+    end
+    -- ⚠ Validated against the set rather than merely type-checked, exactly as HudPrefs.merge and
+    -- the API route do. An unrecognised string must be refused, not written and not defaulted: a
+    -- privacy setting knocked back to permissive by a malformed body is worse than a no-op.
+    if HudPrefs.isVisibility(body.auraVisibility) then
+        payload.auraVisibility = body.auraVisibility
     end
     if next(payload) == nil then
         return

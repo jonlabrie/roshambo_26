@@ -85,3 +85,62 @@ describe("HudPrefs.DEFAULTS", function()
         expect(HudPrefs.fromProfile({ statusBars = false }).statusBars).toBe(false)
     end)
 end)
+
+describe("HudPrefs.auraVisibility", function()
+    local BASE =
+        { escalationPrompts = true, resultSplash = true, statusBars = true, auraVisibility = "PUBLIC" }
+
+    test("a recognised visibility is stored", function()
+        for _, v in { "HIDDEN", "FRIENDS", "PUBLIC" } do
+            expect(HudPrefs.merge(BASE, { auraVisibility = v }).auraVisibility).toBe(v)
+        end
+    end)
+
+    test("⚠ an UNRECOGNISED visibility leaves the stored value alone", function()
+        -- The first NON-BOOLEAN member of this table, so it cannot use the `type(x) == "boolean"`
+        -- guard its neighbours use. A privacy setting that could be knocked to a default by a
+        -- malformed body — or by a typo in a caller — is worse than one that refuses the write.
+        local current =
+            { escalationPrompts = true, resultSplash = true, statusBars = true, auraVisibility = "HIDDEN" }
+        for _, bad in { "hidden", "", "PUBLICK", 3, true, {} } do
+            expect(HudPrefs.merge(current, { auraVisibility = bad :: any }).auraVisibility).toBe("HIDDEN")
+        end
+        expect(HudPrefs.merge(current, {}).auraVisibility).toBe("HIDDEN")
+    end)
+
+    test("a patch naming only auraVisibility leaves the booleans untouched", function()
+        local current =
+            { escalationPrompts = false, resultSplash = true, statusBars = false, auraVisibility = "PUBLIC" }
+        local next = HudPrefs.merge(current, { auraVisibility = "FRIENDS" })
+        expect(next.auraVisibility).toBe("FRIENDS")
+        expect(next.escalationPrompts).toBe(false)
+        expect(next.resultSplash).toBe(true)
+        expect(next.statusBars).toBe(false)
+    end)
+
+    test("absent on the wire means PUBLIC, and a stored value survives the round trip", function()
+        -- Absent-means-PUBLIC matches this table's convention for every other field, and matches
+        -- that a streak is ALREADY public in the stats room. No migration was run, so rows written
+        -- before this field existed must read as PUBLIC rather than as silently hidden.
+        expect(HudPrefs.fromProfile({}).auraVisibility).toBe("PUBLIC")
+        expect(HudPrefs.fromProfile({ auraVisibility = "HIDDEN" }).auraVisibility).toBe("HIDDEN")
+        expect(HudPrefs.fromProfile({ auraVisibility = "nonsense" }).auraVisibility).toBe("PUBLIC")
+        expect(HudPrefs.DEFAULTS.auraVisibility).toBe("PUBLIC")
+    end)
+end)
+
+describe("HudPrefs.isVisibility", function()
+    test("recognises exactly the three wire values", function()
+        -- ⚠ main.server.luau validates the SetHudPreference body with this, and that file is a
+        -- Roblox-runtime file Lune never loads — so this is the only place the rule can be tested
+        -- at all. If it moves back inline, it becomes untestable again, which is the mistake the
+        -- whole HudPrefs module exists to have corrected once already.
+        expect(HudPrefs.isVisibility("HIDDEN")).toBe(true)
+        expect(HudPrefs.isVisibility("FRIENDS")).toBe(true)
+        expect(HudPrefs.isVisibility("PUBLIC")).toBe(true)
+        for _, bad in { "hidden", "Public", "", "GARBAGE", 3, true, {} } do
+            expect(HudPrefs.isVisibility(bad :: any)).toBe(false)
+        end
+        expect(HudPrefs.isVisibility(nil)).toBe(false)
+    end)
+end)

@@ -19,6 +19,10 @@ import {
     Size, EconomyState, appendDecoration, DEFAULT_ACCESS,
 } from '../economy';
 
+// The only values `auraVisibility` may take. Mirrored in roblox/src/shared/HudPrefs.luau and
+// roblox/src/shared/StreakAura.luau; all three fail their own tests if one drifts.
+const AURA_VISIBILITIES = ['HIDDEN', 'FRIENDS', 'PUBLIC'];
+
 // Extracted so the shape is testable without a request. Every field is defaulted: no migration
 // was run for the 2026-08-02 play-HUD fields, so documents written before them lack the keys.
 export function buildProfilePayload(user: IUser) {
@@ -32,6 +36,7 @@ export function buildProfilePayload(user: IUser) {
         escalationPrompts: user.escalationPrompts ?? true,
         resultSplash: user.resultSplash ?? true,
         statusBars: user.statusBars ?? true,
+        auraVisibility: user.auraVisibility ?? 'PUBLIC',
         seenBeats: user.seenBeats ?? [],
         counters: {
             roundsPlayed: user.roundsPlayed ?? 0,
@@ -227,6 +232,14 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             }
             if (typeof req.body?.resultSplash === 'boolean') {
                 set.resultSplash = req.body.resultSplash;
+            }
+            // ⚠ VALIDATED AGAINST THE SET, not merely type-checked. Every neighbour here is a
+            // boolean, where `typeof` is the whole check; this is a string, and an unrecognised one
+            // must be REFUSED rather than written or defaulted. A privacy setting knocked back to a
+            // permissive default by a malformed body — or a caller's typo — is worse than a write
+            // that does nothing.
+            if (AURA_VISIBILITIES.includes(req.body?.auraVisibility)) {
+                set.auraVisibility = req.body.auraVisibility;
             }
             // seenBeat is add-only: a beat can be marked seen but never un-seen from the client
             const addToSet = typeof req.body?.seenBeat === 'string'

@@ -300,6 +300,42 @@ describe('/api/v1', () => {
             expect(u?.escalationPrompts).toBe(false);
         });
 
+        it('sets auraVisibility to a recognised value', async () => {
+            await User.create({ robloxId: 'aura-1', identityTier: 'roblox' });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            for (const v of ['HIDDEN', 'FRIENDS', 'PUBLIC']) {
+                await request(app)
+                    .put('/api/v1/players/aura-1/preferences-hud')
+                    .set('X-API-Key', API_KEY).send({ auraVisibility: v }).expect(200);
+                const u = await User.findOne({ robloxId: 'aura-1' });
+                expect(u?.auraVisibility).toBe(v);
+            }
+        });
+
+        it('REFUSES an unrecognised auraVisibility rather than defaulting it', async () => {
+            // A privacy setting must never be knocked back to a permissive default by a malformed
+            // body or a caller's typo. Storing HIDDEN and then sending junk must leave HIDDEN.
+            await User.create({ robloxId: 'aura-2', identityTier: 'roblox', auraVisibility: 'HIDDEN' });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            for (const bad of ['hidden', '', 'PUBLICK', 3, true, null]) {
+                await request(app)
+                    .put('/api/v1/players/aura-2/preferences-hud')
+                    .set('X-API-Key', API_KEY).send({ auraVisibility: bad, statusBars: false });
+                const u = await User.findOne({ robloxId: 'aura-2' });
+                expect(u?.auraVisibility).toBe('HIDDEN');
+            }
+        });
+
+        it('defaults auraVisibility to PUBLIC and returns it on GET', async () => {
+            // No migration was run, so a row written before this field existed must read as PUBLIC
+            // rather than as silently hidden.
+            await User.create({ robloxId: 'aura-3', identityTier: 'roblox' });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const res = await request(app)
+                .get('/api/v1/players/aura-3').set('X-API-Key', API_KEY).expect(200);
+            expect(res.body.auraVisibility).toBe('PUBLIC');
+        });
+
         it('sets resultSplash independently of escalationPrompts', async () => {
             await User.create({ robloxId: 'hud-5', identityTier: 'roblox' });
             const app = makeApp(makeEngine(), new ResultsStore());

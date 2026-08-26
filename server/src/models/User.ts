@@ -30,6 +30,11 @@ export interface IUser extends Document {
     // design.md §2) after a round settles. Default ON, a second preference beside escalationPrompts.
     resultSplash: boolean;
     statusBars: boolean;
+    // Who may see this player's streak aura: 'HIDDEN' | 'FRIENDS' | 'PUBLIC'. ⚠ Default PUBLIC, and
+    // absent must READ as PUBLIC — no migration was run, so rows written before this field existed
+    // would otherwise read as silently hidden. Safe to default permissively only because the datum
+    // is already public: the 番付 room shows live runs to everyone.
+    auraVisibility: string;
     seenBeats: string[];
     roundsPlayed: number;
     wins: number;
@@ -85,6 +90,7 @@ const UserSchema: Schema = new Schema({
     confirmThrows: { type: Boolean, default: true },
     resultSplash: { type: Boolean, default: true },
     statusBars: { type: Boolean, default: true },
+    auraVisibility: { type: String, enum: ['HIDDEN', 'FRIENDS', 'PUBLIC'], default: 'PUBLIC' },
     seenBeats: { type: [String], default: [] },
     roundsPlayed: { type: Number, default: 0 },
     wins: { type: Number, default: 0 },
