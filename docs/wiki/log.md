@@ -922,3 +922,39 @@ Lifted by a proportion of the arm rather than a constant, so scaled avatars lift
 ⚠ **The song could arrive before the bird did.** The stagger fired it 0–2.2s after the cue while
 `ENTRY.WIN` is 2.4s, so a win could sing while the bird was still flying in. It now waits the full
 entry first, which puts every song over the dance — the moment it was written for.
+
+## [2026-08-26] gate | The streak aura reads — and the victory song finally waits for the bird
+
+Owner: *"Aura is reading fine."* ⚠ **GATED** after two rejected versions, and what changed between
+them is the transferable part:
+
+**v1 — a Highlight whose transparency ramped with the streak.** Rejected: *"the differences in color
+are not obvious (at least, not in the singular)."* The flaw was the CHANNEL, not the palette. A ramp
+is readable only COMPARATIVELY, and with a low floor a lone glowing player is the ordinary case — so
+the design picked a channel that fails in the situation it is actually in.
+
+**v2 — particles, emitted from inside the torso.** Rejected: *"only emitted while the avatar is in
+motion, and seem to be emitting from the avatar's ass."* Two symptoms, one cause: the attachment sat
+INSIDE the body, so particles spawned occluded, and walking left them behind in world space.
+
+**v3, gated:** embers from the FEET, `LockedToPart` so they travel with the player, three times the
+size, and rate + pulse tempo carrying the streak because **rate and tempo can be counted off one
+body where brightness cannot.**
+
+**And the metric changed underneath it**: `currentStreak`, not `stakingStreak`. Banking resets the
+latter, and banking is THE decision in Roshambo — tying the reward to not-banking punished the
+action the whole loop is built around.
+
+**Two familiar fixes, both of which had been approximated with constants and are now measured or
+event-driven:**
+
+⚠ **The seat lift is arithmetic now.** R15 `RightUpperArm` is 1.213 studs tall, so the 0.10 factor
+lifted the bird 1.46 inches — the owner called it an inch high, and 0.031 lands it at 0.45.
+
+⚠ **THE SONG NOW FIRES ON THE LANDING, because no timer can know when that is.** Three attempts:
+a random 0–2.2s, then `ENTRY.WIN` (2.4s) plus stagger, then this. Both timers sang early, and the
+reason is structural — the bird FLIES to the shoulder and `flightDuration` is 0.85s plus distance
+over cruise speed, so a bird twenty studs away needs 2.65s and one across the canyon needs far more.
+**Any constant is wrong for every distance but one.** The song is now armed by the cue and fired in
+the update loop at the instant the dance begins, where "has it landed" is simply true rather than
+estimated.

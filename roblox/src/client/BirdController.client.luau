@@ -149,6 +149,10 @@ type Bird = {
     turnTo: number,
     turnNo: number,
     nextTurnAt: number,
+    -- The victory song waits for the bird to actually land; a timer cannot know when that is.
+    singArmed: boolean,
+    singOwn: boolean,
+    singAt: number?,
     flightFrom: Vector3?, -- a flight is a PATH between two points, so both ends must be held
     flightTo: Vector3?,
     flightAt: number,
@@ -253,6 +257,9 @@ local function makeBird(userId: string): Bird
         turnTo = 0,
         turnNo = 0,
         nextTurnAt = os.clock() + BirdFlight.nextTurnGap(seedFor(userId), 0),
+        singArmed = false,
+        singOwn = false,
+        singAt = nil,
         flightFrom = nil,
         flightTo = nil,
         flightAt = 0,
@@ -308,7 +315,11 @@ local SEAT_INBOARD = 0.42
 -- the visible shoulder: the R15 arm mesh and anything layered over it (clothing, accessories) sit
 -- proud of the bounding box, so the feet sank in (owner, 2026-08-26). Proportional to the arm, so
 -- scaled avatars lift by the same amount relative to themselves.
-local SEAT_LIFT = 0.10
+--
+-- ⚠ MEASURED, not guessed. R15 RightUpperArm is 1.213 studs tall on this rig, so 0.10 lifted the
+-- bird 1.46 INCHES and the owner called it an inch too high (1 stud ~ 1 foot in the owner's units).
+-- 0.031 lands it at 0.45 inches -- clear of the mesh, not standing on air.
+local SEAT_LIFT = 0.031
 
 local function shoulderSeat(character: Model): Vector3?
     local arm = character:FindFirstChild("RightUpperArm") or character:FindFirstChild("Right Arm")
@@ -436,18 +447,18 @@ EventBus.Cue.Event:Connect(function(cue)
         b.state = cue.result
         b.since = os.clock()
         if cue.result == "WIN" then
-            local at = b.since
-            -- ⚠ NOT UNTIL IT HAS LANDED. The stagger alone could fire the song at any point in the
-            -- 0..2.2s after the cue, while the bird was still flying in -- `ENTRY.WIN` is 2.4s, so
-            -- a song could and did arrive before the bird arrived (owner, 2026-08-26). Waiting the
-            -- full entry first puts every song over the dance, which is the moment it belongs to.
-            task.delay(BirdFlight.ENTRY.WIN + math.random() * SONG_STAGGER, function()
-                -- Only if the win is still the bird's current state: a reveal reset, or the
-                -- player leaving, must not produce a song from nowhere.
-                if birds[cue.userId] == b and b.state == "WIN" and b.since == at then
-                    sing(b, cue.userId == tostring(Players.LocalPlayer.UserId))
-                end
-            end)
+            -- ⚠ ARMED HERE, FIRED ON THE LANDING -- see the update loop. A TIMER CANNOT KNOW WHEN
+            -- THE BIRD ARRIVES. The first version waited a random 0..2.2s, the second waited
+            -- `ENTRY.WIN` (2.4s) first; both still sang early, because arrival is not a fixed time
+            -- at all. The bird FLIES to the shoulder, and `flightDuration` is 0.85s plus distance
+            -- over cruise speed -- a bird twenty studs away needs 2.65s, and one across the canyon
+            -- needs far more. Any constant is wrong for every distance but one.
+            b.singArmed = true
+            b.singOwn = cue.userId == tostring(Players.LocalPlayer.UserId)
+            b.singAt = nil
+        else
+            b.singArmed = false
+            b.singAt = nil
         end
     end
 end)
@@ -740,6 +751,20 @@ RunService.RenderStepped:Connect(function()
             -- wheels down" (owner, 2026-08-25). Measured: +100 degrees at the hip folds the whole
             -- leg chain inside the body's bounding box, so no knee bone is needed. Both hips take
             -- the SAME sign, which is the convention the victory hop already uses.
+            -- ===== THE VICTORY SONG =====
+            -- ⚠ THIS IS THE MOMENT THE DANCE STARTS, which is the only correct cue for the song:
+            -- the bird is in a WIN, its flight is over, and it is no longer moving. Everything a
+            -- timer was trying to approximate is simply true here.
+            if b.singArmed and b.state == "WIN" and not resting and not flying and k >= 1 then
+                if not b.singAt then
+                    b.singAt = now + math.random() * SONG_STAGGER
+                elseif now >= b.singAt then
+                    b.singArmed = false
+                    b.singAt = nil
+                    sing(b, b.singOwn)
+                end
+            end
+
             if flying then
                 local tuck = math.rad(BirdFlight.legTuck(k) * BirdFlight.LEG_TUCK_DEG)
                 if b.hipL then
