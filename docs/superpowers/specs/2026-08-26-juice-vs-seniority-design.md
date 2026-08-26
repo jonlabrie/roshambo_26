@@ -172,12 +172,15 @@ And it is a flex in the word's real sense: *"I hit 27 tonight"* is something ano
 want. Scale the glow steeply — log₃, so each 3ⁿ tier is one even step — so a pot of 1 barely
 registers and a deep run is unmistakable. A presence indicator is not a flex; a magnitude is.
 
-**⚠ The cost, stated plainly: this is NOT free, unlike seniority.** `bestPot` is an all-time `$max`
-with no date (`Settlement.ts:62`), so a *windowed* peak is new data. The cheap shape is a
-`potPeak` + `potPeakAt` pair written in the same settlement update that already computes `nextPot`,
-with the client decaying it locally from the timestamp — one extra field pair on an existing write,
-and it rides the roster push that already carries `currentStreak`. That is a small change, but it
-is a real one and it should be priced before it is agreed, not after.
+**⚠ The cost — CORRECTED 2026-08-26; this document over-priced it.** It first said the peak was
+"NOT free, unlike seniority" and would need a stored `potPeak` / `potPeakAt` pair. It does not.
+`PlayerRound.pointsDelta` on a WIN already records the **new pot value**, so a `$max` over that
+column in a window *is* the peak — the documented trap that makes summing the column wrong is
+exactly what makes maxing it right. No new collection, no schema change: one aggregation on the
+join call (the `presence.qualified` rule), the running peak raised from the `nextPot` that
+settlement already computes, and both values riding the roster push that already carries
+`currentStreak`. Full working, and the general capability behind it:
+`docs/superpowers/specs/2026-08-26-time-windowed-values-design.md`.
 
 **What is unchanged either way:** the rendering gated on 2026-08-26 — embers from the feet,
 `LockedToPart`, `emitRate` and `pulsePeriod` carrying the magnitude, fill a faint floor, colour
