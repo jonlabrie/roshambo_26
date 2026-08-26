@@ -28,6 +28,11 @@ import math
 # whose trailing edge is SCALLOPED per feather.
 #
 # Planform stations across the span: (t, leading_y, trailing_y, z_rise)
+# ⚠ THE LAST STATIONS CONVERGE, AND THEY DID NOT USED TO. The plan ended at t=1.00 with a 0.114
+# chord and the loft caps the outermost column flat, so the wing finished in a SQUARED-OFF CUT.
+# Found on the karasu (owner, 2026-08-26) and present here too — proportionally WORSE, at 24% of
+# span against the crow's 13%. It went unnoticed for the same reason it was tolerable: this wing is
+# 0.47 studs long, exists only in flight, and belongs to a bird whose wings are hidden at rest.
 PLAN = [
     (0.00,  0.030, -0.150, 0.000),
     (0.16,  0.038, -0.205, 0.010),
@@ -35,7 +40,9 @@ PLAN = [
     (0.56,  0.006, -0.272, 0.033),
     (0.74, -0.028, -0.276, 0.042),
     (0.88, -0.062, -0.258, 0.048),
-    (1.00, -0.104, -0.218, 0.052),
+    (0.92, -0.074, -0.250, 0.0495),
+    (0.96, -0.088, -0.234, 0.0510),
+    (1.00, -0.122, -0.166, 0.052),
 ]
 SCALLOP = 0.016        # how deep the trailing edge notches between feather tips
 N_SCALLOP = 9          # tips along the trailing edge
@@ -71,6 +78,9 @@ def build(name="UguisuWing", span=0.47, scale=1.0, uv_region=(0.06, 0.06, 0.30))
 
     # 1. THE MEMBRANE. One continuous surface, sampled finely enough that the scalloped trailing
     #    edge lands on real geometry rather than being faked by the texture.
+    # ⚠ 25 IS DELIBERATE, NOT INHERITED. 1/25 = 0.04 exactly, so the taper stations at 0.88, 0.92,
+    # 0.96 and 1.00 land ON columns rather than being interpolated between them — the convergence
+    # is sampled where it is defined. Raising this would need the stations moved to match.
     COLS = 25
     cols = []
     for c in range(COLS + 1):
@@ -79,7 +89,10 @@ def build(name="UguisuWing", span=0.47, scale=1.0, uv_region=(0.06, 0.06, 0.30))
         x = u * span
         # Scallop: the trailing edge notches back and forth so each bump is one feather tip.
         phase = u * N_SCALLOP * math.pi
-        notch = (0.5 - 0.5 * math.cos(2.0 * phase)) * SCALLOP * (0.35 + 0.65 * u)
+        # ⚠ CLAMPED TO THE LOCAL CHORD — see the karasu's copy of this for the full reasoning.
+        # A fixed notch against a now-narrowing tip chord would invert the trailing edge.
+        depth = min(SCALLOP * (0.35 + 0.65 * u), abs(trail - lead) * 0.35)
+        notch = (0.5 - 0.5 * math.cos(2.0 * phase)) * depth
         trail += notch
         base_z = zr + AOA_RISE * 0.5 * (1.0 - (1.0 - AOA_WASHOUT) * u)
         rows = []

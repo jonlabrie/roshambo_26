@@ -206,13 +206,21 @@ KARASU = {
         "aoa_rise": 0.048,
         "aoa_washout": 0.45,
         # (t, leading_y, trailing_y, z_rise)
+        # ⚠ THE LAST FOUR STATIONS CONVERGE, AND THEY DID NOT USED TO. The plan ended at t=1.00
+        # with a 0.188 chord and the loft caps the outermost column flat, so the wing finished in a
+        # SQUARED-OFF CUT -- 0.244 studs of flat edge after chord_scale, about 2.9 inches at this
+        # bird's size (owner, 2026-08-26: "why are the tips of the wings squared off?"). A corvid
+        # wingtip is the iconic slotted one, so a blunt end reads wrong on a crow specifically.
+        # Not tapered to a POINT: that is a swift. It closes to a narrow rounded end.
         "plan": [(0.00,  0.070, -0.300, 0.000),
                  (0.16,  0.086, -0.400, 0.014),
                  (0.36,  0.074, -0.470, 0.030),
                  (0.56,  0.030, -0.500, 0.045),
                  (0.74, -0.038, -0.496, 0.058),
                  (0.88, -0.104, -0.452, 0.066),
-                 (1.00, -0.184, -0.372, 0.072)],
+                 (0.92, -0.126, -0.436, 0.0685),
+                 (0.96, -0.156, -0.396, 0.0705),
+                 (1.00, -0.214, -0.262, 0.072)],
     },
     # The bill is split along its gape so `bill_lower` has something to move. Plane measured on
     # the vendor head; `run()` re-measures and overrides these if the mesh moves under them.
@@ -600,7 +608,10 @@ def build_spread_wings(spec=KARASU):
                 return tuple(a[k] + (b[k] - a[k]) * f for k in (1, 2, 3))
         return plan[-1][1], plan[-1][2], plan[-1][3]
 
-    COLS, ROWS = 26, 4
+    # ⚠ 40, not 26. The taper lives in the last 12% of span, and at 26 columns there were only
+    # three samples in it — the convergence read as a chamfer rather than a round. Wing triangles
+    # rise from 856 to roughly 1.3k, which is nothing for a part that exists only in flight.
+    COLS, ROWS = 40, 4
     for side in (1.0, -1.0):
         cols = []
         for c in range(COLS + 1):
@@ -611,6 +622,12 @@ def build_spread_wings(spec=KARASU):
             x = side * (w["root_gap"] + u * w["span"])
             phase = u * w["n_scallop"] * math.pi
             depth = w["scallop_root"] + (w["scallop_tip"] - w["scallop_root"]) * (u ** 1.6)
+            # ⚠ CLAMP THE NOTCH TO THE LOCAL CHORD. The scallop DEEPENS toward the tip (0.052 at
+            # the end) while the tapered chord NARROWS to 0.048 — unclamped, the notch is 108% of
+            # the chord and the trailing edge crosses the leading one, turning the last feather
+            # into inverted geometry. The two features were designed apart and only conflict now
+            # that the tip actually narrows.
+            depth = min(depth, abs(trail - lead) * 0.35)
             trail += (0.5 - 0.5 * math.cos(2.0 * phase)) * depth
             base_z = w["root_z"] + zr + w["aoa_rise"] * 0.5 * \
                 (1.0 - (1.0 - w["aoa_washout"]) * u)
