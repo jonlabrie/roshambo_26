@@ -39,6 +39,51 @@ reconciled pattern the familiar already uses for round results.
 
 ---
 
+## AMENDMENT 2026-08-25 — visibility control
+
+Owner, during execution: *"We're going to need support for the player to dynamically control
+visibility of their aura(s), e.g. hidden, with friends, publicly. We will probably want a method to
+override such control under certain circumstances."*
+
+**Two independent axes, and conflating them is the trap.** `HudPrefs.statusBars` already exists and
+is a VIEWER preference — "do not draw other people's status over their heads, on my screen". What
+is being added is a SUBJECT preference — "who may see MINE". They compose; neither replaces the
+other.
+
+| axis | who owns it | lives in |
+|---|---|---|
+| `auraVisibility` — HIDDEN / FRIENDS / PUBLIC | the subject | their profile, persisted |
+| `showOthersAuras` | the viewer | their own prefs, persisted |
+| `force` — HIDE / SHOW / SHOW_EVEN_IF_HIDDEN | the system | not persisted; per-moment |
+
+⚠ **FORCE IS NOT SYMMETRIC, AND THE ASYMMETRY IS THE WHOLE POINT.** Forcing a PUBLIC player hidden
+costs them nothing — it is what a client should do when twenty people are glowing on a phone.
+Forcing a HIDDEN player visible overrides a privacy choice they made deliberately. So it is a
+SEPARATE VALUE that must be named: `SHOW` lifts the friends gate, `SHOW_EVEN_IF_HIDDEN` overrides
+an explicit hide, and no caller reaches the second by accident.
+
+⚠ **The viewer's own off-switch always wins on the viewer's own screen**, above every force value.
+An override exists to make a moment legible, not to put something on a screen whose owner turned it
+off.
+
+⚠ **PERSISTENCE CROSSES CODEBASES.** A privacy preference that resets each session is a broken
+promise, so `auraVisibility` must reach Mongo: `server/src/models/User.ts`, the players PUT
+handler, and `HudPrefs.fromProfile`. It is the first non-boolean member of `HudPrefs`, so
+`HudPrefs.merge` needs a validated-enum path rather than a `type(x) == "boolean"` check — an
+unrecognised string must leave the stored value alone, exactly as a stray value does today.
+
+⚠ **`Player:IsFriendsWith` YIELDS — it is a web call.** It must never be called per frame or per
+round for fifty players. Resolve once per (viewer, subject) pair, cache for the session, and treat
+an in-flight or failed lookup as NOT a friend — failing closed is the correct direction for a
+privacy gate.
+
+**Task order changes:** Task 1 grows to own the visibility rule (it is pure and is the piece most
+worth testing). A new Task 2a covers persistence across both codebases. Task 3 gains the friend
+cache. The default is `PUBLIC`, matching `HudPrefs`'s absent-means-on convention, and matching that
+a streak is already public information in the 番付 room.
+
+---
+
 ### Task 1: `StreakAura` — the pure threshold module
 
 **Files:**
