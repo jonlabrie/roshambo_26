@@ -48,7 +48,28 @@ export function lint(root, opts = {}) {
   const warnings = [];
   // Both injectable so the tests can build a wiki in a tmpdir with no git and no repo.
   const repoRoot = opts.repoRoot ?? resolve(root, '..', '..');
-  const gitDate = opts.gitDate ?? gitDateOf;
+  // Is this path deliberately absent — gitignored rather than missing? Asked of git rather than
+// guessed from a name list, so a new local-only file needs no edit here.
+const ignoreCache = new Map();
+function isIgnored(rel) {
+  if (ignoreCache.has(rel)) return ignoreCache.get(rel);
+  let ignored = false;
+  try {
+    execFileSync('git', ['check-ignore', '-q', rel], { cwd: repoRoot, stdio: 'ignore' });
+    ignored = true;
+  } catch (err) {
+    // ⚠ ONLY exit 1 means "not ignored". Anything else — git missing, a bad path, a typo in this
+    // very function — is a REAL failure and must not masquerade as an answer. The first version
+    // of this called `execSync`, which this module does not import; the ReferenceError was caught
+    // here, reported as "not ignored", and the check silently did nothing at all.
+    if (err?.status !== 1) throw err;
+    ignored = false;
+  }
+  ignoreCache.set(rel, ignored);
+  return ignored;
+}
+
+const gitDate = opts.gitDate ?? gitDateOf;
 
   const pages = [];
   for (const shelf of SHELVES) {
@@ -108,7 +129,12 @@ export function lint(root, opts = {}) {
       const abs = CITE_PREFIXES.map((pre) => join(repoRoot, pre + cite)).find(existsSync);
       // 8. dead code citation — the same defect as a dead wikilink, pointed at the repo
       if (!abs) {
-        if (!exempt.has(cite)) errors.push(`${p.rel}: dead code citation ${cite}`);
+        // ⚠ A GITIGNORED FILE IS NOT A DEAD CITATION. `SecretsLocal.luau` is deliberately
+        // local-only and deliberately documented, so it exists in the developer's checkout and in
+        // no other. Running this lint from a fresh clone or a git worktree therefore reported an
+        // error for a page that was correct — and a lint that fails in a VALID workspace teaches
+        // people to ignore lint, which costs more than the check is worth.
+        if (!exempt.has(cite) && !isIgnored(cite)) errors.push(`${p.rel}: dead code citation ${cite}`);
         continue;
       }
       // 9. the ground moved under a page that still claims to be current
