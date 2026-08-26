@@ -11,3 +11,6 @@ __pycache__/
 
 # local macOS alias to the reference asset folder
 /roshambo_reference
+
+# Parallel Claude threads (see docs/wiki/practice/parallel-threads.md). Never committed.
+.worktrees/
