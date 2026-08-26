@@ -145,21 +145,47 @@ local function buildEmitter(): ParticleEmitter
     -- No Texture set: the engine default always exists, where a hardcoded rbxasset id is a guess
     -- that fails silently as an invisible emitter.
     e.Rate = 0
-    e.Lifetime = NumberRange.new(0.7, 1.2)
-    e.Speed = NumberRange.new(1.5, 3)
-    e.SpreadAngle = Vector2.new(12, 12)
-    e.Acceleration = Vector3.new(0, 4, 0) -- embers RISE; falling ones would read as damage
+    e.Lifetime = NumberRange.new(0.9, 1.5)
+    e.Speed = NumberRange.new(3, 6)
+    -- ⚠ WIDE. A narrow cone from a single point is a thin jet, not an aura. This fans the embers
+    -- out around the legs so they rise past the whole silhouette.
+    e.SpreadAngle = Vector2.new(55, 55)
+    e.EmissionDirection = Enum.NormalId.Top
+    e.Acceleration = Vector3.new(0, 8, 0) -- embers RISE; falling ones would read as damage
+    -- ⚠ LOCKED TO THE PART. Without this, particles are left in WORLD space: a walking player
+    -- strews them behind and the effect reads as exhaust rather than as an aura that is theirs.
+    -- Owner saw exactly that -- "emitting from the avatar's ass".
+    e.LockedToPart = true
+    -- ⚠ THREE TIMES THE ORIGINAL SIZE. At 0.18 they were invisible at any distance a player
+    -- actually stands ("particles are small", owner).
     e.Size = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.18),
+        NumberSequenceKeypoint.new(0, 0.55),
+        NumberSequenceKeypoint.new(0.6, 0.35),
         NumberSequenceKeypoint.new(1, 0),
     })
     e.Transparency = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.35),
+        NumberSequenceKeypoint.new(0, 0.25),
         NumberSequenceKeypoint.new(1, 1),
     })
-    e.LightEmission = 0.75
+    e.LightEmission = 0.85
     e.Enabled = false
     return e
+end
+
+-- ⚠ EMIT FROM THE FEET, NOT FROM INSIDE THE TORSO, and this is the whole bug the owner reported.
+-- The first version sat the attachment at HumanoidRootPart + (0, -0.5, 0) -- which is INSIDE the
+-- body -- so particles spawned occluded by the avatar's own geometry. Standing still they were
+-- invisible; walking left them behind, which is why they looked like they came from behind and
+-- below. Measured per character rather than hardcoded: `HipHeight` is the distance from the root
+-- part's BOTTOM to the ground, and it differs across R6, R15 and scaled bodies.
+local function footOffset(character: Model): number
+    local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
+    local humanoid = character:FindFirstChildWhichIsA("Humanoid")
+    if not root then
+        return -3
+    end
+    local hip = if humanoid then humanoid.HipHeight else 2
+    return -(root.Size.Y / 2 + hip) + 0.15 -- a touch above the ground, not buried in it
 end
 
 local function adorn(player: Player, character: Model)
@@ -170,7 +196,7 @@ local function adorn(player: Player, character: Model)
     if root then
         local a = row.attachment or Instance.new("Attachment")
         a.Name = "StreakAuraOrigin"
-        a.Position = Vector3.new(0, -0.5, 0)
+        a.Position = Vector3.new(0, footOffset(character), 0)
         a.Parent = root
         local e = row.emitter or buildEmitter()
         e.Parent = a
