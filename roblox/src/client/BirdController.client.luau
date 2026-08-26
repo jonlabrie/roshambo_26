@@ -301,6 +301,9 @@ end
 -- 3 inches above my shoulder". Measured on a live R15: RightUpperArm top sits at y +0.811,
 -- x +1.128 from the HumanoidRootPart, and neither number is a constant across avatars -- R6,
 -- R15 and scaled bodies all differ. Take it from the character when the part is there.
+-- How far inboard of the upper arm's centre the bird stands, as a fraction of arm width.
+local SEAT_INBOARD = 0.42
+
 local function shoulderSeat(character: Model): Vector3?
     local arm = character:FindFirstChild("RightUpperArm") or character:FindFirstChild("Right Arm")
     local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
@@ -309,8 +312,13 @@ local function shoulderSeat(character: Model): Vector3?
     end
     local top = arm.Position + Vector3.new(0, arm.Size.Y * 0.5, 0)
     local local_ = root.CFrame:PointToObjectSpace(top)
-    -- a shade inboard of the arm's outer face so the bird stands ON it, not on its edge
-    return Vector3.new(local_.X - arm.Size.X * 0.18, local_.Y, local_.Z)
+    -- ⚠ THE MIDDLE OF THE SHOULDER, NOT ITS OUTER EDGE. Owner, 2026-08-25: the bird was sitting
+    -- "at the outer edge". `arm.Position` is the arm's CENTRE, and the old 0.18 nudged barely
+    -- inboard of that — still out over the arm rather than on the shoulder proper. 0.42 lands it
+    -- just short of the arm's inner face, which is where the arm meets the torso and reads as the
+    -- middle of the shoulder. Derived from the arm's own width, so R6, R15 and scaled bodies all
+    -- get the same PROPORTION rather than a constant that only suits one of them.
+    return Vector3.new(local_.X - arm.Size.X * SEAT_INBOARD, local_.Y, local_.Z)
 end
 
 local function characterRoot(userId: string): BasePart?

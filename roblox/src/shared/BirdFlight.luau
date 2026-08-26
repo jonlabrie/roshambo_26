@@ -88,8 +88,15 @@ export type Point = { x: number, y: number, z: number }
 -- further outboard (see SHOULDER_YAW) so the tail swings away from the head rather than the whole
 -- bird standing off.
 local SHOULDER = { x = 0.86, y = 1.00, z = -0.06 }
-BirdFlight.SHOULDER_YAW = -46 -- degrees outboard; also puts the bird in profile, which is the
--- only angle a small bird is identifiable from
+-- ⚠ FACES FORWARD, WITH THE AVATAR. Owner ruling 2026-08-25. This supersedes a -46 degree outboard
+-- yaw that was justified two ways, and both justifications have not survived:
+--   "puts the bird in profile, the only angle a small bird is identifiable from" — the owner has
+--   now looked at it in play and prefers forward, which settles it; identifiability is what the
+--   OWNER can read, not what a comment asserts.
+--   "clears the tail from the avatar's head" — forward-facing clears it BETTER. At yaw 0 the tail
+--   trails straight back behind the shoulder; at -46 it swung backward and INBOARD, toward the
+--   neck. The old value was working against its own stated reason.
+BirdFlight.SHOULDER_YAW = 0
 -- Exported so the hop test can assert about the SHAPE of the hop without hardcoding the offset,
 -- which would then need editing every time the perch is retuned.
 BirdFlight.SHOULDER_X = SHOULDER.x

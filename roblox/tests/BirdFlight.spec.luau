@@ -17,6 +17,10 @@ describe("BirdFlight", function()
         local settled = BirdFlight.offsetFor("WIN", 3, 7)
         expect(settled.y > 0.9 and settled.y < 1.4).toBe(true)
         expect(math.abs(settled.x) > 0.7).toBe(true) -- well off to one side, clear of the head
+        -- ⚠ AND IT FACES FORWARD, with the avatar (owner ruling 2026-08-25). The outboard yaw it
+        -- replaced was justified as putting the bird in profile; the owner looked at it in play and
+        -- disagreed, which is the only evidence that counts for a question of "can you read it".
+        expect(BirdFlight.SHOULDER_YAW).toBe(0)
         -- ⚠ ON the shoulder, not hovering off it. This used to assert z < -0.25, which encoded a
         -- sign error: Roblox -Z is FORWARD, so that put the bird in front of the avatar rather
         -- than behind it, floating. The tail is cleared by yawing outboard, not by standing off.
