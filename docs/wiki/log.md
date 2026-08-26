@@ -847,3 +847,34 @@ per-round.
 still ranks on points-per-throw behind a floor derived for win rate — where twenty identical blind
 players produce a winner by chance alone. A quiet board showing a noisy ranking is survivable; a
 glowing crown broadcasts noise as achievement. Item 7's basis is the prerequisite.
+
+## [2026-08-25] decision | Two kinds of aura — JUICE and SENIORITY — and rarity was a symptom, not a defence
+
+Owner, on seeing the streak aura in play: *"who cares about auras if only 2 or 3 are ever even
+visible on your server? We're either measuring the right thing badly, or measuring the wrong
+thing."*
+
+⚠ **RARITY WAS ARGUED AS A FEATURE AND IS ACTUALLY A SYMPTOM.** The spec defends the design by
+noting a 3-streak is about 1 in 27, so the arena stays dark and the glow is scarce when it matters.
+That reasoning is half right and half backwards: scarcity stops clutter, but a signal almost nobody
+can display is a lottery rather than a flex — and in a high-turnover server a STAKED streak is
+especially fleeting, because banking ends it and leaving ends it.
+
+**Two distinct things are worth showing, and only one is built:**
+
+| | what it measures | shape |
+|---|---|---|
+| **juice** | points on the line RIGHT NOW (`stakingStreak`) | volatile, rare, ends on any bank or loss |
+| **seniority** | personal best win-streak, independent of betting (`bestStreak`) | monotonic, durable, survives logging off |
+
+`bestStreak` already exists on `PlayerProfiles` and in the Mongo model, so seniority is mostly a
+display question rather than a data one. It is also the half that answers *"why should a new player
+ever see one"* — many more people hold a personal best than are mid-run at any instant.
+
+**Not yet decided:** whether they are two auras, one aura with two channels, or seniority belongs to
+a different carrier entirely (it is closer to grade, which the unlock model already handles). Do not
+treat the built aura as answering seniority — it does not.
+
+⚠ **Owner ruling on the floor: 2, not 3.** *"Let the kids dress up if they want."* The floor is an
+access decision, not a tuning number: it decides who is allowed to be seen at all. That supersedes
+the rarity argument in `StreakAura` and its spec, both of which reasoned the other way.
