@@ -44,9 +44,10 @@ at, it stops and hands over. That is the whole rule.
    appends at the same offset. Do not "fix" it by rewriting history.
 4. **The wiki is the shared brain.** `docs/wiki/index.md` first, in every thread, every session —
    the standing rule, and it is what stops two threads inventing two answers to one question.
-5. **Statuses only under `program/`** (`docs/wiki/schema.md` — it sits at the wiki root rather
-   than in a shelf, so it is cited by path; a `[[schema]]` wikilink does not resolve). A thread reporting its own progress writes to
-   `log.md` and its own spec, not to a `world/` page.
+5. **Statuses only under `program/`** — see [schema.md](../schema.md). ⚠ Cite it as a markdown
+   link, never as a double-bracket wikilink: it sits at the wiki ROOT rather than in a shelf, and
+   the resolver only walks shelves, so the wikilink form is dead. A thread reporting its own
+   progress writes to `log.md` and its own spec, not to a `world/` page.
 
 ## The design thread specifically
 
