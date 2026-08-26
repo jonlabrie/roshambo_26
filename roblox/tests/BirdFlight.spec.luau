@@ -698,3 +698,38 @@ describe("BirdFlight", function()
         expect(BirdFlight.distance(a, other) > 0).toBe(true)
     end)
 end)
+
+describe("BirdFlight.shouldReplan", function()
+    test("⚠ a flight in progress is NOT torn up by a target that merely DRIFTS", function()
+        -- THE BUG THIS EXISTS TO PREVENT. A result-state orbit is a MOVING target: LOSS orbits at
+        -- radius 2.0 and speed 0.55, so it slides 1.1 studs a second and crosses the 0.35 replan
+        -- threshold every ~0.32s -- while the flight it triggers lasts ~0.88s. The flight could
+        -- therefore never finish, `k` never reached 1, the arrive-and-track branch never engaged,
+        -- and every replan ALSO re-rolled the path shape. The bird restarted its takeoff three
+        -- times a second along a randomly changing arc: "jerking around between many orientations
+        -- and locations" (owner, 2026-08-25).
+        expect(BirdFlight.shouldReplan(false, 0.4)).toBe(false)
+        expect(BirdFlight.shouldReplan(false, 2.0)).toBe(false)
+        expect(BirdFlight.shouldReplan(false, 4.0)).toBe(false) -- a full LOSS orbit diameter
+    end)
+
+    test("once ARRIVED, a small move is a new destination and is flown", function()
+        expect(BirdFlight.shouldReplan(true, 0.4)).toBe(true)
+        expect(BirdFlight.shouldReplan(true, 0.34)).toBe(false) -- still the same spot
+        expect(BirdFlight.shouldReplan(true, 0)).toBe(false)
+    end)
+
+    test("a GENUINE change of destination interrupts even mid-flight", function()
+        -- Perch-to-perch is tens of studs; no orbit in the game spans this far (the widest is
+        -- RESTING at r 2.6, so 5.2 across), which is what makes the two cases separable at all.
+        expect(BirdFlight.shouldReplan(false, 9)).toBe(true)
+        expect(BirdFlight.shouldReplan(false, 40)).toBe(true)
+    end)
+
+    test("the interrupt threshold clears every orbit in the game", function()
+        -- ⚠ If an orbit could ever span more than this, drift would masquerade as a destination
+        -- change and the jerking would come straight back.
+        expect(BirdFlight.REPLAN_INTERRUPT > 2 * 2.6).toBe(true) -- RESTING, the widest
+        expect(BirdFlight.REPLAN_INTERRUPT > 2 * 3.4).toBe(true) -- the reserved WIN orbit
+    end)
+end)

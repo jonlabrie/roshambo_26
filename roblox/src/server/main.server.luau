@@ -470,9 +470,13 @@ local coordinator = RoundCoordinator.new({
                 -- round's OPEN -- which is why AuraController also derives a streak optimistically
                 -- from the reveal. Do not "fix" that by making the aura wait for this: a glow that
                 -- lingers a round after a LOSS is a lie, and worse than one that starts late.
+                -- ⚠ `row.streak` IS currentStreak: Settlement.ts:189 writes
+                -- `streak: updated.currentStreak` into the results row. The field used to be named
+                -- stakingStreak here and carried this value anyway, so the roster disagreed with
+                -- itself between join and reconciliation. Now both say currentStreak and mean it.
                 local rosterEntry = familiarRoster[row.robloxUserId]
                 if rosterEntry then
-                    rosterEntry.stakingStreak = row.streak
+                    rosterEntry.currentStreak = row.streak
                 end
                 local player = playerByUserId(row.robloxUserId)
                 if player then
@@ -521,10 +525,16 @@ Players.PlayerAdded:Connect(function(player)
                 grade = res.data.grade,
                 gradeName = res.data.gradeName,
                 band = res.data.band,
-                -- The aura needs both halves of every OTHER player: how deep their staked run is,
-                -- and whether they have allowed anyone to see it. The roster is the only thing
-                -- every client holds about everyone, so both ride here.
-                stakingStreak = res.data.stakingStreak,
+                -- The aura needs both halves of every OTHER player: how deep their run is, and
+                -- whether they have allowed anyone to see it. The roster is the only thing every
+                -- client holds about everyone, so both ride here.
+                --
+                -- ⚠ currentStreak, NOT stakingStreak. Banking resets stakingStreak, and banking is
+                -- THE decision in this game — tying the reward display to not-banking punishes the
+                -- action the whole loop is built around, and is a large part of why so few players
+                -- ever lit up. currentStreak survives a bank and reads as "how well are you calling
+                -- the crowd", which is the skill on offer. Owner ruling 2026-08-25.
+                currentStreak = res.data.currentStreak,
                 auraVisibility = HudPrefs.fromProfile(res.data).auraVisibility,
             }
             pushFamiliarRoster()

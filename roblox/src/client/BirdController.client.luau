@@ -526,8 +526,13 @@ RunService.RenderStepped:Connect(function()
             b.flightTo = target
         end
 
+        -- ⚠ PROGRESS IS MEASURED BEFORE THE REPLAN DECISION, because the decision depends on it.
+        -- The old code replanned on distance alone, which meant a drifting orbit target reset the
+        -- flight clock before the flight could ever finish. See BirdFlight.shouldReplan.
         local committed = b.flightTo
-        if not committed or (target - committed).Magnitude > 0.35 then
+        local arrived = b.flightFor <= 0 or (now - b.flightAt) / b.flightFor >= 1
+        local drift = if committed then (target - committed).Magnitude else math.huge
+        if not committed or BirdFlight.shouldReplan(arrived, drift) then
             -- new destination: plan a fresh flight from wherever the bird actually is
             b.flightFrom = b.pos
             b.flightTo = target

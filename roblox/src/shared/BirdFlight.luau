@@ -286,6 +286,30 @@ end
 
 -- How long a flight of this distance should take. The floor is what stops a short hop finishing
 -- before the eye can register it.
+-- How far a destination must move MID-FLIGHT before it counts as a genuinely new destination
+-- rather than a target that is merely drifting. Must exceed the widest orbit's diameter (RESTING,
+-- r 2.6, so 5.2 across) or drift masquerades as a destination change.
+BirdFlight.REPLAN_INTERRUPT = 8
+local REPLAN_MOVED = 0.35 -- once arrived, this much movement is a new place to fly to
+
+-- Should the bird tear up its current route and plan a new one?
+--
+-- ⚠ A FLIGHT IN PROGRESS IS NOT TORN UP BY A DRIFTING TARGET, and that is the whole point of this
+-- function. A result-state orbit MOVES: LOSS orbits at radius 2.0 and speed 0.55, so it slides 1.1
+-- studs a second and crossed the old flat 0.35 threshold every ~0.32s -- while the flight that
+-- triggered lasted ~0.88s. The flight could never finish, so `k` never reached 1, so the
+-- arrive-and-track branch never engaged, so it replanned forever. Each replan also re-rolled the
+-- path shape, so the bird restarted its takeoff three times a second along a randomly changing arc
+-- (owner, 2026-08-25: "jerking around between many orientations and locations").
+--
+-- Perch-to-perch travel is unaffected: the bird arrives, and THEN a new perch is a new destination.
+function BirdFlight.shouldReplan(arrived: boolean, drift: number): boolean
+    if drift > BirdFlight.REPLAN_INTERRUPT then
+        return true -- a real change of destination, worth abandoning the route for
+    end
+    return arrived and drift > REPLAN_MOVED
+end
+
 function BirdFlight.flightDuration(distance: number): number
     return BirdFlight.FLIGHT_MIN_TIME + math.max(0, distance) / BirdFlight.CRUISE_SPEED
 end

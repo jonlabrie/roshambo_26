@@ -1,5 +1,5 @@
 --!strict
--- A whole-body glow for a player riding a STAKED win streak.
+-- A whole-body glow for a player on a run of consecutive wins.
 --
 -- ⚠ WHY THIS AND NOT A BADGE. Four worn answers were rejected before it: plumage on the familiar
 -- (too small to read at arena distance), the worn sashimono ("a bit on the nose for an experience
@@ -269,8 +269,8 @@ FamiliarRoster.OnClientEvent:Connect(function(roster: { [string]: any })
         local entry = roster[tostring(player.UserId)]
         if entry then
             local row = rowFor(player)
-            if type(entry.stakingStreak) == "number" then
-                row.streak = entry.stakingStreak
+            if type(entry.currentStreak) == "number" then
+                row.streak = entry.currentStreak
             end
             if StreakAura.isVisibility(entry.auraVisibility) then
                 row.visibility = entry.auraVisibility
@@ -283,10 +283,10 @@ end)
 -- OPTIMISTIC. `RevealTheater` already carries every player's result, so the glow reacts on the same
 -- beat as the reveal instead of a round later.
 --
--- ⚠ IT CANNOT SEE BANKING. Banking resets stakingStreak and is not in this payload, so a player who
--- banks keeps glowing until the next reconciliation corrects them. One round of over-glow is the
--- deliberate price of not lingering a round after a LOSS, which would be a lie -- and of the two
--- errors, briefly over-crediting a winner is much the kinder.
+-- ⚠ AND IT NO LONGER NEEDS TO SEE BANKING. The aura tracks currentStreak, which a bank does not
+-- reset -- so the optimistic value (increment on WIN, zero on anything else) and the authoritative
+-- one now agree on what they mean. Under the old stakingStreak reading, a banker over-glowed for a
+-- round; that whole discrepancy is gone with the metric it came from.
 RevealTheater.OnClientEvent:Connect(function(payload: any)
     local results = if type(payload) == "table" then payload.results else nil
     if type(results) ~= "table" then
