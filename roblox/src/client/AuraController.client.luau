@@ -39,6 +39,7 @@ type Row = {
     highlight: Highlight,
     attachment: Attachment?,
     emitter: ParticleEmitter?,
+    emberPending: boolean,
     streak: number,
     visibility: string,
 }
@@ -75,6 +76,10 @@ local function isFriend(userId: number): boolean
     return false -- fail closed while the lookup is in flight
 end
 
+-- Forward-declared: `apply` self-heals a missing emitter by calling this, and this in turn calls
+-- `apply` once the wait resolves. Neither can come first.
+local attachEmbers: (Player, Model) -> ()
+
 local function apply(userId: number, row: Row)
     local h = row.highlight
     local show = StreakAura.shows({
@@ -106,7 +111,18 @@ local function apply(userId: number, row: Row)
 
     -- ⚠ THE PARTICLES ARE THE SIGNAL NOW. A Highlight alone read as an editor selection washing the
     -- avatar out ("not very compelling", owner) -- and rate is countable where transparency is not.
+    --
+    -- ⚠ SELF-HEALING, because losing the emitter loses the whole effect silently. If the row is lit
+    -- and has no emitter, ask again -- the character may have finished loading after the first
+    -- attempt, or been replaced by a respawn mid-wait. Guarded by `emberPending`, so a lit row asks
+    -- once rather than spawning a waiter every frame.
     local emitter = row.emitter
+    if not emitter then
+        local character = row.highlight.Adornee
+        if character and character:IsA("Model") then
+            attachEmbers(Players:GetPlayerByUserId(userId) or LOCAL, character)
+        end
+    end
     if emitter then
         emitter.Rate = StreakAura.emitRate(row.streak)
         emitter.Color = ColorSequence.new(tint)
@@ -129,6 +145,7 @@ local function rowFor(player: Player): Row
         highlight = h,
         attachment = nil,
         emitter = nil,
+        emberPending = false,
         streak = 0,
         visibility = StreakAura.VISIBILITY.PUBLIC,
     }
@@ -188,12 +205,30 @@ local function footOffset(character: Model): number
     return -(root.Size.Y / 2 + hip) + 0.15 -- a touch above the ground, not buried in it
 end
 
-local function adorn(player: Player, character: Model)
-    local row = rowFor(player)
-    row.highlight.Adornee = character
-    row.highlight.Parent = character
-    local root = character:FindFirstChild("HumanoidRootPart") :: BasePart?
-    if root then
+-- ⚠ `CharacterAdded` FIRES BEFORE THE PARTS ARE ALL THERE, and this cost the whole particle
+-- effect. The Highlight adorns the MODEL, so it attached fine and looked like everything worked --
+-- but the emitter needs `HumanoidRootPart`, a plain `FindFirstChild` returned nil, the `if` was
+-- silently skipped, and nothing ever retried. Result: an aura that lit but never emitted a single
+-- particle (owner, 2026-08-26: "no particles at all"). Waiting is the fix, and it must be off the
+-- caller's thread because `adorn` runs from a signal handler and from the startup sweep.
+function attachEmbers(player: Player, character: Model)
+    local existing = rows[player.UserId]
+    if existing and existing.emberPending then
+        return -- one waiter at a time; the self-heal below can ask on any frame
+    end
+    if existing then
+        existing.emberPending = true
+    end
+    task.spawn(function()
+        local root = character:WaitForChild("HumanoidRootPart", 15) :: BasePart?
+        local row = rows[player.UserId]
+        if row then
+            row.emberPending = false
+        end
+        -- the character may have been replaced, or the player left, while we waited
+        if not root or not row or row.highlight.Adornee ~= character then
+            return
+        end
         local a = row.attachment or Instance.new("Attachment")
         a.Name = "StreakAuraOrigin"
         a.Position = Vector3.new(0, footOffset(character), 0)
@@ -201,7 +236,15 @@ local function adorn(player: Player, character: Model)
         local e = row.emitter or buildEmitter()
         e.Parent = a
         row.attachment, row.emitter = a, e
-    end
+        apply(player.UserId, row) -- re-apply: the row may already be lit and waiting for an emitter
+    end)
+end
+
+local function adorn(player: Player, character: Model)
+    local row = rowFor(player)
+    row.highlight.Adornee = character
+    row.highlight.Parent = character
+    attachEmbers(player, character)
     apply(player.UserId, row)
 end
 
