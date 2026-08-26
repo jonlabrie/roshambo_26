@@ -303,6 +303,12 @@ end
 -- R15 and scaled bodies all differ. Take it from the character when the part is there.
 -- How far inboard of the upper arm's centre the bird stands, as a fraction of arm width.
 local SEAT_INBOARD = 0.42
+-- ⚠ AND A LITTLE ABOVE THE ARM'S TOP FACE. The bird's origin is at its FEET, so seating it exactly
+-- on `arm.Position + Size.Y/2` ought to stand it on the surface — except the part's top face is not
+-- the visible shoulder: the R15 arm mesh and anything layered over it (clothing, accessories) sit
+-- proud of the bounding box, so the feet sank in (owner, 2026-08-26). Proportional to the arm, so
+-- scaled avatars lift by the same amount relative to themselves.
+local SEAT_LIFT = 0.10
 
 local function shoulderSeat(character: Model): Vector3?
     local arm = character:FindFirstChild("RightUpperArm") or character:FindFirstChild("Right Arm")
@@ -318,7 +324,7 @@ local function shoulderSeat(character: Model): Vector3?
     -- just short of the arm's inner face, which is where the arm meets the torso and reads as the
     -- middle of the shoulder. Derived from the arm's own width, so R6, R15 and scaled bodies all
     -- get the same PROPORTION rather than a constant that only suits one of them.
-    return Vector3.new(local_.X - arm.Size.X * SEAT_INBOARD, local_.Y, local_.Z)
+    return Vector3.new(local_.X - arm.Size.X * SEAT_INBOARD, local_.Y + arm.Size.Y * SEAT_LIFT, local_.Z)
 end
 
 local function characterRoot(userId: string): BasePart?
@@ -431,7 +437,11 @@ EventBus.Cue.Event:Connect(function(cue)
         b.since = os.clock()
         if cue.result == "WIN" then
             local at = b.since
-            task.delay(math.random() * SONG_STAGGER, function()
+            -- ⚠ NOT UNTIL IT HAS LANDED. The stagger alone could fire the song at any point in the
+            -- 0..2.2s after the cue, while the bird was still flying in -- `ENTRY.WIN` is 2.4s, so
+            -- a song could and did arrive before the bird arrived (owner, 2026-08-26). Waiting the
+            -- full entry first puts every song over the dance, which is the moment it belongs to.
+            task.delay(BirdFlight.ENTRY.WIN + math.random() * SONG_STAGGER, function()
                 -- Only if the win is still the bird's current state: a reveal reset, or the
                 -- player leaving, must not produce a song from nowhere.
                 if birds[cue.userId] == b and b.state == "WIN" and b.since == at then

@@ -904,3 +904,21 @@ the first was watched properly.
 outboard yaw whose two justifications both failed — the owner prefers forward, and forward clears
 the tail from the head better than the yaw that claimed to), and its perch moves to the middle of
 the shoulder rather than out over the arm.
+
+## [2026-08-26] drop | The sashimono is deleted, and the victory song waits for the landing
+
+`SashimonoController` is **removed from the codebase**, closing the chain that ran 2026-08-22 →
+2026-08-25: built, disliked, dropped as a design, and now gone as code. Nothing referenced it.
+`KamonDraw` stays — the teahouse nobori still use it, and architecture may be as culturally specific
+as it likes. Only the avatar may not.
+
+**Two familiar fixes from the same look:**
+
+⚠ **The bird's feet sank into the shoulder.** Its origin is at the feet, so seating it on
+`arm.Position + Size.Y/2` should stand it on the surface — except a part's top FACE is not the
+visible shoulder. The R15 arm mesh, and anything layered over it, sits proud of the bounding box.
+Lifted by a proportion of the arm rather than a constant, so scaled avatars lift to match.
+
+⚠ **The song could arrive before the bird did.** The stagger fired it 0–2.2s after the cue while
+`ENTRY.WIN` is 2.4s, so a win could sing while the bird was still flying in. It now waits the full
+entry first, which puts every song over the dance — the moment it was written for.
