@@ -1039,3 +1039,33 @@ at the START of the session rather than at the end of it.
 
 **The test before splitting again:** can the split half SHIP without the other half? The design
 thread passes. The asset thread did not.
+
+## [2026-08-26] ship | The karasu is imported and its rig verified in the place
+
+Merged `thread/assets` (`c2ffc27`, `c5dce64`) and imported both halves. Parked in
+`Workspace.Sandbox.KarasuProbe`, 12 studs above ArenaSpawn, nothing within 6 studs. ⚠ Not wired
+into play — nothing selects a bird per player, so this is inventory rather than progress on item 6,
+which the asset thread said plainly when it retired itself.
+
+**The rig drives correctly.** Seven bone-drive pairs, all non-zero on the chain and exactly 0.0000
+off it, and the axis contract reproduces the uguisu's — local X moves both tips the same sign and
+only vertically, local Z mirrors and only fore-and-aft. That is the pair of facts `BirdController`'s
+beat and fold are written against, so the crow will drive under the existing controller unchanged.
+
+⚠ **THE UGUISU IS NOT THE SIZE THIS WIKI SAID IT WAS.** [[familiars]] recorded 0.552 studs, "life
+size, ~7 inches". Measured off the committed `.rbxm`: **0.828**, and nothing rescales the clone —
+`BirdController` has no `ScaleTo` and no `Size` write. So the shipped bird is ~10 inches and every
+ratio derived from 0.552 was out by 1.5×, including the karasu page's "three times the uguisu",
+which is really 1.98×. The page had carried the DESIGN figure as an as-built for a week.
+
+⚠ **AND MY FIRST BONE-DRIVE TEST WAS WORTHLESS.** Four of its five rows measured the DRIVEN BONE
+AGAINST ITSELF — a bone cannot move under its own rotation, so those rows could only ever read
+0.0000, and read as a clean pass. Only the one row that happened to probe a descendant was a real
+test. Rebuilt to measure a descendant against a bone on another branch. **A test that can only
+return the passing value is not a test**, and this is the fourth instance of that shape in two
+days.
+
+**Two importer settings the instructions did not carry**, now added: Anchored TRUE (it IS in the
+dialog — the previous note here denied that, wrongly), and vertex colours OFF, which matters more
+on a crow than it did on the uguisu because a bird that ships 85% too dark and is already black
+does not announce itself.

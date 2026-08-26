@@ -115,7 +115,7 @@ first of a ROSTER (owner: uguisu first, karasu second), not the only bird.
 |---|---|
 | MeshId | `rbxassetid://114444614583565` |
 | TextureID | `rbxassetid://133923547243928` (1024² ColorMap) |
-| Size | 0.148 × 0.315 × 0.552 studs — **life size, ~7 inches** |
+| Size | ⚠ **0.222 × 0.472 × 0.828 studs AS SHIPPED** — measured off the committed `.rbxm` 2026-08-26. This page long recorded 0.148 × 0.315 × 0.552 ("life size, ~7 inches"); that is the size it was DESIGNED at, and nothing rescales the clone — `BirdController` has no `ScaleTo` and no `Size` write — so what players see is 0.828, about 10 inches. Every ratio derived from 0.552 was therefore wrong by 1.5×. |
 | Triangles | 2,688 |
 | Bones | 19, including `bill_lower`, `wing_R`, `wing_L` |
 | Origin | **feet at z = 0**, centred in x/y |
@@ -311,8 +311,10 @@ choose. It is not wired into play; it is built, verified and waiting on import.
 | Source | `karasu_body.fbx`, `karasu_wings.fbx`, `karasu_colormap.png` in `~/Desktop/Roshambo Reference/models/birds/probe/` |
 | Rebuilt by | `roblox/tools/blender/karasu_retarget.py` — `run()`, `verify_rig()`, `bake_and_finish()` |
 
-⚠ **LIFE SIZE, AND THAT IS THREE TIMES THE UGUISU.** Owner-chosen 2026-08-26: 1.64 studs / 19.7
-inches, a hashibutogarasu (~50cm), against the uguisu's 0.552. It follows two standing rulings
+⚠ **LIFE SIZE, AND THAT IS TWICE THE UGUISU** — not three times. Owner-chosen 2026-08-26: 1.64
+studs / 19.7 inches, a hashibutogarasu (~50cm). The comparison was written against the uguisu's
+DESIGNED 0.552; measured off the committed asset, the shipped uguisu is 0.828, so the real ratio
+is **1.98×**. It follows two standing rulings
 rather than inventing one — *"life size, maybe slightly larger"* (2026-08-19) and *"a presumably
 larger bird, like a raven/crow to carry it"* (2026-08-22). **The consequence is real work for the
 main thread:** `SEAT_INBOARD` / `SEAT_LIFT` are proportions of the avatar's arm, not of the bird,
@@ -378,8 +380,9 @@ and local Z only fore-and-aft, exactly as measured on the uguisu.
 The asset thread does not touch Studio ([[parallel-threads]]). For the main thread:
 
 1. Import `karasu_body.fbx` and `karasu_wings.fbx`. **Do not rescale** — unlike the uguisu (built
-   at 0.828 and scaled to 0.552 in Studio, which is why its recorded numbers never quite agree),
-   this one is 1:1 at its final size.
+   at 0.828 and believed to have been scaled to 0.552 in Studio — measured 2026-08-26, the
+   committed `.rbxm` is 0.828 and nothing rescales it, so that scaling either never happened or was
+   undone), this one is 1:1 at its final size.
 2. ⚠ **DELETE THE SurfaceAppearance THE IMPORTER CREATES AND USE `TextureID` INSTEAD.** The FBX
    carries a ColorMap and nothing else, and a **ColorMap-only SurfaceAppearance on opaque geometry
    renders warm and shiny** — Roblox substitutes its own defaults for the missing channels
@@ -388,7 +391,25 @@ The asset thread does not touch Studio ([[parallel-threads]]). For the main thre
 3. ⚠ **Set `part.CFrame` directly — never `PivotTo`.** The importer bakes a rotation into the
    MeshPart's CFrame with a compensating one in `PivotOffset`, so an identity pivot lays the bird
    on its back ([[blender-pipeline]]).
-4. Confirm `HasSkinnedMesh` and run a bone-drive test in the place before gating.
+4. ⚠ **Anchored: TRUE, and it IS an importer setting** — it is in the dialog, and a parked probe
+   that is not anchored falls out of the world on the first Play.
+5. ⚠ **Vertex colours: OFF.** The vendor meshes carry a `colorSet0` baked-AO layer running
+   0.0–0.15 which Roblox MULTIPLIES into the surface ([[blender-pipeline]]). On the uguisu that read
+   as a broken material for an hour; on a black crow it would be nearly invisible as a fault and
+   simply ship 85% too dark.
+6. Confirm `HasSkinnedMesh` and run a bone-drive test in the place before gating — and measure a
+   DESCENDANT of the driven bone, never the driven bone itself, which cannot move under its own
+   rotation and reads a meaningless zero.
+
+**Import verified 2026-08-26.** No `SurfaceAppearance` was created (the trap in step 2 did not
+fire); `TextureID` came through as `rbxassetid://129407256075817` on both parts; `HasSkinnedMesh`
+true; 15 bones on the body and 5 on the wings, sharing `joint1`, for the 19 claimed. All seven
+bone-drive pairs pass — non-zero on the chain, exactly 0.0000 off it — and the axis contract
+reproduces the uguisu's: local X +40 moves BOTH tips −0.6579 vertically and 0.0000 fore-aft, local
+Z +40 moves them +0.6579 and −0.6579 fore-aft and 0.0000 vertically.
+⚠ Those magnitudes differ from the Blender-side figures recorded above (+0.7413 / +0.7984 /
+−0.7060). The SIGN RELATIONSHIPS — which are what the beat and fold depend on — agree exactly; the
+absolute numbers do not, and the in-place measurement is the one that governs.
 
 Not yet done, and both are code rather than asset work: nothing selects a bird per player, and the
 seat/perch constants above are still tuned for the uguisu.
