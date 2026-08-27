@@ -9,6 +9,7 @@ export interface IBankEvent extends Document {
     userId: Types.ObjectId;
     amount: number;
     streakAtBank: number;
+    partial: boolean;
     platform: 'pwa' | 'roblox';
     timestamp: Date;
 }
@@ -22,6 +23,11 @@ const BankEventSchema: Schema = new Schema({
     // How long the streak was when they chose to stop. The whole bank-vs-stake story lives
     // in the distribution of this number.
     streakAtBank: { type: Number, default: 0 },
+    // ⚠ A PARTIAL BANK IS A DIFFERENT DECISION FROM A FULL ONE, and both write streakAtBank.
+    // Without this flag `bankDepths` (the NERVE histogram) blends "when do players stop" with
+    // "when do players hedge" — no error, no failing test, just a stat about something else.
+    // Cheap now, impossible to reconstruct later: the rows would already be mixed.
+    partial: { type: Boolean, default: false },
     platform: { type: String, enum: ['pwa', 'roblox'], default: 'pwa' },
     timestamp: { type: Date, default: Date.now },
 });

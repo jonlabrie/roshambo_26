@@ -46,6 +46,53 @@ describe('bankPot', () => {
         expect(after!.totalPoints).toBe(27); // not 54
         expect(after!.unresolvedWin).toBe(false);
     });
+
+    it('partial bank: drops 27 to 9, banks 18, and keeps stakingStreak alive', async () => {
+        const u = await User.create({
+            deviceId: 'devPartial1', totalPoints: 5, pointsAtStake: 27,
+            stakingStreak: 3, currentStreak: 3, unresolvedWin: true,
+        });
+        const updated = await bankPot(u._id.toString(), 'pwa', 9);
+        expect(updated).toMatchObject({
+            totalPoints: 23,        // 5 + 18
+            lifetimeBanked: 18,
+            pointsAtStake: 9,       // still riding
+            stakingStreak: 3,       // NOT zeroed — the pot did not reach zero
+            currentStreak: 3,       // never touched by banking
+            unresolvedWin: false,   // the player has decided
+        });
+    });
+
+    it('partial bank down to zero behaves exactly like a full bank', async () => {
+        const u = await User.create({
+            deviceId: 'devPartial2', pointsAtStake: 9, stakingStreak: 2, currentStreak: 2,
+        });
+        const updated = await bankPot(u._id.toString(), 'pwa', 0);
+        expect(updated).toMatchObject({ pointsAtStake: 0, stakingStreak: 0, currentStreak: 2 });
+    });
+
+    it('rejects a keep that is not a lower rung, leaving the wallet untouched', async () => {
+        const u = await User.create({ deviceId: 'devPartial3', pointsAtStake: 27, stakingStreak: 3 });
+        expect(await bankPot(u._id.toString(), 'pwa', 5)).toBeNull();
+        expect(await bankPot(u._id.toString(), 'pwa', 27)).toBeNull();
+        expect(await bankPot(u._id.toString(), 'pwa', 81)).toBeNull();
+        const after = await User.findById(u._id);
+        expect(after).toMatchObject({ pointsAtStake: 27, totalPoints: 0, stakingStreak: 3 });
+    });
+
+    it('writes a BankEvent marked partial, with the streak at the moment of banking', async () => {
+        const u = await User.create({ deviceId: 'devPartial4', pointsAtStake: 27, stakingStreak: 3 });
+        await bankPot(u._id.toString(), 'roblox', 9);
+        const ev = await BankEvent.findOne({ userId: u._id });
+        expect(ev).toMatchObject({ amount: 18, streakAtBank: 3, platform: 'roblox', partial: true });
+    });
+
+    it('a full bank is still recorded as not partial', async () => {
+        const u = await User.create({ deviceId: 'devPartial5', pointsAtStake: 9, stakingStreak: 2 });
+        await bankPot(u._id.toString(), 'pwa');
+        const ev = await BankEvent.findOne({ userId: u._id });
+        expect(ev).toMatchObject({ amount: 9, partial: false });
+    });
 });
 
 describe('bankPot — event log', () => {
