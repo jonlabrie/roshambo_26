@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-15
+updated: 2026-08-27
 checked: 2026-08-26
 ---
 
@@ -60,6 +60,14 @@ both ran `shared-fixtures/game-rules.json`; the PWA's copy was inline in
 `src/lib/gameRules.ts` + vitest, same fixtures, and the hook calls the module instead
 of restating the rules — a test guarding an extracted copy while the shipping code
 keeps its own inline version guards nothing.
+
+⚠ **The three mirrors are gated, but they are not identical, and that is deliberate.** Partial
+banking (2026-08-27) added `keepOptions` / `isValidKeep` to the server and the Luau mirror but
+NOT to `src/lib/gameRules.ts`. The PWA's copy exists to compute a round outcome the server has
+not sent yet; choosing a rung is a UI affordance, and no client can ask for a partial bank yet.
+The fixture still gates all three on every rule they share — `partialBank` is simply a section
+the PWA's suite does not enumerate. **Revisit when the PWA gets a partial-bank control**, and
+until then do not read "three implementations" as "three identical implementations".
 
 **Left alone, all correct as of the sweep:** `MAX_DECORATIONS = 24`
 (`DecorationCatalog.luau`), `MAX_INVITED = 50` (`main.server.luau`),

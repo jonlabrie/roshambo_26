@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: open
-updated: 2026-08-19
+updated: 2026-08-27
 ---
 
 # Backlog
@@ -395,7 +395,7 @@ these are things a later reader would otherwise have to rediscover.
   `windowKind: 'rolling'` because the bound genuinely moves per request — `'calendar'` would be
   a lie — but the label is imprecise and the echoed `from`/`to` are the honest signal.
 - ~~**The two transports disagree on shape for the same boards.**~~ **SUPERSEDED 2026-08-16.**
-  `nameUsers` is exported from `stats.ts:200` and `socketAdapter.ts:14` already imports it — both
+  `nameUsers` is exported from `server/src/stats.ts` and `socketAdapter.ts` already imports it — both
   transports resolve `displayName`. The note was written before the `get-stats` broadcast fix
   landed and was never re-read afterwards; plan 3 needs no work here. (A textbook instance of
   [[wiki-currency]]: the fix appended its own note and left this paragraph standing.)

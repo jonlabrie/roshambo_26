@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-26
+updated: 2026-08-27
 ---
 
 # The Core Loop
@@ -42,6 +42,19 @@ judgement lives.
 - **Stake** — leave the pot riding. It triples on the next WIN, survives a SAFE, and is
   wiped by a LOSS.
 - **Bank** — convert the pot into `totalPoints`, permanently.
+- **Bank down a rung** — drop the pot to any lower rung of the ladder and bank the difference,
+  keeping the rest riding. ⚠ **SERVER ONLY as of 2026-08-27; no client can ask for it yet.**
+  `GameRules.keepOptions(pot)` is the list of rungs a pot may be dropped to, gated on
+  `shared-fixtures/game-rules.json` and mirrored in Luau. `bankPot(userId, platform, keep)`
+  takes it, `keep` defaulting to 0 — which is the full bank, so every shipped client is
+  unchanged. Rungs rather than a slider keep every pot a power of three and every banked
+  difference an integer.
+  ⚠ **`stakingStreak` is now zeroed only when the POT REACHES ZERO**, not whenever a bank
+  happens (owner ruling 2026-08-26) — a player who hedges still has money on the same run.
+  `currentStreak` is untouched by banking of either kind, as it always was.
+  See `docs/superpowers/specs/2026-08-26-partial-banking-design.md` for the strategy analysis:
+  the optimal fraction is a RATIO (`(bank÷pot + 1)/4`), not a constant, and riding the whole
+  pot becomes optimal once the bank is 3× the pot.
 
 ⚠ **Bank-vs-Stake is also the constraint on every status display**: any metric either branch
 changes puts a thumb on the scale of this decision. See [[status-display]].

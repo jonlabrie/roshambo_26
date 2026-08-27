@@ -1262,3 +1262,36 @@ could only pass.
 
 Also fixed while in there: both git helpers ran with the process's cwd, so any page outside it
 returned `''` and silently disabled checks 7-9. They now run from the page's own directory.
+
+## [2026-08-27] ship | Partial banking, server half — a pot may be dropped to a lower rung
+
+Six tasks from `docs/superpowers/plans/2026-08-26-partial-banking-server.md`, written by the
+design thread. `keepOptions(pot)` returns the rungs a pot may be dropped to; `bankPot` takes a
+`keep` that defaults to 0, so a full bank is the zero case and **every shipped client is
+unchanged**. Both transports accept `keep`; the Luau mirror has it; the fixture gates both.
+
+⚠ **NOTHING CAN ASK FOR IT YET, by design.** The client affordance was deliberately excluded —
+the control has not been specified and the Roblox HUD needs the owner's eyes in Studio. The
+server half ships alone precisely because it is backward compatible.
+
+Two rulings made during execution:
+
+1. ⚠ **The plan's task order could not work.** Task 2's tests assert `BankEvent.partial` but the
+   field arrived in Task 3, and mongoose runs strict by default — an undeclared field is
+   silently dropped, so the tests would have failed with nothing pointing at why. The field
+   moved into Task 2. Caught by the pre-flight scan, before any code was written.
+2. **`stakingStreak` zeroes on the pot reaching zero**, not on a bank happening (owner ruling
+   2026-08-26). Full banks behave exactly as before; no special case was needed.
+
+⚠ **Mutation testing found one overstated fixture row.** `partialBankRejects`' 13.5 case claims
+to prove no-fractional-points, but 13.5 is already rejected for not being a rung — the row
+passes with `Number.isInteger` deleted. The guard stays as defence; the row's `why` and the
+code comment now say what they actually prove. Every other row is load-bearing: `<` to `<=`
+fails 7, allowing pot 0 fails 2, on both the TS and Luau sides identically.
+
+`bankDepths` now filters to full banks so NERVE keeps measuring where players *stop* rather
+than blending that with where they *hedge*. The invariant is recorded on the model: **the
+filter follows the COLUMN, not the collection** — every consumer of `amount` counts partial
+banks, because hedged points are real points.
+
+475 server tests, 1515 Luau, 30 PWA. tsc, stylua and selene clean.
