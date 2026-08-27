@@ -294,6 +294,38 @@ describe('socket adapter wire format', () => {
         expect((await updated).user).toMatchObject({ totalPoints: 10, pointsAtStake: 0 });
     });
 
+    it('bank with a keep drops the pot to that rung over the socket', async () => {
+        await initPromise;
+        const devA = await claimDevice(client);
+        await User.findOneAndUpdate({ deviceId: devA }, {
+            $set: { totalPoints: 0, pointsAtStake: 27, stakingStreak: 3, currentStreak: 3 },
+        });
+        client.emit('sync-player');
+        await waitFor(client, 'player-data');
+
+        const updated = waitFor<any>(client, 'player-data');
+        client.emit('bank', { keep: 9 });
+        expect((await updated).user).toMatchObject({
+            totalPoints: 18, pointsAtStake: 9, stakingStreak: 3, currentStreak: 3,
+        });
+    });
+
+    it('bank with an invalid keep changes nothing', async () => {
+        await initPromise;
+        const devA = await claimDevice(client);
+        await User.findOneAndUpdate({ deviceId: devA }, {
+            $set: { totalPoints: 0, pointsAtStake: 27, stakingStreak: 3 },
+        });
+
+        client.emit('bank', { keep: 5 });
+        // No player-data is emitted for a refused bank, so there is no event to await.
+        await new Promise(r => setTimeout(r, 150));
+
+        const after = await User.findOne({ deviceId: devA });
+        expect(after!.pointsAtStake).toBe(27);
+        expect(after!.totalPoints).toBe(0);
+    });
+
     // ===== identity comes from the CONNECTION, never from a payload =====
     // Until 2026-08-18 every mutating handler resolved an account straight out of
     // `data.deviceId`, so anyone who learned one string owned that account: they could read

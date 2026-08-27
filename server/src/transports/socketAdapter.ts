@@ -372,14 +372,18 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
             }
         });
 
-        socket.on('bank', async () => {
+        // ⚠ THE PAYLOAD IS NOT A CREDENTIAL. deviceId is a bearer credential on this transport,
+        // so identity comes from the SOCKET and `keep` is the only field read from the wire.
+        // An invalid keep is rejected inside bankPot, which returns null and emits nothing.
+        socket.on('bank', async (data?: { keep?: number }) => {
             const userId = (socket as any).userId;
             const deviceId = (socket as any).deviceId;
             if (!deviceId && !userId) return;
             try {
                 const user = await resolveUser({ userId, deviceId });
                 if (!user) return;
-                const updated = await bankPot(user._id.toString(), 'pwa');
+                const keep = Number(data?.keep ?? 0);
+                const updated = await bankPot(user._id.toString(), 'pwa', keep);
                 if (updated) {
                     socket.emit('player-data', { user: updated, history: await personalHistory(updated) });
                 }
