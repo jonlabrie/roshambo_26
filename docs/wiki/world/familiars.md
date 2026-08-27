@@ -63,6 +63,10 @@ is empty, so a listener could not tell a loss from an unknown effect.
 
 ## Grades
 
+⚠ **Where grade is DISPLAYED — and the three clocks it sits in — is [[status-display]].**
+That page carries the aura, the rejected carriers, and why grade's reward is the unlock rather than
+a badge. This section is the mechanism only.
+
 **Grade is a count of milestones earned** (owner ruling). A rate is an *inference* and needs
 sample — that is item 7's 360-throw floor — while a milestone is an *event*: exactly true when it
 happens, unaffected by TEST_MODE, and impossible to lose by logging off. That last matters because

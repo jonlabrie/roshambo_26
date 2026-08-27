@@ -21,6 +21,7 @@ Chronology: [log.md](log.md).
 - [Hanabiya](world/hanabiya.md) — the fireworks shop: frontage, stair/attic, noren, chōchin, its gates and drops
 - [Riverside Chaya](world/chaya.md) — the tea stand and its dock: the arrangement, the frame, the thatch, the keeper slot standing empty
 - [Familiars](world/familiars.md) — the bird that reads your round: four states, grades from milestones, and the 326 perches it rests on
+- [Status Display](world/status-display.md) — the three clocks (now / lately / forever), the aura's rules, the five rejected carriers and the three different reasons
 - [Fireworks](world/fireworks.md) — the fireworks system, launch sites, perf rules and measured floor, monetization decision
 - [Day/Night](world/day-night.md) — cycle foundation, scope ruling, night glyphs, lantern and water-VFX subscribers
 - [Viewing Platform](world/viewing-platform.md) — the twin overlook decks, the hand-carved downcanyon vista, the lantern telegraph
