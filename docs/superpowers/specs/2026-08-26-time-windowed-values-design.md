@@ -184,21 +184,53 @@ win    → given a new pot P: if f(P, 0) > f(peak, now − peakAt), replace with
 render → heat = f(peak, now − peakAt), every frame, pure arithmetic, no traffic
 ```
 
-⚠ **The replace rule matters and is easy to get wrong.** It is NOT "keep the larger pot" — a stale
-27 must eventually yield to a fresh 3, or the display is a session peak again by the back door.
-Compare the two *decayed* values, never the raw ones. That comparison is the pure function, and it
-is what the Lune test should pin.
+⚠ **The replace rule matters and is easy to get wrong, and this document had it wrong.** It said
+`>` — strictly beat. Owner, 2026-08-26: *"matching your current value should update/reset the glow
+timer. Obviously."* Right, and the case is not a boundary technicality: **hit 27 at 2pm and 27 again
+at 2:30pm, and under `>` the clock never restarts** — the second run counts for nothing and you go
+dark on the first one's schedule. The rule is `>=`.
+
+Two consequences, and the second is the whole engagement loop:
+
+- It is NOT "keep the larger pot" — a stale 27 must eventually yield to a fresh 3, or the display is
+  a session peak again by the back door. Compare the two **decayed** values, never the raw ones.
+- ⚠ **Repeating your level holds it indefinitely.** A player who can reliably reach tier 3 keeps a
+  tier-3 glow all evening by playing, with no need to escalate. That is a stable loop rather than a
+  treadmill demanding ever-bigger runs — and it is what makes this metric pay for presence *and*
+  for play (juice spec §4, amended).
+
+That comparison is the pure function, and it is what the Lune test should pin.
 
 **Which answers the owner's question directly: it extends across play sessions, and it needs no
 concept of one.** Come back after a coffee and you are still faintly lit; come back tomorrow and
 you are dark. Nothing resets, nothing has an edge to fall off, and no boundary is worth gaming.
 
-**The half-life is the density dial.** Too short and it collapses back into the live pot — sparse,
-which was the original complaint. Too long and everyone is lit, it saturates, and it becomes tenure
-— which is the rank failure from §2 of the juice spec. A round is 60s and an evening's play is
-tens of minutes, so **~20 minutes is offered as a starting point to argue down from**, in the spirit
-of every other number on this project: a peak from half an hour ago at half strength, from an hour
-ago at a quarter, gone by morning. ⚠ **It wants watching in play. Do not settle it in a document.**
+### The decay rate — proposed: ONE RUNG EVERY 2 HOURS
+
+⚠ **Decay the TIER linearly, not the pot exponentially.** Owner asked "25%/hour?", which implies an
+exponential rate on a continuous value. Two reasons to prefer a linear walk down the ladder:
+
+- **Exponential decay never reaches zero**, so a percentage rate needs an arbitrary dark-floor
+  bolted on. A rung-per-period reaches genuine darkness at a predictable, statable time.
+- **It lands on the game's own vocabulary.** The tiers are the 3ⁿ pot ladder — 1, 3, 9, 27, 81 —
+  and "you drop a rung every two hours" is a rule a player can hold in their head. Same principle
+  as `QUALIFY`, whose floors are meant to be printed on the board.
+
+| rate | a tier-4 peak (pot 27) goes dark after |
+|---|---|
+| 1 rung / 20 min | 80 minutes — *this document's earlier proposal; too short* |
+| 1 rung / hour | 4 hours |
+| **1 rung / 2 hours** | **8 hours** — ⚠ **proposed**, and the owner's own figure |
+| 1 rung / 4 hours | 16 hours — drifts into a daily badge |
+
+For reference, a true 25%/hour exponential on the pot value takes a 27 about **11.5 hours** to fall
+below 1, so the owner's instinct and the 2-hour rung are within the same range; the rung is simply
+the more legible way to express it.
+
+**The saturation worry is smaller than §2 of the juice spec assumed**, because of the `>=` refresh:
+during play the arena is lit by **current form**, not by memory. Decay only governs players who have
+stopped winning, so it is a tail rather than the body of the picture. ⚠ Still wants watching in
+play — the rate is the density dial, and no document can settle it.
 
 **One semantic worth stating before it surprises someone:** a `$max` over the window measures the
 peak *reached within that window*. A player who won up to 27 just before the window opened and has

@@ -127,7 +127,32 @@ instances of the same error, now:
 | `pointsAtStake` | never bank **and never throw** | dropped 2026-08-26, this document |
 | `currentStreak` (shipped) | never throw once you are glowing | ⚠ see below — the same trap, weaker |
 
-**Test every future proposal against both branches before anything else.** If banking lowers it,
+**Test every future proposal against both branches before anything else.**
+
+### ⚠ AMENDED 2026-08-26 — "pays you to stay online" is NOT the objection
+
+Owner: *"I don't mind 'paying' players to be online — in fact, given Roblox's incentive structures,
+which pay attention to how long players are in your game — paying players to stay in the game,
+return to it often, etc. — is a core Roblox game development strategy."*
+
+Correct, and this document over-generalised. Session length and return frequency are what Roblox's
+discovery surfaces reward, so **rewarding presence is the business model, not a hazard.** The rule
+above is narrower than it was written, and the corrected form is:
+
+> The aura must be neutral on **Bank vs Stake**, and must never reward **being present without
+> playing**.
+
+Both halves of the original objection survive in that form, and one over-reach is dropped:
+
+- `stakingStreak` paid you never to bank — **still rejected**, it distorts the game's one decision.
+- `pointsAtStake` paid you to reach a deep pot and then **stop throwing** — **still rejected**, and
+  this is the distinction that matters. A lit-up player who never throws again is not engagement;
+  it is a statue in the arena. Presence without play is the failure, not presence.
+- "Anything that pays you to keep playing is suspect" — **withdrawn.** That is the goal.
+
+⚠ **The decaying peak is the good kind, and the `>=` refresh below is what makes it so.** The only
+way to hold a glow is to keep winning at your level, so it pays for presence AND for play, which is
+exactly the loop the platform rewards. If banking lowers it,
 it discourages banking. If losing lowers it, it discourages throwing — because not throwing is
 always available and always safe. A metric must be untouched by both.
 
@@ -206,10 +231,11 @@ third. Every proposal here changes the input number and nothing else.
 1. ⚠ **Is the decaying peak the right shape** — *how hot you have been running* rather than
    *what you have on the line*? This is the open question, and the one thing this document should
    not decide alone.
-2. If yes: the **half-life**. It sets how much of the arena is lit at once, so it is the density
-   dial — long enough that a good run still shows when you walk up to someone, short enough that it
-   cannot be hoarded. **~20 minutes is offered as a starting point to argue down from, not a spec.**
-   It wants watching in play, not arguing in a document.
+2. If yes: the **decay rate**. ⚠ **Proposed: one rung of the 3ⁿ ladder every 2 hours**, so a
+   tier-4 peak (pot 27) runs 8 hours before going dark — the owner's own figure. This document
+   earlier proposed ~20 minutes and that was wrong for the reason amended in §4: it was pricing
+   engagement as a hazard. It still wants watching in play, but the starting point has moved a long
+   way toward the owner's.
 3. If yes: does it need the floor ruling at all? *"Let the kids dress up if they want"*
    (2026-08-25) argues every reached pot glows faintly, with the magnitude doing the work.
 
