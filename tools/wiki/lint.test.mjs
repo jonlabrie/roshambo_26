@@ -248,3 +248,75 @@ test('gitContentDateOf ignores a checked:-only commit and reports the body date'
   git(['commit', '-qm', 'edit'], '2026-08-28T12:00:00');
   assert.equal(gitContentDateOf(page), '2026-08-28');
 });
+
+// ===== checks 10-13: the mechanical sweeps, added 2026-08-27 =====
+// ⚠ ALL FOUR CAME OUT OF A MANUAL FULL-WIKI AUDIT that found 13 rotten line citations and
+// verified 105 commit hashes by hand. They are here so the CHEAP pass is sufficient for the
+// mechanical layer, leaving reading for prose — which is the only thing that catches the rest.
+
+test('a cited commit hash that does not resolve is an error', () => {
+  const wiki = structuredClone(CLEAN);
+  wiki.pages['world/dojo.md'] = FM('world') + '# Dojo\nBuilt in `deadbee` — see [[board]].\n';
+  const { errors } = lint(makeWiki(wiki), { commitExists: (h) => h === 'cafef00' });
+  assert.ok(errors.some((e) => e.includes('world/dojo.md') && e.includes('deadbee')));
+});
+
+test('a resolvable hash is silent, and ASSET IDS ARE NOT HASHES', () => {
+  // ⚠ The manual sweep's first run reported 36 "missing hashes"; all but one were Roblox asset
+  // ids (pure decimal) and an AWS service id. A check that cries wolf on 35 of 36 gets ignored.
+  const wiki = structuredClone(CLEAN);
+  wiki.pages['world/dojo.md'] =
+    FM('world') + '# Dojo\n`cafef00` shipped it; texture `140172233879343`; drum `0123456789`.\n[[board]]\n';
+  const { errors } = lint(makeWiki(wiki), { commitExists: (h) => h === 'cafef00' });
+  assert.deepEqual(errors, []);
+});
+
+test('a cited code symbol that exists nowhere in the repo is an error', () => {
+  const wiki = structuredClone(CLEAN);
+  wiki.pages['world/dojo.md'] = FM('world') + '# Dojo\n`GameRules.deriveWorldThrow` and `Bird.vanished`. [[board]]\n';
+  const { errors } = lint(makeWiki(wiki), { sourceText: () => 'function deriveWorldThrow() {}' });
+  assert.ok(errors.some((e) => e.includes('Bird.vanished')));
+  assert.ok(!errors.some((e) => e.includes('deriveWorldThrow')));
+});
+
+test('a file extension is not a symbol', () => {
+  // `main.server.luau` and `apprunner.yaml` are paths; the leaf must not be looked up as code.
+  const wiki = structuredClone(CLEAN);
+  wiki.pages['world/dojo.md'] = FM('world') + '# Dojo\n`main.server.luau` and `vite.config.ts`. [[board]]\n';
+  const { errors } = lint(makeWiki(wiki), { sourceText: () => '' });
+  assert.deepEqual(errors, []);
+});
+
+test('a constant whose wiki value disagrees with the code is an error', () => {
+  const wiki = structuredClone(CLEAN);
+  wiki.pages['world/dojo.md'] = FM('world') + '# Dojo\n`MIN_STREAK` = 3 governs it. [[board]]\n';
+  const { errors } = lint(makeWiki(wiki), { sourceText: () => 'MIN_STREAK = 2\n' });
+  assert.ok(errors.some((e) => e.includes('MIN_STREAK') && e.includes('3') && e.includes('2')));
+});
+
+test('a constant the wiki NARRATES as retired is exempt on its line', () => {
+  // ⚠ THE ONE FALSE POSITIVE THE MANUAL SWEEP HIT. `one-model-is-not-a-building.md` says
+  // "MIN_SHORO_GAP = 5.0 was a floor invented here" — the page is CORRECT and telling the story
+  // of a wrong value. Without an exemption the check punishes exactly the writing we want.
+  const wiki = structuredClone(CLEAN);
+  wiki.pages['world/dojo.md'] =
+    FM('world') + '# Dojo\n`MIN_STREAK` = 3 was wrong. <!-- lint-ok: narrating a retired value -->\n[[board]]\n';
+  const { errors } = lint(makeWiki(wiki), { sourceText: () => 'MIN_STREAK = 2\n' });
+  assert.deepEqual(errors, []);
+});
+
+test('a line-number citation is an error, because they rot silently', () => {
+  // 8 of 9 in parked-defects.md were wrong while the page carried a `checked:` stamp. Symbol
+  // names survive a refactor; line numbers do not, and a stale one costs a reader their trust.
+  const wiki = structuredClone(CLEAN);
+  wiki.pages['world/dojo.md'] = FM('world') + '# Dojo\nSee `server/src/wallet.ts:42`. [[board]]\n';
+  const { errors } = lint(makeWiki(wiki));
+  assert.ok(errors.some((e) => e.includes('wallet.ts:42') && /line number/i.test(e)));
+});
+
+test('a bare path with no line number is still fine', () => {
+  const wiki = structuredClone(CLEAN);
+  wiki.pages['world/dojo.md'] = FM('world') + '# Dojo\nSee `tools/wiki/lint.mjs`. [[board]]\n';
+  const { errors } = lint(makeWiki(wiki), { repoRoot: process.cwd() });
+  assert.ok(!errors.some((e) => /line number/i.test(e)));
+});

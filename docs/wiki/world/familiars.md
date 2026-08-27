@@ -133,7 +133,7 @@ and the whole ColorMap repainted from photoreal sparrow to plain olive uguisu.
 **The origin at the feet is load-bearing.** It makes `perch.WorldPosition` the bird's position
 with no fudge, retiring the `+ Vector3.new(0, 0.2, 0)` the four-part bird needed.
 
-⚠ **`BAND_COLOR` DOES NOT SURVIVE THIS.** The controller shows grade band by setting `p.Color`
+⚠ **`BAND_COLOR` DOES NOT SURVIVE THIS.** <!-- lint-ok: naming a deleted constant --> The controller shows grade band by setting `p.Color`
 on four parts; a textured MeshPart does not tint that way. Grade must become **ornament on
 separate tinted pieces** — crest, tail streamer — rather than a recoloured bird, which is the
 better answer anyway: it keeps an uguisu an uguisu at every grade instead of producing five

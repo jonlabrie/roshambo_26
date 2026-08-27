@@ -89,6 +89,74 @@ export const gitDateOf = (absPath) => {
   }
 };
 
+
+// ===== THE MECHANICAL SWEEPS (checks 10-13), added 2026-08-27 =====
+// All four came out of a manual full-wiki audit that read 54 pages against the code. It found
+// 13 rotten line citations, and verified 105 commit hashes and every cited symbol BY HAND.
+// Automating exactly that makes the cheap pass SUFFICIENT for the mechanical layer, which is the
+// point: reading is then reserved for prose, where it is the only thing that works.
+
+// ⚠ A HASH IS NOT AN ASSET ID. The manual sweep's first run reported 36 "missing hashes"; 35
+// were Roblox asset ids (pure decimal) and one an AWS service id (32 chars). A check that is
+// wrong 35 times out of 36 is a check nobody reads, so bound the length and require a hex letter.
+const HASH_RE = /`([0-9a-f]{7,12})`/g;
+const commitExistsOf = (hash) => {
+  try {
+    execFileSync('git', ['cat-file', '-e', `${hash}^{commit}`], { stdio: 'ignore' });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+// Backticked code identifiers: `Foo.bar`, `Foo.bar.baz`, or a SHOUTY_CONSTANT.
+const SYMBOL_RE = /`([A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*)+|[A-Z][A-Z0-9_]{4,})`/g;
+// A path's extension is not a symbol — `main.server.luau` must not be looked up as code.
+const EXTENSIONS = new Set([
+  'md', 'ts', 'tsx', 'luau', 'lua', 'json', 'mjs', 'cjs', 'js', 'py', 'yaml', 'yml', 'sh',
+  'toml', 'csv', 'png', 'jpg', 'jpeg', 'fbx', 'blend', 'rbxm', 'rbxl', 'rbxlx', 'env',
+  'nvmrc', 'gitignore', 'com', 'io', 'wav', 'm4a', 'mp4', 'zip', 'html', 'css', 'txt',
+]);
+
+// ⚠ A LINE NUMBER IS A MEASURABLE FACT TRANSCRIBED INTO PROSE (schema rule 9). In the
+// 2026-08-27 audit, 8 of 9 citations in parked-defects.md pointed at the wrong place while the
+// page carried a `checked:` stamp asserting a re-read — one landed on unrelated code entirely.
+// Symbol names survive a refactor; line numbers do not, and a stale one spends a reader's trust.
+const LINECITE_RE = /`([A-Za-z0-9_/.-]+\.(?:ts|tsx|luau|lua|mjs|cjs|js|json|py|yaml|yml)):([0-9]+(?:-[0-9]+)?)`/g;
+
+// The wiki asserting a constant's value: `NAME` = 5 / `NAME = 5` / `NAME` is 5.
+const CONST_RES = [
+  /`([A-Z][A-Z0-9_]{3,})`\s*(?:=|is|of|at)\s*`?(-?[0-9]+(?:\.[0-9]+)?)`?/g,
+  /`([A-Z][A-Z0-9_]{3,})\s*=\s*(-?[0-9]+(?:\.[0-9]+)?)`/g,
+];
+
+const SRC_EXT = /\.(ts|tsx|luau|mjs|cjs|js|py)$/;
+const SKIP_DIR = new Set(['node_modules', 'dist', '.git', 'build', '.worktrees', 'coverage']);
+const sourceTextOf = (repoRoot) => {
+  let out = '';
+  const walk = (dir) => {
+    let entries;
+    try {
+      entries = readdirSync(dir, { withFileTypes: true });
+    } catch {
+      return;
+    }
+    for (const e of entries) {
+      if (e.isDirectory()) {
+        if (!SKIP_DIR.has(e.name)) walk(join(dir, e.name));
+      } else if (SRC_EXT.test(e.name)) {
+        try {
+          out += readFileSync(join(dir, e.name), 'utf8') + '\n';
+        } catch {
+          /* unreadable file is not a wiki defect */
+        }
+      }
+    }
+  };
+  walk(repoRoot);
+  return out;
+};
+
 export function lint(root, opts = {}) {
   const errors = [];
   const warnings = [];
@@ -124,6 +192,10 @@ const gitDate = opts.gitDate ?? gitDateOf;
   // A test that injects only `gitDate` is stating when the page moved and means it to count
   // as content; falling back keeps every pre-existing test honest rather than no-op.
   const gitContentDate = opts.gitContentDate ?? opts.gitDate ?? gitContentDateOf;
+  const commitExists = opts.commitExists ?? commitExistsOf;
+  // Lazy: a wiki-only test never pays for a repo walk, and one walk serves every page.
+  let _src = null;
+  const sourceText = () => (_src ??= opts.sourceText ? opts.sourceText() : sourceTextOf(repoRoot));
 
   const pages = [];
   for (const shelf of SHELVES) {
@@ -162,6 +234,65 @@ const gitDate = opts.gitDate ?? gitDateOf;
     // 5. orphans (index links don't count) — warning only
     const inbound = pages.some((q) => q !== p && (q.text.includes(`[[${p.name}]]`) || q.text.includes(`[[${p.name}|`)));
     if (!inbound) warnings.push(`${p.rel}: no inbound wikilinks (orphan)`);
+
+    // ⚠ Every sweep below honours `<!-- lint-ok` ON THE LINE. The audit hit exactly one false
+    // positive — a page CORRECTLY narrating a retired wrong value — and a check that punishes
+    // good writing gets switched off, taking the true positives with it.
+    const linesOf = p.text.split('\n');
+    const exemptLine = (idx) => linesOf[idx]?.includes('lint-ok');
+    const lineIndexOf = (needle) => linesOf.findIndex((l) => l.includes(needle));
+
+    // 10. every cited commit hash resolves
+    for (const m of p.text.matchAll(HASH_RE)) {
+      const h = m[1];
+      if (!/[a-f]/.test(h)) continue; // pure decimal is an asset id, not a hash
+      if (exemptLine(lineIndexOf(m[0]))) continue;
+      if (!commitExists(h)) errors.push(`${p.rel}: cited commit \`${h}\` does not resolve`);
+    }
+
+    // 11. every cited code symbol exists somewhere in the repo
+    // ⚠ A ROBLOX DATAMODEL PATH IS NOT A CODE SYMBOL. `ServerStorage.RetiredLegacyTeahouses`,
+    // `Lighting.Atmosphere`, `CanyonWorld.Water.FallsAudio` live in the PLACE, which git cannot
+    // see — that is the entire reason world/ pages exist. The first run of this check reported
+    // 15 errors of which 13 were exactly that, which is the "35 of 36" failure the comment above
+    // warns about, shipped anyway. Instance paths and event channels carry PascalCase leaves;
+    // functions and methods carry lowerCamelCase. So a dotted symbol is only looked up when its
+    // leaf starts lowercase. SHOUTY_CONSTANTS are always checked — they are never instances.
+    for (const m of p.text.matchAll(SYMBOL_RE)) {
+      const sym = m[1];
+      const leaf = sym.includes('.') ? sym.split('.').pop() : sym;
+      if (EXTENSIONS.has(leaf)) continue; // it is a filename, not a symbol
+      if (sym.includes('.') && !/^[a-z]/.test(leaf)) continue; // DataModel path or event channel
+      if (exemptLine(lineIndexOf(m[0]))) continue;
+      if (!sourceText().includes(leaf))
+        errors.push(`${p.rel}: cited symbol \`${sym}\` exists nowhere in the repo`);
+    }
+
+    // 12. a constant the wiki gives a value for must match the code
+    for (const re of CONST_RES) {
+      for (const m of p.text.matchAll(re)) {
+        const [, name, val] = m;
+        if (exemptLine(lineIndexOf(m[0]))) continue;
+        const found = [...sourceText().matchAll(
+          new RegExp(`\\b${name}\\b\\s*(?::\\s*[A-Za-z<>\\[\\]{}, ]+)?\\s*=\\s*(-?[0-9]+(?:\\.[0-9]+)?)`, 'g')
+        )].map((x) => x[1]);
+        if (!found.length) continue; // not a constant we can see; nothing to compare
+        if (!found.some((g) => Math.abs(Number(g) - Number(val)) < 1e-9))
+          errors.push(
+            `${p.rel}: says ${name} = ${val}, code has ${[...new Set(found)].join('/')}` +
+              ` — fix it, or add <!-- lint-ok --> if the page is narrating a retired value`
+          );
+      }
+    }
+
+    // 13. no line-number citations — schema rule 9
+    for (const m of p.text.matchAll(LINECITE_RE)) {
+      if (exemptLine(lineIndexOf(m[0]))) continue;
+      errors.push(
+        `${p.rel}: \`${m[1]}:${m[2]}\` cites a line number — name the symbol instead;` +
+          ` line numbers rot silently (8 of 9 were wrong in the 2026-08-27 audit)`
+      );
+    }
 
     const updated = (p.text.match(/^updated: (\d{4}-\d{2}-\d{2})$/m) ?? [])[1];
     // Optional. "I re-read this and it was still true" — a different claim from "I changed it".

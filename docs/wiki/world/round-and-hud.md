@@ -97,8 +97,13 @@ the prompt is delivered to the button underneath. The **payoff count**
 counters repaint on `RenderStepped` (a 10 Hz heartbeat renders a long count as
 lurches); the driver checks `countersAnimating()` before painting; celebrations key
 on the balance RISING; seed counters on the profile arriving, never first render.
-Splash timing triggers on the drum's residual angle (`DrumStep.glideResidual`,
-half a facet) — not a time constant. The glyph reel is `ReelStep.luau`.
+⚠ **The splash INHERITS the one drum-rest gate rather than timing itself.** It is fired from
+`maybeShowReveal` in `main.client.luau`, beside the Onboard win beat, and never from
+`RevealResult` directly — so it cannot land ~3s early and spoil the wheel; and because
+`p.result` is nil for a player who did not throw, a spectator gets no splash. **This sentence
+used to name a `DrumStep.glideResidual` that does not exist and has no equivalent**, describing <!-- lint-ok: naming the phantom symbol in order to bury it -->
+a second timing mechanism the section above says must never be built. Corrected 2026-08-27 by
+the lint's new symbol check, on its first run. The glyph reel is `ReelStep.luau`.
 
 ## Gates & decisions
 
