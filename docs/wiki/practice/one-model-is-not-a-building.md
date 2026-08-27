@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-15
+updated: 2026-08-27
 ---
 
 # One Model Is Not a Building
@@ -46,7 +46,7 @@ like diligence, so nobody re-checks them.**
 
 ## And don't launder your own thresholds as the owner's
 
-`MIN_SHORO_GAP = 5.0` was a floor **invented here** when the owner's holdout top was
+`MIN_SHORO_GAP = 5.0` was a floor **invented here** <!-- lint-ok: narrating the invented value; the code carries the owner's 9.0 --> when the owner's holdout top was
 retired as "approximate". Their stated relationship was **9 studs subordinate to the
 bell tower**. The 5.0 then got quoted back to them repeatedly as though it were their
 gate, framing a design decision around spending "the last stud" of it.
