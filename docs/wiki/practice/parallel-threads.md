@@ -1,7 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-26
-checked: 2026-08-27
+updated: 2026-08-27
 ---
 
 # Parallel Threads
@@ -61,6 +60,16 @@ wrong thing and finding out at the gate*. The familiar's status display was desi
 rejection cost implementation work. Deciding earlier is worth more than typing faster.
 
 Its queue, in order:
+- ⚠ **Roblox identity — does the PWA lean on it, offered or required, and what happens to the
+  wallet?** Queued 2026-08-27. The owner's framing: Roblox is being pushed into serious
+  anti-bot and age-verification work, and runs proof-of-human infrastructure this project
+  could never build — and every measurement surface on [[stats-room]] is worthless against a
+  sybil farm. **Bounded by three facts**: Roblox requires a 13+ account to authorize an OAuth
+  app and this is a kid-first product; the economy split is enforced by IDENTITY rather than
+  the schema, so OAuth forces the wallet question ([[data]], [[identity]]); and
+  [[parked-defects]] (i) is the trap waiting at `/auth/sso`. **This is the highest-value item
+  in the queue** — it gates a feature the owner is actively considering, and the wallet
+  decision is upstream of any code.
 - **juice vs seniority** — the aura shows `currentStreak`; `bestStreak` already exists in the
   profile and in Mongo, so seniority is a display question, not a data one. It may belong with
   grade rather than getting its own glow.
