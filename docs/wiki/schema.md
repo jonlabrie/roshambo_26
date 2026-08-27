@@ -55,10 +55,16 @@ Sessions read `index.md` first. The pattern is Karpathy's LLM-wiki
    service's branch and URL rather than naming them; `familiars.md` carries
    `tools/studio/measureBirds.luau` rather than a table of dimensions. A command cannot go stale
    without failing loudly.
-10. ⚠ **Staleness BLOCKS.** A cited file that changed more than three days after the page was last
-   verified is an ERROR, not a warning. Re-read the page, then bump `updated:` if you changed it,
-   or add `checked: YYYY-MM-DD` if it was already right — two different claims, two different
-   fields. Warnings were what this used to be, and fifteen had accumulated unactioned, eight of
+10. ⚠ **Staleness BLOCKS, and "re-read" means the WHOLE PAGE.** A cited file that changed more
+   than three days after the page was last verified is an ERROR, not a warning. Read the page end
+   to end — not the cited line — then bump `updated:` if you changed it, or add
+   `checked: YYYY-MM-DD` if it was already right: two different claims, two different fields.
+   ⚠ **`checked:` asserts you read ALL of it.** The lint fires on a citation because that is what
+   it can see; the citation is a prompt, not the scope. Measured 2026-08-27 over three long pages:
+   reading 545 lines costs about 7k tokens, which is nothing — **the expense is never the reading,
+   it is the four or five VERIFICATIONS a full read turns up**, and every one of those changed the
+   verdict. A pass that stamps the cited line and moves on is the cheap move that made this rule
+   necessary in the first place. Warnings were what this used to be, and fifteen had accumulated unactioned, eight of
    them eleven days old. Detection was never the gap; consequence was.
 
 ## Lint (recurring)
