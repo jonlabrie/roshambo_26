@@ -92,6 +92,11 @@ like "my change did nothing".
   inherit prod's `/roshambo/*` SSM secrets tree; its own secrets live at
   `/roshambo/dev/*`, reusing the same instance role's wildcard grant. See
   [[data]] for the database each side talks to.
+  ⚠ **THAT SPLIT HAS A COST, PAID 2026-08-27:** `/roshambo/dev/JWT_SECRET` was the `.env`
+  placeholder while prod's was properly generated — nothing propagates prod's discipline to a
+  tree that cannot inherit from it. ⚠ **And "dev" is the PUBLIC-FACING service**: Amplify points
+  at it while prod is paused, so a secret hygiene problem here is not a development problem.
+  See [[parked-defects]] (k).
   ⚠ **`update-service` REPLACES `SourceConfiguration` wholesale, it does not merge.**
   A repoint that omits `RuntimeEnvironmentSecrets` silently drops all three secrets and
   the service comes back unable to reach Mongo. Always `describe-service` first and

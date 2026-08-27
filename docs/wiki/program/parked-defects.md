@@ -163,12 +163,22 @@ which no test can see.)
   account, throw as it, rename it, bank its pot. ⚠ **This is the vulnerability the 2026-08-18
   hard cut closed, reopened by a weak key.** The mechanism was right; a signature is only worth
   its secret.
-- **Measured, not alarmist:** not published, so it needs a targeted guess rather than a brute
-  force; prod is PAUSED and both environments run TEST_MODE.
-- **Status:** owner rotating dev `/roshambo/dev/JWT_SECRET` + `start-deployment` 2026-08-27
-  (App Runner reads secrets at deploy time — [[deploy]]). ⚠ **Prod `/roshambo/JWT_SECRET` still
-  to check, before any resume.** Rotation logs everyone out and orphans guest tokens — a second
-  hard cut, cheap now, expensive after launch.
+- ⚠ **PROD WAS FINE — 64 characters, properly generated. ONLY DEV CARRIED THE PLACEHOLDER, AND
+  DEV IS THE SERVICE THAT SERVES THE PUBLIC.** Amplify's `VITE_SOCKET_URL` points at
+  `roshambo_server_dev`; `roshambo_server` has been PAUSED since 2026-08-18 and serves nothing
+  ([[deploy]]). So the weak key was on the internet-facing backend behind playroshambo.com and
+  the strong key was on the service nobody can reach. ⚠ **An initial severity call of "it is only
+  dev" was reasoning from the NAME rather than from where traffic goes** — corrected the same day.
+- **Why only dev:** prod's `/roshambo/*` tree was created from `README_DEPLOY.md`; dev cannot inherit
+  it (configured through the App Runner API rather than `apprunner.yaml`) so `/roshambo/dev/*` was
+  created by hand, and the `.env` placeholder went in with it. **The deliberate split of the
+  secret trees is exactly why prod's discipline never reached dev.**
+- **Measured, not alarmist:** the key is not published, so it needs a targeted guess rather than a
+  brute force, and both environments run TEST_MODE.
+- **Status:** rotate `/roshambo/dev/JWT_SECRET` then `aws apprunner start-deployment` — App
+  Runner reads secrets at DEPLOY time, so the new value is inert until redeployed ([[deploy]]).
+  Rotation logs everyone out and orphans guest device tokens: a second hard cut, cheap while the
+  audience is friends-and-family, expensive after launch.
 
 _(h) — the World Throw picked at random — was FIXED 2026-08-16, see [[world-throw]] and
 `log.md`. It is deliberately NOT active in any deployed environment yet: both prod and dev
