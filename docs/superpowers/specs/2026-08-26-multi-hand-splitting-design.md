@@ -5,6 +5,17 @@ A player who reaches a 3- or 4-streak may **park** that hand — leaving it unex
 building a new one with fresh throws, choosing each round which hand to aim at, and holding the big
 one back for a round they feel lucky. The glow would show the longest hand.
 
+⚠ **STATUS 2026-08-26: SET ASIDE by the owner, not killed** — *"let's set hands aside as impractical
+for now. I'll give it more thought."* This document is the analysis, not a closed ruling.
+
+⚠ **AND ONE CORRECTION TO IT, owed to the owner.** §3's "obvious improvement is catastrophic" —
+throwing at all three hands in one round — was **this document's own extrapolation, never the
+proposal.** Owner: *"I never expected e.g. a player with three hands to be playing all of them in a
+single round — the player would have to choose in advance which hand he's playing in the current
+round, i.e. which hand is at risk."* That is exactly the design §2 analyses, so **the free-option
+objection stands against the real proposal and does not depend on the strawman.** The multi-throw
+note is kept below as a guard-rail for anyone who reaches for it later, and is now labelled as such.
+
 **Verdict: NO.** The owner asked for brutal honesty rather than support, so, plainly: this is not a
 tuning risk or a complexity concern. **It structurally removes the Bank-vs-Stake dilemma, which is
 the only decision Roshambo has.** Two things in it are genuinely right and both are already served
@@ -78,10 +89,11 @@ Throw — so "which hand do I aim at" carries **no information the player can ac
 read, not a bluff, not a tell. It is pure risk allocation, and §1 shows the risk-neutral answer is
 always "the biggest", so the mechanic only ever engages risk aversion. In practice everyone parks.
 
-### ⚠ And the obvious "improvement" is mathematically catastrophic
+### ⚠ A guard-rail, NOT the proposal: throwing at every hand in one round
 
-The natural next proposal is to let a player throw at all three hands each round with different
-throws. **Do not.** With three options and three hands, R/P/S across them guarantees **exactly one
+⚠ **This was never the owner's design** (see the correction at the top) — it is recorded because it
+is the natural next thing someone reaches for. If anyone proposes letting a player throw at all
+three hands each round with different throws: **Do not.** With three options and three hands, R/P/S across them guarantees **exactly one
 WIN, one SAFE and one LOSS every single round, deterministically.** All variance and all skill
 vanish; the game becomes an annuity. The three-outcome structure is only a game because a player
 gets one throw.

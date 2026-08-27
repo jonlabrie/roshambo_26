@@ -226,6 +226,71 @@ third. Every proposal here changes the input number and nothing else.
   intrinsic to the metric (§3), and floor 1 means "won last round" — a third of the arena, flat, no
   gradient, and the hold trap gets more common rather than less.
 
+## 6. ⚠ THE THREE CLOCKS — the owner's own synthesis, and it reorganises the queue
+
+Owner, 2026-08-26: *"the Aura/grades/whatever need to show **current skill/luck**, **longer-term
+success**, and **levels earned and held forever**."*
+
+That is three displays on three clocks, and it settles from the top what this document argued from
+the bottom. Mapping what exists onto it:
+
+| clock | shows | carrier | status |
+|---|---|---|---|
+| **now** — minutes to hours | current skill / luck | the aura (decaying peak) | designed; metric under ruling |
+| **lately** — days to weeks | longer-term success | ⚠ **nothing** | **the real gap** |
+| **forever** — monotonic | levels earned and held | grade → the five familiar unlocks | decided; ⚠ no display, no announcement |
+
+**Two findings fall straight out of this table.**
+
+⚠ **The middle clock has no carrier at all, and it is the one nobody has been designing.** Every
+rejected proposal — plumage, sashimono, crest, seniority aura — was trying to put *forever* on a
+body, and every one failed because forever belongs to the unlocks. Meanwhile *lately* has been
+sitting unclaimed. **And its data is already computed**: `stats.heatBoard` is points banked over a
+rolling window, per player, optionally scoped to the players present in one instance
+(`docs/superpowers/specs/2026-08-26-time-windowed-values-design.md` §1). It exists as a **board**
+and has no presence on or around the player.
+
+⚠ **"Forever" is settled but silent.** Grade is earned, banded and unlocked — and nothing announces
+a grade-up, and nothing prints the grade (`docs/wiki/world/familiars.md`, *Still thin*). The next
+queue item owes the **private** half first: a player must learn they levelled before anyone designs
+where strangers read it.
+
+**Nothing here changes §1–3.** Seniority still has no separate carrier; it is one of the milestone
+families feeding *forever*. What the three clocks add is that the argument was incomplete — the
+answer to "juice vs seniority" was never one of the two, because a third thing was missing.
+
+## 7. The ambient player — and a trap in the obvious fix
+
+Owner, 2026-08-26: *"the glow needs to persist longer if the player is still actively engaged, even
+if that just means they're socializing with friends and only occasionally throwing… RPS is the
+ambient game here."* Roblox precedent named: zombie games where players hang out and chat, killing
+one as it wanders past.
+
+**This is a product framing, not a tuning note**, and it changes what the decay is for. A player
+throwing five rounds an hour while socialising is the TARGET USER, and under a pure wall clock at
+one rung / 2 hours they fade out while still present and still playing.
+
+⚠ **The obvious fix — decay per THROW instead of per hour — reintroduces the abstention trap, and it
+took working through to see.** Under it, a player glowing at tier 4 whose pot is dead cannot refresh
+without rebuilding all the way to 27, so every throw *only* advances their decay. **The optimal move
+for the glow becomes: stop throwing.** That is the `pointsAtStake` failure in a new place, and it is
+the exact thing §4's amended rule forbids — rewarding presence without play.
+
+**Wall-clock decay is incentive-clean** precisely because the clock runs whether you throw or not,
+so throwing is never punished. Keep it. The ambient problem is then solved on the other side:
+
+> ⚠ **A WIN BUYS BACK TIME.** Time takes rungs away; wins give rungs back, capped at the tier your
+> best pot justifies. A win too small to raise your tier still moves the clock back.
+
+That rewards playing without ever punishing it, and it is what carries an occasional thrower: five
+throws an hour yields a win or two, and a win or two holds the glow. A player who stops winning
+entirely still fades, which is correct — the clock is *current* skill/luck.
+
+**How much time a win buys is the ambient dial**, and it is the number to watch in play alongside
+the rung rate. ⚠ Do not set it so high that a single tier-1 win indefinitely sustains a tier-4 glow;
+at that point the display stops meaning "how hot you have been running" and means "won once, ran hot
+once."
+
 ## Owner decisions required
 
 1. ⚠ **Is the decaying peak the right shape** — *how hot you have been running* rather than
@@ -236,7 +301,8 @@ third. Every proposal here changes the input number and nothing else.
    earlier proposed ~20 minutes and that was wrong for the reason amended in §4: it was pricing
    engagement as a hazard. It still wants watching in play, but the starting point has moved a long
    way toward the owner's.
-3. If yes: does it need the floor ruling at all? *"Let the kids dress up if they want"*
+3. If yes: **how much time a win buys back** (§7) — the ambient dial, alongside the rung rate.
+4. If yes: does it need the floor ruling at all? *"Let the kids dress up if they want"*
    (2026-08-25) argues every reached pot glows faintly, with the magnitude doing the work.
 
 ## Not proposed
