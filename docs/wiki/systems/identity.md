@@ -51,6 +51,41 @@ one layer out — `LEADERBOARD_FIELDS` once carried `deviceId` to any socket tha
 stats. `leaderboards.ts` now carries a second projection rather than a widened shared one, and
 says why at the point of use. Add a projection; never widen a shared list.
 
+## ⚠ The two platforms are DIFFERENT PEOPLE to this server, and that is what splits the economy
+
+Traced 2026-08-27. `resolveUser` returns on its first branch for a `robloxUserId`, before any
+merge logic; `robloxId` is written in exactly one place in the whole server; nothing links it to
+a `deviceId` or an auth account. So a Roblox player and a PWA player are always two documents,
+and a Roblox-earned point cannot reach the PWA store because that store operates on a document
+the Roblox player does not have. **The economy split is enforced HERE, not in the schema** —
+`data.md` claimed per-platform wallet fields that do not exist ([[data]]).
+
+⚠ **This is contingent, not structural.** It holds only because no linking flow exists, and
+`/auth/sso` is already a linking route for four providers. Adding a fifth would collide with the
+`unique, sparse` index on `robloxId` — see [[parked-defects]] (i) for the trap and the repair
+that makes it worse.
+
+## ⚠ Roblox OAuth is a named gate, and it has a hard external constraint
+
+Raised by the owner 2026-08-27: lean on Roblox's identity, since their anti-bot, anti-sybil and
+age-verification machinery is far beyond what this project could build. **The reasoning is
+sound** — every measurement surface in [[stats-room]] is worthless against a sybil farm, and
+identity is the only real defence.
+
+⚠ **But Roblox's own OAuth docs state: "You must have a 13+ account to authorize OAuth 2.0
+apps."** Roshambo is kid-first — it is why the gambling register is barred ([[owner-rulings]])
+and why onboarding is measured against a child who has never played. **Requiring Roblox sign-in
+would lock under-13s out of the PWA entirely.** Registering the app also requires the developer
+to be ID-verified.
+
+⚠ **Verify this against Roblox's current terms before designing on it** — read from
+`create.roblox.com/docs/cloud/auth/oauth2-overview` on 2026-08-27, and platform policy moves.
+
+**Offered rather than required is the shape that survives the constraint**: linked accounts get
+a verified badge, or leaderboard ELIGIBILITY requires a link while anyone may play. That puts
+sybil resistance where it actually matters — the standings — without an age wall on the door.
+Either way the wallet must be ruled first.
+
 ## Owner ruling — HARD CUT, no migration (2026-08-18)
 
 Guest points and streaks from before the change are **orphaned**. An existing deviceId cannot

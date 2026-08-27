@@ -121,6 +121,24 @@ which no test can see.)
   App Runner → re-sync Rojo → start a FRESH Studio session.
 - spec: `docs/superpowers/specs/2026-08-04-round-structure-design.md`
 
+## (i) Adding `roblox` to `/auth/sso` would E11000 at login — and the obvious fix merges the wallets
+
+- **Where:** `server/src/routes/auth.ts`, the `/sso` link path. It finds a user by email or
+  deviceId and writes the provider id onto THAT document. `robloxId` carries a
+  `unique, sparse` index and the game server's document already holds it, so linking a PWA
+  guest to their Roblox account throws **E11000 duplicate key**, uncaught, as a 500 at login —
+  hitting exactly the players who use both platforms.
+- ⚠ **The severity is not the 500. It is the repair.** "Resolve to the existing Roblox document
+  instead" clears the error and silently merges the two wallets — the thing `ef6ced9` ruled
+  non-viable under Roblox policy, shipped as a bugfix. Merging is a one-way door: afterwards
+  there is no honest answer to whose points are whose.
+- **Not a live defect.** `/auth/sso` is stubbed, has no `roblox` provider, and its own comment
+  says the client has never called it. This is a **GATE on future work**, recorded because the
+  trap is invisible at the moment someone adds a fifth provider. See [[identity]], [[data]].
+- **Before any of it:** rule the wallet. Either per-platform balances on one document
+  (`identityTier` is the seam), or a standing decision that one human means one wallet and
+  Robux therefore never buys points.
+
 _(h) — the World Throw picked at random — was FIXED 2026-08-16, see [[world-throw]] and
 `log.md`. It is deliberately NOT active in any deployed environment yet: both prod and dev
 run `TEST_MODE`, which keeps the R→P→S cycle. Defect (e) therefore still stands._

@@ -1547,3 +1547,50 @@ known root, with a test, and it immediately found a dead one:
 `friends-family-baseline` cited `.superpowers/sdd/2026-08-18-shoji-screens/` and **no such ledger
 was ever created** — item 5 ran without one. Corrected in place, pointing at the spec and plan
 that do exist.
+
+## [2026-08-27] decision | R2 — the economy split is enforced by IDENTITY, and Roblox OAuth is the gate on it
+
+[[data]] claimed the Roblox/PWA split was "enforced in the schema — per-platform wallet fields".
+**There are no such fields.** `User` has one `totalPoints` and one `pointsAtStake`. Traced
+rather than assumed:
+
+- `resolveUser` **returns on its first branch** for a `robloxUserId`, before any merge logic.
+- `robloxId` is written in **exactly one place** in the entire server, that branch.
+- `auth.ts` and `store.ts` never mention it; **no linking flow exists**.
+
+So the two platforms always resolve to different documents, and a Roblox-earned point cannot
+reach the PWA store because that store works on a document the Roblox player does not have. The
+split is real and STRONGER than described — separate documents, not separate columns. It simply
+is not the schema doing it.
+
+⚠ **AND IT IS CONTINGENT, NOT STRUCTURAL.** `/auth/sso` is already a linking route for four
+providers: it finds a user by email or deviceId and writes the provider id onto THAT document.
+A fifth named `roblox` would write `robloxId` onto the PWA's document while the game server's
+already holds it. The `unique, sparse` index turns that into an unhandled E11000 at login — an
+accidental guard. ⚠ **The obvious repair, "resolve to the existing Roblox document instead", IS
+the silent merge**, and would ship as a bugfix. Parked as [[parked-defects]] (i).
+
+### The owner's Roblox-OAuth idea, and the fact that bounds it
+
+Owner, 2026-08-27: Roblox is being pushed into serious anti-bot and age-verification work, and
+runs proof-of-human infrastructure far beyond what this project could build — so require a
+Roblox account for the PWA and lean on it.
+
+**The reasoning is sound and the problem is real.** Everything on [[stats-room]] is measurement,
+and measurement is worthless against a sybil farm; the 360-throw qualification floor does not
+help if the throws are bots.
+
+⚠ **But Roblox's own docs say "You must have a 13+ account to authorize OAuth 2.0 apps."** This
+is a kid-first product. Requiring Roblox sign-in locks under-13s out of the PWA — not a friction
+cost, an exclusion of the audience the product is for. The 13+ gate reads like Roblox having
+already drawn this line. (App registration also requires the developer to be ID-verified.)
+
+**Offered rather than required survives it**: a verified badge, or leaderboard ELIGIBILITY
+gated on a link while anyone may play — sybil resistance where it matters, no age wall on the
+door. Either way **the wallet must be ruled before any OAuth code**: per-platform balances on
+one document (`identityTier` is the seam), or one-human-one-wallet and Robux never buys points.
+Handed to the design thread.
+
+⚠ Two pages got `checked: 2026-08-27` for an unusual reason: committing the SDD ledgers gave
+them today's commit date, so the currency check saw [[fireworks]] and [[foliage]] lagging
+citations that had not changed — they were IMPORTED. Both were read end to end before stamping.
