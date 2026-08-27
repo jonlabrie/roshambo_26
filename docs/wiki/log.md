@@ -1365,3 +1365,63 @@ and genuinely accreted; these two are the same length and are not. The signal wa
 it was never age either — of everything removed across all three, almost nothing was WRONG. It was
 **correct material on the wrong shelf**, plus one fact filed somewhere nobody would look. A length
 check, a staleness check and a decay score would each have passed all three pages every day.
+
+## [2026-08-27] audit | Full-wiki audit — all 54 pages read against the code, 11 defects
+
+Run because the owner rejected my claim that the wiki was in reasonable shape, correctly:
+I had audited 3 pages, chosen by LENGTH — a proxy I had just finished disproving — and
+generalised "1 in 3" from a sample selected on the wrong axis. **27 of 54 pages had exactly
+one commit ever.** The wiki was not fine; it was UNAUDITED, which is a different claim.
+
+### Mechanical sweeps (all 54 pages) — the citation layer is sound
+
+| check | result |
+|---|---|
+| cited commit hashes resolve | **105 / 105** |
+| code symbols cited in backticks exist | **0 unresolvable** |
+| constants asserted vs their value in code | **0 real mismatches** |
+| line-number citations | **13 removed; 0 remain wiki-wide** |
+| cited repo paths exist | 0 dead (lint) |
+
+### The 11 defects, and what they have in common
+
+1. ⚠ [[friends-family-baseline]] item 6 **contradicted itself** — "wired into play and
+   owner-gated" four lines above "NOT yet wired, nothing in play uses it", listing three
+   changes all long done. On the GOVERNING program page.
+2. ⚠ [[parked-defects]] — **8 of 9 line citations wrong**, under a `checked:` stamp I had
+   written the day before. Every defect still real; every pointer rotten.
+3. ⚠ [[place-state]] named **`CLAUDE.md` as its Authority**, inverting the hierarchy the owner
+   set — and CLAUDE.md was wrong about that very subject ("7 hero-prop models"; actually 19).
+4. ⚠ [[place-state]]'s pre-publish checklist **omitted the toolbox backdoor scan**, which
+   [[toolbox-backdoor-scan]] has always said belongs there. The payload early-returns in
+   Studio and fires only on a published server: that checklist is the ONLY place it is
+   catchable.
+5. [[rojo-and-place]] and [[place-state]] both missed `ReplicatedStorage.RoshamboBirds` —
+   a whole Rojo-managed subtree added the previous day.
+6. [[parked-defects]] contradicted [[deploy]]: "every push auto-deploys dev" has been false
+   since 2026-08-25.
+7. [[deploy]]'s CI path filters omitted `shared-fixtures/**` (in TWO workflows) and `public/**`.
+8. [[status-display]] listed partial banking as unruled hours after its server half shipped.
+9. [[wiki-currency]] — the page ABOUT this failure mode did not record that the `checked:`
+   hatch shipped unusable.
+10. [[familiars]] — the shipped uguisu wing cannot be regenerated from any script, and that
+    lived only in a Python comment.
+11. `backlog.md` — 134 lines of superseded, duplicated and misfiled content.
+
+⚠ **NINE OF ELEVEN ARE "CORRECT, BUT NOT HERE" OR "TRUE ONCE".** Almost nothing was invented
+or sloppy. It was live knowledge on the wrong shelf, a pointer that rotted while its claim
+stayed true, or a page that never re-read its own opening. **Length, staleness and decay
+scoring would each have passed most of these every day** — the lint was green on all 54 the
+whole time.
+
+### What the audit CANNOT settle
+
+**13 of 21 `world/` pages rest on a live Studio verification dated 2026-08-15.** Neither I nor
+the lint can re-check terrain, collision groups, prefabs or place-only folders from git. That
+is a permanent limit of this method, not a backlog item.
+
+### Cost
+
+Reading the whole wiki: **~95k tokens, one sitting.** Reading was never the expense. Every
+defect above came out of a VERIFICATION — querying AWS, grepping for a symbol, diffing a
+declaration — and each one changed the verdict I would otherwise have written.

@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-26
+updated: 2026-08-27
 ---
 
 # Why Wiki Pages Go Stale (and what the lint cannot catch)
@@ -83,6 +83,23 @@ different fields, and silencing one with the other would be a small lie in the f
 
 ⚠ **The escape hatch is also a trap worth naming:** `checked:` older than the code change does not
 clear anything, or one stale acknowledgement would silence a page forever. Tested.
+
+⚠ **AND THE HATCH SHIPPED UNUSABLE — 2026-08-26, fixed 2026-08-27.** Writing `checked:` COMMITS
+the page, which advanced the page's commit date, which tripped the "your edits outran `updated:`"
+check — whose only remedy was bumping `updated:`, the exact lie the second field exists to avoid.
+**All seven pages given `checked:` on the day it shipped failed the lint it introduced.** Found by
+another session, not by its author. The check now asks when the page's BODY last moved, read from
+the diff, so a `checked:`-only commit does not count and a commit touching both still does.
+**The lesson is this page's own thesis one level up:** a mechanism built to catch rot was itself
+rotten on arrival, and no amount of care in writing it substituted for someone running it.
+
+⚠ **"RE-READ" MEANS THE WHOLE PAGE — clarified in schema rule 10, 2026-08-27.** The lint fires on
+a CITATION because a citation is what it can see; the citation is a prompt, not the scope. Stamping
+`checked:` after reading the cited line is the cheap move that produced every failure above, and it
+was done to `world-throw.md` on 2026-08-27 by the same session that had just written the rule
+against it. Measured that day: reading a 545-line page costs about 7k tokens. **Reading was never
+the expense — the expense is the four or five VERIFICATIONS a full read turns up**, and in the
+2026-08-27 full-wiki audit every one of them changed the verdict.
 Details and the `<!-- lint-ok -->` exemption are in [schema.md](../schema.md).
 
 First run: **5 errors, 13 warnings across 50 pages** — a usable volume rather than noise. It
