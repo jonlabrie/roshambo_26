@@ -1069,3 +1069,26 @@ days.
 dialog — the previous note here denied that, wrongly), and vertex colours OFF, which matters more
 on a crow than it did on the uguisu because a bird that ships 85% too dark and is already black
 does not announce itself.
+
+## [2026-08-26] gate | Both wingtips taper — and watchWingbeat can show either bird
+
+Owner: *"wingbeatwatch looks fine."* The squared-off tips are gated on both birds. Karasu tip chord
+0.244 → 0.062 studs, uguisu 0.114 → 0.044, with the angle of attack now scaling with the local
+chord so a narrowed tip no longer pitches down (karasu 19.2° → 4.1°, uguisu 45.3° → 23.9°).
+
+Both `.rbxm` assets are committed and all four birds are declared in `default.project.json`.
+⚠ The karasu is still INVENTORY — nothing selects a bird per player.
+
+**`watchWingbeat` takes a `SPECIES` now**, and every framing number is DERIVED from the chosen
+bird rather than typed: viewing distance is 3× body length, trace beads 1.5% of it. The karasu is
+twice the uguisu, so a constant tuned for one is wrong by 2× for the other — the tool would have
+parked a crow half in the camera. Verified by running it: 4.92 studs back against the uguisu's
+2.48, all four wing bones resolved, 90 trace beads lit.
+
+⚠ **The uguisu's shipped wing was NOT what its generator produces.** Measured during this work:
+`spread_wing.py` yields about 8° of angle of attack at the root, the shipped mesh sits at 23.9°
+across its whole span, and its chord extent differs from the blend's. The asset had been reshaped
+after the script ran by a step nobody recorded — so the script is that wing's ORIGIN, not its
+definition, and the tip fix had to be applied to the MESH. `spread_wing.py` now carries a warning
+saying so. This is the same failure as the recorded size, one layer down: an artifact drifting from
+its record with nothing in place to notice.

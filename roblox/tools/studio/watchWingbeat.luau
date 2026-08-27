@@ -24,6 +24,12 @@
 -- connection drops and every borrowed tag is restored — that is the whole cleanup story, and it is
 -- why each connection re-checks the folder rather than trusting a flag.
 
+-- ⚠ WHICH BIRD. The roster is `<Species>Body` / `<Species>Wings` under
+-- ReplicatedStorage.RoshamboBirds, so this is the only line to change to look at a different one.
+-- Every framing number below is DERIVED from the chosen bird's own size, because the karasu is
+-- twice the uguisu and a distance tuned for one is wrong by 2x for the other.
+local SPECIES: string = "Uguisu" -- "Uguisu" | "Karasu"
+
 local MODE: string = "ISOLATED" -- "ISOLATED" | "FLIGHT"
 local BEAT_RATE = 0.22 -- fraction of real wingbeat speed (ISOLATED only)
 local TRACE = true -- draw the wingtip path (ISOLATED only)
@@ -81,9 +87,18 @@ end
 
 local birdAssets = ReplicatedStorage:FindFirstChild("RoshamboBirds")
 assert(birdAssets, "watchWingbeat: no ReplicatedStorage.RoshamboBirds")
-local BODY = meshOf(birdAssets:FindFirstChild("UguisuBody"))
-local WINGS = meshOf(birdAssets:FindFirstChild("UguisuWings"))
-assert(BODY and WINGS, "watchWingbeat: need both UguisuBody and UguisuWings")
+local BODY = meshOf(birdAssets:FindFirstChild(SPECIES .. "Body"))
+local WINGS = meshOf(birdAssets:FindFirstChild(SPECIES .. "Wings"))
+assert(
+    BODY and WINGS,
+    `watchWingbeat: need both {SPECIES}Body and {SPECIES}Wings under ReplicatedStorage.RoshamboBirds`
+)
+
+-- ⚠ FRAMING COMES OFF THE BIRD, not off a constant. Body LENGTH is the z extent — the FBX axis
+-- conversion puts nose-to-tail on z — and the karasu is 1.640 against the uguisu's 0.828.
+local BODY_LEN = (BODY :: BasePart).Size.Z
+local VIEW_DISTANCE = BODY_LEN * 3.0
+local BEAD_SIZE = BODY_LEN * 0.015
 
 -- ===== workspace =====
 
@@ -161,7 +176,7 @@ end
 local function runIsolated()
     local cam = workspace.CurrentCamera
     assert(cam, "watchWingbeat: no CurrentCamera")
-    local origin = cam.CFrame.Position + cam.CFrame.LookVector * 2.5
+    local origin = cam.CFrame.Position + cam.CFrame.LookVector * VIEW_DISTANCE
     -- SIDE-ON: aim the bird along the camera's RIGHT, so its profile faces the lens. A bird viewed
     -- nose-on tells you nothing about a wingbeat.
     local base = CFrame.lookAt(origin, origin + cam.CFrame.RightVector)
@@ -176,7 +191,7 @@ local function runIsolated()
             local bead = Instance.new("Part")
             bead.Name = `Tip{i}`
             bead.Shape = Enum.PartType.Ball
-            bead.Size = Vector3.new(0.012, 0.012, 0.012)
+            bead.Size = Vector3.new(BEAD_SIZE, BEAD_SIZE, BEAD_SIZE)
             bead.Anchored, bead.CanCollide, bead.CastShadow = true, false, false
             bead.Material = Enum.Material.Neon
             bead.Color = Color3.fromRGB(255, 210, 90)
@@ -209,9 +224,12 @@ local function runIsolated()
     end)
 
     print(
-        ("[watchWingbeat] ISOLATED at %.1f%% speed, %s. Delete Workspace.Sandbox.%s to stop."):format(
+        ("[watchWingbeat] %s ISOLATED at %.1f%% speed, %s. Body %.2f studs, viewed from %.2f. Delete Workspace.Sandbox.%s to stop."):format(
+            SPECIES,
             BEAT_RATE * 100,
             if TRACE then "tracing the right wingtip" else "no trace",
+            BODY_LEN,
+            VIEW_DISTANCE,
             FOLDER_NAME
         )
     )
