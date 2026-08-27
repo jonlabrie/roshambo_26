@@ -139,6 +139,37 @@ which no test can see.)
   (`identityTier` is the seam), or a standing decision that one human means one wallet and
   Robux therefore never buys points.
 
+## (j) PWA identities can vote in the World Throw — GATE on enabling the PWA
+
+- **What:** both platforms feed one tally and a PWA identity is free, so a farm holding ~N/3 of a
+  round decides the World Throw for everyone in it. Full trace on [[identity]].
+- **Why parked, not fixed:** it is inert until TEST_MODE goes off AND a PWA population exists.
+  Owner 2026-08-27: **Roblox launches first, PWA not enabled at launch.** Designing a defence now
+  would be building ahead of the constraint.
+- **⚠ THE GATE, so it cannot be forgotten:** do not enable the PWA against a non-TEST_MODE
+  backend until this is answered. Either condition alone is safe; together they are not.
+- **Partial mitigation shipped 2026-08-27:** per-connection `CLAIM_LIMIT` of 3 — a floor against
+  unauthenticated Atlas writes, not a sybil defence.
+- **The shape of the answer**, if it helps whoever picks this up: earned enfranchisement plus
+  cohort detection, gating the VOTE rather than the account. Proof-of-work rejected — regressive
+  on the weakest device, and this is kid-first on phones.
+
+## (k) `JWT_SECRET` was a project-named placeholder in SSM
+
+- **Found 2026-08-27** by length: `/roshambo/dev/JWT_SECRET` was 26 characters, matching the
+  placeholder in `server/.env` exactly.
+- **Blast radius:** that key signs BOTH device tokens and user JWTs. A guessable key means forging
+  `{ typ: 'device', did: <any victim> }`, which the handshake trusts completely — read the
+  account, throw as it, rename it, bank its pot. ⚠ **This is the vulnerability the 2026-08-18
+  hard cut closed, reopened by a weak key.** The mechanism was right; a signature is only worth
+  its secret.
+- **Measured, not alarmist:** not published, so it needs a targeted guess rather than a brute
+  force; prod is PAUSED and both environments run TEST_MODE.
+- **Status:** owner rotating dev `/roshambo/dev/JWT_SECRET` + `start-deployment` 2026-08-27
+  (App Runner reads secrets at deploy time — [[deploy]]). ⚠ **Prod `/roshambo/JWT_SECRET` still
+  to check, before any resume.** Rotation logs everyone out and orphans guest tokens — a second
+  hard cut, cheap now, expensive after launch.
+
 _(h) — the World Throw picked at random — was FIXED 2026-08-16, see [[world-throw]] and
 `log.md`. It is deliberately NOT active in any deployed environment yet: both prod and dev
 run `TEST_MODE`, which keeps the R→P→S cycle. Defect (e) therefore still stands._

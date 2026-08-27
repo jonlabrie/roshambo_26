@@ -65,6 +65,44 @@ the Roblox player does not have. **The economy split is enforced HERE, not in th
 `unique, sparse` index on `robloxId` — see [[parked-defects]] (i) for the trap and the repair
 that makes it worse.
 
+## ⚠ THE WORLD THROW IS A VOTE, AND PWA IDENTITY IS FREE
+
+Traced 2026-08-27, and it is the most consequential thing on this page.
+
+**Both platforms feed ONE tally.** `socketAdapter` submits `pwa:<deviceId>`, `apiV1` submits
+`roblox:<robloxUserId>`, into a single `Map` on `RoundEngine`; `countThrows()` iterates it
+without regard to platform; `GameRules.deriveWorldThrow` takes the argmax of that. So a PWA
+throw is a vote in the World Throw that every Roblox player is then scored against.
+
+**And a PWA identity costs nothing.** `claim-device` mints a `randomUUID()` and upserts a durable
+User document — unauthenticated, and until 2026-08-27 unlimited. ⚠ **It is NOT a device id:** no
+hardware binding, no fingerprint, just `localStorage` plus a server-signed token. Clearing site
+data mints another; so does a `socket.io-client` loop, with no browser involved at all.
+
+⚠ **THE PLURALITY MATH INVERTS THE USUAL ASSUMPTION.** The World Throw is an argmax, not a
+majority. With honest players splitting roughly evenly across R/P/S, a farm needs only about
+**N/3** of the round to own the outcome — ~2 bots at the 5-participant floor, ~10 at thirty,
+~300 at nine hundred. **The attack is cheapest when the population is smallest, which is
+launch.** Sybil defence cannot be deferred until the game is big; big is when it gets harder.
+
+**Not live, and the gate is why.** Both environments run `TEST_MODE`, so the World Throw is the
+R→P→S cycle and the plurality rule has never run ([[world-throw]]). The exposure opens when
+TEST_MODE goes off AND a PWA population exists. Owner, 2026-08-27: Roblox launches first and the
+PWA is not enabled at launch, so this is a **gate on enabling the PWA**, not on launching.
+
+**Done 2026-08-27:** a per-connection `CLAIM_LIMIT` of 3. ⚠ **That is a floor, not a defence** —
+an attacker opens more sockets. It is there because each claim writes to Atlas unauthenticated
+and its absence was indefensible, NOT because it solves anything.
+
+**Designed and deliberately NOT built** (see [[parked-defects]] (j)): earned enfranchisement — an
+identity throws, wins, banks and ranks immediately, but does not count toward the World Throw
+until it has played across N rounds. ⚠ Its weakness, stated so nobody rests on it: a farm runs
+identities in PARALLEL, so a cohort enfranchises together after one wait, not per identity. What
+it actually buys is SHAPE — identities born together, throwing in lockstep, never idling, never
+banking — which is the loudest possible pattern in `PlayerRound`. **Detection gates the vote;
+the account need never be blocked.** Proof-of-work was considered and rejected: it taxes the
+weakest device hardest, and this is a kid-first game gated on a Samsung A13.
+
 ## ⚠ Roblox OAuth is a named gate, and it has a hard external constraint
 
 Raised by the owner 2026-08-27: lean on Roblox's identity, since their anti-bot, anti-sybil and

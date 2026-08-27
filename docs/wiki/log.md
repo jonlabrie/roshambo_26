@@ -1594,3 +1594,36 @@ Handed to the design thread.
 ⚠ Two pages got `checked: 2026-08-27` for an unusual reason: committing the SDD ledgers gave
 them today's commit date, so the currency check saw [[fireworks]] and [[foliage]] lagging
 citations that had not changed — they were IMPORTED. Both were read end to end before stamping.
+
+## [2026-08-27] defect | The World Throw is a vote, PWA identity is free, and the signing key was a placeholder
+
+Came out of the owner's Roblox-OAuth question, which turned out to be pointing at something
+larger than it asked.
+
+**1. PWA throws vote in the World Throw.** Both platforms submit into one `Map` on `RoundEngine`;
+`countThrows()` ignores platform; `deriveWorldThrow` takes the argmax. A PWA identity costs
+nothing — `claim-device` mints a `randomUUID()` and upserts a User, unauthenticated. ⚠ **It is
+not a device id**: no hardware binding, no fingerprint, just localStorage and a token; a
+`socket.io-client` loop mints them with no browser at all.
+
+⚠ **The plurality math inverts the usual assumption.** Argmax, not majority — a farm needs ~N/3
+of the round. Two bots at the five-participant floor. **Cheapest when the population is smallest,
+which is launch.**
+
+⚠ **Owner ruling 2026-08-27: NOT built now.** Roblox launches first with the PWA disabled and
+TEST_MODE on, so the exposure is inert. Designing a defence for a population that does not exist,
+against a rule that is not running, for a client that is not enabled, is the karasu mistake
+([[parallel-threads]]). Parked as [[parked-defects]] (j) with an explicit GATE on enabling the
+PWA. Shipped only `CLAIM_LIMIT = 3`, and its comment says plainly it is a floor, not a defence.
+
+**2. ⚠ `/roshambo/dev/JWT_SECRET` was 26 characters — the `.env` placeholder, in SSM.** That key
+signs device tokens AND user JWTs, so a guessable key means forged identities: read any account,
+throw as it, bank its pot. **This is exactly what the 2026-08-18 hard cut closed, reopened by a
+weak key** — the mechanism was right, and a signature is only worth its secret. Owner rotating;
+prod still to check. Parked as (k).
+
+⚠ **Two corrections I made to my own reasoning during this**, recorded because the design would
+have rested on them: earned enfranchisement does NOT price out a farm (identities enfranchise in
+parallel, one wait for the whole cohort — what it buys is a detectable SHAPE); and proof-of-work
+is REGRESSIVE here, taxing a kid's A13 harder than an attacker's server, in a game gated on that
+exact device.

@@ -9,6 +9,7 @@ import { ResultsStore } from '../engine/ResultsStore';
 import { attachSocketAdapter } from './socketAdapter';
 import Session from '../models/Session';
 import User from '../models/User';
+import { CLAIM_LIMIT } from './socketAdapter';
 import BankEvent from '../models/BankEvent';
 import StreakEvent from '../models/StreakEvent';
 import PlayerRound from '../models/PlayerRound';
@@ -37,6 +38,8 @@ async function claimDevice(sock: ClientSocket): Promise<string> {
 }
 
 describe('socket adapter wire format', () => {
+    let port = 0; // hoisted so a test can open its OWN socket; the shared `client` carries
+    // per-connection state (the claim counter) that would make such a test order-dependent.
     beforeAll(connectTestDb);
     afterAll(disconnectTestDb);
 
@@ -57,7 +60,7 @@ describe('socket adapter wire format', () => {
         const io = new Server(httpServer);
         attachSocketAdapter(io, engine, new ResultsStore());
         await new Promise<void>(r => httpServer.listen(0, r));
-        const port = (httpServer.address() as AddressInfo).port;
+        port = (httpServer.address() as AddressInfo).port;
         client = clientIo(`http://localhost:${port}`, { auth: {} });
         initPromise = new Promise<any>(resolve => client.once('init', resolve));
         await waitFor(client, 'connect');
@@ -293,6 +296,32 @@ describe('socket adapter wire format', () => {
         client.emit('bank');
         expect((await updated).user).toMatchObject({ totalPoints: 10, pointsAtStake: 0 });
     });
+
+    it('⚠ one socket cannot mint unlimited identities', async () => {
+        // Each `claim-device` UPSERTS a durable User document, unauthenticated. Before the cap a
+        // script with socket.io-client filled Atlas in a for-loop — and once TEST_MODE is off,
+        // every minted identity is also a VOTE in the World Throw, which is a plurality: a farm
+        // needs only ~N/3 of the round to decide the outcome for everyone, and that is CHEAPEST
+        // when the population is smallest. See docs/wiki/systems/identity.md.
+        await initPromise;
+        const sock = clientIo(`http://localhost:${port}`, { auth: {}, forceNew: true });
+        await waitFor(sock, 'connect');
+        const before = await User.countDocuments({});
+
+        let claimed = 0;
+        for (let i = 0; i < CLAIM_LIMIT + 5; i++) {
+            const got = waitFor<any>(sock, 'device-claimed');
+            sock.emit('claim-device');
+            // a refused claim emits nothing, so race the wait against a short timer
+            const res = await Promise.race([got, new Promise(r => setTimeout(() => r(null), 120))]);
+            if (res) claimed++;
+        }
+        sock.disconnect();
+
+        expect(claimed).toBe(CLAIM_LIMIT);
+        expect(await User.countDocuments({})).toBe(before + CLAIM_LIMIT);
+    });
+
 
     it('bank with a keep drops the pot to that rung over the socket', async () => {
         await initPromise;

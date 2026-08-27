@@ -23,6 +23,10 @@ async function personalHistory(user: { _id: unknown; deviceId?: string }) {
     }).sort({ timestamp: -1 }).limit(30);
 }
 
+// A real client claims ONCE and re-presents its token. Three allows for a retry and a race
+// without ever being reached by an honest browser.
+export const CLAIM_LIMIT = 3;
+
 export function attachSocketAdapter(io: Server, engine: RoundEngine, store: ResultsStore): void {
     let seqCounter = 0;
     // PWA submits arriving during REVEAL are held for the next round
@@ -180,6 +184,9 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
     // --- per-connection handlers ---
     io.on('connection', (socket: Socket) => {
         let sessionId: string | null = null;
+        // Per CONNECTION, deliberately: a page reload is a new socket and must still be able to
+        // claim. This bounds one socket's damage; it does not bound an attacker's.
+        let claims = 0;
 
         // The PWA attaches its 'init' listener BEFORE connecting, so this single
         // synchronous emit preserves the production wire contract exactly.
@@ -210,6 +217,25 @@ export function attachSocketAdapter(io: Server, engine: RoundEngine, store: Resu
         // hard cut on 2026-08-18 — guest points and streaks from before this change are
         // orphaned rather than handed to whoever asks for them first.
         socket.on('claim-device', async () => {
+            // ⚠ EACH CLAIM UPSERTS A DURABLE User DOCUMENT, UNAUTHENTICATED. A socket.io-client
+            // for-loop filled Atlas at no cost and with no ceiling. A browser needs ONE identity
+            // and re-presents its token thereafter, so a low cap is invisible to every real
+            // client and closes the loop.
+            //
+            // ⚠ AND THIS IS NOT ONLY A STORAGE PROBLEM. Once TEST_MODE is off, every identity is
+            // a VOTE: the World Throw is the PLURALITY of the round's throws, both platforms into
+            // one tally, so a farm needs roughly N/3 of the round to decide the outcome for
+            // everyone — Roblox players included. That is CHEAPEST when the population is
+            // smallest, which is launch. See docs/wiki/systems/identity.md.
+            //
+            // A per-socket cap is a floor, not a defence: an attacker opens more sockets. It is
+            // here because it is free and its absence is indefensible, NOT because it solves the
+            // sybil problem, which is gated on enabling the PWA and unsolved.
+            if (claims >= CLAIM_LIMIT) {
+                socket.emit('claim-refused', { reason: 'CLAIM_LIMIT' });
+                return;
+            }
+            claims++;
             try {
                 const deviceId = randomUUID();
                 const user = await resolveUser({ deviceId });
