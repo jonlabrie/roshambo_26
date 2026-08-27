@@ -236,5 +236,101 @@
             "expect": "R",
             "why": "exactly at the threshold, so the plurality rule applies"
         }
+    ],
+    "partialBank": [
+        {
+            "pot": 0,
+            "keepOptions": [],
+            "why": "nothing staked \u2014 there is nothing to drop"
+        },
+        {
+            "pot": 1,
+            "keepOptions": [
+                0
+            ],
+            "why": "the only move from the bottom rung is a full bank"
+        },
+        {
+            "pot": 3,
+            "keepOptions": [
+                0,
+                1
+            ],
+            "why": "drop to 1, banking 2"
+        },
+        {
+            "pot": 9,
+            "keepOptions": [
+                0,
+                1,
+                3
+            ],
+            "why": "three choices below the pot"
+        },
+        {
+            "pot": 27,
+            "keepOptions": [
+                0,
+                1,
+                3,
+                9
+            ],
+            "why": "the worked example in the spec"
+        },
+        {
+            "pot": 81,
+            "keepOptions": [
+                0,
+                1,
+                3,
+                9,
+                27
+            ],
+            "why": "the ladder keeps its shape as the pot deepens"
+        },
+        {
+            "pot": 243,
+            "keepOptions": [
+                0,
+                1,
+                3,
+                9,
+                27,
+                81
+            ],
+            "why": "no upper bound on the ladder"
+        }
+    ],
+    "partialBankRejects": [
+        {
+            "pot": 27,
+            "keep": 27,
+            "why": "keep must be STRICTLY below the pot \u2014 this is a no-op, not a bank"
+        },
+        {
+            "pot": 27,
+            "keep": 81,
+            "why": "banking may never increase the pot"
+        },
+        {
+            "pot": 27,
+            "keep": 5,
+            "why": "5 is not a rung of the 3^n ladder"
+        },
+        {
+            "pot": 27,
+            "keep": 13.5,
+            "why": "no fractional points, ever \u2014 though 13.5 is caught by not being a rung at all"
+        },
+        {
+            "pot": 27,
+            "keep": -1,
+            "why": "negative"
+        },
+        {
+            "pot": 0,
+            "keep": 0,
+            "why": "nothing staked"
+        }
     ]
 }

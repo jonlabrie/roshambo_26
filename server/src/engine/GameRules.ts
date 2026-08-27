@@ -28,6 +28,32 @@ export function nextStreak(currentStreak: number, result: RoundResult): number {
     return result === 'WIN' ? currentStreak + 1 : 0;
 }
 
+// PARTIAL BANKING: a pot may be dropped to a LOWER RUNG, banking the difference.
+//
+// WHY RUNGS AND NOT A SLIDER. A continuous fraction turns Bank-vs-Stake into an optimisation with
+// a computable answer; three or four discrete choices keep it a judgement call. Rungs also mean
+// every pot stays a power of three and every banked difference is an integer, so "never 13.5"
+// holds by construction rather than by rounding (owner, 2026-08-26).
+//
+// Returns every ladder value strictly below `pot`, ascending, 0 first. 0 is the full bank, which
+// is why `bankPot`'s default keep of 0 reproduces today's behaviour exactly.
+export function keepOptions(pot: number): number[] {
+    if (!Number.isFinite(pot) || pot <= 0) return [];
+    const options = [0];
+    // Walk the ladder 1, 3, 9, ... and stop before reaching the pot itself.
+    for (let rung = 1; rung < pot; rung *= 3) options.push(rung);
+    return options;
+}
+
+export function isValidKeep(pot: number, keep: number): boolean {
+    // ⚠ DEFENCE, NOT THE FRACTIONAL CHECK THAT ACTUALLY BITES. No rung is ever fractional, so
+    // membership below already rejects 13.5 -- mutation testing showed the fixture's 13.5 row
+    // passes with this line deleted. It stays as a guard on the day keepOptions changes shape,
+    // but do not read the fixture as proving it.
+    if (!Number.isInteger(keep)) return false;
+    return keepOptions(pot).includes(keep);
+}
+
 // ── The World Throw ──────────────────────────────────────────────────────────
 // THE PREMISE: the World Throw is what the crowd threw — "you against the world".
 // See docs/wiki/world/world-throw.md. Deriving it from the round's own tally is what

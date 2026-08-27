@@ -1,8 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import fixtures from '../../../shared-fixtures/game-rules.json';
-import { calculateResult, nextPot, potDelta, nextStreak, deriveWorldThrow, Throw, RoundResult } from './GameRules';
+import { calculateResult, nextPot, potDelta, nextStreak, keepOptions, isValidKeep, deriveWorldThrow, Throw, RoundResult } from './GameRules';
 
 describe('GameRules (shared fixtures)', () => {
+    it.each(fixtures.partialBank)('pot $pot may be dropped to $keepOptions — $why', ({ pot, keepOptions: expected }) => {
+        expect(keepOptions(pot)).toEqual(expected);
+        for (const keep of expected) expect(isValidKeep(pot, keep)).toBe(true);
+    });
+
+    it.each(fixtures.partialBankRejects)('pot $pot rejects keep $keep — $why', ({ pot, keep }) => {
+        expect(isValidKeep(pot, keep)).toBe(false);
+    });
+
     it.each(fixtures.matchups)('$player vs world $world -> $result', ({ player, world, result }) => {
         expect(calculateResult(player as Throw, world as Throw)).toBe(result);
     });
