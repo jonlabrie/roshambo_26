@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-26
+updated: 2026-08-27
 ---
 
 # Familiars — the bird that reads your round
@@ -163,6 +163,19 @@ aligned). `Transparency = 1` is the only complete answer. All three failures are
 Two bones per wing, hinged at 46% of span: **0.467 studs spread → 0.093 folded**, inside the
 0.112 body half-width. Verified in Roblox, not only in Blender.
 
+⚠ **THE SHIPPED UGUISU WING CANNOT BE REGENERATED FROM ANY SCRIPT, AND THE PAGE SAID NOTHING
+ABOUT IT UNTIL 2026-08-27.** `roblox/tools/blender/spread_wing.py` is that wing's ORIGIN, not its
+definition: measured off the committed mesh the wing holds a uniform ~23.9° angle of attack across
+its span, where the script's formula yields about 8° at the root. It was reshaped after the script
+ran, by a step nobody wrote down. The 2026-08-26 tip fix therefore had to be applied to the MESH,
+in `uguisu_retarget.blend`.
+**Do not assume re-running `build()` reproduces what is in the game.** The warning has lived in
+that file's header since the day it was found — where only somebody already editing the script
+would meet it, which is the wrong audience for a fact about the shipped asset. This is the same
+failure shape as the recorded 0.552 size, one layer up: the artifact and its record disagree, and
+nothing was positioned to notice. The karasu does not share it — `karasu_retarget.py` runs end to
+end ([[blender-pipeline]]).
+
 **Amended 2026-08-25:** "completely disappear" now means *at rest*, not *while perched*. A perched
 bird flutters (below), and a flutter is a half-unfold — so the wings are visible for half a second
 at a time on a perch. Transparency still returns to 1 the instant the burst ends. The owner made
@@ -217,8 +230,8 @@ studs forward against 1.64 up: the bird went up like a rocket and then turned to
 (owner). Rise and CIRCLE's side-swing now key off `along`, so the climb is proportional to
 progress. Endpoints and peak heights are unchanged; only the schedule moves.
 
-⚠ **GEAR UP.** Fixed legs read as *"a plane flying with the wheels down"*. Measured: **+100° at the
-hip** lifts the foot 0.280 studs, from y −0.281 to −0.001, and puts EVERY joint of the leg chain
+⚠ **GEAR UP.** Fixed legs read as *"a plane flying with the wheels down"*. Measured: **`BirdFlight.LEG_TUCK_DEG` at the
+hip** (100° today) lifts the foot 0.280 studs, from y −0.281 to −0.001, and puts EVERY joint of the leg chain
 inside the body's bounding box (protrusion 0.000) — so the hip alone folds the leg into the flank
 and no knee bone is needed. At rest the foot protrudes 0.045 below, which is correct: feet should
 show on a perch. Up by 22% of the flight, down from 78%, so it extends BEFORE touchdown.
@@ -378,29 +391,28 @@ tip +0.7413 — *the same sign raises both, local X does not mirror*. About loca
 them +0.7984 and −0.7060 — *opposite, local Z does mirror*. Local X moves the tip only vertically
 and local Z only fore-and-aft, exactly as measured on the uguisu.
 
-### ⚠ Import instructions — this is the hand-off, and one step is not optional
+### Importing a bird — the checklist
 
-The asset thread does not touch Studio ([[parallel-threads]]). For the main thread:
+⚠ **This was written as a hand-off to the main thread; that thread split is retired
+([[parallel-threads]]) and the karasu is imported.** Kept as the checklist for the NEXT bird,
+with the reasoning left on the pages that own it rather than restated here — a third copy of a
+trap is a third thing to correct when the trap is corrected.
 
-1. Import `karasu_body.fbx` and `karasu_wings.fbx`. **Do not rescale** — unlike the uguisu (built
-   at one size and scaled in Studio), this one is 1:1 at its final size.
-2. ⚠ **DELETE THE SurfaceAppearance THE IMPORTER CREATES AND USE `TextureID` INSTEAD.** The FBX
-   carries a ColorMap and nothing else, and a **ColorMap-only SurfaceAppearance on opaque geometry
-   renders warm and shiny** — Roblox substitutes its own defaults for the missing channels
-   ([[material-and-mesh-traps]] §8). On a black bird that is glaring. The uguisu ships as a
-   `TextureID` for exactly this reason.
-3. ⚠ **Set `part.CFrame` directly — never `PivotTo`.** The importer bakes a rotation into the
-   MeshPart's CFrame with a compensating one in `PivotOffset`, so an identity pivot lays the bird
-   on its back ([[blender-pipeline]]).
-4. ⚠ **Anchored: TRUE, and it IS an importer setting** — it is in the dialog, and a parked probe
-   that is not anchored falls out of the world on the first Play.
-5. ⚠ **Vertex colours: OFF.** The vendor meshes carry a `colorSet0` baked-AO layer running
-   0.0–0.15 which Roblox MULTIPLIES into the surface ([[blender-pipeline]]). On the uguisu that read
-   as a broken material for an hour; on a black crow it would be nearly invisible as a fault and
-   simply ship 85% too dark.
-6. Confirm `HasSkinnedMesh` and run a bone-drive test in the place before gating — and measure a
-   DESCENDANT of the driven bone, never the driven bone itself, which cannot move under its own
-   rotation and reads a meaningless zero.
+1. Import body and wings. **Do not rescale** if the source is authored 1:1 (the karasu is; the
+   uguisu was built at one size and scaled in Studio).
+2. **Delete any `SurfaceAppearance` the importer creates; use `TextureID`** —
+   [[material-and-mesh-traps]] §8 (ColorMap-only renders warm and shiny).
+3. **Set `part.CFrame` directly, never `PivotTo`** — [[blender-pipeline]] (the importer bakes a
+   rotation into the CFrame with a compensating `PivotOffset`).
+4. **Anchored: TRUE** — it is an importer dialog setting; an unanchored probe falls out of the
+   world on the first Play.
+5. **Vertex colours: OFF** — [[blender-pipeline]] (a baked-AO `colorSet0` layer is MULTIPLIED in).
+6. Confirm `HasSkinnedMesh`, then bone-drive test before gating — ⚠ **measure a DESCENDANT of the
+   driven bone, never the driven bone itself**, which cannot move under its own rotation and reads
+   a meaningless zero.
+
+Run `roblox/tools/studio/measureBirds.luau` for the roster's actual sizes, bone counts and asset
+ids rather than reading them here.
 
 **Import verified 2026-08-26.** No `SurfaceAppearance` was created (the trap in step 2 did not
 fire); `TextureID` came through as `rbxassetid://129407256075817` on both parts; `HasSkinnedMesh`

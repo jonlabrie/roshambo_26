@@ -1333,3 +1333,35 @@ existed only as prose are now one-liners on [[owner-rulings]]: the 2026-08-18 ha
 per-viewer SurfaceGui trick) still sit in `backlog.md` carrying a note that they belong on
 [[misc-engine-traps]]. Recorded rather than moved so the next pass has a start, and so this
 entry does not claim a clean sweep it did not do.
+
+## [2026-08-27] audit | The other two long pages — and the pass found the opposite problem
+
+Ran the backlog.md method on [[blender-pipeline]] (449) and [[familiars]] (440), the two other
+pages past the schema's own 439-line mark. ⚠ **Neither was accreted, and forcing them to shrink
+would have destroyed the thing worth keeping.**
+
+**blender-pipeline.md: 0 dead markers, 0 duplication, all live technique on the right shelf.**
+Verified rather than assumed — checked the transcribed FBX flags against the shipped script and
+found the page CORRECT where it looked wrong: it prints `use_mesh_modifiers=True` in the static
+block and `False` in the skinned block, which is exactly right, and the `⚠ True silently destroys
+the rig` warning sits beside the second. Checked the two rig sections for overlap: none, they are
+import-a-vendor-rig versus author-new-geometry. One real defect, and it was a SCOPE statement, not
+stale content — the intro said "pipelines that feed Roblox from OUTSIDE the engine" while its own
+contents list an IN-engine river. Corrected in place; the page grew by 8 lines and is better.
+
+**familiars.md: net +12 lines, and the pass was still worth it.** The import-instructions section
+was a hand-off to a thread that no longer exists, and steps 2/3/5 were third copies of traps
+canonical on the pages they cite — collapsed to a checklist that points instead of restating. One
+transcribed constant (`+100°` at the hip) now names `BirdFlight.LEG_TUCK_DEG` so it cannot drift.
+
+⚠ **BUT THE REAL FIND WAS A MISSING FACT, NOT A SURPLUS ONE.** The shipped uguisu wing cannot be
+regenerated from any script — it was reshaped after `spread_wing.py` ran, by a step nobody wrote
+down, and sits at 23.9° angle of attack where the script yields 8°. **That warning existed only in
+the script's own header**, where only somebody already editing it would meet it. The as-built page
+for the birds said nothing. Now recorded on [[familiars]].
+
+**What the three pages together say.** Length is a bad proxy twice over: backlog.md was 545 lines
+and genuinely accreted; these two are the same length and are not. The signal was never size, and
+it was never age either — of everything removed across all three, almost nothing was WRONG. It was
+**correct material on the wrong shelf**, plus one fact filed somewhere nobody would look. A length
+check, a staleness check and a decay score would each have passed all three pages every day.

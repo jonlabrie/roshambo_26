@@ -1,13 +1,21 @@
 ---
 shelf: practice
-updated: 2026-08-26
+updated: 2026-08-27
 ---
 
 # Blender Pipeline
 
-The asset pipelines that feed Roblox from outside the engine: Blender→FBX import (static
-and SKINNED), the in-engine procedural river technique, and the SDF glyph rasteriser. Tools live in
-`roblox/tools/blender/`, `roblox/tools/textures/`, and `roblox/tools/glyphs/`.
+How assets get MADE, wherever the making happens: Blender→FBX import (static and SKINNED),
+the procedural river, the waterfall VFX recipe, and the SDF glyph rasteriser. Tools live in
+`roblox/tools/blender/`, `roblox/tools/studio/`, `roblox/tools/textures/` and
+`roblox/tools/glyphs/`.
+
+⚠ **The name is narrower than the page.** This said "pipelines that feed Roblox from OUTSIDE
+the engine" while its own contents list an IN-engine river — a scope statement contradicting
+its own table of contents. The subject is asset *production*; two of these pipelines never
+open Blender. Corrected 2026-08-27 rather than split, because neither [[build-recipes]] (a
+canyon-geometry gate) nor a new page is a better home for a river technique than the page a
+reader already goes to for "how do I make the thing".
 
 ## Blender → Roblox FBX
 
