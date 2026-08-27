@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-18
+updated: 2026-08-26
 ---
 
 # The Core Loop
@@ -42,6 +42,9 @@ judgement lives.
 - **Stake** — leave the pot riding. It triples on the next WIN, survives a SAFE, and is
   wiped by a LOSS.
 - **Bank** — convert the pot into `totalPoints`, permanently.
+
+⚠ **Bank-vs-Stake is also the constraint on every status display**: any metric either branch
+changes puts a thumb on the scale of this decision. See [[status-display]].
 
 The pot is never "wagered" in the gambling sense and the copy must never say so — the
 owner's standing RISK/BANK ruling is on [[round-and-hud]]: a player may collect or keep

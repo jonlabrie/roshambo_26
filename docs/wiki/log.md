@@ -1092,3 +1092,100 @@ after the script ran by a step nobody recorded — so the script is that wing's 
 definition, and the tip fix had to be applied to the MESH. `spread_wing.py` now carries a warning
 saying so. This is the same failure as the recorded size, one layer down: an artifact drifting from
 its record with nothing in place to notice.
+## [2026-08-26] decision | Seniority gets no carrier — and the owner named the three clocks that say why
+
+Owner, on the gated aura: *"who cares about auras if only 2 or 3 are ever even visible on your
+server? We're either measuring the right thing badly, or measuring the wrong thing."* They named
+two candidates — juice and seniority. **Seniority is out**, and the count was exact rather than
+impressionistic: at p(win) ≈ 0.30 under plurality, P(streak ≥ 2) = 0.09, so a 30-player server
+yields 2.7 glowing. The design's own arithmetic produced the complaint.
+
+⚠ **Seniority is not "closer to grade" — it IS grade.** `bestStreak` already drives the
+`run.3/5/7/10` milestone family in `Milestones.ts`, so it already feeds grade → band → the familiar
+unlocks. A second carrier would render overlapping inputs as two disagreeing rankings on one body.
+It also fails on durability — a durable rank worn by everyone is exactly what killed the sashimono,
+and the visibility toggle does not rescue it, because opt-out is not opt-in. And on density from
+the other side: `bestStreak ≥ 3` is ~50 minutes of play (nearly everyone) while `≥ 5` is ~10 hours
+(almost nobody), with nothing usable between — the two thresholds bracketing that gap being `run.3`
+and `run.5`, which already exist.
+
+**Then the owner settled the whole architecture in one line:** *"the Aura/grades/whatever need to
+show current skill/luck, longer-term success, and levels earned and held forever."* Three clocks,
+now on [[status-display]]. ⚠ **The middle one has no carrier and nobody was designing it** — every
+rejected proposal was trying to put *forever* on a body, and forever already belongs to the
+unlocks, while *lately* sat unclaimed. Its data is already computed (`stats.heatBoard`), as a board
+with no presence on or around the player. And *forever* is settled but **silent**: nothing
+announces a grade-up and nothing prints the grade, so the private half is owed before anyone
+designs where strangers read it.
+
+## [2026-08-26] decision | The aura must be neutral on Bank vs Stake — three metrics fail it
+
+⚠ **THE STANDING RULE, arrived at by getting it wrong twice.** Bank-or-Stake is the only real
+decision in Roshambo, so any metric either branch changes puts a thumb on the scale of the choice
+the game exists to pose — **and it must never reward being present without playing.**
+
+I proposed re-keying the aura to `pointsAtStake` on density grounds. Owner: *"pointsAtStake is NOT
+the number; I don't want to lean into 'current risk level' being what kids are relying on for flex
+because it DISCOURAGES PLAY. If you get to an impressive AURA level, why risk it, and why bank
+it?"* Correct, and worse than stated: `settleRound` iterates `data.throws` only, so an unthrown
+player is never settled and keeps pot, streak and aura indefinitely. The glow-optimal strategy
+becomes **reach a deep pot and stop playing.** Third instance of one error — `stakingStreak` paid
+you never to bank; `pointsAtStake` pays you never to bank *and* never to throw; and the shipped
+`currentStreak` carries the same trap weakly, since a 6-streak is preserved forever by not playing.
+
+⚠ **And a correction to my own over-reach, which the owner supplied.** *"I don't mind 'paying'
+players to be online — given Roblox's incentive structures… paying players to stay in the game,
+return to it often, is a core Roblox game development strategy."* Rewarding **presence** is the
+business model; rewarding **presence without play** is the failure. RPS here is the **ambient**
+game — players socialise and throw occasionally.
+
+**Proposed replacement, not yet ruled on: a decaying peak** — the highest pot you have *reached*
+recently, fading. Banking and losing both leave it alone; only winning raises it; only time lowers
+it. ⚠ It is **not a "session" peak** — a `Session` is scoped by platform AND instanceId, so a
+boundary would zero the glow on a server hop, a PWA→Roblox walk or a dropped connection, and would
+pay players not to log off. Rules ruled since: `>=` not `>` (matching your value resets the clock —
+*"obviously"*), comparing the **decayed** values not the raw ones, wall-clock decay at one rung per
+2 hours, and **a win buys back time** — which is what carries the ambient player without the
+per-throw decay that would pay them to stop throwing. ⚠ It needs **no new storage**:
+`PlayerRound.pointsDelta` on a WIN records the new pot value, so the documented trap that makes
+summing the column wrong is exactly what makes `$max` over it right.
+
+**Also surveyed, since the owner asked whether decay is a general unlock:** it largely already is.
+`windows.ts` + `stats.heatBoard` are windowed leaderboards with the period as an argument. ⚠ Not on
+`totalPoints` — no timestamps, and it is a wallet purchases decrement. **General rule: to window a
+quantity you need an EVENT ROW, not a counter**, which makes it a checklist rather than an
+architecture — and the gap is retroactive. One quantity is missing: purchases write nothing
+(`store.ts:49`), so **spending is unanswerable until a `PurchaseEvent` exists**, and that wants
+landing before the fireworks catalog, not after.
+
+## [2026-08-26] drop | Multi-hand splitting set aside — parking is a free option
+
+Owner proposed up to 3 working hands, blackjack-split style: park a good streak unexposed, build a
+new one, choose in advance which hand is at risk each round. Asked for brutal honesty rather than
+support. **Set aside** — *"impractical for now. I'll give it more thought."*
+
+⚠ **The finding worth keeping: parking dominates both Bank and Stake at no cost** — it keeps the
+pot, risks nothing, and can still grow. Bank-or-Stake is a dilemma *only* because there is no third
+choice, so this removes the game's only decision. Predicted equilibrium: build to the depth that
+feels frightening, park, repeat until slots are full, bank one to free a slot — press-your-luck
+becomes accumulation. Concrete casualty: **`stats.livePots` goes permanently quiet**, and that
+board exists for exactly one reason, *"someone is holding 243 points right now and has to decide"*.
+
+The blackjack analogy breaks on four properties, deepest being that a split draws independent cards
+while every hand here resolves against the **same World Throw** — so which hand you aim at carries
+no information, and the risk-neutral answer is always "the biggest".
+
+⚠ **One correction owed to the owner:** my "throwing at all three hands is catastrophic" note was
+my own extrapolation, never their proposal. It stands as a guard-rail, not a rebuttal.
+
+**And it produced the better door.** Partial banking — bank down to a lower rung, pocketing the
+difference — was named as the cheaper way to get the risk-granularity the owner wanted, and the
+owner took it up. ⚠ The math does not break: nothing requires a pot to be a power of three. An
+ideal strategy does fall out, and **its shape is what saves it: `f* = (bank ÷ pot + 1)/4` is a
+RATIO, not a constant.** A single publishable number would have solved a decision that today has no
+correct answer; a ratio moves with the player's own position every round. The optimum is also flat
+near the top (riding a third scores 89% of optimal at zero bank), so play does not reward
+calculator work — and ⚠ **at bank ≥ 3× pot, riding the whole pot is optimal**, so the dramatic play
+is not made wrong, it is made *earned*. Recommended shape: drop to a lower rung, which keeps every
+pot a power of three by construction and every difference an integer, so *"never 13.5"* holds
+without rounding. Not ruled on.
