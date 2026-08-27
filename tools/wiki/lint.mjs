@@ -3,7 +3,7 @@
 // program/, log entry format, required frontmatter. See docs/wiki/schema.md.
 import { readdirSync, readFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { join, basename, resolve } from 'node:path';
+import { join, basename, resolve, dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const SHELVES = ['program', 'world', 'practice', 'systems'];
@@ -18,9 +18,10 @@ const STATUS_RE = /\b(NEXT IS|IN PROGRESS|RESUME HERE|OPEN:|BLOCKED|PARKED:|TODO
 // is notice that the ground under a page moved after the page last claimed to be current,
 // and say so. A warning here means RE-READ, not "wrong".
 //
-// The escape hatch is real and deliberate: bumping `updated:` silences a warning without
-// reading anything. That trade is the point -- an invisible rot becomes a visible prompt,
-// and the prompt is cheap enough to survive being seen every session.
+// The escape hatch is real and deliberate: a stamp silences a warning without reading anything.
+// That trade is the point -- an invisible rot becomes a visible prompt, and the prompt is cheap
+// enough to survive being seen every session. Two fields, so the claim is at least legible:
+// `updated:` says "I changed this", `checked:` says "I re-read this and it was right".
 
 // Repo paths as the wiki writes them. Extensions run longest-first so .tsx is not clipped
 // to .ts. Leading delimiter keeps `docs/foo.md` inside a wikilink or URL from matching.
@@ -37,9 +38,49 @@ const CITE_PREFIXES = ['', 'roblox/'];
 // the eleven-day gaps that were sitting unactioned when this became blocking.
 const STALE_GRACE_DAYS = 3;
 
-const gitDateOf = (absPath) => {
+// When did the page's BODY last move? Check 7 must not count a commit that ONLY bumped
+// `checked:` -- adding that field commits the file, and if that counted as an edit the hatch
+// would trip the very check it exists to satisfy. It did, on the day it shipped: seven pages
+// failed 7fada0b for no reason but carrying the field it introduced.
+//
+// Measured from the diff rather than trusted from the frontmatter, so a commit that touches
+// BOTH the body and `checked:` still counts as an edit -- which trusting `checked:` could not
+// tell apart. Walks back only until it finds a real content change; a page whose last commit is
+// an ordinary edit stops on the first step.
+const CHECKED_LINE = /^[+-]checked: /;
+export const gitContentDateOf = (absPath) => {
+  try {
+    const shas = execFileSync('git', ['log', '-20', '--format=%H %ad', '--date=short', '--', absPath], {
+      cwd: dirname(absPath),
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    })
+      .trim()
+      .split('\n')
+      .filter(Boolean);
+    for (const entry of shas) {
+      const [sha, date] = entry.split(' ');
+      const diff = execFileSync('git', ['show', '--unified=0', '--format=', sha, '--', absPath], {
+        cwd: dirname(absPath),
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      });
+      const touched = diff
+        .split('\n')
+        .filter((l) => /^[+-]/.test(l) && !/^(\+\+\+|---)/.test(l));
+      if (touched.some((l) => !CHECKED_LINE.test(l))) return date;
+    }
+    // Every commit in reach only bumped `checked:`. The body has not moved.
+    return '';
+  } catch {
+    return '';
+  }
+};
+
+export const gitDateOf = (absPath) => {
   try {
     return execFileSync('git', ['log', '-1', '--format=%ad', '--date=short', '--', absPath], {
+      cwd: dirname(absPath),
       encoding: 'utf8',
       stdio: ['ignore', 'pipe', 'ignore'],
     }).trim();
@@ -80,6 +121,9 @@ function isIgnored(rel) {
 }
 
 const gitDate = opts.gitDate ?? gitDateOf;
+  // A test that injects only `gitDate` is stating when the page moved and means it to count
+  // as content; falling back keeps every pre-existing test honest rather than no-op.
+  const gitContentDate = opts.gitContentDate ?? opts.gitDate ?? gitContentDateOf;
 
   const pages = [];
   for (const shelf of SHELVES) {
@@ -125,7 +169,7 @@ const gitDate = opts.gitDate ?? gitDateOf;
     if (!updated) continue; // check 4 already reported the bad frontmatter
 
     // 7. the page's own edits outran its `updated:` — schema rule 6, mechanically
-    const pageCommitted = gitDate(p.path);
+    const pageCommitted = gitContentDate(p.path);
     if (pageCommitted && pageCommitted > updated)
       errors.push(`${p.rel}: committed ${pageCommitted} but frontmatter says updated: ${updated} — bump it`);
 

@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { lint } from './lint.mjs';
+import { execFileSync } from 'node:child_process';
+import { lint, gitContentDateOf, gitDateOf } from './lint.mjs';
 
 const FM = (shelf, extra = '') => `---\nshelf: ${shelf}\nupdated: 2026-08-15\n${extra}---\n`;
 
@@ -184,4 +185,66 @@ test('a malformed checked: date is an error in its own right', () => {
   wiki.pages['world/dojo.md'] = FM('world', 'checked: last tuesday\n') + '# Dojo\nSee [[board]].\n';
   const { errors } = lint(makeWiki(wiki));
   assert.ok(errors.some((e) => e.includes("bad frontmatter 'checked'")));
+});
+
+// ⚠ THE HATCH HAD TO BE OPENABLE. Shipped 2026-08-26 (7fada0b), `checked:` was unusable by
+// construction: adding it COMMITS the page, which advances the page's commit date, which trips
+// check 7 -- whose only remedy is bumping `updated:`, the exact lie `checked:` exists to avoid.
+// Seven pages failed the moment the feature that created them landed. Check 7 must therefore ask
+// when the page's BODY last moved, not when its file last moved.
+test("a commit that only bumps 'checked:' does not trip check 7", () => {
+  const root = makeWiki(CLEAN);
+  const { errors } = lint(root, {
+    gitDate: () => '2026-08-31', // the file moved today...
+    gitContentDate: () => '2026-08-15', // ...but its body did not
+  });
+  assert.deepEqual(errors, []);
+});
+
+test('a commit that changes the body still trips check 7', () => {
+  // The hatch must not become a blanket amnesty: this is the check earning its keep.
+  const root = makeWiki(CLEAN);
+  const { errors } = lint(root, {
+    gitDate: () => '2026-08-31',
+    gitContentDate: (p) => (p.endsWith('dojo.md') ? '2026-08-31' : '2026-08-15'),
+  });
+  assert.ok(errors.some((e) => e.includes('world/dojo.md') && e.includes('committed 2026-08-31')));
+  // ⚠ and the OTHER page must stay silent. Without this line the assertion above is satisfied by
+  // the very bug it guards -- pre-fix, check 7 fired on every page, so "dojo errors" was vacuous.
+  assert.ok(!errors.some((e) => e.includes('program/board.md')));
+});
+
+// ⚠ THE TWO TESTS ABOVE INJECT `gitContentDate`, so they prove check 7 is WIRED to it and nothing
+// more -- both survived mutating the real helper's body. This one drives `gitContentDateOf`
+// against an actual repo, because that is where the bug lived.
+test('gitContentDateOf ignores a checked:-only commit and reports the body date', () => {
+  const repo = mkdtempSync(join(tmpdir(), 'wikigit-'));
+  const page = join(repo, 'page.md');
+  const git = (args, date) =>
+    execFileSync('git', args, {
+      cwd: repo,
+      stdio: 'ignore',
+      env: { ...process.env, GIT_AUTHOR_DATE: date, GIT_COMMITTER_DATE: date,
+             GIT_AUTHOR_NAME: 'T', GIT_AUTHOR_EMAIL: 't@t', GIT_COMMITTER_NAME: 'T',
+             GIT_COMMITTER_EMAIL: 't@t' },
+    });
+  git(['init', '-q', '-b', 'main']);
+
+  writeFileSync(page, '---\nshelf: world\nupdated: 2026-08-15\n---\n# Page\nbody\n');
+  git(['add', 'page.md']);
+  git(['commit', '-qm', 'body'], '2026-08-15T12:00:00');
+
+  // the checked: bump -- a real commit, on a later day, touching only that line
+  writeFileSync(page, '---\nshelf: world\nupdated: 2026-08-15\nchecked: 2026-08-26\n---\n# Page\nbody\n');
+  git(['add', 'page.md']);
+  git(['commit', '-qm', 'checked'], '2026-08-26T12:00:00');
+
+  assert.equal(gitDateOf(page), '2026-08-26'); // the FILE moved today
+  assert.equal(gitContentDateOf(page), '2026-08-15'); // the BODY did not
+
+  // and a real edit is seen again, so the hatch is not a blanket amnesty
+  writeFileSync(page, '---\nshelf: world\nupdated: 2026-08-15\nchecked: 2026-08-26\n---\n# Page\nEDITED\n');
+  git(['add', 'page.md']);
+  git(['commit', '-qm', 'edit'], '2026-08-28T12:00:00');
+  assert.equal(gitContentDateOf(page), '2026-08-28');
 });

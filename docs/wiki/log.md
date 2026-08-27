@@ -1092,3 +1092,32 @@ after the script ran by a step nobody recorded — so the script is that wing's 
 definition, and the tip fix had to be applied to the MESH. `spread_wing.py` now carries a warning
 saying so. This is the same failure as the recorded size, one layer down: an artifact drifting from
 its record with nothing in place to notice.
+
+## [2026-08-26] defect | The staleness hatch was unusable by construction, and it broke main the day it shipped
+
+`checked:` (rule 10, shipped 7fada0b) could not be used without failing the lint. Adding the field
+COMMITS the page; check 7 compared the page's commit date against `updated:` and knew nothing about
+`checked:`; so the only way to clear the resulting error was to bump `updated:` — asserting an edit
+nobody made, the exact lie the second field exists to avoid. **All seven pages that received
+`checked:` in that commit failed the lint it introduced.** Main was red from the moment the feature
+landed.
+
+Found by the design thread, which verified rather than assumed: all seven byte-identical to main,
+same last-commit date, so provably main's failure and not a rebase artifact. It **declined to bump
+the dates** — bumping seven pages it had not re-read would have been the small frontmatter lie rule
+2 warns about. That refusal is why the mechanism got fixed instead of papered over.
+
+Fix: check 7 now asks when the page's BODY last moved, read from the diff (`gitContentDateOf`) —
+a commit touching only `checked:` does not count, and one touching body *and* `checked:` still
+does, which trusting the frontmatter could not tell apart. Schema rule 6 said `updated:` is
+"bumped on every edit", the textual half of the same contradiction; corrected in place along with
+two other passages that still named `updated:` as the hatch.
+
+⚠ **The first two tests were vacuous and mutation testing caught it.** They injected
+`gitContentDate`, so they proved check 7 was WIRED to the helper while never executing it — both
+survived mutating its body. A third test drives it against a real temp git repo; all three
+mutations fail it now. Second time this session that an injected dependency produced a test which
+could only pass.
+
+Also fixed while in there: both git helpers ran with the process's cwd, so any page outside it
+returned `''` and silently disabled checks 7-9. They now run from the page's own directory.

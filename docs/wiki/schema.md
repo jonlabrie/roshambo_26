@@ -24,6 +24,26 @@ Sessions read `index.md` first. The pattern is Karpathy's LLM-wiki
    wiki commits were corrections of things already written**. Corrections were landing BESIDE the
    wrong text rather than on top of it, leaving a reader free to believe either — and at 439 lines
    nobody re-reads far enough to notice the contradiction.
+3. **Update triggers** — touch the wiki in the same commit/session as: an owner gate,
+   a drop ("do not re-raise"), a program item opening/closing, a defect found or
+   parked, a standing-rule correction, a place save/publish.
+4. **Cite, don't duplicate.** `docs/superpowers/` specs/plans/SDD ledgers and git
+   history are the immutable raw layer. Link to them; carry only synthesis and what
+   they cannot record (owner decisions, place state).
+5. **`⚠ unverified`** marks any claim not checked against git or the live place.
+   Never launder a memory into a fact.
+6. **Frontmatter**: every page has `shelf:` and `updated:` (absolute date, bumped on every edit
+   to the page's BODY); `status:` only on `program/` pages. Optional `checked:` (same format)
+   means "re-read on this date and still true" — see rule 10.
+   ⚠ **Adding or bumping `checked:` is NOT a body edit and must not bump `updated:`.** This rule
+   used to say "bumped on every edit", which made the two fields contradict: writing `checked:`
+   commits the file, and if that counted as an edit the only way to satisfy the lint was to bump
+   `updated:` — asserting a change nobody made, the exact lie `checked:` exists to avoid. It cost
+   seven pages on the day rule 10 shipped. The lint now reads the two apart from the diff, so a
+   commit touching body AND `checked:` still demands an `updated:` bump.
+7. **Links** are `[[wikilinks]]` between pages; `index.md` uses markdown links.
+8. **`log.md`** entries: `## [YYYY-MM-DD] <kind> | <title>`, kind ∈
+   gate | ship | decision | drop | defect | migrate | lint | audit. Append-only.
 9. ⚠ **Never transcribe a measurable fact — record how to MEASURE it.** Sizes, counts, IDs, angles,
    service URLs, branch names: a number copied into prose has no source, cannot be re-derived, and
    is wrong the moment the artifact moves, with nothing positioned to notice.
@@ -40,20 +60,6 @@ Sessions read `index.md` first. The pattern is Karpathy's LLM-wiki
    or add `checked: YYYY-MM-DD` if it was already right — two different claims, two different
    fields. Warnings were what this used to be, and fifteen had accumulated unactioned, eight of
    them eleven days old. Detection was never the gap; consequence was.
-3. **Update triggers** — touch the wiki in the same commit/session as: an owner gate,
-   a drop ("do not re-raise"), a program item opening/closing, a defect found or
-   parked, a standing-rule correction, a place save/publish.
-4. **Cite, don't duplicate.** `docs/superpowers/` specs/plans/SDD ledgers and git
-   history are the immutable raw layer. Link to them; carry only synthesis and what
-   they cannot record (owner decisions, place state).
-5. **`⚠ unverified`** marks any claim not checked against git or the live place.
-   Never launder a memory into a fact.
-6. **Frontmatter**: every page has `shelf:` and `updated:` (absolute date, bumped on
-   every edit); `status:` only on `program/` pages. Optional `checked:` (same format) means
-   "re-read on this date and still true" — see rule 10.
-7. **Links** are `[[wikilinks]]` between pages; `index.md` uses markdown links.
-8. **`log.md`** entries: `## [YYYY-MM-DD] <kind> | <title>`, kind ∈
-   gate | ship | decision | drop | defect | migrate | lint | audit. Append-only.
 
 ## Lint (recurring)
 
@@ -73,9 +79,10 @@ Run on request, and cheaply at any session close.
 Three checks put a floor under the manual pass, by noticing when the GROUND under a page moved
 after the page last claimed to be current:
 
-- **`updated:` must not lag the page's own last commit** (error). Editing a page and forgetting
-  to bump the date is how `world/arena-square.md` carried a 2026-08-17 addition under a
-  2026-08-15 stamp.
+- **`updated:` must not lag the page's own last BODY commit** (error). Editing a page and
+  forgetting to bump the date is how `world/arena-square.md` carried a 2026-08-17 addition under a
+  2026-08-15 stamp. "Body" is measured from the diff: a commit that only writes `checked:` does
+  not count, or the hatch in rule 6 would trip the check it exists to satisfy.
 - **A cited repo path must exist** (error) — the same defect as a dead wikilink, pointed at the
   code. `program/backlog.md` cited `BoardController.client.luau` for two days after it was
   retired. Where a page names a path in order to say it is GONE, put `<!-- lint-ok: why -->` on
@@ -89,6 +96,8 @@ contradictory and years out of date while passing every mechanical check — the
 remains the only thing that catches that, and it is the part that gets skipped. See
 [[wiki-currency]] for the mechanism.
 
-⚠ Bumping `updated:` silences a warning without reading anything. That escape hatch is
-deliberate — the value is turning invisible rot into a visible prompt — but it means a date bump
-with no re-read is a lie the lint will believe.
+⚠ **The hatch is `checked:`, and it is still only as honest as the hand that writes it.** Either
+field silences the prompt without reading anything, so a stamp with no re-read is a lie the lint
+will believe — the two fields exist to make the lie *distinguishable*, not impossible: `updated:`
+claims "I changed this", `checked:` claims "I re-read this and it was right". Turning invisible rot
+into a visible prompt is the whole value, and it survives being seen every session.
