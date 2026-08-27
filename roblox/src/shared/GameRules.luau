@@ -42,4 +42,39 @@ function GameRules.nextStreak(currentStreak: number, result: RoundResult): numbe
     return if result == "WIN" then currentStreak + 1 else 0
 end
 
+-- PARTIAL BANKING: a pot may be dropped to a LOWER RUNG, banking the difference. Rungs rather
+-- than a slider so every pot stays a power of three and every banked difference is an integer.
+-- Returns every ladder value strictly below `pot`, ascending, 0 first; 0 is the full bank.
+--
+-- Mirrors server/src/engine/GameRules.ts. Both are held to shared-fixtures/game-rules.json, so
+-- drift fails CI rather than being a promise.
+function GameRules.keepOptions(pot: number): { number }
+    -- `pot ~= pot` is the NaN test; Luau has no isNaN.
+    if pot ~= pot or pot == math.huge or pot <= 0 then
+        return {}
+    end
+    local options = { 0 }
+    local rung = 1
+    while rung < pot do
+        table.insert(options, rung)
+        rung *= 3
+    end
+    return options
+end
+
+function GameRules.isValidKeep(pot: number, keep: number): boolean
+    -- ⚠ DEFENCE, NOT THE FRACTIONAL CHECK THAT ACTUALLY BITES -- no rung is ever fractional, so
+    -- the scan below already rejects 13.5. Mutation testing showed the TS twin's equivalent line
+    -- is unreachable; this one is kept for the same reason, and the fixture does not prove it.
+    if keep % 1 ~= 0 then
+        return false
+    end
+    for _, option in GameRules.keepOptions(pot) do
+        if option == keep then
+            return true
+        end
+    end
+    return false
+end
+
 return GameRules

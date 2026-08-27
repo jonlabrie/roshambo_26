@@ -26,4 +26,23 @@ describe("GameRules (shared fixtures)", function()
             expect(GameRules.nextStreak(row.currentStreak, row.result)).toBe(row.nextStreak)
         end)
     end
+
+    for _, row in fixtures.partialBank do
+        test(`pot {row.pot} may be dropped to {#row.keepOptions} rung(s)`, function()
+            local got = GameRules.keepOptions(row.pot)
+            expect(#got).toBe(#row.keepOptions)
+            for i, want in row.keepOptions do
+                expect(got[i]).toBe(want)
+            end
+            for _, keep in row.keepOptions do
+                expect(GameRules.isValidKeep(row.pot, keep)).toBe(true)
+            end
+        end)
+    end
+
+    for _, row in fixtures.partialBankRejects do
+        test(`pot {row.pot} rejects keep {row.keep}`, function()
+            expect(GameRules.isValidKeep(row.pot, row.keep)).toBe(false)
+        end)
+    end
 end)
