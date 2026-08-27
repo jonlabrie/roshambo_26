@@ -26,7 +26,14 @@ Everything below marked *verified* was checked live via the Studio MCP on 2026-0
    never publish a dusk/night lock. Verified 2026-08-15: `DayNightLockT = 0.19`,
    `PreNightTestLockT = 0.19`, `DayNightStartT` cleared — currently satisfied.
 2. Run `roblox/tools/studio/verifyWorkspaceConvention.luau` in Studio.
-3. Save/publish the place after ANY place-only work — a session's live edits are
+3. ⚠ **Scan any newly imported toolbox/marketplace model for a require-backdoor** —
+   [[toolbox-backdoor-scan]]. **This checklist is the ONLY place that can catch one**: the
+   2026-07-08 `VibrantNature` payload carried `if RunService:IsStudio() then return end`, so it
+   is dormant in Studio and in Play-test and fires only on a live published server. That page
+   has said since it was written that the scan "belongs in the pre-publish checklist on
+   place-state"; it was not here until 2026-08-27, which is the whole reason to write a
+   cross-reference down on BOTH ends.
+4. Save/publish the place after ANY place-only work — a session's live edits are
    worthless until saved.
 
 ## Workspace (verified 2026-08-15)

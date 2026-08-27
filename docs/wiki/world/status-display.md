@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-26
+updated: 2026-08-27
 ---
 
 # Status Display — the three clocks
@@ -138,18 +138,21 @@ everyone must wear is a ranking; a rare thing you may choose is a flex.* The del
 
 ## Under evaluation, not decided
 
-Two mechanics that would change what the clocks measure. Both are analysed in full; neither is
-ruled on.
+Two mechanics that would change what the clocks measure. Both are analysed in full.
+⚠ **Partial banking is no longer merely evaluated — its SERVER HALF SHIPPED 2026-08-27.**
 
 - **Partial banking** — bank down to a lower rung, pocketing the difference. ⚠ The math does not
   break (nothing requires a pot to be a power of three), and the risk-optimal play is
   `f* = (bank ÷ pot + 1)/4` — **a ratio, not a constant**, which is what keeps it a judgement
   call. At bank ≥ 3× pot, riding the whole pot is optimal, so the dramatic play becomes *earned*
-  rather than wrong. **Ruled 2026-08-26:** a partial bank does **not** zero `stakingStreak` — the
-  condition becomes *"the pot reached zero"* rather than *"a bank happened"*, so a full bank behaves
-  as today. ⚠ **One shipped display would break quietly:** `bankDepths` (the NERVE histogram in
-  [[stats-room]]) would blend *"when do players stop"* with *"when do players hedge"*, since both
-  write `streakAtBank`. One boolean fixes it, and only before the rows are mixed. Spec:
+  rather than wrong. **Ruled 2026-08-26, BUILT 2026-08-27:** a partial bank does **not** zero
+  `stakingStreak` — the condition is now *"the pot reached zero"* rather than *"a bank happened"*,
+  so a full bank behaves as before. `GameRules.keepOptions` gates the rungs, `bankPot` takes a
+  `keep` defaulting to 0, and both transports accept it. ⚠ **Nothing can ask for it yet** — the
+  client affordance is undesigned, which is why this stays under evaluation for the CLOCKS even
+  though the mechanic exists. The `bankDepths` hazard below was fixed in the same change:
+  `BankEvent.partial` now exists and the NERVE histogram filters to full banks, so the rows were
+  never mixed. Spec:
   `docs/superpowers/specs/2026-08-26-partial-banking-design.md`.
 - **Multi-hand splitting** — set aside by the owner 2026-08-26, *"impractical for now"*. ⚠ The
   finding worth keeping: **parking is a free option** that dominates both Bank and Stake, so it
