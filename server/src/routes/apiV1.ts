@@ -485,9 +485,14 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
         try {
             const robloxUserId = String(req.body?.robloxUserId ?? '');
             if (!robloxUserId) { res.status(400).json({ error: 'BAD_REQUEST' }); return; }
+            // `keep` is what stays riding; absent means a full bank, which is what every client
+            // shipped before partial banking sends. An invalid keep is rejected inside bankPot
+            // and surfaces as the same 409 as "nothing staked" — from the caller's side both
+            // mean "the bank you asked for did not happen".
+            const keep = Number(req.body?.keep ?? 0);
             const user = await resolveUser({ robloxUserId });
             if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
-            const updated = await bankPot(user._id.toString(), 'roblox');
+            const updated = await bankPot(user._id.toString(), 'roblox', keep);
             if (!updated) { res.status(409).json({ error: 'NOTHING_STAKED' }); return; }
             res.json({
                 totalPoints: updated.totalPoints,

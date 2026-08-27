@@ -412,6 +412,32 @@ describe('/api/v1', () => {
             await request(makeApp(makeEngine(), new ResultsStore()))
                 .post('/api/v1/bank').set('X-API-Key', API_KEY).send({ robloxUserId: '77' }).expect(409);
         });
+
+        it('banks down to a rung and keeps the rest riding', async () => {
+            await User.create({
+                robloxId: '78', identityTier: 'roblox', pointsAtStake: 27,
+                stakingStreak: 3, currentStreak: 3,
+            });
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .post('/api/v1/bank').set('X-API-Key', API_KEY)
+                .send({ robloxUserId: '78', keep: 9 }).expect(200);
+
+            expect(res.body).toMatchObject({
+                totalPoints: 18, pointsAtStake: 9, stakingStreak: 3, currentStreak: 3,
+            });
+        });
+
+        it('refuses an invalid keep with 409 and changes nothing', async () => {
+            const u = await User.create({
+                robloxId: '79', identityTier: 'roblox', pointsAtStake: 27, stakingStreak: 3,
+            });
+            await request(makeApp(makeEngine(), new ResultsStore()))
+                .post('/api/v1/bank').set('X-API-Key', API_KEY)
+                .send({ robloxUserId: '79', keep: 5 }).expect(409);
+
+            const after = await User.findById(u._id);
+            expect(after!.pointsAtStake).toBe(27);
+        });
     });
 
     describe('POST /instances/:instanceId/presence', () => {
