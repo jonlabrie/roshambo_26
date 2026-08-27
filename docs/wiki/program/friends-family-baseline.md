@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: open
-updated: 2026-08-26
+updated: 2026-08-27
 ---
 
 # Friends & Family Baseline
@@ -59,12 +59,10 @@ rounds skippable, no penalty) — hangout is the product.
    ⚠ Grade bands are SET ASIDE, not solved — a 7-inch bird cannot carry status at arena
    distance, and the owner's answer is a larger bird (raven/crow) rather than a colour scheme.
    That leaves item 6's REWARD half unproven even though its display half now works.
-   **2026-08-20: the familiar is now a real bird.** A skinned, textured, rigged uguisu is in the
-   place and verified — owner: *"it looks right, and it looks good"* ([[familiars]]). NOT yet
-   wired: `BirdController` still builds four parts, so nothing in play uses it. Three changes
-   stand between the asset and the game — clone the MeshPart instead of building parts, drive
-   `bill_lower`/`wing_R`/`wing_L` from `BirdFlight.wingAngle`, and replace `BAND_COLOR` (a
-   textured MeshPart does not tint via `p.Color`), which is a DESIGN decision and not a port.
+   **2026-08-26: a SECOND bird ships — the karasu** ([[familiars]]) — and it is INVENTORY, not
+   progress: **nothing selects a bird per player.** The unlock model decided 2026-08-25 is
+   unbuilt, so item 6 still cannot close, and roster selection is now the smallest thing that
+   would move it.
 7. **Statistics** — closed 2026-08-18 ("let's close Item 7 for now; we'll revisit in the
    future with clearer thoughts"). The 番付 room is built, measured and saved: READ / YIELD /
    NERVE from rows the server already wrote, qualification at 360 throws over a rolling week,

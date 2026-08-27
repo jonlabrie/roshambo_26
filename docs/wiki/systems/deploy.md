@@ -1,6 +1,6 @@
 ---
 shelf: systems
-updated: 2026-08-25
+updated: 2026-08-27
 ---
 
 # Deploy
@@ -51,8 +51,12 @@ changed. The push that prompted this was 15 `roblox/` files and 7 `docs/` — **
 waste: the App Runner redeploy bounces the dev backend *that Studio is talking to*, so pushing
 during a session disturbs the thing being tested.
 
-GitHub Actions are unaffected and stay on — they are already path-filtered (`roblox/**`,
-`server/**`, `src/**`) and run in 20–60s. ⚠ Their filter applies to the **whole push range**, not
+GitHub Actions are unaffected and stay on — they are already path-filtered and run in 20–60s.
+⚠ **The filters are wider than "one directory each", and `shared-fixtures/**` is in TWO of them**
+(`roblox-ci` and `server-ci`), because it gates both GameRules mirrors — so a rules change
+correctly runs both. Each workflow also watches its own file. Read the `paths:` keys in
+`.github/workflows/*.yml` rather than a list here; this line said `src/**` and missed
+`public/**` and `shared-fixtures/**`. ⚠ Their filter applies to the **whole push range**, not
 per commit, so a batch containing one `roblox/` commit runs `roblox-ci` once even if the rest are
 docs. That is correct: it tests the tree actually pushed.
 
