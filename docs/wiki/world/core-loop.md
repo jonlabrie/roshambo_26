@@ -17,10 +17,22 @@ world at once. That is the product: *you against the world*, not you against a b
 
 ## The three outcomes
 
-Authority: `shared-fixtures/game-rules.json`. Three implementations are gated against that
-fixture in CI (`server/src/engine/GameRules.ts` authoritative, `roblox/src/shared/
-GameRules.luau`, `src/lib/gameRules.ts`), so drift fails the build rather than being a
-promise to keep them in sync.
+Authority: `shared-fixtures/game-rules.json`, and drift fails the build rather than being a
+promise to keep in sync. ⚠ **But the three implementations are gated on DIFFERENT SUBSETS of
+it, and "three implementations are gated" was too coarse a claim** — the fixture has grown
+sections that only some harnesses read:
+
+| section | server `GameRules.ts` | Luau `GameRules.luau` | PWA `src/lib/gameRules.ts` |
+|---|:--:|:--:|:--:|
+| `matchups`, `potProgression`, `streakRules` | ✅ | ✅ | ✅ |
+| `worldThrowDerivation` | ✅ | — | — |
+| `partialBank`, `partialBankRejects` | ✅ | ✅ | — |
+
+**The three outcomes themselves — this section — ARE gated in all three.** The gaps are by
+design, not drift: the World Throw is decided server-side so no client derives it, and the
+PWA's copy exists to compute an outcome the server has not sent yet, which choosing a rung
+is not ([[duplicated-server-constants]]). Verify with
+`grep -o 'fixtures\.[a-zA-Z]*' <each test file>` rather than trusting this table.
 
 | You throw | vs the World | Result | Pot | Streaks |
 |---|---|---|---|---|

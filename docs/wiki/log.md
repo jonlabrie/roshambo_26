@@ -1493,3 +1493,29 @@ sites and `FireworkBench_PARKED` (`fireworks`), the per-size prefabs and `Engawa
 A symbol sweep over every backticked `Module.method` in the wiki (60 distinct) found no phantoms
 beyond the one fixed; `DrumStep.glideResidual` and `CanyonLayout.luau` fired and are both correct
 writing — the first names a phantom in order to bury it and is already exempted.
+
+## [2026-08-27] lint | R3 and R4 from the first prose-lint run — a page that could not count its own rows
+
+Two of the four findings the scheduled prose lint left for a ruling. Both were settleable
+without the owner; R1 (`.superpowers/` citations) and R2 (the economy split) are not.
+
+**R3 — [[one-model-is-not-a-building]] said SEVEN models and listed six.** The missing one is
+`BonshoBell`, and *why* it was missing is worth more than the row: the bell hangs INSIDE
+`BonshoRig`'s span, so it moves the union not at all. ⚠ **A model that changes no answer is
+exactly the one an inventory forgets** — and "it wouldn't have mattered" is a conclusion only
+available after looking, which is the page's whole thesis turned on the page itself.
+
+Its numbers are also a 2026-08-13 snapshot: the drum grew a sōrin on 2026-08-14 and
+`ArenaLayout.towerTopY` has been 174.17 since, held by a rebuild-and-compare test. The
+snapshot is KEPT — it is the evidence for the 17-stud error — but now says so, so nobody
+reads 153.54 as the tower's height. Correcting it away would have destroyed the lesson.
+
+**R4 — [[core-loop]] claimed "three implementations are gated against that fixture in CI".**
+True in outline, too coarse in fact. Measured: the fixture has six sections and each harness
+reads a different subset — server 6, Luau 5, PWA 3. The three OUTCOMES are gated in all three;
+`worldThrowDerivation` is server-only (the World Throw is decided server-side, so no client
+derives it) and `partialBank` skips the PWA. Both gaps are by design ([[duplicated-server-constants]]),
+which is exactly why a coarse claim was dangerous: it made a deliberate divergence read as drift.
+
+Replaced with a per-section table and the `grep` that regenerates it — a claim about coverage
+should carry the command that checks it (schema rule 9).
