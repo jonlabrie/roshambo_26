@@ -1,7 +1,7 @@
 ---
 shelf: world
-updated: 2026-08-18
-checked: 2026-08-26
+updated: 2026-08-27
+checked: 2026-08-27
 ---
 
 # Teahouses
@@ -19,8 +19,9 @@ runtime spine (sub-projects A–E) is committed under `roblox/src/shared` and
   `StructureBuilder` (`47b8057..3f718ad`). Datum contract: structure ends at Y0 =
   floor underside; nothing below; `MirrorX` part tags + `MirrorXRigid` model tags
   replace geometric reflection (roof wedges flip wrong).
-- **B — pads**: `PadPlanner` / `PadBuilder` / `PadRegistry` (fit-aware `claimVacantFor`,
-  `810fb1f`) / `VacantState` (vacant cliff = dark shuttered shell, chōchin removed;
+- **B — pads**: `PadPlanner` / `PadBuilder` / `PadRegistry` (per-server occupancy only —
+  `register` / `claim` / `release` / `get`; fit matching is D's job, in `SiteCoordinator`)
+  / `VacantState` (vacant cliff = dark shuttered shell, chōchin removed;
   valley = garden marker). Deck railing/fall-guard geometry in `src/server/PadOps.luau`.
 - **C — persistence**: Mongo via `/api/v1` (`server/src/routes/apiV1.ts`,
   `server/src/loadout.ts`) — players own multiple teahouses keyed by size class;
@@ -132,6 +133,7 @@ CLAUDE.md's "Legacy holds the frozen 14" note is stale against the live place.
   registry / vacant-state / fit-aware / loadout-persistence specs of 2026-07-05;
   sliding shoji: `2026-08-18-shoji-screens-design.md` +
   `docs/superpowers/plans/2026-08-18-shoji-screens.md`
-- key commits: `47b8057..3f718ad` A · `810fb1f` B fit-aware · `c8d53d3..5d9433b` D.1 ·
+- key commits: `47b8057..3f718ad` A · `810fb1f` B fit-aware helpers, removed as dead in
+  `b8db9bd` · `c8d53d3..5d9433b` D.1 ·
   `7593a3c` D.2 race fix · `c89221b` D.3 · `98debd5` D.4 sites + dynamic posts ·
   `3f95641`/`0d15d27`/`26a9311`/`31ce54b` deck safety · `021d745..95375f3` sliding shoji

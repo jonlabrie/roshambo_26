@@ -1,6 +1,7 @@
 ---
 shelf: practice
 updated: 2026-08-26
+checked: 2026-08-27
 ---
 
 # Parallel Threads

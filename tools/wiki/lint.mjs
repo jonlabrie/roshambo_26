@@ -132,7 +132,17 @@ const CONST_RES = [
 
 const SRC_EXT = /\.(ts|tsx|luau|mjs|cjs|js|py)$/;
 const SKIP_DIR = new Set(['node_modules', 'dist', '.git', 'build', '.worktrees', 'coverage']);
+// ⚠ THIS LINT'S OWN TEST FILE IS NOT REPO SOURCE, and reading it as source silently disarmed
+// checks 11 and 12. `lint.test.mjs` builds fake wikis out of fake source strings, and it quotes
+// the real defects it was written from -- including the comment "MIN_SHORO_GAP = 5.0 was a floor
+// invented here". Check 12 then found a 5.0 for MIN_SHORO_GAP, matched the wiki's value, and
+// passed the page. The check the test was guarding was defeated by the test that guards it, and
+// the page it was written about never needed its exemption. Found 2026-08-27: excluding this one
+// file turns check 12 back on with exactly one hit, the hit the test predicted.
+// Only the TEST is excluded -- `lint.mjs` itself is real source, and backlog.md legitimately
+// cites `CITE_RE`/`CITE_PREFIXES` from it.
 const sourceTextOf = (repoRoot) => {
+  const selfTest = join(repoRoot, 'tools', 'wiki', 'lint.test.mjs');
   let out = '';
   const walk = (dir) => {
     let entries;
@@ -144,7 +154,7 @@ const sourceTextOf = (repoRoot) => {
     for (const e of entries) {
       if (e.isDirectory()) {
         if (!SKIP_DIR.has(e.name)) walk(join(dir, e.name));
-      } else if (SRC_EXT.test(e.name)) {
+      } else if (SRC_EXT.test(e.name) && join(dir, e.name) !== selfTest) {
         try {
           out += readFileSync(join(dir, e.name), 'utf8') + '\n';
         } catch {
@@ -364,8 +374,39 @@ const gitDate = opts.gitDate ?? gitDateOf;
   return { errors, warnings, pageCount: pages.length };
 }
 
+// ⚠ A SHALLOW CLONE CANNOT ANSWER ANY OF THE GIT CHECKS, AND FAILS THEM ALL AT ONCE.
+// Checks 7-10 ask git when a file last changed and whether a hash resolves. In a shallow clone
+// (`git clone --depth`, which is what CI and the hosted agent containers do) every commit before
+// the boundary is absent, so every cited hash "does not resolve" and every file appears to have
+// changed on the boundary commit's date -- it is one synthetic squash of the whole tree.
+// Measured 2026-08-27 in a depth-61 container: 231 errors, of which 231 were phantom. The full
+// clone reported 0.
+// A lint that is wrong 231 times teaches people to ignore lint -- the same reasoning as the
+// gitignored-citation note above -- so refuse to render a verdict rather than render a false one.
+const isShallow = () => {
+  try {
+    return (
+      execFileSync('git', ['rev-parse', '--is-shallow-repository'], {
+        encoding: 'utf8',
+        stdio: ['ignore', 'pipe', 'ignore'],
+      }).trim() === 'true'
+    );
+  } catch {
+    return false; // not a git repo at all; the git checks degrade to no-ops on their own
+  }
+};
+
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   const root = process.argv[2] ?? 'docs/wiki';
+  if (isShallow()) {
+    console.log(
+      'ERROR shallow clone — the git-history checks (7-10) cannot run here and would report\n' +
+        '      hundreds of phantom errors. Deepen the clone first:\n' +
+        '\n' +
+        '        git fetch --unshallow origin\n'
+    );
+    process.exit(1);
+  }
   const { errors, warnings, pageCount } = lint(root);
   for (const w of warnings) console.log(`WARN  ${w}`);
   for (const e of errors) console.log(`ERROR ${e}`);

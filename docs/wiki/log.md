@@ -1425,3 +1425,71 @@ is a permanent limit of this method, not a backlog item.
 Reading the whole wiki: **~95k tokens, one sitting.** Reading was never the expense. Every
 defect above came out of a VERIFICATION — querying AWS, grepping for a symbol, diffing a
 declaration — and each one changed the verdict I would otherwise have written.
+
+## [2026-08-27] lint | Prose lint — the lint's own test file was disarming two of its checks
+
+First scheduled prose-lint run. Three defects, two of them in the checker rather than the wiki.
+
+**1. `lint.test.mjs` was being read as repo source, and it silently disarmed checks 11 and 12.**
+`sourceTextOf` walks the repo for `.mjs` and slurped the lint's own test file, so every fixture
+string and explanatory comment in it counted as code. The test *"a constant the wiki NARRATES as
+retired is exempt on its line"* quotes `MIN_SHORO_GAP = 5.0` in its comment — the real defect it
+was written from. Check 12 then found a `5.0` for that constant, matched
+`one-model-is-not-a-building.md`'s value, and passed the page, whose real code value is `9.0`.
+**The test defeated the check it was written to guard, and the page it was written about never
+needed its exemption.** Excluding the one file turns check 12 back on with exactly one hit — the
+hit the test predicted. Only the test is excluded; `lint.mjs` is real source and `backlog.md`
+legitimately cites `CITE_RE`/`CITE_PREFIXES` from it. Regression test added, and verified to fail
+without the fix.
+
+**2. The lint reports 231 phantom errors in a shallow clone, which is what it runs in.** This
+routine's container clones `--depth`. Every commit before the boundary is absent, so all 200 cited
+hashes "do not resolve"; and the boundary commit is one synthetic squash of the whole tree (755
+files, one date), so every cited file appears to have changed that day. Measured: **231 errors at
+depth 61, 0 after `git fetch --unshallow`.** The CLI now detects a shallow clone and refuses to
+render a verdict rather than render a false one — the same reasoning as the gitignored-citation
+note beside check 8.
+
+**3. `world/teahouses.md` cited a symbol deleted seven weeks earlier.** Sub-project B was
+described as `PadRegistry` *(fit-aware `claimVacantFor`)*. That helper — with `fits`, `findVacant`
+and `claimVacant` — was removed as **confirmed-dead code** on 2026-07-07 (`b8db9bd`). `PadRegistry`
+is occupancy only; fit matching is D's, in `SiteCoordinator`, which the same page already says.
+The page carried `checked: 2026-08-26` — stamped the day before, over a dead symbol.
+
+### Reported, not fixed — these need the owner
+
+- **`.superpowers/` is gitignored and was never committed, and 12 wiki citations point into it**
+  across 7 pages, `friends-family-baseline.md` (the governing board) among them. No fresh clone or
+  CI run can resolve an SDD ledger. Invisible to check 8, whose `CITE_RE` only matches
+  `roblox|server|src|tools|docs|shared-fixtures`. Schema rule 4 names `docs/superpowers/` as the
+  raw layer; the ledgers are not there.
+- **`systems/data.md` states the Roblox/PWA economy split as enforced as-built** — "per-platform
+  wallet fields". `User.ts` has one shared wallet (`totalPoints`, `lifetimeBanked`,
+  `pointsAtStake`). Rounds and bank events *are* platform-tagged; the wallet is not. `backlog.md`
+  files the split under the **approved** meta-game spec, i.e. design, not built.
+- **`one-model-is-not-a-building.md`'s tower table is stale and short a model.** It tops the stack
+  at 153.54; `ArenaLayout.towerTopY` has been **174.17 since 2026-08-14** (`8d40514`, the sōrin),
+  the day before the page was last updated. It also says SEVEN models and lists six — the missing
+  one is `BonshoBell`, per `WorkspaceConvention`. Both numbers are schema-rule-9 transcriptions;
+  re-measuring needs Studio.
+- **`core-loop.md` says three implementations are fixture-gated "so drift fails the build".** True
+  per-implementation, but the PWA fallback runs 3 of the fixture's 6 keys and has no `keepOptions`,
+  so a new rule can be added to the fixture and the PWA will silently not run it.
+
+### Coverage
+
+Read end to end and verified against code: `core-loop`, `world-throw`, `teahouses`,
+`parallel-threads` (the pages whose cited code moved), plus the rotation `systems/data`,
+`day-night`, `one-model-is-not-a-building`, `replication-races`, `modal-cursor-grip`, `fireworks`,
+`canyon` — 11 pages, plus `index` and `schema`. **Not read this run: the other 43**, including all
+of `program/`, `familiars`, `status-display`, `round-and-hud`, `place-state`, `blender-pipeline`
+and the remaining `practice/` shelf.
+
+Studio-dependent and NOT verified: the W## watercourse inventory and pool chain (`canyon`), the
+135 `VfxNightDim` objects and the `DayNightLockT` values (`day-night`), the three tagged launch
+sites and `FireworkBench_PARKED` (`fireworks`), the per-size prefabs and `EngawaBarrier`
+(`teahouses`), and the bell-tower model extents above.
+
+A symbol sweep over every backticked `Module.method` in the wiki (60 distinct) found no phantoms
+beyond the one fixed; `DrumStep.glideResidual` and `CanyonLayout.luau` fired and are both correct
+writing — the first names a phantom in order to bury it and is already exempted.

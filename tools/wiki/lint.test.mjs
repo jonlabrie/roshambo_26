@@ -245,8 +245,8 @@ test('gitContentDateOf ignores a checked:-only commit and reports the body date'
   // and a real edit is seen again, so the hatch is not a blanket amnesty
   writeFileSync(page, '---\nshelf: world\nupdated: 2026-08-15\nchecked: 2026-08-26\n---\n# Page\nEDITED\n');
   git(['add', 'page.md']);
-  git(['commit', '-qm', 'edit'], '2026-08-28T12:00:00');
-  assert.equal(gitContentDateOf(page), '2026-08-28');
+  git(['commit', '-qm', 'edit'], '2026-08-27T12:00:00');
+  assert.equal(gitContentDateOf(page), '2026-08-27');
 });
 
 // ===== checks 10-13: the mechanical sweeps, added 2026-08-27 =====
@@ -319,4 +319,26 @@ test('a bare path with no line number is still fine', () => {
   wiki.pages['world/dojo.md'] = FM('world') + '# Dojo\nSee `tools/wiki/lint.mjs`. [[board]]\n';
   const { errors } = lint(makeWiki(wiki), { repoRoot: process.cwd() });
   assert.ok(!errors.some((e) => /line number/i.test(e)));
+});
+
+test("this test file is not read as repo source, or it disarms the checks it guards", () => {
+  // ⚠ REGRESSION, found 2026-08-27. `sourceTextOf` walked the whole repo for .mjs and slurped
+  // THIS FILE, so every fixture string and every explanatory comment here counted as code.
+  // The exemption test above quotes "MIN_SHORO_GAP = 5.0" in its comment; check 12 duly found a
+  // 5.0 for that constant, matched the wiki's value, and passed `one-model-is-not-a-building.md`
+  // -- whose real code value is 9.0. The test defeated the check it was written to guard, and
+  // the page it was written about never needed its exemption.
+  //
+  // The sentinel below appears in no other file in the repo, so a lint that can see it is
+  // reading this file as source again.
+  const SENTINEL_NOT_IN_ANY_SOURCE = 'ZZQX_LINT_SELF_CONTAMINATION_SENTINEL';
+  const wiki = structuredClone(CLEAN);
+  wiki.pages['world/dojo.md'] =
+    FM('world') + `# Dojo\n\`${SENTINEL_NOT_IN_ANY_SOURCE}\` is cited. [[board]]\n`;
+  const { errors } = lint(makeWiki(wiki), { repoRoot: process.cwd() });
+  assert.ok(
+    errors.some((e) => e.includes(SENTINEL_NOT_IN_ANY_SOURCE) && /exists nowhere/.test(e)),
+    'check 11 should report the sentinel as a phantom symbol; if it does not, lint.test.mjs is ' +
+      'being read as source again and checks 11 and 12 are silently disarmed'
+  );
 });
