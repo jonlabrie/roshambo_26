@@ -1189,3 +1189,47 @@ calculator work — and ⚠ **at bank ≥ 3× pot, riding the whole pot is optim
 is not made wrong, it is made *earned*. Recommended shape: drop to a lower rung, which keeps every
 pot a power of three by construction and every difference an integer, so *"never 13.5"* holds
 without rounding. Not ruled on.
+
+## [2026-08-26] decision | TEST_MODE is a test affordance, and citing it as a blocker was an error
+
+⚠ **I called TEST_MODE a reason not to build things, four times, across four documents.** Owner:
+*"I don't know why I keep getting the R-P-S test loop thrown back in my face as a condition that
+makes something 'untestable'; how am I meant to test functionality of win-streaks in a
+non-deterministic system without having to wait for said streaks to fall out of the randomized
+sky?"*
+
+Correct, and it inverts the claim. **Two questions were being collapsed into one:**
+
+| question | needs | verdict |
+|---|---|---|
+| **does it work?** — pot math, streak rules, row writes | **DETERMINISTIC outcomes**, so any streak can be constructed on demand | ⚠ TEST_MODE is the RIGHT tool |
+| **is it tuned right?** — is p(win) really 0.30 | real crowds, 10+ players | not ready, and rarely the question |
+| **do players use it?** | shipping to friends & family | a product question, not a test |
+
+**A randomised World Throw makes the first question HARDER** — testing a 4-streak would mean waiting
+for one to occur by chance. That is already the repo's own position everywhere else:
+`shared-fixtures/game-rules.json` gates three implementations against **constructed cases, never
+sampled play** ([[core-loop]]). The correct statement is narrow — derived RATES are unvalidated
+until the plurality rule is live and crowds are real; the MECHANICS are testable today, TDD as
+usual. Corrected in the juice/seniority and partial-banking specs.
+
+**Also ruled this session, on partial banking's first open question.** Owner: *"we don't zero
+stakingStreak if the pot isn't zeroed."* The condition moves from *"a bank happened"* to *"the pot
+reached zero"*, so a full bank behaves exactly as today and the partial case needs no special code.
+`currentStreak` stays untouched either way.
+
+**And the other two open questions were traced rather than guessed.** ⚠ **`bankDepths` is the one
+real casualty**, and it is a shipped display: the NERVE histogram on the 番付 room wall
+(`statsV1.ts:170`) plus a personal median (`:193`). A partial bank writes `streakAtBank` too, so a
+player who drops one rung at streak 6 records the same `6` as one who cashed out at 6 — blending
+*"when do players stop"* with *"when do players hedge"*. No error, no failing test, just a stat that
+quietly becomes about something else. **Fix is one boolean** (`BankEvent.partial`, filtered out of
+`bankDepths`), cheap now and impossible to reconstruct later — the same retroactive shape as the
+missing `PurchaseEvent`.
+
+⚠ **`pointsDelta` needs nothing, and I had overstated it.** A partial bank is a WALLET action and
+writes no `PlayerRound` row, exactly like a full bank today — so `biggestRounds`, the forfeits sum,
+the PWA per-round banner and the big-wins feed all keep working. One coupling worth knowing before
+either feature is ruled on: a hedger reaches smaller pots, so their peaks are smaller, so **partial
+banking dims the proposed aura**. That does not violate the Bank-vs-Stake neutrality rule — nothing
+already achieved is removed — but the two features now touch.

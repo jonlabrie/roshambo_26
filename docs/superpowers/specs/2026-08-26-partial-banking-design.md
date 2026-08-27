@@ -86,9 +86,9 @@ It is not a constant. Three properties follow, and all three are healthy:
 - ⚠ **The model breaks at the origin.** At `B = 0` it scores riding everything as −∞, because
   `ln(0)` treats a lost pot as ruin. There is no ruin here: throwing is free, rounds are skippable,
   and a player at zero simply plays on. Treat the `b = 0` row as directional only.
-- ⚠ **None of this is measurable today.** TEST_MODE runs a fixed R→P→S cycle in both prod and dev,
-  so p_w is not 0.30 for anyone who has spotted the cycle. Do not validate any of this in play until
-  the plurality rule is actually live.
+- ⚠ **p_w = 0.30 is derived, not observed.** Under TEST_MODE's fixed R→P→S cycle it is not 0.30 for
+  anyone who has spotted the cycle, so the *tuning* numbers here are unvalidated. **This does NOT
+  make the mechanic untestable** — see §5.
 
 ## 3. What it costs the game
 
@@ -141,6 +141,93 @@ Why this shape:
 - **`potDelta` semantics.** Already documented as recording the new pot on a WIN rather than the
   increment; a partial bank is a third kind of pot movement and needs its own row shape or it will
   corrupt earnings analysis the way summing `pointsDelta` already would.
+
+## 5. ⚠ TEST_MODE IS A TEST AFFORDANCE, NOT A BLOCKER — a correction
+
+⚠ **This document, and three others, cited TEST_MODE as though it made partial banking
+untestable. That was wrong, and the owner corrected it:** *"how am I meant to test functionality of
+win-streaks in a non-deterministic system without having to wait for said streaks to fall out of the
+randomized sky?"*
+
+Exactly right, and it inverts the claim. **Two different questions were being collapsed into one:**
+
+| question | what it needs | status |
+|---|---|---|
+| **does it work?** — the pot math, the rung snap, the streak rules, the row writes | **DETERMINISTIC outcomes**, so any streak can be constructed on demand | ⚠ TEST_MODE is the RIGHT tool, not an obstacle |
+| **is it tuned right?** — is p_w really 0.30, does the ratio bite | real crowds, 10+ players | not ready, and not the question |
+| **do players use it?** | shipping to friends & family | a product question, not a test |
+
+**A randomised World Throw would make the first question HARDER**, not easier — testing a 4-streak
+would mean waiting for one to occur by chance, which is precisely the wrong way to test a
+deterministic rule. The fixture-driven suites (`shared-fixtures/game-rules.json`, gating three
+implementations) are the same principle already in force: **rules are tested against constructed
+cases, never against sampled play.**
+
+**So the correct statement is narrow:** the *numbers* in §2 cannot be validated until the plurality
+rule is live and crowds are real. The *mechanic* can be built and tested today, TDD as usual, and
+its tests belong in the fixture rather than in a play session either way.
+
+## 6. What actually depends on `BankEvent` and `pointsDelta`
+
+The owner asked, having ruled on the first open question: *"Not sure about BankEvent vs. bankDepths
+because I'm not sure what relies on them. Same for potDelta."* Traced:
+
+### `stakingStreak` — RULED, and it is clean
+
+Owner: *"we don't zero stakingStreak if the pot isn't zeroed."* So the condition moves from *"a bank
+happened"* to *"the pot reached zero"*, which makes a full bank behave exactly as today and needs no
+special case for the partial one. `currentStreak` is untouched either way, as it is now.
+
+⚠ One consequence to note rather than fix: a player can hold a long `stakingStreak` while having
+hedged down to a pot of 1. `stakingStreak` is not displayed anywhere today — the aura reads
+`currentStreak` — so this is an analytics nuance, and §6's `partial` flag is what keeps it from
+becoming a reporting error.
+
+### `BankEvent` — ONE REAL CASUALTY, and it is a shipped display
+
+`BankEvent` has five consumers:
+
+| consumer | what it does | affected by partial banks? |
+|---|---|---|
+| `stats.heatBoard` | sums `amount` over a window — the earnings board | **no** — a partial bank is real earnings |
+| `leaderboards.earningsInWindow` | same sum, per player | **no** |
+| `stats.biggestBanks` | records board, shows `amount` + `streakAtBank` | mild — a partial bank is a smaller amount, so it self-sorts |
+| `stats.bankDepths` → `depthHistogram` | ⚠ **the NERVE stat** | ⚠ **YES — this is the one** |
+| `StatsFixtures.luau` | Roblox test fixtures | fixture update only |
+
+⚠ **`bankDepths` is NERVE, and it is on the wall in the 番付 room** — a room-wide histogram
+(`statsV1.ts:170`) and a personal median (`:193`). Its own comment states the intent: *"how deep a
+player rides before collecting… the whole bank-vs-stake story lives in the distribution of this
+number."*
+
+**A partial bank writes `streakAtBank` too, and it means something different.** A player who drops
+one rung at streak 6 and keeps riding records the same `6` as a player who cashed out entirely at
+streak 6 — but one of them quit and the other hedged. The histogram would silently blend *"when do
+players stop"* with *"when do players hedge"*, and NERVE would stop measuring what its comment says
+it measures. **No error, no test failure, just a stat that quietly becomes about something else.**
+
+**Fix: one boolean.** `BankEvent.partial`, and `bankDepths` filters to full banks. Cheap now,
+impossible to reconstruct later — the rows would already be mixed and indistinguishable, exactly the
+retroactive-gap shape as the missing `PurchaseEvent`.
+
+### `pointsDelta` — needs NOTHING, and this document overstated it
+
+⚠ **A partial bank is a WALLET action, not a round outcome.** Banking today writes a `BankEvent`
+and no `PlayerRound` row (`wallet.ts`), and a partial bank is the same shape. Settlement keeps
+computing `potDelta(pointsAtStake, result)` from whatever the pot is at that moment, so:
+
+- **`stats.biggestRounds`** (WIN rows, "the pot reached") — still exactly correct.
+- **`stats.ts:91` forfeits** (the one place the column may be summed, over LOSS rows) — still
+  correct: it reports what was actually lost, which a hedger has made smaller on purpose.
+- **PWA per-round banner** (`VideoArena`, `ArenaVisuals`, `RiveArena`, `useGameLoop.ts:368`) and the
+  `socketAdapter` big-wins feed — unaffected.
+
+**So the third open question dissolves.** The only nuance worth stating: a player who hedges reaches
+smaller pots thereafter, so their peaks are smaller. ⚠ **That couples partial banking to the aura**,
+whose proposed metric is the peak pot reached — hedging dims you. It does **not** violate the
+Bank-vs-Stake neutrality rule, because nothing already achieved is taken away; it only means future
+peaks come slower, which is equally true of full banking. Worth knowing before ruling on either
+feature, since the two now touch.
 
 ## Raw layer
 

@@ -73,8 +73,11 @@ the floor more than it needs the ceiling.
 
 ## 3. The density arithmetic — the owner's "2 or 3" is exact, and seniority is bimodal.
 
-Derived, not measured (⚠ nothing about streaks is measurable today: both prod and dev run TEST_MODE,
-so the World Throw is a fixed R→P→S cycle and outcomes reward memorising it). Under the shipped
+Derived, not measured (⚠ the *rates* are unvalidated: both prod and dev run TEST_MODE, so the World
+Throw is a fixed R→P→S cycle and p(win) is not 0.30 for anyone who has spotted it. ⚠ This bounds the
+TUNING only — it does not make anything untestable; deterministic outcomes are the right tool for
+testing streak behaviour, and citing TEST_MODE as a blocker was an error corrected 2026-08-26, see
+`2026-08-26-partial-banking-design.md` §5). Under the shipped
 plurality rule with roughly uniform play, the argmax bucket is by construction the largest, so it
 takes ~38–40% (those players go SAFE) and WIN and LOSS split the remainder at **p ≈ 0.30** each.
 
