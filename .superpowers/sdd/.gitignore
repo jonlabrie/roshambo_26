@@ -1,0 +1,8 @@
+# ⚠ THIS FILE USED TO BE A BARE `*`, and that is why 11 wiki citations across 7 pages pointed
+# at content no clone could resolve — the ledgers are the wiki's cited raw layer (schema rule 4).
+# Narrowed 2026-08-27 to match the top-level intent: keep the MARKDOWN, drop what git already
+# holds. A review package is `git diff BASE..HEAD` output; git is the authority for that.
+*.diff
+*.html
+*.log
+*.pid

@@ -119,6 +119,10 @@ nits (owner: "I would put it into production today").
 - item ledgers: `.superpowers/sdd/2026-07-30-foliage-finish/`,
   `.superpowers/sdd/2026-08-02-play-hud/` (+ revision/round-two/three/four),
   `.superpowers/sdd/2026-08-05-fireworks-core/`, `.superpowers/sdd/2026-08-05-hanabiya-shop/`,
-  `.superpowers/sdd/2026-08-18-shoji-screens/`
+  `.superpowers/sdd/2026-08-15-machiya-row/`.
+  ⚠ **Item 5 (shoji) has NO ledger** — this list claimed `2026-08-18-shoji-screens/` and no such
+  directory was ever created; the work ran without one. Its raw layer is the spec and plan under
+  `docs/superpowers/`, plus the branch's own commits. Caught 2026-08-27 once these paths became
+  checkable.
 - the round restructure that shipped alongside item 2:
   `docs/superpowers/specs/2026-08-04-round-structure-design.md` (`830d2b8..00bf8f8`)

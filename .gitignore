@@ -3,7 +3,15 @@ dist/
 ./DS_Store
 .env
 npm-debug.log
-.superpowers/
+# ⚠ NARROWED 2026-08-27. The SDD ledgers are the wiki's cited raw layer (schema rule 4) and
+# were unresolvable for anyone but this laptop — 11 citations across 7 pages, four of them on
+# the governing program board. The MARKDOWN is now committed; what stays ignored is what git
+# already holds or nobody needs:
+.superpowers/**/*.diff
+.superpowers/**/*.html
+.superpowers/**/*.log
+.superpowers/**/*.pid
+.superpowers/brainstorm/
 
 # python build junk (a .pyc was committed by mistake in 3bdb40e)
 __pycache__/

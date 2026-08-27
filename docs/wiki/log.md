@@ -1519,3 +1519,31 @@ which is exactly why a coarse claim was dangerous: it made a deliberate divergen
 
 Replaced with a per-section table and the `grep` that regenerates it — a claim about coverage
 should carry the command that checks it (schema rule 9).
+
+## [2026-08-27] migrate | R1 — the SDD ledgers were gitignored, so the wiki's raw layer did not exist
+
+Schema rule 4 says the wiki cites the immutable raw layer rather than duplicating it, and names
+SDD ledgers as part of it. **That layer was in `.gitignore` and had never been committed** — 11
+citations across 7 pages, four on [[friends-family-baseline]] itself, resolvable on exactly one
+laptop. A fresh clone, the cloud lint routine, or the owner on a new machine would find nothing.
+
+⚠ **TWO ignores were hiding it, and the second is why nobody noticed.** The top-level
+`.superpowers/` line was visible in `.gitignore`; a NESTED `.superpowers/sdd/.gitignore`
+containing a bare `*` was not. Both narrowed.
+
+**What is committed: the 238 markdown ledgers (2.3MB).** What stays ignored is what git already
+holds or nobody needs — the 263 `.diff` review packages (5.6MB, and each is `git diff BASE..HEAD`
+output), plus `brainstorm/` html and the `.pid`/`.log`/server-state scratch. Committing all 8.3MB
+would have added five megabytes of the repository to the repository.
+
+⚠ **Scanned before pushing, because git history is not reversible.** No credentials: no
+`mongodb+srv` URI with a password, no AWS key, no token, no private key — plus a targeted sweep
+for this repo's own known secrets. Clean.
+
+**And the lint could not have caught any of it.** `CITE_RE` anchored on
+`roblox|server|src|tools|docs|shared-fixtures`, so `.superpowers/` paths matched nothing —
+a citation the checker cannot see is exactly as good as no citation. `.superpowers` is now a
+known root, with a test, and it immediately found a dead one:
+`friends-family-baseline` cited `.superpowers/sdd/2026-08-18-shoji-screens/` and **no such ledger
+was ever created** — item 5 ran without one. Corrected in place, pointing at the spec and plan
+that do exist.

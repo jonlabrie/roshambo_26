@@ -342,3 +342,23 @@ test("this test file is not read as repo source, or it disarms the checks it gua
       'being read as source again and checks 11 and 12 are silently disarmed'
   );
 });
+
+test('a dead .superpowers/ ledger citation is caught like any other path', () => {
+  // ⚠ CITE_RE anchored on roblox|server|src|tools|docs|shared-fixtures, so the 11 `.superpowers/`
+  // citations across 7 pages were INVISIBLE to check 8 — including one naming a ledger that was
+  // never created. The directory was also gitignored, so no clone could resolve any of them.
+  // Both fixed 2026-08-27: the markdown is committed, and the prefix is now a known root.
+  const wiki = structuredClone(CLEAN);
+  wiki.pages['world/dojo.md'] =
+    FM('world') + '# Dojo\nLedger `.superpowers/sdd/never-existed/progress.md`. [[board]]\n';
+  const { errors } = lint(makeWiki(wiki), { repoRoot: process.cwd() });
+  assert.ok(errors.some((e) => e.includes('never-existed') && /citation|does not exist/i.test(e)));
+});
+
+test('a .superpowers/ ledger that DOES exist is silent', () => {
+  const wiki = structuredClone(CLEAN);
+  wiki.pages['world/dojo.md'] =
+    FM('world') + '# Dojo\nLedger `.superpowers/sdd/progress.md`. [[board]]\n';
+  const { errors } = lint(makeWiki(wiki), { repoRoot: process.cwd() });
+  assert.ok(!errors.some((e) => e.includes('.superpowers')));
+});

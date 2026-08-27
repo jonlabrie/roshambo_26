@@ -25,8 +25,12 @@ const STATUS_RE = /\b(NEXT IS|IN PROGRESS|RESUME HERE|OPEN:|BLOCKED|PARKED:|TODO
 
 // Repo paths as the wiki writes them. Extensions run longest-first so .tsx is not clipped
 // to .ts. Leading delimiter keeps `docs/foo.md` inside a wikilink or URL from matching.
+// ⚠ `.superpowers` IS A ROOT, added 2026-08-27. Its absence made 11 citations across 7 pages
+// invisible to check 8 -- one of them naming an SDD ledger that was never created -- and the
+// directory was gitignored besides, so no clone could resolve any of them. A citation the
+// checker cannot see is exactly as good as no citation.
 const CITE_RE =
-  /(?:^|[\s`(\[])((?:roblox|server|src|tools|docs|shared-fixtures)\/[A-Za-z0-9._\/-]+\.(?:luau|tsx|ts|mjs|json|md))/g;
+  /(?:^|[\s`(\[])((?:roblox|server|src|tools|docs|shared-fixtures|\.superpowers)\/[A-Za-z0-9._\/-]+\.(?:luau|tsx|ts|mjs|json|md))/g;
 
 // The wiki cites Roblox files both ways -- `roblox/src/shared/X.luau` and, inside world/
 // pages that never leave that tree, a bare `src/shared/X.luau`. Both must resolve or the
