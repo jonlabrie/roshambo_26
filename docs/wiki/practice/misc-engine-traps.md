@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-25
+updated: 2026-08-26
 ---
 
 # Misc Engine Traps
@@ -94,6 +94,38 @@ print(m.Source:find("h = 7.2", 1, true) ~= nil)  -- truth; require() may lie
 Corollary for any Studio build tool that reads a shared module: **its output can be stale
 in two independent ways** — the source may not have synced, or the VM may be holding an
 old copy. They look identical from the built artefact. See [[studio-tooling]].
+
+## ⚠ Rojo: a reconnect never re-reads disk, and a wrong-CLASS instance blocks the node forever
+
+Three separate mechanisms, discovered in one sitting on 2026-08-26 because the first two hid the
+third. A `$path` node had gone to an EMPTY MODEL where a MeshPart belonged, and stayed that way
+through everything short of the real fix.
+
+| symptom | what it is NOT | the actual rule |
+|---|---|---|
+| plugin reconnect changes nothing | not a stale plugin | ⚠ **a reconnect re-reads the SERVER'S SNAPSHOT, never the disk** |
+| server restart changes nothing | not a stale server | the node was blocked (below) |
+| a known-good file also fails to sync | not the file's format | proves the blocker is in the PLACE, not on disk |
+
+⚠ **THE BLOCKER: Rojo cannot change an instance's ClassName.** When the thing in the place is a
+`Model` and the `$path` resolves to a `MeshPart`, Rojo must REPLACE rather than patch — and it
+simply does not. The node stays wrong through reconnects, through server restarts, and through
+reverting the file. **Delete the wrong-class instance and Rojo recreates it correctly within
+seconds.** That is the whole fix, and nothing else touches it.
+
+**How the wrong class got there:** a Studio "Save to File" over an existing `.rbxm` while `rojo
+serve` was watching. The patch half-applied — old MeshPart torn out, replacement never made — and
+left a bare `Model` placeholder that then blocked its own repair.
+
+**The diagnostic that separates all three**, and the only one worth running first: put a
+KNOWN-GOOD file back and see whether IT syncs. If the previously-working file also fails, the
+problem is not the new file, and every hypothesis about format or parser versions is dead. On the
+same day, two brand-new `$path` entries (`KarasuBody`, `KarasuWings`) synced perfectly from the
+same server in the same session — new nodes have no wrong-class instance to collide with, which is
+what finally isolated it.
+
+⚠ Adding new `default.project.json` entries still needs a **server restart**, not a reconnect —
+see CLAUDE.md. That is a different rule from this one and both are true.
 
 ## A string require that crosses `src/` roots resolves under Lune and dies in Roblox
 
