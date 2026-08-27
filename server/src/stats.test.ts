@@ -546,3 +546,24 @@ describe('FORM — what is riding right now', () => {
         expect(rows.map(r => r.pot)).toEqual([81]);
     });
 });
+
+describe('bankDepths excludes partial banks', () => {
+    it('counts only full banks, so NERVE keeps measuring when players stop', async () => {
+        const u = await User.create({ deviceId: 'nerve-1' });
+        const w = { from: new Date(Date.now() - 60_000), to: new Date(Date.now() + 60_000) };
+        await BankEvent.create({ userId: u._id, amount: 9, streakAtBank: 2, partial: false });
+        await BankEvent.create({ userId: u._id, amount: 18, streakAtBank: 6, partial: true });
+        await BankEvent.create({ userId: u._id, amount: 27, streakAtBank: 3, partial: false });
+
+        expect((await bankDepths(w)).sort()).toEqual([2, 3]);
+    });
+
+    it('still counts a legacy row with no partial field', async () => {
+        const u = await User.create({ deviceId: 'nerve-2' });
+        const w = { from: new Date(Date.now() - 60_000), to: new Date(Date.now() + 60_000) };
+        await BankEvent.collection.insertOne({
+            userId: u._id, amount: 9, streakAtBank: 4, platform: 'pwa', timestamp: new Date(),
+        });
+        expect(await bankDepths(w)).toEqual([4]);
+    });
+});

@@ -27,6 +27,11 @@ const BankEventSchema: Schema = new Schema({
     // Without this flag `bankDepths` (the NERVE histogram) blends "when do players stop" with
     // "when do players hedge" — no error, no failing test, just a stat about something else.
     // Cheap now, impossible to reconstruct later: the rows would already be mixed.
+    //
+    // ⚠ THE FILTER FOLLOWS THE COLUMN, NOT THE COLLECTION -- do not "fix" the inconsistency.
+    // `amount` is earnings and every consumer counts partial banks (biggestBanks, heatBoard,
+    // qualifiedBoard, earningsInWindow): hedged points are real points. `streakAtBank` is a
+    // decision, and only bankDepths reads it, so only bankDepths filters.
     partial: { type: Boolean, default: false },
     platform: { type: String, enum: ['pwa', 'roblox'], default: 'pwa' },
     timestamp: { type: Date, default: Date.now },

@@ -100,7 +100,13 @@ export async function forfeitsInWindow(userId: Types.ObjectId, w: Window): Promi
 // their own read and banks nothing, which is a losing strategy wearing a winner's hat. This
 // feeds a personal figure and a room-wide histogram, and neither is ranked.
 export async function bankDepths(w: Window, userId?: Types.ObjectId): Promise<number[]> {
-    const match: Record<string, unknown> = { timestamp: { $gte: w.from, $lt: w.to } };
+    // ⚠ FULL BANKS ONLY. A partial bank is a hedge, not a decision to stop, and this stat is
+    // about where players stop. `$ne: true` rather than `false` so rows written before the
+    // field existed still count — they are all full banks by definition.
+    const match: Record<string, unknown> = {
+        timestamp: { $gte: w.from, $lt: w.to },
+        partial: { $ne: true },
+    };
     if (userId) match.userId = userId;
     const rows = await BankEvent.find(match).select('streakAtBank');
     return rows.map(r => r.streakAtBank ?? 0);
