@@ -142,8 +142,11 @@ function NetworkClient.getPlayer(self: any, robloxUserId: string, country: strin
     return self:_request("GET", path)
 end
 
-function NetworkClient.postBank(self: any, robloxUserId: string): Result
-    return self:_request("POST", "/api/v1/bank", { robloxUserId = robloxUserId })
+-- `keep` is what stays riding after the bank; 0 is the full bank, which is what every caller
+-- shipped before partial banking sends. The SERVER validates it against the player's own pot
+-- (GameRules.keepOptions) and answers an invalid one with 409, the same shape as nothing staked.
+function NetworkClient.postBank(self: any, robloxUserId: string, keep: number?): Result
+    return self:_request("POST", "/api/v1/bank", { robloxUserId = robloxUserId, keep = keep or 0 })
 end
 
 function NetworkClient.getLeaderboards(self: any, scope: string): Result

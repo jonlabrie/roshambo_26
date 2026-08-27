@@ -77,4 +77,35 @@ function GameRules.isValidKeep(pot: number, keep: number): boolean
     return false
 end
 
+-- A `keep` arriving from a CLIENT (the BankRequest RemoteEvent) rather than from our own code.
+-- Returns the sanitised value, or nil meaning REFUSE THE REQUEST.
+--
+-- ⚠ MALFORMED MUST NOT BECOME 0. `keep = 0` is a FULL bank, so coercing junk to 0 would cash out
+-- a player's whole pot because their client sent something odd. Absent IS 0 — the bank button
+-- fires with no argument and that is a full bank, exactly as it was before partial banking.
+--
+-- The TS transports get the same semantics from `Number(x ?? 0)`: absent coerces to 0, garbage
+-- coerces to NaN, and `isValidKeep` rejects NaN. This function is the Luau-side equivalent, and
+-- is deliberately not mirrored in `GameRules.ts` — there is no RemoteEvent on that side.
+function GameRules.keepFromWire(value: any): number?
+    if value == nil then
+        return 0
+    end
+    if typeof(value) ~= "number" then
+        return nil
+    end
+    -- ⚠ BELT AND BRACES, AND THE FIXTURE DOES NOT PROVE IT. `value ~= value` is the NaN test and
+    -- math.huge would serialise as invalid JSON -- but the `% 1` check below already rejects both,
+    -- because `NaN % 1` and `math.huge % 1` are each NaN and so are `~= 0`. Mutation testing showed
+    -- this block can be deleted with every test still green. It stays because relying on that
+    -- emergent behaviour is subtler than saying what we mean; do not read the tests as covering it.
+    if value ~= value or value == math.huge or value == -math.huge then
+        return nil
+    end
+    if value < 0 or value % 1 ~= 0 then
+        return nil
+    end
+    return value
+end
+
 return GameRules

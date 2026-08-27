@@ -46,3 +46,26 @@ describe("GameRules (shared fixtures)", function()
         end)
     end
 end)
+
+describe("GameRules.keepFromWire", function()
+    -- ⚠ THE FAILURE DIRECTION IS THE WHOLE POINT. `keep = 0` means BANK EVERYTHING, so coercing a
+    -- malformed value to 0 would cash out a player's entire pot because their client sent junk.
+    -- Absent is 0 (the bank button sends nothing, and that is a full bank, exactly as before);
+    -- anything present but malformed REFUSES. The TS transports get the same semantics for free
+    -- from `Number(x ?? 0)` — absent coerces to 0, garbage coerces to NaN and isValidKeep rejects it.
+    test("absent means a FULL bank, because that is what the bank button sends", function()
+        expect(GameRules.keepFromWire(nil)).toBe(0)
+    end)
+
+    test("a non-negative integer passes through untouched", function()
+        expect(GameRules.keepFromWire(0)).toBe(0)
+        expect(GameRules.keepFromWire(9)).toBe(9)
+        expect(GameRules.keepFromWire(27)).toBe(27)
+    end)
+
+    test("⚠ anything malformed REFUSES rather than defaulting to a full bank", function()
+        for _, junk in { -1, 13.5, "9", "", true, {}, 0 / 0, math.huge } do
+            expect(GameRules.keepFromWire(junk)).toBe(nil)
+        end
+    end)
+end)

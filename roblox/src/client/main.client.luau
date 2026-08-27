@@ -783,8 +783,11 @@ end)
 
 -- No optimistic wallet edit: the pot indicator clears when ProfileUpdate lands with the banked
 -- wallet, and guessing here would flash the pot to 0 and back if the request failed.
-EventBus.HudBank.Event:Connect(function()
-    BankRequest:FireServer()
+-- `keep` is what stays riding; nil/absent is a FULL bank, which is all the HUD can ask for
+-- today — there is no control for choosing a rung yet, only this one button. The plumbing
+-- carries the value so that building the control is the only remaining step.
+EventBus.HudBank.Event:Connect(function(keep)
+    BankRequest:FireServer(keep)
 end)
 
 -- The picker's tap. It carries only a shellId: the server owns whether that shell may fly, where

@@ -575,9 +575,22 @@ end)
 
 local handlerQueue = HandlerQueue.new(task.spawn)
 
-BankRequest.OnServerEvent:Connect(function(player)
+-- ⚠ `keep` IS THE ONLY THING READ OFF THE WIRE HERE — identity comes from `player`, which
+-- OnServerEvent supplies, never from the payload ([[identity]]'s standing rule). A client cannot
+-- bank someone else's pot by sending an id, because no id is sent.
+--
+-- A malformed keep REFUSES rather than defaulting to 0: 0 means a FULL bank, so the lenient
+-- reading would cash out the player's whole pot on a garbled message. The server then validates
+-- the value against that player's own pot and answers 409 if it is not a rung, so nothing here
+-- has to know the ladder.
+BankRequest.OnServerEvent:Connect(function(player, rawKeep)
+    local keep = GameRules.keepFromWire(rawKeep)
+    if keep == nil then
+        warn(`[Bank] refusing malformed keep from {player.UserId}: {tostring(rawKeep)}`)
+        return
+    end
     handlerQueue:run(tostring(player.UserId), function()
-        local res = net:postBank(tostring(player.UserId))
+        local res = net:postBank(tostring(player.UserId), keep)
         if res.ok then
             -- /bank's response doesn't carry unresolvedWin, but wallet.bankPot sets it false in
             -- the same atomic update, so mirror that rather than passing a now-stale true through.
