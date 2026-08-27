@@ -342,7 +342,10 @@ than wrongly closed, so a backfill can still close them at their last known `las
 bug it replaced overwrote correct intervals unrecoverably.
 
 **2. A disconnect racing `sync-player` leaks a self-refreshing heartbeat entry.**
-`socketAdapter.ts:169-170` vs `:283-284` — if the socket drops while `sync-player` is awaiting
+In `socketAdapter.ts`, the `disconnect` handler's `heartbeats.delete(socket.id)` versus
+`sync-player`'s `heartbeats.set(socket.id, ...)` after `openSession` — ⚠ the line numbers that
+used to be here pointed at reveal broadcasting instead, unrelated code. If the socket drops while
+`sync-player` is awaiting
 `resolveUser`/`openSession`, the disconnect handler runs first and finds no `sessionId`, then
 the sync handler registers a heartbeat for a dead socket. That entry refreshes `lastSeenAt`
 forever, so it would defeat follow-up (1) as well as growing the `Map` unbounded over process

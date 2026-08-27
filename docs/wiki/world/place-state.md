@@ -1,17 +1,21 @@
 ---
 shelf: world
-updated: 2026-08-17
+updated: 2026-08-27
 ---
 
 # Place State
 
 The page for what git cannot see. Rojo manages exactly what `default.project.json`
-names — everything under `Workspace.RoshamboStage` — and nothing else; all other
-Workspace content is place-only, organized by lifecycle (`CanyonWorld` shipped,
-`Sandbox` throwaway). Ship by **publishing/saving the place, never `rojo build`**
-(a build emits only the declared stage children and drops all place-only content).
-CI fails on any committed `.rbxl(x)`. Authority: CLAUDE.md §Workspace organization,
-[[rojo-and-place]].
+names — `Workspace.RoshamboStage`, **and since 2026-08-26 `ReplicatedStorage.RoshamboBirds`
+too** ([[familiars]]) — and nothing else; all other Workspace content is place-only,
+organized by lifecycle (`CanyonWorld` shipped, `Sandbox` throwaway). Ship by
+**publishing/saving the place, never `rojo build`** (a build emits only the declared
+children and drops all place-only content). CI fails on any committed `.rbxl(x)`.
+
+⚠ **Authority is [[rojo-and-place]], NOT `CLAUDE.md`.** This line used to name CLAUDE.md
+first, which inverts the hierarchy: CLAUDE.md's own banner says it is orientation and not
+authoritative for repo or system state, and it has been wrong about this very subject — it
+still said "7 hero-prop models" when the declaration held 19 children. Corrected 2026-08-27.
 
 Everything below marked *verified* was checked live via the Studio MCP on 2026-08-15
 (Edit mode, place "Roshambo").
@@ -37,7 +41,7 @@ Everything below marked *verified* was checked live via the Studio MCP on 2026-0
 - `CanyonWorld`: Arena (incl. `W##_*_Rocks/_VFX`, `FallsLanding`), Paths
   (`PathRailings` 5,186 descendants, `PathLanterns` 2,599), Structures (incl.
   `Chochin_Hanabiya`), **Legacy (empty — the 14 legacy teahouses were retired to
-  `ServerStorage.RetiredLegacyTeahouses`; CLAUDE.md's "frozen 14" note is stale)**,
+  `ServerStorage.RetiredLegacyTeahouses`)**,
   Foliage (Heroes, Preserve, ShoreRocks, ArrangementsDraft ×22, EastBackdrop), Water
   (runs + `FallsAudio` with 17 emitters), Ambience (`Audio_Dock_Uguisu` +
   `UguisuScheduler`), LaunchSites (3 tagged `FireworkLaunchSite` parts).

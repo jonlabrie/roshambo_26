@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-17
+updated: 2026-08-27
 ---
 
 # Round & HUD
@@ -16,7 +16,7 @@ round restructure (2026-08-02..05, owner Studio-gated). Server truth lives in
 
 A 60 s round (`830d2b8..00bf8f8`), env-driven via `ROUND_OPEN_SECONDS` /
 `ROUND_LOCK_SECONDS` / `ROUND_REVEAL_SECONDS` (defaults verified in
-`server/src/index.ts:59`). The old phase names were **offset by one** from the
+`server/src/index.ts`). The old phase names were **offset by one** from the
 events (ACTIVE ended with 2 s of lockout; nothing was ever tallied in TALLY; the
 drum's 3.45 s settle never fit inside a 3 s REVEAL) — that diagnosis is the part not
 to re-derive. REVEAL's 7 is derived (3.45 settle + 3.0 glyph + 0.4 fade) and does
@@ -132,4 +132,4 @@ half a facet) — not a time constant. The glyph reel is `ReelStep.luau`.
 - specs: `2026-08-04-round-structure-design.md`, the four play-HUD specs
   (2026-08-02..04); ledgers under `.superpowers/sdd/`
 - key commits: `830d2b8..00bf8f8` round restructure · `1964b73..9a18224` HUD round
-  three · env defaults `server/src/index.ts:59`
+  three · env defaults `ROUND_OPEN_SECONDS`/`ROUND_LOCK_SECONDS`/`ROUND_REVEAL_SECONDS` = 51/2/7 in `server/src/index.ts`

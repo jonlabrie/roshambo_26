@@ -113,8 +113,12 @@ Milestone 4a adds the arena machinery: pure modules (`FlapScheduler`, `DoomEscal
 
 ### Workspace organization (Rojo vs place-only)
 
-Rojo manages **exactly what `default.project.json` names** — all of it lives under
-`Workspace.RoshamboStage` (7 hero-prop models from `assets/*.model.json` + `ArenaSpawn`).
+Rojo manages **exactly what `default.project.json` names**, in TWO places:
+`Workspace.RoshamboStage` (19 children as of 2026-08-27, from both `assets/*.model.json` and
+`assets/meshes/*.rbxm`, plus `ArenaSpawn`) and `ReplicatedStorage.RoshamboBirds` (the
+familiars' skinned meshes). ⚠ Read `default.project.json` for the current list — this said
+"all of it lives under RoshamboStage" and "7 hero-prop models" for weeks after both stopped
+being true.
 `RoshamboStage` holds nothing else; never hand-add children to it in Studio.
 
 Everything else in Workspace is **place-only** (saved in the place, not in git) and

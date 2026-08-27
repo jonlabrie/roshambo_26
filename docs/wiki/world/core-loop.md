@@ -88,7 +88,7 @@ by it an easy mistake to make — that is the live hazard, not the current sort.
 ## Trap: `pointsDelta` is not an increment
 
 `GameRules.potDelta` records, on a WIN, the **new pot value** rather than the gain
-(characterised from production behaviour; `server/src/engine/GameRules.ts:18-24`). A run
+(characterised from production behaviour; `GameRules.potDelta`). A run
 of 0→1→3→9 writes deltas `1, 3, 9` for a pot worth 9. **Summing `PlayerRound.pointsDelta`
 does not give points earned** — any points-per-round or earnings stat must derive from
 bank events or `lifetimeBanked`, not from a naive sum.
