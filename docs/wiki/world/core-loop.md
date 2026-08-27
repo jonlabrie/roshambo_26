@@ -43,7 +43,14 @@ judgement lives.
   wiped by a LOSS.
 - **Bank** — convert the pot into `totalPoints`, permanently.
 - **Bank down a rung** — drop the pot to any lower rung of the ladder and bank the difference,
-  keeping the rest riding. ⚠ **SERVER ONLY as of 2026-08-27; no client can ask for it yet.**
+  keeping the rest riding. ⚠ **PLUMBED END TO END 2026-08-27; the only missing piece is a
+  CONTROL.** The Roblox chain carries a `keep` at all five links (HudController → `EventBus.HudBank`
+  → `BankRequest` → the server handler → `NetworkClient.postBank`), and the PWA's socket handler
+  already reads `data?.keep` — its `emit('bank')` just sends no payload yet. Nothing can ask for a
+  partial bank because no UI offers the choice, NOT because anything is unfinished underneath.
+  ⚠ `GameRules.keepFromWire` guards the RemoteEvent: a malformed `keep` REFUSES rather than
+  falling back to 0, because 0 is a FULL bank and the lenient reading would cash out a whole pot
+  on a garbled message.
   `GameRules.keepOptions(pot)` is the list of rungs a pot may be dropped to, gated on
   `shared-fixtures/game-rules.json` and mirrored in Luau. `bankPot(userId, platform, keep)`
   takes it, `keep` defaulting to 0 — which is the full bank, so every shipped client is
