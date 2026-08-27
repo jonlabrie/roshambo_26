@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-18
+updated: 2026-08-26
 ---
 
 # Why Wiki Pages Go Stale (and what the lint cannot catch)
@@ -38,9 +38,16 @@ Three more instances from the same 48 hours, same shape:
 ## What the lint can and cannot do
 
 `tools/wiki/lint.mjs` checks STRUCTURE: index completeness, dead wikilinks, orphans, status
-language outside `program/`, log format, frontmatter. It ran clean through every one of the
-failures above, because none of them are structural. **A page can be internally contradictory,
-four buildings out of date, and lint-clean.**
+language outside `program/`, log format, frontmatter — plus currency, below. It ran clean through
+every one of the failures above, because none of them are structural. **A page can be internally
+contradictory, four buildings out of date, and lint-clean.**
+
+⚠ **AND ONE WHOLE CLASS REMAINS INVISIBLE TO IT: a page that was NEVER TRUE.** Currency compares
+the page against the moment its cited code last moved, so it can only catch a page that has fallen
+behind. `familiars.md` recorded the uguisu at 0.552 studs — its size in Blender, not the size that
+shipped — and a MeshId two imports stale. The page and the artifact never agreed, so there was no
+*change* to detect and no date to compare. The only defence is not to transcribe the number at all:
+record how to measure it (schema rule 9).
 
 The schema already prescribes a manual pass for exactly this (contradictions, superseded claims,
 `⚠ unverified` gone checkable). That pass requires reading and therefore is the part that gets
@@ -60,8 +67,22 @@ grepping the program shelf for those phrases returned five hits, of which four w
 something else. The rot is not reliably announced in the wording.
 
 What is: a page's claims cite files, and those files have commit dates. `tools/wiki/lint.mjs`
-now errors when a page's `updated:` lags its own last commit, errors on a cited repo path that
-does not exist, and warns `re-read —` when cited code was committed after the page's `updated:`.
+errors when a page's `updated:` lags its own last commit, and errors on a cited repo path that
+does not exist.
+
+⚠ **AND `re-read —` NOW BLOCKS (2026-08-26).** It shipped as a WARNING, and the warning was the
+mistake: **warnings do not get cleared.** Fifteen accumulated over eleven days — eight of them on
+pages untouched since 2026-08-15 — while 60 of the 77 wiki commits in that window were corrections
+of things already written. The signal was firing the whole time and nobody was downstream of it.
+
+It is an error past a **three-day grace**, which is wide enough for "edited the code Friday, wrote
+the page Monday" and far too narrow for the gaps that were actually sitting there. Inside the
+grace it is still a warning. Clear it by re-reading and then either bumping `updated:` (you changed
+the page) or adding `checked: YYYY-MM-DD` (it was already right) — two different claims, two
+different fields, and silencing one with the other would be a small lie in the frontmatter.
+
+⚠ **The escape hatch is also a trap worth naming:** `checked:` older than the code change does not
+clear anything, or one stale acknowledgement would silence a page forever. Tested.
 Details and the `<!-- lint-ok -->` exemption are in [schema.md](../schema.md).
 
 First run: **5 errors, 13 warnings across 50 pages** — a usable volume rather than noise. It

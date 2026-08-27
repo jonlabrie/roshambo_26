@@ -111,14 +111,13 @@ so a bird that has one keeps it and waits outside, and only a bird with none fol
 The four-part greybox is superseded by a **skinned MeshPart**, verified in the place. It is the
 first of a ROSTER (owner: uguisu first, karasu second), not the only bird.
 
-| | |
-|---|---|
-| MeshId | `rbxassetid://114444614583565` |
-| TextureID | `rbxassetid://133923547243928` (1024² ColorMap) |
-| Size | ⚠ **0.222 × 0.472 × 0.828 studs AS SHIPPED** — measured off the committed `.rbxm` 2026-08-26. This page long recorded 0.148 × 0.315 × 0.552 ("life size, ~7 inches"); that is the size it was DESIGNED at, and nothing rescales the clone — `BirdController` has no `ScaleTo` and no `Size` write — so what players see is 0.828, about 10 inches. Every ratio derived from 0.552 was therefore wrong by 1.5×. |
-| Triangles | 2,688 |
-| Bones | 19, including `bill_lower`, `wing_R`, `wing_L` |
-| Origin | **feet at z = 0**, centred in x/y |
+⚠ **Sizes, bone counts and asset IDs are MEASURED, not recorded here** — run
+`roblox/tools/studio/measureBirds.luau`. A transcribed size and a transcribed MeshId were both
+wrong on this page for a week (see [log.md](../log.md), 2026-08-26).
+
+**The one contract worth stating in prose:** origin is **feet at z = 0**, centred in x/y, and body
+and wings must agree — that is what makes `perch.WorldPosition` the bird's position with no fudge.
+
 
 Built by retargeting a purchased sparrow (TurboSquid "Rigged Low Poly Bird Collection" 1603819,
 Standard License; source lives outside the repo). What was inherited: the standing posture, ten
@@ -302,19 +301,19 @@ Owner ruling 2026-08-19 was *"uguisu first, karasu second"*, and 2026-08-25 made
 **unlocks** rather than a grade ladder — so this is the first bird a player can earn the right to
 choose. It is not wired into play; it is built, verified and waiting on import.
 
-| | |
-|---|---|
-| Body | 0.328 × 1.640 × 0.897 studs, **2,666 triangles** |
-| Wings | 2.446 studs tip to tip, **856 triangles** (`KarasuWings`, separate part) |
-| Bones | **19**, one rig shared by both parts |
-| Origin | **feet at z = 0**, centred in x/y — same contract as the uguisu |
-| Source | `karasu_body.fbx`, `karasu_wings.fbx`, `karasu_colormap.png` in `~/Desktop/Roshambo Reference/models/birds/probe/` |
-| Rebuilt by | `roblox/tools/blender/karasu_retarget.py` — `run()`, `verify_rig()`, `bake_and_finish()` |
+⚠ **Measured, not transcribed** — `roblox/tools/studio/measureBirds.luau`, same as the uguisu
+above. Rebuilt end to end by `roblox/tools/blender/karasu_retarget.py` (`run()`, `verify_rig()`,
+`bake_and_finish()`); source FBXs and the ColorMap live in
+`~/Desktop/Roshambo Reference/models/birds/probe/`.
 
-⚠ **LIFE SIZE, AND THAT IS TWICE THE UGUISU** — not three times. Owner-chosen 2026-08-26: 1.64
-studs / 19.7 inches, a hashibutogarasu (~50cm). The comparison was written against the uguisu's
-DESIGNED 0.552; measured off the committed asset, the shipped uguisu is 0.828, so the real ratio
-is **1.98×**. It follows two standing rulings
+⚠ **Triangle counts are the exception** and have to be recorded, because Roblox exposes no face
+count for a MeshPart at runtime: body 2,666, spread wings 1,304. `karasu_retarget.run()` reports
+both, and is the only place they can be re-derived.
+
+
+⚠ **LIFE SIZE, AND THAT IS ABOUT TWICE THE UGUISU.** Owner-chosen 2026-08-26: a hashibutogarasu
+(~50cm). `measureBirds` prints the exact ratio; it was first written here as "three times", from
+the uguisu's designed size rather than its shipped one. It follows two standing rulings
 rather than inventing one — *"life size, maybe slightly larger"* (2026-08-19) and *"a presumably
 larger bird, like a raven/crow to carry it"* (2026-08-22). **The consequence is real work for the
 main thread:** `SEAT_INBOARD` / `SEAT_LIFT` are proportions of the avatar's arm, not of the bird,
@@ -380,9 +379,7 @@ and local Z only fore-and-aft, exactly as measured on the uguisu.
 The asset thread does not touch Studio ([[parallel-threads]]). For the main thread:
 
 1. Import `karasu_body.fbx` and `karasu_wings.fbx`. **Do not rescale** — unlike the uguisu (built
-   at 0.828 and believed to have been scaled to 0.552 in Studio — measured 2026-08-26, the
-   committed `.rbxm` is 0.828 and nothing rescales it, so that scaling either never happened or was
-   undone), this one is 1:1 at its final size.
+   at one size and scaled in Studio), this one is 1:1 at its final size.
 2. ⚠ **DELETE THE SurfaceAppearance THE IMPORTER CREATES AND USE `TextureID` INSTEAD.** The FBX
    carries a ColorMap and nothing else, and a **ColorMap-only SurfaceAppearance on opaque geometry
    renders warm and shiny** — Roblox substitutes its own defaults for the missing channels

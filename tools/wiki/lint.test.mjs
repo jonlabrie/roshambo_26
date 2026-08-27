@@ -132,3 +132,56 @@ test('a deliberately-absent citation is exempted by lint-ok on its line', () => 
   const { errors } = lint(makeWiki(wiki), { repoRoot: process.cwd() });
   assert.ok(!errors.some((e) => e.includes('dead code citation')));
 });
+
+// ===== staleness blocks past the grace window (2026-08-26) =====
+//
+// ⚠ These exist because staleness used to be a WARNING, and warnings do not get cleared: fifteen
+// had accumulated, eight of them eleven days old, while 60 of the previous 77 wiki commits were
+// corrections of things already written. The escape hatch has to work, or this becomes noise
+// somebody disables — so it is tested as carefully as the block itself.
+//
+// Cites a REAL file with repoRoot = cwd, matching the tests above: a citation that does not resolve
+// is reported as a dead citation and never reaches the staleness check at all.
+
+const stale = ({ moved, checked }) => {
+  const wiki = structuredClone(CLEAN);
+  wiki.pages['world/dojo.md'] =
+    FM('world', checked ? `checked: ${checked}\n` : '') +
+    '# Dojo\nSee `tools/wiki/lint.mjs`. See [[board]].\n';
+  return lint(makeWiki(wiki), {
+    repoRoot: process.cwd(),
+    gitDate: (f) => (f.endsWith('lint.mjs') ? moved : '2026-08-01'),
+  });
+};
+
+test('code changed long after the page was verified is an ERROR, not a warning', () => {
+  const { errors, warnings } = stale({ moved: '2026-08-30' }); // page updated 2026-08-15 => 15d
+  assert.ok(errors.some((e) => e.includes('re-read') && e.includes('lint.mjs')));
+  assert.ok(!warnings.some((w) => w.includes('lint.mjs')));
+});
+
+test('inside the grace window it stays a warning — same-session work must not trip it', () => {
+  const { errors, warnings } = stale({ moved: '2026-08-17' }); // 2 days
+  assert.ok(!errors.some((e) => e.includes('lint.mjs')));
+  assert.ok(warnings.some((w) => w.includes('re-read') && w.includes('lint.mjs')));
+});
+
+test("'checked:' clears staleness without claiming the page changed", () => {
+  // ⚠ THE WHOLE POINT OF A SEPARATE FIELD. Bumping `updated:` would silence this too, but it would
+  // assert the page was EDITED when all that happened is somebody re-read it and found it right.
+  const { errors } = stale({ moved: '2026-08-30', checked: '2026-08-31' });
+  assert.ok(!errors.some((e) => e.includes('lint.mjs')));
+});
+
+test("a 'checked:' older than the code change does NOT clear it", () => {
+  // Otherwise one stale acknowledgement silences a page forever.
+  const { errors } = stale({ moved: '2026-08-30', checked: '2026-08-20' });
+  assert.ok(errors.some((e) => e.includes('re-read') && e.includes('lint.mjs')));
+});
+
+test('a malformed checked: date is an error in its own right', () => {
+  const wiki = structuredClone(CLEAN);
+  wiki.pages['world/dojo.md'] = FM('world', 'checked: last tuesday\n') + '# Dojo\nSee [[board]].\n';
+  const { errors } = lint(makeWiki(wiki));
+  assert.ok(errors.some((e) => e.includes("bad frontmatter 'checked'")));
+});

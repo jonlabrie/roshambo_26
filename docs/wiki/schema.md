@@ -16,8 +16,30 @@ Sessions read `index.md` first. The pattern is Karpathy's LLM-wiki
 ## Rules
 
 1. **Statuses only on `program/` pages.**
-2. **Supersede, don't append.** New truth replaces old text; chronology goes to
-   `log.md`. A page must never read as an argument with its past self.
+2. ⚠ **Supersede, don't append — DELETE THE OLD CLAIM.** New truth REPLACES old text; the old
+   value goes to `log.md`, which is append-only by design and is where chronology belongs. A page
+   must never read as an argument with its past self.
+   **This rule was being broken, measurably.** Over the eleven days to 2026-08-26, `familiars.md`
+   grew +482 lines against 43 deleted and `blender-pipeline.md` +244 against 10, while **60 of 77
+   wiki commits were corrections of things already written**. Corrections were landing BESIDE the
+   wrong text rather than on top of it, leaving a reader free to believe either — and at 439 lines
+   nobody re-reads far enough to notice the contradiction.
+9. ⚠ **Never transcribe a measurable fact — record how to MEASURE it.** Sizes, counts, IDs, angles,
+   service URLs, branch names: a number copied into prose has no source, cannot be re-derived, and
+   is wrong the moment the artifact moves, with nothing positioned to notice.
+   The failure this prevents: `familiars.md` recorded the uguisu at **0.552 studs** for a week. That
+   was its size in Blender; the shipped asset is **0.828**, and nothing rescales it. A DESIGN figure
+   carried as an AS-BUILT, and no currency check can ever catch it, because the page and the
+   artifact never agreed in the first place — there is no "change" to detect.
+   Write the query instead. `CLAUDE.md`'s deploy note carries the `aws` command that returns the
+   service's branch and URL rather than naming them; `familiars.md` carries
+   `tools/studio/measureBirds.luau` rather than a table of dimensions. A command cannot go stale
+   without failing loudly.
+10. ⚠ **Staleness BLOCKS.** A cited file that changed more than three days after the page was last
+   verified is an ERROR, not a warning. Re-read the page, then bump `updated:` if you changed it,
+   or add `checked: YYYY-MM-DD` if it was already right — two different claims, two different
+   fields. Warnings were what this used to be, and fifteen had accumulated unactioned, eight of
+   them eleven days old. Detection was never the gap; consequence was.
 3. **Update triggers** — touch the wiki in the same commit/session as: an owner gate,
    a drop ("do not re-raise"), a program item opening/closing, a defect found or
    parked, a standing-rule correction, a place save/publish.
@@ -27,7 +49,8 @@ Sessions read `index.md` first. The pattern is Karpathy's LLM-wiki
 5. **`⚠ unverified`** marks any claim not checked against git or the live place.
    Never launder a memory into a fact.
 6. **Frontmatter**: every page has `shelf:` and `updated:` (absolute date, bumped on
-   every edit); `status:` only on `program/` pages.
+   every edit); `status:` only on `program/` pages. Optional `checked:` (same format) means
+   "re-read on this date and still true" — see rule 10.
 7. **Links** are `[[wikilinks]]` between pages; `index.md` uses markdown links.
 8. **`log.md`** entries: `## [YYYY-MM-DD] <kind> | <title>`, kind ∈
    gate | ship | decision | drop | defect | migrate | lint | audit. Append-only.

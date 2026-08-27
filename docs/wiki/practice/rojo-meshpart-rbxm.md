@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-15
+updated: 2026-08-26
 ---
 
 # Rojo MeshPart .rbxm
@@ -102,3 +102,16 @@ moderation resolves ([[image-moderation]]). Variants are place-state → SAVE/PU
 the place; reproducible via a committed setup script that bakes the asset ids
 (`roblox/tools/studio/setupCenterpieceMaterials.luau`). See [[place-state]] and the
 terrain recipe on [[build-recipes]].
+
+## Four birds now ship this way (2026-08-26)
+
+`RoshamboBirds` declares `UguisuBody`, `UguisuWings`, `KarasuBody`, `KarasuWings` — each a bare
+skinned MeshPart from its own `.rbxm`. Save the **MeshPart**, never the Model the 3D Importer wraps
+it in: that Model carries an `InitialPoses` folder and an `AnimationController`, and neither does
+anything here — `BirdController` drives bones directly and plays no Animation.
+
+⚠ **Saving over an existing `.rbxm` while `rojo serve` is watching can half-apply the patch**,
+tearing out the MeshPart and leaving a bare `Model` placeholder that then blocks its own repair —
+through reconnects, through server restarts, and through reverting the file. Rojo cannot change an
+instance's ClassName. Delete the wrong-class instance and it recreates correctly in seconds. Full
+diagnosis, including the test that separates the three causes, is on [[misc-engine-traps]].

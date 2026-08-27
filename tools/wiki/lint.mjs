@@ -32,6 +32,11 @@ const CITE_RE =
 // check reports phantom dead citations on a third of the world shelf.
 const CITE_PREFIXES = ['', 'roblox/'];
 
+// How long a page may lag its cited code before staleness stops being a warning and starts being
+// an error. Three days covers "I edited the code Friday and the wiki Monday"; it does not cover
+// the eleven-day gaps that were sitting unactioned when this became blocking.
+const STALE_GRACE_DAYS = 3;
+
 const gitDateOf = (absPath) => {
   try {
     return execFileSync('git', ['log', '-1', '--format=%ad', '--date=short', '--', absPath], {
@@ -58,11 +63,16 @@ function isIgnored(rel) {
     execFileSync('git', ['check-ignore', '-q', rel], { cwd: repoRoot, stdio: 'ignore' });
     ignored = true;
   } catch (err) {
-    // ⚠ ONLY exit 1 means "not ignored". Anything else — git missing, a bad path, a typo in this
-    // very function — is a REAL failure and must not masquerade as an answer. The first version
-    // of this called `execSync`, which this module does not import; the ReferenceError was caught
-    // here, reported as "not ignored", and the check silently did nothing at all.
-    if (err?.status !== 1) throw err;
+    // ⚠ DISTINGUISH "git answered no" FROM "this function is broken". The first version of this
+    // called `execSync`, which the module does not import, and its own catch swallowed the
+    // ReferenceError and reported "not ignored" — the check silently did nothing at all. So a
+    // programming error must still escape.
+    //
+    // But git legitimately fails in two ways here: exit 1 (the path is not ignored) and exit 128
+    // (repoRoot is not a git repo — the lint is INJECTABLE precisely so tests can run against a
+    // tmpdir with no git, and an over-strict rethrow broke four of them). Both mean "not ignored";
+    // an error with no numeric status at all is a bug in this file and is rethrown.
+    if (typeof err?.status !== 'number' && err?.code !== 'ENOENT') throw err;
     ignored = false;
   }
   ignoreCache.set(rel, ignored);
@@ -103,11 +113,15 @@ const gitDate = opts.gitDate ?? gitDateOf;
     // 4. frontmatter
     if (!/^shelf: (program|world|practice|systems)$/m.test(p.text)) errors.push(`${p.rel}: missing/bad frontmatter 'shelf'`);
     if (!/^updated: \d{4}-\d{2}-\d{2}$/m.test(p.text)) errors.push(`${p.rel}: missing/bad frontmatter 'updated'`);
+    if (/^checked:/m.test(p.text) && !/^checked: \d{4}-\d{2}-\d{2}$/m.test(p.text))
+      errors.push(`${p.rel}: bad frontmatter 'checked' (want YYYY-MM-DD)`);
     // 5. orphans (index links don't count) — warning only
     const inbound = pages.some((q) => q !== p && (q.text.includes(`[[${p.name}]]`) || q.text.includes(`[[${p.name}|`)));
     if (!inbound) warnings.push(`${p.rel}: no inbound wikilinks (orphan)`);
 
     const updated = (p.text.match(/^updated: (\d{4}-\d{2}-\d{2})$/m) ?? [])[1];
+    // Optional. "I re-read this and it was still true" — a different claim from "I changed it".
+    const checked = (p.text.match(/^checked: (\d{4}-\d{2}-\d{2})$/m) ?? [])[1];
     if (!updated) continue; // check 4 already reported the bad frontmatter
 
     // 7. the page's own edits outran its `updated:` — schema rule 6, mechanically
@@ -138,9 +152,31 @@ const gitDate = opts.gitDate ?? gitDateOf;
         continue;
       }
       // 9. the ground moved under a page that still claims to be current
+      //
+      // ⚠ THIS BLOCKS AS OF 2026-08-26, and the reason is measured rather than felt. It was a
+      // WARNING, and warnings do not get cleared: fifteen had accumulated, eight of them on pages
+      // untouched for eleven days, while 60 of the previous 77 wiki commits were CORRECTIONS of
+      // things already written. Detection was never the gap — consequence was.
+      //
+      // `checked:` is the escape hatch and it is deliberately not `updated:`. Bumping `updated:`
+      // to silence this would claim the page CHANGED when all that happened is somebody re-read it
+      // and found it still true. Two different facts, two different fields.
+      //
+      // The GRACE window exists so ordinary same-session work does not trip it — you edit code and
+      // the wiki in one sitting, in either order. Past it, a page that has not been looked at while
+      // its ground moved is an error, because that is exactly the state every drift in this repo
+      // was found in.
       const moved = gitDate(abs);
-      if (moved && moved > updated)
-        warnings.push(`${p.rel}: re-read — ${cite} changed ${moved}, page updated ${updated}`);
+      const verified = checked && checked > updated ? checked : updated;
+      if (moved && moved > verified) {
+        const staleDays = Math.floor((Date.parse(moved) - Date.parse(verified)) / 86400000);
+        const msg =
+          `${p.rel}: re-read — ${cite} changed ${moved}, page verified ${verified}` +
+          ` (${staleDays}d). Re-read it, then bump 'updated:' if you changed it or add` +
+          ` 'checked: YYYY-MM-DD' if it was already right.`;
+        if (staleDays > STALE_GRACE_DAYS) errors.push(msg);
+        else warnings.push(msg);
+      }
     }
   }
 
