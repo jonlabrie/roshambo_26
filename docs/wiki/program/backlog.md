@@ -44,12 +44,8 @@ to gate them to dusk.
 
 ## Teahouse access control — core SHIPPED, extensions remain
 
-The core feature shipped and was 2-account-validated on a published server 2026-07-19/20
-(`deec13c..7d36e59`, perimeter+beacons `cd4dbfa`, join-race fix `c5bf33c`): per-player
-Public / Friends / Private modes, invite-by-username resolved to persisted userIds (cap
-50), hybrid enforcement (client-local noren gates + authoritative server region backstop
-with eviction). The old "NOT built" backlog note is superseded by that ship. Still
-deferred from it: guest passes / portal-to-a-friend's-teahouse (the `canEnter` seam is
+Shipped and 2-account-validated 2026-07-19/20 — see [[teahouses]] for the as-built.
+Deferred from it: guest passes / portal-to-a-friend's-teahouse (the `canEnter` seam is
 ready), block/ban lists, per-decoration/floor/time access, the gate ART pass (noren
 perimeter + newel beacons are placeholders), and the optional tunnel-mouth gate survey
 (`roblox/tools/studio/surveyAccessGates.luau`). Guest passes and floors are on the F&F
@@ -68,10 +64,8 @@ interaction with the arena-central round loop and with access gates.
 
 ## Piece B — the remaining arc
 
-Shipped 2026-07-13..20: B1 player back door, B2 size economy, B3 management UI, B4
-repositioning, per-uid handler serialization (`ce7c34d..0f37e2d`), the deck-decoration
-framework (`37e8e12..0d2fc9a`), the Home Portal MVP, and access control (above).
-Remaining Piece B: decoration catalog expansion (swap-skinning — colorScheme / shoji /
+B1-B4, the deck-decoration framework, the Home Portal MVP and access control all shipped
+2026-07-13..20 ([[teahouses]]). Remaining: decoration catalog expansion (swap-skinning — colorScheme / shoji /
 tatami / flags / wallArt; teahouse-anchored props needing S/M/L anchor slots; banner /
 noren / maku slot content; collidable/sittable props; partial refunds; multi-pad
 decoration memory), teahouse floors, the fireworks-battle / valley-as-secondary-arena
@@ -359,32 +353,6 @@ does NOT drop an index already built in a live database. If `roshambo-dev` or `r
 already created `userId_1` on `sessions`/`bankevents`, it persists until dropped by hand or by
 `syncIndexes()`. The write-cost saving is only realised on fresh collections.
 
-## ~~⚠ SECURITY — the `get-stats` socket handler broadcasts deviceIds~~ FIXED 2026-08-16
-
-Found by the plan-2 whole-branch review, 2026-08-16. **Pre-existing; not introduced by that
-plan, and deliberately not fixed by it.**
-
-`server/src/transports/socketAdapter.ts`'s `get-stats` handler emits `topByCareer` with the
-default `LEADERBOARD_FIELDS`, which **includes `deviceId`**, and emits unprojected `PlayerRound`
-documents as `biggestWins`, which carry it too. A `deviceId` is a **bearer credential** on the
-socket path: `sync-player { deviceId }` grants that account with no further auth.
-
-So any connected socket can call `get-stats`, harvest roughly a hundred other players'
-deviceIds, and then assume those accounts. No authentication at any step.
-
-This is the exact credential the plan-2 stats surface works hard to contain — `nameUsers`
-returns `Map<string,string>` precisely so a future field cannot leak — and that discipline is
-moot while the handler beside it hands the same credential to anyone who asks.
-
-**Why it was not fixed inline:** `src/components/StatsView.tsx` uses `deviceId` as a React key,
-so removing it from the payload is a cross-tree change to the PWA, not a server-only edit. It
-deserves its own decision rather than being smuggled into a stats plan.
-
-**Fix sketch:** give the socket path its own projection without `deviceId` (the API path already
-has one, `API_LEADERBOARD_FIELDS`), project `biggestWins` explicitly rather than emitting whole
-documents, and switch the PWA's list key to the user id. Do it **before plan 3 ships a room that
-advertises these boards** and drives traffic to them.
-
 ## Stats surface (plan 2) — notes carried out of the merge
 
 Plan `docs/superpowers/plans/2026-08-16-stats-surface.md` shipped 2026-08-16. Nothing blocking;
@@ -394,11 +362,6 @@ these are things a later reader would otherwise have to rediscover.
   print that bound verbatim or "All time" will read as ending tomorrow. It is labelled
   `windowKind: 'rolling'` because the bound genuinely moves per request — `'calendar'` would be
   a lie — but the label is imprecise and the echoed `from`/`to` are the honest signal.
-- ~~**The two transports disagree on shape for the same boards.**~~ **SUPERSEDED 2026-08-16.**
-  `nameUsers` is exported from `server/src/stats.ts` and `socketAdapter.ts` already imports it — both
-  transports resolve `displayName`. The note was written before the `get-stats` broadcast fix
-  landed and was never re-read afterwards; plan 3 needs no work here. (A textbook instance of
-  [[wiki-currency]]: the fix appended its own note and left this paragraph standing.)
 - **`window=all` is an unbounded scan** of `StreakEvent`, `BankEvent` and every WIN row of
   `PlayerRound`, with sorts not served by the range indexes. Fine at fifty players; consider
   capping it at a season, or adding sort-key indexes, before it matters.
@@ -411,57 +374,12 @@ these are things a later reader would otherwise have to rediscover.
 - **The plan doc diverges from the code**: it names a `playerVolume(userId, w)` that was never
   built. Its three figures are folded into `playerRates` instead, which is the better shape.
 
-## ~~⚠ SECURITY — socket handlers trust a client-supplied `deviceId` as authentication~~ FIXED 2026-08-18
-
-Four handlers in `server/src/transports/socketAdapter.ts` resolved an account straight out of
-`data.deviceId` with no further check: `sync-player` read it, `submit-throw` threw as it,
-`update-progress` renamed it, and `bank` **cashed out its pot**. A deviceId is an identifier —
-it sits in localStorage, travels in support screenshots and over shoulders — and it was being
-used as a password, so anyone who learned one string owned that account outright. The JWT path
-beside it was already done correctly, and that asymmetry was the whole bug.
-
-**The fix moves identity to the CONNECTION.** The server mints the deviceId itself on a new
-`claim-device` event and signs a device token (`{ typ: 'device', did }`, same secret as user
-JWTs, `typ` checked so neither can be replayed as the other). The token rides the socket
-handshake beside the user JWT; the middleware sets `socket.deviceId` from it; the handlers read
-that and nothing else. Closing it at the connection rather than per-handler is what makes it a
-class fix — a future handler cannot be handed an account name, because messages no longer carry
-one. `device-required` tells a socket with no device to claim one rather than failing silently.
-
-**Standing rule this leaves behind: identity comes from the connection, never from a payload.**
-`/auth/register` and `/auth/sso` had the same hole in the REST path — a bare `deviceId` in the
-form body claimed whatever guest owned it — and close the same way: they take the signed device
-token instead, so an account inherits a guest's points only when the browser can prove it IS
-that guest (2026-08-18).
-
-**Owner ruling 2026-08-18 — HARD CUT, no migration.** Guest points and streaks from before the
-change are orphaned: an existing deviceId cannot be presented for adoption, because a stolen one
-would be adopted just as readily. The alternative (claim-on-first-sight) was offered and
-declined.
-
-**Verified live 2026-08-18**: claim, throw, win and bank all confirmed against the demo's
-backend by the owner after a hard reload, and by a socket probe that took a pot to 3 over two
-rounds. The rollout crutch (a legacy `deviceId` payload sent while the client held no token)
-is REMOVED — it existed only for the window where a new client could meet an old server, and
-no old server serves anything now.
-
-**What the PWA still keeps in localStorage**: `roshambo_device_token` (the credential) and
-`roshambo_device_id` (an identifier, written from what the server sends back, read only by the
-account-migration call).
-
 ## Stats room displays (plan 3) — SHIPPED; one thread left open
 
 Plan `docs/superpowers/plans/2026-08-16-stats-room-displays.md` shipped 2026-08-16..17. The
 boards are built, the place is saved, and the owner has walked the room on the A13. The
 as-built — siting, flap modules, typography, framing, the live-tuning attribute trap — lives on
 [[stats-room]], which is the page to read. This entry keeps only what did NOT ship.
-
-`BoardController` was **retired, not retargeted** (`3bc7580`): there was no kōsatsu in the place
-to retarget onto. The renderer was extracted to `FlapBoard.luau` and rehomed on the Stats room's
-own boards. (A supporting claim in that ruling was wrong, and is corrected rather than left
-standing: `BoardController` was not the only client consumer of `BoardData` — `main.client.luau`
-has had its own handler all along, so the deletion orphaned nothing. The conclusion held; the
-reason given for it did not.)
 
 Two spec §6.2 items are deferred with reasons in the plan, not dropped: the 番付 as a printed
 sheet with rank encoded by calligraphy size (a different renderer; the owner decides whether the
@@ -470,50 +388,11 @@ that `fuda` vacated ([[stats-room]]).
 
 ### Carried out of the branch, unfixed and deliberate
 
-The whole-branch review raised these; each was ruled deferred rather than guessed at. Two need
-a number only the owner can supply and are in the plan's gate list instead:
+The whole-branch review raised these; each was ruled deferred rather than guessed at. (The two
+that have since CLOSED — the 49-character wall drum, owner-gated 2026-08-18, and the perf budget,
+superseded by measurement 2026-08-17 — are off this page: the drum ladder's reasoning lives on
+[[stats-room]] and in `FlapScheduler.luau`'s "WHY SMALLEST-FIRST" comment.)
 
-- ~~**⚠ THE WALL BOARDS ARE STILL ON THE 49-CHARACTER DRUM**~~ **CLOSED 2026-08-18, owner-gated
-  ("looks fine").** The clock half closed 2026-08-17 (per-column drums, `RoundDisplayModel.DIGITS`
-  descending, the colon printed via `statics()`); the walls closed with a different mechanism,
-  because the clock's does not transfer. A clock column has a fixed KIND — column 3 is always a
-  tens digit — so a drum can be bolted to the position. A wall column has no kind:
-  `1. JONNY        1,234` holds a digit in one row, a space in the next and a letter in the
-  third, and it all moves when the window changes.
-
-  **Owner's ruling, 2026-08-18: pick the drum from the TRANSITION, and make it a LADDER** —
-  `FlapScheduler.drumFor(cur, tgt)` returns the smallest drum carrying both characters, over
-  `DIGITS` (10) → `FIGURES` (17) → `DRUM` (49). `FlapBoard.drums` now takes a table OR a
-  function, so the round display keeps its bolted-per-column table and the walls pass the policy.
-
-  **Why a ladder and not one numeric drum** — the arithmetic, because it is not obvious and
-  cost a wrong first answer: `maxSteps` caps a roll at 9, and a smaller drum does not remove the
-  cap, only fires it less. `7 → 3` is 45 steps on the full drum and **still 11** on a 15-character
-  numeric one, capped either way. On a TEN-character drum it is 6, and the greatest distance
-  possible is 9 — exactly the cap — so **no digit transition is ever truncated** and the jump-cut
-  cheat goes quiet. Every character added to a rung is paid for by every transition using it,
-  which is why digits get a rung to themselves.
-
-  **`FIGURES` = `0123456789+-.,%/ `** — the punctuation the boards actually print
-  (`StatsBoardModel.figure` emits `,` and a leading `-`; `pct` adds `%` and a bare `-` for a
-  round with no throws; the weekly quota adds `/`; padding adds the space) plus `+` and `.` as
-  headroom at the owner's call: nothing emits them today, and reserving them costs nothing on
-  rung 1 when a signed delta or a decimal arrives.
-
-  Carried in the same change: `FlapScheduler.plan` now **caches each drum's character array and
-  reverse index**. It rebuilt both on every call, which was free while callers planned a whole
-  line at a time — the ladder makes a caller plan one cell per call, taking a 10×40 board repaint
-  from 10 index builds to 400.
-
-  The risk flagged before the gate — two adjacent columns rolling on different drums at once —
-  was looked at and does not read as a defect.
-
-- ~~**No perf budget was taken**~~ **SUPERSEDED 2026-08-17 by measurement.** The owner walked
-  the finished room on the A13: load inside is neither better nor worse than the arena square
-  outside, at ~8,400 GUI instances with no cull. **No budget work is owed, and the `MaxDistance`
-  idea is parked** ([[stats-room]]). If it ever comes off the shelf, note that `MaxDistance`
-  stops the GUIs being DRAWN, not being BUILT — the join-time instance cost needs construction
-  gated on room presence, which is the same fix the fan-out below wants.
 - **Per-player stats fan-out is unbounded**: one `getStatsPlayer` per player every 60s, all in
   one tick, each triggering four Mongo aggregations. At 40 CCU that is a 40-request burst per
   minute against a 500/min HttpService budget, for a slip visible only inside one room. Gate on
@@ -540,6 +419,5 @@ it does not redesign it.
   use `BoardController`'s small-canvas-stretched-large trick or text is unreadable at distance.
 - Per-viewer displays need NO new mechanism: a client-built SurfaceGui parented to a world part
   is already private to that client. Signpost personal vs public boards physically.
-- The socket surface returns raw `userId` ObjectIds with no names, unlike REST — export
-  `nameUsers` from `stats.ts` rather than duplicating the projection in the client path.
-- Boards will be EMPTY until people play: `StreakEvent`/`BankEvent` start from deploy, no backfill.
+⚠ Both belong on [[misc-engine-traps]] rather than a status page; left here until someone
+moves them, which is the accretion this page is trying to stop.

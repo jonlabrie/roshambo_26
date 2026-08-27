@@ -66,4 +66,5 @@ Chronology: [log.md](log.md).
 
 - [Deploy](systems/deploy.md) — App Runner topology (cloud dev auto-deploy vs prod manual), the never-start-a-local-server rule, the parked ECS migration
 - [Data](systems/data.md) — the single Atlas cluster, prod/dev database split, the orphaned `test` db, the economy-split-is-schema-not-database rule
+- [Identity](systems/identity.md) — the identity-comes-from-the-connection rule, device tokens, the 2026-08-18 hard cut
 - [Rojo & Place](systems/rojo-and-place.md) — the Rojo-vs-place-only ownership split, ship-by-publish rule, the workspace convention

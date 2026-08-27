@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-16
+updated: 2026-08-27
 ---
 
 # Owner Rulings
@@ -41,6 +41,16 @@ re-litigate them without new instructions.
 - **Composition first: scatter is background fill only** — hand-composed arrangements
   and hero placements govern; a scatter rule must never bury a composition someone
   hand-placed. See [[foliage]].
+
+- **Guest accounts from before 2026-08-18 are a HARD CUT — no migration.** Points and streaks
+  tied to a pre-change deviceId are orphaned and stay orphaned. Claim-on-first-sight was offered
+  and declined, because a stolen deviceId would be adopted just as readily.
+  **Why:** the deviceId was being used as a password; adoption would preserve the hole it closed.
+  **How to apply:** never add a "recover my old guest points" path. See [[identity]].
+- **Throw keybindings are `1` / `2` / `3`** (2026-08-16), not `R`/`P`/`S` — `S` is Roblox's
+  walk-backward default, and `KeyCode`s follow physical position, so letters move under
+  AZERTY/QWERTZ while numbers do not. **How to apply:** the HUD teaches the binding by printing
+  the numeral on each throw tile. See [[backlog]].
 
 ## Process
 

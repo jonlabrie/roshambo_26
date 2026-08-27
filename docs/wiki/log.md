@@ -1295,3 +1295,41 @@ filter follows the COLUMN, not the collection** — every consumer of `amount` c
 banks, because hedged points are real points.
 
 475 server tests, 1515 Luau, 30 PWA. tsc, stylua and selene clean.
+
+## [2026-08-27] audit | backlog.md condensed by hand — the experiment, and what it measured
+
+Ran one page as a test of whether supersede-don't-append is affordable without new tooling,
+after the owner rejected a length check as "appending a check instead of addressing the
+problem head on". **545 → 423 lines. 23 insertions against 134 deletions** — the inverse of
+the 14:1 insert-to-delete ratio the wiki had been running.
+
+⚠ **Reading was never the expensive part.** All 545 lines cost about 7k tokens. The cost was
+in four verifications, and every one of them changed the answer:
+
+1. `~~get-stats broadcasts deviceIds~~ FIXED` — the header said fixed, the body said "why it
+   was not fixed inline" and gave a fix sketch. **The page was arguing with itself.** Checked
+   the code: genuinely fixed. `LEADERBOARD_FIELDS` no longer carries `deviceId`, `biggestWins`
+   is explicitly projected, `StatsView.tsx` no longer references it. Section deleted; the
+   lesson already lives at the point of use in `leaderboards.ts`.
+2. The 45-line drum-ladder writeup was a **third copy** — `stats-room.md` and
+   `FlapScheduler.luau`'s "WHY SMALLEST-FIRST" comment both carry it, on the right shelves.
+3. `~~The two transports disagree on shape~~ SUPERSEDED` — a struck paragraph that
+   **described its own failure**: "the fix appended its own note and left this paragraph
+   standing". It then stood for another nine days.
+4. The identity fix was 45 lines of **standing rule sitting on a status shelf**.
+
+⚠ **THE REAL FINDING IS NOT AGE, IT IS SHELF.** Very little on that page was stale. Most of
+what came off was live knowledge filed in the wrong place — a `program/` page holding practice
+rules, as-built technique and engine constraints. Accretion here is not "old text stayed"; it
+is **"text landed wherever the work happened and nobody moved it"**, and a length or staleness
+check cannot see that at all. Both would have passed this page every day.
+
+Created [[identity]] to receive the standing rule (identity comes from the CONNECTION, never
+from a payload) plus the device-token as-built and the hard-cut ruling. Two rulings that
+existed only as prose are now one-liners on [[owner-rulings]]: the 2026-08-18 hard cut, and
+`1`/`2`/`3` for throw keybindings.
+
+**Left undone and flagged in place:** two engine constraints (the 100px `TextSize` cap, the
+per-viewer SurfaceGui trick) still sit in `backlog.md` carrying a note that they belong on
+[[misc-engine-traps]]. Recorded rather than moved so the next pass has a start, and so this
+entry does not claim a clean sweep it did not do.
