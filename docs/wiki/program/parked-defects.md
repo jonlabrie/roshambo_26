@@ -154,7 +154,7 @@ which no test can see.)
   cohort detection, gating the VOTE rather than the account. Proof-of-work rejected — regressive
   on the weakest device, and this is kid-first on phones.
 
-## (k) `JWT_SECRET` was a project-named placeholder in SSM
+## ~~(k) `JWT_SECRET` was a project-named placeholder in SSM~~ ROTATED 2026-08-27
 
 - **Found 2026-08-27** by length: `/roshambo/dev/JWT_SECRET` was 26 characters, matching the
   placeholder in `server/.env` exactly.
@@ -175,10 +175,16 @@ which no test can see.)
   secret trees is exactly why prod's discipline never reached dev.**
 - **Measured, not alarmist:** the key is not published, so it needs a targeted guess rather than a
   brute force, and both environments run TEST_MODE.
-- **Status:** rotate `/roshambo/dev/JWT_SECRET` then `aws apprunner start-deployment` — App
-  Runner reads secrets at DEPLOY time, so the new value is inert until redeployed ([[deploy]]).
-  Rotation logs everyone out and orphans guest device tokens: a second hard cut, cheap while the
-  audience is friends-and-family, expensive after launch.
+- **CLOSED 2026-08-27.** Owner rotated `/roshambo/dev/JWT_SECRET` and ran `start-deployment`;
+  the service reached RUNNING and was verified live — socket.io handshake 200, and
+  `/api/v1/stats/records` returning real rows. The same deploy carried the `CLAIM_LIMIT` cap.
+  Prod needed nothing: its key was 64 characters and properly generated.
+- ⚠ **Rotation degraded gracefully, which was NOT obvious and was checked rather than assumed.**
+  The handshake middleware `catch`es an unverifiable device token, logs it, and calls `next()` —
+  so the socket connects without a deviceId instead of being rejected; the server then emits
+  `device-required` and `useGameLoop` re-emits `claim-device`. A returning player sees a working
+  app, not an error. **The cost is the intended one and only that:** their old identity is
+  orphaned, so guest points and streaks are gone — the same hard cut as 2026-08-18.
 
 _(h) — the World Throw picked at random — was FIXED 2026-08-16, see [[world-throw]] and
 `log.md`. It is deliberately NOT active in any deployed environment yet: both prod and dev

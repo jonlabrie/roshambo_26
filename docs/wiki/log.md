@@ -1627,3 +1627,19 @@ have rested on them: earned enfranchisement does NOT price out a farm (identitie
 parallel, one wait for the whole cohort — what it buys is a detectable SHAPE); and proof-of-work
 is REGRESSIVE here, taxing a kid's A13 harder than an attacker's server, in a game gated on that
 exact device.
+
+## [2026-08-27] ship | The live backend's signing key is rotated, and the claim cap went with it
+
+`/roshambo/dev/JWT_SECRET` rotated by the owner and redeployed; service RUNNING and verified
+live — socket.io handshake 200, `/api/v1/stats/records` returning real rows. Prod needed
+nothing (64 chars, properly generated). [[parked-defects]] (k) closed.
+
+⚠ **The graceful-degradation question was the one worth checking, and it was checked before
+celebrating.** Rotating a signing key invalidates every device token in the wild, and the live
+demo is full of them. The handshake middleware `catch`es an unverifiable token, logs, and calls
+`next()` — the socket connects device-less rather than being refused — then `device-required`
+goes out and the client re-claims. So a returning player sees a working app. **The only cost is
+the intended one**: their guest points and streaks are orphaned, exactly as on 2026-08-18.
+
+The same deployment carried `CLAIM_LIMIT`, so the live service now also refuses a fourth
+`claim-device` on one connection.
