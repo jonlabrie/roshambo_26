@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local BirdFlight = require(shared:WaitForChild("BirdFlight"))
+local BirdVoice = require(shared:WaitForChild("BirdVoice"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local CollectionService = game:GetService("CollectionService")
@@ -83,13 +84,13 @@ local LEASH = 70
 -- Three things keep them apart. The familiar sings ONLY on a win, so it is an event and not
 -- ambience. Its rolloff is far tighter than the dock's 12-55, so it is intimate rather than a
 -- landmark you can hear across the pool. And it is quieter.
-local SONG = { 74571915778017, 93957494294947, 133151225815336 }
--- Raised from 0.38 on the owner's ear, 2026-08-22. The old value was set to stay under the
--- falls-dock uguisu's 0.6, but that bird is AMBIENCE across a pool while this one is singing on
--- your shoulder — the thing it must not do is drown the dock bird out at the dock, and the tight
--- rolloff below already handles that. Being too quiet to hear was the worse failure.
-local SONG_VOLUME = 0.85
-local SONG_ROLLOFF_MIN, SONG_ROLLOFF_MAX = 9, 34
+-- ⚠ THE CLIPS AND LEVELS NOW LIVE PER SPECIES in `shared/BirdVoice.luau`, because a crow is
+-- not a loud warbler. The uguisu's volume of 0.85 was raised from 0.38 on the owner's ear
+-- (2026-08-22): the old value was set to stay under the falls-dock uguisu's 0.6, but that bird
+-- is AMBIENCE across a pool while this one sings on your shoulder — what it must not do is
+-- drown the dock bird out AT the dock, and the tight rolloff already handles that. Being too
+-- quiet to hear was the worse failure. That reasoning moved with the number.
+local SPECIES = "Uguisu" -- ⚠ hardcoded: nothing selects a bird per player yet (F&F item 6)
 -- ⚠ EVERY WINNER WINS AT THE SAME INSTANT -- more so under TEST_MODE, where the World Throw
 -- cycles R->P->S and a whole crowd can throw the same winning hand. Fifty birds opening together
 -- is a cacophony, so each waits a random beat and only a few sing at all.
@@ -280,13 +281,20 @@ local function sing(b: Bird, isOwn: boolean)
     if not isOwn and (singing >= MAX_CONCURRENT_SONGS or math.random() > chance) then
         return
     end
+    local voice = BirdVoice.VOICE[SPECIES]
+    local clip = BirdVoice.pick(SPECIES, math.random)
+    -- A species with no voice is SILENT rather than borrowed. Nothing to clean up, and no slot
+    -- taken, so the count below must not have been incremented yet.
+    if not voice or not clip then
+        return
+    end
     singing += 1
     local s = Instance.new("Sound")
-    s.SoundId = `rbxassetid://{SONG[math.random(#SONG)]}`
-    s.Volume = SONG_VOLUME
+    s.SoundId = `rbxassetid://{clip}`
+    s.Volume = voice.volume
     s.RollOffMode = Enum.RollOffMode.InverseTapered
-    s.RollOffMinDistance = SONG_ROLLOFF_MIN
-    s.RollOffMaxDistance = SONG_ROLLOFF_MAX
+    s.RollOffMinDistance = voice.rolloff[1]
+    s.RollOffMaxDistance = voice.rolloff[2]
     s.PlaybackSpeed = 0.97 + math.random() * 0.06 -- the dock scheduler's jitter, same reason
     s.Parent = b.part
     s.Ended:Once(function()

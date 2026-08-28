@@ -1677,3 +1677,39 @@ print; found only because the owner tried to use it.
 
 Also noted ⚠ unverified: the karasu's wingspan measures ~75% of life while its body is 100%
 (~1.5x body length against a real crow's ~2.0x), which may be why it reads small.
+
+## [2026-08-27] ship | The karasu has a voice — per species, weighted, and unreachable until selection
+
+Three clips cut from a source recording, uploaded by the owner, moderation cleared and verified
+loading in the place (0.52 / 1.30 / 2.08s, ids in `shared/BirdVoice.luau`).
+
+**Clips and levels are now PER SPECIES.** A crow is not a loud warbler, and volume and rolloff
+belong to the bird as much as its calls do. The uguisu's values moved across unchanged, carrying
+the reasoning that earned them.
+
+⚠ **The pick is WEIGHTED because the karasu's clips are not substitutable.** The uguisu's three
+are three ways of saying one thing. The karasu's are ONE, TWO and THREE caws — uniform selection
+would make the two-second declaration a third of every song, and a thing heard every third time
+is not a declaration. Weights are reasoned, not heard; tune them in one play session.
+
+**Two things measured rather than guessed.** The owner judged the source's second phrase noisier;
+measured, its background sits **9.3 dB** above the first (−37.7 vs −47.0), so all three clips
+come from phrase one. And the karasu plays at volume 1.0 against the uguisu's 0.85 because its
+source clips peak **2–4.5 dB quieter** — equal Volume would have made the crow quieter than the
+warbler, which is backwards.
+
+⚠ **Composition verified and deliberately not wired.** A 3+2 built from the three-caw and two-caw
+clips is SAMPLE-IDENTICAL to a baked recording except for 0.48s of room tone at −56 dBFS —
+established by diffing the two files, not by listening. The delay is 0.48s, **not** the 0.76s gap
+you would measure off the source, because the clips carry their own padding. Both constants live
+in the module so nobody re-derives them.
+
+⚠ **A scope correction I had to make mid-task.** I classified this as bounded and designed for the
+familiar's win-song. The owner: birds will be found all around the experience, flying and perching
+and calling. **That system does not exist** — no world population, no perching, and the dock
+uguisu is a Sound emitter with no visible bird. It also reverses the ruling that the familiar
+sings only on a win, which exists to keep the dock bird special. Stepped the path back up and
+built only the piece that is genuinely bounded and serves both futures.
+
+**Still unreachable.** `SPECIES` is hardcoded to Uguisu; nothing selects a bird per player. Same
+shape as the mesh — built, correct, waiting on item 6.

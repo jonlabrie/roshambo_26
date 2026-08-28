@@ -414,6 +414,43 @@ trap is a third thing to correct when the trap is corrected.
 Run `roblox/tools/studio/measureBirds.luau` for the roster's actual sizes, bone counts and asset
 ids rather than reading them here.
 
+## Voice — per species, in `roblox/src/shared/BirdVoice.luau`
+
+⚠ **A crow is not a loud warbler.** Clips, volume and rolloff are all per species now; the
+uguisu's values moved unchanged, with the reasoning that earned them. Read the module for the
+asset ids rather than trusting a list here.
+
+**The karasu's three clips are NOT substitutable**, which is why the pick is weighted. They are
+one, two and three caws — a remark, a statement and a declaration. Uniform selection would make
+the declaration a third of every song, and a thing heard every third time is not a declaration.
+⚠ **The weights are unturned by ear** — set from reasoning, to be fixed in one play session.
+
+**Cut from a source recording** at `~/Desktop/Roshambo Reference/sound/birds/Large-billed
+Crow.mp3` (place-only; not in git). ⚠ **All three come from the FIRST phrase**, measured: the
+second phrase's background sits 9.3 dB noisier (−37.7 dB against −47.0), which the owner heard
+before it was measured. The measured group gaps live in the module as constants so nobody
+re-derives them by ear.
+
+⚠ **The karasu plays at volume 1.0 against the uguisu's 0.85 for a MEASURED reason, not because
+crows are loud**: its source clips peak 2–4.5 dB quieter, so equal Volume would make the crow
+quieter than the warbler. It offsets the recording; it does not editorialise about the bird.
+
+⚠ **Composing is possible and deliberately not wired.** A 3+2 phrase built from the three-caw
+and two-caw clips is sample-identical to a baked recording apart from 0.48s of room tone at
+−56 dBFS — verified by diffing, not by ear. `GROUP_GAP_SECONDS` is the delay it needs, and it is
+NOT the 0.76s gap you would measure off the source: the clips carry their own padding.
+
+⚠ **AND NONE OF THE KARASU'S VOICE IS REACHABLE.** `BirdController` hardcodes
+`SPECIES = "Uguisu"` because nothing selects a bird per player. Same shape as the mesh: built,
+correct, waiting on selection.
+
+⚠ **The familiar sings ONLY on a win, and that is a RULING, not an implementation detail.** It
+protects the falls-dock uguisu's gate — *"this bird lives here and you have to be close to hear
+it"* ([[falls-dock]]). Owner 2026-08-27: birds will eventually be found around the world,
+flying and perching and calling occasionally, which **reverses that premise**. That is an
+ambient-bird system which does not exist — there is no world population, no perching, and the
+dock bird is a Sound emitter with no visible bird at all. Design it before building it.
+
 ## ⚠ THE UGUISU IS DELIBERATELY OVERSIZED — do not "correct" it toward life-size
 
 Owner ruling 2026-08-27, after watching the karasu fly and asking whether it was too small.
