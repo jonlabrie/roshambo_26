@@ -556,27 +556,60 @@ bright shape at a **fixed place**. It cannot move with the light or the camera, 
 obviously a marking. **That failure mode has no tuning fix**, which is why the colours being
 sampled off a photograph never helped.
 
-**As built:** two `Part`s per bird, `Shape = Ball`, their own `Material` / `Color` / `Reflectance`.
+**Built and kept** (owner, 2026-08-28: *"I'd like to keep the eye and girth/belly work"*): a
+`KarasuEyes` **MeshPart** exported from Blender like the wings — both eyeballs in one mesh, so one
+extra part per bird rather than two — plus a lofted lid ring merged into the body. ⚠ **The Roblox
+side is NOT wired**: no Rojo declaration, no controller code, no species record. The geometry and
+its bones ship; nothing consumes them yet.
 
-⚠ **THE POSITION LIVES IN THE ASSET, NOT IN LUAU.** `rebuild_rig` puts `eye_R` / `eye_L` bones at
-the measured eye site, **parented to the head**, and the controller reads
-`Bone.TransformedWorldCFrame` — verified to track the driven Transform exactly (40° for a 40° yaw,
-0.25 studs for a 0.25 offset). So the eyes follow every head turn and check with no extra code,
-and nothing about where they go is transcribed. ⚠ The bone's **length** does NOT survive import —
-a Roblox `Bone` is an Attachment, a point with an orientation — so the radius is the one eye
-number that has to live on [[familiars]]' species record, with the Blender constant named as its
-source.
+⚠ **A RUNTIME `Part` BALL WAS TRIED FIRST AND WAS THE WRONG CALL**, chosen for a trade that does
+not exist: "tunable in Studio without a Blender round trip". Measured — a MeshPart keeps `Color`,
+`Material` AND `Reflectance` at runtime, every dial the Part was supposed to buy, **plus
+`TextureID`, which a Part does not have.** The ball gave up the iris and gave up being visible
+while authoring, and bought nothing back. Nor is it meaningfully cheaper: both are one Instance
+per eye, and instance count is what costs. See [[owner-rulings]] — model in Blender, approve in
+Studio.
 
-⚠ **THE UGUISU HAS NO EYE ENTRY AND MUST NOT GET ONE.** It carries eye GEOMETRY baked into its
-body from `bird_familiar._eyes`. A nil eye means *"this species handles its own"*; giving it a
-record would float a second pair on bones its rig does not have.
+⚠ **THE HEAD IS NOT SYMMETRIC AND THE FIRST BUILD MIRRORED ONE MEASUREMENT.** Owner: *"the eye is
+very visible on one side of the head and missing on the other."* The surface stands at 0.0514 on
+the right against 0.0610 on the left, and the vendor head carries 120 vertices one side against
+163 the other. Each eye is now seated against **its own side**, and against the **footprint** it
+occupies rather than a single raycast at its centre — which had struck 0.0379 where nearby
+vertices reached 0.0514 and buried the ball entirely. Both protrusions are **asserted equal**, not
+eyeballed. See [[blender-pipeline]].
 
-**`reflectance` is the one dial**, and it is tuneable in Studio without a Blender round trip —
-which is most of the point of moving the eye out of the texture. ⚠ **Do not paint an eye back
-into the ColorMap**: it would sit still beside the moving specular and give the bird two
-highlights, one obviously fake. The texture now draws only the dark **socket** the ball sits in,
-and a socket is *darker* than what surrounds it — the opposite of the pale ring the failed
-versions kept reaching for.
+### The lid — lofted, because displacement could not do it
+
+⚠ **THE APERTURE IS AN EDGE LOOP ON THE EYEBALL, bridged back to the head.** Three attempts to
+clip the ball to an oval by displacing whichever body vertices sat near that curve all came out
+visibly lumpy — the boundary lands where the vertices already are — and the last cost +630
+triangles for a finer lumpy edge. A curve needs a loop ON it, which is what the tail, the folded
+wing and this lid all now do.
+
+⚠ **THE BRIDGE RIDES A CONCENTRIC SPHERE out to the ball's own silhouette**, and only then peels
+back to the head. Anything else cuts through the eyeball: it is convex, so *any* chord between two
+points near it dips inside, and the skull falls away toward the crown so the return happens lower
+up top than at the sides. Measured before the fix, the ball escaped to 0.975r straight up while
+covered to 0.375r underneath; after it, exposure equals the aperture in every direction.
+
+⚠ **THE RING IS A CONSTANT-WIDTH BAND, offset along the ellipse's normal — not a scaled ellipse.**
+Scaling the semi-axes makes the band widest exactly where the aperture already is, which the owner
+caught: *"much larger than the eye it encloses, especially in the horizontal dimension."* The
+normal to `(a·cosθ, b·sinθ)` is proportional to `(b·cosθ, a·sinθ)` — the axes **swap**. Widths then
+vary by direction (deepest above and below, tightest behind) blended by a **weighted mean**, never
+a sum: summing inflates the diagonals past either and the ring bulges at the corners.
+
+**Every number is in `KARASU["eye"]`; read it there rather than here.**
+
+⚠ **THE UGUISU MUST NOT GET THIS TREATMENT.** It carries eye GEOMETRY baked into its body from
+`bird_familiar._eyes`, so it already has eyes; giving it a second pair would float them on bones
+its rig does not have.
+
+**`Reflectance` will be the one dial** once the eye is wired, and it is tuneable in Studio without
+a Blender round trip. ⚠ **Do not paint an eye back into the ColorMap**: it would sit still beside
+the moving specular and give the bird two highlights, one obviously fake. The texture now draws
+only the dark **socket** the ball sits in, and a socket is *darker* than what surrounds it — the
+opposite of the pale ring the failed versions kept reaching for.
 
 ## Motion scales with the bird — built 2026-08-28
 

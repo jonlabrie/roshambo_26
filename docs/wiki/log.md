@@ -1927,3 +1927,62 @@ to move to `BirdSpecies`. The uguisu deliberately has no eye entry: it models it
 and broke the src/shared purity rule — a pure module names no Roblox type or it fails to load
 under Lune, taking all 1546 tests with it. Plain RGB triple and a material NAME now; the
 controller converts at the boundary, same as BirdFlight's {x, y, z}.
+
+## [2026-08-28] gate | Standing ruling: model in Blender, approve in Studio
+
+Owner: "I don't understand your pipeline at all; it presumes that tuning is more important than
+accuracy, and the Studio is the preferred tuning environment. Is a Ball part in Roblox
+better-performing than a ball mesh exported from Blender?"
+
+**No, not meaningfully** — both are one Instance per eye and instance count is what costs. And the
+trade the Part was chosen for does not exist: measured in Studio, a MeshPart keeps Color, Material
+AND Reflectance at runtime, plus TextureID which a Part lacks. The ball gave up the iris and gave
+up being visible while authoring, and bought nothing back.
+
+⚠ **Standing ruling ([[owner-rulings]]): model in Blender, approve in Studio.** Build and
+conditionally approve in Blender, then play and give final approval in Studio; manual imports are
+not a cost worth designing around. The corollary is the thing actually being got wrong — do not
+trade authoring control for iteration speed.
+
+**Then the first build was visibly wrong on one side**, and it found a trap worth its own section
+on [[blender-pipeline]]: the eye surface was measured on ONE side and mirrored, and the head is not
+symmetric — 0.0514 proud on the right against 0.0610 on the left, 120 vertices one side against
+163 the other. Compounded by a single raycast standing in for the surface: it struck 0.0379 where
+vertices in the same footprint reached 0.0514, so the ball sat inside the skull at every zoom.
+Each eye is now seated per side and against its whole footprint, with both protrusions ASSERTED
+equal (0.0108) rather than eyeballed.
+
+⚠ **THE EYEBALL ITSELF IS NOT APPROVED.** Owner, 2026-08-28: *"these eyes are still not correct,
+so hopefully you're not proceeding as if they are."* Three FBXs are exported (body, wings, eyes)
+and the geometry seats correctly on both sides, but seating correctly is not the same as looking
+right, and this session had begun wiring Rojo and the controller as though it were settled. The
+GATE recorded above is the workflow ruling, not the eye.
+
+## [2026-08-28] ship | The karasu's eye is modelled and lidded; the beak work is reverted
+
+Kept, on the owner's call: girth 1.15 and belly 0.060 through the torso, and the whole eye — a
+`KarasuEyes` MeshPart, a lofted lid ring, and `eye_R`/`eye_L` bones parented to the head so the
+position travels inside the asset. ⚠ The Roblox side is NOT wired: no Rojo entry, no controller
+code, no species record. Geometry and bones ship; nothing consumes them.
+
+**Reverted, all of it**: culmen arch, forehead lift, tip hook, tip blunt, tomium retraction, the
+bill-depth profile, the moved hinge and the steepened gape plane. Owner: "revert all the beak
+work." ⚠ The cause was structural rather than any bad number — every attempt displaced a vendor
+bill only a few vertex rings long, so each fix bought the next defect, and the steepened plane
+(tilted purely to satisfy the upper/lower classifier) took the cut off the anatomy and produced a
+wedge-shaped jaw that swung through the upper mandible.
+
+⚠ **AND THE OPEN BEAK WEBS, which nothing was measuring.** The cut deliberately stops short of the
+hinge so the mandibles stay joined, so their two boundary loops SHARE vertices — topologically one
+loop, which `holes_fill` closes as one membrane down the whole mouth, welded to both halves. 13
+such faces. Filling the two sides separately does NOT fix it (neither is a closed loop; the bill
+comes out 24-edge open) and that failed attempt is recorded in the code.
+**This shipped for two days behind `boundary_after: 0, non_manifold: 0` — both of which a webbed
+jaw satisfies perfectly.** Watertight is not correct. `split_bill` now reports
+`faces_bridging_joint`, which is the number that says whether a jaw can actually move.
+
+⚠ **The open direction is NEGATIVE X**, and a session asserted the opposite for two messages
+because it measured `norm()` — a magnitude, which cannot tell opening from closing into the skull.
+
+A modelled mouth cavity is the remaining work, and it is the same conclusion the bill profile
+reached independently: this bill wants LOFTING from station data, not displacement ([[familiars]]).

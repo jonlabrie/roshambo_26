@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-27
+updated: 2026-08-28
 ---
 
 # Owner Rulings
@@ -75,6 +75,17 @@ re-litigate them without new instructions.
 - **Never launder an invented threshold as an owner gate** — when a gated number is
   retired and you substitute a proxy, say the new number is yours. See
   [[one-model-is-not-a-building]].
+- ⚠ **MODEL IN BLENDER, APPROVE IN STUDIO** (2026-08-28). Standing ruling for birds, teahouse
+  items and anything else modelled: **build and conditionally approve in Blender, then play and
+  give final approval in Studio.** Owner: *"It doesn't bother me if I have to import things
+  manually."* Manual imports are NOT a cost worth designing around, and the corollary is the part
+  that was actually being got wrong — **do not trade authoring control for iteration speed.**
+  ⚠ It was earned: a session built the karasu's eyeball as a runtime Roblox `Part` specifically
+  so it could be retuned in Studio without a Blender round trip, and justified it with a trade
+  that **does not exist** — measured in Studio, a MeshPart keeps `Color`, `Material` AND
+  `Reflectance` at runtime, every dial the Part was supposed to buy, plus `TextureID`, which a
+  Part does not have. The Part gave up the iris, gave up being visible while authoring, and
+  bought nothing. See [[familiars]] and [[blender-pipeline]].
 - **Judge visuals in Play at eye level, side by side** — not Edit stills, not scattered
   across the map, and not from hex values. See [[foliage]] (Gates) and
   [[texturing-pack-meshes]].

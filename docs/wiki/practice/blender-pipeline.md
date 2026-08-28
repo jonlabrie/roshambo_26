@@ -341,6 +341,27 @@ down rather than failing — and RECORDS what it actually gave, because "no sile
 texture space as much as to coverage.
 
 
+## ⚠ MIRRORING A MEASUREMENT ASSUMES A SYMMETRY THE MESH DOES NOT HAVE
+
+Found 2026-08-28 on the karasu's eyes. Owner: *"the eye is very visible on one side of the head
+and missing on the other."*
+
+Two independent faults, and they stack:
+
+- **The surface was measured on ONE side and mirrored.** `bird_familiar._eyes` builds both eyes
+  from a single `x`, which is correct only on a symmetric head. Measured at the karasu's eye
+  station the surface stands at **0.0514 on the right against 0.0610 on the left**, and the
+  vendor head carries **120 vertices on one side against 163** on the other. Purchased models are
+  not mirror-symmetric, and none of ours have been.
+- **A single raycast is not the surface.** The ray struck 0.0379 where vertices in the same
+  footprint reached 0.0514 — exact for the triangle it hit, and misleading on a 555-vertex head.
+  Seated against that dip the eyeball vanished INSIDE the skull at every zoom.
+
+**The rule:** anything seated against a surface must measure **per side**, and must clear the
+**footprint** it occupies rather than the point at its centre. Verify by asserting the protrusion
+on BOTH sides, not by looking at one and assuming — that assertion is what turned "it looks fine"
+into "both sides are proud by exactly 0.0108".
+
 ## ⚠ THE MCP EXECS A SCRIPT, IT DOES NOT IMPORT IT — so `__file__` is undefined
 
 Found 2026-08-28. Every helper import in `karasu_retarget.py` is written as

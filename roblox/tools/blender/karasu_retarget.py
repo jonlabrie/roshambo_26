@@ -242,6 +242,18 @@ KARASU = {
     # the upper mandible is the deeper of the two.
     # ⚠ The cut STOPS SHORT of the hinge (`hinge_y`) so the two halves stay joined at the back --
     # that gives a real hinge and leaves no hole in the head.
+    # The bill is split along its gape so `bill_lower` has something to move. Plane measured on
+    # the vendor head.
+    # ⚠ THESE ARE TYPED AND NOTHING RE-MEASURES THEM. `split_bill` reads them straight from here;
+    # `landmarks_final` only REPORTS where they ended up. There is a guard for a plane that cuts
+    # NOTHING, but a plane that still cuts in the wrong place passes silently.
+    # ⚠ AND THEY DO NOT DESCRIBE THE MOUTH LINE WELL -- measured 2026-08-28 on the VENDOR mesh,
+    # the real gape (the tomium, i.e. the widest point of each cross-section) is essentially FLAT
+    # at z 0.957 -> 0.956 across the whole bill, while this plane falls 0.013 over the same span.
+    # Small, but it is the seed of the problem: a later pass steepened this to 0.1907 to keep a
+    # hooked tip on the upper side, which took the cut right off the anatomy and produced a
+    # wedge-shaped lower mandible that swung THROUGH the upper when the beak opened.
+    # `measure_gape_plane()` fits this from the mesh and is deliberately NOT wired -- see it.
     "bill": {"gape_p": (0.0, 0.720, 0.9555), "gape_n": (0.0, 0.0599, 0.9982),
              "hinge_y": 0.645, "tip_y": 0.830},
     # ⚠ THE KARASU'S EYE IS PAINTED, NOT MODELLED -- unlike the uguisu, which carries eye
@@ -276,13 +288,86 @@ KARASU = {
     # ⚠ BUILD COORDINATES, like everything else in this dict. The painted version carried FINAL
     # studs as a special case; geometry has to be built before `normalise_size` exists, so the
     # special case is gone and `landmarks_final` maps the eye out like every other landmark.
-    "eye": {"y": 0.5092, "crown_drop": 0.0729, "r": 0.0287,
+    # ⚠ SMALLER AND SUNK DEEPER, 2026-08-28. Owner on the first build: "the eyeball itself is too
+    # large, and protrudes too far." At `proud` 0.45 nearly half a sphere stood out of the skull,
+    # which reads as a ball bearing pressed into the head rather than as an eye -- a real eye
+    # shows as a shallow LENS, because most of the ball is behind the lids. Dropping `proud` does
+    # more of that work than shrinking `r` does, so the radius moves only a little.
+    # ⚠ y MOVED FORWARD 2026-08-28. Owner: the opening "is located a bit to the rear, instead of
+    # squarely on the sides of the head." Measured, 0.5092 put it 60.6% of the way from the nape
+    # to the bill hinge; 0.545 puts it at 71%, which reads as the side of the head rather than
+    # behind it. Re-derive the percentage rather than nudging blind: the head runs y 0.300 to the
+    # hinge at 0.645.
+    "eye": {"y": 0.5450, "crown_drop": 0.0729, "r": 0.0225,
             # ⚠ x IS DERIVED FROM THE SKULL IT SITS IN, never typed. The uguisu learned this the
             # expensive way: "v2 had it at r=0.026/x=0.106 against a 0.116 half-width head and it
             # read as a bolt screwed into the side." The centre is sunk below the measured
             # surface so exactly this fraction of the radius stands proud, which also means the
             # eye follows any reshape of the head instead of floating off it.
-            "proud": 0.45},
+            # ⚠ AND ONLY JUST PROUD. Owner, 2026-08-28: "if it's easy to make the eyes slightly
+            # less proud, do it." ⚠ There is a floor: the ball only emerges from the head within
+            # r*sqrt(1-(1-proud)^2), and the aperture must stay INSIDE that or the skull occludes
+            # the eye before the lid does. At 0.24 that limit is 0.650r against an `ap_y` of
+            # 0.60 -- close, and the number to re-check before lowering this further.
+            "proud": 0.24,
+            # ⚠ THE SOCKET IS BODY GEOMETRY, NOT A SECOND MESH. Owner, 2026-08-28: a modelled lid
+            # opening would help, "but I'd hate to spend too many meshes on it." It costs none --
+            # this dishes the HEAD around the eye, on the part that already exists, so the ball
+            # emerges from an opening instead of sitting on the skin like a bead. The only real
+            # cost is a handful of triangles from the local subdivision the dish needs to be
+            # smooth on a 555-vertex head.
+            # `socket_depth` is how far the skin falls away AT the eye centre, `socket_r` how far
+            # out the dish reaches, both as multiples of the eye radius.
+            # THE LIDS, as multiples of the eye radius. `ap_y`/`ap_z` are the half-axes of the
+            # OVAL opening -- fore-aft and vertical -- and their ratio is the whole reason the
+            # visible eye reads oval while the ball stays a sphere.
+            # ⚠ BOTH INSIDE THE BALL'S SILHOUETTE (< 1.0), or the aperture is wider than the eye
+            # and the head shows through the gap at the fore-aft extremes.
+            # ⚠ BOTH WELL INSIDE THE VISIBLE CAP. The ball is sunk, so it emerges from the head
+            # only within ~0.69r; an aperture drawn wider than that is BURIED, and the visible
+            # edge reverts to the ball's own emergence circle -- which is why every earlier oval
+            # still read as a circle at the front and back.
+            "ap_y": 0.60,
+            "ap_z": 0.38,
+            "collar_segments": 24,   # 16 left visible flats once the ring tightened
+            # ⚠ WIDTHS, NOT SCALES, and that distinction is the whole fix. Owner: "the size of
+            # your periorbital ring is much larger than the eye it encloses, especially in the
+            # horizontal dimension." It was built by SCALING the aperture's semi-axes, so the
+            # band came out widest where the aperture was already widest -- 1.18r of ring
+            # horizontally against 0.74r vertically, and over twice the eye's width overall. A
+            # real lid ring is a roughly CONSTANT-WIDTH band, which means stepping along the
+            # ellipse's own normal by a fixed distance. Both are multiples of the eye radius.
+            # ⚠ AND THE WIDTH IS NOT CONSTANT EITHER. A uniform band was the right correction to
+            # a scaled one and still wrong: owner, 2026-08-28, "too tight now vertically, and
+            # still too loose in the rear/trailing part." On the bird the periorbital skin is
+            # deepest above and below the eye, moderate toward the bill, and tucks in tightly
+            # behind it. Three widths, blended smoothly around the ellipse by a weighted mean of
+            # where you are -- front at theta 0, top/bottom at +/-90, rear at 180.
+            "collar_w_front": 0.58,  # toward the bill
+            "collar_w_rear": 0.52,   # behind the eye: the tightest part of the ring
+            "collar_w_vert": 0.78,   # above and below, where the lids are deepest
+            # The crest rides at this fraction of whatever the local width is, so the ring's
+            # PROFILE stays the same shape all the way round even as its width changes.
+            # ⚠ THE LID WRAPS THE BALL ON A CONCENTRIC SPHERE. A single step off the aperture and
+            # then a straight run to the head CANNOT work: the ball is convex, so any chord
+            # between two points near it cuts inside, and the head makes it worse by falling away
+            # toward the crown -- measured, the ball escaped to 0.975r straight up while being
+            # covered to 0.375r underneath. Riding a slightly larger sphere out to the ball's own
+            # silhouette is outside it BY CONSTRUCTION, everywhere, and only then does the skirt
+            # peel back to the head, where there is no ball left to cut.
+            "collar_wraps": 3,        # loops on the concentric sphere between edge and silhouette
+            "collar_wrap_end": 0.97,  # how far round to wrap, as a fraction of that sphere
+            # ⚠ AND THEN LIFT IT CLEAR. A tangent step alone leaves the sphere by only
+            # sqrt(r^2+t^2)-r -- 0.024r here -- so the lid GRAZES the ball instead of covering
+            # it, and the eye goes on showing all the way to its own emergence circle, which is
+            # round. A lid has to overlap the eyeball or it is not clipping anything. Pushing the
+            # middle loop out to r*(1+lift) keeps it strictly outside (so the no-cutting
+            # guarantee holds) while putting it in FRONT of the ball at that angle.
+            # the lid's thickness: radius of the wrap sphere over the ball. Owner called 0.10
+            # "slightly too heavy" -- this is the dial for how swollen the lid reads.
+            "collar_lift": 0.07,
+            "collar_sink": 0.18,     # how far the outer loop is BURIED, as a multiple of r
+            "lid_height": 0.26},  # how far the crest stands proud of the feathering
     # ⚠ EVERY STATION BELOW WAS READ OFF `body_profile()`, not chosen. Owner, 2026-08-28, having
     # watched the karasu on a shoulder: "more of an arch on the culmen, and a fatter body,
     # presumably by giving the bird more of a 'belly'". The vendor crow is a lean bird and a
@@ -308,27 +393,14 @@ KARASU = {
         # moved OUT instead, so the fill runs up into the breast rather than deepening the vent.
         "belly": 0.060,
         "belly_band": (-0.14, -0.02, 0.20, 0.36),
-        # --- CULMEN: bow the upper mandible's ridge -------------------------------------------
-        # ⚠ ABOVE THE GAPE PLANE ONLY, weighted to zero AT it -- see the note on "bill" below.
-        # The bill runs y 0.645 (hinge) to 0.830 (tip); measured culmen z falls 1.018 -> 0.960
-        # with a bow of only about +0.006 over the chord at mid-bill. 0.014 roughly triples it.
-        "culmen_arch": 0.014,
-        # ⚠ THE REAR SHOULDER RUNS BACK PAST THE HINGE (0.645) AND IT HAS TO. The first attempt
-        # ramped the arch in over y 0.645..0.700 -- 0.055 of run -- and rendered a visible SHELF
-        # where the bill meets the feathering, the exact "bent stick" this dial was paired with a
-        # forehead lift to avoid. A short shoulder on a smooth field is still a crease. Starting
-        # at 0.600 gives 0.12 of run and lands the blend inside the forehead, where the two
-        # displacements sum into one curve -- which is what the trait is on the real bird.
-        # ⚠ Verts behind the hinge are still gated on the GAPE PLANE, so this cannot move the cut.
-        "culmen_band": (0.600, 0.720, 0.790, 0.834),
-        # --- FOREHEAD: the other half of the same trait ---------------------------------------
-        # ⚠ AN ARCH THAT STOPS AT THE FEATHERING READS AS A BENT STICK. A hashibutogarasu's
-        # signature is the arched culmen AND the steep forehead above it; on the real bird they
-        # are one curve. Small, separate, and trivial to zero if the bill alone is wanted. The
-        # crown already peaks at z 1.073 near y 0.474, so this lifts BEHIND the bill, not the
-        # crown itself.
-        "forehead": 0.008,
-        "forehead_band": (0.44, 0.54, 0.66, 0.74),   # overlaps the culmen's rear ramp, on purpose
+        # ⚠ THE BEAK WORK OF 2026-08-28 IS DELIBERATELY GONE, all of it: culmen arch, forehead
+        # lift, tip hook, tip blunt, tomium retraction, the steepened gape plane and the moved
+        # hinge. Owner: "revert all the beak work." It ended with a jaw that swung through the
+        # upper mandible, and the reason was structural rather than a bad number -- every attempt
+        # displaced a vendor bill only a few vertex rings long, so each fix bought the next
+        # defect. The measurements are kept in the comments here and on docs/wiki because they
+        # are the useful part: the bill wants LOFTING from station data, the way the tail, the
+        # folded wing and the eye lids in this same file already are.
     },
     "feet_target_tris": 130,         # per foot, down from the vendor's 920
 }
@@ -562,19 +634,17 @@ def reshape_body(spec=KARASU):
               "zmax": round(float(co[:, 2].max()), 4)}
 
     ys, zlo, zhi = _z_envelope(co)
-    gp, gn = Vector(b["gape_p"]), Vector(b["gape_n"]).normalized()
-    # How far above the gape plane the upper mandible actually reaches -- the arch is weighted by
-    # a vertex's height above the plane as a fraction of THIS, so the ridge moves fully and the
-    # gape line does not move at all.
+    gp, gn = gape_plane(spec)
     fwd = co[:, 1] > b["hinge_y"]
     d_all = (co[:, 0] - gp.x) * gn.x + (co[:, 1] - gp.y) * gn.y + (co[:, 2] - gp.z) * gn.z
+    # A sanity check on the plane itself: if nothing sits above it, it is not describing the bill.
     d_max = float(d_all[fwd].max()) if fwd.any() else 1.0
     if d_max <= 1e-6:
         raise RuntimeError("no bill geometry above the gape plane -- check bill.gape_p / gape_n")
 
     girth, belly = r["girth"], r["belly"]
-    gb, bb, cb, fb = r["girth_band"], r["belly_band"], r["culmen_band"], r["forehead_band"]
-    moved = {"girth": 0, "belly": 0, "culmen": 0, "forehead": 0}
+    gb, bb = r["girth_band"], r["belly_band"]
+    moved = {"girth": 0, "belly": 0}
 
     for i, v in enumerate(me.vertices):
         y, z = co[i, 1], co[i, 2]
@@ -596,22 +666,6 @@ def reshape_body(spec=KARASU):
                 v.co.z -= belly * w * ventral
                 moved["belly"] += 1
 
-        # --- forehead: lift, dorsal verts only --------------------------------------------
-        f = _band(y, *fb)
-        if f > 0.0 and hi - mid > 1e-6:
-            dorsal = _smoothstep((z - mid) / (hi - mid))
-            if dorsal > 0.0:
-                v.co.z += r["forehead"] * f * dorsal
-                moved["forehead"] += 1
-
-        # --- culmen: bow the ridge, ALONG THE PLANE NORMAL, above the plane only ----------
-        c = _band(y, *cb)
-        if c > 0.0 and d_all[i] > 0.0:
-            k = _smoothstep(d_all[i] / d_max)
-            if k > 0.0:
-                v.co += gn * (r["culmen_arch"] * c * k)
-                moved["culmen"] += 1
-
     me.update()
     co2 = np.array([v.co[:] for v in me.vertices], dtype=float)
     after = {"hw": round(float(np.abs(co2[:, 0]).max()), 4),
@@ -628,6 +682,64 @@ def reshape_body(spec=KARASU):
 
 
 LAST_EYE = None      # (x, y, z, r) in BUILD coords, recorded by build_eyes for landmarks_final
+
+
+_BRIDGE_INFO = []
+LAST_GAPE = None     # (gape_p, gape_n) fitted from the mesh by measure_gape_plane
+
+
+def gape_plane(spec=KARASU):
+    """The gape plane in use: MEASURED if it has been fitted, otherwise the spec's typed values."""
+    if LAST_GAPE is not None:
+        return Vector(LAST_GAPE[0]), Vector(LAST_GAPE[1]).normalized()
+    b = spec["bill"]
+    return Vector(b["gape_p"]), Vector(b["gape_n"]).normalized()
+
+
+def measure_gape_plane(spec=KARASU):
+    """Fit the gape plane to the bill's own mouth line instead of trusting a typed one.
+
+    ⚠ THE TOMIUM IS THE WIDEST PART OF EVERY CROSS-SECTION. A bill is a wedge in section, so the
+    lateral extreme at each station IS the cutting edge -- which means the mouth line can be
+    measured rather than declared, and this is the only thing here that ever knew where it was.
+
+    ⚠ THIS EXISTS BECAUSE A TYPED PLANE WRECKED THE MOUTH. To keep a hooked tip on the upper side
+    of the classifier, `gape_n` was steepened from 0.0599 to 0.1907 -- and measured on the VENDOR
+    mesh, before any reshaping, the real mouth line is essentially FLAT (z 0.9574 at y 0.59
+    against 0.9557 at 0.81). The steepened plane fell 0.043 across the same span, so it crossed
+    the mouth diagonally: above the tomium at the back, below it at the front. `split_bill` then
+    sliced the bill at an angle to its own anatomy and the "lower mandible" came out a wedge --
+    a thin blade that swung through the upper when the jaw opened.
+    ⚠ Do not re-steepen this to solve a tip-classification problem. Fix the tip.
+    """
+    global LAST_GAPE
+    b = spec["bill"]
+    o = bpy.data.objects.get("KarasuBody") or bpy.data.objects[BODY_OBJ]
+    co = np.array([v.co[:] for v in o.data.vertices])
+    ys, zs = [], []
+    step = 0.02
+    for y0 in np.arange(b["hinge_y"] - 0.06, b["tip_y"] - 0.02, step):
+        m = (co[:, 1] >= y0) & (co[:, 1] < y0 + step)
+        # ⚠ SKIP THIN STATIONS. Rings of 2-3 vertices are ends and seams, not sections, and their
+        # "widest" point is noise -- one of them sat 0.045 off the line and would have tilted the
+        # whole fit on its own.
+        if m.sum() < 8:
+            continue
+        sub = co[m]
+        i = int(np.argmax(np.abs(sub[:, 0])))
+        ys.append(float(sub[i, 1]))
+        zs.append(float(sub[i, 2]))
+    if len(ys) < 3:
+        raise RuntimeError("not enough bill sections to fit a gape plane")
+    a, c = np.polyfit(np.array(ys), np.array(zs), 1)
+    ymid = float(np.mean(ys))
+    gp = (0.0, ymid, float(a * ymid + c))
+    gn = Vector((0.0, float(-a), 1.0)).normalized()      # z = a*y + c  =>  normal (0, -a, 1)
+    LAST_GAPE = (gp, tuple(gn))
+    return {"stations_used": len(ys), "slope": round(float(a), 5),
+            "gape_p": [round(v, 4) for v in gp], "gape_n": [round(v, 4) for v in gn],
+            "typed_gape_n": list(b["gape_n"]),
+            "residual_max": round(float(np.max(np.abs(np.array(zs) - (a * np.array(ys) + c)))), 4)}
 
 
 def eye_site(spec=KARASU):
@@ -662,14 +774,299 @@ def eye_site(spec=KARASU):
     if not near.any():
         raise RuntimeError("no head geometry at the eye station -- check eye.y")
     z = float(co[near][:, 2].max()) - e["crown_drop"]
-    surf = body_surface_x(e["y"], z, 1.0, body)
-    # The ball's CENTRE sits below the skin by the part of it we do not want showing, so exactly
-    # `proud` of its radius stands out of the head.
-    x = surf - e["r"] * (1.0 - e["proud"])
-    LAST_EYE = (round(x, 5), e["y"], round(z, 5), e["r"])
-    return {"centre": LAST_EYE[:3], "r": e["r"], "surface_x": round(surf, 5),
+    # ⚠ MEASURE EACH SIDE SEPARATELY. THE HEAD IS NOT MIRROR-SYMMETRIC. Owner, seeing the first
+    # build: "the eye is very visible on one side of the head and missing on the other." Measured
+    # at the eye station -- the surface stands at 0.0514 on the right and 0.0610 on the left, and
+    # the vendor head carries 120 vertices on one side against 163 on the other. Measuring one
+    # side and MIRRORING it, which is what the uguisu's `_eyes` builder does, is guaranteed to be
+    # wrong on the other side of any bird that was not modelled symmetrically -- and none of them
+    # were.
+    #
+    # ⚠ AND CLEAR THE FOOTPRINT, NOT A POINT. A single raycast is exact for the triangle it hits
+    # and misleading on a 555-vertex head: the ray struck 0.0379 on the right where vertices in
+    # the same footprint reached 0.0514. Seated against that dip the ball vanished INSIDE the
+    # head at every zoom. The ball spans +/- r in y and z, so what it has to clear is the surface
+    # across that whole footprint, per side.
+    sites = {}
+    for side, sfx in ((1.0, "R"), (-1.0, "L")):
+        ray = body_surface_x(e["y"], z, side, body)
+        m = ((np.abs(co[:, 1] - e["y"]) < e["r"]) & (np.abs(co[:, 2] - z) < e["r"])
+             & (np.sign(co[:, 0]) == side))
+        local = float(np.abs(co[m][:, 0]).max()) if m.any() else ray
+        surf = max(ray, local)
+        # The centre sits below the skin by the part we do not want showing, so exactly `proud`
+        # of the radius stands out -- on THIS side, against THIS side's surface.
+        sites[sfx] = {"x": round(surf - e["r"] * (1.0 - e["proud"]), 5),
+                      "surface": round(surf, 5), "raycast": round(ray, 5),
+                      "local_max": round(local, 5), "verts_in_footprint": int(m.sum())}
+    LAST_EYE = {"R": sites["R"]["x"], "L": sites["L"]["x"], "y": e["y"], "z": round(z, 5),
+                "r": e["r"]}
+    return {"sites": sites, "y": e["y"], "z": round(z, 5), "r": e["r"],
             "proud_studs": round(e["r"] * e["proud"], 5),
+            "asymmetry": round(abs(sites["R"]["surface"] - sites["L"]["surface"]), 5),
             "crown": round(z + e["crown_drop"], 5)}
+
+
+def build_eye_lids(spec=KARASU):
+    """Raise a CONVEX ring of periorbital skin around an OVAL aperture.
+
+    ⚠ THE FIRST VERSION DISHED THE HEAD INWARD AND THAT WAS BACKWARDS. Owner, against the
+    reference photograph: "the area surrounding the eye in the bird is convex, not concave -- the
+    skin is rising up from the surface to enclose the eyeball - and the visible eyeball itself is
+    not circular, but oval." Both are plainly true in the photo and neither was true of the dish:
+    a crow's periorbital skin is a puffy bare ring standing PROUD of the feathering, and the lids
+    close over the ball top and bottom so what shows is an oval, not a disc.
+
+    ⚠ THE APERTURE IS ELLIPTICAL, AND THAT IS WHERE THE OVAL COMES FROM -- not from squashing the
+    eyeball. The ball stays a sphere; the lids decide how much of it you see, which is what
+    happens on the animal. Distance is measured in aperture units, so `d == 1` IS the lid edge
+    wherever you are around it: wider fore-aft (`ap_y`) than vertically (`ap_z`).
+
+    ⚠ RUNS AFTER `eye_site` AND BEFORE `build_eye_mesh`, for the same reason the dish did: the
+    site must be measured against undisturbed skin, or the eye seats itself into its own lids.
+    """
+    if LAST_EYE is None:
+        raise RuntimeError("eye_site() has not run")
+    E, e = LAST_EYE, spec["eye"]
+    r = E["r"]
+    ap_y, ap_z = r * e["ap_y"], r * e["ap_z"]
+    outer, height = e["lid_outer"], r * e["lid_height"]
+    o = bpy.data.objects.get("KarasuBody") or bpy.data.objects[BODY_OBJ]
+    me = o.data
+    bm = bmesh.new()
+    bm.from_mesh(me)
+
+    def aperture_d(y, z):
+        return math.sqrt(((y - E["y"]) / ap_y) ** 2 + ((z - E["z"]) / ap_z) ** 2)
+
+    before = len(bm.faces)
+    # ⚠ ONE ROUND OF LOCAL SUBDIVISION. Two cost 1396 triangles -- 52% of the whole body -- for
+    # two eye rings on a 19.7-inch bird. The lid is a smooth low-frequency shape and does not
+    # need the density; triangles spent here are triangles not spent on a silhouette anyone sees.
+    # ⚠ SPEND THE TRIANGLES AT THE RIM, NOT ACROSS THE WHOLE RING. The lid's shape is smooth
+    # everywhere except one place -- the aperture edge, where the skin has to close over the ball
+    # along a curve. Subdividing the whole region evenly made that edge JAGGED while paying for
+    # density out where nothing happens. Two passes, each narrower than the last, put the
+    # vertices where the curve is.
+    for reach in (outer * 1.1,):
+        bm.faces.ensure_lookup_table()
+        region = [f for f in bm.faces
+                  if aperture_d(f.calc_center_median().y, f.calc_center_median().z) < reach]
+        if not region:
+            continue
+        edges = set()
+        for f in region:
+            edges.update(f.edges)
+        bmesh.ops.subdivide_edges(bm, edges=list(edges), cuts=1, use_grid_fill=True)
+
+    # 2. lift the ring: highest right at the lid edge, falling to nothing by `outer`
+    bm.verts.ensure_lookup_table()
+    raised = 0
+    clearance = r * 0.02
+    for v in bm.verts:
+        d = aperture_d(v.co.y, v.co.z)
+        # ⚠ INSIDE THE APERTURE, LEAVE THE SKIN ALONE. That is the hole the eyeball shows
+        # through; raising it there would push the head out THROUGH the ball.
+        if d <= 1.0 or d >= outer:
+            continue
+        side = 1.0 if v.co.x > 0 else -1.0
+        cx = E["R"] if side > 0 else E["L"]
+        # ⚠ THE LID MUST COVER THE BALL, and a decorative ring alone does not. The first version
+        # only added `height * w`, which FALLS OFF as `d` grows -- and `d` grows fastest
+        # vertically, so the lids came out thinnest exactly where they had to be thickest. The
+        # visible eye stayed a circle: the ball pokes through wherever it stands above the skin,
+        # and with a constant skin height that boundary is a circle by construction, whatever
+        # shape the aperture is drawn.
+        #
+        # So raise the skin to CLEAR THE BALL for every vertex outside the aperture. The visible
+        # region is then exactly `d <= 1` -- an ellipse, because that is what the aperture is --
+        # and the ball stays a sphere, which is what happens on the animal.
+        # ⚠ THE PER-VERTEX "COVER THE BALL" LIFT IS DELIBERATELY GONE. It is the right IDEA and
+        # the wrong MECHANISM: clipping a smooth analytic ellipse by displacing whichever
+        # vertices happen to sit near it cannot produce a clean curve, and three attempts each
+        # came out visibly lumpy -- the last at +630 triangles. A clean oval needs an edge loop
+        # that FOLLOWS the ellipse, which means lofting the lid ring as explicit geometry, the
+        # way the tail and the folded wing in this same file are built. Until that exists this
+        # raises a smooth convex ring and leaves the visible eye circular, which is honest.
+        _ = (cx, clearance)
+        w = 1.0 - _smoothstep((d - 1.0) / (outer - 1.0))
+        lift = height * w
+        if lift <= 0.0:
+            continue
+        v.co.x += side * lift
+        raised += 1
+
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    added = len(bm.faces) - before
+    bm.to_mesh(me)
+    me.update()
+    bm.free()
+    return {"faces_added": added, "verts_raised": raised,
+            "aperture_y": round(ap_y, 5), "aperture_z": round(ap_z, 5),
+            "aperture_ratio": round(ap_y / ap_z, 2), "lid_height": round(height, 5)}
+
+
+def build_lid_collar(spec=KARASU):
+    """The lid: an edge loop ON THE EYEBALL, bridged back to the head.
+
+    ⚠ THE BRIDGE MUST NEVER CUT THROUGH THE EYEBALL (owner, 2026-08-28). Earlier versions could:
+    with a tight band the straight run from the lid edge to the head descends STEEPER than the
+    sphere's own surface does, so it dives back inside the ball and the lid clips the eye it is
+    supposed to frame.
+
+    ⚠ SO THE FIRST STEP LEAVES ALONG THE TANGENT, which makes the failure impossible rather than
+    merely unlikely. A sphere is convex, so its tangent plane at any point lies entirely OUTSIDE
+    it -- a bridge that departs tangentially cannot re-enter, at any width, for any bird. Only
+    the second step bends down to the head, and by then it is already clear of the surface.
+    The check at the end is belt and braces: it measures every generated vertex against the
+    sphere and refuses to build a lid that intrudes.
+
+    ⚠ AND THE WHOLE APERTURE MUST LIE ON THE VISIBLE CAP. The ball is sunk, so it only emerges
+    from the head within some radius; an aperture drawn wider than that is BURIED, and then the
+    visible edge is the ball's own emergence circle rather than the oval that was drawn. That is
+    why the earlier ovals kept reading as circles with the sides chewed.
+
+    THREE LOOPS per eye: on the ball, one tangent step out, then buried in the head.
+    """
+    if LAST_EYE is None:
+        raise RuntimeError("eye_site() has not run")
+    E, e = LAST_EYE, spec["eye"]
+    r = E["r"]
+    ap_y, ap_z = r * e["ap_y"], r * e["ap_z"]
+    n = int(e["collar_segments"])
+    w_front, w_rear = r * e["collar_w_front"], r * e["collar_w_rear"]
+    w_vert = r * e["collar_w_vert"]
+    sink = r * e["collar_sink"]
+    lift = e["collar_lift"]
+    R = r * (1.0 + lift)                       # the wrap sphere, concentric and strictly outside
+    wraps, wrap_end = int(e["collar_wraps"]), e["collar_wrap_end"]
+    body = bpy.data.objects.get("KarasuBody") or bpy.data.objects[BODY_OBJ]
+
+    def band_width(th):
+        """Ring width at this angle. theta 0 is toward the bill, +90 up, 180 aft.
+
+        ⚠ A WEIGHTED MEAN, not a sum -- adding a vertical bonus to a horizontal base inflates the
+        DIAGONALS past either, and the ring bulges at the corners and stops reading as a lid.
+        """
+        c, sn = math.cos(th), math.sin(th)
+        wf, wr, wv = max(0.0, c), max(0.0, -c), abs(sn)
+        total = wf + wr + wv
+        return (wf * w_front + wr * w_rear + wv * w_vert) / total if total else w_front
+
+    me = bpy.data.meshes.new("KarasuLids")
+    ob = bpy.data.objects.new("KarasuLids", me)
+    bpy.context.scene.collection.objects.link(ob)
+    bm = bmesh.new()
+    worst = 1e9
+
+    for sfx, side in (("R", 1.0), ("L", -1.0)):
+        cx = E[sfx]
+        n_loops = 2 + wraps
+        rings = [[] for _ in range(n_loops)]
+        for i in range(n):
+            th = 2.0 * math.pi * i / n
+            cth, sth = math.cos(th), math.sin(th)
+            py, pz = ap_y * cth, ap_z * sth
+            rho0 = math.hypot(py, pz)
+            if rho0 >= r:
+                raise RuntimeError("aperture is wider than the eyeball -- lower ap_y / ap_z")
+            uy, uz = (py / rho0, pz / rho0) if rho0 > 1e-9 else (cth, sth)
+            width = band_width(th)
+            pts = []
+            # 1. the visible lid EDGE, on the ball itself
+            pts.append(Vector((math.sqrt(r * r - rho0 * rho0), py, pz)))
+            # 2. wrap loops on the concentric sphere, out to the ball's silhouette
+            rho_end = wrap_end * R
+            for k in range(1, wraps + 1):
+                rho = rho0 + (rho_end - rho0) * (k / wraps)
+                pts.append(Vector((math.sqrt(max(0.0, R * R - rho * rho)), uy * rho, uz * rho)))
+            # 3. the skirt, buried in the head -- past the silhouette, so no ball left to cut
+            oy, oz = uy * (rho_end + width), uz * (rho_end + width)
+            surf = body_surface_x(E["y"] + oy, E["z"] + oz, side, body)
+            pts.append(Vector((surf - cx - sink, oy, oz)))
+            for k, q in enumerate(pts):
+                worst = min(worst, q.length)
+                rings[k].append(bm.verts.new((side * (cx + q.x), E["y"] + q.y, E["z"] + q.z)))
+
+        bm.verts.ensure_lookup_table()
+        for A, B in zip(range(n_loops - 1), range(1, n_loops)):
+            for i in range(n):
+                j = (i + 1) % n
+                quad = (rings[A][i], rings[A][j], rings[B][j], rings[B][i])
+                bm.faces.new(quad if side > 0 else tuple(reversed(quad)))
+
+    # ⚠ ASSERT IT, do not trust the argument. Every vertex must sit at or outside the sphere.
+    if worst < r - 1e-6:
+        bm.free()
+        raise RuntimeError(f"lid intrudes into the eyeball: {worst:.5f} < r {r:.5f}")
+
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+    bm.to_mesh(me)
+    bm.free()
+    for poly in me.polygons:
+        poly.use_smooth = True
+    grp = ob.vertex_groups.new(name="joint4")
+    grp.add([v.index for v in me.vertices], 1.0, 'REPLACE')
+    return {"verts": len(me.vertices), "tris": sum(len(p_.vertices) - 2 for p_ in me.polygons),
+            "segments": n, "aperture_ratio": round(ap_y / ap_z, 2),
+            "closest_vertex_to_eye_centre": round(worst, 5), "eye_radius": round(r, 5),
+            "clears_eyeball_by": round(worst - r, 6),
+            "aperture_vs_eye_front": round(ap_y / r, 2),
+            "aperture_vs_eye_vert": round(ap_z / r, 2)}
+
+
+def build_eye_mesh(spec=KARASU):
+    """The eyeballs, as their OWN MeshPart -- the same shape the wings already are.
+
+    ⚠ A `Part` BALL WAS TRIED FIRST AND WAS THE WRONG CALL. It was chosen for a trade that does
+    not exist: "tunable in Studio without a Blender round trip". Measured in Studio -- a MeshPart
+    keeps `Color`, `Material` AND `Reflectance` at runtime, every dial the ball was supposed to
+    buy, and it also has `TextureID`, which a Part does not. So the ball gave up the iris and gave
+    up being VISIBLE WHILE AUTHORING, and bought nothing back. Nor is it meaningfully cheaper:
+    both are one Instance per eye, and instance count is what costs.
+
+    Owner ruling 2026-08-28, and it generalises past this bird: build and conditionally approve in
+    BLENDER, then play and give final approval in Studio. Manual imports are not a burden worth
+    designing around, and Blender is where control over the outcome actually lives.
+
+    ⚠ ONE MESH, BOTH EYES, sharing the body's origin exactly as the wings do -- so it is one extra
+    part per bird rather than two, and `PivotOffset` seats it with no fudge.
+    """
+    if LAST_EYE is None:
+        raise RuntimeError("eye_site() has not run")
+    E = LAST_EYE
+    me = bpy.data.meshes.new("KarasuEyes")
+    ob = bpy.data.objects.new("KarasuEyes", me)
+    bpy.context.scene.collection.objects.link(ob)
+    bm = bmesh.new()
+    # ⚠ NOT `bird_familiar._eyes`, and that is the whole fix. It builds both eyes by MIRRORING a
+    # single x, which is correct only on a symmetric head -- and measured, this one stands 0.0514
+    # proud on the right against 0.0610 on the left. Same sphere resolution as the uguisu's (8x6)
+    # so the two birds still read as one family; only the placement is per side.
+    for sfx, side in (("R", 1.0), ("L", -1.0)):
+        bmesh.ops.create_uvsphere(
+            bm, u_segments=8, v_segments=6, radius=E["r"],
+            matrix=Matrix.Translation(Vector((side * E[sfx], E["y"], E["z"]))))
+    bm.to_mesh(me)
+    bm.free()
+    # ⚠ SHADE IT SMOOTH, AND THAT IS THE WHOLE FIX FOR THE FACETING. Owner: "can't it simply be a
+    # sphere? Or does that not survive the export to Studio?" It can, and it does. The visible
+    # faceting was never polygon count -- `create_uvsphere` makes FLAT faces, and a flat-shaded
+    # 8x6 sphere shows every one of them. The body is 87.7% smooth-shaded and reads smooth in
+    # Studio today, which is the proof that it survives: `export()` writes
+    # `mesh_smooth_type='FACE'`, i.e. per-face smoothing groups, so a smooth face exports smooth.
+    # ⚠ Do NOT answer faceting by raising `u_segments`/`v_segments` here. That spends triangles on
+    # a problem that costs one flag, and the uguisu's 8x6 is deliberately matched.
+    for poly in me.polygons:
+        poly.use_smooth = True
+    # ⚠ WEIGHT IT, even though the controller CFrames the whole part. `export()` carries the
+    # armature, so Roblox imports this as a SKINNED MeshPart; an unweighted skinned mesh collapses
+    # to the origin the moment anything touches a bone. Bound to the head, which is also the bone
+    # the controller reads to place it, so the two can never disagree.
+    g = ob.vertex_groups.new(name="joint4")
+    g.add([v.index for v in me.vertices], 1.0, 'REPLACE')
+    return {"verts": len(me.vertices), "tris": sum(len(p_.vertices) - 2 for p_ in me.polygons),
+            "x_right": E["R"], "x_left": E["L"], "y": E["y"], "z": E["z"], "r": E["r"]}
 
 
 def plate_margins(spec=KARASU):
@@ -1000,7 +1397,7 @@ def split_bill(spec=KARASU):
     on. Get this wrong and both twins land in the same group and the split does nothing visible.
     """
     b = spec["bill"]
-    gp, gn = Vector(b["gape_p"]), Vector(b["gape_n"]).normalized()
+    gp, gn = gape_plane(spec)
     o = bpy.data.objects[BODY_OBJ]
     me = o.data
     bm = bmesh.new()
@@ -1040,6 +1437,20 @@ def split_bill(spec=KARASU):
     # custom data, and writes made through references taken beforehand land nowhere -- the tag
     # read back as zero on every face while reporting success.
     gape_layer = bm.faces.layers.int.get("gape") or bm.faces.layers.int.new("gape")
+    # ⚠ THE FILL SPANS THE CUT, AND THAT IS TOPOLOGY, NOT A BUG IN THIS CALL. The cut deliberately
+    # STOPS SHORT of the hinge so the mandibles stay joined at the back -- which means their two
+    # boundary loops SHARE the vertices where the cut ends. Topologically that is ONE loop, so
+    # `holes_fill` correctly closes it as ONE membrane running the whole length of the mouth,
+    # welded to both halves. Measured: 13 faces owning vertices from both, spanning y 0.645..0.742.
+    # Invisible shut; a flat sheet between the mandibles the moment `bill_lower` rotates.
+    #
+    # ⚠ FILLING THE TWO SIDES SEPARATELY DOES NOT FIX IT -- tried 2026-08-28. Split by which face
+    # each boundary edge belongs to and neither group is a closed loop on its own, so the fill
+    # leaves the bill open: 24 boundary edges and 24 non-manifold, against 0 and 0 before.
+    #
+    # ⚠ AND WATERTIGHT IS NOT CORRECT. This shipped behind `boundary_after: 0, non_manifold: 0`,
+    # both of which a webbed jaw satisfies perfectly. They say the mesh has no holes; they say
+    # nothing about whether it can MOVE. `faces_bridging_joint` below is the number that does.
     bmesh.ops.holes_fill(bm, edges=boundary, sides=0)
     # ⚠ And tag by GEOMETRY, not by the op's return value: `holes_fill` reported one face for the
     # two holes it demonstrably closed (0 boundary edges afterwards), so trusting its bookkeeping
@@ -1063,8 +1474,25 @@ def split_bill(spec=KARASU):
         d = sum((f.calc_center_median() - gp).dot(gn) for f in v.link_faces) / len(v.link_faces)
         if d < 0:
             lower.append(i)
+    # ⚠ THE NUMBER THAT WOULD HAVE CAUGHT THE WEB. Faces owning vertices from BOTH halves cannot
+    # hinge -- they stretch. A couple at the very back are the hinge itself and are correct; a
+    # dozen running to the tip are a membrane. Nothing else reported this: see the note above on
+    # watertight not meaning correct.
+    lower_set = set(lower)
+    bridging = []
+    for f in bm.faces:
+        if f.calc_center_median().y <= b["hinge_y"] + 0.02:
+            continue
+        vs = {v.index for v in f.verts}
+        if (vs & lower_set) and (vs - lower_set):
+            bridging.append(f.index)
+    # ⚠ REPORTED, NOT RAISED. It is a real defect and there is no correct value to demand yet:
+    # some bridging at the very back IS the hinge. What is wrong is a membrane down the whole
+    # mouth, and telling those apart needs a modelled cavity, not a threshold.
+
     bm.edges.ensure_lookup_table()
     stats = {"cut_edges": len(on_plane), "holes_closed": len(boundary),
+             "faces_bridging_joint": len(bridging),
              "gape_faces_tagged": tagged, "lower_verts": len(lower),
              "boundary_after": len([e for e in bm.edges if e.is_boundary]),
              "non_manifold": len([e for e in bm.edges if not e.is_manifold])}
@@ -1332,11 +1760,13 @@ def rebuild_rig(spec=KARASU):
         # ⚠ They must stay DEFORM bones despite deforming nothing -- `export()` passes
         # `use_armature_deform_only=True`, which silently drops any bone that is not.
         if LAST_EYE:
-            ex, ey, ez, er = LAST_EYE
+            E = LAST_EYE
             for side, sfx in ((1.0, "R"), (-1.0, "L")):
                 if ("eye_" + sfx) in ebs:
                     ebs.remove(ebs["eye_" + sfx])
                 b = ebs.new("eye_" + sfx)
+                # ⚠ PER SIDE, matching the mesh. A mirrored x puts one bone inside the skull.
+                ex, ey, ez, er = E[sfx], E["y"], E["z"], E["r"]
                 b.head = Vector((side * ex, ey, ez))
                 # The tail points outboard and is one radius long. ⚠ THE LENGTH DOES NOT SURVIVE
                 # IMPORT -- a Roblox `Bone` is an Attachment, a POINT with an orientation, and has
@@ -1432,7 +1862,7 @@ def join_all():
     dv_dst = bm.verts.layers.deform.verify()
 
     added = {}
-    for src_name in ("KarasuTail", "KarasuFolded", FOOT_L, FOOT_R):
+    for src_name in ("KarasuTail", "KarasuFolded", "KarasuLids", FOOT_L, FOOT_R):
         src = bpy.data.objects.get(src_name)
         if not src:
             continue
@@ -1449,14 +1879,17 @@ def join_all():
     bm.to_mesh(me)
     me.update()
     bm.free()
-    for n in ("KarasuTail", "KarasuFolded", FOOT_L, FOOT_R):
+    for n in ("KarasuTail", "KarasuFolded", "KarasuLids", FOOT_L, FOOT_R):
         if n in bpy.data.objects:
             bpy.data.objects.remove(bpy.data.objects[n], do_unlink=True)
 
     # UVs for the new faces. The feet arrive with the vendor's own (clean, non-overlapping)
     # unwrap but it sits ON TOP of the body's islands, so they are repacked too.
     # each block now holds BOTH shells stacked, so it is taller than the piece's own aspect
+    # ⚠ THE LIDS PROJECT ALONG X, the axis they face -- a ring on the side of a head unwraps
+    # cleanly from the side and degenerately from anywhere else.
     plan = {"KarasuTail": (2, 0.17, 0.19), "KarasuFolded": (0, 0.19, 0.17),
+            "KarasuLids": (0, 0.09, 0.07),
             FOOT_L: (0, 0.08, 0.10), FOOT_R: (0, 0.08, 0.10)}
     packed = {}
     for name, (lo, hi) in added.items():
@@ -1622,8 +2055,15 @@ def landmarks_final(spec=KARASU):
     # geometry's numbers. Before this the eye was hand-typed, drifted silently when the head
     # moved, and `landmarks_final` did not emit it at all.
     if LAST_EYE is None:
-        raise RuntimeError("build_eyes() has not run -- call run() first")
-    ex, ey, ez, er = LAST_EYE
+        raise RuntimeError("eye_site() has not run -- call run() first")
+    # ⚠ ONE x FOR A TWO-SIDED FACT, and it is the honest compromise rather than an oversight.
+    # The eyes sit at DIFFERENT depths because the head is not symmetric, but the shader works in
+    # `abs(x)` -- it literally cannot tell the sides apart -- so the socket it paints has to use a
+    # single value. The mean is right in the middle of a ~0.01 spread against a 0.024 radius, and
+    # the socket's falloff is soft and 0.6 radii wide, so it lands on both. If a future bird is
+    # wildly asymmetric this is where that shows up first.
+    ex = (LAST_EYE["R"] + LAST_EYE["L"]) * 0.5
+    ey, ez, er = LAST_EYE["y"], LAST_EYE["z"], LAST_EYE["r"]
     return {"covert_edge_y": tuple(ys[i] for i in order),
             "covert_edge_z": tuple(zs[i] for i in order),
             "covert_back_y": round(plate[-1][0] * S + T[1] - 0.02, 4),
@@ -1714,10 +2154,20 @@ def run(spec=KARASU, do_export=False):
     log = {}
     log["load"] = load_vendor()
     log["split_wings"] = split_wings()
+    # ⚠ `measure_gape_plane(spec)` would go HERE and is deliberately not called. It fits the cut
+    # to the bill's own mouth line and is strictly better than the typed plane -- but it belongs
+    # with a bill that is lofted, not displaced, and wiring it alone changes the split under a
+    # bill nobody has re-approved.
     # ⚠ ORDER IS LOAD-BEARING -- see reshape_body's docstring. After the wing cut (which needs the
     # measured gap at |x| 0.19), before everything that MEASURES the body it attaches to.
     log["reshape"] = reshape_body(spec)
     log["eyes"] = eye_site(spec)            # after the reshape: it seats on the shipped skull
+    # ⚠ NO SEPARATE DISPLACEMENT SWELL. `build_eye_lids` used to lift a broad ring of body
+    # vertices before this ran; between them they produced a halo more than twice the eye's width.
+    # The collar's own crest IS the skin rising, it is a fixed width all the way round, and
+    # dropping the displacement takes 224 triangles with it.
+    log["lid_collar"] = build_lid_collar(spec)
+    log["eye_mesh"] = build_eye_mesh(spec)
     log["tail"] = build_tail(spec)
     log["folded"] = build_folded_wings(spec)
     log["spread"] = build_spread_wings(spec)
@@ -1906,9 +2356,25 @@ def bake_and_finish(res=1024):
         o = bpy.data.objects[n]
         o.data.materials.clear()
         o.data.materials.append(mat)
+    eyes = bpy.data.objects.get("KarasuEyes")
+    if eyes:
+        em = bpy.data.materials.get("KarasuEyeMat") or bpy.data.materials.new("KarasuEyeMat")
+        em.use_nodes = True
+        nt2 = em.node_tree
+        b2 = next((n for n in nt2.nodes if n.type == 'BSDF_PRINCIPLED'), None)
+        if b2:
+            b2.inputs["Base Color"].default_value = (0.006, 0.005, 0.005, 1.0)
+            b2.inputs["Roughness"].default_value = 0.08   # so the VIEWPORT shows what Roblox will
+        eyes.data.materials.clear()
+        eyes.data.materials.append(em)
 
     files = {"body": export("KarasuBody", OUT_DIR + "karasu_body.fbx"),
              "wings": export("KarasuWings", OUT_DIR + "karasu_wings.fbx"),
+             # ⚠ NO ColorMap ON THE EYES. They are a plain glossy black ball for now and the
+             # controller sets Color/Material/Reflectance; when the iris arrives it gets its own
+             # small TextureID rather than a slice of the bird's atlas, because the atlas is
+             # painted by 3D POSITION and an eyeball wants a flat little iris disc instead.
+             "eyes": export("KarasuEyes", OUT_DIR + "karasu_eyes.fbx"),
              "colormap": png}
     bpy.ops.wm.save_as_mainfile(filepath=OUT_DIR + "karasu_retarget.blend")
     return {"bake": info, "files": files}
