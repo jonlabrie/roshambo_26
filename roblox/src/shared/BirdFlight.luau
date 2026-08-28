@@ -118,6 +118,34 @@ BirdFlight.SHOULDER_YAW = 0
 -- which would then need editing every time the perch is retuned.
 BirdFlight.SHOULDER_X = SHOULDER.x
 BirdFlight.SHOULDER_Y = SHOULDER.y
+-- ⚠ WHICH CONSTANTS IN THIS FILE SURVIVE A SECOND SPECIES, AUDITED 2026-08-28.
+-- Every number here was tuned against the uguisu at 0.828 studs. The karasu is 1.640 -- almost
+-- exactly 2x -- so anything expressed in STUDS or SECONDS is wrong on it, while anything in
+-- DEGREES is fine. This is `practice/derive-from-what-it-touches.md` applied to motion.
+--
+--   SAFE, scale-free .. every angle: WING_BEAT_DEG, WING_SWEEP_DEG, FOLD_SHOULDER, FOLD_WRIST,
+--                      LEG_TUCK_DEG, TURN_MIN_DEG, TURN_MAX_DEG. 45 degrees is 45 degrees on a
+--                      wren or an eagle.
+--   ⚠ DISTANCES ..... HOP_HEIGHT (0.05) and TURN_HOP (0.06) are ABSOLUTE. On the uguisu they are
+--                      6.0% and 7.2% of body length; on the karasu, 3.0% and 3.7%. A crow doing a
+--                      uguisu-sized hop reads as STIFF, and it diagnoses as "the animation is
+--                      wrong" rather than "the constant is absolute", which is the expensive kind
+--                      of bug. Scale these LINEARLY with body length.
+--   ⚠ TIMES ......... HOP_PERIOD, FLUTTER_BURST, TURN_TIME, WING_OPEN_TIME, FLIGHT_MIN_TIME.
+--                      Bigger animals move SLOWER, roughly as sqrt(length) for pendulum-like
+--                      motion -- so a 2x bird is about 1.41x slower, NOT 2x. Scaling times
+--                      linearly overshoots into slow motion. The comment below already knew:
+--                      "a small bird's is quick" was a warning written before there was a second
+--                      bird.
+--   TASTE, not scale . IDLE_FLUTTER_GAP and IDLE_TURN_GAP are how OFTEN a bird fidgets. A crow is
+--                      plausibly more deliberate than a warbler, but that is character per
+--                      species, not proportion, and it should be chosen by eye.
+--
+-- The plan agreed with the owner 2026-08-28: fold this into a per-species record (voice already
+-- lives in `BirdVoice`), carry `bodyLength`, and pass a scale into this module -- distances x
+-- scale, times x sqrt(scale), angles untouched. ⚠ With the uguisu as the reference at 1.0 its
+-- behaviour must come out BIT-IDENTICAL, which is the property that makes the change safe to
+-- land before anyone has watched a karasu perch.
 local HOP_PERIOD = 0.62 -- one hop; a small bird's is quick
 local HOP_HEIGHT = 0.05
 -- ⚠ THE HOP NO LONGER MOVES THE BIRD. It used to translate the whole body 0.09 studs each way
