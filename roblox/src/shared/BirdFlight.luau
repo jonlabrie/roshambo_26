@@ -72,11 +72,16 @@ export type Point = { x: number, y: number, z: number }
 
 -- Each held pose is an orbit: radius, height, angular speed. SAFE is the exception -- it is a
 -- fixed perch, because a bird that has landed does not orbit anything.
--- ⚠ RESTING IS A PLACEHOLDER ORBIT, AND IT IS THE NEXT THING TO BUILD. Owner, 2026-08-18: birds
--- circling every head "will look like a bad cartoon where everyone just got knocked on the head".
--- A resting familiar belongs in the WORLD -- perched on a railing, a branch, a roof ridge -- near
--- its owner and ready to react, not orbiting them. Until that exists this is a holding pattern in
--- the most literal sense.
+-- ⚠ THE RESTING ORBIT IS NOW A FALLBACK, NOT A PLACEHOLDER -- corrected 2026-08-28. Owner,
+-- 2026-08-18: birds circling every head "will look like a bad cartoon where everyone just got
+-- knocked on the head", and a resting familiar belongs in the WORLD, perched on a railing or a
+-- branch near its owner. THAT WAS BUILT THE SAME DAY: the controller picks a tagged
+-- `FamiliarPerch` and only falls back to this orbit when none is in range -- which is also what
+-- keeps birds out of buildings, since indoors has no perches.
+--
+-- ⚠ This comment said "the NEXT THING TO BUILD" for ten days after it was built, and on
+-- 2026-08-28 it caused a session to tell the owner that perching did not exist. A note that
+-- describes finished work as pending is not merely untidy: it is read and believed.
 -- ⚠ WIN IS A SHOULDER PERCH AS OF 2026-08-21, AND IT OVERTURNS THE VERTICAL GRAMMAR ABOVE.
 -- Owner, having seen the real mesh in play: "it's really small, almost unreadable as a bird at
 -- all... perch on the player's shoulder, chirp out one of the three songs while hopping back and

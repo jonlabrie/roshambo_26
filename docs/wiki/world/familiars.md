@@ -447,9 +447,20 @@ correct, waiting on selection.
 ⚠ **The familiar sings ONLY on a win, and that is a RULING, not an implementation detail.** It
 protects the falls-dock uguisu's gate — *"this bird lives here and you have to be close to hear
 it"* ([[falls-dock]]). Owner 2026-08-27: birds will eventually be found around the world,
-flying and perching and calling occasionally, which **reverses that premise**. That is an
-ambient-bird system which does not exist — there is no world population, no perching, and the
-dock bird is a Sound emitter with no visible bird at all. Design it before building it.
+flying and perching and calling occasionally, which **reverses that premise**. Design that
+before building it.
+
+⚠ **AND MUCH OF THE MACHINERY ALREADY EXISTS — a claim written here on 2026-08-27 that "there is
+no world population, no perching" was WRONG and is deleted.** It came from grepping for
+"ambient" and from a stale comment in `BirdFlight` calling the resting orbit a placeholder. The
+familiar perches on tagged `FamiliarPerch` attachments swept across railings, hero trees, chōchin
+poles and the descent stair; the orbit is only the fallback for when none is in range. Count them
+with `CollectionService:GetTagged("FamiliarPerch")` rather than trusting a number here.
+
+**What genuinely does not exist** is an OWNERLESS bird: `pickPerch` already takes a position
+rather than an owner, so the seam is narrow, but nothing spawns a bird with no player attached,
+nothing schedules its calls (the dock uguisu's bout pattern on [[falls-dock]] is the proven
+design), and nothing decides how many there are or stops one being mistaken for your familiar.
 
 ## ⚠ THE UGUISU IS DELIBERATELY OVERSIZED — do not "correct" it toward life-size
 

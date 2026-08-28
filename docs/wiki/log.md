@@ -1713,3 +1713,26 @@ built only the piece that is genuinely bounded and serves both futures.
 
 **Still unreachable.** `SPECIES` is hardcoded to Uguisu; nothing selects a bird per player. Same
 shape as the mesh — built, correct, waiting on item 6.
+
+## [2026-08-28] defect | "There is no perching" — a stale code comment was believed and repeated
+
+⚠ **Correcting yesterday's entry above.** The 2026-08-27 ambient-birds note claimed "no world
+population, no perching, and the dock uguisu is a Sound emitter with no visible bird". **The last
+clause is true; "no perching" is false and was told to the owner as fact.**
+
+The familiar perches on tagged `FamiliarPerch` attachments swept across path railings, hero
+trees, chōchin poles, the descent stair and the Rojo builders' output. The resting ORBIT is only
+the fallback for when none is in range — which is also what keeps birds out of buildings, since
+indoors has no perches. Owner numbers from 2026-08-18: a 20-stud search radius, a 10–60s hold,
+a 70-stud leash, and a deliberately random re-pick so it sometimes returns to the perch it just
+left, "which is what a real bird does and what stops the movement reading as a patrol."
+
+**Why it was believed:** `BirdFlight.luau` carried a comment reading *"RESTING IS A PLACEHOLDER
+ORBIT, AND IT IS THE NEXT THING TO BUILD"*. It was true for part of one morning. Perching shipped
+the same day and the comment never caught up — so for ten days a pure module described finished
+work as pending, and a session read it, grepped for the wrong word, and told the owner the feature
+did not exist. ⚠ **This is [[wiki-currency]]'s mechanism operating in CODE COMMENTS rather than
+wiki prose, and nothing lints those.** The wiki's currency checks cannot see a stale `--`.
+
+Corrected in both places, and the owner caught it — from playing the game, which is the only
+instrument that had the right answer.
