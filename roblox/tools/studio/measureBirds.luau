@@ -15,7 +15,13 @@
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local birds = ReplicatedStorage:FindFirstChild("RoshamboBirds")
-assert(birds, "measureBirds: no ReplicatedStorage.RoshamboBirds")
+if not birds then
+    -- Rojo-managed (default.project.json). Absent means the place was saved before the birds
+    -- were declared, or Rojo has never synced into this place since they were added.
+    print("measureBirds: no ReplicatedStorage.RoshamboBirds — connect Rojo and re-sync, or open")
+    print("              a place saved after 2026-08-26. Nothing measured.")
+    return
+end
 
 -- Accept a MeshPart or the Model the 3D Importer wraps it in, exactly as BirdController does.
 local function meshOf(a: Instance?): BasePart?
@@ -91,4 +97,8 @@ for _, n in names do
     end
 end
 
-return table.concat(rows, "\n")
+-- ⚠ PRINT, DO NOT RETURN. The command bar executes the chunk and DISCARDS its return value,
+-- so the first version of this file built the whole table and showed nothing — and the wiki had
+-- been pointed at it as the authority for bird sizes without anyone ever running it. A tool that
+-- produces no output is worse than no tool: it reads as "measured" in a citation.
+print("\n" .. table.concat(rows, "\n") .. "\n")
