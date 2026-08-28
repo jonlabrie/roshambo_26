@@ -263,17 +263,26 @@ KARASU = {
     # nothing about how the bird looks; it only changed what happens NEXT time the head moves.
     # ⚠ These are in FINAL studs, not build coordinates -- they are compared against the
     # normalised mesh, unlike everything else in this dict.
-    # ⚠ THE GLINT IS A BROAD CAP, NOT A DOT, and its size is the whole reason the eye did not
-    # read in play (owner, 2026-08-28: "nothing reads as an eye"). Measured off the reference
-    # photograph, the sky reflection covers about a THIRD of the eyeball across its top; at
-    # catch_r 0.0092 against an eye of 0.024 it was 15% of the area. 0.012, stretched 1.45x in y
-    # by the shader, lands at ~36%. Its BRIGHTNESS was always right -- 3.4x the crown against a
-    # measured 3.08 -- which is why "add a catchlight" looked done and was not.
-    "eye": {"y": 0.560, "x": 0.062, "crown_drop": 0.061, "r": 0.024,
-            "catch_dy": 0.0060, "catch_dz": 0.0095, "catch_r": 0.0120,
-            # The pale ear-covert frame, offset toward the bill and the crown. This is the piece
-            # that was missing entirely rather than mis-sized.
-            "peri_dy": 0.0180, "peri_dz": 0.0140, "peri_r": 0.0624},
+    # ⚠ THE EYE IS MODELLED, AND THAT IS THE THIRD ANSWER AFTER TWO PAINTED ONES FAILED.
+    # Owner, 2026-08-28: a flat dark disc read as nothing; a bigger brighter glint read as
+    # "cataracts and/or possessed"; a hand-repaint of the same map did not satisfy either. The
+    # common failure is that a painted highlight is a BRIGHT SHAPE AT A FIXED PLACE -- it cannot
+    # move with the light or the camera, so it reads as a marking rather than as wetness, and
+    # making it more visible only makes it more obviously a marking. A dome earns its highlight
+    # from the engine instead, and its curvature shades even when nothing is specular.
+    #
+    # Same builder as the uguisu (`bird_familiar._eyes`, two UV spheres) -- "simply, if possible".
+    #
+    # ⚠ BUILD COORDINATES, like everything else in this dict. The painted version carried FINAL
+    # studs as a special case; geometry has to be built before `normalise_size` exists, so the
+    # special case is gone and `landmarks_final` maps the eye out like every other landmark.
+    "eye": {"y": 0.5092, "crown_drop": 0.0729, "r": 0.0287,
+            # ⚠ x IS DERIVED FROM THE SKULL IT SITS IN, never typed. The uguisu learned this the
+            # expensive way: "v2 had it at r=0.026/x=0.106 against a 0.116 half-width head and it
+            # read as a bolt screwed into the side." The centre is sunk below the measured
+            # surface so exactly this fraction of the radius stands proud, which also means the
+            # eye follows any reshape of the head instead of floating off it.
+            "proud": 0.45},
     # ⚠ EVERY STATION BELOW WAS READ OFF `body_profile()`, not chosen. Owner, 2026-08-28, having
     # watched the karasu on a shoulder: "more of an arch on the culmen, and a fatter body,
     # presumably by giving the bird more of a 'belly'". The vendor crow is a lean bird and a
@@ -616,6 +625,45 @@ def reshape_body(spec=KARASU):
     return {"before": before, "after": after, "moved": moved,
             "gape_line_shift": gape_shift, "gape_line_verts": int(near.sum()),
             "d_max_above_gape": round(d_max, 4)}
+
+
+LAST_EYE = None      # (x, y, z, r) in BUILD coords, recorded by build_eyes for landmarks_final
+
+
+def build_eyes(spec=KARASU):
+    """Two spheres, sunk into the skull so a shallow cap stands proud. Same builder as the uguisu.
+
+    ⚠ RUNS AFTER `reshape_body`, so the surface it seats against is the one that ships. The x is
+    RAYCAST off the head rather than typed -- change the forehead or the girth and the eye moves
+    with the skull instead of sinking into it or standing off it.
+
+    ⚠ THEY ARE THEIR OWN OBJECT so `join_all` can give them a UV block, exactly like the tail and
+    the folded wing. Merged straight into the body they would inherit whatever UV bmesh invents
+    -- in practice the atlas origin -- and paint themselves with whatever colour happens to live
+    at texel (0, 0).
+    """
+    global LAST_EYE
+    e = spec["eye"]
+    body = bpy.data.objects.get("KarasuBody") or bpy.data.objects[BODY_OBJ]
+    co = np.array([v.co[:] for v in body.data.vertices])
+    near = np.abs(co[:, 1] - e["y"]) < 0.04
+    if not near.any():
+        raise RuntimeError("no head geometry at the eye station -- check eye.y")
+    z = float(co[near][:, 2].max()) - e["crown_drop"]
+    surf = body_surface_x(e["y"], z, 1.0, body)
+    x = surf - e["r"] * (1.0 - e["proud"])
+    LAST_EYE = (round(x, 5), e["y"], round(z, 5), e["r"])
+
+    me = bpy.data.meshes.new("KarasuEyes")
+    ob = bpy.data.objects.new("KarasuEyes", me)
+    bpy.context.scene.collection.objects.link(ob)
+    bm = bmesh.new()
+    _bf()._eyes(bm, {"eye": {"x": x, "y": e["y"], "z": z, "r": e["r"]}})
+    bm.to_mesh(me)
+    bm.free()
+    return {"centre": LAST_EYE[:3], "r": e["r"], "surface_x": round(surf, 5),
+            "proud_studs": round(e["r"] * e["proud"], 5),
+            "crown": round(z + e["crown_drop"], 5), "tris": len(me.polygons) * 2}
 
 
 def plate_margins(spec=KARASU):
@@ -1355,7 +1403,7 @@ def join_all():
     dv_dst = bm.verts.layers.deform.verify()
 
     added = {}
-    for src_name in ("KarasuTail", "KarasuFolded", FOOT_L, FOOT_R):
+    for src_name in ("KarasuTail", "KarasuFolded", "KarasuEyes", FOOT_L, FOOT_R):
         src = bpy.data.objects.get(src_name)
         if not src:
             continue
@@ -1372,14 +1420,17 @@ def join_all():
     bm.to_mesh(me)
     me.update()
     bm.free()
-    for n in ("KarasuTail", "KarasuFolded", FOOT_L, FOOT_R):
+    for n in ("KarasuTail", "KarasuFolded", "KarasuEyes", FOOT_L, FOOT_R):
         if n in bpy.data.objects:
             bpy.data.objects.remove(bpy.data.objects[n], do_unlink=True)
 
     # UVs for the new faces. The feet arrive with the vendor's own (clean, non-overlapping)
     # unwrap but it sits ON TOP of the body's islands, so they are repacked too.
     # each block now holds BOTH shells stacked, so it is taller than the piece's own aspect
+    # ⚠ THE EYES PROJECT ALONG X, which is the axis they face -- a sphere on the side of a head
+    # unwraps cleanly from the side and degenerately from anywhere else.
     plan = {"KarasuTail": (2, 0.17, 0.19), "KarasuFolded": (0, 0.19, 0.17),
+            "KarasuEyes": (0, 0.07, 0.07),
             FOOT_L: (0, 0.08, 0.10), FOOT_R: (0, 0.08, 0.10)}
     packed = {}
     for name, (lo, hi) in added.items():
@@ -1437,6 +1488,14 @@ def bind(added_ranges):
         # swing with every tail flick, which is not a thing wings do.
         out["folded"] = weight_to_nearest(
             body, verts_of(lo, hi), ["joint1", "joint2", "joint2b", "joint2c"], arm)
+
+    if "KarasuEyes" in added_ranges:
+        lo, hi = added_ranges["KarasuEyes"]
+        # ⚠ THE HEAD BONE, NAMED, NOT NEAREST. The orphan catch-all below would bind these to
+        # whatever bone is closest, and `joint3` (the neck) is a plausible winner on a bird whose
+        # eye sits low on the skull -- which would leave the eyes swimming a fraction behind
+        # every head turn. The head is the only correct answer, so say it.
+        out["eyes"] = weight_to_nearest(body, verts_of(lo, hi), ["joint4"], arm)
 
     # Anything the vendor left unweighted (the shoulder caps, the gape fill) would collapse to
     # the origin the moment a bone moves. Catch it explicitly rather than discovering it in play.
@@ -1540,14 +1599,13 @@ def landmarks_final(spec=KARASU):
     # rest. Its z is a drop from the CROWN at its own station, so a forehead change carries the
     # eye with it instead of leaving it behind -- which is the drift this function did not
     # previously catch, because it did not emit the eye at all.
-    e = spec["eye"]
-    o = bpy.data.objects.get("KarasuBody") or bpy.data.objects[BODY_OBJ]
-    co = np.array([v.co[:] for v in o.data.vertices])
-    near = np.abs(co[:, 1] - e["y"]) < 0.04
-    if not near.any():
-        raise RuntimeError("no head geometry at the eye station -- check eye.y")
-    crown = float(co[near][:, 2].max())
-    eye_z = crown - e["crown_drop"]
+    # ⚠ THE EYE LANDMARK IS THE SPHERE'S OWN CENTRE, mapped out through the same transform. It
+    # is not re-derived and not re-measured: the paint describes the geometry because it IS the
+    # geometry's numbers. Before this the eye was hand-typed, drifted silently when the head
+    # moved, and `landmarks_final` did not emit it at all.
+    if LAST_EYE is None:
+        raise RuntimeError("build_eyes() has not run -- call run() first")
+    ex, ey, ez, er = LAST_EYE
     return {"covert_edge_y": tuple(ys[i] for i in order),
             "covert_edge_z": tuple(zs[i] for i in order),
             "covert_back_y": round(plate[-1][0] * S + T[1] - 0.02, 4),
@@ -1555,11 +1613,8 @@ def landmarks_final(spec=KARASU):
             "gape_p": (0.0, gy, gz),
             "bill_y": round(b["hinge_y"] * S + T[1] - 0.045, 4),
             "tail_root_y": round(spec["tail"]["root_y"] * S + T[1], 4),
-            "eye": (e["x"], e["y"], round(eye_z, 4)), "eye_r": e["r"],
-            "catchlight": (e["x"], round(e["y"] + e["catch_dy"], 4),
-                           round(eye_z + e["catch_dz"], 4)), "catchlight_r": e["catch_r"],
-            "periocular_offset": (e["peri_dy"], e["peri_dz"]), "periocular_r": e["peri_r"],
-            "crown_at_eye": round(crown, 4),
+            "eye": (round(ex * S, 4), round(ey * S + T[1], 4), round(ez * S + T[2], 4)),
+            "eye_r": round(er * S, 4),
             "scale": round(S, 6), "translate": [round(v, 5) for v in T]}
 
 
@@ -1644,6 +1699,7 @@ def run(spec=KARASU, do_export=False):
     # ⚠ ORDER IS LOAD-BEARING -- see reshape_body's docstring. After the wing cut (which needs the
     # measured gap at |x| 0.19), before everything that MEASURES the body it attaches to.
     log["reshape"] = reshape_body(spec)
+    log["eyes"] = build_eyes(spec)          # after the reshape: it seats on the shipped skull
     log["tail"] = build_tail(spec)
     log["folded"] = build_folded_wings(spec)
     log["spread"] = build_spread_wings(spec)

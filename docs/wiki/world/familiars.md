@@ -533,9 +533,40 @@ now an ellipse, wider in y than z because a reflection on a sphere lies along th
 patch, dark socket rim, iris, pupil, glint. The periocular frame was **missing entirely** rather
 than mis-tuned, and on a bird with no other head markings it is what says "there is a face here".
 
-**Modelling it remains the fallback**, not the plan: with 31 texels available the miss was a paint
-bug, and geometry would additionally buy a view-dependent engine specular if paint proves not to
-be enough in play.
+### ⚠ THE EYE IS MODELLED NOW — and the thing that blocks it is an ENGINE constraint, not tuning
+
+Owner rejected the five-layer paint as *"cataracts and/or possessed"*, and their own repaint of the
+same map too: *"we're going to need to model the eye — simply, if possible."*
+
+**Built** (`karasu_retarget.build_eyes`): one UV sphere per eye, the same builder the uguisu uses,
+sunk so a shallow cap stands proud. 192 tris (body 2666 → 2826, +6%), its own UV block, bound
+explicitly to `joint4` — ⚠ **named, not nearest**, because the orphan catch-all would plausibly
+give a low-set eye to the NECK and leave the eyes swimming behind every head turn. ⚠ **x is
+raycast off the skull**, never typed: the uguisu learned that one as *"a bolt screwed into the
+side"*, and it means the eye follows any reshape of the head.
+
+⚠ **BUT A DOME CANNOT EARN A HIGHLIGHT FROM THIS ENGINE.** The bird ships as ONE MeshPart wearing
+ONE plain ColorMap with no SurfaceAppearance ([[material-and-mesh-traps]] §8), so **there is no
+per-texel roughness — the eye cannot be made wet without making the whole bird wet.** Tested
+2026-08-28 at roughness 0.10: the crow came out as glossy black plastic and the eye still did not
+read. **So the highlight must be painted whatever the geometry does**, and "model it and let the
+engine light it" is not available here.
+
+What the dome does buy is that a painted dot now sits on curvature that shades away from it, which
+is the difference between a specular point and a marking. **That is the open question, and it is
+the owner's eye that settles it** — three paint attempts have bracketed it without landing:
+
+| attempt | on | result |
+|---|---|---|
+| flat disc + small dot | flat | *"nothing reads as an eye"* |
+| five layers + broad cap | flat | *"cataracts and/or possessed"* |
+| owner's own repaint | flat | rejected by the owner |
+| dark dome, no glint | **dome** | invisible in preview |
+| dome + pinpoint | **dome** | still too subtle |
+
+**The honest range between invisible and possessed is narrow**, and `catch_frac` (a fraction of the
+eye's radius) is the one dial. ⚠ **Do not reach for the periocular frame again** — it existed to
+compensate for an eye that did not read on its own, and it contributed to the possessed read.
 
 ## Motion scales with the bird — built 2026-08-28
 

@@ -1878,3 +1878,24 @@ dimension was not the one anyone had checked.
 Five layers now: pale ear-covert frame, dark socket rim, iris, pupil, broad elliptical glint. The
 frame was missing entirely rather than mis-tuned. Baked and exported; awaiting the owner's look.
 Modelling the eye stays the fallback if paint proves insufficient in play ([[familiars]]).
+
+## [2026-08-28] defect | The karasu's eye is modelled — and gloss turns out to be unavailable
+
+Owner rejected the five-layer paint as "cataracts and/or possessed", and their own repaint of the
+same map too: "we're going to need to model the eye - simply, if possible."
+
+**Built.** `build_eyes` makes one UV sphere per eye with the uguisu's own builder, sunk so a
+shallow cap stands proud. 192 tris (+6%), its own UV block, x RAYCAST off the skull rather than
+typed, bound explicitly to `joint4` — named rather than nearest, because the orphan catch-all
+would plausibly hand a low-set eye to the neck and leave the eyes swimming behind every head turn.
+Zero orphans, rig verification unchanged.
+
+⚠ **AND THE PLAN IT WAS BUILT FOR DOES NOT WORK.** "Model it and let the engine light it" assumed
+a dome earns a specular highlight. It cannot here: the bird is ONE MeshPart with ONE plain
+ColorMap and no SurfaceAppearance, so there is no per-texel roughness — **the eye cannot be made
+wet without making the whole bird wet.** Tested at roughness 0.10: glossy black plastic crow, and
+the eye still did not read. The highlight has to be painted whatever the geometry does.
+
+What the dome buys is that a painted dot sits on curvature that shades away from it — a specular
+point rather than a marking. Five attempts have now bracketed the range without landing it, and
+the useful next input is the owner's eye, not another guess ([[familiars]]).
