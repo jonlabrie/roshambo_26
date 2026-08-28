@@ -1986,3 +1986,37 @@ because it measured `norm()` — a magnitude, which cannot tell opening from clo
 
 A modelled mouth cavity is the remaining work, and it is the same conclusion the bill profile
 reached independently: this bill wants LOFTING from station data, not displacement ([[familiars]]).
+
+## [2026-08-28] ship | The karasu's bill is LOFTED; split_bill retired and the jaw finally opens
+
+The vendor bill was never a bill. Measured by clustering its own vertex rings: 18 rings, only SIX
+with enough vertices to describe a cross-section, and past y 0.746 it is five vertices tapering to
+nothing. Every attempt to reshape it failed because there was no shape there to refine.
+
+Rebuilt from station data, the way the tail, the folded wing and the eye lids already are. Two
+mandibles, each a CLOSED profile -- out from the midline ridge, round the flank to the tomium,
+then back across the palate to the other side -- so each is watertight on its own and the mouth
+cavity is lofted rather than capped afterwards. 724 tris each.
+
+⚠ **This deletes the whole failure class.** `split_bill` is retired: no plane, no bisect, no
+hole-fill. The mouth line is the authored tomium loop, so it follows the bill's curve instead of
+being a plane intersected with it; and there is no shared boundary to cap, so the membrane that
+welded the jaw shut cannot exist. Measured: faces bridging the joint 13 -> **0**, jaw 30 verts ->
+364, swing at 35 degrees 0.058 -> 0.122 studs and now DOWNWARD.
+
+`bill_lower` pivots on the loft's own tomium base rather than a typed `hinge_y` -- the value that
+had the old jaw hinging a third of the way along its own bill, on a lever too short to see.
+
+Owner-gated shape, in order: hold depth then round (55% of base depth at three-quarters, checked
+against the table rather than claimed); base thinner than mid-bill; culmen arch cut from 0.027 to
+0.010; base moved back so the join buries under the feathering.
+
+⚠ **The loft IS the head transition.** The head's section at every candidate cut is BIGGER than
+the thin bill the owner asked for -- at y 0.596 the head runs z 0.943..1.028 against a bill of
+0.915..1.009 -- so rather than bridge two mismatched loops, the first stations match the head's
+own section and narrow to bill size within the buried span.
+
+⚠ Four sign errors in one session, all invisible until something moved: the jaw's rotation
+direction, the lower mandible's column roles, the palate's direction, and a `norm()` that reports
+the same magnitude whether a jaw opens or closes into the skull. Geometric assertions caught the
+last two before a render did.

@@ -742,6 +742,208 @@ def measure_gape_plane(spec=KARASU):
             "residual_max": round(float(np.max(np.abs(np.array(zs) - (a * np.array(ys) + c)))), 4)}
 
 
+# ---------------------------------------------------------------------------------------
+# THE BILL, LOFTED
+# ---------------------------------------------------------------------------------------
+# ⚠ THE VENDOR BILL IS NOT A BILL, IT IS A SPIKE, and that is why every attempt to reshape it
+# failed. Measured by clustering its own vertex rings: 18 rings over the whole bill and only SIX
+# with enough vertices to describe a cross-section. By y 0.746 it is five vertices and 0.020
+# deep; by y 0.809 it is three vertices and ZERO depth. There was never a shape there to refine.
+#
+# So it is rebuilt from station data, the way the tail, the folded wing and the eye lids already
+# are. That buys three things at once, and the third is the one that matters most:
+#   * a profile we choose, instead of a taper that collapses to a point
+#   * the tomium as an AUTHORED EDGE LOOP -- which means the mouth line is geometry rather than a
+#     plane intersected with geometry, so it can follow the bill's curve
+#   * NO BISECT AND NO HOLE FILL. Two shells built separately are already two surfaces; there is
+#     nothing to cut apart and nothing to cap, so the membrane that welded the jaw shut cannot
+#     exist. See the note on `split_bill`.
+#
+# Owner ruling 2026-08-28: replace the whole bill, starting at y 0.587 -- the 57-vertex ring where
+# the bill meets the feathering, which is dense enough to bridge onto cleanly -- and keep the
+# vendor's overall length.
+BILL_LOFT = {
+    # ⚠ THE LOFT STARTS BEHIND WHERE THE HEAD IS CUT, so its base ring is BURIED. Owner approved
+    # moving it back: on the real bird the nasal bristles and feathering encroach over the first
+    # fifth of the bill, so the join does not have to be perfect -- it has to be hidden. The
+    # alternative was matching a 0.036 bill onto a 0.044 head ring exactly, in view.
+    # ⚠ THE LOFT IS THE TRANSITION. Measured, the head's cross-section at every candidate cut is
+    # BIGGER than the thin bill the owner asked for -- at y 0.596 the head runs z 0.943..1.028
+    # against a bill of 0.915..1.009, so its forehead stands proud of the bill and a capped hole
+    # would show as a collar. Rather than bridge two mismatched loops, the first stations MATCH
+    # THE HEAD and narrow to the bill within the buried span; by the time the loft emerges at
+    # `head_cut_y` it is already bill-sized.
+    "base_y": 0.555,
+    "head_cut_y": 0.578,
+    "tip_y": 0.8188,
+    "segments": 7,          # per side, from the midline round to the tomium
+    # ⚠ HOW DEEP THE MOUTH IS, as a fraction of the mandible's own depth at each station. The
+    # profile is CLOSED -- outer surface out to the tomium, then back along the palate (or the
+    # floor) to the other side -- so each mandible is a solid from the moment it is lofted.
+    # Nothing has to be capped afterwards, which is exactly where the old bill grew its membrane.
+    "palate": 0.35,
+    # (t, culmen_z, tomium_z, gonys_z, half_width). t is 0 at the base, 1 at the tip.
+    # ⚠ THE FIRST STATION IS MEASURED off the vendor's own base ring so the bridge onto the head
+    # has nothing to reconcile. Everything forward of it is AUTHORED: the vendor data there is
+    # 1-5 vertices per ring and describes a spike, not a crow.
+    # ⚠ THE TAPER HOLDS DEPTH AND THEN ROUNDS, which is the whole point -- a hashibutogarasu is
+    # deep almost to the point. The vendor's own depth ran 0.158 -> 0.096 -> 0.058 -> 0.020 -> 0,
+    # collapsing from the base; this holds ~60% of base depth to t 0.75.
+    # ⚠ DEPTH IS HELD BY THE CULMEN STAYING HIGH, NOT BY THE TOMIUM DROPPING. The mouth line is
+    # fixed -- it follows the vendor's authored crease, which RISES along the bill -- so the only
+    # way to keep a deep bill is a culmen that stays up and then falls late. That IS the arched
+    # corvid culmen. A first pass ran the culmen down evenly and gave depths of 0.095 / 0.062 /
+    # 0.036 / 0.019 / 0.010: the same collapse as the vendor spike, under a comment claiming it
+    # held 60% of base depth. Measure the table, do not trust the note.
+    #
+    # ⚠ AND THE BASE STATION IS NOT THE VENDOR'S BASE RING. That ring has 57 vertices because it
+    # is the whole HEAD cross-section at y 0.587 -- its top is the forehead and its bottom is the
+    # throat, spanning 0.158. Taking it literally made the bill deeper at the join than anywhere
+    # else and left the culmen still CLIMBING as it ran back into the feathering. Owner: on the
+    # real bird the culmen "almost appears to be dropping as it meets the head - or is at least
+    # level". So the culmen peaks about a third along and eases DOWN into the base, which is what
+    # an arched corvid culmen does, and the base is the thinnest part of the bill rather than the
+    # thickest.
+    #
+    # ⚠ THE ARCH IS SUBTLE. A first pass raised the culmen 0.027 above its base and the owner
+    # called it too much; this rises 0.010, which reads as a crow rather than a parrot. The bill
+    # is now close to CONSTANT depth for two thirds of its length and then rounds -- which is what
+    # the reference actually shows, more than a pronounced bow.
+    #        t   culmen   tomium   half_w      depth   note
+    "upper": [
+        (0.00, 1.0503, 0.9556, 0.0437),   # 0.0947   the HEAD's section -- buried
+        (0.09, 1.0300, 0.9570, 0.0432),   # 0.0730   at the head cut
+        (0.18, 1.0170, 0.9620, 0.0405),   # 0.0550   bill-sized as it emerges
+        (0.35, 1.0160, 0.9700, 0.0370),   # 0.0460
+        (0.60, 1.0150, 0.9700, 0.0320),   # 0.0450
+        (0.75, 1.0100, 0.9670, 0.0270),   # 0.0430
+        (0.88, 0.9960, 0.9620, 0.0190),   # 0.0340
+        (1.00, 0.9560, 0.9530, 0.0035),   # 0.0030   rounded, not pointed
+    ],
+    #        t   gonys    tomium   half_w      depth
+    "lower": [
+        (0.00, 0.8924, 0.9556, 0.0437),   # 0.0632   the HEAD's section -- buried
+        (0.09, 0.9020, 0.9570, 0.0432),   # 0.0550   at the head cut
+        (0.18, 0.9120, 0.9620, 0.0405),   # 0.0500   bill-sized as it emerges
+        (0.35, 0.9200, 0.9700, 0.0370),   # 0.0500
+        (0.60, 0.9280, 0.9700, 0.0320),   # 0.0420
+        (0.75, 0.9380, 0.9670, 0.0270),   # 0.0290
+        (0.92, 0.9520, 0.9600, 0.0150),   # 0.0080
+    ],
+    "lower_end": 0.92,
+    # ⚠ COLUMNS ARE (t, MIDLINE_z, WIDEST_z, half_width) IN BOTH TABLES, and the two mandibles
+    # put different features in those roles. The upper's midline is the CULMEN ridge and its
+    # widest point is the tomium. The lower is the other way up: its midline is the GONYS keel
+    # and its widest point is the tomium. Writing the lower as (tomium, gonys) built it inside
+    # out -- a shell sweeping from the mouth line at the centre to the keel at the flanks, which
+    # rendered as a flat fin.
+}
+
+
+def build_bill(spec=KARASU, loft=BILL_LOFT):
+    """The bill's two outer shells, lofted from station data. No cavity yet, no integration.
+
+    ⚠ EACH SHELL IS ITS OWN SURFACE FROM THE START. The upper runs from the culmen ridge on the
+    midline, round the flank, to the tomium; the lower from the tomium down to the gonys. They
+    meet along the tomium and share nothing -- which is what makes the mouth line real geometry
+    and removes the need to bisect anything.
+    """
+    n = int(loft["segments"])
+    y0, y1 = loft["base_y"], loft["tip_y"]
+
+    def shell(table, t_end, name, inward):
+        """One mandible, as a CLOSED tube.
+
+        ⚠ THE PROFILE CLOSES ON ITSELF: out from the midline ridge, round the flank to the
+        tomium, then back across the mouth's own surface to the other tomium. A first version
+        lofted only the outer half and left two open half-tubes, which then needed capping --
+        and capping across a shared boundary is precisely how the vendor bill grew the membrane
+        that welded its jaw shut. A closed profile has no boundary to cap.
+        """
+        me = bpy.data.meshes.new(name)
+        ob = bpy.data.objects.new(name, me)
+        bpy.context.scene.collection.objects.link(ob)
+        bm = bmesh.new()
+        loops = []
+        ts = [r[0] for r in table]
+        steps = 12
+        for k in range(steps + 1):
+            t = t_end * k / steps
+            ridge = float(np.interp(t, ts, [r[1] for r in table]))
+            edge = float(np.interp(t, ts, [r[2] for r in table]))
+            hw = float(np.interp(t, ts, [r[3] for r in table]))
+            y = y0 + (y1 - y0) * t
+            # ⚠ TOWARD THE RIDGE, NOT AWAY FROM IT. Written as `(edge - ridge)` the palate sinks
+            # BELOW the tomium and the floor rises ABOVE it -- both bulging into the gap between
+            # the mandibles instead of hollowing into their own. It reads as a convex lump where
+            # a mouth should be concave, and it is invisible until the beak opens.
+            mouth = (ridge - edge) * loft["palate"]      # signed: INTO the mandible
+            ring = []
+            # outer: left tomium -> midline ridge -> right tomium
+            for side in (-1.0, 1.0):
+                rng = range(n, 0, -1) if side < 0 else range(0, n + 1)
+                for i in rng:
+                    a = math.pi * 0.5 * i / n
+                    ring.append(bm.verts.new((side * hw * math.sin(a), y,
+                                              ridge + (edge - ridge) * (1.0 - math.cos(a)))))
+            # inner: back across the mouth, right tomium -> left tomium, domed by `palate`
+            for i in range(n - 1, 0, -1):
+                u = i / n
+                ring.append(bm.verts.new((hw * u, y, edge + mouth * (1.0 - u * u))))
+            for i in range(0, n):
+                u = i / n
+                ring.append(bm.verts.new((-hw * u, y, edge + mouth * (1.0 - u * u))))
+            loops.append(ring)
+        bm.verts.ensure_lookup_table()
+        m = len(loops[0])
+        for a_, b_ in zip(loops[:-1], loops[1:]):
+            for i in range(m):
+                j = (i + 1) % m          # ⚠ closed profile, so the ring DOES wrap
+                quad = (a_[i], a_[j], b_[j], b_[i])
+                bm.faces.new(quad[::-1] if inward else quad)
+        # cap the base; the tip closes on itself as hw -> 0
+        bmesh.ops.holes_fill(bm, edges=[e for e in bm.edges if e.is_boundary], sides=0)
+        bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
+        bm.to_mesh(me)
+        bm.free()
+        for poly in me.polygons:
+            poly.use_smooth = True
+        return ob, len(me.vertices), sum(len(p_.vertices) - 2 for p_ in me.polygons)
+
+    # ⚠ THE VENDOR BILL GOES. It is 18 rings of which six carry a usable cross-section, and past
+    # y 0.746 it is five vertices tapering to nothing -- there is no shape there to keep. The head
+    # is cut at `head_cut_y` and capped; the cap is buried inside the loft, whose first stations
+    # match the head's own section precisely so nothing shows.
+    body = bpy.data.objects.get("KarasuBody") or bpy.data.objects[BODY_OBJ]
+    bmh = bmesh.new()
+    bmh.from_mesh(body.data)
+    bmh.verts.ensure_lookup_table()
+    doomed = [v for v in bmh.verts if v.co.y > loft["head_cut_y"]]
+    bmesh.ops.delete(bmh, geom=doomed, context='VERTS')
+    bmh.edges.ensure_lookup_table()
+    holes = [e for e in bmh.edges if e.is_boundary]
+    if holes:
+        bmesh.ops.holes_fill(bmh, edges=holes, sides=0)
+    bmesh.ops.recalc_face_normals(bmh, faces=bmh.faces[:])
+    removed = len(doomed)
+    bmh.to_mesh(body.data)
+    body.data.update()
+    bmh.free()
+
+    for nm in ("BillUpper", "BillLower"):
+        if nm in bpy.data.objects:
+            bpy.data.objects.remove(bpy.data.objects[nm], do_unlink=True)
+    _, uv, ut = shell(loft["upper"], 1.0, "BillUpper", False)
+    _, lv, lt = shell(loft["lower"], loft["lower_end"], "BillLower", True)
+    # each mandible rides its own bone; the upper is head, the lower is the jaw
+    for nm, bone in (("BillUpper", "joint4"), ("BillLower", "bill_lower")):
+        ob = bpy.data.objects[nm]
+        grp = ob.vertex_groups.new(name=bone)
+        grp.add([v.index for v in ob.data.vertices], 1.0, 'REPLACE')
+    return {"upper": {"verts": uv, "tris": ut}, "lower": {"verts": lv, "tris": lt},
+            "base_y": y0, "tip_y": y1, "segments": n, "vendor_verts_removed": removed}
+
+
 def eye_site(spec=KARASU):
     """WHERE the eye goes. Measures only -- it builds no geometry at all, and that is the point.
 
@@ -1797,9 +1999,14 @@ def rebuild_rig(spec=KARASU):
             r.align_roll(Vector((0.0, 0.0, 1.0)))
             made["wing_" + sfx] = list(w.head) + list(w.tail)
         b = spec["bill"]
+        # ⚠ THE PIVOT COMES FROM THE LOFT, NOT FROM A TYPED HINGE. `hinge_y` described where a
+        # plane was told to start cutting; the jaw actually hinges at the commissure, which is
+        # now the base of the authored tomium. Reading it from BILL_LOFT means the bone cannot
+        # drift away from the mouth it opens -- the exact failure that left the old jaw pivoting
+        # a third of the way along its own bill, on a lever too short to see.
         j = ebs.new("bill_lower")
-        j.head = Vector((0.0, b["hinge_y"], b["gape_p"][2]))
-        j.tail = Vector((0.0, b["tip_y"], b["gape_p"][2] - 0.011))
+        j.head = Vector((0.0, BILL_LOFT["base_y"], BILL_LOFT["lower"][0][2]))
+        j.tail = Vector((0.0, BILL_LOFT["tip_y"], BILL_LOFT["lower"][-1][2]))
         j.parent = ebs["joint4"]
         j.use_connect = False
         j.align_roll(Vector((0.0, 0.0, 1.0)))
@@ -1862,7 +2069,8 @@ def join_all():
     dv_dst = bm.verts.layers.deform.verify()
 
     added = {}
-    for src_name in ("KarasuTail", "KarasuFolded", "KarasuLids", FOOT_L, FOOT_R):
+    for src_name in ("KarasuTail", "KarasuFolded", "KarasuLids", "BillUpper", "BillLower",
+                     FOOT_L, FOOT_R):
         src = bpy.data.objects.get(src_name)
         if not src:
             continue
@@ -1879,7 +2087,8 @@ def join_all():
     bm.to_mesh(me)
     me.update()
     bm.free()
-    for n in ("KarasuTail", "KarasuFolded", "KarasuLids", FOOT_L, FOOT_R):
+    for n in ("KarasuTail", "KarasuFolded", "KarasuLids", "BillUpper", "BillLower",
+              FOOT_L, FOOT_R):
         if n in bpy.data.objects:
             bpy.data.objects.remove(bpy.data.objects[n], do_unlink=True)
 
@@ -1890,6 +2099,8 @@ def join_all():
     # cleanly from the side and degenerately from anywhere else.
     plan = {"KarasuTail": (2, 0.17, 0.19), "KarasuFolded": (0, 0.19, 0.17),
             "KarasuLids": (0, 0.09, 0.07),
+            # the mandibles are seen side-on, so they unwrap from X like the folded wing
+            "BillUpper": (0, 0.16, 0.11), "BillLower": (0, 0.16, 0.11),
             FOOT_L: (0, 0.08, 0.10), FOOT_R: (0, 0.08, 0.10)}
     packed = {}
     for name, (lo, hi) in added.items():
@@ -2168,10 +2379,17 @@ def run(spec=KARASU, do_export=False):
     # dropping the displacement takes 224 triangles with it.
     log["lid_collar"] = build_lid_collar(spec)
     log["eye_mesh"] = build_eye_mesh(spec)
+    # ⚠ AFTER the eyes (which measure the skull) and BEFORE the tail and folded wing (which
+    # measure the body); the bill touches neither.
+    log["bill_loft"] = build_bill(spec)
     log["tail"] = build_tail(spec)
     log["folded"] = build_folded_wings(spec)
     log["spread"] = build_spread_wings(spec)
-    log["bill"] = split_bill(spec)
+    # ⚠ `split_bill` IS RETIRED. There is nothing left to split: `build_bill` lofts the two
+    # mandibles as separate closed solids, so the mouth line is authored geometry rather than a
+    # plane intersected with a mesh. That removes the whole failure class it carried -- a typed
+    # plane drifting off the anatomy, and a hole-fill welding the jaw shut with a membrane that
+    # every watertightness check happily passed.
     log["feet"] = simplify_feet(spec)
     log["rig"] = rebuild_rig(spec)
     j = join_all()
