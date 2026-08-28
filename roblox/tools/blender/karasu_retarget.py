@@ -26,9 +26,13 @@
 #   * a jaw. There is no bill_lower bone and the bill is one closed shell; it is split here.
 #
 # UNITS ARE STUDS, 1 stud ~ 1 foot. Built at FINAL size — 1.64 studs nose to tail, a life-size
-# hashibutogarasu (~50cm), owner-chosen 2026-08-26. ⚠ The uguisu was exported at 0.828 and
-# rescaled to 0.552 inside Studio, which is why its recorded numbers never quite agree with each
-# other. This one is 1:1: import it and do not rescale.
+# hashibutogarasu (~50cm), owner-chosen 2026-08-26. This one is 1:1: import it and do not rescale.
+#
+# ⚠ THIS COMMENT USED TO SAY the uguisu "was exported at 0.828 and rescaled to 0.552 inside
+# Studio". IT WAS NOT. Measured in the live place 2026-08-27 via the Studio MCP: UguisuBody is
+# 0.828 studs and BirdController does no rescaling at all. 0.552 was a figure the wiki also
+# carried and it was wrong in both places — an invented number that propagated between records
+# because neither was ever checked against the artifact. Run tools/studio/measureBirds.luau.
 #
 # AXES, working frame: +Y forward (the bird faces +Y), +Z up, +X the bird's right, feet at z = 0,
 # geometry centred in x and y. Export rotates 180 degrees about Z so the model faces -Y, which is

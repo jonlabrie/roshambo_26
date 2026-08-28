@@ -414,6 +414,29 @@ trap is a third thing to correct when the trap is corrected.
 Run `roblox/tools/studio/measureBirds.luau` for the roster's actual sizes, bone counts and asset
 ids rather than reading them here.
 
+## ⚠ THE UGUISU IS DELIBERATELY OVERSIZED — do not "correct" it toward life-size
+
+Owner ruling 2026-08-27, after watching the karasu fly and asking whether it was too small.
+Measured in the live place rather than guessed: **the karasu is life-size and the uguisu is not.**
+A hashibutogarasu is ~50-59cm and the karasu is at the bottom of that range; a Japanese bush
+warbler is ~15-16cm and the uguisu is roughly 65% over it. So the pair reads at about 2x when
+nature is about 3.2x.
+
+**The crow is correct. Leave it.** ⚠ **And leave the warbler too** — owner: *"I deliberately
+chose to upscale it because it was hard to see; we might revisit that decision in the future."*
+A future session that measures this pair will find the uguisu oversized and be tempted to fix it.
+**That is the fix to NOT make.** Legibility at arena distance beat realism, on purpose.
+
+Note the legibility complaint on record — *"a 7-inch bird cannot carry status at arena
+distance"* — was made about a bird SMALLER than what shipped: seven inches is ~0.55 studs, and
+the uguisu ships larger than that. The bird you have is already the answer to that objection.
+
+⚠ **unverified, worth a look if sizes are ever revisited:** the karasu's body is life-size but its
+wingspan measured ~75% of life (about 1.5x body length where a real crow is ~2.0x). Crows read as
+long-winged in flight, so short wings may be part of why it does not feel big. Taken from a
+bounding box on a rest pose, so confirm before acting on it.
+
+
 **Import verified 2026-08-26.** No `SurfaceAppearance` was created (the trap in step 2 did not
 fire); `TextureID` came through as `rbxassetid://129407256075817` on both parts; `HasSkinnedMesh`
 true; 15 bones on the body and 5 on the wings, sharing `joint1`, for the 19 claimed. All seven

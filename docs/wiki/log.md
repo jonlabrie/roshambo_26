@@ -1643,3 +1643,37 @@ the intended one**: their guest points and streaks are orphaned, exactly as on 2
 
 The same deployment carried `CLAIM_LIMIT`, so the live service now also refuses a fourth
 `claim-device` on one connection.
+
+## [2026-08-27] decision | The karasu is life-size, the uguisu is deliberately not — measured, not argued
+
+Owner, watching the karasu fly: *"I'm wondering if it's too small — certainly smaller than
+reality, but not that much bigger than the uguisu?"* Measured in the live place via the Studio
+MCP rather than reasoned about:
+
+| | shipped | real | verdict |
+|---|---|---|---|
+| uguisu | 9.9 in | ~6 in | **~65% oversized** |
+| karasu | 19.7 in | 19.7-23 in | **life-size** |
+| ratio | **1.98x** | ~3.2x | |
+
+**The eye was right and the obvious fix was wrong.** Growing the crow would have broken the
+life-size decision made the previous day AND left the warbler inflated. ⚠ **Owner ruling: leave
+both** — *"I deliberately chose to upscale it because it was hard to see."* Recorded on
+[[owner-rulings]] because a future session will measure this pair, find the uguisu oversized, and
+be tempted to correct it. That is the fix to NOT make.
+
+⚠ **Two of our own records were wrong, and they disagreed with each other.**
+`karasu_retarget.py` claimed the uguisu "was exported at 0.828 and rescaled to 0.552 inside
+Studio"; `measureBirds.luau` said it ships at 0.828 with nothing rescaling it. The second was
+right — `BirdController` performs no rescale. **0.552 was an invented number that propagated
+between two records because neither was ever checked against the artifact**, which is the exact
+failure schema rule 9 exists for, appearing again in the same file that documents it.
+
+⚠ **AND `measureBirds.luau` DID NOT WORK.** It ended in `return table.concat(rows, "\\n")`, and
+the Studio command bar discards a chunk's return value — so it printed nothing, and had never
+been run by anyone. **[[familiars]] had been pointed at it as the authority for bird sizes on
+the strength of it existing.** A citation to a silent tool still reads as "measured". Fixed to
+print; found only because the owner tried to use it.
+
+Also noted ⚠ unverified: the karasu's wingspan measures ~75% of life while its body is 100%
+(~1.5x body length against a real crow's ~2.0x), which may be why it reads small.

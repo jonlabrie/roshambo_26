@@ -33,6 +33,14 @@ re-litigate them without new instructions.
   junctions, tight squeezes are character, not defects to sanitize. See
   [[misc-engine-traps]].
 
+- **The uguisu is DELIBERATELY oversized; do not correct it toward life-size** (2026-08-27).
+  Measured, it is ~65% over a real bush warbler while the karasu is life-size, so the pair reads
+  at ~2x where nature is ~3.2x. Owner: *"I deliberately chose to upscale it because it was hard
+  to see; we might revisit that decision in the future."*
+  **Why:** legibility at arena distance beat realism, on purpose.
+  **How to apply:** a future session WILL measure this and be tempted to fix it — do not. Size
+  the next bird against reality, not against the uguisu. See [[familiars]].
+
 ## Priorities
 
 - **Polish-where-visible beats tutorialization** — the F&F bar: a harsh-critic
