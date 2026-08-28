@@ -533,40 +533,50 @@ now an ellipse, wider in y than z because a reflection on a sphere lies along th
 patch, dark socket rim, iris, pupil, glint. The periocular frame was **missing entirely** rather
 than mis-tuned, and on a bird with no other head markings it is what says "there is a face here".
 
-### ⚠ THE EYE IS MODELLED NOW — and the thing that blocks it is an ENGINE constraint, not tuning
+### ⚠ THE EYE IS A SEPARATE PART, because gloss cannot be localised on this bird
 
-Owner rejected the five-layer paint as *"cataracts and/or possessed"*, and their own repaint of the
-same map too: *"we're going to need to model the eye — simply, if possible."*
+Owner rejected three painted eyes — *"nothing reads as an eye"*, then *"cataracts and/or
+possessed"*, then their own repaint of the same map — and asked the question that broke the
+deadlock: *"wouldn't you put a separate sphere in that space and give it a material like an
+eyeball?"*
 
-**Built** (`karasu_retarget.build_eyes`): one UV sphere per eye, the same builder the uguisu uses,
-sunk so a shallow cap stands proud. 192 tris (body 2666 → 2826, +6%), its own UV block, bound
-explicitly to `joint4` — ⚠ **named, not nearest**, because the orphan catch-all would plausibly
-give a low-set eye to the NECK and leave the eyes swimming behind every head turn. ⚠ **x is
-raycast off the skull**, never typed: the uguisu learned that one as *"a bolt screwed into the
-side"*, and it means the eye follows any reshape of the head.
+⚠ **A SESSION HAD ASSERTED THE OPPOSITE AND IT WAS WRONG.** The claim was that the highlight must
+be painted because the bird is one MeshPart. **The wings have always been a separate part**,
+CFramed onto the body every frame — the architecture already had the pattern, and the constraint
+was self-imposed.
 
-⚠ **BUT A DOME CANNOT EARN A HIGHLIGHT FROM THIS ENGINE.** The bird ships as ONE MeshPart wearing
-ONE plain ColorMap with no SurfaceAppearance ([[material-and-mesh-traps]] §8), so **there is no
-per-texel roughness — the eye cannot be made wet without making the whole bird wet.** Tested
-2026-08-28 at roughness 0.10: the crow came out as glossy black plastic and the eye still did not
-read. **So the highlight must be painted whatever the geometry does**, and "model it and let the
-engine light it" is not available here.
+**The real constraint, measured:** one MeshPart, one plain ColorMap, no SurfaceAppearance
+([[material-and-mesh-traps]] §8) means **no per-texel roughness** — an eye painted or modelled
+INTO the body cannot be wet unless the whole bird is wet. Tested at roughness 0.10: a glossy black
+plastic crow, and the eye still did not read.
 
-What the dome does buy is that a painted dot now sits on curvature that shades away from it, which
-is the difference between a specular point and a marking. **That is the open question, and it is
-the owner's eye that settles it** — three paint attempts have bracketed it without landing:
+⚠ **AND THAT IS WHY ALL THREE PAINTED ATTEMPTS FAILED FOR ONE REASON.** A painted highlight is a
+bright shape at a **fixed place**. It cannot move with the light or the camera, so it reads as a
+**marking** rather than as wetness — and every attempt to make it more visible only made it more
+obviously a marking. **That failure mode has no tuning fix**, which is why the colours being
+sampled off a photograph never helped.
 
-| attempt | on | result |
-|---|---|---|
-| flat disc + small dot | flat | *"nothing reads as an eye"* |
-| five layers + broad cap | flat | *"cataracts and/or possessed"* |
-| owner's own repaint | flat | rejected by the owner |
-| dark dome, no glint | **dome** | invisible in preview |
-| dome + pinpoint | **dome** | still too subtle |
+**As built:** two `Part`s per bird, `Shape = Ball`, their own `Material` / `Color` / `Reflectance`.
 
-**The honest range between invisible and possessed is narrow**, and `catch_frac` (a fraction of the
-eye's radius) is the one dial. ⚠ **Do not reach for the periocular frame again** — it existed to
-compensate for an eye that did not read on its own, and it contributed to the possessed read.
+⚠ **THE POSITION LIVES IN THE ASSET, NOT IN LUAU.** `rebuild_rig` puts `eye_R` / `eye_L` bones at
+the measured eye site, **parented to the head**, and the controller reads
+`Bone.TransformedWorldCFrame` — verified to track the driven Transform exactly (40° for a 40° yaw,
+0.25 studs for a 0.25 offset). So the eyes follow every head turn and check with no extra code,
+and nothing about where they go is transcribed. ⚠ The bone's **length** does NOT survive import —
+a Roblox `Bone` is an Attachment, a point with an orientation — so the radius is the one eye
+number that has to live on [[familiars]]' species record, with the Blender constant named as its
+source.
+
+⚠ **THE UGUISU HAS NO EYE ENTRY AND MUST NOT GET ONE.** It carries eye GEOMETRY baked into its
+body from `bird_familiar._eyes`. A nil eye means *"this species handles its own"*; giving it a
+record would float a second pair on bones its rig does not have.
+
+**`reflectance` is the one dial**, and it is tuneable in Studio without a Blender round trip —
+which is most of the point of moving the eye out of the texture. ⚠ **Do not paint an eye back
+into the ColorMap**: it would sit still beside the moving specular and give the bird two
+highlights, one obviously fake. The texture now draws only the dark **socket** the ball sits in,
+and a socket is *darker* than what surrounds it — the opposite of the pale ring the failed
+versions kept reaching for.
 
 ## Motion scales with the bird — built 2026-08-28
 

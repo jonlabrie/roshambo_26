@@ -630,17 +630,29 @@ def reshape_body(spec=KARASU):
 LAST_EYE = None      # (x, y, z, r) in BUILD coords, recorded by build_eyes for landmarks_final
 
 
-def build_eyes(spec=KARASU):
-    """Two spheres, sunk into the skull so a shallow cap stands proud. Same builder as the uguisu.
+def eye_site(spec=KARASU):
+    """WHERE the eye goes. Measures only -- it builds no geometry at all, and that is the point.
 
-    ⚠ RUNS AFTER `reshape_body`, so the surface it seats against is the one that ships. The x is
-    RAYCAST off the head rather than typed -- change the forehead or the girth and the eye moves
-    with the skull instead of sinking into it or standing off it.
+    ⚠ THE EYE IS A SEPARATE ROBLOX PART, NOT MESH IN THIS BODY, and the reason is a constraint
+    this file cannot fix. The bird ships as one MeshPart wearing one plain ColorMap with no
+    SurfaceAppearance, so there is no per-texel roughness: an eye modelled INTO the body cannot be
+    wet unless the whole bird is wet (tested at roughness 0.10 -- a glossy black plastic crow, and
+    the eye still did not read). A separate part carries its own Material, Color and Reflectance,
+    which is the only way to get a highlight that MOVES with the camera. A painted one cannot,
+    which is why three painted attempts read as markings rather than as wetness.
+    Owner, 2026-08-28: "wouldn't you put a separate sphere in that space and give it a material
+    like an eyeball?" -- and the precedent was already here: `KarasuWings` is a separate part that
+    `BirdController` CFrames onto the body every frame.
 
-    ⚠ THEY ARE THEIR OWN OBJECT so `join_all` can give them a UV block, exactly like the tail and
-    the folded wing. Merged straight into the body they would inherit whatever UV bmesh invents
-    -- in practice the atlas origin -- and paint themselves with whatever colour happens to live
-    at texel (0, 0).
+    ⚠ SO THIS SHIPS A BONE, NOT A MESH. `rebuild_rig` puts `eye_R`/`eye_L` at these coordinates,
+    parented to the head, and the controller reads `Bone.TransformedWorldCFrame` to place a ball
+    there. The POSITION therefore travels inside the asset and is never transcribed into Luau --
+    and because the bone is a child of the head, the eyes follow every head turn for free.
+
+    ⚠ RUNS AFTER `reshape_body`, so it seats against the skull that ships, and x is RAYCAST off
+    that skull rather than typed. Change the forehead or the girth and the eye moves with the
+    head instead of sinking into it or standing off it -- the uguisu learned the typed version as
+    "a bolt screwed into the side".
     """
     global LAST_EYE
     e = spec["eye"]
@@ -651,19 +663,13 @@ def build_eyes(spec=KARASU):
         raise RuntimeError("no head geometry at the eye station -- check eye.y")
     z = float(co[near][:, 2].max()) - e["crown_drop"]
     surf = body_surface_x(e["y"], z, 1.0, body)
+    # The ball's CENTRE sits below the skin by the part of it we do not want showing, so exactly
+    # `proud` of its radius stands out of the head.
     x = surf - e["r"] * (1.0 - e["proud"])
     LAST_EYE = (round(x, 5), e["y"], round(z, 5), e["r"])
-
-    me = bpy.data.meshes.new("KarasuEyes")
-    ob = bpy.data.objects.new("KarasuEyes", me)
-    bpy.context.scene.collection.objects.link(ob)
-    bm = bmesh.new()
-    _bf()._eyes(bm, {"eye": {"x": x, "y": e["y"], "z": z, "r": e["r"]}})
-    bm.to_mesh(me)
-    bm.free()
     return {"centre": LAST_EYE[:3], "r": e["r"], "surface_x": round(surf, 5),
             "proud_studs": round(e["r"] * e["proud"], 5),
-            "crown": round(z + e["crown_drop"], 5), "tris": len(me.polygons) * 2}
+            "crown": round(z + e["crown_drop"], 5)}
 
 
 def plate_margins(spec=KARASU):
@@ -1319,6 +1325,29 @@ def rebuild_rig(spec=KARASU):
             if n in ebs:
                 ebs.remove(ebs[n])
         made = {}
+        # ⚠ THE EYE BONES CARRY A POSITION, NOT A DEFORMATION. Nothing is weighted to them and
+        # nothing ever should be: they exist so the eye's place travels INSIDE the asset, where
+        # `BirdController` can read it off `Bone.TransformedWorldCFrame` and park a ball there.
+        # Parented to the head, so the eyes follow every head turn and check with no extra code.
+        # ⚠ They must stay DEFORM bones despite deforming nothing -- `export()` passes
+        # `use_armature_deform_only=True`, which silently drops any bone that is not.
+        if LAST_EYE:
+            ex, ey, ez, er = LAST_EYE
+            for side, sfx in ((1.0, "R"), (-1.0, "L")):
+                if ("eye_" + sfx) in ebs:
+                    ebs.remove(ebs["eye_" + sfx])
+                b = ebs.new("eye_" + sfx)
+                b.head = Vector((side * ex, ey, ez))
+                # The tail points outboard and is one radius long. ⚠ THE LENGTH DOES NOT SURVIVE
+                # IMPORT -- a Roblox `Bone` is an Attachment, a POINT with an orientation, and has
+                # no notion of a tail. So the radius cannot ride along here and lives on
+                # `BirdSpecies` instead; what this direction buys is the bone's ORIENTATION, which
+                # does survive, and which says which way is outboard.
+                b.tail = Vector((side * (ex + er), ey, ez))
+                b.parent = ebs["joint4"]
+                b.use_connect = False
+                b.use_deform = True
+                made["eye_" + sfx] = True
         for side, sfx in ((1.0, "R"), (-1.0, "L")):
             w = ebs.new("wing_" + sfx)
             w.head = Vector((side * x0, by, bz))
@@ -1403,7 +1432,7 @@ def join_all():
     dv_dst = bm.verts.layers.deform.verify()
 
     added = {}
-    for src_name in ("KarasuTail", "KarasuFolded", "KarasuEyes", FOOT_L, FOOT_R):
+    for src_name in ("KarasuTail", "KarasuFolded", FOOT_L, FOOT_R):
         src = bpy.data.objects.get(src_name)
         if not src:
             continue
@@ -1420,17 +1449,14 @@ def join_all():
     bm.to_mesh(me)
     me.update()
     bm.free()
-    for n in ("KarasuTail", "KarasuFolded", "KarasuEyes", FOOT_L, FOOT_R):
+    for n in ("KarasuTail", "KarasuFolded", FOOT_L, FOOT_R):
         if n in bpy.data.objects:
             bpy.data.objects.remove(bpy.data.objects[n], do_unlink=True)
 
     # UVs for the new faces. The feet arrive with the vendor's own (clean, non-overlapping)
     # unwrap but it sits ON TOP of the body's islands, so they are repacked too.
     # each block now holds BOTH shells stacked, so it is taller than the piece's own aspect
-    # ⚠ THE EYES PROJECT ALONG X, which is the axis they face -- a sphere on the side of a head
-    # unwraps cleanly from the side and degenerately from anywhere else.
     plan = {"KarasuTail": (2, 0.17, 0.19), "KarasuFolded": (0, 0.19, 0.17),
-            "KarasuEyes": (0, 0.07, 0.07),
             FOOT_L: (0, 0.08, 0.10), FOOT_R: (0, 0.08, 0.10)}
     packed = {}
     for name, (lo, hi) in added.items():
@@ -1488,14 +1514,6 @@ def bind(added_ranges):
         # swing with every tail flick, which is not a thing wings do.
         out["folded"] = weight_to_nearest(
             body, verts_of(lo, hi), ["joint1", "joint2", "joint2b", "joint2c"], arm)
-
-    if "KarasuEyes" in added_ranges:
-        lo, hi = added_ranges["KarasuEyes"]
-        # ⚠ THE HEAD BONE, NAMED, NOT NEAREST. The orphan catch-all below would bind these to
-        # whatever bone is closest, and `joint3` (the neck) is a plausible winner on a bird whose
-        # eye sits low on the skull -- which would leave the eyes swimming a fraction behind
-        # every head turn. The head is the only correct answer, so say it.
-        out["eyes"] = weight_to_nearest(body, verts_of(lo, hi), ["joint4"], arm)
 
     # Anything the vendor left unweighted (the shoulder caps, the gape fill) would collapse to
     # the origin the moment a bone moves. Catch it explicitly rather than discovering it in play.
@@ -1699,7 +1717,7 @@ def run(spec=KARASU, do_export=False):
     # ⚠ ORDER IS LOAD-BEARING -- see reshape_body's docstring. After the wing cut (which needs the
     # measured gap at |x| 0.19), before everything that MEASURES the body it attaches to.
     log["reshape"] = reshape_body(spec)
-    log["eyes"] = build_eyes(spec)          # after the reshape: it seats on the shipped skull
+    log["eyes"] = eye_site(spec)            # after the reshape: it seats on the shipped skull
     log["tail"] = build_tail(spec)
     log["folded"] = build_folded_wings(spec)
     log["spread"] = build_spread_wings(spec)

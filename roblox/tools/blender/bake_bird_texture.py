@@ -79,25 +79,12 @@ KARASU = {
     # bird's eye reads because the iris is a pale warm brown against black; the photograph says
     # the opposite -- every part of the eye except the glint is darker than the head around it.
     # What makes a crow's eye read is CONTRAST WITH ITS OWN SURROUND, not a light iris.
-    "eye":         (26, 24, 24),      # the modelled dome: dark and even, between the measured
-                                      # iris (0.66x) and pupil (0.14x). It is not painted with an
-                                      # iris/pupil split -- at 19.7 inches nobody resolves one,
-                                      # and the ring it produced read as a target.
+    # ⚠ NO `eye` COLOUR, and none should come back. The eyeball is a separate Roblox part with
+    # its own Material and Reflectance ([[familiars]]); the texture paints only the socket.
     "lid":         (28, 26, 28),      # the socket rim, darker than the feathers it sits in
-    # ⚠ THE GLINT HAD TO COME BACK, AND THE REASON IS A HARD ENGINE CONSTRAINT, not taste.
-    # The bird ships as ONE MeshPart wearing ONE plain ColorMap and no SurfaceAppearance, so
-    # there is no per-texel roughness: the eye cannot be made wet without making the whole bird
-    # wet. Tested 2026-08-28 at roughness 0.10 -- the crow came out as glossy black plastic and
-    # the eye STILL did not read. So a modelled dome cannot earn a highlight from the engine
-    # here, and the highlight has to be painted whatever the geometry does.
-    # ⚠ What changed is WHERE it is painted. Both failed attempts put a bright shape on a FLAT
-    # disc, where it reads as a marking -- small was invisible, large was "cataracts and/or
-    # possessed". On a dome the surrounding curvature shades away from it, which is what lets a
-    # small hard dot read as a specular point instead of a painted spot.
-    # ⚠ `periocular` is gone and should stay gone: the pale ear-covert frame existed to
-    # compensate for an eye that did not read on its own.
-    "catchlight":  (150, 152, 162),   # 2.7x the crown, DOWN from 3.4x -- on a dome it does not
-                                      # need to shout, and shouting is what read as possessed.
+    # ⚠ `catchlight` and `periocular` are GONE and must stay gone. The glint is now a real
+    # specular on a separate glossy part, which MOVES with the camera; a painted one underneath
+    # would sit still beside it and give the bird two highlights, one of them obviously fake.
     "bill":        (42, 42, 48),      # heavy, matte, and the same colour top and bottom -- what
     "bill_gloss":  (72, 73, 86),      # separates the mandibles is the culmen highlight and the
     "leg":         (40, 40, 44),      # dark gape line between them, not two colours
@@ -306,44 +293,24 @@ def shade_corvid(P, N, pal, S=1.0, lm=None):
     line = (1.0 - _smooth(0.003, 0.010, np.abs(z - edge_z))) * span
     out = out * (1 - line)[:, None] + C["covert_edge"] * line[:, None]
 
-    # 3. THE EYE IS GEOMETRY NOW, so the paint does almost nothing -- and that is the point.
+    # 3. THE EYE IS A SEPARATE ROBLOX PART, so all this paints is the SOCKET it sits in.
     #
-    # ⚠ TWO PAINTED VERSIONS FAILED BEFORE THIS ONE. A flat dark disc read as nothing (owner:
-    # "nothing reads as an eye"); a measured five-layer version with a broad bright glint read as
-    # "cataracts and/or possessed", and so did the owner's own repaint of the same map. The
-    # lesson is not that the colours were wrong -- they were sampled off a photograph. It is that
-    # a painted highlight is A BRIGHT SHAPE AT A FIXED PLACE. It cannot move with the light or
-    # the camera, so it reads as a MARKING rather than as wetness, and every attempt to make it
-    # more visible only made it more obviously a marking. That failure mode has no tuning fix.
+    # ⚠ THREE PAINTED EYES FAILED BEFORE THIS, and the reason was never the colours -- they were
+    # sampled off a photograph. A painted highlight is A BRIGHT SHAPE AT A FIXED PLACE: it cannot
+    # move with the light or the camera, so it reads as a MARKING rather than as wetness, and
+    # every attempt to make it more visible only made it more obviously a marking. Small read as
+    # nothing; large read as "cataracts and/or possessed"; the owner's own repaint did not land
+    # either. That failure mode has no tuning fix, which is why the eye left the texture entirely.
     #
-    # `karasu_retarget.build_eyes` now models a sphere per eye, sunk so a shallow cap stands
-    # proud. Curvature shades under any light and the engine gives it a real, moving highlight.
-    # So all this has to do is keep the dome dark and seat it. ⚠ RESIST re-adding a catchlight
-    # here: if the eye does not read in Roblox the answer is the MATERIAL or the dome's radius,
-    # not a painted glint, which is the thing already known to fail.
+    # ⚠ DO NOT PAINT AN EYE HERE AGAIN. `BirdController` parks a glossy ball on the `eye_R` /
+    # `eye_L` bones; a painted one underneath would show around its edge as a second, duller eye.
+    # A dark rim is all that is wanted: it gives the ball a socket to sit in, and it is measured
+    # -- the lid runs 0.72-0.50x the feathers beside it, i.e. a socket is darker than what
+    # surrounds it, which is the opposite of the pale ring the failed versions kept reaching for.
     e, er = lm["eye"], lm["eye_r"]
     de = np.sqrt((x - e[0]) ** 2 + (y - e[1]) ** 2 + (z - e[2]) ** 2)
-    # ⚠ A BAND, NOT A DISC, and 3D distance is the right measure here for once. Every point of a
-    # sphere's surface sits at exactly `er` from its centre, so this selects the eye geometry and
-    # nothing else: head faces just outside the rim are ~1.14x er away and are correctly missed,
-    # while head faces UNDER the dome are nearer than er and are hidden anyway.
-    on_eye = 1.0 - _smooth(er * 1.00, er * 1.12, de)
-    out = out * (1 - on_eye)[:, None] + C["eye"] * on_eye[:, None]
-
-    # A dark rim just outside the sphere, so the eye sits IN the head rather than on it. Measured
-    # at 0.72-0.50x the feathers beside it -- a socket is darker than what surrounds it.
-    lid = (1.0 - _smooth(er * 1.55, er * 1.95, de)) * _smooth(er * 1.05, er * 1.30, de)
-    out = out * (1 - lid)[:, None] + C["lid"] * lid[:, None]
-
-    # A PINPOINT, high and slightly forward, and only on the dome. ⚠ Measured in the eye's own
-    # (y, z) plane, not in 3D: every point of a sphere is the same 3D distance from its centre,
-    # so 3D cannot tell the apex from the rim. Radius is a fraction of the eye, so it tracks any
-    # change to the dome. This is the ONE dial to move if the eye reads wrong -- bigger was
-    # "cataracts", absent is invisible, and the honest range is narrow.
-    cf = lm.get("catch_frac", 0.26)
-    d2 = np.sqrt((y - (e[1] + er * 0.22)) ** 2 + (z - (e[2] + er * 0.40)) ** 2)
-    glint = (1.0 - _smooth(er * cf * 0.5, er * cf, d2)) * on_eye
-    out = out * (1 - glint)[:, None] + C["catchlight"] * glint[:, None]
+    socket = 1.0 - _smooth(er * 1.15, er * 1.75, de)
+    out = out * (1 - socket)[:, None] + C["lid"] * socket[:, None]
 
     # 4. bill. Both mandibles are the same colour on a corvid -- what separates them is the
     #    highlight along the culmen ridge and the dark line of the gape between them.

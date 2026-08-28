@@ -148,6 +148,11 @@ type Bird = {
     tail: Bone?,
     hipL: Bone?,
     hipR: Bone?,
+    -- The eyeballs, and the bones they ride. See EYE below for why they are parts at all.
+    eyeR: BasePart?,
+    eyeL: BasePart?,
+    eyeBoneR: Bone?,
+    eyeBoneL: Bone?,
     root: Bone?,
     seed: number,
     flyingSince: number?,
@@ -182,6 +187,49 @@ type Bird = {
 
 local birds: { [string]: Bird } = {}
 local roster: { [string]: any } = {}
+-- ⚠ THE EYE IS A SEPARATE PART, AND THE REASON IS AN ENGINE CONSTRAINT, not a preference.
+-- The bird is ONE MeshPart wearing ONE plain ColorMap with no SurfaceAppearance, so there is no
+-- per-texel roughness: an eye painted or modelled INTO the body cannot be wet unless the whole
+-- bird is wet. Measured 2026-08-28 -- at roughness 0.10 the crow came out as glossy black
+-- plastic and the eye STILL did not read.
+--
+-- Three painted eyes failed before this, all for one reason: a painted highlight is a bright
+-- shape at a FIXED PLACE, so it reads as a MARKING rather than as wetness, and every attempt to
+-- make it more visible only made it more obviously a marking (owner: "cataracts and/or
+-- possessed"). A separate part's specular MOVES with the camera, which is the whole difference.
+--
+-- ⚠ THE PRECEDENT WAS ALREADY HERE: the wings are a separate part CFramed onto the body every
+-- frame. This is the same pattern, driven off a bone instead of the body.
+local EYE = BirdSpecies.eyeOf(SPECIES)
+local EYE_COLOUR = if EYE then Color3.fromRGB(EYE.colour[1], EYE.colour[2], EYE.colour[3]) else nil
+-- ⚠ `Enum.Material[name]` rather than a typed enum in the shared module, which must name no
+-- Roblox type or it stops loading under Lune. An unknown name falls back rather than throwing:
+-- a familiar with a plastic eye is a blemish, a familiar that errors on spawn is no familiar.
+local EYE_MATERIAL = if EYE
+    then ((Enum.Material :: any)[EYE.material] or Enum.Material.SmoothPlastic)
+    else nil
+
+local function makeEye(userId: string, side: string): BasePart?
+    if not (EYE and EYE_COLOUR) then
+        return nil
+    end
+    local p = Instance.new("Part")
+    p.Name = `FamiliarEye{side}_{userId}`
+    p.Shape = Enum.PartType.Ball
+    p.Size = Vector3.one * (EYE.radius * 2)
+    p.Color = EYE_COLOUR
+    p.Material = EYE_MATERIAL :: Enum.Material
+    p.Reflectance = EYE.reflectance
+    p.Anchored = true
+    p.CanCollide = false
+    p.CanQuery = false
+    p.CanTouch = false
+    p.CastShadow = false
+    p.Massless = true
+    p.Parent = folder
+    return p
+end
+
 local function seedFor(userId: string): number
     local n = tonumber(userId) or 0
     return (n % 997) / 997 * math.pi * 2
@@ -260,6 +308,14 @@ local function makeBird(userId: string): Bird
         -- Rotating the HIP swings the whole leg, which is the lift; the knee would only fold it.
         hipL = bone("joint12"),
         hipR = bone("joint25"),
+        -- ⚠ CHILDREN OF THE HEAD in the exported rig, so the eyes follow every head turn and
+        -- check for free -- `Bone.TransformedWorldCFrame` tracks the driven Transform exactly
+        -- (verified: 40 degrees for a 40-degree yaw, 0.25 studs for a 0.25 offset). Absent on
+        -- the uguisu, which models its own eyes, so both of these are legitimately nil there.
+        eyeBoneR = bone("eye_R"),
+        eyeBoneL = bone("eye_L"),
+        eyeR = makeEye(userId, "R"),
+        eyeL = makeEye(userId, "L"),
         root = bone("joint1"),
         seed = seedFor(userId),
         flyingSince = nil,
@@ -436,6 +492,12 @@ FamiliarRoster.OnClientEvent:Connect(function(next_: { [string]: any })
             if b.wings then
                 b.wings:Destroy()
             end
+            if b.eyeR then
+                b.eyeR:Destroy()
+            end
+            if b.eyeL then
+                b.eyeL:Destroy()
+            end
             birds[userId] = nil
         end
     end
@@ -505,19 +567,28 @@ RunService.RenderStepped:Connect(function()
     local now = os.clock()
     for userId, b in birds do
         local root = characterRoot(userId)
-        if not root then
+        local function hideBird()
             b.part.Transparency = 1
             if b.wings then
                 b.wings.Transparency = 1
             end
+            -- ⚠ THE EYES MUST HIDE WITH THE BIRD. They are anchored parts driven from a bone;
+            -- left visible they would hang in the air at the last place the head was, which is
+            -- exactly the "cached CFrame lands the bird on remembered air" failure one part out.
+            if b.eyeR then
+                b.eyeR.Transparency = 1
+            end
+            if b.eyeL then
+                b.eyeL.Transparency = 1
+            end
+        end
+        if not root then
+            hideBird()
             continue
         end
         local far = if eye then (root.Position - eye).Magnitude else 0
         if far > DRAW_DISTANCE then
-            b.part.Transparency = 1
-            if b.wings then
-                b.wings.Transparency = 1
-            end
+            hideBird()
             continue
         end
         b.part.Transparency = 0
@@ -709,6 +780,17 @@ RunService.RenderStepped:Connect(function()
         b.part.CFrame = base * CFrame.new(-b.part.PivotOffset.Position)
         if b.wings then
             b.wings.CFrame = base * CFrame.new(-b.wings.PivotOffset.Position)
+        end
+        -- ⚠ OFF THE BONE, NOT OFF `base`. The head turns are driven on joint4/joint3 INSIDE the
+        -- body mesh, so an eye placed relative to the body would stare straight ahead while the
+        -- head looked away. Reading the bone is what makes the eyes belong to the head.
+        for _, e in { { b.eyeR, b.eyeBoneR }, { b.eyeL, b.eyeBoneL } } do
+            local part, bone_ = e[1] :: BasePart?, e[2] :: Bone?
+            if part and bone_ then
+                part.CFrame = bone_.TransformedWorldCFrame
+                -- Sub-pixel well before this, and it is a whole part per eye per bird.
+                part.Transparency = if far <= DETAIL_DISTANCE then 0 else 1
+            end
         end
 
         if far <= DETAIL_DISTANCE then

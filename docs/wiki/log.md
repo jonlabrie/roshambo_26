@@ -1899,3 +1899,31 @@ the eye still did not read. The highlight has to be painted whatever the geometr
 What the dome buys is that a painted dot sits on curvature that shades away from it — a specular
 point rather than a marking. Five attempts have now bracketed the range without landing it, and
 the useful next input is the owner's eye, not another guess ([[familiars]]).
+
+## [2026-08-28] ship | The karasu's eye becomes a separate part — gloss cannot be localised on one MeshPart
+
+Owner, after rejecting three painted eyes: "wouldn't you put a separate sphere in that space and
+give it a material like an eyeball?" Yes — and a session had asserted the opposite an hour
+earlier, that the highlight must be painted because the bird is one MeshPart. ⚠ **The wings have
+always been a separate part**, CFramed onto the body every frame. The constraint was self-imposed
+and the architecture already had the pattern.
+
+The real one, measured: one plain ColorMap and no SurfaceAppearance means no per-texel roughness,
+so an eye inside the body cannot be wet unless the whole bird is. At roughness 0.10 the crow came
+out as glossy black plastic and the eye still did not read.
+
+⚠ **Which explains all three failures at once.** A painted highlight is a bright shape at a FIXED
+PLACE — it reads as a marking rather than as wetness, and making it more visible only makes it
+more obviously a marking. No amount of colour accuracy fixes that; the colours had been sampled
+off a photograph.
+
+Built: two Ball parts per bird with their own Material/Color/Reflectance, parked on new
+`eye_R`/`eye_L` bones parented to the HEAD in the exported rig — so position lives in the asset,
+nothing is transcribed, and the eyes follow every head turn for free. ⚠ Bone LENGTH does not
+survive import (a Roblox Bone is an Attachment, a point), so the radius is the one number that had
+to move to `BirdSpecies`. The uguisu deliberately has no eye entry: it models its own.
+
+⚠ Caught by the tests immediately: the first `BirdSpecies` draft named `Color3` and `Enum.Material`
+and broke the src/shared purity rule — a pure module names no Roblox type or it fails to load
+under Lune, taking all 1546 tests with it. Plain RGB triple and a material NAME now; the
+controller converts at the boundary, same as BirdFlight's {x, y, z}.
