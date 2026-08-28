@@ -782,6 +782,11 @@ BILL_LOFT = {
     # floor) to the other side -- so each mandible is a solid from the moment it is lofted.
     # Nothing has to be capped afterwards, which is exactly where the old bill grew its membrane.
     "palate": 0.35,
+    # ⚠ WHERE THE MANDIBLES SEPARATE. Behind the rictus a bill is ONE piece -- that is the corner
+    # of the mouth -- so the loft builds a single closed root there and splits into two forward
+    # of it. That root is what bridges to the head, which is the difference between a bill welded
+    # to a face and a bill passing through one.
+    "rictus": 0.16,
     # (t, culmen_z, tomium_z, gonys_z, half_width). t is 0 at the base, 1 at the tip.
     # ⚠ THE FIRST STATION IS MEASURED off the vendor's own base ring so the bridge onto the head
     # has nothing to reconcile. Everything forward of it is AUTHORED: the vendor data there is
@@ -851,7 +856,7 @@ def build_bill(spec=KARASU, loft=BILL_LOFT):
     n = int(loft["segments"])
     y0, y1 = loft["base_y"], loft["tip_y"]
 
-    def shell(table, t_end, name, inward):
+    def shell(table, t_end, name, inward, t0=0.0):
         """One mandible, as a CLOSED tube.
 
         ⚠ THE PROFILE CLOSES ON ITSELF: out from the midline ridge, round the flank to the
@@ -868,7 +873,7 @@ def build_bill(spec=KARASU, loft=BILL_LOFT):
         ts = [r[0] for r in table]
         steps = 12
         for k in range(steps + 1):
-            t = t_end * k / steps
+            t = t0 + (t_end - t0) * k / steps
             ridge = float(np.interp(t, ts, [r[1] for r in table]))
             edge = float(np.interp(t, ts, [r[2] for r in table]))
             hw = float(np.interp(t, ts, [r[3] for r in table]))
@@ -915,17 +920,25 @@ def build_bill(spec=KARASU, loft=BILL_LOFT):
     # is cut at `head_cut_y` and capped; the cap is buried inside the loft, whose first stations
     # match the head's own section precisely so nothing shows.
     body = bpy.data.objects.get("KarasuBody") or bpy.data.objects[BODY_OBJ]
+    # ⚠ BISECT, THEN CLEAR. Deleting every vertex forward of a plane also destroys every face
+    # that merely STRADDLES it, which leaves a ragged saw-toothed boundary that `holes_fill`
+    # cannot close -- measured, that produced 142 boundary edges and 144 non-manifold on the
+    # assembled body, and the head tore open around the new bill. `bisect_plane` inserts vertices
+    # exactly on the plane first, so what is left behind is a single clean planar loop.
     bmh = bmesh.new()
     bmh.from_mesh(body.data)
-    bmh.verts.ensure_lookup_table()
-    doomed = [v for v in bmh.verts if v.co.y > loft["head_cut_y"]]
-    bmesh.ops.delete(bmh, geom=doomed, context='VERTS')
-    bmh.edges.ensure_lookup_table()
-    holes = [e for e in bmh.edges if e.is_boundary]
-    if holes:
-        bmesh.ops.holes_fill(bmh, edges=holes, sides=0)
+    bmh.faces.ensure_lookup_table()
+    before_v = len(bmh.verts)
+    bmesh.ops.bisect_plane(
+        bmh, geom=list(bmh.verts) + list(bmh.edges) + list(bmh.faces), dist=1e-6,
+        plane_co=Vector((0.0, loft["head_cut_y"], 0.0)), plane_no=Vector((0.0, 1.0, 0.0)),
+        clear_outer=True, clear_inner=False)
+    # ⚠ DO NOT FILL THE HEAD'S HOLE. It is what the bill BRIDGES onto -- capping it here closed
+    # the loop before the bridge could find it, so the bridge silently built nothing and the bill
+    # went on passing through a sealed face. Left open deliberately; the bridge below closes it,
+    # and an assertion there fails the build if it does not.
     bmesh.ops.recalc_face_normals(bmh, faces=bmh.faces[:])
-    removed = len(doomed)
+    removed = before_v - len(bmh.verts)
     bmh.to_mesh(body.data)
     body.data.update()
     bmh.free()
@@ -933,15 +946,82 @@ def build_bill(spec=KARASU, loft=BILL_LOFT):
     for nm in ("BillUpper", "BillLower"):
         if nm in bpy.data.objects:
             bpy.data.objects.remove(bpy.data.objects[nm], do_unlink=True)
-    _, uv, ut = shell(loft["upper"], 1.0, "BillUpper", False)
-    _, lv, lt = shell(loft["lower"], loft["lower_end"], "BillLower", True)
+    _, uv, ut = shell(loft["upper"], 1.0, "BillUpper", False, t0=loft["rictus"])
+    _, lv, lt = shell(loft["lower"], loft["lower_end"], "BillLower", True, t0=loft["rictus"])
     # each mandible rides its own bone; the upper is head, the lower is the jaw
+    # ⚠ THE ROOT, BUILT STRAIGHT INTO THE BODY AND BRIDGED. Everything up to now left the bill
+    # PASSING THROUGH the head -- two surfaces intersecting, which reads as a hard seam however
+    # well the sections match (measured, they matched to 0.012). A bridge makes them one skin.
+    # The root is a single closed section because behind the rictus a bill IS one piece.
+    bmb = bmesh.new()
+    bmb.from_mesh(body.data)
+    bmb.edges.ensure_lookup_table()
+    head_loop = [e for e in bmb.edges if e.is_boundary]
+    rings = []
+    for t in (0.0, loft["rictus"]):
+        cul = float(np.interp(t, [r[0] for r in loft["upper"]], [r[1] for r in loft["upper"]]))
+        gon = float(np.interp(t, [r[0] for r in loft["lower"]], [r[1] for r in loft["lower"]]))
+        tom = float(np.interp(t, [r[0] for r in loft["upper"]], [r[2] for r in loft["upper"]]))
+        hw = float(np.interp(t, [r[0] for r in loft["upper"]], [r[3] for r in loft["upper"]]))
+        y = y0 + (y1 - y0) * t
+        ring = []
+        # a full section: culmen at the midline, round to the tomium, down to the gonys, and back
+        for side in (1.0, -1.0):
+            rng = range(0, n + 1) if side > 0 else range(n, -1, -1)
+            for i in rng:
+                a = math.pi * 0.5 * i / n
+                ring.append(bmb.verts.new((side * hw * math.sin(a), y,
+                                           cul + (tom - cul) * (1.0 - math.cos(a)))))
+            rng2 = range(n - 1, -1, -1) if side > 0 else range(1, n + 1)
+            for i in rng2:
+                a = math.pi * 0.5 * i / n
+                ring.append(bmb.verts.new((side * hw * math.sin(a), y,
+                                           gon + (tom - gon) * (1.0 - math.cos(a)))))
+        rings.append(ring)
+    bmb.verts.ensure_lookup_table()
+    root_verts = [v.index for r in rings for v in r]
+    m = len(rings[0])
+    root_faces = 0
+    for i in range(m):
+        j = (i + 1) % m
+        bmb.faces.new((rings[0][i], rings[0][j], rings[1][j], rings[1][i]))
+        root_faces += 1
+    bmb.edges.ensure_lookup_table()
+    base_ring_edges = [e for e in bmb.edges
+                       if e.is_boundary and all(abs(v.co.y - y0) < 1e-6 for v in e.verts)]
+    bridged = bmesh.ops.bridge_loops(bmb, edges=head_loop + base_ring_edges)
+    # the forward end of the root is capped; it sits inside the mandibles and is never seen
+    bmb.edges.ensure_lookup_table()
+    front = [e for e in bmb.edges if e.is_boundary]
+    if front:
+        bmesh.ops.holes_fill(bmb, edges=front, sides=0)
+    bmb.edges.ensure_lookup_table()
+    left_open = len([e for e in bmb.edges if e.is_boundary])
+    if left_open:
+        bmb.free()
+        raise RuntimeError(f"bill root left {left_open} boundary edges after bridging")
+    bmesh.ops.recalc_face_normals(bmb, faces=bmb.faces[:])
+    bmb.to_mesh(body.data)
+    body.data.update()
+    bmb.free()
+    for poly in body.data.polygons:
+        poly.use_smooth = True
+    # ⚠ THE ROOT IS SKULL, NOT JAW. It goes into the body mesh directly, so without this the
+    # orphan catch-all in `bind` weights it to whatever bone is nearest -- and `bill_lower` is
+    # right there. Some of the face would then open with the beak.
+    vg = body.vertex_groups.get("joint4") or body.vertex_groups.new(name="joint4")
+    vg.add(root_verts, 1.0, 'REPLACE')
+
+    # ⚠ THE JAW STARTS AT THE RICTUS, NOT AT THE BASE. The root is shared skull; weighting the
+    # lower mandible all the way back would drag the face open with the beak.
     for nm, bone in (("BillUpper", "joint4"), ("BillLower", "bill_lower")):
         ob = bpy.data.objects[nm]
         grp = ob.vertex_groups.new(name=bone)
         grp.add([v.index for v in ob.data.vertices], 1.0, 'REPLACE')
     return {"upper": {"verts": uv, "tris": ut}, "lower": {"verts": lv, "tris": lt},
-            "base_y": y0, "tip_y": y1, "segments": n, "vendor_verts_removed": removed}
+            "base_y": y0, "tip_y": y1, "segments": n, "vendor_verts_removed": removed,
+            "head_loop_edges": len(head_loop), "root_faces": root_faces,
+            "bridge_faces": len(bridged.get("faces", []))}
 
 
 def eye_site(spec=KARASU):
