@@ -750,3 +750,193 @@ describe("BirdFlight.shouldReplan", function()
         expect(BirdFlight.REPLAN_INTERRUPT > 2 * 3.4).toBe(true) -- the reserved WIN orbit
     end)
 end)
+
+-- ===== SCALE =====
+-- ⚠ THE PROPERTY THAT MAKES THIS SAFE TO LAND is that the uguisu, at scale 1, comes out
+-- BIT-IDENTICAL. It is the only bird anyone has watched, every constant in the module was tuned
+-- by eye against it, and nobody has yet seen a karasu perch -- so the reference bird must be
+-- provably untouched before the second bird's numbers are worth arguing about.
+describe("BirdFlight scale", function()
+    local SEEDS = { 0, 0.17, 1.3, 7.77, 41.0 }
+
+    test("the reference profile is the module's own constants", function()
+        local p = BirdFlight.profile(1)
+        expect(p.scale).toBe(1)
+        expect(p.linear).toBe(1)
+        expect(p.time).toBe(1)
+        expect(p.TURN_TIME).toBe(BirdFlight.TURN_TIME)
+        expect(p.FLUTTER_BURST).toBe(BirdFlight.FLUTTER_BURST)
+    end)
+
+    test("distances go LINEARLY and durations as the SQUARE ROOT", function()
+        -- Bigger animals move slower, roughly as sqrt(length) for pendulum-like limbs, so a 2x
+        -- bird is about 1.41x slower -- NOT 2x, which overshoots into slow motion.
+        local p = BirdFlight.profile(4)
+        expect(p.linear).toBe(4)
+        expect(p.time).toBe(2)
+        expect(p.TURN_TIME).toBe(BirdFlight.TURN_TIME * 2)
+        expect(p.FLUTTER_BURST).toBe(BirdFlight.FLUTTER_BURST * 2)
+    end)
+
+    test("a bird with no size is refused rather than divided by", function()
+        -- scale 0 makes every duration 0 and every clock a division by zero, which surfaces as
+        -- NaN positions frames later and diagnoses as "the bird vanished".
+        expect(pcall(BirdFlight.profile, 0)).toBe(false)
+        expect(pcall(BirdFlight.profile, -1)).toBe(false)
+        expect(pcall(BirdFlight.profile, 0 / 0)).toBe(false)
+    end)
+
+    test("the REFERENCE bird is bit-identical, profile or no profile", function()
+        local p = BirdFlight.profile(1)
+        for _, seed in SEEDS do
+            for t = 0, 6, 0.05 do
+                local ay, ap, at = BirdFlight.idlePose(t, seed)
+                local by, bp, bt = BirdFlight.idlePose(t, seed, p)
+                expect(by).toBe(ay)
+                expect(bp).toBe(ap)
+                expect(bt).toBe(at)
+
+                local al, ar, aroll = BirdFlight.legPose(t, seed)
+                local bl, br, broll = BirdFlight.legPose(t, seed, p)
+                expect(bl).toBe(al)
+                expect(br).toBe(ar)
+                expect(broll).toBe(aroll)
+
+                expect(BirdFlight.flutterExtension(t, seed, p)).toBe(BirdFlight.flutterExtension(t, seed))
+                expect(BirdFlight.wingExtension(t, seed, true, p)).toBe(
+                    BirdFlight.wingExtension(t, seed, true)
+                )
+
+                local ax, az = BirdFlight.beatPose(t, seed, true)
+                local bx, bz = BirdFlight.beatPose(t, seed, true, p)
+                expect(bx).toBe(ax)
+                expect(bz).toBe(az)
+
+                local aprog, ahop = BirdFlight.turnPose(t)
+                local bprog, bhop = BirdFlight.turnPose(t, p)
+                expect(bprog).toBe(aprog)
+                expect(bhop).toBe(ahop)
+
+                for _, state in { "WIN", "RESTING" } do
+                    local a = BirdFlight.offsetFor(state, t, seed)
+                    local b = BirdFlight.offsetFor(state, t, seed, p)
+                    expect(b.x).toBe(a.x)
+                    expect(b.y).toBe(a.y)
+                    expect(b.z).toBe(a.z)
+                end
+            end
+            for d = 0, 40, 2.5 do
+                expect(BirdFlight.flightDuration(d, p)).toBe(BirdFlight.flightDuration(d))
+            end
+        end
+    end)
+
+    test("a bigger bird runs the SAME motion on a slower clock -- angles never change", function()
+        -- ⚠ THE STRONGEST STATEMENT OF THE RULE. 45 degrees is 45 degrees on a wren or an eagle,
+        -- so every angular output must be reproducible on the scaled bird simply by waiting
+        -- longer. If a scale factor ever leaks into an angle, this fails.
+        local p = BirdFlight.profile(4) -- time exactly 2x, so the dilation is exact in binary
+        for _, seed in SEEDS do
+            for t = 0, 6, 0.05 do
+                local ay, ap, at = BirdFlight.idlePose(t, seed)
+                local by, bp, bt = BirdFlight.idlePose(t * 2, seed, p)
+                expect(by).toBe(ay)
+                expect(bp).toBe(ap)
+                expect(bt).toBe(at)
+
+                local al, ar, aroll = BirdFlight.legPose(t, seed)
+                local bl, br, broll = BirdFlight.legPose(t * 2, seed, p)
+                expect(bl).toBe(al)
+                expect(br).toBe(ar)
+                expect(broll).toBe(aroll)
+
+                expect(BirdFlight.flutterExtension(t * 2, seed, p)).toBe(BirdFlight.flutterExtension(t, seed))
+                expect(BirdFlight.wingExtension(t * 2, seed, true, p)).toBe(
+                    BirdFlight.wingExtension(t, seed, true)
+                )
+
+                local ax, az = BirdFlight.beatPose(t, seed, true)
+                local bx, bz = BirdFlight.beatPose(t * 2, seed, true, p)
+                expect(bx).toBe(ax)
+                expect(bz).toBe(az)
+            end
+        end
+    end)
+
+    test("the perch turn takes longer AND hops higher, each by its own rule", function()
+        local p = BirdFlight.profile(4)
+        for t = 0, BirdFlight.TURN_TIME, 0.01 do
+            local aprog, ahop = BirdFlight.turnPose(t)
+            local bprog, bhop = BirdFlight.turnPose(t * 2, p)
+            expect(bprog).toBe(aprog) -- progress is scale-free
+            expect(bhop).toBeCloseTo(ahop * 4, 1e-9) -- the hop is a DISTANCE
+        end
+        -- ⚠ AND THE WINDOW ITSELF MOVED, rather than the same window being re-parameterised. At
+        -- the REFERENCE bird's turn time the bigger bird is still mid-turn; it finishes on its
+        -- own clock. This is the assertion that would fail if TURN_TIME were read from the
+        -- module instead of the profile -- which is exactly the mistake the controller can make.
+        expect(select(1, BirdFlight.turnPose(BirdFlight.TURN_TIME, p)) < 1).toBe(true)
+        expect(select(1, BirdFlight.turnPose(p.TURN_TIME, p))).toBe(1)
+        expect(select(2, BirdFlight.turnPose(p.TURN_TIME, p))).toBe(0) -- never left standing in air
+    end)
+
+    test("a bigger bird's victory hop is bigger, not just slower", function()
+        -- ⚠ HOP_HEIGHT was ABSOLUTE at 0.05 studs: 6.0% of the uguisu's body but 3.0% of the
+        -- karasu's. A crow doing a uguisu-sized hop reads as STIFF.
+        local p = BirdFlight.profile(4)
+        local settled = BirdFlight.ENTRY.WIN * 2 + 10 -- well past the scaled entry animation
+        local peak = 0
+        for t = settled, settled + 3, 0.005 do
+            peak = math.max(peak, BirdFlight.offsetFor("WIN", t, 0.3, p).y - BirdFlight.SHOULDER_Y)
+        end
+        local refPeak = 0
+        for t = BirdFlight.ENTRY.WIN + 10, BirdFlight.ENTRY.WIN + 13, 0.005 do
+            refPeak = math.max(refPeak, BirdFlight.offsetFor("WIN", t, 0.3).y - BirdFlight.SHOULDER_Y)
+        end
+        expect(peak).toBeCloseTo(refPeak * 4, 1e-3)
+    end)
+
+    test("the shoulder is an ANCHOR ON THE AVATAR and does not grow with the bird", function()
+        -- The bird's origin is at its feet (the PivotOffset contract measureBirds checks), so
+        -- the perch offset says where the FEET go. A 5-stud avatar's shoulder does not move
+        -- because the bird standing on it got bigger.
+        local p = BirdFlight.profile(4)
+        local held = BirdFlight.ENTRY.WIN * 2 + 10
+        local o = BirdFlight.offsetFor("WIN", held, 0.3, p)
+        expect(o.x).toBe(BirdFlight.SHOULDER_X)
+        expect(o.y >= BirdFlight.SHOULDER_Y).toBe(true)
+    end)
+
+    test("a flight of proportional length takes proportionally longer", function()
+        -- CRUISE_SPEED is a distance over a time, so it goes as linear/time; the minimum flight
+        -- time is a time. Together: a 4x bird crossing 4x the distance takes 2x as long.
+        local p = BirdFlight.profile(4)
+        for d = 0, 40, 2.5 do
+            expect(BirdFlight.flightDuration(d * 4, p)).toBeCloseTo(BirdFlight.flightDuration(d) * 2, 1e-9)
+        end
+    end)
+
+    test("fidget GAPS are character, not proportion, and stay put", function()
+        -- ⚠ How OFTEN a bird flutters or turns is per-species character to be chosen by eye, not
+        -- a consequence of its length. A crow is plausibly more deliberate than a warbler, but
+        -- that is a decision somebody makes, not arithmetic. Scaling these silently would take
+        -- the choice away and hide it inside a square root.
+        for _, seed in SEEDS do
+            for i = 0, 8 do
+                expect(BirdFlight.nextFlutterGap(seed, i) > 0).toBe(true)
+                expect(BirdFlight.nextTurnGap(seed, i) > 0).toBe(true)
+            end
+        end
+        expect(BirdFlight.profile(4).FLUTTER_GAP).toBeNil()
+        expect(BirdFlight.profile(4).TURN_GAP).toBeNil()
+    end)
+
+    test("the karasu is about twice the uguisu, so it moves about 1.41x slower", function()
+        local BirdSpecies = require("../src/shared/BirdSpecies")
+        local p = BirdFlight.profile(BirdSpecies.scaleOf("Karasu") :: number)
+        expect(p.linear).toBeCloseTo(2, 0.05)
+        expect(p.time).toBeCloseTo(1.41, 0.02)
+        -- The trap this whole pass exists to avoid: times must NOT track length.
+        expect(p.time < p.linear * 0.8).toBe(true)
+    end)
+end)

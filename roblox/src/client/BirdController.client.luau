@@ -18,7 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local BirdFlight = require(shared:WaitForChild("BirdFlight"))
-local BirdVoice = require(shared:WaitForChild("BirdVoice"))
+local BirdSpecies = require(shared:WaitForChild("BirdSpecies"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local CollectionService = game:GetService("CollectionService")
@@ -30,9 +30,25 @@ local FamiliarRoster = remotes:WaitForChild("FamiliarRoster") :: RemoteEvent
 -- ordinary child instances, so `AssetService:CreateMeshPartAsync` cannot rebuild them from a
 -- MeshId -- it returns bare geometry. The template ships as a committed .rbxm via Rojo, the same
 -- route as BonshoBell and ShoroRoof ([[rojo-meshpart-rbxm]]).
+--
+-- ⚠ WHICH BIRD, and it is ONE name feeding assets, voice AND proportion. Splitting it -- a
+-- hardcoded "UguisuBody" here and a separate "Uguisu" for the voice -- is how a bird ends up
+-- wearing a crow's body with a warbler's song, with nothing to catch it.
+local SPECIES = "Uguisu" -- ⚠ hardcoded: nothing selects a bird per player yet (F&F item 6)
+-- ⚠ NO FALLBACK. `scaleOf` returns nil for an unregistered species and this refuses to start
+-- rather than moving a crow on uguisu timings, which would present as "the animation is wrong".
+local SPECIES_SCALE = BirdSpecies.scaleOf(SPECIES)
+if not SPECIES_SCALE then
+    warn(`BirdController: species "{SPECIES}" is not in BirdSpecies.SPECIES; no familiars.`)
+    return
+end
+-- Distances x scale, durations x sqrt(scale), angles untouched. At the uguisu's 1.0 every number
+-- is unchanged, bit for bit -- see the scale notes in BirdFlight.
+local PROFILE = BirdFlight.profile(SPECIES_SCALE)
+
 local birdAssets = ReplicatedStorage:WaitForChild("RoshamboBirds", 20)
-local asset = birdAssets and birdAssets:FindFirstChild("UguisuBody")
-local wingAsset = birdAssets and birdAssets:FindFirstChild("UguisuWings")
+local asset = birdAssets and birdAssets:FindFirstChild(`{SPECIES}Body`)
+local wingAsset = birdAssets and birdAssets:FindFirstChild(`{SPECIES}Wings`)
 -- ⚠ ACCEPT EITHER A MeshPart OR THE MODEL THE IMPORTER WRAPS IT IN. Studio's 3D Importer emits a
 -- Model containing the MeshPart plus an AnimationController and an InitialPoses folder, and which
 -- of the two gets saved to the .rbxm depends on what was right-clicked. Requiring one shape makes
@@ -84,13 +100,12 @@ local LEASH = 70
 -- Three things keep them apart. The familiar sings ONLY on a win, so it is an event and not
 -- ambience. Its rolloff is far tighter than the dock's 12-55, so it is intimate rather than a
 -- landmark you can hear across the pool. And it is quieter.
--- ⚠ THE CLIPS AND LEVELS NOW LIVE PER SPECIES in `shared/BirdVoice.luau`, because a crow is
+-- ⚠ THE CLIPS AND LEVELS NOW LIVE PER SPECIES in `shared/BirdSpecies.luau`, because a crow is
 -- not a loud warbler. The uguisu's volume of 0.85 was raised from 0.38 on the owner's ear
 -- (2026-08-22): the old value was set to stay under the falls-dock uguisu's 0.6, but that bird
 -- is AMBIENCE across a pool while this one sings on your shoulder — what it must not do is
 -- drown the dock bird out AT the dock, and the tight rolloff already handles that. Being too
 -- quiet to hear was the worse failure. That reasoning moved with the number.
-local SPECIES = "Uguisu" -- ⚠ hardcoded: nothing selects a bird per player yet (F&F item 6)
 -- ⚠ EVERY WINNER WINS AT THE SAME INSTANT -- more so under TEST_MODE, where the World Throw
 -- cycles R->P->S and a whole crowd can throw the same winning hand. Fifty birds opening together
 -- is a cacophony, so each waits a random beat and only a few sing at all.
@@ -281,8 +296,8 @@ local function sing(b: Bird, isOwn: boolean)
     if not isOwn and (singing >= MAX_CONCURRENT_SONGS or math.random() > chance) then
         return
     end
-    local voice = BirdVoice.VOICE[SPECIES]
-    local clip = BirdVoice.pick(SPECIES, math.random)
+    local voice = BirdSpecies.voiceOf(SPECIES)
+    local clip = BirdSpecies.pick(SPECIES, math.random)
     -- A species with no voice is SILENT rather than borrowed. Nothing to clean up, and no slot
     -- taken, so the count below must not have been incremented yet.
     if not voice or not clip then
@@ -504,7 +519,7 @@ RunService.RenderStepped:Connect(function()
         if not resting then
             -- A result takes the bird off its perch entirely: it is doing something, not sitting.
             release(b)
-            local o = BirdFlight.offsetFor(b.state, elapsed, b.seed)
+            local o = BirdFlight.offsetFor(b.state, elapsed, b.seed, PROFILE)
             if b.state == "WIN" then
                 -- Keep BirdFlight's HOP (the x shuffle and y bob) but re-base it on the seat
                 -- measured off this avatar, rather than on its guessed constant.
@@ -547,7 +562,7 @@ RunService.RenderStepped:Connect(function()
                 -- what keeps a bird OUT of buildings (owner: birds do not go inside) — indoors
                 -- there are no perches, so a bird that already has one simply keeps it and waits
                 -- outside; only a bird with none at all follows its owner in.
-                local o = BirdFlight.offsetFor("RESTING", elapsed, b.seed)
+                local o = BirdFlight.offsetFor("RESTING", elapsed, b.seed, PROFILE)
                 target = (root.CFrame * CFrame.new(o.x, o.y, o.z)).Position
             end
         end
@@ -575,7 +590,7 @@ RunService.RenderStepped:Connect(function()
             b.flightTo = target
             b.flightNo += 1
             b.flightAt = now
-            b.flightFor = BirdFlight.flightDuration((target - b.pos).Magnitude)
+            b.flightFor = BirdFlight.flightDuration((target - b.pos).Magnitude, PROFILE)
             b.flightShape = BirdFlight.flightShape(b.seed, b.flightNo)
         end
 
@@ -625,10 +640,10 @@ RunService.RenderStepped:Connect(function()
         -- ⚠ AND THE THREE PERCH MOTIONS MUST NOT OVERLAP. A turn on top of a flutter or the
         -- victory hop reads as one confused compound move rather than two separate habits.
         -- Only on a REAL perch, too: a bird pivoting on someone's shoulder is not a bird.
-        local turning = b.turnSince ~= nil and (now - (b.turnSince or 0)) < BirdFlight.TURN_TIME
+        local turning = b.turnSince ~= nil and (now - (b.turnSince or 0)) < PROFILE.TURN_TIME
         if far <= DETAIL_DISTANCE and travelled <= 0.001 and b.perch then
             local flutterRunning = b.flutterSince ~= nil
-                and (now - (b.flutterSince or 0)) < BirdFlight.FLUTTER_BURST
+                and (now - (b.flutterSince or 0)) < PROFILE.FLUTTER_BURST
             local hopping = b.state == "WIN" and not resting
             if not turning and not flutterRunning and not hopping and now >= b.nextTurnAt then
                 local f = b.part.CFrame.LookVector
@@ -656,7 +671,7 @@ RunService.RenderStepped:Connect(function()
             if turning then
                 -- Driven from the captured pair, so the self-read above cannot compound it. The
                 -- hop returns to zero at the end, which is what puts the bird back on the rail.
-                local p, hop = BirdFlight.turnPose(now - (b.turnSince or 0))
+                local p, hop = BirdFlight.turnPose(now - (b.turnSince or 0), PROFILE)
                 local yaw = b.turnFrom + (b.turnTo - b.turnFrom) * p
                 base = CFrame.new(b.pos + Vector3.new(0, hop, 0)) * CFrame.Angles(0, yaw, 0)
             else
@@ -702,7 +717,7 @@ RunService.RenderStepped:Connect(function()
             -- arrives -- and a win fires one too, for the case where the familiar is ALREADY on
             -- the shoulder and so never lands. Starting is GUARDED: on a won round both triggers
             -- fire in the same frame, and restarting a running burst would read as a hitch.
-            local running = b.flutterSince ~= nil and (now - (b.flutterSince or 0)) < BirdFlight.FLUTTER_BURST
+            local running = b.flutterSince ~= nil and (now - (b.flutterSince or 0)) < PROFILE.FLUTTER_BURST
             local landed = b.wasFlying and not flying
             local justWon = b.state == "WIN" and b.lastState ~= "WIN"
             if not running and not flying and (landed or justWon or now >= b.nextFlutterAt) then
@@ -722,9 +737,9 @@ RunService.RenderStepped:Connect(function()
             -- fade, so a perched wing appears BY unfolding instead of popping into view.
             local open
             if flying then
-                open = BirdFlight.wingExtension(now - (b.flyingSince or now), b.seed, true)
+                open = BirdFlight.wingExtension(now - (b.flyingSince or now), b.seed, true, PROFILE)
             else
-                open = BirdFlight.flutterExtension(now - (b.flutterSince or -99), b.seed)
+                open = BirdFlight.flutterExtension(now - (b.flutterSince or -99), b.seed, PROFILE)
             end
             if b.wings then
                 b.wings.Transparency = BirdFlight.wingTransparency(open)
@@ -736,7 +751,7 @@ RunService.RenderStepped:Connect(function()
             -- local Z sweeps fore-aft and DOES mirror, which is exactly why the fold already runs
             -- `shoulder` on the right and `-shoulder` on the left. Mirroring X too would have one
             -- wing rise while the other fell.
-            local beatX, beatZ = BirdFlight.beatPose(now, b.seed, flying)
+            local beatX, beatZ = BirdFlight.beatPose(now, b.seed, flying, PROFILE)
             local zRight = math.rad(shoulder + beatZ)
             if b.wingR then
                 b.wingR.Transform = CFrame.Angles(math.rad(beatX), 0, zRight)
@@ -785,7 +800,7 @@ RunService.RenderStepped:Connect(function()
                     b.root.Transform = CFrame.new()
                 end
             elseif b.state == "WIN" and not resting then
-                local liftL, liftR, roll = BirdFlight.legPose(now, b.seed)
+                local liftL, liftR, roll = BirdFlight.legPose(now, b.seed, PROFILE)
                 if b.hipL then
                     b.hipL.Transform = CFrame.Angles(math.rad(liftL * 26), 0, 0)
                 end
@@ -810,7 +825,7 @@ RunService.RenderStepped:Connect(function()
             -- somewhere, and a head snapping about mid-flight reads as a glitch.
             local idleYaw, idlePitch, idleTail = 0, 0, 0
             if not flying then
-                idleYaw, idlePitch, idleTail = BirdFlight.idlePose(now, b.seed)
+                idleYaw, idlePitch, idleTail = BirdFlight.idlePose(now, b.seed, PROFILE)
             end
             if b.neck then
                 b.neck.Transform = CFrame.Angles(math.rad(idlePitch * 0.35), math.rad(idleYaw * 0.4), 0)

@@ -72,9 +72,15 @@ mid-air.
 ## What exists today
 
 **Familiars — mostly built.** `BirdController.client.luau` (client) over the pure, Lune-tested
-`BirdFlight` and `BirdVoice`. Perches on tagged `FamiliarPerch` attachments near its owner;
+`BirdFlight` and `BirdSpecies`. Perches on tagged `FamiliarPerch` attachments near its owner;
 holds, leashes, flutters, turns, lands on a shoulder and sings on a win. Two species built, one
 reachable — **nothing selects a bird per player** ([[familiars]]).
+
+⚠ **THE PERCH BEHAVIOURS ARE SPECIES-INDEPENDENT AS OF 2026-08-28**, which is what makes any of
+this reusable. Head turns, tail flicks, the weight-shift hop, the flutter and the perch turn all
+take a scale profile: angles unchanged, distances × scale, durations × √scale. So an ambient bird
+of any size gets the built idle for free, and the only thing an ambient bird still needs is an
+ANCHOR that is not a player. See [[familiars]] for the rules and what is deliberately not scaled.
 
 **Ambient — one hand-built instance, and it has no body.** The falls-dock uguisu is a place-only
 Part + three Sounds + a `Script` under `CanyonWorld.Ambience`. ⚠ **It is a PRECEDENT, not a
@@ -100,7 +106,7 @@ railings, hero trees, chōchin poles, the descent stair and the Rojo builders' o
 
 Arrived at independently, living in two places, one of them place-only and invisible to git —
 [[duplicated-server-constants]]'s exact defect class. **Making the dock bird visible is the
-moment to fix it**: a server `Script` can `require` `ReplicatedStorage.RoshamboShared.BirdVoice`,
+moment to fix it**: a server `Script` can `require` `ReplicatedStorage.RoshamboShared.BirdSpecies`,
 so the numbers move into the committed, Lune-tested module and the place keeps only wiring.
 
 ## Open, not decided

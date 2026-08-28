@@ -105,6 +105,38 @@ function harness.run(): boolean
     return failed == 0
 end
 
+-- ⚠ SCAN CODE, NOT PROSE. Source-scanning guards must strip comments first, or a note that
+-- QUOTES the mistake it warns about fails the build -- which is exactly what a warning note is
+-- supposed to do. Shared rather than copied: two subtly different strippers would be the defect
+-- class in `practice/duplicated-server-constants.md`, in the tests that police it.
+function harness.stripComments(src: string): string
+    local body = string.gsub(src, "%-%-%[%[.-%]%]", "") -- block comments, possibly multi-line
+    local out: { string } = {}
+    for line in string.gmatch(body .. "\n", "(.-)\n") do
+        local quote: string? = nil
+        local cut: number? = nil
+        local i = 1
+        while i <= #line do
+            local c = string.sub(line, i, i)
+            if quote then
+                if c == "\\" then
+                    i += 1
+                elseif c == quote then
+                    quote = nil
+                end
+            elseif c == '"' or c == "'" or c == "`" then
+                quote = c
+            elseif c == "-" and string.sub(line, i + 1, i + 1) == "-" then
+                cut = i - 1
+                break
+            end
+            i += 1
+        end
+        table.insert(out, if cut then string.sub(line, 1, cut) else line)
+    end
+    return table.concat(out, "\n")
+end
+
 -- Allows the runner to detect double-loading mistakes in specs.
 function harness.count(): number
     return #tests

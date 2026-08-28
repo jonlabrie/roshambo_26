@@ -42,36 +42,10 @@ local function normalise(path: string): string
     return table.concat(parts, "/")
 end
 
--- ⚠ SCAN CODE, NOT PROSE. The first version of this guard grepped raw text and flagged the very
--- comment in TreatmentApplier that documents the bug -- quoting a bad path is exactly what a
--- warning note is supposed to do, and it must not fail the build.
-local function stripComments(src: string): string
-    local body = string.gsub(src, "%-%-%[%[.-%]%]", "") -- block comments, possibly multi-line
-    local out: { string } = {}
-    for line in string.gmatch(body .. "\n", "(.-)\n") do
-        local quote: string? = nil
-        local cut: number? = nil
-        local i = 1
-        while i <= #line do
-            local c = string.sub(line, i, i)
-            if quote then
-                if c == "\\" then
-                    i += 1
-                elseif c == quote then
-                    quote = nil
-                end
-            elseif c == '"' or c == "'" or c == "`" then
-                quote = c
-            elseif c == "-" and string.sub(line, i + 1, i + 1) == "-" then
-                cut = i - 1
-                break
-            end
-            i += 1
-        end
-        table.insert(out, if cut then string.sub(line, 1, cut) else line)
-    end
-    return table.concat(out, "\n")
-end
+-- ⚠ SCAN CODE, NOT PROSE -- see `harness.stripComments`, which this shares with the bird
+-- scale guard. The first version of this test grepped raw text and flagged the very comment in
+-- TreatmentApplier that documents the bug.
+local stripComments = harness.stripComments
 
 local function walk(dir: string, out: { string })
     for _, name in fs.readDir(dir) do

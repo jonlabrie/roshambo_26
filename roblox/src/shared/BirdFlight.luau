@@ -141,11 +141,68 @@ BirdFlight.SHOULDER_Y = SHOULDER.y
 --                      plausibly more deliberate than a warbler, but that is character per
 --                      species, not proportion, and it should be chosen by eye.
 --
--- The plan agreed with the owner 2026-08-28: fold this into a per-species record (voice already
--- lives in `BirdVoice`), carry `bodyLength`, and pass a scale into this module -- distances x
--- scale, times x sqrt(scale), angles untouched. ⚠ With the uguisu as the reference at 1.0 its
--- behaviour must come out BIT-IDENTICAL, which is the property that makes the change safe to
--- land before anyone has watched a karasu perch.
+-- BUILT 2026-08-28, and this is how it works. `BirdSpecies` carries each bird's measured
+-- `bodyLength`; `BirdSpecies.scaleOf` divides it by the reference bird's; `BirdFlight.profile`
+-- turns that one number into the two multipliers below, and every scale-sensitive function takes
+-- an optional trailing Profile. ⚠ THE UGUISU AT SCALE 1 IS BIT-IDENTICAL -- multiplying by 1.0
+-- and dividing by sqrt(1) are exact in IEEE arithmetic, and a test asserts the whole surface
+-- output-for-output. That property is what made this safe to land before anyone had watched a
+-- karasu perch: the one bird the owner HAS watched provably did not move.
+--
+-- ⚠ WHAT IS DELIBERATELY NOT SCALED, so the next reader does not read restraint as an oversight:
+--   the RESTING orbit ... geometry about the PLAYER, not the bird, and a fallback for "no perch
+--                        in range" that the owner's perch ruling already retired from normal play.
+--   SHOULDER ........... an anchor on a 5-stud avatar. The bird's origin is at its FEET, so this
+--                        says where the feet go, and a shoulder does not move because the bird
+--                        standing on it got bigger.
+--   flightPoint's bow .. already proportional to flight distance, which is world geometry. Only
+--                        its small constant terms are bird-ish, and they shape a PATH.
+--   REPLAN_* ........... thresholds tied to the unscaled orbit radii; scaling one and not the
+--                        other is how the replan loop of 2026-08-25 came back.
+--
+-- ⚠ AND THE RULE FOR GAPS, because the audit above left it half-stated. A gap that a GESTURE
+-- LIVES INSIDE scales with the gesture -- LOOK_HOLD is the slot the head's snap, hold and return
+-- must fit within, so a fixed slot around a stretched gesture eventually overflows and garbles
+-- the pose. A gap BETWEEN INDEPENDENT EVENTS is character: IDLE_FLUTTER_GAP and IDLE_TURN_GAP
+-- have nothing inside them, so how often a crow fidgets stays a choice somebody makes by eye,
+-- not a consequence of a square root. Per-species character belongs on the species record, named,
+-- rather than half-applied here and hidden.
+export type Profile = {
+    scale: number, -- body length relative to the reference bird
+    linear: number, -- multiply DISTANCES by this
+    time: number, -- multiply DURATIONS by this: sqrt(scale), not scale
+    -- The two durations the CONTROLLER gates on. It must read them from here and never from the
+    -- module fields, or a crow's turn would end on a uguisu's clock while running on its own.
+    TURN_TIME: number,
+    FLUTTER_BURST: number,
+}
+
+-- ⚠ sqrt, NOT linear. Bigger animals move slower roughly as the square root of length for
+-- pendulum-like limbs, so a 2x bird is about 1.41x slower. Scaling times linearly overshoots
+-- into slow motion, which is the mistake this function exists to make impossible to repeat.
+function BirdFlight.profile(scale: number): Profile
+    -- ⚠ REFUSED, not clamped. A zero or negative scale makes every duration zero and every
+    -- clock a division by zero, and NaN positions surface frames later as "the bird vanished" --
+    -- a diagnosis that costs a day, from a caller mistake that costs a line to report here.
+    if not (scale > 0) or scale == math.huge then
+        error(`BirdFlight.profile: scale must be a positive finite number, got {scale}`, 2)
+    end
+    local time = math.sqrt(scale)
+    return {
+        scale = scale,
+        linear = scale,
+        time = time,
+        TURN_TIME = BirdFlight.TURN_TIME * time,
+        FLUTTER_BURST = BirdFlight.FLUTTER_BURST * time,
+    }
+end
+
+-- The reference bird's profile, so an omitted argument means "the uguisu" rather than "no scale".
+-- ⚠ Read as a FIELD at call time, not captured: it is assigned at the bottom of this file,
+-- because building it needs constants declared further down than the functions that use it.
+local function prof(p: Profile?): Profile
+    return p or BirdFlight.REFERENCE_PROFILE
+end
 local HOP_PERIOD = 0.62 -- one hop; a small bird's is quick
 local HOP_HEIGHT = 0.05
 -- ⚠ THE HOP NO LONGER MOVES THE BIRD. It used to translate the whole body 0.09 studs each way
@@ -187,7 +244,10 @@ function BirdFlight.distance(a: Point, b: Point): number
     return BirdFlight.magnitude({ x = a.x - b.x, y = a.y - b.y, z = a.z - b.z })
 end
 
-function BirdFlight.offsetFor(state: string, elapsed: number, seed: number): Point
+function BirdFlight.offsetFor(state: string, elapsed: number, seed: number, profile: Profile?): Point
+    local p = prof(profile)
+    -- The orbit is NOT scaled: see the note on the profile above -- it is a fallback ring about
+    -- the PLAYER, and its radius has nothing to do with how long the bird is.
     local idle = orbit(elapsed, seed, HOLD.RESTING)
 
     -- SAFE and LOSS are deliberately absent and fall through to RESTING: nothing changed for a
@@ -196,10 +256,10 @@ function BirdFlight.offsetFor(state: string, elapsed: number, seed: number): Poi
     if state == "WIN" then
         -- LANDS ON THE SHOULDER AND HOPS. The flight in is a quick arc from wherever the bird
         -- was; after that it stays put and hops, which is the read the owner is testing for.
-        local hop = elapsed / HOP_PERIOD
-        local bob = math.abs(math.sin(hop * math.pi)) * HOP_HEIGHT
+        local hop = elapsed / (HOP_PERIOD * p.time)
+        local bob = math.abs(math.sin(hop * math.pi)) * HOP_HEIGHT * p.linear
         local perch = { x = SHOULDER.x, y = SHOULDER.y + bob, z = SHOULDER.z }
-        local k = math.min(1, elapsed / BirdFlight.ENTRY.WIN)
+        local k = math.min(1, elapsed / (BirdFlight.ENTRY.WIN * p.time))
         if k >= 1 then
             return perch
         end
@@ -287,8 +347,8 @@ end
 -- pins it. The feet alternate on the hop clock, each spending only a third of its beat in the
 -- air, and the body ROLLS toward whichever foot is planted. That roll is what makes this read as
 -- weight shifting rather than as legs twitching independently of the bird above them.
-function BirdFlight.legPose(elapsed: number, seed: number): (number, number, number)
-    local phase = elapsed / HOP_PERIOD + seed * 0.37
+function BirdFlight.legPose(elapsed: number, seed: number, profile: Profile?): (number, number, number)
+    local phase = elapsed / (HOP_PERIOD * prof(profile).time) + seed * 0.37
     local beat = math.floor(phase)
     local into = phase - beat
     local lift = 0
@@ -356,8 +416,12 @@ function BirdFlight.shouldReplan(arrived: boolean, drift: number): boolean
     return arrived and drift > REPLAN_MOVED
 end
 
-function BirdFlight.flightDuration(distance: number): number
-    return BirdFlight.FLIGHT_MIN_TIME + math.max(0, distance) / BirdFlight.CRUISE_SPEED
+function BirdFlight.flightDuration(distance: number, profile: Profile?): number
+    -- CRUISE_SPEED is a distance over a time, so it goes as linear/time; the floor is a time. A
+    -- bird twice as long crossing twice the distance therefore takes 1.41x as long, not 2x.
+    local p = prof(profile)
+    local speed = BirdFlight.CRUISE_SPEED * p.linear / p.time
+    return BirdFlight.FLIGHT_MIN_TIME * p.time + math.max(0, distance) / speed
 end
 
 -- Which shape this bird flies on its Nth flight. Deterministic, so two clients agree.
@@ -455,10 +519,18 @@ local TAIL_MAX = 9 -- degrees
 -- Where a perched bird is looking, and what its tail is doing, at time `elapsed`.
 -- Returns head yaw, head pitch and tail pitch, all in DEGREES. Pure and seed-deterministic, so
 -- two clients watching the same bird see the same idle.
-function BirdFlight.idlePose(elapsed: number, seed: number): (number, number, number)
+function BirdFlight.idlePose(elapsed: number, seed: number, profile: Profile?): (number, number, number)
+    -- ⚠ THE WHOLE IDLE IS ONE TIME DILATION, applied once to the input rather than to five
+    -- separate constants. Every clock in here -- the look slot, the snap, the check hold, the
+    -- tail's period and stroke -- is a duration, and they are structurally coupled: the snap and
+    -- its return must FIT INSIDE the slot, so stretching one without the other eventually
+    -- overflows and garbles the pose. Dividing the input keeps them in step by construction, and
+    -- makes the guarantee exact: a bigger bird runs the identical motion on a slower clock, and
+    -- no angle changes. Head yaw is 62 degrees on a wren and on an eagle.
+    local clock = elapsed / prof(profile).time
     -- Slots of ~LOOK_HOLD, each with its own target. Jittered per slot so the rhythm is not a
     -- metronome, which is the other way a fake idle gives itself away.
-    local phase = elapsed / LOOK_HOLD + seed
+    local phase = clock / LOOK_HOLD + seed
     local slot = math.floor(phase)
     local function isCheck(i: number): boolean
         return hash01(i * 4.13 + seed * 7.77) < CHECK_CHANCE
@@ -504,7 +576,7 @@ function BirdFlight.idlePose(elapsed: number, seed: number): (number, number, nu
     end
 
     -- The tail flick is on its own clock, so it does not always land with a head turn.
-    local tphase = elapsed / TAIL_PERIOD + seed * 0.61
+    local tphase = clock / TAIL_PERIOD + seed * 0.61
     local tslot = math.floor(tphase)
     local start = 0.1 + hash01(tslot + seed * 9.7) * 0.7
     local tinto = (tphase - tslot - start) * TAIL_PERIOD
@@ -532,11 +604,11 @@ end
 -- Opening is eased with per-bird jitter so fifty birds do not spread as one. Closing is INSTANT,
 -- on purpose: the owner asked for wings that "quickly fold in and disappear when it lands", and
 -- easing shut would leave a perched bird holding its wings half-open.
-function BirdFlight.wingExtension(elapsed: number, seed: number, flying: boolean): number
+function BirdFlight.wingExtension(elapsed: number, seed: number, flying: boolean, profile: Profile?): number
     if not flying then
         return 0
     end
-    local span = BirdFlight.WING_OPEN_TIME * (0.85 + 0.30 * hash01(seed))
+    local span = BirdFlight.WING_OPEN_TIME * prof(profile).time * (0.85 + 0.30 * hash01(seed))
     local k = math.min(1, math.max(0, elapsed / span))
     return 1 - (1 - k) * (1 - k) * (1 - k)
 end
@@ -567,12 +639,21 @@ end
 -- ⚠ MIRRORING DIFFERS PER AXIS, also measured: local X does NOT mirror (-30 raises BOTH wings),
 -- local Z DOES (forward is -Z on the right, +Z on the left). Guessing would have had one wing
 -- rise while the other fell.
-function BirdFlight.beatPose(elapsed: number, seed: number, flying: boolean): (number, number)
+function BirdFlight.beatPose(
+    elapsed: number,
+    seed: number,
+    flying: boolean,
+    profile: Profile?
+): (number, number)
     if not flying then
         return 0, 0
     end
-    local p = elapsed * FLAP_RATE + seed
-    return BirdFlight.WING_BEAT_DEG * math.sin(p), -BirdFlight.WING_SWEEP_DEG * math.cos(p)
+    -- ⚠ A RATE IS A RECIPROCAL TIME, so it is DIVIDED by the time multiplier, not multiplied.
+    -- The audit that classified this file's constants missed FLAP_RATE entirely; left alone, a
+    -- crow flaps at a warbler's 2.5 beats a second, which is the exact "the animation is wrong"
+    -- misdiagnosis the audit was written to prevent. The AMPLITUDES stay put -- they are angles.
+    local q = elapsed * (FLAP_RATE / prof(profile).time) + seed
+    return BirdFlight.WING_BEAT_DEG * math.sin(q), -BirdFlight.WING_SWEEP_DEG * math.cos(q)
 end
 
 -- How far open the wings are during a perched flutter, given seconds SINCE THAT FLUTTER BEGAN.
@@ -586,11 +667,12 @@ end
 --
 -- WHEN a flutter happens is the CONTROLLER's business -- it fires them on landing and on a win,
 -- and otherwise on `nextFlutterGap`. This function owns only the shape.
-function BirdFlight.flutterExtension(t: number, seed: number): number
-    if t <= 0 or t >= BirdFlight.FLUTTER_BURST then
+function BirdFlight.flutterExtension(t: number, seed: number, profile: Profile?): number
+    local burst = prof(profile).FLUTTER_BURST
+    if t <= 0 or t >= burst then
         return 0
     end
-    local u = t / BirdFlight.FLUTTER_BURST
+    local u = t / burst
     -- ⚠ FLATTENED (^0.5). A plain sine envelope over THREE flexes makes the middle one twice the
     -- reach of its neighbours, which reads as one flex with a stutter either side rather than
     -- three. The root pulls the shoulders up while still tapering both ends to zero.
@@ -637,15 +719,18 @@ end
 -- current facing. The perched branch of the controller derives its heading by reading the bird's
 -- OWN LookVector back each frame, so an incremental turn would compound into a spin. Capture
 -- `from` and `to` once when the turn starts and interpolate between them.
-function BirdFlight.turnPose(t: number): (number, number)
+function BirdFlight.turnPose(t: number, profile: Profile?): (number, number)
+    local p = prof(profile)
     if t <= 0 then
         return 0, 0
     end
-    if t >= BirdFlight.TURN_TIME then
+    if t >= p.TURN_TIME then
         return 1, 0 -- ⚠ hop returns to ZERO, or the bird is left standing in the air
     end
-    local u = t / BirdFlight.TURN_TIME
-    return u * u * (3 - 2 * u), math.sin(math.pi * u) * TURN_HOP
+    local u = t / p.TURN_TIME
+    -- Progress is scale-free; the hop is a DISTANCE, and at an absolute 0.06 it was 7.2% of the
+    -- uguisu but 3.7% of the karasu -- a crow barely leaving the rail reads as stiff.
+    return u * u * (3 - 2 * u), math.sin(math.pi * u) * TURN_HOP * p.linear
 end
 
 -- Seconds until the next idle turn. Deliberately NOT a multiple of the flutter gap: two habits on
@@ -664,5 +749,11 @@ end
 function BirdFlight.wingTransparency(open: number): number
     return 1 - math.clamp(open / WING_FADE_IN, 0, 1)
 end
+
+-- ⚠ ASSIGNED HERE, AT THE BOTTOM, ON PURPOSE. `profile` reads TURN_TIME and FLUTTER_BURST,
+-- which are declared further down this file than the functions that need the reference -- so it
+-- cannot be built at the point it is explained. `prof()` looks it up as a field at CALL time,
+-- by which point module load has finished and this line has run.
+BirdFlight.REFERENCE_PROFILE = BirdFlight.profile(1)
 
 return BirdFlight

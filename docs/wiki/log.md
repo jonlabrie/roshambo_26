@@ -1774,3 +1774,32 @@ are what carry forward; its implementation is not.
 Recorded alongside: the two systems already duplicate pitch jitter, timing band and clip set
 between a place-only Script and committed code — [[duplicated-server-constants]]'s exact class,
 and making the dock bird visible is the moment to collapse it.
+
+## [2026-08-28] ship | Bird motion scales with the species; BirdVoice becomes BirdSpecies
+
+Every motion constant in `BirdFlight` was tuned against the uguisu, and the karasu is about twice
+as long — so studs and seconds were wrong on it while degrees were fine. `BirdVoice` is renamed
+`BirdSpecies` and now carries a measured `bodyLength` beside the voice in ONE record per bird
+(two parallel tables keyed by species name would have been [[duplicated-server-constants]] with a
+different subject). `BirdSpecies.scaleOf` divides by the reference bird; `BirdFlight.profile`
+turns that into two multipliers; eight functions take it as a trailing argument. **Angles
+unchanged, distances × scale, durations × √scale.**
+
+`FLAP_RATE` and `CRUISE_SPEED` were both missing from the 2026-08-27 constant audit and are
+included here: a rate is a reciprocal time, so it is divided. Left alone, a crow flaps at a
+warbler's 2.5 beats a second — which presents as "the animation is wrong" rather than "a constant
+was absolute".
+
+⚠ **The uguisu at scale 1 is bit-identical**, asserted output-for-output across the whole
+surface — the property that made this safe to land before anyone has watched a karasu perch. The
+karasu's numbers are reasoned, not gated; they want the owner's eye.
+
+Eight mutations on the arithmetic and four on the controller, all caught. The controller guard is
+a source-scanning spec (`BirdScaleConvention`), because `BirdController` is a Roblox-runtime file
+Lune cannot execute and forgetting the argument compiles and looks almost right. ⚠ The list of
+functions it polices is derived from `BirdFlight`'s signatures rather than typed, and
+`stripComments` moved into `harness` rather than being copied a second time.
+
+`SPECIES` now also selects the mesh (`{SPECIES}Body`/`{SPECIES}Wings`, already declared in
+`default.project.json`), so one name drives assets, voice and proportion. Flipping it to Karasu is
+a one-line change; nothing selects a bird per player yet. 1545 Luau tests.

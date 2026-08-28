@@ -1,12 +1,13 @@
 ---
 shelf: world
-updated: 2026-08-27
+updated: 2026-08-28
 ---
 
 # Familiars
 
-The player's own bird. The architecture shared with ambient birds — and why both are
-client-rendered while only one is client-authoritative — is [[ambient-birds]]. — the bird that reads your round
+The player's own bird — the bird that reads your round. The architecture shared with ambient
+birds, and why both are client-rendered while only one is client-authoritative, is
+[[ambient-birds]].
 
 Every player has one small bird. It reacts to their result, wears their grade, and rests on the
 world rather than orbiting their head. Built 2026-08-18 as the core of
@@ -93,6 +94,12 @@ and settling a round must not run a per-player aggregation for every participant
 20 studs from the **owner**; a new perch is picked at random from what is in range so a bird
 sometimes returns to the one it just left; held 10–60s; a 70-stud leash stops an owner walking off
 and stranding their familiar.
+
+⚠ **THE 20-STUD RADIUS AND THE 70-STUD LEASH DO NOT SCALE WITH THE BIRD, deliberately.** They
+describe how far a familiar will stray from its OWNER — territory, which is a fact about the
+player, not about how long the bird is. A crow's perch search widening because a crow is longer
+would be arithmetic standing in for a design decision. Motion scales; territory is chosen. See
+the scale section below.
 
 ⚠ **THREE LIFETIMES, AND THE SWEEP OWNS ONE.** Getting this wrong works when tested and degrades
 silently in play:
@@ -335,10 +342,14 @@ both, and is the only place they can be re-derived.
 (~50cm). `measureBirds` prints the exact ratio; it was first written here as "three times", from
 the uguisu's designed size rather than its shipped one. It follows two standing rulings
 rather than inventing one — *"life size, maybe slightly larger"* (2026-08-19) and *"a presumably
-larger bird, like a raven/crow to carry it"* (2026-08-22). **The consequence is real work for the
-main thread:** `SEAT_INBOARD` / `SEAT_LIFT` are proportions of the avatar's arm, not of the bird,
-so a bird three times longer than the shipped one will not seat correctly without retuning, and
-`PERCH_RADIUS` and the flight tuning were both set looking at a 7-inch bird.
+larger bird, like a raven/crow to carry it"* (2026-08-22).
+
+**The motion consequence is now handled** — see the scale section below; this used to read as
+outstanding work and no longer is. `SEAT_INBOARD` / `SEAT_LIFT` remain proportions of the
+AVATAR's arm and are correctly untouched by bird size: they say where the feet go, and a stock
+R15 shoulder does not move because the bird standing on it got bigger. ⚠ **What is still unproven
+is the seat by eye** — nobody has watched a life-size crow stand on a shoulder, and a bird twice
+as long overhangs twice as far.
 
 ⚠ **THE WINGSPAN IS THE DIAL MOST LIKELY TO WANT THE OWNER'S EYE.** It ships at **1.49× body
 length**. A live crow is 2.0× (50cm long, ~100cm span) and the shipped uguisu is 1.13× — so the
@@ -417,7 +428,13 @@ trap is a third thing to correct when the trap is corrected.
 Run `roblox/tools/studio/measureBirds.luau` for the roster's actual sizes, bone counts and asset
 ids rather than reading them here.
 
-## Voice — per species, in `roblox/src/shared/BirdVoice.luau`
+## The species record — `roblox/src/shared/BirdSpecies.luau`
+
+⚠ **ONE RECORD PER BIRD, carrying voice AND measured `bodyLength`.** This file was `BirdVoice`
+and held only clips; body length arrived beside it on 2026-08-28 and went INTO the same record
+rather than into a second table, because two parallel lists keyed by species name is
+[[duplicated-server-constants]] with a different subject. `BirdSpecies.REFERENCE` names the bird
+every motion constant was tuned against, and `scaleOf` divides by it.
 
 ⚠ **A crow is not a loud warbler.** Clips, volume and rolloff are all per species now; the
 uguisu's values moved unchanged, with the reasoning that earned them. Read the module for the
@@ -443,9 +460,12 @@ and two-caw clips is sample-identical to a baked recording apart from 0.48s of r
 −56 dBFS — verified by diffing, not by ear. `GROUP_GAP_SECONDS` is the delay it needs, and it is
 NOT the 0.76s gap you would measure off the source: the clips carry their own padding.
 
-⚠ **AND NONE OF THE KARASU'S VOICE IS REACHABLE.** `BirdController` hardcodes
-`SPECIES = "Uguisu"` because nothing selects a bird per player. Same shape as the mesh: built,
-correct, waiting on selection.
+⚠ **AND NONE OF THE KARASU IS REACHABLE, but the gap is now one line.** `BirdController`
+hardcodes `SPECIES = "Uguisu"` because nothing selects a bird per player. As of 2026-08-28 that
+ONE name drives the mesh (`{SPECIES}Body` / `{SPECIES}Wings`, both already declared in
+`default.project.json`), the voice and the motion scale — so flipping it changes the whole bird
+rather than half of it. A test pins that the three cannot drift apart, because a bird wearing a
+crow's body with a warbler's song is the failure that has nothing positioned to notice it.
 
 ⚠ **The familiar sings ONLY on a win, and that is a RULING, not an implementation detail.** It
 protects the falls-dock uguisu's gate — *"this bird lives here and you have to be close to hear
@@ -464,6 +484,48 @@ with `CollectionService:GetTagged("FamiliarPerch")` rather than trusting a numbe
 rather than an owner, so the seam is narrow, but nothing spawns a bird with no player attached,
 nothing schedules its calls (the dock uguisu's bout pattern on [[falls-dock]] is the proven
 design), and nothing decides how many there are or stops one being mistaken for your familiar.
+
+## Motion scales with the bird — built 2026-08-28
+
+⚠ **EVERY MOTION CONSTANT IN `BirdFlight` WAS TUNED AGAINST THE UGUISU**, and the karasu is about
+twice as long, so the ones expressed in studs or seconds were all wrong on it while the ones in
+degrees were fine. That is [[derive-from-what-it-touches]] applied to animation.
+
+`BirdSpecies.scaleOf` returns a bird's length over the reference bird's; `BirdFlight.profile`
+turns that one number into two multipliers, and every scale-sensitive function takes the profile
+as a trailing argument. The three rules:
+
+| | rule | why |
+|---|---|---|
+| **angles** | unchanged | 45° is 45° on a wren or an eagle |
+| **distances** | × scale | the hop was an absolute 0.05 studs — 6% of the uguisu, 3% of the karasu, and a crow doing a uguisu-sized hop reads as STIFF |
+| **durations** | × **√**scale | bigger animals move slower roughly as the square root of length, so a 2× bird is ~1.41× slower; × scale overshoots into slow motion |
+
+⚠ **RATES ARE RECIPROCAL TIMES AND ARE DIVIDED, NOT MULTIPLIED.** `FLAP_RATE` and `CRUISE_SPEED`
+were both missing from the constant audit that preceded this work. Left alone, a crow flaps at a
+warbler's 2.5 beats a second — which presents as *"the animation is wrong"* rather than *"a
+constant was absolute"*, and that misdiagnosis is the expensive one.
+
+⚠ **THE UGUISU AT SCALE 1 IS BIT-IDENTICAL, and that property is what made this safe to land.**
+Multiplying by 1.0 and dividing by √1 are exact in IEEE arithmetic; a test asserts the whole
+surface output-for-output, so the one bird anyone has actually watched provably did not move.
+Nobody has yet seen a karasu perch, so its numbers are reasoned, not gated — **they want the
+owner's eye before they are called right.**
+
+**Deliberately NOT scaled**, recorded so restraint is not read as oversight: the resting orbit
+(geometry about the player, and only a fallback for "no perch in range"), the shoulder seat (an
+anchor on the avatar), the flight path's bow (already proportional to flight distance),
+`RESULT_HOLD` (an owner-set display duration, not a motion), and the two idle **gaps** — how
+often a bird fidgets is per-species character to be chosen by eye, not a consequence of a square
+root. The rule that separates the last case: a gap a gesture lives *inside* scales with the
+gesture; a gap *between* independent events is character.
+
+⚠ **THE ONE MISTAKE THAT CANNOT BE CAUGHT AT RUNTIME** is forgetting the argument — it compiles,
+runs, and looks almost right. `BirdController` is a Roblox-runtime file so Lune cannot execute
+it, and `tests/BirdScaleConvention.spec.luau` reads its SOURCE instead: every call must pass the
+profile, and no gate may read a duration off the module. ⚠ The list of functions it polices is
+**derived from `BirdFlight`'s own signatures**, never typed in the test — a hand-kept list would
+go stale exactly at the newest function, which is the worst place for it.
 
 ## ⚠ THE UGUISU IS DELIBERATELY OVERSIZED — do not "correct" it toward life-size
 
@@ -498,8 +560,9 @@ Z +40 moves them +0.6579 and −0.6579 fore-aft and 0.0000 vertically.
 −0.7060). The SIGN RELATIONSHIPS — which are what the beat and fold depend on — agree exactly; the
 absolute numbers do not, and the in-place measurement is the one that governs.
 
-Not yet done, and both are code rather than asset work: nothing selects a bird per player, and the
-seat/perch constants above are still tuned for the uguisu.
+Not yet done, and it is code rather than asset work: **nothing selects a bird per player.** The
+motion constants are no longer uguisu-only — see the scale section above — so selection is now
+the single thing standing between the karasu and being playable.
 
 ## Still thin
 
