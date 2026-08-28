@@ -87,12 +87,19 @@ KARASU = {
 SPECIES = {
     "uguisu": {"palette": UGUISU, "shader": "warbler", "ref_length": 0.552},
     "karasu": {"palette": KARASU, "shader": "corvid", "ref_length": 1.640,
-               # ⚠ DERIVED, NOT TRANSCRIBED. Every one of these comes from
-               # `karasu_retarget.landmarks_final()`, which maps that module's build-coordinate
-               # proportions through the same rescale the mesh got. Re-run it after any change
-               # to KARASU rather than editing numbers here: a landmark that stops describing
-               # the geometry it draws is exactly how the uguisu's supercilium ended up painted
-               # across its breast.
+               # ⚠ THESE ARE A FALLBACK AND A RECORD, NOT THE VALUES ACTUALLY USED.
+               # `karasu_retarget.bake_and_finish` now OVERWRITES this dict from
+               # `landmarks_final()` immediately before baking, so the paint always describes the
+               # mesh that was just built. That is new on 2026-08-28 and it closed a real gap:
+               # this comment used to claim every number here "comes from landmarks_final()", and
+               # `eye` and `catchlight` did not -- landmarks_final did not emit them at all. They
+               # were hand-measured and typed, so a reshape of the head slid the skull out from
+               # under them with nothing to notice. The 2026-08-28 belly-and-culmen pass raised
+               # the crown 0.0033 studs at the eye's station, 14% of the eye's radius: too small
+               # to see, and exactly the size that accumulates.
+               # ⚠ `throat_y` and `leg_z` still have NO derivation and are the live instance of
+               # the same risk. A landmark that stops describing the geometry it draws is how the
+               # uguisu's supercilium ended up painted across its breast.
                "landmarks": {
                    "eye": (0.062, 0.560, 0.836), "eye_r": 0.024,
                    "catchlight": (0.062, 0.5705, 0.8455), "catchlight_r": 0.0092,

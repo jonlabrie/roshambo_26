@@ -244,6 +244,27 @@ KARASU = {
     # that gives a real hinge and leaves no hole in the head.
     "bill": {"gape_p": (0.0, 0.720, 0.9555), "gape_n": (0.0, 0.0599, 0.9982),
              "hinge_y": 0.645, "tip_y": 0.830},
+    # ⚠ THE KARASU'S EYE IS PAINTED, NOT MODELLED -- unlike the uguisu, which carries eye
+    # GEOMETRY from `bird_familiar._eyes`. A crow's eye is as dark as its head, so a sphere buys
+    # nothing a texture cannot; what sells it is the CATCHLIGHT (`bake_bird_texture`). One
+    # consequence worth stating plainly, because it wasted a look on 2026-08-28: an untextured
+    # solid-shaded render of this bird HAS NO EYES, and that is not a missing feature.
+    #
+    # ⚠ AND UNTIL NOW IT WAS THE ONE LANDMARK NOTHING COULD RE-DERIVE. `bake_bird_texture` says
+    # every karasu landmark "comes from `karasu_retarget.landmarks_final()`"; `eye` and
+    # `catchlight` did not -- they were measured by hand and typed, so any reshape of the head
+    # slid the skull out from under them silently. Measured after the 2026-08-28 reshape: the
+    # crown rose 0.0033 studs at the eye's station, 14% of the eye's own radius -- too small to
+    # see, and exactly the size of drift that accumulates unnoticed.
+    #
+    # Now `landmarks_final` derives the eye's z from the MEASURED crown at its own station, so it
+    # tracks a forehead change instead of ignoring one. `crown_drop` reproduces the hand-measured
+    # z exactly on the pre-reshape bird (crown 0.897 - 0.061 = 0.836), so adopting this changed
+    # nothing about how the bird looks; it only changed what happens NEXT time the head moves.
+    # ⚠ These are in FINAL studs, not build coordinates -- they are compared against the
+    # normalised mesh, unlike everything else in this dict.
+    "eye": {"y": 0.560, "x": 0.062, "crown_drop": 0.061, "r": 0.024,
+            "catch_dy": 0.0105, "catch_dz": 0.0095, "catch_r": 0.0092},
     # ⚠ EVERY STATION BELOW WAS READ OFF `body_profile()`, not chosen. Owner, 2026-08-28, having
     # watched the karasu on a shoulder: "more of an arch on the culmen, and a fatter body,
     # presumably by giving the bird more of a 'belly'". The vendor crow is a lean bird and a
@@ -263,8 +284,12 @@ KARASU = {
         # the belly -- pushing it lower crowds the feet, which stand at z 0. What reads as a
         # full-bellied bird is the breast-to-vent line bowing convex, so the bulge sits over
         # y 0.08 where zmin is ~0.30 and there is room to give.
-        "belly": 0.035,
-        "belly_band": (-0.14, -0.02, 0.16, 0.32),
+        # ⚠ 0.035 READ AS "STILL A BIT SVELTE" (owner, 2026-08-28) and this is the second pass.
+        # The rear edge stays put: at y -0.126 the band is only ~4% in, so the thigh dip (zmin
+        # 0.111 against feet at z 0) barely moves however far this dial goes. The front edge
+        # moved OUT instead, so the fill runs up into the breast rather than deepening the vent.
+        "belly": 0.060,
+        "belly_band": (-0.14, -0.02, 0.20, 0.36),
         # --- CULMEN: bow the upper mandible's ridge -------------------------------------------
         # ⚠ ABOVE THE GAPE PLANE ONLY, weighted to zero AT it -- see the note on "bill" below.
         # The bill runs y 0.645 (hinge) to 0.830 (tip); measured culmen z falls 1.018 -> 0.960
@@ -1502,6 +1527,18 @@ def landmarks_final(spec=KARASU):
     order = sorted(range(len(ys)), key=lambda i: ys[i])
     b = spec["bill"]
     gy, gz = pt(b["gape_p"][1], b["gape_p"][2])
+    # ⚠ THE EYE IS MEASURED OFF THE FINISHED HEAD, not mapped through the transform like the
+    # rest. Its z is a drop from the CROWN at its own station, so a forehead change carries the
+    # eye with it instead of leaving it behind -- which is the drift this function did not
+    # previously catch, because it did not emit the eye at all.
+    e = spec["eye"]
+    o = bpy.data.objects.get("KarasuBody") or bpy.data.objects[BODY_OBJ]
+    co = np.array([v.co[:] for v in o.data.vertices])
+    near = np.abs(co[:, 1] - e["y"]) < 0.04
+    if not near.any():
+        raise RuntimeError("no head geometry at the eye station -- check eye.y")
+    crown = float(co[near][:, 2].max())
+    eye_z = crown - e["crown_drop"]
     return {"covert_edge_y": tuple(ys[i] for i in order),
             "covert_edge_z": tuple(zs[i] for i in order),
             "covert_back_y": round(plate[-1][0] * S + T[1] - 0.02, 4),
@@ -1509,6 +1546,10 @@ def landmarks_final(spec=KARASU):
             "gape_p": (0.0, gy, gz),
             "bill_y": round(b["hinge_y"] * S + T[1] - 0.045, 4),
             "tail_root_y": round(spec["tail"]["root_y"] * S + T[1], 4),
+            "eye": (e["x"], e["y"], round(eye_z, 4)), "eye_r": e["r"],
+            "catchlight": (e["x"], round(e["y"] + e["catch_dy"], 4),
+                           round(eye_z + e["catch_dz"], 4)), "catchlight_r": e["catch_r"],
+            "crown_at_eye": round(crown, 4),
             "scale": round(S, 6), "translate": [round(v, 5) for v in T]}
 
 
@@ -1745,6 +1786,15 @@ def bake_and_finish(res=1024):
     sys.modules["bake_bird_texture"] = bbt
     spec.loader.exec_module(bbt)
 
+    # ⚠ PAINT AGAINST THE MESH THAT WAS JUST BUILT, NOT AGAINST A TRANSCRIPT OF AN OLDER ONE.
+    # `bake_bird_texture` carries a typed `landmarks` dict whose own comment says to re-derive it
+    # from `landmarks_final()` after any change to KARASU -- and nothing enforced that, so the
+    # numbers were only ever as fresh as somebody's memory. They go stale in the direction that
+    # is hardest to see: the 2026-08-28 reshape raised the crown 0.0033 studs under a hand-typed
+    # eye, which is 14% of the eye's radius and invisible until it is not.
+    # MERGED, not replaced -- `throat_y` and `leg_z` have no derivation and still come from there.
+    bbt.SPECIES["karasu"]["landmarks"] = {**bbt.SPECIES["karasu"]["landmarks"],
+                                          **landmarks_final()}
     info = bbt.bake("KarasuBody", "karasu", res=res, wing_name="KarasuWings")
     img = bpy.data.images[info["image"]]
     png = OUT_DIR + "karasu_colormap.png"
