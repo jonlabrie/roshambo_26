@@ -343,11 +343,18 @@ local SEAT_INBOARD = 0.42
 -- bird 1.46 INCHES and the owner called it an inch too high (1 stud ~ 1 foot in the owner's units).
 -- 0.031 lands it at 0.45 inches -- clear of the mesh, not standing on air.
 local SEAT_LIFT = 0.031
--- ⚠ AND A BIGGER BIRD IS GIVEN BACK THE WIDTH IT GAINED. See `BirdFlight.seatRelief`: the seat
+-- ⚠ AND A WIDER BIRD IS GIVEN BACK THE WIDTH IT GAINED. See `BirdFlight.seatRelief`: the seat
 -- above places the FEET, and a bird centred on its feet reaches half its width inboard, so a
--- wider bird crowds the neck from an identical footprint. Measured off the clone's own Size.X
--- rather than a table, and exactly zero for the reference bird.
-local SEAT_RELIEF = BirdFlight.seatRelief(TEMPLATE.Size.X, PROFILE)
+-- wider bird crowds the neck from an identical footprint.
+--
+-- ⚠ BOTH WIDTHS ARE MEASURED OFF THE MESHES THAT ARE ACTUALLY THERE. The reference template is
+-- loaded beside this one, so nothing has to be inferred from the length ratio -- which would be
+-- wrong, because the karasu is 1.98x the uguisu long and only 1.47x wide. A missing reference
+-- template relieves nothing rather than guessing.
+local REFERENCE_BODY = meshOf(birdAssets and birdAssets:FindFirstChild(`{BirdSpecies.REFERENCE}Body`))
+local SEAT_RELIEF = if REFERENCE_BODY
+    then BirdFlight.seatRelief(TEMPLATE.Size.X, REFERENCE_BODY.Size.X)
+    else 0
 
 local function shoulderSeat(character: Model): Vector3?
     local arm = character:FindFirstChild("RightUpperArm") or character:FindFirstChild("Right Arm")

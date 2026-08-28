@@ -245,12 +245,23 @@ should chase that now."* ⚠ **This is not a measurement error.** The bird is li
 real hashibutogarasu; the question is how it READS at arena distance, which is the same tension
 that got the uguisu deliberately upscaled — in the opposite direction ([[familiars]]).
 
-⚠ **Do not open this by rescaling the mesh.** The lead already on record is the WINGSPAN: it
-ships at about 1.49x body length where a live crow is ~2.0x, and crows read as long-winged, so
-short wings may be most of why a life-size body does not feel big. `KARASU["wing_spread"]["span"]`
-in `roblox/tools/blender/karasu_retarget.py` is the dial, and the retarget runs end to end
-([[blender-pipeline]]) — so this is asset work, testable without touching motion. Confirm the
-wingspan figure first; it is recorded as `⚠ unverified`, taken from a bounding box on a rest pose.
+⚠ **Measured in the live place the same day, and it changes the question** ([[familiars]]). The
+avatar's head is about **2.5x too wide for its body** against real human proportion, so anything
+sized to reality and placed beside it reads at roughly 40% of what a real observer would see.
+**The karasu is not small; the head it stands next to is big** — which is the same finding that
+got the uguisu deliberately upscaled, and it makes this a design decision with a precedent rather
+than a defect.
+
+**Two ways to open it, cheapest first:**
+
+- **Wingspan.** Now VERIFIED off the spread-wing mesh at **1.49x body length** against a live
+  crow's ~2.0x (the uguisu is 1.13x, so both ship short-winged). A crow reads as long-winged in
+  life and loses most by this. `KARASU["wing_spread"]["span"]` in
+  `roblox/tools/blender/karasu_retarget.py` is the dial; the retarget runs end to end
+  ([[blender-pipeline]]), so it is asset work that touches no motion.
+- **Upscale the body**, accepting stylized proportion over realism. ⚠ This needs an OWNER ruling,
+  not a session's judgement — it reverses "life size" (2026-08-26) and the wiki now carries a
+  standing warning against re-litigating the uguisu's size in the other direction.
 
 **Cheaper than either:** nothing selects a bird per player yet, so no player can meet a karasu at
 all. Selection is upstream of caring how it reads.

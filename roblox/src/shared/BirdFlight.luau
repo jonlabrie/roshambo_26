@@ -750,26 +750,26 @@ function BirdFlight.wingTransparency(open: number): number
     return 1 - math.clamp(open / WING_FADE_IN, 0, 1)
 end
 
--- How far OUTBOARD to shift a perched bird's feet, in studs, so that a bigger bird's body does
--- not crowd the avatar's neck. `bodyWidth` is the bird's own measured Size.X.
+-- How far OUTBOARD to shift a perched bird's feet, in studs, so its body does not crowd the
+-- avatar's neck. Both widths are the birds' own measured `Size.X`.
 --
 -- ⚠ THE SEAT SAYS WHERE THE FEET GO; THE BODY IS WHAT CROWDS THE HEAD. The controller's
 -- SEAT_INBOARD is a proportion of the AVATAR's arm and is right to stay one -- a shoulder does
 -- not move because the bird standing on it got bigger. But the bird is centred on its feet, so a
--- bird twice as wide reaches half a width further inboard from the same footprint, and that is
--- what the owner saw on 2026-08-28: "shoulder seat is a little tight to the head".
+-- bird half a width wider reaches that much further inboard from an identical footprint, and that
+-- is what the owner saw on 2026-08-28: "shoulder seat is a little tight to the head".
 --
--- Hold the bird's INNER EDGE where the reference bird's sat and the whole correction falls out
--- with no tuning constant: give back exactly the half-width this bird has that the reference one
--- did not. ⚠ It is EXACTLY ZERO at scale 1, so the uguisu's gated seat is untouched.
+-- Hold the bird's INNER EDGE where the reference bird's sat and the correction is just the
+-- difference of two half-widths -- no tuning constant, and EXACTLY ZERO for the reference bird,
+-- whose seat the owner gated.
 --
--- ⚠ `bodyWidth / scale` is the reference-equivalent width, and it is an APPROXIMATION: the karasu
--- is a different mesh, not a scaled uguisu, so its width does not track its length exactly. It is
--- honest all the same -- the figure is measured off the bird that is actually there, and the
--- magnitude is right. If a future bird is unusually broad or unusually slim for its length, this
--- will be the line to look at.
-function BirdFlight.seatRelief(bodyWidth: number, profile: Profile?): number
-    return (bodyWidth * 0.5) * (1 - 1 / prof(profile).linear)
+-- ⚠ TAKE THE REFERENCE WIDTH, DO NOT INFER IT FROM SCALE. The first version of this used
+-- `width / scale`, assuming a bigger bird is a scaled one. Measured in the live place: the karasu
+-- is 1.98x the uguisu in length, 1.90x in height and only 1.47x in WIDTH. Birds are not scaled
+-- copies of each other, and the assumption over-relieved by about a third of an inch. Both
+-- templates are in `ReplicatedStorage.RoshamboBirds` at once, so there is nothing to infer.
+function BirdFlight.seatRelief(bodyWidth: number, referenceWidth: number): number
+    return (bodyWidth - referenceWidth) * 0.5
 end
 
 -- ⚠ ASSIGNED HERE, AT THE BOTTOM, ON PURPOSE. `profile` reads TURN_TIME and FLUTTER_BURST,

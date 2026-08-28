@@ -1830,3 +1830,28 @@ deliberately upscaled, in the opposite direction. The lead already on record is 
 (~1.49x body length against a live crow's ~2.0x, and `⚠ unverified`), which would make it asset
 work rather than a rescale. Cheaper than either: nothing selects a bird per player, so no player
 can meet a karasu at all.
+
+## [2026-08-28] audit | Measured the karasu in the live place: it is not a scaled uguisu, and the avatar's head is why it reads small
+
+Owner asked how large the karasu is. Measured against `ReplicatedStorage.RoshamboBirds` and a live
+character rather than answered from the page, and two facts came out that nothing had predicted.
+
+⚠ **THE KARASU IS NOT A SCALED UGUISU.** Length 1.98x, height 1.90x, **width only 1.47x**. That
+invalidated a line committed an hour earlier: `seatRelief` inferred the reference bird's width as
+`width / scale`, which over-relieved by about a third of an inch. Both templates are loaded at
+once, so the fix removes the inference rather than correcting it — `seatRelief(bodyWidth,
+referenceWidth)` is now the difference of two MEASURED half-widths, still exactly zero for the
+reference bird. Three mutations, all caught. **The rule this earns: never derive one of a mesh's
+dimensions from another across species.** `BirdFlight`'s motion scale is unaffected — it keys off
+`bodyLength` and applies to time and distance, not to geometry.
+
+⚠ **THE AVATAR'S HEAD IS WHY A LIFE-SIZE BIRD READS SMALL.** A stock R15 head is 1.196 studs wide
+on a 5.88-stud body — 20% of height, where a real human head is about 8%. The avatar's head is
+roughly 2.5x too wide for its body, so anything sized to reality and placed beside it reads at
+about 40% of what a real observer would see. This is the same finding that got the uguisu
+deliberately upscaled, arriving from the other direction. It reframes the owner's "seems small"
+from a possible measurement error (it is not one) to a design question with a precedent.
+
+⚠ **The wingspan is now VERIFIED**, previously `⚠ unverified` from a rest-pose bounding box:
+1.49x body length off the spread-wing MeshPart, against a live large-billed crow's ~2.0x. The
+uguisu is 1.13x. Both ship short-winged and the crow loses more by it. Still the cheapest lead.

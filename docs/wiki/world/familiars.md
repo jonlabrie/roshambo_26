@@ -319,12 +319,13 @@ scaled avatar gets the same result:
 The three proportions above place the bird's **feet**, and a bird is centred on its feet — so a
 wider bird reaches half a width further inboard from an identical footprint and crowds the neck.
 Owner, watching the karasu on a shoulder: *"a little tight to the head."* Holding the bird's INNER
-EDGE where the reference bird's sat is the whole correction and needs no tuning constant: give
-back exactly the half-width this bird has that the reference one did not. It is **exactly zero at
-scale 1**, so the gated uguisu seat is untouched, and it is measured off the clone's own `Size.X`
-rather than a table. ⚠ `width / scale` as the reference-equivalent width is an APPROXIMATION — the
-karasu is a different mesh, not a scaled uguisu — so an unusually broad or slim bird is the case
-that will want this line looked at.
+EDGE where the reference bird's sat is the whole correction and needs no tuning constant: it is
+the difference of two half-widths, **exactly zero for the reference bird** whose seat was gated.
+
+⚠ **BOTH WIDTHS ARE MEASURED; NEITHER IS INFERRED FROM LENGTH.** The first version took the
+reference width as `width / scale`, assuming a bigger bird is a scaled one. It is not — see the
+measured proportions below — and the assumption over-relieved by about a third of an inch. Both
+templates sit in `RoshamboBirds` at once, so there is nothing to infer.
 
 ⚠ **THE VICTORY SONG FIRES ON THE LANDING, AND NO TIMER CAN REPLACE THAT.** Three attempts said
 otherwise: a random 0–2.2s, then `ENTRY.WIN` + stagger, then this. Both timers sang before the bird
@@ -545,6 +546,31 @@ go stale exactly at the newest function, which is the worst place for it.
 | the wings | **fine for now** |
 | the shoulder seat | *"a little tight to the head"* — corrected, see the seat table above; awaits a second look |
 | overall size | ⚠ *"the karasu seems small, but I'm not sure we should chase that now"* — **parked, see below** |
+
+### ⚠ MEASURED IN THE LIVE PLACE, 2026-08-28 — and the bird is not scaled, it is SLIMMER
+
+Run the query yourself rather than trusting this paragraph — `roblox/tools/studio/measureBirds.luau`
+in Edit, or the same reads against `ReplicatedStorage.RoshamboBirds` in a Play client. Two facts
+came out of it that nothing on this page had predicted:
+
+⚠ **THE KARASU IS NOT A SCALED UGUISU.** Length 1.98×, height 1.90×, **width only 1.47×**. Any
+code that derives one dimension from another across species is wrong, and one already was — the
+seat relief above. `BirdFlight`'s motion scale is unaffected: it keys off `bodyLength` and applies
+to time and distance, not to the mesh.
+
+⚠ **THE AVATAR'S HEAD IS THE REASON A LIFE-SIZE BIRD READS SMALL, and this is the same finding
+that got the uguisu upscaled** ([[status-display]] and the ruling below). Measured on a stock R15:
+head **1.196 studs wide against a 5.88-stud body** — 20% of height, where a real human head is
+about 8%. The avatar's head is roughly **two and a half times too wide for its body**, so anything
+sized to *reality* and placed beside it reads at about 40% of what a real observer would see.
+**The karasu is not small; the head it stands next to is big.** That reframes the size question
+from "is the measurement wrong" (it is not) to "does life-size survive stylized proportions"
+(it may not) — which is a design decision with a precedent, not a bug.
+
+⚠ **The wingspan figure is now VERIFIED and was previously marked unverified.** Measured off the
+spread-wing MeshPart rather than a rest pose: **1.49× body length**, against a live large-billed
+crow's ~2.0×. The uguisu's is 1.13×. So both birds ship short-winged, and the crow — a bird that
+reads as long-winged in life — loses more by it. This remains the cheapest lead on "seems small".
 
 ⚠ **THE SIZE OBSERVATION IS DEFERRED, NOT DISMISSED, and it is a genuinely open question rather
 than a bug.** The karasu measures life-size against a real hashibutogarasu, so "seems small" is a
