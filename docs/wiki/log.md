@@ -1855,3 +1855,26 @@ from a possible measurement error (it is not one) to a design question with a pr
 ⚠ **The wingspan is now VERIFIED**, previously `⚠ unverified` from a rest-pose bounding box:
 1.49x body length off the spread-wing MeshPart, against a live large-billed crow's ~2.0x. The
 uguisu is 1.13x. Both ship short-winged and the crow loses more by it. Still the cheapest lead.
+
+## [2026-08-28] defect | The karasu's eye: 31 texels, all of them spent on black
+
+Owner in play: "nothing reads as an eye on the existing model", rejecting an earlier session's
+"black on black so it cannot read" as an oversimplification, with a reference photograph.
+
+Two measurements, both of which contradicted the standing explanation. The eye has **31 texels
+across** at the shipped 1024 atlas (from the UV area of the faces around it), so resolution was
+never the limit. And sampled off the reference as ratios to the adjacent head feather: highlight
+3.08x, ear-covert stipple 1.37x, lid 0.72-0.50x, **iris 0.66x**, pupil 0.14x.
+
+⚠ **The iris is DARKER than the feathers.** Two sessions had reasoned that a bird's eye reads
+because a pale warm iris sits against black; the photograph says every part of the eye except the
+glint is darker than the head around it. A crow's eye reads by contrast with its OWN surround.
+
+⚠ **And the catchlight's brightness was right all along** — 3.4x the crown against a measured
+3.08. Its SIZE was the bug: 38% of the eye's radius, ~15% of its area, against a real reflection
+covering about a third of the eyeball. "Add a catchlight" looked done because the failing
+dimension was not the one anyone had checked.
+
+Five layers now: pale ear-covert frame, dark socket rim, iris, pupil, broad elliptical glint. The
+frame was missing entirely rather than mis-tuned. Baked and exported; awaiting the owner's look.
+Modelling the eye stays the fallback if paint proves insufficient in play ([[familiars]]).

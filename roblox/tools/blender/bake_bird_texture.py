@@ -71,9 +71,23 @@ KARASU = {
                                       # here is deliberately low-relief geometry, so its edge has
                                       # to be drawn. Same finding as the uguisu, and it matters
                                       # more on a bird with no other markings at all.
-    "eye":         (20, 19, 19),
-    "catchlight":  (190, 192, 200),   # a crow's eye is as dark as its head; without a highlight
-                                      # the face is a blank. The only bright value in the palette.
+    # ⚠ THE EYE IS A DARK SOCKET WITH ONE BIG GLINT, FRAMED BY PALER FEATHERING -- measured off
+    # `birds/Jungle_crow_Close-up.jpg` on 2026-08-28, as luminance RATIOS against the plain head
+    # feather beside it, so they survive this palette's ~35% legibility lift:
+    #     highlight 3.08x | ear-covert stipple 1.37x | lid 0.72-0.50x | iris 0.66x | pupil 0.14x
+    # ⚠ THE IRIS IS DARKER THAN THE FEATHERS, NOT LIGHTER. Two sessions in a row reasoned that a
+    # bird's eye reads because the iris is a pale warm brown against black; the photograph says
+    # the opposite -- every part of the eye except the glint is darker than the head around it.
+    # What makes a crow's eye read is CONTRAST WITH ITS OWN SURROUND, not a light iris.
+    "eye":         (40, 36, 33),      # iris: warm, and 0.66x the crown
+    "pupil":       (8, 8, 10),        # 0.14x
+    "lid":         (28, 26, 28),      # the socket rim, darker than the feathers it sits in
+    "periocular":  (76, 78, 92),      # ⚠ THE FRAME. Pale scalloped ear coverts above and in front
+                                      # of the eye, 1.37x the head. On a bird with no other head
+                                      # markings this is what says "there is a face here" at
+                                      # arena distance, and nothing was drawing it.
+    "catchlight":  (190, 192, 200),   # 3.4x the crown, against a measured 3.08 -- kept bright on
+                                      # purpose. ⚠ Its RATIO was never the problem; its SIZE was.
     "bill":        (42, 42, 48),      # heavy, matte, and the same colour top and bottom -- what
     "bill_gloss":  (72, 73, 86),      # separates the mandibles is the culmen highlight and the
     "leg":         (40, 40, 44),      # dark gape line between them, not two colours
@@ -102,7 +116,8 @@ SPECIES = {
                # uguisu's supercilium ended up painted across its breast.
                "landmarks": {
                    "eye": (0.062, 0.560, 0.836), "eye_r": 0.024,
-                   "catchlight": (0.062, 0.5705, 0.8455), "catchlight_r": 0.0092,
+                   "catchlight": (0.062, 0.5660, 0.8455), "catchlight_r": 0.0120,
+                   "periocular_offset": (0.0180, 0.0140), "periocular_r": 0.0624,
                    # the folded wing plate's own top edge
                    "covert_edge_y": (-0.4346, -0.3092, -0.1837, -0.0917,
                                      0.0170, 0.1509, 0.2763, 0.3851),
@@ -283,17 +298,46 @@ def shade_corvid(P, N, pal, S=1.0, lm=None):
     line = (1.0 - _smooth(0.003, 0.010, np.abs(z - edge_z))) * span
     out = out * (1 - line)[:, None] + C["covert_edge"] * line[:, None]
 
-    # 3. eye, then the catchlight on top of it
+    # 3. THE EYE. Five layers, painted outward-in, because the read comes from the SURROUND as
+    #    much as from the eye -- see the measured ratios on KARASU.
+    #    ⚠ The eye has 31 TEXELS ACROSS at 1024 (measured 2026-08-28 from the UV area of the
+    #    faces around it). Resolution was never the limit; the paint was. A flat near-black disc
+    #    with a dot on it spends all 31 of them saying nothing.
     e, cl = lm["eye"], lm["catchlight"]
+    er = lm["eye_r"]
     de = np.sqrt((x - e[0]) ** 2 + (y - e[1]) ** 2 + (z - e[2]) ** 2)
-    we = 1.0 - _smooth(lm["eye_r"] * 0.60, lm["eye_r"], de)
-    out = out * (1 - we)[:, None] + C["eye"] * we[:, None]
-    # ⚠ THE CATCHLIGHT IS MEASURED IN THE EYE'S OWN PLANE, NOT IN 3D. As a 3D ball it has to be
-    # centred exactly on a curved surface to touch it at all, and at r = 0.008 on a head 0.15
-    # wide it simply missed -- the bird came out with a flat black hole for an eye. Gating the
-    # 2D (y, z) offset on "wherever the eye is painted" puts it on the eye by construction.
-    d2 = np.sqrt((y - cl[1]) ** 2 + (z - cl[2]) ** 2)
-    wc = (1.0 - _smooth(lm["catchlight_r"] * 0.40, lm["catchlight_r"], d2)) * (we > 0.45)
+
+    #    a. THE FRAME: pale ear-covert feathering above and in front of the eye. Offset toward
+    #       the bill (+y) and the crown (+z), and faded hard so it reads as a cheek patch rather
+    #       than a lightened head.
+    po = lm.get("periocular_offset", (0.018, 0.014))
+    pr = lm.get("periocular_r", er * 2.6)
+    dp = np.sqrt((y - (e[1] + po[0])) ** 2 + (z - (e[2] + po[1])) ** 2)
+    wp = (1.0 - _smooth(pr * 0.35, pr, dp)) * 0.75
+    out = out * (1 - wp)[:, None] + C["periocular"] * wp[:, None]
+
+    #    b. THE SOCKET: a rim darker than the feathers, so the eye sits IN something.
+    wl = (1.0 - _smooth(er * 1.55, er * 1.9, de)) * _smooth(er * 0.9, er * 1.15, de)
+    out = out * (1 - wl)[:, None] + C["lid"] * wl[:, None]
+
+    #    c. iris, then d. pupil inside it
+    wi = 1.0 - _smooth(er * 0.75, er, de)
+    out = out * (1 - wi)[:, None] + C["eye"] * wi[:, None]
+    wpu = 1.0 - _smooth(er * 0.42, er * 0.58, de)
+    out = out * (1 - wpu)[:, None] + C["pupil"] * wpu[:, None]
+
+    #    e. THE GLINT, and it is a BROAD CAP, not a dot. In the reference the sky reflection
+    #       covers about a third of the eyeball across its top; at r = 0.0092 against an eye of
+    #       0.024 this was 15% of the area and read as a speck on a smudge. Elliptical -- wider
+    #       in y than in z -- because a reflection on a sphere lies along the horizon, and it is
+    #       the single brightest thing on the whole bird.
+    #    ⚠ MEASURED IN THE EYE'S OWN (y, z) PLANE, NOT IN 3D. As a 3D ball it has to be centred
+    #    exactly on a curved surface to touch it at all, and it simply missed -- the bird came
+    #    out with a flat black hole for an eye. Gating on "wherever the eye is painted" puts it
+    #    on the eye by construction.
+    cr = lm["catchlight_r"]
+    d2 = np.sqrt(((y - cl[1]) / 1.45) ** 2 + (z - cl[2]) ** 2)
+    wc = (1.0 - _smooth(cr * 0.45, cr, d2)) * (de < er * 1.02)
     out = out * (1 - wc)[:, None] + C["catchlight"] * wc[:, None]
 
     # 4. bill. Both mandibles are the same colour on a corvid -- what separates them is the

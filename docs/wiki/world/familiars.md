@@ -494,6 +494,49 @@ rather than an owner, so the seam is narrow, but nothing spawns a bird with no p
 nothing schedules its calls (the dock uguisu's bout pattern on [[falls-dock]] is the proven
 design), and nothing decides how many there are or stops one being mistaken for your familiar.
 
+## ⚠ THE KARASU'S EYE IS PAINTED, AND FOR TWO DAYS IT PAINTED NOTHING
+
+Owner, 2026-08-28, in play: *"nothing reads as an eye on the existing model."* The karasu's eye
+lives in the ColorMap — unlike the uguisu, which carries eye GEOMETRY from `bird_familiar._eyes`.
+⚠ **An untextured solid-shaded render of this bird therefore has no eyes at all**, which is worth
+knowing before it costs a look.
+
+⚠ **THE FIRST DIAGNOSIS WAS WRONG AND IS RECORDED SO IT IS NOT REACHED FOR AGAIN.** A session
+explained the miss as "a crow's eye is as dark as its head, so it cannot read" — an
+oversimplification the owner rejected with a reference photograph. Two measurements settled it:
+
+- **The eye has 31 texels across** at the shipped 1024 atlas, computed from the UV area of the
+  faces around it. **Resolution was never the limit.** A flat near-black disc with a dot on it
+  spends all 31 of them saying nothing.
+- **Sampled off `birds/Jungle_crow_Close-up.jpg`**, as luminance ratios against the plain head
+  feather beside the eye — so they survive the palette's ~35% legibility lift:
+
+| | vs the feathers |
+|---|---|
+| highlight (sky reflection) | **3.08×** |
+| ear-covert stipple | **1.37×** |
+| lid rim | 0.72× / 0.50× |
+| iris | **0.66×** |
+| pupil | 0.14× |
+
+⚠ **THE IRIS IS DARKER THAN THE FEATHERS, NOT LIGHTER.** Every part of the eye except the glint
+is darker than the head around it. What makes a crow's eye read is **contrast with its own
+surround** — a dark socket holding one big glint, framed by paler feathering — not a pale iris.
+
+⚠ **And the catchlight's BRIGHTNESS was right all along, at 3.4× the crown against a measured
+3.08. Its SIZE was the bug**: 38% of the eye's radius, so ~15% of its area, where the real
+reflection covers about a third of the eyeball as a broad cap. That is why "add a catchlight"
+looked done and was not — the failing dimension was not the one anyone had checked. The glint is
+now an ellipse, wider in y than z because a reflection on a sphere lies along the horizon.
+
+**Five layers now**, painted outward-in, and the frame matters as much as the eye: pale ear-covert
+patch, dark socket rim, iris, pupil, glint. The periocular frame was **missing entirely** rather
+than mis-tuned, and on a bird with no other head markings it is what says "there is a face here".
+
+**Modelling it remains the fallback**, not the plan: with 31 texels available the miss was a paint
+bug, and geometry would additionally buy a view-dependent engine specular if paint proves not to
+be enough in play.
+
 ## Motion scales with the bird — built 2026-08-28
 
 ⚠ **EVERY MOTION CONSTANT IN `BirdFlight` WAS TUNED AGAINST THE UGUISU**, and the karasu is about

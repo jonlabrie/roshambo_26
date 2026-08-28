@@ -263,8 +263,17 @@ KARASU = {
     # nothing about how the bird looks; it only changed what happens NEXT time the head moves.
     # ⚠ These are in FINAL studs, not build coordinates -- they are compared against the
     # normalised mesh, unlike everything else in this dict.
+    # ⚠ THE GLINT IS A BROAD CAP, NOT A DOT, and its size is the whole reason the eye did not
+    # read in play (owner, 2026-08-28: "nothing reads as an eye"). Measured off the reference
+    # photograph, the sky reflection covers about a THIRD of the eyeball across its top; at
+    # catch_r 0.0092 against an eye of 0.024 it was 15% of the area. 0.012, stretched 1.45x in y
+    # by the shader, lands at ~36%. Its BRIGHTNESS was always right -- 3.4x the crown against a
+    # measured 3.08 -- which is why "add a catchlight" looked done and was not.
     "eye": {"y": 0.560, "x": 0.062, "crown_drop": 0.061, "r": 0.024,
-            "catch_dy": 0.0105, "catch_dz": 0.0095, "catch_r": 0.0092},
+            "catch_dy": 0.0060, "catch_dz": 0.0095, "catch_r": 0.0120,
+            # The pale ear-covert frame, offset toward the bill and the crown. This is the piece
+            # that was missing entirely rather than mis-sized.
+            "peri_dy": 0.0180, "peri_dz": 0.0140, "peri_r": 0.0624},
     # ⚠ EVERY STATION BELOW WAS READ OFF `body_profile()`, not chosen. Owner, 2026-08-28, having
     # watched the karasu on a shoulder: "more of an arch on the culmen, and a fatter body,
     # presumably by giving the bird more of a 'belly'". The vendor crow is a lean bird and a
@@ -1549,6 +1558,7 @@ def landmarks_final(spec=KARASU):
             "eye": (e["x"], e["y"], round(eye_z, 4)), "eye_r": e["r"],
             "catchlight": (e["x"], round(e["y"] + e["catch_dy"], 4),
                            round(eye_z + e["catch_dz"], 4)), "catchlight_r": e["catch_r"],
+            "periocular_offset": (e["peri_dy"], e["peri_dz"]), "periocular_r": e["peri_r"],
             "crown_at_eye": round(crown, 4),
             "scale": round(S, 6), "translate": [round(v, 5) for v in T]}
 
