@@ -229,7 +229,14 @@ KARASU = {
                  (1.00, -0.214, -0.262, 0.072)],
     },
     # The bill is split along its gape so `bill_lower` has something to move. Plane measured on
-    # the vendor head; `run()` re-measures and overrides these if the mesh moves under them.
+    # the vendor head.
+    # ⚠ THESE ARE TYPED AND NOTHING RE-MEASURES THEM. This comment used to say "`run()`
+    # re-measures and overrides these if the mesh moves under them"; it does not -- `split_bill`
+    # reads them straight from here, and `landmarks_final` only REPORTS where they ended up after
+    # `normalise_size`. There is a guard for a plane that cuts NOTHING, but a plane that still
+    # cuts in the wrong place passes silently and the bird's beak opens along the wrong seam.
+    # That is why `reshape_body` displaces the culmen only ABOVE this plane, weighted to zero AT
+    # it: the cut stays valid by construction rather than by anyone remembering to re-measure.
     # THE GAPE PLANE, measured: the bill runs y 0.60 -> 0.83 with its z-midline at 0.970 falling
     # to 0.957 at the tip. The commissure sits a little BELOW that midline on a corvid, because
     # the upper mandible is the deeper of the two.
@@ -237,6 +244,49 @@ KARASU = {
     # that gives a real hinge and leaves no hole in the head.
     "bill": {"gape_p": (0.0, 0.720, 0.9555), "gape_n": (0.0, 0.0599, 0.9982),
              "hinge_y": 0.645, "tip_y": 0.830},
+    # ⚠ EVERY STATION BELOW WAS READ OFF `body_profile()`, not chosen. Owner, 2026-08-28, having
+    # watched the karasu on a shoulder: "more of an arch on the culmen, and a fatter body,
+    # presumably by giving the bird more of a 'belly'". The vendor crow is a lean bird and a
+    # hashibutogarasu is not -- it is heavy and full-chested, and the arched culmen is the single
+    # trait the bird's NAME is built on (hashibuto = thick-billed).
+    "reshape": {
+        # --- GIRTH: how much wider through the torso. A plain multiplier on |x|. -------------
+        # ⚠ THE HEAD MUST NOT WIDEN. Measured half-width peaks at 0.188 over y 0.054..0.234 and
+        # has already fallen to 0.118 by y 0.354, which is skull. Widening a crow's head costs
+        # the silhouette the whole bird is recognised by, so the taper is FULLY out before the
+        # head begins.
+        "girth": 1.15,
+        "girth_band": (-0.42, -0.18, 0.22, 0.34),   # 0, full, full, 0 -- smoothstep between
+        # --- BELLY: bow the ventral line instead of ramping it --------------------------------
+        # ⚠ CENTRED FORWARD OF THE LOWEST POINT, ON PURPOSE. The underside already dips hard at
+        # y -0.13 (zmin 0.111, against 0.445 at the breast) and that dip is the THIGH region, not
+        # the belly -- pushing it lower crowds the feet, which stand at z 0. What reads as a
+        # full-bellied bird is the breast-to-vent line bowing convex, so the bulge sits over
+        # y 0.08 where zmin is ~0.30 and there is room to give.
+        "belly": 0.035,
+        "belly_band": (-0.14, -0.02, 0.16, 0.32),
+        # --- CULMEN: bow the upper mandible's ridge -------------------------------------------
+        # ⚠ ABOVE THE GAPE PLANE ONLY, weighted to zero AT it -- see the note on "bill" below.
+        # The bill runs y 0.645 (hinge) to 0.830 (tip); measured culmen z falls 1.018 -> 0.960
+        # with a bow of only about +0.006 over the chord at mid-bill. 0.014 roughly triples it.
+        "culmen_arch": 0.014,
+        # ⚠ THE REAR SHOULDER RUNS BACK PAST THE HINGE (0.645) AND IT HAS TO. The first attempt
+        # ramped the arch in over y 0.645..0.700 -- 0.055 of run -- and rendered a visible SHELF
+        # where the bill meets the feathering, the exact "bent stick" this dial was paired with a
+        # forehead lift to avoid. A short shoulder on a smooth field is still a crease. Starting
+        # at 0.600 gives 0.12 of run and lands the blend inside the forehead, where the two
+        # displacements sum into one curve -- which is what the trait is on the real bird.
+        # ⚠ Verts behind the hinge are still gated on the GAPE PLANE, so this cannot move the cut.
+        "culmen_band": (0.600, 0.720, 0.790, 0.834),
+        # --- FOREHEAD: the other half of the same trait ---------------------------------------
+        # ⚠ AN ARCH THAT STOPS AT THE FEATHERING READS AS A BENT STICK. A hashibutogarasu's
+        # signature is the arched culmen AND the steep forehead above it; on the real bird they
+        # are one curve. Small, separate, and trivial to zero if the bill alone is wanted. The
+        # crown already peaks at z 1.073 near y 0.474, so this lifts BEHIND the bill, not the
+        # crown itself.
+        "forehead": 0.008,
+        "forehead_band": (0.44, 0.54, 0.66, 0.74),   # overlaps the culmen's rear ramp, on purpose
+    },
     "feet_target_tris": 130,         # per foot, down from the vendor's 920
 }
 
@@ -314,6 +364,15 @@ def load_vendor():
 # GEOMETRY — shared builders come from bird_familiar, which is the SPEC for our birds
 # ---------------------------------------------------------------------------------------
 
+# ⚠ THE FALLBACK BELOW IS THE PATH ACTUALLY TAKEN, in all three places that use it. The MCP
+# EXECS this file's source rather than importing it, so `__file__` is undefined and the fallback
+# resolves every helper import. It pointed at `.worktrees/assets/...` -- the ASSET THREAD's
+# worktree, retired 2026-08-26 and slated for deletion ([[parallel-threads]]) -- so this script
+# loaded its shared builders and its texture baker from a copy nobody maintains, and would have
+# broken outright the moment that worktree was removed. Checked 2026-08-28: the two copies of
+# `bird_familiar` and `bake_bird_texture` were still identical, so nothing had gone wrong yet.
+# That was luck, not design -- `spread_wing.py` HAD already diverged, and only escaped mattering
+# because nothing here loads it.
 def _bf():
     """bird_familiar.py holds `_blade` (a flat two-sided blade, for tail feathers) and
     `_flank_blade` (a blade whose thickness runs along X, so it presents its FACE outward --
@@ -323,7 +382,7 @@ def _bf():
     import os
     import sys
     here = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else \
-        "/Users/jonlabrie/Desktop/ClaudeCode/Roshambo_26/.worktrees/assets/roblox/tools/blender"
+        "/Users/jonlabrie/Desktop/ClaudeCode/Roshambo_26/roblox/tools/blender"
     if here not in sys.path:
         sys.path.insert(0, here)
     spec = importlib.util.spec_from_file_location(
@@ -389,6 +448,171 @@ def split_wings(cut=SHOULDER_CUT):
         if n in bpy.data.objects:
             bpy.data.objects.remove(bpy.data.objects[n], do_unlink=True)
     return stats
+
+
+def _smoothstep(t):
+    t = 0.0 if t < 0.0 else (1.0 if t > 1.0 else t)
+    return t * t * (3.0 - 2.0 * t)
+
+
+def _band(y, y0, y1, y2, y3):
+    """0 outside [y0, y3], 1 across [y1, y2], smoothstep on the shoulders.
+
+    ⚠ SMOOTHSTEP, NOT LINEAR. A linear ramp is C0 -- its slope jumps at each knee -- and on a
+    555-vertex body that shows as a visible crease ring where the taper starts, exactly the
+    "blocks bolted on" read the folded wing already had to learn its way out of.
+    """
+    if y <= y0 or y >= y3:
+        return 0.0
+    if y < y1:
+        return _smoothstep((y - y0) / (y1 - y0))
+    if y > y2:
+        return _smoothstep((y3 - y) / (y3 - y2))
+    return 1.0
+
+
+def _z_envelope(co, step=0.04):
+    """Per-station zmin/zmax/zmid of the body, as arrays to interpolate against.
+
+    This is what lets a displacement be VENTRAL or DORSAL rather than global: a vertex is weighted
+    by where it sits between the midline and the surface at its OWN station, so the belly bulges
+    without the back moving and the forehead lifts without the throat following.
+    """
+    y0, y1 = float(co[:, 1].min()), float(co[:, 1].max())
+    edges = np.arange(y0, y1 + step, step)
+    ys, zlo, zhi = [], [], []
+    for a in edges:
+        m = (co[:, 1] >= a - step) & (co[:, 1] < a + step)   # overlapping, so the curve is smooth
+        if m.sum() >= 3:
+            ys.append(a)
+            zlo.append(float(co[m][:, 2].min()))
+            zhi.append(float(co[m][:, 2].max()))
+    return np.array(ys), np.array(zlo), np.array(zhi)
+
+
+def reshape_body(spec=KARASU):
+    """Fatten the torso, drop a belly into the ventral line, and arch the culmen.
+
+    ⚠ THIS RUNS AFTER `split_wings` AND BEFORE EVERYTHING ELSE, and the position is load-bearing
+    in BOTH directions:
+
+      * AFTER the wing cut, because the cut is a plane at |x| = SHOULDER_CUT chosen to land in a
+        measured GAP -- body verts stop at 0.1579, wing verts start at 0.2267. Widening the body
+        first pushes the flank into that gap and the plane starts slicing shoulder.
+      * BEFORE the tail, the folded wing and the bill, because every one of those MEASURES the
+        body rather than assuming it -- `build_folded_wings` raycasts the flank at each station,
+        the tail seats on the rump. Reshape afterwards and the folded wing is shrink-wrapped to a
+        body that no longer exists, which is the "two flat fins with daylight behind them" bug.
+
+    ⚠ AND THE CULMEN IS DISPLACED ONLY ABOVE THE GAPE PLANE, weighted to zero AT it. The plane is
+    typed in `spec["bill"]` and nothing re-measures it, so moving the mandible out from under it
+    would leave the beak splitting along the wrong seam -- and `split_bill`'s guard only catches a
+    plane that cuts NOTHING, not one that cuts in the wrong place.
+    """
+    r = spec["reshape"]
+    b = spec["bill"]
+    o = bpy.data.objects[BODY_OBJ]
+    me = o.data
+    co = np.array([v.co[:] for v in me.vertices], dtype=float)
+    before = {"hw": round(float(np.abs(co[:, 0]).max()), 4),
+              "zmin": round(float(co[:, 2].min()), 4),
+              "zmax": round(float(co[:, 2].max()), 4)}
+
+    ys, zlo, zhi = _z_envelope(co)
+    gp, gn = Vector(b["gape_p"]), Vector(b["gape_n"]).normalized()
+    # How far above the gape plane the upper mandible actually reaches -- the arch is weighted by
+    # a vertex's height above the plane as a fraction of THIS, so the ridge moves fully and the
+    # gape line does not move at all.
+    fwd = co[:, 1] > b["hinge_y"]
+    d_all = (co[:, 0] - gp.x) * gn.x + (co[:, 1] - gp.y) * gn.y + (co[:, 2] - gp.z) * gn.z
+    d_max = float(d_all[fwd].max()) if fwd.any() else 1.0
+    if d_max <= 1e-6:
+        raise RuntimeError("no bill geometry above the gape plane -- check bill.gape_p / gape_n")
+
+    girth, belly = r["girth"], r["belly"]
+    gb, bb, cb, fb = r["girth_band"], r["belly_band"], r["culmen_band"], r["forehead_band"]
+    moved = {"girth": 0, "belly": 0, "culmen": 0, "forehead": 0}
+
+    for i, v in enumerate(me.vertices):
+        y, z = co[i, 1], co[i, 2]
+        lo = float(np.interp(y, ys, zlo))
+        hi = float(np.interp(y, ys, zhi))
+        mid = 0.5 * (lo + hi)
+
+        # --- girth: a plain multiplier on |x| across the torso ---------------------------
+        g = _band(y, *gb)
+        if g > 0.0:
+            v.co.x = co[i, 0] * (1.0 + (girth - 1.0) * g)
+            moved["girth"] += 1
+
+        # --- belly: push DOWN, ventral verts only ----------------------------------------
+        w = _band(y, *bb)
+        if w > 0.0 and mid - lo > 1e-6:
+            ventral = _smoothstep((mid - z) / (mid - lo))
+            if ventral > 0.0:
+                v.co.z -= belly * w * ventral
+                moved["belly"] += 1
+
+        # --- forehead: lift, dorsal verts only --------------------------------------------
+        f = _band(y, *fb)
+        if f > 0.0 and hi - mid > 1e-6:
+            dorsal = _smoothstep((z - mid) / (hi - mid))
+            if dorsal > 0.0:
+                v.co.z += r["forehead"] * f * dorsal
+                moved["forehead"] += 1
+
+        # --- culmen: bow the ridge, ALONG THE PLANE NORMAL, above the plane only ----------
+        c = _band(y, *cb)
+        if c > 0.0 and d_all[i] > 0.0:
+            k = _smoothstep(d_all[i] / d_max)
+            if k > 0.0:
+                v.co += gn * (r["culmen_arch"] * c * k)
+                moved["culmen"] += 1
+
+    me.update()
+    co2 = np.array([v.co[:] for v in me.vertices], dtype=float)
+    after = {"hw": round(float(np.abs(co2[:, 0]).max()), 4),
+             "zmin": round(float(co2[:, 2].min()), 4),
+             "zmax": round(float(co2[:, 2].max()), 4)}
+    # ⚠ THE GAPE LINE MUST NOT HAVE MOVED. Reported rather than trusted: this is the one number
+    # that says `split_bill` will still cut where it was measured to cut.
+    d2 = (co2[:, 0] - gp.x) * gn.x + (co2[:, 1] - gp.y) * gn.y + (co2[:, 2] - gp.z) * gn.z
+    near = fwd & (np.abs(d_all) < 0.004)
+    gape_shift = round(float(np.abs(d2[near] - d_all[near]).max()), 6) if near.any() else None
+    return {"before": before, "after": after, "moved": moved,
+            "gape_line_shift": gape_shift, "gape_line_verts": int(near.sum()),
+            "d_max_above_gape": round(d_max, 4)}
+
+
+def plate_margins(spec=KARASU):
+    """Top edge of each folded-wing station against the body's own zmax there.
+
+    ⚠ NEGATIVE MARGIN IS A SHIPPED BUG WITH A NAME. When the plate's top edge reached the body's
+    zmax the left and right plates met along the spine and the bird grew a Y-shaped crease down
+    its back, plainly visible from above. The `plate` z stations are TYPED; the body under them is
+    not, so anything that reshapes the body has to re-read this table rather than assume it.
+    """
+    # The body is renamed to KarasuBody by `join_all`, so accept either -- the same lookup
+    # `body_profile` and `body_surface_x` already use. Called after `run()` the numbers are in the
+    # normalised frame; the check that matters is the one either side of `reshape_body`.
+    o = bpy.data.objects.get("KarasuBody") or bpy.data.objects[BODY_OBJ]
+    co = np.array([v.co[:] for v in o.data.vertices])
+    rows = []
+    for st in spec["wing_folded"]["plate"]:
+        y, zc, hh = st[0], st[1], st[2]
+        # ⚠ A 4-TUPLE MEANS "PAST THE RUMP" -- the station carries an explicit x precisely because
+        # there is no body left to raycast there, so it lies over the TAIL BASE and has no margin
+        # to measure. Reporting one anyway produced a -0.032 that looks like the spine-crease bug
+        # and is not: the nearest body verts are 0.05 forward of the station.
+        if len(st) > 3:
+            rows.append({"y": y, "top_edge": round(zc + hh, 3), "past_rump": True})
+            continue
+        m = np.abs(co[:, 1] - y) < 0.075
+        zmax = float(co[m][:, 2].max()) if m.any() else None
+        rows.append({"y": y, "top_edge": round(zc + hh, 3),
+                     "body_zmax": None if zmax is None else round(zmax, 3),
+                     "margin": None if zmax is None else round(zmax - (zc + hh), 3)})
+    return rows
 
 
 def body_half_width(y, z, zwin=0.09):
@@ -794,7 +1018,7 @@ def _bake_mod():
     import os
     import sys
     here = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else \
-        "/Users/jonlabrie/Desktop/ClaudeCode/Roshambo_26/.worktrees/assets/roblox/tools/blender"
+        "/Users/jonlabrie/Desktop/ClaudeCode/Roshambo_26/roblox/tools/blender"
     if here not in sys.path:
         sys.path.insert(0, here)
     spec = importlib.util.spec_from_file_location(
@@ -1366,6 +1590,9 @@ def run(spec=KARASU, do_export=False):
     log = {}
     log["load"] = load_vendor()
     log["split_wings"] = split_wings()
+    # ⚠ ORDER IS LOAD-BEARING -- see reshape_body's docstring. After the wing cut (which needs the
+    # measured gap at |x| 0.19), before everything that MEASURES the body it attaches to.
+    log["reshape"] = reshape_body(spec)
     log["tail"] = build_tail(spec)
     log["folded"] = build_folded_wings(spec)
     log["spread"] = build_spread_wings(spec)
@@ -1511,7 +1738,7 @@ def bake_and_finish(res=1024):
     import os
     import sys
     here = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else \
-        "/Users/jonlabrie/Desktop/ClaudeCode/Roshambo_26/.worktrees/assets/roblox/tools/blender"
+        "/Users/jonlabrie/Desktop/ClaudeCode/Roshambo_26/roblox/tools/blender"
     spec = importlib.util.spec_from_file_location(
         "bake_bird_texture", os.path.join(here, "bake_bird_texture.py"))
     bbt = importlib.util.module_from_spec(spec)

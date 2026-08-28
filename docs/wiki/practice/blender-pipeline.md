@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-27
+updated: 2026-08-28
 ---
 
 # Blender Pipeline
@@ -340,6 +340,29 @@ atlas in fragments, so a block request that does not fit is normal. `UVAllocator
 down rather than failing — and RECORDS what it actually gave, because "no silent caps" applies to
 texture space as much as to coverage.
 
+
+## ⚠ THE MCP EXECS A SCRIPT, IT DOES NOT IMPORT IT — so `__file__` is undefined
+
+Found 2026-08-28. Every helper import in `karasu_retarget.py` is written as
+
+```python
+here = os.path.dirname(os.path.abspath(__file__)) if "__file__" in globals() else <fallback>
+```
+
+and **the fallback is the branch actually taken, every time**, because the Blender MCP `exec`s the
+file's source rather than importing it as a module. That makes the fallback path load-bearing
+where it reads as a safety net.
+
+⚠ **All three of them pointed into `.worktrees/assets/`** — the asset thread's worktree, retired
+2026-08-26 and slated for deletion ([[parallel-threads]]). So the karasu's shared builders AND its
+texture baker were being loaded from a copy nobody maintains, and the script would have broken
+outright the moment that worktree was removed. Checked when found: `bird_familiar.py` and
+`bake_bird_texture.py` were still byte-identical between the two, so nothing had gone wrong yet.
+**That was luck** — `spread_wing.py` had already diverged, and escaped mattering only because
+nothing in the karasu path loads it.
+
+**The rule:** a fallback path in a script the MCP runs is not a fallback, it is the path. Point it
+at the repo, and treat any reference to a worktree in committed code as a defect.
 
 ## Procedural river (in-engine, no Blender)
 
