@@ -3,7 +3,10 @@ shelf: world
 updated: 2026-08-27
 ---
 
-# Familiars — the bird that reads your round
+# Familiars
+
+The player's own bird. The architecture shared with ambient birds — and why both are
+client-rendered while only one is client-authoritative — is [[ambient-birds]]. — the bird that reads your round
 
 Every player has one small bird. It reacts to their result, wears their grade, and rests on the
 world rather than orbiting their head. Built 2026-08-18 as the core of

@@ -15,6 +15,9 @@ also a fireworks launch site (`Site_FallsDock` tag, [[fireworks]]) and carries i
 
 ## The uguisu (built & signed off 2026-07-28)
 
+⚠ **This bird is AUDIBLE AND INVISIBLE — there is no model.** It is the first ambient bird and
+the precedent for the rest; the architecture over it and the familiar is [[ambient-birds]].
+
 A Japanese bush warbler that lives here and nowhere else — first occupant of the
 place-only `CanyonWorld.Ambience` folder (emitter `Audio_Dock_Uguisu` + its
 `UguisuScheduler` Script, both verified in the place 2026-08-15). Owner verdict:

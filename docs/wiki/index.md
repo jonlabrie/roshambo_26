@@ -20,6 +20,7 @@ Chronology: [log.md](log.md).
 - [Round & HUD](world/round-and-hud.md) — OPEN/LOCK/REVEAL timing, the drum-is-authoritative rule, ring/undo/payoff recipes, copy rulings
 - [Hanabiya](world/hanabiya.md) — the fireworks shop: frontage, stair/attic, noren, chōchin, its gates and drops
 - [Riverside Chaya](world/chaya.md) — the tea stand and its dock: the arrangement, the frame, the thatch, the keeper slot standing empty
+- [Birds — two systems, one architecture](world/ambient-birds.md) — the split is AUTHORITY not rendering; territory as a bird property; why long flights are free
 - [Familiars](world/familiars.md) — the bird that reads your round: four states, grades from milestones, and the 326 perches it rests on
 - [Status Display](world/status-display.md) — the three clocks (now / lately / forever), the aura's rules, the five rejected carriers and the three different reasons
 - [Fireworks](world/fireworks.md) — the fireworks system, launch sites, perf rules and measured floor, monetization decision

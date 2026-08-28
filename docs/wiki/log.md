@@ -1736,3 +1736,41 @@ wiki prose, and nothing lints those.** The wiki's currency checks cannot see a s
 
 Corrected in both places, and the owner caught it — from playing the game, which is the only
 instrument that had the right answer.
+
+## [2026-08-28] decision | Birds are ONE architecture, not two — the split is authority, not rendering
+
+Written up as [[ambient-birds]] after the owner asked to classify what exists. Three corrections
+came out of the classification, two of them to things said earlier in the same session.
+
+**1. "Familiars client-side, ambient server-side" is the wrong axis.** Both are client-RENDERED;
+[[fireworks]] states it as binding — *"client-side VFX only; the server sends a tiny launch
+event."* A server-rendered bird would be the only thing in the game replicating a CFrame per
+frame, against the A13 budget. What differs is what the server is AUTHORITATIVE for: the familiar's
+roster and results, an ambient bird's placement and call timing. Same shape as fireworks.
+
+⚠ **This matters because it solves the divergence problem WITHOUT the replication cost.** The
+familiar tolerates two clients disagreeing about which railing it sits on — a recorded trade —
+because it is anchored to a player and stays "Bob's bird near Bob". An ambient bird has no such
+anchor, so two players on one dock would see different birds. Server authority over placement
+fixes that; server rendering was never needed for it.
+
+**2. Territory is a property of the BIRD, not a mode.** `pickPerch(anchor)` already takes a
+position; only the radius is a constant. The familiar is already a territorial bird whose
+territory follows a player. A static anchor is the entire difference. And the uguisu's territory
+is already RULED, not open — *"this bird lives here"* ([[falls-dock]]) — which is also authentic.
+
+**3. ⚠ Long flights are nearly free, because nobody can watch them.** StreamingEnabled means a
+client holds only nearby geometry, so it cannot see a perch across the canyon — it does not exist
+locally. A long flight is therefore unobservable for most of its length by definition, and reads
+from a fixed vantage point as a bird leaving and later arriving, which is what a real bird looks
+like. Only the TRANSITION needs care.
+
+**And the dock uguisu is a PRECEDENT, not a platform.** One hand-built Part + three Sounds + a
+Script, place-only: no registry, no spawner, no module. It is server-rendered today only because
+it renders nothing — it is audible and invisible. A visible dock uguisu is the FAMILIAR's
+renderer with a static anchor, plus a small server voice. Its schedule design and its owner ruling
+are what carry forward; its implementation is not.
+
+Recorded alongside: the two systems already duplicate pitch jitter, timing band and clip set
+between a place-only Script and committed code — [[duplicated-server-constants]]'s exact class,
+and making the dock bird visible is the moment to collapse it.
