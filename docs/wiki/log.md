@@ -1803,3 +1803,30 @@ functions it polices is derived from `BirdFlight`'s signatures rather than typed
 `SPECIES` now also selects the mesh (`{SPECIES}Body`/`{SPECIES}Wings`, already declared in
 `default.project.json`), so one name drives assets, voice and proportion. Flipping it to Karasu is
 a one-line change; nothing selects a bird per player yet. 1545 Luau tests.
+
+## [2026-08-28] gate | First look at a karasu familiar: hop and wings pass, seat corrected, size parked
+
+`SPECIES` flipped to Karasu for a look. Owner: hop **fine**, wings **fine for now**, shoulder seat
+*"a little tight to the head"*, and *"the karasu seems small, but I'm not sure we should chase that
+now."*
+
+**The seat was a real gap in the scaling pass and the reason is worth keeping.** `SEAT_INBOARD`
+places the bird's FEET and is a proportion of the AVATAR's arm — correctly untouched by bird size,
+which is what the 2026-08-28 scaling commit argued. But a bird is CENTRED on its feet, so a wider
+bird reaches half a width further inboard from an identical footprint. Feet position is avatar
+geometry; body clearance is bird geometry, and only the first of those was reasoned about.
+`BirdFlight.seatRelief` gives back exactly the half-width this bird has that the reference one did
+not — no tuning constant, exactly zero at scale 1 so the gated uguisu seat is untouched, ~1 inch on
+the karasu. Three mutations, all caught.
+
+⚠ **Also found by flipping**: two `warn` calls still had `UguisuBody`/`UguisuWings` in their
+MESSAGE TEXT, so a missing karasu asset would have named the wrong bird in the one line meant to
+diagnose it. The convention guard had banned the quoted literal and sailed past prose. It now bans
+a species name anywhere in the controller except the single declaration line.
+
+**Size is parked, not dismissed** ([[backlog]]). The bird is life-size against a real
+hashibutogarasu, so "seems small" is about how it READS — the same tension that got the uguisu
+deliberately upscaled, in the opposite direction. The lead already on record is the wingspan
+(~1.49x body length against a live crow's ~2.0x, and `⚠ unverified`), which would make it asset
+work rather than a rescale. Cheaper than either: nothing selects a bird per player, so no player
+can meet a karasu at all.

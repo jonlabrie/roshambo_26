@@ -34,7 +34,7 @@ local FamiliarRoster = remotes:WaitForChild("FamiliarRoster") :: RemoteEvent
 -- ⚠ WHICH BIRD, and it is ONE name feeding assets, voice AND proportion. Splitting it -- a
 -- hardcoded "UguisuBody" here and a separate "Uguisu" for the voice -- is how a bird ends up
 -- wearing a crow's body with a warbler's song, with nothing to catch it.
-local SPECIES = "Uguisu" -- ⚠ hardcoded: nothing selects a bird per player yet (F&F item 6)
+local SPECIES = "Karasu" -- ⚠ hardcoded: nothing selects a bird per player yet (F&F item 6)
 -- ⚠ NO FALLBACK. `scaleOf` returns nil for an unregistered species and this refuses to start
 -- rather than moving a crow on uguisu timings, which would present as "the animation is wrong".
 local SPECIES_SCALE = BirdSpecies.scaleOf(SPECIES)
@@ -70,11 +70,11 @@ if not TEMPLATE then
     -- ⚠ DO NOT let a missing asset take the client down. Familiars are decoration; the round
     -- still has to be playable without them. A missing WINGS template is survivable on its own —
     -- the bird simply never flies with them — so it is warned about but not fatal.
-    warn("[BirdController] no RoshamboBirds.UguisuBody -- familiars disabled")
+    warn(`[BirdController] no RoshamboBirds.{SPECIES}Body -- familiars disabled`)
     return
 end
 if not WING_TEMPLATE then
-    warn("[BirdController] no RoshamboBirds.UguisuWings -- familiars will not spread wings")
+    warn(`[BirdController] no RoshamboBirds.{SPECIES}Wings -- familiars will not spread wings`)
 end
 
 -- ===== PERCHING (owner's numbers, 2026-08-18) =====
@@ -343,6 +343,11 @@ local SEAT_INBOARD = 0.42
 -- bird 1.46 INCHES and the owner called it an inch too high (1 stud ~ 1 foot in the owner's units).
 -- 0.031 lands it at 0.45 inches -- clear of the mesh, not standing on air.
 local SEAT_LIFT = 0.031
+-- ⚠ AND A BIGGER BIRD IS GIVEN BACK THE WIDTH IT GAINED. See `BirdFlight.seatRelief`: the seat
+-- above places the FEET, and a bird centred on its feet reaches half its width inboard, so a
+-- wider bird crowds the neck from an identical footprint. Measured off the clone's own Size.X
+-- rather than a table, and exactly zero for the reference bird.
+local SEAT_RELIEF = BirdFlight.seatRelief(TEMPLATE.Size.X, PROFILE)
 
 local function shoulderSeat(character: Model): Vector3?
     local arm = character:FindFirstChild("RightUpperArm") or character:FindFirstChild("Right Arm")
@@ -358,7 +363,8 @@ local function shoulderSeat(character: Model): Vector3?
     -- just short of the arm's inner face, which is where the arm meets the torso and reads as the
     -- middle of the shoulder. Derived from the arm's own width, so R6, R15 and scaled bodies all
     -- get the same PROPORTION rather than a constant that only suits one of them.
-    return Vector3.new(local_.X - arm.Size.X * SEAT_INBOARD, local_.Y + arm.Size.Y * SEAT_LIFT, local_.Z)
+    local inboard = arm.Size.X * SEAT_INBOARD - SEAT_RELIEF
+    return Vector3.new(local_.X - inboard, local_.Y + arm.Size.Y * SEAT_LIFT, local_.Z)
 end
 
 local function characterRoot(userId: string): BasePart?

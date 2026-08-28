@@ -931,6 +931,32 @@ describe("BirdFlight scale", function()
         expect(BirdFlight.profile(4).TURN_GAP).toBeNil()
     end)
 
+    test("a wider bird is given back exactly the width it gained, and no more", function()
+        -- ⚠ THE SEAT SAYS WHERE THE FEET GO; THE BODY IS WHAT CROWDS THE NECK. Owner, 2026-08-28,
+        -- looking at the karasu on a shoulder: "a little tight to the head". SEAT_INBOARD is a
+        -- proportion of the AVATAR's arm and is right to stay that way -- a shoulder does not
+        -- move because the bird on it got bigger -- but a bird twice as wide reaches half a
+        -- width further inboard from the same footprint. Holding its INNER EDGE where the
+        -- reference bird's sat is the whole correction, and it needs no tuning constant.
+        local ref = BirdFlight.profile(1)
+        for _, w in { 0.1, 0.328, 1.0, 2.5 } do
+            expect(BirdFlight.seatRelief(w, ref)).toBe(0) -- ⚠ EXACTLY: the uguisu was gated here
+            expect(BirdFlight.seatRelief(w)).toBe(0)
+        end
+        -- 4x long is 4x wide, so three quarters of the new half-width is width it did not have.
+        expect(BirdFlight.seatRelief(1.0, BirdFlight.profile(4))).toBeCloseTo(0.375, 1e-12)
+        -- ⚠ A SMALLER-THAN-REFERENCE BIRD GOES THE OTHER WAY, and that is not a sign error: a
+        -- narrower bird can sit closer in without crowding anything, so the relief is negative.
+        expect(BirdFlight.seatRelief(1.0, BirdFlight.profile(0.25)) < 0).toBe(true)
+        -- monotonic, so no scale can be relieved less than a smaller one
+        local last = -math.huge
+        for _, sc in { 0.5, 1, 1.5, 2, 3, 6 } do
+            local r = BirdFlight.seatRelief(0.5, BirdFlight.profile(sc))
+            expect(r > last).toBe(true)
+            last = r
+        end
+    end)
+
     test("the karasu is about twice the uguisu, so it moves about 1.41x slower", function()
         local BirdSpecies = require("../src/shared/BirdSpecies")
         local p = BirdFlight.profile(BirdSpecies.scaleOf("Karasu") :: number)

@@ -315,6 +315,17 @@ scaled avatar gets the same result:
 | `SEAT_LIFT` | 0.031 of arm height | ⚠ a part's top FACE is not the visible shoulder — the mesh and any layered clothing sit proud of it, so at 0 the feet sank in. 0.45 inches on a stock R15 |
 | `SHOULDER_YAW` | 0 | faces forward with the avatar |
 
+⚠ **AND A BIGGER BIRD IS GIVEN BACK THE WIDTH IT GAINED** (`BirdFlight.seatRelief`, 2026-08-28).
+The three proportions above place the bird's **feet**, and a bird is centred on its feet — so a
+wider bird reaches half a width further inboard from an identical footprint and crowds the neck.
+Owner, watching the karasu on a shoulder: *"a little tight to the head."* Holding the bird's INNER
+EDGE where the reference bird's sat is the whole correction and needs no tuning constant: give
+back exactly the half-width this bird has that the reference one did not. It is **exactly zero at
+scale 1**, so the gated uguisu seat is untouched, and it is measured off the clone's own `Size.X`
+rather than a table. ⚠ `width / scale` as the reference-equivalent width is an APPROXIMATION — the
+karasu is a different mesh, not a scaled uguisu — so an unusually broad or slim bird is the case
+that will want this line looked at.
+
 ⚠ **THE VICTORY SONG FIRES ON THE LANDING, AND NO TIMER CAN REPLACE THAT.** Three attempts said
 otherwise: a random 0–2.2s, then `ENTRY.WIN` + stagger, then this. Both timers sang before the bird
 arrived, and the reason is structural — the bird FLIES in, and `flightDuration` is 0.85s plus
@@ -344,12 +355,9 @@ the uguisu's designed size rather than its shipped one. It follows two standing 
 rather than inventing one — *"life size, maybe slightly larger"* (2026-08-19) and *"a presumably
 larger bird, like a raven/crow to carry it"* (2026-08-22).
 
-**The motion consequence is now handled** — see the scale section below; this used to read as
-outstanding work and no longer is. `SEAT_INBOARD` / `SEAT_LIFT` remain proportions of the
-AVATAR's arm and are correctly untouched by bird size: they say where the feet go, and a stock
-R15 shoulder does not move because the bird standing on it got bigger. ⚠ **What is still unproven
-is the seat by eye** — nobody has watched a life-size crow stand on a shoulder, and a bird twice
-as long overhangs twice as far.
+**The motion consequence is handled** — see the scale section below. `SEAT_INBOARD` / `SEAT_LIFT`
+remain proportions of the AVATAR's arm and are correctly untouched by bird size, with a separate
+width relief for the body; see the seat table above.
 
 ⚠ **THE WINGSPAN IS THE DIAL MOST LIKELY TO WANT THE OWNER'S EYE.** It ships at **1.49× body
 length**. A live crow is 2.0× (50cm long, ~100cm span) and the shipped uguisu is 1.13× — so the
@@ -526,6 +534,26 @@ it, and `tests/BirdScaleConvention.spec.luau` reads its SOURCE instead: every ca
 profile, and no gate may read a duration off the module. ⚠ The list of functions it polices is
 **derived from `BirdFlight`'s own signatures**, never typed in the test — a hand-kept list would
 go stale exactly at the newest function, which is the worst place for it.
+
+### Watched on a shoulder, 2026-08-28 — the first look at a karasu familiar
+
+`SPECIES` was flipped to Karasu for a look. Owner's read, in their order:
+
+| | verdict |
+|---|---|
+| the victory hop | **fine** |
+| the wings | **fine for now** |
+| the shoulder seat | *"a little tight to the head"* — corrected, see the seat table above; awaits a second look |
+| overall size | ⚠ *"the karasu seems small, but I'm not sure we should chase that now"* — **parked, see below** |
+
+⚠ **THE SIZE OBSERVATION IS DEFERRED, NOT DISMISSED, and it is a genuinely open question rather
+than a bug.** The karasu measures life-size against a real hashibutogarasu, so "seems small" is a
+statement about how it READS, not about whether the number is right — and the same tension already
+has a ruling on the other bird, in the opposite direction, one section down. Do not resolve it by
+quietly rescaling the mesh. The most likely lead is already on record below as `⚠ unverified`: the
+**wingspan** ships at about 1.49× body length where a live crow is ~2.0×, and crows read as
+long-winged in flight, so short wings may be most of why a life-size body does not feel big.
+That would make it a wingspan question, not a size question. See [[backlog]].
 
 ## ⚠ THE UGUISU IS DELIBERATELY OVERSIZED — do not "correct" it toward life-size
 

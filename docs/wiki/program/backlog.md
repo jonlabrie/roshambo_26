@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: open
-updated: 2026-08-27
+updated: 2026-08-28
 ---
 
 # Backlog
@@ -237,6 +237,23 @@ displacement, no lichen, faceted roof eave).
 
 From the F&F baseline: a working replica of the arena's throw drum on the PWA. The PWA is
 otherwise out of F&F scope (showable as-is).
+
+## The karasu reads small on a shoulder — parked 2026-08-28
+
+Owner, on the first look at a karasu familiar: *"the karasu seems small, but I'm not sure we
+should chase that now."* ⚠ **This is not a measurement error.** The bird is life-size against a
+real hashibutogarasu; the question is how it READS at arena distance, which is the same tension
+that got the uguisu deliberately upscaled — in the opposite direction ([[familiars]]).
+
+⚠ **Do not open this by rescaling the mesh.** The lead already on record is the WINGSPAN: it
+ships at about 1.49x body length where a live crow is ~2.0x, and crows read as long-winged, so
+short wings may be most of why a life-size body does not feel big. `KARASU["wing_spread"]["span"]`
+in `roblox/tools/blender/karasu_retarget.py` is the dial, and the retarget runs end to end
+([[blender-pipeline]]) — so this is asset work, testable without touching motion. Confirm the
+wingspan figure first; it is recorded as `⚠ unverified`, taken from a bounding box on a rest pose.
+
+**Cheaper than either:** nothing selects a bird per player yet, so no player can meet a karasu at
+all. Selection is upstream of caring how it reads.
 
 ## World remainders (carried from the world-shelf migration, 2026-08-15)
 

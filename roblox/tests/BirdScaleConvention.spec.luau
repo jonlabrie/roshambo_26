@@ -126,9 +126,22 @@ describe("bird scale convention", function()
     test("the species name drives assets, voice AND proportion from one place", function()
         -- A hardcoded "UguisuBody" beside a separate "Uguisu" for the voice is how a bird ends up
         -- wearing a crow's body with a warbler's song, with nothing positioned to notice.
+        -- ⚠ BAN THE NAME OUTRIGHT, not just the quoted literal. The first version of this check
+        -- banned `"UguisuBody"` and passed while two `warn` calls still SAID
+        -- "no RoshamboBirds.UguisuBody" in their message text -- so the first thing a missing
+        -- karasu asset would have done is name the wrong bird in the one line meant to diagnose
+        -- it. A species name has no business appearing in this file at all.
         local src = harness.stripComments(fs.readFile(CONTROLLER))
-        expect(string.find(src, '"UguisuBody"', 1, true)).toBeNil()
-        expect(string.find(src, '"UguisuWings"', 1, true)).toBeNil()
+        -- The ONE line allowed to name a bird is the declaration itself. Cut it, and nothing
+        -- anywhere else in the file may mention a species -- not an asset lookup, not a warning
+        -- message, not a comparison.
+        local decl = string.match(src, 'local SPECIES = "[%w_]+"')
+        expect(decl ~= nil).toBe(true)
+        local rest = string.gsub(src, 'local SPECIES = "[%w_]+"', "", 1)
+        for name in require("../src/shared/BirdSpecies").SPECIES do
+            local hit = string.find(rest, name, 1, true)
+            expect(if hit then `the species name "{name}" is hardcoded in the controller` else "").toBe("")
+        end
         expect(string.find(src, "{SPECIES}Body", 1, true) ~= nil).toBe(true)
         expect(string.find(src, "BirdSpecies.scaleOf(SPECIES)", 1, true) ~= nil).toBe(true)
     end)
