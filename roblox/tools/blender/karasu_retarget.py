@@ -1926,6 +1926,21 @@ def join_all():
         _project_faces(me, gape, 1, blk, split_shells=False)
         packed["gape"] = [round(v, 4) for v in blk]
 
+    # ⚠ TAG WHAT THE VENDOR NEVER PAINTED. Everything appended above -- tail, folded wings, feet
+    # -- plus the gape fill is geometry the purchased model did not have, so no vendor art exists
+    # for it and it MUST be painted procedurally. Everything else is the vendor's own mesh wearing
+    # the vendor's own unwrap, where the hand-painted map beats anything a colour function can
+    # compute. The bake reads this to decide which texels it owns; without it the choice would be
+    # a UV rectangle typed by hand, which is the thing that goes stale the first time a block moves.
+    newgeo = me.attributes.get("newgeo") or me.attributes.new("newgeo", 'INT', 'FACE')
+    vals = [0] * len(me.polygons)
+    for _n, (lo, hi) in added.items():
+        for i in range(lo, hi):
+            vals[i] = 1
+    for i in gape:
+        vals[i] = 1
+    newgeo.data.foreach_set("value", vals)
+
     wings = bpy.data.objects["KarasuWings"]
     if not wings.data.uv_layers:
         wings.data.uv_layers.new(name=me.uv_layers[0].name)

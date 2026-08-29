@@ -453,6 +453,42 @@ def base_from_image(name, res):
     return a
 
 
+def grade_to_palette(a, tint=(66, 68, 86), gain=1.0, chroma_keep=0.10, gamma=1.0):
+    """Re-hue the vendor's hand-painted map to the corvid palette, KEEPING ITS LUMINANCE STRUCTURE.
+
+    ⚠ THIS IS A GRADE, NOT A REPAINT, and the difference is the whole point. The vendor map for
+    this bird is already a crow -- real feather structure, a painted bill, and an eye with an iris,
+    a pupil and a catchlight. Only its HUE is wrong: warm brown against a cool blue-black. A colour
+    function cannot invent that detail, so throwing the map away to compute one is a downgrade
+    dressed as a repaint. This module's procedural law was written for the UGUISU, whose vendor map
+    is a photoreal SPARROW being turned into a plain olive warbler -- a genuine repaint. The karasu
+    inherited the machinery without that reasoning being re-checked.
+
+    ⚠ BRIGHTNESS IS ALREADY RIGHT, so `gain` defaults to 1.0. Measured: the vendor map's mean is
+    0.0748 linear, i.e. sRGB ~77/255, against the palette's dorsal at ~73/255. Darkening toward a
+    photoreal crow is the trap the KARASU palette comment already records -- the first set ran
+    28-88 and rendered as a silhouette, "correct-looking as a photograph and useless as a
+    familiar". Everything there is lifted ~35% on purpose and this must not undo it.
+
+    Luminance carries the detail; the tint carries the identity. `chroma_keep` leaves a trace of
+    the original hue variation so the result is not a flat monochrome ramp.
+    """
+    L = a @ np.array([0.2126, 0.7152, 0.0722])
+    if gamma != 1.0:
+        L = np.power(np.clip(L, 0.0, None), gamma)
+    # ⚠ 0-255 IN. `_srgb_to_linear` divides by 255 itself, so pre-dividing sends every channel
+    # into the curve's LINEAR branch (c <= 0.04045), where the sRGB ratios survive instead of the
+    # linear-light ones -- a quietly desaturated tint that the unit-luminance normalise below then
+    # hides, because normalising cancels the scale error but not the ratio error.
+    t = _srgb_to_linear(np.array(tint, dtype=np.float64))
+    tl = float(t @ np.array([0.2126, 0.7152, 0.0722]))
+    t = t / (tl if tl > 1e-9 else 1.0)          # unit luminance, so L survives the multiply
+    out = (L * gain)[:, :, None] * t[None, None, :]
+    if chroma_keep:
+        out = out + (a - L[:, :, None]) * chroma_keep
+    return np.clip(out, 0.0, None)
+
+
 def eye_preserve(eyes_name="KarasuEyes", inner=1.9, outer=3.2):
     """Spheres around each eyeball inside which the vendor's paint is kept, blended out by `outer`.
 
@@ -475,7 +511,7 @@ def eye_preserve(eyes_name="KarasuEyes", inner=1.9, outer=3.2):
 
 
 def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name=None,
-         base_image=None, preserve=None):
+         base_image=None, preserve=None, grade=None, paint_attr=None):
     ob = bpy.data.objects[obj_name]
     me = ob.data
     uv_name = uv_name or me.uv_layers[0].name
@@ -494,6 +530,14 @@ def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name
     # anything this bake declines to paint FALLS THROUGH to hand-painted work rather than to
     # black -- which is the whole mechanism behind `preserve`.
     base = base_from_image(base_image, res) if base_image else None
+    if base is not None and grade:
+        base = grade_to_palette(base, **(grade if isinstance(grade, dict) else {}))
+    # ⚠ WHICH TEXELS THIS BAKE OWNS. With `paint_attr` it paints ONLY the faces that attribute
+    # marks -- the geometry the vendor never had -- and leaves everything else to the graded map.
+    # Without it, it paints the whole bird, which is right for the uguisu and wrong for this one.
+    own = None
+    if paint_attr and paint_attr in me.attributes:
+        own = {i for i, v in enumerate(me.attributes[paint_attr].data) if v.value == 1}
     img = np.zeros((res, res, 3), dtype=np.float64) if base is None else base.copy()
     hit = np.zeros((res, res), dtype=bool)
     # 3D position per texel, kept so `preserve` can be evaluated in WORLD space after the raster
@@ -505,6 +549,8 @@ def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name
     pal = sp["palette"]
 
     for tri in me.loop_triangles:
+        if own is not None and tri.polygon_index not in own:
+            continue
         uv = np.array([uvl[l].uv[:] for l in tri.loops]) * res
         vi = list(tri.vertices)
         x0 = max(0, int(np.floor(uv[:, 0].min())) - 1)
@@ -625,5 +671,7 @@ def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name
 
     return {"image": name, "res": res, "landmark_scale": round(S, 4), "texels_painted": filled,
             "coverage_pct": round(100.0 * filled / (res * res), 2),
-            "base": base_image, "texels_kept_from_vendor": preserved,
+            "base": base_image, "graded": bool(grade), "texels_kept_from_vendor": preserved,
+            "faces_painted": (len(own) if own is not None else len(me.polygons)),
+            "faces_total": len(me.polygons),
             "tris": len(me.loop_triangles)}
