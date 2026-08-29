@@ -192,6 +192,26 @@ local roster: { [string]: any } = {}
 -- the rim ends up 0.57 of an eyeball radius from where a rigid follow puts it. Guarded by
 -- tests/BirdEyeConvention.spec.luau. See docs/wiki/world/familiars.md.
 
+-- ⚠ A DENYLIST, AND THE SHAPE IS THE POINT. This was `if not c:IsA("Bone") then c:Destroy()`,
+-- which was correct only while a bird's appearance lived on `TextureID` -- a PROPERTY, which
+-- survives a clone. The karasu carries a `SurfaceAppearance` (ColorMap + Normal + Roughness +
+-- Metalness) and that is a CHILD INSTANCE, so the allowlist deleted the whole appearance and every
+-- familiar rendered in the MeshPart's default grey.
+--
+-- ⚠ IT ONLY SHOWED IN PLAY, because the template kept its SurfaceAppearance: correct in Edit,
+-- wrong in the game. Owner, 2026-08-29: "the bird is black in edit and grey in play."
+--
+-- The asymmetry decides the shape. Over-keeping costs a few dead instances; over-deleting costs an
+-- invisible appearance bug that only appears at runtime. So name what is dead and keep the rest --
+-- never the other way round. Guarded by tests/BirdTemplateClone.spec.luau.
+local function stripImporterJunk(part: Instance)
+    for _, c in part:GetChildren() do
+        if c:IsA("AnimationController") or c:IsA("Animator") or c:IsA("Folder") then
+            c:Destroy()
+        end
+    end
+end
+
 local function seedFor(userId: string): number
     local n = tonumber(userId) or 0
     return (n % 997) / 997 * math.pi * 2
@@ -202,11 +222,7 @@ local function makeBird(userId: string): Bird
     part.Name = `Familiar_{userId}`
     -- The importer's AnimationController and InitialPoses folder ride along on a Model-shaped
     -- template. We drive Bone.Transform directly, so they are dead weight on every bird.
-    for _, c in part:GetChildren() do
-        if not c:IsA("Bone") then
-            c:Destroy()
-        end
-    end
+    stripImporterJunk(part)
     part.Anchored = true
     part.CanCollide = false
     part.CanQuery = false
@@ -226,11 +242,7 @@ local function makeBird(userId: string): Bird
     if WING_TEMPLATE then
         local w = WING_TEMPLATE:Clone() :: BasePart
         w.Name = `FamiliarWings_{userId}`
-        for _, c in w:GetChildren() do
-            if not c:IsA("Bone") then
-                c:Destroy()
-            end
-        end
+        stripImporterJunk(w)
         w.Anchored = true
         w.CanCollide = false
         w.CanQuery = false

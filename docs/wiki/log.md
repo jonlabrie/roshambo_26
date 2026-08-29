@@ -2163,3 +2163,30 @@ with its bones deleted, a leak on the second teardown path). The fifth was not: 
 cannot track a smooth-skinned socket.** At a 30° head yaw parts of the rim land 0.57 of an eyeball
 radius from where a rigid follow puts them, so the ball escapes on whichever side lags. No amount
 of care fixes that; the architecture was wrong. See [[familiars]].
+
+## [2026-08-29] defect | Every familiar rendered grey in Play — the clone strip deleted the SurfaceAppearance
+
+Owner: *"the bird is black in edit and grey in play."* That one sentence located it after two wrong
+guesses at the asset itself, because the split is the whole diagnosis: the TEMPLATE was fine and
+the CLONE was not.
+
+`BirdController` strips children off a cloned template — the importer leaves an `AnimationController`
+and an `InitialPoses` folder on every mesh and we drive `Bone.Transform` directly. It was written as
+an **allowlist**, `if not c:IsA("Bone") then c:Destroy()`, which was correct only while a bird's
+appearance lived on `TextureID`. That is a **property**, and properties survive a clone. The karasu
+now carries a `SurfaceAppearance` — ColorMap, Normal, Roughness, Metalness — and that is a **child
+instance**, so the strip deleted the bird's entire appearance and every familiar rendered in the
+MeshPart's default grey.
+
+⚠ **THE SHAPE WAS THE DEFECT, not the list.** Over-keeping costs a few dead instances; over-deleting
+costs an invisible appearance bug that only appears at runtime. `stripImporterJunk` is now a
+denylist — name what is dead, keep everything else — and `tests/BirdTemplateClone.spec.luau` asserts
+the destroy condition never mentions a class that carries appearance (`SurfaceAppearance`,
+`MaterialVariant`, `Decal`, `Texture`, `Highlight`).
+
+⚠ **TWO WRONG GUESSES ARE WORTH RECORDING**, because both were plausible and both cost a look.
+`AlphaMode = Overlay` with an alpha-less ColorMap was blamed first — changed to `Transparency`, no
+effect. Then the three derived maps being 16-bit PNGs, reasoned to break the packaged `TexturePack`
+— also not it. ⚠ **The 16-bit files are still a real defect and still want fixing**; they simply were
+not this. And a diagnostic A/B built on setting a packaged map as a plain `TextureID` proved nothing,
+because a TexturePack member need not be usable standalone. See [[familiars]].
