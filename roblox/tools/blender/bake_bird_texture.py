@@ -489,6 +489,60 @@ def grade_to_palette(a, tint=(66, 68, 86), gain=1.0, chroma_keep=0.10, gamma=1.0
     return np.clip(out, 0.0, None)
 
 
+def _box_mean(a, r):
+    """Mean over a (2r+1) square, by summed-area table -- O(1) per texel regardless of window."""
+    p = np.pad(a, r + 1, mode='edge')
+    S = p.cumsum(0).cumsum(1)
+    n = a.shape[0]
+    w = 2 * r + 1
+    tot = (S[w:w + n, w:w + n] - S[0:n, w:w + n] - S[w:w + n, 0:n] + S[0:n, 0:n])
+    return tot / (w * w)
+
+
+def derive_roughness(base_image, res=RES, rough_min=0.25, rough_max=0.85, radius=2,
+                     owned=None, catchlight=0.45):
+    """A roughness map inferred from the colour art, because the vendor shipped no surface maps.
+
+    ⚠ WHY THIS EXISTS: one MeshPart carries ONE roughness scalar, and the bird needs two. A tight
+    specular is what makes an eye look WET -- a small bright point that moves with the camera -- so
+    the eye wants LOW roughness; feathers want HIGH roughness or the whole bird goes soft and
+    gathers environment light until it reads overexposed. Both ends were measured on this bird: at
+    0.10 it came out as glossy black plastic, at 0.78 the feathers were right and the eye died. The
+    scalar cannot serve both, and that -- not the eye alone -- is what buys a map.
+
+    ⚠ WHAT THE MODEL SHIPPED: `crow_mesh_diffuse`, `wing_diffuse02`, and `uv_crow_alpha` which is a
+    BINARY CUTOUT MASK (99.3% of it is pure 0 or pure 1). No normal, no roughness, no specular.
+    There is nothing to recover, so this is inference.
+
+    ⚠ AND IT IS A HACK, stated plainly. Diffuse luminance mixes albedo with whatever lighting and
+    ambient occlusion the artist baked in, so "detail" here is not relief -- it is contrast that
+    MIGHT be relief. On feather barbs it reads well; on a bill it can invent texture that is not
+    there. Judge it, do not trust it.
+
+    THE SIGNAL: local standard deviation of luminance. Feathers are fine high-frequency structure
+    -> rough. An eyeball and a bill are broad smooth areas -> glossy. ⚠ The catchlight would defeat
+    that on its own -- it is a tiny very high-contrast spot sitting in the middle of the one region
+    that must come out glossiest -- so luminance is clipped at `catchlight` before the variance is
+    taken, which removes the spike without touching the feathers.
+    """
+    a = base_from_image(base_image, res)
+    L = np.clip(a @ np.array([0.2126, 0.7152, 0.0722]), 0.0, catchlight)
+    m = _box_mean(L, radius)
+    var = np.clip(_box_mean(L * L, radius) - m * m, 0.0, None)
+    d = np.sqrt(var)
+    # normalise against the art's own spread, not an absolute -- a p98 so a few outliers cannot
+    # compress everything else into the bottom of the range
+    hi = float(np.percentile(d[L > 0.002], 98)) if (L > 0.002).any() else 1.0
+    t = np.clip(d / (hi if hi > 1e-9 else 1.0), 0.0, 1.0)
+    rough = rough_min + (rough_max - rough_min) * t
+    if owned is not None:
+        # ⚠ GEOMETRY THE VENDOR NEVER PAINTED has no detail to infer from, and inferring anyway
+        # would hand the tail and the folded wings a glossy sheen for having a flat procedural
+        # colour. Feathers, so: matte.
+        rough = np.where(owned, rough, rough_max)
+    return np.clip(rough, 0.0, 1.0)
+
+
 def eye_preserve(eyes_name="KarasuEyes", inner=1.9, outer=3.2):
     """Spheres around each eyeball inside which the vendor's paint is kept, blended out by `outer`.
 
