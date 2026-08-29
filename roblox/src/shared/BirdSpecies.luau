@@ -20,14 +20,21 @@ export type Voice = { clips: { Clip }, volume: number, rolloff: { number } }
 -- wetness, and making it more visible only makes it more obviously a marking.
 --
 -- A separate part carries its own Material, Color and Reflectance, so its highlight MOVES with
--- the camera. `BirdController` parks one on the `eye_R` / `eye_L` bones, which are parented to
--- the head in the exported rig -- so the POSITION lives in the asset and the eyes follow every
--- head turn for free. Only the appearance is here.
+-- the camera. It is a MESH -- `KarasuEyes`, both eyeballs in one part -- and `BirdController`
+-- CFrames it off the body's head bone once per frame. Only the appearance is here; the size and
+-- the seating are measured into the asset.
+--
+-- ⚠ THIS DESCRIBED A RUNTIME `Part` PARKED ON `eye_R` / `eye_L` BONES until 2026-08-28, and the
+-- correction is worth keeping because both halves of it were wrong. The Part was retired by the
+-- owner (it gave up the iris and gave up being visible while authoring, to buy dials a MeshPart
+-- already has); and the bones it rode COULD NEVER HAVE WORKED -- Roblox strips any bone that
+-- influences no vertex, so they never survived an import. The claim that the eyes "follow every
+-- head turn for free" was the load-bearing error: two MeshParts do not share a skeleton.
 -- ⚠ PLAIN DATA, NO ROBLOX TYPES. This module runs under Lune, where `Color3` and `Enum` do not
 -- exist -- naming one makes the whole file fail to load and takes every test with it. Same rule
 -- as `BirdFlight`, which returns {x, y, z} tables rather than Vector3. `colour` is an RGB triple
 -- and `material` is the Enum.Material NAME; `BirdController` converts at the boundary.
-export type Eye = { radius: number, colour: { number }, material: string, reflectance: number }
+export type Eye = { colour: { number }, material: string, reflectance: number }
 export type Species = { bodyLength: number, voice: Voice, eye: Eye? }
 
 -- ⚠ THE REFERENCE SPECIES, and it is load-bearing. Every motion constant in `BirdFlight` was
@@ -79,13 +86,12 @@ BirdSpecies.SPECIES = {
         -- large-billed crow. Almost exactly twice the uguisu, which is why the two of them
         -- together are a real test of whether the motion scales at all.
         bodyLength = 1.640,
-        -- ⚠ radius is MEASURED, not chosen: it is `KARASU["eye"]["r"]` in
-        -- `tools/blender/karasu_retarget.py`, mapped to final studs by `landmarks_final()`, and
-        -- it is the one eye number that could not ride along in the asset -- a Roblox `Bone` is
-        -- an Attachment, a point with an orientation and no length. Re-derive it there rather
-        -- than adjusting it here, or the ball stops matching the socket painted around it.
+        -- ⚠ APPEARANCE ONLY -- there is no `radius` here and there must not be one. It sized a
+        -- runtime `Part` ball; the eyeballs are geometry in `KarasuEyes.rbxm` now, so their size
+        -- is measured in `tools/blender/karasu_retarget.py` and rides along in the asset. The
+        -- field outlived the ball by long enough to drift: it read 0.024 against a mesh that
+        -- measures 0.0188. A dimension the asset also carries is a second copy of a number.
         eye = {
-            radius = 0.024,
             -- Nearly black and slightly warm. ⚠ Measured off the reference, every part of a
             -- crow's eye except the glint is DARKER than the feathers around it -- iris 0.66x,
             -- pupil 0.14x. It reads by contrast with its own socket, not by being pale, and the

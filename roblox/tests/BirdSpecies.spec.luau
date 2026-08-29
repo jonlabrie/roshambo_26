@@ -110,6 +110,24 @@ describe("BirdSpecies", function()
         expect(math.abs((BirdSpecies.scaleOf("Karasu") :: number) - 2) < 0.05).toBe(true)
     end)
 
+    test("an eye record describes APPEARANCE ONLY -- the mesh carries its own size", function()
+        -- ⚠ `radius` USED TO LIVE HERE and its removal is the point. It sized a runtime `Part`
+        -- ball; the eyeballs are now geometry in `KarasuEyes.rbxm`, so a number here could only
+        -- ever disagree with the mesh -- and it already did, at 0.024 against a measured 0.0188.
+        -- A dimension that the asset also carries is a second copy, which is the defect class in
+        -- practice/duplicated-server-constants.md.
+        for name, rec in BirdSpecies.SPECIES do
+            local eye = rec.eye
+            if eye then
+                expect((eye :: any).radius).toBe(nil)
+                expect(#eye.colour).toBe(3)
+                expect(typeof(eye.material)).toBe("string")
+                expect(eye.reflectance >= 0 and eye.reflectance <= 1).toBe(true)
+                expect(typeof(name)).toBe("string")
+            end
+        end
+    end)
+
     test("an unknown species has NO scale rather than defaulting to the reference", function()
         -- ⚠ Returning 1 here is the expensive bug the whole audit was written about: a new bird
         -- would move on uguisu timings and diagnose as "the animation is wrong" instead of "the

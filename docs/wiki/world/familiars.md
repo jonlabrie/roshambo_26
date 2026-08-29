@@ -556,11 +556,34 @@ bright shape at a **fixed place**. It cannot move with the light or the camera, 
 obviously a marking. **That failure mode has no tuning fix**, which is why the colours being
 sampled off a photograph never helped.
 
-**Built and kept** (owner, 2026-08-28: *"I'd like to keep the eye and girth/belly work"*): a
-`KarasuEyes` **MeshPart** exported from Blender like the wings — both eyeballs in one mesh, so one
-extra part per bird rather than two — plus a lofted lid ring merged into the body. ⚠ **The Roblox
-side is NOT wired**: no Rojo declaration, no controller code, no species record. The geometry and
-its bones ship; nothing consumes them yet.
+**Built, kept and now wired** (owner, 2026-08-28: *"I'd like to keep the eye and girth/belly
+work"*): a `KarasuEyes` **MeshPart** exported from Blender like the wings — both eyeballs in one
+mesh, so one extra part per bird rather than two — plus a lofted lid ring merged into the body.
+`BirdController` clones it, paints it from `BirdSpecies.eye`, and places it every frame.
+
+⚠ **THE EYES ARE PLACED WITH ONE WRITE, AND THE OBVIOUS DESIGN COSTS FOUR.** Two MeshParts **do
+not share a skeleton** — the body's `joint4` and the eyes part's `joint4` are different instances,
+so driving one does nothing to the other. Making the eyes' own bones track the head means
+mirroring `joint1`, `joint3` and `joint4` every frame *on top of* the part CFrame. Eyeballs are
+**rigid relative to the skull**, so the correct amount of work is one rigid transform:
+`eyes.CFrame = head.TransformedWorldCFrame * eyeOffset`, with the offset measured once at spawn
+from the two **rest** poses. Nothing at runtime distinguishes the two designs — both put the eyes
+in the right place, one costs four times as much forever — so `tests/BirdEyeConvention.spec.luau`
+guards it by reading the controller's source.
+
+⚠ **`TransformedWorldCFrame` on the per-frame write, `WorldCFrame` on the spawn-time offset.** The
+first is where the bone currently is, the second where it was authored. Swapping them looks
+perfectly correct in every screenshot of a bird facing forward and only breaks when the head turns.
+
+⚠ **APPEARANCE IN THE MODULE, SIZE IN THE MESH.** `BirdSpecies.eye` carries colour, material and
+reflectance only. A `radius` lived there to size the retired ball and outlived it long enough to
+drift — 0.024 against a mesh measuring 0.0188. The importer sets **no** appearance, so a clone
+that skips the three paint lines ships the eyes of a mannequin.
+
+⚠ **THE `eye_R`/`eye_L` BONES ARE VESTIGIAL AND ALWAYS WERE.** They anchored the retired Part, and
+they could never have reached Roblox at all: the importer **strips any bone that influences no
+vertex**, so a position-only bone is unshippable however it is exported. A session spent two
+commits and two import cycles fixing an exporter flag to rescue them. See [[blender-pipeline]].
 
 ⚠ **A RUNTIME `Part` BALL WAS TRIED FIRST AND WAS THE WRONG CALL**, chosen for a trade that does
 not exist: "tunable in Studio without a Blender round trip". Measured — a MeshPart keeps `Color`,

@@ -2012,3 +2012,31 @@ exactly one bone — the head — and `joint4` already is one. `BirdController`'
 path and the `eye` record in `BirdSpecies` are now dead code awaiting removal; because Roblox
 strips the eye bones on import, `bone("eye_R")` already returns nil and the parts are never placed.
 A session proposed rescuing the bones instead — sunk cost dressed as a design.
+
+## [2026-08-28] ship | The karasu's eyes are wired — one write per frame, off the head bone
+
+Owner, on being shown the wings pattern: *"cFrames for the eyes? isn't that a performance hit?"* —
+and the push was right. The proposal was the **more** expensive design. Two MeshParts do not share
+a skeleton: the body's `joint4` and the eyes part's `joint4` are different instances, so making the
+eyes' own bones track the head means mirroring `joint1`, `joint3` and `joint4` every frame on top
+of the part CFrame. Four writes per bird per frame, against two for the runtime `Part` it replaced.
+
+Eyeballs are **rigid relative to the skull**, so the correct amount of work is one rigid transform:
+`eyes.CFrame = head.TransformedWorldCFrame * eyeOffset`, the offset measured once at spawn from the
+two rest poses. **One write, one instance** — half what the retired two-Part design cost.
+
+⚠ **A CORRECTION THAT CHANGED THE DESIGN.** A session had reported the 0.00000-stud bone agreement
+between body and eyes as proof that "a head turn carries the eyes." It is not: it proves the two
+parts share a COORDINATE FRAME, which is what makes the offset exact. Head turns do not propagate
+across MeshParts. Conflating "same skeleton geometry" with "same skeleton" is what produced the
+four-write proposal.
+
+Retired with it: `makeEye`, the two `Part` fields, the `eyeBoneR`/`eyeBoneL` lookups, and the
+`radius` in `BirdSpecies.eye` — which had sized the ball and outlived it by long enough to drift to
+0.024 against a mesh measuring 0.0188. Appearance stays in the module, size stays in the asset.
+
+`tests/BirdEyeConvention.spec.luau` guards all of it by reading the controller's source, because
+nothing at runtime distinguishes a one-write placement from a four-write one — both put the eyes in
+the right place. Five mutations, each caught by exactly one test: rest pose for driven pose, the
+offset rebuilt per frame, the eyes dropped from the cull path, `radius` creeping back, and a `Part`
+ball returning. See [[familiars]].

@@ -1808,11 +1808,17 @@ def rebuild_rig(spec=KARASU):
         return made
     made = _edit_armature(arm, _wings)
     # ⚠ ASSERT THE ROSTER. `BirdController` looks these up BY NAME, and a missing one fails
-    # SILENTLY at runtime -- no error, just a familiar with no eyes or a jaw that will not open.
-    # Losing eye_R/eye_L to a stray block-delete cost two commits and an import cycle before
-    # anyone counted the bones in Studio.
+    # SILENTLY at runtime -- no error, just a familiar with a jaw that will not open.
+    #
+    # ⚠ EVERY NAME HERE MUST DEFORM SOMETHING, which is why `eye_R`/`eye_L` are NOT listed even
+    # though the rig still builds them. Roblox strips any bone that influences no vertex, so a
+    # position-only bone cannot reach the game however carefully it is exported -- listing one
+    # here would assert a guarantee this script has no power to make. The eyes are placed by
+    # CFraming the `KarasuEyes` mesh off the BODY's joint4; the two eye bones are vestigial and
+    # can go the next time the rig is rebuilt. A session lost two commits and two import cycles
+    # to fighting for them.
     required = ("joint1", "joint3", "joint4", "joint8", "joint12", "joint25",
-                "bill_lower", "eye_R", "eye_L", "wing_R", "wing_L", "wrist_R", "wrist_L")
+                "bill_lower", "wing_R", "wing_L", "wrist_R", "wrist_L")
     have = {b.name for b in arm.data.bones}
     missing = [n for n in required if n not in have]
     if missing:
