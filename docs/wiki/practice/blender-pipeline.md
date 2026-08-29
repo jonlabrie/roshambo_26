@@ -64,7 +64,13 @@ import.
 with `path_mode='COPY'` (writes a `.fbm` folder beside the FBX) and Studio uploads the
 maps and wires them itself. Each MeshPart gets its own MeshId; all share one
 SurfaceAppearance asset set when they share one UV atlas (**so one shared UV atlas
-across parts is worth engineering** — N×3 uploads become 3). `TextureID` stays empty,
+across parts is worth engineering** — N×3 uploads become 3). ⚠ That set is a real
+property, `SurfaceAppearance.TexturePack`, and it appears in a saved `.rbxm` as a
+**fifth asset id** beyond the four maps — measured 2026-08-29 on the karasu, where it
+is identical across body and wings, which is the proof the sharing worked. It reads
+empty from a Luau property access, so a session that finds the id in the file and
+greps the live instance for it will conclude the asset is corrupt. It is not.
+`TextureID` stays empty,
 which is what you want ([[texturing-pack-meshes]]). `Material` defaults to Plastic —
 set it to Rock/Slate for correct footstep audio.
 
