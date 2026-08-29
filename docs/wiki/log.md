@@ -2119,3 +2119,47 @@ here. See [[familiars]].
 line-bounded or expression-bounded and failed on CORRECT code — once on a two-statement fix, once
 on a `:: BasePart` cast. Bind a source scan to a declaration or a block, never to the shape of an
 expression. [[blender-pipeline]] and BirdScaleConvention both already record this.
+
+## [2026-08-29] ship | The karasu's eye is painted after all — the modelled eye and its part are withdrawn
+
+⚠ **THE PREMISE THE WHOLE MODELLED EYE RESTED ON WAS FALSE.** "A painted eye cannot read" came
+from three bakes, **all of them our own procedural output**. The vendor's hand-painted eye — iris,
+pupil, catchlight, lid line — was never in that sample and was packed inside `crow.blend` the whole
+time. The owner said so on Thursday (*"is that the original colormap? That eye is vastly better"*)
+and the session treated it as an observation instead of a question. Six hours followed.
+
+**What ships:** the vendor's `crow_mesh_diffuse` **graded** to the corvid palette rather than
+repainted over — luminance keeps the detail, the tint carries the identity — then hand-graded by
+the owner in Photoshop for black level and contrast. That file, `karasu_colormap_graded_2.png`, is
+now `COLORMAP_AUTHORITY`: the bake writes `karasu_colormap_baked.png` instead and **raises rather
+than overwrites** if the authority is missing, because it cannot regenerate a Photoshop curve.
+Procedural paint survives only on the 855 faces the vendor never had (tail, folded wings, feet,
+gape), tagged `newgeo` by `join_all`.
+
+⚠ **A ROUGHNESS MAP, BECAUSE ONE SCALAR CANNOT SERVE BOTH ENDS.** Measured on this bird: at 0.10 it
+was glossy black plastic, at 0.78 the feathers were right and the eye died — a tight specular is
+what makes an eye look wet, and roughness is exactly what broadens it away. That trade, not the eye
+alone, is what buys per-texel roughness. Derived from local luminance variance (feathers are fine
+structure → rough; eyeball and bill are broad and smooth → glossy), with luminance clipped at 0.45
+first so the catchlight cannot invert the result in the one place that must be glossiest.
+⚠ **It is inference, not recovery**: the vendor shipped no surface maps at all — `uv_crow_alpha` is
+a binary cutout mask, 99.3% pure 0 or 1 — and diffuse luminance mixes albedo with baked lighting.
+Normal and metalness are derived too, because [[material-and-mesh-traps]] §8: a partial PBR set
+renders WORSE than none.
+
+**Withdrawn:** `KarasuEyes` (mesh, `.rbxm`, Rojo entry), `makeEyes`, the eye fields and the
+per-frame placement in `BirdController`, and the `Eye` type, `eye` records and `eyeOf` in
+`BirdSpecies`. The mesh is rebuilt with `run(eyes=False)` — a plain skull that keeps the girth and
+belly, 1591 → 1351 verts, and **open edges 112 → 16**, which retires the floating-lid-collar defect
+outright.
+
+⚠ **THE MESH AND THE TEXTURE ARE A MATCHED PAIR.** `join_all` packs new geometry into free UV blocks
+in sequence, so dropping the lids shifted every block allocated after them. The new ColorMap is
+meaningless on the shipped meshes. All of it re-imports together or the atlas is scrambled.
+
+⚠ **AND THE FIFTH DEFECT WAS UNFIXABLE, WHICH IS THE REAL LESSON.** Four bugs in the modelled eye
+were mine (a rest pose seated against the wrong reference, a one-frame ordering lag, a skinned mesh
+with its bones deleted, a leak on the second teardown path). The fifth was not: **a rigid eyeball
+cannot track a smooth-skinned socket.** At a 30° head yaw parts of the rim land 0.57 of an eyeball
+radius from where a rigid follow puts them, so the ball escapes on whichever side lags. No amount
+of care fixes that; the architecture was wrong. See [[familiars]].

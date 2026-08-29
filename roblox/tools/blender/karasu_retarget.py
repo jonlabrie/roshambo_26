@@ -42,6 +42,7 @@
 # Run inside Blender (the MCP execs this file), then call:  run()
 
 import bpy
+import os
 import bmesh
 import math
 import numpy as np
@@ -2058,6 +2059,19 @@ def normalise_size(target=NOSE_TO_TAIL):
 
 OUT_DIR = "/Users/jonlabrie/Desktop/Roshambo Reference/models/birds/probe/"
 
+# ⚠ HAND-GRADED BY THE OWNER, AND NOT REPRODUCIBLE FROM THIS SCRIPT. `bake_bird_texture` can
+# regenerate the composite it started from, but not the Photoshop curve applied on top -- measured
+# against the bake, its non-black median luma is 9.6 against 15.6 and its p95 is 14.9 against 86,
+# i.e. crushed dark with the catchlights kept. Treat this file as source, back it up, and never
+# let a bake write to it.
+COLORMAP_AUTHORITY = "karasu_colormap_graded_2.png"
+
+# The derived PBR channels that ship with it. ⚠ ALL OR NOTHING -- a partial set renders WORSE than
+# none (practice/material-and-mesh-traps.md §8): Roblox substitutes its own defaults for whatever
+# is missing and a ColorMap-only SurfaceAppearance comes out warm and shiny.
+PBR_MAPS = {"roughness": "karasu_roughness.png", "normal": "karasu_normal.png",
+            "metalness": "karasu_metalness.png"}
+
 LAST_TRANSFORM = None       # (uniform scale, translation) applied by normalise_size
 
 
@@ -2397,10 +2411,23 @@ def bake_and_finish(res=1024):
                                           **landmarks_final()}
     info = bbt.bake("KarasuBody", "karasu", res=res, wing_name="KarasuWings")
     img = bpy.data.images[info["image"]]
-    png = OUT_DIR + "karasu_colormap.png"
+    # ⚠ THE SHIPPED ColorMap IS THE OWNER'S FILE, NOT THIS BAKE'S OUTPUT (2026-08-29). The bake
+    # produces a STARTING POINT; the owner then graded it in Photoshop for contrast and black
+    # level, and that hand-edit is the thing the bird wears. Writing over `COLORMAP_AUTHORITY`
+    # would silently destroy it -- the whole reason it is named here rather than left implicit.
+    # The bake's own output goes to a separate file so it stays available for comparison and as
+    # the base for the NEXT grade.
+    png = OUT_DIR + "karasu_colormap_baked.png"
     img.filepath_raw = png
     img.file_format = 'PNG'
     img.save()
+    authority = OUT_DIR + COLORMAP_AUTHORITY
+    if not os.path.exists(authority):
+        raise RuntimeError(
+            f"the shipped ColorMap {COLORMAP_AUTHORITY} is missing from {OUT_DIR}. It is a "
+            f"hand-graded file that this script cannot regenerate -- recover it rather than "
+            f"substituting the bake, which is a different image.")
+    png = authority
 
     mat = bpy.data.materials.get("KarasuMat") or bpy.data.materials.new("KarasuMat")
     mat.use_nodes = True

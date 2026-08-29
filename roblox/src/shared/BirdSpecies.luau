@@ -11,31 +11,27 @@ local BirdSpecies = {}
 
 export type Clip = { id: number, weight: number }
 export type Voice = { clips: { Clip }, volume: number, rolloff: { number } }
--- ⚠ THE EYE IS A SEPARATE PART, NOT PAINT, and that is an engine constraint rather than a
--- preference. The bird is one MeshPart wearing one plain ColorMap with no SurfaceAppearance, so
--- there is no per-texel roughness -- an eye painted or modelled INTO the body cannot be wet
--- unless the whole bird is wet (tested: at roughness 0.10 the crow came out as glossy black
--- plastic and the eye still did not read). Three painted attempts failed for one reason: a
--- painted highlight is a bright shape at a FIXED PLACE, so it reads as a marking rather than as
--- wetness, and making it more visible only makes it more obviously a marking.
+-- ⚠ THERE IS NO EYE RECORD HERE, AND THAT IS THE ANSWER RATHER THAN AN OMISSION. A karasu's eye
+-- is TEXELS: the vendor's hand-painted art -- iris, pupil, catchlight, lid line -- graded to the
+-- corvid palette, with a derived roughness map so it stays wet while the feathers stay matte.
+-- Nothing about it is a runtime decision, so nothing about it belongs in a data module.
 --
--- A separate part carries its own Material, Color and Reflectance, so its highlight MOVES with
--- the camera. It is a MESH -- `KarasuEyes`, both eyeballs in one part -- and `BirdController`
--- CFrames it off the body's head bone once per frame. Only the appearance is here; the size and
--- the seating are measured into the asset.
+-- ⚠ TWO SEPARATE-PART EYES WERE SHIPPED AND BOTH WERE WITHDRAWN (2026-08-28/29): a `Part` ball
+-- parked on `eye_R`/`eye_L` bones, then a `KarasuEyes` MeshPart CFramed off the head. The second
+-- failed for a reason no care would have fixed -- a rigid eyeball cannot track a SMOOTH-SKINNED
+-- socket, and at a 30 degree head yaw the rim lands 0.57 of an eyeball radius off a rigid follow.
 --
--- ⚠ THIS DESCRIBED A RUNTIME `Part` PARKED ON `eye_R` / `eye_L` BONES until 2026-08-28, and the
--- correction is worth keeping because both halves of it were wrong. The Part was retired by the
--- owner (it gave up the iris and gave up being visible while authoring, to buy dials a MeshPart
--- already has); and the bones it rode COULD NEVER HAVE WORKED -- Roblox strips any bone that
--- influences no vertex, so they never survived an import. The claim that the eyes "follow every
--- head turn for free" was the load-bearing error: two MeshParts do not share a skeleton.
+-- ⚠ AND THE PREMISE UNDER BOTH WAS FALSE. "One MeshPart, one plain ColorMap, so no per-texel
+-- roughness, so a painted eye cannot be wet" described the bird's SETUP, not the engine. A
+-- SurfaceAppearance carrying a full PBR set gives per-texel roughness; a partial one is worse than
+-- none (practice/material-and-mesh-traps.md §8), which is the only reason it costs anything.
+-- The three "painted eyes do not read" failures were all our own procedural bakes; the vendor's
+-- painted eye was never in that sample and was in the file the whole time.
 -- ⚠ PLAIN DATA, NO ROBLOX TYPES. This module runs under Lune, where `Color3` and `Enum` do not
 -- exist -- naming one makes the whole file fail to load and takes every test with it. Same rule
 -- as `BirdFlight`, which returns {x, y, z} tables rather than Vector3. `colour` is an RGB triple
 -- and `material` is the Enum.Material NAME; `BirdController` converts at the boundary.
-export type Eye = { colour: { number }, material: string, reflectance: number }
-export type Species = { bodyLength: number, voice: Voice, eye: Eye? }
+export type Species = { bodyLength: number, voice: Voice }
 
 -- ⚠ THE REFERENCE SPECIES, and it is load-bearing. Every motion constant in `BirdFlight` was
 -- tuned by eye against this bird, so its scale must come out at exactly 1 and its behaviour must
@@ -65,10 +61,6 @@ BirdSpecies.SPECIES = {
         -- Do not "correct" it toward reality -- that decision has been made and may be revisited
         -- only by the owner.
         bodyLength = 0.828,
-        -- ⚠ NO EYE ENTRY, and that is not an oversight. The uguisu carries eye GEOMETRY baked
-        -- into its body mesh from `bird_familiar._eyes`, so it already has eyes and must not be
-        -- given a second pair floating on bones its rig does not have. A nil eye means "this
-        -- species handles its own"; `BirdController` builds nothing.
         voice = {
             -- Shared with the falls-dock bird's Call_1/2/3, deliberately: it is the same species
             -- and the same throat. See docs/wiki/world/falls-dock.md.
@@ -86,26 +78,6 @@ BirdSpecies.SPECIES = {
         -- large-billed crow. Almost exactly twice the uguisu, which is why the two of them
         -- together are a real test of whether the motion scales at all.
         bodyLength = 1.640,
-        -- ⚠ APPEARANCE ONLY -- there is no `radius` here and there must not be one. It sized a
-        -- runtime `Part` ball; the eyeballs are geometry in `KarasuEyes.rbxm` now, so their size
-        -- is measured in `tools/blender/karasu_retarget.py` and rides along in the asset. The
-        -- field outlived the ball by long enough to drift: it read 0.024 against a mesh that
-        -- measures 0.0188. A dimension the asset also carries is a second copy of a number.
-        eye = {
-            -- Nearly black and slightly warm. ⚠ Measured off the reference, every part of a
-            -- crow's eye except the glint is DARKER than the feathers around it -- iris 0.66x,
-            -- pupil 0.14x. It reads by contrast with its own socket, not by being pale, and the
-            -- three attempts that tried to make it pale are why this comment exists.
-            colour = { 18, 16, 15 },
-            -- ⚠ SmoothPlastic, not Glass: Glass refracts what is behind it, and behind an eye is
-            -- the inside of a head. What is wanted is a hard specular on a dark ball.
-            material = "SmoothPlastic",
-            -- ⚠ THE ONE DIAL. This is what a painted glint could never be -- a highlight that
-            -- moves with the camera. Too low and the eye vanishes into the head; too high and it
-            -- reads as a chrome bead. Tune BY EYE in play, in Studio, without a Blender round
-            -- trip -- which is most of why the eye left the texture.
-            reflectance = 0.25,
-        },
         voice = {
             clips = {
                 { id = 136463941193848, weight = 45 }, -- karasu-1, one caw,    0.52s
@@ -133,13 +105,6 @@ BirdSpecies.SPECIES = {
 -- of room tone at -56 dBFS. Not wired yet; recorded for when it is.
 BirdSpecies.GROUP_GAP_SECONDS = 0.48
 BirdSpecies.CAW_GAP_RANGE = { 0.48, 0.60 }
-
--- How this species' eyeballs look, or nil if it does not use separate eye parts (the uguisu
--- models its own). ⚠ nil is a real answer here, not a missing one -- see the Uguisu entry.
-function BirdSpecies.eyeOf(species: string): Eye?
-    local rec = BirdSpecies.SPECIES[species]
-    return if rec then rec.eye else nil
-end
 
 -- The voice for `species`, or nil if it has none. See `pick` for why nil rather than a fallback.
 function BirdSpecies.voiceOf(species: string): Voice?

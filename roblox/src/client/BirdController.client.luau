@@ -49,7 +49,6 @@ local PROFILE = BirdFlight.profile(SPECIES_SCALE)
 local birdAssets = ReplicatedStorage:WaitForChild("RoshamboBirds", 20)
 local asset = birdAssets and birdAssets:FindFirstChild(`{SPECIES}Body`)
 local wingAsset = birdAssets and birdAssets:FindFirstChild(`{SPECIES}Wings`)
-local eyeAsset = birdAssets and birdAssets:FindFirstChild(`{SPECIES}Eyes`)
 -- ⚠ ACCEPT EITHER A MeshPart OR THE MODEL THE IMPORTER WRAPS IT IN. Studio's 3D Importer emits a
 -- Model containing the MeshPart plus an AnimationController and an InitialPoses folder, and which
 -- of the two gets saved to the .rbxm depends on what was right-clicked. Requiring one shape makes
@@ -67,15 +66,6 @@ local TEMPLATE = meshOf(asset)
 -- fold 93 of 208 wing vertices are still outside the body. Transparency on a separate MeshPart is
 -- complete and unarguable, and the wings stay SKINNED so they keep the two-bone fold and the flap.
 local WING_TEMPLATE = meshOf(wingAsset)
--- ⚠ THE EYES ARE A THIRD PART FOR A DIFFERENT REASON THAN THE WINGS. Nothing about them needs to
--- vanish; they are separate because GLOSS CANNOT BE LOCALISED. The bird is one MeshPart wearing
--- one plain ColorMap with no SurfaceAppearance, so there is no per-texel roughness -- an eye
--- painted or modelled INTO the body cannot be wet unless the whole bird is wet (measured: at
--- roughness 0.10 the crow came out as glossy black plastic and the eye still did not read).
---
--- ⚠ ONE MESH, BOTH EYEBALLS, so it is one extra instance per bird rather than two. Absent on the
--- uguisu, which models its eyes into its body -- a nil template is a real answer, not a fault.
-local EYE_TEMPLATE = meshOf(eyeAsset)
 if not TEMPLATE then
     -- ⚠ DO NOT let a missing asset take the client down. Familiars are decoration; the round
     -- still has to be playable without them. A missing WINGS template is survivable on its own —
@@ -158,10 +148,6 @@ type Bird = {
     tail: Bone?,
     hipL: Bone?,
     hipR: Bone?,
-    -- Both eyeballs as ONE part, and its fixed offset from the head bone. See EYE below for why
-    -- they are a separate part at all, and the placement in RenderStepped for why one offset.
-    eyes: BasePart?,
-    eyeOffset: CFrame?,
     root: Bone?,
     seed: number,
     flyingSince: number?,
@@ -196,59 +182,15 @@ type Bird = {
 
 local birds: { [string]: Bird } = {}
 local roster: { [string]: any } = {}
--- ⚠ HOW THE EYES ARE PAINTED LIVES IN `BirdSpecies`, HOW BIG THEY ARE LIVES IN THE MESH. A
--- MeshPart keeps Color, Material and Reflectance at runtime exactly as a Part does, so the three
--- appearance dials stay in the readable shared module where they can be tuned and reviewed; the
--- geometry stays in `KarasuEyes.rbxm`, where it was measured. A `radius` in the module used to
--- size a runtime ball, and by the time the ball was retired it read 0.024 against a mesh that
--- measured 0.0188 -- a second copy of a dimension, drifted, exactly as that defect always goes.
-local EYE = BirdSpecies.eyeOf(SPECIES)
-local EYE_COLOUR = if EYE then Color3.fromRGB(EYE.colour[1], EYE.colour[2], EYE.colour[3]) else nil
--- ⚠ `Enum.Material[name]` rather than a typed enum in the shared module, which must name no
--- Roblox type or it stops loading under Lune. An unknown name falls back rather than throwing:
--- a familiar with a plastic eye is a blemish, a familiar that errors on spawn is no familiar.
-local EYE_MATERIAL = if EYE
-    then ((Enum.Material :: any)[EYE.material] or Enum.Material.SmoothPlastic)
-    else nil
-
-local function makeEyes(userId: string): BasePart?
-    if not (EYE_TEMPLATE and EYE and EYE_COLOUR) then
-        return nil
-    end
-    local e = (EYE_TEMPLATE :: BasePart):Clone()
-    e.Name = `FamiliarEyes_{userId}`
-    -- ⚠ THE MESH IMPORTS AS DEFAULT GREY PLASTIC. Studio's importer sets no appearance, so
-    -- without these three lines the crow ships with the eyes of a mannequin.
-    e.Color = EYE_COLOUR
-    e.Material = EYE_MATERIAL :: Enum.Material
-    -- ⚠ THE ONE DIAL, and the whole reason the eye left the texture: a highlight that MOVES with
-    -- the camera. A painted glint is a bright shape at a fixed place, which reads as a marking.
-    e.Reflectance = EYE.reflectance
-    -- ⚠ KEEP THE BONES, exactly as the wings clone does. They ARE inert here -- the part is
-    -- placed rigidly off the BODY's head bone and never deformed -- but `KarasuEyes` is a SKINNED
-    -- MeshPart, carrying a real Skin deformer with `joint4` weighting all 84 vertices, and a
-    -- skinned mesh stripped of its bones still declares skinning with nothing to skin to.
-    --
-    -- ⚠ THIS WAS SHIPPED AS AN UNCONDITIONAL `c:Destroy()` and made these the only part in the
-    -- game rendering that way; the owner saw the eyes THROUGH the bird's head. Measured, the mesh
-    -- was not at fault: the balls sit tangent to the skull silhouette (right +0.0404 against a
-    -- skull reaching +0.0396, left -0.0535 against -0.0537) and a ray to the far eye crosses a
-    -- closed shell, so the far eyeball is geometrically occluded. The deviation from the working
-    -- pattern was the only thing left. A handful of inert Attachments is the whole cost.
-    for _, c in e:GetChildren() do
-        if not c:IsA("Bone") then
-            c:Destroy()
-        end
-    end
-    e.Anchored = true
-    e.CanCollide = false
-    e.CanQuery = false
-    e.CanTouch = false
-    e.CastShadow = false
-    e.Massless = true
-    e.Parent = folder
-    return e
-end
+-- ⚠ NO EYE CODE, AND THAT IS THE POINT. The karasu's eye is TEXELS -- the vendor's hand-painted
+-- art graded to the corvid palette, with a derived roughness map so it stays wet while the
+-- feathers stay matte. It needs no part, no clone, no bone and no per-frame write.
+--
+-- ⚠ DO NOT REINTRODUCE ONE. Two were shipped: a `Part` ball parked on `eye_R`/`eye_L`, and a
+-- `KarasuEyes` MeshPart CFramed off the head bone. The second failed for a reason no care would
+-- have fixed -- a rigid eyeball cannot track a SMOOTH-SKINNED socket, and at a 30 degree head yaw
+-- the rim ends up 0.57 of an eyeball radius from where a rigid follow puts it. Guarded by
+-- tests/BirdEyeConvention.spec.luau. See docs/wiki/world/familiars.md.
 
 local function seedFor(userId: string): number
     local n = tonumber(userId) or 0
@@ -307,34 +249,7 @@ local function makeBird(userId: string): Bird
         return host and host:FindFirstChild(name, true) :: Bone?
     end
 
-    -- ⚠ BOTH NEEDED BEFORE THE RECORD, because `eyeOffset` is derived from them rather than
-    -- looked up. Building it inside the table literal would read a field the literal has not
-    -- finished defining.
     local head = bone("joint4")
-    local eyes = makeEyes(userId)
-    if eyes and head then
-        -- Seat the clone on its authored rest pose first, so the offset below measures the place
-        -- the eyes were MODELLED into rather than wherever the template happened to be sitting.
-        --
-        -- ⚠ VIA THE SHARED ORIGIN, NOT `part.CFrame`. A part's CFrame is its BOUNDING-BOX CENTRE,
-        -- and these two centres are nowhere near each other -- body PivotOffset
-        -- (0.0010, -0.4485, 0.0000) against eyes (0.0065, -0.8329, 0.5900). Seating one to the
-        -- other put the eyes 0.59 studs down the nose-to-tail axis: two balls floating behind the
-        -- bird, which is what the owner saw. Both halves were exported around the SAME origin and
-        -- `PivotOffset.Position` is each part's offset to it, so routing through the origin is
-        -- what makes them agree -- the same seating the render loop gives the body and the wings.
-        --
-        -- ⚠ AND A BAD REST POSE IS AMPLIFIED, not merely offset, because it is then MEASURED into
-        -- `eyeOffset` below: a 0.7-stud lever arm in place of a 0.038-stud one swings the eyes
-        -- through an arc eighteen times too large on every head turn. The symptom presents as
-        -- wrong MOTION, which is not where anyone looks for a seating bug.
-        --
-        -- ⚠ POSITION ONLY. `PivotOffset` also carries the FBX axis conversion (90, 0, -180); its
-        -- ROTATION would reintroduce the nose-up attitude cleared a few lines above.
-        local origin = part.CFrame * CFrame.new(part.PivotOffset.Position)
-        eyes.CFrame = origin * CFrame.new(-eyes.PivotOffset.Position)
-    end
-
     return {
         part = part,
         wings = wings,
@@ -356,15 +271,6 @@ local function makeBird(userId: string): Bird
         -- Rotating the HIP swings the whole leg, which is the lift; the knee would only fold it.
         hipL = bone("joint12"),
         hipR = bone("joint25"),
-        -- ⚠ THE OFFSET IS COMPUTED ONCE, HERE, and that is the entire performance argument.
-        -- Eyeballs are RIGID relative to the skull, so their place in the head never changes:
-        -- one inverse at spawn buys a constant, and every frame after is a single multiply.
-        -- ⚠ `WorldCFrame` -- the REST pose -- is correct on this line and wrong on the other one.
-        -- Both parts were exported around the same origin and their rigs agree to 0.00000 studs
-        -- at every shared bone, so rest-to-rest is exactly the offset. Reading the driven pose
-        -- here would bake whatever the head happened to be doing on the frame the bird spawned.
-        eyes = eyes,
-        eyeOffset = if eyes and head then head.WorldCFrame:Inverse() * eyes.CFrame else nil,
         root = bone("joint1"),
         seed = seedFor(userId),
         flyingSince = nil,
@@ -541,9 +447,6 @@ FamiliarRoster.OnClientEvent:Connect(function(next_: { [string]: any })
             if b.wings then
                 b.wings:Destroy()
             end
-            if b.eyes then
-                b.eyes:Destroy()
-            end
             birds[userId] = nil
         end
     end
@@ -617,12 +520,6 @@ RunService.RenderStepped:Connect(function()
             b.part.Transparency = 1
             if b.wings then
                 b.wings.Transparency = 1
-            end
-            -- ⚠ THE EYES MUST HIDE WITH THE BIRD. It is an anchored part driven from a bone;
-            -- left visible it would hang in the air at the last place the head was, which is
-            -- exactly the "cached CFrame lands the bird on remembered air" failure one part out.
-            if b.eyes then
-                b.eyes.Transparency = 1
             end
         end
         if not root then
@@ -824,11 +721,6 @@ RunService.RenderStepped:Connect(function()
         if b.wings then
             b.wings.CFrame = base * CFrame.new(-b.wings.PivotOffset.Position)
         end
-        -- Sub-pixel well before this, and it is a whole part per bird. The PLACEMENT lives at
-        -- the end of the detail block below, because it has to read a skull that is posed there.
-        if b.eyes then
-            b.eyes.Transparency = if far <= DETAIL_DISTANCE then 0 else 1
-        end
 
         if far <= DETAIL_DISTANCE then
             -- FLYING IS A FACT ABOUT MOVEMENT, NOT ABOUT STATE. A bird hopping on a shoulder is
@@ -977,32 +869,6 @@ RunService.RenderStepped:Connect(function()
                 end
                 b.billLower.Transform = CFrame.Angles(-gape, 0, 0)
             end
-
-            -- ===== THE EYES, LAST, BECAUSE THEY READ THE POSED SKULL =====
-            -- ⚠ OFF THE BONE, NOT OFF `base`. The head turn is driven on joint4/joint3 INSIDE the
-            -- body mesh, so eyes placed relative to the body would stare straight ahead while the
-            -- head looked away. Reading the bone is what makes the eyes belong to the head.
-            --
-            -- ⚠ AND IT MUST RUN AFTER `b.head.Transform` IS WRITTEN, a few lines above.
-            -- `TransformedWorldCFrame` reports where the bone IS, which is whatever `Transform`
-            -- last said -- so placing the eyes earlier in the frame (as this did when first
-            -- written, 135 lines up) reads LAST frame's skull. Standing still that is invisible,
-            -- because the pose is unchanged; it shows only while the head is MOVING, and it shows
-            -- as the two things the owner reported -- eyes that trail the turn, and eyes that pop
-            -- in and out of the head as the skull moves out from under them and back.
-            --
-            -- ⚠ AND ONE WRITE, NOT FOUR. The obvious move is to give this part its own copy of
-            -- the head turn -- but two MeshParts DO NOT SHARE A SKELETON: the body's `joint4` and
-            -- this part's `joint4` are different instances, so driving the eyes' own bones means
-            -- mirroring joint1, joint3 and joint4 every frame on top of the CFrame. Eyeballs are
-            -- RIGID relative to the skull, so one rigid transform is the whole job.
-            --
-            -- ⚠ `TransformedWorldCFrame`, NOT `WorldCFrame`. The former is where the bone
-            -- currently is, the latter where it was authored. The wrong one looks perfectly right
-            -- in every screenshot of a bird facing forward and only breaks when the head turns.
-            if b.eyes and b.head and b.eyeOffset then
-                b.eyes.CFrame = b.head.TransformedWorldCFrame * b.eyeOffset
-            end
         end
     end
 end)
@@ -1014,12 +880,6 @@ Players.PlayerRemoving:Connect(function(player)
         b.part:Destroy()
         if b.wings then
             b.wings:Destroy()
-        end
-        -- ⚠ THE SECOND TEARDOWN PATH, and it was missed when the eyes were added. An orphaned
-        -- eyes part is ANCHORED: it does not fall, fade or expire, it simply hangs over the
-        -- canyon until the session ends.
-        if b.eyes then
-            b.eyes:Destroy()
         end
         birds[tostring(player.UserId)] = nil
     end

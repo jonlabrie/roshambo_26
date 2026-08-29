@@ -543,6 +543,46 @@ def derive_roughness(base_image, res=RES, rough_min=0.25, rough_max=0.85, radius
     return np.clip(rough, 0.0, 1.0)
 
 
+def derive_normal(base_image, res=RES, strength=2.0, radius=3, owned=None):
+    """A normal map inferred from the colour art's HIGH-FREQUENCY luminance, as height.
+
+    ⚠ HIGH-PASSED, NOT RAW LUMINANCE. Using luminance directly makes every broad albedo change a
+    slope -- a dark mantle against a pale throat becomes a cliff running down the bird. Only the
+    fine detail plausibly corresponds to relief, so the low frequencies are subtracted out first.
+
+    ⚠ SAME CAVEAT AS `derive_roughness`, and it compounds here: this is contrast that MIGHT be
+    relief, being turned into geometry-like shading. Where the artist painted a feather edge you
+    get a ridge whether or not the surface moves. Judge it against the bird, not against a belief
+    that a normal map is always an improvement.
+
+    ⚠ EXISTS BECAUSE A PARTIAL PBR SET IS WORSE THAN NONE (material-and-mesh-traps §8): Roblox
+    substitutes its own defaults for missing channels, and a ColorMap-only SurfaceAppearance
+    renders warm and shiny. Shipping the roughness map means shipping all four.
+    """
+    a = base_from_image(base_image, res)
+    L = a @ np.array([0.2126, 0.7152, 0.0722])
+    h = (L - _box_mean(L, radius)) * strength
+    # central differences, wrapping -- the atlas is not tiled, but the seam texels are dilated
+    # padding rather than real surface, so what happens there does not reach the model
+    dx = (np.roll(h, -1, 1) - np.roll(h, 1, 1)) * 0.5
+    dy = (np.roll(h, -1, 0) - np.roll(h, 1, 0)) * 0.5
+    n = np.stack([-dx, -dy, np.ones_like(h)], axis=2)
+    n /= np.linalg.norm(n, axis=2, keepdims=True)
+    if owned is not None:
+        flat = np.zeros_like(n); flat[:, :, 2] = 1.0
+        n = np.where(owned[:, :, None], n, flat)
+    return n * 0.5 + 0.5          # tangent-space encode, 0..1
+
+
+def flat_map(res=RES, value=0.0):
+    """A constant channel -- metalness for a bird, which is dielectric everywhere.
+
+    Not a placeholder: §8's failure is a set with channels MISSING, and Roblox filling them with
+    its own defaults. A deliberate zero is the correct value and stops that substitution.
+    """
+    return np.full((res, res, 3), float(value), dtype=np.float64)
+
+
 def eye_preserve(eyes_name="KarasuEyes", inner=1.9, outer=3.2):
     """Spheres around each eyeball inside which the vendor's paint is kept, blended out by `outer`.
 
