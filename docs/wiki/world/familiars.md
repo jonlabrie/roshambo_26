@@ -582,6 +582,16 @@ turn. The symptom therefore presents as wrong MOTION, which is not where anyone 
 bug. This is the same trap the body and the wings were already documented against, three lines
 above where it was reintroduced.
 
+⚠ **PLACE THE EYES LAST IN THE FRAME, AFTER `head.Transform` IS WRITTEN.** Shipped and seen in
+play as eyes that *"don't seem to turn accurately with the head"* and are *"popping in and out of
+the geometry"* — one defect, not two. `TransformedWorldCFrame` reports where a bone **is**, which
+is whatever `Transform` last said, so placing the eyes earlier in the loop reads **last frame's
+skull**. Standing still it is invisible, because the pose is unchanged; it appears only while the
+head moves, and it appears in exactly those two ways — the eyes trail the turn, and the skull moves
+out from under them and back, so they sink in and re-emerge. ⚠ **Ordering has no runtime signal**:
+both orders compile, run, and put the eyes on the head. Guarded by source position in
+`tests/BirdEyeConvention.spec.luau`.
+
 ⚠ **`TransformedWorldCFrame` on the per-frame write, `WorldCFrame` on the spawn-time offset.** The
 first is where the bone currently is, the second where it was authored. Swapping them looks
 perfectly correct in every screenshot of a bird facing forward and only breaks when the head turns.

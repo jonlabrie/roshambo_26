@@ -2065,3 +2065,27 @@ where this was written. Reading a warning is not obeying it.
 version of the guard was line-bounded and failed on the correct two-statement fix, which is the
 trap [[blender-pipeline]] and BirdScaleConvention both already record — bound a source scan by the
 structure it lives in. Three mutations caught, including the shipped bug verbatim. See [[familiars]].
+
+## [2026-08-28] defect | The karasu's eyes read last frame's skull — placed 135 lines before the head was posed
+
+Owner, in play: *"they don't seem to turn accurately with the head, and they seem to be popping in
+and out of the geometry."* One defect, not two.
+
+`Bone.TransformedWorldCFrame` reports where a bone IS, which is whatever `Transform` last said. The
+eyes were placed at the top of the per-frame block; `b.head.Transform` and `b.neck.Transform` are
+written 135 lines further down, at the end of the detail block. So every frame the eyes were seated
+on the PREVIOUS frame's skull.
+
+⚠ **A ONE-FRAME LAG IS INVISIBLE AT REST**, because the pose is unchanged and a frame late is
+indistinguishable from on time. It shows only while the head is MOVING, and it shows in exactly the
+two ways reported: the eyes trail the turn, and the skull moves out from under them and back, so
+they sink into the head and re-emerge. Neither symptom names its cause.
+
+⚠ **ORDERING HAS NO RUNTIME SIGNAL.** Both orders compile, run, and place the eyes on the head. The
+guard is source POSITION — the eyes' CFrame write must appear after the last `head.Transform` write
+— which is the same class of test as BirdScaleConvention and for the same reason.
+
+Found beside it and fixed: **`Players.PlayerRemoving` destroyed the body and the wings but not the
+eyes.** Two teardown paths exist and only the roster sweep had been updated. An orphaned eyes part
+is ANCHORED, so it does not fall, fade or expire — it hangs over the canyon until the session ends.
+Now guarded by counting `part:Destroy()` against `eyes:Destroy()`. See [[familiars]].

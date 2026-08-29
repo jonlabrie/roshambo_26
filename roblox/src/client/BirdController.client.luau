@@ -814,23 +814,9 @@ RunService.RenderStepped:Connect(function()
         if b.wings then
             b.wings.CFrame = base * CFrame.new(-b.wings.PivotOffset.Position)
         end
-        -- ⚠ OFF THE BONE, NOT OFF `base`. The head turns are driven on joint4/joint3 INSIDE the
-        -- body mesh, so eyes placed relative to the body would stare straight ahead while the
-        -- head looked away. Reading the bone is what makes the eyes belong to the head.
-        --
-        -- ⚠ AND ONE WRITE, NOT FOUR. The obvious move is to give this part its own copy of the
-        -- head turn -- but two MeshParts DO NOT SHARE A SKELETON: the body's `joint4` and this
-        -- part's `joint4` are different instances, so driving the eyes' own bones means mirroring
-        -- joint1, joint3 and joint4 every frame on top of the CFrame. Eyeballs are RIGID
-        -- relative to the skull, so one rigid transform is the whole job, and `eyeOffset` was
-        -- measured once at spawn.
-        --
-        -- ⚠ `TransformedWorldCFrame`, NOT `WorldCFrame`. The former is where the bone currently
-        -- IS, the latter where it was authored. The wrong one looks perfectly right in every
-        -- screenshot of a bird facing forward and only breaks when the head turns.
-        if b.eyes and b.head and b.eyeOffset then
-            b.eyes.CFrame = b.head.TransformedWorldCFrame * b.eyeOffset
-            -- Sub-pixel well before this, and it is a whole part per bird.
+        -- Sub-pixel well before this, and it is a whole part per bird. The PLACEMENT lives at
+        -- the end of the detail block below, because it has to read a skull that is posed there.
+        if b.eyes then
             b.eyes.Transparency = if far <= DETAIL_DISTANCE then 0 else 1
         end
 
@@ -981,6 +967,32 @@ RunService.RenderStepped:Connect(function()
                 end
                 b.billLower.Transform = CFrame.Angles(-gape, 0, 0)
             end
+
+            -- ===== THE EYES, LAST, BECAUSE THEY READ THE POSED SKULL =====
+            -- ⚠ OFF THE BONE, NOT OFF `base`. The head turn is driven on joint4/joint3 INSIDE the
+            -- body mesh, so eyes placed relative to the body would stare straight ahead while the
+            -- head looked away. Reading the bone is what makes the eyes belong to the head.
+            --
+            -- ⚠ AND IT MUST RUN AFTER `b.head.Transform` IS WRITTEN, a few lines above.
+            -- `TransformedWorldCFrame` reports where the bone IS, which is whatever `Transform`
+            -- last said -- so placing the eyes earlier in the frame (as this did when first
+            -- written, 135 lines up) reads LAST frame's skull. Standing still that is invisible,
+            -- because the pose is unchanged; it shows only while the head is MOVING, and it shows
+            -- as the two things the owner reported -- eyes that trail the turn, and eyes that pop
+            -- in and out of the head as the skull moves out from under them and back.
+            --
+            -- ⚠ AND ONE WRITE, NOT FOUR. The obvious move is to give this part its own copy of
+            -- the head turn -- but two MeshParts DO NOT SHARE A SKELETON: the body's `joint4` and
+            -- this part's `joint4` are different instances, so driving the eyes' own bones means
+            -- mirroring joint1, joint3 and joint4 every frame on top of the CFrame. Eyeballs are
+            -- RIGID relative to the skull, so one rigid transform is the whole job.
+            --
+            -- ⚠ `TransformedWorldCFrame`, NOT `WorldCFrame`. The former is where the bone
+            -- currently is, the latter where it was authored. The wrong one looks perfectly right
+            -- in every screenshot of a bird facing forward and only breaks when the head turns.
+            if b.eyes and b.head and b.eyeOffset then
+                b.eyes.CFrame = b.head.TransformedWorldCFrame * b.eyeOffset
+            end
         end
     end
 end)
@@ -992,6 +1004,12 @@ Players.PlayerRemoving:Connect(function(player)
         b.part:Destroy()
         if b.wings then
             b.wings:Destroy()
+        end
+        -- ⚠ THE SECOND TEARDOWN PATH, and it was missed when the eyes were added. An orphaned
+        -- eyes part is ANCHORED: it does not fall, fade or expire, it simply hangs over the
+        -- canyon until the session ends.
+        if b.eyes then
+            b.eyes:Destroy()
         end
         birds[tostring(player.UserId)] = nil
     end

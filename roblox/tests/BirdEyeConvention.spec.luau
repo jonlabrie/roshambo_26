@@ -105,6 +105,40 @@ describe("BirdController eye convention", function()
         expect(string.find(src, "eye_L", 1, true)).toBe(nil)
     end)
 
+    test("the eyes are placed AFTER the head is posed this frame", function()
+        -- ⚠ THE ONE-FRAME LAG, seen in play as eyes that "don't seem to turn accurately with the
+        -- head" and "popping in and out of the geometry". Both are the same defect.
+        --
+        -- `TransformedWorldCFrame` reports where a bone IS, so it answers with whatever
+        -- `Transform` was last written. The head and neck are posed at the END of the per-frame
+        -- block; placing the eyes before that reads LAST frame's skull. Standing still it looks
+        -- perfect -- the pose is unchanged, so a frame late is indistinguishable. It only breaks
+        -- while the head is moving, and it breaks in the two ways reported: the eyes trail the
+        -- turn, and because the skull moves out from under them they sink into it and re-emerge.
+        --
+        -- Ordering has no runtime signal at all. Both orders compile, run, and place the eyes on
+        -- the head; only one is a frame stale.
+        local src = source()
+        local place = string.find(src, "%.eyes%s*%.CFrame%s*=")
+        local lastHeadPose = nil
+        for i in string.gmatch(src, "()[%w_]+%.head%.Transform%s*=") do
+            lastHeadPose = i
+        end
+        expect(place ~= nil).toBe(true)
+        expect(lastHeadPose ~= nil).toBe(true)
+        expect((place :: number) > (lastHeadPose :: number)).toBe(true)
+    end)
+
+    test("every teardown that destroys the bird destroys the eyes", function()
+        -- ⚠ TWO TEARDOWN PATHS EXIST and only one was updated: the roster sweep and
+        -- `Players.PlayerRemoving`. An eyes part missed by either is ANCHORED, so it does not
+        -- fall or fade -- it hangs over the canyon for the rest of the session.
+        local src = source()
+        local _, bodies = string.gsub(src, "%.part:Destroy%(%)", "")
+        local _, eyes = string.gsub(src, "%.eyes:Destroy%(%)", "")
+        expect(eyes).toBe(bodies)
+    end)
+
     test("the eyes hide with the bird", function()
         -- ⚠ AN ANCHORED PART LEFT VISIBLE HANGS IN THE AIR at the last place the head was. The
         -- body and the wings are both hidden on the cull path; the eyes must be too, or a culled
