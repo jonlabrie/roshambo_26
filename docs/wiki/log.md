@@ -2040,3 +2040,28 @@ nothing at runtime distinguishes a one-write placement from a four-write one —
 the right place. Five mutations, each caught by exactly one test: rest pose for driven pose, the
 offset rebuilt per frame, the eyes dropped from the cull path, `radius` creeping back, and a `Part`
 ball returning. See [[familiars]].
+
+## [2026-08-28] defect | The karasu's eyes shipped floating behind the tail — a rest pose seated by the part centre
+
+Owner, in play: *"there are two blue-ish balls floating in space behind the back of the bird — not
+sure if those are meant to be the eyes, but they're nearer the tail than the head, and seem to be
+moving more than eyes would."*
+
+`eyes.CFrame = part.CFrame` seats the eyes' BOUNDING-BOX CENTRE where the body's centre is, and the
+two centres are far apart: body `PivotOffset` (0.0010, -0.4485, 0.0000) against eyes
+(0.0065, -0.8329, 0.5900). The error is (-0.0055, +0.3844, -0.5900), and Z is nose-to-tail — 0.59
+studs toward the tail, which is exactly what was reported.
+
+⚠ **THE MOTION SYMPTOM WAS THE SAME BUG, NOT A SECOND ONE.** The bad rest pose is MEASURED into
+`eyeOffset`, so the constant carries a ~0.7-stud lever arm in place of 0.038 and every head turn
+swings the eyes through an arc eighteen times too large. A seating error that presents as wrong
+motion is worth naming, because motion is not where anyone looks for it.
+
+Fixed by routing through the shared authored origin, which is how the render loop already seats the
+body and the wings — and the file's own ⚠ against seating by the part centre sits three lines below
+where this was written. Reading a warning is not obeying it.
+
+`tests/BirdEyeConvention.spec.luau` now scans the seating BLOCK rather than the line: the first
+version of the guard was line-bounded and failed on the correct two-statement fix, which is the
+trap [[blender-pipeline]] and BirdScaleConvention both already record — bound a source scan by the
+structure it lives in. Three mutations caught, including the shipped bug verbatim. See [[familiars]].

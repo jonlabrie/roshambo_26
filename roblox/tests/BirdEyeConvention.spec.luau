@@ -58,6 +58,40 @@ describe("BirdController eye convention", function()
         expect(inverses <= 1).toBe(true)
     end)
 
+    test("the rest pose is seated by the SHARED ORIGIN, not by the part centre", function()
+        -- ⚠ THE BUG THIS EXISTS FOR, seen in play as "two blue-ish balls floating behind the
+        -- bird, nearer the tail than the head, moving more than eyes would".
+        --
+        -- `part.CFrame` puts a part's BOUNDING-BOX CENTRE somewhere, and the body and the eyes
+        -- have different centres: body PivotOffset (0.0010, -0.4485, 0.0000) against eyes
+        -- (0.0065, -0.8329, 0.5900). Seating one to the other's CFrame therefore lands the eyes
+        -- 0.59 studs down the nose-to-tail axis and 0.38 up -- behind the bird.
+        --
+        -- ⚠ AND THE ERROR IS AMPLIFIED, not merely offset, because the bad rest pose is then
+        -- MEASURED into `eyeOffset`. A ~0.7-stud lever arm replaces a 0.038-stud one, so every
+        -- head turn swings the eyes through an arc eighteen times too large. That is why the
+        -- symptom read as wrong MOTION rather than as a wrong position.
+        --
+        -- Both parts were exported around the same origin, and `PivotOffset.Position` is the
+        -- offset from each part's centre to it -- so going through the origin is what makes the
+        -- two agree. The render loop already seats the body and the wings exactly this way.
+        -- ⚠ SCAN THE BLOCK, NOT THE LINE. The seating is naturally two statements -- compute
+        -- the shared origin, then place the eyes relative to it -- and a line-bounded pattern
+        -- sees only one `PivotOffset` and fails on correct code. Same trap BirdScaleConvention
+        -- hit when stylua wrapped a signature: bound a source scan by the STRUCTURE it lives in.
+        local src = source()
+        local seat = string.match(src, "if eyes and head then(.-)\n    end")
+        expect(seat ~= nil).toBe(true)
+        seat = seat :: string
+        -- BOTH pivots: routing through only the eyes' leaves the body's own centre offset in.
+        expect(string.find(seat, "part.PivotOffset", 1, true) ~= nil).toBe(true)
+        expect(string.find(seat, "eyes.PivotOffset", 1, true) ~= nil).toBe(true)
+        -- ⚠ POSITION ONLY. PivotOffset also carries the FBX axis conversion (90, 0, -180), so
+        -- using the whole CFrame reintroduces the nose-up attitude cleared a few lines above.
+        local _, positions = string.gsub(seat, "PivotOffset%.Position", "")
+        expect(positions).toBe(2)
+    end)
+
     test("no eyeball is built out of a Part", function()
         -- ⚠ OWNER RULING 2026-08-28, and it was earned: the runtime `Part` ball was chosen for a
         -- trade that does not exist. A MeshPart keeps Color, Material AND Reflectance at runtime

@@ -571,6 +571,17 @@ from the two **rest** poses. Nothing at runtime distinguishes the two designs �
 in the right place, one costs four times as much forever — so `tests/BirdEyeConvention.spec.luau`
 guards it by reading the controller's source.
 
+⚠ **SEAT THE REST POSE VIA THE SHARED ORIGIN, NEVER `part.CFrame`.** Shipped and seen in play as
+*"two blue-ish balls floating behind the bird, nearer the tail than the head, moving more than eyes
+would."* A part's CFrame is its BOUNDING-BOX CENTRE, and these two centres are far apart — body
+`PivotOffset` (0.0010, −0.4485, 0.0000) against eyes (0.0065, −0.8329, 0.5900) — so seating one to
+the other lands the eyes **0.59 studs down the nose-to-tail axis**. ⚠ **And a bad rest pose is
+AMPLIFIED, not merely offset**, because it is then measured into `eyeOffset`: a 0.7-stud lever arm
+replacing a 0.038-stud one swings the eyes through an arc **eighteen times** too large on every head
+turn. The symptom therefore presents as wrong MOTION, which is not where anyone looks for a seating
+bug. This is the same trap the body and the wings were already documented against, three lines
+above where it was reintroduced.
+
 ⚠ **`TransformedWorldCFrame` on the per-frame write, `WorldCFrame` on the spawn-time offset.** The
 first is where the bone currently is, the second where it was authored. Swapping them looks
 perfectly correct in every screenshot of a bird facing forward and only breaks when the head turns.

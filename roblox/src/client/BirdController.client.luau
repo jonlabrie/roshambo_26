@@ -305,7 +305,24 @@ local function makeBird(userId: string): Bird
     if eyes and head then
         -- Seat the clone on its authored rest pose first, so the offset below measures the place
         -- the eyes were MODELLED into rather than wherever the template happened to be sitting.
-        eyes.CFrame = part.CFrame
+        --
+        -- ⚠ VIA THE SHARED ORIGIN, NOT `part.CFrame`. A part's CFrame is its BOUNDING-BOX CENTRE,
+        -- and these two centres are nowhere near each other -- body PivotOffset
+        -- (0.0010, -0.4485, 0.0000) against eyes (0.0065, -0.8329, 0.5900). Seating one to the
+        -- other put the eyes 0.59 studs down the nose-to-tail axis: two balls floating behind the
+        -- bird, which is what the owner saw. Both halves were exported around the SAME origin and
+        -- `PivotOffset.Position` is each part's offset to it, so routing through the origin is
+        -- what makes them agree -- the same seating the render loop gives the body and the wings.
+        --
+        -- ⚠ AND A BAD REST POSE IS AMPLIFIED, not merely offset, because it is then MEASURED into
+        -- `eyeOffset` below: a 0.7-stud lever arm in place of a 0.038-stud one swings the eyes
+        -- through an arc eighteen times too large on every head turn. The symptom presents as
+        -- wrong MOTION, which is not where anyone looks for a seating bug.
+        --
+        -- ⚠ POSITION ONLY. `PivotOffset` also carries the FBX axis conversion (90, 0, -180); its
+        -- ROTATION would reintroduce the nose-up attitude cleared a few lines above.
+        local origin = part.CFrame * CFrame.new(part.PivotOffset.Position)
+        eyes.CFrame = origin * CFrame.new(-eyes.PivotOffset.Position)
     end
 
     return {
