@@ -139,6 +139,26 @@ describe("BirdController eye convention", function()
         expect(eyes).toBe(bodies)
     end)
 
+    test("the eyes clone keeps its bones, exactly as the wings clone does", function()
+        -- ⚠ A SKINNED MeshPart STRIPPED OF ITS BONES IS UNDEFINED TERRITORY, and `KarasuEyes` is
+        -- skinned -- it carries a real `Skin` deformer with `joint4` weighting all 84 vertices.
+        -- Deleting the Bone instances leaves a mesh that still declares skinning with nothing to
+        -- skin to, and it was the ONLY part in the game shipped that way; the wings clone, which
+        -- renders correctly, guards its strip with `IsA("Bone")`.
+        --
+        -- The bones are inert either way -- the part is placed rigidly off the BODY's head bone,
+        -- never deformed -- so keeping them costs a handful of Attachments and removes the one
+        -- thing that made this part unlike every other.
+        local src = source()
+        -- ⚠ ANCHOR ON THE FUNCTION, not on the assignment. `local e = (EYE_TEMPLATE ::
+        -- BasePart):Clone()` carries a type cast, so a pattern expecting the identifier straight
+        -- after `=` misses it and fails on correct code. Third brittle scan in this file: bound
+        -- these by a declaration, never by the shape of an expression.
+        local strip = string.match(src, "local function makeEyes.-\n    e%.Anchored")
+        expect(strip ~= nil).toBe(true)
+        expect(string.find(strip :: string, 'IsA("Bone")', 1, true) ~= nil).toBe(true)
+    end)
+
     test("the eyes hide with the bird", function()
         -- ⚠ AN ANCHORED PART LEFT VISIBLE HANGS IN THE AIR at the last place the head was. The
         -- body and the wings are both hidden on the cull path; the eyes must be too, or a culled

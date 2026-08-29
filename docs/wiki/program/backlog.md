@@ -452,3 +452,12 @@ it does not redesign it.
   is already private to that client. Signpost personal vs public boards physically.
 ⚠ Both belong on [[misc-engine-traps]] rather than a status page; left here until someone
 moves them, which is the accretion this page is trying to stop.
+
+- **The karasu's two lid collars are welded to nothing** (found 2026-08-28). The body mesh is 8
+  connected components; two are 120-vertex rings sitting on the eyes with 48 open edges each — 96
+  of the body's 112 open edges. `build_lid_collar` was meant to bridge the eyeball's aperture to
+  the head, but the eyeballs became a separate MeshPart, so the ring's inner edge has nothing to
+  meet and its outer edge never merged into the skull. ⚠ Not currently visible: the main body is
+  closed (0 open edges), so nothing renders see-through, and the balls sit tangent to the skull
+  silhouette. Fix in `karasu_retarget.py`, then re-export and re-import all three. See
+  [[familiars]] and [[blender-pipeline]].

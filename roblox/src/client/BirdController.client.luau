@@ -224,11 +224,21 @@ local function makeEyes(userId: string): BasePart?
     -- ⚠ THE ONE DIAL, and the whole reason the eye left the texture: a highlight that MOVES with
     -- the camera. A painted glint is a bright shape at a fixed place, which reads as a marking.
     e.Reflectance = EYE.reflectance
-    -- ⚠ STRIP THE BONES. They are inert here -- the part is placed rigidly off the BODY's head
-    -- bone, not deformed -- and Roblox strips any bone that influences no vertex anyway, so the
-    -- clone carries only `joint4`'s ancestor chain. Keeping them costs instances for nothing.
+    -- ⚠ KEEP THE BONES, exactly as the wings clone does. They ARE inert here -- the part is
+    -- placed rigidly off the BODY's head bone and never deformed -- but `KarasuEyes` is a SKINNED
+    -- MeshPart, carrying a real Skin deformer with `joint4` weighting all 84 vertices, and a
+    -- skinned mesh stripped of its bones still declares skinning with nothing to skin to.
+    --
+    -- ⚠ THIS WAS SHIPPED AS AN UNCONDITIONAL `c:Destroy()` and made these the only part in the
+    -- game rendering that way; the owner saw the eyes THROUGH the bird's head. Measured, the mesh
+    -- was not at fault: the balls sit tangent to the skull silhouette (right +0.0404 against a
+    -- skull reaching +0.0396, left -0.0535 against -0.0537) and a ray to the far eye crosses a
+    -- closed shell, so the far eyeball is geometrically occluded. The deviation from the working
+    -- pattern was the only thing left. A handful of inert Attachments is the whole cost.
     for _, c in e:GetChildren() do
-        c:Destroy()
+        if not c:IsA("Bone") then
+            c:Destroy()
+        end
     end
     e.Anchored = true
     e.CanCollide = false

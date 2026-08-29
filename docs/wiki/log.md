@@ -2089,3 +2089,33 @@ Found beside it and fixed: **`Players.PlayerRemoving` destroyed the body and the
 eyes.** Two teardown paths exist and only the roster sweep had been updated. An orphaned eyes part
 is ANCHORED, so it does not fall, fade or expire — it hangs over the canyon until the session ends.
 Now guarded by counting `part:Destroy()` against `eyes:Destroy()`. See [[familiars]].
+
+## [2026-08-28] defect | The karasu's eyes rendered through its head — a skinned mesh shipped with its bones deleted
+
+Owner, in play: *"I seem to be able to see the eyes through the bird's head?"*
+
+⚠ **THE MESH WAS MEASURED AND CLEARED FIRST**, which is the part worth keeping. At the eye station
+the skull spans x −0.0537 .. +0.0396 and the eyeballs reach +0.0404 and −0.0535 — tangent to the
+silhouette, 0.0008 proud on one side and 0.0002 inside on the other. A ray from a viewer abeam the
+head crosses a closed shell to reach the far eye, so the far eyeball is geometrically occluded.
+Guessing would have sent a session into Blender to fix a mesh that was correct.
+
+The cause was the clone. `makeEyes` stripped **every** child including the `Bone` instances, making
+these the only part in the game shipped as a **skinned MeshPart with no bones** — `KarasuEyes`
+carries a real Skin deformer with `joint4` weighting all 84 vertices, so the mesh still declares
+skinning with nothing to skin to. The wings clone, which renders correctly, guards its strip with
+`IsA("Bone")`; the eyes did not. Now they match. The bones stay inert either way — the part is
+placed rigidly off the BODY's head bone and never deformed — so the cost is a few Attachments.
+
+⚠ **FOUND BESIDE IT, NOT THE CAUSE, AND STILL A DEFECT: the two lid collars are welded to nothing.**
+The body mesh is 8 connected components, and two of them are 120-vertex rings sitting on the eyes
+with 48 open edges each — 96 of the body's 112 open edges, previously logged as "84 explained, 28
+unverified". That accounting was wrong: the collars are not open by design, they are FLOATING. The
+main body is closed (0 open edges), so nothing is see-through, but a ring welded to neither the
+skull nor the eyeball is not what `build_lid_collar` was supposed to produce. Backlogged, not fixed
+here. See [[familiars]].
+
+⚠ **AND A PROCESS NOTE.** Three source-scan guards in `BirdEyeConvention.spec.luau` were written
+line-bounded or expression-bounded and failed on CORRECT code — once on a two-statement fix, once
+on a `:: BasePart` cast. Bind a source scan to a declaration or a block, never to the shape of an
+expression. [[blender-pipeline]] and BirdScaleConvention both already record this.
