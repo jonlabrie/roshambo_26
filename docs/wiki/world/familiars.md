@@ -423,8 +423,15 @@ trap is a third thing to correct when the trap is corrected.
 
 1. Import body and wings. **Do not rescale** if the source is authored 1:1 (the karasu is; the
    uguisu was built at one size and scaled in Studio).
-2. **Delete any `SurfaceAppearance` the importer creates; use `TextureID`** —
-   [[material-and-mesh-traps]] §8 (ColorMap-only renders warm and shiny).
+2. **SurfaceAppearance: DELETE IT FOR A ONE-MAP BIRD, KEEP IT FOR A FULL PBR SET.** The rule is
+   about how many channels the bird ships, not about SurfaceAppearance being bad.
+   [[material-and-mesh-traps]] §8: a **ColorMap-only** SurfaceAppearance renders warm and shiny
+   because Roblox substitutes its own defaults for the missing channels — so the **uguisu**, which
+   ships one map, gets it deleted and uses `TextureID`. The **karasu** (2026-08-29) ships ColorMap
+   + Roughness + Normal + Metalness, so the importer's SurfaceAppearance is the point: leave it
+   alone and do NOT set `TextureID`. ⚠ There is no import setting for this either way — the
+   importer builds it automatically from the maps in the `.fbm`; this is a step you skip or do
+   afterwards.
 3. **Set `part.CFrame` directly, never `PivotTo`** — [[blender-pipeline]] (the importer bakes a
    rotation into the CFrame with a compensating `PivotOffset`).
 4. **Anchored: TRUE** — it is an importer dialog setting; an unanchored probe falls out of the
