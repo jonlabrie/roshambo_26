@@ -250,6 +250,33 @@ hinged at ~46% of span) does work: 0.467 spread → 0.093 folded, verified in Ro
 vertices outside the body. If something must vanish completely, it has to be a **separate
 MeshPart** with `Transparency = 1`. That part can still be skinned, so it keeps its bones.
 
+### ⚠ A BONE SURVIVES TO ROBLOX ONLY IF IT DEFORMS A VERTEX — two filters, both silent
+
+Found 2026-08-28 on the karasu's eyes, after an import that "succeeded" three times. A bone can
+be dropped at either end of the trip, and neither end reports it: the export succeeds, the mesh
+is fine, and the loss only shows as a `nil` from a lookup by name — at runtime, in play.
+
+**Filter 1, on export: `use_armature_deform_only=True` drops bones with NO WEIGHTS ON THE MESH
+BEING EXPORTED** — not merely bones flagged non-deform. `eye_R`/`eye_L` were flagged
+`use_deform = True` and carried a position rather than any weights, so the flag culled them: 21
+bones in Blender, 15 in the imported body. Set it **`False`** whenever a rig carries position-only
+bones.
+
+**Filter 2, on import: Roblox strips bones that influence nothing, and no flag turns that off.**
+Fixing filter 1 changed nothing visible, and the proof was the asset id — the re-imported body and
+wings came back with the *same* `rbxassetid` as the previous import. Roblox content-hashes the
+mesh, so an identical id means identical uploaded data: a weightless bone adds nothing the
+importer records. **A bone that moves no vertex cannot reach Roblox.** If you want one there, give
+it geometry to hold; if nothing needs it, delete it from the rig rather than fighting for it.
+
+**And the trap underneath both: a vertex group is NOT skinning.** `KarasuEyes` was built with a
+`joint4` group and left unparented, on the belief that putting the armature in the scene is what
+makes a mesh skinned. It is not — Blender's FBX exporter writes a `Skin` deformer only for a mesh
+carrying an **ARMATURE MODIFIER**. Without it the group is inert, the file has no deformer, and
+the mesh imports static with zero bones: the eyes would have hung in world space ignoring every
+head turn. Diagnose from the file, not the exporter's success message —
+`strings x.fbx | grep -c Skin` is 0 for a static mesh and ≥1 for a skinned one.
+
 ### ⚠ An imported MeshPart's CFrame and PivotOffset are IMPORTER ARTEFACTS
 
 This trap bit three times in one file, wearing a different hat each time:

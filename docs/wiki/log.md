@@ -1986,3 +1986,29 @@ because it measured `norm()` — a magnitude, which cannot tell opening from clo
 
 A modelled mouth cavity is the remaining work, and it is the same conclusion the bill profile
 reached independently: this bill wants LOFTING from station data, not displacement ([[familiars]]).
+
+## [2026-08-28] defect | The karasu's eyes imported unrigged, and the eye bones can never reach Roblox
+
+Owner imported all three FBXs and asked for the bones. `KarasuEyes` came in with **zero** bones and
+`KarasuBody` with 15 — no `eye_R`/`eye_L`, on the third import in a row.
+
+Two independent filters, neither of which reports anything. **On export**,
+`use_armature_deform_only=True` drops bones with no weights *on the mesh being exported*, not
+merely non-deform bones — it had been culling the eye bones silently. **On import, Roblox strips
+any bone that influences nothing**, and no flag changes that. The proof was the asset id: the
+re-imported body and wings returned the *same* `rbxassetid` as the previous import, so the upload
+was byte-identical and the extra bone added nothing the importer records. Fixing the exporter was
+necessary and could never have been sufficient. See [[blender-pipeline]].
+
+Underneath both, the actual defect: **`KarasuEyes` had a `joint4` vertex group but no armature
+modifier and no parent.** `run()`'s reparent loop named only `("KarasuBody", "KarasuWings")`. A
+vertex group without a modifier is inert — Blender writes no `Skin` deformer — so the eyes exported
+static and would have hung in world space ignoring every head turn. Fixed by adding the eyes to
+that loop; the file now carries a `Skin` with `joint4` weighting all 84 vertices.
+
+⚠ **The eye BONES are not needed and were never the fix.** They exist as position anchors for the
+runtime `Part` eyeball the owner retired on 2026-08-28 ([[owner-rulings]]). Modelled eyeballs need
+exactly one bone — the head — and `joint4` already is one. `BirdController`'s `makeEye`/`eyeBoneR`
+path and the `eye` record in `BirdSpecies` are now dead code awaiting removal; because Roblox
+strips the eye bones on import, `bone("eye_R")` already returns nil and the parts are never placed.
+A session proposed rescuing the bones instead — sunk cost dressed as a design.

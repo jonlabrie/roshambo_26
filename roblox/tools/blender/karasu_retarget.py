@@ -1059,10 +1059,12 @@ def build_eye_mesh(spec=KARASU):
     # a problem that costs one flag, and the uguisu's 8x6 is deliberately matched.
     for poly in me.polygons:
         poly.use_smooth = True
-    # ⚠ WEIGHT IT, even though the controller CFrames the whole part. `export()` carries the
-    # armature, so Roblox imports this as a SKINNED MeshPart; an unweighted skinned mesh collapses
-    # to the origin the moment anything touches a bone. Bound to the head, which is also the bone
-    # the controller reads to place it, so the two can never disagree.
+    # ⚠ WEIGHT IT TO THE HEAD -- this group is what makes the eyes follow the head, and it is
+    # the ONLY bone they need. `run()` gives this object the armature modifier that turns the
+    # group into a skin deformer; the group alone does nothing, which is exactly how these
+    # shipped once as a static mesh with zero bones. One bone, not two: `eye_R`/`eye_L` carry a
+    # position for a runtime Part that the owner retired in favour of this mesh, and a bone that
+    # deforms no vertex is stripped by Roblox's importer regardless.
     g = ob.vertex_groups.new(name="joint4")
     g.add([v.index for v in me.vertices], 1.0, 'REPLACE')
     return {"verts": len(me.vertices), "tris": sum(len(p_.vertices) - 2 for p_ in me.polygons),
@@ -1805,8 +1807,18 @@ def rebuild_rig(spec=KARASU):
         j.align_roll(Vector((0.0, 0.0, 1.0)))
         return made
     made = _edit_armature(arm, _wings)
+    # ⚠ ASSERT THE ROSTER. `BirdController` looks these up BY NAME, and a missing one fails
+    # SILENTLY at runtime -- no error, just a familiar with no eyes or a jaw that will not open.
+    # Losing eye_R/eye_L to a stray block-delete cost two commits and an import cycle before
+    # anyone counted the bones in Studio.
+    required = ("joint1", "joint3", "joint4", "joint8", "joint12", "joint25",
+                "bill_lower", "eye_R", "eye_L", "wing_R", "wing_L", "wrist_R", "wrist_L")
+    have = {b.name for b in arm.data.bones}
+    missing = [n for n in required if n not in have]
+    if missing:
+        raise RuntimeError(f"rig is missing bones BirdController drives: {missing}")
     return {"bones": renamed, "wing_bones": made,
-            "total": len(arm.data.bones)}
+            "total": len(arm.data.bones), "required_present": len(required)}
 
 
 def weight_to_nearest(obj, vert_idx, bone_names, arm=None):
@@ -2117,7 +2129,16 @@ def export(part, filepath):
                                              # armature modifier and writes a static mesh. The
                                              # import then SUCCEEDS and simply has no bones.
                 add_leaf_bones=False,
-                use_armature_deform_only=True,
+                # ⚠ FALSE, AND THE REASON IS THE EYE BONES. This flag does not merely drop
+                # non-deform bones -- it drops bones with NO WEIGHTS ON THE MESH BEING EXPORTED.
+                # `eye_R`/`eye_L` carry a POSITION and deform nothing by design, so it culled
+                # them silently: the rig had 21 bones in Blender and the imported body had 15
+                # (21 minus 4 wing bones, which live on the other mesh, minus the 2 eyes). The
+                # bird arrived in Studio with no way to place its own eyes, and nothing reported
+                # it -- the export succeeded, the mesh was fine, only a lookup by name would ever
+                # have failed. Every bone this rig builds is a deform bone, so turning it off
+                # costs nothing but a few inert bones on each mesh.
+                use_armature_deform_only=False,
                 bake_anim=False,
                 mesh_smooth_type='FACE',
                 path_mode='COPY', embed_textures=False,
@@ -2179,9 +2200,15 @@ def run(spec=KARASU, do_export=False):
     log["join"]["gape_faces"] = j.get("gape_faces")
     log["bind"] = bind(j["face_ranges"])
     log["size"] = normalise_size()
-    # reparent both meshes to the rig with an identity basis (trap 2 again)
+    # reparent every mesh to the rig with an identity basis (trap 2 again)
+    # ⚠ ALL THREE, AND THE EYES ARE THE ONE THAT WAS MISSED. `KarasuEyes` was built with a
+    # `joint4` vertex group and left unparented, on the belief that putting the armature in the
+    # scene is what makes a mesh skinned. It is not -- Blender's FBX exporter writes a skin
+    # deformer only for a mesh that carries an ARMATURE MODIFIER, and a vertex group with no
+    # modifier behind it is inert. The eyes imported as a static MeshPart with zero bones, so
+    # they would have hung in world space ignoring every head turn.
     arm = bpy.data.objects["Karasu_Rig"]
-    for n in ("KarasuBody", "KarasuWings"):
+    for n in ("KarasuBody", "KarasuWings", "KarasuEyes"):
         o = bpy.data.objects[n]
         o.parent = arm
         o.matrix_parent_inverse = Matrix.Identity(4)
