@@ -461,3 +461,19 @@ moves them, which is the accretion this page is trying to stop.
   closed (0 open edges), so nothing renders see-through, and the balls sit tangent to the skull
   silhouette. Fix in `karasu_retarget.py`, then re-export and re-import all three. See
   [[familiars]] and [[blender-pipeline]].
+
+- ⚠ **OPEN DECISION, OWNER DEFERRED 2026-08-28: how the karasu gets eyes.** Owner: *"I'm thinking
+  this approach to eyes is a failure and we have to go back to square one"*, then *"we'll talk
+  about this later"*. **Do not re-litigate or act on this without them.** The separate-MeshPart
+  eyes are shipped and working as of `bf3591f`; four bugs were found in play, all in the placement
+  code and all authored in one session, none of them the architecture.
+  ⚠ **The finding worth keeping, because it invalidates the premise the separate part exists for:**
+  "no per-texel roughness" is a property of the bird's CURRENT setup, not an engine limit.
+  [[material-and-mesh-traps]] §8 records that ColorMap-ONLY SurfaceAppearance renders worse than
+  none — and that 21 templates with a FULL PBR set were all correct. A `RoughnessMap` would let the
+  eye be wet while the feathers stay matte, on one mesh, with the eye modelled into the body the
+  way the uguisu's already is — deleting `KarasuEyes`, `makeEyes`, the offset, the frame-ordered
+  write and both teardown paths. Costs: a complete map set (partial trips §8), the eye is 31 texels
+  at the 1024 atlas so it may need 2048, and the feather look needs re-verifying.
+  Three options were put to the owner: full PBR + eye in the body mesh; keep the part but re-export
+  it unskinned; or pull the eye work entirely. See [[familiars]].
