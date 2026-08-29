@@ -2176,8 +2176,19 @@ def body_profile(step=0.06):
     return rows
 
 
-def run(spec=KARASU, do_export=False):
-    """The whole pipeline, vendor blend -> two rigged meshes in the working frame."""
+def run(spec=KARASU, do_export=False, eyes=True):
+    """The whole pipeline, vendor blend -> two rigged meshes in the working frame.
+
+    ⚠ `eyes=False` BUILDS A PLAIN SKULL -- no lid collar, no eyeball mesh -- so the eye can be
+    PAINTED instead. That is not a debug switch; it is the fork between the two approaches, and
+    the reason it exists is that a painted eye cannot be judged against a modelled one while the
+    modelled one's geometry is still in the mesh. The lofted collar is a raised ring exactly where
+    the paint has to lie flat, so paint on top of it reads as a lumpy annulus no matter how good
+    the art is (owner, 2026-08-29: "that's not going to work because of all the modeling done
+    around the eyeballs").
+    ⚠ `eye_site` still runs either way -- it only MEASURES, and `landmarks_final` and the texture
+    bake both need the seat it records.
+    """
     log = {}
     log["load"] = load_vendor()
     log["split_wings"] = split_wings()
@@ -2193,8 +2204,11 @@ def run(spec=KARASU, do_export=False):
     # vertices before this ran; between them they produced a halo more than twice the eye's width.
     # The collar's own crest IS the skin rising, it is a fixed width all the way round, and
     # dropping the displacement takes 224 triangles with it.
-    log["lid_collar"] = build_lid_collar(spec)
-    log["eye_mesh"] = build_eye_mesh(spec)
+    if eyes:
+        log["lid_collar"] = build_lid_collar(spec)
+        log["eye_mesh"] = build_eye_mesh(spec)
+    else:
+        log["lid_collar"] = log["eye_mesh"] = "SKIPPED -- painted eye, plain skull"
     log["tail"] = build_tail(spec)
     log["folded"] = build_folded_wings(spec)
     log["spread"] = build_spread_wings(spec)
@@ -2215,13 +2229,17 @@ def run(spec=KARASU, do_export=False):
     # they would have hung in world space ignoring every head turn.
     arm = bpy.data.objects["Karasu_Rig"]
     for n in ("KarasuBody", "KarasuWings", "KarasuEyes"):
-        o = bpy.data.objects[n]
+        o = bpy.data.objects.get(n)
+        if not o:
+            continue
         o.parent = arm
         o.matrix_parent_inverse = Matrix.Identity(4)
         o.matrix_basis = Matrix.Identity(4)
         if not any(m.type == 'ARMATURE' for m in o.modifiers):
             m = o.modifiers.new("Armature", 'ARMATURE')
             m.object = arm
+    log["eye_bones_note"] = ("eye_R/eye_L are vestigial and unshippable -- Roblox strips any bone "
+                             "that influences no vertex")
     if do_export:
         log["export"] = {
             "body": export("KarasuBody", OUT_DIR + "karasu_body.fbx"),
@@ -2407,7 +2425,8 @@ def bake_and_finish(res=1024):
              # controller sets Color/Material/Reflectance; when the iris arrives it gets its own
              # small TextureID rather than a slice of the bird's atlas, because the atlas is
              # painted by 3D POSITION and an eyeball wants a flat little iris disc instead.
-             "eyes": export("KarasuEyes", OUT_DIR + "karasu_eyes.fbx"),
              "colormap": png}
+    if "KarasuEyes" in bpy.data.objects:
+        files["eyes"] = export("KarasuEyes", OUT_DIR + "karasu_eyes.fbx")
     bpy.ops.wm.save_as_mainfile(filepath=OUT_DIR + "karasu_retarget.blend")
     return {"bake": info, "files": files}

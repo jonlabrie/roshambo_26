@@ -17,6 +17,7 @@
 
 import bpy
 import numpy as np
+from mathutils import Vector
 
 RES = 1024
 
@@ -428,7 +429,53 @@ SHADERS = {"warbler": lambda P, N, pal, S, lm: shade(P, N, pal, S),
            "corvid": shade_corvid}
 
 
-def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name=None):
+def base_from_image(name, res):
+    """The vendor's own diffuse, box-filtered to `res`, as the ground the bake paints onto.
+
+    ⚠ BOX FILTER, NOT NEAREST. The vendor map is 2048 and the ceiling is 1024, so every output
+    texel covers four source texels; picking one of the four throws away three quarters of the
+    hand-painted detail this exists to keep, and does it worst exactly where detail is finest.
+
+    ⚠ `pixels` IS SCENE-LINEAR for an sRGB image, which is the same space `shade_*` works in and
+    the same space `bake` writes back out. No conversion here, and none should be added.
+    """
+    im = bpy.data.images[name]
+    w, h = im.size
+    px = np.empty(w * h * 4, dtype=np.float32)
+    im.pixels.foreach_get(px)
+    a = px.reshape(h, w, 4)[:, :, :3].astype(np.float64)
+    while a.shape[0] > res and a.shape[0] % 2 == 0:
+        a = 0.25 * (a[0::2, 0::2] + a[1::2, 0::2] + a[0::2, 1::2] + a[1::2, 1::2])
+    if a.shape[0] != res:
+        yi = (np.arange(res) * a.shape[0] // res)
+        xi = (np.arange(res) * a.shape[1] // res)
+        a = a[yi][:, xi]
+    return a
+
+
+def eye_preserve(eyes_name="KarasuEyes", inner=1.9, outer=3.2):
+    """Spheres around each eyeball inside which the vendor's paint is kept, blended out by `outer`.
+
+    ⚠ MEASURED OFF THE EYEBALL MESH, never off `SPECIES[...]["landmarks"]`. Those landmarks carry
+    |x| 0.062 and r 0.024 against an actual 0.0216/0.0346 and 0.0188 -- they were transcribed and
+    have drifted, which is the exact failure `landmarks_final()` was written to prevent. The mesh
+    is the measurement.
+    """
+    ob = bpy.data.objects[eyes_name]
+    co = [v.co.copy() for v in ob.data.vertices]
+    out = []
+    for side in (lambda c: c.x > 0, lambda c: c.x < 0):
+        pts = [c for c in co if side(c)]
+        ctr = Vector((sum(p.x for p in pts) / len(pts),
+                      sum(p.y for p in pts) / len(pts),
+                      sum(p.z for p in pts) / len(pts)))
+        r = max((p - ctr).length for p in pts)
+        out.append((ctr, r * inner, r * outer))
+    return out
+
+
+def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name=None,
+         base_image=None, preserve=None):
     ob = bpy.data.objects[obj_name]
     me = ob.data
     uv_name = uv_name or me.uv_layers[0].name
@@ -442,8 +489,17 @@ def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name
     ys = [v.co.y for v in me.vertices]
     S = (max(ys) - min(ys)) / sp.get("ref_length", LANDMARK_REF_LENGTH)
 
-    img = np.zeros((res, res, 3), dtype=np.float64)
+    # ⚠ THE GROUND MATTERS. With no `base_image` this is black and every unpainted texel is a
+    # hole the dilation has to smear shut. With one, the vendor's own art is underneath, so
+    # anything this bake declines to paint FALLS THROUGH to hand-painted work rather than to
+    # black -- which is the whole mechanism behind `preserve`.
+    base = base_from_image(base_image, res) if base_image else None
+    img = np.zeros((res, res, 3), dtype=np.float64) if base is None else base.copy()
     hit = np.zeros((res, res), dtype=bool)
+    # 3D position per texel, kept so `preserve` can be evaluated in WORLD space after the raster
+    # rather than in UV space during it -- an eye is a place on the bird, not a rectangle in an
+    # atlas, and its island is not contiguous.
+    pos = np.zeros((res, res, 3), dtype=np.float64)
     co = np.array([v.co[:] for v in me.vertices])
     no = np.array([v.normal[:] for v in me.vertices])
     pal = sp["palette"]
@@ -494,6 +550,7 @@ def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name
         n = np.linalg.norm(N, axis=1, keepdims=True)
         N = N / np.where(n == 0, 1, n)
         img[gy[inside].astype(int), gx[inside].astype(int)] = shader(P, N, pal, S, lm)
+        pos[gy[inside].astype(int), gx[inside].astype(int)] = P
         hit[gy[inside].astype(int), gx[inside].astype(int)] = True
 
     # The spread wing shares this atlas — one upload for the whole bird, and the wing cannot be
@@ -515,6 +572,28 @@ def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name
                 np.array([v.normal[:] for v in wme.vertices]),
                 img, hit, res, shade_wing, pal, S)  # flat per surface -- see shade_wing
         filled = int(hit.sum())
+
+    # ⚠ HAND BACK THE EYE. Everything above painted the whole bird, this returns the one region
+    # the vendor already did better. Three painted eyes were rejected before the eye was modelled
+    # instead -- and all three were THIS bake's own output. The vendor's painted eye was never in
+    # that sample, and the conclusion drawn from it ("a painted eye cannot read") was generalised
+    # into an engine constraint it never was.
+    #
+    # ⚠ FEATHERED, NOT CUT. A hard boundary between vendor art and this palette reads as a decal
+    # pasted on the face; `inner`..`outer` is a smoothstep so the two grounds meet in a ring.
+    if preserve and base is not None:
+        d = np.full((res, res), np.inf)
+        for ctr, _r_in, _r_out in preserve:
+            c = np.array(ctr[:])
+            d = np.minimum(d, np.linalg.norm(pos - c[None, None, :], axis=2))
+        r_in = min(p_[1] for p_ in preserve)
+        r_out = max(p_[2] for p_ in preserve)
+        keep = 1.0 - _smooth(r_in, r_out, d)          # 1 = vendor, 0 = this bake
+        keep[~hit] = 0.0                              # never resurrect it outside painted texels
+        img = base * keep[:, :, None] + img * (1.0 - keep[:, :, None])
+        preserved = int((keep > 0.5).sum())
+    else:
+        preserved = 0
 
     # DILATE. Bilinear sampling at a UV island's edge reaches past it; without padding every
     # seam shows a dark fringe on the model.
@@ -540,6 +619,11 @@ def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name
     px = np.concatenate([img, np.ones((res, res, 1))], axis=2).astype(np.float32)
     bi.pixels.foreach_set(px.ravel())
     bi.update()
+    # Any texel this bake never reached keeps the vendor's art rather than a dilation smear.
+    if base is not None:
+        img[~hit] = base[~hit]
+
     return {"image": name, "res": res, "landmark_scale": round(S, 4), "texels_painted": filled,
             "coverage_pct": round(100.0 * filled / (res * res), 2),
+            "base": base_image, "texels_kept_from_vendor": preserved,
             "tris": len(me.loop_triangles)}
