@@ -23,3 +23,7 @@ __pycache__/
 # Parallel Claude threads (see docs/wiki/practice/parallel-threads.md). Never committed.
 .worktrees/
 .blender-rules.log
+
+# Blender writes these automatic backups on every save — pure churn, never commit them.
+*.blend1
+*.blend2

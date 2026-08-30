@@ -2541,3 +2541,70 @@ so the palate rides the skull and the floor rides `bill_lower` and only two thro
 degrees multiplier, so the gape angle is still unchosen (25° was a test value). The mouth interior's
 UVs are one tiny disc per face, not a real island. `BirdFlight.luau:200` still cites a stale 0.30
 `CAW_GAPE_SECONDS` against a 0.48 gap; both numbers are wrong.
+
+## 2026-08-30 — `art/`: a formal in-repo home for what no script can reproduce
+
+`karasu_authored.blend` was irreplaceable and lived in exactly one place on one disk, outside the
+repo. It and `karasu_colormap_graded_2.png` now live in `art/birds/karasu/`, and Blender saves
+there directly rather than to scratch — the pipeline reads authored inputs from `ART_DIR`, never
+from `OUT_DIR`, so an owner edit cannot land in a file the pipeline no longer reads.
+
+The admission rule is in `art/README.md` and is **checked, not merely written**: a new CI step
+rejects derived files under `art/` (`*.fbx`, `*_baked.*`, `karasu_retarget.blend`, mesh formats)
+and fails if any `ART_SOURCES` name is not stored there. Both branches were proved by mutation —
+planting a `karasu_body.fbx` under `art/` fails the first, un-tracking the colormap fails the
+second, and removing each restores the pass.
+
+⚠ **THE FIRST DRAFT OF THAT CHECK WAS SELF-CONTRADICTORY** and would have failed on a correct
+tree: it demanded every `OWNER_AUTHORED` name be stored in `art/` while separately rejecting
+`.fbx` there — and `karasu_body.fbx` is in that set. The two categories are genuinely different,
+so the script now names them separately (`ART_SOURCES` vs `OWNER_AUTHORED`).
+
+**Git LFS was considered and declined**, with numbers: 57 MB of history across 1652 commits, and
+the existing multi-megabyte binaries (a 5.9 MB mp4, a 5.5 MB normal map) were committed once and
+never re-saved, so the repo has no churn problem. LFS costs a tool every contributor and CI job
+must install plus a metered GitHub quota. The mitigation is instead a stated rule — **`art/`
+receives deliberate saves at approved milestones, not every tweak.** Retrofitting LFS is not
+blocked by this layout; `.git` outgrowing the working tree is the trigger.
+
+**The blend is self-contained: every image in it is PACKED.** An initial note here claimed the
+committed blend would open with `karasu_normal.png` and `karasu_roughness.png` missing on a
+machine that had not run the bake. That was wrong — Blender had packed them, so the derived maps
+travel inside the file while staying correctly out of `art/` as separate assets. Checking
+`image.packed_file` is the answer to "will this open elsewhere", not whether the path resolves.
+
+Auditing that claim turned up three real problems the wrong one had masked:
+- **`KarasuWings` had no material at all.** Now shares `KarasuPBR` with the body — verified rather
+  than assumed: both use UV layer `map1`, the body occupies 153 atlas cells and the wings 12,
+  with **zero overlap**. One atlas, disjoint islands.
+- **Three unused vendor textures were packed inside** (`crow_mesh_diffuse`, `uv_crow_alpha`,
+  `wing_diffuse02`) with the materials that referenced them. Purging them took the blend from
+  **7.22 MB to 2.75 MB** — 62% of the file we had just committed as irreplaceable source was dead
+  vendor weight. ⚠ Packing makes a blend self-contained; it also silently commits everything the
+  scene ever loaded. Purge before promoting to `art/`.
+- Their relative paths had broken when the file moved into the repo, which is what made them
+  visible at all.
+
+### Conditioning the authored blend for export — and a blind spot in the guard that exists to prevent it
+
+`run()` ends with `normalise_weights` and `thicken_degenerate_uvs`; a blend built by hand never
+passes through them, so the authored master was out of spec on both counts. Fixed in place, but
+the interesting part is *why the audit disagreed with the pipeline's own report*.
+
+⚠ **`thicken_degenerate_uvs` TESTED THE UV BOUNDING BOX, WHICH CANNOT SEE A DIAGONAL COLLAPSE.**
+It reported 0 problems on the wings while 84 faces had exactly zero UV area — every zero-area face
+on that mesh, missed. They are quads whose UVs read `[A, B, B, A]`: folded onto a line running
+diagonally, so the box around them spans 2.5 × 1.6 texels and passes. All 84 have real 3D area
+(~0.0005) and no coincident vertices, so they are genuine geometry — thin strips along the wing
+edge, ~0.015 wide — sampling a UV line. The function now measures **area**, keeping the box test
+alongside it for faces that have area but are thinner than a texel. Body 24 thickened by the box
+test, wings 84 by the new area test; neither would have caught the other's.
+
+⚠ **A VERTEX GROUP MATCHING NO BONE INFLATES EVERY WEIGHT AUDIT.** `joint8.001` carried real
+weight on the karasu body but had no corresponding bone, so nothing read it — while it made 43
+vertices look like they had 5 influences and pushed weight sums to 1.9505. `normalise_weights`
+filters to deform bones and so correctly reported 1.0; a naive audit over *all* groups did not.
+When two measurements of the same mesh disagree, the definition is usually the difference. Group
+removed; body 16 → 15 groups, all bones.
+
+State after: body and wings both at 0 over-influence, 0 un-normalised, 0 zero-area UV faces.

@@ -142,6 +142,24 @@ from the vendor blend, so by the time `assert_writable` fires at the export the 
 thrown away everything it was going to. The guard has to be a stop sign at the door, not a lock on
 the till. Move `AUTHORED_BLEND` aside to rebuild the base bird — an action, not an accident.
 
+**Where the guarded files live (2026-08-30).** `art/` at the repo root is the in-repo home for
+hand-authored source; `art/README.md` carries the admission rule. The two halves are kept in
+agreement by CI: `art/` must contain no derived files, and every name in
+`karasu_retarget.ART_SOURCES` must actually be stored there.
+
+⚠ **`OWNER_AUTHORED` AND `ART_SOURCES` ARE NOT THE SAME SET.** `ART_SOURCES` was made by hand
+and is stored in `art/`. `karasu_body.fbx` is guarded but *derived*, so it is deliberately NOT in
+`art/` — it is in `OWNER_AUTHORED` only because it is what Studio imports, and a rebuild would
+replace the shipping bird with one carrying none of the authored bill.
+
+⚠ **BLEND SAVES ARE MILESTONE-ONLY, AND THAT IS A SIZE CONSTRAINT, NOT ETIQUETTE.** Git cannot
+diff a `.blend`; every save is a full copy kept forever, and Blender writes a `.blend1` backup
+beside it on each save (gitignored — committing one doubles the cost for nothing).
+`karasu_authored.blend` is 7.2 MB against a 57 MB repo history: one file, 13% of everything. Git
+LFS was considered and deliberately declined — it adds a tool every contributor and CI job must
+install plus a metered quota, and the repo had no churn to solve. `.git` outgrowing the working
+tree is the evidence that would change that answer.
+
 ## 9. Verify instrumentation is live before spending the owner's time on it.
 
 Two play rounds were spent on diagnostics: the first was one-shot and fired mid-flight where the

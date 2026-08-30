@@ -1609,7 +1609,19 @@ def thicken_degenerate_uvs(me, texels=3.0, res=1024):
     for poly in me.polygons:
         us = [uvl[li].uv[0] for li in poly.loop_indices]
         vs = [uvl[li].uv[1] for li in poly.loop_indices]
-        if (max(us) - min(us)) >= lim and (max(vs) - min(vs)) >= lim:
+        # ⚠ THE BOUNDING BOX CANNOT SEE A DIAGONAL COLLAPSE, and that is not a corner case: it let
+        # 84 wing faces through, every single zero-area face on that mesh. They are quads whose UVs
+        # read [A, B, B, A] -- folded onto a line running diagonally, so the box around them spans
+        # 2.5 x 1.6 texels and passes, while the face itself has no area at all. All 84 have real
+        # 3D area (~0.0005) and no coincident vertices, so they are genuine geometry sampling a UV
+        # line. Measure the AREA, which is the property that actually matters, and keep the box
+        # test alongside it for faces that have area but are thinner than a texel.
+        area = 0.0
+        for k in range(1, len(us) - 1):
+            area += abs((us[k] - us[0]) * (vs[k + 1] - vs[0])
+                        - (us[k + 1] - us[0]) * (vs[k] - vs[0])) / 2.0
+        box_ok = (max(us) - min(us)) >= lim and (max(vs) - min(vs)) >= lim
+        if box_ok and area > 1e-12:
             continue
         cu, cv = sum(us) / len(us), sum(vs) / len(vs)
         n = Vector(poly.normal)
@@ -2165,6 +2177,15 @@ def normalise_size(target=NOSE_TO_TAIL):
 
 OUT_DIR = "/Users/jonlabrie/Desktop/Roshambo Reference/models/birds/probe/"
 
+# ⚠ IN-REPO HOME FOR WHAT CANNOT BE REGENERATED -- see art/README.md for the admission
+# rule. OUT_DIR is scratch and is not backed up by anything; ART_DIR is version-controlled
+# and is where the authoritative copies live. Read authored inputs from HERE, never from
+# OUT_DIR, or an owner edit lands in a file the pipeline no longer reads.
+# ⚠ ABSOLUTE ON PURPOSE. The MCP execs this script rather than importing it, so `__file__`
+# is undefined and the repo cannot be located relative to the source. One line to change if
+# the checkout moves.
+ART_DIR = "/Users/jonlabrie/Desktop/ClaudeCode/Roshambo_26/art/birds/karasu/"
+
 # ⚠ HAND-GRADED BY THE OWNER, AND NOT REPRODUCIBLE FROM THIS SCRIPT. `bake_bird_texture` can
 # regenerate the composite it started from, but not the Photoshop curve applied on top -- measured
 # against the bake, its non-black median luma is 9.6 against 15.6 and its p95 is 14.9 against 86,
@@ -2185,7 +2206,14 @@ COLORMAP_AUTHORITY = "karasu_colormap_graded_2.png"
 # not write the blend, and must not write the body FBX exported from it either.
 AUTHORED_BLEND = "karasu_authored.blend"
 
-OWNER_AUTHORED = {COLORMAP_AUTHORITY, AUTHORED_BLEND, "karasu_body.fbx"}
+# The two categories are NOT the same and CI has to tell them apart. ART_SOURCES were made by
+# hand and are stored in ART_DIR -- losing one loses the work. `karasu_body.fbx` is DERIVED from
+# them, so it is not stored in art/ (CI rejects derived files there), but it is still guarded,
+# because it is what Studio imports and a from-vendor rebuild would quietly replace the shipping
+# bird with one that has none of the authored bill in it.
+ART_SOURCES = {COLORMAP_AUTHORITY, AUTHORED_BLEND}
+
+OWNER_AUTHORED = ART_SOURCES | {"karasu_body.fbx"}
 
 
 def assert_authored_bill_absent():
@@ -2200,7 +2228,7 @@ def assert_authored_bill_absent():
     To rebuild the base bird deliberately, move `AUTHORED_BLEND` aside first -- an action, not an
     accident.
     """
-    path = OUT_DIR + AUTHORED_BLEND
+    path = ART_DIR + AUTHORED_BLEND
     if os.path.exists(path):
         raise RuntimeError(
             f"refusing to run(): {AUTHORED_BLEND} exists, so the shipping bill is hand-finished "
@@ -2586,10 +2614,10 @@ def bake_and_finish(res=1024):
     img.filepath_raw = png
     img.file_format = 'PNG'
     img.save()
-    authority = OUT_DIR + COLORMAP_AUTHORITY
+    authority = ART_DIR + COLORMAP_AUTHORITY
     if not os.path.exists(authority):
         raise RuntimeError(
-            f"the shipped ColorMap {COLORMAP_AUTHORITY} is missing from {OUT_DIR}. It is a "
+            f"the shipped ColorMap {COLORMAP_AUTHORITY} is missing from {ART_DIR}. It is a "
             f"hand-graded file that this script cannot regenerate -- recover it rather than "
             f"substituting the bake, which is a different image.")
     png = authority
