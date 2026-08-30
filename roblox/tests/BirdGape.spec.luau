@@ -27,33 +27,28 @@ describe("BirdFlight.gapeAt", function()
         expect(BirdFlight.gapeAt(99, caws, OPEN)).toBe(0)
     end)
 
-    describe("BirdController drives the gape from the clip", function()
+    test("the controller drives no jaw bone", function()
+        -- ⚠ THE SPLIT AND THE BONE ARE BOTH RETIRED (owner, 2026-08-30). A `bill_lower` lookup that
+        -- silently returns nil is worse than none: it reads as a working feature to anyone scanning
+        -- the file, and it would come back to life the moment a bone of that name reappeared --
+        -- driving a bill that no longer separates, which is a bill that stretches.
         local fs = require("@lune/fs")
-        local CONTROLLER = "src/client/BirdController.client.luau"
+        local src = harness.stripComments(fs.readFile("src/client/BirdController.client.luau"))
+        for _, gone in { "bill_lower", "billLower", "GAPE_DEG" } do
+            expect(string.find(src, gone, 1, true)).toBe(nil)
+        end
+    end)
 
-        test("the beak is not driven by a free-running oscillator", function()
-            -- ⚠ THE EXACT SHAPE THAT SHIPPED: `math.sin(now * 9 + b.seed)`, gated on the WIN state.
-            -- It looks like a bird chattering and is unrelated to any sound the bird is making.
-            local src = harness.stripComments(fs.readFile(CONTROLLER))
-            local gape = string.match(src, "if b%.billLower then.-\n            end")
-            expect(gape ~= nil).toBe(true)
-            gape = gape :: string
-            expect(string.find(gape, "math.sin", 1, true)).toBe(nil)
-            expect(string.find(gape, "BirdFlight.gapeAt", 1, true) ~= nil).toBe(true)
-            -- ⚠ CLIP TIME, NOT WALL TIME -- the per-bird pitch jitter moves every onset by up to 3%.
-            expect(string.find(gape, "cawSpeed", 1, true) ~= nil).toBe(true)
-        end)
-
-        test("singing arms the beak, and only singing", function()
-            -- The onsets and the clip's pitch are known ONLY where the clip is chosen. If `sing` stops
-            -- recording them the beak goes silent for good, with no error anywhere.
-            local src = harness.stripComments(fs.readFile(CONTROLLER))
-            local fn = string.match(src, "local function sing%(.-\nend")
-            expect(fn ~= nil).toBe(true)
-            for _, needed in { "cawFrom", "cawOnsets", "cawSpeed", "clipById" } do
-                expect(string.find(fn :: string, needed, 1, true) ~= nil).toBe(true)
-            end
-        end)
+    test("the caw data and the envelope SURVIVE the retirement", function()
+        -- ⚠ KEPT ON PURPOSE. The onsets are measured off the source WAVs by
+        -- `tools/audio/measure_caws.py` and the envelope is tested above; both are inputs the next
+        -- attempt at a jaw will need, and neither depends on how the geometry splits. Deleting them
+        -- would throw away the one part of this that was measured rather than guessed.
+        local clips = (BirdSpecies.voiceOf("Karasu") :: any).clips
+        for i, c in clips do
+            expect(#(c.caws :: any)).toBe(i)
+        end
+        expect(BirdFlight.gapeAt(0.09 + OPEN * 0.3, { 0.09 }, OPEN)).toBe(1)
     end)
 
     test("it reaches full gape once per caw", function()

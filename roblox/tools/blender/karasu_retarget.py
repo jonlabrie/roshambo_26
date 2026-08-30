@@ -14,7 +14,7 @@
 #     reshaped into.
 # What it did NOT buy, contrary to first expectations:
 #   * usable wing BONES. The crow rig is a Maya QuickRig humanoid (`QuickRigCharacter_*`) and
-#     BirdController drives the SPARROW's names (joint1/3/4/8/12/25 + bill_lower + wing_*/wrist_*).
+#     BirdController drives the SPARROW's names (joint1/3/4/8/12/25 + wing_*/wrist_*).
 #     Every bone is renamed here. ⚠ The crow's own TAIL bone is literally named `joint1`, which
 #     is also the target name for the ROOT — rename via a temp namespace or one silently eats
 #     the other.
@@ -23,7 +23,8 @@
 #     wing is built into the flank instead.
 #   * a usable tail. The vendor tail is 48 triangles of ALPHA CARDS. We ship a plain ColorMap
 #     with no SurfaceAppearance, so an alpha card renders as an opaque rectangle. Rebuilt solid.
-#   * a jaw. There is no bill_lower bone and the bill is one closed shell; it is split here.
+#   * a jaw. The bill is one closed shell. ⚠ It STAYS one: the plane split that used to cut it
+#     was retired 2026-08-30 -- a tomium is a curve. The beak does not open.
 #
 # UNITS ARE STUDS, 1 stud ~ 1 foot. Built at FINAL size — 1.64 studs nose to tail, a life-size
 # hashibutogarasu (~50cm), owner-chosen 2026-08-26. This one is 1:1: import it and do not rescale.
@@ -229,32 +230,15 @@ KARASU = {
                  (0.96, -0.156, -0.396, 0.0705),
                  (1.00, -0.214, -0.262, 0.072)],
     },
-    # The bill is split along its gape so `bill_lower` has something to move. Plane measured on
-    # the vendor head.
-    # ⚠ THESE ARE TYPED AND NOTHING RE-MEASURES THEM. This comment used to say "`run()`
-    # re-measures and overrides these if the mesh moves under them"; it does not -- `split_bill`
-    # reads them straight from here, and `landmarks_final` only REPORTS where they ended up after
-    # `normalise_size`. There is a guard for a plane that cuts NOTHING, but a plane that still
-    # cuts in the wrong place passes silently and the bird's beak opens along the wrong seam.
-    # That is why `reshape_body` displaces the culmen only ABOVE this plane, weighted to zero AT
-    # it: the cut stays valid by construction rather than by anyone remembering to re-measure.
-    # THE GAPE PLANE, measured: the bill runs y 0.60 -> 0.83 with its z-midline at 0.970 falling
-    # to 0.957 at the tip. The commissure sits a little BELOW that midline on a corvid, because
-    # the upper mandible is the deeper of the two.
-    # ⚠ The cut STOPS SHORT of the hinge (`hinge_y`) so the two halves stay joined at the back --
-    # that gives a real hinge and leaves no hole in the head.
-    # The bill is split along its gape so `bill_lower` has something to move. Plane measured on
-    # the vendor head.
-    # ⚠ THESE ARE TYPED AND NOTHING RE-MEASURES THEM. `split_bill` reads them straight from here;
-    # `landmarks_final` only REPORTS where they ended up. There is a guard for a plane that cuts
-    # NOTHING, but a plane that still cuts in the wrong place passes silently.
-    # ⚠ AND THEY DO NOT DESCRIBE THE MOUTH LINE WELL -- measured 2026-08-28 on the VENDOR mesh,
-    # the real gape (the tomium, i.e. the widest point of each cross-section) is essentially FLAT
-    # at z 0.957 -> 0.956 across the whole bill, while this plane falls 0.013 over the same span.
-    # Small, but it is the seed of the problem: a later pass steepened this to 0.1907 to keep a
-    # hooked tip on the upper side, which took the cut right off the anatomy and produced a
-    # wedge-shaped lower mandible that swung THROUGH the upper when the beak opened.
-    # `measure_gape_plane()` fits this from the mesh and is deliberately NOT wired -- see it.
+    # ⚠ THIS IS A REFERENCE LINE, NOT A CUT. `split_bill` used to bisect the bill along it; that
+    # was retired 2026-08-30 on the owner's ruling -- a tomium is a CURVE and a plane cannot follow
+    # one. Measured, this plane sat 0.0107 studs below the mesh's own mouth line and left 13 faces
+    # owning vertices from both mandibles.
+    # ⚠ IT SURVIVES FOR ONE REASON: `reshape_body` displaces the culmen only ABOVE this line,
+    # weighted to zero AT it, so the girth pass cannot flatten the mouth. That use does not need
+    # the line to be the true gape -- only to sit inside the bill and stay put.
+    # `measure_gape_plane()` fits a better plane from the mesh and is still deliberately unwired:
+    # it reduces the error without changing its class, which is why it was never the answer.
     "bill": {"gape_p": (0.0, 0.720, 0.9555), "gape_n": (0.0, 0.0599, 0.9982),
              "hinge_y": 0.645, "tip_y": 0.830},
     # ⚠ THE KARASU'S EYE IS PAINTED, NOT MODELLED -- unlike the uguisu, which carries eye
@@ -1391,201 +1375,6 @@ def build_spread_wings(spec=KARASU):
             "dims": [round(d, 4) for d in ob.dimensions]}
 
 
-def split_bill(spec=KARASU):
-    """Bisect the bill along its gape so `bill_lower` has something to move.
-
-    ⚠ TRAP 4 (blender-pipeline): `split_edges` leaves COINCIDENT vertex pairs, so a position test
-    cannot tell upper from lower -- both twins sit at identical coordinates. Classify by the
-    FACES a vertex belongs to instead: average which side of the gape plane its `link_faces` sit
-    on. Get this wrong and both twins land in the same group and the split does nothing visible.
-    """
-    b = spec["bill"]
-    gp, gn = gape_plane(spec)
-    o = bpy.data.objects[BODY_OBJ]
-    me = o.data
-    bm = bmesh.new()
-    bm.from_mesh(me)
-    bm.faces.ensure_lookup_table()
-
-    # Restrict the cut to the bill, forward of the hinge. bisect_plane cuts everything it is
-    # given, so handing it the whole model would slice the bird in half at head height.
-    region = [f for f in bm.faces if f.calc_center_median().y > b["hinge_y"]]
-    geom = set(region)
-    for f in region:
-        geom.update(f.verts)
-        geom.update(f.edges)
-    bmesh.ops.bisect_plane(bm, geom=list(geom), dist=1e-6, plane_co=gp, plane_no=gn,
-                           clear_inner=False, clear_outer=False)
-    bm.verts.ensure_lookup_table()
-    bm.edges.ensure_lookup_table()
-
-    on_plane = [e for e in bm.edges
-                if all(abs((v.co - gp).dot(gn)) < 1e-4 for v in e.verts)
-                and (e.verts[0].co.y + e.verts[1].co.y) * 0.5 > b["hinge_y"]]
-    if not on_plane:
-        bm.free()
-        raise RuntimeError("gape plane produced no cut edges -- check bill.gape_p / gape_n")
-    bmesh.ops.split_edges(bm, edges=on_plane)
-    bm.edges.ensure_lookup_table()
-    boundary = [e for e in bm.edges if e.is_boundary
-                and (e.verts[0].co.y + e.verts[1].co.y) * 0.5 > b["hinge_y"] - 0.02]
-    # ⚠ TAG THE INTERIOR FACES. These are the surfaces the cut exposed -- the inside of the mouth
-    # -- and they are the only faces that may take the gape colour. Finding them again later by a
-    # geometric test ("forward of the hinge and facing up or down") also catches the OUTSIDE of
-    # the bill's top and bottom, which meet near the gape line; the first version did exactly
-    # that, reprojected the whole bill into the gape's texture block, and painted a raw red
-    # stripe down the culmen of a bird that is meant to be black.
-    #
-    # ⚠ CREATE THE LAYER BEFORE THE OP, NOT AFTER. Adding a custom-data layer reallocates face
-    # custom data, and writes made through references taken beforehand land nowhere -- the tag
-    # read back as zero on every face while reporting success.
-    gape_layer = bm.faces.layers.int.get("gape") or bm.faces.layers.int.new("gape")
-    # ⚠ THE FILL SPANS THE CUT, AND THAT IS TOPOLOGY, NOT A BUG IN THIS CALL. The cut deliberately
-    # STOPS SHORT of the hinge so the mandibles stay joined at the back -- which means their two
-    # boundary loops SHARE the vertices where the cut ends. Topologically that is ONE loop, so
-    # `holes_fill` correctly closes it as ONE membrane running the whole length of the mouth,
-    # welded to both halves. Measured: 13 faces owning vertices from both, spanning y 0.645..0.742.
-    # Invisible shut; a flat sheet between the mandibles the moment `bill_lower` rotates.
-    #
-    # ⚠ FILLING THE TWO SIDES SEPARATELY DOES NOT FIX IT -- tried 2026-08-28. Split by which face
-    # each boundary edge belongs to and neither group is a closed loop on its own, so the fill
-    # leaves the bill open: 24 boundary edges and 24 non-manifold, against 0 and 0 before.
-    #
-    # ⚠ AND WATERTIGHT IS NOT CORRECT. This shipped behind `boundary_after: 0, non_manifold: 0`,
-    # both of which a webbed jaw satisfies perfectly. They say the mesh has no holes; they say
-    # nothing about whether it can MOVE. `faces_bridging_joint` below is the number that does.
-    bmesh.ops.holes_fill(bm, edges=boundary, sides=0)
-    # ⚠ And tag by GEOMETRY, not by the op's return value: `holes_fill` reported one face for the
-    # two holes it demonstrably closed (0 boundary edges afterwards), so trusting its bookkeeping
-    # would have left the second mandible's interior untagged. A fill face is exactly a face all
-    # of whose vertices lie on the cut plane.
-    tagged = 0
-    for f in bm.faces:
-        if f.calc_center_median().y <= b["hinge_y"] - 0.02:
-            continue
-        if all(abs((v.co - gp).dot(gn)) < 1e-4 for v in f.verts):
-            f[gape_layer] = 1
-            tagged += 1
-    bmesh.ops.recalc_face_normals(bm, faces=bm.faces[:])
-    bm.verts.ensure_lookup_table()
-
-    # classify by link_faces, NOT by position
-    lower = []
-    for i, v in enumerate(bm.verts):
-        if v.co.y <= b["hinge_y"] - 0.02 or not v.link_faces:
-            continue
-        d = sum((f.calc_center_median() - gp).dot(gn) for f in v.link_faces) / len(v.link_faces)
-        if d < 0:
-            lower.append(i)
-    # ⚠ THE NUMBER THAT WOULD HAVE CAUGHT THE WEB. Faces owning vertices from BOTH halves cannot
-    # hinge -- they stretch. A couple at the very back are the hinge itself and are correct; a
-    # dozen running to the tip are a membrane. Nothing else reported this: see the note above on
-    # watertight not meaning correct.
-    lower_set = set(lower)
-    bridging = []
-    for f in bm.faces:
-        if f.calc_center_median().y <= b["hinge_y"] + 0.02:
-            continue
-        vs = {v.index for v in f.verts}
-        if (vs & lower_set) and (vs - lower_set):
-            bridging.append(f.index)
-    # ⚠ REPORTED, NOT RAISED. It is a real defect and there is no correct value to demand yet:
-    # some bridging at the very back IS the hinge. What is wrong is a membrane down the whole
-    # mouth, and telling those apart needs a modelled cavity, not a threshold.
-
-    bm.edges.ensure_lookup_table()
-    stats = {"cut_edges": len(on_plane), "holes_closed": len(boundary),
-             "faces_bridging_joint": len(bridging),
-             "gape_faces_tagged": tagged, "lower_verts": len(lower),
-             "boundary_after": len([e for e in bm.edges if e.is_boundary]),
-             "non_manifold": len([e for e in bm.edges if not e.is_manifold])}
-    bm.to_mesh(me)
-    me.update()
-    bm.free()
-    vg = o.vertex_groups.get("bill_lower") or o.vertex_groups.new(name="bill_lower")
-    vg.add(lower, 1.0, 'REPLACE')
-    # ⚠ CLAIM THEM EXCLUSIVELY, or the jaw stays welded to the skull. `add(..., 'REPLACE')` sets
-    # bill_lower to 1.0 but leaves the vendor's joint4 weight sitting on the same vertices at 1.0
-    # too -- and normalisation then splits them 50/50, so the mandible moves HALF as far as the
-    # bone that drives it. Measured before this line existed: the lower bill's tip carried a mean
-    # bill_lower weight of 0.167, i.e. 83% of it was held by the head, and a 16-degree gape moved
-    # the tip 0.0199 studs -- 1.2% of the bird's length, invisible at any play distance. The owner
-    # heard the caw and saw no beak open.
-    # ⚠ A JAW IS RIGID. Blending it with the skull is not a softer hinge, it is a jaw that only
-    # partly opens; the hinge itself is handled by the cut stopping short, not by weights.
-    for other in o.vertex_groups:
-        if other.name != "bill_lower":
-            other.remove(lower)
-    stats["lower_claimed_exclusively"] = len(lower)
-    return stats
-
-
-def assert_bill_invariants(spec=KARASU, strict=True):
-    """What must be TRUE of an assembled bill, written down before it is built.
-
-    ⚠ THIS EXISTS BECAUSE FOUR GREEN CHECKS PASSED ON A BIRD WHOSE FACE WAS TORN OPEN. Luau tests,
-    stylua, selene and the wiki lint all went green on `af7a134`; none of them look at geometry, and
-    the bill was committed with 142 boundary edges and a hole in the head. The previous attempt was
-    built reactively -- render, spot a fault, patch, find the next -- which is the same loop that
-    failed on the vendor bill before it was lofted. Assemble ONCE, against these.
-
-    Each check is a fact about the bird, not about the code that made it:
-
-    1. NO FACE OWNS VERTICES FROM BOTH MANDIBLES. Such a face cannot hinge, it stretches -- a
-       membrane across the open mouth. ⚠ This is the check that a watertight test does NOT make:
-       `boundary_after: 0, non_manifold: 0` are both satisfied by a webbed jaw.
-    2. NO ORPHANS. A vertex with no weight collapses to the origin the moment a bone moves, and
-       `bind`'s catch-all would otherwise weight it by PROXIMITY -- which puts skull next to the
-       jaw bone and opens part of the face with the beak.
-    3. NO COINCIDENT CAPS. Two capping faces at the same place are invisible in a still and show
-       as z-fighting the moment anything moves; the previous attempt left the root's front cap
-       coincident with each mandible's rear cap at the rictus.
-    4. NO OPEN EDGES IN THE BILL REGION. The tail and the folded wings are open by design; the
-       bill is not.
-    5. THE JAW IS CLAIMED BY NAME. Every vertex of the lower mandible weighted 1.0 to `bill_lower`
-       and to nothing else -- not blended with the skull, which halves the gape.
-    """
-    body = bpy.data.objects.get("KarasuBody") or bpy.data.objects[BODY_OBJ]
-    me = body.data
-    gi = {g.index: g.name for g in body.vertex_groups}
-    lower = {v.index for v in me.vertices
-             if any(gi[g.group] == "bill_lower" and g.weight > 0.99 for g in v.groups)}
-    b = spec["bill"]
-    y0 = b["hinge_y"] - 0.02
-
-    bridging = [p.index for p in me.polygons
-                if (set(p.vertices) & lower) and (set(p.vertices) - lower)]
-    orphans = [v.index for v in me.vertices if not v.groups]
-    blended = [v.index for v in me.vertices
-               if v.index in lower and len([g for g in v.groups if g.weight > 1e-4]) > 1]
-
-    bm = bmesh.new()
-    bm.from_mesh(me)
-    bm.verts.ensure_lookup_table()
-    open_in_bill = [e.index for e in bm.edges
-                    if len(e.link_faces) == 1
-                    and all(v.co.y > y0 for v in e.verts)]
-    # coincident faces: two faces whose centres and areas agree to within a hair
-    seen, coincident = {}, []
-    for f in bm.faces:
-        c = f.calc_center_median()
-        if c.y <= y0:
-            continue
-        key = (round(c.x, 4), round(c.y, 4), round(c.z, 4))
-        if key in seen:
-            coincident.append((seen[key], f.index))
-        else:
-            seen[key] = f.index
-    bm.free()
-
-    report = {"faces_bridging_mandibles": len(bridging), "orphan_verts": len(orphans),
-              "lower_verts_blended_with_other_bones": len(blended),
-              "open_edges_in_bill": len(open_in_bill), "coincident_faces": len(coincident),
-              "lower_verts": len(lower)}
-    bad = {k: v for k, v in report.items() if k != "lower_verts" and v}
-    if bad and strict:
-        raise RuntimeError(f"bill invariants violated: {bad}")
-    return report
 
 
 def simplify_feet(spec=KARASU):
@@ -1890,7 +1679,7 @@ def rebuild_rig(spec=KARASU):
     bz = (max(zs) + min(zs)) * 0.5
 
     def _wings(ebs):
-        for n in ("wing_R", "wrist_R", "wing_L", "wrist_L", "bill_lower"):
+        for n in ("wing_R", "wrist_R", "wing_L", "wrist_L"):
             if n in ebs:
                 ebs.remove(ebs[n])
         made = {}
@@ -1937,13 +1726,6 @@ def rebuild_rig(spec=KARASU):
             r.use_connect = True
             r.align_roll(Vector((0.0, 0.0, 1.0)))
             made["wing_" + sfx] = list(w.head) + list(w.tail)
-        b = spec["bill"]
-        j = ebs.new("bill_lower")
-        j.head = Vector((0.0, b["hinge_y"], b["gape_p"][2]))
-        j.tail = Vector((0.0, b["tip_y"], b["gape_p"][2] - 0.011))
-        j.parent = ebs["joint4"]
-        j.use_connect = False
-        j.align_roll(Vector((0.0, 0.0, 1.0)))
         return made
     made = _edit_armature(arm, _wings)
     # ⚠ ASSERT THE ROSTER. `BirdController` looks these up BY NAME, and a missing one fails
@@ -1957,7 +1739,7 @@ def rebuild_rig(spec=KARASU):
     # can go the next time the rig is rebuilt. A session lost two commits and two import cycles
     # to fighting for them.
     required = ("joint1", "joint3", "joint4", "joint8", "joint12", "joint25",
-                "bill_lower", "wing_R", "wing_L", "wrist_R", "wrist_L")
+                "wing_R", "wing_L", "wrist_R", "wrist_L")
     have = {b.name for b in arm.data.bones}
     missing = [n for n in required if n not in have]
     if missing:
@@ -2441,7 +2223,14 @@ def run(spec=KARASU, do_export=False, eyes=True):
     log["tail"] = build_tail(spec)
     log["folded"] = build_folded_wings(spec)
     log["spread"] = build_spread_wings(spec)
-    log["bill"] = split_bill(spec)
+    # ⚠ THE BEAK IS NOT SPLIT, AND THAT IS DELIBERATE (owner, 2026-08-30). The plane bisect that
+    # used to run here is retired: a bird's tomium is a CURVE and a plane cannot follow one. It sat
+    # 0.0107 studs below the mesh's own mouth line and left 13 faces owning vertices from both
+    # mandibles -- a web that stretches instead of a jaw that hinges. Two attempts at a replacement
+    # (a fitted plane, then a lofted bill grafted onto this head) both failed on assembly.
+    # ⚠ THE JAW BONE GOES WITH IT. A `bill_lower` driving nothing is worse than no bone: it reads
+    # as a working feature to anyone scanning the rig, and `BirdController` would look it up, find
+    # it, and drive geometry that no longer separates. See practice/owner-rulings.md.
     log["feet"] = simplify_feet(spec)
     log["rig"] = rebuild_rig(spec)
     j = join_all()

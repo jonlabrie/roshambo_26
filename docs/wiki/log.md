@@ -2367,3 +2367,35 @@ by 0.025 studs. Station counts are 5, 14, 14, 13, 6, 11, 5, 8, 3, 13. There is n
 to cut along, so the replacement cannot be a cleverer cut on this geometry. **The curve has to be
 authored**, which is the lofted bill on `bill-loft-wip` — the same conclusion the bill work reached
 independently on 2026-08-28. See [[owner-rulings]].
+
+## [2026-08-30] gate | The beak split and the jaw bone are reverted entirely
+
+Owner: *"revert the beak split entirely, we're going to re-attempt it in a more thoughtful way. If
+that means you need to revert the bone as well, do that."*
+
+⚠ **THE SPLIT WAS NEVER THE VENDOR'S.** The purchased crow ships one closed bill with no mandible
+separation and no jaw bone; `split_bill`, the `bill_lower` bone and the plane that cut them were all
+authored here in `c2ffc27`. So the web between the mandibles and the split sitting below the mouth
+line were not inherited defects — they were the residue of that cut.
+
+Gone: `split_bill`, the `bill_lower` bone, its vertex group, `BirdController`'s `billLower` lookup
+and gape drive, and `BirdFlight.GAPE_DEG`. Body 1351 → **1325 verts** (the cut's 26 extra vertices),
+open edges unchanged at 16, size unchanged at 1.64 studs. The beak does not open.
+
+⚠ **THE BONE HAD TO GO WITH THE SPLIT.** A `bill_lower` driving nothing is worse than no bone: it
+reads as a working feature to anyone scanning the rig, and it would come back to life the moment a
+bone of that name reappeared — driving a bill that no longer separates, which is a bill that
+stretches. Guarded in `tests/BirdGape.spec.luau`.
+
+**KEPT, deliberately:** `BirdFlight.gapeAt` and the per-clip `caws` onsets. The onsets are MEASURED
+off the source WAVs by `tools/audio/measure_caws.py` and the envelope is tested; both are inputs the
+next attempt needs and neither depends on how the geometry splits. They are the one part of the beak
+work that was measured rather than guessed.
+
+⚠ **AND `assert_bill_invariants` WENT TOO**, one commit after it was written. It was built to gate an
+assembly that is not happening. Its idea was right and is worth rebuilding with the re-attempt: five
+facts about the BIRD rather than about the code, because four green checks — Luau tests, stylua,
+selene, wiki lint — once passed on a bird whose face was torn open, and none of them look at geometry.
+
+⚠ **THREE THINGS HAVE NOW BEEN BUILT ON THIS HEAD AND WITHDRAWN**: the modelled eye, the lid collar,
+and the jaw. See [[owner-rulings]] for the ruling that retired the plane, and [[familiars]].

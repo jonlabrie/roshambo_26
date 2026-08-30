@@ -180,16 +180,6 @@ export type Profile = {
 -- ⚠ sqrt, NOT linear. Bigger animals move slower roughly as the square root of length for
 -- pendulum-like limbs, so a 2x bird is about 1.41x slower. Scaling times linearly overshoots
 -- into slow motion, which is the mistake this function exists to make impossible to repeat.
--- How far the lower mandible swings at a full caw. ⚠ MEASURED, not chosen, and 16 was too small
--- to see: at 16 degrees the bill tip travels 0.0199 studs, **1.2% of the bird's own length**, which
--- is a pixel or two at play distance. The owner heard the caw and saw no beak open. The jaw bone is
--- only 0.155 studs long and the mandible tapers to meet the upper bill, so there is very little
--- lever to swing -- the angle has to carry what the geometry cannot.
---
--- Re-derive rather than guess: pose `bill_lower` in Blender and measure the TIP's displacement as a
--- fraction of body length. 16 deg -> 1.8%, 24 -> 2.7%, 32 -> 3.6% (with the mandible weighted
--- exclusively to the jaw; before that fix every figure was two thirds of these).
-BirdFlight.GAPE_DEG = 30
 
 -- Hermite smoothstep. BirdFlight had no easing helper -- the two places that ease a value inline
 -- both use a cubic ease-OUT (`1 - (1-k)^3`), which is a different curve and deliberately so.
@@ -213,6 +203,10 @@ end
 -- a bigger crow does not caw more slowly, it plays the same clip. Every other duration in this
 -- module scales by sqrt(length); this one must not, or the beak drifts off the audio on any bird
 -- whose scale is not 1.
+-- ⚠ NOTHING CALLS THIS TODAY. The beak split and the `bill_lower` bone were retired 2026-08-30 --
+-- a tomium is a curve and the plane cut could not follow it -- so no geometry opens. Kept because
+-- the envelope is tested and the onsets it consumes are MEASURED off the source WAVs; both are
+-- inputs the next attempt at a jaw needs, and neither depends on how the bill splits.
 function BirdFlight.gapeAt(elapsed: number, caws: { number }, open: number): number
     if open <= 0 or open ~= open then
         error(`BirdFlight.gapeAt: open must be a positive number, got {open}`)
