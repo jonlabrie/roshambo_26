@@ -2048,6 +2048,24 @@ OUT_DIR = "/Users/jonlabrie/Desktop/Roshambo Reference/models/birds/probe/"
 # let a bake write to it.
 COLORMAP_AUTHORITY = "karasu_colormap_graded_2.png"
 
+# ⚠ FILES THIS SCRIPT MUST NEVER WRITE. Everything here was authored by the owner in a tool we do
+# not drive, so nothing in this pipeline can reproduce it -- a Photoshop curve is not re-derivable
+# from the bake it was applied to. A tool that regenerates its own input eventually destroys work
+# nobody can get back, and it does so silently, on a run that was about something else entirely.
+# Rule 8 of practice/blender-working-rules.md, as a check rather than a sentence.
+OWNER_AUTHORED = {COLORMAP_AUTHORITY}
+
+
+def assert_writable(path):
+    """Refuse to write over anything in OWNER_AUTHORED. Call before every file write."""
+    name = os.path.basename(path)
+    if name in OWNER_AUTHORED:
+        raise RuntimeError(
+            f"refusing to write {name}: it is owner-authored and this script cannot reproduce it. "
+            f"If it genuinely needs replacing, the owner replaces it -- or remove it from "
+            f"OWNER_AUTHORED deliberately, which is a decision and should look like one.")
+    return path
+
 # The derived PBR channels that ship with it. ⚠ ALL OR NOTHING -- a partial set renders WORSE than
 # none (practice/material-and-mesh-traps.md §8): Roblox substitutes its own defaults for whatever
 # is missing and a ColorMap-only SurfaceAppearance comes out warm and shiny.
@@ -2113,6 +2131,7 @@ def export(part, filepath):
     mesh in the scene -- which is exactly what uguisu_body.fbx and uguisu_wings.fbx do (both
     reimport with an identical 22-bone armature at identical loc/rot/scale).
     """
+    assert_writable(filepath)
     arm = bpy.data.objects["Karasu_Rig"]
     scene = bpy.context.scene
     others = [o for o in bpy.data.objects
@@ -2406,7 +2425,7 @@ def bake_and_finish(res=1024):
     # would silently destroy it -- the whole reason it is named here rather than left implicit.
     # The bake's own output goes to a separate file so it stays available for comparison and as
     # the base for the NEXT grade.
-    png = OUT_DIR + "karasu_colormap_baked.png"
+    png = assert_writable(OUT_DIR + "karasu_colormap_baked.png")
     img.filepath_raw = png
     img.file_format = 'PNG'
     img.save()

@@ -16,6 +16,8 @@ after it actually did -- measured, 12% vs 20% of peak moves karasu-3's third ons
 Usage:  python3 measure_caws.py <dir-of-wavs> [glob]
 """
 
+import io
+import re
 import struct
 import sys
 import glob as globmod
@@ -88,7 +90,47 @@ def caws(path):
     }
 
 
+def check(species_luau, wav_dir, tol=0.006):
+    """Re-derive every onset and compare against what `BirdSpecies.luau` ships. Exit non-zero on drift.
+
+    ⚠ THIS IS RULE 7 AS A CHECK RATHER THAN A SENTENCE (practice/blender-working-rules.md): a number
+    is MEASURED only if a committed script re-derives it. `CAW_GAP_RANGE` once carried the comment
+    "MEASURED FROM THE SOURCE RECORDING, kept so it is never re-derived by ear" and matched no
+    recording in the project; the caw onsets were modelled from clip durations and shipped while
+    the WAVs sat unread on disk. Prose could not catch either. This can.
+
+    ⚠ TOLERANCE IS THE ENVELOPE WINDOW, not a fudge. Onsets are read at 5 ms resolution, so
+    agreement finer than that is not meaningful; 6 ms allows one window of slop and nothing more.
+    """
+    src = io.open(species_luau, encoding="utf-8").read()
+    shipped = {}
+    for m in re.finditer(r"\{\s*id\s*=\s*(\d+).*?caws\s*=\s*\{([^}]*)\}", src, re.S):
+        shipped[int(m.group(1))] = [float(x) for x in re.findall(r"[\d.]+", m.group(2))]
+    if not shipped:
+        print("FAIL: no clips with `caws` found in", species_luau)
+        return 1
+    files = sorted(globmod.glob(os.path.join(wav_dir, "karasu-[0-9].wav")))
+    measured = [caws(f)["caws"] for f in files]
+    bad = 0
+    # clips are matched by CAW COUNT, since the Luau carries ids and the WAVs carry filenames
+    for cid, onsets in sorted(shipped.items(), key=lambda kv: len(kv[1])):
+        match = next((m for m in measured if len(m) == len(onsets)), None)
+        if match is None:
+            print(f"FAIL: clip {cid} ships {len(onsets)} onsets; no WAV has that many caws")
+            bad += 1
+            continue
+        for a, b in zip(onsets, match):
+            if abs(a - b) > tol:
+                print(f"FAIL: clip {cid} onset {a} vs measured {b} (drift {abs(a-b):.4f}s)")
+                bad += 1
+    print("caw onsets:", "DRIFTED" if bad else f"all {sum(len(v) for v in shipped.values())} agree "
+          f"with the WAVs within {tol}s")
+    return 1 if bad else 0
+
+
 if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--check":
+        sys.exit(check(sys.argv[2], sys.argv[3]))
     d = sys.argv[1] if len(sys.argv) > 1 else "."
     pat = sys.argv[2] if len(sys.argv) > 2 else "*.wav"
     for f in sorted(globmod.glob(os.path.join(d, pat))):

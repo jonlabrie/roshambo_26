@@ -14,6 +14,21 @@ is done. Every rule below was earned on 2026-08-29/30, in one session, on one bi
 Owner: *"blender is going to be a significant ongoing part of the Roshambo development pipeline.
 It's as important as Studio, frankly, not an ad-hoc sort of thing."*
 
+⚠ **RULES 7 AND 8 ARE CHECKS, NOT SENTENCES, AND RULE 0 IS A HOOK.** Prose is the weakest mechanism
+available: on 2026-08-30 [[owner-rulings]] was read, quoted back to the owner, and then broken for
+the rest of the session. Where a rule can run, it runs — see each rule for its command. The rest
+depend on the model actually stopping, and the owner should weight trust accordingly.
+
+## 0. The rules are injected before the first Blender call of a session
+
+`tools/hooks/blender_rules.sh`, wired as a `PreToolUse` hook on `mcp__blender__.*` in
+`.claude/settings.json`. ⚠ **Asked when it would re-read this page, the honest answer was: never
+spontaneously.** Pages are read when something prompts a lookup — a grep, a wikilink, an error —
+and nothing signals "you are re-entering Blender". A long session also compacts, so text read early
+degrades to a summary line saying it was read. The hook does not depend on remembering.
+⚠ **Once per session, keyed on the session id**: twenty Blender calls each carrying nine rules is
+noise, and noise is ignored.
+
 ## 1. A step is ONE operation that changes what the bird looks like. Then stop.
 
 Not "one feature". The eye was treated as a single attempt — seat it, loft a lid collar, build the
@@ -80,20 +95,36 @@ unmeasured number wearing a measured label is worse than an admitted guess, beca
 precisely what stops the next person checking.
 
 Same session, same defect twice: caw onsets were modelled from clip durations and shipped while
-claiming the audio could not be read — the WAVs were on disk. `tools/audio/measure_caws.py` now
-re-derives them in one command. This is schema rule 9 applied to Blender work: record how to
-measure, not what was measured.
+claiming the audio could not be read — the WAVs were on disk.
+
+**The check:**
+
+```
+python3 roblox/tools/audio/measure_caws.py --check roblox/src/shared/BirdSpecies.luau \
+  "~/Desktop/Roshambo Reference/sound/birds"
+```
+
+Re-derives every onset from the WAVs and exits non-zero on drift. ⚠ Verified by re-introducing the
+original error — the modelled 0.62 against the measured 0.865 — which it reports as a 0.2450s drift.
+Tolerance is 6 ms because onsets are read at a 5 ms envelope resolution; agreement finer than the
+measurement window is not meaningful.
 
 ## 8. A script never overwrites what the owner authored.
 
-`karasu_retarget.COLORMAP_AUTHORITY` names the hand-graded ColorMap and the bake **raises rather
-than substituting** if it is missing. Generalise: owner-authored files are upstream of our tools,
-and a tool that regenerates its own input will eventually destroy a Photoshop pass nobody can
-reproduce.
+**The check:** `karasu_retarget.OWNER_AUTHORED` is the registry and `assert_writable(path)` the
+guard, called before every file write in the pipeline. It raises rather than overwriting, and the
+message says the owner replaces such a file — or that removing it from the registry is a decision
+and should look like one.
+
+⚠ **A TOOL THAT REGENERATES ITS OWN INPUT EVENTUALLY DESTROYS WORK NOBODY CAN GET BACK**, silently,
+on a run that was about something else entirely. A Photoshop curve is not re-derivable from the bake
+it was applied to.
 
 ## 9. Verify instrumentation is live before spending the owner's time on it.
 
 Two play rounds were spent on diagnostics: the first was one-shot and fired mid-flight where the
-condition it printed was legitimately false, proving nothing; the second never reached Studio at
-all. ⚠ **One `script_grep` for the diagnostic's own text confirms it is running.** Do that before
-asking anyone to play a round.
+condition it printed was legitimately false, proving nothing; the second never reached Studio at all.
+
+⚠ **This one stays prose, because there is nothing to assert** — it is a step to take, not a state
+to check. The step: `script_grep` for the diagnostic's own literal text and confirm it appears under
+`Players.<name>.PlayerScripts`, which proves Rojo synced it, BEFORE asking anyone to play a round.
