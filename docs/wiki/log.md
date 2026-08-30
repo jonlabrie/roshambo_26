@@ -2280,3 +2280,35 @@ ambient bird is **server-owned** per [[ambient-birds]] — *"which bird, where, 
 that system does not exist yet. The phrase composition it would use is designed and unwired:
 GROUP_GAP_SECONDS 0.48 is already measured for composing a 3+2 from the baked clips. Also still
 open on that page: an ambient karasu must not read as somebody's familiar.
+
+## [2026-08-30] fix | The caw onsets were modelled, the WAVs were on disk, and every number was wrong
+
+Owner: *"what do you mean you have no way to open the audio? You created the clips"*. Correct — the
+source WAVs are in `Roshambo Reference/sound/birds/` and a session shipped MODELLED onsets while
+claiming they could not be measured. They are now measured, by
+`roblox/tools/audio/measure_caws.py`, re-derivable in one command.
+
+| clip | measured | had been modelled |
+|---|---|---|
+| karasu-1 | `{0.090}` | `{0.00}` |
+| karasu-2 | `{0.090, 0.865}` | `{0.08, 0.62}` |
+| karasu-3 | `{0.100, 0.920, 1.635}` | `{0.00, 0.54, 1.08}` |
+
+karasu-2's second caw was out by **0.245s** — a quarter of a second, which on a beak is not subtle.
+
+⚠ **A CAW IS AN EVENT WITH A DURATION, not a threshold crossing.** karasu-3 carries a 25ms blip at
+1.245s, 16% of peak, which a plain envelope threshold counts as a fourth caw — the beak would snap
+at nothing. Real caws run 0.18-0.24s, so the tool rejects events under 0.10s.
+⚠ **AND ONSETS ARE READ AT A LOW THRESHOLD**: 12% vs 20% of peak moves karasu-3's third onset from
+1.635 to 1.655, because a higher threshold triggers after the sound has already started.
+
+`CAW_GAPE_SECONDS` is now 0.23, measured — four of the six caws land on it exactly.
+
+⚠ **`CAW_GAP_RANGE` WAS WRONG AND IS CORRECTED**, `{0.48, 0.60}` → `{0.70, 0.82}`. Measured across
+all three clips and the original `japanese_raven_corbeau.wav`, every onset gap falls in 0.695-0.82
+(mean 0.75); the single 1.005 is a phrase break. The old value carried the comment *"MEASURED FROM
+THE SOURCE RECORDING, kept so it is never re-derived by ear"* — an unmeasured number wearing a
+measured label, which is worse than an admitted guess because it stops anyone checking.
+⚠ **`GROUP_GAP_SECONDS = 0.48` SURVIVED** the same re-measurement and is kept: its derivation was
+0.76 between groups minus a 0.20 tail minus a 0.08 lead, and measured those are 0.775, 0.205 and
+0.090. See [[familiars]].

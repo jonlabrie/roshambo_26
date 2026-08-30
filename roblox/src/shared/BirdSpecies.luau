@@ -13,10 +13,10 @@ local BirdSpecies = {}
 -- one caw, karasu-2 is two, karasu-3 is three, so the bill has to open once per onset or it drifts
 -- off its own voice. `seconds` is the clip's length, kept beside the onsets so a test can assert
 -- the last caw actually fits inside the recording.
--- ⚠ THE ONSETS ARE MODELLED, NOT MEASURED, and that is the one number here nobody has checked by
--- ear. They come from the recorded structure: karasu-2 opens with 0.08s of room tone, karasu-3 ends
--- with 0.20s of it, and CAW_GAP_RANGE says 0.48-0.60 between caws inside a group. TUNE THESE IN ONE
--- PLAY SESSION against the actual audio -- a beak a tenth of a second late is visible.
+-- ⚠ MEASURED OFF THE SOURCE WAVs by `tools/audio/measure_caws.py`, re-derivable in one command.
+-- They were MODELLED first -- inferred from clip durations and room-tone padding -- and every value
+-- was wrong: karasu-2's second caw was typed at 0.62s against a measured 0.865s. A quarter of a
+-- second late is plainly visible on a beak. The WAVs were on disk the whole time.
 -- ⚠ OPTIONAL, because not every voice is made of discrete calls. A karasu's song IS its caws --
 -- countable, separable, each one a beak movement. An uguisu's is a continuous warble with no
 -- onsets to hit, so it carries neither field and its bill simply does not open. A species with no
@@ -93,11 +93,15 @@ BirdSpecies.SPECIES = {
         voice = {
             clips = {
                 -- karasu-1, ONE caw
-                { id = 136463941193848, weight = 45, seconds = 0.52, caws = { 0.00 } },
-                -- karasu-2, TWO caws -- opens with 0.08s of room tone, so the first onset is late
-                { id = 120005368709153, weight = 35, seconds = 1.30, caws = { 0.08, 0.62 } },
-                -- karasu-3, THREE caws -- ends with 0.20s of room tone, so the last onset is early
-                { id = 125330698317872, weight = 20, seconds = 2.08, caws = { 0.00, 0.54, 1.08 } },
+                { id = 136463941193848, weight = 45, seconds = 0.52, caws = { 0.090 } },
+                -- karasu-2, TWO caws. ⚠ The gap is 0.775s, not the 0.48-0.60 CAW_GAP_RANGE claims
+                -- for caws inside a group -- these two read as separate groups.
+                { id = 120005368709153, weight = 35, seconds = 1.30, caws = { 0.090, 0.865 } },
+                -- karasu-3, THREE caws. ⚠ There is a 25ms blip at 1.245s, 16% of peak, which a
+                -- plain envelope threshold counts as a FOURTH caw and the beak then snaps at
+                -- nothing. Real caws here run 0.18-0.24s; the measuring tool rejects events under
+                -- 0.10s for exactly this.
+                { id = 125330698317872, weight = 20, seconds = 2.08, caws = { 0.100, 0.920, 1.635 } },
             },
             -- ⚠ LOUDER THAN THE UGUISU FOR A MEASURED REASON, not because crows are loud. The
             -- karasu source clips peak at -7.4 to -9.9 dBFS against the uguisu's -5.4, so at
@@ -118,14 +122,24 @@ BirdSpecies.SPECIES = {
 -- clip ends. Using 0.76 there would insert a second of dead air and read as a hesitation.
 -- Verified offline: the composed phrase is sample-identical to the baked one apart from 0.48s
 -- of room tone at -56 dBFS. Not wired yet; recorded for when it is.
+-- ⚠ THIS ONE SURVIVED THE RE-MEASUREMENT and is kept. Its derivation was 0.76 between groups minus
+-- karasu-3's 0.20s tail minus karasu-2's 0.08s lead; measured, the gap is 0.775, the tail 0.205 and
+-- the lead 0.090, giving 0.48. The arithmetic and the inputs both hold.
 BirdSpecies.GROUP_GAP_SECONDS = 0.48
-BirdSpecies.CAW_GAP_RANGE = { 0.48, 0.60 }
+-- ⚠ CORRECTED 2026-08-30: this read { 0.48, 0.60 } and described no recording in the project.
+-- Measured with `tools/audio/measure_caws.py` across all three shipped clips AND the original
+-- `japanese_raven_corbeau.wav`, every onset-to-onset gap falls in 0.695-0.82, mean 0.75. The one
+-- outlier is 1.005s in karasu-3-2, which is a phrase break rather than a gap inside a phrase.
+-- ⚠ The old value carried the comment "MEASURED FROM THE SOURCE RECORDING, kept so it is never
+-- re-derived by ear" -- an unmeasured number wearing a measured label, which is worse than an
+-- admitted guess because it stops anyone checking.
+BirdSpecies.CAW_GAP_RANGE = { 0.70, 0.82 }
 
--- How long the bill stays open for ONE caw. ⚠ It must be shorter than the smallest gap in
--- CAW_GAP_RANGE or consecutive caws merge into one long croak instead of reading as separate
--- calls -- 0.30 against 0.48 leaves real silence between them, which is what a two-caw clip
--- sounds like. Tune by eye with the audio playing, not on paper.
-BirdSpecies.CAW_GAPE_SECONDS = 0.30
+-- How long the bill stays open for ONE caw. ⚠ MEASURED, not chosen: every caw in all three clips
+-- runs 0.18-0.24s, and 0.23s is the value four of the six land on exactly. It must also stay well
+-- under the smallest gap between onsets -- 0.715s, karasu-3's second to third -- or consecutive
+-- caws would merge into one long croak instead of reading as separate calls. It does, easily.
+BirdSpecies.CAW_GAPE_SECONDS = 0.23
 
 -- The voice for `species`, or nil if it has none. See `pick` for why nil rather than a fallback.
 function BirdSpecies.voiceOf(species: string): Voice?
