@@ -2444,3 +2444,36 @@ to confirm framing, after two that day wasted the owner's attention on a macro s
 Ruled against — "checking the framing" degrades into "having a look and adjusting", which is
 self-approval by another name, and an occasional badly framed shot is cheaper. See
 [[blender-working-rules]] rule 10.
+
+## [2026-08-30] ship | The karasu's beak opens — there was never a cut to make
+
+Owner, on the working jaw: *"that is pretty awesome"*.
+
+⚠ **ONE VERTEX WAS WELDING THE MANDIBLES SHUT.** A 46-edge fan on the mouth's midline — average
+valence on this mesh is 4.13, next-highest anything else is 12 — left behind by a `holes_fill(sides=0)`,
+which triangulates a boundary loop as a star from a single point. **Delete it and the mandibles are
+already two separate surfaces** from the rictus forward to the tip, joined only where the bill runs
+into the face, which is exactly where a real mandible articulates.
+
+Everything built against it was work on a problem that stopped existing the moment it went: the
+plane bisect (retired by owner ruling — a tomium is a curve), a lofted bill grafted onto the head,
+four hand-constructed cut paths, and three failed split attempts. The fan was found because the
+owner asked *"what happens if we just get rid of it?"*
+
+**`open_the_mouth`** is now in `run()`, and **everything in it is derived, never indexed** — `run()`
+renumbers every vertex, so a hardcoded index is wrong on the next build and wrong SILENTLY:
+- **the fan, by valence** — the single vertex above 4× the mesh average; raises rather than guessing
+  if two ever trip it
+- **the lower mandible, by component** — forward of the rictus the surface falls into exactly two
+  pieces, and the lower is the one with the lower mean z. ⚠ NOT "below the mouth line": the upper
+  mandible OVERHANGS, so its tip dips below the lower's and that test picks the wrong piece at
+  exactly the wrong place. It was tried and it failed that way.
+
+Verified on a full rebuild from the vendor blend, with different numbering throughout: 1324 verts,
+1402 faces, 62 open edges. At a 25° gape the jaw moves **5.48% of body length** and **everything else
+moves 0.00000**. The retired plane-cut jaw managed 3.4% at 30° while dragging the skull with it,
+because its mandible tip carried a mean `bill_lower` weight of 0.167.
+
+⚠ **THE `ROI_*` GROUPS DID NOT SURVIVE**, as predicted — they encode owner judgement as vertex
+indices and a rebuild renumbers underneath them. `ROI_lower_beak_tip` read 0/0 on the very check
+that confirmed the new derivation. Nothing now depends on them.

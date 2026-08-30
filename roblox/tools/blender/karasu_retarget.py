@@ -1377,6 +1377,112 @@ def build_spread_wings(spec=KARASU):
 
 
 
+RICTUS_Y = 0.62          # build coords: forward of this the mandibles are separate surfaces
+FAN_VALENCE_FACTOR = 4.0  # a vertex this many times the mesh's average valence is a fill artefact
+JAW_HEAD = (0.0, 0.615, 0.806)
+
+
+def open_the_mouth(spec=KARASU):
+    """Delete the fill fan that welds the mandibles shut, then hang the lower one on a jaw bone.
+
+    ⚠ THERE WAS NEVER A CUT TO MAKE, and that is the whole finding. The bill arrived welded by ONE
+    vertex -- a 46-edge fan on the mouth's midline, the residue of a `holes_fill(sides=0)`, which
+    triangulates a boundary loop as a star from a single point. Remove it and the mandibles are
+    ALREADY two separate surfaces from the rictus forward to the tip, joined only where the bill
+    runs into the face, which is exactly where a real mandible articulates.
+    ⚠ Before this was found: a plane bisect (retired by owner ruling -- a tomium is a curve), four
+    hand-constructed cut paths, and three failed split attempts. All of it was work on a problem
+    that stopped existing the moment the fan went.
+
+    ⚠ EVERYTHING HERE IS DERIVED, NEVER INDEXED. `run()` renumbers every vertex, so a hardcoded
+    index is wrong on the next build and wrong SILENTLY -- it still names a vertex, just the wrong
+    one. Both rules below were validated against the build that produced them.
+    """
+    body = bpy.data.objects.get("KarasuBody") or bpy.data.objects[BODY_OBJ]
+    me = body.data
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.verts.ensure_lookup_table()
+
+    # ⚠ THE FAN, BY VALENCE. Measured on the vendor build: average 4.17 edges per vertex, the fan
+    # 46, the next highest anything else 12. A 4x threshold isolates it uniquely across the whole
+    # mesh -- verified, not assumed. If a future vendor mesh trips this on two vertices, it must
+    # fail rather than guess, because deleting the wrong one silently removes real surface.
+    avg = sum(len(v.link_edges) for v in bm.verts) / len(bm.verts)
+    fans = [v for v in bm.verts if len(v.link_edges) > FAN_VALENCE_FACTOR * avg]
+    if len(fans) != 1:
+        bm.free()
+        raise RuntimeError(
+            f"expected exactly one fill fan (valence > {FAN_VALENCE_FACTOR}x the {avg:.2f} average), "
+            f"found {len(fans)}: {[(v.index, len(v.link_edges)) for v in fans]}")
+    fan = fans[0]
+    stats = {"fan_valence": len(fan.link_edges), "mesh_avg_valence": round(avg, 2),
+             "fan_at": tuple(round(c, 4) for c in fan.co)}
+    bmesh.ops.delete(bm, geom=[fan], context='VERTS')
+    bm.verts.ensure_lookup_table()
+    bm.faces.ensure_lookup_table()
+
+    # ⚠ THE LOWER MANDIBLE, BY COMPONENT. Forward of the rictus the surface now falls into exactly
+    # two pieces; the lower one is the piece with the lower mean z, because the upper carries the
+    # culmen. ⚠ Do NOT identify it by "below the mouth line" -- the upper mandible OVERHANGS, so its
+    # tip dips below the lower's and that test picks the wrong piece at exactly the wrong place.
+    fset = {f.index for f in bm.faces if f.calc_center_median().y >= RICTUS_Y}
+    seen, comps = set(), []
+    for f in bm.faces:
+        if f.index not in fset or f.index in seen:
+            continue
+        st, comp = [f], []
+        seen.add(f.index)
+        while st:
+            g = st.pop()
+            comp.append(g)
+            for e in g.edges:
+                for h in e.link_faces:
+                    if h.index in fset and h.index not in seen:
+                        seen.add(h.index)
+                        st.append(h)
+        comps.append(comp)
+    comps.sort(key=len, reverse=True)
+    if len(comps) < 2:
+        bm.free()
+        raise RuntimeError(
+            f"forward of the rictus the surface is {len(comps)} component(s), expected 2 -- the fan "
+            f"deletion did not separate the mandibles")
+
+    def meanz(c):
+        return sum(f.calc_center_median().z for f in c) / len(c)
+    lower = min(comps[:2], key=meanz)
+    lower_verts = sorted({v.index for f in lower for v in f.verts})
+    stats.update({"components_forward_of_rictus": len(comps),
+                  "lower_faces": len(lower), "lower_verts": len(lower_verts),
+                  "lower_mean_z": round(meanz(lower), 4)})
+    bm.to_mesh(me)
+    me.update()
+    bm.free()
+
+    def _jaw(ebs):
+        if "bill_lower" in ebs:
+            ebs.remove(ebs["bill_lower"])
+        j = ebs.new("bill_lower")
+        j.head = Vector(JAW_HEAD)
+        j.tail = Vector(JAW_HEAD) + Vector((0.0, 0.10, -0.01))
+        j.parent = ebs["joint4"]
+        j.use_connect = False
+        j.align_roll(Vector((0.0, 0.0, 1.0)))
+    _edit_armature(bpy.data.objects["Karasu_Rig"], _jaw)
+
+    # ⚠ EXCLUSIVELY. `add(..., 'REPLACE')` sets bill_lower to 1.0 and leaves the vendor's joint4
+    # weight on the same vertices; normalisation then splits them 50/50 and the mandible moves HALF
+    # as far as the bone driving it. That shipped once -- the jaw tip carried a mean bill_lower
+    # weight of 0.167, so 83% of the lower bill was held by the head.
+    vg = body.vertex_groups.get("bill_lower") or body.vertex_groups.new(name="bill_lower")
+    vg.add(lower_verts, 1.0, 'REPLACE')
+    for other in body.vertex_groups:
+        if other.name != "bill_lower":
+            other.remove(lower_verts)
+    return stats
+
+
 def simplify_feet(spec=KARASU):
     """The vendor's feet are 920 triangles EACH against a 1,096-triangle body -- more geometry in
     the toes than in the whole bird. Decimate before joining."""
@@ -2252,6 +2358,9 @@ def run(spec=KARASU, do_export=False, eyes=True):
     # it, and drive geometry that no longer separates. See practice/owner-rulings.md.
     log["feet"] = simplify_feet(spec)
     log["rig"] = rebuild_rig(spec)
+    # ⚠ AFTER THE RIG, because it hangs the jaw bone off joint4; BEFORE join_all, so the mandible
+    # components are found on the bill alone rather than on a body carrying tail and wings.
+    log["mouth"] = open_the_mouth(spec)
     j = join_all()
     log["join"] = {k: v for k, v in j.items() if k != "face_ranges"}
     log["join"]["gape_faces"] = j.get("gape_faces")
