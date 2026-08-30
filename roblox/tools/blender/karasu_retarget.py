@@ -1504,6 +1504,19 @@ def split_bill(spec=KARASU):
     bm.free()
     vg = o.vertex_groups.get("bill_lower") or o.vertex_groups.new(name="bill_lower")
     vg.add(lower, 1.0, 'REPLACE')
+    # ⚠ CLAIM THEM EXCLUSIVELY, or the jaw stays welded to the skull. `add(..., 'REPLACE')` sets
+    # bill_lower to 1.0 but leaves the vendor's joint4 weight sitting on the same vertices at 1.0
+    # too -- and normalisation then splits them 50/50, so the mandible moves HALF as far as the
+    # bone that drives it. Measured before this line existed: the lower bill's tip carried a mean
+    # bill_lower weight of 0.167, i.e. 83% of it was held by the head, and a 16-degree gape moved
+    # the tip 0.0199 studs -- 1.2% of the bird's length, invisible at any play distance. The owner
+    # heard the caw and saw no beak open.
+    # ⚠ A JAW IS RIGID. Blending it with the skull is not a softer hinge, it is a jaw that only
+    # partly opens; the hinge itself is handled by the cut stopping short, not by weights.
+    for other in o.vertex_groups:
+        if other.name != "bill_lower":
+            other.remove(lower)
+    stats["lower_claimed_exclusively"] = len(lower)
     return stats
 
 

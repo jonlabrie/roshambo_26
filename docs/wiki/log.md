@@ -2312,3 +2312,30 @@ measured label, which is worse than an admitted guess because it stops anyone ch
 ⚠ **`GROUP_GAP_SECONDS = 0.48` SURVIVED** the same re-measurement and is kept: its derivation was
 0.76 between groups minus a 0.20 tail minus a 0.08 lead, and measured those are 0.775, 0.205 and
 0.090. See [[familiars]].
+
+## [2026-08-30] defect | The beak WAS opening — 1.2% of the bird's length, on a jaw welded to the skull
+
+Owner: *"I heard a different caw on both wins, but I saw no beak opening."* The two clips being
+different is the weighted pick working, so the song, the gate and the audio were all fine. Verified
+by `script_grep` that the gape wiring was live in the running client. It was opening; it was
+invisible.
+
+⚠ **THE JAW WAS WELDED TO THE SKULL BY WEIGHTS.** `split_bill` sets `bill_lower = 1.0` on the
+mandible's 30 vertices with `add(..., 'REPLACE')` — which replaces the bill_lower weight and leaves
+the vendor's `joint4` weight sitting on the same vertices at 1.0. Normalisation then splits them
+50/50, so **the mandible moved half as far as the bone driving it.** Measured, the jaw tip carried a
+mean bill_lower weight of **0.167** — 83% of the lower bill was held by the head. It now claims
+those vertices exclusively, which took a 16° gape from 0.0199 to 0.0299 studs.
+⚠ **A JAW IS RIGID.** Blending it with the skull is not a softer hinge, it is a jaw that only partly
+opens; the hinge is handled by the cut stopping short of it, not by weights.
+
+⚠ **AND 16° WAS NEVER ENOUGH ANYWAY.** The jaw bone is 0.155 studs and the mandible tapers to meet
+the upper bill — at the tip only 5 of 37 vertices sit below the gape plane — so there is very little
+lever. At 16° the tip travels **1.2% of the bird's own length** (1.8% after the weight fix), which
+is a pixel or two at play distance. `BirdFlight.GAPE_DEG` is now **30**, giving ~3.4%, with the
+measurement table in the comment so it is re-derivable rather than re-guessed.
+
+⚠ **A NOTE ON THE DIAGNOSTIC.** The first one was ONE-SHOT and fired 1s after the win, catching the
+bird mid-flight at k=0.39 where `flying=true` is simply correct — it proved nothing and cost a play
+round. The second never reached Studio at all, which `script_grep` showed in one call. **Check that
+the instrumentation is actually running before asking anyone to play a round for it.**

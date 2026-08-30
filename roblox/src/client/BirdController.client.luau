@@ -903,7 +903,7 @@ RunService.RenderStepped:Connect(function()
                 local gape = 0
                 if b.cawFrom and b.cawOnsets then
                     local clipTime = (now - b.cawFrom) * b.cawSpeed
-                    gape = math.rad(16)
+                    gape = math.rad(BirdFlight.GAPE_DEG)
                         * BirdFlight.gapeAt(clipTime, b.cawOnsets, BirdSpecies.CAW_GAPE_SECONDS)
                 end
                 b.billLower.Transform = CFrame.Angles(-gape, 0, 0)
