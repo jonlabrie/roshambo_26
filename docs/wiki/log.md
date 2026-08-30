@@ -2496,3 +2496,48 @@ well above the 3.4% the retired plane-cut jaw managed while dragging the skull w
 The hinge is now DERIVED — the centroid of the mandible's own rear-most vertices — so it lands
 correctly in whatever coordinate space the function runs in. ⚠ A corrected constant would have been
 the same trap one coordinate space over.
+
+## 2026-08-30 — the karasu's bill: traced from the photograph, and the pipeline hands it over
+
+The culmen was **fitted to a profile traced from the reference photograph** rather than to typed
+control points. The bird is black on blurred green, so the dorsal silhouette is a colour boundary,
+and the feather line — the one genuinely ambiguous anchor — is *measurable*: brightness sampled
+under the dorsal edge ramps 40 → 175 between x=2320 and x=2740 as matte feathers give way to glossy
+bill, midpoint ≈ x2510. The owner picked that anchor from three candidates placed in the scene.
+
+⚠ **TAKE THE CURVE'S SHAPE, DISCARD ITS SCALE.** The head is yawed slightly toward the camera,
+which foreshortens the bill along its length and leaves the vertical alone. Normalising both axes
+to the endpoints cancels a uniform foreshortening exactly, so curvature survives; absolute
+depth-over-length does not (photo 0.75 against the model's 0.51 — unusable). Drop-over-length
+*was* usable: photo 0.330 against the model's 0.305, inside the error, so the bill already fell the
+right total amount and only the distribution was wrong.
+
+Three defects found and fixed along the way, none visible in the closed silhouette:
+- **The upper mandible had NO vertices between y=0.779 and y=0.817** — one unsupported span across
+  the forward 20%, which was simultaneously the faceting, the straight drop and the sharp tip.
+  Depth measured 0.0000 from 84% forward: the last sixth was a zero-thickness blade.
+- **One asymmetric quad webbed the gape shut on the right.** Face 237 spanned y 0.6252→0.6815
+  where its left-side mirror (face 41) stopped at 0.648. Invisible closed; it stretched from lower
+  bill to upper the moment the jaw opened. Deleting it left wire edges behind, which then
+  subdivided into 7 fractional-weight vertices — `FACES_ONLY` is not a cleanup.
+- **The jaw hinge sat 0.025 BELOW the gape line.** Moved back behind the rictus and up to gape
+  level; tip drop at 25° went 0.0689 → 0.0874.
+
+**The mouth is now lined and the bird is watertight.** Ray tests, not edge counts, are the proof: a
+vertical ray through the closed bill hits four surfaces (culmen, palate, floor, gonys) in
+front/back/front/back order, and with the jaw open at 25°, 428 of 960 cast rays hit the mesh and
+**none hit a backface first**. Before, a ray fired forward from the throat ran all the way to the
+tip: head and bill were one empty cavity, and Roblox culls backfaces, so an open beak would have
+shown sky through the head. The gape boundary was a single 156-vertex manifold loop — 84 upper, 72
+lower, joined at the two rictus corners — which is what let each arc be zipped shut independently,
+so the palate rides the skull and the floor rides `bill_lower` and only two throat quads span both.
+
+**`run()` no longer produces the shipping bird, and now says so.** See rule 8 of
+`practice/blender-working-rules.md`: `assert_authored_bill_absent()` is the first statement in
+`run()`, and `karasu_authored.blend` and `karasu_body.fbx` joined `OWNER_AUTHORED`.
+
+⚠ **STILL OWED:** the deliverable `.rbxm` and `karasu_body.fbx` predate all of this, and
+`BirdController` has no gape wiring at all — `BirdFlight.gapeAt` returns 0–1 with no caller and no
+degrees multiplier, so the gape angle is still unchosen (25° was a test value). The mouth interior's
+UVs are one tiny disc per face, not a real island. `BirdFlight.luau:200` still cites a stale 0.30
+`CAW_GAPE_SECONDS` against a 0.48 gap; both numbers are wrong.

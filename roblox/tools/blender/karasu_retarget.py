@@ -2177,7 +2177,36 @@ COLORMAP_AUTHORITY = "karasu_colormap_graded_2.png"
 # from the bake it was applied to. A tool that regenerates its own input eventually destroys work
 # nobody can get back, and it does so silently, on a run that was about something else entirely.
 # Rule 8 of practice/blender-working-rules.md, as a check rather than a sentence.
-OWNER_AUTHORED = {COLORMAP_AUTHORITY}
+# ⚠ THE BILL IS HAND-FINISHED AND LIVES IN A BLEND, NOT IN THIS SCRIPT. On 2026-08-30 the culmen
+# was fitted to a profile traced from the reference photograph, the mouth was lined so an open
+# beak does not read through the head, and the owner then moved vertices by hand at the tip. The
+# fit is reproducible; the hand edits are not. From that point `karasu_authored.blend` is SOURCE
+# and `run()` is a from-vendor rebuild that can no longer produce the shipping bird -- so it must
+# not write the blend, and must not write the body FBX exported from it either.
+AUTHORED_BLEND = "karasu_authored.blend"
+
+OWNER_AUTHORED = {COLORMAP_AUTHORITY, AUTHORED_BLEND, "karasu_body.fbx"}
+
+
+def assert_authored_bill_absent():
+    """Refuse to rebuild once a hand-finished bill exists. Called first thing in `run()`.
+
+    ⚠ THIS FAILS ON PURPOSE AND EARLY. `run()` rebuilds from the vendor blend, so it produces a
+    bird whose bill has none of the authored work -- and it would then export that bird over
+    `karasu_body.fbx`, which is what Studio imports. The damage would be silent and on a run that
+    was about something else. `assert_writable` is the backstop at the two writes; this is the
+    stop sign at the door, before any work is done that would have to be thrown away.
+
+    To rebuild the base bird deliberately, move `AUTHORED_BLEND` aside first -- an action, not an
+    accident.
+    """
+    path = OUT_DIR + AUTHORED_BLEND
+    if os.path.exists(path):
+        raise RuntimeError(
+            f"refusing to run(): {AUTHORED_BLEND} exists, so the shipping bill is hand-finished "
+            f"and this script cannot reproduce it. run() rebuilds from the vendor blend and would "
+            f"export a bird with an unlofted bill over karasu_body.fbx. Move {AUTHORED_BLEND} "
+            f"aside if you really mean to rebuild the base bird from scratch.")
 
 
 def assert_writable(path):
@@ -2343,6 +2372,7 @@ def run(spec=KARASU, do_export=False, eyes=True):
     ⚠ `eye_site` still runs either way -- it only MEASURES, and `landmarks_final` and the texture
     bake both need the seat it records.
     """
+    assert_authored_bill_absent()
     log = {}
     log["load"] = load_vendor()
     log["split_wings"] = split_wings()
@@ -2605,5 +2635,6 @@ def bake_and_finish(res=1024):
              "colormap": png}
     if "KarasuEyes" in bpy.data.objects:
         files["eyes"] = export("KarasuEyes", OUT_DIR + "karasu_eyes.fbx")
-    bpy.ops.wm.save_as_mainfile(filepath=OUT_DIR + "karasu_retarget.blend")
+    bpy.ops.wm.save_as_mainfile(
+        filepath=assert_writable(OUT_DIR + "karasu_retarget.blend"))
     return {"bake": info, "files": files}

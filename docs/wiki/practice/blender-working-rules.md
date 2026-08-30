@@ -132,6 +132,16 @@ and should look like one.
 on a run that was about something else entirely. A Photoshop curve is not re-derivable from the bake
 it was applied to.
 
+**Extended 2026-08-30 from a file to a whole asset.** The karasu's bill is now hand-finished in
+`karasu_authored.blend` — a traced culmen fit, a lined mouth, and owner vertex edits at the tip.
+The fit is reproducible; the hand edits are not. So the registry gained `karasu_authored.blend`
+and `karasu_body.fbx`, and `run()` gained `assert_authored_bill_absent()` as its FIRST statement.
+
+⚠ **THE BACKSTOP AT THE WRITE IS NOT ENOUGH ONCE A WHOLE ASSET IS AUTHORED.** `run()` rebuilds
+from the vendor blend, so by the time `assert_writable` fires at the export the run has already
+thrown away everything it was going to. The guard has to be a stop sign at the door, not a lock on
+the till. Move `AUTHORED_BLEND` aside to rebuild the base bird — an action, not an accident.
+
 ## 9. Verify instrumentation is live before spending the owner's time on it.
 
 Two play rounds were spent on diagnostics: the first was one-shot and fired mid-flight where the
