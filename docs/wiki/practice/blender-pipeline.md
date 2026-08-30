@@ -10,6 +10,11 @@ the procedural river, the waterfall VFX recipe, and the SDF glyph rasteriser. To
 `roblox/tools/blender/`, `roblox/tools/studio/`, `roblox/tools/textures/` and
 `roblox/tools/glyphs/`.
 
+⚠ **THIS PAGE IS TRAPS AND TECHNIQUES, NOT PROCESS.** How we WORK in Blender — what counts as one
+step, who judges shape, when a Studio trip is earned, explore-then-codify — is
+[[blender-working-rules]]. The separation is deliberate and was missing until 2026-08-30: 500 lines
+of engine facts here and nothing anywhere saying when to stop.
+
 ⚠ **The name is narrower than the page.** This said "pipelines that feed Roblox from OUTSIDE
 the engine" while its own contents list an IN-engine river — a scope statement contradicting
 its own table of contents. The subject is asset *production*; two of these pipelines never

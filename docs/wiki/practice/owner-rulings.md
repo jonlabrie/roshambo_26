@@ -100,6 +100,16 @@ re-litigate them without new instructions.
   station and the two sides disagree by 0.025 studs at the hinge. The curve has to be AUTHORED,
   which is the lofted bill parked on `bill-loft-wip`. See [[familiars]] and [[blender-pipeline]].
 
+- ⚠ **BLENDER IS A FIRST-CLASS PIPELINE, NOT AN AD-HOC TOOL** (2026-08-30). Owner: *"blender is
+  going to be a significant ongoing part of the Roshambo development pipeline. It's as important as
+  Studio, frankly, not an ad-hoc sort of thing."* The working rules live on
+  [[blender-working-rules]]; two of them are owner rulings in their own right:
+  **no Studio until there is something that can ONLY be seen, evaluated or approved there**, and
+  **an approach is abandoned when the OWNER says it is** — there is no self-assessed criterion for
+  giving up, and inventing one is what let three patch-and-retry loops run in a single session.
+  **Why:** measurement can tell us a model is broken; only the owner can tell us it is wrong.
+  **How to apply:** report what is failing and wait. See [[blender-working-rules]].
+
 - **Judge visuals in Play at eye level, side by side** — not Edit stills, not scattered
   across the map, and not from hex values. See [[foliage]] (Gates) and
   [[texturing-pack-meshes]].

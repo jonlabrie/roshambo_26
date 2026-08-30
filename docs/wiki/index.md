@@ -38,6 +38,7 @@ Chronology: [log.md](log.md).
 ## practice — how we work
 
 - [Wiki Currency](practice/wiki-currency.md) — why a one-day-old wiki went stale: appends land, prose rots, and the lint checks structure not currency
+- [Blender Working Rules](practice/blender-working-rules.md) — HOW we work in Blender, not what breaks in it: step size, who judges shape, when Studio is earned, explore-then-codify
 - [Owner Rulings](practice/owner-rulings.md) — the standing taste/copy/process rulings, one line each, with citations
 - [Flush Outside Edges](practice/flush-outside-edges.md) — outer faces flush at free edges, tucked where they die into walls, the z-fight scan, barrier gaps
 - [Derive From What It Touches](practice/derive-from-what-it-touches.md) — size every member from what it meets; level is never the target where surfaces meet

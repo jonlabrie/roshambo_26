@@ -2399,3 +2399,27 @@ selene, wiki lint — once passed on a bird whose face was torn open, and none o
 
 ⚠ **THREE THINGS HAVE NOW BEEN BUILT ON THIS HEAD AND WITHDRAWN**: the modelled eye, the lid collar,
 and the jaw. See [[owner-rulings]] for the ruling that retired the plane, and [[familiars]].
+
+## [2026-08-30] gate | Blender gets working rules, because it had none
+
+Owner: *"blender is going to be a significant ongoing part of the Roshambo development pipeline.
+It's as important as Studio, frankly, not an ad-hoc sort of thing."*
+
+⚠ **THE GAP WAS REAL AND VISIBLE IN THE DAY'S WORK.** [[blender-pipeline]] is ~500 lines and every
+section is a trap or a technique — FBX scale, PBR set completeness, bone survival, importer
+artefacts. Nothing anywhere said what one step is, who decides a step is done, or when to stop. So
+each operation looked locally safe and twenty were chained.
+
+[[blender-working-rules]] now carries nine, each earned in this session. Two are owner rulings:
+**no Studio until something can only be seen there**, and **an approach is abandoned when the owner
+says it is**. The rest were proposed and accepted: a step is one operation that changes what the
+bird looks like; defects are ours to judge and shape is the owner's, never inferred from each other;
+geometry commits need the owner's eyes and tool code does not; explore in the live scene and codify
+into `run()` only after approval; a number is measured only if a committed script re-derives it; a
+script never overwrites what the owner authored; verify instrumentation is live before spending a
+play round on it.
+
+⚠ **THE MOST USEFUL FINDING IS RULE 1's COROLLARY.** `run()` rebuilds the bird from the vendor
+blend, so the smallest executable unit is a full pipeline pass — and the response to that cost was
+to batch changes. **Step size was large because the tooling made small steps expensive, and the
+tooling is ours.** Rule 6 is the fix: sculpt in the live scene, codify the settled operation after.
