@@ -1520,6 +1520,74 @@ def split_bill(spec=KARASU):
     return stats
 
 
+def assert_bill_invariants(spec=KARASU, strict=True):
+    """What must be TRUE of an assembled bill, written down before it is built.
+
+    ⚠ THIS EXISTS BECAUSE FOUR GREEN CHECKS PASSED ON A BIRD WHOSE FACE WAS TORN OPEN. Luau tests,
+    stylua, selene and the wiki lint all went green on `af7a134`; none of them look at geometry, and
+    the bill was committed with 142 boundary edges and a hole in the head. The previous attempt was
+    built reactively -- render, spot a fault, patch, find the next -- which is the same loop that
+    failed on the vendor bill before it was lofted. Assemble ONCE, against these.
+
+    Each check is a fact about the bird, not about the code that made it:
+
+    1. NO FACE OWNS VERTICES FROM BOTH MANDIBLES. Such a face cannot hinge, it stretches -- a
+       membrane across the open mouth. ⚠ This is the check that a watertight test does NOT make:
+       `boundary_after: 0, non_manifold: 0` are both satisfied by a webbed jaw.
+    2. NO ORPHANS. A vertex with no weight collapses to the origin the moment a bone moves, and
+       `bind`'s catch-all would otherwise weight it by PROXIMITY -- which puts skull next to the
+       jaw bone and opens part of the face with the beak.
+    3. NO COINCIDENT CAPS. Two capping faces at the same place are invisible in a still and show
+       as z-fighting the moment anything moves; the previous attempt left the root's front cap
+       coincident with each mandible's rear cap at the rictus.
+    4. NO OPEN EDGES IN THE BILL REGION. The tail and the folded wings are open by design; the
+       bill is not.
+    5. THE JAW IS CLAIMED BY NAME. Every vertex of the lower mandible weighted 1.0 to `bill_lower`
+       and to nothing else -- not blended with the skull, which halves the gape.
+    """
+    body = bpy.data.objects.get("KarasuBody") or bpy.data.objects[BODY_OBJ]
+    me = body.data
+    gi = {g.index: g.name for g in body.vertex_groups}
+    lower = {v.index for v in me.vertices
+             if any(gi[g.group] == "bill_lower" and g.weight > 0.99 for g in v.groups)}
+    b = spec["bill"]
+    y0 = b["hinge_y"] - 0.02
+
+    bridging = [p.index for p in me.polygons
+                if (set(p.vertices) & lower) and (set(p.vertices) - lower)]
+    orphans = [v.index for v in me.vertices if not v.groups]
+    blended = [v.index for v in me.vertices
+               if v.index in lower and len([g for g in v.groups if g.weight > 1e-4]) > 1]
+
+    bm = bmesh.new()
+    bm.from_mesh(me)
+    bm.verts.ensure_lookup_table()
+    open_in_bill = [e.index for e in bm.edges
+                    if len(e.link_faces) == 1
+                    and all(v.co.y > y0 for v in e.verts)]
+    # coincident faces: two faces whose centres and areas agree to within a hair
+    seen, coincident = {}, []
+    for f in bm.faces:
+        c = f.calc_center_median()
+        if c.y <= y0:
+            continue
+        key = (round(c.x, 4), round(c.y, 4), round(c.z, 4))
+        if key in seen:
+            coincident.append((seen[key], f.index))
+        else:
+            seen[key] = f.index
+    bm.free()
+
+    report = {"faces_bridging_mandibles": len(bridging), "orphan_verts": len(orphans),
+              "lower_verts_blended_with_other_bones": len(blended),
+              "open_edges_in_bill": len(open_in_bill), "coincident_faces": len(coincident),
+              "lower_verts": len(lower)}
+    bad = {k: v for k, v in report.items() if k != "lower_verts" and v}
+    if bad and strict:
+        raise RuntimeError(f"bill invariants violated: {bad}")
+    return report
+
+
 def simplify_feet(spec=KARASU):
     """The vendor's feet are 920 triangles EACH against a 1,096-triangle body -- more geometry in
     the toes than in the whole bird. Decimate before joining."""
