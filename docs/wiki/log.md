@@ -2477,3 +2477,22 @@ because its mandible tip carried a mean `bill_lower` weight of 0.167.
 ⚠ **THE `ROI_*` GROUPS DID NOT SURVIVE**, as predicted — they encode owner judgement as vertex
 indices and a rebuild renumbers underneath them. `ROI_lower_beak_tip` read 0/0 on the very check
 that confirmed the new derivation. Nothing now depends on them.
+
+## [2026-08-30] fix | The jaw bone was slung 0.088 studs under the mandible it drives
+
+Owner, looking at the rig: *"why does your new lower mandible bone on the rig appear so much lower
+than the part it drives?"*
+
+`JAW_HEAD` was typed as (0, 0.615, 0.806) — measured in a prototype scene that had ALREADY been
+through `normalise_size`. `open_the_mouth` runs BEFORE that scaling, so the constant landed in BUILD
+coords and was then scaled again, ending at final z 0.674 against a mandible spanning 0.7618..0.8134.
+
+⚠ **THE GAPE STILL MEASURED CORRECTLY**, which is why every check passed. Rotating a bone pivots its
+weighted vertices wherever the bone sits — only the ARC was wrong. A displacement test cannot see a
+wrong pivot; an eye can, and did. The reported 5.48% was inflated BY the error: a bone 0.088 studs
+low swings the mandible on a longer lever. The honest figure on a correct pivot is **4.38%**, still
+well above the 3.4% the retired plane-cut jaw managed while dragging the skull with it.
+
+The hinge is now DERIVED — the centroid of the mandible's own rear-most vertices — so it lands
+correctly in whatever coordinate space the function runs in. ⚠ A corrected constant would have been
+the same trap one coordinate space over.

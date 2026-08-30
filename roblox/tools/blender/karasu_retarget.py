@@ -1379,7 +1379,15 @@ def build_spread_wings(spec=KARASU):
 
 RICTUS_Y = 0.62          # build coords: forward of this the mandibles are separate surfaces
 FAN_VALENCE_FACTOR = 4.0  # a vertex this many times the mesh's average valence is a fill artefact
-JAW_HEAD = (0.0, 0.615, 0.806)
+# ⚠ THE HINGE IS DERIVED, not typed. It was typed once -- (0, 0.615, 0.806), measured in a
+# prototype scene that had already been through `normalise_size` -- and `open_the_mouth` runs
+# BEFORE that scaling, so the constant landed in BUILD coords and was then scaled again: it ended
+# up at final z 0.674 against a mandible spanning 0.7618..0.8134, slung 0.0878 studs UNDER the part
+# it drives. ⚠ The gape still measured correctly, because rotating a bone pivots its weighted
+# vertices wherever the bone sits -- only the ARC was wrong, which a displacement check cannot see
+# and an eye can (owner: "why does your new lower mandible bone appear so much lower than the part
+# it drives?"). A corrected constant would be the same trap one coordinate space over.
+JAW_TAIL_LEN = 0.10
 
 
 def open_the_mouth(spec=KARASU):
@@ -1460,12 +1468,22 @@ def open_the_mouth(spec=KARASU):
     me.update()
     bm.free()
 
+    # the hinge: the centroid of the mandible's own rear-most vertices, so it sits inside the
+    # geometry it drives, in whatever coordinate space this function happens to run in
+    rear_y = min(me.vertices[i].co.y for i in lower_verts)
+    rear = [me.vertices[i].co for i in lower_verts if me.vertices[i].co.y < rear_y + 0.024]
+    hinge = Vector((sum(c.x for c in rear) / len(rear),
+                    sum(c.y for c in rear) / len(rear),
+                    sum(c.z for c in rear) / len(rear)))
+    stats["hinge"] = tuple(round(c, 4) for c in hinge)
+    stats["hinge_from_verts"] = len(rear)
+
     def _jaw(ebs):
         if "bill_lower" in ebs:
             ebs.remove(ebs["bill_lower"])
         j = ebs.new("bill_lower")
-        j.head = Vector(JAW_HEAD)
-        j.tail = Vector(JAW_HEAD) + Vector((0.0, 0.10, -0.01))
+        j.head = hinge
+        j.tail = hinge + Vector((0.0, JAW_TAIL_LEN, -0.01))
         j.parent = ebs["joint4"]
         j.use_connect = False
         j.align_roll(Vector((0.0, 0.0, 1.0)))
