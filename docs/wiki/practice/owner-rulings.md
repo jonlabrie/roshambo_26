@@ -86,6 +86,20 @@ re-litigate them without new instructions.
   `Reflectance` at runtime, every dial the Part was supposed to buy, plus `TextureID`, which a
   Part does not have. The Part gave up the iris, gave up being visible while authoring, and
   bought nothing. See [[familiars]] and [[blender-pipeline]].
+- ⚠ **A BEAK IS NOT SPLIT BY A PLANE** (2026-08-30). Owner: *"the beak should not be split by a
+  plane, there's an actual curve to it"*, and the plane bisect *"was too simple to be used, and
+  should be retired"*. A bird's tomium — the cutting edge where the mandibles meet — is a curve in
+  three dimensions; a plane can only approximate it, and the approximation shows as a split sitting
+  below the model's own mouth line and as faces owning vertices from both halves.
+  **Why:** measured, the typed plane sits 0.0107 studs below the mesh's fitted mouth line, and 13
+  faces still bridge the two mandibles. Fitting a BETTER plane (`measure_gape_plane`) does not fix
+  the class of error, only its size.
+  **How to apply:** retire `gape_plane` / `measure_gape_plane` / the `bmesh.ops.bisect_plane` cut in
+  `split_bill`. ⚠ And the replacement is not a cleverer cut on this mesh — measured, the vendor bill
+  carries no tomium edge loop to follow: its widest-point z wanders non-monotonically station to
+  station and the two sides disagree by 0.025 studs at the hinge. The curve has to be AUTHORED,
+  which is the lofted bill parked on `bill-loft-wip`. See [[familiars]] and [[blender-pipeline]].
+
 - **Judge visuals in Play at eye level, side by side** — not Edit stills, not scattered
   across the map, and not from hex values. See [[foliage]] (Gates) and
   [[texturing-pack-meshes]].

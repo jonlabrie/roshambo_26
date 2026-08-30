@@ -2339,3 +2339,31 @@ measurement table in the comment so it is re-derivable rather than re-guessed.
 bird mid-flight at k=0.39 where `flying=true` is simply correct — it proved nothing and cost a play
 round. The second never reached Studio at all, which `script_grep` showed in one call. **Check that
 the instrumentation is actually running before asking anyone to play a round for it.**
+
+## [2026-08-30] gate | The plane bisect of the beak is retired — a tomium is a curve
+
+Owner, looking at the open beak in Blender: *"the beak split is lower than the actual split implied
+by the model, and there are vertices connecting the upper and lower beak"*, then the ruling — the
+bisect *"was too simple to be used, and should be retired... the beak should not be split by a
+plane, there's an actual curve to it"*.
+
+Both symptoms measured before the ruling, and both are the plane:
+
+- **The split sits low.** The typed plane's point converts to final z 0.7992; `measure_gape_plane`
+  fits the mesh's own mouth line at 0.8099. The cut is **0.0107 studs below** where the model says
+  the mandibles meet, so part of the true lower bill stays with the upper.
+- **13 faces own vertices from both mandibles.** Twelve are at the hinge, where the cut deliberately
+  stops and bridging is correct. One is **44% of the way along the bill** and is not a hinge face —
+  it is a web, and it stretches when the jaw opens.
+
+⚠ **A BETTER PLANE IS NOT THE FIX.** `measure_gape_plane` exists, is unwired, and would move the cut
+0.0107 studs and change its tilt — it reduces the error without changing its class. A plane cannot
+follow a curve.
+
+⚠ **AND THE CURVE IS NOT IN THE MESH TO FOLLOW.** Measured across the bill's 99 vertices in 14
+stations: the widest-point z (where the mandibles meet) runs 0.821, 0.813, 0.820, 0.811, 0.798,
+0.808, 0.812, 0.818, 0.803, 0.799 — non-monotonic — and at the hinge station the two sides disagree
+by 0.025 studs. Station counts are 5, 14, 14, 13, 6, 11, 5, 8, 3, 13. There is no tomium edge loop
+to cut along, so the replacement cannot be a cleverer cut on this geometry. **The curve has to be
+authored**, which is the lofted bill on `bill-loft-wip` — the same conclusion the bill work reached
+independently on 2026-08-28. See [[owner-rulings]].
