@@ -109,6 +109,16 @@ re-litigate them without new instructions.
   giving up, and inventing one is what let three patch-and-retry loops run in a single session.
   **Why:** measurement can tell us a model is broken; only the owner can tell us it is wrong.
   **How to apply:** report what is failing and wait. See [[blender-working-rules]].
+- ⚠ **IN BLENDER: PLACE THE CAMERA, DO NOT LOOK** (2026-08-30). Owner: *"you're pretty good at
+  placing the camera, and pretty bad at deciding what it is you're 'seeing'... place the camera and
+  ask me to look, don't iterate."* Position model, pose and camera at the angle that shows the
+  change, then hand it over — do not capture and evaluate first.
+  **Why:** vision on 3D meshes and geometry is weak, and checking images is token-heavy. Earned: a
+  beak posed open at 30° was rendered, examined and reported as working; the owner saw the low split
+  and the bridging vertices immediately, both in frame. Measurement found them afterwards, so the
+  information was recoverable by MEASURING and not by LOOKING.
+  **How to apply:** no framing-check capture either — that degrades into looking and adjusting.
+  See [[blender-working-rules]] rule 10.
 
 - **Judge visuals in Play at eye level, side by side** — not Edit stills, not scattered
   across the map, and not from hex values. See [[foliage]] (Gates) and

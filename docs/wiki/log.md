@@ -2423,3 +2423,24 @@ play round on it.
 blend, so the smallest executable unit is a full pipeline pass — and the response to that cost was
 to batch changes. **Step size was large because the tooling made small steps expensive, and the
 tooling is ours.** Rule 6 is the fix: sculpt in the live scene, codify the settled operation after.
+
+## [2026-08-30] gate | In Blender: place the camera, do not look
+
+Owner: *"you're pretty good at placing the camera, and pretty bad at deciding what it is you're
+'seeing'... place the camera and ask me to look, don't iterate."*
+
+⚠ **THE CASE THAT EARNED IT.** The beak was posed open at 30°, rendered, examined and reported as
+working. The owner looked at the same geometry and immediately named two defects that were in
+frame: the split sitting below the model's own mouth line, and vertices connecting the mandibles.
+Measurement afterwards confirmed both — 0.0107 studs low, 13 bridging faces. **The information was
+recoverable by measuring and was not recoverable by looking**, which is the whole rule.
+
+Capability confirmed while settling this: `bpy.ops.render.opengl(view_context=True)` captures the
+viewport (900×700 JPEG, 14KB) and `bpy.ops.screen.screenshot()` the whole window;
+`screen.screenshot_area` does not work in this build. So the constraint is judgment, not capture.
+
+⚠ **A HALF-MEASURE WAS PROPOSED AND REJECTED**, recorded so it is not re-proposed: one capture purely
+to confirm framing, after two that day wasted the owner's attention on a macro shot and a black PNG.
+Ruled against — "checking the framing" degrades into "having a look and adjusting", which is
+self-approval by another name, and an occasional badly framed shot is cheaper. See
+[[blender-working-rules]] rule 10.

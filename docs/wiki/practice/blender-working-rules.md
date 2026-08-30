@@ -140,3 +140,39 @@ condition it printed was legitimately false, proving nothing; the second never r
 ⚠ **This one stays prose, because there is nothing to assert** — it is a step to take, not a state
 to check. The step: `script_grep` for the diagnostic's own literal text and confirm it appears under
 `Players.<name>.PlayerScripts`, which proves Rojo synced it, BEFORE asking anyone to play a round.
+
+## 10. Place the camera. Ask the owner to look. Do NOT look first.
+
+Owner's ruling, 2026-08-30: *"you're pretty good at placing the camera, and pretty bad at deciding
+what it is you're 'seeing'... place the camera and ask me to look, don't iterate. Checking images is
+token-heavy, and while your vision skills are pretty impressive generally, they're not strong when
+viewing 3D meshes and geometry."*
+
+**The division of labour in Blender**: position the model, the pose and the camera at the angle that
+shows the change — that part is reliable — then hand it over. The owner evaluates. If the owner
+wants the model to see something, they frame it and ask for a capture, or send one.
+
+⚠ **THE EVIDENCE IS A CASE OF READING PAST WHAT MATTERED, not of failing to render.** The beak was
+posed open at 30°, rendered, examined, and reported as working. The owner looked at the same
+geometry and immediately saw two defects in frame: the split sitting below the model's own mouth
+line, and vertices connecting the upper and lower mandibles. Both were the defects that mattered.
+Measurement afterwards confirmed both — 0.0107 studs low, 13 bridging faces — so the information was
+recoverable by MEASURING and was not recoverable by LOOKING.
+
+⚠ **AND A REJECTED HALF-MEASURE, recorded so it is not re-proposed.** The model offered to take one
+capture purely to confirm framing — subject in frame, lit, file saved — on the grounds that two
+captures that day had wasted the owner's attention on a macro shot and a black PNG. The owner ruled
+against it: the line is cleaner without it, and "checking the framing" degrades into "having a look
+and adjusting", which is self-approval by another name. **An occasional badly framed shot is cheaper
+than that.**
+
+**How to capture, when asked:**
+
+```python
+bpy.ops.render.opengl(write_still=True, view_context=True)   # what the viewport shows
+bpy.ops.screen.screenshot(filepath=...)                      # the whole window, for panels/nodes
+```
+
+Both verified working 2026-08-30; `screen.screenshot_area` is not (writes 250 bytes).
+⚠ `render.opengl` needs a `temp_override` carrying the VIEW_3D area and its WINDOW region.
+
