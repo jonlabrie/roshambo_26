@@ -2190,3 +2190,35 @@ effect. Then the three derived maps being 16-bit PNGs, reasoned to break the pac
 — also not it. ⚠ **The 16-bit files are still a real defect and still want fixing**; they simply were
 not this. And a diagnostic A/B built on setting a packaged map as a plain `TextureID` proved nothing,
 because a TexturePack member need not be usable standalone. See [[familiars]].
+
+## [2026-08-30] fix | 148 faces had zero-area UVs, and the roughness map made the flattest paint the shiniest
+
+Two defects the owner found in Studio, both from the same habit — inferring a per-face answer from
+a per-piece rule.
+
+⚠ **ZERO-AREA UVs: `_project_faces` unwraps a whole piece down ONE axis**, so any face lying edge-on
+to that axis collapses to a LINE. 60 faces on the body, 88 on the wings — a membrane is worse
+because its rim faces are edge-on to any projection. A zero-area face samples a single texel row and
+renders as a streak or untextured, showing the MeshPart's flat `Color`.
+`thicken_degenerate_uvs` gives each one a ~3-texel footprint built in the face's own plane.
+⚠ **THICKENED IN PLACE, NOT RE-PROJECTED**, and that constraint comes from the ColorMap being a
+hand-graded file we cannot regenerate: moving these faces to a fresh atlas block would put them
+where that file has no paint for them. Thickening keeps each face where it is, so it samples its own
+piece's existing paint. ⚠ The first attempt preserved each face's aspect ratio, which sounds
+respectful and defeats the purpose — a 3D sliver stays a UV sliver, and 7 came back still under a
+texel. The axes are normalised INDEPENDENTLY now: shape fidelity is worthless on a face with no area.
+
+⚠ **THE ROUGHNESS MAP WAS INFERENCE AND INFERRED BACKWARDS.** `derive_roughness` read local
+luminance variance as surface roughness — fine detail rough, broad smooth areas glossy, on the
+theory that an eyeball and a bill are smooth and feathers are not. But paint is flat for reasons
+that have nothing to do with surface, and a crow's belly, thighs and tail are the largest
+flat-painted areas on the bird. Measured: **21.3% of the atlas at the glossy floor**, including 21%
+of the thigh faces. Owner: *"still bright on belly/legs"*.
+Replaced by `roughness_map`: matte everywhere, glossy only within ~2.2 eye radii of the seats
+`eye_site` MEASURED. Glossy texels 21.3% → **0.27%**. The asymmetry is the argument — feathers
+slightly too matte is invisible, a chrome-sheened belly is the first thing anyone sees — and the eye
+was always the entire reason a roughness map exists here. A two-value mask was the answer from the
+start; a general signal was reached for because it felt more principled.
+
+Also fixed: the three derived maps were **16-bit** PNGs (`float_buffer=True` on the Blender image);
+all four are 8-bit now. See [[familiars]].

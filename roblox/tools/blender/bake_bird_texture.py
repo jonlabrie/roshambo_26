@@ -543,6 +543,51 @@ def derive_roughness(base_image, res=RES, rough_min=0.25, rough_max=0.85, radius
     return np.clip(rough, 0.0, 1.0)
 
 
+def roughness_map(obj_name, eye_centres, eye_r, res=RES, body=0.85, eye=0.25, feather=2.2):
+    """Matte everywhere, glossy ONLY at the eyes. Deterministic -- nothing is inferred.
+
+    ⚠ THIS REPLACES A VARIANCE-BASED INFERENCE THAT FAILED IN THE ONE DIRECTION THAT MATTERED.
+    `derive_roughness` read local luminance detail as surface roughness: fine structure -> rough,
+    broad smooth areas -> glossy. The reasoning was that an eyeball and a bill are smooth while
+    feathers are not. But a PAINTED area can be flat for a reason that has nothing to do with the
+    surface, and a crow's belly, thighs and tail are exactly that -- large regions the artist filled
+    with an even tone. Measured, 21% of the atlas came out at the glossy floor, including 21% of the
+    thigh faces, so the flattest-painted parts of the bird rendered as the shiniest. Owner, in
+    Studio: "still bright on belly/legs".
+
+    ⚠ THE ASYMMETRY IS WHY THIS IS A MASK AND NOT A SIGNAL. Feathers being slightly too matte is
+    invisible; a belly with a chrome sheen is the first thing anyone sees. So: default matte, and
+    spend gloss only where it is definitely wanted. The eye is the entire reason a roughness map
+    exists here -- a tight specular is what makes an eye read as wet -- and it is a tiny region
+    whose position is MEASURED by `karasu_retarget.eye_site`, not guessed.
+
+    `eye_centres` are in the mesh's own coordinates; `feather` is the falloff radius in eye radii.
+    """
+    ob = bpy.data.objects[obj_name]
+    me = ob.data
+    me.calc_loop_triangles()
+    uvl = me.uv_layers.active.data
+    R = np.full((res, res), float(body), dtype=np.float64)
+    # distance-to-nearest-eye per texel, accumulated over the faces that carry those texels --
+    # UV space has no metric of its own, so the falloff has to be measured in 3D and painted in.
+    D = np.full((res, res), np.inf)
+    for tri in me.loop_triangles:
+        uv = np.array([uvl[l].uv[:] for l in tri.loops]) * res
+        vs = [np.array(me.vertices[i].co[:]) for i in tri.vertices]
+        centre = sum(vs) / 3.0
+        d = min(np.linalg.norm(centre - np.array(c)) for c in eye_centres)
+        if d > eye_r * (feather + 1.0):
+            continue
+        x0 = max(0, int(np.floor(uv[:, 0].min())) - 1); x1 = min(res, int(np.ceil(uv[:, 0].max())) + 2)
+        y0 = max(0, int(np.floor(uv[:, 1].min())) - 1); y1 = min(res, int(np.ceil(uv[:, 1].max())) + 2)
+        if x1 <= x0 or y1 <= y0:
+            continue
+        D[y0:y1, x0:x1] = np.minimum(D[y0:y1, x0:x1], d)
+    t = _smooth(eye_r * 0.9, eye_r * feather, D)      # 0 at the eye, 1 away from it
+    R = eye + (body - eye) * t
+    return np.clip(R, 0.0, 1.0)
+
+
 def derive_normal(base_image, res=RES, strength=2.0, radius=3, owned=None):
     """A normal map inferred from the colour art's HIGH-FREQUENCY luminance, as height.
 

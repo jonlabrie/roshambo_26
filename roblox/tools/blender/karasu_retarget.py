@@ -1591,6 +1591,63 @@ class UVAllocator:
         raise RuntimeError(f"no free block for {name} even at a third of {w}x{h}")
 
 
+def thicken_degenerate_uvs(me, texels=3.0, res=1024):
+    """Give every face a NON-ZERO UV footprint, in place, without moving it in the atlas.
+
+    ⚠ `_project_faces` unwraps a whole piece down ONE axis, so any face lying edge-on to that axis
+    collapses to a LINE in UV -- zero area. Measured on the karasu: 60 body faces, all of them added
+    geometry, several exactly 0.0 texels tall. A zero-area face samples a single texel row, so it
+    renders as a streak or as untextured, showing the MeshPart's flat `Color` instead. Owner saw it
+    as a bright patch on the belly and legs.
+
+    ⚠ THIS THICKENS RATHER THAN RE-PROJECTS, and the reason is that the ColorMap is a hand-graded
+    file we cannot regenerate (`COLORMAP_AUTHORITY`). Re-projecting these faces into a fresh atlas
+    block would move them somewhere that file has no paint for them. Thickening keeps each face
+    exactly where it already is and merely gives it area, so it samples its OWN piece's existing
+    paint -- which at this scale is near-uniform, so a few texels is enough and the colour is right.
+
+    The footprint is built in the face's own plane, so the little triangle keeps the face's shape
+    and winding rather than being an arbitrary blob.
+    """
+    uvl = me.uv_layers[0].data
+    lim = 1.0 / res
+    fixed = 0
+    for poly in me.polygons:
+        us = [uvl[li].uv[0] for li in poly.loop_indices]
+        vs = [uvl[li].uv[1] for li in poly.loop_indices]
+        if (max(us) - min(us)) >= lim and (max(vs) - min(vs)) >= lim:
+            continue
+        cu, cv = sum(us) / len(us), sum(vs) / len(vs)
+        n = Vector(poly.normal)
+        if n.length < 1e-9:
+            continue
+        # an orthonormal basis IN the face's plane, so the footprint mirrors the face's own shape
+        t1 = Vector((0.0, 0.0, 1.0)).cross(n)
+        if t1.length < 1e-6:
+            t1 = Vector((1.0, 0.0, 0.0)).cross(n)
+        t1.normalize()
+        # ⚠ `Vector.normalize()` normalises IN PLACE and returns None -- assigning its result
+        # gives you None, and the error surfaces later as "invalid 'other' arg" on the dot product.
+        t2 = n.cross(t1)
+        t2.normalize()
+        ctr = Vector(poly.center)
+        loc = [((me.vertices[me.loops[li].vertex_index].co - ctr).dot(t1),
+                (me.vertices[me.loops[li].vertex_index].co - ctr).dot(t2))
+               for li in poly.loop_indices]
+        # ⚠ NORMALISE THE TWO AXES INDEPENDENTLY. Preserving the face's aspect ratio sounds
+        # respectful and defeats the purpose: a face that is a thin sliver in 3D stays a thin
+        # sliver in UV, and seven of them came back still under a texel tall. These faces are
+        # degenerate by definition, so an isotropic footprint is the correct answer -- shape
+        # fidelity is worthless on a face that currently has no area at all.
+        sx = max(max(abs(x) for x, _ in loc), 1e-9)
+        sy = max(max(abs(y) for _, y in loc), 1e-9)
+        r = texels / res
+        for li, (x, y) in zip(poly.loop_indices, loc):
+            uvl[li].uv = (cu + r * x / sx, cv + r * y / sy)
+        fixed += 1
+    return {"thickened": fixed, "texels": texels}
+
+
 def _project_faces(me, face_idx, axis, block, split_shells=True):
     """Planar-project a set of faces down `axis` and fit them into `block` = (u0, v0, w, h).
 
@@ -1942,12 +1999,17 @@ def join_all():
         vals[i] = 1
     newgeo.data.foreach_set("value", vals)
 
+    packed["thickened_body"] = thicken_degenerate_uvs(me)["thickened"]
+
     wings = bpy.data.objects["KarasuWings"]
     if not wings.data.uv_layers:
         wings.data.uv_layers.new(name=me.uv_layers[0].name)
     wblk = alloc.take(0.22, 0.17, "KarasuWings")
     _project_faces(wings.data, range(len(wings.data.polygons)), 2, wblk)
     packed["KarasuWings"] = [round(v, 4) for v in wblk]
+    # ⚠ THE WINGS NEED IT TOO, and are worse: a membrane is a two-sided plate, so its rim faces
+    # are edge-on to any projection. 88 of 652 collapsed before this ran.
+    packed["thickened_wings"] = thicken_degenerate_uvs(wings.data)["thickened"]
 
     tri = lambda m: sum(len(p.vertices) - 2 for p in m.polygons)
     return {"body_verts": len(me.vertices), "body_tris": tri(me), "gape_faces": len(gape),
