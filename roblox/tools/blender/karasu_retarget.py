@@ -2067,7 +2067,64 @@ def bind(added_ranges):
         counts[name] = counts.get(name, 0) + 1
     out["wings"] = counts
     out["orphan_count"] = len(orphans)
+    out["normalise_body"] = normalise_weights(body, arm)
+    out["normalise_wings"] = normalise_weights(wings, arm)
     return out
+
+
+def normalise_weights(obj, arm, max_influences=4):
+    """Every vertex's weights must sum to 1, across at most `max_influences` bones.
+
+    ⚠ A VERTEX THAT SUMS TO LESS THAN 1 UNDER-DEFORMS -- it moves only that fraction of the way
+    with its bones, so it lags the geometry around it and the surface tears or creases as the rig
+    moves. Measured on the karasu before this existed: 417 of 1591 body vertices summed to anything
+    from 0.288 to 1.508, while the wings were clean at 1.000 -- which is what makes it a defect
+    rather than a style. The vendor's own weights arrive un-normalised and every operation that
+    merges or appends geometry carries them along unchanged.
+
+    ⚠ AND IT IS INVISIBLE AT REST. Weights only express themselves under motion, so nothing about
+    a still bird -- in Blender, in Studio Edit, in any screenshot -- can show this. Blender does not
+    normalise on the fly either: measured, a vertex totalling 0.502 moved 69% as far as a fully
+    weighted one.
+
+    ⚠ FOUR INFLUENCES IS ROBLOX'S LIMIT, not a tidiness preference. A skinned mesh stores four per
+    vertex; a fifth is dropped at import, and dropping one from a set that summed to 1 leaves the
+    remainder summing to less -- re-introducing the same defect at the point where nobody is
+    looking. So trim first, then normalise, and the file that leaves here already satisfies the
+    constraint the importer would otherwise enforce silently.
+    """
+    deform = {b.name for b in arm.data.bones if b.use_deform}
+    idx_ok = {g.index for g in obj.vertex_groups if g.name in deform}
+    before, trimmed, rebound = [], 0, 0
+    for v in obj.data.vertices:
+        gs = [g for g in v.groups if g.group in idx_ok and g.weight > 0.0]
+        before.append(sum(g.weight for g in gs))
+        if len(gs) > max_influences:
+            gs.sort(key=lambda g: -g.weight)
+            for g in gs[max_influences:]:
+                g.weight = 0.0
+            # ⚠ RE-READ rather than slicing the list we just mutated. Zeroing a weight can
+            # invalidate the element references, and normalising a stale set left one vertex at
+            # 0.9975 -- small, but the whole point here is that the total is exactly 1.
+            gs = [g for g in v.groups if g.group in idx_ok and g.weight > 0.0]
+            trimmed += 1
+        tot = sum(g.weight for g in gs)
+        if tot <= 1e-6:
+            # nothing holds this vertex; it would collapse to the origin the moment a bone moves
+            weight_to_nearest(obj, [v.index], sorted(deform), arm)
+            rebound += 1
+            continue
+        for g in gs:
+            g.weight = g.weight / tot
+    after = [sum(g.weight for g in v.groups if g.group in idx_ok) for v in obj.data.vertices]
+    off = [t for t in after if abs(t - 1.0) > 1e-4]
+    return {"verts": len(before),
+            "was_off_by_more_than_0.01": sum(1 for t in before if abs(t - 1.0) > 0.01),
+            "was_min": round(min(before), 4) if before else None,
+            "was_max": round(max(before), 4) if before else None,
+            "trimmed_over_%d_influences" % max_influences: trimmed,
+            "rebound_unweighted": rebound,
+            "still_off": len(off)}
 
 
 def normalise_size(target=NOSE_TO_TAIL):

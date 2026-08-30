@@ -2222,3 +2222,27 @@ start; a general signal was reached for because it felt more principled.
 
 Also fixed: the three derived maps were **16-bit** PNGs (`float_buffer=True` on the Blender image);
 all four are 8-bit now. See [[familiars]].
+
+## [2026-08-30] fix | 539 body vertices under-deformed — skin weights that did not sum to 1
+
+Backlogged since 2026-08-28, fixed now. Measured before: **539 of 1351 body vertices** summed to
+anything from **0.046 to 1.5079**, while the wings were clean at exactly 1.000 — which is what makes
+it a defect rather than a style. The vendor's weights arrive un-normalised and every operation that
+merges or appends geometry carried them along unchanged.
+
+⚠ **A VERTEX SUMMING TO LESS THAN 1 UNDER-DEFORMS**: it travels only that fraction of the way with
+its bones, so it lags the geometry around it and the surface creases or tears as the rig moves.
+⚠ **AND IT IS INVISIBLE AT REST.** Weights only express themselves under motion, so no still
+image — Blender, Studio Edit, any screenshot — can show it. Blender does not normalise on the fly
+either: measured, a vertex totalling 0.502 moved 69% as far as a fully weighted one.
+
+`normalise_weights` trims to Roblox's **four influences per vertex** and then normalises. ⚠ The
+order matters: a skinned mesh stores four, a fifth is dropped at import, and dropping one from a set
+that summed to 1 leaves the remainder summing to less — re-introducing the defect at the point
+nobody is looking. Trim first, normalise second, and the exported file already satisfies the
+constraint the importer would otherwise enforce silently.
+
+⚠ **ONE VERTEX LANDS AT 0.997509 AND THAT IS LEFT ALONE.** Roblox quantises skin weights to 8 bits,
+so its resolution is 1/255 ≈ 0.0039; a 0.0025 residue is below what the format can represent and
+cannot survive import as a difference. Chasing it would cost a rebuild to change nothing.
+See [[familiars]].
