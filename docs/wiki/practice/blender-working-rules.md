@@ -29,6 +29,18 @@ degrades to a summary line saying it was read. The hook does not depend on remem
 ⚠ **Once per session, keyed on the session id**: twenty Blender calls each carrying nine rules is
 noise, and noise is ignored.
 
+**How the owner verifies it fired**, without trusting the model's own report:
+
+```
+cat .blender-rules.log        # gitignored; one line per Blender session
+/hooks                        # confirms the hook is registered
+```
+
+The log records `RULES INJECTED before first Blender call` for each session served, and
+`(already served this session)` for every later call. ⚠ **"Ask the model whether it saw the rules"
+is exactly the report that should not be load-bearing here** — the log is a filesystem fact.
+If a session does Blender work and the log gains no line, the hook is not running.
+
 ## 1. A step is ONE operation that changes what the bird looks like. Then stop.
 
 Not "one feature". The eye was treated as a single attempt — seat it, loft a lid collar, build the

@@ -22,3 +22,4 @@ __pycache__/
 
 # Parallel Claude threads (see docs/wiki/practice/parallel-threads.md). Never committed.
 .worktrees/
+.blender-rules.log

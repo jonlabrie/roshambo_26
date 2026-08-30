@@ -17,10 +17,20 @@ payload=$(cat)
 session=$(printf '%s' "$payload" | python3 -c 'import sys,json;print(json.load(sys.stdin).get("session_id","nosession"))' 2>/dev/null || echo nosession)
 marker="${TMPDIR:-/tmp}/roshambo-blender-rules-${session}"
 
-[ -f "$marker" ] && exit 0
-touch "$marker"
-
 repo=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+
+# ⚠ A DURABLE, CHECKABLE RECORD. Whether hook output reaches the transcript depends on the client,
+# and "ask the model whether it saw the rules" is exactly the report you should not have to trust.
+# This log is a filesystem fact: `cat .blender-rules.log` shows every session that was served, and
+# every Blender call that was not the first. Gitignored -- it is local evidence, not project truth.
+log="$repo/.blender-rules.log"
+stamp=$(date "+%Y-%m-%d %H:%M:%S")
+if [ -f "$marker" ]; then
+  echo "$stamp  session ${session:0:8}  (already served this session)" >> "$log"
+  exit 0
+fi
+touch "$marker"
+echo "$stamp  session ${session:0:8}  RULES INJECTED before first Blender call" >> "$log"
 [ -f "$repo/$RULES" ] || exit 0
 
 echo "=== Blender working rules (docs/wiki/practice/blender-working-rules.md) ==="
