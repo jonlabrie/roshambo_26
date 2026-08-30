@@ -180,6 +180,51 @@ export type Profile = {
 -- ⚠ sqrt, NOT linear. Bigger animals move slower roughly as the square root of length for
 -- pendulum-like limbs, so a 2x bird is about 1.41x slower. Scaling times linearly overshoots
 -- into slow motion, which is the mistake this function exists to make impossible to repeat.
+-- Hermite smoothstep. BirdFlight had no easing helper -- the two places that ease a value inline
+-- both use a cubic ease-OUT (`1 - (1-k)^3`), which is a different curve and deliberately so.
+local function smoothstep(e0: number, e1: number, x: number): number
+    local t = math.clamp((x - e0) / (e1 - e0), 0, 1)
+    return t * t * (3 - 2 * t)
+end
+
+-- How wide the bill is open, 0 to 1, `elapsed` seconds into a clip whose caws begin at `caws`.
+--
+-- ⚠ THE ENVELOPE IS NOT SYMMETRIC. A crow's bill snaps open on the attack and lingers before it
+-- shuts; a symmetric bump reads as a yawn. Peak lands at 30% of the window, so the open is roughly
+-- twice as fast as the close.
+--
+-- ⚠ AND `open` MUST BE SHORTER THAN THE GAP BETWEEN CAWS. Overlap them and two calls merge into one
+-- long croak, which is the failure this replaced: a fixed `sin(now * 9)` chatter that ran whenever
+-- the bird was in the WIN state, whether or not it was singing and whatever clip it had chosen.
+-- `BirdSpecies.CAW_GAPE_SECONDS` is 0.30 against a 0.48 minimum gap for exactly this reason.
+--
+-- ⚠ NOT SCALE-SENSITIVE, so it takes no profile. A caw's timing is the RECORDING's, not the bird's:
+-- a bigger crow does not caw more slowly, it plays the same clip. Every other duration in this
+-- module scales by sqrt(length); this one must not, or the beak drifts off the audio on any bird
+-- whose scale is not 1.
+function BirdFlight.gapeAt(elapsed: number, caws: { number }, open: number): number
+    if open <= 0 or open ~= open then
+        error(`BirdFlight.gapeAt: open must be a positive number, got {open}`)
+    end
+    local peak = 0.3
+    local best = 0
+    for _, onset in caws do
+        local u = (elapsed - onset) / open
+        if u >= 0 and u <= 1 then
+            local g
+            if u <= peak then
+                g = smoothstep(0, peak, u)
+            else
+                g = 1 - smoothstep(peak, 1, u)
+            end
+            if g > best then
+                best = g
+            end
+        end
+    end
+    return best
+end
+
 function BirdFlight.profile(scale: number): Profile
     -- ⚠ REFUSED, not clamped. A zero or negative scale makes every duration zero and every
     -- clock a division by zero, and NaN positions surface frames later as "the bird vanished" --

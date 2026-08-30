@@ -169,6 +169,12 @@ type Bird = {
     singArmed: boolean,
     singOwn: boolean,
     singAt: number?,
+    -- The caw the BEAK is following: when the clip started, the onsets inside it, and the pitch
+    -- jitter that clip is playing at. All three are needed together or the bill drifts off the
+    -- sound -- see the gape in RenderStepped.
+    cawFrom: number?,
+    cawOnsets: { number }?,
+    cawSpeed: number,
     flightFrom: Vector3?, -- a flight is a PATH between two points, so both ends must be held
     flightTo: Vector3?,
     flightAt: number,
@@ -299,6 +305,9 @@ local function makeBird(userId: string): Bird
         singArmed = false,
         singOwn = false,
         singAt = nil,
+        cawFrom = nil,
+        cawOnsets = nil,
+        cawSpeed = 1,
         flightFrom = nil,
         flightTo = nil,
         flightAt = 0,
@@ -335,6 +344,13 @@ local function sing(b: Bird, isOwn: boolean)
     s.RollOffMaxDistance = voice.rolloff[2]
     s.PlaybackSpeed = 0.97 + math.random() * 0.06 -- the dock scheduler's jitter, same reason
     s.Parent = b.part
+    -- ⚠ ARM THE BEAK HERE, not where the gape is drawn. Only this function knows WHICH clip was
+    -- chosen and at what pitch, and both change where the caws land: at PlaybackSpeed 1.03 a caw
+    -- recorded at 0.62s arrives at 0.602s. Nothing downstream can recover either fact.
+    local rec = BirdSpecies.clipById(SPECIES, clip)
+    b.cawFrom = os.clock()
+    b.cawOnsets = if rec then rec.caws else nil
+    b.cawSpeed = s.PlaybackSpeed
     s.Ended:Once(function()
         singing -= 1
         s:Destroy()
@@ -873,11 +889,22 @@ RunService.RenderStepped:Connect(function()
                 b.tail.Transform = CFrame.Angles(math.rad(idleTail), 0, 0)
             end
 
+            -- ⚠ THE BEAK FOLLOWS THE CAW, and nothing else opens it. This was
+            -- `sin(now * 9) ^ 2` gated on the WIN state -- a fixed chatter with no relationship to
+            -- the audio, so a bird that never sang still sat there mouthing (most do not sing:
+            -- `sing` is gated by MAX_CONCURRENT_SONGS and a chance roll), and one that did caw
+            -- opened on a rhythm unrelated to its own clip.
+            --
+            -- ⚠ CLIP TIME, NOT WALL TIME. `cawSpeed` is the per-bird pitch jitter, so a caw
+            -- recorded at 0.62s arrives early or late by up to 3%; multiplying elapsed by it puts
+            -- the bill back on the recording. ⚠ And NO SCALE PROFILE: a caw's timing belongs to the
+            -- recording, not to the bird, so unlike every other duration here it must not scale.
             if b.billLower then
                 local gape = 0
-                if b.state == "WIN" and not resting then
-                    local pulse = math.sin(now * 9 + b.seed)
-                    gape = math.rad(16) * math.max(0, pulse) ^ 2
+                if b.cawFrom and b.cawOnsets then
+                    local clipTime = (now - b.cawFrom) * b.cawSpeed
+                    gape = math.rad(16)
+                        * BirdFlight.gapeAt(clipTime, b.cawOnsets, BirdSpecies.CAW_GAPE_SECONDS)
                 end
                 b.billLower.Transform = CFrame.Angles(-gape, 0, 0)
             end

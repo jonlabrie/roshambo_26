@@ -2246,3 +2246,37 @@ constraint the importer would otherwise enforce silently.
 so its resolution is 1/255 ≈ 0.0039; a 0.0025 residue is below what the format can represent and
 cannot survive import as a difference. Chasing it would cost a rebuild to change nothing.
 See [[familiars]].
+
+## [2026-08-30] ship | The beak opens on the caw, not near it
+
+The gape shipped as `math.sin(now * 9 + b.seed) ^ 2` gated on the WIN state — a fixed chatter with
+no relationship to any sound. Two failures in one: a bird that never sang still sat there mouthing
+(and most do not sing — `sing` is gated by MAX_CONCURRENT_SONGS and a chance roll so a crowd is not
+a wall of noise), and a bird that DID caw opened on a rhythm unrelated to its own clip.
+
+⚠ **THE CLIPS ARE FIXED RECORDINGS, and that constraint decides the whole design.** karasu-1 is one
+caw, karasu-2 two, karasu-3 three, at 0.52 / 1.30 / 2.08 seconds. Their internal timing cannot be
+jittered — the mouth would drift off the sound. **Randomness belongs to which clip plays and when,
+never to the envelope.**
+
+`Clip` now carries `seconds` and `caws` (onset times); `BirdFlight.gapeAt` turns elapsed clip time
+into a 0-1 gape, peaking at 30% of the window so the bill snaps open and lingers rather than
+yawning. `BirdSpecies.clipById` reunites the id `pick` returns with the record the beak needs —
+additive, because widening `pick` would have changed every caller and its tests for one new need.
+
+⚠ **CLIP TIME, NOT WALL TIME.** Each bird plays at a PlaybackSpeed of 0.97–1.03 (the dock
+scheduler's jitter), so a caw recorded at 0.62s arrives up to 3% early or late. Elapsed is
+multiplied by that speed. ⚠ **And `gapeAt` takes no scale profile**, alone among durations in
+`BirdFlight`: a caw's timing belongs to the recording, not the bird, so a scaled bird must not caw
+more slowly.
+
+⚠ **THE ONSETS ARE MODELLED, NOT MEASURED** — derived from the recorded structure (karasu-2 opens
+with 0.08s of room tone, karasu-3 ends with 0.20s, gaps 0.48–0.60). They are the one number here
+nobody has checked by ear, and a beak a tenth of a second late is visible. Tune in one play session.
+
+⚠ **AMBIENT CALLING IS NOT THIS.** Owner: the karasu is to be the first ambient bird *with a model*
+(the falls-dock uguisu is the first, and is audible and invisible). Randomised call timing for an
+ambient bird is **server-owned** per [[ambient-birds]] — *"which bird, where, when it calls"* — and
+that system does not exist yet. The phrase composition it would use is designed and unwired:
+GROUP_GAP_SECONDS 0.48 is already measured for composing a 3+2 from the baked clips. Also still
+open on that page: an ambient karasu must not read as somebody's familiar.

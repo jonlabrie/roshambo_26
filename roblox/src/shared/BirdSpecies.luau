@@ -9,7 +9,19 @@
 -- This is also the table bird SELECTION will read from, so it is not throwaway.
 local BirdSpecies = {}
 
-export type Clip = { id: number, weight: number }
+-- ⚠ `caws` IS THE BEAK'S SCORE, and it exists because the clip is a fixed recording. karasu-1 is
+-- one caw, karasu-2 is two, karasu-3 is three, so the bill has to open once per onset or it drifts
+-- off its own voice. `seconds` is the clip's length, kept beside the onsets so a test can assert
+-- the last caw actually fits inside the recording.
+-- ⚠ THE ONSETS ARE MODELLED, NOT MEASURED, and that is the one number here nobody has checked by
+-- ear. They come from the recorded structure: karasu-2 opens with 0.08s of room tone, karasu-3 ends
+-- with 0.20s of it, and CAW_GAP_RANGE says 0.48-0.60 between caws inside a group. TUNE THESE IN ONE
+-- PLAY SESSION against the actual audio -- a beak a tenth of a second late is visible.
+-- ⚠ OPTIONAL, because not every voice is made of discrete calls. A karasu's song IS its caws --
+-- countable, separable, each one a beak movement. An uguisu's is a continuous warble with no
+-- onsets to hit, so it carries neither field and its bill simply does not open. A species with no
+-- onsets gets a shut beak, never an error.
+export type Clip = { id: number, weight: number, seconds: number?, caws: { number }? }
 export type Voice = { clips: { Clip }, volume: number, rolloff: { number } }
 -- ⚠ THERE IS NO EYE RECORD HERE, AND THAT IS THE ANSWER RATHER THAN AN OMISSION. A karasu's eye
 -- is TEXELS: the vendor's hand-painted art -- iris, pupil, catchlight, lid line -- graded to the
@@ -80,9 +92,12 @@ BirdSpecies.SPECIES = {
         bodyLength = 1.640,
         voice = {
             clips = {
-                { id = 136463941193848, weight = 45 }, -- karasu-1, one caw,    0.52s
-                { id = 120005368709153, weight = 35 }, -- karasu-2, two caws,   1.30s
-                { id = 125330698317872, weight = 20 }, -- karasu-3, three caws, 2.08s
+                -- karasu-1, ONE caw
+                { id = 136463941193848, weight = 45, seconds = 0.52, caws = { 0.00 } },
+                -- karasu-2, TWO caws -- opens with 0.08s of room tone, so the first onset is late
+                { id = 120005368709153, weight = 35, seconds = 1.30, caws = { 0.08, 0.62 } },
+                -- karasu-3, THREE caws -- ends with 0.20s of room tone, so the last onset is early
+                { id = 125330698317872, weight = 20, seconds = 2.08, caws = { 0.00, 0.54, 1.08 } },
             },
             -- ⚠ LOUDER THAN THE UGUISU FOR A MEASURED REASON, not because crows are loud. The
             -- karasu source clips peak at -7.4 to -9.9 dBFS against the uguisu's -5.4, so at
@@ -105,6 +120,12 @@ BirdSpecies.SPECIES = {
 -- of room tone at -56 dBFS. Not wired yet; recorded for when it is.
 BirdSpecies.GROUP_GAP_SECONDS = 0.48
 BirdSpecies.CAW_GAP_RANGE = { 0.48, 0.60 }
+
+-- How long the bill stays open for ONE caw. ⚠ It must be shorter than the smallest gap in
+-- CAW_GAP_RANGE or consecutive caws merge into one long croak instead of reading as separate
+-- calls -- 0.30 against 0.48 leaves real silence between them, which is what a two-caw clip
+-- sounds like. Tune by eye with the audio playing, not on paper.
+BirdSpecies.CAW_GAPE_SECONDS = 0.30
 
 -- The voice for `species`, or nil if it has none. See `pick` for why nil rather than a fallback.
 function BirdSpecies.voiceOf(species: string): Voice?
@@ -131,6 +152,22 @@ end
 -- ⚠ Returns nil for a species with no voice rather than borrowing another bird's. A fallback
 -- would make a new familiar sound like a warbler, and the bug would present as "the crane sounds
 -- wrong" instead of "the crane has no voice yet".
+-- The clip record behind an id. ⚠ `pick` returns an ID because that is what a Sound needs, but the
+-- BEAK needs the record's `caws`, so the two have to be reunited somewhere. Widening `pick` would
+-- have changed every caller and its tests for one new need; this is additive and does not.
+function BirdSpecies.clipById(species: string, id: number): Clip?
+    local voice = BirdSpecies.voiceOf(species)
+    if not voice then
+        return nil
+    end
+    for _, c in voice.clips do
+        if c.id == id then
+            return c
+        end
+    end
+    return nil
+end
+
 function BirdSpecies.pick(species: string, rand: () -> number): number?
     local voice = BirdSpecies.voiceOf(species)
     if not voice then
