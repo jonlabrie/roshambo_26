@@ -13,7 +13,9 @@
                 "UguisuBody": { "$path": "assets/meshes/UguisuBody.rbxm" },
                 "UguisuWings": { "$path": "assets/meshes/UguisuWings.rbxm" },
                 "KarasuBody": { "$path": "assets/meshes/KarasuBody.rbxm" },
-                "KarasuWings": { "$path": "assets/meshes/KarasuWings.rbxm" }
+                "KarasuWings": { "$path": "assets/meshes/KarasuWings.rbxm" },
+                "MejiroBody": { "$path": "assets/meshes/MejiroBody.rbxm" },
+                "MejiroWings": { "$path": "assets/meshes/MejiroWings.rbxm" }
             },
             "RoshamboRemotes": {
                 "$className": "Folder",
