@@ -2292,7 +2292,31 @@ def landmarks_final(spec=KARASU):
             "scale": round(S, 6), "translate": [round(v, 5) for v in T]}
 
 
-def export(part, filepath):
+def rig_of(part):
+    """The armature that actually deforms `part`, read off its modifier rather than typed.
+
+    ⚠ THIS EXISTS BECAUSE THE PIPELINE HARDCODED `Karasu_Rig` IN NINE PLACES, and the uguisu --
+    whose retarget was never a script (practice/blender-pipeline.md) -- could not use any of it.
+    With more birds coming, a rig NAME is the wrong thing to pass around: the object already
+    knows which armature deforms it, and reading it back cannot be typed wrong.
+
+    ⚠ FIRST USE ON A SECOND BIRD FOUND A DEFECT NO NAMED RIG WOULD HAVE. `UguisuWings` carried
+    every weight TWICE -- once at its own group indices 0-3 and once at 17-20, where those bones
+    sit in `Uguisu_R`, the object it was separated from. 832 stale entries across all 416
+    vertices, summing every vertex to 2.0. `normalise_weights` reported it clean because it
+    filters to groups NAMED after deform bones, and the stale entries name nothing. Cleaned by
+    rebuilding the deform layer against the declared groups.
+    """
+    obj = bpy.data.objects[part] if isinstance(part, str) else part
+    for m in obj.modifiers:
+        if m.type == 'ARMATURE' and m.object:
+            return m.object
+    raise RuntimeError(
+        f"{obj.name} has no armature modifier, so nothing can say which rig deforms it. "
+        f"An unrigged mesh exports as a static one and the import SUCCEEDS with no bones.")
+
+
+def export(part, filepath, arm=None):
     """One FBX per MeshPart, BOTH around the same origin and carrying the SAME rig.
 
     ⚠ Export both halves seated on the SAME origin or they mate with an offset that looks like a
@@ -2301,7 +2325,9 @@ def export(part, filepath):
     reimport with an identical 22-bone armature at identical loc/rot/scale).
     """
     assert_writable(filepath)
-    arm = bpy.data.objects["Karasu_Rig"]
+    # ⚠ DERIVED, NOT NAMED. Passing `arm` is for the rare case of exporting a mesh whose modifier
+    # points somewhere you do not want; every ordinary call should let it be read off the mesh.
+    arm = arm or rig_of(part)
     scene = bpy.context.scene
     others = [o for o in bpy.data.objects
               if o.type == 'MESH' and o.name != part and o.name in scene.collection.all_objects]

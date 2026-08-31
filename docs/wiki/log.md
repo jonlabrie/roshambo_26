@@ -2868,3 +2868,26 @@ Luau contract and `measure_envelope.py --check`, which report the same defect fr
 ⚠ **STILL PLACE-ONLY:** `MejiroBody`/`MejiroWings` exist in the place with their SurfaceAppearances
 but are not saved to `assets/meshes/` and not declared in `default.project.json`. `SPECIES =
 "Mejiro"` therefore works in the owner's session and nowhere else until they are.
+
+### The export stops naming its rig, and finds a second bird's defect on first use
+
+`export()` hardcoded `Karasu_Rig`, one of nine places in the pipeline that did, which is why the
+uguisu — whose retarget was never a script — could use none of it. It now derives the armature
+from the mesh's own modifier (`rig_of`). ⚠ **A RIG NAME IS THE WRONG THING TO PASS:** the object
+already knows what deforms it, and a derived value cannot be typed wrong. An unrigged mesh now
+raises instead of exporting a static one, which imports successfully with no bones.
+
+⚠ **AND THE FIRST USE ON A SECOND BIRD FOUND A DEFECT.** `UguisuWings` carried every weight
+**twice** — once at its own group indices 0–3 and once at 17–20, which is where those four bones
+sit in `Uguisu_R`, the object it was separated from. **832 stale entries across all 416 vertices**,
+summing every vertex to 2.0. `normalise_weights` had reported it clean, correctly: it filters to
+groups NAMED after deform bones, and a stale index names nothing. Only summing the raw entries
+showed it. Cleaned by rebuilding the deform layer against the declared groups.
+
+⚠ **THE LESSON IS ABOUT THE CHECK, NOT THE BUG.** Three separate measures disagreed about the same
+mesh — `normalise_weights` said 1.0, a naive sum said 2.0, and the truth was that both were right
+about different sets. When two measurements of one thing disagree, the definitions are the
+difference; that is the second time this session that has been the answer.
+
+Both uguisu FBXs re-exported with the rigid bill, normalised weights, no `bill_lower`, and no
+stale entries.
