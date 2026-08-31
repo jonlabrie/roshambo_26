@@ -45,8 +45,21 @@ describe("BirdFlight.gapeAt", function()
         -- `if b.billLower then`, which was harmless while every bird had that bone -- but the
         -- uguisu and mejiro share a bill that cannot open and no longer carry it, so nested
         -- that way they would compute no gape and get no lift: silent AND still, while singing.
-        for _, needed in { "bill_lower", "billLower", "TimePosition", "SING_LIFT_DEG" } do
+        for _, needed in { "bill_lower", "billLower", "TimePosition", "gapeForClip", "singLift" } do
             expect(string.find(src, needed, 1, true) ~= nil).toBe(true)
+        end
+    end)
+
+    test("the diagnostic tool drives the song the same way the controller does", function()
+        -- ⚠ THE TOOL REIMPLEMENTS THE WIRING, WHICH IS THE ONE THING IT CANNOT PROVE ABOUT
+        -- ITSELF. PERCH mode had its own copy of the gape decision and implemented only the
+        -- `caws` branch, so a mejiro sang in it with nothing moving -- indistinguishable, to
+        -- someone watching, from the feature being broken. Both now call the same two functions,
+        -- and this fails if either drifts back to a private copy.
+        local fs = require("@lune/fs")
+        local tool = harness.stripComments(fs.readFile("tools/studio/watchWingbeat.luau"))
+        for _, needed in { "gapeForClip", "singLift" } do
+            expect(string.find(tool, needed, 1, true) ~= nil).toBe(true)
         end
     end)
 
@@ -81,6 +94,36 @@ describe("BirdFlight.gapeAt", function()
             return BirdFlight.gapeFromEnvelope(0.1, { 0.5 }, 0)
         end)
         expect(ok).toBe(false)
+    end)
+
+    test("one function decides the gape, whichever the clip carries", function()
+        -- ⚠ THIS EXISTS BECAUSE THE CHOICE WAS DUPLICATED AND THE COPIES DIVERGED. Both
+        -- `BirdController` and `watchWingbeat`'s PERCH mode have to turn a clip plus a playhead
+        -- into a gape; PERCH implemented only the `caws` branch, so the mejiro -- an envelope
+        -- bird -- sang in PERCH with nothing moving at all, and the owner reasonably read that
+        -- as the feature being broken rather than the tool being incomplete.
+        local caws = { 0.10 }
+        local env = { 0.0, 1.0 }
+        expect(BirdFlight.gapeForClip(0.10 + OPEN * 0.3, caws, nil, OPEN, 4)).toBe(1)
+        expect(BirdFlight.gapeForClip(0.25, nil, env, OPEN, 4)).toBe(1)
+        -- onsets win when a clip somehow carries both; the contract forbids it, this is the
+        -- behaviour if it ever slips through
+        expect(BirdFlight.gapeForClip(0.0, caws, env, OPEN, 4)).toBe(0)
+        -- and a clip with neither is simply still: correct for a dove, not a gap in the data
+        expect(BirdFlight.gapeForClip(0.5, nil, nil, OPEN, 4)).toBe(0)
+    end)
+
+    test("the sing lift splits between neck and head and never exceeds its budget", function()
+        local DEG, FRAC = BirdSpecies.SING_LIFT_DEG, BirdSpecies.SING_NECK_FRAC
+        local neck, head = BirdFlight.singLift(1.0, DEG, FRAC)
+        expect(neck + head).toBe(BirdSpecies.SING_LIFT_DEG)
+        expect(neck > head).toBe(true) -- the neck leads, as it does in the idle pose
+        local n0, h0 = BirdFlight.singLift(0.0, DEG, FRAC)
+        expect(n0).toBe(0)
+        expect(h0).toBe(0)
+        local nh, hh = BirdFlight.singLift(0.5, DEG, FRAC)
+        expect(nh * 2).toBe(neck)
+        expect(hh * 2).toBe(head)
     end)
 
     test("the gape angle is a real angle, and shared rather than per-species", function()

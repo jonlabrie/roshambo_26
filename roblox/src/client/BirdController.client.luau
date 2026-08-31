@@ -904,11 +904,13 @@ RunService.RenderStepped:Connect(function()
                 -- Onsets for a punctuated caller, an envelope for a warbler; a clip with neither
                 -- leaves the bird still, which is correct for a dove rather than missing data.
                 if song and song.IsPlaying then
-                    if caws then
-                        gape = BirdFlight.gapeAt(song.TimePosition, caws, BirdSpecies.CAW_GAPE_SECONDS)
-                    elseif env then
-                        gape = BirdFlight.gapeFromEnvelope(song.TimePosition, env, BirdSpecies.ENV_HZ)
-                    end
+                    gape = BirdFlight.gapeForClip(
+                        song.TimePosition,
+                        caws,
+                        env,
+                        BirdSpecies.CAW_GAPE_SECONDS,
+                        BirdSpecies.ENV_HZ
+                    )
                 end
                 -- The jaw, on the birds that have one. ⚠ LOCAL +X, POSITIVE, AND THE SIGN IS
                 -- OPPOSITE TO BLENDER'S -- measured in Studio on the shipped asset: a probe one
@@ -924,7 +926,8 @@ RunService.RenderStepped:Connect(function()
             -- gape is 6.8 pixels on a karasu at ordinary third-person distance and 2.6 on a
             -- mejiro; the POSTURE is what carries at that size, and a small bird throws its head
             -- back to sing. Split across neck and head so the bird arches rather than hinging.
-            local lift = gape * BirdSpecies.SING_LIFT_DEG
+            local liftNeck, liftHead =
+                BirdFlight.singLift(gape, BirdSpecies.SING_LIFT_DEG, BirdSpecies.SING_NECK_FRAC)
 
             -- ===== IDLE =====
             -- ⚠ ONLY WHILE PERCHED. A bird in the air is not looking around; it is going
@@ -934,18 +937,12 @@ RunService.RenderStepped:Connect(function()
                 idleYaw, idlePitch, idleTail = BirdFlight.idlePose(now, b.seed, PROFILE)
             end
             if b.neck then
-                b.neck.Transform = CFrame.Angles(
-                    math.rad(idlePitch * 0.35 - lift * BirdSpecies.SING_NECK_FRAC),
-                    math.rad(idleYaw * 0.4),
-                    0
-                )
+                b.neck.Transform =
+                    CFrame.Angles(math.rad(idlePitch * 0.35 - liftNeck), math.rad(idleYaw * 0.4), 0)
             end
             if b.head then
-                b.head.Transform = CFrame.Angles(
-                    math.rad(idlePitch * 0.65 - lift * (1 - BirdSpecies.SING_NECK_FRAC)),
-                    math.rad(idleYaw * 0.6),
-                    0
-                )
+                b.head.Transform =
+                    CFrame.Angles(math.rad(idlePitch * 0.65 - liftHead), math.rad(idleYaw * 0.6), 0)
             end
             if b.tail then
                 b.tail.Transform = CFrame.Angles(math.rad(idleTail), 0, 0)

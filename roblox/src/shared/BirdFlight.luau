@@ -272,6 +272,47 @@ function BirdFlight.gapeFromEnvelope(elapsed: number, env: { number }, hz: numbe
     return a + (b - a) * (x - i)
 end
 
+-- ⚠ ONE PLACE DECIDES WHICH DESCRIPTION A CLIP CARRIES. Two callers have to turn a clip plus a
+-- playhead into a gape -- `BirdController` and `watchWingbeat`'s PERCH mode -- and when they each
+-- did it themselves they diverged: PERCH implemented only the `caws` branch, so the mejiro sang
+-- in the diagnostic tool with nothing moving, which reads as a broken feature rather than an
+-- incomplete tool. A shared function is the whole fix.
+--
+-- ⚠ ONSETS WIN IF A CLIP SOMEHOW CARRIES BOTH. The contract test forbids it; this is what
+-- happens anyway rather than an error, because a bird that sings wrongly beats a bird that
+-- throws mid-song.
+function BirdFlight.gapeForClip(
+    elapsed: number,
+    caws: { number }?,
+    env: { number }?,
+    open: number,
+    hz: number
+): number
+    if caws then
+        return BirdFlight.gapeAt(elapsed, caws, open)
+    elseif env then
+        return BirdFlight.gapeFromEnvelope(elapsed, env, hz)
+    end
+    return 0
+end
+
+-- ⚠ WHAT SINGING LOOKS LIKE ON A BIRD TOO SMALL FOR A GAPE TO READ, in degrees for the neck and
+-- the head. A 20 degree jaw is 6.8 pixels on a karasu at ordinary third-person distance and 2.6
+-- on a mejiro, so the POSTURE carries it: a small bird throws its head back to sing.
+--
+-- ⚠ THE NECK LEADS, as it does in the idle pose -- splitting the lift across two joints is what
+-- makes the bird arch rather than hinge at one point. Returns both so no caller has to know the
+-- split, which is the mistake this pair of functions exists to prevent.
+--
+-- ⚠ TAKES ITS NUMBERS RATHER THAN READING `BirdSpecies`, like `gapeAt` takes `open`. This module
+-- is motion and that one is data; a require from here to there would invert that and would put a
+-- Roblox-free module behind a table of asset ids for no gain.
+function BirdFlight.singLift(gape: number, deg: number, neckFrac: number): (number, number)
+    local total = deg * gape
+    local neck = total * neckFrac
+    return neck, total - neck
+end
+
 function BirdFlight.profile(scale: number): Profile
     -- ⚠ REFUSED, not clamped. A zero or negative scale makes every duration zero and every
     -- clock a division by zero, and NaN positions surface frames later as "the bird vanished" --
