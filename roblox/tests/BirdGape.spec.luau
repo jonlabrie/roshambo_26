@@ -46,6 +46,39 @@ describe("BirdFlight.gapeAt", function()
         end
     end)
 
+    test("an envelope drives the gape for a bird that warbles", function()
+        -- ⚠ ONSETS ARE THE WRONG MODEL FOR A CONTINUOUS SINGER. A karasu's clip is two or three
+        -- discrete caws separated by 0.775s of silence; a mejiro's 5.3s clip is voiced 46% of its
+        -- own length in an unbroken stream. Asked for onsets you would be picking arbitrary
+        -- points in a run of sound, so the envelope IS the description.
+        local env = { 0.0, 0.5, 1.0, 0.25 }
+        local hz = 4 -- samples at t = 0, 0.25, 0.5, 0.75
+        expect(BirdFlight.gapeFromEnvelope(0.0, env, hz)).toBe(0)
+        expect(BirdFlight.gapeFromEnvelope(0.25, env, hz)).toBe(0.5)
+        expect(BirdFlight.gapeFromEnvelope(0.5, env, hz)).toBe(1)
+        -- between samples it interpolates rather than stepping, or a 12Hz table would make the
+        -- jaw tick twelve times a second
+        expect(BirdFlight.gapeFromEnvelope(0.125, env, hz)).toBe(0.25)
+        expect(BirdFlight.gapeFromEnvelope(0.375, env, hz)).toBe(0.75)
+    end)
+
+    test("the envelope gape is shut outside the clip", function()
+        -- A clip that has ended must not leave the beak parked open: `sing` clears the song on
+        -- Ended, but a frame can land after the audio finishes and before that fires.
+        local env = { 0.8, 0.9 }
+        expect(BirdFlight.gapeFromEnvelope(-0.1, env, 4)).toBe(0)
+        expect(BirdFlight.gapeFromEnvelope(99, env, 4)).toBe(0)
+    end)
+
+    test("gapeFromEnvelope refuses a bad rate rather than clamping it", function()
+        -- Same contract as `profile` and `gapeAt`: a zero rate is a division, and NaN surfaces
+        -- frames later as a jaw that has vanished.
+        local ok = pcall(function()
+            return BirdFlight.gapeFromEnvelope(0.1, { 0.5 }, 0)
+        end)
+        expect(ok).toBe(false)
+    end)
+
     test("the gape angle is a real angle, and shared rather than per-species", function()
         -- ⚠ SCALE-FREE, for the same reason `CAW_GAPE_SECONDS` is: a bigger crow does not open
         -- wider, it opens the same. Every other bird constant scales by sqrt(length); an angle

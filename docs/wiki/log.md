@@ -2799,3 +2799,43 @@ vanished". 1562 tests -> 1568.
 
 ⚠ **A GUARD THAT HAS NEVER FIRED IS NOT KNOWN TO WORK.** Every check added here was made to fail
 once, deliberately, before being trusted. That is cheaper than the check itself and worth more.
+
+### The beak learns to warble — an envelope alongside the onsets
+
+⚠ **ONSETS ARE THE WRONG MODEL FOR A CONTINUOUS SINGER, AND THE MEJIRO PROVED IT.** `gapeAt` takes
+a list of onsets and opens the beak for a fixed window at each, which describes a karasu exactly:
+two or three caws of 0.18–0.24s separated by 0.775s of silence. A mejiro's 5.3s clip is **voiced
+46% of its own length** in an unbroken warble — asked for onsets you would be picking arbitrary
+points in a run of sound. So a clip now carries **either** `caws` **or** `env`, and the choice
+belongs to the bird rather than to us. Neither leaves the beak shut, which is correct for a dove.
+
+⚠ **NORMALISE THE ENVELOPE BY A HIGH PERCENTILE, NOT THE PEAK.** The peak of a warble is one
+transient; dividing by it left the mejiro's mean gape at **0.25 with 12% of frames above half** —
+a bird mumbling through its own song. At p85 it is **0.53 with 52% above half and 10% shut**: a
+beak that sits open, modulates, and closes in the breaths. Same class of error as peak-normalising
+a colour palette.
+
+⚠ **SMOOTH BEFORE SAMPLING, AND STORE SLOWER THAN YOU MEASURE.** A jaw has mass and cannot track
+syllables; 150 ms smoothing at a 12 Hz storage rate costs **106 numbers for all four mejiro
+clips**, and `gapeFromEnvelope` interpolates so the jaw does not tick at the storage rate.
+
+**Clip selection, measured not guessed.** Whole-file SNR picked mejiro_3 at 56 dB — and that was
+the WRONG STATISTIC: the file is clean because most of it is quiet, containing a *second, distant
+bird*. Only 2 of its 8 phrases are usable; the rest run 21–36 dB down. Per-phrase SNR is the right
+measure, and by it mejiro_3's two loud phrases (59–62 dB) still beat everything in the other files
+(36–45 dB) by 15 dB. The short "remark" came from inside the 1.64s song, which turned out to be
+three motifs separated by >60 ms of near-silence. ⚠ The long clip is capped at 5.3s by the **8s
+leak guard in `sing()`** — the two best long passages are 7.75s and 8.40s and would be truncated
+mid-song by a safety net meant for failed loads.
+
+`tools/audio/measure_envelope.py` is the sibling of `measure_caws.py` and shares its WAV reader.
+Its `--check` mode and a new contract test both catch the same defect: **an edited `seconds` with
+a stale `env`**, which slides the beak out of sync with its own audio, silently and worse the
+further into the clip you get.
+
+Mutation-proven: a clip carrying both onsets and an envelope, an envelope too short for its
+duration, and a value outside 0–1 all fail. 1571 → 1573 tests.
+
+⚠ **NOT YET SHIPPED:** no species carries an `env`, because the mejiro has no uploaded clip ids.
+The two new contracts are therefore vacuous until it does — which is why they were mutation-tested
+against a temporarily-envelope'd karasu rather than trusted.

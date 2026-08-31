@@ -104,7 +104,43 @@ describe("BirdSpecies contract", function()
         end
     end)
 
+    test("a clip carries onsets or an envelope, never both", function()
+        -- Both would be a bird described two ways, and nothing says which the controller should
+        -- believe -- it checks `caws` first, so an envelope would silently never play.
+        for name, _ in SPECIES do
+            local voice = BirdSpecies.voiceOf(name)
+            if voice then
+                for _, c in voice.clips do
+                    expect(c.caws ~= nil and c.env ~= nil).toBe(false)
+                end
+            end
+        end
+    end)
+
+    test("an envelope has one sample per ENV_HZ of its own duration", function()
+        -- ⚠ THE DEFECT THIS CATCHES IS AN EDITED `seconds`. The envelope is indexed by TIME, so a
+        -- clip whose duration is changed without re-extracting slides the beak out of sync with
+        -- its own audio -- silently, and worse the further into the clip you get.
+        -- `tools/audio/measure_envelope.py --check` is the same check against the source WAVs.
+        for name, _ in SPECIES do
+            local voice = BirdSpecies.voiceOf(name)
+            if voice then
+                for _, c in voice.clips do
+                    if c.env then
+                        expect(type(c.seconds) == "number").toBe(true)
+                        local want = (c.seconds :: number) * BirdSpecies.ENV_HZ
+                        expect(math.abs(#(c.env :: { number }) - want) <= 1.5).toBe(true)
+                        for _, v in c.env :: { number } do
+                            expect(v >= 0 and v <= 1).toBe(true)
+                        end
+                    end
+                end
+            end
+        end
+    end)
+
     test("the gape constants are scale-free and sane", function()
+        expect(BirdSpecies.ENV_HZ > 0).toBe(true)
         expect(BirdSpecies.CAW_GAPE_SECONDS > 0).toBe(true)
         expect(BirdSpecies.CAW_GAPE_DEGREES > 0).toBe(true)
         expect(BirdSpecies.CAW_GAPE_DEGREES < 90).toBe(true)

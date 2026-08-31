@@ -235,6 +235,43 @@ function BirdFlight.gapeAt(elapsed: number, caws: { number }, open: number): num
     return best
 end
 
+-- ⚠ THE OTHER HALF OF THE GAPE, FOR BIRDS THAT DO NOT PUNCTUATE. `gapeAt` above takes a list of
+-- ONSETS and opens the beak for a fixed window at each, which describes a karasu exactly: two or
+-- three caws of 0.18-0.24s separated by 0.775s of silence. It describes a mejiro not at all --
+-- its 5.3s clip is voiced 46% of its own length in a continuous warble, and there is no honest
+-- place to put an onset in a run of sound.
+--
+-- ⚠ SO THE ENVELOPE IS THE DESCRIPTION, AND IT IS MEASURED. `tools/audio/measure_envelope.py`
+-- reads the loudness off the source WAV at `BirdSpecies.ENV_HZ`, smoothed to something a jaw can
+-- actually follow and normalised by a high percentile rather than the peak -- peak-normalising
+-- left the mejiro's mean gape at 0.25 and the bird mumbled through its own song.
+--
+-- ⚠ IT INTERPOLATES RATHER THAN STEPPING. Reading the nearest sample would tick the jaw at the
+-- storage rate, which is a buzz at 12 Hz, not a mouth.
+--
+-- ⚠ AND IT IS SHUT OUTSIDE THE CLIP. `sing` clears the song on `Ended`, but a frame can land
+-- between the audio finishing and that firing, and a beak parked open is worse than a late one.
+function BirdFlight.gapeFromEnvelope(elapsed: number, env: { number }, hz: number): number
+    -- Refused, not clamped -- the same contract as `profile` and `gapeAt`. A zero rate is a
+    -- division, and NaN surfaces frames later as a jaw that has vanished.
+    if not (hz > 0) or hz ~= hz or hz == math.huge then
+        error(`BirdFlight.gapeFromEnvelope: hz must be a positive finite number, got {hz}`, 2)
+    end
+    local n = #env
+    if n == 0 or elapsed < 0 then
+        return 0
+    end
+    local x = elapsed * hz -- position in samples, measured from the clip's start
+    local last = n - 1
+    if x > last then
+        return 0
+    end
+    local i = math.floor(x)
+    local a = env[i + 1]
+    local b = env[math.min(i + 2, n)]
+    return a + (b - a) * (x - i)
+end
+
 function BirdFlight.profile(scale: number): Profile
     -- ⚠ REFUSED, not clamped. A zero or negative scale makes every duration zero and every
     -- clock a division by zero, and NaN positions surface frames later as "the bird vanished" --

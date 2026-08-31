@@ -21,7 +21,19 @@ local BirdSpecies = {}
 -- countable, separable, each one a beak movement. An uguisu's is a continuous warble with no
 -- onsets to hit, so it carries neither field and its bill simply does not open. A species with no
 -- onsets gets a shut beak, never an error.
-export type Clip = { id: number, weight: number, seconds: number?, caws: { number }? }
+-- ⚠ A CLIP CARRIES ONSETS OR AN ENVELOPE, NOT BOTH, AND THE CHOICE IS THE BIRD'S NOT OURS. A
+-- punctuated caller (karasu: two or three caws separated by 0.775s of silence) is described
+-- exactly by `caws`. A warbler (mejiro: 5.3s voiced 46% of its own length, unbroken) has no
+-- honest onset to name, and is described by `env` -- its measured loudness at `ENV_HZ`.
+-- A clip with neither leaves the beak SHUT, which is correct for a dove: they coo with the bill
+-- closed, so silence there is authentic rather than missing data.
+export type Clip = {
+    id: number,
+    weight: number,
+    seconds: number?,
+    caws: { number }?,
+    env: { number }?,
+}
 export type Voice = { clips: { Clip }, volume: number, rolloff: { number } }
 -- ⚠ THERE IS NO EYE RECORD HERE, AND THAT IS THE ANSWER RATHER THAN AN OMISSION. A karasu's eye
 -- is TEXELS: the vendor's hand-painted art -- iris, pupil, catchlight, lid line -- graded to the
@@ -154,6 +166,14 @@ BirdSpecies.CAW_GAPE_SECONDS = 0.23
 --
 -- 20 degrees is the owner's starting value, to be judged in Play and adjusted by eye.
 BirdSpecies.CAW_GAPE_DEGREES = 20
+
+-- ⚠ THE STORAGE RATE FOR `Clip.env`, AND IT IS A STORAGE RATE, NOT A PLAYBACK ONE.
+-- `BirdFlight.gapeFromEnvelope` interpolates between samples, so this only has to be above the
+-- rate a jaw can move -- not above the rate a bird can sing. 12 Hz costs 106 numbers for the
+-- mejiro's four clips together; doubling it would double that for a jaw that cannot use it.
+-- ⚠ CHANGING THIS INVALIDATES EVERY SHIPPED `env`. Re-run `tools/audio/measure_envelope.py`
+-- over the source WAVs; `--check` fails on drift rather than letting the beak slide.
+BirdSpecies.ENV_HZ = 12
 
 -- The voice for `species`, or nil if it has none. See `pick` for why nil rather than a fallback.
 function BirdSpecies.voiceOf(species: string): Voice?

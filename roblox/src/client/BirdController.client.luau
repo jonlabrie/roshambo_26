@@ -152,6 +152,7 @@ type Bird = {
     -- ⚠ THE SOUND ITSELF, not a timestamp. The gape reads `TimePosition` off it -- see `sing()`.
     song: Sound?,
     songCaws: { number }?,
+    songEnv: { number }?,
     seed: number,
     flyingSince: number?,
     -- A perched flutter is EVENT-TRIGGERED (landing, winning) with a slow idle rate underneath
@@ -291,6 +292,7 @@ local function makeBird(userId: string): Bird
         billLower = bone("bill_lower"),
         song = nil,
         songCaws = nil,
+        songEnv = nil,
         seed = seedFor(userId),
         flyingSince = nil,
         flutterSince = nil,
@@ -348,9 +350,11 @@ local function sing(b: Bird, isOwn: boolean)
     local record = BirdSpecies.clipById(SPECIES, clip)
     b.song = s
     b.songCaws = record and record.caws or nil
+    b.songEnv = record and record.env or nil
     local function release()
         b.song = nil
         b.songCaws = nil
+        b.songEnv = nil
         if b.billLower then
             b.billLower.Transform = CFrame.identity
         end
@@ -914,9 +918,16 @@ RunService.RenderStepped:Connect(function()
             -- on the WIN state: birds that never sang still sat there mouthing.
             if b.billLower then
                 local gape = 0
-                local song, caws = b.song, b.songCaws
-                if song and caws and song.IsPlaying then
-                    gape = BirdFlight.gapeAt(song.TimePosition, caws, BirdSpecies.CAW_GAPE_SECONDS)
+                local song, caws, env = b.song, b.songCaws, b.songEnv
+                -- ⚠ WHICHEVER THE CLIP CARRIES. Onsets for a punctuated caller, an envelope
+                -- for a warbler; a clip with neither leaves the beak shut, which is correct for
+                -- a dove rather than a gap in the data. Both read the SAME playhead.
+                if song and song.IsPlaying then
+                    if caws then
+                        gape = BirdFlight.gapeAt(song.TimePosition, caws, BirdSpecies.CAW_GAPE_SECONDS)
+                    elseif env then
+                        gape = BirdFlight.gapeFromEnvelope(song.TimePosition, env, BirdSpecies.ENV_HZ)
+                    end
                 end
                 b.billLower.Transform = if gape > 0
                     then CFrame.Angles(math.rad(BirdSpecies.CAW_GAPE_DEGREES * gape), 0, 0)
