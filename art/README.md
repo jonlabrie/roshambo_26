@@ -39,7 +39,21 @@ working tree, that is the evidence, and LFS is the answer.
 art/birds/karasu/
   karasu_authored.blend            the rigged bird; the bill is hand-finished
   karasu_colormap_graded_2.png     hand-graded in Photoshop over a bake
+art/birds/uguisu/
+  uguisu_authored.blend            the retarget itself — see below
 ```
+
+⚠ **The uguisu's blend is here because the RETARGET is the irreproducible thing.** There is no
+`uguisu_retarget.py`; the whole recipe existed only as a .blend on one machine, which is why the
+karasu's had to be written as a script (`practice/blender-pipeline.md`). This file is also the
+proof that the uguisu is the vendor sparrow: it still carries `Sparrow_orig` (1338 verts) beside
+`UguisuBody` (1350), twelve apart. Every small bird planned is built on that base, so losing it
+would cost four birds, not one.
+
+⚠ **Its ColorMap is PACKED, not stored beside it, and that is deliberate.** `uguisu_colormap.png`
+is DERIVED — `bake_bird_texture.py` generates it from a palette — so it must not be committed as a
+file here. But an authored blend has to open standalone, so the texture is packed inside it. The
+rule is about what is stored as a FILE, not about what a blend may carry.
 
 One directory per subject. Keep the filenames the pipeline already knows — `OWNER_AUTHORED`
 matches on basename, so a rename here silently unguards the file.
