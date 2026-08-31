@@ -2608,3 +2608,30 @@ When two measurements of the same mesh disagree, the definition is usually the d
 removed; body 16 → 15 groups, all bones.
 
 State after: body and wings both at 0 over-influence, 0 un-normalised, 0 zero-area UV faces.
+
+### Correction: the guard was protecting the wrong thing
+
+`karasu_body.fbx` was briefly added to `OWNER_AUTHORED`, and that single wrong entry generated
+every tangle that followed — a self-contradictory CI check (it demanded the FBX be stored under
+`art/` while another rule rejected `.fbx` there), an `ART_SOURCES`/`OWNER_AUTHORED` split invented
+to paper over the contradiction, and finally a guard that refused the very export the authored
+blend exists to produce. Removed, and the split and the second CI check collapsed with it.
+
+⚠ **PROTECT THE SOURCE, AND ONLY THE SOURCE.** A derivative can always be re-exported, so guarding
+one buys nothing and costs the legitimate path. The correct model is **one source of truth per
+asset, changing hands exactly once**: `run()` owns a bird until a human makes an edit the script
+cannot reproduce, and from that moment the `.blend` owns it and `run()` has no jurisdiction. The
+one-way door is `assert_authored_bill_absent()`; nothing else needs guarding.
+
+⚠ **WHEN A GUARD BLOCKS A LEGITIMATE ACTION, THE GUARD IS MODELLING THE WRONG THING.** That is the
+signal to delete, not to add an exemption. Three mechanisms were added here before that was seen.
+
+**The door has a cost worth planning around:** after it closes, upstream fixes can never reach that
+bird. Do the procedural work first, hand-finish last, hand-finish once — and codify every edit you
+can, because the door closes on the first one you cannot. On the karasu the loft, the mouth lining
+and the tip merge are all reproducible; only the owner's vertex nudges at the tip closed it.
+
+Both FBXs exported from the authored blend at rest pose. Each `.fbm` carries the complete PBR set
+(ColorMap/Normal/Roughness/Metalness — partial is worse than none), and the exported ColorMap is
+byte-identical to `art/`. ⚠ `eye_L`/`eye_R` carry no weights and Roblox will strip them on import;
+that is expected since modelled eyes were abandoned.

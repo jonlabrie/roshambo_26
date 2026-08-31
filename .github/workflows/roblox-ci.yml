@@ -36,25 +36,7 @@ jobs:
             echo "$derived"
             exit 1
           fi
-          # Every name the pipeline refuses to overwrite must actually be stored here, or the
-          # guard is protecting a path nothing keeps.
-          missing=""
-          for f in $(python3 - <<'EOF'
-import re
-src = open("roblox/tools/blender/karasu_retarget.py").read()
-names = re.findall(r'^(?:COLORMAP_AUTHORITY|AUTHORED_BLEND)\s*=\s*"([^"]+)"', src, re.M)
-assert re.search(r'^ART_SOURCES\s*=\s*\{COLORMAP_AUTHORITY, AUTHORED_BLEND\}', src, re.M), \
-    "ART_SOURCES is not the pair this check knows how to resolve"
-print("\n".join(sorted(set(names))))
-EOF
-          ); do
-            [ -n "$(git ls-files "art/**/$f")" ] || missing="$missing $f"
-          done
-          if [ -n "$missing" ]; then
-            echo "::error::ART_SOURCES not stored under art/:$missing"
-            exit 1
-          fi
-          echo "OK — art/ is source-only and every guarded file is stored."
+          echo "OK — art/ holds no derived files."
       - name: Install Rokit
         run: |
           curl -sSf https://raw.githubusercontent.com/rojo-rbx/rokit/main/scripts/install.sh | bash

@@ -2206,14 +2206,13 @@ COLORMAP_AUTHORITY = "karasu_colormap_graded_2.png"
 # not write the blend, and must not write the body FBX exported from it either.
 AUTHORED_BLEND = "karasu_authored.blend"
 
-# The two categories are NOT the same and CI has to tell them apart. ART_SOURCES were made by
-# hand and are stored in ART_DIR -- losing one loses the work. `karasu_body.fbx` is DERIVED from
-# them, so it is not stored in art/ (CI rejects derived files there), but it is still guarded,
-# because it is what Studio imports and a from-vendor rebuild would quietly replace the shipping
-# bird with one that has none of the authored bill in it.
-ART_SOURCES = {COLORMAP_AUTHORITY, AUTHORED_BLEND}
-
-OWNER_AUTHORED = ART_SOURCES | {"karasu_body.fbx"}
+# ⚠ PROTECT THE SOURCE, AND ONLY THE SOURCE. Everything here was authored by hand and nothing in
+# this pipeline can reproduce it. Derived files -- FBX exports, baked atlases, .rbxm meshes -- are
+# deliberately NOT here, however important they look: you can always re-export a derivative, and
+# guarding one buys nothing while blocking the legitimate export it was supposed to protect.
+# `karasu_body.fbx` was briefly in this set (2026-08-30) and that single wrong entry is what made
+# the guard refuse the very export the authored blend exists to produce.
+OWNER_AUTHORED = {COLORMAP_AUTHORITY, AUTHORED_BLEND}
 
 
 def assert_authored_bill_absent():
