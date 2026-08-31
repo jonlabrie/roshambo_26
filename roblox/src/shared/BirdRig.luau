@@ -43,4 +43,26 @@ function BirdRig.pose(axes: Axes, pitchDeg: number, yawDeg: number): CFrame
         * CFrame.fromAxisAngle(axes.pitch, math.rad(pitchDeg))
 end
 
+-- ⚠ SEAT BY THE FEET, WHICH ARE THE RENDERED BOX BOTTOM, NOT THE PIVOT. Both halves are placed by
+-- `PivotOffset.Position` first -- that is what keeps the body and the wings locked to each other,
+-- and it is exact -- and then the pair is dropped together so the bird's lowest point rests on
+-- `base`. Only the pair's height changes; their relationship does not.
+--
+-- ⚠ THE PIVOT'S *ROTATION* STAYS IGNORED. It carries the FBX axis conversion (90, 0, -180), so
+-- `PivotTo` reintroduces the nose-up attitude. Position from the pivot, rotation from `base`.
+function BirdRig.seat(body: BasePart, wings: BasePart?, base: CFrame)
+    body.CFrame = base * CFrame.new(-body.PivotOffset.Position)
+    if wings then
+        wings.CFrame = base * CFrame.new(-wings.PivotOffset.Position)
+    end
+    local drop = BirdFlight.footOffset(body.Position.Y, body.Size.Y, base.Position.Y)
+    if drop ~= 0 then
+        local fix = Vector3.new(0, drop, 0)
+        body.CFrame = body.CFrame - fix
+        if wings then
+            wings.CFrame = wings.CFrame - fix
+        end
+    end
+end
+
 return BirdRig

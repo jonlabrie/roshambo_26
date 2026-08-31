@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-28
+updated: 2026-08-31
 ---
 
 # Blender Pipeline
@@ -378,6 +378,58 @@ atlas in fragments, so a block request that does not fit is normal. `UVAllocator
 down rather than failing — and RECORDS what it actually gave, because "no silent caps" applies to
 texture space as much as to coverage.
 
+
+## ⚠ A BONE'S LOCAL AXES ARE NOT THE BODY'S — `CFrame.Angles(pitch, yaw, 0)` is a guess
+
+Measured 2026-08-31 on `MejiroBody`, each bone-local axis written in body space (body X = right,
+Y = up, Z = length):
+
+| bone | local X | local Y | local Z |
+|---|---|---|---|
+| `joint3` (neck) | −body Y | −body Z | **+body X** |
+| `joint4` (head) | −body Z | +body Y | **+body X** |
+
+So pitch is slot **Z** on both neck bones. `BirdController` and `watchWingbeat` had written
+`CFrame.Angles(pitch, yaw, 0)` since the birds shipped: the pitch went into a yaw on the neck and a
+roll on the head, the yaw rolled the neck, and **the song's head-lift never fired once on any
+bird**. The two bones also yawed against each other (−body Y against +body Y), producing an S-bend
+that read as a side-to-side wobble and was mistaken for a damping fault.
+
+⚠ **NOTHING FLAGS THIS, BECAUSE THE WRONG ANSWER STILL LOOKS ALIVE.** A head that yaws and rolls
+when you asked for pitch is still a moving head. It took an owner saying "it does NOT lift up its
+beak" to surface it.
+
+**Read the axes off the rig**: `BirdRig.axesOf(bone, body)` converts a body-space direction into
+bone-local space via `BirdFlight.toBoneSpace` (pure, so Lune can test it — Lune has no `CFrame`),
+and `BirdRig.pose` builds the Transform with `CFrame.fromAxisAngle`, yaw first so a bird that has
+looked left raises its beak along the way it faces. Resolved once at spawn; the axes are constants
+of the armature. A hardcoded slot permutation would be the same silent failure on the next rig.
+
+## ⚠ RESIZING A MESHPART DOES NOT RESIZE ITS `PivotOffset`
+
+The mejiro is the uguisu's mesh scaled to 0.773 in Studio. The mesh scaled; the pivot did not, and
+the two carry a byte-identical `PivotOffset.Position` of −0.215. Measured with each pivot placed at
+y = 100, reading the rendered box bottom:
+
+| part | centre | size Y | bottom | offset from pivot |
+|---|---|---|---|---|
+| `KarasuBody` | 100.449 | 0.897 | 100.000 | **0.000** — the pivot *is* the feet |
+| `UguisuBody` | 100.215 | 0.472 | 99.979 | −0.021 |
+| `MejiroBody` | 100.215 | 0.365 | 100.033 | **+0.033**, the other way |
+
+Both seating paths placed the **pivot** on the perch and a comment cited "feet land within 0.021 of
+the target" as verification — that 0.021 was the uguisu's own residual, accepted once and then
+treated as a property of all birds. Two birds sharing a mesh, a rig and a pivot now land 0.054
+apart, 15% of the mejiro's height, and the error grows with the scale factor.
+
+**Seat by the rendered box bottom** (`BirdFlight.footOffset`, used by `BirdRig.seat`), which is the
+toes on a perching bird and is what the karasu's exact 0.000 confirms the export intended. Place
+both halves by the pivot first — that is what locks body and wings together, and it is exact — then
+drop the pair.
+
+⚠ **`Bone.WorldCFrame` IS NOT A USABLE MEASUREMENT ON A RESIZED MESHPART.** The mejiro and the
+uguisu report their lowest bone at an identical −0.093 from the pivot despite a 0.773 scale factor
+between them, so bone positions read back unscaled. Measure feet from `Size`, not from bones.
 
 ## ⚠ MIRRORING A MEASUREMENT ASSUMES A SYMMETRY THE MESH DOES NOT HAVE
 

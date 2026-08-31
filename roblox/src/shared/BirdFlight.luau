@@ -312,6 +312,19 @@ end
 -- because the bird carried on glancing about while it sang and the two motions were
 -- indistinguishable. A bird that is singing holds still and sings. `stillness` is how much of the
 -- look-around to remove at full gape; callers multiply their idle angles by the returned scale.
+-- ⚠ HOW FAR THE BIRD'S FEET ARE FROM THE POINT THE SEATING CODE AIMS AT. Both seating paths put
+-- the part's PIVOT on the perch, because the export puts the pivot at the feet -- which is exactly
+-- true of the karasu, 0.021 studs out on the uguisu, and 0.033 studs out the OTHER WAY on the
+-- mejiro. The mejiro is the uguisu mesh scaled to 0.773 in Studio, and resizing a MeshPart does
+-- not resize its PivotOffset: the two carry a byte-identical pivot and their feet land 0.054
+-- apart, 15% of the mejiro's height. Every bird scaled from a shared mesh inherits it.
+--
+-- The rendered box bottom is the toes on a perching bird and does not care how the part was
+-- scaled. See BirdSeat.spec for the measurements.
+function BirdFlight.footOffset(centreY: number, sizeY: number, pivotY: number): number
+    return (centreY - sizeY / 2) - pivotY
+end
+
 export type Basis = { { number } }
 
 -- ⚠ WHICH WAY IS UP FOR THIS BONE. `CFrame.Angles(pitch, yaw, 0)` is only pitch and yaw if the

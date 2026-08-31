@@ -39,7 +39,7 @@
 -- ReplicatedStorage.RoshamboBirds, so this is the only line to change to look at a different one.
 -- Every framing number below is DERIVED from the chosen bird's own size, because the karasu is
 -- twice the uguisu and a distance tuned for one is wrong by 2x for the other.
-local SPECIES: string = "Uguisu" -- "Uguisu" | "Karasu"
+local SPECIES: string = "Mejiro" -- "Uguisu" | "Karasu" | "Mejiro"
 
 local MODE: string = "PERCH" -- "ISOLATED" | "FLIGHT" | "PERCH"
 -- PERCH only. Where to stand the bird. CAMERA puts it an arm's length in front of wherever you are
@@ -186,12 +186,11 @@ local function headAxes(body: BasePart, bones: { [string]: Bone }): { [string]: 
     return axes
 end
 
--- Seat both halves by their SHARED ORIGIN (the feet), never by the part centre, and take the
--- rotation from `base` — PivotOffset's rotation carries the FBX axis conversion and reintroduces a
--- nose-up attitude. Exactly what BirdController does, and for the same reasons.
+-- Seat both halves on their FEET, never the part centre, and take the rotation from `base`.
+-- ⚠ THIS USED TO PLACE THE PIVOT AND CALL THAT THE FEET, which floated the mejiro 0.033 studs off
+-- the torii rail (owner, 2026-08-31); see BirdRig.seat and BirdSeat.spec.
 local function seat(body: BasePart, wings: BasePart, base: CFrame)
-    body.CFrame = base * CFrame.new(-body.PivotOffset.Position)
-    wings.CFrame = base * CFrame.new(-wings.PivotOffset.Position)
+    BirdRig.seat(body, wings, base)
 end
 
 local function pose(bones: { [string]: Bone }, open: number, beatX: number, beatZ: number)

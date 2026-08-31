@@ -756,17 +756,13 @@ RunService.RenderStepped:Connect(function()
         -- part's BOUNDING-BOX CENTRE at the perch, and the body's centre rides 0.236 studs above
         -- its feet -- half the bird's height -- so the bird sank into whatever it landed on.
         --
-        -- `PivotOffset.POSITION` is the offset from the part centre to the origin both halves
-        -- were exported around, which is the feet. Verified: feet land within 0.021 of the target
-        -- and the two halves agree to 0.00000 studs at a shared bone.
-        --
-        -- ⚠ ITS *ROTATION* MUST BE IGNORED. PivotOffset also carries the FBX axis conversion
-        -- (90, 0, -180), so `PivotTo` reintroduces exactly the nose-up attitude that was fixed a
-        -- moment ago. Take the position, take the rotation from `base`.
-        b.part.CFrame = base * CFrame.new(-b.part.PivotOffset.Position)
-        if b.wings then
-            b.wings.CFrame = base * CFrame.new(-b.wings.PivotOffset.Position)
-        end
+        -- ⚠ AND `PivotOffset.POSITION` IS NOT THE FEET EITHER, though this comment said it was
+        -- and cited "feet land within 0.021 of the target" as the verification. 0.021 was the
+        -- uguisu's residual; the mejiro is that same mesh scaled to 0.773 and a resize does not
+        -- move PivotOffset, so its feet land 0.033 the OTHER way. BirdRig.seat places the pair by
+        -- the pivot -- which is what locks the two halves together -- then drops both so the
+        -- rendered bottom rests on `base`. See BirdSeat.spec for the measurements.
+        BirdRig.seat(b.part, b.wings, base)
 
         if far <= DETAIL_DISTANCE then
             -- FLYING IS A FACT ABOUT MOVEMENT, NOT ABOUT STATE. A bird hopping on a shoulder is

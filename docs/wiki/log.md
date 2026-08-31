@@ -2952,3 +2952,29 @@ The mirrored rig and the new roughness map ship together, so it is one import cy
 two. `joint15` now carries 355 vertices where it had none — it was the only deform bone in the rig
 with nothing bound to it, which is why the left front toe rode the ankle while the right rode its
 own toe bone.
+
+## [2026-08-31] defect | the birds' heads never pitched, and their feet never touched the perch
+
+Two silent faults under one session, both surfaced by the owner looking rather than by
+any check. **`CFrame.Angles(pitch, yaw, 0)` assumed the bone's local axes were the
+body's.** Measured on `MejiroBody`, pitch is slot **Z** on both neck bones: the pitch we
+wrote yawed the neck and rolled the head, the yaw rolled the neck, and the song's
+head-lift had never fired on any bird since they shipped. The two neck bones also yawed
+against each other (−body Y against +body Y), an S-bend that read as a side-to-side
+wobble — which I had spent a commit tuning `SING_STILLNESS` against, treating a broken
+axis as a damping problem. Owner: *"the head rotates (yaw) and tilts side to side (roll)
+but does NOT lift up it's beak (pitch) at all."* Nothing flagged it because a head that
+yaws when asked to pitch is still a moving head.
+
+**And `PivotOffset` is not the feet once a mesh is resized.** The mejiro is the uguisu's
+mesh scaled to 0.773; the mesh scaled, the pivot did not, and the two now seat 0.054
+studs apart on a byte-identical pivot — 15% of the mejiro's height. The comment
+justifying the pivot cited "feet land within 0.021 of the target", which was the uguisu's
+own residual accepted once and then generalised to every bird.
+
+Both now read from the rig instead of assuming it: `BirdFlight.toBoneSpace` and
+`BirdFlight.footOffset` are pure (Lune has no `CFrame`), with `BirdRig` the Roblox half
+that resolves each bone's axes at spawn and seats by the rendered box bottom. Recorded in
+[[blender-pipeline]], including the trap that `Bone.WorldCFrame` reads back **unscaled**
+on a resized MeshPart and so cannot be used to find the feet. 1579 → 1588 tests.
+
