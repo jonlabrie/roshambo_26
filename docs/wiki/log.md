@@ -2659,3 +2659,41 @@ Four comments describing the removed code were corrected in the same pass (`eye_
 claimed "SO THIS SHIPS A BONE", `build_eye_mesh`, the roster assert, and the `add_leaf_bones`
 block). The `use_armature_deform_only=False` setting stays despite having no live reason left,
 because the failure it causes is silent and the next bird's rig is not written yet.
+
+### The beak opens on the caw — gape wiring, driven off the audio's playhead
+
+`BirdFlight.gapeAt` had been tested, fed with measured onsets, and called by nothing since the
+plane-cut jaw was retired. It has a caller now. `bill_lower` ships on `KarasuBody`, `sing()` keeps
+the clip record and the `Sound` instead of throwing both away, and `RenderStepped` writes the jaw.
+
+⚠ **THE GAPE READS `Sound.TimePosition`, NOT AN ELAPSED CLOCK.** `:Play()` on a sound that has not
+loaded does not start the audio — it starts it when the load finishes — so a timer taken at the
+call runs ahead of the caw and the beak opens before the sound, precisely on a cold load, which is
+the first time anyone sees the bird. The onsets were measured off the source WAVs by
+`tools/audio/measure_caws.py`; comparing them against a guessed playhead throws away the only
+reason they were measured.
+
+⚠ **THE HINGE IS LOCAL +X, POSITIVE — OPPOSITE TO BLENDER'S SIGN, WHERE THE SAME MOTION IS −25°.**
+Measured in Studio on the shipped asset rather than derived: a probe rigidly attached one jaw-length
+out along the bone's local **+Y** (the jaw direction — local +Z points at the *floor*) drops
+**0.0641 studs** and swings 0.0156 back toward the tail under `CFrame.Angles(rad(+20), 0, 0)`.
+Local Z rotation is lateral yaw and does nothing useful. A first probe run measured the wrong axis
+because it assumed +Z was forward.
+
+`BirdSpecies.CAW_GAPE_DEGREES = 20` (owner's starting value, to judge in Play). Shared rather than
+per-species on the same argument as `CAW_GAPE_SECONDS`: an angle is scale-free, so a bigger crow
+does not open wider. Every other bird constant scales by sqrt(length) and this one must not.
+
+**The old test asserted the opposite and was inverted, not deleted** — it guarded against a
+`bill_lower` lookup that silently returned nil, and now requires the lookup to exist and the source
+to read `TimePosition`. Two invariants added: the gape angle is a real angle, and consecutive
+onsets never sit closer than the gape window (the karasu's own gap is 0.775s against 0.23s, so a
+two-caw clip cannot merge into one held croak). 1562 tests green, stylua and selene clean.
+
+⚠ **THE UGUISU IS WIRED BUT SILENT.** `UguisuBody` carries a `bill_lower` bone, but none of its
+clips have measured `caws`, so its beak stays shut — correct, not a bug. `measure_caws.py` is what
+would change that.
+
+Two stale comments in `BirdFlight` corrected in the same pass: `CAW_GAPE_SECONDS` was cited as 0.30
+against a 0.48 gap (it is 0.23 against 0.70), and the module still announced "NOTHING CALLS THIS
+TODAY".

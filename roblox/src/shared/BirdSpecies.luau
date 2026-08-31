@@ -141,6 +141,20 @@ BirdSpecies.CAW_GAP_RANGE = { 0.70, 0.82 }
 -- caws would merge into one long croak instead of reading as separate calls. It does, easily.
 BirdSpecies.CAW_GAPE_SECONDS = 0.23
 
+-- ⚠ HOW FAR THE JAW SWINGS, IN DEGREES ON `bill_lower`'s LOCAL +X. Shared rather than per-species
+-- for the same reason the duration above is: an angle is scale-free, so a bigger crow does not
+-- open wider, it opens the same. Every other bird constant scales by sqrt(length) and this one
+-- must not, or the karasu's jaw would swing twice the uguisu's for one call.
+--
+-- ⚠ THE AXIS AND THE SIGN WERE MEASURED IN STUDIO, NOT DERIVED -- and the sign is OPPOSITE to
+-- Blender's, where the same motion is -25 degrees. A probe rigidly attached to the bone one jaw
+-- length out along its local +Y (the jaw direction; local +Z points at the floor) drops 0.0641
+-- studs and swings 0.0156 back toward the tail under `CFrame.Angles(rad(+20), 0, 0)`. Local Z is
+-- lateral yaw and does nothing useful. Guessing this costs a session.
+--
+-- 20 degrees is the owner's starting value, to be judged in Play and adjusted by eye.
+BirdSpecies.CAW_GAPE_DEGREES = 20
+
 -- The voice for `species`, or nil if it has none. See `pick` for why nil rather than a fallback.
 function BirdSpecies.voiceOf(species: string): Voice?
     local rec = BirdSpecies.SPECIES[species]

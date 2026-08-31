@@ -27,28 +27,49 @@ describe("BirdFlight.gapeAt", function()
         expect(BirdFlight.gapeAt(99, caws, OPEN)).toBe(0)
     end)
 
-    test("the controller drives no jaw bone", function()
-        -- ⚠ THE SPLIT AND THE BONE ARE BOTH RETIRED (owner, 2026-08-30). A `bill_lower` lookup that
-        -- silently returns nil is worse than none: it reads as a working feature to anyone scanning
-        -- the file, and it would come back to life the moment a bone of that name reappeared --
-        -- driving a bill that no longer separates, which is a bill that stretches.
+    test("the controller drives the jaw bone off the AUDIO's clock, not the frame clock", function()
+        -- ⚠ THIS TEST WAS THE OPPOSITE ASSERTION UNTIL 2026-08-30. The plane-cut jaw was retired
+        -- and this guarded against a `bill_lower` lookup that silently returned nil -- which reads
+        -- as a working feature to anyone scanning the file. The bill was re-cut along its own
+        -- tomium and the bone ships again, so the guard is inverted rather than deleted: the
+        -- lookup must now EXIST, and a bird whose beak stopped moving should fail here first.
+        --
+        -- ⚠ AND IT MUST READ `Sound.TimePosition`. `:Play()` on an unloaded sound does not start
+        -- the audio, it starts it WHEN IT LOADS -- so an elapsed clock taken at `:Play()` runs
+        -- ahead of the caw and the beak opens before the sound, precisely on a cold load, which is
+        -- the first time anyone ever sees the bird. Measuring the onsets off the source WAVs buys
+        -- nothing if the playhead they are compared against is guessed.
         local fs = require("@lune/fs")
         local src = harness.stripComments(fs.readFile("src/client/BirdController.client.luau"))
-        for _, gone in { "bill_lower", "billLower", "GAPE_DEG" } do
-            expect(string.find(src, gone, 1, true)).toBe(nil)
+        for _, needed in { "bill_lower", "billLower", "TimePosition" } do
+            expect(string.find(src, needed, 1, true) ~= nil).toBe(true)
         end
     end)
 
-    test("the caw data and the envelope SURVIVE the retirement", function()
-        -- ⚠ KEPT ON PURPOSE. The onsets are measured off the source WAVs by
-        -- `tools/audio/measure_caws.py` and the envelope is tested above; both are inputs the next
-        -- attempt at a jaw will need, and neither depends on how the geometry splits. Deleting them
-        -- would throw away the one part of this that was measured rather than guessed.
+    test("the gape angle is a real angle, and shared rather than per-species", function()
+        -- ⚠ SCALE-FREE, for the same reason `CAW_GAPE_SECONDS` is: a bigger crow does not open
+        -- wider, it opens the same. Every other bird constant scales by sqrt(length); an angle
+        -- must not, or the karasu's jaw would swing twice the uguisu's for the same call.
+        local deg = BirdSpecies.CAW_GAPE_DEGREES
+        expect(type(deg) == "number").toBe(true)
+        expect(deg > 0 and deg < 90).toBe(true)
+    end)
+
+    test("two caws in one clip never merge into one gape", function()
+        -- ⚠ THE FAILURE THIS PREVENTS IS A LONG CROAK. If consecutive onsets sit closer together
+        -- than the gape window, the envelope never returns to zero between them and a two-caw
+        -- recording reads as one held note. The karasu's own gap is 0.775s against a 0.23s window,
+        -- so there is room -- but the clips are data and data gets edited.
         local clips = (BirdSpecies.voiceOf("Karasu") :: any).clips
-        for i, c in clips do
-            expect(#(c.caws :: any)).toBe(i)
+        for _, c in clips do
+            local prev = nil
+            for _, onset in c.caws do
+                if prev then
+                    expect(onset - prev > BirdSpecies.CAW_GAPE_SECONDS).toBe(true)
+                end
+                prev = onset
+            end
         end
-        expect(BirdFlight.gapeAt(0.09 + OPEN * 0.3, { 0.09 }, OPEN)).toBe(1)
     end)
 
     test("it reaches full gape once per caw", function()

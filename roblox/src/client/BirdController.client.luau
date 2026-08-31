@@ -148,6 +148,10 @@ type Bird = {
     hipL: Bone?,
     hipR: Bone?,
     root: Bone?,
+    billLower: Bone?,
+    -- ⚠ THE SOUND ITSELF, not a timestamp. The gape reads `TimePosition` off it -- see `sing()`.
+    song: Sound?,
+    songCaws: { number }?,
     seed: number,
     flyingSince: number?,
     -- A perched flutter is EVENT-TRIGGERED (landing, winning) with a slow idle rate underneath
@@ -282,6 +286,11 @@ local function makeBird(userId: string): Bird
         hipL = bone("joint12"),
         hipR = bone("joint25"),
         root = bone("joint1"),
+        -- ⚠ NOT ROUTED TO THE WINGS. `bone()` sends only names containing "wing" or "wrist" to
+        -- the wings part; `bill_lower` correctly resolves against the body.
+        billLower = bone("bill_lower"),
+        song = nil,
+        songCaws = nil,
         seed = seedFor(userId),
         flyingSince = nil,
         flutterSince = nil,
@@ -333,14 +342,29 @@ local function sing(b: Bird, isOwn: boolean)
     s.RollOffMaxDistance = voice.rolloff[2]
     s.PlaybackSpeed = 0.97 + math.random() * 0.06 -- the dock scheduler's jitter, same reason
     s.Parent = b.part
+    -- ⚠ KEEP THE CLIP'S ONSETS AND THE SOUND. `pick()` returns an id and this used to throw the
+    -- record away, so nothing downstream could know WHERE in the recording the caws fall.
+    -- A clip with no measured onsets (every uguisu clip today) simply leaves the beak shut.
+    local record = BirdSpecies.clipById(SPECIES, clip)
+    b.song = s
+    b.songCaws = record and record.caws or nil
+    local function release()
+        b.song = nil
+        b.songCaws = nil
+        if b.billLower then
+            b.billLower.Transform = CFrame.identity
+        end
+    end
     s.Ended:Once(function()
         singing -= 1
+        release()
         s:Destroy()
     end)
     -- A clip that never fires Ended (failed load, moderation) would leak a slot forever.
     task.delay(8, function()
         if s.Parent then
             singing -= 1
+            release()
             s:Destroy()
         end
     end)
@@ -869,6 +893,34 @@ RunService.RenderStepped:Connect(function()
             end
             if b.tail then
                 b.tail.Transform = CFrame.Angles(math.rad(idleTail), 0, 0)
+            end
+
+            -- ===== GAPE =====
+            -- ⚠ DRIVEN OFF THE AUDIO'S OWN PLAYHEAD, NOT A CLOCK STARTED AT `:Play()`. Calling
+            -- `:Play()` on a sound that has not loaded does not start the audio -- it starts it
+            -- when the load finishes -- so an elapsed timer runs ahead of the caw and the beak
+            -- opens before the sound. That happens on a cold load, which is the first time anyone
+            -- sees the bird. The onsets in `BirdSpecies` were MEASURED off the source WAVs by
+            -- `tools/audio/measure_caws.py`; comparing them against a guessed playhead throws away
+            -- the only reason they were measured.
+            --
+            -- ⚠ LOCAL +X, POSITIVE, AND THE SIGN IS OPPOSITE TO BLENDER'S. Measured in Studio on
+            -- the shipped asset: a probe one jaw-length out along the bone's local +Y drops 0.0641
+            -- studs under `CFrame.Angles(rad(+20), 0, 0)`. Local +Z points at the floor and local
+            -- Z rotation is lateral yaw -- neither is the hinge.
+            --
+            -- A clip with no measured onsets leaves the beak SHUT rather than guessing a rhythm,
+            -- which is every uguisu clip today. The predecessor here was `sin(now * 9) ^ 2` gated
+            -- on the WIN state: birds that never sang still sat there mouthing.
+            if b.billLower then
+                local gape = 0
+                local song, caws = b.song, b.songCaws
+                if song and caws and song.IsPlaying then
+                    gape = BirdFlight.gapeAt(song.TimePosition, caws, BirdSpecies.CAW_GAPE_SECONDS)
+                end
+                b.billLower.Transform = if gape > 0
+                    then CFrame.Angles(math.rad(BirdSpecies.CAW_GAPE_DEGREES * gape), 0, 0)
+                    else CFrame.identity
             end
         end
     end
