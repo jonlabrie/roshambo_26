@@ -2920,3 +2920,35 @@ The Rojo round-trip is sound: a `rojo build` carries every bird's `MeshContent` 
 `TextureContent`. The blank duplicates that appeared under `RoshamboBirds` were a LIVE-SYNC
 artifact — Rojo created the newly declared Mejiro children before their `.rbxm`s had content —
 not a defect in the committed files.
+
+### "Only the mejiro" — one observation that falsified a whole diagnosis
+
+The owner saw flat polygonal blobs on the toes and I traced it to an asymmetric rig: the uguisu's
+RIGHT leg chain sat **0.049 studs outboard of its own geometry**, so posing it swung the leg about
+a pivot outside the limb. Mirroring the chain took toe-deformation asymmetry from **0.042 to
+0.0119 studs** and mismatched mirror pairs from **197 to 1**. Real defect, worth keeping — the
+mesh is symmetric to 0.0012 and the rig was not.
+
+⚠ **AND IT WAS NOT THE CAUSE.** The owner then said *"only the mejiro"*. The two birds share the
+mesh AND the rig, so anything in either must show on both. That single sentence falsified the
+whole line of investigation, and I would have gone on believing it.
+
+What differs between them is **Size and paint**, and the scaling is uniform to six decimal places
+(x = y = z = 0.772899, spread 0.000000). So it was the SurfaceAppearance — and specifically the
+roughness map, which the uguisu does not have at all.
+
+⚠ **GLOSS REVEALS FACETS, AND LOW-POLY GEOMETRY HAS NOTHING TO SPARE.** `shade_roughness` gave
+legs **0.42** against plumage's 0.88 — the toes were twice as glossy as the feathers, and a
+specular that tight picks out each facet's normal. The geometry was blameless: all **324 toe faces
+are smooth-shaded**, no custom normals, no sharp edges. Legs raised to 0.70 and the bill from 0.34
+to 0.55 — the bill is the same mechanism on the same mesh with 66 vertices carrying the whole
+thing, so it was raised pre-emptively rather than after another cycle.
+
+⚠ **A BIRD WITH NO ROUGHNESS MAP IS A CONTROL GROUP.** The uguisu could not show this defect, and
+that is what identified the cause. Two assets differing in exactly one property is worth more than
+any amount of staring at the one that is broken.
+
+The mirrored rig and the new roughness map ship together, so it is one import cycle rather than
+two. `joint15` now carries 355 vertices where it had none — it was the only deform bone in the rig
+with nothing bound to it, which is why the left front toe rode the ankle while the right rode its
+own toe bone.

@@ -404,8 +404,15 @@ def shade(P, N, pal, S=1.0):
 ROUGH = {
     "eye": 0.16,        # wet. The entire reason a roughness map exists here.
     "orbital": 0.46,    # bare skin around the eye: damp, not wet
-    "bill": 0.34,       # keratin, semi-gloss
-    "leg": 0.42,        # scaly
+    # ⚠ GLOSS REVEALS FACETS, AND A LOW-POLY TOE HAS NOTHING TO SPARE. At 0.42 the mejiro's toes
+    # were twice as glossy as its plumage, and the specular picked out each facet's normal --
+    # the owner saw "strange quads" on the talons. The geometry was not at fault: all 324 toe
+    # faces are smooth-shaded with no custom normals and no sharp edges. The uguisu could never
+    # show it because it has no roughness map at all, which is what identified the cause.
+    # ⚠ THE BILL IS THE SAME MECHANISM ON THE SAME MESH and was raised with it, pre-emptively --
+    # 66 vertices carry the whole bill, so it has even less to spare than the foot.
+    "bill": 0.55,       # keratin, semi-gloss -- was 0.34
+    "leg": 0.70,        # scaly -- was 0.42
     "covert": 0.80,     # flight and covert feathers keep a little sheen
     "feather": 0.88,    # body plumage
     "ventral": 0.93,    # soft underside, the most matte thing on the bird
