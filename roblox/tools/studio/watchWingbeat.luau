@@ -41,11 +41,11 @@
 -- twice the uguisu and a distance tuned for one is wrong by 2x for the other.
 local SPECIES: string = "Uguisu" -- "Uguisu" | "Karasu"
 
-local MODE: string = "ISOLATED" -- "ISOLATED" | "FLIGHT" | "PERCH"
+local MODE: string = "PERCH" -- "ISOLATED" | "FLIGHT" | "PERCH"
 -- PERCH only. Where to stand the bird. CAMERA puts it an arm's length in front of wherever you are
 -- looking, which is what a close-up wants; TORII stands it on the gate's top rail (y 128.5), which
 -- is the prettier shot and 15 studs off the ground.
-local PERCH_AT: string = "CAMERA" -- "CAMERA" | "TORII"
+local PERCH_AT: string = "TORII" -- "CAMERA" | "TORII"
 local SONG_GAP = 3.5 -- seconds between songs. The game waits far longer; this is for looking.
 -- ⚠ SLOWS THE AUDIO AND THE JAW TOGETHER, which is why it is safe. `gapeAt` consumes
 -- `Sound.TimePosition`, and TimePosition is measured in CLIP time — it advances at PlaybackSpeed.
@@ -454,6 +454,27 @@ local function runPerch()
 
     local body, wings, bones = spawnBird()
     seat(body, wings, base)
+
+    -- ⚠ SAY IT AT THE START, NOT AT 12 SECONDS. The file's default SPECIES is the uguisu, which
+    -- has no measured caws, so the single most likely way to reach PERCH is with the one bird whose
+    -- beak cannot open -- and a silent bird reads as a broken gape, not as missing data. Cost an
+    -- owner a Play session on 2026-08-30, which is exactly one more than it should have.
+    do
+        local v = BirdSpecies.voiceOf(SPECIES)
+        local any = false
+        for _, c in (if v then v.clips else {}) do
+            any = any or (c.caws ~= nil and #(c.caws :: { number }) > 0)
+        end
+        if not any then
+            warn(
+                (
+                    "[watchWingbeat] %s has NO measured caw onsets, so its beak will stay SHUT -- that "
+                    .. "is correct, not a bug. Set SPECIES to a bird with onsets (Karasu), or run "
+                    .. "tools/audio/measure_caws.py over the %s clips."
+                ):format(SPECIES, SPECIES)
+            )
+        end
+    end
 
     -- Timings scale with the bird, exactly as the real controller's do: every duration in
     -- BirdFlight goes as sqrt(length), so a karasu's flutter is slower than a uguisu's.
