@@ -1,7 +1,7 @@
 ---
 shelf: world
 updated: 2026-08-16
-checked: 2026-08-27
+checked: 2026-08-31
 ---
 
 # The World Throw

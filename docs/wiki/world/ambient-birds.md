@@ -1,6 +1,7 @@
 ---
 shelf: world
 updated: 2026-08-30
+checked: 2026-08-31
 ---
 
 # Birds — the two systems, and the one architecture

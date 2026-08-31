@@ -2191,7 +2191,7 @@ effect. Then the three derived maps being 16-bit PNGs, reasoned to break the pac
 not this. And a diagnostic A/B built on setting a packaged map as a plain `TextureID` proved nothing,
 because a TexturePack member need not be usable standalone. See [[familiars]].
 
-## [2026-08-30] fix | 148 faces had zero-area UVs, and the roughness map made the flattest paint the shiniest
+## [2026-08-30] defect | 148 faces had zero-area UVs, and the roughness map made the flattest paint the shiniest
 
 Two defects the owner found in Studio, both from the same habit — inferring a per-face answer from
 a per-piece rule.
@@ -2223,7 +2223,7 @@ start; a general signal was reached for because it felt more principled.
 Also fixed: the three derived maps were **16-bit** PNGs (`float_buffer=True` on the Blender image);
 all four are 8-bit now. See [[familiars]].
 
-## [2026-08-30] fix | 539 body vertices under-deformed — skin weights that did not sum to 1
+## [2026-08-30] defect | 539 body vertices under-deformed — skin weights that did not sum to 1
 
 Backlogged since 2026-08-28, fixed now. Measured before: **539 of 1351 body vertices** summed to
 anything from **0.046 to 1.5079**, while the wings were clean at exactly 1.000 — which is what makes
@@ -2281,7 +2281,7 @@ that system does not exist yet. The phrase composition it would use is designed 
 GROUP_GAP_SECONDS 0.48 is already measured for composing a 3+2 from the baked clips. Also still
 open on that page: an ambient karasu must not read as somebody's familiar.
 
-## [2026-08-30] fix | The caw onsets were modelled, the WAVs were on disk, and every number was wrong
+## [2026-08-30] defect | The caw onsets were modelled, the WAVs were on disk, and every number was wrong
 
 Owner: *"what do you mean you have no way to open the audio? You created the clips"*. Correct — the
 source WAVs are in `Roshambo Reference/sound/birds/` and a session shipped MODELLED onsets while
@@ -2478,7 +2478,7 @@ because its mandible tip carried a mean `bill_lower` weight of 0.167.
 indices and a rebuild renumbers underneath them. `ROI_lower_beak_tip` read 0/0 on the very check
 that confirmed the new derivation. Nothing now depends on them.
 
-## [2026-08-30] fix | The jaw bone was slung 0.088 studs under the mandible it drives
+## [2026-08-30] defect | The jaw bone was slung 0.088 studs under the mandible it drives
 
 Owner, looking at the rig: *"why does your new lower mandible bone on the rig appear so much lower
 than the part it drives?"*
@@ -2497,7 +2497,7 @@ The hinge is now DERIVED — the centroid of the mandible's own rear-most vertic
 correctly in whatever coordinate space the function runs in. ⚠ A corrected constant would have been
 the same trap one coordinate space over.
 
-## 2026-08-30 — the karasu's bill: traced from the photograph, and the pipeline hands it over
+## [2026-08-30] ship | The karasu's bill: traced from the photograph, and the pipeline hands it over
 
 The culmen was **fitted to a profile traced from the reference photograph** rather than to typed
 control points. The bird is black on blurred green, so the dorsal silhouette is a colour boundary,
@@ -2542,7 +2542,7 @@ degrees multiplier, so the gape angle is still unchosen (25° was a test value).
 UVs are one tiny disc per face, not a real island. `BirdFlight.luau:200` still cites a stale 0.30
 `CAW_GAPE_SECONDS` against a 0.48 gap; both numbers are wrong.
 
-## 2026-08-30 — `art/`: a formal in-repo home for what no script can reproduce
+## [2026-08-30] ship | `art/` — a formal in-repo home for what no script can reproduce
 
 `karasu_authored.blend` was irreplaceable and lived in exactly one place on one disk, outside the
 repo. It and `karasu_colormap_graded_2.png` now live in `art/birds/karasu/`, and Blender saves
@@ -2766,3 +2766,59 @@ Two findings recorded against the ambient design, neither built:
 **71% are path lanterns and railings**, 16% bridges, 7% the falls landing, and only **15 perches
 in the whole canyon are on a tree**. The perch graph is a ROAD MAP, not a habitat map; it is
 correct for familiars, which follow players who walk on paths, and wrong for territories.
+
+## [2026-08-31] lint | Prose lint — a withdrawn eye still shipped as as-built on the familiars page
+
+`tools/wiki/lint.mjs` reported **10 errors** and 7 warnings at the start of this run; it ends at
+**0 and 0** across 56 pages. The mechanical half was the cheap half. The prose half found a page
+arguing with its own heading.
+
+⚠ **`world/familiars.md` CARRIED ~160 LINES DESCRIBING A MECHANISM WITHDRAWN TWO DAYS EARLIER.**
+Its heading said the karasu's eye is PAINTED; the section immediately under it said *"Built, kept
+and now wired… a `KarasuEyes` MeshPart… `BirdController` clones it, paints it from
+`BirdSpecies.eye`, and places it every frame"*, and then spent a hundred lines on the rest pose,
+the frame ordering, the lid loft and the ring width. Every one of those is gone: the `.rbxm` is
+deleted, the Rojo entry is removed, `BirdController` carries a **DO NOT REINTRODUCE** comment, and
+`tests/BirdEyeConvention.spec.luau` fails on the names. The withdrawal is recorded here under
+2026-08-29 and the page was never touched. ⚠ **The lint was green on that page the whole time** —
+it cites `tests/BirdEyeConvention.spec.luau`, which exists, and `BirdSpecies.eye`, whose leaf
+`eye` matches somewhere in every source tree. A citation check cannot tell a live claim from a
+dead one. Superseded per schema rule 2 rather than annotated; the chronology stays here.
+
+**Also corrected on that page, each verified against code:** `SPECIES` was quoted as `"Uguisu"`
+and reads `"Karasu"`, so the page said *"none of the karasu is reachable"* about the bird every
+player currently gets; the "Import verified 2026-08-26" note still claimed no `SurfaceAppearance`
+and a `TextureID`, three sections after the same page recorded the full PBR set; the wingspan
+figure was carried as `⚠ unverified` in two places after a third paragraph announced it verified;
+`watchWingbeat`'s mode list omitted PERCH; and a transcribed **326** perches stood forty lines
+above the page's own instruction to count them with `CollectionService` (schema rule 9).
+
+⚠ **`practice/blender-working-rules.md` RULE 8 DESCRIBED THE `ART_SOURCES` SPLIT AS LIVE.**
+`8d69da6` collapsed it the same day it was invented — `OWNER_AUTHORED` is `{COLORMAP_AUTHORITY,
+AUTHORED_BLEND}`, `karasu_body.fbx` is deliberately NOT guarded, and the second CI step is
+deleted — and that commit updated this log but not the page. The rule now records the finding
+that commit reached: guard the source, never the derivative. The two `bpy` operator names the
+symbol check fires on are third-party API, and are exempted rather than "fixed".
+
+**`log.md` itself was malformed** in six entries — four written with kind `fix`, which schema
+rule 8 does not define, and two with no `[date] kind |` header at all. Headers repaired to the
+defined vocabulary (`defect` / `ship`); no entry's body was touched and nothing was reordered.
+
+**Read at depth (19 shelf pages + index, schema and this file):** the changed-code set —
+`familiars`, `ambient-birds`, `blender-working-rules`, `blender-pipeline`, `core-loop`,
+`world-throw`, `round-and-hud`, `status-display`, `rojo-meshpart-rbxm`, `parallel-threads`,
+`duplicated-server-constants` — plus the rotating slice by oldest stamp:
+`material-and-mesh-traps`, `replication-races`, `visible-is-not-pixels`, `toolbox-backdoor-scan`,
+`image-moderation`, `misc-engine-traps`, `falls-dock`, `friends-family-baseline`.
+
+⚠ **NOT READ THIS RUN — 37 pages, and no claim is made about them.** All of `systems/`; the rest
+of `program/` (`item-4-merchant-row`, `parked-defects`, `backlog`); 15 `world/` pages (`canyon`,
+`arena-square`, `bell-engine`, `hanabiya`, `chaya`, `fireworks`, `day-night`,
+`viewing-platform`, `stats-room`, `switchback-deck`, `paths`, `teahouses`, `foliage`,
+`water-audio`, `place-state`); and 15 `practice/` pages. Next run should start there.
+
+⚠ **`falls-dock` and `blender-pipeline` were read and deliberately NOT stamped `checked:`.**
+`falls-dock` rests on emitter positions, a place-only `UguisuScheduler` Script and asset ids that
+only Studio can confirm; `blender-pipeline` still teaches the plane bisect as the way to split a
+bill, which owner ruling 2026-08-30 retired, and does not carry the `holes_fill` fan-vertex
+finding that made the cut unnecessary. Both want the owner.

@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-30
+updated: 2026-08-31
 ---
 
 # Blender Working Rules
@@ -134,8 +134,8 @@ it was applied to.
 
 **Extended 2026-08-30 from a file to a whole asset.** The karasu's bill is now hand-finished in
 `karasu_authored.blend` — a traced culmen fit, a lined mouth, and owner vertex edits at the tip.
-The fit is reproducible; the hand edits are not. So the registry gained `karasu_authored.blend`
-and `karasu_body.fbx`, and `run()` gained `assert_authored_bill_absent()` as its FIRST statement.
+The fit is reproducible; the hand edits are not. So the registry gained `karasu_authored.blend`,
+and `run()` gained `assert_authored_bill_absent()` as its FIRST statement.
 
 ⚠ **THE BACKSTOP AT THE WRITE IS NOT ENOUGH ONCE A WHOLE ASSET IS AUTHORED.** `run()` rebuilds
 from the vendor blend, so by the time `assert_writable` fires at the export the run has already
@@ -143,14 +143,18 @@ thrown away everything it was going to. The guard has to be a stop sign at the d
 the till. Move `AUTHORED_BLEND` aside to rebuild the base bird — an action, not an accident.
 
 **Where the guarded files live (2026-08-30).** `art/` at the repo root is the in-repo home for
-hand-authored source; `art/README.md` carries the admission rule. The two halves are kept in
-agreement by CI: `art/` must contain no derived files, and every name in
-`karasu_retarget.ART_SOURCES` must actually be stored there.
+hand-authored source; `art/README.md` carries the admission rule. CI enforces one half of it:
+`art/` must contain no derived files.
 
-⚠ **`OWNER_AUTHORED` AND `ART_SOURCES` ARE NOT THE SAME SET.** `ART_SOURCES` was made by hand
-and is stored in `art/`. `karasu_body.fbx` is guarded but *derived*, so it is deliberately NOT in
-`art/` — it is in `OWNER_AUTHORED` only because it is what Studio imports, and a rebuild would
-replace the shipping bird with one carrying none of the authored bill.
+⚠ **GUARD THE SOURCE, AND ONLY THE SOURCE.** `karasu_body.fbx` was briefly in `OWNER_AUTHORED` on
+the day the registry grew, and that **single wrong entry generated every tangle that followed**: a
+CI check that demanded the FBX be stored under `art/` while the rule above rejects `.fbx` there, an
+`ART_SOURCES` split invented to paper over the contradiction, <!-- lint-ok: naming the retired split in order to bury it --> and a guard that refused the very
+export the authored blend exists to produce. A derivative can always be re-exported, so guarding
+one buys nothing and costs the legitimate path. The correct model is **one source of truth per
+asset, changing hands exactly once**: `run()` owns a bird until a human makes an edit the script
+cannot reproduce, and from that moment the `.blend` owns it. The one-way door is
+`assert_authored_bill_absent()`; nothing else needs guarding.
 
 ⚠ **BLEND SAVES ARE MILESTONE-ONLY, AND THAT IS A SIZE CONSTRAINT, NOT ETIQUETTE.** Git cannot
 diff a `.blend`; every save is a full copy kept forever, and Blender writes a `.blend1` backup
@@ -201,6 +205,6 @@ bpy.ops.render.opengl(write_still=True, view_context=True)   # what the viewport
 bpy.ops.screen.screenshot(filepath=...)                      # the whole window, for panels/nodes
 ```
 
-Both verified working 2026-08-30; `screen.screenshot_area` is not (writes 250 bytes).
-⚠ `render.opengl` needs a `temp_override` carrying the VIEW_3D area and its WINDOW region.
+Both verified working 2026-08-30; `screen.screenshot_area` is not (writes 250 bytes). <!-- lint-ok: bpy operator names, third-party API — not repo symbols -->
+⚠ `render.opengl` needs a `temp_override` carrying the VIEW_3D area and its WINDOW region. <!-- lint-ok: bpy operator name, third-party API — not a repo symbol -->
 

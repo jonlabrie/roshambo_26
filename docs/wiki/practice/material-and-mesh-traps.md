@@ -1,6 +1,7 @@
 ---
 shelf: practice
 updated: 2026-08-15
+checked: 2026-08-31
 ---
 
 # Material and Mesh Traps
