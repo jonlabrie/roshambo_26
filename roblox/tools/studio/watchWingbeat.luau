@@ -444,7 +444,24 @@ local function runPerch()
             and workspace.RoshamboStage:FindFirstChild("Torii")
         assert(torii, "watchWingbeat: PERCH_AT is TORII but Workspace.RoshamboStage.Torii is missing")
         local cf, size = (torii :: Model):GetBoundingBox()
-        base = CFrame.new(cf.Position + Vector3.new(0, size.Y / 2, 0))
+        -- ⚠ THE BOUNDING BOX TOP IS NOT THE SURFACE. A torii's kasagi curves upward at both ends,
+        -- so the axis-aligned box is as tall as the HIGHEST point -- the ends -- while the middle,
+        -- where the bird stands, sits lower. Seating at `size.Y / 2` floated it about a stud above
+        -- the rail (owner, 2026-08-31). Raycast down onto the model instead and stand on what is
+        -- actually there.
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Include
+        params.FilterDescendantsInstances = { torii }
+        local from = cf.Position + Vector3.new(0, size.Y, 0)
+        local hit = workspace:Raycast(from, Vector3.new(0, -size.Y * 2, 0), params)
+        local top = if hit then hit.Position.Y else cf.Position.Y + size.Y / 2
+        if not hit then
+            warn(
+                "[watchWingbeat] nothing under the ray over the Torii -- falling back to its "
+                    .. "bounding-box top, which sits above a curved rail."
+            )
+        end
+        base = CFrame.new(Vector3.new(cf.Position.X, top, cf.Position.Z))
     else
         -- Face the bird back at the lens, three body-lengths out: a gape is a FRONT-ON read, unlike
         -- the wingbeat, which ISOLATED deliberately shows side-on.
@@ -565,8 +582,12 @@ local function runPerch()
                 then CFrame.Angles(math.rad(BirdSpecies.CAW_GAPE_DEGREES * g), 0, 0)
                 else CFrame.identity
         end
-        local liftNeck, liftHead =
-            BirdFlight.singLift(g, BirdSpecies.SING_LIFT_DEG, BirdSpecies.SING_NECK_FRAC)
+        local liftNeck, liftHead, idleScale = BirdFlight.singLift(
+            g,
+            BirdSpecies.SING_LIFT_DEG,
+            BirdSpecies.SING_NECK_FRAC,
+            BirdSpecies.SING_STILLNESS
+        )
 
         -- --- flutter: a short burst of real wingbeat, then folded again ---
         local open = 0
@@ -592,12 +613,18 @@ local function runPerch()
         -- --- idle: the head and tail keep the bird alive between events ---
         local idleYaw, idlePitch, idleTail = BirdFlight.idlePose(t, 0, PROFILE)
         if bones.joint3 then
-            bones.joint3.Transform =
-                CFrame.Angles(math.rad(idlePitch * 0.35 - liftNeck), math.rad(idleYaw * 0.4), 0)
+            bones.joint3.Transform = CFrame.Angles(
+                math.rad(idlePitch * 0.35 * idleScale - liftNeck),
+                math.rad(idleYaw * 0.4 * idleScale),
+                0
+            )
         end
         if bones.joint4 then
-            bones.joint4.Transform =
-                CFrame.Angles(math.rad(idlePitch * 0.65 - liftHead), math.rad(idleYaw * 0.6), 0)
+            bones.joint4.Transform = CFrame.Angles(
+                math.rad(idlePitch * 0.65 * idleScale - liftHead),
+                math.rad(idleYaw * 0.6 * idleScale),
+                0
+            )
         end
         if bones.joint8 then
             bones.joint8.Transform = CFrame.Angles(math.rad(idleTail), 0, 0)

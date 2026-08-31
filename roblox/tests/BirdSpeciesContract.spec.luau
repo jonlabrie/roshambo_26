@@ -147,6 +147,9 @@ describe("BirdSpecies contract", function()
         expect(BirdSpecies.SING_LIFT_DEG <= BirdFlight.HEAD_PITCH_MAX).toBe(true)
         -- strictly between 0 and 1: at either end the lift becomes a hinge at one joint
         expect(BirdSpecies.SING_NECK_FRAC > 0 and BirdSpecies.SING_NECK_FRAC < 1).toBe(true)
+        -- ⚠ STILLNESS MUST NOT EXCEED 1, or `singLift` would drive the idle motion NEGATIVE and
+        -- the bird would counter-wobble against its own look-around while singing.
+        expect(BirdSpecies.SING_STILLNESS >= 0 and BirdSpecies.SING_STILLNESS <= 1).toBe(true)
     end)
 
     test("the gape constants are scale-free and sane", function()

@@ -926,8 +926,12 @@ RunService.RenderStepped:Connect(function()
             -- gape is 6.8 pixels on a karasu at ordinary third-person distance and 2.6 on a
             -- mejiro; the POSTURE is what carries at that size, and a small bird throws its head
             -- back to sing. Split across neck and head so the bird arches rather than hinging.
-            local liftNeck, liftHead =
-                BirdFlight.singLift(gape, BirdSpecies.SING_LIFT_DEG, BirdSpecies.SING_NECK_FRAC)
+            local liftNeck, liftHead, idleScale = BirdFlight.singLift(
+                gape,
+                BirdSpecies.SING_LIFT_DEG,
+                BirdSpecies.SING_NECK_FRAC,
+                BirdSpecies.SING_STILLNESS
+            )
 
             -- ===== IDLE =====
             -- ⚠ ONLY WHILE PERCHED. A bird in the air is not looking around; it is going
@@ -937,12 +941,18 @@ RunService.RenderStepped:Connect(function()
                 idleYaw, idlePitch, idleTail = BirdFlight.idlePose(now, b.seed, PROFILE)
             end
             if b.neck then
-                b.neck.Transform =
-                    CFrame.Angles(math.rad(idlePitch * 0.35 - liftNeck), math.rad(idleYaw * 0.4), 0)
+                b.neck.Transform = CFrame.Angles(
+                    math.rad(idlePitch * 0.35 * idleScale - liftNeck),
+                    math.rad(idleYaw * 0.4 * idleScale),
+                    0
+                )
             end
             if b.head then
-                b.head.Transform =
-                    CFrame.Angles(math.rad(idlePitch * 0.65 - liftHead), math.rad(idleYaw * 0.6), 0)
+                b.head.Transform = CFrame.Angles(
+                    math.rad(idlePitch * 0.65 * idleScale - liftHead),
+                    math.rad(idleYaw * 0.6 * idleScale),
+                    0
+                )
             end
             if b.tail then
                 b.tail.Transform = CFrame.Angles(math.rad(idleTail), 0, 0)

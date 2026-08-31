@@ -307,10 +307,22 @@ end
 -- ⚠ TAKES ITS NUMBERS RATHER THAN READING `BirdSpecies`, like `gapeAt` takes `open`. This module
 -- is motion and that one is data; a require from here to there would invert that and would put a
 -- Roblox-free module behind a table of asset ids for no gain.
-function BirdFlight.singLift(gape: number, deg: number, neckFrac: number): (number, number)
+-- ⚠ AND IT RETURNS A THIRD VALUE: HOW MUCH IDLE MOTION TO KEEP. The first version added the lift
+-- on top of the idle pose and read as a head wobble rather than a song (owner, 2026-08-31),
+-- because the bird carried on glancing about while it sang and the two motions were
+-- indistinguishable. A bird that is singing holds still and sings. `stillness` is how much of the
+-- look-around to remove at full gape; callers multiply their idle angles by the returned scale.
+function BirdFlight.singLift(
+    gape: number,
+    deg: number,
+    neckFrac: number,
+    stillness: number
+): (number, number, number)
     local total = deg * gape
     local neck = total * neckFrac
-    return neck, total - neck
+    -- clamped so a stillness over 1 cannot invert the idle motion into a counter-wobble
+    local idleScale = math.max(0, 1 - stillness * gape)
+    return neck, total - neck, idleScale
 end
 
 function BirdFlight.profile(scale: number): Profile

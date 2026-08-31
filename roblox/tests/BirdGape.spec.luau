@@ -114,16 +114,31 @@ describe("BirdFlight.gapeAt", function()
     end)
 
     test("the sing lift splits between neck and head and never exceeds its budget", function()
-        local DEG, FRAC = BirdSpecies.SING_LIFT_DEG, BirdSpecies.SING_NECK_FRAC
-        local neck, head = BirdFlight.singLift(1.0, DEG, FRAC)
+        local DEG, FRAC, STILL =
+            BirdSpecies.SING_LIFT_DEG, BirdSpecies.SING_NECK_FRAC, BirdSpecies.SING_STILLNESS
+        local neck, head = BirdFlight.singLift(1.0, DEG, FRAC, STILL)
         expect(neck + head).toBe(BirdSpecies.SING_LIFT_DEG)
         expect(neck > head).toBe(true) -- the neck leads, as it does in the idle pose
-        local n0, h0 = BirdFlight.singLift(0.0, DEG, FRAC)
+        local n0, h0 = BirdFlight.singLift(0.0, DEG, FRAC, STILL)
         expect(n0).toBe(0)
         expect(h0).toBe(0)
-        local nh, hh = BirdFlight.singLift(0.5, DEG, FRAC)
+        local nh, hh = BirdFlight.singLift(0.5, DEG, FRAC, STILL)
         expect(nh * 2).toBe(neck)
         expect(hh * 2).toBe(head)
+    end)
+
+    test("singing stills the idle look-around, so the lift reads as posture not wobble", function()
+        -- ⚠ THE FIRST VERSION ADDED THE LIFT ON TOP OF THE IDLE POSE AND READ AS A HEAD WOBBLE
+        -- (owner, 2026-08-31). A bird that is singing holds still and sings; it does not carry on
+        -- glancing about. Superimposing the two made the lift indistinguishable from more idle.
+        local DEG, FRAC, STILL =
+            BirdSpecies.SING_LIFT_DEG, BirdSpecies.SING_NECK_FRAC, BirdSpecies.SING_STILLNESS
+        local _, _, quiet = BirdFlight.singLift(0.0, DEG, FRAC, STILL)
+        expect(quiet).toBe(1) -- not singing: the idle pose is untouched
+        local _, _, loud = BirdFlight.singLift(1.0, DEG, FRAC, STILL)
+        expect(loud).toBe(1 - STILL)
+        expect(loud < quiet).toBe(true)
+        expect(loud >= 0).toBe(true) -- never inverts the idle motion
     end)
 
     test("the gape angle is a real angle, and shared rather than per-species", function()

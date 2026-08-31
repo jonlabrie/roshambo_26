@@ -337,8 +337,13 @@ BirdSpecies.ENV_HZ = 12
 -- with zero boundary edges -- it cannot open) and get only the lift.
 -- ⚠ AND IT IS A ROTATION, NOT A SWELL. `Bone.Transform` DISCARDS SCALE -- measured, set 0.06 and
 -- it reads back 1.0 -- so a throat cannot puff. Degrees are all we have.
-BirdSpecies.SING_LIFT_DEG = 11 -- head, at full envelope
+BirdSpecies.SING_LIFT_DEG = 15 -- head + neck total, at full envelope (was 11)
 BirdSpecies.SING_NECK_FRAC = 0.55 -- the neck takes this much of it, so the lift is not a hinge
+-- ⚠ HOW MUCH OF THE IDLE LOOK-AROUND TO REMOVE WHILE SINGING. At 11 degrees added ON TOP of the
+-- idle pose the lift read as a head wobble, because the bird kept glancing about mid-song and the
+-- two motions were the same size. Stilling the idle is what turns it into a held posture; the
+-- degrees alone could not, however far they were pushed.
+BirdSpecies.SING_STILLNESS = 0.75
 
 -- The voice for `species`, or nil if it has none. See `pick` for why nil rather than a fallback.
 function BirdSpecies.voiceOf(species: string): Voice?
