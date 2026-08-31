@@ -422,10 +422,24 @@ the target" as verification — that 0.021 was the uguisu's own residual, accept
 treated as a property of all birds. Two birds sharing a mesh, a rig and a pivot now land 0.054
 apart, 15% of the mejiro's height, and the error grows with the scale factor.
 
-**Seat by the rendered box bottom** (`BirdFlight.footOffset`, used by `BirdRig.seat`), which is the
-toes on a perching bird and is what the karasu's exact 0.000 confirms the export intended. Place
-both halves by the pivot first — that is what locks body and wings together, and it is exact — then
-drop the pair.
+**Seat by the rendered box bottom** (`BirdFlight.footOffset`), placing both halves by the pivot
+first — that is what locks body and wings together, and it is exact — then dropping the pair.
+
+⚠ **AND THAT IS STILL NOT WHERE THE BIRD STANDS.** The box bottom is the lowest *toe tip*, and the
+toes are modelled curled for gripping, so they hang below the foot pad. Seating the tips on the
+kasagi landed them 0.004 studs above it — correct to five thousandths of a stud — and the owner
+looked at it and said the bird was sunk. Twice, across two different seating models, because both
+were solving the wrong quantity.
+
+⚠ **NO MEASUREMENT OF THE MESH CAN FIND THIS GAP: the bounds *are* the tips.** It was settled by
+putting three identical mejiros on the rail at +0.00 / +0.05 / +0.10 studs and asking which read
+right — the owner picked +0.05 on a bird 0.640 long, so `PERCH_CLEARANCE_FRAC = 0.078`. It is
+labelled the owner's eye in the source, because that is what it is.
+
+**A fraction of body length, not a constant**: the mejiro *is* the uguisu's mesh at 0.773, the same
+feet uniformly smaller, so the droop scales with the bird. Certain for that pair. The karasu has its
+own feet and takes 0.078 only as a default — it has not been judged, and its clearance lands at
+0.128 studs on that assumption alone.
 
 ⚠ **`Bone.WorldCFrame` IS NOT A USABLE MEASUREMENT ON A RESIZED MESHPART.** The mejiro and the
 uguisu report their lowest bone at an identical −0.093 from the pivot despite a 0.773 scale factor

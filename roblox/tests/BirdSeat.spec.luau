@@ -26,8 +26,8 @@ local describe, test, expect = harness.describe, harness.test, harness.expect
 -- ⚠ 1e-3 BECAUSE THE INPUTS ARE THREE-DECIMAL PRINTOUTS. The karasu's true offset is 0.0005 --
 -- centre 100.449 minus half of 0.897 -- and agreement finer than the measurement's own resolution
 -- would be asserting precision that was never read off the rig.
-local function near(a: number, b: number): boolean
-    return math.abs(a - b) < 1e-3
+local function near(a: number, b: number, tol: number?): boolean
+    return math.abs(a - b) < (tol or 1e-3)
 end
 
 describe("BirdFlight.footOffset", function()
@@ -55,5 +55,41 @@ describe("BirdFlight.footOffset", function()
         expect(near(BirdFlight.footOffset(3.215, 0.365, 3), BirdFlight.footOffset(100.215, 0.365, 100))).toBe(
             true
         )
+    end)
+end)
+
+describe("BirdFlight.perchClearance", function()
+    -- ⚠ THE LOWEST TOE IS NOT WHERE THE BIRD STANDS. Seating the lowest geometry exactly on the
+    -- rail is what the measurements said to do -- toes landed 0.004 studs above the kasagi, five
+    -- thousandths -- and the owner looked at it and said the bird was too low. Twice.
+    --
+    -- The toes are modelled curled for gripping, so their tips hang below the foot pad the bird
+    -- actually stands on. The gap is real geometry and no measurement of the mesh bounds can find
+    -- it: the bounds are the tips.
+    --
+    -- ⚠ SO THIS NUMBER IS THE OWNER'S EYE, NOT A DERIVATION, and it is labelled that way on
+    -- purpose. Three identical mejiros were placed along the torii rail at +0.00, +0.05 and +0.10
+    -- studs above the toes-on-surface seat; the owner picked +0.05 on a bird 0.640 long.
+    -- 0.05 / 0.640 = 0.078.
+    --
+    -- ⚠ A FRACTION OF BODY LENGTH, NOT A CONSTANT, because the mejiro IS the uguisu's mesh scaled
+    -- to 0.773 -- the same toes, uniformly smaller, so their droop scales with the bird. That much
+    -- is certain for those two. The karasu is a different mesh with its own feet and inherits this
+    -- only as a default; it has not been judged.
+    test("reproduces the owner's pick on the bird it was judged on", function()
+        expect(near(BirdFlight.perchClearance(0.640), 0.050, 1e-3)).toBe(true)
+    end)
+
+    test("scales with the bird, so the uguisu and its scaled sibling agree", function()
+        -- the mejiro is the uguisu at 0.773; the clearance must be too, or one of them is wrong
+        local ratio = BirdFlight.perchClearance(0.640) / BirdFlight.perchClearance(0.828)
+        expect(near(ratio, 0.640 / 0.828, 1e-6)).toBe(true)
+    end)
+
+    test("lifts the mejiro off the seat that read too low", function()
+        -- pivot-seated: box bottom +0.0325 from the pivot. Applying the drop RAISES it by 0.0175.
+        local drop = BirdFlight.perchDrop(100.215, 0.365, 100, 0.640)
+        expect(near(drop, 0.0325 - 0.050, 1e-3)).toBe(true)
+        expect(drop < 0).toBe(true)
     end)
 end)

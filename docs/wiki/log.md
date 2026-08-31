@@ -2972,9 +2972,18 @@ studs apart on a byte-identical pivot — 15% of the mejiro's height. The commen
 justifying the pivot cited "feet land within 0.021 of the target", which was the uguisu's
 own residual accepted once and then generalised to every bird.
 
-Both now read from the rig instead of assuming it: `BirdFlight.toBoneSpace` and
+⚠ **And the seat was still wrong after that.** The box bottom is the lowest toe *tip*, and the
+toes are modelled curled, so the pad the bird stands on is above them. Two seating models both
+measured correct — the second to within 0.004 studs — and both read as a sunk bird to the owner,
+because neither was solving for the pad. Settled the only way it could be: three identical mejiros
+on the rail at +0.00 / +0.05 / +0.10 studs, owner picked +0.05, giving
+`PERCH_CLEARANCE_FRAC = 0.078` of body length. Recorded in the source as the owner's eye, not a
+derivation. The owner also challenged the perch height itself, which was worth checking and turned
+out sound — a probe cube on the same raycast sat correctly, and the rail's profile is flat at
+127.598 across the bird's whole footprint, rising to 128.480 only at the curved tips.
+
+Both faults now read from the rig instead of assuming it: `BirdFlight.toBoneSpace` and
 `BirdFlight.footOffset` are pure (Lune has no `CFrame`), with `BirdRig` the Roblox half
 that resolves each bone's axes at spawn and seats by the rendered box bottom. Recorded in
 [[blender-pipeline]], including the trap that `Bone.WorldCFrame` reads back **unscaled**
 on a resized MeshPart and so cannot be used to find the feet. 1579 → 1588 tests.
-

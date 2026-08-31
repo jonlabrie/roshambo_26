@@ -325,6 +325,29 @@ function BirdFlight.footOffset(centreY: number, sizeY: number, pivotY: number): 
     return (centreY - sizeY / 2) - pivotY
 end
 
+-- ⚠ HOW FAR THE FOOT PAD SITS ABOVE THE LOWEST TOE, as a fraction of body length. The toes are
+-- modelled curled for gripping, so their tips hang below the surface the bird actually stands on,
+-- and `footOffset` -- which reads the mesh BOUNDS -- can only ever find the tips. Seating those on
+-- the rail put the mejiro's toes 0.004 studs off the kasagi and still read as a bird sunk into it.
+--
+-- ⚠ THE OWNER'S EYE, NOT A DERIVATION. Three identical mejiros at +0.00 / +0.05 / +0.10 studs
+-- above the toes-on-surface seat; +0.05 on a bird 0.640 long, so 0.078. Nothing in the mesh can
+-- confirm this and no measurement should be presented as if it had.
+--
+-- ⚠ A FRACTION, NOT A CONSTANT, because the mejiro IS the uguisu's mesh at 0.773 -- the same feet,
+-- uniformly smaller, so the droop scales with the bird. Certain for that pair. The karasu has its
+-- own feet and takes this only as a default; it has not been judged.
+BirdFlight.PERCH_CLEARANCE_FRAC = 0.078
+
+function BirdFlight.perchClearance(bodyLength: number): number
+    return bodyLength * BirdFlight.PERCH_CLEARANCE_FRAC
+end
+
+-- How far to move a pivot-seated bird so it STANDS on the target: positive drops, negative lifts.
+function BirdFlight.perchDrop(centreY: number, sizeY: number, pivotY: number, bodyLength: number): number
+    return BirdFlight.footOffset(centreY, sizeY, pivotY) - BirdFlight.perchClearance(bodyLength)
+end
+
 export type Basis = { { number } }
 
 -- ⚠ WHICH WAY IS UP FOR THIS BONE. `CFrame.Angles(pitch, yaw, 0)` is only pitch and yaw if the
