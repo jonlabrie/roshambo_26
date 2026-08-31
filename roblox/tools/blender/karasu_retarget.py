@@ -2316,7 +2316,7 @@ def rig_of(part):
         f"An unrigged mesh exports as a static one and the import SUCCEEDS with no bones.")
 
 
-def export(part, filepath, arm=None):
+def export(part, filepath, arm=None, textures=True):
     """One FBX per MeshPart, BOTH around the same origin and carrying the SAME rig.
 
     ⚠ Export both halves seated on the SAME origin or they mate with an offset that looks like a
@@ -2329,6 +2329,17 @@ def export(part, filepath, arm=None):
     # points somewhere you do not want; every ordinary call should let it be read off the mesh.
     arm = arm or rig_of(part)
     scene = bpy.context.scene
+    # ⚠ `textures=False` FOR A MESH TWO BIRDS SHARE. `path_mode='COPY'` copies whatever material
+    # the object happens to be wearing into the FBX's .fbm folder, and the Studio importer offers
+    # it as a TextureID. That is convenient for a bird that owns its mesh and actively wrong for
+    # one that does not: the uguisu and mejiro are the same geometry with different paint, so an
+    # FBX carrying either is a trap. It shipped the MEJIRO's colormap inside `uguisu_body.fbm`
+    # once, and the owner caught it in the import dialog. Bare geometry, paint set in Studio.
+    stripped = {}
+    if not textures:
+        po = bpy.data.objects[part] if isinstance(part, str) else part
+        stripped[po] = [sl.material for sl in po.material_slots]
+        po.data.materials.clear()
     others = [o for o in bpy.data.objects
               if o.type == 'MESH' and o.name != part and o.name in scene.collection.all_objects]
     holders = {}
@@ -2375,6 +2386,9 @@ def export(part, filepath, arm=None):
                 path_mode='COPY', embed_textures=False,
                 axis_forward='-Z', axis_up='Y')
     finally:
+        for po, mats in stripped.items():
+            for m in mats:
+                po.data.materials.append(m)
         arm.rotation_euler = prev
         for o, cs in holders.items():
             for c in cs:
