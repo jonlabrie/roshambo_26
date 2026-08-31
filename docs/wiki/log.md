@@ -2697,3 +2697,35 @@ would change that.
 Two stale comments in `BirdFlight` corrected in the same pass: `CAW_GAPE_SECONDS` was cited as 0.30
 against a 0.48 gap (it is 0.23 against 0.70), and the module still announced "NOTHING CALLS THIS
 TODAY".
+
+### `watchWingbeat` gains a PERCH mode — a bird you can stand in front of and watch sing
+
+The shoulder landing is not yet good enough to use as a viewing platform, and FLIGHT mode only
+answers questions about travel. PERCH parks a bird three body-lengths in front of the camera,
+facing the lens (a gape is a front-on read, unlike the wingbeat, which ISOLATED shows side-on),
+and loops the ambient behaviours far tighter than the game does: singing every ~3.5s instead of
+waiting on a chance roll, plus flutter and the idle head/tail. `PERCH_AT = "TORII"` stands it on
+the gate's top rail (y 128.5) for the prettier shot.
+
+⚠ **PERCH REFUSES TO RUN IN EDIT, AND THE REASON IS MEASURED.** In Edit a Sound loads properly
+(`IsLoaded` true, `TimeLength` 0.520) and reports `IsPlaying` true, but **`TimePosition` never
+advances** — six samples over half a second all read 0.000. The gape is driven off `TimePosition`,
+so in Edit the beak hangs shut and the tool looks broken rather than unsupported. It asserts with
+an explanation instead. This is the first mode in that file that cannot use the Edit path the
+header otherwise recommends.
+
+⚠ **`SONG_SPEED` SLOWS THE AUDIO AND THE JAW TOGETHER, WHICH IS WHY IT IS SAFE TO USE.**
+`gapeAt` consumes `Sound.TimePosition`, and TimePosition is measured in CLIP time — it advances at
+`PlaybackSpeed`. So the measured onsets still line up and the whole envelope simply plays slower.
+0.35 makes a 0.23s gape something the eye can follow. A tool that slowed the jaw by any other means
+would be showing a motion the game never performs.
+
+The mode calls the same shared functions with the same arguments the controller does, so it proves
+the ENVELOPE, THE DATA AND THE ASSET. It does not prove `BirdController`'s own wiring — the tool
+reimplements that, and could show a perfect gape while the shipped controller is broken. The
+inverted test in `BirdGape.spec` is what guards the wiring; this guards the look.
+
+It reports after 12s and warns specifically: no `bill_lower` bone, versus songs playing with no
+measured `caws` (correct for the uguisu, not a bug), versus nothing playing at all. A clip that
+fails to load never fires `Ended`, so the song also carries an 8s deadline — the same guard
+`BirdController` has, for the same reason.
