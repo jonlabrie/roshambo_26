@@ -2766,3 +2766,36 @@ Two findings recorded against the ambient design, neither built:
 **71% are path lanterns and railings**, 16% bridges, 7% the falls landing, and only **15 perches
 in the whole canyon are on a tree**. The perch graph is a ROAD MAP, not a habitat map; it is
 correct for familiars, which follow players who walk on paths, and wrong for territories.
+
+### Contract tests — the gap conventional testing still fills
+
+⚠ **ELEVEN REAL DEFECTS WERE FOUND ACROSS THIS SESSION AND A UNIT TEST CAUGHT NONE OF THEM.**
+Five came from measuring geometry (vertex valence, signed volume, ray casts, texel run lengths),
+three from assertions embedded in the doing, two from reading a code path before running it, and
+three from the owner's eye. That is the honest case against writing tests for generative work: no
+assertion substitutes for "does this read as a crow".
+
+But there is one class conventional testing still owns — **the contract between DATA and the code
+that reads it** — and it was going unchecked. Both halves now exist and both were mutation-proven
+rather than merely written.
+
+**`tools/blender/test_bake_contracts.py`** runs the real shaders over the real palettes with
+`bpy` stubbed (they are pure numpy). ⚠ **IT RUNS THEM RATHER THAN PARSING THEM**: grepping the
+source for `C["..."]` would be guessing, and a key read inside a conditional is only checked if
+the condition is true — `shade` looks up `eyeline` and `supercilium` inside `if head.any()`, so
+the probe points deliberately include the head band 0.082 < y < 0.168. Seven planted defects, all
+caught: a missing palette key, a species naming a shader that does not exist, an inverted eye-ring
+stack, roughening that dies before the ring's outer edge, a lore that stops reading off `EYE`,
+colour leaking into a scalar roughness channel, and a throat running past the bill line. Wired
+into `roblox-ci.yml`.
+
+**`tests/BirdSpeciesContract.spec.luau`** tests the SHAPE every species must have, where
+`BirdGape.spec` tests the karasu's measured onsets specifically. Six planted defects, all caught:
+a duplicate clip id inside one voice (which errors nowhere and merely makes one call twice as
+likely as the weights say), an onset that leaves the beak open after the sound stops, two onsets
+closer together than the gape window, a reversed rolloff pair, a zero clip weight, and a
+`bodyLength` of 0 — which would otherwise surface at spawn as NaN positions and "the bird
+vanished". 1562 tests -> 1568.
+
+⚠ **A GUARD THAT HAS NEVER FIRED IS NOT KNOWN TO WORK.** Every check added here was made to fail
+once, deliberately, before being trusted. That is cheaper than the check itself and worth more.
