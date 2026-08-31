@@ -2839,3 +2839,32 @@ duration, and a value outside 0–1 all fail. 1571 → 1573 tests.
 ⚠ **NOT YET SHIPPED:** no species carries an `env`, because the mejiro has no uploaded clip ids.
 The two new contracts are therefore vacuous until it does — which is why they were mutation-tested
 against a temporarily-envelope'd karasu rather than trusted.
+
+### The mejiro is a species — and the contract caught a defect on its first real use
+
+Four clips shipped with measured envelopes and ids. Weights follow the karasu's rhetoric rather
+than being uniform — 40/30/20/10 from the 0.46s remark to the 5.3s full warble — because a thing
+heard every fourth time is not a declaration. `volume = 0.85`, the uguisu's rather than the
+karasu's, and for the same measured reason: these clips peak −3.3 to −7.8 dBFS (mean ≈ −5.5)
+against the uguisu's −5.4 and the karasu's −7.4 to −9.9. `bodyLength = 0.640`, measured off the
+shipped asset, sharing the uguisu's mesh scaled 0.7729 on **both** halves.
+
+⚠ **THE ENVELOPE CONTRACT FIRED THE MOMENT IT STOPPED BEING VACUOUS, AND IT WAS RIGHT.**
+`measure_envelope` computed its frame count as `(len - hop) // hop`, dropping the trailing partial
+frame — mejiro-4's 62 samples spanned **5.167s of a 5.30s clip**, so the beak would have shut
+0.13s before the song ended. Every clip was short by a frame or two. The fix is `ceil` with the
+final frame taking whatever samples remain; the test's ±1.5-sample tolerance is what made it
+visible, and a looser one would have hidden it.
+
+⚠ **THAT IS THE ARGUMENT FOR CONTRACT TESTS IN ONE EXAMPLE.** It is not a defect anybody would
+report — nobody watches a beak for the last eighth of a second of a song — and no amount of
+looking at the bird would have found it. It is exactly the mechanical, invisible class that
+conventional testing still owns.
+
+Proven live rather than assumed: editing `seconds` to 7.0 while leaving `env` stale fails both the
+Luau contract and `measure_envelope.py --check`, which report the same defect from two directions.
+1573 tests green.
+
+⚠ **STILL PLACE-ONLY:** `MejiroBody`/`MejiroWings` exist in the place with their SurfaceAppearances
+but are not saved to `assets/meshes/` and not declared in `default.project.json`. `SPECIES =
+"Mejiro"` therefore works in the owner's session and nowhere else until they are.

@@ -42,8 +42,13 @@ def envelope(path, hz=ENV_HZ, smooth_ms=SMOOTH_MS, pct=PERCENTILE):
     a, sr = read_wav(path)
     dur = len(a) / sr
     hop = max(1, int(sr / hz))
-    n = max(1, (len(a) - hop) // hop)
-    rms = np.array([np.sqrt(np.mean(a[i * hop:(i + 1) * hop] ** 2) + 1e-12) for i in range(n)])
+    # ⚠ COVER THE WHOLE CLIP, INCLUDING THE TRAILING PARTIAL FRAME. `(len - hop) // hop` drops it,
+    # and the envelope then ends BEFORE the audio does -- measured on mejiro-4, 62 samples spanned
+    # 5.167s of a 5.30s clip and the beak shut 0.13s early. The contract test
+    # (#env ~= seconds * ENV_HZ) is what caught it; a looser tolerance would have hidden it.
+    n = max(1, -(-len(a) // hop))          # ceil
+    rms = np.array([np.sqrt(np.mean(a[i * hop:min((i + 1) * hop, len(a))] ** 2) + 1e-12)
+                    for i in range(n)])
     k = max(1, int(smooth_ms / 1000 * hz))
     if k > 1:
         pad = np.pad(rms, (k // 2, k // 2), mode="edge")
