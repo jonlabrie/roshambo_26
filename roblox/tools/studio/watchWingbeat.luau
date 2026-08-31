@@ -562,8 +562,9 @@ local function runPerch()
         -- mejiro -- an envelope bird -- sang in PERCH with nothing moving at all. That reads as a
         -- broken feature rather than an incomplete tool, and cost the owner a viewing session.
         -- The choice now lives in `BirdFlight.gapeForClip`, which the real controller calls too.
-        local g = 0
+        local g, songGate = 0, 0
         if song and song.IsPlaying then
+            songGate = BirdFlight.songGate(song.TimePosition, song.TimeLength, BirdSpecies.SING_GATE_RAMP)
             g = BirdFlight.gapeForClip(
                 song.TimePosition,
                 caws,
@@ -586,7 +587,8 @@ local function runPerch()
             g,
             BirdSpecies.SING_LIFT_DEG,
             BirdSpecies.SING_NECK_FRAC,
-            BirdSpecies.SING_STILLNESS
+            BirdSpecies.SING_STILLNESS,
+            songGate
         )
 
         -- --- flutter: a short burst of real wingbeat, then folded again ---

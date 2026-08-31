@@ -343,7 +343,14 @@ BirdSpecies.SING_NECK_FRAC = 0.55 -- the neck takes this much of it, so the lift
 -- idle pose the lift read as a head wobble, because the bird kept glancing about mid-song and the
 -- two motions were the same size. Stilling the idle is what turns it into a held posture; the
 -- degrees alone could not, however far they were pushed.
-BirdSpecies.SING_STILLNESS = 0.75
+-- ⚠ 0.90, NOT 0.75, AND THE REASON IS ARITHMETIC. `idlePose` yaws up to 62 degrees against a
+-- pitch of 18, and the head bone takes 0.6 of the yaw -- so at 0.75 the head still received 9.3
+-- degrees of side-to-side against 6.8 of lift, and the SIDEWAYS motion was the larger of the two.
+-- The owner saw "a side to side head wobble" because that is literally what was biggest.
+BirdSpecies.SING_STILLNESS = 0.90
+-- Seconds to settle at the start of a song and to release at the end. Long enough not to snap,
+-- short enough that the bird is already still by the first syllable.
+BirdSpecies.SING_GATE_RAMP = 0.15
 
 -- The voice for `species`, or nil if it has none. See `pick` for why nil rather than a fallback.
 function BirdSpecies.voiceOf(species: string): Voice?

@@ -150,6 +150,16 @@ describe("BirdSpecies contract", function()
         -- ⚠ STILLNESS MUST NOT EXCEED 1, or `singLift` would drive the idle motion NEGATIVE and
         -- the bird would counter-wobble against its own look-around while singing.
         expect(BirdSpecies.SING_STILLNESS >= 0 and BirdSpecies.SING_STILLNESS <= 1).toBe(true)
+        expect(BirdSpecies.SING_GATE_RAMP > 0).toBe(true)
+        -- ⚠ THE LIFT MUST BEAT THE RESIDUAL YAW OR THE BIRD READS AS WOBBLING SIDEWAYS. `idlePose`
+        -- yaws four times as far as it pitches, and the head bone takes 0.6 of that -- so the
+        -- stillness has to be strong enough that what is left is smaller than the lift. This is
+        -- the arithmetic that made 0.75 look wrong and 0.90 look right.
+        -- ⚠ BY A MARGIN, NOT BY A HAIR. Written first as `residual < lift`, which passed at
+        -- stillness 0.60 -- residual 14.88 against a 15.0 lift, a 0.12 degree win that guards
+        -- nothing and that the owner would still read as a wobble. The lift has to DOMINATE.
+        local residualYaw = BirdFlight.HEAD_YAW_MAX * 0.6 * (1 - BirdSpecies.SING_STILLNESS)
+        expect(residualYaw * 2 < BirdSpecies.SING_LIFT_DEG).toBe(true)
     end)
 
     test("the gape constants are scale-free and sane", function()

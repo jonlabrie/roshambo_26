@@ -312,16 +312,37 @@ end
 -- because the bird carried on glancing about while it sang and the two motions were
 -- indistinguishable. A bird that is singing holds still and sings. `stillness` is how much of the
 -- look-around to remove at full gape; callers multiply their idle angles by the returned scale.
+-- ⚠ IS THE BIRD SINGING AT ALL -- a flat 1 across the phrase, ramped at both ends. NOT the gape.
+-- Damping the look-around by the gape modulated it at `ENV_HZ`, twelve times a second, which is
+-- a wobble generator rather than a bird settling. A bird settles when it begins to sing and stays
+-- settled until it stops.
+--
+-- ⚠ STATELESS, DERIVED FROM THE PLAYHEAD. A smoothed per-bird flag would need memory that can
+-- drift out of step with the audio; the clip's own position cannot.
+function BirdFlight.songGate(elapsed: number, length: number, ramp: number): number
+    if elapsed < 0 or elapsed > length or length <= 0 then
+        return 0
+    end
+    if ramp <= 0 then
+        return 1
+    end
+    local rise = smoothstep(0, math.min(ramp, length * 0.5), elapsed)
+    local fall = 1 - smoothstep(length - math.min(ramp, length * 0.5), length, elapsed)
+    return math.min(rise, fall)
+end
+
 function BirdFlight.singLift(
     gape: number,
     deg: number,
     neckFrac: number,
-    stillness: number
+    stillness: number,
+    gate: number
 ): (number, number, number)
     local total = deg * gape
     local neck = total * neckFrac
-    -- clamped so a stillness over 1 cannot invert the idle motion into a counter-wobble
-    local idleScale = math.max(0, 1 - stillness * gape)
+    -- ⚠ THE GATE DAMPS, THE GAPE LIFTS. They are different signals on purpose: the lift should
+    -- follow the syllables and the settling should not.
+    local idleScale = math.max(0, 1 - stillness * gate)
     return neck, total - neck, idleScale
 end
 

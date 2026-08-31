@@ -116,15 +116,35 @@ describe("BirdFlight.gapeAt", function()
     test("the sing lift splits between neck and head and never exceeds its budget", function()
         local DEG, FRAC, STILL =
             BirdSpecies.SING_LIFT_DEG, BirdSpecies.SING_NECK_FRAC, BirdSpecies.SING_STILLNESS
-        local neck, head = BirdFlight.singLift(1.0, DEG, FRAC, STILL)
+        local neck, head = BirdFlight.singLift(1.0, DEG, FRAC, STILL, 1)
         expect(neck + head).toBe(BirdSpecies.SING_LIFT_DEG)
         expect(neck > head).toBe(true) -- the neck leads, as it does in the idle pose
-        local n0, h0 = BirdFlight.singLift(0.0, DEG, FRAC, STILL)
+        local n0, h0 = BirdFlight.singLift(0.0, DEG, FRAC, STILL, 1)
         expect(n0).toBe(0)
         expect(h0).toBe(0)
-        local nh, hh = BirdFlight.singLift(0.5, DEG, FRAC, STILL)
+        local nh, hh = BirdFlight.singLift(0.5, DEG, FRAC, STILL, 1)
         expect(nh * 2).toBe(neck)
         expect(hh * 2).toBe(head)
+    end)
+
+    test("the stillness gate follows the SONG, not the syllables", function()
+        -- ⚠ TYING IT TO `gape` BUILT A WOBBLE GENERATOR. The gape is the envelope and moves at
+        -- ENV_HZ, so damping the look-around by it modulated the yaw twelve times a second --
+        -- the owner saw "a side to side head wobble", which is exactly what that is. A bird
+        -- settles when it begins to sing and stays settled through the phrase.
+        -- Stateless on purpose: derived from the playhead, so no per-bird memory can drift.
+        local RAMP = 0.15
+        expect(BirdFlight.songGate(-1, 2.0, RAMP)).toBe(0) -- before the clip
+        expect(BirdFlight.songGate(3.0, 2.0, RAMP)).toBe(0) -- after it
+        expect(BirdFlight.songGate(1.0, 2.0, RAMP)).toBe(1) -- settled, mid-phrase
+        -- and it ramps rather than snapping, at both ends
+        local a = BirdFlight.songGate(RAMP / 2, 2.0, RAMP)
+        expect(a > 0 and a < 1).toBe(true)
+        local b = BirdFlight.songGate(2.0 - RAMP / 2, 2.0, RAMP)
+        expect(b > 0 and b < 1).toBe(true)
+        -- ⚠ FLAT ACROSS THE MIDDLE is the whole point: two samples a syllable apart must agree,
+        -- or the damping animates and we are back to the wobble.
+        expect(BirdFlight.songGate(0.9, 2.0, RAMP)).toBe(BirdFlight.songGate(1.0, 2.0, RAMP))
     end)
 
     test("singing stills the idle look-around, so the lift reads as posture not wobble", function()
@@ -133,9 +153,13 @@ describe("BirdFlight.gapeAt", function()
         -- glancing about. Superimposing the two made the lift indistinguishable from more idle.
         local DEG, FRAC, STILL =
             BirdSpecies.SING_LIFT_DEG, BirdSpecies.SING_NECK_FRAC, BirdSpecies.SING_STILLNESS
-        local _, _, quiet = BirdFlight.singLift(0.0, DEG, FRAC, STILL)
+        local _, _, quiet = BirdFlight.singLift(0.0, DEG, FRAC, STILL, 0)
         expect(quiet).toBe(1) -- not singing: the idle pose is untouched
-        local _, _, loud = BirdFlight.singLift(1.0, DEG, FRAC, STILL)
+        -- ⚠ THE GATE, NOT THE GAPE, decides the damping: a bird mid-phrase between two syllables
+        -- is still settled, so gape 0 with the gate open must still be quiet.
+        local _, _, between = BirdFlight.singLift(0.0, DEG, FRAC, STILL, 1)
+        expect(between).toBe(1 - STILL)
+        local _, _, loud = BirdFlight.singLift(1.0, DEG, FRAC, STILL, 1)
         expect(loud).toBe(1 - STILL)
         expect(loud < quiet).toBe(true)
         expect(loud >= 0).toBe(true) -- never inverts the idle motion

@@ -898,12 +898,16 @@ RunService.RenderStepped:Connect(function()
             -- `:Play()` on a sound that has not loaded does not start the audio -- it starts it
             -- when the load finishes -- so an elapsed timer runs ahead of the song. That happens
             -- on a cold load, which is the first time anyone sees the bird.
-            local gape = 0
+            local gape, songGate = 0, 0
             do
                 local song, caws, env = b.song, b.songCaws, b.songEnv
                 -- Onsets for a punctuated caller, an envelope for a warbler; a clip with neither
                 -- leaves the bird still, which is correct for a dove rather than missing data.
                 if song and song.IsPlaying then
+                    -- ⚠ THE GATE IS FLAT ACROSS THE PHRASE; the gape is not. Damping the
+                    -- look-around by the gape modulates it at ENV_HZ and reads as a wobble.
+                    songGate =
+                        BirdFlight.songGate(song.TimePosition, song.TimeLength, BirdSpecies.SING_GATE_RAMP)
                     gape = BirdFlight.gapeForClip(
                         song.TimePosition,
                         caws,
@@ -930,7 +934,8 @@ RunService.RenderStepped:Connect(function()
                 gape,
                 BirdSpecies.SING_LIFT_DEG,
                 BirdSpecies.SING_NECK_FRAC,
-                BirdSpecies.SING_STILLNESS
+                BirdSpecies.SING_STILLNESS,
+                songGate
             )
 
             -- ===== IDLE =====
