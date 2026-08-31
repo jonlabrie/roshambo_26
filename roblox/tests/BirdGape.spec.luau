@@ -41,7 +41,11 @@ describe("BirdFlight.gapeAt", function()
         -- nothing if the playhead they are compared against is guessed.
         local fs = require("@lune/fs")
         local src = harness.stripComments(fs.readFile("src/client/BirdController.client.luau"))
-        for _, needed in { "bill_lower", "billLower", "TimePosition" } do
+        -- ⚠ AND THE LIFT MUST BE THERE TOO. The gape used to be computed INSIDE
+        -- `if b.billLower then`, which was harmless while every bird had that bone -- but the
+        -- uguisu and mejiro share a bill that cannot open and no longer carry it, so nested
+        -- that way they would compute no gape and get no lift: silent AND still, while singing.
+        for _, needed in { "bill_lower", "billLower", "TimePosition", "SING_LIFT_DEG" } do
             expect(string.find(src, needed, 1, true) ~= nil).toBe(true)
         end
     end)

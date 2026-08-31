@@ -328,6 +328,18 @@ BirdSpecies.CAW_GAPE_DEGREES = 20
 -- over the source WAVs; `--check` fails on drift rather than letting the beak slide.
 BirdSpecies.ENV_HZ = 12
 
+-- ⚠ WHAT SINGING LOOKS LIKE ON A BIRD TOO SMALL FOR A GAPE TO READ. A 20 degree jaw on the
+-- karasu is 6.8 pixels at ordinary third-person distance and worth its bill split; on the mejiro
+-- it is 2.6, and on the uguisu 3.4. What carries at that size is the POSTURE -- a small bird
+-- throws its head back to sing -- so the envelope also lifts the head and neck, on every bird.
+-- ⚠ IT ADDS TO THE GAPE RATHER THAN REPLACING IT. The karasu does both, which is what a cawing
+-- crow does; the uguisu and mejiro have no `bill_lower` at all (their bill is one closed shell
+-- with zero boundary edges -- it cannot open) and get only the lift.
+-- ⚠ AND IT IS A ROTATION, NOT A SWELL. `Bone.Transform` DISCARDS SCALE -- measured, set 0.06 and
+-- it reads back 1.0 -- so a throat cannot puff. Degrees are all we have.
+BirdSpecies.SING_LIFT_DEG = 11 -- head, at full envelope
+BirdSpecies.SING_NECK_FRAC = 0.55 -- the neck takes this much of it, so the lift is not a hinge
+
 -- The voice for `species`, or nil if it has none. See `pick` for why nil rather than a fallback.
 function BirdSpecies.voiceOf(species: string): Voice?
     local rec = BirdSpecies.SPECIES[species]

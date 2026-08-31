@@ -139,6 +139,16 @@ describe("BirdSpecies contract", function()
         end
     end)
 
+    test("the sing lift is a real angle, split between neck and head", function()
+        -- ⚠ THE LIFT IS WHAT SINGING LOOKS LIKE ON A BIRD TOO SMALL FOR A GAPE. A 20 degree jaw
+        -- is 6.8 pixels on a karasu at ordinary distance and 2.6 on a mejiro, so the posture
+        -- carries the read. It must not exceed the neck's own limit or the bird folds backwards.
+        expect(BirdSpecies.SING_LIFT_DEG > 0).toBe(true)
+        expect(BirdSpecies.SING_LIFT_DEG <= BirdFlight.HEAD_PITCH_MAX).toBe(true)
+        -- strictly between 0 and 1: at either end the lift becomes a hinge at one joint
+        expect(BirdSpecies.SING_NECK_FRAC > 0 and BirdSpecies.SING_NECK_FRAC < 1).toBe(true)
+    end)
+
     test("the gape constants are scale-free and sane", function()
         expect(BirdSpecies.ENV_HZ > 0).toBe(true)
         expect(BirdSpecies.CAW_GAPE_SECONDS > 0).toBe(true)

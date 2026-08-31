@@ -882,6 +882,50 @@ RunService.RenderStepped:Connect(function()
                 end
             end
 
+            -- ===== SONG =====
+            -- ⚠ COMPUTED BEFORE THE IDLE POSE, because the sing lift is ADDED to the idle head
+            -- and neck angles. The idle block writes those bones, so anything set first would
+            -- simply be overwritten.
+            --
+            -- ⚠ AND COMPUTED WHETHER OR NOT THERE IS A JAW. This used to sit inside
+            -- `if b.billLower then`, which was harmless while every bird had that bone -- but the
+            -- uguisu and mejiro share a bill that is ONE CLOSED SHELL with zero boundary edges,
+            -- so the bone was removed rather than left to stretch a bill that cannot open. Nested
+            -- as it was, those birds would compute no gape and get no lift either: silent AND
+            -- still, while singing.
+            --
+            -- ⚠ DRIVEN OFF THE AUDIO'S OWN PLAYHEAD, NOT A CLOCK STARTED AT `:Play()`. Calling
+            -- `:Play()` on a sound that has not loaded does not start the audio -- it starts it
+            -- when the load finishes -- so an elapsed timer runs ahead of the song. That happens
+            -- on a cold load, which is the first time anyone sees the bird.
+            local gape = 0
+            do
+                local song, caws, env = b.song, b.songCaws, b.songEnv
+                -- Onsets for a punctuated caller, an envelope for a warbler; a clip with neither
+                -- leaves the bird still, which is correct for a dove rather than missing data.
+                if song and song.IsPlaying then
+                    if caws then
+                        gape = BirdFlight.gapeAt(song.TimePosition, caws, BirdSpecies.CAW_GAPE_SECONDS)
+                    elseif env then
+                        gape = BirdFlight.gapeFromEnvelope(song.TimePosition, env, BirdSpecies.ENV_HZ)
+                    end
+                end
+                -- The jaw, on the birds that have one. ⚠ LOCAL +X, POSITIVE, AND THE SIGN IS
+                -- OPPOSITE TO BLENDER'S -- measured in Studio on the shipped asset: a probe one
+                -- jaw-length out along the bone's local +Y drops 0.0641 studs under rad(+20).
+                if b.billLower then
+                    b.billLower.Transform = if gape > 0
+                        then CFrame.Angles(math.rad(BirdSpecies.CAW_GAPE_DEGREES * gape), 0, 0)
+                        else CFrame.identity
+                end
+            end
+
+            -- ⚠ AND THE SONG LIFTS THE HEAD, WHICH IS THE WHOLE READ ON A SMALL BIRD. A 20 degree
+            -- gape is 6.8 pixels on a karasu at ordinary third-person distance and 2.6 on a
+            -- mejiro; the POSTURE is what carries at that size, and a small bird throws its head
+            -- back to sing. Split across neck and head so the bird arches rather than hinging.
+            local lift = gape * BirdSpecies.SING_LIFT_DEG
+
             -- ===== IDLE =====
             -- ⚠ ONLY WHILE PERCHED. A bird in the air is not looking around; it is going
             -- somewhere, and a head snapping about mid-flight reads as a glitch.
@@ -890,48 +934,21 @@ RunService.RenderStepped:Connect(function()
                 idleYaw, idlePitch, idleTail = BirdFlight.idlePose(now, b.seed, PROFILE)
             end
             if b.neck then
-                b.neck.Transform = CFrame.Angles(math.rad(idlePitch * 0.35), math.rad(idleYaw * 0.4), 0)
+                b.neck.Transform = CFrame.Angles(
+                    math.rad(idlePitch * 0.35 - lift * BirdSpecies.SING_NECK_FRAC),
+                    math.rad(idleYaw * 0.4),
+                    0
+                )
             end
             if b.head then
-                b.head.Transform = CFrame.Angles(math.rad(idlePitch * 0.65), math.rad(idleYaw * 0.6), 0)
+                b.head.Transform = CFrame.Angles(
+                    math.rad(idlePitch * 0.65 - lift * (1 - BirdSpecies.SING_NECK_FRAC)),
+                    math.rad(idleYaw * 0.6),
+                    0
+                )
             end
             if b.tail then
                 b.tail.Transform = CFrame.Angles(math.rad(idleTail), 0, 0)
-            end
-
-            -- ===== GAPE =====
-            -- ⚠ DRIVEN OFF THE AUDIO'S OWN PLAYHEAD, NOT A CLOCK STARTED AT `:Play()`. Calling
-            -- `:Play()` on a sound that has not loaded does not start the audio -- it starts it
-            -- when the load finishes -- so an elapsed timer runs ahead of the caw and the beak
-            -- opens before the sound. That happens on a cold load, which is the first time anyone
-            -- sees the bird. The onsets in `BirdSpecies` were MEASURED off the source WAVs by
-            -- `tools/audio/measure_caws.py`; comparing them against a guessed playhead throws away
-            -- the only reason they were measured.
-            --
-            -- ⚠ LOCAL +X, POSITIVE, AND THE SIGN IS OPPOSITE TO BLENDER'S. Measured in Studio on
-            -- the shipped asset: a probe one jaw-length out along the bone's local +Y drops 0.0641
-            -- studs under `CFrame.Angles(rad(+20), 0, 0)`. Local +Z points at the floor and local
-            -- Z rotation is lateral yaw -- neither is the hinge.
-            --
-            -- A clip with no measured onsets leaves the beak SHUT rather than guessing a rhythm,
-            -- which is every uguisu clip today. The predecessor here was `sin(now * 9) ^ 2` gated
-            -- on the WIN state: birds that never sang still sat there mouthing.
-            if b.billLower then
-                local gape = 0
-                local song, caws, env = b.song, b.songCaws, b.songEnv
-                -- ⚠ WHICHEVER THE CLIP CARRIES. Onsets for a punctuated caller, an envelope
-                -- for a warbler; a clip with neither leaves the beak shut, which is correct for
-                -- a dove rather than a gap in the data. Both read the SAME playhead.
-                if song and song.IsPlaying then
-                    if caws then
-                        gape = BirdFlight.gapeAt(song.TimePosition, caws, BirdSpecies.CAW_GAPE_SECONDS)
-                    elseif env then
-                        gape = BirdFlight.gapeFromEnvelope(song.TimePosition, env, BirdSpecies.ENV_HZ)
-                    end
-                end
-                b.billLower.Transform = if gape > 0
-                    then CFrame.Angles(math.rad(BirdSpecies.CAW_GAPE_DEGREES * gape), 0, 0)
-                    else CFrame.identity
             end
         end
     end
