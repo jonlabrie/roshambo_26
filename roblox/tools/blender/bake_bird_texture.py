@@ -698,6 +698,20 @@ def find_free_uv_block(me, w, h, res=512):
     return None
 
 
+def shade_wing_roughness(P, N, pal, S=1.0):
+    """Flat flight-feather roughness across the wing plate.
+
+    ⚠ THE WING NEEDS ITS OWN ROUGHNESS SHADER OR THE CHANNEL LEAKS. `bake` hardcoded `shade_wing`
+    for the wing region whatever channel it was baking, so a roughness pass wrote wing COLOUR --
+    linear RGB, three different values -- into a map read as a scalar. The bird would have come
+    back with a wing glossier on one side than the other for no reason anybody could trace.
+
+    Flat rather than shaded, for the same reason `shade_wing` is flat: gradients along a wing
+    alias into visible banding at this resolution.
+    """
+    return np.full((len(P), 3), ROUGH["covert"])
+
+
 def shade_wing(P, N, pal, S=1.0):
     """FLAT per surface — dark above, pale below, and nothing else.
 
@@ -1084,7 +1098,9 @@ def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name
         _raster(wme, wme.uv_layers[0].data,
                 np.array([v.co[:] for v in wme.vertices]),
                 np.array([v.normal[:] for v in wme.vertices]),
-                img, hit, res, shade_wing, pal, S)  # flat per surface -- see shade_wing
+                img, hit, res,
+                shade_wing_roughness if channel == "roughness" else shade_wing,
+                pal, S)  # flat per surface -- see shade_wing
         filled = int(hit.sum())
 
     # ⚠ HAND BACK THE EYE. Everything above painted the whole bird, this returns the one region
