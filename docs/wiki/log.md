@@ -2891,3 +2891,32 @@ difference; that is the second time this session that has been the answer.
 
 Both uguisu FBXs re-exported with the rigid bill, normalised weights, no `bill_lower`, and no
 stale entries.
+
+### The uguisu and mejiro re-ship on a repaired mesh
+
+Both birds now share mesh `125989270453965` (body) and `122044327250866` (wings): 16 bones, no
+`bill_lower`, weights normalised, bill rigid to `joint4`. The karasu keeps its 15 bones INCLUDING
+`bill_lower` — its bill is genuinely cut, so it is the one bird that should have a jaw.
+
+⚠ **A SHARED MESH MUST EXPORT WITHOUT EITHER BIRD'S PAINT.** `export()` uses `path_mode='COPY'`,
+which copies whatever material the object is wearing into the FBX's `.fbm` for the Studio importer
+to offer as a TextureID. The uguisu FBX shipped the MEJIRO's colormap — `MejiroPreview` had been
+left on the uguisu meshes after the bake — and the owner caught it in the import dialog. `export()`
+now takes `textures=False`, which strips the slots for the duration and restores them after.
+
+⚠ **DO NOT SWAP `MeshId` TO KEEP A SurfaceAppearance.** `Bone` instances are CHILDREN of the
+MeshPart, created by the importer; changing `MeshId` swaps the geometry and leaves the old skeleton,
+so new weights would bind to a stale rig. Import fresh and transfer the SurfaceAppearance, the
+size and the name onto the new part instead.
+
+⚠ **THREE MEASUREMENTS WERE WRONG TODAY AND THE DATA WAS RIGHT EVERY TIME.** `strings` on a
+compressed `.rbxl` said a mesh id was missing; a regex for `MeshId`/`<url>` said every MeshPart was
+blank, when the modern serialisation is **`MeshContent`/`<uri>`**; and a per-part regex bounded by
+lookahead swept to end-of-file and reported `bill_lower` on the wings. Each nearly became a bug
+report. **Verify the instrument before trusting a surprising reading** — see also
+`practice/blender-working-rules.md` rule 9.
+
+The Rojo round-trip is sound: a `rojo build` carries every bird's `MeshContent` and the uguisu's
+`TextureContent`. The blank duplicates that appeared under `RoshamboBirds` were a LIVE-SYNC
+artifact — Rojo created the newly declared Mejiro children before their `.rbxm`s had content —
+not a defect in the committed files.
