@@ -2729,3 +2729,40 @@ It reports after 12s and warns specifically: no `bill_lower` bone, versus songs 
 measured `caws` (correct for the uguisu, not a bug), versus nothing playing at all. A clip that
 fails to load never fires `Ended`, so the song also carries an 8s deadline — the same guard
 `BirdController` has, for the same reason.
+
+### The species list opens, and a recollection checked against the source
+
+Ambient and familiar birds will be **different species**, and the distinction is ecological rather
+than enforced: **familiars are birds that come to people; ambient birds keep their distance.** That
+answers the distinguishability question `world/ambient-birds.md` had left open, without a size
+clamp or a behavioural exception. First slice is four perching birds — yamagara, mejiro, hiyodori,
+sekirei — which are one body plan and therefore one retarget with four palettes.
+
+⚠ **THE UGUISU IS THE SPARROW, AND THE SPARROW WAS NEVER DISCARDED.** Checked against an owner
+recollection that it had been rejected as a base. It had not: `bake_bird_texture.py` describes
+repainting *"a photoreal SPARROW"* into *"a plain olive uguisu"* while keeping the vendor unwrap,
+and `BirdController` drives **the sparrow's bone names** — the crow arrived as a Maya QuickRig
+humanoid and every bone was renamed into the sparrow's scheme. What was rejected is the sparrow as
+a base for the KARASU, for one stated reason: *"a real crow head and bill... is the half of the
+silhouette a sparrow cannot be reshaped into."* That objection is about a head and bill and is
+silent for small birds, so the sparrow is the right base for all four of the first slice. Had this
+gone unchecked, four birds would have been built on the wrong base or not at all.
+
+**The zebra dove is an owner ruling** (`dove.blend` → *Geopelia striata*), chosen for its call and
+knowingly not a Japanese bird — recorded so nobody corrects it toward a kijibato later. ⚠ Its
+`caws` must be nil: doves coo with the bill closed, so a silent beak is authentic, and
+`watchWingbeat`'s no-caws warning is wrong for this one species.
+
+Two findings recorded against the ambient design, neither built:
+- **Anchors want to be committed data, not place tags.** `GetTagged` returns a different set per
+  client under streaming, so a tag sweep cannot be derived deterministically. A committed
+  territory table is identical everywhere by construction, which makes placement derivable from a
+  shared clock with **zero server traffic** — closing the divergence problem that page opens with.
+- ⚠ **The bell startle is already free.** `RoundMetronome.Schedule` carries `strikeAt`, published
+  as a schedule rather than an event, so a startle is `f(strikeAt, now, seed)` with no remote at
+  all. A round is 60s, so it must belong to the TERRITORY rather than the world.
+
+⚠ **COVERAGE, COUNTED RATHER THAN ASSUMED:** 326 `FamiliarPerch` attachments in 20 clusters — but
+**71% are path lanterns and railings**, 16% bridges, 7% the falls landing, and only **15 perches
+in the whole canyon are on a tree**. The perch graph is a ROAD MAP, not a habitat map; it is
+correct for familiars, which follow players who walk on paths, and wrong for territories.

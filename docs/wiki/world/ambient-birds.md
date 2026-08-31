@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-28
+updated: 2026-08-30
 ---
 
 # Birds — the two systems, and the one architecture
@@ -109,11 +109,79 @@ Arrived at independently, living in two places, one of them place-only and invis
 moment to fix it**: a server `Script` can `require` `ReplicatedStorage.RoshamboShared.BirdSpecies`,
 so the numbers move into the committed, Lune-tested module and the place keeps only wiring.
 
+## The species list — started 2026-08-30
+
+**Ambient and familiar birds are DIFFERENT SPECIES** (owner ruling). And the distinction is
+ecological, not a rule the code has to enforce: **familiars are birds that come to people;
+ambient birds keep their distance.** You never see a heron on a shoulder because a heron
+wouldn't. That answers the distinguishability question below without a size clamp or a
+behavioural exception.
+
+⚠ **THE COST DRIVER IS BEHAVIOUR CLASSES, NOT SPECIES COUNT.** The system does one thing today:
+perch, hop, flutter, fly perch-to-perch, sing. A bird that fits is nearly free; a bird that does
+not buys a whole class. Soaring (a kite), wading (a heron), ground-walking (a pheasant) and
+flocking (sparrows) are four separate pieces of work, and each is a session on its own.
+
+**First slice, chosen 2026-08-30 — four perching birds, all free on the built behaviour:**
+yamagara (varied tit), mejiro (Japanese white-eye), hiyodori (brown-eared bulbul), sekirei
+(wagtail). All four are one body plan, so they are ONE retarget with four proportion sets and
+four palettes, not four efforts.
+
+### ⚠ The zebra dove is an OWNER RULING, not an oversight
+
+`dove.blend` becomes a **zebra dove** (*Geopelia striata*), chosen for its call — owner, 2026-08-30:
+*"I know it's invasive almost everywhere but I love its call from my time spent in Hawaii and I'll
+find it soothing here."* It is native to Southeast Asia and introduced in Hawaii, so it is not a
+Japanese bird and is not meant to be. **Do not "correct" it toward a kijibato on authenticity
+grounds** — that decision has been made and may be revisited only by the owner. Same standing as
+the uguisu's deliberate oversize ([[familiars]]).
+
+Two consequences that are easy to misread as defects:
+
+- ⚠ **ITS BEAK MUST NOT OPEN, AND `caws = nil` IS THE CORRECT DATA.** Doves coo with the bill
+  essentially closed; the sound is the throat inflating. A silent beak here is authentic, not
+  missing onsets — so do NOT run `tools/audio/measure_caws.py` at it, and ignore
+  `watchWingbeat`'s no-caws warning for this species.
+- **Its markings are a new kind of paint.** The bird's whole identity is fine barring across neck
+  and flanks. `bake_bird_texture.py` rasterises a colour FUNCTION of 3D position, which suits
+  gradients and features like a supercilium; regular fine barring is periodic instead, and at
+  1024² over a whole bird the bars may not resolve. Test a swatch before committing.
+
+### ⚠ The uguisu IS the sparrow, and the sparrow was never discarded
+
+Checked 2026-08-30 against an owner recollection that it had been rejected. It had not, and the
+distinction matters because it decides the base for every future small bird:
+
+- The uguisu is the vendor **sparrow**, repainted. `bake_bird_texture.py`: *"the vendor's map is a
+  photoreal SPARROW... and the target is a plain olive uguisu"*, keeping the vendor unwrap because
+  *"a non-overlapping unwrap is most of what the purchased model is worth."*
+- **The sparrow's rig is the contract the whole system runs on.** `BirdController` drives the
+  sparrow's bone names (`joint1/3/4/8/12/25` + `wing_*`/`wrist_*`); the crow arrived as a Maya
+  QuickRig humanoid and every bone was renamed into the sparrow's scheme.
+- What WAS rejected is the sparrow **as a base for the karasu**, and only for one reason:
+  *"a real crow head and bill... is the half of the silhouette a sparrow cannot be reshaped into."*
+
+⚠ **THAT OBJECTION IS ABOUT A HEAD AND BILL, AND IS SILENT FOR SMALL BIRDS.** Every bird in the
+first slice has a fine passerine bill, which is what a sparrow already has — so the sparrow is the
+right base for all four.
+
 ## Open, not decided
 
-- **Distinguishability.** An ambient karasu on a railing must not read as somebody's familiar.
-  If they are the same species at the same size, the familiar stops being special in exactly the
-  way the sings-only-on-a-win rule was protecting ([[familiars]]).
-- **A species list** for the setting — desirable and authentic — is wanted and unwritten. It
-  bears on both roles at once, which is part of why it is worth doing deliberately.
+- ~~**Distinguishability.**~~ **Decided 2026-08-30** by ecological register — see the species
+  list above. Ambient and familiar are different species, and familiars are the birds that come
+  to people.
+- **The species list is started, not finished.** Four perching birds and the zebra dove are
+  chosen; the larger ambient birds (a kite, a heron, a flock) are candidates only, and each buys
+  a behaviour class the system does not have.
+- **Anchors want to be COMMITTED DATA, not place tags.** `GetTagged` returns a different set per
+  client under `StreamingEnabled`, so a tag sweep cannot be derived deterministically. A committed
+  table of territories (name, position, radius, species, which events it reacts to) is identical
+  on every client by construction — which makes placement derivable from a shared clock with
+  **zero server traffic**, and closes the divergence problem this page opens with. Not built.
+- ⚠ **THE BELL STARTLE IS ALREADY FREE, and nobody has used it.** `RoundMetronome` is pure and
+  clock-agnostic, and its `Schedule` carries `strikeAt` — the server publishes the strike as a
+  SCHEDULE, not an event. So a startle is a pure function of `(strikeAt, now, seed)`: no remote,
+  no replication, and every client scatters the same birds on the same toll by construction.
+  ⚠ A round is 60s, so a canyon-wide reaction every minute would read as a machine — startle
+  belongs to the TERRITORY (the bell tower roof), not to the world.
 - **Population and lifecycle**: how many, spawned by what, retired when.
