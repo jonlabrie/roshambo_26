@@ -43,27 +43,31 @@ function BirdRig.pose(axes: Axes, pitchDeg: number, yawDeg: number): CFrame
         * CFrame.fromAxisAngle(axes.pitch, math.rad(pitchDeg))
 end
 
--- ⚠ SEAT BY THE FOOT PAD -- not the pivot, and not the mesh bounds either. Both halves are placed by
--- `PivotOffset.Position` first -- that is what keeps the body and the wings locked to each other,
--- and it is exact -- and then the pair is dropped together so the bird's lowest point rests on
--- `base`. Only the pair's height changes; their relationship does not.
+-- ⚠ SEAT BY THE PIVOT -- the authored origin -- AND THAT WAS ALWAYS RIGHT. Measured against the
+-- owner's eye on a flat plank at kasagi height, pivot-seating lands the karasu exactly and the
+-- uguisu within 0.002 studs. Only the mejiro misses, and only because it is the uguisu's MeshPart
+-- resized in Studio: the pivot data does not rescale and the skinned mesh does not draw where
+-- `Size` says it does.
 --
--- ⚠ THE PIVOT'S *ROTATION* STAYS IGNORED. It carries the FBX axis conversion (90, 0, -180), so
+-- ⚠ TWO MODELS WERE FITTED TO THE MEJIRO ALONE AND BOTH BROKE THE OTHER TWO SPECIES. Seating the
+-- mesh BOUNDS was correct to 0.004 studs and read as a sunk bird; a "toe droop" clearance scaled by
+-- body length then predicted the LARGER bird needed more lift, and it needed none. The residual is
+-- carried per species in `BirdSpecies.seatNudge`, measured, because nothing readable off the part
+-- predicts it.
+--
+-- ⚠ ITS *ROTATION* STAYS IGNORED. PivotOffset carries the FBX axis conversion (90, 0, -180), so
 -- `PivotTo` reintroduces the nose-up attitude. Position from the pivot, rotation from `base`.
-function BirdRig.seat(body: BasePart, wings: BasePart?, base: CFrame)
+function BirdRig.seat(body: BasePart, wings: BasePart?, base: CFrame, nudge: number?)
     body.CFrame = base * CFrame.new(-body.PivotOffset.Position)
     if wings then
         wings.CFrame = base * CFrame.new(-wings.PivotOffset.Position)
     end
-    -- ⚠ NOT `footOffset` ALONE. That lands the lowest TOE on the target, which measured correct to
-    -- 0.004 studs and looked wrong to the owner twice; the pad the bird stands on is above the
-    -- curled tips. `Size.Z` is body length -- the FBX conversion puts nose-to-tail on z.
-    local drop = BirdFlight.perchDrop(body.Position.Y, body.Size.Y, base.Position.Y, body.Size.Z)
-    if drop ~= 0 then
-        local fix = Vector3.new(0, drop, 0)
-        body.CFrame = body.CFrame - fix
+    local lift = nudge or 0
+    if lift ~= 0 then
+        local v = Vector3.new(0, lift, 0)
+        body.CFrame = body.CFrame + v
         if wings then
-            wings.CFrame = wings.CFrame - fix
+            wings.CFrame = wings.CFrame + v
         end
     end
 end

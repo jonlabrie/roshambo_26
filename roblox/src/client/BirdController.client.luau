@@ -39,6 +39,7 @@ local SPECIES = "Karasu" -- ⚠ hardcoded: nothing selects a bird per player yet
 -- ⚠ NO FALLBACK. `scaleOf` returns nil for an unregistered species and this refuses to start
 -- rather than moving a crow on uguisu timings, which would present as "the animation is wrong".
 local SPECIES_SCALE = BirdSpecies.scaleOf(SPECIES)
+local SEAT_NUDGE = BirdSpecies.seatNudgeOf(SPECIES)
 if not SPECIES_SCALE then
     warn(`BirdController: species "{SPECIES}" is not in BirdSpecies.SPECIES; no familiars.`)
     return
@@ -762,7 +763,7 @@ RunService.RenderStepped:Connect(function()
         -- move PivotOffset, so its feet land 0.033 the OTHER way. BirdRig.seat places the pair by
         -- the pivot -- which is what locks the two halves together -- then drops both so the
         -- rendered bottom rests on `base`. See BirdSeat.spec for the measurements.
-        BirdRig.seat(b.part, b.wings, base)
+        BirdRig.seat(b.part, b.wings, base, SEAT_NUDGE)
 
         if far <= DETAIL_DISTANCE then
             -- FLYING IS A FACT ABOUT MOVEMENT, NOT ABOUT STATE. A bird hopping on a shoulder is

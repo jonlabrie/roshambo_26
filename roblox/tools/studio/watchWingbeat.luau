@@ -190,7 +190,7 @@ end
 -- ⚠ THIS USED TO PLACE THE PIVOT AND CALL THAT THE FEET, which floated the mejiro 0.033 studs off
 -- the torii rail (owner, 2026-08-31); see BirdRig.seat and BirdSeat.spec.
 local function seat(body: BasePart, wings: BasePart, base: CFrame)
-    BirdRig.seat(body, wings, base)
+    BirdRig.seat(body, wings, base, BirdSpecies.seatNudgeOf(SPECIES))
 end
 
 local function pose(bones: { [string]: Bone }, open: number, beatX: number, beatZ: number)

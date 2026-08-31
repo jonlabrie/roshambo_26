@@ -1,95 +1,60 @@
 --!strict
--- ⚠ `PivotOffset` IS NOT THE FEET, AND STOPS BEING CLOSE THE MOMENT A MESH IS RESIZED.
+-- ⚠ SEATING A BIRD MEANS PUTTING ITS PIVOT ON THE PERCH, AND THAT WAS RIGHT BEFORE ANY OF THIS.
 --
--- Both seating paths -- BirdController's perch and watchWingbeat's -- put the part's PIVOT on the
--- target, on the stated grounds that the pivot "is the offset from the part centre to the origin
--- both halves were exported around, which is the feet. Verified: feet land within 0.021 of the
--- target." That 0.021 was the uguisu's own residual, small enough to accept and then forget.
+-- Measured against the owner's eye, all three species on one flat plank at the kasagi's height,
+-- as clearance relative to a bounds-seated placement:
 --
--- Measured in Studio with each pivot placed at y = 100, reading the RENDERED box bottom:
+--   bird     pivot - boxBottom    pivot-seating gives    owner chose    error
+--   Karasu        0.000                 0.000              0.000        0.000
+--   Uguisu       +0.021                -0.021             ~-0.023      -0.002
+--   Mejiro       -0.0325               +0.0325            +0.0489      +0.0164
 --
---   KarasuBody  centre 100.449  size 0.897  ->  bottom 100.000   pivot IS the feet
---   UguisuBody  centre 100.215  size 0.472  ->  bottom  99.979   0.021 low, the accepted residual
---   MejiroBody  centre 100.215  size 0.365  ->  bottom 100.033   0.033 HIGH
+-- Exact on the karasu, 0.002 on the uguisu. Only the RESIZED bird misses: the mejiro is the
+-- uguisu's MeshPart scaled to 0.773 in Studio, which does not rescale the pivot data, and the
+-- skinned mesh does not draw where `Size` says it does.
 --
--- ⚠ THE MEJIRO IS THE UGUISU MESH SCALED TO 0.773 IN STUDIO, AND RESIZING A MESHPART DOES NOT
--- RESIZE ITS PivotOffset. The two share a mesh, a rig and a byte-identical PivotOffset of -0.215,
--- and their feet land 0.054 studs apart -- 15% of the mejiro's whole height. Every future bird
--- scaled from a shared mesh inherits the same error, growing with the scale factor.
+-- ⚠ TWO MODELS WERE FITTED TO THE MEJIRO ALONE AND EACH BROKE A SPECIES THAT HAD BEEN CORRECT.
+-- First the mesh BOUNDS: measured right to 0.004 studs and read as a bird sunk into the rail.
+-- Then a "toe droop" clearance scaled by body length, which predicted the LARGER uguisu wanted
+-- MORE lift than the mejiro; the owner put them side by side and the uguisu wanted none. Both had
+-- passing tests and mutation-proven constants. Neither had a mechanism anyone had verified.
 --
--- So seat by the RENDERED BOTTOM, which is the toes on a perching bird and is what the karasu's
--- exact 0.000 confirms the export intended.
+-- ⚠ SO THE RESIDUAL IS A MEASURED NUMBER PER BIRD, NOT A THIRD FORMULA. Nothing readable off the
+-- part predicts it, and the real fix is upstream: export the mejiro at its own size and its nudge
+-- joins the others at zero.
 local harness = require("./harness")
-local BirdFlight = require("../src/shared/BirdFlight")
+local BirdSpecies = require("../src/shared/BirdSpecies")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 
--- ⚠ 1e-3 BECAUSE THE INPUTS ARE THREE-DECIMAL PRINTOUTS. The karasu's true offset is 0.0005 --
--- centre 100.449 minus half of 0.897 -- and agreement finer than the measurement's own resolution
--- would be asserting precision that was never read off the rig.
-local function near(a: number, b: number, tol: number?): boolean
-    return math.abs(a - b) < (tol or 1e-3)
-end
-
-describe("BirdFlight.footOffset", function()
-    test("is zero on the karasu, whose pivot the export put exactly at the feet", function()
-        expect(near(BirdFlight.footOffset(100.449, 0.897, 100), 0)).toBe(true)
+describe("BirdSpecies.seatNudgeOf", function()
+    test("is zero for every bird exported at its own size", function()
+        expect(BirdSpecies.seatNudgeOf("Karasu")).toBe(0)
     end)
 
-    test("recovers the uguisu's known 0.021 residual, below the pivot", function()
-        expect(near(BirdFlight.footOffset(100.215, 0.472, 100), -0.021)).toBe(true)
+    test("gives the mejiro the uguisu's number, because it IS the uguisu at 0.773", function()
+        -- ⚠ THE POINT OF THE RE-EXPORT. While the mejiro was a MeshPart resized inside Studio it
+        -- needed 0.0164 that no other bird needed -- a hack covering an asset defect. Exported from
+        -- Blender at its own 0.640, the pivot scales with the mesh and the two birds agree.
+        expect(BirdSpecies.seatNudgeOf("Mejiro")).toBe(BirdSpecies.seatNudgeOf("Uguisu"))
     end)
 
-    test("recovers the mejiro's 0.033, ABOVE the pivot -- the opposite direction", function()
-        expect(near(BirdFlight.footOffset(100.215, 0.365, 100), 0.0325)).toBe(true)
+    test("keeps every bird's correction small enough to be a nudge", function()
+        -- -0.002 is below what the eye resolved reliably; a value this size must never grow into a
+        -- model. If it ever needs to, that is a measurement, not a tweak.
+        expect(math.abs(BirdSpecies.seatNudgeOf("Uguisu")) < 0.005).toBe(true)
+        expect(math.abs(BirdSpecies.seatNudgeOf("Mejiro")) < 0.005).toBe(true)
     end)
 
-    test("separates two birds that share a mesh and a byte-identical PivotOffset", function()
-        -- ⚠ THE WHOLE POINT. Same pivot, same rig, same mesh, one of them scaled: if seating reads
-        -- the pivot it cannot tell these apart, and one of the two is always wrong.
-        local uguisu = BirdFlight.footOffset(100.215, 0.472, 100)
-        local mejiro = BirdFlight.footOffset(100.215, 0.365, 100)
-        expect(near(mejiro - uguisu, 0.0535)).toBe(true)
+    test("no bird needs a correction big enough to be hiding an asset defect", function()
+        -- ⚠ THE GUARD THAT WOULD HAVE CAUGHT THE MEJIRO. A nudge is a hair of eye-measured
+        -- residual; anything approaching a tenth of a small bird's height is a broken asset wearing
+        -- a constant. 0.0164 -- what the resized mejiro needed -- fails this.
+        for name in { "Uguisu", "Mejiro", "Karasu" } do
+            expect(math.abs(BirdSpecies.seatNudgeOf(name)) < 0.01).toBe(true)
+        end
     end)
 
-    test("moves with the part, so a bird seated anywhere lands the same way", function()
-        expect(near(BirdFlight.footOffset(3.215, 0.365, 3), BirdFlight.footOffset(100.215, 0.365, 100))).toBe(
-            true
-        )
-    end)
-end)
-
-describe("BirdFlight.perchClearance", function()
-    -- ⚠ THE LOWEST TOE IS NOT WHERE THE BIRD STANDS. Seating the lowest geometry exactly on the
-    -- rail is what the measurements said to do -- toes landed 0.004 studs above the kasagi, five
-    -- thousandths -- and the owner looked at it and said the bird was too low. Twice.
-    --
-    -- The toes are modelled curled for gripping, so their tips hang below the foot pad the bird
-    -- actually stands on. The gap is real geometry and no measurement of the mesh bounds can find
-    -- it: the bounds are the tips.
-    --
-    -- ⚠ SO THIS NUMBER IS THE OWNER'S EYE, NOT A DERIVATION, and it is labelled that way on
-    -- purpose. Three identical mejiros were placed along the torii rail at +0.00, +0.05 and +0.10
-    -- studs above the toes-on-surface seat; the owner picked +0.05 on a bird 0.640 long.
-    -- 0.05 / 0.640 = 0.078.
-    --
-    -- ⚠ A FRACTION OF BODY LENGTH, NOT A CONSTANT, because the mejiro IS the uguisu's mesh scaled
-    -- to 0.773 -- the same toes, uniformly smaller, so their droop scales with the bird. That much
-    -- is certain for those two. The karasu is a different mesh with its own feet and inherits this
-    -- only as a default; it has not been judged.
-    test("reproduces the owner's pick on the bird it was judged on", function()
-        expect(near(BirdFlight.perchClearance(0.640), 0.050, 1e-3)).toBe(true)
-    end)
-
-    test("scales with the bird, so the uguisu and its scaled sibling agree", function()
-        -- the mejiro is the uguisu at 0.773; the clearance must be too, or one of them is wrong
-        local ratio = BirdFlight.perchClearance(0.640) / BirdFlight.perchClearance(0.828)
-        expect(near(ratio, 0.640 / 0.828, 1e-6)).toBe(true)
-    end)
-
-    test("lifts the mejiro off the seat that read too low", function()
-        -- pivot-seated: box bottom +0.0325 from the pivot. Applying the drop RAISES it by 0.0175.
-        local drop = BirdFlight.perchDrop(100.215, 0.365, 100, 0.640)
-        expect(near(drop, 0.0325 - 0.050, 1e-3)).toBe(true)
-        expect(drop < 0).toBe(true)
+    test("returns zero rather than erroring for a bird that has no record yet", function()
+        expect(BirdSpecies.seatNudgeOf("Hiyodori")).toBe(0)
     end)
 end)

@@ -2987,3 +2987,22 @@ Both faults now read from the rig instead of assuming it: `BirdFlight.toBoneSpac
 that resolves each bone's axes at spawn and seats by the rendered box bottom. Recorded in
 [[blender-pipeline]], including the trap that `Bone.WorldCFrame` reads back **unscaled**
 on a resized MeshPart and so cannot be used to find the feet. 1579 → 1588 tests.
+
+## [2026-08-31] ship | the mejiro is exported at its own size, and stops being a special case
+
+The perch seat was chased through three models in one session and the owner's eye rejected two
+that measured correct. What settled it was putting all three species on one plank at once:
+pivot-seating is exact on the karasu and 0.002 out on the uguisu, and **only the mejiro missed**,
+because it was the uguisu's MeshPart resized inside Studio — which scales the mesh and leaves the
+pivot data behind. It had been carrying a 0.0164 correction no other bird needed.
+
+Re-exported from `uguisu_authored.blend` at its own 0.640 nose-to-tail: data-level scale on meshes
+and armature, no re-centring, `textures=False`. Verified round-tripping with 21 bones on both
+halves and no materials. Its `seatNudge` is now the uguisu's −0.002, because it *is* the uguisu at
+0.773 — two birds, one measured number, no hack. A test now fails if any bird's nudge grows past a
+hair, which the old 0.0164 does.
+
+⚠ Owner ruling that drove this: *"we don't want one bird to be a hack."* Recipe for scaled siblings
+recorded in [[blender-pipeline]], along with the MCP trap that `import_scene.fbx` needs a full
+window override.
+

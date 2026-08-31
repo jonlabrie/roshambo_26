@@ -405,6 +405,32 @@ and `BirdRig.pose` builds the Transform with `CFrame.fromAxisAngle`, yaw first s
 looked left raises its beak along the way it faces. Resolved once at spawn; the axes are constants
 of the armature. A hardcoded slot permutation would be the same silent failure on the next rig.
 
+## Recipe: exporting a scaled sibling (a second bird from one authored mesh)
+
+The mejiro is the uguisu at 0.773. Do this in Blender, **never** by resizing the MeshPart in Studio.
+
+1. **`save_as_mainfile` to a scratch path FIRST.** It switches the session off the authored blend,
+   so nothing that follows can reach `art/` — a stronger guarantee than remembering not to save.
+2. `S = target_length / body_data_y_span`. The uguisu's span is 0.82805 and matches `bodyLength`.
+3. **Transform the DATA, never the object**: `o.data.transform(Matrix.Scale(S, 4))` for every mesh
+   bound to the rig, and `arm.data.transform(M)` for the armature. An object-level scale rides on
+   the armature and `Bone.Transform` **discards scale** in Roblox — the bird imports at the right
+   size and animates at the wrong one.
+4. **Do not re-centre.** `normalise_size()` also re-seats feet at z = 0, which would put the pivot
+   at the feet and make the sibling behave unlike the bird it is. Leaving the origin alone keeps
+   them identical up to scale, so they share one measured seat number.
+5. Rename the objects, then `export(part, path, textures=False)` — the shared-mesh trap.
+6. Verify the round trip before anyone imports: **21 bones on both halves** and `materials=NONE`.
+
+⚠ **UVs DO NOT MOVE UNDER A VERTEX SCALE**, so an already-baked colormap stays valid and does not
+need re-uploading. Re-bakes are safe too: `bake()` derives `landmark_scale` from the mesh's own span
+against `ref_length`, so landmarks follow the new size on their own.
+
+⚠ **`import_scene.fbx` FAILS UNDER THE MCP WITHOUT A FULL WINDOW OVERRIDE** — its armature branch
+calls `mode_set()`, whose poll needs an active object, and it dies mid-hierarchy with
+`Context missing active object`. Use the same `temp_override(window, screen, area, region, …)` that
+`export()` uses. An empty startup file is not enough on its own.
+
 ## ⚠ RESIZING A MESHPART DOES NOT RESIZE ITS `PivotOffset`
 
 The mejiro is the uguisu's mesh scaled to 0.773 in Studio. The mesh scaled; the pivot did not, and
@@ -422,24 +448,24 @@ the target" as verification — that 0.021 was the uguisu's own residual, accept
 treated as a property of all birds. Two birds sharing a mesh, a rig and a pivot now land 0.054
 apart, 15% of the mejiro's height, and the error grows with the scale factor.
 
-**Seat by the rendered box bottom** (`BirdFlight.footOffset`), placing both halves by the pivot
-first — that is what locks body and wings together, and it is exact — then dropping the pair.
+**Seat by the pivot** — the authored origin — and that was right before any of it. Measured against
+the owner's eye on a flat plank at kasagi height, pivot-seating lands the karasu exactly and the
+uguisu within 0.002 studs. Only the resized bird missed.
 
-⚠ **AND THAT IS STILL NOT WHERE THE BIRD STANDS.** The box bottom is the lowest *toe tip*, and the
-toes are modelled curled for gripping, so they hang below the foot pad. Seating the tips on the
-kasagi landed them 0.004 studs above it — correct to five thousandths of a stud — and the owner
-looked at it and said the bird was sunk. Twice, across two different seating models, because both
-were solving the wrong quantity.
+⚠ **TWO MODELS WERE FITTED TO THE MEJIRO ALONE AND EACH BROKE A SPECIES THAT HAD BEEN CORRECT.**
+First the mesh bounds — measured right to 0.004 studs and read as a bird sunk into the rail. Then a
+"toe droop" clearance scaled by body length, which predicted the *larger* uguisu wanted *more* lift;
+put side by side, it wanted none. Both had passing tests and mutation-proven constants. Neither had
+a mechanism anyone had verified, and the tests only confirmed arithmetic that was already assumed.
 
-⚠ **NO MEASUREMENT OF THE MESH CAN FIND THIS GAP: the bounds *are* the tips.** It was settled by
-putting three identical mejiros on the rail at +0.00 / +0.05 / +0.10 studs and asking which read
-right — the owner picked +0.05 on a bird 0.640 long, so `PERCH_CLEARANCE_FRAC = 0.078`. It is
-labelled the owner's eye in the source, because that is what it is.
+⚠ **THE MEASUREMENT THAT SETTLED IT WAS THREE SPECIES ON ONE PLANK AT ONCE.** One bird at a time
+cannot distinguish "this bird is wrong" from "the rule is wrong", and three rounds were spent
+before that was done. `BirdSpecies.seatNudge` now carries only the eye-measured residual — 0.000
+karasu, −0.002 uguisu and mejiro — and a value larger than a hair is a smell, not a setting.
 
-**A fraction of body length, not a constant**: the mejiro *is* the uguisu's mesh at 0.773, the same
-feet uniformly smaller, so the droop scales with the bird. Certain for that pair. The karasu has its
-own feet and takes 0.078 only as a default — it has not been judged, and its clearance lands at
-0.128 studs on that assumption alone.
+**Root cause, and the actual fix**: the mejiro was the uguisu's MeshPart *resized inside Studio*,
+so it alone needed a 0.0164 correction. It is now exported from Blender at its own 0.640 and the
+special case is gone. See the recipe below.
 
 ⚠ **`Bone.WorldCFrame` IS NOT A USABLE MEASUREMENT ON A RESIZED MESHPART.** The mejiro and the
 uguisu report their lowest bone at an identical −0.093 from the pivot despite a 0.773 scale factor

@@ -55,7 +55,19 @@ export type Voice = { clips: { Clip }, volume: number, rolloff: { number } }
 -- exist -- naming one makes the whole file fail to load and takes every test with it. Same rule
 -- as `BirdFlight`, which returns {x, y, z} tables rather than Vector3. `colour` is an RGB triple
 -- and `material` is the Enum.Material NAME; `BirdController` converts at the boundary.
-export type Species = { bodyLength: number, voice: Voice }
+-- ⚠ `seatNudge`: HOW FAR THIS BIRD'S RENDER SITS OFF ITS OWN PIVOT, in studs, measured by eye.
+-- Seating the pivot on the perch is what BirdRig does and it is very nearly exact: 0.000 on the
+-- karasu, 0.002 on the uguisu. This carries only that residual.
+--
+-- ⚠ IT ONCE CARRIED 0.0164 FOR THE MEJIRO, AND THAT WAS A HACK COVERING AN ASSET DEFECT. The
+-- mejiro was the uguisu's MeshPart resized inside Studio, which scales the mesh and leaves the
+-- pivot data behind, so it needed a correction no other bird did. It is now exported from Blender
+-- at its own 0.640 -- same geometry, uniformly scaled, pivot scaled with it -- so it takes the
+-- uguisu's number because it IS the uguisu. Two birds, one measured value, no special case.
+--
+-- ⚠ A NON-ZERO VALUE HERE IS A SMELL, NOT A SETTING. If a new bird needs one bigger than the
+-- uguisu's hair, suspect how it reached Studio before reaching for this field.
+export type Species = { bodyLength: number, voice: Voice, seatNudge: number? }
 
 -- ⚠ THE REFERENCE SPECIES, and it is load-bearing. Every motion constant in `BirdFlight` was
 -- tuned by eye against this bird, so its scale must come out at exactly 1 and its behaviour must
@@ -85,6 +97,7 @@ BirdSpecies.SPECIES = {
         -- Do not "correct" it toward reality -- that decision has been made and may be revisited
         -- only by the owner.
         bodyLength = 0.828,
+        seatNudge = -0.002, -- uguisu: pivot-seating reads a hair high; below the eye's reliable resolution
         voice = {
             -- Shared with the falls-dock bird's Call_1/2/3, deliberately: it is the same species
             -- and the same throat. See docs/wiki/world/falls-dock.md.
@@ -102,6 +115,7 @@ BirdSpecies.SPECIES = {
         -- large-billed crow. Almost exactly twice the uguisu, which is why the two of them
         -- together are a real test of whether the motion scales at all.
         bodyLength = 1.640,
+        seatNudge = 0.0, -- karasu: natively exported, pivot-seating is exact
         voice = {
             clips = {
                 -- karasu-1, ONE caw
@@ -131,6 +145,7 @@ BirdSpecies.SPECIES = {
         -- mate with an offset that reads as a rigging bug. A real mejiro is ~11.5cm against an
         -- uguisu's ~15cm, so the uguisu's own deliberate oversize rides along.
         bodyLength = 0.640,
+        seatNudge = -0.002, -- mejiro: the uguisu's number, because it IS the uguisu at 0.773
         voice = {
             -- ⚠ AN ENVELOPE BIRD, NOT AN ONSET BIRD. Every clip carries `env` rather than `caws`,
             -- because a mejiro warbles rather than calls. See BirdFlight.gapeFromEnvelope.
@@ -371,6 +386,13 @@ function BirdSpecies.scaleOf(species: string): number?
         return nil
     end
     return rec.bodyLength / BirdSpecies.SPECIES[BirdSpecies.REFERENCE].bodyLength
+end
+
+-- Studs to lift this bird above a pivot-seated placement. Zero for anything exported at its own
+-- size; only a MeshPart resized in Studio needs one.
+function BirdSpecies.seatNudgeOf(name: string): number
+    local rec = BirdSpecies.SPECIES[name]
+    return (rec and rec.seatNudge) or 0
 end
 
 -- Pick one clip id for `species`, weighted. `rand` returns a float in [0, 1).
