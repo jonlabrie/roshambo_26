@@ -2635,3 +2635,27 @@ Both FBXs exported from the authored blend at rest pose. Each `.fbm` carries the
 (ColorMap/Normal/Roughness/Metalness — partial is worse than none), and the exported ColorMap is
 byte-identical to `art/`. ⚠ `eye_L`/`eye_R` carry no weights and Roblox will strip them on import;
 that is expected since modelled eyes were abandoned.
+
+### `eye_R`/`eye_L` deleted — the rig no longer advertises a forbidden mechanism
+
+They existed to carry the eye POSITION inside the asset, so a runtime sphere could be CFramed off
+`Bone.TransformedWorldCFrame` with no coordinates transcribed into Luau. `rebuild_rig` even set
+`use_deform = True` on them specifically so `export()`'s `use_armature_deform_only=True` would not
+drop them. Both halves of that are now dead: Roblox strips any bone influencing no vertex so it
+never reached the game, and the runtime eye it served is forbidden outright — the karasu's eye is
+the vendor's PAINTED eye in the ColorMap (`BirdController.client.luau:184` "NO EYE CODE, AND THAT
+IS THE POINT"; `BirdSpecies.luau:26` records both shipped attempts failing).
+
+⚠ **UNUSED SCAFFOLDING FOR A FORBIDDEN APPROACH IS WORSE THAN CLUTTER.** A rig carrying eye bones
+invites exactly the reintroduction two Luau files warn against. That, not the two wasted bones, is
+why they had to go.
+
+Rig 21 → 19 bones, no orphaned vertex groups on either mesh, both FBXs re-exported. ⚠ The imported
+result is unchanged — Roblox was stripping them anyway — so nothing already in Studio is stale.
+`eye_site()` is untouched: it only MEASURES, and `landmarks_final` still emits `eye`/`eye_r` for
+the bake. The seat was always data; it was never the bones.
+
+Four comments describing the removed code were corrected in the same pass (`eye_site`'s docstring
+claimed "SO THIS SHIPS A BONE", `build_eye_mesh`, the roster assert, and the `add_leaf_bones`
+block). The `use_armature_deform_only=False` setting stays despite having no live reason left,
+because the failure it causes is silent and the next bird's rig is not written yet.

@@ -741,10 +741,12 @@ def eye_site(spec=KARASU):
     like an eyeball?" -- and the precedent was already here: `KarasuWings` is a separate part that
     `BirdController` CFrames onto the body every frame.
 
-    ⚠ SO THIS SHIPS A BONE, NOT A MESH. `rebuild_rig` puts `eye_R`/`eye_L` at these coordinates,
-    parented to the head, and the controller reads `Bone.TransformedWorldCFrame` to place a ball
-    there. The POSITION therefore travels inside the asset and is never transcribed into Luau --
-    and because the bone is a child of the head, the eyes follow every head turn for free.
+    ⚠ SO THIS SHIPS NEITHER -- IT SHIPS A NUMBER. It once put `eye_R`/`eye_L` bones here so the
+    controller could CFrame a ball off `Bone.TransformedWorldCFrame`, which failed twice over:
+    Roblox strips any bone influencing no vertex, so it never reached the game, and the runtime
+    eye it served is now forbidden outright (`BirdController.client.luau:184`). The bones were
+    removed 2026-08-30. What survives is the measurement: `landmarks_final` emits `eye` and
+    `eye_r`, the texture bake seats the painted eye on them, and that is the whole contract.
 
     ⚠ RUNS AFTER `reshape_body`, so it seats against the skull that ships, and x is RAYCAST off
     that skull rather than typed. Change the forehead or the girth and the eye moves with the
@@ -1047,9 +1049,9 @@ def build_eye_mesh(spec=KARASU):
     # ⚠ WEIGHT IT TO THE HEAD -- this group is what makes the eyes follow the head, and it is
     # the ONLY bone they need. `run()` gives this object the armature modifier that turns the
     # group into a skin deformer; the group alone does nothing, which is exactly how these
-    # shipped once as a static mesh with zero bones. One bone, not two: `eye_R`/`eye_L` carry a
-    # position for a runtime Part that the owner retired in favour of this mesh, and a bone that
-    # deforms no vertex is stripped by Roblox's importer regardless.
+    # shipped once as a static mesh with zero bones. One bone, not two -- and the `eye_R`/`eye_L`
+    # pair that once carried a position for a runtime Part is gone entirely (2026-08-30), because
+    # a bone that deforms no vertex is stripped by Roblox's importer regardless.
     g = ob.vertex_groups.new(name="joint4")
     g.add([v.index for v in me.vertices], 1.0, 'REPLACE')
     return {"verts": len(me.vertices), "tris": sum(len(p_.vertices) - 2 for p_ in me.polygons),
@@ -1822,28 +1824,16 @@ def rebuild_rig(spec=KARASU):
         # ⚠ THE EYE BONES CARRY A POSITION, NOT A DEFORMATION. Nothing is weighted to them and
         # nothing ever should be: they exist so the eye's place travels INSIDE the asset, where
         # `BirdController` can read it off `Bone.TransformedWorldCFrame` and park a ball there.
-        # Parented to the head, so the eyes follow every head turn and check with no extra code.
-        # ⚠ They must stay DEFORM bones despite deforming nothing -- `export()` passes
-        # `use_armature_deform_only=True`, which silently drops any bone that is not.
-        if LAST_EYE:
-            E = LAST_EYE
-            for side, sfx in ((1.0, "R"), (-1.0, "L")):
-                if ("eye_" + sfx) in ebs:
-                    ebs.remove(ebs["eye_" + sfx])
-                b = ebs.new("eye_" + sfx)
-                # ⚠ PER SIDE, matching the mesh. A mirrored x puts one bone inside the skull.
-                ex, ey, ez, er = E[sfx], E["y"], E["z"], E["r"]
-                b.head = Vector((side * ex, ey, ez))
-                # The tail points outboard and is one radius long. ⚠ THE LENGTH DOES NOT SURVIVE
-                # IMPORT -- a Roblox `Bone` is an Attachment, a POINT with an orientation, and has
-                # no notion of a tail. So the radius cannot ride along here and lives on
-                # `BirdSpecies` instead; what this direction buys is the bone's ORIENTATION, which
-                # does survive, and which says which way is outboard.
-                b.tail = Vector((side * (ex + er), ey, ez))
-                b.parent = ebs["joint4"]
-                b.use_connect = False
-                b.use_deform = True
-                made["eye_" + sfx] = True
+        # ⚠ NO eye_R/eye_L BONES, AND THAT IS DELIBERATE -- do not add them back. They existed to
+        # carry the eye POSITION inside the asset so a separate glossy sphere could be CFramed off
+        # `Bone.TransformedWorldCFrame` without transcribing coordinates into Luau. Two things
+        # killed that: Roblox strips any bone influencing no vertex, so it never survived import
+        # at all; and the eye approach it served is now forbidden outright -- the karasu's eye is
+        # the vendor's PAINTED eye in the ColorMap (`BirdController.client.luau:184` "NO EYE CODE,
+        # AND THAT IS THE POINT", and `BirdSpecies.luau:26` records both shipped attempts failing).
+        # A rig carrying eye bones invites exactly the reintroduction those two files warn against.
+        # ⚠ `eye_site()` STILL RUNS -- it only MEASURES, and `landmarks_final` emits `eye`/`eye_r`
+        # for the texture bake. The seat is data; it was never the bones.
         for side, sfx in ((1.0, "R"), (-1.0, "L")):
             w = ebs.new("wing_" + sfx)
             w.head = Vector((side * x0, by, bz))
@@ -1867,13 +1857,12 @@ def rebuild_rig(spec=KARASU):
     # ⚠ ASSERT THE ROSTER. `BirdController` looks these up BY NAME, and a missing one fails
     # SILENTLY at runtime -- no error, just a familiar with a jaw that will not open.
     #
-    # ⚠ EVERY NAME HERE MUST DEFORM SOMETHING, which is why `eye_R`/`eye_L` are NOT listed even
-    # though the rig still builds them. Roblox strips any bone that influences no vertex, so a
-    # position-only bone cannot reach the game however carefully it is exported -- listing one
-    # here would assert a guarantee this script has no power to make. The eyes are placed by
-    # CFraming the `KarasuEyes` mesh off the BODY's joint4; the two eye bones are vestigial and
-    # can go the next time the rig is rebuilt. A session lost two commits and two import cycles
-    # to fighting for them.
+    # ⚠ EVERY NAME HERE MUST DEFORM SOMETHING. Roblox strips any bone that influences no vertex,
+    # so a position-only bone cannot reach the game however carefully it is exported -- listing
+    # one here would assert a guarantee this script has no power to make. That is not theory:
+    # `eye_R`/`eye_L` were exactly such bones, they were never listed, and a session still lost
+    # two commits and two import cycles to fighting for them. They were deleted from the rig on
+    # 2026-08-30; every bone this script now builds deforms something.
     required = ("joint1", "joint3", "joint4", "joint8", "joint12", "joint25",
                 "wing_R", "wing_L", "wrist_R", "wrist_L")
     have = {b.name for b in arm.data.bones}
@@ -2345,15 +2334,15 @@ def export(part, filepath):
                                              # armature modifier and writes a static mesh. The
                                              # import then SUCCEEDS and simply has no bones.
                 add_leaf_bones=False,
-                # ⚠ FALSE, AND THE REASON IS THE EYE BONES. This flag does not merely drop
-                # non-deform bones -- it drops bones with NO WEIGHTS ON THE MESH BEING EXPORTED.
-                # `eye_R`/`eye_L` carry a POSITION and deform nothing by design, so it culled
-                # them silently: the rig had 21 bones in Blender and the imported body had 15
-                # (21 minus 4 wing bones, which live on the other mesh, minus the 2 eyes). The
-                # bird arrived in Studio with no way to place its own eyes, and nothing reported
+                # ⚠ FALSE, AND KEEP IT FALSE. This flag does not merely drop non-deform bones --
+                # it drops bones with NO WEIGHTS ON THE MESH BEING EXPORTED, which is a much wider
+                # net than the name suggests. It is how `eye_R`/`eye_L` were culled silently: the
+                # rig had 21 bones in Blender and the imported body had 15, and nothing reported
                 # it -- the export succeeded, the mesh was fine, only a lookup by name would ever
-                # have failed. Every bone this rig builds is a deform bone, so turning it off
-                # costs nothing but a few inert bones on each mesh.
+                # have failed. Those bones are gone now (2026-08-30) and every bone this rig
+                # builds deforms something, so the flag currently changes nothing. It stays False
+                # because the failure it causes is silent, and the next bird's rig is not written
+                # yet.
                 use_armature_deform_only=False,
                 bake_anim=False,
                 mesh_smooth_type='FACE',
@@ -2459,8 +2448,6 @@ def run(spec=KARASU, do_export=False, eyes=True):
         if not any(m.type == 'ARMATURE' for m in o.modifiers):
             m = o.modifiers.new("Armature", 'ARMATURE')
             m.object = arm
-    log["eye_bones_note"] = ("eye_R/eye_L are vestigial and unshippable -- Roblox strips any bone "
-                             "that influences no vertex")
     if do_export:
         log["export"] = {
             "body": export("KarasuBody", OUT_DIR + "karasu_body.fbx"),
