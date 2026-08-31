@@ -312,6 +312,27 @@ end
 -- because the bird carried on glancing about while it sang and the two motions were
 -- indistinguishable. A bird that is singing holds still and sings. `stillness` is how much of the
 -- look-around to remove at full gape; callers multiply their idle angles by the returned scale.
+export type Basis = { { number } }
+
+-- ⚠ WHICH WAY IS UP FOR THIS BONE. `CFrame.Angles(pitch, yaw, 0)` is only pitch and yaw if the
+-- bone's local axes happen to be the body's, and on the uguisu/mejiro rig they are not: pitch
+-- lives in slot Z on both neck bones, and the neck's yaw is slot X INVERTED against the head's
+-- slot Y. Writing Euler slots by hand turned the song's head-lift into a sideways S-bend.
+--
+-- `basis` is the bone's local X, Y and Z axes each written in BODY space; `want` is a direction in
+-- body space. The result is that direction in the bone's own space, ready for `fromAxisAngle`.
+-- Both frames are orthonormal, so the change of basis is three dot products -- the transpose is
+-- the inverse.
+--
+-- ⚠ READ FROM THE RIG AT SPAWN, NEVER HARDCODED. More birds are coming and nothing promises the
+-- next armature is built like this one.
+function BirdFlight.toBoneSpace(basis: Basis, want: { number }): (number, number, number)
+    local function dot(a: { number }): number
+        return a[1] * want[1] + a[2] * want[2] + a[3] * want[3]
+    end
+    return dot(basis[1]), dot(basis[2]), dot(basis[3])
+end
+
 -- ⚠ IS THE BIRD SINGING AT ALL -- a flat 1 across the phrase, ramped at both ends. NOT the gape.
 -- Damping the look-around by the gape modulated it at `ENV_HZ`, twelve times a second, which is
 -- a wobble generator rather than a bird settling. A bird settles when it begins to sing and stays

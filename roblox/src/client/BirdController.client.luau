@@ -19,6 +19,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local BirdFlight = require(shared:WaitForChild("BirdFlight"))
 local BirdSpecies = require(shared:WaitForChild("BirdSpecies"))
+local BirdRig = require(shared:WaitForChild("BirdRig"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local CollectionService = game:GetService("CollectionService")
@@ -144,6 +145,8 @@ type Bird = {
     wristR: Bone?,
     head: Bone?,
     neck: Bone?,
+    headAxes: BirdRig.Axes?,
+    neckAxes: BirdRig.Axes?,
     tail: Bone?,
     hipL: Bone?,
     hipR: Bone?,
@@ -266,6 +269,7 @@ local function makeBird(userId: string): Bird
     end
 
     local head = bone("joint4")
+    local neck = bone("joint3")
     return {
         part = part,
         wings = wings,
@@ -280,7 +284,11 @@ local function makeBird(userId: string): Bird
         -- head turn across TWO bones is what keeps the neck from shearing: the neck takes the
         -- lead and the head follows, which is also the order a real bird moves in.
         head = head,
-        neck = bone("joint3"),
+        neck = neck,
+        -- ⚠ WHICH LOCAL AXIS IS PITCH, ASKED OF THE RIG RATHER THAN ASSUMED. Resolved once here
+        -- because the answer is a constant of the armature; see BirdRig for what assuming it cost.
+        headAxes = head and BirdRig.axesOf(head, part),
+        neckAxes = neck and BirdRig.axesOf(neck, part),
         tail = bone("joint8"),
         -- The two leg chains: joint12 -> joint13 -> joint14 and joint25 -> joint13.001 -> ...
         -- Rotating the HIP swings the whole leg, which is the lift; the knee would only fold it.
@@ -945,18 +953,18 @@ RunService.RenderStepped:Connect(function()
             if not flying then
                 idleYaw, idlePitch, idleTail = BirdFlight.idlePose(now, b.seed, PROFILE)
             end
-            if b.neck then
-                b.neck.Transform = CFrame.Angles(
-                    math.rad(idlePitch * 0.35 * idleScale - liftNeck),
-                    math.rad(idleYaw * 0.4 * idleScale),
-                    0
+            if b.neck and b.neckAxes then
+                b.neck.Transform = BirdRig.pose(
+                    b.neckAxes,
+                    idlePitch * 0.35 * idleScale - liftNeck,
+                    idleYaw * 0.4 * idleScale
                 )
             end
-            if b.head then
-                b.head.Transform = CFrame.Angles(
-                    math.rad(idlePitch * 0.65 * idleScale - liftHead),
-                    math.rad(idleYaw * 0.6 * idleScale),
-                    0
+            if b.head and b.headAxes then
+                b.head.Transform = BirdRig.pose(
+                    b.headAxes,
+                    idlePitch * 0.65 * idleScale - liftHead,
+                    idleYaw * 0.6 * idleScale
                 )
             end
             if b.tail then

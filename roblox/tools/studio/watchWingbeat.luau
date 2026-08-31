@@ -97,6 +97,7 @@ end
 local sharedFolder = ReplicatedStorage:WaitForChild("RoshamboShared")
 local BirdFlight = freshRequire(sharedFolder:WaitForChild("BirdFlight") :: ModuleScript)
 local BirdSpecies = freshRequire(sharedFolder:WaitForChild("BirdSpecies") :: ModuleScript)
+local BirdRig = freshRequire(sharedFolder:WaitForChild("BirdRig") :: ModuleScript)
 
 -- Accept either a MeshPart or the Model the 3D Importer wraps it in — same reason BirdController
 -- does: which of the two reached the .rbxm depends on what was right-clicked.
@@ -170,6 +171,19 @@ local function spawnBird(): (BasePart, BasePart, { [string]: Bone })
         end
     end
     return body, wings, bones
+end
+
+-- ⚠ ASK THE RIG WHICH WAY IS UP, once. PERCH used to write `CFrame.Angles(pitch, yaw, 0)` and get
+-- neither: on this armature pitch is slot Z on both neck bones, so the song's head-lift went into
+-- a yaw on the neck and a roll on the head and the beak never rose at all.
+local function headAxes(body: BasePart, bones: { [string]: Bone }): { [string]: BirdRig.Axes }
+    local axes = {}
+    for _, name in { "joint3", "joint4" } do
+        if bones[name] then
+            axes[name] = BirdRig.axesOf(bones[name], body)
+        end
+    end
+    return axes
 end
 
 -- Seat both halves by their SHARED ORIGIN (the feet), never by the part centre, and take the
@@ -471,6 +485,7 @@ local function runPerch()
 
     local body, wings, bones = spawnBird()
     seat(body, wings, base)
+    local axes = headAxes(body, bones)
 
     -- ⚠ SAY IT AT THE START, NOT AT 12 SECONDS. The file's default SPECIES is the uguisu, which
     -- has no measured caws, so the single most likely way to reach PERCH is with the one bird whose
@@ -615,18 +630,12 @@ local function runPerch()
         -- --- idle: the head and tail keep the bird alive between events ---
         local idleYaw, idlePitch, idleTail = BirdFlight.idlePose(t, 0, PROFILE)
         if bones.joint3 then
-            bones.joint3.Transform = CFrame.Angles(
-                math.rad(idlePitch * 0.35 * idleScale - liftNeck),
-                math.rad(idleYaw * 0.4 * idleScale),
-                0
-            )
+            bones.joint3.Transform =
+                BirdRig.pose(axes.joint3, idlePitch * 0.35 * idleScale - liftNeck, idleYaw * 0.4 * idleScale)
         end
         if bones.joint4 then
-            bones.joint4.Transform = CFrame.Angles(
-                math.rad(idlePitch * 0.65 * idleScale - liftHead),
-                math.rad(idleYaw * 0.6 * idleScale),
-                0
-            )
+            bones.joint4.Transform =
+                BirdRig.pose(axes.joint4, idlePitch * 0.65 * idleScale - liftHead, idleYaw * 0.6 * idleScale)
         end
         if bones.joint8 then
             bones.joint8.Transform = CFrame.Angles(math.rad(idleTail), 0, 0)
