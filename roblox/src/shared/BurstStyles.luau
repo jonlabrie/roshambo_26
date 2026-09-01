@@ -19,6 +19,9 @@ export type Style = {
     -- own path, so a streak's bright head LEADS and its tail trails behind (camera-facing
     -- billboards wore the streak upside down on falling stars -- owner, 2026-09-03)
     sizeScale: number, -- multiplier on the spread-derived sprite size (streaks need bulk)
+    lightEmission: number, -- the STACKING LAW, not just a glow switch: 1 = fully additive
+    -- (overlaps sum without bound -- the shared-halo problem), lower = part-normal blend,
+    -- so pileups compress. Dots ~0.7, streaks higher (they overlap less).
     soundRole: string, -- key into SOUNDS (burst roles are variant pools)
     pointRule: string, -- "scatter" | "circle" | "tilted" | "single"
 }
@@ -46,6 +49,7 @@ BurstStyles.STYLES = {
         pointRule = "scatter",
         orientation = "camera",
         sizeScale = 1,
+        lightEmission = 0.7,
     },
     -- Planar circle of stars, tilted per shell ("tilted" point rule).
     ring = {
@@ -61,6 +65,7 @@ BurstStyles.STYLES = {
         pointRule = "tilted",
         orientation = "camera",
         sizeScale = 1,
+        lightEmission = 0.7,
     },
     -- Few thick arms, aimed outward-up by the "circle" point rule, falling hard.
     palm = {
@@ -76,6 +81,7 @@ BurstStyles.STYLES = {
         pointRule = "circle",
         orientation = "velocity",
         sizeScale = 2.2,
+        lightEmission = 0.85,
     },
     -- A hanging cloud that flickers: the 18-keypoint square-wave transparency.
     strobe = {
@@ -114,6 +120,7 @@ BurstStyles.STYLES = {
         pointRule = "scatter",
         orientation = "camera",
         sizeScale = 1,
+        lightEmission = 0.7,
     },
     -- The golden crown: long, heavy, drooping to the water.
     kamuro = {
@@ -129,6 +136,7 @@ BurstStyles.STYLES = {
         pointRule = "single",
         orientation = "velocity",
         sizeScale = 2.4,
+        lightEmission = 0.85,
     },
 } :: { [string]: Style }
 
@@ -193,6 +201,7 @@ BurstStyles.APPLIED = {
     "textureRole",
     "orientation",
     "sizeScale",
+    "lightEmission",
     "soundRole",
     "pointRule",
 }

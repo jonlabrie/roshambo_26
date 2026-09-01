@@ -124,12 +124,12 @@ for _ = 1, POOL_SIZE do
         p.Parent = folder
         local em = Instance.new("ParticleEmitter")
         em.Enabled = false -- burst-only; :Emit() drives it
-        em.LightEmission = 1
         em.LightInfluence = 0 -- default 1 lets scene light DIM the stars, worst at night (spec §7)
         em.Rate = 0
-        -- Everything else — SpreadAngle, Drag, Transparency, Speed, Lifetime, Brightness,
-        -- Acceleration — is a style property (BurstStyles.STYLES), applied per emit by
-        -- fireBurst below. The pool sets only what's invariant across every style and shell.
+        -- Everything else — LightEmission (the stacking law, per style since 2026-09-03),
+        -- SpreadAngle, Drag, Transparency, Speed, Lifetime, Brightness, Acceleration — is a
+        -- style property (BurstStyles.STYLES), applied per emit by fireBurst below. The pool
+        -- sets only what's invariant across every style and shell.
         em.Parent = p
         table.insert(points, p)
         table.insert(emitters, em)
@@ -298,6 +298,7 @@ local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random)
         em.Transparency = transparency
         em.Orientation = orientation
         em.Rotation = rotation
+        em.LightEmission = style.lightEmission
         em:Emit(particles)
     end
 end
@@ -355,6 +356,7 @@ local function play(payload: any, distance: number)
                 fem.Size = NumberSequence.new(0.45)
                 fem.Orientation = Enum.ParticleOrientation.FacingCamera
                 fem.Rotation = NumberRange.new(0)
+                fem.LightEmission = 1 -- the flash IS a light source; few sparks, no stacking risk
                 fem.Speed = NumberRange.new(8, 18)
                 fem.Drag = 2
                 fem.Lifetime = NumberRange.new(0.2, 0.4)
