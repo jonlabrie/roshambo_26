@@ -232,7 +232,19 @@ local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random)
     local particles = if #frames == 1 and ev.points > 1 then ev.particles * ev.points else ev.particles
 
     local texture = ev.texture or BurstStyles.TEXTURES[style.textureRole]
-    local color = ColorSequence.new(colorOf(ev.color), colorOf(ev.edgeColor or ev.color))
+    -- COLOR OVER LIFE (owner, 2026-09-03): the star IGNITES near-white, settles to the
+    -- shell's saturated color for the body of the burn, and embers into the edge color at
+    -- death. The heat lives HERE, not in Brightness — brightness past ~8 saturated every
+    -- overlap to white and the color drowned.
+    local core = colorOf(ev.color)
+    local edge = colorOf(ev.edgeColor or ev.color)
+    local flash = core:Lerp(Color3.new(1, 1, 1), 0.75)
+    local color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, flash),
+        ColorSequenceKeypoint.new(0.12, core),
+        ColorSequenceKeypoint.new(0.75, core),
+        ColorSequenceKeypoint.new(1, edge),
+    })
     local size = NumberSequence.new((ev.spread or 30) / 40)
     local acceleration = if ev.droop == true
         then Vector3.new(0, -28, 0)
