@@ -26,6 +26,7 @@ local FireworkCatalog = require(shared:WaitForChild("FireworkCatalog"))
 local FireworkDrafts = require(shared:WaitForChild("FireworkDrafts"))
 local FireworkSchedule = require(shared:WaitForChild("FireworkSchedule"))
 local FireworkDirector = require(shared:WaitForChild("FireworkDirector"))
+local BurstStyles = require(shared:WaitForChild("BurstStyles"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local FireworkLaunched = remotes:WaitForChild("FireworkLaunched") :: RemoteEvent
@@ -48,7 +49,7 @@ folder.Parent = workspace
 
 -- MAX_POINTS burst parts per slot, because a nested break happens at several places AT ONCE and
 -- :Emit() fires wherever its part currently is — one part cannot be in six places in one frame.
-local MAX_POINTS = 8
+local MAX_POINTS = BurstStyles.MAX_POINTS
 local POOL_SIZE = FireworkDirector.MAX_CONCURRENT + 4
 
 type Slot = {
@@ -102,22 +103,11 @@ for _ = 1, POOL_SIZE do
         local em = Instance.new("ParticleEmitter")
         em.Enabled = false -- burst-only; :Emit() drives it
         em.LightEmission = 1
+        em.LightInfluence = 0 -- default 1 lets scene light DIM the stars, worst at night (spec §7)
         em.Rate = 0
-        -- THE RADIAL BREAK LIVES IN SpreadAngle. Default is (0,0): every particle fires
-        -- along the emitter's up axis and a shell reads as a flat vertical line — which is
-        -- exactly what shipped, unnoticed from 2026-08-05 until the proving range put a
-        -- burst 190 studs out at eye level (owner, 2026-09-01: "flat vertical lines").
-        -- (360, 360), the drag and the fade curve are the bench's proven recipe
-        -- (buildFireworkBench.luau emitter(), the look the owner approved on device).
-        em.SpreadAngle = Vector2.new(360, 360)
-        em.Drag = 2.2
-        em.Transparency = NumberSequence.new({
-            NumberSequenceKeypoint.new(0, 0),
-            NumberSequenceKeypoint.new(0.8, 0.15),
-            NumberSequenceKeypoint.new(1, 1),
-        })
-        em.Speed = NumberRange.new(20, 60)
-        em.Lifetime = NumberRange.new(1.2, 2.4)
+        -- Everything else — SpreadAngle, Drag, Transparency, Speed, Lifetime, Brightness,
+        -- Acceleration — is a style property (BurstStyles.STYLES), applied per emit by
+        -- fireBurst below. The pool sets only what's invariant across every style and shell.
         em.Parent = p
         table.insert(points, p)
         table.insert(emitters, em)
@@ -140,25 +130,67 @@ local function playSound(slot: Slot, id: string?, audible: boolean)
     end
 end
 
+-- The keypoint list -> NumberSequence conversion, memoized per style table identity so it isn't
+-- rebuilt on every emit (styles are static module-level tables, so identity is stable for the
+-- program's whole life — nothing to evict).
+local transparencyCache: { [BurstStyles.Style]: NumberSequence } = {}
+local function transparencyOf(style: BurstStyles.Style): NumberSequence
+    local cached = transparencyCache[style]
+    if cached then
+        return cached
+    end
+    local keypoints = {}
+    for i, kp in style.transparency do
+        keypoints[i] = NumberSequenceKeypoint.new(kp[1], kp[2])
+    end
+    local seq = NumberSequence.new(keypoints)
+    transparencyCache[style] = seq
+    return seq
+end
+
 local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random)
-    -- `points` break locations scattered around the anchor. `particles` is PER POINT — the schedule
-    -- already divided the shell's budget, so this must never multiply it back up.
-    local n = math.min(ev.points, MAX_POINTS)
-    for i = 1, n do
+    -- `frames` are the style's point rule turning ev.points into per-part placement/orientation —
+    -- ring/kamuro's rules always collapse to a single frame, so this iterates #frames, NOT
+    -- ev.points: one part cannot stand in for eight positions in one frame.
+    local style = BurstStyles.styleOf(ev.style)
+    local frames = BurstStyles.pointFrames(ev.style, math.min(ev.points, MAX_POINTS), ev.scatter, function()
+        return rng:NextNumber()
+    end)
+
+    -- Budget is sacred: normally `particles` is PER POINT, exactly as scheduled. When the point
+    -- rule collapsed ev.points worth of break locations into fewer physical frames, the whole
+    -- points' worth of particles must come from the frames that actually exist, so the shell's
+    -- total cost is IDENTICAL to what was scheduled — never more.
+    local particles = if #frames < ev.points then ev.particles * ev.points else ev.particles
+
+    local texture = ev.texture or BurstStyles.TEXTURES[style.textureRole]
+    local color = ColorSequence.new(colorOf(ev.color), colorOf(ev.edgeColor or ev.color))
+    local size = NumberSequence.new((ev.spread or 30) / 40)
+    local acceleration = if ev.droop == true
+        then Vector3.new(0, -28, 0)
+        else Vector3.new(style.acceleration[1], style.acceleration[2], style.acceleration[3])
+    local speed = NumberRange.new(style.speed[1], style.speed[2])
+    local lifetime = NumberRange.new(style.lifetime[1], style.lifetime[2])
+    local spreadAngle = Vector2.new(style.spreadAngle[1], style.spreadAngle[2])
+    local transparency = transparencyOf(style)
+
+    for i, f in frames do
         local p, em = slot.points[i], slot.emitters[i]
-        local off = if ev.scatter > 0
-            then Vector3.new(
-                rng:NextNumber(-ev.scatter, ev.scatter),
-                rng:NextNumber(-ev.scatter, ev.scatter) * 0.6,
-                rng:NextNumber(-ev.scatter, ev.scatter)
-            )
-            else Vector3.zero
-        p.Position = anchorPos + off
-        em.Texture = ev.texture or ""
-        em.Color = ColorSequence.new(colorOf(ev.color), colorOf(ev.edgeColor or ev.color))
-        em.Size = NumberSequence.new((ev.spread or 30) / 40)
-        em.Acceleration = if ev.droop then Vector3.new(0, -28, 0) else Vector3.new(0, -6, 0)
-        em:Emit(ev.particles)
+        -- Frame `rot` is an XYZ Euler triple authored against RotX*RotY*RotZ composition;
+        -- CFrame.Angles applies in exactly that order (it IS fromEulerAnglesXYZ).
+        p.CFrame = CFrame.new(anchorPos + Vector3.new(f.pos[1], f.pos[2], f.pos[3]))
+            * CFrame.Angles(math.rad(f.rot[1]), math.rad(f.rot[2]), math.rad(f.rot[3]))
+        em.Texture = texture
+        em.Color = color
+        em.Size = size
+        em.Speed = speed
+        em.Drag = style.drag
+        em.Lifetime = lifetime
+        em.Brightness = style.brightness
+        em.SpreadAngle = spreadAngle
+        em.Acceleration = acceleration
+        em.Transparency = transparency
+        em:Emit(particles)
     end
 end
 
@@ -184,9 +216,15 @@ local function play(payload: any, distance: number)
     local apex = origin
         + Vector3.new(rng:NextNumber(-8, 8), 46 + rng:NextNumber(-6, 6), rng:NextNumber(-8, 8))
 
+    -- `tail` is the longest release-worthy lifetime among this shell's burst styles (kamuro's
+    -- 4.2s crown must not have its slot's parts re-positioned under it while it's still hanging).
     local last = 0
+    local tail = 0
     for _, ev in schedule do
         last = math.max(last, ev.at)
+        if ev.kind == "burst" then
+            tail = math.max(tail, BurstStyles.releaseTail(ev.style))
+        end
     end
 
     active += 1
@@ -216,9 +254,9 @@ local function play(payload: any, distance: number)
         end)
     end
 
-    -- Released after the last phase plus the longest particle lifetime, so the slot is not reused
-    -- while its own sparks are still on screen.
-    task.delay(last + 2.6, function()
+    -- Released after the last phase plus the longest burst style's release tail, so the slot is
+    -- not reused — and its parts repositioned — while its own sparks are still on screen.
+    task.delay(last + tail + 0.2, function()
         active -= 1
         slot.trail.Enabled = false
     end)
