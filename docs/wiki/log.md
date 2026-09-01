@@ -3006,3 +3006,14 @@ hair, which the old 0.0164 does.
 recorded in [[blender-pipeline]], along with the MCP trap that `import_scene.fbx` needs a full
 window override.
 
+
+## [2026-09-01] decision | Fireworks proving range spec approved; in-Play only, at FallsLanding
+
+Spec: docs/superpowers/specs/2026-09-01-proving-range-design.md. First of four
+fireworks sub-projects (range → vocabulary → handheld → distribution). Owner rulings
+folded in: review loop is IN-PLAY ONLY (an edit-mode/MCP proofing tier was offered and
+declined — the true runtime path every time); the yard sits on FallsLanding; rack
+labels are physical plaques, never BillboardGuis ("always floating strangely in
+screen space"). Drafts live in src/shared/FireworkDrafts.luau as families of
+variants, namespaced draft:family/variant, absent from the shared fixture so CI
+never prices a draft.
