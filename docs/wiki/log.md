@@ -3030,3 +3030,10 @@ location…"). THE RANGE PAID FOR ITSELF IMMEDIATELY: every shipped burst since
 controller) — caught at the range's first eye-level look, fixed in adaa1fe. Owner,
 end of session: night toggle works, ladder looks right, "a lot of comments in the
 morning… well done." NOT merged; comments pending. Place not yet saved/published.
+
+## [2026-09-02] gate | Proving range merged to main -- owner: "good for now"
+
+Fast-forward 8ed22e5..4967872 (13 commits), suite green on the merged result
+(1611). Range is live in the place (saved 2026-09-01). Next per program order:
+the VOCABULARY sub-project (new phase kinds; multi-break/sub-bursts, break
+geometries, the crisp round-dot texture upload the 2026-07-20 bench left open).
