@@ -63,8 +63,8 @@ FireworkCatalog.RECIPES = {
                 at = 3.1,
                 kind = "burst",
                 anchor = "apex",
-                color = { 180, 220, 255 },
-                edgeColor = { 220, 240, 255 },
+                color = { 255, 190, 90 }, -- molten gold: a willow is golden by definition (owner caught the pale blue, 2026-09-03)
+                edgeColor = { 255, 226, 160 },
                 spread = 34,
                 droop = true,
             },

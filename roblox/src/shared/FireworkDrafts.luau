@@ -113,6 +113,25 @@ local function kamuro(burstAt: number)
     }
 end
 
+-- 青 ao, blue: the ladder varies hue temperature at fixed spread.
+local function ao(core: { number }, edge: { number })
+    return {
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 160, 200, 255 } },
+            {
+                at = 3.0,
+                kind = "burst",
+                anchor = "apex",
+                color = core,
+                edgeColor = edge,
+                spread = 40,
+                droop = false,
+            },
+        },
+    }
+end
+
 FireworkDrafts.FAMILIES = {
     kiku = {
         v1 = kiku(28, { 255, 240, 200 }),
@@ -133,6 +152,15 @@ FireworkDrafts.FAMILIES = {
         v1 = hotaru(24),
         v2 = hotaru(36),
         v3 = hotaru(48),
+    },
+    -- 青 ao, the blue: bright saturated blue peony. Blue is the HARDEST color in real
+    -- pyro (copper compounds quench at flame temperatures), the mark of a serious maker
+    -- -- which is exactly the premium story for the shelf. The ladder walks azure ->
+    -- cobalt -> electric.
+    ao = {
+        v1 = ao({ 70, 150, 255 }, { 180, 220, 255 }),
+        v2 = ao({ 40, 100, 255 }, { 140, 190, 255 }),
+        v3 = ao({ 90, 180, 255 }, { 220, 240, 255 }),
     },
     kamuro = {
         v1 = kamuro(2.8),
