@@ -157,11 +157,14 @@ local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random)
         return rng:NextNumber()
     end)
 
-    -- Budget is sacred: normally `particles` is PER POINT, exactly as scheduled. When the point
-    -- rule collapsed ev.points worth of break locations into fewer physical frames, the whole
-    -- points' worth of particles must come from the frames that actually exist, so the shell's
-    -- total cost is IDENTICAL to what was scheduled — never more.
-    local particles = if #frames < ev.points then ev.particles * ev.points else ev.particles
+    -- Budget is sacred: normally `particles` is PER POINT, exactly as scheduled. Compensation
+    -- only applies to the deliberate single-frame collapse (tilted/single rules, ring/kamuro),
+    -- where one physical frame stands in for the whole points' worth of break locations, so that
+    -- frame emits ev.particles * ev.points to match the scheduled total. Any other shortfall —
+    -- e.g. pointFrames clamping scatter/circle to MAX_POINTS frames — is left alone: the frames
+    -- that exist each emit their per-point share, which UNDER-emits relative to what was
+    -- scheduled. Budget is never exceeded, only sometimes not fully spent.
+    local particles = if #frames == 1 and ev.points > 1 then ev.particles * ev.points else ev.particles
 
     local texture = ev.texture or BurstStyles.TEXTURES[style.textureRole]
     local color = ColorSequence.new(colorOf(ev.color), colorOf(ev.edgeColor or ev.color))
