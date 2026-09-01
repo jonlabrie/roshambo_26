@@ -89,7 +89,9 @@ for _ = 1, POOL_SIZE do
     -- times the mixer cost.
     local snd = Instance.new("Sound")
     snd.RollOffMode = Enum.RollOffMode.InverseTapered
-    snd.RollOffMaxDistance = FireworkDirector.NEAR_STUDS
+    snd.Volume = BurstStyles.SOUND_LEVELS.volume
+    snd.RollOffMinDistance = BurstStyles.SOUND_LEVELS.rolloffMin
+    snd.RollOffMaxDistance = BurstStyles.SOUND_LEVELS.rolloffMax
     snd.Parent = shell
 
     local points, emitters = {}, {}

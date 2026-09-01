@@ -124,6 +124,16 @@ BurstStyles.TEXTURES = {
     dot = "rbxassetid://87559558731370",
     streak = "rbxassetid://136219621015067",
 }
+-- How LOUD and how FAR. Fireworks are shared spectacle, the opposite of the familiars'
+-- deliberately intimate 9-34 rolloff: full volume out to a plateau, audible across the
+-- canyon. Never left to Sound defaults again (Volume 0.5 / RollOffMin 10 made the whole
+-- show a whisper from FallsLanding -- owner, 2026-09-03: "they don't seem very loud").
+BurstStyles.SOUND_LEVELS = {
+    volume = 2,
+    rolloffMin = 45, -- studs of full volume around the shell
+    rolloffMax = 400, -- audible reach; the director's NEAR_STUDS (250) sits inside it
+}
+
 BurstStyles.SOUNDS = {
     -- Owner uploads 2026-09-03 (sources: Roshambo Reference/sound/fireworks_cuts/).
     -- Each burst role is a VARIANT POOL: the controller picks one per shell from the
