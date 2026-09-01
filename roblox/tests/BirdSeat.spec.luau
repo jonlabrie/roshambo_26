@@ -55,6 +55,12 @@ describe("BirdSpecies.seatNudgeOf", function()
     end)
 
     test("returns zero rather than erroring for a bird that has no record yet", function()
-        expect(BirdSpecies.seatNudgeOf("Hiyodori")).toBe(0)
+        -- The hiyodori graduated to a real record on 2026-09-02; the yamagara is still
+        -- just a proportion-set line in warbler_proportions.py, so it is the example now.
+        expect(BirdSpecies.seatNudgeOf("Yamagara")).toBe(0)
+    end)
+
+    test("the hiyodori wears the warbler seat", function()
+        expect(BirdSpecies.seatNudgeOf("Hiyodori")).toBe(-0.002)
     end)
 end)

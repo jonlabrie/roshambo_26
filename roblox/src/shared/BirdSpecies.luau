@@ -293,6 +293,114 @@ BirdSpecies.SPECIES = {
             rolloff = { 9, 34 },
         },
     },
+    Hiyodori = {
+        -- Sized against the uguisu's deliberate oversize, same reasoning as the mejiro: a real
+        -- hiyodori is ~27cm -- bigger than the uguisu -- so it rides the same scale, not reality.
+        bodyLength = 1.150,
+        seatNudge = -0.002, -- the uguisu's number: shares the warbler body plan and its pivot seat
+        voice = {
+            -- ⚠ AN ENVELOPE BIRD, like the mejiro, NOT an onset bird: its shriek strings run
+            -- 3-5 notes a second, faster than a beak articulates discrete snaps (the karasu's
+            -- caws sit 0.775s apart). Envelopes extracted by tools/audio/measure_envelope.py
+            -- from the 2026-09-02 cuts (Roshambo Reference/sound/birds/hiyodori/cuts);
+            -- `--check` re-derives against the WAVs.
+            -- Weights follow the karasu's rhetoric: the single "piyo" is the everyday remark,
+            -- the six-note shriek phrase the rare declaration.
+            clips = {
+                -- hiyodori-5, one sharp piyo
+                {
+                    id = 83972125364897,
+                    weight = 35,
+                    seconds = 0.61,
+                    env = { 0.06, 0.00, 1.00, 1.00, 0.41, 0.00, 0.00, 0.00 },
+                },
+                -- hiyodori-2, three notes
+                {
+                    id = 75813303704290,
+                    weight = 20,
+                    seconds = 1.09,
+                    env = {
+                        0.02,
+                        0.04,
+                        0.51,
+                        0.83,
+                        1.00,
+                        0.10,
+                        0.32,
+                        0.16,
+                        0.29,
+                        1.00,
+                        1.00,
+                        0.02,
+                        0.00,
+                        0.00,
+                    },
+                },
+                -- hiyodori-3, three notes, different voicing
+                {
+                    id = 81032361933993,
+                    weight = 20,
+                    seconds = 1.13,
+                    env = {
+                        0.02,
+                        0.02,
+                        0.68,
+                        1.00,
+                        0.87,
+                        0.31,
+                        0.25,
+                        0.48,
+                        0.06,
+                        0.99,
+                        1.00,
+                        0.19,
+                        0.01,
+                        0.00,
+                    },
+                },
+                -- hiyodori-4, three notes from the second session
+                {
+                    id = 133499317149598,
+                    weight = 15,
+                    seconds = 1.03,
+                    env = { 0.00, 0.00, 0.59, 0.32, 0.60, 0.98, 0.56, 0.68, 1.00, 1.00, 0.02, 0.00, 0.00 },
+                },
+                -- hiyodori-1, the six-note declaration
+                {
+                    id = 111925871408982,
+                    weight = 10,
+                    seconds = 1.59,
+                    env = {
+                        0.00,
+                        0.45,
+                        0.15,
+                        0.40,
+                        0.52,
+                        0.20,
+                        0.02,
+                        0.38,
+                        0.30,
+                        0.72,
+                        1.00,
+                        1.00,
+                        0.24,
+                        0.53,
+                        0.07,
+                        1.00,
+                        0.99,
+                        0.02,
+                        0.00,
+                        0.00,
+                    },
+                },
+            },
+            -- The uguisu's volume, for the measured reason: these cuts peak -3.0 to -7.2 dBFS
+            -- (one common gain across the set), mean about -5.3, beside the uguisu's -5.4.
+            volume = 0.85,
+            -- On your shoulder, like the others.
+            rolloff = { 9, 34 },
+        },
+    },
 } :: { [string]: Species }
 
 -- ⚠ MEASURED FROM THE SOURCE RECORDING, kept so it is never re-derived by ear. In the original

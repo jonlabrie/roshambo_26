@@ -92,7 +92,12 @@ def check(species_luau, wav_dir, tol=0.04):
             print(f"FAIL: clip {cid} has no WAV of {secs}s with {len(vals)} samples")
             bad += 1
             continue
-        drift = max(abs(a - b) for a, b in zip(vals, hit[0]["env"]))
+        # Two clips can share a length and sit within the 0.05s duration window (the
+        # hiyodori's 1.09s and 1.13s cuts both store 14 samples), making the match
+        # ambiguous. Score every candidate and keep the best: the check still catches an
+        # edited `seconds` (nothing matches) and a redrawn `env` (best drift too large),
+        # which are the defects it exists for.
+        drift = min(max(abs(a - b) for a, b in zip(vals, m["env"])) for m in hit)
         if drift > tol:
             print(f"FAIL: clip {cid} envelope drifted {drift:.3f} from the WAV")
             bad += 1
