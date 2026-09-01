@@ -257,6 +257,10 @@ local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random)
     local orientation = if style.orientation == "velocity"
         then Enum.ParticleOrientation.VelocityParallel
         else Enum.ParticleOrientation.FacingCamera
+    -- VelocityParallel runs the sprite's HORIZONTAL axis along the motion; the streak is
+    -- authored vertical, so unrotated it lay perpendicular to its own path (owner,
+    -- 2026-09-03). 90° turns it into the direction of travel; dots are symmetric, 0.
+    local rotation = if style.orientation == "velocity" then NumberRange.new(90) else NumberRange.new(0)
     local acceleration = if ev.droop == true
         then Vector3.new(0, -28, 0)
         else Vector3.new(style.acceleration[1], style.acceleration[2], style.acceleration[3])
@@ -282,6 +286,7 @@ local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random)
         em.Acceleration = acceleration
         em.Transparency = transparency
         em.Orientation = orientation
+        em.Rotation = rotation
         em:Emit(particles)
     end
 end
@@ -338,6 +343,7 @@ local function play(payload: any, distance: number)
                 fem.Color = ColorSequence.new(Color3.fromRGB(255, 236, 200), Color3.fromRGB(255, 200, 120))
                 fem.Size = NumberSequence.new(0.45)
                 fem.Orientation = Enum.ParticleOrientation.FacingCamera
+                fem.Rotation = NumberRange.new(0)
                 fem.Speed = NumberRange.new(8, 18)
                 fem.Drag = 2
                 fem.Lifetime = NumberRange.new(0.2, 0.4)
