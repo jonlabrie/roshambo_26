@@ -132,6 +132,11 @@ BurstStyles.SOUND_LEVELS = {
     volume = 2,
     rolloffMin = 45, -- studs of full volume around the shell
     rolloffMax = 400, -- audible reach; the director's NEAR_STUDS (250) sits inside it
+    -- Light is instant; sound is not. 1 stud = 1 foot and sound runs ~1125 ft/s, so every
+    -- phase sound arrives distance/1125 late for THIS listener (owner, 2026-09-03: "the
+    -- sound from an aerial burst should be slightly delayed"). ~0.17s from FallsLanding
+    -- to the bridge racks.
+    speedOfSound = 1125,
 }
 
 BurstStyles.SOUNDS = {

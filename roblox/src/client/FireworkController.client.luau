@@ -125,12 +125,55 @@ local function colorOf(rgb: { number }?): Color3
     return Color3.fromRGB(c[1], c[2], c[3])
 end
 
-local function playSound(slot: Slot, id: string?, audible: boolean)
-    if id and audible then
+-- ⚠ SOUND TRAVELS. Each phase sound is delayed by this listener's distance to its source
+-- over the speed of sound — the flash is instant, the thump crosses the canyon. Per client,
+-- so the bridge hears it tight and FallsLanding hears the ~0.17s of physics. Phase order is
+-- safe: every phase of one shell gets a near-identical delay, so nothing reorders.
+local function playSound(slot: Slot, id: string?, audible: boolean, from: Vector3)
+    if not (id and audible) then
+        return
+    end
+    local cam = workspace.CurrentCamera
+    local dist = if cam then (cam.CFrame.Position - from).Magnitude else 0
+    task.delay(dist / BurstStyles.SOUND_LEVELS.speedOfSound, function()
         slot.sound.SoundId = id
         slot.sound:Play()
-    end
+    end)
 end
+
+-- ⚠ PRELOAD EVERY SOUND AND SPRITE ONCE, AT STARTUP. A Sound's first :Play() otherwise
+-- streams the asset from the CDN mid-show, and the session's first launch thump arrives
+-- while the shell is already climbing (owner, 2026-09-03). Async: the show can start
+-- before this finishes; it only moves the cost off the first shell.
+task.spawn(function()
+    local ContentProvider = game:GetService("ContentProvider")
+    local warm = {}
+    local function add(id: string)
+        local s = Instance.new("Sound")
+        s.SoundId = id
+        table.insert(warm, s)
+    end
+    for _, v in BurstStyles.SOUNDS do
+        if typeof(v) == "table" then
+            for _, id in v do
+                add(id)
+            end
+        else
+            add(v)
+        end
+    end
+    for _, id in BurstStyles.TEXTURES do
+        table.insert(warm, id)
+    end
+    pcall(function()
+        ContentProvider:PreloadAsync(warm)
+    end)
+    for _, w in warm do
+        if typeof(w) == "Instance" then
+            w:Destroy()
+        end
+    end
+end)
 
 -- The keypoint list -> NumberSequence conversion, memoized per style table identity so it isn't
 -- rebuilt on every emit (styles are static module-level tables, so identity is stable for the
@@ -238,12 +281,12 @@ local function play(payload: any, distance: number)
             local anchorPos = if ev.anchor == "apex" then apex else origin
             if ev.kind == "report" then
                 slot.shell.Position = origin
-                playSound(slot, ev.sound, lod.sound)
+                playSound(slot, ev.sound, lod.sound, origin)
             elseif ev.kind == "ascent" then
                 slot.shell.Position = origin
                 slot.trail.Color = ColorSequence.new(colorOf(ev.color))
                 slot.trail.Enabled = true
-                playSound(slot, ev.sound, lod.sound)
+                playSound(slot, ev.sound, lod.sound, origin)
                 -- The comet rises to the apex over whatever time the next phase leaves it —
                 -- in TWO stages: straight out of the tube for the first ~60% of the height,
                 -- then easing into the apex's lateral drift. One straight slanted tween read
@@ -282,7 +325,7 @@ local function play(payload: any, distance: number)
                         soundId = pool
                     end
                 end
-                playSound(slot, soundId, lod.sound)
+                playSound(slot, soundId, lod.sound, anchorPos)
                 fireBurst(slot, ev, anchorPos, rng)
             end
         end)
