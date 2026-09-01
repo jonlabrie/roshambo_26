@@ -131,7 +131,7 @@ BurstStyles.STYLES = {
         -- The owner's own canyon-echoed sizzle, over the FINAL flicker phase only: the
         -- strobe's square wave reads as 3-4 sequential re-bursts and the last one
         -- shimmers -- that is the phase this voice belongs to (~70% of star lifetime).
-        tailSound = { role = "tail_strobe", delay = 1.75, volume = 0.6 },
+        tailSound = { role = "tail_strobe", delay = 1.75, volume = 0.35 },
     },
     -- The golden crown: long, heavy, drooping to the water.
     kamuro = {
