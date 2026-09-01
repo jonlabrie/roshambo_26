@@ -22,6 +22,7 @@ export type Phase = {
     edgeColor: { number }?,
     spread: number?,
     droop: boolean?,
+    style: string?,
 }
 export type Recipe = { phases: { Phase } }
 
@@ -38,6 +39,7 @@ export type Event = {
     edgeColor: { number }?,
     spread: number?,
     droop: boolean?,
+    style: string?,
 }
 
 function FireworkSchedule.compile(recipe: Recipe, budget: number): { Event }
@@ -78,6 +80,7 @@ function FireworkSchedule.compile(recipe: Recipe, budget: number): { Event }
             edgeColor = ph.edgeColor,
             spread = ph.spread,
             droop = ph.droop,
+            style = ph.style,
         })
     end
     table.sort(out, function(a, b)
