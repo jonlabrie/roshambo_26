@@ -20,7 +20,8 @@ shape of a phrase.
 the rate at which the table stops being readable: all four mejiro clips cost 106 numbers together.
 
 Usage:  python3 measure_envelope.py <dir-of-wavs> [glob]
-        python3 measure_envelope.py --check <BirdSpecies.luau> <dir-of-wavs>
+        python3 measure_envelope.py --check <BirdSpecies.luau> <dir-of-wavs>...
+        (--check accepts several dirs -- env birds span species: mejiro/cuts hiyodori/cuts)
 """
 
 import sys
@@ -78,7 +79,11 @@ def check(species_luau, wav_dir, tol=0.04):
     if not shipped:
         print("no clips with `env` found in", species_luau)
         return 0
-    measured = [envelope(f) for f in sorted(globmod.glob(os.path.join(wav_dir, "*.wav")))]
+    # `wav_dir` may be several directories (os.pathsep-joined or repeated CLI args merged by
+    # the caller): env birds now span species dirs (mejiro/cuts + hiyodori/cuts), and a check
+    # that can only see one dir would FAIL the other species' clips as "no WAV".
+    dirs = wav_dir if isinstance(wav_dir, list) else [wav_dir]
+    measured = [envelope(f) for d in dirs for f in sorted(globmod.glob(os.path.join(d, "*.wav")))]
     bad = 0
     for cid, (vals, secs) in shipped.items():
         want = round(secs * ENV_HZ)
@@ -107,7 +112,7 @@ def check(species_luau, wav_dir, tol=0.04):
 
 if __name__ == "__main__":
     if len(sys.argv) > 1 and sys.argv[1] == "--check":
-        sys.exit(check(sys.argv[2], sys.argv[3]))
+        sys.exit(check(sys.argv[2], sys.argv[3:]))
     d = sys.argv[1] if len(sys.argv) > 1 else "."
     pat = sys.argv[2] if len(sys.argv) > 2 else "*.wav"
     for f in sorted(globmod.glob(os.path.join(d, pat))):
