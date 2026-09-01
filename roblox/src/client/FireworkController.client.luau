@@ -23,6 +23,7 @@ local TweenService = game:GetService("TweenService")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local FireworkCatalog = require(shared:WaitForChild("FireworkCatalog"))
+local FireworkDrafts = require(shared:WaitForChild("FireworkDrafts"))
 local FireworkSchedule = require(shared:WaitForChild("FireworkSchedule"))
 local FireworkDirector = require(shared:WaitForChild("FireworkDirector"))
 
@@ -149,7 +150,10 @@ local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random)
 end
 
 local function play(payload: any, distance: number)
-    local recipe = FireworkCatalog.RECIPES[payload.shellId]
+    -- Shipped shells first, then proving drafts ("draft:family/variant" — Studio only;
+    -- resolve() is nil for anything else). Same interpreter either way: what the range
+    -- proves is exactly what a player will get.
+    local recipe = FireworkCatalog.RECIPES[payload.shellId] or FireworkDrafts.resolve(payload.shellId)
     if not recipe then
         return -- the contract test exists so this cannot happen in a shipped build
     end
