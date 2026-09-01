@@ -239,11 +239,16 @@ local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random)
     local core = colorOf(ev.color)
     local edge = colorOf(ev.edgeColor or ev.color)
     local flash = core:Lerp(Color3.new(1, 1, 1), 0.75)
+    -- A dying star cools like a blackbody: dim orange-brown, whatever color it burned.
+    -- Using the raw edgeColor here read as "blue grey white" on pale-edged shells
+    -- (owner, 2026-09-03); the ember keeps only a hint of the shell's own tint.
+    local ember = Color3.fromRGB(150, 70, 25):Lerp(edge, 0.2)
     local color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, flash),
         ColorSequenceKeypoint.new(0.12, core),
-        ColorSequenceKeypoint.new(0.75, core),
-        ColorSequenceKeypoint.new(1, edge),
+        ColorSequenceKeypoint.new(0.7, core),
+        ColorSequenceKeypoint.new(0.92, ember),
+        ColorSequenceKeypoint.new(1, ember),
     })
     local size = NumberSequence.new((ev.spread or 30) / 40)
     local acceleration = if ev.droop == true
