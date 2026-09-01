@@ -22,6 +22,10 @@ export type Style = {
     lightEmission: number, -- the STACKING LAW, not just a glow switch: 1 = fully additive
     -- (overlaps sum without bound -- the shared-halo problem), lower = part-normal blend,
     -- so pileups compress. Dots ~0.7, streaks higher (they overlap less).
+    tailSound: { role: string, delay: number, volume: number } | false, -- a SECOND voice
+    -- layered after the burst (owner's canyon sizzle over hotaru's final flicker phase,
+    -- 2026-09-03) -- role into SOUNDS, delay seconds after the break, volume as a
+    -- fraction of SOUND_LEVELS.volume. false = the style has no tail.
     soundRole: string, -- key into SOUNDS (burst roles are variant pools)
     pointRule: string, -- "scatter" | "circle" | "tilted" | "single"
 }
@@ -50,6 +54,7 @@ BurstStyles.STYLES = {
         orientation = "camera",
         sizeScale = 1,
         lightEmission = 0.7,
+        tailSound = false,
     },
     -- Planar circle of stars, tilted per shell ("tilted" point rule).
     ring = {
@@ -66,6 +71,7 @@ BurstStyles.STYLES = {
         orientation = "camera",
         sizeScale = 1,
         lightEmission = 0.7,
+        tailSound = false,
     },
     -- Few thick arms, aimed outward-up by the "circle" point rule, falling hard.
     palm = {
@@ -82,6 +88,7 @@ BurstStyles.STYLES = {
         orientation = "velocity",
         sizeScale = 2.2,
         lightEmission = 0.85,
+        tailSound = false,
     },
     -- A hanging cloud that flickers: the 18-keypoint square-wave transparency.
     strobe = {
@@ -121,6 +128,10 @@ BurstStyles.STYLES = {
         orientation = "camera",
         sizeScale = 1,
         lightEmission = 0.7,
+        -- The owner's own canyon-echoed sizzle, over the FINAL flicker phase only: the
+        -- strobe's square wave reads as 3-4 sequential re-bursts and the last one
+        -- shimmers -- that is the phase this voice belongs to (~70% of star lifetime).
+        tailSound = { role = "tail_strobe", delay = 1.75, volume = 0.6 },
     },
     -- The golden crown: long, heavy, drooping to the water.
     kamuro = {
@@ -137,6 +148,7 @@ BurstStyles.STYLES = {
         orientation = "velocity",
         sizeScale = 2.4,
         lightEmission = 0.85,
+        tailSound = false,
     },
 } :: { [string]: Style }
 
@@ -168,6 +180,7 @@ BurstStyles.SOUNDS = {
     -- aerial pool as stand-ins until the firecracker-string and glitter-sizzle
     -- recordings land (owner ruling 2026-09-03).
     report = "rbxassetid://87713703495045", -- launch-deck-2: the tube thump
+    tail_strobe = "rbxassetid://93851330785281", -- jon-sizzle-c3-canyon-v4: the owner's sizzle, canyon-echoed
     burst_peony = {
         "rbxassetid://89225206152876", -- burst-aerial-1
         "rbxassetid://91810415393899", -- burst-aerial-2
@@ -202,6 +215,7 @@ BurstStyles.APPLIED = {
     "orientation",
     "sizeScale",
     "lightEmission",
+    "tailSound",
     "soundRole",
     "pointRule",
 }
@@ -291,8 +305,18 @@ function BurstStyles.pointFrames(
     return rule(n, scatter, rand)
 end
 
+-- How long a tail-voice clip is allowed to run past its entry before the slot may be
+-- reused. Generous by design: a reused slot teleports, and a still-playing tail sound
+-- would jump across the canyon with it.
+local TAIL_CLIP_ALLOWANCE = 4.5
+
 function BurstStyles.releaseTail(name: string?): number
-    return BurstStyles.styleOf(name).lifetime[2]
+    local style = BurstStyles.styleOf(name)
+    local tail = style.lifetime[2]
+    if style.tailSound then
+        tail = math.max(tail, style.tailSound.delay + TAIL_CLIP_ALLOWANCE)
+    end
+    return tail
 end
 
 return BurstStyles

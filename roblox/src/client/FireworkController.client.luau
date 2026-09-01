@@ -58,6 +58,9 @@ type Slot = {
     points: { BasePart },
     emitters: { ParticleEmitter },
     sound: Sound,
+    tail: Sound, -- the SECOND voice: a style's tailSound (the owner's canyon sizzle over
+    -- hotaru's final flicker) deliberately OVERLAPS the burst's decay, so it cannot share
+    -- the main Sound -- that one's SoundId swap would cut whichever clip was still playing.
 }
 local pool: { Slot } = {}
 local poolNext = 1
@@ -114,6 +117,12 @@ for _ = 1, POOL_SIZE do
     snd.RollOffMaxDistance = BurstStyles.SOUND_LEVELS.rolloffMax
     snd.Parent = shell
 
+    local tailSnd = Instance.new("Sound")
+    tailSnd.RollOffMode = Enum.RollOffMode.InverseTapered
+    tailSnd.RollOffMinDistance = BurstStyles.SOUND_LEVELS.rolloffMin
+    tailSnd.RollOffMaxDistance = BurstStyles.SOUND_LEVELS.rolloffMax
+    tailSnd.Parent = shell
+
     local points, emitters = {}, {}
     for _ = 1, MAX_POINTS do
         local p = Instance.new("Part")
@@ -135,7 +144,10 @@ for _ = 1, POOL_SIZE do
         table.insert(emitters, em)
     end
 
-    table.insert(pool, { shell = shell, trail = trail, points = points, emitters = emitters, sound = snd })
+    table.insert(
+        pool,
+        { shell = shell, trail = trail, points = points, emitters = emitters, sound = snd, tail = tailSnd }
+    )
 end
 
 local WHITE = { 255, 255, 255 }
@@ -426,6 +438,20 @@ local function play(payload: any, distance: number)
                     end
                 end
                 playSound(slot, soundId, lod.sound, anchorPos)
+                -- The tail voice: a style's second sound, entering its own delay after the
+                -- break (plus the same speed-of-sound travel), on the slot's SEPARATE tail
+                -- Sound so it can overlap the burst clip's decay.
+                local tailSpec = BurstStyles.styleOf(ev.style).tailSound
+                if tailSpec and lod.sound then
+                    local tailId = BurstStyles.SOUNDS[tailSpec.role]
+                    local cam = workspace.CurrentCamera
+                    local dist = if cam then (cam.CFrame.Position - anchorPos).Magnitude else 0
+                    task.delay(tailSpec.delay + dist / BurstStyles.SOUND_LEVELS.speedOfSound, function()
+                        slot.tail.SoundId = tailId
+                        slot.tail.Volume = BurstStyles.SOUND_LEVELS.volume * tailSpec.volume
+                        slot.tail:Play()
+                    end)
+                end
                 fireBurst(slot, ev, anchorPos, rng)
             end
         end)
