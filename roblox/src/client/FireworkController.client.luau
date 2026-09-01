@@ -84,6 +84,22 @@ for _ = 1, POOL_SIZE do
     -- 2026-09-03: "launch beginnings still well overhead"). 1.6s keeps the ribbon anchored
     -- at the muzzle for most of a ~2s flight (owner ruling: flights run ~2 seconds).
     trail.Lifetime = 1.6
+    -- ⚠ THE TAIL DIES BY FADING, NOT BY ERASURE (owner, 2026-09-03: the hard Lifetime
+    -- eraser read as a constant-rate wipe; "the last thing we see should be the last bit
+    -- of trail fading to full transparency"). The gradient runs head (0) -> oldest (1):
+    -- fully transparent well before the eraser, so the cut edge is never visible; the
+    -- PERCEIVED tail end is the fade, which retraces the shell's own decelerating path.
+    trail.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.1),
+        NumberSequenceKeypoint.new(0.6, 0.45),
+        NumberSequenceKeypoint.new(0.85, 1),
+        NumberSequenceKeypoint.new(1, 1),
+    })
+    -- comet taper: full width at the shell, needle at the tail
+    trail.WidthScale = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(1, 0.2),
+    })
     trail.LightEmission = 1
     trail.Enabled = false
     trail.Parent = shell
