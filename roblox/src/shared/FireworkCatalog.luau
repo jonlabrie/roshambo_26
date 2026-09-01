@@ -28,7 +28,7 @@ FireworkCatalog.RECIPES = {
             { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
             { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 200, 120 } },
             {
-                at = 1.0,
+                at = 1.2,
                 kind = "burst",
                 anchor = "apex",
                 color = { 255, 236, 170 },
@@ -44,7 +44,7 @@ FireworkCatalog.RECIPES = {
             { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
             { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 190, 200 } },
             {
-                at = 2.0,
+                at = 3.0,
                 kind = "burst",
                 anchor = "apex",
                 color = { 255, 120, 140 },
@@ -60,7 +60,7 @@ FireworkCatalog.RECIPES = {
             { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
             { at = 0.02, kind = "ascent", anchor = "origin", color = { 220, 240, 255 } },
             {
-                at = 2.1,
+                at = 3.1,
                 kind = "burst",
                 anchor = "apex",
                 color = { 180, 220, 255 },
@@ -77,7 +77,7 @@ FireworkCatalog.RECIPES = {
             { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
             { at = 0.02, kind = "ascent", anchor = "origin", color = { 198, 194, 186 } },
             {
-                at = 2.2,
+                at = 3.2,
                 kind = "burst",
                 anchor = "apex",
                 color = { 226, 222, 210 },

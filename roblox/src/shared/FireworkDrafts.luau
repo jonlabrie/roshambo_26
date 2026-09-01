@@ -21,7 +21,7 @@ local function kiku(spread: number, edge: { number })
             { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
             { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 214, 130 } },
             {
-                at = 2.0,
+                at = 3.0,
                 kind = "burst",
                 anchor = "apex",
                 color = { 255, 190, 90 },
@@ -40,7 +40,7 @@ local function wa(spread: number)
             { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
             { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 180, 100 } },
             {
-                at = 2.0,
+                at = 3.0,
                 kind = "burst",
                 anchor = "apex",
                 style = "ring",
@@ -60,7 +60,7 @@ local function yashi(points: number)
             { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
             { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 210, 140 } },
             {
-                at = 2.0,
+                at = 3.0,
                 kind = "burst",
                 anchor = "apex",
                 style = "palm",
@@ -81,7 +81,7 @@ local function hotaru(spread: number)
             { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
             { at = 0.02, kind = "ascent", anchor = "origin", color = { 210, 225, 245 } },
             {
-                at = 2.0,
+                at = 3.0,
                 kind = "burst",
                 anchor = "apex",
                 style = "strobe",
@@ -135,9 +135,9 @@ FireworkDrafts.FAMILIES = {
         v3 = hotaru(48),
     },
     kamuro = {
-        v1 = kamuro(1.9),
-        v2 = kamuro(2.05),
-        v3 = kamuro(2.2),
+        v1 = kamuro(2.8),
+        v2 = kamuro(3.0),
+        v3 = kamuro(3.2),
     },
     dan = {
         v1 = {
@@ -150,7 +150,7 @@ FireworkDrafts.FAMILIES = {
                     color = { 255, 214, 130 },
                 },
                 {
-                    at = 2.0,
+                    at = 3.0,
                     kind = "burst",
                     anchor = "apex",
                     color = { 255, 190, 90 },
@@ -160,7 +160,7 @@ FireworkDrafts.FAMILIES = {
                     share = 2,
                 },
                 {
-                    at = 2.6,
+                    at = 3.6,
                     kind = "burst",
                     anchor = "apex",
                     style = "strobe",
@@ -172,7 +172,7 @@ FireworkDrafts.FAMILIES = {
                     share = 1,
                 },
                 {
-                    at = 3.5,
+                    at = 4.5,
                     kind = "burst",
                     anchor = "apex",
                     style = "kamuro",

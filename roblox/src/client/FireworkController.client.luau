@@ -81,9 +81,9 @@ for _ = 1, POOL_SIZE do
     trail.Attachment0, trail.Attachment1 = a0, a1
     -- ⚠ LONG ENOUGH TO STAY ROOTED AT THE TUBE. At 0.45 the tail end of the ribbon faded
     -- before the eye caught the comet, so every launch read as starting mid-air (owner,
-    -- 2026-09-03: "launch beginnings still well overhead"). 1.6s keeps the ribbon anchored
-    -- at the muzzle for most of a ~2s flight (owner ruling: flights run ~2 seconds).
-    trail.Lifetime = 1.6
+    -- 2026-09-03: "launch beginnings still well overhead"). 2.4s keeps the ribbon anchored
+    -- at the muzzle for most of a ~3s flight (owner ruling 2026-09-03: ~3s average).
+    trail.Lifetime = 2.4
     -- ⚠ THE TAIL DIES BY FADING, NOT BY ERASURE (owner, 2026-09-03: the hard Lifetime
     -- eraser read as a constant-rate wipe; "the last thing we see should be the last bit
     -- of trail fading to full transparency"). The gradient runs head (0) -> oldest (1):
@@ -352,8 +352,12 @@ local function play(payload: any, distance: number)
                 local flight: RBXScriptConnection
                 flight = RunService.Heartbeat:Connect(function()
                     local k = math.min((os.clock() - t0) / rise, 1)
-                    -- ease-out: fast out of the tube, slowing toward the break
-                    local e = 1 - (1 - k) * (1 - k)
+                    -- ⚠ CUBIC ease-out, and the exponent IS the ballistics (owner asked after
+                    -- gravity, 2026-09-03: there is none simulated -- the curve implies it).
+                    -- Exponent 3 fronts the deceleration like air drag on a fast muzzle exit
+                    -- (~50%% faster launch than quadratic for the same flight) and floats the
+                    -- shell into its break, which is how a real mortar shell rises.
+                    local e = 1 - (1 - k) * (1 - k) * (1 - k)
                     local a = origin:Lerp(control, e)
                     local b = control:Lerp(apex, e)
                     slot.shell.Position = a:Lerp(b, e)
