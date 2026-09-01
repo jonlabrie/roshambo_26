@@ -250,7 +250,13 @@ local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random)
         ColorSequenceKeypoint.new(0.92, ember),
         ColorSequenceKeypoint.new(1, ember),
     })
-    local size = NumberSequence.new((ev.spread or 30) / 40)
+    local size = NumberSequence.new((ev.spread or 30) / 40 * style.sizeScale)
+    -- Velocity-parallel aligns each sprite to its own path, so a streak's bright head
+    -- LEADS and its tail trails behind — camera billboards wore the streak upside down
+    -- on falling stars (owner, 2026-09-03).
+    local orientation = if style.orientation == "velocity"
+        then Enum.ParticleOrientation.VelocityParallel
+        else Enum.ParticleOrientation.FacingCamera
     local acceleration = if ev.droop == true
         then Vector3.new(0, -28, 0)
         else Vector3.new(style.acceleration[1], style.acceleration[2], style.acceleration[3])
@@ -275,6 +281,7 @@ local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random)
         em.SpreadAngle = spreadAngle
         em.Acceleration = acceleration
         em.Transparency = transparency
+        em.Orientation = orientation
         em:Emit(particles)
     end
 end
@@ -330,6 +337,7 @@ local function play(payload: any, distance: number)
                 fem.Texture = BurstStyles.TEXTURES.dot
                 fem.Color = ColorSequence.new(Color3.fromRGB(255, 236, 200), Color3.fromRGB(255, 200, 120))
                 fem.Size = NumberSequence.new(0.45)
+                fem.Orientation = Enum.ParticleOrientation.FacingCamera
                 fem.Speed = NumberRange.new(8, 18)
                 fem.Drag = 2
                 fem.Lifetime = NumberRange.new(0.2, 0.4)
