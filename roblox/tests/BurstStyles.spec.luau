@@ -114,6 +114,15 @@ describe("BurstStyles — the vocabulary's one source of truth", function()
         expect(rises >= 4 and falls >= 4).toBe(true)
     end)
 
+    test("orientation and sizeScale are sane on every style", function()
+        for name, style in BurstStyles.STYLES do
+            if style.orientation ~= "camera" and style.orientation ~= "velocity" then
+                error(`style '{name}' has unknown orientation '{tostring(style.orientation)}'`)
+            end
+            expect(typeof(style.sizeScale) == "number" and style.sizeScale > 0).toBe(true)
+        end
+    end)
+
     test("MAX_POINTS is 8 — the pool's per-slot break-part count", function()
         expect(BurstStyles.MAX_POINTS).toBe(8)
     end)

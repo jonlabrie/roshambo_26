@@ -15,6 +15,10 @@ export type Style = {
     spreadAngle: { number }, -- {x, y} degrees
     transparency: { { number } }, -- keypoints {time, value}
     textureRole: string, -- "dot" | "streak"
+    orientation: string, -- "camera" | "velocity": velocity aligns the sprite to each star's
+    -- own path, so a streak's bright head LEADS and its tail trails behind (camera-facing
+    -- billboards wore the streak upside down on falling stars -- owner, 2026-09-03)
+    sizeScale: number, -- multiplier on the spread-derived sprite size (streaks need bulk)
     soundRole: string, -- key into SOUNDS (burst roles are variant pools)
     pointRule: string, -- "scatter" | "circle" | "tilted" | "single"
 }
@@ -40,6 +44,8 @@ BurstStyles.STYLES = {
         textureRole = "dot",
         soundRole = "burst_peony",
         pointRule = "scatter",
+        orientation = "camera",
+        sizeScale = 1,
     },
     -- Planar circle of stars, tilted per shell ("tilted" point rule).
     ring = {
@@ -53,6 +59,8 @@ BurstStyles.STYLES = {
         textureRole = "dot",
         soundRole = "burst_peony",
         pointRule = "tilted",
+        orientation = "camera",
+        sizeScale = 1,
     },
     -- Few thick arms, aimed outward-up by the "circle" point rule, falling hard.
     palm = {
@@ -66,6 +74,8 @@ BurstStyles.STYLES = {
         textureRole = "streak",
         soundRole = "burst_peony",
         pointRule = "circle",
+        orientation = "velocity",
+        sizeScale = 2.2,
     },
     -- A hanging cloud that flickers: the 18-keypoint square-wave transparency.
     strobe = {
@@ -102,6 +112,8 @@ BurstStyles.STYLES = {
         textureRole = "dot",
         soundRole = "burst_strobe",
         pointRule = "scatter",
+        orientation = "camera",
+        sizeScale = 1,
     },
     -- The golden crown: long, heavy, drooping to the water.
     kamuro = {
@@ -115,6 +127,8 @@ BurstStyles.STYLES = {
         textureRole = "streak",
         soundRole = "burst_kamuro",
         pointRule = "single",
+        orientation = "velocity",
+        sizeScale = 2.4,
     },
 } :: { [string]: Style }
 
@@ -177,6 +191,8 @@ BurstStyles.APPLIED = {
     "spreadAngle",
     "transparency",
     "textureRole",
+    "orientation",
+    "sizeScale",
     "soundRole",
     "pointRule",
 }
