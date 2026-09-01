@@ -94,12 +94,14 @@ local function releaseCursor()
     RunService:UnbindFromRenderStep(CURSOR_BIND)
 end
 
--- ===== night toggle: local-only Lighting.ClockTime override, never a server write, so it cannot
--- fight the shipped day-night cycle. The saved value is captured once, on first enable, and reused
--- for every restore after that (a second enable while already-off would otherwise "save" 22). =====
+-- ===== night toggle: an attribute gate, not a raw ClockTime fight. DayNightController rewrites
+-- Lighting.ClockTime at WRITE_HZ (10) on RenderStepped, so a bare `Lighting.ClockTime = 22` here
+-- loses within ~100ms. Setting `ProvingNightOverride` true tells DayNightController's per-tick
+-- write path to skip itself entirely while night mode is on; THIS script then owns ClockTime for
+-- as long as the attribute stays set. Turning night off (or closing the panel) just clears the
+-- attribute -- no saved-ClockTime restore is needed or wanted, since DayNightController reclaims
+-- the sky on its very next tick. =====
 local nightOn = false
-local hasSavedClockTime = false
-local savedClockTime = 0
 
 local nightButton: TextButton
 
@@ -111,10 +113,7 @@ local function enableNight()
     if nightOn then
         return
     end
-    if not hasSavedClockTime then
-        savedClockTime = Lighting.ClockTime
-        hasSavedClockTime = true
-    end
+    Lighting:SetAttribute("ProvingNightOverride", true)
     Lighting.ClockTime = 22
     nightOn = true
     paintNightButton()
@@ -124,16 +123,15 @@ local function disableNight()
     if not nightOn then
         return
     end
-    if hasSavedClockTime then
-        Lighting.ClockTime = savedClockTime
-    end
+    Lighting:SetAttribute("ProvingNightOverride", nil)
     nightOn = false
     paintNightButton()
 end
 
 -- THE ONLY PLACE gui.Enabled IS WRITTEN. Cursor grip and the night override both have to be paired
 -- with it exactly: closing without releasing the cursor leaves the camera stuck for the rest of
--- the session, and closing without restoring the clock leaves the range dark forever.
+-- the session, and closing without clearing the override leaves DayNightController locked out of
+-- ClockTime forever (disableNight clears the attribute, so this is safe).
 local function setOpen(open: boolean)
     if open then
         gripCursor()
@@ -200,9 +198,70 @@ closeButton.MouseButton1Click:Connect(function()
     setOpen(false)
 end)
 
+-- ===== rack selector: which rack SINGLE fires (draft variant buttons and shipped Fire buttons)
+-- target. Ladder and sequence ignore this entirely -- ladder always spans all five racks by
+-- definition, and sequence is pinned to ProvingPlan.SEQUENCE_RACK for clean-air comparison. =====
+local rackRow = Instance.new("Frame")
+rackRow.Size = UDim2.new(1, -20, 0, 26)
+rackRow.Position = UDim2.fromOffset(10, 44)
+rackRow.BackgroundTransparency = 1
+rackRow.Parent = panel
+
+local rackRowLabel = Instance.new("TextLabel")
+rackRowLabel.Size = UDim2.fromOffset(50, 26)
+rackRowLabel.Position = UDim2.fromOffset(0, 0)
+rackRowLabel.BackgroundTransparency = 1
+rackRowLabel.TextColor3 = INK_CREAM
+rackRowLabel.Font = Enum.Font.Code
+rackRowLabel.TextSize = 12
+rackRowLabel.TextXAlignment = Enum.TextXAlignment.Left
+rackRowLabel.Text = "Rack:"
+rackRowLabel.Parent = rackRow
+
+local selectedRack = ProvingPlan.SEQUENCE_RACK
+local rackButtons: { [string]: TextButton } = {}
+
+local function paintRackButtons()
+    for rack, b in rackButtons do
+        if rack == selectedRack then
+            b.BackgroundColor3 = GOLD
+            b.BackgroundTransparency = 0
+            b.TextColor3 = WASHI
+        else
+            b.BackgroundColor3 = WASHI
+            b.BackgroundTransparency = 0.3
+            b.TextColor3 = INK_CREAM
+        end
+    end
+end
+
+local rackButtonX = 54
+for _, rack in ProvingPlan.RACKS do
+    local letter = rack:sub(-1)
+    local rb = Instance.new("TextButton")
+    rb.Size = UDim2.fromOffset(30, 26)
+    rb.Position = UDim2.fromOffset(rackButtonX, 0)
+    rb.BorderSizePixel = 0
+    rb.AutoButtonColor = false
+    rb.Text = letter
+    rb.Font = Enum.Font.Code
+    rb.TextSize = 13
+    rb.Parent = rackRow
+    local rc = Instance.new("UICorner")
+    rc.CornerRadius = UDim.new(0, 5)
+    rc.Parent = rb
+    rackButtons[rack] = rb
+    rb.MouseButton1Click:Connect(function()
+        selectedRack = rack
+        paintRackButtons()
+    end)
+    rackButtonX += 34
+end
+paintRackButtons()
+
 local scroll = Instance.new("ScrollingFrame")
-scroll.Size = UDim2.new(1, -20, 1, -110)
-scroll.Position = UDim2.fromOffset(10, 44)
+scroll.Size = UDim2.new(1, -20, 1, -140)
+scroll.Position = UDim2.fromOffset(10, 74)
 scroll.BackgroundTransparency = 1
 scroll.BorderSizePixel = 0
 scroll.ScrollBarThickness = 6
@@ -337,7 +396,7 @@ for _, family in FireworkDrafts.familyNames() do
         local vButton = makeButton(row, variant, 40, variantX)
         local id = ("draft:%s/%s"):format(family, variant)
         vButton.MouseButton1Click:Connect(function()
-            fireSingle(id, ProvingPlan.SEQUENCE_RACK)
+            fireSingle(id, selectedRack)
         end)
         variantX += 44
     end
@@ -370,6 +429,6 @@ for _, id in shippedIds do
 
     local fireButton = makeButton(row, "Fire", 50, 154)
     fireButton.MouseButton1Click:Connect(function()
-        fireSingle(id, ProvingPlan.SEQUENCE_RACK)
+        fireSingle(id, selectedRack)
     end)
 end

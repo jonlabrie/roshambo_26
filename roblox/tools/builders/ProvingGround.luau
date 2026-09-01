@@ -51,7 +51,7 @@ local PLAQUE_Y = TUBE_TOP_Y - PLAQUE_SIZE[2] / 2
 -- (Z) dimension, so the plaque stands flush against that face.
 local PLAQUE_Z = BASE_SIZE[3] / 2 + PLAQUE_SIZE[3] / 2
 
-local FIRING_POST_POS = { 0, 0, 14 } -- 14 studs from the rack line, facing them
+local FIRING_POST_POS = { 0, 0.3, 14 } -- 14 studs from the rack line, facing them; y = POST_SIZE[2]/2 so the post's base sits on the ground datum, not half-buried in it
 
 -- ===== the plaque letter — Machiya's `kanjiLabel` canvas recipe (tools/builders/Machiya.luau,
 -- ~lines 37-104), copied rather than shared: SizingMode "PixelsPerStud" (the default FixedSize

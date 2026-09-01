@@ -22,14 +22,23 @@ describe("FireworkDrafts — the proving range's working file", function()
         expect(count > 0).toBe(true) -- the file ships with a seed family
     end)
 
-    test("resolve round-trips the namespaced id", function()
+    test("resolve round-trips the namespaced id for EVERY family and EVERY variant", function()
+        -- Round-tripping only families[1]/variants[1] would miss a future family name the
+        -- resolve pattern (%w_ only) can't parse -- every family, every variant, must resolve
+        -- back to the exact recipe table it came from.
         local families = FireworkDrafts.familyNames()
         expect(#families > 0).toBe(true)
-        local family = families[1]
-        local variants = FireworkDrafts.variantsOf(family)
-        expect(#variants > 0).toBe(true)
-        local id = "draft:" .. family .. "/" .. variants[1]
-        expect(FireworkDrafts.resolve(id) == FireworkDrafts.FAMILIES[family][variants[1]]).toBe(true)
+        local checked = 0
+        for _, family in families do
+            local variants = FireworkDrafts.variantsOf(family)
+            expect(#variants > 0).toBe(true)
+            for _, variant in variants do
+                local id = "draft:" .. family .. "/" .. variant
+                expect(FireworkDrafts.resolve(id) == FireworkDrafts.FAMILIES[family][variant]).toBe(true)
+                checked += 1
+            end
+        end
+        expect(checked > 0).toBe(true)
     end)
 
     test("resolve returns nil for unknowns and malformed ids", function()
