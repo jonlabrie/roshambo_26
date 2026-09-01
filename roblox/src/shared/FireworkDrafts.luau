@@ -11,7 +11,6 @@
 -- Pure data + string parsing, no Roblox globals; runs under Lune.
 local FireworkDrafts = {}
 
-local SPARKLE = "rbxasset://textures/particles/sparkles_main.dds"
 local S_REPORT = "rbxassetid://87713703495045" -- launch-deck-2 (owner pick, 2026-09-03)
 
 -- 菊 kiku, chrysanthemum: a tight peony with a distinct edge tint. The seed ladder —
@@ -25,7 +24,6 @@ local function kiku(spread: number, edge: { number })
                 at = 1.15,
                 kind = "burst",
                 anchor = "apex",
-                texture = SPARKLE,
                 color = { 255, 190, 90 },
                 edgeColor = edge,
                 spread = spread,
@@ -45,7 +43,6 @@ local function wa(spread: number)
                 at = 1.15,
                 kind = "burst",
                 anchor = "apex",
-                texture = SPARKLE,
                 style = "ring",
                 color = { 255, 60, 40 },
                 edgeColor = { 255, 240, 220 },
@@ -66,7 +63,6 @@ local function yashi(points: number)
                 at = 1.15,
                 kind = "burst",
                 anchor = "apex",
-                texture = SPARKLE,
                 style = "palm",
                 color = { 255, 180, 60 },
                 edgeColor = { 255, 230, 160 },
@@ -88,7 +84,6 @@ local function hotaru(spread: number)
                 at = 1.15,
                 kind = "burst",
                 anchor = "apex",
-                texture = SPARKLE,
                 style = "strobe",
                 color = { 235, 245, 255 },
                 edgeColor = { 180, 220, 255 },
@@ -109,7 +104,6 @@ local function kamuro(burstAt: number)
                 at = burstAt,
                 kind = "burst",
                 anchor = "apex",
-                texture = SPARKLE,
                 style = "kamuro",
                 color = { 255, 170, 40 },
                 edgeColor = { 255, 220, 140 },
@@ -159,7 +153,6 @@ FireworkDrafts.FAMILIES = {
                     at = 1.1,
                     kind = "burst",
                     anchor = "apex",
-                    texture = SPARKLE,
                     color = { 255, 190, 90 },
                     edgeColor = { 200, 100, 50 },
                     spread = 30,
@@ -170,7 +163,6 @@ FireworkDrafts.FAMILIES = {
                     at = 1.7,
                     kind = "burst",
                     anchor = "apex",
-                    texture = SPARKLE,
                     style = "strobe",
                     color = { 235, 245, 255 },
                     edgeColor = { 180, 220, 255 },
@@ -183,7 +175,6 @@ FireworkDrafts.FAMILIES = {
                     at = 2.6,
                     kind = "burst",
                     anchor = "apex",
-                    texture = SPARKLE,
                     style = "kamuro",
                     color = { 255, 170, 40 },
                     edgeColor = { 255, 220, 140 },

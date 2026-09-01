@@ -28,10 +28,10 @@ describe("FireworkRecipes.validate — the one recipe schema", function()
         expect(ok).toBe(true)
     end)
 
-    test("A BURST WITH NO TEXTURE FAILS — the blank-sky trap", function()
+    test("a burst may omit its texture — the style role resolves one at render", function()
         local r = goodRecipe()
         r.phases[3].texture = nil
-        expect(FireworkRecipes.validate(r)).toBe(false)
+        expect(FireworkRecipes.validate(r)).toBe(true)
     end)
 
     test("a burst with an EMPTY texture fails the same way", function()

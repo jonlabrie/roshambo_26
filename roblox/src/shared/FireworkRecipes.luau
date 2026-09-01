@@ -45,8 +45,17 @@ function FireworkRecipes.validate(recipe: any): (boolean, string?)
         if not ANCHORS[ph.anchor] then
             return false, `phase {i}: anchor must be 'origin' or 'apex'`
         end
-        if ph.kind == "burst" and (typeof(ph.texture) ~= "string" or ph.texture == "") then
-            return false, `phase {i}: a burst must name a non-empty texture (blank-sky trap)`
+        -- A burst MAY omit `texture`: the style's textureRole resolves one at render, and
+        -- BurstStyles' tests guarantee every role id is non-empty — the blank-sky trap moved
+        -- there (2026-09-03, after pinned recipe textures made the uploaded sprites
+        -- unreachable: the recipe always won over the role). An EMPTY texture is still the
+        -- trap and still fails.
+        if
+            ph.kind == "burst"
+            and ph.texture ~= nil
+            and (typeof(ph.texture) ~= "string" or ph.texture == "")
+        then
+            return false, `phase {i}: a burst's texture, when named, must be a non-empty string`
         end
         for _, key in { "color", "edgeColor" } do
             if ph[key] ~= nil and not validColor(ph[key]) then

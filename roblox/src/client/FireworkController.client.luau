@@ -244,13 +244,28 @@ local function play(payload: any, distance: number)
                 slot.trail.Color = ColorSequence.new(colorOf(ev.color))
                 slot.trail.Enabled = true
                 playSound(slot, ev.sound, lod.sound)
-                -- The comet rises to the apex over whatever time the next phase leaves it.
+                -- The comet rises to the apex over whatever time the next phase leaves it —
+                -- in TWO stages: straight out of the tube for the first ~60% of the height,
+                -- then easing into the apex's lateral drift. One straight slanted tween read
+                -- as "tilted trajectories" (owner, 2026-09-03); a mortar leaves its tube
+                -- vertically. Two chained tweens cost what one does; the trail rounds the knee.
                 local rise = math.max(0.05, last - ev.at)
-                TweenService:Create(
+                local kneeAt = origin + Vector3.new(0, (apex.Y - origin.Y) * 0.6, 0)
+                local up = TweenService:Create(
                     slot.shell,
-                    TweenInfo.new(rise, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                    { Position = apex }
-                ):Play()
+                    TweenInfo.new(rise * 0.55, Enum.EasingStyle.Linear),
+                    { Position = kneeAt }
+                )
+                up.Completed:Once(function()
+                    TweenService
+                        :Create(
+                            slot.shell,
+                            TweenInfo.new(rise * 0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                            { Position = apex }
+                        )
+                        :Play()
+                end)
+                up:Play()
             elseif ev.kind == "burst" then
                 slot.trail.Enabled = false
                 -- A recipe may pin a burst sound; otherwise the style's role resolves to a

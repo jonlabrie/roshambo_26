@@ -14,7 +14,6 @@
 -- error, no warning. Learned on the 2026-07-20 bench; see the roshambo-fireworks memory.
 local FireworkCatalog = {}
 
-local SPARKLE = "rbxasset://textures/particles/sparkles_main.dds"
 -- The launch thump (owner's pick, 2026-09-03: launch-deck-2 from the kingsrow deck set). Ascent
 -- phases carry NO sound (owner ruling: a real aerial shell's rise is mostly quiet from the
 -- ground), and burst phases name none either -- the style's variant pool in BurstStyles.SOUNDS
@@ -32,7 +31,6 @@ FireworkCatalog.RECIPES = {
                 at = 0.7,
                 kind = "burst",
                 anchor = "apex",
-                texture = SPARKLE,
                 color = { 255, 236, 170 },
                 edgeColor = { 255, 200, 120 },
                 spread = 18,
@@ -49,7 +47,6 @@ FireworkCatalog.RECIPES = {
                 at = 1.1,
                 kind = "burst",
                 anchor = "apex",
-                texture = SPARKLE,
                 color = { 255, 120, 140 },
                 edgeColor = { 255, 190, 200 },
                 spread = 42,
@@ -66,7 +63,6 @@ FireworkCatalog.RECIPES = {
                 at = 1.2,
                 kind = "burst",
                 anchor = "apex",
-                texture = SPARKLE,
                 color = { 180, 220, 255 },
                 edgeColor = { 220, 240, 255 },
                 spread = 34,
@@ -84,7 +80,6 @@ FireworkCatalog.RECIPES = {
                 at = 1.3,
                 kind = "burst",
                 anchor = "apex",
-                texture = SPARKLE,
                 color = { 226, 222, 210 },
                 edgeColor = { 198, 194, 186 },
                 spread = 26,

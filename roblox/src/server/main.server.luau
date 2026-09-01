@@ -1338,7 +1338,9 @@ RequestProvingFire.OnServerEvent:Connect(function(_player, shellId, rackName)
     end
     FireworkLaunched:FireAllClients({
         shellId = shellId,
-        origin = rack.Position + Vector3.new(0, 3, 0),
+        -- rack.Position is the 6" tube's CENTER; +1.25 (its half-length) is the MUZZLE.
+        -- +3 floated shells two studs above the tube (owner, 2026-09-03).
+        origin = rack.Position + Vector3.new(0, 1.25, 0),
         seed = math.random(1, 2 ^ 31 - 1),
         by = "proving",
     })
