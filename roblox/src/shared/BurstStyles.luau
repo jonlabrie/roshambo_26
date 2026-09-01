@@ -120,8 +120,9 @@ BurstStyles.STYLES = {
 
 -- Role tables (built-in stand-ins until the owner's uploads clear, per spec §4/§8).
 BurstStyles.TEXTURES = {
-    dot = "rbxasset://textures/particles/sparkles_main.dds",
-    streak = "rbxasset://textures/particles/sparkles_main.dds",
+    -- Owner uploads 2026-09-02 (sources: tools/textures/firework_dot.png / firework_streak.png).
+    dot = "rbxassetid://87559558731370",
+    streak = "rbxassetid://136219621015067",
 }
 BurstStyles.SOUNDS = {
     burst_peony = "rbxasset://sounds/impact_explosion_03.mp3",
