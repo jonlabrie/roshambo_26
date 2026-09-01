@@ -130,6 +130,18 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
         return
     end
     if input.KeyCode == Enum.KeyCode.P then
+        -- BARE P only. Shift-P is Studio Play's free-camera toggle (owner hit the collision
+        -- 2026-09-03), and a modified P should never double as the panel key.
+        if
+            UserInputService:IsKeyDown(Enum.KeyCode.LeftShift)
+            or UserInputService:IsKeyDown(Enum.KeyCode.RightShift)
+            or UserInputService:IsKeyDown(Enum.KeyCode.LeftControl)
+            or UserInputService:IsKeyDown(Enum.KeyCode.RightControl)
+            or UserInputService:IsKeyDown(Enum.KeyCode.LeftAlt)
+            or UserInputService:IsKeyDown(Enum.KeyCode.RightAlt)
+        then
+            return
+        end
         setOpen(not gui.Enabled)
     end
 end)
