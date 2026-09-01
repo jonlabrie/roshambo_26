@@ -243,14 +243,25 @@ local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random)
     -- Using the raw edgeColor here read as "blue grey white" on pale-edged shells
     -- (owner, 2026-09-03); the ember keeps only a hint of the shell's own tint.
     local ember = Color3.fromRGB(150, 70, 25):Lerp(edge, 0.2)
+    -- With additive blending, BLACK IS OFF: driving the color to near-black at death is
+    -- what ramps the glow to zero as the star fades (owner, 2026-09-03: end-of-life reads
+    -- soft). Transparency alone dims the sprite but leaves its bloom halo mushy.
+    local dark = ember:Lerp(Color3.new(0, 0, 0), 0.85)
     local color = ColorSequence.new({
         ColorSequenceKeypoint.new(0, flash),
         ColorSequenceKeypoint.new(0.12, core),
         ColorSequenceKeypoint.new(0.7, core),
-        ColorSequenceKeypoint.new(0.92, ember),
-        ColorSequenceKeypoint.new(1, ember),
+        ColorSequenceKeypoint.new(0.9, ember),
+        ColorSequenceKeypoint.new(1, dark),
     })
-    local size = NumberSequence.new((ev.spread or 30) / 40 * style.sizeScale)
+    -- The star SHRINKS as it burns out -- a dying spark tightens to a point, it does not
+    -- linger at full size behind a transparency curtain.
+    local s0 = (ev.spread or 30) / 40 * style.sizeScale
+    local size = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, s0),
+        NumberSequenceKeypoint.new(0.7, s0),
+        NumberSequenceKeypoint.new(1, s0 * 0.3),
+    })
     -- Velocity-parallel aligns each sprite to its own path, so a streak's bright head
     -- LEADS and its tail trails behind — camera billboards wore the streak upside down
     -- on falling stars (owner, 2026-09-03).
