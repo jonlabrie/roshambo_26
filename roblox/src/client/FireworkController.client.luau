@@ -103,6 +103,19 @@ for _ = 1, POOL_SIZE do
         em.Enabled = false -- burst-only; :Emit() drives it
         em.LightEmission = 1
         em.Rate = 0
+        -- THE RADIAL BREAK LIVES IN SpreadAngle. Default is (0,0): every particle fires
+        -- along the emitter's up axis and a shell reads as a flat vertical line — which is
+        -- exactly what shipped, unnoticed from 2026-08-05 until the proving range put a
+        -- burst 190 studs out at eye level (owner, 2026-09-01: "flat vertical lines").
+        -- (360, 360), the drag and the fade curve are the bench's proven recipe
+        -- (buildFireworkBench.luau emitter(), the look the owner approved on device).
+        em.SpreadAngle = Vector2.new(360, 360)
+        em.Drag = 2.2
+        em.Transparency = NumberSequence.new({
+            NumberSequenceKeypoint.new(0, 0),
+            NumberSequenceKeypoint.new(0.8, 0.15),
+            NumberSequenceKeypoint.new(1, 1),
+        })
         em.Speed = NumberRange.new(20, 60)
         em.Lifetime = NumberRange.new(1.2, 2.4)
         em.Parent = p
