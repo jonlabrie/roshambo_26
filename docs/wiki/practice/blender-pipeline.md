@@ -405,6 +405,29 @@ and `BirdRig.pose` builds the Transform with `CFrame.fromAxisAngle`, yaw first s
 looked left raises its beak along the way it faces. Resolved once at spawn; the axes are constants
 of the armature. A hardcoded slot permutation would be the same silent failure on the next rig.
 
+## ⚠ A `.rbxm` CAN HOLD A MESHPART WITH NO MESH, AND NOTHING COMPLAINS
+
+Saving a MeshPart to file before its uploaded mesh asset has resolved writes a part carrying
+**everything except the mesh**: correct `Size`, correct `PivotOffset`, both SurfaceAppearance maps,
+the full bone set. Rojo then serves exactly that and the bird is invisible.
+
+Hit on the hiyodori 2026-08-31. The Workspace originals held
+`MeshContent = Uri, rbxassetid://116753878826591`, the `.rbxm` copies held
+`MeshContent = SourceType=None`. **Fix: re-save to file once the ids have resolved.**
+
+⚠ **`Size` IS STORED INDEPENDENTLY OF THE MESH**, so a property dump reads entirely correct — the
+part is the right length, the pivot is right, the maps are attached. Three separate checks passed
+on a part with no geometry in it. The two tells:
+
+```lua
+p.MeshContent          -- SourceType=None instead of Uri
+p.CollisionFidelity    -- fell back to Box; a real import is Default
+p.MeshSize             -- (0,0,0), so Size/MeshSize is inf rather than 1.0
+```
+
+⚠ **CHECK `MeshContent` AFTER EVERY ROJO SYNC OF A BIRD.** It is the one property that cannot be
+inferred from the others, and the failure is invisible in Studio's own property panel.
+
 ## ⚠ ONE ROUGHNESS MAP PER MESH, NOT PER SPECIES — and 1024 is a ceiling, not a default
 
 `shade_roughness` accepts a palette and never reads it. Roughness describes the **material**
