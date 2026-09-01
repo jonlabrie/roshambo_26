@@ -284,6 +284,11 @@ local function play(payload: any, distance: number)
                 playSound(slot, ev.sound, lod.sound, origin)
             elseif ev.kind == "ascent" then
                 slot.shell.Position = origin
+                -- ⚠ CLEAR BEFORE ENABLE. The slot's shell TELEPORTS here from wherever its
+                -- previous shell died; a re-enabled Trail can draw ghost geometry from its
+                -- stale segment history — streaks hanging at the LAST apex (owner, 2026-09-03:
+                -- "trails soared many studs above the launch tubes").
+                slot.trail:Clear()
                 slot.trail.Color = ColorSequence.new(colorOf(ev.color))
                 slot.trail.Enabled = true
                 playSound(slot, ev.sound, lod.sound, origin)
@@ -293,17 +298,19 @@ local function play(payload: any, distance: number)
                 -- as "tilted trajectories" (owner, 2026-09-03); a mortar leaves its tube
                 -- vertically. Two chained tweens cost what one does; the trail rounds the knee.
                 local rise = math.max(0.05, last - ev.at)
-                local kneeAt = origin + Vector3.new(0, (apex.Y - origin.Y) * 0.6, 0)
+                -- Knee at 45%% of the height in 40%% of the time: most of the visible flight
+                -- is the decelerating curved stage, so the arc actually reads at distance.
+                local kneeAt = origin + Vector3.new(0, (apex.Y - origin.Y) * 0.45, 0)
                 local up = TweenService:Create(
                     slot.shell,
-                    TweenInfo.new(rise * 0.55, Enum.EasingStyle.Linear),
+                    TweenInfo.new(rise * 0.4, Enum.EasingStyle.Linear),
                     { Position = kneeAt }
                 )
                 up.Completed:Once(function()
                     TweenService
                         :Create(
                             slot.shell,
-                            TweenInfo.new(rise * 0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
+                            TweenInfo.new(rise * 0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
                             { Position = apex }
                         )
                         :Play()
