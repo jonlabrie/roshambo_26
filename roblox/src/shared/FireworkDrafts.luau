@@ -132,6 +132,36 @@ local function ao(core: { number }, edge: { number })
     }
 end
 
+-- One color, three shapes: a SHAPE ladder. The variant name is the style it wears,
+-- so a range ladder answers "which break suits this hue" in one firing.
+local function shapeTrio(core: { number }, edge: { number }, ascent: { number })
+    local function shell(style: string?, spread: number, points: number?, scatter: number?)
+        return {
+            phases = {
+                { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+                { at = 0.02, kind = "ascent", anchor = "origin", color = ascent },
+                {
+                    at = 3.0,
+                    kind = "burst",
+                    anchor = "apex",
+                    style = style,
+                    color = core,
+                    edgeColor = edge,
+                    spread = spread,
+                    points = points,
+                    scatter = scatter,
+                    droop = false,
+                },
+            },
+        }
+    end
+    return {
+        v1_peony = shell(nil, 42),
+        v2_ring = shell("ring", 40),
+        v3_palm = shell("palm", 34, 5, 6),
+    }
+end
+
 FireworkDrafts.FAMILIES = {
     kiku = {
         v1 = kiku(28, { 255, 240, 200 }),
@@ -162,6 +192,10 @@ FireworkDrafts.FAMILIES = {
         v2 = ao({ 40, 100, 255 }, { 140, 190, 255 }),
         v3 = ao({ 90, 180, 255 }, { 220, 240, 255 }),
     },
+    -- 緑 midori: barium emerald, the classic vivid pyro green.
+    midori = shapeTrio({ 60, 255, 110 }, { 180, 255, 190 }, { 150, 255, 180 }),
+    -- 紫 murasaki: royal violet, historically a premium shell color.
+    murasaki = shapeTrio({ 170, 60, 255 }, { 220, 170, 255 }, { 210, 170, 255 }),
     kamuro = {
         v1 = kamuro(2.8),
         v2 = kamuro(3.0),
