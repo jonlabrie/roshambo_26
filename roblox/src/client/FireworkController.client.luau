@@ -256,7 +256,7 @@ local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random)
     })
     -- The star SHRINKS as it burns out -- a dying spark tightens to a point, it does not
     -- linger at full size behind a transparency curtain.
-    local s0 = (ev.spread or 30) / 40 * style.sizeScale
+    local s0 = (ev.spread or 30) / 80 * style.sizeScale -- /80: owner halved star size 2026-09-03
     local size = NumberSequence.new({
         NumberSequenceKeypoint.new(0, s0),
         NumberSequenceKeypoint.new(0.7, s0),
