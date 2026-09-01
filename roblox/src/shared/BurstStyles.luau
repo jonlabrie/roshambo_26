@@ -134,7 +134,7 @@ BurstStyles.STYLES = {
         -- The owner's own canyon-echoed sizzle, over the FINAL flicker phase only: the
         -- strobe's square wave reads as 3-4 sequential re-bursts and the last one
         -- shimmers -- that is the phase this voice belongs to (~70% of star lifetime).
-        tailSound = { role = "tail_strobe", delay = 1.75, volume = 0.35, duration = 1.3 },
+        tailSound = { role = "tail_strobe", delay = 1.75, volume = 0.35, duration = 1.6 },
     },
     -- The golden crown: long, heavy, drooping to the water.
     kamuro = {
@@ -183,7 +183,7 @@ BurstStyles.SOUNDS = {
     -- aerial pool as stand-ins until the firecracker-string and glitter-sizzle
     -- recordings land (owner ruling 2026-09-03).
     report = "rbxassetid://87713703495045", -- launch-deck-2: the tube thump
-    tail_strobe = "rbxassetid://93851330785281", -- jon-sizzle-c3-canyon-v4: the owner's sizzle, canyon-echoed
+    tail_strobe = "rbxassetid://92069275413514", -- jon-sizzle-c3-canyon-v6: 0.8s sizzle body, vast dark returns, lows shaved
     burst_peony = {
         "rbxassetid://89225206152876", -- burst-aerial-1
         "rbxassetid://91810415393899", -- burst-aerial-2
