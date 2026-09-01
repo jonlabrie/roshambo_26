@@ -74,6 +74,7 @@
                 "Overlook": { "$path": "assets/Overlook.model.json" },
                 "SwitchbackDeck": { "$path": "assets/SwitchbackDeck.model.json" },
                 "FallsDock": { "$path": "assets/FallsDock.model.json" },
+                "ProvingGround": { "$path": "assets/ProvingGround.model.json" },
                 "Karesansui": { "$path": "assets/Karesansui.model.json" },
                 "Hanabiya": { "$path": "assets/Hanabiya.model.json" },
                 "MachiyaApparel": { "$path": "assets/MachiyaApparel.model.json" },
