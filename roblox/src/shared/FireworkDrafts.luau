@@ -12,9 +12,7 @@
 local FireworkDrafts = {}
 
 local SPARKLE = "rbxasset://textures/particles/sparkles_main.dds"
-local S_REPORT = "rbxasset://sounds/collide.wav"
-local S_ASCENT = "rbxasset://sounds/swoosh.wav"
-local S_BURST = "rbxasset://sounds/impact_explosion_03.mp3"
+local S_REPORT = "rbxassetid://87713703495045" -- launch-deck-2 (owner pick, 2026-09-03)
 
 -- 菊 kiku, chrysanthemum: a tight peony with a distinct edge tint. The seed ladder —
 -- three spreads of the same idea so the range's first session has a real comparison.
@@ -22,12 +20,11 @@ local function kiku(spread: number, edge: { number })
     return {
         phases = {
             { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
-            { at = 0.02, kind = "ascent", anchor = "origin", sound = S_ASCENT, color = { 255, 214, 130 } },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 214, 130 } },
             {
                 at = 1.15,
                 kind = "burst",
                 anchor = "apex",
-                sound = S_BURST,
                 texture = SPARKLE,
                 color = { 255, 190, 90 },
                 edgeColor = edge,
@@ -43,12 +40,11 @@ local function wa(spread: number)
     return {
         phases = {
             { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
-            { at = 0.02, kind = "ascent", anchor = "origin", sound = S_ASCENT, color = { 255, 180, 100 } },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 180, 100 } },
             {
                 at = 1.15,
                 kind = "burst",
                 anchor = "apex",
-                sound = S_BURST,
                 texture = SPARKLE,
                 style = "ring",
                 color = { 255, 60, 40 },
@@ -65,12 +61,11 @@ local function yashi(points: number)
     return {
         phases = {
             { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
-            { at = 0.02, kind = "ascent", anchor = "origin", sound = S_ASCENT, color = { 255, 210, 140 } },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 210, 140 } },
             {
                 at = 1.15,
                 kind = "burst",
                 anchor = "apex",
-                sound = S_BURST,
                 texture = SPARKLE,
                 style = "palm",
                 color = { 255, 180, 60 },
@@ -88,12 +83,11 @@ local function hotaru(spread: number)
     return {
         phases = {
             { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
-            { at = 0.02, kind = "ascent", anchor = "origin", sound = S_ASCENT, color = { 210, 225, 245 } },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 210, 225, 245 } },
             {
                 at = 1.15,
                 kind = "burst",
                 anchor = "apex",
-                sound = S_BURST,
                 texture = SPARKLE,
                 style = "strobe",
                 color = { 235, 245, 255 },
@@ -110,12 +104,11 @@ local function kamuro(burstAt: number)
     return {
         phases = {
             { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
-            { at = 0.02, kind = "ascent", anchor = "origin", sound = S_ASCENT, color = { 255, 200, 120 } },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 200, 120 } },
             {
                 at = burstAt,
                 kind = "burst",
                 anchor = "apex",
-                sound = S_BURST,
                 texture = SPARKLE,
                 style = "kamuro",
                 color = { 255, 170, 40 },
@@ -160,14 +153,12 @@ FireworkDrafts.FAMILIES = {
                     at = 0.02,
                     kind = "ascent",
                     anchor = "origin",
-                    sound = S_ASCENT,
                     color = { 255, 214, 130 },
                 },
                 {
                     at = 1.1,
                     kind = "burst",
                     anchor = "apex",
-                    sound = S_BURST,
                     texture = SPARKLE,
                     color = { 255, 190, 90 },
                     edgeColor = { 200, 100, 50 },
@@ -179,7 +170,6 @@ FireworkDrafts.FAMILIES = {
                     at = 1.7,
                     kind = "burst",
                     anchor = "apex",
-                    sound = S_BURST,
                     texture = SPARKLE,
                     style = "strobe",
                     color = { 235, 245, 255 },
@@ -193,7 +183,6 @@ FireworkDrafts.FAMILIES = {
                     at = 2.6,
                     kind = "burst",
                     anchor = "apex",
-                    sound = S_BURST,
                     texture = SPARKLE,
                     style = "kamuro",
                     color = { 255, 170, 40 },

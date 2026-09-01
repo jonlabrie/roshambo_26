@@ -15,7 +15,7 @@ export type Style = {
     spreadAngle: { number }, -- {x, y} degrees
     transparency: { { number } }, -- keypoints {time, value}
     textureRole: string, -- "dot" | "streak"
-    soundRole: string, -- key into SOUNDS
+    soundRole: string, -- key into SOUNDS (burst roles are variant pools)
     pointRule: string, -- "scatter" | "circle" | "tilted" | "single"
 }
 
@@ -125,11 +125,28 @@ BurstStyles.TEXTURES = {
     streak = "rbxassetid://136219621015067",
 }
 BurstStyles.SOUNDS = {
-    burst_peony = "rbxasset://sounds/impact_explosion_03.mp3",
-    burst_strobe = "rbxasset://sounds/impact_explosion_03.mp3",
-    burst_kamuro = "rbxasset://sounds/impact_explosion_03.mp3",
-    report = "rbxasset://sounds/collide.wav",
-    ascent = "rbxasset://sounds/swoosh.wav",
+    -- Owner uploads 2026-09-03 (sources: Roshambo Reference/sound/fireworks_cuts/).
+    -- Each burst role is a VARIANT POOL: the controller picks one per shell from the
+    -- seeded rng, so a show is not one clip on repeat. Strobe and kamuro share the
+    -- aerial pool as stand-ins until the firecracker-string and glitter-sizzle
+    -- recordings land (owner ruling 2026-09-03). burst-aerial-2's id is PENDING
+    -- (the paste duplicated launch-deck-2's id); it joins the pools when supplied.
+    report = "rbxassetid://87713703495045", -- launch-deck-2: the tube thump
+    burst_peony = {
+        "rbxassetid://89225206152876", -- burst-aerial-1
+        "rbxassetid://84490753811521", -- burst-aerial-3
+        "rbxassetid://110252668535781", -- burst-aerial-4
+    },
+    burst_strobe = {
+        "rbxassetid://89225206152876",
+        "rbxassetid://84490753811521",
+        "rbxassetid://110252668535781",
+    },
+    burst_kamuro = {
+        "rbxassetid://89225206152876",
+        "rbxassetid://84490753811521",
+        "rbxassetid://110252668535781",
+    },
 }
 
 -- Exactly the Style field names above -- the completeness contract the controller

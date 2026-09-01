@@ -251,7 +251,21 @@ local function play(payload: any, distance: number)
                 ):Play()
             elseif ev.kind == "burst" then
                 slot.trail.Enabled = false
-                playSound(slot, ev.sound, lod.sound)
+                -- A recipe may pin a burst sound; otherwise the style's role resolves to a
+                -- VARIANT POOL and the shell's seeded rng picks one — same clip on every
+                -- client, different clip per shell, so a show is not one boom on repeat.
+                -- ⚠ The draw sits immediately before fireBurst's own draws, so the per-burst
+                -- rng order stays a pure function of the payload.
+                local soundId = ev.sound
+                if not soundId then
+                    local pool = BurstStyles.SOUNDS[BurstStyles.styleOf(ev.style).soundRole]
+                    if typeof(pool) == "table" then
+                        soundId = pool[rng:NextInteger(1, #pool)]
+                    else
+                        soundId = pool
+                    end
+                end
+                playSound(slot, soundId, lod.sound)
                 fireBurst(slot, ev, anchorPos, rng)
             end
         end)
