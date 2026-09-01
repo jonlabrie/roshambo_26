@@ -67,7 +67,7 @@ BurstStyles.STYLES = {
         soundRole = "burst_peony",
         pointRule = "circle",
     },
-    -- A hanging cloud that flickers: the 17-keypoint square-wave transparency.
+    -- A hanging cloud that flickers: the 18-keypoint square-wave transparency.
     strobe = {
         speed = { 8, 16 },
         drag = 3.5,

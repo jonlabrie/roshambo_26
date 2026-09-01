@@ -9,7 +9,8 @@ ratio, and onset density. Categories proposed:
               broadband that doesn't land in another bucket)
   crackle  -- dense onsets (>8/s), broadband, low_ratio < 0.35
   ambience -- long (>15s) without dominant onsets
-  reject   -- clipped (peak >= -0.1 dBFS for >1% of samples), or <0.2s, or unreadable
+  reject   -- clipped (peak >= -0.1 dBFS for >1% of samples), or <0.2s
+  unreadable -- ffmpeg unavailable/failed, or a header this reader can't parse
 Non-wav inputs (mp3/ogg/flac/aiff) are decoded via ffmpeg when present, else rowed
 as 'unreadable' rather than skipped silently -- same for a wav whose header this
 reader can't parse, or a zip member ffmpeg still can't touch.

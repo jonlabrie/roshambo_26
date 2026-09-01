@@ -5,9 +5,12 @@ dot:    a crisp round core -- solid white center, tight radial falloff
         (alpha = clamp01(1.6 - 1.6*r)^2.2 inside r<1, 0 outside; r normalized
         to 0..1 at 40% of the half-width so the core is small and HARD, the
         opposite of the engine's fuzzy sparkle).
-streak: a vertical streak -- alpha = (1 - |x|)^3 * (1 - |y|)^1.2 on a tall
+streak: a vertical streak -- alpha = (1 - |x|)^3 * (1 - |y-0.25|)^1.2 on a tall
         gaussian-ish lobe occupying the middle 20% horizontally, full height,
-        brightest 25% from the top so the motion reads downward.
+        brightest 25% from the top so the motion reads downward. The vertical
+        term is windowed by a short 12%-of-height ramp so alpha reaches
+        EXACTLY zero at y=0 and y=1 -- no hard cut at the quad's top/bottom
+        edge -- without touching the brightness peak or falloff in the interior.
 
 Both pure white; ALL color comes from the emitter's Color/Brightness, so one
 sprite serves every shell. Deterministic: same bytes every run (PIL, no
@@ -55,6 +58,13 @@ def make_streak(size: int = 256) -> np.ndarray:
     # Vertical: full height, brightest 25% down from the top.
     y = np.linspace(0, 1, size)
     row = (1 - np.abs(y - 0.25)) ** 1.2
+
+    # Edge window: fades row to EXACTLY zero at y=0 and y=1 over a short 12% ramp,
+    # so the quad's top/bottom edges never show a hard alpha cut. Full strength
+    # (1.0) everywhere between the two ramps, so the y=0.25 brightness peak and
+    # the top-brighter-than-bottom falloff are unaffected in the interior.
+    edge = np.clip(np.minimum(y, 1 - y) / 0.12, 0, 1)
+    row = row * edge
 
     # Outer(row, col) gives [row, col] indexing -- exactly PIL's array orientation.
     alpha = np.outer(row, col)
