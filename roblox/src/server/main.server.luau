@@ -4,6 +4,7 @@ local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local LocalizationService = game:GetService("LocalizationService")
+local RunService = game:GetService("RunService")
 
 -- Day/Night cycle: publish the fixed, global cycle constants once at boot as attributes on a
 -- replicated Configuration. Clients derive t locally from workspace:GetServerTimeNow() (Roblox's
@@ -101,6 +102,7 @@ local AccessBlocked = remotes:WaitForChild("AccessBlocked") :: RemoteEvent
 local RequestFireworkLaunch = remotes:WaitForChild("RequestFireworkLaunch") :: RemoteEvent
 local FireworkLaunched = remotes:WaitForChild("FireworkLaunched") :: RemoteEvent
 local FireworkState = remotes:WaitForChild("FireworkState") :: RemoteEvent
+local RequestProvingFire = remotes:WaitForChild("RequestProvingFire") :: RemoteEvent
 local StatsData = remotes:WaitForChild("StatsData") :: RemoteEvent
 local StatsPersonal = remotes:WaitForChild("StatsPersonal") :: RemoteEvent
 local TextService = game:GetService("TextService")
@@ -1315,6 +1317,31 @@ RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
             pushFireworkState(player)
         end
     end)
+end)
+
+-- THE PROVING RANGE (spec 2026-09-01-proving-range-design). Studio-only: fires any shell or
+-- draft id from a named proving rack through the SAME FireworkLaunched broadcast the spend
+-- path uses — director, LOD, pooling all engaged — but with NO inventory spend and NO backend
+-- call. The IsStudio gate is the whole security model: a published client's request dies here.
+RequestProvingFire.OnServerEvent:Connect(function(_player, shellId, rackName)
+    if not RunService:IsStudio() then
+        return
+    end
+    if typeof(shellId) ~= "string" or typeof(rackName) ~= "string" then
+        return
+    end
+    local stageForProving = workspace:FindFirstChild("RoshamboStage")
+    local ground = stageForProving and stageForProving:FindFirstChild("ProvingGround")
+    local rack = ground and ground:FindFirstChild(rackName)
+    if not (rack and rack:IsA("BasePart")) then
+        return
+    end
+    FireworkLaunched:FireAllClients({
+        shellId = shellId,
+        origin = rack.Position + Vector3.new(0, 3, 0),
+        seed = math.random(1, 2 ^ 31 - 1),
+        by = "proving",
+    })
 end)
 
 -- B3 gate fix: mid-session live rebuilds (buy-to-claim, upgrade, display change) destroy the

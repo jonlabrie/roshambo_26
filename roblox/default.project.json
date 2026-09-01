@@ -35,6 +35,7 @@
                 "RequestFireworkLaunch": { "$className": "RemoteEvent" },
                 "FireworkLaunched": { "$className": "RemoteEvent" },
                 "FireworkState": { "$className": "RemoteEvent" },
+                "RequestProvingFire": { "$className": "RemoteEvent" },
                 "SetPadPreference": { "$className": "RemoteEvent" },
                 "PreferenceState": { "$className": "RemoteEvent" },
                 "SetBackDoor": { "$className": "RemoteEvent" },
