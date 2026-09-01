@@ -20,13 +20,16 @@ local ProvingPlan = require("../../src/shared/ProvingPlan")
 
 local ProvingGround = {}
 
--- ===== baked placement (PROVISIONAL: baked from the marker survey) =====
--- Rack line: center of the suspension bridge deck (deck runs along world Z).
-ProvingGround.RACK_ORIGIN = { -246, 222, 0 } -- PROVISIONAL: baked from ProvingRackMarker survey
-ProvingGround.RACK_YAW_DEG = 90 -- PROVISIONAL: local X (rack line) -> world Z, plaques (+Z) face west
--- Firing post: FallsLanding.
-ProvingGround.POST_ORIGIN = { -432, 252.4, -26 } -- PROVISIONAL: baked from ProvingPostMarker survey
-ProvingGround.POST_YAW_DEG = 0 -- PROVISIONAL: baked from ProvingPostMarker survey
+-- ===== baked placement (surveyed 2026-09-01, owner-dragged markers) =====
+-- Rack line: atop the suspension bridge cross members (the walk surface the
+-- ProvingRackMarker rested on — NOT the model bbox, whose towers reach far higher).
+ProvingGround.RACK_ORIGIN = { -246.67, 210.45, -0.01 }
+-- Plaques (+Z) face the owner-aimed arrow: due west, up-canyon at FallsLanding;
+-- the rack line (local X) runs along the deck.
+ProvingGround.RACK_YAW_DEG = -91.22
+-- Firing post: the owner's standing spot on FallsLanding.
+ProvingGround.POST_ORIGIN = { -430.11, 245.75, -17.93 }
+ProvingGround.POST_YAW_DEG = 0 -- square post; yaw is meaningless
 
 -- ===== dimensions =====
 -- Racks along local X, 12 studs apart. ProvingPlan.RACKS pairs with offsets by index.
