@@ -38,11 +38,171 @@ local function kiku(spread: number, edge: { number })
     }
 end
 
+-- 輪 wa, ring: a planar circle of points. The ladder varies spread.
+local function wa(spread: number)
+    return {
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.02, kind = "ascent", anchor = "origin", sound = S_ASCENT, color = { 255, 180, 100 } },
+            {
+                at = 1.15,
+                kind = "burst",
+                anchor = "apex",
+                sound = S_BURST,
+                texture = SPARKLE,
+                style = "ring",
+                color = { 255, 60, 40 },
+                edgeColor = { 255, 240, 220 },
+                spread = spread,
+                droop = false,
+            },
+        },
+    }
+end
+
+-- 椰子 yashi, palm: thick outward-aimed arms. The ladder varies point count.
+local function yashi(points: number)
+    return {
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.02, kind = "ascent", anchor = "origin", sound = S_ASCENT, color = { 255, 210, 140 } },
+            {
+                at = 1.15,
+                kind = "burst",
+                anchor = "apex",
+                sound = S_BURST,
+                texture = SPARKLE,
+                style = "palm",
+                color = { 255, 180, 60 },
+                edgeColor = { 255, 230, 160 },
+                points = points,
+                scatter = 6,
+                droop = false,
+            },
+        },
+    }
+end
+
+-- 蛍 hotaru, strobe: a hanging cloud that flickers. The ladder varies spread.
+local function hotaru(spread: number)
+    return {
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.02, kind = "ascent", anchor = "origin", sound = S_ASCENT, color = { 210, 225, 245 } },
+            {
+                at = 1.15,
+                kind = "burst",
+                anchor = "apex",
+                sound = S_BURST,
+                texture = SPARKLE,
+                style = "strobe",
+                color = { 235, 245, 255 },
+                edgeColor = { 180, 220, 255 },
+                spread = spread,
+                droop = false,
+            },
+        },
+    }
+end
+
+-- 黄金 kamuro, golden crown: long heavy drooping arms. The ladder varies burst hang time.
+local function kamuro(burstAt: number)
+    return {
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.02, kind = "ascent", anchor = "origin", sound = S_ASCENT, color = { 255, 200, 120 } },
+            {
+                at = burstAt,
+                kind = "burst",
+                anchor = "apex",
+                sound = S_BURST,
+                texture = SPARKLE,
+                style = "kamuro",
+                color = { 255, 170, 40 },
+                edgeColor = { 255, 220, 140 },
+                droop = false,
+            },
+        },
+    }
+end
+
 FireworkDrafts.FAMILIES = {
     kiku = {
         v1 = kiku(28, { 255, 240, 200 }),
         v2 = kiku(38, { 255, 150, 60 }),
         v3 = kiku(50, { 200, 90, 40 }),
+    },
+    wa = {
+        v1 = wa(30),
+        v2 = wa(42),
+        v3 = wa(56),
+    },
+    yashi = {
+        v1 = yashi(4),
+        v2 = yashi(5),
+        v3 = yashi(6),
+    },
+    hotaru = {
+        v1 = hotaru(24),
+        v2 = hotaru(36),
+        v3 = hotaru(48),
+    },
+    kamuro = {
+        v1 = kamuro(1.1),
+        v2 = kamuro(1.25),
+        v3 = kamuro(1.4),
+    },
+    dan = {
+        v1 = {
+            phases = {
+                { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+                {
+                    at = 0.02,
+                    kind = "ascent",
+                    anchor = "origin",
+                    sound = S_ASCENT,
+                    color = { 255, 214, 130 },
+                },
+                {
+                    at = 1.1,
+                    kind = "burst",
+                    anchor = "apex",
+                    sound = S_BURST,
+                    texture = SPARKLE,
+                    color = { 255, 190, 90 },
+                    edgeColor = { 200, 100, 50 },
+                    spread = 30,
+                    droop = false,
+                    share = 2,
+                },
+                {
+                    at = 1.7,
+                    kind = "burst",
+                    anchor = "apex",
+                    sound = S_BURST,
+                    texture = SPARKLE,
+                    style = "strobe",
+                    color = { 235, 245, 255 },
+                    edgeColor = { 180, 220, 255 },
+                    points = 5,
+                    scatter = 9,
+                    droop = false,
+                    share = 1,
+                },
+                {
+                    at = 2.6,
+                    kind = "burst",
+                    anchor = "apex",
+                    sound = S_BURST,
+                    texture = SPARKLE,
+                    style = "kamuro",
+                    color = { 255, 170, 40 },
+                    edgeColor = { 255, 220, 140 },
+                    droop = false,
+                    share = 1,
+                },
+            },
+        },
     },
 } :: { [string]: { [string]: any } }
 
