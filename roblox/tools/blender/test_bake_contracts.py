@@ -91,6 +91,26 @@ def test_every_palette_satisfies_its_shader():
             f"{name}: shader returned values outside [0,1] -- range {out.min()}..{out.max()}"
 
 
+def test_roughness_is_species_agnostic():
+    """⚠ ONE ROUGHNESS MAP PER MESH. `shade_roughness` must not read the palette: the hiyodori's
+    bake came out SHA-identical to the mejiro's and Roblox refused the duplicate upload. If this
+    ever starts differing per species, the "reuse the other bird's asset id" instruction in
+    blender-pipeline.md becomes wrong and someone ships a bird wearing the wrong material.
+    """
+    import numpy as np
+    n = 500
+    P = np.zeros((n, 3))
+    P[:, 1] = np.linspace(-0.4, 0.3, n)
+    P[:, 2] = np.linspace(0.0, 0.45, n)
+    P[:, 0] = 0.02
+    N = np.zeros((n, 3))
+    N[:, 2] = np.linspace(-1.0, 1.0, n)
+    a = bbt.shade_roughness(P.copy(), N, bbt.MEJIRO)
+    b = bbt.shade_roughness(P.copy(), N, bbt.HIYODORI)
+    assert np.array_equal(a, b), \
+        "shade_roughness now depends on the palette -- the shared-asset rule no longer holds"
+
+
 def test_roughness_shaders_satisfy_ROUGH():
     for shader in (bbt.shade_roughness, bbt.shade_wing_roughness):
         out = shader(P.copy(), N.copy(), bbt.UGUISU, 1.0)

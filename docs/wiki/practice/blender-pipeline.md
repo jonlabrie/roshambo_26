@@ -405,6 +405,30 @@ and `BirdRig.pose` builds the Transform with `CFrame.fromAxisAngle`, yaw first s
 looked left raises its beak along the way it faces. Resolved once at spawn; the axes are constants
 of the armature. A hardcoded slot permutation would be the same silent failure on the next rig.
 
+## ⚠ ONE ROUGHNESS MAP PER MESH, NOT PER SPECIES — and 1024 is a ceiling, not a default
+
+`shade_roughness` accepts a palette and never reads it. Roughness describes the **material**
+(feather, ventral, covert, leg, bill, orbital, eye) and those zones are geometry, so two birds
+sharing a mesh bake a byte-identical map. The hiyodori's came out SHA-identical to the mejiro's
+(`a6fc657f…`) and Roblox refused it as a duplicate of an asset the owner already had — correct
+behaviour on both sides, and it cost an upload attempt to discover.
+
+| mesh | roughness asset | birds |
+|---|---|---|
+| warbler | `rbxassetid://111059118365271` | uguisu, mejiro, hiyodori, + yamagara, sekirei |
+| karasu | `rbxassetid://138781967530157` | karasu |
+
+Colormaps *are* per species — those read the palette. A contract test now fails if
+`shade_roughness` ever starts depending on one, because that would silently invalidate the shared
+asset above.
+
+⚠ **STUDIO ENFORCES 1024** (owner, 2026-08-31), so "bake this bird larger" is not an available
+answer to a marking that will not resolve. On a 1.15-stud bird that is ~0.0034 studs per texel.
+A black eye-rim requested at hairline width came out **0.20 texels** and could only land on
+whichever texels it happened to straddle; the separation is a multiplicative orbital shadow
+~2.5 texels wide instead, with a contract that fails under 2. **Any feature finer than about two
+texels is not a design choice — it is a request the renderer will refuse.**
+
 ## Recipe: exporting a scaled sibling (a second bird from one authored mesh)
 
 The mejiro is the uguisu at 0.773. Do this in Blender, **never** by resizing the MeshPart in Studio.

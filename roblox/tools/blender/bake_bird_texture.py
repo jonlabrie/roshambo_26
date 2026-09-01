@@ -636,6 +636,20 @@ ROUGH = {
 
 
 def shade_roughness(P, N, pal, S=1.0, lm=None):
+    """⚠ SPECIES-AGNOSTIC BY CONSTRUCTION -- `pal` IS ACCEPTED AND NEVER READ. Roughness is a
+    property of the MATERIAL (feather, bill, leg, orbital), and those zones are geometry, so two
+    birds sharing a mesh get a byte-identical map.
+
+    ⚠ THEREFORE: ONE ROUGHNESS UPLOAD PER MESH, NOT PER SPECIES. The hiyodori's bake came out
+    SHA-identical to the mejiro's (a6fc657f...) and Roblox refused it as a duplicate of an asset
+    the owner already had -- which is correct behaviour on both sides. Every warbler-mesh bird
+    (uguisu, mejiro, hiyodori, and yamagara and sekirei to come) shares one roughness asset; the
+    karasu has its own because it has its own mesh.
+
+    `pal` stays in the signature so this matches every other shader and can be dispatched the same
+    way. If a future bird ever needs species-dependent roughness, that is a real change and the
+    contract test below is what will catch the assumption going stale.
+    """
     """Per-texel roughness as a function of 3D position -- the SAME law as the colour shaders.
 
     ⚠ THIS REPLACES A SECOND, WORSE RASTERISER. `roughness_map` painted each triangle's
