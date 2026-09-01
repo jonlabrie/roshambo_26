@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-15
+updated: 2026-09-01
 checked: 2026-08-27
 ---
 
@@ -24,6 +24,24 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   — `Site_SuspensionBridge`, `Site_FallsDock`, `Site_Overlook` under
   `CanyonWorld.LaunchSites` (verified in the place 2026-08-15).
 - Shop front-end: [[hanabiya]].
+- **Proving range (2026-09-01, branch `proving-range`, working — owner comments pending)**:
+  the authoring loop for new shells. Draft recipes in `src/shared/FireworkDrafts.luau`
+  (families of variants, ids `draft:<family>/<variant>`, never in the CI fixture);
+  schema `FireworkRecipes.luau` makes the blank-sky trap a test failure; Studio-gated
+  `RequestProvingFire` fires any draft/shipped id from five mortar racks ON THE
+  SUSPENSION BRIDGE (owner siting; surveyed catenary — per-station height + inward
+  tilt), judged from FallsLanding ~190 studs west at burst eye level. Panel opens
+  ANYWHERE in Studio (P key / top-right chip, left-edge rail — a location-bound panel
+  was ruled theater and the FiringPost deleted); modes single (rack A–E selector),
+  ladder (variants side-by-side), sequence (2s apart); night via `ProvingNightOverride`
+  Lighting attribute that DayNightController's tick respects. Mortars are accurate
+  2"/4"/6" at ~4–5:1 (owner ruling; **yonshakudama parked as a future premium
+  spectacle**). Spec `docs/superpowers/specs/2026-09-01-proving-range-design.md`.
+- ⚠ **Every shipped burst 2026-08-05 → 2026-09-01 rendered as a flat vertical line**:
+  the bench's `SpreadAngle (360,360)`, drag and fade curve never made it into
+  `FireworkController`'s pool, so particles fired straight up. Invisible from below at
+  the Overlook; exposed by the proving range's first eye-level sightline and fixed in
+  `adaa1fe`. Reaches players on the next place publish.
 - VFX recipe (proven on device): rising Trail comet → flash core → radial burst →
   glitter/willow, glow via LightEmission + the one global Bloom, ~500–700
   particles/shell, client-side emission (server `Emit()` does not replicate).

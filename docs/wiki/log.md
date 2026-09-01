@@ -3017,3 +3017,16 @@ labels are physical plaques, never BillboardGuis ("always floating strangely in
 screen space"). Drafts live in src/shared/FireworkDrafts.luau as families of
 variants, namespaced draft:family/variant, absent from the shared fixture so CI
 never prices a draft.
+
+## [2026-09-01] ship | Proving range working in Play; first session catches a shipped VFX bug
+
+Branch `proving-range` (12 commits, base 8ed22e5): drafts/schema/plan modules,
+Studio-gated remote, bridge racks (surveyed catenary: per-station dy + inward tilt),
+open-anywhere panel, night attribute gate. Owner rulings during the gate: 2"/4"/6"
+mortars (yonshakudama parked for later), racks on the suspension bridge + judging from
+FallsLanding, FiringPost/location-bound panel killed ("what's the point of a panel
+location…"). THE RANGE PAID FOR ITSELF IMMEDIATELY: every shipped burst since
+2026-08-05 was a flat vertical line (SpreadAngle/drag/fade lost between bench and
+controller) — caught at the range's first eye-level look, fixed in adaa1fe. Owner,
+end of session: night toggle works, ladder looks right, "a lot of comments in the
+morning… well done." NOT merged; comments pending. Place not yet saved/published.
