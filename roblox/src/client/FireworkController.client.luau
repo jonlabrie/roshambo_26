@@ -282,7 +282,7 @@ local function play(payload: any, distance: number)
     local rng = Random.new(payload.seed)
     local origin = payload.origin
     local apex = origin
-        + Vector3.new(rng:NextNumber(-8, 8), 46 + rng:NextNumber(-6, 6), rng:NextNumber(-8, 8))
+        + Vector3.new(rng:NextNumber(-8, 8), 60 + rng:NextNumber(-6, 6), rng:NextNumber(-8, 8)) -- 60: owner, 2026-09-03 ("bursts should ride higher")
 
     -- `tail` is the longest release-worthy lifetime among this shell's burst styles (kamuro's
     -- 4.2s crown must not have its slot's parts re-positioned under it while it's still hanging).
