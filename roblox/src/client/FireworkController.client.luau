@@ -19,7 +19,7 @@
 -- appears — that needs eyes in Studio.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
-local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local FireworkCatalog = require(shared:WaitForChild("FireworkCatalog"))
@@ -325,24 +325,26 @@ local function play(payload: any, distance: number)
                 -- as "tilted trajectories" (owner, 2026-09-03); a mortar leaves its tube
                 -- vertically. Two chained tweens cost what one does; the trail rounds the knee.
                 local rise = math.max(0.05, last - ev.at)
-                -- Knee at 45%% of the height in 40%% of the time: most of the visible flight
-                -- is the decelerating curved stage, so the arc actually reads at distance.
-                local kneeAt = origin + Vector3.new(0, (apex.Y - origin.Y) * 0.45, 0)
-                local up = TweenService:Create(
-                    slot.shell,
-                    TweenInfo.new(rise * 0.4, Enum.EasingStyle.Linear),
-                    { Position = kneeAt }
-                )
-                up.Completed:Once(function()
-                    TweenService
-                        :Create(
-                            slot.shell,
-                            TweenInfo.new(rise * 0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                            { Position = apex }
-                        )
-                        :Play()
+                -- ⚠ DRIVEN PER FRAME, NOT TWEENED. TweenService stepped this shell in
+                -- 1.8-stud chunks at ~15Hz (measured 2026-09-03), and the trail drew the
+                -- chunks -- the owner read it instantly ("feels like screen space"). A
+                -- quadratic bezier from the muzzle through a straight-up control point to
+                -- the apex, advanced on Heartbeat, is smooth at true framerate and is the
+                -- honest ballistic shape: vertical at the tube, decelerating into the drift.
+                local control = origin + Vector3.new(0, (apex.Y - origin.Y) * 0.9, 0)
+                local t0 = os.clock()
+                local flight: RBXScriptConnection
+                flight = RunService.Heartbeat:Connect(function()
+                    local k = math.min((os.clock() - t0) / rise, 1)
+                    -- ease-out: fast out of the tube, slowing toward the break
+                    local e = 1 - (1 - k) * (1 - k)
+                    local a = origin:Lerp(control, e)
+                    local b = control:Lerp(apex, e)
+                    slot.shell.Position = a:Lerp(b, e)
+                    if k >= 1 then
+                        flight:Disconnect()
+                    end
                 end)
-                up:Play()
             elseif ev.kind == "burst" then
                 slot.trail.Enabled = false
                 -- A recipe may pin a burst sound; otherwise the style's role resolves to a
