@@ -4,6 +4,7 @@
 -- draft fails `lune run tests/run` instead of silently rendering a blank sky in a Play
 -- session (an emitter with Texture == "" renders NOTHING — the documented 2026-07-20 trap).
 -- Pure, no Roblox globals; runs under Lune.
+local BurstStyles = require("./BurstStyles")
 local FireworkRecipes = {}
 
 -- The phase kinds FireworkController can draw. The vocabulary project widens this table;
@@ -50,6 +51,34 @@ function FireworkRecipes.validate(recipe: any): (boolean, string?)
         for _, key in { "color", "edgeColor" } do
             if ph[key] ~= nil and not validColor(ph[key]) then
                 return false, `phase {i}: '{key}' must be three numbers in 0..255`
+            end
+        end
+        local staged = { style = ph.style, points = ph.points, scatter = ph.scatter, share = ph.share }
+        if ph.kind ~= "burst" then
+            for field, v in staged do
+                if v ~= nil then
+                    return false, `phase {i}: '{field}' is a burst field`
+                end
+            end
+        else
+            if ph.style ~= nil and BurstStyles.STYLES[ph.style] == nil then
+                return false, `phase {i}: unknown style '{tostring(ph.style)}'`
+            end
+            if ph.points ~= nil then
+                if
+                    typeof(ph.points) ~= "number"
+                    or ph.points % 1 ~= 0
+                    or ph.points < 1
+                    or ph.points > BurstStyles.MAX_POINTS
+                then
+                    return false, `phase {i}: points must be an integer 1..{BurstStyles.MAX_POINTS}`
+                end
+            end
+            if ph.scatter ~= nil and (typeof(ph.scatter) ~= "number" or ph.scatter < 0) then
+                return false, `phase {i}: scatter must be a non-negative number`
+            end
+            if ph.share ~= nil and (typeof(ph.share) ~= "number" or ph.share <= 0) then
+                return false, `phase {i}: share must be a positive number`
             end
         end
     end

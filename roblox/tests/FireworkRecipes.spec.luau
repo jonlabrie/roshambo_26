@@ -85,4 +85,40 @@ describe("FireworkRecipes.validate — the one recipe schema", function()
             expect(ok).toBe(true)
         end
     end)
+
+    test("a burst may carry a known style; an unknown one fails", function()
+        local r = goodRecipe()
+        r.phases[3].style = "ring"
+        expect(FireworkRecipes.validate(r)).toBe(true)
+        r.phases[3].style = "chrysanthemum" -- not a wave-one word
+        expect(FireworkRecipes.validate(r)).toBe(false)
+    end)
+
+    test("staged fields belong to bursts alone", function()
+        for _, field in { "style", "points", "scatter", "share" } do
+            local r = goodRecipe();
+            (r.phases[2] :: any)[field] = if field == "style" then "peony" else 2
+            expect(FireworkRecipes.validate(r)).toBe(false)
+        end
+    end)
+
+    test("points is an integer 1..MAX_POINTS; scatter >= 0; share > 0", function()
+        local BurstStyles = require("../src/shared/BurstStyles")
+        local cases: { { field: string, value: any, ok: boolean } } = {
+            { field = "points", value = 1, ok = true },
+            { field = "points", value = BurstStyles.MAX_POINTS, ok = true },
+            { field = "points", value = 0, ok = false },
+            { field = "points", value = BurstStyles.MAX_POINTS + 1, ok = false },
+            { field = "points", value = 2.5, ok = false },
+            { field = "scatter", value = 0, ok = true },
+            { field = "scatter", value = -1, ok = false },
+            { field = "share", value = 0.5, ok = true },
+            { field = "share", value = 0, ok = false },
+        }
+        for _, c in cases do
+            local r = goodRecipe();
+            (r.phases[3] :: any)[c.field] = c.value
+            expect(FireworkRecipes.validate(r)).toBe(c.ok)
+        end
+    end)
 end)
