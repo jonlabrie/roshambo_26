@@ -3037,3 +3037,15 @@ Fast-forward 8ed22e5..4967872 (13 commits), suite green on the merged result
 (1611). Range is live in the place (saved 2026-09-01). Next per program order:
 the VOCABULARY sub-project (new phase kinds; multi-break/sub-bursts, break
 geometries, the crisp round-dot texture upload the 2026-07-20 bench left open).
+
+## [2026-09-02] decision | Vocabulary wave-one spec approved: style-on-burst, glow stack, staged shells now
+
+Spec: docs/superpowers/specs/2026-09-02-fireworks-vocabulary-design.md. Owner
+decisions: styles ring/palm/strobe/kamuro (+peony default); both textures; done =
+styles + seed drafts (promotion stays per-shell); vibrancy in scope (LightInfluence
+0, per-style Brightness through the one Bloom, saturated authoring); audio in scope
+(87 files/573MB in Roshambo Reference/sound/fireworks, titles untrusted -> manifest
+triage, composite boom+tail clips per style). Load-bearing find: the schedule
+compiler already supports staged shells (points/scatter/share) -- staging is wave
+one via validation + seed drafts, no compiler change. Style is a burst FIELD, not a
+new kind; budget logic untouched.
