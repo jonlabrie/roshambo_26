@@ -32,11 +32,24 @@ ProvingGround.POST_ORIGIN = { -430.11, 245.75, -17.93 }
 ProvingGround.POST_YAW_DEG = 0 -- square post; yaw is meaningless
 
 -- ===== dimensions =====
--- Racks along local X, 12 studs apart. ProvingPlan.RACKS pairs with offsets by index.
-local RACK_X_OFFSETS = { -24, -12, 0, 12, 24 }
+-- Racks along local X, 12 studs apart. ProvingPlan.RACKS pairs with stations by index.
+-- THE DECK IS A CATENARY (owner, 2026-09-01: "the C platform is the lowest, because
+-- it's in the center… the other 4 would naturally tilt inwards"): each station carries
+-- the deck height offset (dy, relative to RACK_ORIGIN's surveyed center height) and the
+-- local slope's tilt, both measured in-Studio 2026-09-01 by raycasting the deck at
+-- station ±1.5 studs along the line (origin + rotY(RACK_YAW)·(offset,0,0), cast down
+-- from y 226). A rack is tilted about local Z at its deck contact point, so it lies ON
+-- the curve rather than hovering over it.
+local RACK_STATIONS = {
+    { offset = -24, dy = 1.377, tiltDeg = -7.69 },
+    { offset = -12, dy = 0.325, tiltDeg = -4.43 },
+    { offset = 0, dy = -0.017, tiltDeg = 0.11 },
+    { offset = 12, dy = 0.349, tiltDeg = 2.48 },
+    { offset = 24, dy = 1.514, tiltDeg = 4.73 },
+}
 assert(
-    #RACK_X_OFFSETS == #ProvingPlan.RACKS,
-    `ProvingGround has {#RACK_X_OFFSETS} rack offsets but ProvingPlan names {#ProvingPlan.RACKS} racks`
+    #RACK_STATIONS == #ProvingPlan.RACKS,
+    `ProvingGround has {#RACK_STATIONS} rack stations but ProvingPlan names {#ProvingPlan.RACKS} racks`
 )
 
 local BASE_SIZE = { 3, 0.6, 3 } -- timber base block
@@ -144,6 +157,49 @@ local function buildRack(name: string, letter: string, x: number): Spec.PartSpec
     return main
 end
 
+-- Tilt a rack about local Z through its deck contact point (station, 0, 0), then lift
+-- it by the station's dy — the "laid on the curved deck" pose. Row-major rotZ, same
+-- layout as Spec's matrices; rotZ(atan(slope)) aligns the rack's local X with the
+-- deck tangent, which is exactly what a platform resting on the slope does.
+local function rotZMat(deg: number): { number }
+    local r = math.rad(deg)
+    local c, s = math.cos(r), math.sin(r)
+    return { c, -s, 0, s, c, 0, 0, 0, 1 }
+end
+
+local function tiltAtStation(spec: Spec.PartSpec, tiltDeg: number, dy: number, px: number)
+    local m = rotZMat(tiltDeg)
+    local props = spec.properties
+    if props and props.CFrame then
+        local cf = props.CFrame :: { number }
+        local rx, ry, rz = cf[1] - px, cf[2], cf[3]
+        local nx = m[1] * rx + m[2] * ry + m[3] * rz
+        local ny = m[4] * rx + m[5] * ry + m[6] * rz
+        local nz = m[7] * rx + m[8] * ry + m[9] * rz
+        local localRot = { cf[4], cf[5], cf[6], cf[7], cf[8], cf[9], cf[10], cf[11], cf[12] }
+        local rot = Spec.matMul(m, localRot)
+        props.CFrame = {
+            nx + px,
+            ny + dy,
+            nz,
+            rot[1],
+            rot[2],
+            rot[3],
+            rot[4],
+            rot[5],
+            rot[6],
+            rot[7],
+            rot[8],
+            rot[9],
+        }
+    end
+    if spec.children then
+        for _, child in spec.children do
+            tiltAtStation(child, tiltDeg, dy, px)
+        end
+    end
+end
+
 -- Rotate a tree about an origin by yawDeg and translate to it — walking every nested
 -- child (Base/Plaque/tubes are parented under their rack, and Roblox parts do not
 -- inherit a parent's CFrame). Composes each part's OWN local rotation (a tube's
@@ -183,7 +239,9 @@ function ProvingGround.build(): Spec.PartSpec
     local children: { Spec.PartSpec } = {}
     for i, rackName in ProvingPlan.RACKS do
         local letter = string.sub(rackName, -1)
-        local rack = buildRack(rackName, letter, RACK_X_OFFSETS[i])
+        local station = RACK_STATIONS[i]
+        local rack = buildRack(rackName, letter, station.offset)
+        tiltAtStation(rack, station.tiltDeg, station.dy, station.offset)
         seatInWorld(rack, ProvingGround.RACK_YAW_DEG, ProvingGround.RACK_ORIGIN)
         table.insert(children, rack)
     end

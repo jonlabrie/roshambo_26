@@ -69,7 +69,10 @@ describe("ProvingGround — the yard the range fires from", function()
             local a, b = positions[i - 1], positions[i]
             local dx, dy, dz = b[1] - a[1], b[2] - a[2], b[3] - a[3]
             local dist = math.sqrt(dx * dx + dy * dy + dz * dz)
-            expect(math.abs(dist - 12) < 0.01).toBe(true)
+            -- Stations are 12 apart along the line; the bridge's catenary adds up to
+            -- ~1.2 studs of dy between neighbours plus a small tilt displacement, so
+            -- the tube-to-tube distance rides a little over 12, never exactly on it.
+            expect(math.abs(dist - 12) < 0.5).toBe(true)
         end
     end)
 
