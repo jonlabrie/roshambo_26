@@ -447,9 +447,25 @@ local function play(payload: any, distance: number)
                     local cam = workspace.CurrentCamera
                     local dist = if cam then (cam.CFrame.Position - anchorPos).Magnitude else 0
                     task.delay(tailSpec.delay + dist / BurstStyles.SOUND_LEVELS.speedOfSound, function()
+                        local vol = BurstStyles.SOUND_LEVELS.volume * tailSpec.volume
                         slot.tail.SoundId = tailId
-                        slot.tail.Volume = BurstStyles.SOUND_LEVELS.volume * tailSpec.volume
+                        slot.tail.Volume = vol
                         slot.tail:Play()
+                        -- THE SOUND OBEYS THE PHASE, not the clip: fade out over 0.35s once
+                        -- the style's declared duration is up, however long the file runs.
+                        local mySound = slot.tail
+                        task.delay(tailSpec.duration, function()
+                            for step = 1, 7 do
+                                task.delay(0.05 * step, function()
+                                    if mySound.SoundId == tailId then
+                                        mySound.Volume = vol * (1 - step / 7)
+                                        if step == 7 then
+                                            mySound:Stop()
+                                        end
+                                    end
+                                end)
+                            end
+                        end)
                     end)
                 end
                 fireBurst(slot, ev, anchorPos, rng)

@@ -22,10 +22,13 @@ export type Style = {
     lightEmission: number, -- the STACKING LAW, not just a glow switch: 1 = fully additive
     -- (overlaps sum without bound -- the shared-halo problem), lower = part-normal blend,
     -- so pileups compress. Dots ~0.7, streaks higher (they overlap less).
-    tailSound: { role: string, delay: number, volume: number } | false, -- a SECOND voice
-    -- layered after the burst (owner's canyon sizzle over hotaru's final flicker phase,
-    -- 2026-09-03) -- role into SOUNDS, delay seconds after the break, volume as a
-    -- fraction of SOUND_LEVELS.volume. false = the style has no tail.
+    tailSound: { role: string, delay: number, volume: number, duration: number } | false,
+    -- a SECOND voice layered after the burst (owner's canyon sizzle over hotaru's final
+    -- flicker phase, 2026-09-03) -- role into SOUNDS, delay seconds after the break,
+    -- volume as a fraction of SOUND_LEVELS.volume, duration seconds the voice may run
+    -- before the engine fades it: THE SOUND OBEYS THE PHASE, not the clip's own length
+    -- (owner ruling: "the sizzle clip should only run as long as the final phase").
+    -- false = the style has no tail.
     soundRole: string, -- key into SOUNDS (burst roles are variant pools)
     pointRule: string, -- "scatter" | "circle" | "tilted" | "single"
 }
@@ -131,7 +134,7 @@ BurstStyles.STYLES = {
         -- The owner's own canyon-echoed sizzle, over the FINAL flicker phase only: the
         -- strobe's square wave reads as 3-4 sequential re-bursts and the last one
         -- shimmers -- that is the phase this voice belongs to (~70% of star lifetime).
-        tailSound = { role = "tail_strobe", delay = 1.75, volume = 0.35 },
+        tailSound = { role = "tail_strobe", delay = 1.75, volume = 0.35, duration = 1.3 },
     },
     -- The golden crown: long, heavy, drooping to the water.
     kamuro = {
