@@ -106,6 +106,32 @@ def test_eye_stack_does_not_overlap():
     """⚠ THE RINGS ARE DEFINED BY FOUR CONSTANTS THAT MUST STAY ORDERED. Pupil inside iris inside
     orbital inside white ring. Any inversion silently paints one over another."""
     assert bbt.PUPIL0 < bbt.PUPIL1 <= 1.0, "pupil is not inside the iris"
+    assert bbt.HIYO_PUPIL0 < bbt.HIYO_PUPIL1 <= 1.0, "hiyodori pupil is not inside its iris"
+    # the hiyodori's stack is pupil -> iris -> black rim, and the rim must start OUTSIDE the iris
+    # or it eats the ring it is meant to frame
+    assert bbt.HIYO_RIM_IN0 > bbt.HIYO_PUPIL1, "hiyodori rim starts inside the pupil fade"
+    assert bbt.HIYO_RIM_IN1 < bbt.HIYO_RIM_OUT0, "hiyodori rim has no width"
+    assert bbt.HIYO_RIM_OUT0 > 1.0, "hiyodori rim closes inside the eye instead of around it"
+    # ⚠ THE ORBITAL MUST BE WIDE ENOUGH TO SURVIVE THE BAKE. The rim it backs is 0.2 texels at
+    # 1024 and renders as speckle; the whole point of the shadow is that it does not. Two texels
+    # is the floor at which a soft edge still reads as an edge.
+    _texel = 1.15 / bbt.RES * 3.0        # studs per texel on a 1.15-stud bird at ship resolution
+    _orbit_w = (bbt.HIYO_ORBIT_OUT1 - bbt.HIYO_ORBIT_IN1) * bbt.EYE_R
+    assert _orbit_w / _texel > 2.0, \
+        "hiyodori orbital is only %.1f texels wide -- it will bake as speckle" % (_orbit_w / _texel)
+    # ⚠ AND THE PUPIL MUST ACTUALLY BE DARKER THAN THE IRIS IT SITS IN. The hiyodori shipped with
+    # iris (96,60,44) against pupil (28,22,20): the two read as one dark bead and the owner could
+    # not see the iris at all. A ring needs contrast, not just an order.
+    #
+    # ⚠ THE THRESHOLD IS 200 BECAUSE THE KNOWN-BAD PAIR SCORES 130. Written first at 120, which
+    # let the exact defect it was written for pass -- a guard set below the value that motivated
+    # it tests nothing. Mutation-checked by restoring (96,60,44)/(28,22,20) and confirming failure.
+    for sp in ("mejiro", "hiyodori", "karasu"):
+        pal = bbt.SPECIES[sp]["palette"]
+        if "iris" in pal:
+            gap = sum(pal["iris"]) - sum(pal["eye"])
+            assert gap > 200, \
+                "%s: iris is only %d brighter than its pupil -- it will not read" % (sp, gap)
     assert bbt.ORBIT_OUT0 >= 1.0, "orbital grey starts inside the iris"
     assert bbt.RING_IN0 >= bbt.ORBIT_OUT0, "the white ring starts before the orbital grey ends"
     assert bbt.RING_IN1 < bbt.RING_OUT0, "the white ring has no width"
