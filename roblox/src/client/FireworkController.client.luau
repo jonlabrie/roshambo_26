@@ -79,7 +79,11 @@ for _ = 1, POOL_SIZE do
     a0.Parent, a1.Parent = shell, shell
     local trail = Instance.new("Trail")
     trail.Attachment0, trail.Attachment1 = a0, a1
-    trail.Lifetime = 0.45
+    -- ⚠ LONG ENOUGH TO STAY ROOTED AT THE TUBE. At 0.45 the tail end of the ribbon faded
+    -- before the eye caught the comet, so every launch read as starting mid-air (owner,
+    -- 2026-09-03: "launch beginnings still well overhead"). 1.1s keeps the ribbon anchored
+    -- at the muzzle for most of the climb.
+    trail.Lifetime = 1.1
     trail.LightEmission = 1
     trail.Enabled = false
     trail.Parent = shell
@@ -282,6 +286,29 @@ local function play(payload: any, distance: number)
             if ev.kind == "report" then
                 slot.shell.Position = origin
                 playSound(slot, ev.sound, lod.sound, origin)
+                -- THE MUZZLE FLASH: the visual partner of the launch thump, anchoring the
+                -- launch to the tube the way the ribbon alone could not. A fixed ~14 sparks
+                -- (2% of a shell's budget; the mobile floor was measured at 500-700) with the
+                -- FULL property set written -- pool emitters are shared, so a partial write
+                -- would inherit the previous shell's style.
+                local fp = slot.points[1]
+                local fem = slot.emitters[1]
+                fp.CFrame = CFrame.new(origin)
+                fem.Texture = BurstStyles.TEXTURES.dot
+                fem.Color = ColorSequence.new(Color3.fromRGB(255, 236, 200), Color3.fromRGB(255, 200, 120))
+                fem.Size = NumberSequence.new(0.45)
+                fem.Speed = NumberRange.new(8, 18)
+                fem.Drag = 2
+                fem.Lifetime = NumberRange.new(0.2, 0.4)
+                fem.Brightness = 2
+                fem.SpreadAngle = Vector2.new(20, 20)
+                fem.Acceleration = Vector3.new(0, -4, 0)
+                fem.Transparency = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0, 0),
+                    NumberSequenceKeypoint.new(0.6, 0.2),
+                    NumberSequenceKeypoint.new(1, 1),
+                })
+                fem:Emit(14)
             elseif ev.kind == "ascent" then
                 slot.shell.Position = origin
                 -- ⚠ CLEAR BEFORE ENABLE. The slot's shell TELEPORTS here from wherever its
