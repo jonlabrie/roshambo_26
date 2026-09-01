@@ -81,9 +81,9 @@ for _ = 1, POOL_SIZE do
     trail.Attachment0, trail.Attachment1 = a0, a1
     -- ⚠ LONG ENOUGH TO STAY ROOTED AT THE TUBE. At 0.45 the tail end of the ribbon faded
     -- before the eye caught the comet, so every launch read as starting mid-air (owner,
-    -- 2026-09-03: "launch beginnings still well overhead"). 1.1s keeps the ribbon anchored
-    -- at the muzzle for most of the climb.
-    trail.Lifetime = 1.1
+    -- 2026-09-03: "launch beginnings still well overhead"). 1.6s keeps the ribbon anchored
+    -- at the muzzle for most of a ~2s flight (owner ruling: flights run ~2 seconds).
+    trail.Lifetime = 1.6
     trail.LightEmission = 1
     trail.Enabled = false
     trail.Parent = shell
