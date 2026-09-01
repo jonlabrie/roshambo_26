@@ -1,9 +1,12 @@
 --!strict
--- THE PROVING RANGE PANEL. An owner-facing dev tool at FiringPost (see
--- tools/builders/ProvingGround.luau): step up, open the panel, fire any draft or shipped shell
--- from any rack, alone or in a ladder/sequence. It evaluates NOTHING about a shell's look — that
--- is FireworkDrafts/FireworkCatalog's recipe and FireworkController's job to render. This file
--- only turns a button press into a `RequestProvingFire:FireServer(id, rack)` call.
+-- THE PROVING RANGE PANEL. An owner-facing dev tool that opens ANYWHERE in Studio — press P, or
+-- click the "Proving" chip top-right (owner ruling 2026-09-01: a location-bound panel was
+-- theater; a dev tool opens where you stand, and a fireworks panel must never sit in front of
+-- the fireworks — so it docks as a rail on the LEFT edge, sky clear). Fire any draft or shipped
+-- shell from any rack on the suspension bridge, alone or in a ladder/sequence. It evaluates
+-- NOTHING about a shell's look — that is FireworkDrafts/FireworkCatalog's recipe and
+-- FireworkController's job to render. This file only turns a button press into a
+-- `RequestProvingFire:FireServer(id, rack)` call.
 --
 -- STUDIO-ONLY BY ITS FIRST STATEMENT. A published place must hold no prompt, no panel, nothing —
 -- the guard below is the whole security model on the client side (the server's own IsStudio
@@ -33,32 +36,9 @@ local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local RequestProvingFire = remotes:WaitForChild("RequestProvingFire") :: RemoteEvent
 
--- FiringPost may not have replicated yet (StreamingEnabled can delay it) -- wait, generously,
--- rather than assuming it is already there.
-local stage = workspace:WaitForChild("RoshamboStage", 60)
-if not stage then
-    return
-end
-local ground = stage:WaitForChild("ProvingGround", 60)
-if not ground then
-    return
-end
-local firingPost = ground:WaitForChild("FiringPost", 60)
-if not firingPost or not firingPost:IsA("BasePart") then
-    return
-end
-
 local INK_CREAM = Color3.fromRGB(240, 234, 216)
 local WASHI = Color3.fromRGB(26, 24, 28)
 local GOLD = Color3.fromRGB(212, 176, 102)
-
--- ===== the prompt: client-created only, so a published place holds no prompt at all =====
-local prompt = Instance.new("ProximityPrompt")
-prompt.ActionText = "Open Panel"
-prompt.ObjectText = "Proving Range"
-prompt.RequiresLineOfSight = false
-prompt.MaxActivationDistance = 12
-prompt.Parent = firingPost
 
 -- ===== the panel =====
 local gui = Instance.new("ScreenGui")
@@ -142,15 +122,51 @@ local function setOpen(open: boolean)
     gui.Enabled = open
 end
 
-prompt.Triggered:Connect(function()
+-- ===== open from anywhere: the P key, or the always-visible "Proving" chip top-right.
+-- The chip lives in its OWN ScreenGui because gui.Enabled=false hides everything inside it,
+-- and the chip has to stay clickable while the panel is closed. =====
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then
+        return
+    end
+    if input.KeyCode == Enum.KeyCode.P then
+        setOpen(not gui.Enabled)
+    end
+end)
+
+local chipGui = Instance.new("ScreenGui")
+chipGui.Name = "ProvingChip"
+chipGui.ResetOnSpawn = false
+chipGui.Parent = player:WaitForChild("PlayerGui")
+
+local chip = Instance.new("TextButton")
+chip.AnchorPoint = Vector2.new(1, 0)
+chip.Position = UDim2.new(1, -10, 0, 10)
+chip.Size = UDim2.fromOffset(76, 24)
+chip.BackgroundColor3 = WASHI
+chip.BackgroundTransparency = 0.35
+chip.BorderSizePixel = 0
+chip.AutoButtonColor = false
+chip.Text = "Proving [P]"
+chip.TextColor3 = INK_CREAM
+chip.Font = Enum.Font.Code
+chip.TextSize = 12
+chip.Parent = chipGui
+do
+    local c = Instance.new("UICorner")
+    c.CornerRadius = UDim.new(0, 6)
+    c.Parent = chip
+end
+chip.MouseButton1Click:Connect(function()
     setOpen(not gui.Enabled)
 end)
 
--- ===== panel chrome =====
+-- ===== panel chrome: a rail docked to the LEFT edge, so the sky (and the bridge east of
+-- FallsLanding) stays in view while firing =====
 local panel = Instance.new("Frame")
-panel.AnchorPoint = Vector2.new(0.5, 0.5)
-panel.Position = UDim2.fromScale(0.5, 0.5)
-panel.Size = UDim2.fromOffset(480, 440)
+panel.AnchorPoint = Vector2.new(0, 0.5)
+panel.Position = UDim2.new(0, 10, 0.5, 0)
+panel.Size = UDim2.new(0, 360, 1, -20)
 panel.BackgroundColor3 = WASHI
 panel.BackgroundTransparency = 0.12
 panel.BorderSizePixel = 0
@@ -365,7 +381,7 @@ for _, family in FireworkDrafts.familyNames() do
     local row = makeRow(order)
 
     local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size = UDim2.fromOffset(90, 26)
+    nameLabel.Size = UDim2.fromOffset(68, 26)
     nameLabel.Position = UDim2.fromOffset(0, 2)
     nameLabel.BackgroundTransparency = 1
     nameLabel.TextColor3 = INK_CREAM
@@ -375,14 +391,14 @@ for _, family in FireworkDrafts.familyNames() do
     nameLabel.Text = family
     nameLabel.Parent = row
 
-    local ladderButton = makeButton(row, "Ladder", 60, 92)
+    local ladderButton = makeButton(row, "Ladder", 56, 70)
     ladderButton.MouseButton1Click:Connect(function()
         for _, entry in ProvingPlan.ladder(family, variants) do
             fireSingle(entry.id, entry.rack)
         end
     end)
 
-    local seqButton = makeButton(row, "Seq", 44, 156)
+    local seqButton = makeButton(row, "Seq", 40, 130)
     seqButton.MouseButton1Click:Connect(function()
         for _, entry in ProvingPlan.sequence(family, variants) do
             task.delay(entry.delaySeconds, function()
@@ -391,7 +407,7 @@ for _, family in FireworkDrafts.familyNames() do
         end
     end)
 
-    local variantX = 204
+    local variantX = 174
     for _, variant in variants do
         local vButton = makeButton(row, variant, 40, variantX)
         local id = ("draft:%s/%s"):format(family, variant)

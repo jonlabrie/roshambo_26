@@ -1,16 +1,15 @@
 --!strict
 -- The fireworks proving range: five mortar racks on the suspension bridge deck
--- (ProvingPlan.RACKS names them Rack_A..Rack_E) and a FiringPost at FallsLanding,
--- ~190 studs west and 30 above — the owner opens the panel there and judges the
--- bursts breaking over the bridge at roughly their own eye level (owner's siting,
--- 2026-09-01, superseding the spec's one-yard-at-FallsLanding shape). NO Tags
+-- (ProvingPlan.RACKS names them Rack_A..Rack_E), fired from ProvingController's
+-- anywhere-in-Studio panel and judged from FallsLanding, ~190 studs west and 30
+-- above, where the bursts break at roughly the viewer's eye level (owner's siting,
+-- 2026-09-01; the FiringPost died the same day — a location-bound panel was
+-- theater, so no standing spot needs marking). NO Tags
 -- anywhere here — racks stand in a world with real FireworkLaunchSites and must
 -- never be mistaken for one; the server fires by looking up a rack's Position.
 --
--- Structured like FallsDock: baked placement constants (PROVISIONAL until the
--- two-marker survey bakes them), pure geometry, then a rotate-about-origin pass.
--- TWO origins, because the rack line and the firing post live on opposite sides
--- of the canyon and are surveyed independently.
+-- Structured like FallsDock: baked placement constants from the owner-dragged
+-- marker survey, pure geometry, then a rotate-about-origin pass.
 --
 -- Tube bores are the owner's 2026-09-01 ruling: 2", 4" and 6" shells for now
 -- (yonshakudama noted for the future). 1 stud = 1 foot, and real display mortars
@@ -27,9 +26,6 @@ ProvingGround.RACK_ORIGIN = { -246.67, 210.45, -0.01 }
 -- Plaques (+Z) face the owner-aimed arrow: due west, up-canyon at FallsLanding;
 -- the rack line (local X) runs along the deck.
 ProvingGround.RACK_YAW_DEG = -91.22
--- Firing post: the owner's standing spot on FallsLanding.
-ProvingGround.POST_ORIGIN = { -430.11, 245.75, -17.93 }
-ProvingGround.POST_YAW_DEG = 0 -- square post; yaw is meaningless
 
 -- ===== dimensions =====
 -- Racks along local X, 12 studs apart. ProvingPlan.RACKS pairs with stations by index.
@@ -63,12 +59,10 @@ local TUBE6_X, TUBE4_X, TUBE2_X = -0.8, 0.1, 0.75 -- spread across the base, loc
 -- Plaque sized to read from the FallsLanding sightline (~190 studs); it STANDS ON the
 -- base's west edge rather than floating at tube height (the final review's float note).
 local PLAQUE_SIZE = { 2, 2, 0.15 }
-local POST_SIZE = { 1.2, 0.6, 1.2 }
 
 -- Grey-cypress timber treatment (216/214/206) — the base and plaque wear it.
 local TIMBER_GREY = { 0.847, 0.839, 0.808 }
 local TUBE_COLOR = { 0.20, 0.20, 0.22 }
-local POST_COLOR = { 0.55, 0.55, 0.52 }
 local INK = { 0.15, 0.13, 0.11 }
 
 -- Local ground datum is y = 0 (each origin's y carries the surveyed ground height).
@@ -79,8 +73,6 @@ end
 local PLAQUE_Y = BASE_SIZE[2] + PLAQUE_SIZE[2] / 2
 -- Against the base's +Z face, flush.
 local PLAQUE_Z = BASE_SIZE[3] / 2 + PLAQUE_SIZE[3] / 2
-
-local POST_Y = POST_SIZE[2] / 2 -- base on the ground datum
 
 -- ===== the plaque letter — Machiya's `kanjiLabel` canvas recipe (tools/builders/Machiya.luau,
 -- ~lines 37-104), copied rather than shared: SizingMode "PixelsPerStud" (the default FixedSize
@@ -245,16 +237,6 @@ function ProvingGround.build(): Spec.PartSpec
         seatInWorld(rack, ProvingGround.RACK_YAW_DEG, ProvingGround.RACK_ORIGIN)
         table.insert(children, rack)
     end
-    local post = Spec.part("FiringPost", {
-        Size = POST_SIZE,
-        CFrame = Spec.cframe({ 0, POST_Y, 0 }),
-        Material = "Slate",
-        Color = POST_COLOR,
-        CanCollide = true,
-    })
-    seatInWorld(post, ProvingGround.POST_YAW_DEG, ProvingGround.POST_ORIGIN)
-    table.insert(children, post)
-
     return Spec.model("ProvingGround", children)
 end
 

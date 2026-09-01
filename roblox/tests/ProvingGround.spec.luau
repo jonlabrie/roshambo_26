@@ -76,18 +76,10 @@ describe("ProvingGround — the yard the range fires from", function()
         end
     end)
 
-    test("the firing post exists, seated on its OWN surveyed origin", function()
-        -- The post is placed independently of the rack line (owner's 2026-09-01 siting:
-        -- racks on the suspension bridge, post at FallsLanding), so the assertion is
-        -- origin-relative — it keeps holding whatever the marker survey bakes.
-        local post = childNamed(model, "FiringPost")
-        expect(post ~= nil).toBe(true)
-        assert(post)
-        expect(post.className).toBe("Part")
-        local cf = post.properties.CFrame
-        expect(math.abs(cf[1] - ProvingGround.POST_ORIGIN[1]) < 0.01).toBe(true)
-        expect(math.abs(cf[2] - (ProvingGround.POST_ORIGIN[2] + 0.3)) < 0.01).toBe(true)
-        expect(math.abs(cf[3] - ProvingGround.POST_ORIGIN[3]) < 0.01).toBe(true)
+    test("no firing post — the panel opens anywhere, nothing marks a spot", function()
+        -- Owner ruling 2026-09-01: the location-bound panel was theater. The yard is
+        -- racks only; a FiringPost reappearing here means someone resurrected the idea.
+        expect(childNamed(model, "FiringPost") == nil).toBe(true)
     end)
 
     test("every rack carries all three bores at mortar proportions (owner ruling: 2/4/6 inch)", function()
