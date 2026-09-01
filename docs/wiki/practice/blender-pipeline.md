@@ -405,31 +405,35 @@ and `BirdRig.pose` builds the Transform with `CFrame.fromAxisAngle`, yaw first s
 looked left raises its beak along the way it faces. Resolved once at spawn; the axes are constants
 of the armature. A hardcoded slot permutation would be the same silent failure on the next rig.
 
-## ⚠ A ROJO-SERVED MESHPART CAN ARRIVE WITH NO MESH — cause not yet established
+## ⚠ ADDING A BIRD TO `default.project.json` MID-SESSION SERVES IT WITHOUT ITS MESH
 
-Hit on the hiyodori 2026-08-31. `ReplicatedStorage.RoshamboBirds.HiyodoriBody` came through with
-correct `Size`, correct `PivotOffset`, both SurfaceAppearance maps and all 17 bones, and
-`MeshContent = SourceType=None` — no geometry. The bird is invisible.
+**Confirmed 2026-08-31.** Adding `HiyodoriBody` / `HiyodoriWings` to the project file while Rojo
+was already serving created both instances with correct `Size`, correct `PivotOffset`, both
+SurfaceAppearance maps and all 17 bones — and `MeshContent = SourceType=None`. No geometry, so the
+bird is invisible. **Disconnecting and reconnecting the Rojo plugin fixed it**, and every bird then
+reported a mesh uri. The `.rbxm` files were correct throughout.
 
-⚠ **THE FIRST EXPLANATION WAS WRONG AND IS RECORDED HERE SO IT IS NOT RE-PROPOSED.** It was blamed
-on the `.rbxm` save happening before the uploaded mesh ids resolved, and the owner was asked to
-re-save. The re-saved files came back **byte-identical**, and `strings` shows the mesh ids were in
-them all along (`116753878826591` body, `126780011949127` wings). The files were never the problem.
+**So: after adding an entry to `default.project.json`, reconnect Rojo. An incremental sync does not
+populate `MeshContent`.**
 
-**What actually differs**: `MejiroBody` was in `default.project.json` when Rojo connected;
-the Hiyodori entries were added to that file *while Rojo was already serving*. Reconnecting Rojo
-is the next thing to test. **Until that is confirmed, this section is a symptom, not a cause.**
+⚠ **A WRONG EXPLANATION WAS PUBLISHED HERE FIRST, and is kept so it is not re-proposed.** It was
+blamed on the `.rbxm` being saved before the uploaded mesh ids resolved, and the owner was sent to
+re-save both files. They came back **byte-identical**, and one `strings` call showed the mesh ids
+had been in them all along (`116753878826591`, `126780011949127`) — a check that would have killed
+the theory before it cost a round trip.
 
-⚠ **`Size` IS STORED INDEPENDENTLY OF THE MESH**, which is why this is worth a page at all: a
-property dump reads entirely correct. Length, pivot, maps and bone count all passed on a part with
-nothing in it. Check `MeshContent` after every Rojo sync of a bird — it is the one property that
-cannot be inferred from the others, and it is invisible in Studio's property panel.
+⚠ **`Size` IS STORED INDEPENDENTLY OF THE MESH**, which is what makes this worth a page: a property
+dump reads entirely correct. Length, pivot, maps and bone count all passed on a part containing
+nothing. Check after every bird sync:
 
 ```lua
-p.MeshContent          -- SourceType=None instead of Uri
-p.CollisionFidelity    -- fell back to Box; a real import is Default
+p.MeshContent          -- SourceType=None instead of Uri  <- the only reliable tell
+p.CollisionFidelity    -- falls back to Box; a real import is Default
 p.MeshSize             -- (0,0,0), so Size/MeshSize is inf rather than 1.0
 ```
+
+`MeshContent` is the one property that cannot be inferred from the others, and Studio's property
+panel does not show it.
 
 ## ⚠ ONE ROUGHNESS MAP PER MESH, NOT PER SPECIES — and 1024 is a ceiling, not a default
 
