@@ -200,3 +200,16 @@ task.spawn(function()
         task.wait(1 + math.random() * 0.5)
     end
 end)
+
+-- And the belt that ends the story: a slow rescan heartbeat. Five event-ordering fixes each
+-- closed a real window and the join found another; live instrumentation showed every poke of
+-- rescanAll binds instantly whenever the world is in place, so convergence -- not cleverness --
+-- is what was missing. Two GetTagged calls over a handful of models with a bound-guard no-op is
+-- effectively free at this cadence, and it makes prompt binding reach steady state from ANY
+-- join interleaving within 3 seconds.
+task.spawn(function()
+    while true do
+        task.wait(3)
+        rescanAll()
+    end
+end)
