@@ -218,10 +218,21 @@ balance.TextSize = 13
 balance.TextXAlignment = Enum.TextXAlignment.Left
 balance.Parent = panel
 
-local list = Instance.new("Frame")
+-- A ScrollingFrame, because the shelf outgrew the panel at 8 shells + 3 mortars
+-- (owner, 2026-09-06: "I can't get to the kamuro to select it") and the catalog is
+-- DESIGNED to keep growing -- shell taxonomy is a first-class goal. The canvas sizes
+-- itself; new rows just make it taller.
+local list = Instance.new("ScrollingFrame")
 list.Size = UDim2.new(1, -20, 1, -70)
 list.Position = UDim2.fromOffset(10, 64)
 list.BackgroundTransparency = 1
+list.BorderSizePixel = 0
+list.CanvasSize = UDim2.new()
+-- selene: allow(incorrect_standard_library_use) -- selene 0.31's Roblox std predates AutomaticCanvasSize.Y; the enum is real
+list.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y
+list.ScrollingDirection = Enum.ScrollingDirection.Y
+list.ScrollBarThickness = 6
+list.ScrollBarImageColor3 = DIM
 list.Parent = panel
 local layout = Instance.new("UIListLayout")
 layout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -244,7 +255,7 @@ local rows: { Row } = {}
 local function makeRow(order: number, item: string, label: string): Row
     local b = Instance.new("TextButton")
     b.LayoutOrder = order
-    b.Size = UDim2.new(1, 0, 0, 38)
+    b.Size = UDim2.new(1, -8, 0, 38) -- -8: clear of the scrollbar
     b.BackgroundColor3 = WASHI
     b.BackgroundTransparency = 0.3
     b.BorderSizePixel = 0
