@@ -46,7 +46,7 @@ not, and a stale one sends a reader to unrelated code and quietly costs their tr
   (`nextDecorationId`/`appendDecoration`), or reject additions of unowned props.
 - Verified present 2026-08-27.
 
-## (c) `RESOLVE_FAILED` returns 500 (minor)
+## ~~(c) `RESOLVE_FAILED` returns 500 (minor)~~ FIXED 2026-09-05 (`8651794`, all 14 sites -> 404; note: the branch is defensively dead on /api/v1 robloxUserId routes, see (o))
 
 Thirteen sites in `apiV1.ts` answer a `resolveUser` miss with
 `res.status(500).json({ error: 'RESOLVE_FAILED' })`. It is a client condition and will
@@ -217,3 +217,16 @@ run `TEST_MODE`, which keeps the R→P→S cycle. Defect (e) therefore still sta
   yield, `d510c69`); the structural fragility remains.
 - **Fix sketch:** after each connect, loop existing players through the same handler (idempotent
   guards where needed), the standard Roblox join-race idiom.
+
+## (o) `resolveUser` upserts on ANY truthy robloxUserId — a garbage path id mints a junk user (2026-09-05)
+
+- **Where:** `server/src/identity.ts` `resolveUser` — `if (identifier.robloxUserId)` then
+  `findOneAndUpdate(..., { upsert: true })`. Every `/api/v1/players/:robloxUserId/...` route
+  feeds the RAW path segment in, so `/players/%20/purchase` (or any typo'd id) permanently
+  mints a User with that string as its robloxId — the same identity-root pollution the
+  presence route's own comment guards against with explicit validation before resolveUser.
+  Found 2026-09-05 while fixing (c): the upsert also makes RESOLVE_FAILED unreachable on
+  these routes.
+- **Fix sketch:** validate the path id once (digits-only, as Roblox ids are) in a tiny
+  middleware or at each route's top, 400 on failure — mirroring the presence route's guard;
+  or make resolveUser itself refuse non-numeric robloxUserIds.
