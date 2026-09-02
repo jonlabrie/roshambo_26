@@ -24,7 +24,17 @@ export type Phase = {
     droop: boolean?,
     style: string?,
     glow: number?, -- per-shell brightness multiplier on the style (owner, 2026-09-04)
-    boost: { chance: number, spread: number?, glow: number?, points: number?, lifeScale: number? }?,
+    boost: {
+        chance: number,
+        spread: number?,
+        glow: number?,
+        points: number?,
+        lifeScale: number?,
+        kickerColor: { number }?,
+    }?,
+    -- fires ONLY when the shell's boost roll hits -- the structural half of a surprise
+    -- (owner, 2026-09-05: wa's second concentric ring; later, salute endings)
+    boostOnly: boolean?,
 }
 export type Recipe = { phases: { Phase } }
 
@@ -43,7 +53,17 @@ export type Event = {
     droop: boolean?,
     style: string?,
     glow: number?,
-    boost: { chance: number, spread: number?, glow: number?, points: number?, lifeScale: number? }?,
+    boost: {
+        chance: number,
+        spread: number?,
+        glow: number?,
+        points: number?,
+        lifeScale: number?,
+        kickerColor: { number }?,
+    }?,
+    -- fires ONLY when the shell's boost roll hits -- the structural half of a surprise
+    -- (owner, 2026-09-05: wa's second concentric ring; later, salute endings)
+    boostOnly: boolean?,
 }
 
 function FireworkSchedule.compile(recipe: Recipe, budget: number): { Event }
@@ -87,6 +107,7 @@ function FireworkSchedule.compile(recipe: Recipe, budget: number): { Event }
             style = ph.style,
             glow = ph.glow,
             boost = ph.boost,
+            boostOnly = ph.boostOnly,
         })
     end
     table.sort(out, function(a, b)

@@ -129,6 +129,32 @@ function FireworkRecipes.validate(recipe: any): (boolean, string?)
                     return false,
                         `phase {i}: boost.points must be an integer 1..{BurstStyles.MAX_POINTS - 1} (added to the base)`
                 end
+                -- The kicker's star color (owner, 2026-09-05: wa's kicker is bright orange).
+                -- Optional; absent means the default warm white.
+                if b.kickerColor ~= nil and not validColor(b.kickerColor) then
+                    return false, `phase {i}: boost.kickerColor must be a 3-element 0-255 array`
+                end
+            end
+            -- boostOnly (owner, 2026-09-05): the structural half of a surprise -- a phase that
+            -- exists only when the shell's boost roll hits (wa's second concentric ring). It
+            -- must have a roll to key off: some OTHER phase in the recipe must carry `boost`,
+            -- or the phase can never fire and the recipe is lying about its own contents.
+            if ph.boostOnly ~= nil then
+                if typeof(ph.boostOnly) ~= "boolean" then
+                    return false, `phase {i}: boostOnly must be a boolean`
+                end
+                if ph.boostOnly then
+                    local hasRoll = false
+                    for _, other in recipe.phases do
+                        if other ~= ph and other.boost ~= nil then
+                            hasRoll = true
+                        end
+                    end
+                    if not hasRoll then
+                        return false,
+                            `phase {i}: boostOnly requires another phase carrying boost (nothing rolls the luck it keys off)`
+                    end
+                end
             end
         end
     end

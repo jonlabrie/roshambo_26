@@ -13,26 +13,6 @@ local FireworkDrafts = {}
 
 local S_REPORT = "rbxassetid://87713703495045" -- launch-deck-2 (owner pick, 2026-09-03)
 
--- 輪 wa, ring: a planar circle of points. The ladder varies spread.
-local function wa(spread: number)
-    return {
-        phases = {
-            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
-            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 180, 100 } },
-            {
-                at = 3.0,
-                kind = "burst",
-                anchor = "apex",
-                style = "ring",
-                color = { 255, 60, 40 },
-                edgeColor = { 255, 240, 220 },
-                spread = spread,
-                droop = false,
-            },
-        },
-    }
-end
-
 -- 椰子 yashi, palm: thick outward-aimed arms. The ladder varies point count.
 local function yashi(points: number)
     return {
@@ -143,60 +123,6 @@ local function shapeTrio(core: { number }, edge: { number }, ascent: { number })
 end
 
 FireworkDrafts.FAMILIES = {
-    wa = {
-        v1 = wa(30),
-        v2 = wa(42), -- owner's floor (2026-09-05)
-        v3 = wa(56),
-        -- BOOST PREVIEWS (owner worksheet, 2026-09-05): what the ~30% surprise would look like,
-        -- authored as drafts so the surprise itself auditions at the range before it ships.
-        -- dbl: the v2 ring, then a WIDER concentric ring blooming a half-beat later.
-        dbl = {
-            phases = {
-                { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
-                { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 180, 100 } },
-                {
-                    at = 3.0,
-                    kind = "burst",
-                    anchor = "apex",
-                    style = "ring",
-                    color = { 255, 60, 40 },
-                    edgeColor = { 255, 240, 220 },
-                    spread = 42,
-                    droop = false,
-                    share = 3,
-                },
-                {
-                    at = 3.4,
-                    kind = "burst",
-                    anchor = "apex",
-                    style = "ring",
-                    color = { 255, 90, 60 },
-                    edgeColor = { 255, 240, 220 },
-                    spread = 60,
-                    droop = false,
-                    share = 2,
-                },
-            },
-        },
-        -- blu: the boosted single ring (spread grown ~1.3x, kiku-style) with a blue-shifted edge
-        -- instead of white -- the "different ending color" flavor of surprise.
-        blu = {
-            phases = {
-                { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
-                { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 180, 100 } },
-                {
-                    at = 3.0,
-                    kind = "burst",
-                    anchor = "apex",
-                    style = "ring",
-                    color = { 255, 60, 40 },
-                    edgeColor = { 120, 190, 255 },
-                    spread = 55,
-                    droop = false,
-                },
-            },
-        },
-    },
     yashi = {
         v1 = yashi(4),
         v2 = yashi(5),

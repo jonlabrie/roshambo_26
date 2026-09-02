@@ -1,10 +1,11 @@
 {
     "comment": "The contract between server/src/fireworks.ts (prices, requirements) and roblox/src/shared/FireworkCatalog.luau (recipes). Both sides' tests assert they cover every id here, so a shell that can be sold but not drawn is a CI failure rather than a blank sky.",
-    "shells": ["firecracker", "peony", "willow", "ishibana", "kiku"],
+    "shells": ["firecracker", "peony", "willow", "ishibana", "kiku", "wa"],
     "mortarsComment": "The gear-required subset of `shells` and the mortar tier each needs to fire muzzle-true. Every OTHER shell in `shells` (firecracker, ishibana) requires no gear. Both server/src/fireworks.ts's REQUIREMENTS and roblox/src/shared/MortarPlacement.luau's SHELL_MORTAR are asserted against this list, in both directions, so one side changing a shell's gear tier without the other is a CI failure, not a silent muzzle-origin drift.",
     "mortars": [
         { "shell": "peony", "mortar": "mortar:S" },
         { "shell": "willow", "mortar": "mortar:M" },
-        { "shell": "kiku", "mortar": "mortar:S" }
+        { "shell": "kiku", "mortar": "mortar:S" },
+        { "shell": "wa", "mortar": "mortar:M" }
     ]
 }

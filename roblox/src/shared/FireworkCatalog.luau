@@ -92,6 +92,39 @@ FireworkCatalog.RECIPES = {
     -- burns hot, and a DISTRIBUTION rather than a recording: ~30% of fires upgrade —
     -- wider, brighter, two extra break points, longer hang — announced by the white
     -- kicker pop and the double-tap report.
+    -- 輪 wa, the red ring (promoted 2026-09-05; owner: v2 floor, 5 pts, M tube). The boost
+    -- (30%) is STRUCTURAL: a wider concentric ring blooms 0.4s behind the first -- the first
+    -- boostOnly shell -- with the kicker's stars burning bright orange (owner's pick).
+    wa = {
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 180, 100 } },
+            {
+                at = 3.0,
+                kind = "burst",
+                anchor = "apex",
+                style = "ring",
+                color = { 255, 60, 40 },
+                edgeColor = { 255, 240, 220 },
+                spread = 42,
+                droop = false,
+                share = 3,
+                boost = { chance = 0.3, glow = 1.15, lifeScale = 1.1, kickerColor = { 255, 140, 30 } },
+            },
+            {
+                at = 3.4,
+                kind = "burst",
+                anchor = "apex",
+                style = "ring",
+                color = { 255, 90, 60 },
+                edgeColor = { 255, 240, 220 },
+                spread = 60,
+                droop = false,
+                share = 2,
+                boostOnly = true,
+            },
+        },
+    },
     kiku = {
         phases = {
             { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },

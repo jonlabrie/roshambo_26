@@ -417,6 +417,26 @@ local function play(payload: any, distance: number)
         end
     end
 
+    -- THE SHELL-LEVEL BOOST ROLL (owner, 2026-09-05, superseding the per-phase roll): the
+    -- surprise is a property of the SHELL -- "you landed the bonus" -- so one seeded roll
+    -- against the first boost-carrying phase's chance decides every boosted phase AND whether
+    -- boostOnly phases (wa's second ring; later, salute endings) exist at all. Drawn here,
+    -- before the schedule loop, only when the recipe carries boost anywhere: recipes without
+    -- it consume nothing, and the draw is a pure function of the recipe on every client.
+    local shellBoosted = false
+    do
+        local chance: number? = nil
+        for _, ev in schedule do
+            if ev.boost then
+                chance = ev.boost.chance
+                break
+            end
+        end
+        if chance then
+            shellBoosted = rng:NextNumber() < chance
+        end
+    end
+
     local bonus = last >= BurstStyles.BONUS.minFlight and bonusRoll < BurstStyles.BONUS.chance
     local lifeScale = 1
     if bonus then
@@ -522,16 +542,21 @@ local function play(payload: any, distance: number)
                     end
                 end)
             elseif ev.kind == "burst" then
+                -- A boostOnly phase exists only on a lucky shell (owner, 2026-09-05): the
+                -- structural surprise. Skipped ENTIRELY on the floor roll -- no break, no
+                -- sound, no trail state change; the floor shell honestly never had it.
+                if ev.boostOnly and not shellBoosted then
+                    return
+                end
                 slot.trail.Enabled = false
-                -- THE BOOST ROLL (owner design, 2026-09-04): a burst phase carrying `boost`
-                -- has a seeded chance of an upgraded break — wider, brighter, MORE POINTS
-                -- (which divide the budget, never add particles), longer-lived. Per phase,
-                -- so each stage of a staged shell gets independently lucky; drawn whenever
-                -- the field exists, so the stream stays a pure function of the recipe.
+                -- THE BOOST (owner design, 2026-09-04; roll hoisted to the SHELL 2026-09-05):
+                -- a burst phase carrying `boost` upgrades on the shell's one seeded roll —
+                -- wider, brighter, MORE POINTS (which divide the budget, never add
+                -- particles), longer-lived.
                 local bev = ev
                 local phaseLife = lifeScale
                 if ev.boost then
-                    local boosted = rng:NextNumber() < ev.boost.chance
+                    local boosted = shellBoosted
                     if boosted then
                         bev = table.clone(ev)
                         bev.spread = (ev.spread or 30) * (ev.boost.spread or 1)
@@ -553,7 +578,15 @@ local function play(payload: any, distance: number)
                             local kem = slot.emitters[MAX_POINTS]
                             kp.CFrame = CFrame.new(anchorPos)
                             kem.Texture = BurstStyles.TEXTURES.dot
-                            kem.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(255, 220, 160))
+                            -- boost.kickerColor tints the pop's fade (owner, 2026-09-05:
+                            -- wa's kicker burns bright orange); default keeps the warm white.
+                            local kc = ev.boost.kickerColor
+                            kem.Color = ColorSequence.new(
+                                Color3.new(1, 1, 1),
+                                if kc
+                                    then Color3.fromRGB(kc[1], kc[2], kc[3])
+                                    else Color3.fromRGB(255, 220, 160)
+                            )
                             kem.Size = NumberSequence.new(0.5)
                             kem.Speed = NumberRange.new(14, 26)
                             kem.Drag = 3
