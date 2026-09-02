@@ -47,6 +47,7 @@
                 "SetDisplay": { "$className": "RemoteEvent" },
                 "SetPlacement": { "$className": "RemoteEvent" },
                 "SetDecorationPlacement": { "$className": "RemoteEvent" },
+                "SetMortarPlacement": { "$className": "RemoteEvent" },
                 "SetDecorationRemove": { "$className": "RemoteEvent" },
                 "DecorationPlaced": { "$className": "RemoteEvent" },
                 "SetAccess": { "$className": "RemoteEvent" },

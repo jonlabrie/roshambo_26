@@ -47,6 +47,16 @@ describe("MortarPlacement — default-first gear placement", function()
         expect(inside).toBe(false)
     end)
 
+    test("every SHELL_MORTAR value names a real mortar tier", function()
+        for _, mortarId in MortarPlacement.SHELL_MORTAR do
+            local known = false
+            for _, id in MortarPlacement.MORTAR_ORDER do
+                known = known or id == mortarId
+            end
+            expect(known).toBe(true)
+        end
+    end)
+
     test("unowned/unknown stored ids are ignored", function()
         local stored = {
             ["mortar:L"] = { offset = { 0, 0 }, facing = "N" },

@@ -54,6 +54,7 @@ local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local RoundClock = require(shared:WaitForChild("RoundClock"))
 local CollectionService = game:GetService("CollectionService")
 local LaunchSites = require(shared:WaitForChild("LaunchSites"))
+local MortarPlacement = require(shared:WaitForChild("MortarPlacement"))
 local GameRules = require(shared:WaitForChild("GameRules"))
 local PlayerProfiles = require(shared:WaitForChild("PlayerProfiles"))
 local ThemeManifest = require(shared:WaitForChild("ThemeManifest"))
@@ -92,6 +93,7 @@ local RequestSync = remotes:WaitForChild("RequestSync") :: RemoteEvent
 local SetDisplay = remotes:WaitForChild("SetDisplay") :: RemoteEvent
 local SetPlacement = remotes:WaitForChild("SetPlacement") :: RemoteEvent
 local SetDecorationPlacement = remotes:WaitForChild("SetDecorationPlacement") :: RemoteEvent
+local SetMortarPlacement = remotes:WaitForChild("SetMortarPlacement") :: RemoteEvent
 local SetDecorationRemove = remotes:WaitForChild("SetDecorationRemove") :: RemoteEvent
 local DecorationPlaced = remotes:WaitForChild("DecorationPlaced") :: RemoteEvent
 local SetAccess = remotes:WaitForChild("SetAccess") :: RemoteEvent
@@ -1061,6 +1063,11 @@ local playerEconomy: {
         portalOwned: boolean,
         deckDecorations: { any },
         teahouseAccess: { mode: string, invited: { number } },
+        -- owned mortar tiers + their stored placements (deck-mortars, 2026-09-04): both arrive
+        -- on the fireworks GET (pushFireworkState), not the economy GET -- bootstrapped empty
+        -- here, filled moments later once that first pushFireworkState lands.
+        mortars: { string },
+        mortarPlacements: { [string]: MortarPlacement.StoredPlacement }?,
     },
 } =
     {}
@@ -1086,6 +1093,8 @@ local function echoEconomy(player: Player, uid: string)
         teahouseDisplay = e.teahouseDisplay,
         portalOwned = e.portalOwned,
         deckDecorations = e.deckDecorations,
+        mortars = e.mortars,
+        mortarPlacements = e.mortarPlacements,
     })
 end
 
@@ -1249,20 +1258,65 @@ end
 -- A player's own deck is a site for that player ALONE. Returns nil when they own no deck, which is
 -- the common case for a new player: they use the public sites. The deck does NOT lend a mortar —
 -- gear is personal, and the tube is the thing you bought.
-local function deckSiteFor(uid: string): LaunchSites.Site?
+-- (row, deckSize) for uid's claimed pad -- the exact `spec.deckPlacements` row deckSiteFor turns
+-- into a launch-site position. Shared so RequestFireworkLaunch's muzzle math reads the IDENTICAL
+-- row a launch was just validated against, rather than a second lookup that could drift from it.
+local function deckRowFor(uid: string): ({ number }?, string?)
     local e = playerEconomy[uid]
     if e == nil or e.claimedPadId == nil then
-        return nil
+        return nil, nil
     end
     local spec = PadSites[e.claimedPadId]
     if spec == nil then
-        return nil
+        return nil, nil
     end
-    local row = spec.deckPlacements[e.maxDeckSize or "S"] or spec.deckPlacements.S
+    local deckSize = e.maxDeckSize or "S"
+    local row = spec.deckPlacements[deckSize] or spec.deckPlacements.S
+    if row == nil then
+        return nil, nil
+    end
+    return row, deckSize
+end
+
+local function deckSiteFor(uid: string): LaunchSites.Site?
+    local row = deckRowFor(uid)
     if row == nil then
         return nil
     end
     return { pos = { x = row[1], y = row[2], z = row[3] }, radius = SITE_RADIUS, ownerUserId = uid }
+end
+
+-- Muzzle-true origin for a gear-required shell fired from the player's OWN deck: runs
+-- MortarPlacement's resolved deck-local spot for the shell's required tier through the SAME
+-- deck row deckSiteFor's site position came from. Returns nil (fall back to the eye-level
+-- origin) when: the shell needs no gear (MortarPlacement.SHELL_MORTAR has no entry for it, e.g.
+-- firecracker); the player isn't standing at THIS deck specifically (a public site takes the
+-- eye-level origin even where it happens to overlap someone's deck); or the required tier isn't
+-- actually owned/resolved there. Whether the launch was even ALLOWED for a missing tier is the
+-- backend's call (postFireworkSpend already ran by the time this is consulted) -- this only
+-- decides where an already-granted shell leaves from.
+local function muzzleOriginFor(uid: string, pos: Vector3, deck: LaunchSites.Site?, shellId: string): Vector3?
+    local requiredMortar = MortarPlacement.SHELL_MORTAR[shellId]
+    if requiredMortar == nil or deck == nil then
+        return nil
+    end
+    local dx, dz = pos.X - deck.pos.x, pos.Z - deck.pos.z
+    if dx * dx + dz * dz > deck.radius * deck.radius then
+        return nil -- admitted by some OTHER site (e.g. a public plaza), not this deck
+    end
+    local row, deckSize = deckRowFor(uid)
+    local e = playerEconomy[uid]
+    if row == nil or deckSize == nil or e == nil then
+        return nil
+    end
+    local bounds = SizeClasses.deckFootprint(deckSize)
+    local placement = MortarPlacement.resolve(bounds, e.mortars, e.mortarPlacements, nil)
+    local spot = placement[requiredMortar]
+    if spot == nil then
+        return nil -- required tier not owned; nothing to be muzzle-true FROM
+    end
+    local wx, wy, wz = MortarPlacement.muzzleWorld(row, spot, requiredMortar)
+    return Vector3.new(wx, wy, wz)
 end
 
 -- Push the whole shell state to one player: after every launch (their count changed), at every
@@ -1279,6 +1333,17 @@ pushFireworkState = function(player: Player)
             -- (owner, 2026-09-04: "we haven't made that work yet!"). It had; it hid.
             local deck = deckSiteFor(uid)
             res.data.deckSite = if deck then deck.pos else nil
+            -- Mirror the fireworks GET's mortar fields into playerEconomy (deck-mortars,
+            -- 2026-09-04) -- this is the ONLY place e.mortars/e.mortarPlacements get their real
+            -- values (neither rides the economy GET); every treatment/echo table that already
+            -- carries deckDecorations reads them from here. res.data.mortarPlacements may
+            -- legitimately be nil/absent (a fresh player with no stored overrides), so it is
+            -- adopted directly, not defaulted away.
+            local e = playerEconomy[uid]
+            if e ~= nil then
+                e.mortars = res.data.mortars or e.mortars
+                e.mortarPlacements = res.data.mortarPlacements
+            end
             FireworkState:FireClient(player, res.data)
         end
     end)
@@ -1313,9 +1378,12 @@ RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
             end
             return
         end
+        -- Firecracker and public-site launches keep the eye-level origin; a gear-required shell
+        -- fired from the player's own deck launches from its mortar's actual muzzle instead.
+        local origin = muzzleOriginFor(uid, pos, deck, shellId) or (root.Position + Vector3.new(0, 6, 0))
         FireworkLaunched:FireAllClients({
             shellId = shellId,
-            origin = root.Position + Vector3.new(0, 6, 0),
+            origin = origin,
             seed = math.random(1, 2 ^ 31 - 1),
             by = uid,
         })
@@ -1422,6 +1490,8 @@ local function rebuildClaimedPad(uid: string)
         crest = Kamon.forUserId(uid),
         portalOwned = e.portalOwned,
         deckDecorations = e.deckDecorations,
+        mortarPlacements = e.mortarPlacements,
+        mortars = e.mortars,
     }
     applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
     if built.teahouseSize ~= nil then
@@ -1654,6 +1724,10 @@ Players.PlayerAdded:Connect(function(player)
             portalOwned = (ecoData and ecoData.portalOwned) or false,
             deckDecorations = (ecoData and ecoData.deckDecorations) or {},
             teahouseAccess = (ecoData and ecoData.teahouseAccess) or { mode = "public", invited = {} },
+            -- neither rides the economy GET (ecoData above) -- both arrive moments later off
+            -- the fireworks GET, in pushFireworkState below.
+            mortars = {},
+            mortarPlacements = nil,
         }
         local action = siteCoordinator:onJoin(uid, {
             maxDeckSize = playerEconomy[uid].maxDeckSize,
@@ -1677,6 +1751,8 @@ Players.PlayerAdded:Connect(function(player)
             end
             action.treatment.portalOwned = playerEconomy[uid].portalOwned
             action.treatment.deckDecorations = playerEconomy[uid].deckDecorations
+            action.treatment.mortarPlacements = playerEconomy[uid].mortarPlacements
+            action.treatment.mortars = playerEconomy[uid].mortars
             applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
             playerEconomy[uid].claimedPadId = action.padId
             local tsize = action.teahouse and action.teahouse.size or "bare"
@@ -2230,6 +2306,8 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
                 if action ~= nil and action.padId == claimPadId then
                     action.treatment.portalOwned = e.portalOwned
                     action.treatment.deckDecorations = e.deckDecorations
+                    action.treatment.mortarPlacements = e.mortarPlacements
+                    action.treatment.mortars = e.mortars
                     applier:apply(
                         action.padId,
                         action.spec,
@@ -2299,6 +2377,8 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
                         crest = Kamon.forUserId(uid),
                         portalOwned = e.portalOwned,
                         deckDecorations = e.deckDecorations,
+                        mortarPlacements = e.mortarPlacements,
+                        mortars = e.mortars,
                     }
                     applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
                     -- keep playerHouse in sync with the just-rebuilt structure (B3 final review):
@@ -2377,6 +2457,8 @@ SetDisplay.OnServerEvent:Connect(function(player, payload)
                     crest = Kamon.forUserId(uid),
                     portalOwned = e.portalOwned,
                     deckDecorations = e.deckDecorations,
+                    mortarPlacements = e.mortarPlacements,
+                    mortars = e.mortars,
                 }
                 applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
                 -- keep playerHouse in sync with the just-rebuilt structure (B3 final review): a
@@ -2500,6 +2582,8 @@ SetPlacement.OnServerEvent:Connect(function(player, payload)
             crest = Kamon.forUserId(uid),
             portalOwned = e.portalOwned,
             deckDecorations = e.deckDecorations,
+            mortarPlacements = e.mortarPlacements,
+            mortars = e.mortars,
         }
         applier:apply(e.claimedPadId, spec, treatment, builtNow.deckSize, teahouse)
         playerHouse[uid] = { padId = e.claimedPadId, size = size, loadout = fresh }
@@ -2581,6 +2665,70 @@ SetDecorationPlacement.OnServerEvent:Connect(function(player, payload)
         e.deckDecorations = newList
         rebuildClaimedPad(uid)
         echoBackDoor(player, uid) -- rebuild replaced the Structure; re-arm the F prompts (parity)
+        echoEconomy(player, uid)
+    end)
+end)
+
+-- Mirrors SetDecorationPlacement's shape exactly, keyed on mortarId instead of a decoration
+-- instance id (a mortar has no separate instance -- owning a tier IS the instance). Unlike
+-- decorations, mortars are not server-built props (TreatmentApplier never reads
+-- treatment.mortarPlacements/mortars -- Task 5 renders them client-side), so there is no
+-- rebuildClaimedPad/echoBackDoor step here: echoEconomy is the whole reconciliation.
+SetMortarPlacement.OnServerEvent:Connect(function(player, payload)
+    handlerQueue:run(tostring(player.UserId), function()
+        local uid = tostring(player.UserId)
+        local e = playerEconomy[uid]
+        if e == nil or e.claimedPadId == nil then
+            return -- occupant-only, same discipline as SetDecorationPlacement
+        end
+        if
+            typeof(payload) ~= "table"
+            or typeof(payload.mortarId) ~= "string"
+            or typeof(payload.offset) ~= "table"
+        then
+            return
+        end
+        local mortarId = payload.mortarId
+        local dx, dz = payload.offset[1], payload.offset[2]
+        local facing = payload.facing
+        local isKnownMortar = false
+        for _, id in MortarPlacement.MORTAR_ORDER do
+            isKnownMortar = isKnownMortar or id == mortarId
+        end
+        if not isKnownMortar then
+            return
+        end
+        local owned = false
+        for _, id in e.mortars do
+            owned = owned or id == mortarId
+        end
+        if not owned then
+            return -- gear is personal: standing on your own deck doesn't lend a tier you don't own
+        end
+        if typeof(dx) ~= "number" or dx ~= dx or math.abs(dx) == math.huge then
+            return
+        end
+        if typeof(dz) ~= "number" or dz ~= dz or math.abs(dz) == math.huge then
+            return
+        end
+        if facing ~= "N" and facing ~= "E" and facing ~= "S" and facing ~= "W" then
+            return
+        end
+        -- build a NEW map (pre-persist clone discipline); resolve()'s own clamp handles
+        -- out-of-bounds values at read time, so nothing is clamped here (Task 2's module owns
+        -- that decision, not this runtime file).
+        local newMap = table.clone(e.mortarPlacements or {})
+        newMap[mortarId] = { offset = { dx, dz }, facing = facing }
+        local persisted = net:putMortarPlacements(uid, newMap)
+        if not persisted.ok then
+            warn(`[MORTAR] putMortarPlacements failed for {uid}: {tostring(persisted.error)}`)
+            echoEconomy(player, uid) -- resync
+            return
+        end
+        if not player:IsDescendantOf(Players) then
+            return
+        end
+        e.mortarPlacements = newMap
         echoEconomy(player, uid)
     end)
 end)

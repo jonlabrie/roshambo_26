@@ -22,6 +22,20 @@ export type Tube = { bore: number, length: number }
 -- shop's gear ladder S -> M -> L; if one adds/reorders a tier without the other, defaults drift.
 MortarPlacement.MORTAR_ORDER = { "mortar:S", "mortar:M", "mortar:L" }
 
+-- ⚠ Mirrors REQUIREMENTS in server/src/fireworks.ts (the `.mortar` field of each shell's
+-- requirement) -- the client is never told a shell's requirement (server/src/fireworks.ts:
+-- "The client is told PRICES, never requirements"), so the Studio server can't fetch this from
+-- the backend and instead carries its own minimal copy. If TS adds/changes a gear requirement
+-- without a matching edit here, the Studio server will happily let a shell fire from the
+-- player's eye level instead of its mortar's muzzle -- no test catches that drift (there is no
+-- shared-fixtures file for this one, unlike MORTAR_ORDER/GameRules). Promoting a shell to
+-- gear-required (or changing its tier) touches BOTH tables.
+MortarPlacement.SHELL_MORTAR = {
+    peony = "mortar:S",
+    willow = "mortar:M",
+    kiku = "mortar:S",
+} :: { [string]: string }
+
 -- Proving-range proportions (1 stud = 1 ft): bore is tube inner diameter, length is tube length.
 MortarPlacement.TUBE = {
     ["mortar:S"] = { bore = 1 / 6, length = 0.85 },
