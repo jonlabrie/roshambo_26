@@ -3049,3 +3049,16 @@ triage, composite boom+tail clips per style). Load-bearing find: the schedule
 compiler already supports staged shells (points/scatter/share) -- staging is wave
 one via validation + seed drafts, no compiler change. Style is a burst FIELD, not a
 new kind; budget logic untouched.
+
+## [2026-09-04] gate | Vocabulary wave one gated live and merged -- the range did its job all week
+
+Owner iterated the whole vocabulary AT the range across 2026-09-03/04: caught the
+unreachable sprite textures (recipes pinned SPARKLE over the roles), the 15Hz
+TweenService chunking (fixed with per-frame bezier), upside-down and perpendicular
+streaks (VelocityParallel + rotation -90), launch-read failures (2s->3s flights,
+apex 60, trail 2.4s, muzzle flash), the glow stack (brightness vs color-over-life
+vs lightEmission-as-stacking-law), sound physics (preload, speed-of-sound delay,
+volume/rolloff), and hotaru's bespoke tail voice from the owner's OWN recording
+(cut, slowed by resample, canyon-echoed, low-shaved, phase-bound). Green/violet
+shape-trio families added on request. Owner: "pretty awesome. Let's merge."
+Next named: variation in the aerial burst sounds (the 4-clip pool is one recording).

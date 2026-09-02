@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-09-01
+updated: 2026-09-04
 checked: 2026-08-27
 ---
 
@@ -42,6 +42,23 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   `FireworkController`'s pool, so particles fired straight up. Invisible from below at
   the Overlook; exposed by the proving range's first eye-level sightline and fixed in
   `adaa1fe`. Reaches players on the next place publish.
+- **Vocabulary wave one (2026-09-04, merged)**: five burst styles (peony/ring/palm/
+  strobe/kamuro) as a `style` field on burst phases — `BurstStyles.luau` is the one
+  source of truth (emitter config, point rules, texture/sound ROLE tables, tail
+  voices, completeness test-enforced because pool emitters are shared). Staged
+  multi-burst shells work (`points`/`scatter`/`share` validated; `dan` is the
+  three-act demo). Glow stack: LightInfluence 0, per-style Brightness ~2-3,
+  color-over-life (white ignition → saturated burn → blackbody ember → near-black
+  death = additive glow to zero), per-style lightEmission <1 as the stacking law.
+  Flights ~3s (owner ruling), apex 60, per-frame bezier ascent (TweenService stepped
+  at ~15Hz — measured — and was replaced), 2.4s fading trail, muzzle flash. Audio:
+  owner-picked kingsrow launch thump, SILENT ascents (owner ruling), 4-variant
+  seeded aerial burst pool, speed-of-sound delay per listener (1125 studs/s),
+  startup preload, volume 2 / rolloff 45-400. Hotaru carries the owner's own
+  canyon-echoed sizzle as a phase-bound TAIL VOICE (second Sound per slot, engine
+  fade at duration). Families: kiku, wa, yashi, hotaru (+tail), kamuro, ao (blue),
+  midori (green), murasaki (violet) — the last three as shape/hue ladders; willow
+  re-authored gold. Spec docs/superpowers/specs/2026-09-02-fireworks-vocabulary-design.md.
 - VFX recipe (proven on device): rising Trail comet → flash core → radial burst →
   glitter/willow, glow via LightEmission + the one global Bloom, ~500–700
   particles/shell, client-side emission (server `Emit()` does not replicate).
