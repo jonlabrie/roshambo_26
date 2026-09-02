@@ -363,6 +363,28 @@ local function play(payload: any, distance: number)
     local scatterX = rng:NextNumber(-8, 8)
     local heightJitter = rng:NextNumber(-6, 6)
     local scatterZ = rng:NextNumber(-8, 8)
+    -- NOT A PITCHING MACHINE (owner, 2026-09-05: "a curve is different from a knuckle, and
+    -- we're currently just throwing fastballs from a pitching machine on the deck"). Two
+    -- seeded personalities per HEADING launch, drawn AFTER the base three so the nil-heading
+    -- rng stream stays byte-identical:
+    --   WOBBLE -- a +-2.5 degree cone on the exit axis itself, visible right at the muzzle;
+    --   the ballistics cascade from the angle (downrange = 2h*tan theta), so one wobble
+    --   varies exit angle, curve and reach together, like real shot-to-shot mortar scatter.
+    --   BREAK -- a +-12 stud late-arc deviation perpendicular to the flight; zero at the
+    --   muzzle (the control point stays on the wobbled axis), emerging as the shell falls
+    --   off its line near the peak. Verticals get their break for free from the base scatter;
+    --   tilted flights need it at this scale or the deterministic lean swamps it.
+    local breakVec = Vector3.zero
+    if payload.heading then
+        local p1 = dir:Cross(Vector3.new(0, 1, 0))
+        p1 = if p1.Magnitude > 1e-4 then p1.Unit else Vector3.new(1, 0, 0)
+        local p2 = dir:Cross(p1)
+        local wobble = math.rad(2.5)
+        local a1 = rng:NextNumber(-wobble, wobble)
+        local a2 = rng:NextNumber(-wobble, wobble)
+        dir = (dir + p1 * math.tan(a1) + p2 * math.tan(a2)).Unit
+        breakVec = p1 * rng:NextNumber(-12, 12) + p2 * rng:NextNumber(-12, 12)
+    end
     -- BALLISTIC APEX (2026-09-05): a tilted launch must CURVE -- leave along the tube's axis,
     -- bend over, peak far out with the path flattening. The straight dir-line apex made deck
     -- shells rise in a dead-straight slant. For a parabola whose initial velocity tilts theta
@@ -379,7 +401,7 @@ local function play(payload: any, distance: number)
         -- tan(theta) = horizontal/vertical of the unit heading; downrange = 2 * h * tan(theta)
         apexOffset += horiz.Unit * (2 * h * (horizMag / dir.Y))
     end
-    local apex = origin + apexOffset + Vector3.new(scatterX, 0, scatterZ) -- 60: owner, 2026-09-03 ("bursts should ride higher")
+    local apex = origin + apexOffset + Vector3.new(scatterX, 0, scatterZ) + breakVec -- 60: owner, 2026-09-03 ("bursts should ride higher")
 
     -- `tail` is the longest release-worthy lifetime among this shell's burst styles (kamuro's
     -- 4.2s crown must not have its slot's parts re-positioned under it while it's still hanging).
