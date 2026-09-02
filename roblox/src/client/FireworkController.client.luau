@@ -706,24 +706,16 @@ local function play(payload: any, distance: number)
                     -- muzzle axis, and any perpendicular residue unfolds the Trail into
                     -- the old band; doubling the span made the residue visible again.
                     -- The tangent is the bezier's own derivative direction, b - a, free.
-                    -- ...but not PERFECTLY: a Trail's visible area is the span's LATERAL
-                    -- component, and exact tangency collapses the strip to a zero-area line
-                    -- (owner, 2026-09-06: "barely readable at any size" — the launch-frozen
-                    -- orientation was readable precisely because the arc drifted it
-                    -- off-tangent). A fixed 12° tilt in the flight plane guarantees
-                    -- ~sin(12°) x span of width the whole way up — ~0.2 studs standard,
-                    -- ~0.4 heavy — and can never unfold into the band.
                     local tangent = b - a
                     if tangent.Magnitude > 1e-3 then
                         local yAxis = tangent.Unit
                         local xAxis = yAxis:Cross(Vector3.new(0, 1, 0))
                         if xAxis.Magnitude < 1e-3 then
-                            xAxis = Vector3.new(1, 0, 0) -- vertical flight: any horizontal axis
+                            slot.shell.CFrame = CFrame.new(p)
                         else
                             xAxis = xAxis.Unit
+                            slot.shell.CFrame = CFrame.fromMatrix(p, xAxis, yAxis, xAxis:Cross(yAxis))
                         end
-                        slot.shell.CFrame = CFrame.fromMatrix(p, xAxis, yAxis, xAxis:Cross(yAxis))
-                            * CFrame.Angles(math.rad(12), 0, 0)
                     else
                         slot.shell.Position = p
                     end
