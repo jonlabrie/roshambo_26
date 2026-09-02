@@ -93,6 +93,32 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   rejoin; verify on the published place. Spec
   docs/superpowers/specs/2026-09-04-deck-mortars-design.md; ledger
   `.superpowers/sdd/2026-09-04-deck-mortars/progress.md`.
+- **Rail mounts (2026-09-05, merged `24c6da9..8e1a61b` + gate fixes `27b410d..dcdffed`,
+  GATED)**: mortars are aimable hardware — `{mount: floor|rail, offset, aim: L|C|R}` records
+  (legacy reads floor/C at the saved spot, never relocated), three aims in a 60° arc anchored
+  to deck-front, elevations rail 25°/floor 12° (owner-tuned constants in
+  `MortarPlacement.ELEVATION`). One pose, two consumers: `MortarPlacement.axisLocal/pose/launch`
+  is the only source of tilt — render (`TreatmentApplier`), launch heading
+  (`FireworkLaunched.heading`), and the editor ghost all read it, so aim/render/trajectory
+  cannot drift. Flight generalized from vertical: BALLISTIC apex (peak `2h·tan θ` downrange,
+  bezier control where the tube-axis line reaches apex height — leaves true to the tube,
+  arrives flat at the break; nil heading = byte-identical old flight, so public sites/proving/
+  firecrackers untouched). Editor: the DROP decides the mount (1.25-stud rail snap band —
+  includes the floor-default spot, owner-accepted), R cycles L→C→R with a leaning ghost.
+  **DEFAULT_MOUNT = rail** (owner lever, pulled at gate): record-less tubes saddle the rail out
+  of the box. Gate finds: (1) tilted flights unfolded the comet Trail into the OLD wide band —
+  the attachment pair's local-Y offset is only thin when parallel to motion; the shell part now
+  orients its Y along the heading (`07ab0fa`; the owner's elimination set — public fine,
+  proving fine point-blank, deck wrong — cornered it after two wrong diagnoses); (2) the
+  prompt-binding saga ended in TWO root causes + a convergence belt: DecorationController can
+  miss the join echo (RemoteEvents don't queue for late listeners; idle players get no
+  reveal-time push — it's gated on having picked) → it now pulls its own `RequestSync` re-echo,
+  plus a 3s rescan heartbeat that makes binding converge from ANY join interleaving
+  (`27b410d`, `862568c` — five orderings were patched before instrumentation found the truth);
+  (3) the lever's fall-through would have swept legacy records onto the rail — guarded
+  (`dcdffed`). ⚠ Same-server rejoin verification STILL pending the published place. Spec
+  docs/superpowers/specs/2026-09-04-rail-mounts-design.md; ledger
+  `.superpowers/sdd/2026-09-04-rail-mounts/progress.md`.
 - VFX recipe (proven on device): rising Trail comet → flash core → radial burst →
   glitter/willow, glow via LightEmission + the one global Bloom, ~500–700
   particles/shell, client-side emission (server `Emit()` does not replicate).

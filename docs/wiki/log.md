@@ -3137,3 +3137,30 @@ one); (b) the proving-range racks draw outer diameter = bore, a hair undersized
 under the bore-is-inner ruling; (c) main.server.luau's PlayerAdded handlers have no
 catch-up for players already present -- any future yield added to bootstrap
 re-opens the missed-join window (the mortar CSG was the first to hit it).
+
+## [2026-09-05] ship | Rail mounts gated -- aimable mortars, ballistic arcs over the canyon, rail is the default
+
+Branch `24c6da9..8e1a61b` (SDD, 8 commits) + gate fixes `27b410d..dcdffed`. Records
+became {mount, offset, aim} (legacy floor/C, never relocated); three aims in a 60°
+deck-front arc; elevations rail 25/floor 12; one pose (axisLocal/pose/launch) feeds
+render + heading + ghost so nothing can drift; drop-decides-mount editor with a
+1.25-stud rail snap band; DEFAULT_MOUNT = rail (owner lever pulled at gate -- absent
+records only, the fall-through that would have swept legacy records was guarded).
+Flight: ballistic apex 2h*tan(theta) downrange, control at apex height on the tube
+axis; nil heading byte-identical (public/proving/firecracker untouched).
+
+Two gate sagas worth remembering: (1) deck trails read as "exactly the old ones we
+discarded" -- the owner's elimination set (public fine, proving fine POINT-BLANK,
+deck wrong) survived two wrong diagnoses (path shape, then range) and pinned the
+truth: the comet Trail's attachment pair is only thin when its local-Y offset lies
+along the motion; tilted flights unfolded it into the old wide band. Shell now
+orients local Y along the heading. (2) The missing-prompts hunt ended after FIVE
+event-ordering belts when live instrumentation (a Play session run over MCP) showed
+the join echo simply never arrives for a late listener (RemoteEvents don't queue;
+the reveal push is gated on having picked) -- DecorationController now pulls its own
+RequestSync re-echo AND runs a 3s rescan heartbeat: convergence, not cleverness.
+Lesson logged for the wiki's standing rules: when event-ordering fixes stack past
+two, instrument the live system before writing a third.
+
+Same-server rejoin verification (deck-mortars carryover) STILL awaits the published
+place. Suites at close: Lune 1653, Vitest 489, lint clean, CI green.
