@@ -8,6 +8,7 @@ import {
     validateDecorations,
     validateAccess,
     validateShojiOpen,
+    validateMortarPlacements,
     MAX_CLASSES,
     MAX_BAYS_PER_SIDE,
 } from './loadout';
@@ -270,5 +271,24 @@ describe('validateLoadout with shojiOpen', () => {
     it('rejects the whole loadout when it is malformed', () => {
         // half-applying a bad map would leave a house in a state nobody chose
         expect(validateLoadout({ baseStyle: 'teahouse-1story', shojiOpen: { front: ['x'] } }).ok).toBe(false);
+    });
+});
+
+describe('validateMortarPlacements', () => {
+    const owned = ['mortar:S', 'mortar:M'];
+    const ok = () => ({ 'mortar:S': { offset: [2, -3], facing: 'N' } });
+    it('accepts a well-formed owned placement map', () => {
+        expect(validateMortarPlacements(ok(), owned)).toEqual({ ok: true });
+    });
+    it('accepts an empty object (all defaults)', () => {
+        expect(validateMortarPlacements({}, owned)).toEqual({ ok: true });
+    });
+    it('rejects non-objects, unknown ids, unowned mortars, bad offsets, bad facing', () => {
+        expect(validateMortarPlacements(null, owned).ok).toBe(false);
+        expect(validateMortarPlacements({ 'mortar:X': { offset: [0, 0], facing: 'N' } }, owned).ok).toBe(false);
+        expect(validateMortarPlacements({ 'mortar:L': { offset: [0, 0], facing: 'N' } }, owned).ok).toBe(false);
+        expect(validateMortarPlacements({ 'mortar:S': { offset: [0], facing: 'N' } }, owned).ok).toBe(false);
+        expect(validateMortarPlacements({ 'mortar:S': { offset: [0, NaN], facing: 'N' } }, owned).ok).toBe(false);
+        expect(validateMortarPlacements({ 'mortar:S': { offset: [0, 0], facing: 'Q' } }, owned).ok).toBe(false);
     });
 });

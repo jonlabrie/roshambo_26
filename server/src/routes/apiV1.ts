@@ -13,7 +13,7 @@ import { Throw } from '../engine/GameRules';
 import { topByCareer } from '../leaderboards';
 import { reconcilePresence } from '../sessions';
 import { shellStates, SHELL_IDS, LaunchContext, SHELL_PRICES, MORTAR_PRICES } from '../fireworks';
-import { validateLoadout, validateSizeClass, validatePadPreferences, validateDecorations, validateAccess } from '../loadout';
+import { validateLoadout, validateSizeClass, validatePadPreferences, validateDecorations, validateAccess, validateMortarPlacements } from '../loadout';
 import {
     validatePurchase, applyPurchase, validateDisplay, PRICES, DEFAULT_TEAHOUSE_LOADOUT,
     Size, EconomyState, appendDecoration, DEFAULT_ACCESS,
@@ -350,7 +350,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             const held: Record<string, number> = {};
             for (const id of SHELL_IDS) held[id] = user.fireworks?.get(id) ?? 0;
             res.set('Cache-Control', 'no-store');
-            res.json({ shells: shellStates(held, ctx), mortars: ctx.mortars });
+            res.json({ shells: shellStates(held, ctx), mortars: ctx.mortars, mortarPlacements: user.mortarPlacements ?? {} });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
         }
@@ -461,6 +461,22 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             user.deckDecorations = decorations;
             await user.save();
             res.json({ deckDecorations: user.deckDecorations });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
+    router.put('/players/:robloxUserId/mortar-placements', async (req, res) => {
+        try {
+            const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
+            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            const placements = req.body?.placements;
+            const check = validateMortarPlacements(placements, user.mortars ?? []);
+            if (!check.ok) { res.status(400).json({ error: check.error }); return; }
+            user.mortarPlacements = placements;
+            user.markModified('mortarPlacements');
+            await user.save();
+            res.json({ mortarPlacements: user.mortarPlacements });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
         }
