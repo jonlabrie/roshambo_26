@@ -205,9 +205,6 @@ local MORTAR_TUBE_COLOR = Color3.fromRGB(58, 60, 66)
 -- this ruling; parked, not touched here.)
 local MORTAR_WALL = 0.06
 local MORTAR_BREECH = 0.12 -- solid floor left at the bottom of the bore
--- Must match MortarPlacement's own (unexported) BASE_TOP: muzzleWorld assumes the tube's local
--- top sits at exactly BASE_TOP + tube.length above the deck.
-local MORTAR_BASE_TOP = 0.5
 
 local function mortarPart(name: string, size: Vector3, color: Color3, material: Enum.Material): BasePart
     local p = Instance.new("Part")
@@ -272,10 +269,41 @@ function TreatmentApplier:_initTubeTemplates()
     end
 end
 
+-- Orthonormal (right-handed, X x Y = Z) frame whose X column IS `axis` -- a Part with
+-- Shape=Cylinder runs its length along its own local X (that's what the old fixed +90deg
+-- Z-roll exploited to stand a horizontal cylinder up along world Y), so aligning X to the
+-- mount's tube axis is what makes the barrel point along `axis` instead of always vertical.
+-- Y/Z are picked off a FIXED reference (deck-local +Z, falling back to +Y only if that's ever
+-- parallel to axis, which never happens for the 12deg/25deg elevations in play) rather than
+-- off `axis` itself, so the frame is yaw-stable: it does not spin or flip as `axis` sweeps
+-- across L/C/R -- it only tilts.
+local function tubeOrientation(axis: Vector3): (Vector3, Vector3, Vector3)
+    local ref = Vector3.new(0, 0, 1)
+    local y = ref:Cross(axis)
+    if y.Magnitude < 1e-4 then
+        ref = Vector3.new(0, 1, 0)
+        y = ref:Cross(axis)
+    end
+    y = y.Unit
+    local z = axis:Cross(y)
+    return axis, y, z
+end
+
+-- `mount` selects the support: "floor" gets the flat timber base as before; "rail" gets a
+-- Wood clamp block instead (no timber base -- it saddles the cap rail, built by PadOps
+-- elsewhere). `axis` is MortarPlacement.axisLocal(mount, aim) as a Vector3 -- deck-local, unit
+-- length, the SAME vector `pose`/`launch` transform through the deck's rotation, so the tube's
+-- world lean and the trajectory's world heading can never drift apart. `mp` is the injected
+-- MortarPlacement module, read here only for its constant tables (BASE_OFFSET, RAIL) --
+-- keeping this file from duplicating those numbers, which is what caused the stale
+-- MORTAR_BASE_TOP/muzzleWorld comment this replaces.
 local function buildMortarModel(
     mortarId: string,
     tube: { bore: number, length: number },
-    template: BasePart?
+    template: BasePart?,
+    mount: string,
+    axis: Vector3,
+    mp: any
 ): Model?
     local tier = mortarId:match("^mortar:(%u)$")
     if tier == nil then
@@ -284,17 +312,32 @@ local function buildMortarModel(
     local m = Instance.new("Model")
     m.Name = "Mortar_" .. tier
 
-    -- True-bore proportions per the owner's 2026-09-01 accuracy ruling (the first deck render
-    -- drew diameter at bore*3 and the owner immediately caught the fattening at the gate).
-    local baseSide = tube.bore * 2 + 0.4
-    local base = mortarPart(
-        "Base",
-        Vector3.new(baseSide, MORTAR_BASE_TOP, baseSide),
-        MORTAR_BASE_COLOR,
-        Enum.Material.Wood
-    )
-    base.CFrame = CFrame.new(0, MORTAR_BASE_TOP / 2, 0)
-    base.Parent = m
+    local baseOffset = mp.BASE_OFFSET[mount]
+    if mount == "rail" then
+        -- No timber base -- a small wood clamp saddling the rail cap instead.
+        local capSide = mp.RAIL.capWidth + 0.2
+        local clampBlock = mortarPart(
+            "Clamp",
+            Vector3.new(capSide, baseOffset, capSide),
+            MORTAR_BASE_COLOR,
+            Enum.Material.Wood
+        )
+        clampBlock.CFrame = CFrame.new(0, baseOffset / 2, 0)
+        clampBlock.Parent = m
+    else
+        -- True-bore proportions per the owner's 2026-09-01 accuracy ruling (the first deck
+        -- render drew diameter at bore*3 and the owner immediately caught the fattening at the
+        -- gate). Stays FLAT on the deck -- only the tube leans.
+        local baseSide = tube.bore * 2 + 0.4
+        local base = mortarPart(
+            "Base",
+            Vector3.new(baseSide, baseOffset, baseSide),
+            MORTAR_BASE_COLOR,
+            Enum.Material.Wood
+        )
+        base.CFrame = CFrame.new(0, baseOffset / 2, 0)
+        base.Parent = m
+    end
 
     local barrel: BasePart
     if template then
@@ -309,15 +352,21 @@ local function buildMortarModel(
         )
         barrel.Shape = Enum.PartType.Cylinder
     end
-    barrel.CFrame = CFrame.new(0, MORTAR_BASE_TOP + tube.length / 2, 0) * CFrame.Angles(0, 0, math.rad(90))
+    -- Tube bottom sits `baseOffset` up the axis from the mount point (base/clamp height);
+    -- the tube runs from there for its own length -- center is one more half-length out.
+    local center = axis * (baseOffset + tube.length / 2)
+    local x, y, z = tubeOrientation(axis)
+    barrel.CFrame = CFrame.fromMatrix(center, x, y, z)
     barrel.Parent = m
 
     m.PrimaryPart = barrel
     -- PivotTo aligns a model by its PrimaryPart's PIVOT. The barrel's CFrame carries the
-    -- 90-degree roll that stands the cylinder up, so left alone, PivotTo would map that rolled
-    -- frame onto the upright deck target and lay the whole assembly on its side (shipped that
-    -- way 2026-09-04; caught at the owner gate). This PivotOffset cancels the barrel's own
-    -- frame so the model pivot is identity at the model origin (the base's bottom center).
+    -- lean (and, via the cylinder's local-X-is-length convention, the roll that used to be a
+    -- fixed 90deg), so left alone, PivotTo would map that rotated frame onto the upright deck
+    -- target and throw the whole assembly out of true (shipped rolled-onto-its-side 2026-09-04;
+    -- caught at the owner gate -- the lesson generalizes to any barrel rotation, not just that
+    -- one). This PivotOffset cancels the barrel's own frame so the model pivot is identity at
+    -- the model origin (the mount point).
     barrel.PivotOffset = barrel.CFrame:Inverse()
     return m
 end
@@ -342,23 +391,30 @@ function TreatmentApplier:_buildMortars(
     if mortars == nil or #mortars == 0 then
         return
     end
+    local mp = self._mortarPlacement
     local deckFP = self._sizeClasses.deckFootprint(deckSize)
-    local resolved = self._mortarPlacement.resolve(deckFP, mortars, mortarPlacements, teahouseFP)
+    local resolved = mp.resolve(deckFP, mortars, mortarPlacements, teahouseFP)
     local deckCF = CFrame.new(table.unpack(deckCF12))
-    for mortarId, placement in resolved do
-        local tube = self._mortarPlacement.TUBE[mortarId]
+    for mortarId, r in resolved do
+        local tube = mp.TUBE[mortarId]
         if tube == nil then
             continue
         end
-        local model = buildMortarModel(mortarId, tube, self._tubeTemplates[mortarId])
+        -- `r.x`/`r.z` and this mountY are exactly the local point `MortarPlacement.pose` feeds
+        -- through the deck row's rotation; composing them through `deckCF` here (rather than
+        -- calling `pose` for a world point we'd only decompose back into local again) is the
+        -- LOCAL-equivalent the brief calls out -- same math, no extra transform round-trip.
+        local mountY = if r.mount == "rail" then mp.RAIL.capTop else 0
+        local axis = Vector3.new(mp.axisLocal(r.mount, r.aim))
+        local model = buildMortarModel(mortarId, tube, self._tubeTemplates[mortarId], r.mount, axis, mp)
         if model == nil then
             continue
         end
-        local placeCF =
-            self._buildingPlacer.placeCF({ offset = { placement.x, placement.z }, facing = placement.facing })
-        model:PivotTo(deckCF * CFrame.new(table.unpack(placeCF)))
+        model:PivotTo(deckCF * CFrame.new(r.x, mountY, r.z))
         model:SetAttribute("padId", padId)
         model:SetAttribute("MortarId", mortarId)
+        model:SetAttribute("Mount", r.mount)
+        model:SetAttribute("Aim", r.aim)
         model:AddTag("Mortar")
         model.Parent = staging
     end
