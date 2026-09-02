@@ -100,6 +100,47 @@ describe("BuildingPlacer.canFitFacing", function()
     end)
 end)
 
+describe("BuildingPlacer.resolveFit", function()
+    local D = { minX = -13, maxX = 13, minZ = -10, maxZ = 10 } -- S deck 26x20
+
+    test("in-bounds requested placement is returned as-is", function()
+        local B = { minX = -6, maxX = 6, minZ = -3, maxZ = 3 } -- 12x6
+        local p = BuildingPlacer.resolveFit(B, D, { offset = { 2, -4 }, facing = "N" })
+        expect(p ~= nil).toBe(true)
+        expect((p :: any).offset[1]).toBe(2)
+        expect((p :: any).offset[2]).toBe(-4)
+        expect((p :: any).facing).toBe("N")
+    end)
+
+    test("a stored placement that no longer fits gets clamped back in, facing preserved", function()
+        local B = { minX = -6, maxX = 6, minZ = -3, maxZ = 3 } -- 12x6
+        local p = BuildingPlacer.resolveFit(B, D, { offset = { 99, -99 }, facing = "N" })
+        expect(p ~= nil).toBe(true)
+        expect(BuildingPlacer.fits(B, D, p :: any)).toBe(true)
+        expect((p :: any).facing).toBe("N")
+    end)
+
+    test("a facing that still doesn't fit after clamping falls back to N, re-clamped", function()
+        -- long-thin building: fits facing N, but facing E swaps the extents onto axes the
+        -- (tight-depth) deck cannot hold at ANY offset -- same fixture as the
+        -- BuildingPlacer.canFitFacing "the swap matters" case above.
+        local long = { minX = -10, maxX = 10, minZ = -2, maxZ = 2 } -- 20 wide x 4 deep
+        local tight = { minX = -11, maxX = 11, minZ = -3, maxZ = 3 } -- 22 wide x 6 deep
+        expect(BuildingPlacer.canFitFacing(long, tight, "N")).toBe(true)
+        expect(BuildingPlacer.canFitFacing(long, tight, "E")).toBe(false)
+        local p = BuildingPlacer.resolveFit(long, tight, { offset = { 0, 0 }, facing = "E" })
+        expect(p ~= nil).toBe(true)
+        expect((p :: any).facing).toBe("N")
+        expect(BuildingPlacer.fits(long, tight, p :: any)).toBe(true)
+    end)
+
+    test("nothing fits (building wider on every axis than the deck, even at N): nil", function()
+        local huge = { minX = -50, maxX = 50, minZ = -50, maxZ = 50 }
+        local p = BuildingPlacer.resolveFit(huge, D, { offset = { 0, 0 }, facing = "N" })
+        expect(p).toBe(nil)
+    end)
+end)
+
 describe("BuildingPlacer.footprintBounds", function()
     local B = { minX = -6, maxX = 6, minZ = -3, maxZ = 3 } -- 12 x 6, centered
     test("facing N centers the AABB at the offset with the base half-extents", function()
