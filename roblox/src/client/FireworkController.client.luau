@@ -745,9 +745,9 @@ local function play(payload: any, distance: number)
                                     core.Texture = BurstStyles.TEXTURES.dot
                                     core.Color = ColorSequence.new(Color3.new(1, 1, 1))
                                     core.Size = NumberSequence.new({
-                                        NumberSequenceKeypoint.new(0, 0.6),
-                                        NumberSequenceKeypoint.new(0.3, 1.6),
-                                        NumberSequenceKeypoint.new(1, 0.6),
+                                        NumberSequenceKeypoint.new(0, 0.3),
+                                        NumberSequenceKeypoint.new(0.3, 0.8),
+                                        NumberSequenceKeypoint.new(1, 0.3),
                                     })
                                     core.Speed = NumberRange.new(0, 0)
                                     core.Drag = 0
