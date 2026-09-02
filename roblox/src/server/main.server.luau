@@ -1338,8 +1338,8 @@ local function teahouseFootprintFor(e: any): any
     return BuildingPlacer.footprintBounds(buildingFP, placement)
 end
 
--- Muzzle-true origin for a gear-required shell fired from the player's OWN deck: runs
--- MortarPlacement's resolved deck-local spot for the shell's required tier through the SAME
+-- Muzzle-true origin AND heading for a gear-required shell fired from the player's OWN deck:
+-- runs MortarPlacement's resolved deck-local spot for the shell's required tier through the SAME
 -- (row, deckSize) the render path actually built with. Deliberately NOT deckRowFor/deckSiteFor's
 -- row (final-review fix round): deckSiteFor's own site-radius check just above stays on
 -- deckRowFor's row (its tolerance makes the raw `e.maxDeckSize or "S"` lookup benign there, and
@@ -1350,20 +1350,26 @@ end
 -- MortarPlacement.resolve the WRONG deck bounds whenever a display-shrink (SetDisplay) or pad cap
 -- (spec.maxSize) is active -- while teahouseFootprintFor below already used resolveBuilt, so the
 -- two halves of this same function were resolving two different deck sizes.
--- Returns nil (fall back to the eye-level origin) when: the shell needs no gear
+-- Returns (nil, nil) (fall back to the eye-level origin, no heading) when: the shell needs no gear
 -- (MortarPlacement.SHELL_MORTAR has no entry for it, e.g. firecracker); the player isn't standing
 -- at THIS deck specifically (a public site takes the eye-level origin even where it happens to
 -- overlap someone's deck); or the required tier isn't actually owned/resolved there. Whether the
 -- launch was even ALLOWED for a missing tier is the backend's call (postFireworkSpend already ran
--- by the time this is consulted) -- this only decides where an already-granted shell leaves from.
-local function muzzleOriginFor(uid: string, pos: Vector3, deck: LaunchSites.Site?, shellId: string): Vector3?
+-- by the time this is consulted) -- this only decides where an already-granted shell leaves from
+-- and along what axis (mount-aware: rail-mounted tubes lean, floor tubes fire per their aim).
+local function muzzleOriginFor(
+    uid: string,
+    pos: Vector3,
+    deck: LaunchSites.Site?,
+    shellId: string
+): (Vector3?, Vector3?)
     local requiredMortar = MortarPlacement.SHELL_MORTAR[shellId]
     if requiredMortar == nil or deck == nil then
-        return nil
+        return nil, nil
     end
     local dx, dz = pos.X - deck.pos.x, pos.Z - deck.pos.z
     if dx * dx + dz * dz > deck.radius * deck.radius then
-        return nil -- admitted by some OTHER site (e.g. a public plaza), not this deck
+        return nil, nil -- admitted by some OTHER site (e.g. a public plaza), not this deck
     end
     local row: { number }? = nil
     local deckSize: string? = nil
@@ -1372,17 +1378,17 @@ local function muzzleOriginFor(uid: string, pos: Vector3, deck: LaunchSites.Site
     end
     local e = playerEconomy[uid]
     if row == nil or deckSize == nil or e == nil then
-        return nil
+        return nil, nil
     end
     local bounds = SizeClasses.deckFootprint(deckSize)
     local teahouseFP = teahouseFootprintFor(e)
     local placement = MortarPlacement.resolve(bounds, e.mortars, e.mortarPlacements, teahouseFP)
     local spot = placement[requiredMortar]
     if spot == nil then
-        return nil -- required tier not owned; nothing to be muzzle-true FROM
+        return nil, nil -- required tier not owned; nothing to be muzzle-true FROM
     end
-    local wx, wy, wz = MortarPlacement.muzzleWorld(row, spot, requiredMortar)
-    return Vector3.new(wx, wy, wz)
+    local ox, oy, oz, hx, hy, hz = MortarPlacement.launch(row, spot, requiredMortar)
+    return Vector3.new(ox, oy, oz), Vector3.new(hx, hy, hz)
 end
 
 -- Cheap dirty-check for "did this uid's owned mortars/placements actually change since the pad
@@ -1398,7 +1404,7 @@ local function mortarFingerprint(mortars: { string }, placements: { [string]: an
         if ownedSet[id] then
             local p = placements and placements[id]
             if p then
-                table.insert(parts, `{id}:{p.offset[1]},{p.offset[2]},{p.facing}`)
+                table.insert(parts, `{id}:{p.offset[1]},{p.offset[2]},{p.mount},{p.aim}`)
             else
                 table.insert(parts, id)
             end
@@ -1491,7 +1497,7 @@ RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
         -- character space -- right, half a stud up, a touch forward -- never the old 6-studs-
         -- overhead placeholder (owner gate, 2026-09-04: "firecrackers fire from over my head").
         -- Gear shells at PUBLIC sites keep the invisible overhead origin (spec: unchanged).
-        local origin = muzzleOriginFor(uid, pos, deck, shellId)
+        local origin, heading = muzzleOriginFor(uid, pos, deck, shellId)
         if origin == nil then
             if MortarPlacement.SHELL_MORTAR[shellId] == nil then
                 origin = root.CFrame:PointToWorldSpace(Vector3.new(1.2, 0.6, -0.8))
@@ -1502,6 +1508,7 @@ RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
         FireworkLaunched:FireAllClients({
             shellId = shellId,
             origin = origin,
+            heading = heading and { x = heading.X, y = heading.Y, z = heading.Z } or nil,
             seed = math.random(1, 2 ^ 31 - 1),
             by = uid,
         })
@@ -2819,7 +2826,8 @@ SetMortarPlacement.OnServerEvent:Connect(function(player, payload)
         end
         local mortarId = payload.mortarId
         local dx, dz = payload.offset[1], payload.offset[2]
-        local facing = payload.facing
+        local mount = payload.mount
+        local aim = payload.aim
         local isKnownMortar = false
         for _, id in MortarPlacement.MORTAR_ORDER do
             isKnownMortar = isKnownMortar or id == mortarId
@@ -2840,14 +2848,21 @@ SetMortarPlacement.OnServerEvent:Connect(function(player, payload)
         if typeof(dz) ~= "number" or dz ~= dz or math.abs(dz) == math.huge then
             return
         end
-        if facing ~= "N" and facing ~= "E" and facing ~= "S" and facing ~= "W" then
+        if mount ~= "floor" and mount ~= "rail" then
+            return
+        end
+        local isKnownAim = false
+        for _, a in MortarPlacement.AIMS do
+            isKnownAim = isKnownAim or a == aim
+        end
+        if not isKnownAim then
             return
         end
         -- build a NEW map (pre-persist clone discipline); resolve()'s own clamp handles
         -- out-of-bounds values at read time, so nothing is clamped here (Task 2's module owns
         -- that decision, not this runtime file).
         local newMap = table.clone(e.mortarPlacements or {})
-        newMap[mortarId] = { offset = { dx, dz }, facing = facing }
+        newMap[mortarId] = { offset = { dx, dz }, mount = mount, aim = aim }
         local persisted = net:putMortarPlacements(uid, newMap)
         if not persisted.ok then
             warn(`[MORTAR] putMortarPlacements failed for {uid}: {tostring(persisted.error)}`)
