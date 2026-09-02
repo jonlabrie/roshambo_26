@@ -129,7 +129,11 @@ local function retiltMortarGhost(g: Model, pivot: CFrame, mount: string, aim: st
     local barrel = g.PrimaryPart
     local mortarId = g:GetAttribute("MortarId")
     local tube = typeof(mortarId) == "string" and MortarPlacement.TUBE[mortarId]
-    if barrel == nil or tube == nil then
+    -- `not tube`, not `tube == nil`: the `and` above short-circuits to boolean `false` (not nil)
+    -- when mortarId isn't a string, and `false == nil` is false -- an `== nil` guard would miss
+    -- that case and fall through to `tube.length` below. Latent (a mortar ghost always carries a
+    -- valid MortarId), but the guard should actually catch what it names.
+    if barrel == nil or not tube then
         return
     end
     local baseOffset = MortarPlacement.BASE_OFFSET[mount]
@@ -169,7 +173,12 @@ local function applyMortarGhost(g: Model, m: CFrame)
         mountY = 0
     end
     local pivot = m * CFrame.new(x, mountY, z)
-    g:PivotTo(pivot)
+    g:PivotTo(pivot) -- moves the whole model (base + barrel) to the new mount point using
+    -- whatever tilt the barrel already had; retiltMortarGhost below immediately overwrites
+    -- the barrel's own CFrame/PivotOffset with the current mount/aim's axis. Redundant
+    -- per-frame barrel work on the RenderStepped hot path, but PivotTo is still needed for
+    -- the base block (which retiltMortarGhost never touches) and this isn't worth
+    -- restructuring for a micro-optimization.
     retiltMortarGhost(g, pivot, ms.mount, ms.aim)
 end
 
