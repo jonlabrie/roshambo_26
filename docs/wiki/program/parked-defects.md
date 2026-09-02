@@ -16,7 +16,7 @@ carried a `checked:` stamp asserting a re-read. Symbol names survive a refactor;
 not, and a stale one sends a reader to unrelated code and quietly costs their trust in the page
 (schema rule 9). Grep for the named route or symbol.
 
-## (a) `POST /players/:id/purchase` is a read-modify-write race
+## ~~(a) `POST /players/:id/purchase` is a read-modify-write race~~ FIXED 2026-09-05 (`13ee64e`: one atomic findOneAndUpdate -- balance + uniqueness in the filter, deduction + grant in the update)
 
 - **Where:** `server/src/routes/apiV1.ts`, `POST /players/:robloxUserId/purchase`: `resolveUser` →
   `readEconomy` → `validatePurchase` → `applyPurchase` → `user.save()`. No
