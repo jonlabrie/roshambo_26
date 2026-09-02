@@ -66,11 +66,6 @@ type Slot = {
     -- shot needs its own Sound. Created lazily on first use, then pooled on the slot forever
     -- -- the churn ban is on per-shell instance creation, and after warmup there is none.
     salvoVoices: { Sound },
-    -- The flare's center spot rides the kicker point as a SECOND emitter: streaks and spot
-    -- emit in the same instant with different textures/sizes, and a shared emitter cannot
-    -- do that -- Texture/Size/Color are live-evaluated, so a second write would retro-style
-    -- the particles already in the air.
-    flashCore: ParticleEmitter,
 }
 local pool: { Slot } = {}
 local poolNext = 1
@@ -154,12 +149,6 @@ for _ = 1, POOL_SIZE do
         table.insert(emitters, em)
     end
 
-    local flashCore = Instance.new("ParticleEmitter")
-    flashCore.Enabled = false
-    flashCore.LightInfluence = 0
-    flashCore.Rate = 0
-    flashCore.Parent = points[MAX_POINTS]
-
     table.insert(pool, {
         shell = shell,
         trail = trail,
@@ -168,7 +157,6 @@ for _ = 1, POOL_SIZE do
         sound = snd,
         tail = tailSnd,
         salvoVoices = {},
-        flashCore = flashCore,
     })
 end
 
@@ -686,6 +674,15 @@ local function play(payload: any, distance: number)
                                         rng:NextNumber(-9, 9)
                                     ),
                                     speed = 0.94 + rng:NextNumber() * 0.12,
+                                    -- The shuffle: each shot draws its flare art and its
+                                    -- rotation from the seeded stream, so every flash is a
+                                    -- different star at a different angle — and the same
+                                    -- star on every client.
+                                    flare = BurstStyles.SALUTE_FLARES[rng:NextInteger(
+                                        1,
+                                        #BurstStyles.SALUTE_FLARES
+                                    )],
+                                    rot = rng:NextNumber(0, 360),
                                 }
                             end
                             local cam = workspace.CurrentCamera
@@ -708,21 +705,20 @@ local function play(payload: any, distance: number)
                                     local kp = slot.points[MAX_POINTS]
                                     local kem = slot.emitters[MAX_POINTS]
                                     kp.CFrame = CFrame.new(anchorPos + shot.offset)
-                                    -- CROSSED STREAKS, not a dot (owner, 2026-09-06: "they
-                                    -- read as circles"): two elongated sprites, each at its
-                                    -- own random rotation, flare into an irregular star —
-                                    -- and every shot's cross lands at a different angle.
-                                    kem.Texture = BurstStyles.TEXTURES.streak
+                                    -- PURPOSE-MADE BURST ART (owner, 2026-09-06: "salutes are
+                                    -- a first class effect" — crossed streak sprites read as a
+                                    -- line whenever the rotations aligned). One flare sprite
+                                    -- with the star and its hot core baked into the texture,
+                                    -- shuffled and rotated per shot from the seeded stream.
+                                    kem.Texture = shot.flare
                                     kem.Color = ColorSequence.new(Color3.new(1, 1, 1))
                                     -- Rise-and-fall, not fade (owner, 2026-09-06): the SIZE is
                                     -- the envelope — snaps up, collapses — and the sprite stays
-                                    -- solid until the last instant. Peak pulled off the 10-stud
-                                    -- cap ("might be a little too big", and the roundness reads
-                                    -- less at the smaller size).
+                                    -- solid until the last instant.
                                     kem.Size = NumberSequence.new({
-                                        NumberSequenceKeypoint.new(0, 0.5),
-                                        NumberSequenceKeypoint.new(0.3, 1.5),
-                                        NumberSequenceKeypoint.new(1, 0.5),
+                                        NumberSequenceKeypoint.new(0, 1),
+                                        NumberSequenceKeypoint.new(0.3, 3),
+                                        NumberSequenceKeypoint.new(1, 1),
                                     })
                                     kem.Speed = NumberRange.new(0, 0)
                                     kem.Drag = 0
@@ -736,34 +732,9 @@ local function play(payload: any, distance: number)
                                         NumberSequenceKeypoint.new(1, 1),
                                     })
                                     kem.Orientation = Enum.ParticleOrientation.FacingCamera
-                                    kem.Rotation = NumberRange.new(0, 180)
+                                    kem.Rotation = NumberRange.new(shot.rot, shot.rot)
                                     kem.LightEmission = 1
-                                    kem:Emit(3)
-                                    -- The center spot (owner, 2026-09-06): a small hot core
-                                    -- the streaks flare out of, on its own emitter.
-                                    local core = slot.flashCore
-                                    core.Texture = BurstStyles.TEXTURES.dot
-                                    core.Color = ColorSequence.new(Color3.new(1, 1, 1))
-                                    core.Size = NumberSequence.new({
-                                        NumberSequenceKeypoint.new(0, 0.45),
-                                        NumberSequenceKeypoint.new(0.3, 1.2),
-                                        NumberSequenceKeypoint.new(1, 0.45),
-                                    })
-                                    core.Speed = NumberRange.new(0, 0)
-                                    core.Drag = 0
-                                    core.Lifetime = NumberRange.new(0.09, 0.12)
-                                    core.Brightness = 8
-                                    core.SpreadAngle = Vector2.new(0, 0)
-                                    core.Acceleration = Vector3.zero
-                                    core.Transparency = NumberSequence.new({
-                                        NumberSequenceKeypoint.new(0, 0),
-                                        NumberSequenceKeypoint.new(0.9, 0),
-                                        NumberSequenceKeypoint.new(1, 1),
-                                    })
-                                    core.Orientation = Enum.ParticleOrientation.FacingCamera
-                                    core.Rotation = NumberRange.new(0)
-                                    core.LightEmission = 1
-                                    core:Emit(1)
+                                    kem:Emit(1)
                                 end)
                                 if lod.sound then
                                     task.delay(salvoAt + shot.at + travel, function()

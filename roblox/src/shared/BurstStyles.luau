@@ -163,6 +163,22 @@ BurstStyles.TEXTURES = {
     -- Owner uploads 2026-09-02 (sources: tools/textures/firework_dot.png / firework_streak.png).
     dot = "rbxassetid://87559558731370",
     streak = "rbxassetid://136219621015067",
+    -- Salute flares (2026-09-06, tools/textures/make_salute_flares.py): purpose-made burst
+    -- art -- salutes are a FIRST-CLASS effect (owner ruling; crossed streak sprites read as
+    -- a line whenever the random rotations aligned). Four silhouettes, star baked into the
+    -- texture: a 4-point, b 6-point, c 5-point, d 8-spike pop.
+    flare_a = "rbxassetid://83712003749470",
+    flare_b = "rbxassetid://116765991891671",
+    flare_c = "rbxassetid://95333004243985",
+    flare_d = "rbxassetid://116492224039177",
+}
+
+-- The shuffle deck for salute flashes: one seeded draw per shot in the controller.
+BurstStyles.SALUTE_FLARES = {
+    BurstStyles.TEXTURES.flare_a,
+    BurstStyles.TEXTURES.flare_b,
+    BurstStyles.TEXTURES.flare_c,
+    BurstStyles.TEXTURES.flare_d,
 }
 -- How LOUD and how FAR. Fireworks are shared spectacle, the opposite of the familiars'
 -- deliberately intimate 9-34 rolloff: full volume out to a plateau, audible across the
