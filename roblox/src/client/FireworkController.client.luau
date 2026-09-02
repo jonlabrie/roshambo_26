@@ -696,7 +696,11 @@ local function play(payload: any, distance: number)
                                     local kp = slot.points[MAX_POINTS]
                                     local kem = slot.emitters[MAX_POINTS]
                                     kp.CFrame = CFrame.new(anchorPos + shot.offset)
-                                    kem.Texture = BurstStyles.TEXTURES.dot
+                                    -- CROSSED STREAKS, not a dot (owner, 2026-09-06: "they
+                                    -- read as circles"): two elongated sprites, each at its
+                                    -- own random rotation, flare into an irregular star —
+                                    -- and every shot's cross lands at a different angle.
+                                    kem.Texture = BurstStyles.TEXTURES.streak
                                     kem.Color = ColorSequence.new(Color3.new(1, 1, 1))
                                     -- Rise-and-fall, not fade (owner, 2026-09-06): the SIZE is
                                     -- the envelope — snaps up, collapses — and the sprite stays
@@ -720,9 +724,9 @@ local function play(payload: any, distance: number)
                                         NumberSequenceKeypoint.new(1, 1),
                                     })
                                     kem.Orientation = Enum.ParticleOrientation.FacingCamera
-                                    kem.Rotation = NumberRange.new(0)
+                                    kem.Rotation = NumberRange.new(0, 180)
                                     kem.LightEmission = 1
-                                    kem:Emit(1)
+                                    kem:Emit(2)
                                 end)
                                 if lod.sound then
                                     task.delay(salvoAt + shot.at + travel, function()
