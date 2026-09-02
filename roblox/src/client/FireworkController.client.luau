@@ -720,9 +720,9 @@ local function play(payload: any, distance: number)
                                     -- cap ("might be a little too big", and the roundness reads
                                     -- less at the smaller size).
                                     kem.Size = NumberSequence.new({
-                                        NumberSequenceKeypoint.new(0, 0.35),
-                                        NumberSequenceKeypoint.new(0.3, 1),
-                                        NumberSequenceKeypoint.new(1, 0.35),
+                                        NumberSequenceKeypoint.new(0, 0.5),
+                                        NumberSequenceKeypoint.new(0.3, 1.5),
+                                        NumberSequenceKeypoint.new(1, 0.5),
                                     })
                                     kem.Speed = NumberRange.new(0, 0)
                                     kem.Drag = 0
@@ -745,9 +745,9 @@ local function play(payload: any, distance: number)
                                     core.Texture = BurstStyles.TEXTURES.dot
                                     core.Color = ColorSequence.new(Color3.new(1, 1, 1))
                                     core.Size = NumberSequence.new({
-                                        NumberSequenceKeypoint.new(0, 0.3),
-                                        NumberSequenceKeypoint.new(0.3, 0.8),
-                                        NumberSequenceKeypoint.new(1, 0.3),
+                                        NumberSequenceKeypoint.new(0, 0.45),
+                                        NumberSequenceKeypoint.new(0.3, 1.2),
+                                        NumberSequenceKeypoint.new(1, 0.45),
                                     })
                                     core.Speed = NumberRange.new(0, 0)
                                     core.Drag = 0
