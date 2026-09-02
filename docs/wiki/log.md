@@ -3271,3 +3271,17 @@ main --job-type RELEASE` (auto-deploy stays off per the 2026-08-25 ruling). The
 iOS bell fix (`d5187da`) shipped via job 53. Lesson, same family as the headers
 overreach: an absence claim is only as good as the completeness of the search --
 name the regions you scanned when you claim "not found".
+
+## [2026-09-05] fix | The PWA bell saga closes -- and the fake ad dies
+
+Three acts: (1) the flake diagnosis stood -- the unlock disarmed after first
+success and iOS interruptions made audio death sticky (`d5187da`); (2) that fix
+shipped its own regression -- loadBell lived ONLY behind the resume(), so a
+desktop context born 'running' never loaded the buffer at all; the owner caught it
+within minutes and the console's own [SFX] instrumentation cornered it
+(`6f8e2c0`: load on any gesture, unconditionally); (3) verified live by the owner:
+one touch of the Arena, bell rings -- and the touch-first requirement is the web
+platform's autoplay rule, invisible in real play where the first throw IS the
+first touch. Deploys: Amplify jobs 53-55 via the newly-documented start-job
+procedure. Also gone at owner request (`aa813c8`, job 55): the Antigravity-era
+"Sponsored Intelligence" mock ad squatting on the Arena.
