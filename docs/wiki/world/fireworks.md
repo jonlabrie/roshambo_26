@@ -137,6 +137,13 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   Launch audio: thumps are a 3-clip seeded rotation (launch-deck-1/2/3) with
   launch-deck-4 as the **L tube's grunt** (`292e978`, live via kamuro); per-clip head
   trims measured from source WAVs (peak−35ms).
+- **The comet look is PINNED** (owner, 2026-09-06: "yes, these are the ones. Let's not
+  lose this place!"): tag `trails-approved` (= `8232c98`) is the approved ascent-trail
+  behavior for every style. Three widening strategies for a fatter L trail all failed
+  (see log 2026-09-06 "clean retreat" -- the thin comet IS the collapse of a
+  span-parallel Trail; widening un-collapses it into the band). The one untried avenue
+  for a bigger heavy ascent is a LAYERED particle comet on heavy shells, leaving the
+  Trail untouched -- parked for a screenshot-driven Studio session.
 - VFX recipe (proven on device): rising Trail comet → flash core → radial burst →
   glitter/willow, glow via LightEmission + the one global Bloom, ~500–700
   particles/shell, client-side emission (server `Emit()` does not replicate).
