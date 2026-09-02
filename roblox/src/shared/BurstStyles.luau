@@ -168,6 +168,15 @@ BurstStyles.TEXTURES = {
 -- deliberately intimate 9-34 rolloff: full volume out to a plateau, audible across the
 -- canyon. Never left to Sound defaults again (Volume 0.5 / RollOffMin 10 made the whole
 -- show a whisper from FallsLanding -- owner, 2026-09-03: "they don't seem very loud").
+-- Per-clip head trims, seconds skipped at play time via Sound.TimePosition -- a clip whose cut
+-- carries pre-roll lands its transient LATE, which physics-delay masked at range and point-blank
+-- deck launches exposed (owner, 2026-09-05: "a pretty significant delay between visual launch
+-- and the tube thump"). Measured in Studio by sampling PlaybackLoudness: launch-deck-2's first
+-- audible at 134ms, peak at 201ms. Trimming here beats re-uploading: one tunable number.
+BurstStyles.SOUND_TRIMS = {
+    ["rbxassetid://87713703495045"] = 0.12, -- launch-deck-2: keep a breath of attack, cut the rest
+} :: { [string]: number }
+
 BurstStyles.SOUND_LEVELS = {
     -- Turned up 2026-09-05 (owner: inaudible at a teahouse from the bridge): volume 2 -> 2.4,
     -- reach 400 -> 900 so the far decks hear the show, min 45 -> 60 for a fuller plateau near.

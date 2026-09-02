@@ -175,6 +175,12 @@ local function playSound(slot: Slot, id: string?, audible: boolean, from: Vector
         -- run ±3% for the same reason.
         slot.sound.PlaybackSpeed = speed or 1
         slot.sound:Play()
+        -- Seek past a clip's measured pre-roll so the transient lands ON the event
+        -- (BurstStyles.SOUND_TRIMS; the deck-launch thump carried ~0.2s of head).
+        local trim = BurstStyles.SOUND_TRIMS[id]
+        if trim then
+            slot.sound.TimePosition = trim
+        end
     end)
 end
 
