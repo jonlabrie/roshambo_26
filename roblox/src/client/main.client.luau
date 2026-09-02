@@ -516,6 +516,7 @@ end
 -- tape; it renders `reason`. A requirement that depends on round history is exactly the kind of
 -- fact this codebase has repeatedly re-derived client-side and got wrong.
 local fireworkShells: any = nil
+local deckSitePos: Vector3? = nil
 
 local function publish()
     local inputs = buildInputs()
@@ -543,6 +544,8 @@ local function publish()
         -- Render-only, and deliberately opaque: a table of { count, launchable, reason } straight
         -- off the wire. Not a HudModel input — nothing about the round derives from it.
         fireworkShells = fireworkShells,
+        -- The player's own deck-site position (or nil) -- see the FireworkState handler.
+        deckSite = deckSitePos,
         -- The world's throw for the round the drum has FINISHED revealing, or nil. Set at drum rest
         -- and cleared once the beat's fade has run, so the ring can never spoil the wheel mid-spin
         -- and never carries a glyph into the next round either.
@@ -800,6 +803,14 @@ end)
 FireworkState.OnClientEvent:Connect(function(state)
     if typeof(state) == "table" then
         fireworkShells = state.shells
+        -- The player's OWN deck-site position, when they have a deck. The HUD's launch
+        -- affordance only knew the tagged public sites, so the fire button never appeared
+        -- on a player's own engawa even though the server allowed the launch (owner,
+        -- 2026-09-04). The server now sends it; forward it with the shells.
+        deckSitePos = if typeof(state.deckSite) == "table"
+                and typeof(state.deckSite.x) == "number"
+            then Vector3.new(state.deckSite.x, state.deckSite.y, state.deckSite.z)
+            else nil
         publish()
     end
 end)

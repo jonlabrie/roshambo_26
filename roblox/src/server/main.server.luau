@@ -1273,6 +1273,12 @@ pushFireworkState = function(player: Player)
     handlerQueue:run(uid, function()
         local res = net:getFireworks(uid, lastWorldThrow())
         if res.ok and player:IsDescendantOf(Players) then
+            -- Tell the client where its OWN deck-site is. The deck was always a valid
+            -- launch site server-side, but the HUD's affordance only knew the tagged
+            -- public sites — so at your own teahouse the fire button never appeared
+            -- (owner, 2026-09-04: "we haven't made that work yet!"). It had; it hid.
+            local deck = deckSiteFor(uid)
+            res.data.deckSite = if deck then deck.pos else nil
             FireworkState:FireClient(player, res.data)
         end
     end)
