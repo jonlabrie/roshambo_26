@@ -720,9 +720,9 @@ local function play(payload: any, distance: number)
                                     -- cap ("might be a little too big", and the roundness reads
                                     -- less at the smaller size).
                                     kem.Size = NumberSequence.new({
-                                        NumberSequenceKeypoint.new(0, 1.2),
-                                        NumberSequenceKeypoint.new(0.3, 3.5),
-                                        NumberSequenceKeypoint.new(1, 1.2),
+                                        NumberSequenceKeypoint.new(0, 0.7),
+                                        NumberSequenceKeypoint.new(0.3, 2),
+                                        NumberSequenceKeypoint.new(1, 0.7),
                                     })
                                     kem.Speed = NumberRange.new(0, 0)
                                     kem.Drag = 0
