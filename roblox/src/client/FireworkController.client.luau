@@ -363,7 +363,23 @@ local function play(payload: any, distance: number)
     local scatterX = rng:NextNumber(-8, 8)
     local heightJitter = rng:NextNumber(-6, 6)
     local scatterZ = rng:NextNumber(-8, 8)
-    local apex = origin + dir * (60 + heightJitter) + Vector3.new(scatterX, 0, scatterZ) -- 60: owner, 2026-09-03 ("bursts should ride higher")
+    -- BALLISTIC APEX (2026-09-05): a tilted launch must CURVE -- leave along the tube's axis,
+    -- bend over, peak far out with the path flattening. The straight dir-line apex made deck
+    -- shells rise in a dead-straight slant. For a parabola whose initial velocity tilts theta
+    -- from vertical and peaks at height h, the peak sits 2*h*tan(theta) downrange -- so keep
+    -- today's HEIGHT (h = run * dir.Y) and put the horizontal displacement where physics puts
+    -- it. dir vertical => horizontal term is exactly zero and this is byte-identical to the
+    -- old `origin + dir * run + scatter` (public sites, proving range, firecrackers untouched).
+    local run = 60 + heightJitter
+    local h = run * dir.Y
+    local horiz = Vector3.new(dir.X, 0, dir.Z)
+    local horizMag = horiz.Magnitude
+    local apexOffset = Vector3.new(0, h, 0)
+    if horizMag > 1e-6 and dir.Y > 1e-6 then
+        -- tan(theta) = horizontal/vertical of the unit heading; downrange = 2 * h * tan(theta)
+        apexOffset += horiz.Unit * (2 * h * (horizMag / dir.Y))
+    end
+    local apex = origin + apexOffset + Vector3.new(scatterX, 0, scatterZ) -- 60: owner, 2026-09-03 ("bursts should ride higher")
 
     -- `tail` is the longest release-worthy lifetime among this shell's burst styles (kamuro's
     -- 4.2s crown must not have its slot's parts re-positioned under it while it's still hanging).
@@ -447,8 +463,12 @@ local function play(payload: any, distance: number)
                 -- quadratic bezier from the muzzle through a control point along the heading
                 -- to the apex, advanced on Heartbeat, is smooth at true framerate and is the
                 -- honest ballistic shape: true to the tube at launch, decelerating into the drift.
-                local run = (apex - origin):Dot(dir)
-                local control = origin + dir * (run * 0.9)
+                -- Parabola-true control: a quadratic bezier reproduces a ballistic arc when the
+                -- control sits where the tube-axis line reaches APEX HEIGHT (tangent leaves along
+                -- the tube, arrives horizontal at the peak). Vertical dir: (apex.Y-origin.Y)/dir.Y
+                -- is the old `run` exactly, so the 0.9-scaled control -- and the whole flight --
+                -- is byte-identical for public sites, the proving range, and firecrackers.
+                local control = origin + dir * ((apex.Y - origin.Y) / math.max(dir.Y, 0.05) * 0.9)
                 local t0 = os.clock()
                 local flight: RBXScriptConnection
                 flight = RunService.Heartbeat:Connect(function()
