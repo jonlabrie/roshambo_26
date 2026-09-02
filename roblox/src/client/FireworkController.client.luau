@@ -441,7 +441,20 @@ local function play(payload: any, distance: number)
                 })
                 fem:Emit(14)
             elseif ev.kind == "ascent" then
-                slot.shell.Position = origin
+                -- ⚠ THE RIBBON RIDES THE HEADING (owner, 2026-09-05: deck trails were "exactly
+                -- like the old ones we discarded" while proving/public looked right). The comet's
+                -- attachment pair is separated along the shell's LOCAL Y; when that offset lies
+                -- along the motion the segments overlap into the tuned thin comet, and when the
+                -- motion tilts away from it the same offset unfolds the Trail into the wide
+                -- angled band we threw away. Align local Y with the flight direction; a vertical
+                -- dir keeps the identity orientation and is byte-identical to the old code.
+                if dir.Y > 0.999 then
+                    slot.shell.CFrame = CFrame.new(origin)
+                else
+                    local xAxis = dir:Cross(Vector3.new(0, 1, 0)).Unit
+                    local zAxis = xAxis:Cross(dir)
+                    slot.shell.CFrame = CFrame.fromMatrix(origin, xAxis, dir, zAxis)
+                end
                 -- ⚠ CLEAR BEFORE ENABLE. The slot's shell TELEPORTS here from wherever its
                 -- previous shell died; a re-enabled Trail can draw ghost geometry from its
                 -- stale segment history — streaks hanging at the LAST apex (owner, 2026-09-03:
