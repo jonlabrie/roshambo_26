@@ -3311,3 +3311,13 @@ pretty good now." Lesson twice-earned this sprint: measure each stage of the
 real path; components that are individually fine can sum to a defect.
 Also confirmed: RequestProvingFire is Studio-only by design (main.server.luau
 IsStudio gate) -- live-place testing means deck launches with owned shells.
+
+## [2026-09-06] shipped | Launch thumps pool; deck-4 reserved as the L tube's grunt
+
+Owner uploaded launch-deck-1/3/4. 1 and 3 join deck-2 in a seeded rotation
+(`292e978`, verified by ear); deck-4 ("heavier/gruntier and much more close
+range... like from a bigger tube") is the L tube's voice via SHELL_MORTAR --
+dormant until the first L SKU ships. Recipes no longer hardcode the report
+sound; the controller resolves it, explicit phase sound still overrides. Trims
+measured from source WAVs (peak minus ~35ms; offline envelope matched
+in-engine within 3ms -- future clips can be trimmed before upload).
