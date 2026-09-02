@@ -169,8 +169,8 @@ for _ = 1, POOL_SIZE do
 
     -- The heavy comet layer: Rate-driven (the one emitter in the system that is — the
     -- shell's continuous motion does the streaming; particles spawn at the shell and lag
-    -- behind in world space). Budget disclosure: rate 70 x ~0.55s mean life ≈ 40 alive,
-    -- ~5% of a heavy shell's doubled (800) budget.
+    -- behind in world space). Budget disclosure: rate 90 x ~0.55s mean life ≈ 50 alive,
+    -- ~6% of a heavy shell's doubled (800) budget (owner-tuned 2026-09-06).
     local comet = Instance.new("ParticleEmitter")
     comet.Enabled = false
     comet.Rate = 0 -- armed per heavy launch
@@ -180,15 +180,15 @@ for _ = 1, POOL_SIZE do
     comet.Speed = NumberRange.new(2, 6)
     comet.SpreadAngle = Vector2.new(180, 180)
     comet.Size = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.55),
-        NumberSequenceKeypoint.new(1, 0.15),
+        NumberSequenceKeypoint.new(0, 0.45),
+        NumberSequenceKeypoint.new(1, 0.12),
     })
     comet.Transparency = NumberSequence.new({
         NumberSequenceKeypoint.new(0, 0.1),
         NumberSequenceKeypoint.new(0.7, 0.3),
         NumberSequenceKeypoint.new(1, 1),
     })
-    comet.Acceleration = Vector3.new(0, -12, 0)
+    comet.Acceleration = Vector3.new(0, -18, 0)
     comet.Drag = 1.5
     comet.Brightness = 2.5
     comet.LightEmission = 0.85 -- the stacking law: sparks overlap the Trail constantly
@@ -695,7 +695,7 @@ local function play(payload: any, distance: number)
                 if recipe.heavy then
                     local c = colorOf(ev.color)
                     slot.comet.Color = ColorSequence.new(c:Lerp(Color3.new(1, 1, 1), 0.25), c)
-                    slot.comet.Rate = 70
+                    slot.comet.Rate = 90
                     slot.comet.Enabled = true
                 else
                     slot.comet.Enabled = false
