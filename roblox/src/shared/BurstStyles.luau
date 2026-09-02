@@ -173,8 +173,11 @@ BurstStyles.TEXTURES = {
 -- deck launches exposed (owner, 2026-09-05: "a pretty significant delay between visual launch
 -- and the tube thump"). Measured in Studio by sampling PlaybackLoudness: launch-deck-2's first
 -- audible at 134ms, peak at 201ms. Trimming here beats re-uploading: one tunable number.
+-- 0.12 still lagged (owner, 2026-09-06): the envelope trimmed at 0.12 peaks 68ms after Play,
+-- stacked on frame-hop dispatch. 0.15 keeps ~35ms of rise so the transient still reads as a
+-- thump, not a click.
 BurstStyles.SOUND_TRIMS = {
-    ["rbxassetid://87713703495045"] = 0.12, -- launch-deck-2: keep a breath of attack, cut the rest
+    ["rbxassetid://87713703495045"] = 0.15, -- launch-deck-2: keep a breath of attack, cut the rest
 } :: { [string]: number }
 
 BurstStyles.SOUND_LEVELS = {

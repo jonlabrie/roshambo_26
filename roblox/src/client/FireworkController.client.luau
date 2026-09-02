@@ -167,7 +167,7 @@ local function playSound(slot: Slot, id: string?, audible: boolean, from: Vector
     end
     local cam = workspace.CurrentCamera
     local dist = if cam then (cam.CFrame.Position - from).Magnitude else 0
-    task.delay(dist / BurstStyles.SOUND_LEVELS.speedOfSound, function()
+    local function fire()
         slot.sound.SoundId = id
         -- Per-shell jitter (seeded, so every client hears the same shell the same way):
         -- ±8% speed shifts pitch and length together, and even one clip stops sounding
@@ -181,7 +181,17 @@ local function playSound(slot: Slot, id: string?, audible: boolean, from: Vector
         if trim then
             slot.sound.TimePosition = trim
         end
-    end)
+    end
+    local delay = dist / BurstStyles.SOUND_LEVELS.speedOfSound
+    -- ⚠ SUB-FRAME DELAYS RUN INLINE. task.delay(0) still parks the thunk until the next
+    -- Heartbeat — a whole frame of silence for a listener standing AT the tube, where the
+    -- ear is least forgiving (owner, 2026-09-06: lag persisted after the head trim; the
+    -- residue was frame-hops, not the clip).
+    if delay < 1 / 60 then
+        fire()
+    else
+        task.delay(delay, fire)
+    end
 end
 
 -- ⚠ PRELOAD EVERY SOUND AND SPRITE ONCE, AT STARTUP. A Sound's first :Play() otherwise
@@ -457,7 +467,10 @@ local function play(payload: any, distance: number)
 
     active += 1
     for _, ev in schedule do
-        task.delay(ev.at, function()
+        -- The at=0 report runs INLINE: task.delay(0) costs a Heartbeat, and that frame plus
+        -- playSound's own hop plus the clip's attack was the launch-thump lag a listener at
+        -- the tube heard (owner, 2026-09-06). Timed phases keep task.delay.
+        local runEvent = function()
             local anchorPos = if ev.anchor == "apex" then apex else origin
             if ev.kind == "report" then
                 slot.shell.Position = origin
@@ -705,7 +718,12 @@ local function play(payload: any, distance: number)
                 end
                 fireBurst(slot, bev, anchorPos, rng, phaseLife)
             end
-        end)
+        end
+        if ev.at > 0 then
+            task.delay(ev.at, runEvent)
+        else
+            runEvent()
+        end
     end
 
     -- Released after the last phase plus the longest burst style's release tail, so the slot is
