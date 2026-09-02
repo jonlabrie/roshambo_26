@@ -1972,6 +1972,14 @@ RequestSync.OnServerEvent:Connect(function(player)
     end
     echoBackDoor(player, uid)
     pushAccessState(player, uid)
+    -- FireworkState too (live-place find, 2026-09-05: the shop showed zero holdings while the
+    -- picker was accurate). The join's one-shot FireworkState push races every listener
+    -- independently -- ShopController connects later in script order than main.client and
+    -- missed it, and this re-echo previously sent everything EXCEPT fireworks, so nothing ever
+    -- re-delivered the counts to an idle player. The pull now returns the COMPLETE join state.
+    if pushFireworkState then
+        pushFireworkState(player)
+    end
 end)
 
 Players.PlayerRemoving:Connect(function(player)

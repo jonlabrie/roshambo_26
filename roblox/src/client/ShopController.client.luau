@@ -32,6 +32,7 @@ local player = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local EconomyState = remotes:WaitForChild("EconomyState") :: RemoteEvent
 local FireworkState = remotes:WaitForChild("FireworkState") :: RemoteEvent
+local RequestSync = remotes:WaitForChild("RequestSync") :: RemoteEvent
 local RequestPurchase = remotes:WaitForChild("RequestPurchase") :: RemoteEvent
 
 -- Display names/order moved to shared/ShellDisplay.luau (2026-09-04): the kiku shipped
@@ -77,6 +78,7 @@ local prices: { [string]: number } = {}
 local mortarPrices: { [string]: number } = {}
 local points = 0
 local shells: any = nil
+local sawFireworkState = false -- the pull loop at the bottom retries RequestSync until this flips
 local ownedMortars: { [string]: boolean } = {}
 
 -- ===== the panel =====
@@ -369,6 +371,7 @@ FireworkState.OnClientEvent:Connect(function(state)
     if typeof(state) ~= "table" then
         return
     end
+    sawFireworkState = true
     shells = state.shells
     ownedMortars = {}
     for _, id in state.mortars or {} do
@@ -433,5 +436,18 @@ RunService.Heartbeat:Connect(function()
         setOpen(now)
     elseif inside and not dismissed and not gui.Enabled then
         setOpen(true)
+    end
+end)
+
+-- PULL UNTIL FED (live-place find, 2026-09-05: the shop showed "you hold" zeros while the HUD
+-- picker was accurate). The join's one-shot FireworkState push races each listener
+-- independently -- this script connects later than main.client and missed it on a live server,
+-- and an idle player gets no reveal-time re-push (that push is gated on having picked). Same
+-- cure as DecorationController's: fire RequestSync (server debounces at 0.4s; it now re-echoes
+-- FireworkState too) until OUR listener has seen a payload.
+task.spawn(function()
+    while not sawFireworkState do
+        RequestSync:FireServer()
+        task.wait(1 + math.random() * 0.5)
     end
 end)
