@@ -81,7 +81,7 @@ type Slot = {
     -- big shell reads in a real display (burning debris, not a wider ribbon). Purely
     -- ADDITIVE: the pinned trails-approved Trail is untouched; killing this layer
     -- restores it exactly. Dedicated emitter, so its properties are set ONCE at pool
-    -- build (only Color and Rate move per launch) — the shared-emitter full-write
+    -- build (only Color, Size and Rate move per launch) — the shared-emitter full-write
     -- discipline doesn't apply.
     comet: ParticleEmitter,
 }
@@ -690,12 +690,24 @@ local function play(payload: any, distance: number)
                 slot.trail:Clear()
                 slot.trail.Color = ColorSequence.new(colorOf(ev.color))
                 slot.trail.Enabled = true
-                -- The heavy comet layer rides ONLY the L class; explicitly doused for
-                -- everything else because slots are shared.
-                if recipe.heavy then
+                -- The comet spark layer makes the tube ladder VISUAL the way the thumps
+                -- made it audible (owner, 2026-09-06): S rides the bare Trail, M sheds a
+                -- light spark stream, L the full debris comet. Fill-rate cost is near-nil
+                -- either way — the sparks are small and strung out along the flight, the
+                -- opposite of a break's clustered hundreds. Explicitly doused for S
+                -- because slots are shared. (Drafts have no SHELL_MORTAR row, so an
+                -- M-bound draft shows no sparks at the range — same limitation as the
+                -- launch voice; pin `heavy` for L auditions.)
+                local tube = MortarPlacement.SHELL_MORTAR[payload.shellId]
+                local cometRate = if recipe.heavy then 90 elseif tube == "mortar:M" then 45 else 0
+                if cometRate > 0 then
                     local c = colorOf(ev.color)
                     slot.comet.Color = ColorSequence.new(c:Lerp(Color3.new(1, 1, 1), 0.25), c)
-                    slot.comet.Rate = 90
+                    slot.comet.Size = NumberSequence.new({
+                        NumberSequenceKeypoint.new(0, if recipe.heavy then 0.45 else 0.32),
+                        NumberSequenceKeypoint.new(1, if recipe.heavy then 0.12 else 0.09),
+                    })
+                    slot.comet.Rate = cometRate
                     slot.comet.Enabled = true
                 else
                     slot.comet.Enabled = false
