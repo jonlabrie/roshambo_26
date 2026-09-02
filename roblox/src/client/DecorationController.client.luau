@@ -101,6 +101,18 @@ local function tryBind(inst: Instance, isMortar: boolean)
         return
     end
     local padId = inst:GetAttribute("padId")
+    if padId == nil then
+        -- Join-time replication can fire the tag signal BEFORE the model's attributes apply
+        -- (2026-09-04 gate: models built during the claim flow never bound — padId read nil
+        -- and nothing retried; every later incremental rebuild bound fine). Wait for the
+        -- attribute once, then retry.
+        local conn: RBXScriptConnection
+        conn = inst:GetAttributeChangedSignal("padId"):Connect(function()
+            conn:Disconnect()
+            tryBind(inst, isMortar)
+        end)
+        return
+    end
     if myPadId == nil or padId ~= myPadId then
         return
     end
@@ -130,11 +142,11 @@ CollectionService:GetInstanceRemovedSignal("Mortar"):Connect(function(inst)
 end)
 
 EconomyState.OnClientEvent:Connect(function(p)
-    local newPad = p.claimedPadId
-    if newPad ~= myPadId then
-        myPadId = newPad
-        rescanAll() -- claim just resolved: bind any decorations already replicated in
-    end
+    myPadId = p.claimedPadId
+    -- rescan on EVERY echo, not just a pad change: the bound-guard makes it idempotent and the
+    -- model count is tiny, and it closes every models-before-echo / echo-before-models ordering
+    -- (the change-only guard left join-time builds unbound with nothing to retry them).
+    rescanAll()
 end)
 
 DecorationPlaced.OnClientEvent:Connect(function(p)
