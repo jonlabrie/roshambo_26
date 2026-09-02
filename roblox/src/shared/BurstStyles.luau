@@ -176,6 +176,18 @@ BurstStyles.SOUND_LEVELS = {
     speedOfSound = 1125,
 }
 
+-- THE BONUS SHELL (owner, 2026-09-04): occasionally a shell is simply BIGGER -- it
+-- climbs much higher, its stars live longer, and it speaks with the heavyweight boom.
+-- Seeded per shell, so every client sees the same lucky ones; rolls only on
+-- mortar-class flights (>= 2s), never hand firecrackers.
+BurstStyles.BONUS = {
+    chance = 0.08,
+    apexScale = 1.6,
+    lifeScale = 1.45,
+    sound = "rbxassetid://126255239203597", -- boom-parasonya
+    minFlight = 2,
+}
+
 BurstStyles.SOUNDS = {
     -- Owner uploads 2026-09-03 (sources: Roshambo Reference/sound/fireworks_cuts/).
     -- Each burst role is a VARIANT POOL: the controller picks one per shell from the

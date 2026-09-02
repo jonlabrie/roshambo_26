@@ -230,7 +230,7 @@ local function transparencyOf(style: BurstStyles.Style): NumberSequence
     return seq
 end
 
-local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random)
+local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random, lifeScale: number)
     -- `frames` are the style's point rule turning ev.points into per-part placement/orientation —
     -- ring/kamuro's rules always collapse to a single frame, so this iterates #frames, NOT
     -- ev.points: one part cannot stand in for eight positions in one frame.
@@ -293,7 +293,8 @@ local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random)
         then Vector3.new(0, -28, 0)
         else Vector3.new(style.acceleration[1], style.acceleration[2], style.acceleration[3])
     local speed = NumberRange.new(style.speed[1], style.speed[2])
-    local lifetime = NumberRange.new(style.lifetime[1], style.lifetime[2])
+    -- lifeScale > 1 only on a bonus shell: its stars simply live longer.
+    local lifetime = NumberRange.new(style.lifetime[1] * lifeScale, style.lifetime[2] * lifeScale)
     local spreadAngle = Vector2.new(style.spreadAngle[1], style.spreadAngle[2])
     local transparency = transparencyOf(style)
 
@@ -340,6 +341,10 @@ local function play(payload: any, distance: number)
     local rng = Random.new(payload.seed)
     -- One voice-speed per shell, drawn FIRST so its position in the stream is stable.
     local soundSpeed = 0.92 + rng:NextNumber() * 0.16
+    -- THE BONUS ROLL is drawn unconditionally (stream stability) and applied only to
+    -- mortar-class flights below. Occasionally a shell is simply BIGGER (owner,
+    -- 2026-09-04): higher apex, longer-lived stars, the heavyweight boom.
+    local bonusRoll = rng:NextNumber()
     local origin = payload.origin
     local apex = origin
         + Vector3.new(rng:NextNumber(-8, 8), 60 + rng:NextNumber(-6, 6), rng:NextNumber(-8, 8)) -- 60: owner, 2026-09-03 ("bursts should ride higher")
@@ -353,6 +358,14 @@ local function play(payload: any, distance: number)
         if ev.kind == "burst" then
             tail = math.max(tail, BurstStyles.releaseTail(ev.style))
         end
+    end
+
+    local bonus = last >= BurstStyles.BONUS.minFlight and bonusRoll < BurstStyles.BONUS.chance
+    local lifeScale = 1
+    if bonus then
+        lifeScale = BurstStyles.BONUS.lifeScale
+        tail *= lifeScale
+        apex = origin + (apex - origin) * Vector3.new(1, BurstStyles.BONUS.apexScale, 1)
     end
 
     active += 1
@@ -443,6 +456,11 @@ local function play(payload: any, distance: number)
                     else
                         soundId = pool
                     end
+                    -- the draw above still happens on bonus shells (stream stability);
+                    -- the heavyweight boom then takes the slot.
+                    if bonus then
+                        soundId = BurstStyles.BONUS.sound
+                    end
                 end
                 playSound(slot, soundId, lod.sound, anchorPos, soundSpeed)
                 -- The tail voice: a style's second sound, entering its own delay after the
@@ -475,7 +493,7 @@ local function play(payload: any, distance: number)
                         end)
                     end)
                 end
-                fireBurst(slot, ev, anchorPos, rng)
+                fireBurst(slot, ev, anchorPos, rng, lifeScale)
             end
         end)
     end
