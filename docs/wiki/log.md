@@ -3174,3 +3174,27 @@ through the ballistics) and a +-12-stud late-arc break perpendicular to the flig
 (zero at the muzzle, emerging near the peak). Drawn after the base scatter, so the
 nil-heading rng stream -- public sites, proving range, firecrackers -- stays
 byte-identical. Both numbers are one-line tunables in FireworkController.
+
+## [2026-09-05] ship | Defect-sweep day -- eleven closed, one overturned, the drum never lies
+
+Owner ruling: "let's work them, one at a time." Closed: (l) tsukubai PivotTo; (a)
+atomic purchase (balance + uniqueness in one findOneAndUpdate; portal double-sale
+was deterministically red); (b) decoration ownership (rearrange/remove only, never
+mint); (c) RESOLVE_FAILED -> 404 (branch defensively dead on robloxUserId routes);
+(o) NEW same-day find+fix: garbage path ids minted junk users -- digits-only
+router.param guard; (e) TEST_MODE phase continues from the last persisted face,
+deploys no longer re-roll the cycle; (n) all four PlayerAdded sites sweep players
+already present (the CSG-yield window class, closed structurally); (d) the
+empty onboarding cards -- the recorded AutomaticSize diagnosis was WRONG; the truth
+(found live: seenBeats cleared on dev, probes + the owner's eyes) was
+ZIndexBehavior.Global ranking the opaque card above its own labels, completed by
+the round-2 opacity fix; every F&F guest would have hit it; (m) proving bores
+rebaked to bore-is-inner; the (g)-adjacent bare pollOnce loop (one throw used to
+kill a server's rounds). OVERTURNED: the (g) reveal residual -- owner: "the drum
+should be authoritative" -- the drum now lands late rather than wrong, rests
+between windows on a true miss (drumMiss cue; record releases, celebrations stay
+silent). Backend fixes deployed to dev same-morning. Owner direction banked in
+backlog: the onboarding JOURNEY pass (kid-legible, no gambling vocabulary, the
+four questions), queued after the fireworks sprint. Suites at close: Lune 1654,
+Vitest 498. Still parked: (f) undetermined, (i)/(j) identity gates (decision-gated,
+not code-gated).

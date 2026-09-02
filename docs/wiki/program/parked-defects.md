@@ -98,7 +98,7 @@ reproduce and diagnose first. (Precedent from the same feature: an earlier ledge
 was an *absent caller* — `EventBus.OpenLedger` had two listeners and zero firing sites —
 which no test can see.)
 
-## (g) Round structure: the offset-by-one diagnosis, and the accepted reveal-timing residual
+## ~~(g) Round structure: the offset-by-one diagnosis, and the reveal-timing residual~~ RESIDUAL OVERTURNED & FIXED 2026-09-05 (`9f17c90` + `3066713`)
 
 - **The diagnosis (fixed 2026-08-05, `830d2b8..00bf8f8` — now OPEN 51 / LOCK 2 /
   REVEAL 7), kept so it is never re-derived:** the old phase names were offset by one
@@ -107,7 +107,7 @@ which no test can see.)
   `REVEAL` was shorter than the drum's 3.45s settle, so the drum never finished inside
   its own phase. The jitter is in settlement (Mongo), not scheduling — two independent
   clocks.
-- **The parked residual, accepted ship-and-watch:** the world throw is decided at the end
+- **The residual (WAS accepted ship-and-watch; owner overturned 2026-09-05: "the drum should be authoritative" — the stale-face fallback is deleted; late payloads land late, a true stall-out rests BETWEEN windows and fires `drumMiss`, and the record releases on either cue):** the world throw is decided at the end
   of LOCK, so the payload lands 0–1.25s AFTER the bell against the drum's 1.45s commit
   deadline. `DrumStep.STALL_MAX` covers the overrun; worst case the drum lands on the
   WRONG FACE (`lastLandedThrow or "R"`). The tell is the glyph disagreeing with the tape
@@ -115,7 +115,7 @@ which no test can see.)
   (MessagingService push) is the designed fix; its unresolved blocker: Open Cloud
   MessagingService generally does NOT deliver to Studio sessions — spike that before
   estimating.
-- **Adjacent live hazard, verified still present 2026-08-27:** `pollOnce()` runs in a
+- **Adjacent live hazard — FIXED 2026-09-05 (`3066713`, pcall + 3s backoff):** `pollOnce()` runs in a
   bare `task.spawn` loop with no `pcall` (`roblox/src/server/main.server.luau`, the `coordinator:pollOnce()` loop)
   — one throw kills the round loop until restart, and a server/place duration-shape
   mismatch throws on the FIRST poll. Server and place must move together: push → wait for
