@@ -129,11 +129,14 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   M tube, 10; boost 30% = fifth arm via `boost.points` + violet `kickerStreaks` rain,
   `e791ebd`). **Colorway ruling (owner, 2026-09-06): signature hues sell in the shop,
   colorways live in collections** — ao/midori/murasaki reframed as collection palette
-  material, drafts pruned (archived at `2cd90b4`). Remaining shop families on the
-  worksheet: hotaru, kamuro, dan. Launch audio: thumps are now a 3-clip seeded
-  rotation (launch-deck-1/2/3) with launch-deck-4 reserved as the **L tube's grunt**
-  (`292e978`, dormant until the first L SKU — remember it when pricing a big shell);
-  per-clip head trims measured from source WAVs (peak−35ms).
+  material, drafts pruned (archived at `2cd90b4`). **kamuro** shipped 2026-09-06
+  (`3115d8d`): the L tube's "cheap round to show off the big gun" (owner), price 10,
+  mortar:L — the first `heavy` shell (double sprites under weighted admission, spread
+  60, the eardeer boom on every break, 30% salvo kicker of 3-4 aerial salutes with
+  purpose-made flare art). Remaining shop families on the worksheet: hotaru, dan.
+  Launch audio: thumps are a 3-clip seeded rotation (launch-deck-1/2/3) with
+  launch-deck-4 as the **L tube's grunt** (`292e978`, live via kamuro); per-clip head
+  trims measured from source WAVs (peak−35ms).
 - VFX recipe (proven on device): rising Trail comet → flash core → radial burst →
   glitter/willow, glow via LightEmission + the one global Bloom, ~500–700
   particles/shell, client-side emission (server `Emit()` does not replicate).

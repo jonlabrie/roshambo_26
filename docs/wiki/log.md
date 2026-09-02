@@ -3353,3 +3353,11 @@ heavy-must-be-mortar:L fixture-enforced. Kamuro: heavy, spread 60, streaks
 +50%, salvo in the falling crown. Owner: "looking and sounding good."
 Also: proving panel now opens at night (owner default), drive-by rng lockstep
 fix (double-tap draw was inside the per-client audio gate).
+
+## [2026-09-06] shipped | Kamuro: the L tube's cheap round
+
+Owner: "an inexpensive shell for the large tube -- a cheap round to show off
+the big gun." Price 10, mortar:L, five guarded steps run (`3115d8d`), kamuro
+draft family pruned. First shell of the heavy class -- weighted-admission
+budget, L grunt launch, always-boom break, salvo kicker -- all live in one
+SKU. Dev backend redeployed (op 962b864b). Worksheet remainder: hotaru, dan.
