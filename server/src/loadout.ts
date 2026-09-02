@@ -170,7 +170,6 @@ export function validatePadPreferences(value: unknown): Check {
     return { ok: true };
 }
 
-const MORTAR_FACINGS = new Set(['N', 'E', 'S', 'W']);
 export function validateMortarPlacements(value: unknown, owned: string[]): Check {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
         return { ok: false, error: 'MORTAR_PLACEMENTS_NOT_OBJECT' };
@@ -179,12 +178,18 @@ export function validateMortarPlacements(value: unknown, owned: string[]): Check
     for (const [id, p] of Object.entries(value as Record<string, unknown>)) {
         if (!ownedSet.has(id)) return { ok: false, error: 'MORTAR_NOT_OWNED' };
         if (typeof p !== 'object' || p === null) return { ok: false, error: 'PLACEMENT_NOT_OBJECT' };
-        const { offset, facing } = p as { offset?: unknown; facing?: unknown };
-        if (!Array.isArray(offset) || offset.length !== 2) return { ok: false, error: 'BAD_OFFSET' };
-        if (!offset.every((n) => typeof n === 'number' && Number.isFinite(n))) {
-            return { ok: false, error: 'BAD_OFFSET' };
+        const obj = p as Record<string, unknown>;
+        for (const k of Object.keys(obj)) {
+            if (k !== 'offset' && k !== 'facing') return { ok: false, error: 'BAD_PLACEMENT' };
         }
-        if (typeof facing !== 'string' || !MORTAR_FACINGS.has(facing)) {
+        const { offset, facing } = obj as { offset?: unknown; facing?: unknown };
+        if (!Array.isArray(offset) || offset.length !== 2) return { ok: false, error: 'BAD_OFFSET' };
+        for (const n of offset) {
+            if (typeof n !== 'number' || !Number.isFinite(n) || Math.abs(n) > MAX_PLACEMENT_OFFSET) {
+                return { ok: false, error: 'BAD_OFFSET' };
+            }
+        }
+        if (typeof facing !== 'string' || !PLACEMENT_FACINGS.has(facing)) {
             return { ok: false, error: 'BAD_FACING' };
         }
     }

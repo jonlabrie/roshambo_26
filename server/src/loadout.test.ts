@@ -11,6 +11,7 @@ import {
     validateMortarPlacements,
     MAX_CLASSES,
     MAX_BAYS_PER_SIDE,
+    MAX_PLACEMENT_OFFSET,
 } from './loadout';
 
 describe('validateLoadout', () => {
@@ -290,5 +291,14 @@ describe('validateMortarPlacements', () => {
         expect(validateMortarPlacements({ 'mortar:S': { offset: [0], facing: 'N' } }, owned).ok).toBe(false);
         expect(validateMortarPlacements({ 'mortar:S': { offset: [0, NaN], facing: 'N' } }, owned).ok).toBe(false);
         expect(validateMortarPlacements({ 'mortar:S': { offset: [0, 0], facing: 'Q' } }, owned).ok).toBe(false);
+    });
+    it('rejects an extra key on a placement entry, mirroring validatePlacement', () => {
+        expect(validateMortarPlacements({ 'mortar:S': { offset: [0, 0], facing: 'N', evil: 1 } }, owned).ok).toBe(false);
+    });
+    it('rejects offsets beyond MAX_PLACEMENT_OFFSET, accepting exactly at the boundary', () => {
+        expect(validateMortarPlacements({ 'mortar:S': { offset: [MAX_PLACEMENT_OFFSET + 1, 0], facing: 'N' } }, owned).ok).toBe(false);
+        expect(validateMortarPlacements({ 'mortar:S': { offset: [1e300, 0], facing: 'N' } }, owned).ok).toBe(false);
+        expect(validateMortarPlacements({ 'mortar:S': { offset: [MAX_PLACEMENT_OFFSET, -MAX_PLACEMENT_OFFSET], facing: 'N' } }, owned))
+            .toEqual({ ok: true });
     });
 });
