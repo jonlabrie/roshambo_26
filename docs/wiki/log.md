@@ -3062,3 +3062,11 @@ volume/rolloff), and hotaru's bespoke tail voice from the owner's OWN recording
 (cut, slowed by resample, canyon-echoed, low-shaved, phase-bound). Green/violet
 shape-trio families added on request. Owner: "pretty awesome. Let's merge."
 Next named: variation in the aerial burst sounds (the 4-clip pool is one recording).
+
+## [2026-09-04] ship | The kiku ships -- first shell promoted through the proving range
+
+Owner gate: "that's the one, ship v2 kiku." v2 (spread 38, glow 1.5) with the 30%
+boost distribution is now catalog id `kiku`, fixture-listed, priced 4 points behind
+a mortar S. v1/v3 pruned from drafts (this commit is their archive). The promotion
+pipeline worked exactly as the 2026-09-01 spec drew it: recipe move + one fixture
+line + one server ledger row, CI holding both sides.

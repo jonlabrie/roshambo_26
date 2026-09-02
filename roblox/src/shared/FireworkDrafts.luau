@@ -13,30 +13,6 @@ local FireworkDrafts = {}
 
 local S_REPORT = "rbxassetid://87713703495045" -- launch-deck-2 (owner pick, 2026-09-03)
 
--- 菊 kiku, chrysanthemum: a tight peony with a distinct edge tint. The seed ladder —
--- three spreads of the same idea so the range's first session has a real comparison.
-local function kiku(spread: number, edge: { number })
-    return {
-        phases = {
-            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
-            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 214, 130 } },
-            {
-                at = 3.0,
-                kind = "burst",
-                anchor = "apex",
-                color = { 255, 190, 90 },
-                edgeColor = edge,
-                spread = spread,
-                glow = 1.5, -- owner 2026-09-04: kiku burns hotter
-                -- The kiku is a DISTRIBUTION, not a recording (owner design, 2026-09-04):
-                -- ~30% of fires upgrade to roughly v3's size plus break points v3 never had.
-                boost = { chance = 0.3, spread = 1.32, glow = 1.2, points = 2, lifeScale = 1.15 },
-                droop = false,
-            },
-        },
-    }
-end
-
 -- 輪 wa, ring: a planar circle of points. The ladder varies spread.
 local function wa(spread: number)
     return {
@@ -167,11 +143,6 @@ local function shapeTrio(core: { number }, edge: { number }, ascent: { number })
 end
 
 FireworkDrafts.FAMILIES = {
-    kiku = {
-        v1 = kiku(28, { 255, 240, 200 }),
-        v2 = kiku(38, { 255, 150, 60 }),
-        v3 = kiku(50, { 200, 90, 40 }),
-    },
     wa = {
         v1 = wa(30),
         v2 = wa(42),

@@ -833,6 +833,7 @@ describe('/api/v1', () => {
                 peony: 3,
                 willow: 4,
                 ishibana: 6,
+                kiku: 4,
             });
             expect(res.body.catalog.mortars).toEqual({
                 'mortar:S': 40,

@@ -1,4 +1,4 @@
 {
     "comment": "The contract between server/src/fireworks.ts (prices, requirements) and roblox/src/shared/FireworkCatalog.luau (recipes). Both sides' tests assert they cover every id here, so a shell that can be sold but not drawn is a CI failure rather than a blank sky.",
-    "shells": ["firecracker", "peony", "willow", "ishibana"]
+    "shells": ["firecracker", "peony", "willow", "ishibana", "kiku"]
 }

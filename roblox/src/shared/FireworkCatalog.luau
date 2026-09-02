@@ -87,6 +87,28 @@ FireworkCatalog.RECIPES = {
             },
         },
     },
+    -- 菊 kiku, chrysanthemum — the first shell promoted THROUGH the proving range
+    -- (owner gate 2026-09-04: "that's the one, ship v2 kiku"). A tight gold peony that
+    -- burns hot, and a DISTRIBUTION rather than a recording: ~30% of fires upgrade —
+    -- wider, brighter, two extra break points, longer hang — announced by the white
+    -- kicker pop and the double-tap report.
+    kiku = {
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 214, 130 } },
+            {
+                at = 3.0,
+                kind = "burst",
+                anchor = "apex",
+                color = { 255, 190, 90 },
+                edgeColor = { 255, 150, 60 },
+                spread = 38,
+                glow = 1.5,
+                boost = { chance = 0.3, spread = 1.32, glow = 1.2, points = 2, lifeScale = 1.15 },
+                droop = false,
+            },
+        },
+    },
 } :: { [string]: any }
 
 return FireworkCatalog
