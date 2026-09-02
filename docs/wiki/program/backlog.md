@@ -542,3 +542,21 @@ knob in the recipe/controller (the current ramp is style-fixed: white ignition -
 ember -> black). A natural surprise flavor for the hue families (ao/midori/murasaki) if
 they become colorways, or for any shell whose "different ending color" surprise should read
 clearly. Not built; banked.
+
+## Economy tuning, drops, return rewards, Robux (owner, 2026-09-05)
+
+Direction banked from the wa promotion session; none of it is build-now:
+
+1. **Prices and levels are provisional** -- tuned later "when we get a better feel for
+   things." Nothing in the current point prices is sacred.
+2. **Random shell DROPS for wins** -- winning can gift a shell.
+3. **Return rewards**: coming back on subsequent days earns something -- "a different kind
+   of streak" from the in-round one. Vocabulary note: keep the two streaks legibly distinct.
+4. **Session rewards**: staying long enough matters -- e.g., a reward at 10 throws in a visit.
+5. **Everything sells for Robux** ("obviously") -- extends the standing Lens B ruling
+   (2026-07-20: points buy everyday shells, Robux buys premium/finale; Developer Products,
+   grant only in server ProcessReceipt) from premium-only toward the full catalog.
+
+Interlocks: drops and return rewards are delight-delivery channels for the mystery-pool
+rule ("never a disappointment"); all reward framing must clear the onboarding voice ruling
+(kid-legible, no gambling vocabulary -- a drop is a GIFT, not a jackpot).
