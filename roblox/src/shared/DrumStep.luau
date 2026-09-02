@@ -100,6 +100,21 @@ function DrumStep.symmetric(index: number): number
     return (index + 3) % FACES
 end
 
+-- ===== The honest miss (owner's ruling, 2026-09-05: "the drum should be authoritative") =====
+-- When the World Throw never arrives inside the stall, the drum used to settle on the LAST
+-- landed face -- a lie the tape then contradicted. Now it winds down to a BETWEEN-WINDOWS rest:
+-- symbols sit at 0/-30/-60 degrees within each 90-degree sector (DrumController.landTargetFor's
+-- convention), so -75 degrees -- midway between the third symbol and the next sector -- shows
+-- no face at the front window. Same one-directional stepping as a real landing: the target is
+-- always at least `dmin` below the current theta.
+function DrumStep.missTargetTheta(theta: number, dmin: number): number
+    local tgt = math.rad(-75)
+    while tgt > theta - dmin do
+        tgt -= math.pi / 2
+    end
+    return tgt
+end
+
 -- Continuing +1 detent stepping from `currentFace`, the next face that brings
 -- `throw`'s symbol to the window. Always 1..3 steps ahead; result % 3 == faceForThrow.
 function DrumStep.landingStep(currentFace: number, throw: string): number

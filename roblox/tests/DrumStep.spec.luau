@@ -87,3 +87,25 @@ describe("DrumStep.KICK_OMEGA", function()
         expect(DrumStep.KICK_OMEGA).toBe(4)
     end)
 end)
+
+-- The honest miss (owner, 2026-09-05): a stalled-out drum rests BETWEEN windows, never on a
+-- stale face. -75 degrees mod 90 is midway between the sector's last symbol (-60) and the next
+-- sector's first (-90 = 0); no symbol angle (0/-30/-60 mod 90) can coincide with it.
+describe("DrumStep.missTargetTheta", function()
+    test("rests between windows, at least dmin below theta, stepping one direction", function()
+        for _, theta in { 0, 1.3, -2.7, 10 * math.pi, -35.2 } do
+            for _, dmin in { 0, 0.4, 2.1 } do
+                local tgt = DrumStep.missTargetTheta(theta, dmin)
+                expect(tgt <= theta - dmin).toBe(true)
+                -- congruent to -75 degrees modulo the 90-degree sector
+                local frac = (tgt - math.rad(-75)) / (math.pi / 2)
+                expect(math.abs(frac - math.floor(frac + 0.5)) < 1e-9).toBe(true)
+                -- and NOT congruent to any face angle
+                for sym = 0, 2 do
+                    local faceFrac = (tgt - math.rad(-sym * 30)) / (math.pi / 2)
+                    expect(math.abs(faceFrac - math.floor(faceFrac + 0.5)) > 1e-6).toBe(true)
+                end
+            end
+        end
+    end)
+end)

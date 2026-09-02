@@ -739,7 +739,11 @@ local function armRevealSafety(afterSeconds: number)
 end
 
 EventBus.Cue.Event:Connect(function(cue)
-    if cue.kind == "drumRest" then
+    -- "drumMiss" (owner's 2026-09-05 ruling) is a stall-out rested BETWEEN windows -- an honest
+    -- miss, never a stale face. It releases the round's RECORD exactly like drumRest (tape tile
+    -- and splash carry the truth the theater couldn't), while the celebration cues (lanterns,
+    -- birds) stay silent: they key on drumRest alone, and a miss round earns no theater.
+    if cue.kind == "drumRest" or cue.kind == "drumMiss" then
         drumAtRest = true
         maybeShowReveal()
     elseif cue.kind == "gongHit" then
