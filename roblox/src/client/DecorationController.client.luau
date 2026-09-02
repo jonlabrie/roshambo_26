@@ -18,6 +18,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local EconomyState = remotes:WaitForChild("EconomyState") :: RemoteEvent
 local FireworkState = remotes:WaitForChild("FireworkState") :: RemoteEvent
+local RequestSync = remotes:WaitForChild("RequestSync") :: RemoteEvent
 local DecorationPlaced = remotes:WaitForChild("DecorationPlaced") :: RemoteEvent
 local SetDecorationRemove = remotes:WaitForChild("SetDecorationRemove") :: RemoteEvent
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
@@ -149,7 +150,9 @@ CollectionService:GetInstanceRemovedSignal("Mortar"):Connect(function(inst)
     bound[inst] = nil
 end)
 
+local sawEconomyEcho = false
 EconomyState.OnClientEvent:Connect(function(p)
+    sawEconomyEcho = true
     myPadId = p.claimedPadId
     -- rescan on EVERY echo, not just a pad change: the bound-guard makes it idempotent and the
     -- model count is tiny, and it closes every models-before-echo / echo-before-models ordering
@@ -182,3 +185,18 @@ DecorationPlaced.OnClientEvent:Connect(function(p)
 end)
 
 rescanAll()
+
+-- THE ROOT CAUSE of both gates' missing prompts (2026-09-04/05), found by live instrumentation:
+-- RemoteEvents do not queue for late listeners, this script's EconomyState connection lands
+-- AFTER main.client.luau's, and main's own RequestSync retry loop STOPS once main's listener is
+-- fed -- so the join echo can fly before we are listening, and an idle player (no picks, no
+-- purchases) never receives another one. myPadId stays nil and every bind attempt early-returns
+-- with nothing left to retry it. Same cure the codebase already uses (main.server.luau's
+-- RequestSync comment names this exact trap): pull our own re-echo until OUR listener has seen
+-- one. Server debounces at 0.4s; jittered ~1s retries are polite and terminate on first echo.
+task.spawn(function()
+    while not sawEconomyEcho do
+        RequestSync:FireServer()
+        task.wait(1 + math.random() * 0.5)
+    end
+end)
