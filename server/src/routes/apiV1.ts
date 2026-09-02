@@ -15,8 +15,8 @@ import { reconcilePresence } from '../sessions';
 import { shellStates, SHELL_IDS, LaunchContext, SHELL_PRICES, MORTAR_PRICES } from '../fireworks';
 import { validateLoadout, validateSizeClass, validatePadPreferences, validateDecorations, validateAccess, validateMortarPlacements } from '../loadout';
 import {
-    validatePurchase, applyPurchase, validateDisplay, PRICES, DEFAULT_TEAHOUSE_LOADOUT,
-    Size, EconomyState, appendDecoration, DEFAULT_ACCESS,
+    validatePurchase, validateDisplay, PRICES, DEFAULT_TEAHOUSE_LOADOUT,
+    Size, EconomyState, appendDecoration, DEFAULT_ACCESS, below,
 } from '../economy';
 
 // The only values `auraVisibility` may take. Mirrored in roblox/src/shared/HudPrefs.luau and
@@ -390,32 +390,56 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             const before = readEconomy(user);
             const chk = validatePurchase(before, item);
             if (!chk.ok) { res.status(400).json({ error: chk.error }); return; }
-            const after = applyPurchase(before, item);
-            user.totalPoints = after.totalPoints;
-            user.maxDeckSize = after.maxDeckSize;
-            user.portalOwned = after.portalOwned ?? false;
-            user.mortars = after.mortars ?? [];
+            // ONE ATOMIC OP (parked defect (a), fixed 2026-09-05). validatePurchase above is the
+            // fast, friendly 400; the FILTER below is the authority: it carries the balance
+            // check AND the item's uniqueness (portal unowned, deck tier exactly below,
+            // teahouse size absent, mortar unheld) while the update carries the deduction AND
+            // the grant -- so two racing purchases resolve to exactly one sale, the loser
+            // matching no document. The read-then-save it replaces let both racers read the
+            // pre-purchase balance (this file's own /fireworks/spend comment indicted it).
+            const filter: Record<string, unknown> = { _id: user._id, totalPoints: { $gte: chk.cost } };
+            const inc: Record<string, number> = { totalPoints: -chk.cost };
+            const update: Record<string, unknown> = { $inc: inc };
+            let respond: (updated: InstanceType<typeof User>) => void;
             if (item.startsWith('firework:')) {
                 const shellId = item.slice('firework:'.length);
-                user.fireworks.set(shellId, (user.fireworks.get(shellId) ?? 0) + 1);
-                await user.save();
-                res.json({ item, totalPoints: after.totalPoints, shellId, count: user.fireworks.get(shellId) });
-                return;
+                inc[`fireworks.${shellId}`] = 1;
+                respond = (u) => res.json({ item, totalPoints: u.totalPoints, shellId, count: u.fireworks.get(shellId) ?? 0 });
+            } else if (item.startsWith('decoration:')) {
+                const { instance } = appendDecoration(user.deckDecorations ?? [], item.slice('decoration:'.length));
+                update.$push = { deckDecorations: instance };
+                respond = (u) => res.json({ item, totalPoints: u.totalPoints, decoration: instance, deckDecorations: u.deckDecorations });
+            } else if (item.startsWith('mortar:')) {
+                filter.mortars = { $ne: item };
+                update.$push = { mortars: item };
+                respond = (u) => {
+                    const e = readEconomy(u);
+                    res.json({ item, totalPoints: e.totalPoints, maxDeckSize: e.maxDeckSize, teahouseSizes: e.teahouseSizes, portalOwned: e.portalOwned ?? false });
+                };
+            } else if (item === 'portal') {
+                filter.portalOwned = { $ne: true };
+                update.$set = { portalOwned: true };
+                respond = (u) => {
+                    const e = readEconomy(u);
+                    res.json({ item, totalPoints: e.totalPoints, maxDeckSize: e.maxDeckSize, teahouseSizes: e.teahouseSizes, portalOwned: true });
+                };
+            } else {
+                const [kind, size] = item.split(':') as [string, Size];
+                if (kind === 'deck') {
+                    filter.maxDeckSize = below(size); // exactly the tier below, atomically ({maxDeckSize: null} matches absent too)
+                    update.$set = { maxDeckSize: size };
+                } else {
+                    filter[`teahouses.${size}`] = { $exists: false };
+                    update.$set = { [`teahouses.${size}`]: { ...DEFAULT_TEAHOUSE_LOADOUT } };
+                }
+                respond = (u) => {
+                    const e = readEconomy(u);
+                    res.json({ item, totalPoints: e.totalPoints, maxDeckSize: e.maxDeckSize, teahouseSizes: e.teahouseSizes, portalOwned: e.portalOwned ?? false });
+                };
             }
-            if (item.startsWith('decoration:')) {
-                const propId = item.slice('decoration:'.length);
-                const { list, instance } = appendDecoration(user.deckDecorations ?? [], propId);
-                user.deckDecorations = list;
-                await user.save();
-                res.json({ item, totalPoints: after.totalPoints, decoration: instance, deckDecorations: list });
-                return;
-            }
-            const [kind, size] = item.split(':') as [string, Size];
-            if (kind === 'teahouse') {
-                (user.teahouses as Map<string, unknown>).set(size, { ...DEFAULT_TEAHOUSE_LOADOUT });
-            }
-            await user.save();
-            res.json({ item, totalPoints: after.totalPoints, maxDeckSize: after.maxDeckSize, teahouseSizes: after.teahouseSizes, portalOwned: after.portalOwned ?? false });
+            const updated = await User.findOneAndUpdate(filter, update, { new: true });
+            if (!updated) { res.status(409).json({ error: 'CONFLICT' }); return; }
+            respond(updated);
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
         }

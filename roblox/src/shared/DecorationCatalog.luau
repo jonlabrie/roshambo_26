@@ -84,6 +84,12 @@ BUILDERS.tsukubai = function(): Model
     water.CFrame = CFrame.new(0, 1.0, 0) * CFrame.Angles(0, 0, math.rad(90))
     water.Parent = m
     m.PrimaryPart = basin
+    -- ⚠ PivotTo aligns a model by its PrimaryPart's PIVOT, and the basin's CFrame carries the
+    -- 90-degree roll that stands the cylinder up -- left alone, placement un-rotates the whole
+    -- prop flat on its side (parked defect (l); the mortar tubes shipped with the identical bug
+    -- and were fixed the same way at the 2026-09-04 gate, 9d3cd3c). Cancel the basin's own
+    -- frame so the model pivot is identity at the model origin.
+    basin.PivotOffset = basin.CFrame:Inverse()
     return m
 end
 

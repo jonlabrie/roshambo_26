@@ -16,7 +16,7 @@ carried a `checked:` stamp asserting a re-read. Symbol names survive a refactor;
 not, and a stale one sends a reader to unrelated code and quietly costs their trust in the page
 (schema rule 9). Grep for the named route or symbol.
 
-## (a) `POST /players/:id/purchase` is a read-modify-write race
+## ~~(a) `POST /players/:id/purchase` is a read-modify-write race~~ FIXED 2026-09-05 (`13ee64e`: one atomic findOneAndUpdate -- balance + uniqueness in the filter, deduction + grant in the update)
 
 - **Where:** `server/src/routes/apiV1.ts`, `POST /players/:robloxUserId/purchase`: `resolveUser` →
   `readEconomy` → `validatePurchase` → `applyPurchase` → `user.save()`. No
@@ -191,7 +191,7 @@ _(h) — the World Throw picked at random — was FIXED 2026-08-16, see [[world-
 `log.md`. It is deliberately NOT active in any deployed environment yet: both prod and dev
 run `TEST_MODE`, which keeps the R→P→S cycle. Defect (e) therefore still stands._
 
-## (i) tsukubai renders lying on its side — rolled-PrimaryPart PivotTo bug (2026-09-04)
+## ~~(l) tsukubai renders lying on its side~~ FIXED 2026-09-05 (`1684976`)
 
 - **Where:** `roblox/src/shared/DecorationCatalog.luau`, the `tsukubai` builder: `basin` is a
   cylinder stood up with `CFrame.Angles(0, 0, rad(90))` AND set as `PrimaryPart`;
@@ -201,14 +201,14 @@ run `TEST_MODE`, which keeps the R→P→S cycle. Defect (e) therefore still sta
 - **Fix sketch:** one line, same shape as the mortar fix: `basin.PivotOffset =
   basin.CFrame:Inverse()` in the builder. Owner was offered the fix mid-gate and deferred.
 
-## (j) proving-range tube bores a hair undersized under the bore-is-inner ruling (2026-09-04)
+## (m) proving-range tube bores a hair undersized under the bore-is-inner ruling (2026-09-04)
 
 - **Where:** `roblox/tools/builders/ProvingGround.luau` `TUBE*_SIZE` — outer diameter = bore.
   The 2026-09-04 owner ruling (deck mortars): 2"/4"/6" are INNER diameters; the deck tubes
   hollow at true bore with a 0.06 wall AROUND it. The proving racks' solid tubes read ~11%
   thin by comparison. Cosmetic; fixing means re-running the model bake.
 
-## (k) bootstrap PlayerAdded handlers have no catch-up for players already present (2026-09-04)
+## (n) bootstrap PlayerAdded handlers have no catch-up for players already present (2026-09-04)
 
 - **Where:** `roblox/src/server/main.server.luau` — none of the `Players.PlayerAdded:Connect`
   sites iterate `Players:GetPlayers()` after connecting. Any yield added to top-level bootstrap
