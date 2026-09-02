@@ -3222,3 +3222,23 @@ fed. Owner republished and verified live: shop totals correct, AND the two-devic
 same-server rejoin recipe (hold the instance open on Android, leave/rejoin on
 desktop) proved the deck-mortars fingerprint fix -- tubes present at their
 placements on rejoin. The deck-mortars arc has no open verifications left.
+
+## [2026-09-05] fix | The iOS flaky bell cornered -- and the frontend's hosting is not what the wiki says
+
+Owner: "the bell is missing from the PWA on my iPhone again. Didn't we already fix
+that?" We had (2026-08-17) -- and the fix was live -- but it disarmed itself: the
+unlock removed its gesture listeners after the first successful resume, iOS
+re-suspends/interrupts the context on lock/background, the return-nudge's resume()
+is refused outside a gesture, and no tap could repair it. Sticky audio death until
+a lucky reload = reads as random regression. Fixed (`d5187da`): the listeners never
+disarm; a healthy context makes the handler a no-op.
+
+⚠ DISCOVERED WHILE DIAGNOSING, correcting the wiki's own hosting claim:
+**playroshambo.com is S3 + CloudFront, not Amplify**, since ~2026-08-25
+(index.html last-modified 2026-08-25 21:10; response header `server: AmazonS3`),
+and the bucket/distribution are NOT in this machine's AWS account (198886313292 --
+zero buckets, zero distributions; the only Amplify app in reach is an unrelated
+2023 project). Frontend deploys are therefore manual AND undocumented: nothing in
+README_DEPLOY.md or the wiki describes the S3/CF path. The unlock fix is committed
+but NOT live until whoever owns that account syncs a fresh build. Also stale:
+CLAUDE.md's "dist/ is committed build output" -- dist/ is gitignored.
