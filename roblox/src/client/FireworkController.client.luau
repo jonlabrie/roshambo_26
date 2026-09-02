@@ -662,9 +662,15 @@ local function play(payload: any, distance: number)
                                 end
                                 shots[i] = {
                                     at = shotAt,
+                                    -- BELOW the break, not above it (owner, 2026-09-06: the
+                                    -- salutes were "detonating near the top of the arc, when
+                                    -- they should be falling with and in the middle of the
+                                    -- streaks, because that's where your eye is"). By salvo
+                                    -- time kamuro's arms have drooped 10-20 studs under the
+                                    -- anchor; the flashes land among them.
                                     offset = Vector3.new(
                                         rng:NextNumber(-14, 14),
-                                        rng:NextNumber(6, 16),
+                                        rng:NextNumber(-22, -8),
                                         rng:NextNumber(-14, 14)
                                     ),
                                     speed = 0.94 + rng:NextNumber() * 0.12,
@@ -698,13 +704,13 @@ local function play(payload: any, distance: number)
                                     -- cap ("might be a little too big", and the roundness reads
                                     -- less at the smaller size).
                                     kem.Size = NumberSequence.new({
-                                        NumberSequenceKeypoint.new(0, 2.5),
-                                        NumberSequenceKeypoint.new(0.3, 8),
-                                        NumberSequenceKeypoint.new(1, 2.5),
+                                        NumberSequenceKeypoint.new(0, 1.6),
+                                        NumberSequenceKeypoint.new(0.3, 5),
+                                        NumberSequenceKeypoint.new(1, 1.6),
                                     })
                                     kem.Speed = NumberRange.new(0, 0)
                                     kem.Drag = 0
-                                    kem.Lifetime = NumberRange.new(0.15, 0.18)
+                                    kem.Lifetime = NumberRange.new(0.09, 0.12)
                                     kem.Brightness = 8
                                     kem.SpreadAngle = Vector2.new(0, 0)
                                     kem.Acceleration = Vector3.zero
