@@ -27,6 +27,7 @@ local FireworkDrafts = require(shared:WaitForChild("FireworkDrafts"))
 local FireworkSchedule = require(shared:WaitForChild("FireworkSchedule"))
 local FireworkDirector = require(shared:WaitForChild("FireworkDirector"))
 local BurstStyles = require(shared:WaitForChild("BurstStyles"))
+local MortarPlacement = require(shared:WaitForChild("MortarPlacement"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local FireworkLaunched = remotes:WaitForChild("FireworkLaunched") :: RemoteEvent
@@ -167,7 +168,7 @@ local function playSound(slot: Slot, id: string?, audible: boolean, from: Vector
     end
     local cam = workspace.CurrentCamera
     local dist = if cam then (cam.CFrame.Position - from).Magnitude else 0
-    task.delay(dist / BurstStyles.SOUND_LEVELS.speedOfSound, function()
+    local function fire()
         slot.sound.SoundId = id
         -- Per-shell jitter (seeded, so every client hears the same shell the same way):
         -- ±8% speed shifts pitch and length together, and even one clip stops sounding
@@ -175,7 +176,23 @@ local function playSound(slot: Slot, id: string?, audible: boolean, from: Vector
         -- run ±3% for the same reason.
         slot.sound.PlaybackSpeed = speed or 1
         slot.sound:Play()
-    end)
+        -- Seek past a clip's measured pre-roll so the transient lands ON the event
+        -- (BurstStyles.SOUND_TRIMS; the deck-launch thump carried ~0.2s of head).
+        local trim = BurstStyles.SOUND_TRIMS[id]
+        if trim then
+            slot.sound.TimePosition = trim
+        end
+    end
+    local delay = dist / BurstStyles.SOUND_LEVELS.speedOfSound
+    -- ⚠ SUB-FRAME DELAYS RUN INLINE. task.delay(0) still parks the thunk until the next
+    -- Heartbeat — a whole frame of silence for a listener standing AT the tube, where the
+    -- ear is least forgiving (owner, 2026-09-06: lag persisted after the head trim; the
+    -- residue was frame-hops, not the clip).
+    if delay < 1 / 60 then
+        fire()
+    else
+        task.delay(delay, fire)
+    end
 end
 
 -- ⚠ PRELOAD EVERY SOUND AND SPRITE ONCE, AT STARTUP. A Sound's first :Play() otherwise
@@ -190,13 +207,22 @@ task.spawn(function()
         s.SoundId = id
         table.insert(warm, s)
     end
-    for _, v in BurstStyles.SOUNDS do
-        if typeof(v) == "table" then
-            for _, id in v do
-                add(id)
+    -- The launch thumps warm FIRST. PreloadAsync works the list in order, and hash
+    -- iteration left the thump's place in line to luck — the clips every show opens
+    -- with (owner, 2026-09-06: launches lag for a few moments after start, then settle).
+    for _, id in BurstStyles.SOUNDS.launch do
+        add(id)
+    end
+    add(BurstStyles.SOUNDS.launch_heavy)
+    for role, v in BurstStyles.SOUNDS do
+        if role ~= "launch" and role ~= "launch_heavy" then
+            if typeof(v) == "table" then
+                for _, id in v do
+                    add(id)
+                end
+            else
+                add(v)
             end
-        else
-            add(v)
         end
     end
     for _, id in BurstStyles.TEXTURES do
@@ -417,6 +443,26 @@ local function play(payload: any, distance: number)
         end
     end
 
+    -- THE SHELL-LEVEL BOOST ROLL (owner, 2026-09-05, superseding the per-phase roll): the
+    -- surprise is a property of the SHELL -- "you landed the bonus" -- so one seeded roll
+    -- against the first boost-carrying phase's chance decides every boosted phase AND whether
+    -- boostOnly phases (wa's second ring; later, salute endings) exist at all. Drawn here,
+    -- before the schedule loop, only when the recipe carries boost anywhere: recipes without
+    -- it consume nothing, and the draw is a pure function of the recipe on every client.
+    local shellBoosted = false
+    do
+        local chance: number? = nil
+        for _, ev in schedule do
+            if ev.boost then
+                chance = ev.boost.chance
+                break
+            end
+        end
+        if chance then
+            shellBoosted = rng:NextNumber() < chance
+        end
+    end
+
     local bonus = last >= BurstStyles.BONUS.minFlight and bonusRoll < BurstStyles.BONUS.chance
     local lifeScale = 1
     if bonus then
@@ -431,11 +477,27 @@ local function play(payload: any, distance: number)
 
     active += 1
     for _, ev in schedule do
-        task.delay(ev.at, function()
+        -- The at=0 report runs INLINE: task.delay(0) costs a Heartbeat, and that frame plus
+        -- playSound's own hop plus the clip's attack was the launch-thump lag a listener at
+        -- the tube heard (owner, 2026-09-06). Timed phases keep task.delay.
+        local runEvent = function()
             local anchorPos = if ev.anchor == "apex" then apex else origin
             if ev.kind == "report" then
                 slot.shell.Position = origin
-                playSound(slot, ev.sound, lod.sound, origin, soundSpeed)
+                -- The tube's voice: an explicit recipe sound wins; otherwise an L-tube shell
+                -- speaks with the heavy close-miked grunt and everything else rotates through
+                -- the launch pool. The pool draw is seeded, and the branch is decided by
+                -- shellId (identical on every client), so clients stay in rng lockstep.
+                local launchId = ev.sound
+                if not launchId then
+                    if MortarPlacement.SHELL_MORTAR[payload.shellId] == "mortar:L" then
+                        launchId = BurstStyles.SOUNDS.launch_heavy
+                    else
+                        local launchPool = BurstStyles.SOUNDS.launch
+                        launchId = launchPool[rng:NextInteger(1, #launchPool)]
+                    end
+                end
+                playSound(slot, launchId, lod.sound, origin, soundSpeed)
                 -- THE MUZZLE FLASH: the visual partner of the launch thump, anchoring the
                 -- launch to the tube the way the ribbon alone could not. A fixed ~14 sparks
                 -- (2% of a shell's budget; the mobile floor was measured at 500-700) with the
@@ -522,16 +584,21 @@ local function play(payload: any, distance: number)
                     end
                 end)
             elseif ev.kind == "burst" then
+                -- A boostOnly phase exists only on a lucky shell (owner, 2026-09-05): the
+                -- structural surprise. Skipped ENTIRELY on the floor roll -- no break, no
+                -- sound, no trail state change; the floor shell honestly never had it.
+                if ev.boostOnly and not shellBoosted then
+                    return
+                end
                 slot.trail.Enabled = false
-                -- THE BOOST ROLL (owner design, 2026-09-04): a burst phase carrying `boost`
-                -- has a seeded chance of an upgraded break — wider, brighter, MORE POINTS
-                -- (which divide the budget, never add particles), longer-lived. Per phase,
-                -- so each stage of a staged shell gets independently lucky; drawn whenever
-                -- the field exists, so the stream stays a pure function of the recipe.
+                -- THE BOOST (owner design, 2026-09-04; roll hoisted to the SHELL 2026-09-05):
+                -- a burst phase carrying `boost` upgrades on the shell's one seeded roll —
+                -- wider, brighter, MORE POINTS (which divide the budget, never add
+                -- particles), longer-lived.
                 local bev = ev
                 local phaseLife = lifeScale
                 if ev.boost then
-                    local boosted = rng:NextNumber() < ev.boost.chance
+                    local boosted = shellBoosted
                     if boosted then
                         bev = table.clone(ev)
                         bev.spread = (ev.spread or 30) * (ev.boost.spread or 1)
@@ -542,48 +609,83 @@ local function play(payload: any, distance: number)
                         -- ⚠ LUCK MUST BE LEGIBLE (owner, 2026-09-04: "hard to know you've
                         -- landed a bonus by sight"). Two sellers, both at ~75% of the
                         -- boosted break's life, as the stars begin to fade:
-                        -- 1. THE KICKER — a tight white-hot pop of stars at the anchor
-                        --    (fixed 16 sparks, the muzzle-flash budget disclosure applies).
+                        -- 1. THE KICKER — a tight pop of stars at the anchor (28 sparks,
+                        --    the muzzle-flash budget disclosure applies).
                         -- 2. THE DOUBLE-TAP — a second, sharper report on the tail voice,
                         --    skipped when the style owns its tail (hotaru's sizzle).
+                        -- boost.kicker = false skips BOTH (owner, 2026-09-05): a shell whose
+                        -- surprise is structural (wa's double ring) needs no selling.
                         local style = BurstStyles.styleOf(ev.style)
                         local kickAt = style.lifetime[2] * phaseLife * 0.75
-                        task.delay(kickAt, function()
-                            local kp = slot.points[MAX_POINTS]
-                            local kem = slot.emitters[MAX_POINTS]
-                            kp.CFrame = CFrame.new(anchorPos)
-                            kem.Texture = BurstStyles.TEXTURES.dot
-                            kem.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(255, 220, 160))
-                            kem.Size = NumberSequence.new(0.5)
-                            kem.Speed = NumberRange.new(14, 26)
-                            kem.Drag = 3
-                            kem.Lifetime = NumberRange.new(0.25, 0.4)
-                            kem.Brightness = 4
-                            kem.SpreadAngle = Vector2.new(360, 360)
-                            kem.Acceleration = Vector3.new(0, -4, 0)
-                            kem.Transparency = NumberSequence.new({
-                                NumberSequenceKeypoint.new(0, 0),
-                                NumberSequenceKeypoint.new(0.7, 0.1),
-                                NumberSequenceKeypoint.new(1, 1),
-                            })
-                            kem.Orientation = Enum.ParticleOrientation.FacingCamera
-                            kem.Rotation = NumberRange.new(0)
-                            kem.LightEmission = 1
-                            kem:Emit(16)
-                        end)
-                        if not style.tailSound and lod.sound then
-                            local soundPool = BurstStyles.SOUNDS[style.soundRole]
-                            local tapId = if typeof(soundPool) == "table"
-                                then soundPool[rng:NextInteger(1, #soundPool)]
-                                else soundPool
-                            local cam = workspace.CurrentCamera
-                            local dist = if cam then (cam.CFrame.Position - anchorPos).Magnitude else 0
-                            task.delay(kickAt + dist / BurstStyles.SOUND_LEVELS.speedOfSound, function()
-                                slot.tail.SoundId = tapId
-                                slot.tail.Volume = BurstStyles.SOUND_LEVELS.volume * 0.45
-                                slot.tail.PlaybackSpeed = soundSpeed * 1.12 -- sharper than the main
-                                slot.tail:Play()
+                        local wantKicker = ev.boost.kicker ~= false
+                        if wantKicker then
+                            task.delay(kickAt, function()
+                                local kp = slot.points[MAX_POINTS]
+                                local kem = slot.emitters[MAX_POINTS]
+                                kp.CFrame = CFrame.new(anchorPos)
+                                -- kickerStreaks (owner, 2026-09-05: yashi's violet center pop
+                                -- is "streaks, not stars"): the streak sprite runs its length
+                                -- along the velocity, which needs VelocityParallel PLUS
+                                -- Rotation -90 -- the sprite is authored vertical (the kamuro
+                                -- orientation saga) -- and real speed to streak along.
+                                local streaks = ev.boost.kickerStreaks == true
+                                kem.Texture = if streaks
+                                    then BurstStyles.TEXTURES.streak
+                                    else BurstStyles.TEXTURES.dot
+                                -- THE READABLE KICKER (owner, 2026-09-05: "not enough stars to
+                                -- carry the color"). Four levers, because glow alone whitens:
+                                -- at LightEmission 1 / Brightness 4 the pileup blew out to white
+                                -- (the vocabulary's stacking law), and the old white->color fade
+                                -- spent most of a 0.25-0.4s life in its white half. Hue from
+                                -- birth (color warmed 35% toward white), longer life, blowout
+                                -- pulled under full additive, and 28 stars (~4% of a shell's
+                                -- 500-700 budget -- the honest disclosure, up from 16/2%).
+                                local kc = ev.boost.kickerColor
+                                local hue = if kc
+                                    then Color3.fromRGB(kc[1], kc[2], kc[3])
+                                    else Color3.fromRGB(255, 220, 160)
+                                kem.Color = ColorSequence.new(hue:Lerp(Color3.new(1, 1, 1), 0.35), hue)
+                                kem.Size = NumberSequence.new(if streaks then 0.8 else 0.5)
+                                kem.Speed = if streaks
+                                    then NumberRange.new(24, 38)
+                                    else NumberRange.new(16, 30)
+                                kem.Drag = 3
+                                -- streak kickers rain (owner, 2026-09-05): the violet streaks
+                                -- get the time to arc out and fall; dot pops stay snappy.
+                                kem.Lifetime = if streaks
+                                    then NumberRange.new(0.85, 1.2)
+                                    else NumberRange.new(0.45, 0.7)
+                                kem.Brightness = 2.5
+                                kem.SpreadAngle = Vector2.new(360, 360)
+                                kem.Acceleration = Vector3.new(0, -4, 0)
+                                kem.Transparency = NumberSequence.new({
+                                    NumberSequenceKeypoint.new(0, 0),
+                                    NumberSequenceKeypoint.new(0.7, 0.1),
+                                    NumberSequenceKeypoint.new(1, 1),
+                                })
+                                kem.Orientation = if streaks
+                                    then Enum.ParticleOrientation.VelocityParallel
+                                    else Enum.ParticleOrientation.FacingCamera
+                                kem.Rotation = if streaks
+                                    then NumberRange.new(-90, -90)
+                                    else NumberRange.new(0)
+                                kem.LightEmission = 0.85
+                                kem:Emit(28)
                             end)
+                            if not style.tailSound and lod.sound then
+                                local soundPool = BurstStyles.SOUNDS[style.soundRole]
+                                local tapId = if typeof(soundPool) == "table"
+                                    then soundPool[rng:NextInteger(1, #soundPool)]
+                                    else soundPool
+                                local cam = workspace.CurrentCamera
+                                local dist = if cam then (cam.CFrame.Position - anchorPos).Magnitude else 0
+                                task.delay(kickAt + dist / BurstStyles.SOUND_LEVELS.speedOfSound, function()
+                                    slot.tail.SoundId = tapId
+                                    slot.tail.Volume = BurstStyles.SOUND_LEVELS.volume * 0.45
+                                    slot.tail.PlaybackSpeed = soundSpeed * 1.12 -- sharper than the main
+                                    slot.tail:Play()
+                                end)
+                            end
                         end
                     end
                 end
@@ -639,7 +741,12 @@ local function play(payload: any, distance: number)
                 end
                 fireBurst(slot, bev, anchorPos, rng, phaseLife)
             end
-        end)
+        end
+        if ev.at > 0 then
+            task.delay(ev.at, runEvent)
+        else
+            runEvent()
+        end
     end
 
     -- Released after the last phase plus the longest burst style's release tail, so the slot is

@@ -510,7 +510,14 @@ local coordinator = RoundCoordinator.new({
     },
 })
 
-Players.PlayerAdded:Connect(function(player)
+-- Parked defect (n), fixed 2026-09-05: every PlayerAdded site now sweeps the players ALREADY
+-- present after connecting -- a join that lands during any bootstrap yield above a connect was
+-- silently missed (the mortar CSG hit exactly that window, d510c69: dead session, no claim).
+-- Each handler is join-idempotent so the sweep-vs-event double run is harmless.
+local function onPlayerJoinProfile(player: Player)
+    if player:FindFirstChild("leaderstats") then
+        return -- already processed (catch-up sweep raced the real event)
+    end
     local stats = Instance.new("Folder")
     stats.Name = "leaderstats"
     for _, name in { "Points", "Pot", "Streak" } do
@@ -571,7 +578,12 @@ Players.PlayerAdded:Connect(function(player)
             warn(`[PROFILE] sync failed for {player.UserId}: {res.error or res.status}`)
         end
     end)
-end)
+end
+
+Players.PlayerAdded:Connect(onPlayerJoinProfile)
+for _, p in Players:GetPlayers() do
+    task.spawn(onPlayerJoinProfile, p)
+end
 
 SubmitPick.OnServerEvent:Connect(function(player, throwValue)
     if type(throwValue) ~= "string" then
@@ -827,11 +839,15 @@ task.spawn(function()
     end
 end)
 
-Players.PlayerAdded:Connect(function(player)
+local function onPlayerJoinBoard(player: Player)
     if lastBoard then
-        BoardData:FireClient(player, lastBoard)
+        BoardData:FireClient(player, lastBoard) -- re-fire is an idempotent client update
     end
-end)
+end
+Players.PlayerAdded:Connect(onPlayerJoinBoard)
+for _, p in Players:GetPlayers() do
+    task.spawn(onPlayerJoinBoard, p) -- defect (n): catch a join that landed before this connect
+end
 
 -- FIX 4: names in leaders/recordsWeek/recordsAll/heat are EXTERNAL (player-chosen display
 -- names) and this feed broadcasts to every client, world-visible on the Stats room's walls —
@@ -965,12 +981,16 @@ local function pushStatsPersonal(player: Player)
     end
 end
 
-Players.PlayerAdded:Connect(function(player)
+local function onPlayerJoinStats(player: Player)
     if lastStats then
-        StatsData:FireClient(player, lastStats)
+        StatsData:FireClient(player, lastStats) -- re-fire is an idempotent client update
     end
     task.spawn(pushStatsPersonal, player)
-end)
+end
+Players.PlayerAdded:Connect(onPlayerJoinStats)
+for _, p in Players:GetPlayers() do
+    task.spawn(onPlayerJoinStats, p) -- defect (n): catch a join that landed before this connect
+end
 
 task.spawn(function()
     while true do
@@ -1831,8 +1851,19 @@ for _, action in siteCoordinator:vacantActions() do
     applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
 end
 
-Players.PlayerAdded:Connect(function(player)
+-- Defect (n): once-per-join guard, so the catch-up sweep below and the real PlayerAdded event
+-- can never run the economy flow twice for one player (double GET, double claim). Cleared in
+-- PlayerRemoving with the rest of the per-uid state.
+local economyJoinStarted: { [string]: boolean } = {}
+local function onPlayerJoinEconomy(player: Player)
     task.spawn(function()
+        do
+            local uid = tostring(player.UserId)
+            if economyJoinStarted[uid] then
+                return
+            end
+            economyJoinStarted[uid] = true
+        end
         local res = net:getEconomy(tostring(player.UserId))
         local uid = tostring(player.UserId)
         local ecoData = if res.ok then res.data else nil
@@ -1912,7 +1943,12 @@ Players.PlayerAdded:Connect(function(player)
         pushAccessState(player, uid)
         recomputeAllAccess()
     end)
-end)
+end
+
+Players.PlayerAdded:Connect(onPlayerJoinEconomy)
+for _, p in Players:GetPlayers() do
+    task.spawn(onPlayerJoinEconomy, p) -- defect (n): the window the mortar CSG hit (d510c69)
+end
 
 -- Client-pull sync. The join handler pushes EconomyState/PreferenceState/etc. ONCE, but on a live
 -- server those one-shot pushes can fire before a client's listeners are connected (RemoteEvents do
@@ -1936,6 +1972,14 @@ RequestSync.OnServerEvent:Connect(function(player)
     end
     echoBackDoor(player, uid)
     pushAccessState(player, uid)
+    -- FireworkState too (live-place find, 2026-09-05: the shop showed zero holdings while the
+    -- picker was accurate). The join's one-shot FireworkState push races every listener
+    -- independently -- ShopController connects later in script order than main.client and
+    -- missed it, and this re-echo previously sent everything EXCEPT fireworks, so nothing ever
+    -- re-delivered the counts to an idle player. The pull now returns the COMPLETE join state.
+    if pushFireworkState then
+        pushFireworkState(player)
+    end
 end)
 
 Players.PlayerRemoving:Connect(function(player)
@@ -1984,6 +2028,7 @@ Players.PlayerRemoving:Connect(function(player)
     -- for the whole session while muzzleOriginFor keeps firing shells from the (now invisible)
     -- resolved muzzle. Clearing it here forces the next pushFireworkState to always rebuild once.
     mortarRenderedFingerprint[uid] = nil
+    economyJoinStarted[uid] = nil -- defect (n): let a rejoin run the economy flow afresh
     recomputeAllAccess()
     local action = siteCoordinator:onLeave(uid)
     if action then
@@ -3100,9 +3145,21 @@ portalController:start()
 
 print(`[ROSHAMBO] playable loop starting against {config.baseUrl}`)
 task.spawn(function()
+    -- ⚠ pcall'd, ALWAYS (the (g)-adjacent hazard, fixed 2026-09-05): this loop IS the game --
+    -- one throw here (a backend hiccup mid-decode, a server/place duration-shape mismatch on
+    -- the FIRST poll) used to kill the round loop for the whole server until restart. A failed
+    -- poll now logs and retries on a short backoff instead; the round loop never dies.
+    local POLL_ERROR_BACKOFF = 3
     while true do
-        local delay = coordinator:pollOnce()
-        task.wait(delay)
+        local ok, result = pcall(function()
+            return coordinator:pollOnce()
+        end)
+        if ok then
+            task.wait(result)
+        else
+            warn(`[ROUND] pollOnce threw ({tostring(result)}); retrying in {POLL_ERROR_BACKOFF}s`)
+            task.wait(POLL_ERROR_BACKOFF)
+        end
     end
 end)
 

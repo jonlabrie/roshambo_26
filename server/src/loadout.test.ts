@@ -151,6 +151,20 @@ describe('validateDecorations', () => {
     it('accepts a well-formed list', () => {
         expect(validateDecorations(ok())).toEqual({ ok: true });
     });
+    it('with an owned list: accepts rearrangements of owned instances, rejects minted ones', () => {
+        // Parked defect (b): a full-replace PUT may move/remove what was purchased,
+        // never mint. Ownership is the (id, propId) pair of a stored instance.
+        const owned = [
+            { id: 1, propId: 'bonsai', offset: [0, 0], facing: 'N' },
+            { id: 2, propId: 'bench', offset: [3, -4], facing: 'E' },
+        ];
+        expect(validateDecorations(ok(), owned)).toEqual({ ok: true }); // moved copies of owned
+        expect(validateDecorations([owned[1]], owned)).toEqual({ ok: true }); // removal is fine
+        expect(validateDecorations([{ id: 3, propId: 'bonsai', offset: [0, 0], facing: 'N' }], owned).ok)
+            .toBe(false); // minted instance id
+        expect(validateDecorations([{ id: 1, propId: 'bench', offset: [0, 0], facing: 'N' }], owned).ok)
+            .toBe(false); // owned id wearing a different prop
+    });
     it('accepts an empty list', () => {
         expect(validateDecorations([])).toEqual({ ok: true });
     });

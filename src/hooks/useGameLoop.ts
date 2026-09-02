@@ -305,7 +305,23 @@ export function useGameLoop() {
         const remove = () => events.forEach(e => document.removeEventListener(e, unlock, true))
         function unlock() {
             const ctx = ensureAudioContext()
+            // NEVER DISARM (2026-09-05, the iOS flake finally cornered). The previous version
+            // removed these listeners once resume() first succeeded -- but iOS re-suspends or
+            // INTERRUPTS the context on lock/background/calls, the visibilitychange nudge's
+            // resume() is refused outside a gesture, and with the listeners gone no tap could
+            // ever repair it: audio death was sticky until a lucky reload, which read as "the
+            // bell is missing again" and cleared itself at random. A healthy context makes
+            // this handler a one-comparison no-op, so listening forever costs nothing and
+            // every tap for the rest of the session is a repair opportunity.
             if (!ctx) return
+            // LOAD FIRST, UNCONDITIONALLY (2026-09-05, the regression the never-disarm fix
+            // shipped): fetching and decoding the bell needs no gesture and no running
+            // context, but it used to live only behind the resume() below -- so when a
+            // desktop context was born already 'running', the early return skipped the ONLY
+            // call that ever loads the buffer and the bell went silent everywhere. loadBell
+            // is ref-guarded idempotent; after the first success this line costs nothing.
+            void loadBell(ctx)
+            if (ctx.state === 'running') return
             // iOS wants a source actually STARTED inside the gesture, not merely a resume().
             try {
                 const src = ctx.createBufferSource()
@@ -316,20 +332,10 @@ export function useGameLoop() {
                 // A context too dead to make a one-sample buffer is not worth failing over;
                 // the resume below is the part that matters.
             }
-            // KEEP LISTENING UNTIL IT ACTUALLY WORKED. The previous version removed the
-            // listeners on the first gesture, before resume() had resolved -- so one failed
-            // attempt meant no audio for the rest of the session. That is survivable on a
-            // desktop where the first try always succeeds, and fatal on iOS where it often
-            // does not.
-            void ctx.resume().then(() => {
-                if (ctx.state === 'running') {
-                    void loadBell(ctx)
-                    remove()
-                }
-            }).catch(() => {})
+            void ctx.resume().catch(() => {})
         }
         events.forEach(e => document.addEventListener(e, unlock, true))
-        return remove
+        return remove // unmount only -- the session itself never disarms
     }, [ensureAudioContext, loadBell])
 
     // iOS suspends or interrupts the context when the page goes to the background, and coming

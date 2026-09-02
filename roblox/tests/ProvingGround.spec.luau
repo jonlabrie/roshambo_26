@@ -89,15 +89,17 @@ describe("ProvingGround — the yard the range fires from", function()
             -- Rack_X is itself the 6" tube; Tube4 and Tube2 stand beside it.
             local tubes = { rack, childNamed(rack, "Tube4"), childNamed(rack, "Tube2") }
             local bores = { 0.5, 1 / 3, 1 / 6 } -- 6", 4", 2" in studs (1 stud = 1 ft)
+            local wall = 0.06 -- bore is the INNER diameter (owner ruling, deck-mortars gate);
+            -- the drawn cylinder is bore + 2*wall, same wall the deck tubes hollow against
             for i, t in tubes do
                 expect(t ~= nil).toBe(true)
                 assert(t)
                 local size = t.properties.Size
-                expect(math.abs(size[2] - bores[i]) < 0.001).toBe(true)
+                expect(math.abs(size[2] - (bores[i] + 2 * wall)) < 0.001).toBe(true)
                 expect(size[2] == size[3]).toBe(true)
-                -- Real display mortars run ~4-5.5:1 length-to-bore; the old 2:1 stubs
+                -- Real display mortars run ~4-5.5:1 length-to-BORE; the old 2:1 stubs
                 -- read as buckets (owner: "these mortar tubes are huge").
-                local ratio = size[1] / size[2]
+                local ratio = size[1] / bores[i]
                 expect(ratio > 4 and ratio < 5.5).toBe(true)
             end
         end

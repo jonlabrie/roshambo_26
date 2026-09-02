@@ -38,6 +38,8 @@ MortarPlacement.SHELL_MORTAR = {
     peony = "mortar:S",
     willow = "mortar:M",
     kiku = "mortar:S",
+    wa = "mortar:M",
+    yashi = "mortar:M",
 } :: { [string]: string }
 
 -- Proving-range proportions (1 stud = 1 ft): bore is tube inner diameter, length is tube length.

@@ -43,10 +43,18 @@ describe("FireworkDirector — distance LOD", function()
         expect(l.sound).toBe(true)
     end)
 
-    test("far bursts are thinned and silent", function()
+    test("far bursts are thinned but still HEARD -- audio reaches the far decks", function()
+        -- Owner, 2026-09-05: cross-canyon audibility is the product premise; audio used to
+        -- cut at NEAR_STUDS and a teahouse could not hear the bridge.
         local l = FireworkDirector.lodFor(FireworkDirector.FAR_STUDS + 1)
         expect(l.particles).toBe(FireworkDirector.PARTICLES_FAR)
-        expect(l.sound).toBe(false)
+        expect(l.sound).toBe(true)
+    end)
+
+    test("sound ends at AUDIBLE_STUDS, inside the render drop", function()
+        expect(FireworkDirector.lodFor(FireworkDirector.AUDIBLE_STUDS - 1).sound).toBe(true)
+        expect(FireworkDirector.lodFor(FireworkDirector.AUDIBLE_STUDS + 1).sound).toBe(false)
+        expect(FireworkDirector.AUDIBLE_STUDS < FireworkDirector.DROP_STUDS).toBe(true)
     end)
 
     test("particle count never rises with distance", function()

@@ -30,7 +30,11 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   schema `FireworkRecipes.luau` makes the blank-sky trap a test failure; Studio-gated
   `RequestProvingFire` fires any draft/shipped id from five mortar racks ON THE
   SUSPENSION BRIDGE (owner siting; surveyed catenary — per-station height + inward
-  tilt), judged from FallsLanding ~190 studs west at burst eye level. Panel opens
+  tilt). ⚠ VANTAGE CORRECTED 2026-09-05 (owner): the range is judged from the SOUTH
+  TERMINUS of the suspension bridge, edge-on to the five racks and close -- NOT from
+  FallsLanding ("I'm not using FallsLanding AT ALL"). The ~190-stud FallsLanding sightline
+  was the design assumption (the plaques were sized to it) and never the practice; tuning
+  targets the close, edge-on read. Panel opens
   ANYWHERE in Studio (P key / top-right chip, left-edge rail — a location-bound panel
   was ruled theater and the FiringPost deleted); modes single (rack A–E selector),
   ladder (variants side-by-side), sequence (2s apart); night via `ProvingNightOverride`
@@ -88,14 +92,13 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   player (PlayerAdded handlers have no catch-up loop — deferred via task.spawn), and
   join-time replication fired the tag signal before the padId attribute applied so
   no Move prompts bound (decorations included — a latent shipped bug). Firecracker
-  now launches from HAND height, not 6 studs overhead. ⚠ The same-server-rejoin
-  fingerprint fix is code-reviewed but NOT live-verified — solo Studio cannot
-  rejoin; verify on the published place. Spec
+  now launches from HAND height, not 6 studs overhead. The same-server-rejoin
+  fingerprint fix was LIVE-VERIFIED 2026-09-05 on the published place (two-device
+  hold-open, leave/rejoin: tubes present at their placements). Spec
   docs/superpowers/specs/2026-09-04-deck-mortars-design.md and plan
   docs/superpowers/plans/2026-09-04-deck-mortars.md. ⚠ **No SDD ledger was created** —
   `.superpowers/sdd/2026-09-04-deck-mortars/` does not exist, <!-- lint-ok: naming the ledger path in order to say it was never created -->
-  so the raw layer here is the spec, the plan and the branch's own commits. Same
-  shape as item 5's missing ledger on [[friends-family-baseline]].
+  so the raw layer here is the spec, the plan and the branch's own commits.
 - **Rail mounts (2026-09-05, merged `24c6da9..8e1a61b` + gate fixes `27b410d..dcdffed`,
   GATED)**: mortars are aimable hardware — `{mount: floor|rail, offset, aim: L|C|R}` records
   (legacy reads floor/C at the saved spot, never relocated), three aims in a 60° arc anchored
@@ -119,10 +122,21 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   plus a 3s rescan heartbeat that makes binding converge from ANY join interleaving
   (`27b410d`, `862568c` — five orderings were patched before instrumentation found the truth);
   (3) the lever's fall-through would have swept legacy records onto the rail — guarded
-  (`dcdffed`). ⚠ Same-server rejoin verification STILL pending the published place. Spec
+  (`dcdffed`). Same-server rejoin verification PASSED live 2026-09-05. Spec
   docs/superpowers/specs/2026-09-04-rail-mounts-design.md and plan
-  docs/superpowers/plans/2026-09-04-rail-mounts.md. ⚠ **No SDD ledger was created** here either —
-  `.superpowers/sdd/2026-09-04-rail-mounts/` does not exist. <!-- lint-ok: naming the ledger path in order to say it was never created -->
+  docs/superpowers/plans/2026-09-04-rail-mounts.md. ⚠ **No SDD ledger was created** here
+  either — `.superpowers/sdd/2026-09-04-rail-mounts/` does not exist. <!-- lint-ok: naming the ledger path in order to say it was never created -->
+- **Promotion worksheet (as of 2026-09-06)**: shipped through the five guarded steps —
+  **wa** (red double-ring, M tube, 5; boost 30% = structural second ring via the first
+  `boostOnly` phase, no kicker — "the double ring IS the tell") and **yashi** (palm,
+  M tube, 10; boost 30% = fifth arm via `boost.points` + violet `kickerStreaks` rain,
+  `e791ebd`). **Colorway ruling (owner, 2026-09-06): signature hues sell in the shop,
+  colorways live in collections** — ao/midori/murasaki reframed as collection palette
+  material, drafts pruned (archived at `2cd90b4`). Remaining shop families on the
+  worksheet: hotaru, kamuro, dan. Launch audio: thumps are now a 3-clip seeded
+  rotation (launch-deck-1/2/3) with launch-deck-4 reserved as the **L tube's grunt**
+  (`292e978`, dormant until the first L SKU — remember it when pricing a big shell);
+  per-clip head trims measured from source WAVs (peak−35ms).
 - VFX recipe (proven on device): rising Trail comet → flash core → radial burst →
   glitter/willow, glow via LightEmission + the one global Bloom, ~500–700
   particles/shell, client-side emission (server `Emit()` does not replicate).

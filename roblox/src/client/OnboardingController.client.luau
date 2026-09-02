@@ -100,6 +100,13 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "RoshamboOnboarding"
 gui.ResetOnSpawn = false
 gui.DisplayOrder = 10 -- above the minimal HUD (0), below the ledger takeover (20)
+-- ⚠ EXPLICIT, NEVER DEFAULTED (parked defect (d)'s true cause, found 2026-09-05): this place's
+-- ScreenGuis come up ZIndexBehavior.GLOBAL, where `card.ZIndex = 5` ranked the card's OPAQUE
+-- washi background above its own default-ZIndex labels -- every onboarding card rendered as an
+-- empty box, and the round-2 opacity fix is what completed the burial (at 8% transparency the
+-- entombed text still ghosted through, which is the "unreadable" that round tried to cure).
+-- Sibling renders children above their parent, which is the only sane semantics here.
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 gui.Parent = playerGui
 
 local card = Instance.new("TextButton")

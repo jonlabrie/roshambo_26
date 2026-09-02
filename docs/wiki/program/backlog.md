@@ -499,3 +499,64 @@ Two threads named for the next session:
 Context that survives the night: rail mounts GATED with wobble+break ("perfect, looks
 great"); place save/publish still pending (unlocks the same-server rejoin verification);
 parked defects (i)-(k) untouched.
+
+## The onboarding JOURNEY — a crafted path an 8-year-old can walk (owner, 2026-09-05)
+
+Owner direction, verbatim intent, queued for AFTER the fireworks sprint: the current beat
+copy is correct "but only if you know what a 'pot' or a 'ride' is. These are gambling terms
+-- fine -- but Roblox is, first and foremost, a kid's environment so we need to be
+thoughtful and precise in the journey we're taking them on as we answer the most important
+questions: what is this place? How does it work? What can I do? What makes it special? The
+onboarding path needs to be so smooth that even an 8-year old can do it."
+
+This extends the standing no-sports-book-language rule into the onboarding voice, and it is
+a JOURNEY design (sequence, pacing, vocabulary, the four questions above), not a copy edit.
+To be crafted owner+Claude together (owner: "together you and I need to craft this journey").
+Context: the beats now RENDER (defect (d) fixed 2026-09-05 -- every F&F guest would have seen
+empty boxes); the four existing beats are placeholders for this pass.
+
+## Fireworks monetization vocabulary: boosts standard, surprises typed, mystery + bundle SKUs (owner, 2026-09-05)
+
+Rulings from the wa worksheet session, shaping everything downstream:
+
+1. **The boost package is the STANDARD shape for most fireworks**: a quality floor with an
+   occasional "surprise and delight" (the kiku 30%-class luck design generalizes).
+2. **The surprise VARIES BY TYPE** — e.g., a blue ending burst instead of white, or a loud
+   bang at the end. Each family's promotion verdict should pick its own surprise.
+3. **Salutes are a missing vocabulary class**: "we haven't built any big bright single or
+   multiple bangs yet" — big flash+boom shells (single salute, multi-salute finale crackle)
+   are a planted wave-2 style, AND the raw material for bang-type surprises.
+4. **Mystery shells**: relatively inexpensive, reasonable price, ALWAYS a surprise and NEVER
+   a disappointment when consumed. (Design note: "never a disappointment" is a content-floor
+   constraint, not just randomness -- the pool must contain only delight.)
+5. **Mystery boxes**: purchasable containers holding random firework assortments.
+6. **Firework boxes**: clearly identified contents at a bundled price. Interlocks directly
+   with the Hanabiya box-art/merchandising pass (the box IS the shelf product).
+
+## Toolbox idea: mid-life color shift (owner, 2026-09-05, from the wa worksheet)
+
+The blue-edge surprise candidate was rejected at the range ("blue is unreadable" as an edge
+tint); owner: "you're going to have to do it halfway through" -- i.e., the burst blooms in
+its base color and SHIFTS hue partway through the burn. Needs a color-over-life override
+knob in the recipe/controller (the current ramp is style-fixed: white ignition -> color ->
+ember -> black). A natural surprise flavor for the hue families (ao/midori/murasaki) if
+they become colorways, or for any shell whose "different ending color" surprise should read
+clearly. Not built; banked.
+
+## Economy tuning, drops, return rewards, Robux (owner, 2026-09-05)
+
+Direction banked from the wa promotion session; none of it is build-now:
+
+1. **Prices and levels are provisional** -- tuned later "when we get a better feel for
+   things." Nothing in the current point prices is sacred.
+2. **Random shell DROPS for wins** -- winning can gift a shell.
+3. **Return rewards**: coming back on subsequent days earns something -- "a different kind
+   of streak" from the in-round one. Vocabulary note: keep the two streaks legibly distinct.
+4. **Session rewards**: staying long enough matters -- e.g., a reward at 10 throws in a visit.
+5. **Everything sells for Robux** ("obviously") -- extends the standing Lens B ruling
+   (2026-07-20: points buy everyday shells, Robux buys premium/finale; Developer Products,
+   grant only in server ProcessReceipt) from premium-only toward the full catalog.
+
+Interlocks: drops and return rewards are delight-delivery channels for the mystery-pool
+rule ("never a disappointment"); all reward framing must clear the onboarding voice ruling
+(kid-legible, no gambling vocabulary -- a drop is a GIFT, not a jackpot).

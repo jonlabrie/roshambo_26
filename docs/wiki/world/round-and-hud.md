@@ -1,7 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-27
-checked: 2026-08-31
+updated: 2026-09-02
 ---
 
 # Round & HUD
@@ -26,8 +25,10 @@ asymmetry that makes LOCK work: the HTTP API accepts throws during OPEN *and* LO
 Roblox `submitPick` accepts during OPEN only — reversing either strands buffered
 picks or lets players throw late. Owner gate 2026-08-05: a pick at ~1 s counts; the
 cam still sells the mechanism at 1 rpm — no re-gearing, do not revisit. The
-offset-by-one record, the deploy-lockstep hazard and the accepted
-world-throw-after-strike residual are catalogued on [[parked-defects]] (g).
+offset-by-one record and the deploy-lockstep hazard are catalogued on
+[[parked-defects]] (g). ⚠ **The world-throw-after-strike residual is no longer
+accepted** — it was OVERTURNED and fixed 2026-09-05 (`9f17c90` + `3066713`): a late
+reveal now lands late rather than wrong, and a true miss rests between windows.
 
 ## THE RULE: the drum is authoritative
 
@@ -115,9 +116,11 @@ the lint's new symbol check, on its first run. The glyph reel is `ReelStep.luau`
   RISK/BANK gate was withdrawn even though three tasks had shipped it green;
   replaced by a pot indicator + BANK THESE, with riding expressed by throwing again.
 - Owner gate 2026-08-05 on the HUD: closed ("I'm happy to close out HUD for now…"),
-  onboarding content deferred — that thread and its layout defect live on
-  [[backlog]] and [[parked-defects]] (d); the synthetic plate-click ledger question
-  is [[parked-defects]] (f).
+  onboarding content deferred — that thread lives on [[backlog]]. ⚠ **Its layout
+  defect, [[parked-defects]] (d), was FIXED 2026-09-05** (`4cf73ce`), and the recorded
+  AutomaticSize diagnosis was wrong: `ZIndexBehavior.Global` ranked the opaque card
+  above its own labels — the same trap as [[visible-is-not-pixels]]. The synthetic
+  plate-click ledger question is [[parked-defects]] (f), still open.
 - Standing check for any client-file dispatch: no gate can see the Roblox UI —
   reconcile every `HudLayout.X` read against real exports; 970 green tests say
   nothing about rendering.

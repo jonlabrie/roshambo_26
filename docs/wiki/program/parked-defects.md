@@ -30,7 +30,7 @@ not, and a stale one sends a reader to unrelated code and quietly costs their tr
   read-then-save pattern would let both read 1 and both write 0").
 - Verified present 2026-08-27. Behind `requireApiKey`.
 
-## (b) `PUT /players/:id/decorations` never checks ownership
+## ~~(b) `PUT /players/:id/decorations` never checks ownership~~ FIXED 2026-09-05 (`validateDecorations` takes the stored list; rearrange/remove only, never mint -- DECORATION_NOT_OWNED)
 
 - **Where:** `apiV1.ts`, `PUT /players/:robloxUserId/decorations` — `validateDecorations`
   (`server/src/loadout.ts`) checks
@@ -46,13 +46,13 @@ not, and a stale one sends a reader to unrelated code and quietly costs their tr
   (`nextDecorationId`/`appendDecoration`), or reject additions of unowned props.
 - Verified present 2026-08-27.
 
-## (c) `RESOLVE_FAILED` returns 500 (minor)
+## ~~(c) `RESOLVE_FAILED` returns 500 (minor)~~ FIXED 2026-09-05 (`8651794`, all 14 sites -> 404; note: the branch is defensively dead on /api/v1 robloxUserId routes, see (o))
 
 Thirteen sites in `apiV1.ts` answer a `resolveUser` miss with
 `res.status(500).json({ error: 'RESOLVE_FAILED' })`. It is a client condition and will
 bury real 500s in logs. Fix: a 4xx. Verified present 2026-08-27.
 
-## (d) Onboarding empty-card layout defect — CONFIRM FIRST
+## ~~(d) Onboarding empty-card layout defect~~ FIXED 2026-09-05 (`4cf73ce`) — the AutomaticSize diagnosis was WRONG: ZIndexBehavior.Global ranked the opaque card above its own labels; confirmed and fixed live at the gate (seenBeats cleared on dev to reproduce)
 
 - **Symptom** (owner, 2026-08-05, published place, Android, fresh device account): large,
   mostly-empty toast/card windows repeatedly opening, sometimes with a glyph.
@@ -69,7 +69,7 @@ bury real 500s in logs. Fix: a 4xx. Verified present 2026-08-27.
 - **Weight:** every F&F guest is a first-time player on a fresh account, so every guest
   would hit this. The content/pacing design pass is separate — see [[backlog]].
 
-## (e) TEST_MODE world-throw phase is seeded from a document count
+## ~~(e) TEST_MODE world-throw phase is seeded from a document count~~ FIXED 2026-09-05 (`testModePhaseShift`: the cycle continues from the newest persisted round's face; deploys no longer re-roll the phase)
 
 - **Where:** `server/src/index.ts`, `pickWorldThrow` — `TEST_MODE ? THROWS[roundCount % 3] : random`;
   `roundCount` is in-memory on `RoundEngine`, seeded at boot from
@@ -98,7 +98,7 @@ reproduce and diagnose first. (Precedent from the same feature: an earlier ledge
 was an *absent caller* — `EventBus.OpenLedger` had two listeners and zero firing sites —
 which no test can see.)
 
-## (g) Round structure: the offset-by-one diagnosis, and the accepted reveal-timing residual
+## ~~(g) Round structure: the offset-by-one diagnosis, and the reveal-timing residual~~ RESIDUAL OVERTURNED & FIXED 2026-09-05 (`9f17c90` + `3066713`)
 
 - **The diagnosis (fixed 2026-08-05, `830d2b8..00bf8f8` — now OPEN 51 / LOCK 2 /
   REVEAL 7), kept so it is never re-derived:** the old phase names were offset by one
@@ -107,7 +107,7 @@ which no test can see.)
   `REVEAL` was shorter than the drum's 3.45s settle, so the drum never finished inside
   its own phase. The jitter is in settlement (Mongo), not scheduling — two independent
   clocks.
-- **The parked residual, accepted ship-and-watch:** the world throw is decided at the end
+- **The residual (WAS accepted ship-and-watch; owner overturned 2026-09-05: "the drum should be authoritative" — the stale-face fallback is deleted; late payloads land late, a true stall-out rests BETWEEN windows and fires `drumMiss`, and the record releases on either cue):** the world throw is decided at the end
   of LOCK, so the payload lands 0–1.25s AFTER the bell against the drum's 1.45s commit
   deadline. `DrumStep.STALL_MAX` covers the overrun; worst case the drum lands on the
   WRONG FACE (`lastLandedThrow or "R"`). The tell is the glyph disagreeing with the tape
@@ -115,7 +115,7 @@ which no test can see.)
   (MessagingService push) is the designed fix; its unresolved blocker: Open Cloud
   MessagingService generally does NOT deliver to Studio sessions — spike that before
   estimating.
-- **Adjacent live hazard, verified still present 2026-08-27:** `pollOnce()` runs in a
+- **Adjacent live hazard — FIXED 2026-09-05 (`3066713`, pcall + 3s backoff):** `pollOnce()` runs in a
   bare `task.spawn` loop with no `pcall` (`roblox/src/server/main.server.luau`, the `coordinator:pollOnce()` loop)
   — one throw kills the round loop until restart, and a server/place duration-shape
   mismatch throws on the FIRST poll. Server and place must move together: push → wait for
@@ -201,14 +201,14 @@ run `TEST_MODE`, which keeps the R→P→S cycle. Defect (e) therefore still sta
 - **Fix sketch:** one line, same shape as the mortar fix: `basin.PivotOffset =
   basin.CFrame:Inverse()` in the builder. Owner was offered the fix mid-gate and deferred.
 
-## (m) proving-range tube bores a hair undersized under the bore-is-inner ruling (2026-09-04)
+## ~~(m) proving-range tube bores a hair undersized under the bore-is-inner ruling~~ FIXED 2026-09-05 (rebaked, drawn = bore + 2*0.06)
 
 - **Where:** `roblox/tools/builders/ProvingGround.luau` `TUBE*_SIZE` — outer diameter = bore.
   The 2026-09-04 owner ruling (deck mortars): 2"/4"/6" are INNER diameters; the deck tubes
   hollow at true bore with a 0.06 wall AROUND it. The proving racks' solid tubes read ~11%
   thin by comparison. Cosmetic; fixing means re-running the model bake.
 
-## (n) bootstrap PlayerAdded handlers have no catch-up for players already present (2026-09-04)
+## ~~(n) bootstrap PlayerAdded handlers have no catch-up for players already present~~ FIXED 2026-09-05 (`f450905`: all four PlayerAdded sites sweep `Players:GetPlayers()` after connecting, each handler join-idempotent)
 
 - **Where:** `roblox/src/server/main.server.luau` — none of the `Players.PlayerAdded:Connect`
   sites iterate `Players:GetPlayers()` after connecting. Any yield added to top-level bootstrap
@@ -217,3 +217,16 @@ run `TEST_MODE`, which keeps the R→P→S cycle. Defect (e) therefore still sta
   yield, `d510c69`); the structural fragility remains.
 - **Fix sketch:** after each connect, loop existing players through the same handler (idempotent
   guards where needed), the standard Roblox join-race idiom.
+
+## ~~(o) `resolveUser` upserts on ANY truthy robloxUserId — a garbage path id mints a junk user~~ FIXED 2026-09-05 (`568cdec`: digits-only router.param guard over all /players routes)
+
+- **Where:** `server/src/identity.ts` `resolveUser` — `if (identifier.robloxUserId)` then
+  `findOneAndUpdate(..., { upsert: true })`. Every `/api/v1/players/:robloxUserId/...` route
+  feeds the RAW path segment in, so `/players/%20/purchase` (or any typo'd id) permanently
+  mints a User with that string as its robloxId — the same identity-root pollution the
+  presence route's own comment guards against with explicit validation before resolveUser.
+  Found 2026-09-05 while fixing (c): the upsert also makes RESOLVE_FAILED unreachable on
+  these routes.
+- **Fix sketch:** validate the path id once (digits-only, as Roblox ids are) in a tiny
+  middleware or at each route's top, 400 on failure — mirroring the presence route's guard;
+  or make resolveUser itself refuse non-numeric robloxUserIds.

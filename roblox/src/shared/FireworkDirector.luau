@@ -20,6 +20,12 @@ FireworkDirector.MAX_CONCURRENT = 14
 -- Distance bands, in studs.
 FireworkDirector.NEAR_STUDS = 250
 FireworkDirector.FAR_STUDS = 700
+-- Fireworks are HEARD across the canyon (owner, 2026-09-05: "I couldn't hear a thing from
+-- fireworks shot from the proving range" at a teahouse above the arena -- and cross-canyon
+-- viewing IS the product premise). Audio used to cut at NEAR_STUDS (250); it now reaches to
+-- this, sized to the far teahouses and kept aligned with BurstStyles.SOUND_LEVELS.rolloffMax
+-- so the gate and the rolloff agree about where sound ends.
+FireworkDirector.AUDIBLE_STUDS = 900
 -- Past this, do not render at all. The canyon is long and a burst at the far rim is a few pixels.
 FireworkDirector.DROP_STUDS = 1400
 
@@ -63,7 +69,7 @@ function FireworkDirector.lodFor(distance: number): { particles: number, sound: 
         local t = (distance - near) / (far - near)
         particles = math.floor(pNear + (pFar - pNear) * t)
     end
-    return { particles = particles, sound = distance <= near }
+    return { particles = particles, sound = distance <= FireworkDirector.AUDIBLE_STUDS }
 end
 
 return FireworkDirector

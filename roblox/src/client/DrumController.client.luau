@@ -97,7 +97,7 @@ local glideD = 0
 local landTheta = 0
 local strikeT0 = -1
 local latestWorldThrow: string? = nil
-local lastLandedThrow: string? = nil
+local landingCue = "drumRest" -- "drumRest" (a real face) | "drumMiss" (honest between-windows stop)
 -- s past min spin to wait for the reveal before settling anyway. From DrumStep, not a local literal:
 -- main.client.luau's reveal-safety fallback has to sit BEHIND this worst case or it spoils the throw
 -- while the drum is still turning, and it can only do that if the number is visible outside this file.
@@ -156,10 +156,20 @@ RunService.Heartbeat:Connect(function(_dt)
         theta -= omega * _dt
         local haveThrow = latestWorldThrow ~= nil
         if os.clock() >= spinUntil and (haveThrow or os.clock() >= spinUntil + STALL_MAX) then
-            local throw = latestWorldThrow or lastLandedThrow or "R"
-            lastLandedThrow = throw
-            latestWorldThrow = nil
-            landTheta = landTargetFor(throw, omega * GLIDE_SEC / 2)
+            -- THE DRUM NEVER LIES (owner's ruling, 2026-09-05, overturning the ship-and-watch
+            -- residual): a late payload means the drum lands LATE; a payload that never comes
+            -- means it rests BETWEEN windows -- an honest miss, cue "drumMiss". The old
+            -- fallback (`lastLandedThrow or "R"`) put a stale face at the window for the tape
+            -- to contradict, which is worse than no face at all.
+            if haveThrow then
+                local throw = latestWorldThrow :: string
+                latestWorldThrow = nil
+                landTheta = landTargetFor(throw, omega * GLIDE_SEC / 2)
+                landingCue = "drumRest"
+            else
+                landTheta = DrumStep.missTargetTheta(theta, omega * GLIDE_SEC / 2)
+                landingCue = "drumMiss"
+            end
             glideP0 = theta
             glideD = theta - landTheta
             glideT0 = os.clock()
@@ -172,7 +182,7 @@ RunService.Heartbeat:Connect(function(_dt)
             theta = landTheta
             omega = 0
             mode = "hold"
-            EventBus.Cue:Fire({ kind = "drumRest" })
+            EventBus.Cue:Fire({ kind = landingCue })
         else
             theta = glideP0
                 - glideD * (3 * s * s - 2 * s * s * s)

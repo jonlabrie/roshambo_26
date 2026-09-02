@@ -52,9 +52,14 @@ local BASE_SIZE = { 3, 0.6, 3 } -- timber base block
 -- Mortar tubes at real proportions (cylinder Size is {length, dia, dia}; length -> world-up
 -- via CYL_VERTICAL). Rack_X IS the 6" tube — the server fires from its Position — with the
 -- 4" and 2" tubes standing beside it on the shared base.
-local TUBE6_SIZE = { 2.5, 0.5, 0.5 } -- 6" bore, 2.5 ft — the class the seed drafts imply
-local TUBE4_SIZE = { 1.5, 1 / 3, 1 / 3 } -- 4" bore, 1.5 ft
-local TUBE2_SIZE = { 0.85, 1 / 6, 1 / 6 } -- 2" bore, 10 in
+-- Parked defect (m), fixed 2026-09-05: bore is the INNER diameter (owner ruling at the
+-- deck-mortars gate), so the drawn cylinder is bore + 2×wall — the same 0.06 wall the deck
+-- tubes hollow against. Drawn solid (this is a baked model.json; the deck tubes' CSG hollow
+-- is runtime-only), sized honestly.
+local TUBE_WALL = 0.06
+local TUBE6_SIZE = { 2.5, 0.5 + 2 * TUBE_WALL, 0.5 + 2 * TUBE_WALL } -- 6" bore, 2.5 ft — the class the seed drafts imply
+local TUBE4_SIZE = { 1.5, 1 / 3 + 2 * TUBE_WALL, 1 / 3 + 2 * TUBE_WALL } -- 4" bore, 1.5 ft
+local TUBE2_SIZE = { 0.85, 1 / 6 + 2 * TUBE_WALL, 1 / 6 + 2 * TUBE_WALL } -- 2" bore, 10 in
 local TUBE6_X, TUBE4_X, TUBE2_X = -0.8, 0.1, 0.75 -- spread across the base, local X
 -- Plaque sized to read from the FallsLanding sightline (~190 studs); it STANDS ON the
 -- base's west edge rather than floating at tube height (the final review's float note).

@@ -80,7 +80,10 @@ BurstStyles.STYLES = {
     palm = {
         speed = { 26, 34 },
         drag = 1.4,
-        lifetime = { 1.8, 2.6 },
+        -- was {1.8, 2.6}: +0.4s (owner at the yashi audition, 2026-09-05: "yashi streaks
+        -- should have a longer life... to really let them rain down") -- the arms arc out,
+        -- die back, and visibly FALL before they fade.
+        lifetime = { 2.2, 3.0 },
         acceleration = { 0, -22, 0 },
         brightness = 2.2,
         spreadAngle = { 12, 12 }, -- narrow cone per arm
@@ -165,10 +168,29 @@ BurstStyles.TEXTURES = {
 -- deliberately intimate 9-34 rolloff: full volume out to a plateau, audible across the
 -- canyon. Never left to Sound defaults again (Volume 0.5 / RollOffMin 10 made the whole
 -- show a whisper from FallsLanding -- owner, 2026-09-03: "they don't seem very loud").
+-- Per-clip head trims, seconds skipped at play time via Sound.TimePosition -- a clip whose cut
+-- carries pre-roll lands its transient LATE, which physics-delay masked at range and point-blank
+-- deck launches exposed (owner, 2026-09-05: "a pretty significant delay between visual launch
+-- and the tube thump"). Measured in Studio by sampling PlaybackLoudness: launch-deck-2's first
+-- audible at 134ms, peak at 201ms. Trimming here beats re-uploading: one tunable number.
+-- 0.12 still lagged (owner, 2026-09-06): the envelope trimmed at 0.12 peaks 68ms after Play,
+-- stacked on frame-hop dispatch. 0.15 keeps ~35ms of rise so the transient still reads as a
+-- thump, not a click.
+BurstStyles.SOUND_TRIMS = {
+    -- Launch thumps, each trimmed to peak-minus-~35ms (measured from the source WAVs; the
+    -- offline envelope agreed with the in-engine PlaybackLoudness curve within 3ms).
+    ["rbxassetid://87713703495045"] = 0.15, -- launch-deck-2: peak at 185ms
+    ["rbxassetid://122319288610707"] = 0.14, -- launch-deck-1: peak at 175ms
+    ["rbxassetid://92892667329683"] = 0.135, -- launch-deck-3: peak at 170ms
+    ["rbxassetid://77117688726913"] = 0.16, -- launch-deck-4: peak at 195ms
+} :: { [string]: number }
+
 BurstStyles.SOUND_LEVELS = {
-    volume = 2,
-    rolloffMin = 45, -- studs of full volume around the shell
-    rolloffMax = 400, -- audible reach; the director's NEAR_STUDS (250) sits inside it
+    -- Turned up 2026-09-05 (owner: inaudible at a teahouse from the bridge): volume 2 -> 2.4,
+    -- reach 400 -> 900 so the far decks hear the show, min 45 -> 60 for a fuller plateau near.
+    volume = 2.4,
+    rolloffMin = 60, -- studs of full volume around the shell
+    rolloffMax = 900, -- audible reach; keep FireworkDirector.AUDIBLE_STUDS aligned with this
     -- Light is instant; sound is not. 1 stud = 1 foot and sound runs ~1125 ft/s, so every
     -- phase sound arrives distance/1125 late for THIS listener (owner, 2026-09-03: "the
     -- sound from an aerial burst should be slightly delayed"). ~0.17s from FallsLanding
@@ -194,7 +216,17 @@ BurstStyles.SOUNDS = {
     -- seeded rng, so a show is not one clip on repeat. Strobe and kamuro share the
     -- aerial pool as stand-ins until the firecracker-string and glitter-sizzle
     -- recordings land (owner ruling 2026-09-03).
-    report = "rbxassetid://87713703495045", -- launch-deck-2: the tube thump
+    -- The tube thumps. S/M launches rotate through the pool (seeded per shell, like the
+    -- burst pools); an L tube speaks with the heavy voice alone (owner, 2026-09-06:
+    -- deck-4 is "heavier/gruntier and much more close range... like from a bigger tube").
+    -- Recipes normally omit the report sound and let the controller resolve it here; an
+    -- explicit phase `sound` still overrides for a shell with its own launch voice.
+    launch = {
+        "rbxassetid://122319288610707", -- launch-deck-1
+        "rbxassetid://87713703495045", -- launch-deck-2 (the original, owner pick 2026-09-03)
+        "rbxassetid://92892667329683", -- launch-deck-3
+    },
+    launch_heavy = "rbxassetid://77117688726913", -- launch-deck-4: the L tube's grunt
     tail_strobe = "rbxassetid://92069275413514", -- jon-sizzle-c3-canyon-v6: 0.8s sizzle body, vast dark returns, lows shaved
     burst_peony = {
         "rbxassetid://89225206152876", -- burst-aerial-1

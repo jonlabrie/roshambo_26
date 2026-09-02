@@ -3162,6 +3162,31 @@ the `apiV1.ts` change is confined to purchase atomicity rather than the loadout 
 check** — the changes were same-day, so the three-day grace suppressed every prompt. A stamp is
 only as good as the last read behind it, and the grace window is exactly where that gap opens.
 
+**A fourth base advance closed seven parked defects, and that broke citations on three pages.**
+(a)–(e), (m) and (o) were fixed and (g)'s residual overturned, all 2026-09-05. Corrected here:
+[[round-and-hud]] still called the world-throw-after-strike residual *"accepted"* and still sent the
+reader to (d) for a live onboarding layout defect; [[friends-family-baseline]] item 6 still carried
+economy-API defects (a)–(c), now all three fixed. ⚠ **A DEFECT FIX IS AN EDIT TO EVERY PAGE THAT
+CITES THE LETTER**, and nothing links a bare letter, so nothing breaks visibly when it moves. This
+is the second run in a row where closing defects left stale references behind.
+
+⚠ **AND ONE DEFECT WAS FIXED IN CODE WITHOUT BEING STRUCK OFF THE BOARD.** `f450905` closed (n) —
+all four `PlayerAdded` sites now sweep `Players:GetPlayers()` after connecting, and the code carries
+the comment *"Parked defect (n), fixed 2026-09-05"* — but [[parked-defects]] still listed it open.
+Struck. The commit that fixes a defect and the commit that records it are separate here, and the
+second one is the one that gets skipped.
+
+⚠ **THE LOG'S KIND VOCABULARY IS DRIFTING FASTER THAN IT IS BEING CORRECTED — this needs a ruling,
+not another normalisation pass.** Eight more entries arrived outside rule 8's
+`gate|ship|decision|drop|defect|migrate|lint|audit`, using FOUR undefined kinds: `fix`, `fixed`,
+`shipped` and `correction`. That is on top of the six corrected days earlier. `fixed`/`fix` → `defect`
+and `shipped` → `ship` are plainly synonyms and were normalised as such. **`correction` is not** —
+retracting a claim the wiki got wrong is a first-class event in this project, it happens constantly,
+and no defined kind names it; these were mapped to `audit` as the least-wrong fit, which is not the
+same as right. **Either add `fix` and `correction` to `LOG_KINDS` in `tools/wiki/lint.mjs` and rule
+8, or expect this correction every run** — authors reach for these words because the vocabulary is
+missing them.
+
 ⚠ **`falls-dock` and `blender-pipeline` were read and deliberately NOT stamped `checked:`.**
 `falls-dock` rests on emitter positions, a place-only `UguisuScheduler` Script and asset ids only
 Studio can confirm; `blender-pipeline` still teaches the plane bisect for splitting a bill, which
@@ -3293,3 +3318,161 @@ through the ballistics) and a +-12-stud late-arc break perpendicular to the flig
 (zero at the muzzle, emerging near the peak). Drawn after the base scatter, so the
 nil-heading rng stream -- public sites, proving range, firecrackers -- stays
 byte-identical. Both numbers are one-line tunables in FireworkController.
+
+## [2026-09-05] ship | Defect-sweep day -- eleven closed, one overturned, the drum never lies
+
+Owner ruling: "let's work them, one at a time." Closed: (l) tsukubai PivotTo; (a)
+atomic purchase (balance + uniqueness in one findOneAndUpdate; portal double-sale
+was deterministically red); (b) decoration ownership (rearrange/remove only, never
+mint); (c) RESOLVE_FAILED -> 404 (branch defensively dead on robloxUserId routes);
+(o) NEW same-day find+fix: garbage path ids minted junk users -- digits-only
+router.param guard; (e) TEST_MODE phase continues from the last persisted face,
+deploys no longer re-roll the cycle; (n) all four PlayerAdded sites sweep players
+already present (the CSG-yield window class, closed structurally); (d) the
+empty onboarding cards -- the recorded AutomaticSize diagnosis was WRONG; the truth
+(found live: seenBeats cleared on dev, probes + the owner's eyes) was
+ZIndexBehavior.Global ranking the opaque card above its own labels, completed by
+the round-2 opacity fix; every F&F guest would have hit it; (m) proving bores
+rebaked to bore-is-inner; the (g)-adjacent bare pollOnce loop (one throw used to
+kill a server's rounds). OVERTURNED: the (g) reveal residual -- owner: "the drum
+should be authoritative" -- the drum now lands late rather than wrong, rests
+between windows on a true miss (drumMiss cue; record releases, celebrations stay
+silent). Backend fixes deployed to dev same-morning. Owner direction banked in
+backlog: the onboarding JOURNEY pass (kid-legible, no gambling vocabulary, the
+four questions), queued after the fireworks sprint. Suites at close: Lune 1654,
+Vitest 498. Still parked: (f) undetermined, (i)/(j) identity gates (decision-gated,
+not code-gated).
+
+## [2026-09-05] ship | PLACE PUBLISHED -- the whole fireworks arc reaches players
+
+Owner published the place. Everything since the last publish goes live at once: the
+vertical-line burst fix (adaa1fe -- shipped broken 2026-08-05 to 2026-09-01), the
+full vocabulary wave (five styles, staged shells, sound physics, hotaru's sizzle),
+kiku, deck mortars, rail mounts with wobble/break and DEFAULT_MOUNT=rail, the
+onboarding-card fix, the drum-never-lies build, and the day's defect sweep.
+Verified at publish time: the published place targets the DEV backend
+(SecretsLocal -> zzaw22ugpq / roshambo-dev) -- the service that carries every
+route and fix; prod (the PWA's backend) is untouched by this arc, by design.
+UNLOCKED: the same-server rejoin verification (deck-mortars fingerprint fix) --
+recipe: two sessions hold the server open, leave+rejoin on one.
+
+## [2026-09-05] gate | Live verifications on the published place -- rejoin PASSES, shop heals
+
+Minutes after publish the owner found the shop showing zero holdings while the
+picker was accurate -- the late-listener class's third victim (FireworkState was
+the one payload RequestSync never re-echoed). Fixed same-hour (`a3c4c74`):
+RequestSync now re-delivers the COMPLETE join state and ShopController pulls until
+fed. Owner republished and verified live: shop totals correct, AND the two-device
+same-server rejoin recipe (hold the instance open on Android, leave/rejoin on
+desktop) proved the deck-mortars fingerprint fix -- tubes present at their
+placements on rejoin. The deck-mortars arc has no open verifications left.
+
+## [2026-09-05] defect | The iOS flaky bell cornered -- and the frontend's hosting is not what the wiki says
+
+Owner: "the bell is missing from the PWA on my iPhone again. Didn't we already fix
+that?" We had (2026-08-17) -- and the fix was live -- but it disarmed itself: the
+unlock removed its gesture listeners after the first successful resume, iOS
+re-suspends/interrupts the context on lock/background, the return-nudge's resume()
+is refused outside a gesture, and no tap could repair it. Sticky audio death until
+a lucky reload = reads as random regression. Fixed (`d5187da`): the listeners never
+disarm; a healthy context makes the handler a no-op.
+
+⚠ DISCOVERED WHILE DIAGNOSING, correcting the wiki's own hosting claim:
+**playroshambo.com is S3 + CloudFront, not Amplify**, since ~2026-08-25
+(index.html last-modified 2026-08-25 21:10; response header `server: AmazonS3`),
+and the bucket/distribution are NOT in this machine's AWS account (198886313292 --
+zero buckets, zero distributions; the only Amplify app in reach is an unrelated
+2023 project). Frontend deploys are therefore manual AND undocumented: nothing in
+README_DEPLOY.md or the wiki describes the S3/CF path. The unlock fix is committed
+but NOT live until whoever owns that account syncs a fresh build. Also stale:
+CLAUDE.md's "dist/ is committed build output" -- dist/ is gitignored.
+
+## [2026-09-05] audit | The "S3+CF migration" claim two entries up is RETRACTED -- overreach, owner caught it
+
+Amplify Hosting serves `server: AmazonS3` + `via: cloudfront` headers -- they cannot
+distinguish Amplify from hand-rolled S3+CF, and the `last-modified: 2026-08-25` I
+read as a migration date is better explained as the LAST AUTO-BUILD, made minutes
+before auto-deploy was switched off that same day (the 08-25 entry, written from
+live console observation, which necessarily had the Amplify app in hand). The wiki's
+hosting claim STANDS: playroshambo.com is Amplify, frozen since 08-25. What remains
+true and unresolved from the retracted entry: (1) the Amplify app is not visible to
+this machine's AWS credentials (account 198886313292, us-east-1/2, us-west-1/2) --
+it lives in another region or another account, and the frontend deploy path is
+undocumented from this repo's seat; (2) CLAUDE.md's "dist/ is committed" is stale
+(gitignored); (3) the iOS bell fix (`d5187da`) is committed but not live until an
+Amplify build runs from wherever the app lives.
+
+## [2026-09-05] audit | Second retraction on the same thread: the Amplify app was HERE all along
+
+The retraction above kept one false residue: "not visible to this machine's AWS
+credentials." Owner, looking at the console: "the roshambo_26 Amplify app is
+sitting right there, in us-east-1, under that account." Correct. The region scan
+omitted exactly us-east-1 (the default profile region is us-west-1; the loop
+checked us-west-2/us-west-1/us-east-2). App: roshambo_26, appId dnlwlh7md4i46,
+us-east-1, account 198886313292. Frontend deploy procedure, now DOCUMENTED:
+`aws amplify start-job --region us-east-1 --app-id dnlwlh7md4i46 --branch-name
+main --job-type RELEASE` (auto-deploy stays off per the 2026-08-25 ruling). The
+iOS bell fix (`d5187da`) shipped via job 53. Lesson, same family as the headers
+overreach: an absence claim is only as good as the completeness of the search --
+name the regions you scanned when you claim "not found".
+
+## [2026-09-05] defect | The PWA bell saga closes -- and the fake ad dies
+
+Three acts: (1) the flake diagnosis stood -- the unlock disarmed after first
+success and iOS interruptions made audio death sticky (`d5187da`); (2) that fix
+shipped its own regression -- loadBell lived ONLY behind the resume(), so a
+desktop context born 'running' never loaded the buffer at all; the owner caught it
+within minutes and the console's own [SFX] instrumentation cornered it
+(`6f8e2c0`: load on any gesture, unconditionally); (3) verified live by the owner:
+one touch of the Arena, bell rings -- and the touch-first requirement is the web
+platform's autoplay rule, invisible in real play where the first throw IS the
+first touch. Deploys: Amplify jobs 53-55 via the newly-documented start-job
+procedure. Also gone at owner request (`aa813c8`, job 55): the Antigravity-era
+"Sponsored Intelligence" mock ad squatting on the Arena.
+
+## [2026-09-05] audit | The proving range's real vantage -- and yashi v3 rejected
+
+Owner: "I'm not using FallsLanding AT ALL for proving range, I'm standing on the
+south terminus of the suspension bridge and looking at the 5 mortar racks edge on."
+The recorded ~190-stud FallsLanding sightline was design assumption, not practice;
+fireworks.md corrected. It also explains why the launch-thump pre-roll registered
+at the range (close vantage, no physics-delay mask; fixed same day, SOUND_TRIMS).
+Worksheet note: yashi v3 (6 arms) "particularly bad" -- consistent with the budget
+law (points DIVIDE the budget; six ways is where the palm goes wispy, worse under
+the longer rain). Floor stands at v1 (4 arms).
+
+## [2026-09-06] defect | Launch-thump lag: frame-hops, not just the clip head
+
+The 0.12 head trim helped but "not fixed" (owner). Per-stage measurement in
+Studio found no single culprit -- a STACK: the report's task.delay(0) parks a
+Heartbeat, playSound's distance delay parks another, the trimmed clip still
+ramped 68ms to peak, plus ~30ms SoundId swap: ~150ms+ at the tube. Fixed
+`0e8433e`: zero-delay dispatch runs inline (at=0 phases and sub-frame sound
+delays), trim deepened to 0.15 (peak ~38ms post-Play, thump not click). The
+"settles after start" residue was preload order -- hash iteration left the
+thump's queue position to luck; `00d4ebe` warms it first. Owner: "thump timing
+pretty good now." Lesson twice-earned this sprint: measure each stage of the
+real path; components that are individually fine can sum to a defect.
+Also confirmed: RequestProvingFire is Studio-only by design (main.server.luau
+IsStudio gate) -- live-place testing means deck launches with owned shells.
+
+## [2026-09-06] ship | Launch thumps pool; deck-4 reserved as the L tube's grunt
+
+Owner uploaded launch-deck-1/3/4. 1 and 3 join deck-2 in a seeded rotation
+(`292e978`, verified by ear); deck-4 ("heavier/gruntier and much more close
+range... like from a bigger tube") is the L tube's voice via SHELL_MORTAR --
+dormant until the first L SKU ships. Recipes no longer hardcode the report
+sound; the controller resolves it, explicit phase sound still overrides. Trims
+measured from source WAVs (peak minus ~35ms; offline envelope matched
+in-engine within 3ms -- future clips can be trimmed before upload).
+
+## [2026-09-06] ship | Yashi promoted; colorway ruling lands
+
+Owner rulings: yashi M tube at 10; "signature hues in shop, colorways in
+collections." Yashi ran the five guarded steps (`e791ebd`: catalog 4-arm palm
+with 30% fifth-arm boost + violet streak-rain kicker, fixture, server,
+ShellDisplay, SHELL_MORTAR) and its draft family pruned behind it. The
+colorway ruling reframes ao/midori/murasaki as collection palette material --
+families pruned, archived at `2cd90b4`. Worksheet remainder: hotaru, kamuro,
+dan. Dev backend redeployed (App Runner op 6032e84c). Server suite green
+(one socketAdapter identity-claim flake observed, passed on rerun).

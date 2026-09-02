@@ -7,7 +7,7 @@ import { Throw } from './engine/GameRules';
 // Prices are deliberately tiny. totalPoints changes ONLY on bank, and at a 60-second round banking
 // every win is about one point every three minutes — so a shell must cost about one banked win or
 // nobody ever fires one. The 50-point deck is already hours of play.
-export const SHELL_IDS = ['firecracker', 'peony', 'willow', 'ishibana', 'kiku'] as const;
+export const SHELL_IDS = ['firecracker', 'peony', 'willow', 'ishibana', 'kiku', 'wa', 'yashi'] as const;
 
 export const SHELL_PRICES: Record<string, number> = {
     firecracker: 1,
@@ -17,13 +17,19 @@ export const SHELL_PRICES: Record<string, number> = {
     // The first range-promoted shell (2026-09-04): a hot gold chrysanthemum that ~30% of
     // the time upgrades itself mid-air. Priced above peony for the luck, below willow.
     kiku: 4,
+    // The red ring (2026-09-05): ~30% of the time a second, wider ring blooms behind the
+    // first with an orange-star kicker -- the first STRUCTURAL surprise. Owner-priced.
+    wa: 5,
+    yashi: 10,
 };
 
 // Gear, not real estate — deliberately under the deck ladder (50 / 500 / 3000).
 export const MORTAR_PRICES = {
-    'mortar:S': 40,
-    'mortar:M': 250,
-    'mortar:L': 1000,
+    // Owner re-priced 2026-09-05 (was 40/250/1000: "sounds expensive"): gear should be a
+    // step, not a wall -- and even these may drop once the Robux benchmark exists.
+    'mortar:S': 10,
+    'mortar:M': 50,
+    'mortar:L': 100,
 } as const;
 
 export type MortarId = keyof typeof MORTAR_PRICES;
@@ -50,6 +56,8 @@ export const REQUIREMENTS: Record<string, Requirement> = {
     // cosmetic rather than pay-to-win, and it must not be crossed.
     ishibana: { kind: 'condition', afterWorldThrow: 'R' },
     kiku: { kind: 'gear', mortar: 'mortar:S' },
+    wa: { kind: 'gear', mortar: 'mortar:M' },
+    yashi: { kind: 'gear', mortar: 'mortar:M' },
 };
 
 export type LaunchContext = { mortars: string[]; lastWorldThrow: Throw | null };

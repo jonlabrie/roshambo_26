@@ -56,6 +56,16 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     const router = express.Router();
     router.use(requireApiKey);
 
+    // Parked defect (o), fixed 2026-09-05: resolveUser UPSERTS on any truthy robloxUserId, so
+    // an unvalidated path segment ('%20', a typo, "null") permanently mints a junk User --
+    // identity-root pollution the presence route already guards against by hand. One param
+    // guard covers every /players/:robloxUserId route: Roblox ids are digits, nothing else
+    // reaches a resolver.
+    router.param('robloxUserId', (req, res, next, id) => {
+        if (typeof id === 'string' && /^\d+$/.test(id)) { next(); return; }
+        res.status(400).json({ error: 'BAD_PLAYER_ID' });
+    });
+
     router.get('/state', (_req, res) => {
         const snap = engine.snapshot();
         const now = Date.now();
@@ -166,7 +176,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     router.get('/players/:robloxUserId', async (req, res) => {
         try {
             const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
-            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            if (!user) { res.status(404).json({ error: 'RESOLVE_FAILED' }); return; }
             const country = typeof req.query.country === 'string' ? req.query.country : undefined;
             // THE ONLY PLACE A ROBLOX PLAYER'S NAME IS RECORDED. Nothing else on the Roblox path
             // ever wrote `displayName` — it was written by PWA registration and the PWA's
@@ -222,7 +232,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     router.put('/players/:robloxUserId/preferences-hud', async (req, res) => {
         try {
             const user = await resolveUser({ robloxUserId: String(req.params.robloxUserId) });
-            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            if (!user) { res.status(404).json({ error: 'RESOLVE_FAILED' }); return; }
             const set: Record<string, unknown> = {};
             if (typeof req.body?.escalationPrompts === 'boolean') {
                 set.escalationPrompts = req.body.escalationPrompts;
@@ -267,7 +277,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     router.get('/players/:robloxUserId/teahouses', async (req, res) => {
         try {
             const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
-            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            if (!user) { res.status(404).json({ error: 'RESOLVE_FAILED' }); return; }
             res.set('Cache-Control', 'no-store');
             const teahouses = user.teahouses ? Object.fromEntries(user.teahouses as Map<string, unknown>) : {};
             res.json({ teahouses, padPreferences: user.padPreferences ?? [] });
@@ -279,7 +289,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     router.put('/players/:robloxUserId/teahouses/:sizeClass', async (req, res) => {
         try {
             const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
-            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            if (!user) { res.status(404).json({ error: 'RESOLVE_FAILED' }); return; }
             const sizeClass = req.params.sizeClass;
             const loadout = req.body?.loadout;
             const existing = user.teahouses ? Array.from((user.teahouses as Map<string, unknown>).keys()) : [];
@@ -309,7 +319,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     router.get('/players/:robloxUserId/economy', async (req, res) => {
         try {
             const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
-            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            if (!user) { res.status(404).json({ error: 'RESOLVE_FAILED' }); return; }
             res.set('Cache-Control', 'no-store');
             const st = readEconomy(user);
             const teahouses = user.teahouses ? Object.fromEntries(user.teahouses as Map<string, unknown>) : {};
@@ -339,7 +349,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     router.get('/players/:robloxUserId/fireworks', async (req, res) => {
         try {
             const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
-            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            if (!user) { res.status(404).json({ error: 'RESOLVE_FAILED' }); return; }
             const raw = String(req.query.lastWorldThrow ?? '');
             // The CLIENT is never told a requirement — it is told the ANSWER. The Roblox server
             // passes the round it already has; anything else reads as "not Rock", which fails shut.
@@ -364,7 +374,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
                 return;
             }
             const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
-            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            if (!user) { res.status(404).json({ error: 'RESOLVE_FAILED' }); return; }
             // CONDITIONAL $inc, NOT read-modify-write. Two launches racing on one held shell must
             // resolve to exactly one firing: the filter and the decrement are a single atomic
             // operation, so the loser matches no document and gets 409. The existing /purchase
@@ -384,7 +394,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     router.post('/players/:robloxUserId/purchase', async (req, res) => {
         try {
             const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
-            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            if (!user) { res.status(404).json({ error: 'RESOLVE_FAILED' }); return; }
             const item = req.body?.item;
             if (typeof item !== 'string') { res.status(400).json({ error: 'BAD_ITEM' }); return; }
             const before = readEconomy(user);
@@ -448,7 +458,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     router.post('/players/:robloxUserId/display', async (req, res) => {
         try {
             const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
-            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            if (!user) { res.status(404).json({ error: 'RESOLVE_FAILED' }); return; }
             const chk = validateDisplay(readEconomy(user), req.body?.deckDisplay ?? null, req.body?.teahouseDisplay ?? null);
             if (!chk.ok) { res.status(400).json({ error: chk.error }); return; }
             user.deckDisplay = chk.deckDisplay;
@@ -463,7 +473,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     router.put('/players/:robloxUserId/preferences', async (req, res) => {
         try {
             const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
-            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            if (!user) { res.status(404).json({ error: 'RESOLVE_FAILED' }); return; }
             const padPreferences = req.body?.padPreferences;
             const check = validatePadPreferences(padPreferences);
             if (!check.ok) { res.status(400).json({ error: check.error }); return; }
@@ -478,9 +488,11 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     router.put('/players/:robloxUserId/decorations', async (req, res) => {
         try {
             const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
-            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            if (!user) { res.status(404).json({ error: 'RESOLVE_FAILED' }); return; }
             const decorations = req.body?.decorations;
-            const check = validateDecorations(decorations);
+            // Ownership against the STORED instances (parked defect (b)): rearrange/remove only,
+            // never mint -- new instances enter through /purchase alone.
+            const check = validateDecorations(decorations, user.deckDecorations ?? []);
             if (!check.ok) { res.status(400).json({ error: check.error }); return; }
             user.deckDecorations = decorations;
             await user.save();
@@ -493,7 +505,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     router.put('/players/:robloxUserId/mortar-placements', async (req, res) => {
         try {
             const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
-            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            if (!user) { res.status(404).json({ error: 'RESOLVE_FAILED' }); return; }
             const placements = req.body?.placements;
             const check = validateMortarPlacements(placements, user.mortars ?? []);
             if (!check.ok) { res.status(400).json({ error: check.error }); return; }
@@ -509,7 +521,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     router.put('/players/:robloxUserId/access', async (req, res) => {
         try {
             const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
-            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            if (!user) { res.status(404).json({ error: 'RESOLVE_FAILED' }); return; }
             const access = req.body?.access;
             const check = validateAccess(access);
             if (!check.ok) { res.status(400).json({ error: check.error }); return; }
@@ -531,7 +543,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             // mean "the bank you asked for did not happen".
             const keep = Number(req.body?.keep ?? 0);
             const user = await resolveUser({ robloxUserId });
-            if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
+            if (!user) { res.status(404).json({ error: 'RESOLVE_FAILED' }); return; }
             const updated = await bankPot(user._id.toString(), 'roblox', keep);
             if (!updated) { res.status(409).json({ error: 'NOTHING_STAKED' }); return; }
             res.json({

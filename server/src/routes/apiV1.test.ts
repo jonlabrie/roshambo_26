@@ -290,24 +290,24 @@ describe('/api/v1', () => {
 
     describe('PUT /players/:robloxUserId/preferences-hud', () => {
         it('sets escalationPrompts', async () => {
-            await User.create({ robloxId: 'hud-1', identityTier: 'roblox' });
+            await User.create({ robloxId: '971201', identityTier: 'roblox' });
             const app = makeApp(makeEngine(), new ResultsStore());
             const res = await request(app)
-                .put('/api/v1/players/hud-1/preferences-hud')
+                .put('/api/v1/players/971201/preferences-hud')
                 .set('X-API-Key', API_KEY).send({ escalationPrompts: false }).expect(200);
             expect(res.body).toEqual({ escalationPrompts: false, resultSplash: true, seenBeats: [] });
-            const u = await User.findOne({ robloxId: 'hud-1' });
+            const u = await User.findOne({ robloxId: '971201' });
             expect(u?.escalationPrompts).toBe(false);
         });
 
         it('sets auraVisibility to a recognised value', async () => {
-            await User.create({ robloxId: 'aura-1', identityTier: 'roblox' });
+            await User.create({ robloxId: '971101', identityTier: 'roblox' });
             const app = makeApp(makeEngine(), new ResultsStore());
             for (const v of ['HIDDEN', 'FRIENDS', 'PUBLIC']) {
                 await request(app)
-                    .put('/api/v1/players/aura-1/preferences-hud')
+                    .put('/api/v1/players/971101/preferences-hud')
                     .set('X-API-Key', API_KEY).send({ auraVisibility: v }).expect(200);
-                const u = await User.findOne({ robloxId: 'aura-1' });
+                const u = await User.findOne({ robloxId: '971101' });
                 expect(u?.auraVisibility).toBe(v);
             }
         });
@@ -315,13 +315,13 @@ describe('/api/v1', () => {
         it('REFUSES an unrecognised auraVisibility rather than defaulting it', async () => {
             // A privacy setting must never be knocked back to a permissive default by a malformed
             // body or a caller's typo. Storing HIDDEN and then sending junk must leave HIDDEN.
-            await User.create({ robloxId: 'aura-2', identityTier: 'roblox', auraVisibility: 'HIDDEN' });
+            await User.create({ robloxId: '971102', identityTier: 'roblox', auraVisibility: 'HIDDEN' });
             const app = makeApp(makeEngine(), new ResultsStore());
             for (const bad of ['hidden', '', 'PUBLICK', 3, true, null]) {
                 await request(app)
-                    .put('/api/v1/players/aura-2/preferences-hud')
+                    .put('/api/v1/players/971102/preferences-hud')
                     .set('X-API-Key', API_KEY).send({ auraVisibility: bad, statusBars: false });
-                const u = await User.findOne({ robloxId: 'aura-2' });
+                const u = await User.findOne({ robloxId: '971102' });
                 expect(u?.auraVisibility).toBe('HIDDEN');
             }
         });
@@ -329,21 +329,21 @@ describe('/api/v1', () => {
         it('defaults auraVisibility to PUBLIC and returns it on GET', async () => {
             // No migration was run, so a row written before this field existed must read as PUBLIC
             // rather than as silently hidden.
-            await User.create({ robloxId: 'aura-3', identityTier: 'roblox' });
+            await User.create({ robloxId: '971103', identityTier: 'roblox' });
             const app = makeApp(makeEngine(), new ResultsStore());
             const res = await request(app)
-                .get('/api/v1/players/aura-3').set('X-API-Key', API_KEY).expect(200);
+                .get('/api/v1/players/971103').set('X-API-Key', API_KEY).expect(200);
             expect(res.body.auraVisibility).toBe('PUBLIC');
         });
 
         it('sets resultSplash independently of escalationPrompts', async () => {
-            await User.create({ robloxId: 'hud-5', identityTier: 'roblox' });
+            await User.create({ robloxId: '971205', identityTier: 'roblox' });
             const app = makeApp(makeEngine(), new ResultsStore());
             const res = await request(app)
-                .put('/api/v1/players/hud-5/preferences-hud')
+                .put('/api/v1/players/971205/preferences-hud')
                 .set('X-API-Key', API_KEY).send({ resultSplash: false }).expect(200);
             expect(res.body).toEqual({ escalationPrompts: true, resultSplash: false, seenBeats: [] });
-            const u = await User.findOne({ robloxId: 'hud-5' });
+            const u = await User.findOne({ robloxId: '971205' });
             expect(u?.resultSplash).toBe(false);
             // the other preference is untouched — one remote carries both, so a write of one must
             // never be a silent write of the other
@@ -351,50 +351,50 @@ describe('/api/v1', () => {
         });
 
         it('adds a seenBeat without duplicating it, and never removes one', async () => {
-            await User.create({ robloxId: 'hud-2', identityTier: 'roblox', seenBeats: ['drum'] });
+            await User.create({ robloxId: '971202', identityTier: 'roblox', seenBeats: ['drum'] });
             const app = makeApp(makeEngine(), new ResultsStore());
             const res = await request(app)
-                .put('/api/v1/players/hud-2/preferences-hud')
+                .put('/api/v1/players/971202/preferences-hud')
                 .set('X-API-Key', API_KEY).send({ seenBeat: 'drum' }).expect(200);
             expect(res.body.seenBeats).toEqual(['drum']);
 
             const res2 = await request(app)
-                .put('/api/v1/players/hud-2/preferences-hud')
+                .put('/api/v1/players/971202/preferences-hud')
                 .set('X-API-Key', API_KEY).send({ seenBeat: 'gong' }).expect(200);
             expect(res2.body.seenBeats.sort()).toEqual(['drum', 'gong']);
         });
 
         it('400 when the body has neither field', async () => {
-            await User.create({ robloxId: 'hud-3', identityTier: 'roblox' });
+            await User.create({ robloxId: '971203', identityTier: 'roblox' });
             await request(makeApp(makeEngine(), new ResultsStore()))
-                .put('/api/v1/players/hud-3/preferences-hud')
+                .put('/api/v1/players/971203/preferences-hud')
                 .set('X-API-Key', API_KEY).send({}).expect(400);
         });
 
         it('401 without the API key', async () => {
             await request(makeApp(makeEngine(), new ResultsStore()))
-                .put('/api/v1/players/hud-4/preferences-hud').send({ escalationPrompts: true }).expect(401);
+                .put('/api/v1/players/971204/preferences-hud').send({ escalationPrompts: true }).expect(401);
         });
     });
 
     describe('PUT /players/:robloxUserId/preferences-hud — confirmThrows is retired', () => {
         it('ignores a confirmThrows key rather than persisting it', async () => {
-            await User.create({ robloxId: 'hud-6', identityTier: 'roblox' });
+            await User.create({ robloxId: '971206', identityTier: 'roblox' });
             const app = makeApp(makeEngine(), new ResultsStore());
             const res = await request(app)
-                .put('/api/v1/players/hud-6/preferences-hud')
+                .put('/api/v1/players/971206/preferences-hud')
                 .set('X-API-Key', API_KEY).send({ confirmThrows: false, escalationPrompts: false }).expect(200);
             expect(res.body).not.toHaveProperty('confirmThrows');
             expect(res.body.escalationPrompts).toBe(false);
-            const u = await User.findOne({ robloxId: 'hud-6' });
+            const u = await User.findOne({ robloxId: '971206' });
             expect(u?.confirmThrows).toBe(true); // schema default; the write of `false` was ignored
         });
 
         it('does not ship confirmThrows in the profile payload', async () => {
-            await User.create({ robloxId: 'hud-7', identityTier: 'roblox' });
+            await User.create({ robloxId: '971207', identityTier: 'roblox' });
             const app = makeApp(makeEngine(), new ResultsStore());
             const res = await request(app)
-                .get('/api/v1/players/hud-7').set('X-API-Key', API_KEY).expect(200);
+                .get('/api/v1/players/971207').set('X-API-Key', API_KEY).expect(200);
             expect(res.body).not.toHaveProperty('confirmThrows');
         });
     });
@@ -541,7 +541,7 @@ describe('/api/v1', () => {
     describe('teahouses persistence', () => {
         it('GET returns {} for a wanderer, no-store', async () => {
             const res = await request(makeApp(makeEngine(), new ResultsStore()))
-                .get('/api/v1/players/roblox-1/teahouses').set('X-API-Key', API_KEY).expect(200);
+                .get('/api/v1/players/971301/teahouses').set('X-API-Key', API_KEY).expect(200);
             expect(res.body).toEqual({ teahouses: {}, padPreferences: [] });
             expect(res.headers['cache-control']).toBe('no-store');
         });
@@ -549,9 +549,9 @@ describe('/api/v1', () => {
         it('PUT then GET round-trips a loadout', async () => {
             const app = makeApp(makeEngine(), new ResultsStore());
             const loadout = { baseStyle: 'teahouse-1story', colorScheme: 'scheme.vermilion' };
-            await request(app).put('/api/v1/players/roblox-1/teahouses/M')
+            await request(app).put('/api/v1/players/971301/teahouses/M')
                 .set('X-API-Key', API_KEY).send({ loadout }).expect(200);
-            const res = await request(app).get('/api/v1/players/roblox-1/teahouses')
+            const res = await request(app).get('/api/v1/players/971301/teahouses')
                 .set('X-API-Key', API_KEY).expect(200);
             expect(res.body.teahouses.M).toEqual(loadout);
         });
@@ -559,10 +559,10 @@ describe('/api/v1', () => {
         it('stores multiple sizes and overwrites a size', async () => {
             const app = makeApp(makeEngine(), new ResultsStore());
             const put = (sc: string, cs: string) => request(app)
-                .put(`/api/v1/players/roblox-1/teahouses/${sc}`).set('X-API-Key', API_KEY)
+                .put(`/api/v1/players/971301/teahouses/${sc}`).set('X-API-Key', API_KEY)
                 .send({ loadout: { baseStyle: 'teahouse-1story', colorScheme: cs } }).expect(200);
             await put('S', 'scheme.ink'); await put('L', 'scheme.vermilion'); await put('S', 'scheme.dormant');
-            const res = await request(app).get('/api/v1/players/roblox-1/teahouses')
+            const res = await request(app).get('/api/v1/players/971301/teahouses')
                 .set('X-API-Key', API_KEY).expect(200);
             expect(res.body.teahouses.S.colorScheme).toBe('scheme.dormant');
             expect(res.body.teahouses.L.colorScheme).toBe('scheme.vermilion');
@@ -571,7 +571,7 @@ describe('/api/v1', () => {
         it('rejects invalid loadouts with 400', async () => {
             const app = makeApp(makeEngine(), new ResultsStore());
             const put = (body: unknown) => request(app)
-                .put('/api/v1/players/roblox-1/teahouses/M').set('X-API-Key', API_KEY).send(body as object);
+                .put('/api/v1/players/971301/teahouses/M').set('X-API-Key', API_KEY).send(body as object);
             await put({ loadout: 'nope' }).expect(400);
             await put({ loadout: { colorScheme: 'x' } }).expect(400);
             await put({ loadout: { baseStyle: 't', bogus: 1 } }).expect(400);
@@ -579,41 +579,41 @@ describe('/api/v1', () => {
 
         it('requires the API key', async () => {
             await request(makeApp(makeEngine(), new ResultsStore()))
-                .get('/api/v1/players/roblox-1/teahouses').expect(401);
+                .get('/api/v1/players/971301/teahouses').expect(401);
         });
     });
 
     describe('preferences persistence', () => {
         it('PUT then GET teahouses returns padPreferences', async () => {
             const app = makeApp(makeEngine(), new ResultsStore());
-            await request(app).put('/api/v1/players/roblox-1/preferences')
+            await request(app).put('/api/v1/players/971301/preferences')
                 .set('X-API-Key', API_KEY).send({ padPreferences: ['T06', 'T02'] }).expect(200);
-            const res = await request(app).get('/api/v1/players/roblox-1/teahouses')
+            const res = await request(app).get('/api/v1/players/971301/teahouses')
                 .set('X-API-Key', API_KEY).expect(200);
             expect(res.body.padPreferences).toEqual(['T06', 'T02']);
         });
 
         it('PUT echoes the stored preferences', async () => {
             const res = await request(makeApp(makeEngine(), new ResultsStore()))
-                .put('/api/v1/players/roblox-1/preferences')
+                .put('/api/v1/players/971301/preferences')
                 .set('X-API-Key', API_KEY).send({ padPreferences: ['T04'] }).expect(200);
             expect(res.body).toEqual({ padPreferences: ['T04'] });
         });
 
         it('400 on a non-array / oversize / non-string body', async () => {
             const app = makeApp(makeEngine(), new ResultsStore());
-            await request(app).put('/api/v1/players/roblox-1/preferences')
+            await request(app).put('/api/v1/players/971301/preferences')
                 .set('X-API-Key', API_KEY).send({ padPreferences: 'T06' }).expect(400);
-            await request(app).put('/api/v1/players/roblox-1/preferences')
+            await request(app).put('/api/v1/players/971301/preferences')
                 .set('X-API-Key', API_KEY).send({ padPreferences: [42] }).expect(400);
-            await request(app).put('/api/v1/players/roblox-1/preferences')
+            await request(app).put('/api/v1/players/971301/preferences')
                 .set('X-API-Key', API_KEY)
                 .send({ padPreferences: Array.from({ length: 33 }, (_, i) => `T${i}`) }).expect(400);
         });
 
         it('401 without the API key', async () => {
             await request(makeApp(makeEngine(), new ResultsStore()))
-                .put('/api/v1/players/roblox-1/preferences').send({ padPreferences: [] }).expect(401);
+                .put('/api/v1/players/971301/preferences').send({ padPreferences: [] }).expect(401);
         });
     });
 
@@ -697,6 +697,40 @@ describe('/api/v1', () => {
             expect(after!.totalPoints).toBe(winner.body.totalPoints); // deducted exactly once
         });
 
+        it('PUT decorations rejects instances the player never bought', async () => {
+            // Parked defect (b): the PUT validated shape but never ownership.
+            await User.create({
+                robloxId: '900052', totalPoints: 0, maxDeckSize: 'S',
+                deckDecorations: [{ id: 1, propId: 'bonsai', offset: [0, 0], facing: 'N' }],
+            });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const put = (decorations: unknown) => request(app)
+                .put('/api/v1/players/900052/decorations').set('X-API-Key', API_KEY)
+                .send({ decorations });
+            // rearranging the owned instance: fine
+            await put([{ id: 1, propId: 'bonsai', offset: [2, 3], facing: 'E' }]).expect(200);
+            // minting an unowned instance: refused
+            const minted = await put([
+                { id: 1, propId: 'bonsai', offset: [2, 3], facing: 'E' },
+                { id: 2, propId: 'tsukubai', offset: [0, 0], facing: 'N' },
+            ]).expect(400);
+            expect(minted.body.error).toBe('DECORATION_NOT_OWNED');
+        });
+
+        it('a garbage path id is refused with 400 and mints NO user (parked defect (o))', async () => {
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const before = await User.countDocuments({});
+            const blank = await request(app)
+                .get('/api/v1/players/%20/economy').set('X-API-Key', API_KEY);
+            expect(blank.status).toBe(400);
+            expect(blank.body.error).toBe('BAD_PLAYER_ID');
+            const alpha = await request(app)
+                .post('/api/v1/players/not-a-number/purchase').set('X-API-Key', API_KEY)
+                .send({ item: 'deck:S' });
+            expect(alpha.status).toBe(400);
+            expect(await User.countDocuments({})).toBe(before); // the upsert never ran
+        });
+
         it('GET economy returns display fields (null by default)', async () => {
             await User.create({ robloxId: '900006', totalPoints: 0, maxDeckSize: 'L', teahouses: { S: {}, M: {}, L: {} } });
             const res = await request(makeApp(makeEngine(), new ResultsStore()))
@@ -724,20 +758,20 @@ describe('/api/v1', () => {
         });
 
         it('GET economy returns portalOwned (false by default)', async () => {
-            await User.create({ robloxId: 'p_portal1', totalPoints: 0, maxDeckSize: 'S' });
+            await User.create({ robloxId: '971401', totalPoints: 0, maxDeckSize: 'S' });
             const res = await request(makeApp(makeEngine(), new ResultsStore()))
-                .get('/api/v1/players/p_portal1/economy').set('X-API-Key', API_KEY).expect(200);
+                .get('/api/v1/players/971401/economy').set('X-API-Key', API_KEY).expect(200);
             expect(res.body.portalOwned).toBe(false);
             expect(res.body.catalog.portal).toBe(500);
         });
 
         it('POST purchase portal persists portalOwned and echoes it', async () => {
-            await User.create({ robloxId: 'p_portal2', totalPoints: 1000, maxDeckSize: 'S' });
+            await User.create({ robloxId: '971402', totalPoints: 1000, maxDeckSize: 'S' });
             const res = await request(makeApp(makeEngine(), new ResultsStore()))
-                .post('/api/v1/players/p_portal2/purchase').set('X-API-Key', API_KEY)
+                .post('/api/v1/players/971402/purchase').set('X-API-Key', API_KEY)
                 .send({ item: 'portal' }).expect(200);
             expect(res.body.portalOwned).toBe(true);
-            const u = await User.findOne({ robloxId: 'p_portal2' });
+            const u = await User.findOne({ robloxId: '971402' });
             expect(u?.portalOwned).toBe(true);
         });
     });
@@ -869,11 +903,13 @@ describe('/api/v1', () => {
                 willow: 4,
                 ishibana: 6,
                 kiku: 4,
+                wa: 5,
+                yashi: 10,
             });
             expect(res.body.catalog.mortars).toEqual({
-                'mortar:S': 40,
-                'mortar:M': 250,
-                'mortar:L': 1000,
+                'mortar:S': 10,
+                'mortar:M': 50,
+                'mortar:L': 100,
             });
         });
 
