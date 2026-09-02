@@ -190,20 +190,20 @@ BurstStyles.SOUNDS = {
         "rbxassetid://84490753811521", -- burst-aerial-3
         "rbxassetid://110252668535781", -- burst-aerial-4
         "rbxassetid://108527933513449", -- report-jakub: different recording, city-reverb breath
-        "rbxassetid://108527933513449", -- report-jakub: different recording, city-reverb breath
-        "rbxassetid://108527933513449", -- report-jakub: different recording, city-reverb breath
     },
     burst_strobe = {
         "rbxassetid://89225206152876",
         "rbxassetid://91810415393899",
         "rbxassetid://84490753811521",
         "rbxassetid://110252668535781",
+        "rbxassetid://108527933513449", -- report-jakub
     },
     burst_kamuro = {
         "rbxassetid://89225206152876",
         "rbxassetid://91810415393899",
         "rbxassetid://84490753811521",
         "rbxassetid://110252668535781",
+        "rbxassetid://108527933513449", -- report-jakub
     },
 }
 
