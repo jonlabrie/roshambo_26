@@ -3137,9 +3137,21 @@ portalController:start()
 
 print(`[ROSHAMBO] playable loop starting against {config.baseUrl}`)
 task.spawn(function()
+    -- ⚠ pcall'd, ALWAYS (the (g)-adjacent hazard, fixed 2026-09-05): this loop IS the game --
+    -- one throw here (a backend hiccup mid-decode, a server/place duration-shape mismatch on
+    -- the FIRST poll) used to kill the round loop for the whole server until restart. A failed
+    -- poll now logs and retries on a short backoff instead; the round loop never dies.
+    local POLL_ERROR_BACKOFF = 3
     while true do
-        local delay = coordinator:pollOnce()
-        task.wait(delay)
+        local ok, result = pcall(function()
+            return coordinator:pollOnce()
+        end)
+        if ok then
+            task.wait(result)
+        else
+            warn(`[ROUND] pollOnce threw ({tostring(result)}); retrying in {POLL_ERROR_BACKOFF}s`)
+            task.wait(POLL_ERROR_BACKOFF)
+        end
     end
 end)
 
