@@ -379,6 +379,14 @@ local pushFireworkState: ((Player) -> ())? = nil
 -- Assigned right after `local function rebuildClaimedPad` is defined.
 local rebuildClaimedPadFn: ((string) -> ())? = nil
 
+-- FORWARD DECLARATION (final-review fix round). muzzleOriginFor (below, but textually BEFORE
+-- deckCFForUid is declared) must resolve the SAME (row, deckSize) pair the render path actually
+-- built with -- deckCFForUid already runs SizeClasses.resolveBuilt + DeckPlacement.resolve(...,
+-- built.deckSize, spec.maxSize), the exact call rebuildClaimedPad/TreatmentApplier use, honoring
+-- an active display-shrink (SetDisplay) or pad cap (spec.maxSize) that deckRowFor's raw
+-- `e.maxDeckSize or "S"` lookup does not. Assigned right after `local function deckCFForUid`.
+local deckCFForUidFn: ((string) -> ({ number }?, string?))? = nil
+
 local coordinator = RoundCoordinator.new({
     net = net,
     clock = clock,
@@ -1332,13 +1340,22 @@ end
 
 -- Muzzle-true origin for a gear-required shell fired from the player's OWN deck: runs
 -- MortarPlacement's resolved deck-local spot for the shell's required tier through the SAME
--- deck row deckSiteFor's site position came from. Returns nil (fall back to the eye-level
--- origin) when: the shell needs no gear (MortarPlacement.SHELL_MORTAR has no entry for it, e.g.
--- firecracker); the player isn't standing at THIS deck specifically (a public site takes the
--- eye-level origin even where it happens to overlap someone's deck); or the required tier isn't
--- actually owned/resolved there. Whether the launch was even ALLOWED for a missing tier is the
--- backend's call (postFireworkSpend already ran by the time this is consulted) -- this only
--- decides where an already-granted shell leaves from.
+-- (row, deckSize) the render path actually built with. Deliberately NOT deckRowFor/deckSiteFor's
+-- row (final-review fix round): deckSiteFor's own site-radius check just above stays on
+-- deckRowFor's row (its tolerance makes the raw `e.maxDeckSize or "S"` lookup benign there, and
+-- that's out of scope by controller ruling) -- but the MUZZLE math below needs deckCFForUid's
+-- pair specifically, since that's the one SizeClasses.resolveBuilt + DeckPlacement.resolve(...,
+-- built.deckSize, spec.maxSize) run through, matching rebuildClaimedPad/TreatmentApplier exactly.
+-- Using deckRowFor here (as this used to) would transform through the WRONG row and feed
+-- MortarPlacement.resolve the WRONG deck bounds whenever a display-shrink (SetDisplay) or pad cap
+-- (spec.maxSize) is active -- while teahouseFootprintFor below already used resolveBuilt, so the
+-- two halves of this same function were resolving two different deck sizes.
+-- Returns nil (fall back to the eye-level origin) when: the shell needs no gear
+-- (MortarPlacement.SHELL_MORTAR has no entry for it, e.g. firecracker); the player isn't standing
+-- at THIS deck specifically (a public site takes the eye-level origin even where it happens to
+-- overlap someone's deck); or the required tier isn't actually owned/resolved there. Whether the
+-- launch was even ALLOWED for a missing tier is the backend's call (postFireworkSpend already ran
+-- by the time this is consulted) -- this only decides where an already-granted shell leaves from.
 local function muzzleOriginFor(uid: string, pos: Vector3, deck: LaunchSites.Site?, shellId: string): Vector3?
     local requiredMortar = MortarPlacement.SHELL_MORTAR[shellId]
     if requiredMortar == nil or deck == nil then
@@ -1348,7 +1365,11 @@ local function muzzleOriginFor(uid: string, pos: Vector3, deck: LaunchSites.Site
     if dx * dx + dz * dz > deck.radius * deck.radius then
         return nil -- admitted by some OTHER site (e.g. a public plaza), not this deck
     end
-    local row, deckSize = deckRowFor(uid)
+    local row: { number }? = nil
+    local deckSize: string? = nil
+    if deckCFForUidFn then
+        row, deckSize = deckCFForUidFn(uid)
+    end
     local e = playerEconomy[uid]
     if row == nil or deckSize == nil or e == nil then
         return nil
@@ -1417,11 +1438,17 @@ pushFireworkState = function(player: Player)
                 -- late-arriving/changed mortar state needs the same pad rebuild the decoration
                 -- flow uses -- guarded by the fingerprint so a reveal where nothing changed
                 -- doesn't rebuild the pad (this fires far more often than any decoration event).
-                local fp = mortarFingerprint(e.mortars, e.mortarPlacements)
-                if mortarRenderedFingerprint[uid] ~= fp then
-                    mortarRenderedFingerprint[uid] = fp
-                    if rebuildClaimedPadFn then
-                        rebuildClaimedPadFn(uid) -- no-ops if not claimed (rebuildClaimedPad's own guard)
+                -- Belt-and-braces (final-review fix round): only RECORD the fingerprint when a
+                -- rebuild actually ran while the pad is claimed -- an unclaimed uid has no pad to
+                -- render, so remembering "rendered with fp X" here would be a lie that could later
+                -- suppress the real first rebuild once they do claim.
+                if e.claimedPadId ~= nil then
+                    local fp = mortarFingerprint(e.mortars, e.mortarPlacements)
+                    if mortarRenderedFingerprint[uid] ~= fp then
+                        mortarRenderedFingerprint[uid] = fp
+                        if rebuildClaimedPadFn then
+                            rebuildClaimedPadFn(uid)
+                        end
                     end
                 end
             end
@@ -1605,6 +1632,7 @@ local function deckCFForUid(uid: string): ({ number }?, string?)
     end
     return DeckPlacement.resolve(spec.deckPlacements, built.deckSize, spec.maxSize), built.deckSize
 end
+deckCFForUidFn = deckCFForUid
 
 -- friend cache keyed "viewerId:ownerId" (friendship is static within a session).
 local friendCache: { [string]: boolean } = {}
@@ -1932,6 +1960,13 @@ Players.PlayerRemoving:Connect(function(player)
     flushShojiForUid(uid)
     playerHouse[uid] = nil
     playerEconomy[uid] = nil
+    -- Final-review fix round: a stale entry here survives a rejoin to the SAME server instance.
+    -- The join bootstraps e.mortars/e.mortarPlacements empty (pushFireworkState fills them
+    -- moments later); if the fresh pushFireworkState's fingerprint happens to match what this
+    -- uid's PREVIOUS session last rendered, the rebuild is skipped and the deck stays tubeless
+    -- for the whole session while muzzleOriginFor keeps firing shells from the (now invisible)
+    -- resolved muzzle. Clearing it here forces the next pushFireworkState to always rebuild once.
+    mortarRenderedFingerprint[uid] = nil
     recomputeAllAccess()
     local action = siteCoordinator:onLeave(uid)
     if action then

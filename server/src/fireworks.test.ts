@@ -4,6 +4,7 @@ import {
     SHELL_IDS,
     SHELL_PRICES,
     MORTAR_PRICES,
+    REQUIREMENTS,
     evaluateShell,
     shellStates,
     LaunchContext,
@@ -17,6 +18,37 @@ describe('the fixture is the contract', () => {
     });
     it('SHELL_IDS matches the fixture exactly', () => {
         expect([...SHELL_IDS].sort()).toEqual([...fixtures.shells].sort());
+    });
+});
+
+// Final-review fix round (deck-mortars): SHELL_MORTAR (roblox/src/shared/MortarPlacement.luau)
+// used to be a hand-mirrored copy of REQUIREMENTS' `.mortar` fields with no test on either side —
+// house rule is drift fails CI. fixtures.mortars is the gear-required subset of fixtures.shells;
+// every OTHER shell in fixtures.shells must NOT require gear on this side, and MortarPlacement's
+// own Lune spec asserts the identical fixture against SHELL_MORTAR.
+describe('the fixture is the gear-requirement contract too', () => {
+    const gearMap = new Map(fixtures.mortars.map((m) => [m.shell, m.mortar]));
+
+    it('every fixture shell not listed in mortars requires no gear', () => {
+        for (const id of fixtures.shells) {
+            if (gearMap.has(id)) continue;
+            expect(REQUIREMENTS[id]?.kind).not.toBe('gear');
+        }
+    });
+
+    it('every fixture mortars entry matches REQUIREMENTS exactly', () => {
+        for (const [shell, mortar] of gearMap) {
+            expect(REQUIREMENTS[shell]).toEqual({ kind: 'gear', mortar });
+        }
+    });
+
+    it('no OTHER shell quietly grew a gear requirement missing from the fixture', () => {
+        for (const id of fixtures.shells) {
+            const req = REQUIREMENTS[id];
+            if (req?.kind === 'gear') {
+                expect(gearMap.get(id)).toBe(req.mortar);
+            }
+        }
     });
 });
 

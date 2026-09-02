@@ -32,12 +32,17 @@ export const MORTAR_IDS = Object.keys(MORTAR_PRICES) as MortarId[];
 const MORTAR_RANK: Record<MortarId, number> = { 'mortar:S': 1, 'mortar:M': 2, 'mortar:L': 3 };
 
 // What a shell needs. Three kinds, one evaluator — a fourth kind is a branch below, not a redesign.
-type Requirement =
+export type Requirement =
     | { kind: 'none' }
     | { kind: 'gear'; mortar: MortarId }
     | { kind: 'condition'; afterWorldThrow: Throw };
 
-const REQUIREMENTS: Record<string, Requirement> = {
+// Exported so the gear-requirement half of shared-fixtures/firework-shells.json (the `mortars`
+// list) can be asserted against it directly, the same way SHELL_IDS is asserted against
+// `fixtures.shells` below — see fireworks.test.ts's "the fixture is the contract" describe block.
+// roblox/src/shared/MortarPlacement.luau's SHELL_MORTAR is asserted against the SAME fixture list
+// on the Lune side (tests/MortarPlacement.spec.luau), so the two can no longer drift silently.
+export const REQUIREMENTS: Record<string, Requirement> = {
     firecracker: { kind: 'none' },
     peony: { kind: 'gear', mortar: 'mortar:S' },
     willow: { kind: 'gear', mortar: 'mortar:M' },

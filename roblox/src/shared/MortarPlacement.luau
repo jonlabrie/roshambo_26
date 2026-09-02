@@ -26,10 +26,12 @@ MortarPlacement.MORTAR_ORDER = { "mortar:S", "mortar:M", "mortar:L" }
 -- requirement) -- the client is never told a shell's requirement (server/src/fireworks.ts:
 -- "The client is told PRICES, never requirements"), so the Studio server can't fetch this from
 -- the backend and instead carries its own minimal copy. If TS adds/changes a gear requirement
--- without a matching edit here, the Studio server will happily let a shell fire from the
--- player's eye level instead of its mortar's muzzle -- no test catches that drift (there is no
--- shared-fixtures file for this one, unlike MORTAR_ORDER/GameRules). Promoting a shell to
--- gear-required (or changing its tier) touches BOTH tables.
+-- without a matching edit here, the Studio server would happily let a shell fire from the
+-- player's eye level instead of its mortar's muzzle -- but as of the final-review fix round
+-- (deck-mortars) that drift now fails CI: shared-fixtures/firework-shells.json's `mortars` list
+-- is the enforced contract, asserted against THIS table by tests/MortarPlacement.spec.luau and
+-- against TS's REQUIREMENTS by fireworks.test.ts. Promoting a shell to gear-required (or changing
+-- its tier) touches all three: REQUIREMENTS, this table, AND the fixture.
 MortarPlacement.SHELL_MORTAR = {
     peony = "mortar:S",
     willow = "mortar:M",

@@ -2,6 +2,7 @@
 local harness = require("./harness")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 local MortarPlacement = require("../src/shared/MortarPlacement")
+local shellFixture = require("./fixtures/fireworkShells")
 
 local BOUNDS = { minX = -8, maxX = 8, minZ = -6, maxZ = 6 }
 local ALL = { "mortar:S", "mortar:M", "mortar:L" }
@@ -89,5 +90,41 @@ describe("MortarPlacement — default-first gear placement", function()
         local rx, _, rz = MortarPlacement.muzzleWorld(rot, { x = 2, z = 0, facing = "N" }, "mortar:S")
         expect(math.abs(rx - 100) < 1e-6).toBe(true)
         expect(math.abs(rz - -22) < 1e-6).toBe(true)
+    end)
+end)
+
+-- Final-review fix round (deck-mortars): SHELL_MORTAR used to be a hand-mirrored copy of
+-- server/src/fireworks.ts's REQUIREMENTS with no test on either side -- house rule is drift
+-- fails CI. shared-fixtures/firework-shells.json's `mortars` list is the gear-required subset of
+-- `shells`; fireworks.test.ts asserts the SAME fixture against REQUIREMENTS on the TS side, so a
+-- shell's gear tier changing on either side without the other is now a CI failure, not a shell
+-- that fires from the player's eye level instead of its mortar's muzzle.
+describe("MortarPlacement.SHELL_MORTAR -- the fixture is the gear-requirement contract too", function()
+    test("every fixture mortars entry matches SHELL_MORTAR exactly", function()
+        for _, entry in shellFixture.mortars do
+            expect(MortarPlacement.SHELL_MORTAR[entry.shell]).toBe(entry.mortar)
+        end
+    end)
+
+    test("every fixture shell not listed in mortars has no SHELL_MORTAR entry", function()
+        local gearShells: { [string]: boolean } = {}
+        for _, entry in shellFixture.mortars do
+            gearShells[entry.shell] = true
+        end
+        for _, id in shellFixture.shells do
+            if not gearShells[id] then
+                expect(MortarPlacement.SHELL_MORTAR[id] == nil).toBe(true)
+            end
+        end
+    end)
+
+    test("no OTHER shell in SHELL_MORTAR is missing from the fixture", function()
+        local fixtureShells: { [string]: string } = {}
+        for _, entry in shellFixture.mortars do
+            fixtureShells[entry.shell] = entry.mortar
+        end
+        for shellId, mortarId in MortarPlacement.SHELL_MORTAR do
+            expect(fixtureShells[shellId]).toBe(mortarId)
+        end
     end)
 end)
