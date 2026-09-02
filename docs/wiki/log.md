@@ -3078,3 +3078,13 @@ counter: ShopController hardcoded SHELL_ORDER/SHELL_NAME and renders only shells
 can name. Display metadata moved to shared/ShellDisplay.luau with a spec holding it
 to the fixture -- the next forgotten shell is a CI failure, not an empty counter.
 The proving-range spec's "no new machinery" promotion claim corrected in place.
+
+## [2026-09-04] decision | Deck mortars spec approved -- default-first placeable gear
+
+Spec: docs/superpowers/specs/2026-09-04-deck-mortars-design.md. Owner rulings: owning
+a mortar puts it on the deck at a front-edge default immediately ("players shouldn't
+have to know how to place a mortar before they can use it"); one tube per owned tier
+(S/M/L staggered -- the deck shows the arsenal); gear exempt from the 24-decoration
+cap. Gear-requiring shells launch from the required tier's muzzle; firecracker stays
+hand-launched. Root cause it fixes: deck launches originated 6 studs above the
+player's head since the August build.
