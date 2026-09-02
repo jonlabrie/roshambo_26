@@ -350,8 +350,58 @@ local function play(payload: any, distance: number)
     -- 2026-09-04): higher apex, longer-lived stars, the heavyweight boom.
     local bonusRoll = rng:NextNumber()
     local origin = payload.origin
-    local apex = origin
-        + Vector3.new(rng:NextNumber(-8, 8), 60 + rng:NextNumber(-6, 6), rng:NextNumber(-8, 8)) -- 60: owner, 2026-09-03 ("bursts should ride higher")
+    -- THE HEADING (rail-mounts, 2026-09-04): a muzzle launch from a player's own deck sends a
+    -- unit vector the flight rides along; every other launch site (public sites, proving range,
+    -- hand firecrackers) sends no heading, and the vertical default reproduces today's flight
+    -- exactly -- same rng stream, same vectors.
+    local dir = if payload.heading
+        then Vector3.new(payload.heading.x, payload.heading.y, payload.heading.z).Unit
+        else Vector3.new(0, 1, 0)
+    -- ⚠ RNG DRAW ORDER IS CROSS-CLIENT DETERMINISM: x, then height, then z -- exactly the order
+    -- the old `Vector3.new(rng(-8,8), 60 + rng(-6,6), rng(-8,8))` consumed the stream in. Drawing
+    -- into locals in this order and assembling afterward keeps every client's rng in lockstep.
+    local scatterX = rng:NextNumber(-8, 8)
+    local heightJitter = rng:NextNumber(-6, 6)
+    local scatterZ = rng:NextNumber(-8, 8)
+    -- NOT A PITCHING MACHINE (owner, 2026-09-05: "a curve is different from a knuckle, and
+    -- we're currently just throwing fastballs from a pitching machine on the deck"). Two
+    -- seeded personalities per HEADING launch, drawn AFTER the base three so the nil-heading
+    -- rng stream stays byte-identical:
+    --   WOBBLE -- a +-2.5 degree cone on the exit axis itself, visible right at the muzzle;
+    --   the ballistics cascade from the angle (downrange = 2h*tan theta), so one wobble
+    --   varies exit angle, curve and reach together, like real shot-to-shot mortar scatter.
+    --   BREAK -- a +-12 stud late-arc deviation perpendicular to the flight; zero at the
+    --   muzzle (the control point stays on the wobbled axis), emerging as the shell falls
+    --   off its line near the peak. Verticals get their break for free from the base scatter;
+    --   tilted flights need it at this scale or the deterministic lean swamps it.
+    local breakVec = Vector3.zero
+    if payload.heading then
+        local p1 = dir:Cross(Vector3.new(0, 1, 0))
+        p1 = if p1.Magnitude > 1e-4 then p1.Unit else Vector3.new(1, 0, 0)
+        local p2 = dir:Cross(p1)
+        local wobble = math.rad(2.5)
+        local a1 = rng:NextNumber(-wobble, wobble)
+        local a2 = rng:NextNumber(-wobble, wobble)
+        dir = (dir + p1 * math.tan(a1) + p2 * math.tan(a2)).Unit
+        breakVec = p1 * rng:NextNumber(-12, 12) + p2 * rng:NextNumber(-12, 12)
+    end
+    -- BALLISTIC APEX (2026-09-05): a tilted launch must CURVE -- leave along the tube's axis,
+    -- bend over, peak far out with the path flattening. The straight dir-line apex made deck
+    -- shells rise in a dead-straight slant. For a parabola whose initial velocity tilts theta
+    -- from vertical and peaks at height h, the peak sits 2*h*tan(theta) downrange -- so keep
+    -- today's HEIGHT (h = run * dir.Y) and put the horizontal displacement where physics puts
+    -- it. dir vertical => horizontal term is exactly zero and this is byte-identical to the
+    -- old `origin + dir * run + scatter` (public sites, proving range, firecrackers untouched).
+    local run = 60 + heightJitter
+    local h = run * dir.Y
+    local horiz = Vector3.new(dir.X, 0, dir.Z)
+    local horizMag = horiz.Magnitude
+    local apexOffset = Vector3.new(0, h, 0)
+    if horizMag > 1e-6 and dir.Y > 1e-6 then
+        -- tan(theta) = horizontal/vertical of the unit heading; downrange = 2 * h * tan(theta)
+        apexOffset += horiz.Unit * (2 * h * (horizMag / dir.Y))
+    end
+    local apex = origin + apexOffset + Vector3.new(scatterX, 0, scatterZ) + breakVec -- 60: owner, 2026-09-03 ("bursts should ride higher")
 
     -- `tail` is the longest release-worthy lifetime among this shell's burst styles (kamuro's
     -- 4.2s crown must not have its slot's parts re-positioned under it while it's still hanging).
@@ -372,7 +422,11 @@ local function play(payload: any, distance: number)
     if bonus then
         lifeScale = BurstStyles.BONUS.lifeScale
         tail *= lifeScale
-        apex = origin + (apex - origin) * Vector3.new(1, BurstStyles.BONUS.apexScale, 1)
+        -- Stretches only the along-heading component of the flight; the lateral/along-tube
+        -- scatter is untouched. With a vertical dir this reproduces the old Y-only scaling to
+        -- within the scatter's own (unscaled, ±8-stud) contribution -- exactly as before, since
+        -- the old expression never scaled X/Z either.
+        apex = origin + (apex - origin) + dir * ((apex - origin):Dot(dir) * (BurstStyles.BONUS.apexScale - 1))
     end
 
     active += 1
@@ -409,7 +463,20 @@ local function play(payload: any, distance: number)
                 })
                 fem:Emit(14)
             elseif ev.kind == "ascent" then
-                slot.shell.Position = origin
+                -- ⚠ THE RIBBON RIDES THE HEADING (owner, 2026-09-05: deck trails were "exactly
+                -- like the old ones we discarded" while proving/public looked right). The comet's
+                -- attachment pair is separated along the shell's LOCAL Y; when that offset lies
+                -- along the motion the segments overlap into the tuned thin comet, and when the
+                -- motion tilts away from it the same offset unfolds the Trail into the wide
+                -- angled band we threw away. Align local Y with the flight direction; a vertical
+                -- dir keeps the identity orientation and is byte-identical to the old code.
+                if dir.Y > 0.999 then
+                    slot.shell.CFrame = CFrame.new(origin)
+                else
+                    local xAxis = dir:Cross(Vector3.new(0, 1, 0)).Unit
+                    local zAxis = xAxis:Cross(dir)
+                    slot.shell.CFrame = CFrame.fromMatrix(origin, xAxis, dir, zAxis)
+                end
                 -- ⚠ CLEAR BEFORE ENABLE. The slot's shell TELEPORTS here from wherever its
                 -- previous shell died; a re-enabled Trail can draw ghost geometry from its
                 -- stale segment history — streaks hanging at the LAST apex (owner, 2026-09-03:
@@ -421,16 +488,22 @@ local function play(payload: any, distance: number)
                 -- The comet rises to the apex over whatever time the next phase leaves it —
                 -- in TWO stages: straight out of the tube for the first ~60% of the height,
                 -- then easing into the apex's lateral drift. One straight slanted tween read
-                -- as "tilted trajectories" (owner, 2026-09-03); a mortar leaves its tube
-                -- vertically. Two chained tweens cost what one does; the trail rounds the knee.
+                -- as "tilted trajectories" (owner, 2026-09-03); a mortar leaves its tube along
+                -- its own heading (vertical, absent one). Two chained tweens cost what one
+                -- does; the trail rounds the knee.
                 local rise = math.max(0.05, last - ev.at)
                 -- ⚠ DRIVEN PER FRAME, NOT TWEENED. TweenService stepped this shell in
                 -- 1.8-stud chunks at ~15Hz (measured 2026-09-03), and the trail drew the
                 -- chunks -- the owner read it instantly ("feels like screen space"). A
-                -- quadratic bezier from the muzzle through a straight-up control point to
-                -- the apex, advanced on Heartbeat, is smooth at true framerate and is the
-                -- honest ballistic shape: vertical at the tube, decelerating into the drift.
-                local control = origin + Vector3.new(0, (apex.Y - origin.Y) * 0.9, 0)
+                -- quadratic bezier from the muzzle through a control point along the heading
+                -- to the apex, advanced on Heartbeat, is smooth at true framerate and is the
+                -- honest ballistic shape: true to the tube at launch, decelerating into the drift.
+                -- Parabola-true control: a quadratic bezier reproduces a ballistic arc when the
+                -- control sits where the tube-axis line reaches APEX HEIGHT (tangent leaves along
+                -- the tube, arrives horizontal at the peak). Vertical dir: (apex.Y-origin.Y)/dir.Y
+                -- is the old `run` exactly, so the 0.9-scaled control -- and the whole flight --
+                -- is byte-identical for public sites, the proving range, and firecrackers.
+                local control = origin + dir * ((apex.Y - origin.Y) / math.max(dir.Y, 0.05) * 0.9)
                 local t0 = os.clock()
                 local flight: RBXScriptConnection
                 flight = RunService.Heartbeat:Connect(function()

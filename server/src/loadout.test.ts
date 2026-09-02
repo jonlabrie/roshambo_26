@@ -301,4 +301,17 @@ describe('validateMortarPlacements', () => {
         expect(validateMortarPlacements({ 'mortar:S': { offset: [MAX_PLACEMENT_OFFSET, -MAX_PLACEMENT_OFFSET], facing: 'N' } }, owned))
             .toEqual({ ok: true });
     });
+    it('accepts the rail-mounts record shape (mount + aim, no facing)', () => {
+        const v = { 'mortar:S': { offset: [2, -3], mount: 'rail', aim: 'L' } };
+        expect(validateMortarPlacements(v, owned)).toEqual({ ok: true });
+    });
+    it('still accepts legacy records (facing, no mount/aim)', () => {
+        const v = { 'mortar:S': { offset: [2, -3], facing: 'E' } };
+        expect(validateMortarPlacements(v, owned)).toEqual({ ok: true });
+    });
+    it('rejects unknown mount, unknown aim, and still rejects unknown keys', () => {
+        expect(validateMortarPlacements({ 'mortar:S': { offset: [0, 0], mount: 'roof', aim: 'C' } }, owned).ok).toBe(false);
+        expect(validateMortarPlacements({ 'mortar:S': { offset: [0, 0], mount: 'rail', aim: 'X' } }, owned).ok).toBe(false);
+        expect(validateMortarPlacements({ 'mortar:S': { offset: [0, 0], aim: 'C', evil: 1 } }, owned).ok).toBe(false);
+    });
 });

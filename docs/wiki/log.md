@@ -3050,6 +3050,105 @@ compiler already supports staged shells (points/scatter/share) -- staging is wav
 one via validation + seed drafts, no compiler change. Style is a burst FIELD, not a
 new kind; budget logic untouched.
 
+## [2026-09-02] lint | Prose lint — the withdrawn karasu eye survived a lint-clean of its own page
+
+A prose-lint run opened 2026-08-31 against `ef63c65`; `main` moved ~120 commits under it before
+review, including `35cbb6a` — an independent lint-clean by another session that touched four of the
+same five files. What survived that overlap is the finding.
+
+⚠ **`world/familiars.md` STILL DESCRIBED THE WITHDRAWN `KarasuEyes` PART AS SHIPPING**, and a
+lint-clean pass over that very page did not catch it. Under a heading reading *"THE KARASU'S EYE
+IS PAINTED"* sat *"**Built, kept and now wired**… `BirdController` clones it, paints it from
+`BirdSpecies.eye`, and places it every frame"*, then a hundred lines on the rest pose, the frame
+ordering, the lid loft and the ring width. All withdrawn 2026-08-29: no eye mesh asset, no Rojo
+entry, `BirdController` carries a **DO NOT REINTRODUCE** comment, and
+`tests/BirdEyeConvention.spec.luau` fails on the names. ⚠ **The mechanical lint was green on that
+page throughout, and stayed green through a dedicated clean-up pass** — it cites a test file that
+exists and `BirdSpecies.eye`, whose leaf `eye` matches somewhere in every source tree. A citation
+check cannot tell a live claim from a dead one, and neither can a pass that only follows citations.
+Superseded per rule 2.
+
+⚠ **A RENAME IS NOT A CORRECTION.** `35cbb6a` folded `ART_SOURCES` into `OWNER_AUTHORED` on
+[[blender-working-rules]] and carried both of that section's false claims across intact: that the
+registry *"gained `karasu_authored.blend` and `karasu_body.fbx`"*, and that CI keeps `art/` and the
+registry in agreement. Neither holds — `OWNER_AUTHORED` is `{COLORMAP_AUTHORITY, AUTHORED_BLEND}`,
+`8d69da6` deleted the second CI step, and that commit's own message says the `karasu_body.fbx`
+entry is *"what made the guard refuse the very export the authored blend exists to produce"*. The
+symbol the lint could see was fixed; the sentence around it was not.
+
+⚠ **`world/fireworks.md` CITED AN SDD LEDGER THAT WAS NEVER CREATED** —
+`.superpowers/sdd/2026-09-04-deck-mortars/` does not exist, and no 2026-09 ledger does. The
+markdown under `.superpowers/sdd/` is tracked (the bare `*` ignore was narrowed 2026-08-27), so
+this is an absent ledger rather than an invisible one: the same shape as item 5's missing shoji
+ledger on [[friends-family-baseline]]. Recorded as absent rather than quietly dropped.
+
+**Also corrected on `familiars`:** a transcribed **326** perches forty lines above the page's own
+instruction to count them (rule 9); the wingspan carried as `⚠ unverified` in two places after a
+third paragraph declared it verified; the "Import verified 2026-08-26" note, superseded by the
+2026-08-29 PBR re-import; and `watchWingbeat`'s mode list, which omitted PERCH and told the reader
+to run in Edit, where PERCH deliberately refuses.
+
+**Dropped as already fixed on `main`:** the four `fix` → `defect` log kinds and two dateless
+headers, the two `bpy` API symbol exemptions, and the `SPECIES = "Uguisu"` claim (now
+*"currently `Karasu`"*). Found independently by both passes within a day of each other.
+
+⚠ **AND ONE STAMP WAS WITHDRAWN RATHER THAN LEFT.** [[ambient-birds]] was read end to end and
+stamped `checked: 2026-08-31`; `main` then shipped the mejiro and the hiyodori, so its *"Two
+species built, one reachable"* is now wrong — `BirdSpecies.SPECIES` carries four. The stamp was
+removed rather than carried forward: it was honest on the day and is not honest now, and the page
+needs a re-read against the two new species rather than a one-word patch, because its whole
+"species list — started 2026-08-30" section plans as FUTURE the birds that have since shipped.
+
+⚠ **THE CURRENCY CHECK COULD NOT HAVE CAUGHT THAT, AND THE REASON GENERALISES.** That page cites
+its modules by bare name — `` `BirdController.client.luau` ``, `` `BirdFlight` ``, `` `BirdSpecies` ``
+— and never as a repo PATH, so `CITE_RE` matches nothing on it and checks 8 and 9 have no anchor to
+fire from. **A page with no path citation is exempt from every currency check by construction**, and
+it is exempt silently. The pages most worth watching are the architectural ones, which are exactly
+the ones that name modules rather than paths.
+
+⚠ **THREE PAGES CARRY A FUTURE `updated:` — reported, not changed.** `fireworks`, `familiars` and
+`blender-working-rules` are stamped **2026-09-04** while the newest commit on `main` at the time of
+this run was dated 2026-09-01. A stamp ahead of today silences check 9 (cited code committed after
+`updated:`) until that date arrives. Rule 10 made staleness blocking; a future date is a way past
+it, whether or not anyone meant it as one.
+
+**Read at depth (19 shelf pages + index, schema and this file):** `familiars`, `ambient-birds`,
+`blender-working-rules`, `blender-pipeline`, `core-loop`, `world-throw`, `round-and-hud`,
+`status-display`, `rojo-meshpart-rbxm`, `parallel-threads`, `duplicated-server-constants`,
+`material-and-mesh-traps`, `replication-races`, `visible-is-not-pixels`, `toolbox-backdoor-scan`,
+`image-moderation`, `misc-engine-traps`, `falls-dock`, `friends-family-baseline`.
+
+⚠ **NOT READ — 37 pages, and no claim is made about them.** All of `systems/`; the rest of
+`program/`; 15 `world/` pages (`canyon`, `arena-square`, `bell-engine`, `hanabiya`, `chaya`,
+`fireworks`, `day-night`, `viewing-platform`, `stats-room`, `switchback-deck`, `paths`,
+`teahouses`, `foliage`, `water-audio`, `place-state`); 15 `practice/` pages. ⚠ **`fireworks`,
+`parked-defects` and `backlog` changed heavily in the commits this branch merged and were NOT
+re-read** — only the one dead citation was fixed on `fireworks`. Start there next run.
+
+⚠ **AND THE LEDGER GAP IS A PATTERN, NOT AN INCIDENT.** A second base advance during this run
+brought the rail-mounts work, which cites `.superpowers/sdd/2026-09-04-rail-mounts/progress.md` —
+also never created. Two consecutive features, two cited ledgers that do not exist. The spec and
+plan land under `docs/superpowers/`; the SDD ledger is the step being skipped. Both are now
+recorded as absent. ⚠ **Worth deciding rather than re-fixing every run**: either the ledger is part
+of shipping a feature, or the wiki should stop citing one by default.
+
+**Two blocking staleness errors came with that advance and were worked, not stamped away.**
+[[teahouses]] fired on `server/src/routes/apiV1.ts` and `server/src/loadout.ts`, and
+[[modal-cursor-grip]] on `roblox/src/client/ShopController.client.luau`. Both pages were read end
+to end and both are still correct: the mortar work added a SIBLING `User.mortarPlacements` field
+rather than changing the teahouse loadout contract (`LOADOUT_KEYS` is unchanged, and
+`validateShojiOpen`, `shoji.plain`/`shoji.crane` and `StructureOps.setTexture` all resolve), and the
+ShopController commit touched shop display tables, leaving `CURSOR_PRIORITY`, the `holding` flag and
+both recorded rejected approaches exactly as described. Stamped `checked:` on the strength of the
+read, not of the citation.
+
+⚠ **`falls-dock` and `blender-pipeline` were read and deliberately NOT stamped `checked:`.**
+`falls-dock` rests on emitter positions, a place-only `UguisuScheduler` Script and asset ids only
+Studio can confirm; `blender-pipeline` still teaches the plane bisect for splitting a bill, which
+owner ruling 2026-08-30 retired, and lacks the `holes_fill` fan-vertex finding that made the cut
+unnecessary. Both want the owner.
+
+
 ## [2026-09-04] gate | Vocabulary wave one gated live and merged -- the range did its job all week
 
 Owner iterated the whole vocabulary AT the range across 2026-09-03/04: caught the
@@ -3107,83 +3206,70 @@ muzzle deck-size mismatch on display-shrunk decks. SHELL_MORTAR joined the fixtu
 CI gate -- gear-shell promotion is now a guarded FIFTH step (proving-range spec §5
 amended). Suites at merge: Lune 1649, Vitest 486, lint clean.
 
-## [2026-09-02] lint | Prose lint — the withdrawn karasu eye survived a lint-clean of its own page
+## [2026-09-04] gate | Deck mortars gated -- six finds in one Play session, all fixed same-day
 
-A prose-lint run opened 2026-08-31 against `ef63c65`; `main` moved ~120 commits under it before
-review, including `35cbb6a` — an independent lint-clean by another session that touched four of the
-same five files. What survived that overlap is the finding.
+Gate fixes `9d3cd3c..9aa660a` on main. The finds, in order of discovery: (1) tubes
+shipped onto the BACK edge -- the plan asserted front = local +Z; the live place says
+-Z (Nobori canyon-side, PortalControl back-side); (2) PivotTo un-rolled the stood-up
+cylinder (rolled PrimaryPart pivot) -- tubes lay flat at deck level, near-invisible;
+(3) tubes drew 3x fat (plan's bore*3) -- bore is the INNER diameter, owner ruling;
+(4) a mortar is an EMPTY tube: two faked bore-disc attempts rejected ("filled",
+"overfilled"), replaced with real CSG hollow -- one SubtractAsync per tier, cached at
+boot, cloned per rebuild; (5) the boot CSG yield let the player join BEFORE
+PlayerAdded connected (no catch-up loop) -- dead session, no claim; deferred via
+task.spawn; (6) join-time tag signals beat the padId attribute so NO Move prompts
+bound at session start -- decorations included, a LATENT SHIPPED BUG (mid-session
+rebuilds always bound, masking it). Bonus: firecracker now fires from hand height,
+not the 6-studs-overhead placeholder. Gate steps passed: front-edge defaults, kiku
+from the S muzzle, move-persist across Plays, hand firecracker, no phantom tubes.
+NOT passed (untestable in solo Studio): same-server rejoin -- the fingerprint fix is
+re-review-verified only; VERIFY ON THE PUBLISHED PLACE. Next: rail-mounts spec
+(tubes clamp to the engawa's front rail, aimed out over the canyon; launch heading
+follows the visible tilt -- owner direction, 2026-09-04).
 
-⚠ **`world/familiars.md` STILL DESCRIBED THE WITHDRAWN `KarasuEyes` PART AS SHIPPING**, and a
-lint-clean pass over that very page did not catch it. Under a heading reading *"THE KARASU'S EYE
-IS PAINTED"* sat *"**Built, kept and now wired**… `BirdController` clones it, paints it from
-`BirdSpecies.eye`, and places it every frame"*, then a hundred lines on the rest pose, the frame
-ordering, the lid loft and the ring width. All withdrawn 2026-08-29: no eye mesh asset, no Rojo
-entry, `BirdController` carries a **DO NOT REINTRODUCE** comment, and
-`tests/BirdEyeConvention.spec.luau` fails on the names. ⚠ **The mechanical lint was green on that
-page throughout, and stayed green through a dedicated clean-up pass** — it cites a test file that
-exists and `BirdSpecies.eye`, whose leaf `eye` matches somewhere in every source tree. A citation
-check cannot tell a live claim from a dead one, and neither can a pass that only follows citations.
-Superseded per rule 2.
+## [2026-09-04] defect | Parked from the mortar gate: tsukubai lies down, proving bores undersized, bootstrap races
 
-⚠ **A RENAME IS NOT A CORRECTION.** `35cbb6a` folded `ART_SOURCES` into `OWNER_AUTHORED` on
-[[blender-working-rules]] and carried both of that section's false claims across intact: that the
-registry *"gained `karasu_authored.blend` and `karasu_body.fbx`"*, and that CI keeps `art/` and the
-registry in agreement. Neither holds — `OWNER_AUTHORED` is `{COLORMAP_AUTHORITY, AUTHORED_BLEND}`,
-`8d69da6` deleted the second CI step, and that commit's own message says the `karasu_body.fbx`
-entry is *"what made the guard refuse the very export the authored blend exists to produce"*. The
-symbol the lint could see was fixed; the sentence around it was not.
+Three pre-existing issues surfaced by the gate, parked not fixed: (a)
+DecorationCatalog's tsukubai builder has the same rolled-PrimaryPart PivotTo bug --
+any placed tsukubai renders on its side (one-line fix, same shape as the mortar
+one); (b) the proving-range racks draw outer diameter = bore, a hair undersized
+under the bore-is-inner ruling; (c) main.server.luau's PlayerAdded handlers have no
+catch-up for players already present -- any future yield added to bootstrap
+re-opens the missed-join window (the mortar CSG was the first to hit it).
 
-⚠ **`world/fireworks.md` CITED AN SDD LEDGER THAT WAS NEVER CREATED** —
-`.superpowers/sdd/2026-09-04-deck-mortars/` does not exist, and no 2026-09 ledger does. The
-markdown under `.superpowers/sdd/` is tracked (the bare `*` ignore was narrowed 2026-08-27), so
-this is an absent ledger rather than an invisible one: the same shape as item 5's missing shoji
-ledger on [[friends-family-baseline]]. Recorded as absent rather than quietly dropped.
+## [2026-09-05] ship | Rail mounts gated -- aimable mortars, ballistic arcs over the canyon, rail is the default
 
-**Also corrected on `familiars`:** a transcribed **326** perches forty lines above the page's own
-instruction to count them (rule 9); the wingspan carried as `⚠ unverified` in two places after a
-third paragraph declared it verified; the "Import verified 2026-08-26" note, superseded by the
-2026-08-29 PBR re-import; and `watchWingbeat`'s mode list, which omitted PERCH and told the reader
-to run in Edit, where PERCH deliberately refuses.
+Branch `24c6da9..8e1a61b` (SDD, 8 commits) + gate fixes `27b410d..dcdffed`. Records
+became {mount, offset, aim} (legacy floor/C, never relocated); three aims in a 60°
+deck-front arc; elevations rail 25/floor 12; one pose (axisLocal/pose/launch) feeds
+render + heading + ghost so nothing can drift; drop-decides-mount editor with a
+1.25-stud rail snap band; DEFAULT_MOUNT = rail (owner lever pulled at gate -- absent
+records only, the fall-through that would have swept legacy records was guarded).
+Flight: ballistic apex 2h*tan(theta) downrange, control at apex height on the tube
+axis; nil heading byte-identical (public/proving/firecracker untouched).
 
-**Dropped as already fixed on `main`:** the four `fix` → `defect` log kinds and two dateless
-headers, the two `bpy` API symbol exemptions, and the `SPECIES = "Uguisu"` claim (now
-*"currently `Karasu`"*). Found independently by both passes within a day of each other.
+Two gate sagas worth remembering: (1) deck trails read as "exactly the old ones we
+discarded" -- the owner's elimination set (public fine, proving fine POINT-BLANK,
+deck wrong) survived two wrong diagnoses (path shape, then range) and pinned the
+truth: the comet Trail's attachment pair is only thin when its local-Y offset lies
+along the motion; tilted flights unfolded it into the old wide band. Shell now
+orients local Y along the heading. (2) The missing-prompts hunt ended after FIVE
+event-ordering belts when live instrumentation (a Play session run over MCP) showed
+the join echo simply never arrives for a late listener (RemoteEvents don't queue;
+the reveal push is gated on having picked) -- DecorationController now pulls its own
+RequestSync re-echo AND runs a 3s rescan heartbeat: convergence, not cleverness.
+Lesson logged for the wiki's standing rules: when event-ordering fixes stack past
+two, instrument the live system before writing a third.
 
-⚠ **THREE PAGES CARRY A FUTURE `updated:` — reported, not changed.** `fireworks`, `familiars` and
-`blender-working-rules` are stamped **2026-09-04** while the newest commit on `main` is dated
-2026-09-01. A stamp ahead of today silences check 9 (cited code committed after `updated:`) until
-that date arrives, so those three are immune to the staleness prompt for two days. Rule 10 made
-staleness blocking; a future date is a way past it, whether or not anyone meant it as one.
+Same-server rejoin verification (deck-mortars carryover) STILL awaits the published
+place. Suites at close: Lune 1653, Vitest 489, lint clean, CI green.
 
-**Read at depth (19 shelf pages + index, schema and this file):** `familiars`, `ambient-birds`,
-`blender-working-rules`, `blender-pipeline`, `core-loop`, `world-throw`, `round-and-hud`,
-`status-display`, `rojo-meshpart-rbxm`, `parallel-threads`, `duplicated-server-constants`,
-`material-and-mesh-traps`, `replication-races`, `visible-is-not-pixels`, `toolbox-backdoor-scan`,
-`image-moderation`, `misc-engine-traps`, `falls-dock`, `friends-family-baseline`.
+## [2026-09-05] gate | Wobble and break gated -- "perfect, looks great"
 
-⚠ **NOT READ — 37 pages, and no claim is made about them.** All of `systems/`; the rest of
-`program/`; 15 `world/` pages (`canyon`, `arena-square`, `bell-engine`, `hanabiya`, `chaya`,
-`fireworks`, `day-night`, `viewing-platform`, `stats-room`, `switchback-deck`, `paths`,
-`teahouses`, `foliage`, `water-audio`, `place-state`); 15 `practice/` pages. ⚠ **`fireworks` and
-`parked-defects` changed heavily in the commits this branch merged and were NOT re-read** — only
-the one dead citation above was fixed on `fireworks`. Start there next run.
-
-⚠ **`falls-dock` and `blender-pipeline` were read and deliberately NOT stamped `checked:`.**
-`falls-dock` rests on emitter positions, a place-only `UguisuScheduler` Script and asset ids only
-Studio can confirm; `blender-pipeline` still teaches the plane bisect for splitting a bill, which
-owner ruling 2026-08-30 retired, and lacks the `holes_fill` fan-vertex finding that made the cut
-unnecessary. Both want the owner.
-
-⚠ **AND ONE STAMP WAS WITHDRAWN RATHER THAN LEFT.** [[ambient-birds]] was read end to end and
-stamped `checked: 2026-08-31`; `main` then shipped the mejiro and the hiyodori, so its *"Two
-species built, one reachable"* is now wrong — `BirdSpecies.SPECIES` carries four. The stamp was
-removed rather than carried forward: it was honest on the day and is not honest now, and the page
-needs a re-read against the two new species rather than a one-word patch, because its whole
-"species list — started 2026-08-30" section plans as FUTURE the birds that have since shipped.
-
-⚠ **THE CURRENCY CHECK COULD NOT HAVE CAUGHT THAT, AND THE REASON GENERALISES.** That page cites
-its modules by bare name — `` `BirdController.client.luau` ``, `` `BirdFlight` ``, `` `BirdSpecies` ``
-— and never as a repo PATH, so `CITE_RE` matches nothing on it and checks 8 and 9 have no anchor to
-fire from. **A page with no path citation is exempt from every currency check by construction**, and
-it is exempt silently. The pages most worth watching are the architectural ones, which are exactly
-the ones that name modules rather than paths.
+Post-gate owner direction ("we're currently just throwing fastballs from a pitching
+machine on the deck") shipped and gated same-session (`d7eb85f`): heading launches
+draw a seeded +-2.5-degree exit-axis wobble (angle/curve/reach cascade together
+through the ballistics) and a +-12-stud late-arc break perpendicular to the flight
+(zero at the muzzle, emerging near the peak). Drawn after the base scatter, so the
+nil-heading rng stream -- public sites, proving range, firecrackers -- stays
+byte-identical. Both numbers are one-line tunables in FireworkController.

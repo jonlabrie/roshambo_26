@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: parked
-updated: 2026-08-27
+updated: 2026-09-04
 checked: 2026-09-04
 ---
 
@@ -190,3 +190,30 @@ which no test can see.)
 _(h) — the World Throw picked at random — was FIXED 2026-08-16, see [[world-throw]] and
 `log.md`. It is deliberately NOT active in any deployed environment yet: both prod and dev
 run `TEST_MODE`, which keeps the R→P→S cycle. Defect (e) therefore still stands._
+
+## (i) tsukubai renders lying on its side — rolled-PrimaryPart PivotTo bug (2026-09-04)
+
+- **Where:** `roblox/src/shared/DecorationCatalog.luau`, the `tsukubai` builder: `basin` is a
+  cylinder stood up with `CFrame.Angles(0, 0, rad(90))` AND set as `PrimaryPart`;
+  `TreatmentApplier._buildDecorations` places via `model:PivotTo(...)`, which aligns by the
+  PrimaryPart's rolled frame — un-rotating the whole prop flat, exactly the mortar-tube bug
+  fixed at the 2026-09-04 gate (`9d3cd3c`). The ishidoro escapes it (unrotated Block PrimaryPart).
+- **Fix sketch:** one line, same shape as the mortar fix: `basin.PivotOffset =
+  basin.CFrame:Inverse()` in the builder. Owner was offered the fix mid-gate and deferred.
+
+## (j) proving-range tube bores a hair undersized under the bore-is-inner ruling (2026-09-04)
+
+- **Where:** `roblox/tools/builders/ProvingGround.luau` `TUBE*_SIZE` — outer diameter = bore.
+  The 2026-09-04 owner ruling (deck mortars): 2"/4"/6" are INNER diameters; the deck tubes
+  hollow at true bore with a 0.06 wall AROUND it. The proving racks' solid tubes read ~11%
+  thin by comparison. Cosmetic; fixing means re-running the model bake.
+
+## (k) bootstrap PlayerAdded handlers have no catch-up for players already present (2026-09-04)
+
+- **Where:** `roblox/src/server/main.server.luau` — none of the `Players.PlayerAdded:Connect`
+  sites iterate `Players:GetPlayers()` after connecting. Any yield added to top-level bootstrap
+  ABOVE a connect re-opens the window where a fast join is silently missed (dead session: no
+  claim, no economy). The mortar CSG build was the first to hit it (fixed by deferring the
+  yield, `d510c69`); the structural fragility remains.
+- **Fix sketch:** after each connect, loop existing players through the same handler (idempotent
+  guards where needed), the standard Roblox join-race idiom.

@@ -17,6 +17,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local EconomyState = remotes:WaitForChild("EconomyState") :: RemoteEvent
+local FireworkState = remotes:WaitForChild("FireworkState") :: RemoteEvent
+local RequestSync = remotes:WaitForChild("RequestSync") :: RemoteEvent
 local DecorationPlaced = remotes:WaitForChild("DecorationPlaced") :: RemoteEvent
 local SetDecorationRemove = remotes:WaitForChild("SetDecorationRemove") :: RemoteEvent
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
@@ -101,6 +103,25 @@ local function tryBind(inst: Instance, isMortar: boolean)
         return
     end
     local padId = inst:GetAttribute("padId")
+    if padId == nil then
+        -- Join-time replication can fire the tag signal BEFORE the model's attributes apply
+        -- (2026-09-04 gate: models built during the claim flow never bound — padId read nil
+        -- and nothing retried; every later incremental rebuild bound fine). Wait for the
+        -- attribute once, then retry.
+        local conn: RBXScriptConnection
+        conn = inst:GetAttributeChangedSignal("padId"):Connect(function()
+            conn:Disconnect()
+            tryBind(inst, isMortar)
+        end)
+        -- Close the read-connect window (2026-09-05 gate, second miss): the attribute can
+        -- apply BETWEEN the nil read above and the Connect — then the signal never fires and
+        -- nothing retries. Re-read after connecting; if it landed in the gap, retry now.
+        if inst:GetAttribute("padId") ~= nil then
+            conn:Disconnect()
+            tryBind(inst, isMortar)
+        end
+        return
+    end
     if myPadId == nil or padId ~= myPadId then
         return
     end
@@ -129,12 +150,23 @@ CollectionService:GetInstanceRemovedSignal("Mortar"):Connect(function(inst)
     bound[inst] = nil
 end)
 
+local sawEconomyEcho = false
 EconomyState.OnClientEvent:Connect(function(p)
-    local newPad = p.claimedPadId
-    if newPad ~= myPadId then
-        myPadId = newPad
-        rescanAll() -- claim just resolved: bind any decorations already replicated in
-    end
+    sawEconomyEcho = true
+    myPadId = p.claimedPadId
+    -- rescan on EVERY echo, not just a pad change: the bound-guard makes it idempotent and the
+    -- model count is tiny, and it closes every models-before-echo / echo-before-models ordering
+    -- (the change-only guard left join-time builds unbound with nothing to retry them).
+    rescanAll()
+end)
+
+-- The join's LAST rebuild is the mortar-bearing one, triggered by pushFireworkState (the
+-- fireworks GET landing) -- it fires FireworkState, NOT an EconomyState echo, so the
+-- rescan-on-echo belt above never sees those models (2026-09-05 gate, second miss). Rescan on
+-- this event too; idempotent, and FireworkState fires at join/launch/reveal so it doubles as a
+-- periodic self-heal.
+FireworkState.OnClientEvent:Connect(function()
+    rescanAll()
 end)
 
 DecorationPlaced.OnClientEvent:Connect(function(p)
@@ -153,3 +185,31 @@ DecorationPlaced.OnClientEvent:Connect(function(p)
 end)
 
 rescanAll()
+
+-- THE ROOT CAUSE of both gates' missing prompts (2026-09-04/05), found by live instrumentation:
+-- RemoteEvents do not queue for late listeners, this script's EconomyState connection lands
+-- AFTER main.client.luau's, and main's own RequestSync retry loop STOPS once main's listener is
+-- fed -- so the join echo can fly before we are listening, and an idle player (no picks, no
+-- purchases) never receives another one. myPadId stays nil and every bind attempt early-returns
+-- with nothing left to retry it. Same cure the codebase already uses (main.server.luau's
+-- RequestSync comment names this exact trap): pull our own re-echo until OUR listener has seen
+-- one. Server debounces at 0.4s; jittered ~1s retries are polite and terminate on first echo.
+task.spawn(function()
+    while not sawEconomyEcho do
+        RequestSync:FireServer()
+        task.wait(1 + math.random() * 0.5)
+    end
+end)
+
+-- And the belt that ends the story: a slow rescan heartbeat. Five event-ordering fixes each
+-- closed a real window and the join found another; live instrumentation showed every poke of
+-- rescanAll binds instantly whenever the world is in place, so convergence -- not cleverness --
+-- is what was missing. Two GetTagged calls over a handful of models with a bound-guard no-op is
+-- effectively free at this cadence, and it makes prompt binding reach steady state from ANY
+-- join interleaving within 3 seconds.
+task.spawn(function()
+    while true do
+        task.wait(3)
+        rescanAll()
+    end
+end)
