@@ -127,6 +127,35 @@ FireworkCatalog.RECIPES = {
             },
         },
     },
+    -- 椰子 yashi, the palm (promoted 2026-09-06; owner: M tube, 10). Four thick outward
+    -- arms with the long rain (palm lifetime carries the extra 0.4s). The boost (30%)
+    -- lands a FIFTH arm via boost.points, sold by a violet streak kicker that rains --
+    -- the family's only streak treatment, so the lucky shell reads at a glance.
+    yashi = {
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin" },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 210, 140 } },
+            {
+                at = 3.0,
+                kind = "burst",
+                anchor = "apex",
+                style = "palm",
+                color = { 255, 180, 60 },
+                edgeColor = { 255, 230, 160 },
+                points = 4,
+                scatter = 6,
+                droop = false,
+                boost = {
+                    chance = 0.3,
+                    points = 1,
+                    glow = 1.15,
+                    lifeScale = 1.1,
+                    kickerColor = { 190, 90, 255 },
+                    kickerStreaks = true,
+                },
+            },
+        },
+    },
     kiku = {
         phases = {
             { at = 0.0, kind = "report", anchor = "origin" },
