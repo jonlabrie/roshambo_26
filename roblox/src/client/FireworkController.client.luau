@@ -124,6 +124,13 @@ for _ = 1, POOL_SIZE do
         NumberSequenceKeypoint.new(1, 0.2),
     })
     trail.LightEmission = 1
+    -- ⚠ FaceCamera IS the ribbon fix (owner, 2026-09-06, after two manual-orientation
+    -- failures in one hour): a Trail draws its full span as width every frame, so a span
+    -- parallel to motion collapses to a hairline (segments overlap collinearly) and ANY
+    -- tilt unfolds the band — there is no readable middle in world space. Billboarded,
+    -- the span is held PERPENDICULAR to motion (the flight stepper does this) and the
+    -- engine faces the strip to the viewer: exact width, every angle, no ribbon possible.
+    trail.FaceCamera = true
     trail.Enabled = false
     trail.Parent = shell
 
@@ -639,19 +646,20 @@ local function play(payload: any, distance: number)
                 })
                 fem:Emit(14)
             elseif ev.kind == "ascent" then
-                -- ⚠ THE RIBBON RIDES THE HEADING (owner, 2026-09-05: deck trails were "exactly
-                -- like the old ones we discarded" while proving/public looked right). The comet's
-                -- attachment pair is separated along the shell's LOCAL Y; when that offset lies
-                -- along the motion the segments overlap into the tuned thin comet, and when the
-                -- motion tilts away from it the same offset unfolds the Trail into the wide
-                -- angled band we threw away. Align local Y with the flight direction; a vertical
-                -- dir keeps the identity orientation and is byte-identical to the old code.
-                if dir.Y > 0.999 then
-                    slot.shell.CFrame = CFrame.new(origin)
-                else
-                    local xAxis = dir:Cross(Vector3.new(0, 1, 0)).Unit
-                    local zAxis = xAxis:Cross(dir)
-                    slot.shell.CFrame = CFrame.fromMatrix(origin, xAxis, dir, zAxis)
+                -- Launch-instant orientation, matching the flight stepper's convention
+                -- (2026-09-06, superseding the 07ab0fa along-heading alignment): the span
+                -- rides PERPENDICULAR to the motion — the strip's width — and FaceCamera
+                -- billboards it to the viewer. The stepper re-orients every frame; this
+                -- only covers the first recorded segment.
+                do
+                    local xAxis = dir:Cross(Vector3.new(0, 1, 0))
+                    if xAxis.Magnitude < 1e-3 then
+                        xAxis = Vector3.new(1, 0, 0)
+                    else
+                        xAxis = xAxis.Unit
+                    end
+                    local yAxis = xAxis:Cross(dir)
+                    slot.shell.CFrame = CFrame.fromMatrix(origin, xAxis, yAxis, xAxis:Cross(yAxis))
                 end
                 -- ⚠ CLEAR BEFORE ENABLE. The slot's shell TELEPORTS here from wherever its
                 -- previous shell died; a re-enabled Trail can draw ghost geometry from its
@@ -706,24 +714,21 @@ local function play(payload: any, distance: number)
                     -- muzzle axis, and any perpendicular residue unfolds the Trail into
                     -- the old band; doubling the span made the residue visible again.
                     -- The tangent is the bezier's own derivative direction, b - a, free.
-                    -- ...but not PERFECTLY: a Trail's visible area is the span's LATERAL
-                    -- component, and exact tangency collapses the strip to a zero-area line
-                    -- (owner, 2026-09-06: "barely readable at any size" — the launch-frozen
-                    -- orientation was readable precisely because the arc drifted it
-                    -- off-tangent). A fixed 12° tilt in the flight plane guarantees
-                    -- ~sin(12°) x span of width the whole way up — ~0.2 studs standard,
-                    -- ~0.4 heavy — and can never unfold into the band.
+                    -- PERPENDICULAR to the tangent — the classic trail setup FaceCamera
+                    -- expects: the span is the strip's width, the engine billboards it to
+                    -- the viewer, and the width knob (attachment span) becomes exact.
                     local tangent = b - a
                     if tangent.Magnitude > 1e-3 then
-                        local yAxis = tangent.Unit
-                        local xAxis = yAxis:Cross(Vector3.new(0, 1, 0))
+                        local dirT = tangent.Unit
+                        local xAxis = dirT:Cross(Vector3.new(0, 1, 0))
                         if xAxis.Magnitude < 1e-3 then
                             xAxis = Vector3.new(1, 0, 0) -- vertical flight: any horizontal axis
                         else
                             xAxis = xAxis.Unit
                         end
+                        -- local Y = the in-flight-plane perpendicular of the tangent
+                        local yAxis = xAxis:Cross(dirT)
                         slot.shell.CFrame = CFrame.fromMatrix(p, xAxis, yAxis, xAxis:Cross(yAxis))
-                            * CFrame.Angles(math.rad(12), 0, 0)
                     else
                         slot.shell.Position = p
                     end
