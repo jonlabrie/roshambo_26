@@ -24,9 +24,11 @@ export const SHELL_PRICES: Record<string, number> = {
 
 // Gear, not real estate — deliberately under the deck ladder (50 / 500 / 3000).
 export const MORTAR_PRICES = {
-    'mortar:S': 40,
-    'mortar:M': 250,
-    'mortar:L': 1000,
+    // Owner re-priced 2026-09-05 (was 40/250/1000: "sounds expensive"): gear should be a
+    // step, not a wall -- and even these may drop once the Robux benchmark exists.
+    'mortar:S': 10,
+    'mortar:M': 50,
+    'mortar:L': 100,
 } as const;
 
 export type MortarId = keyof typeof MORTAR_PRICES;

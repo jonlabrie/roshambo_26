@@ -906,9 +906,9 @@ describe('/api/v1', () => {
                 wa: 5,
             });
             expect(res.body.catalog.mortars).toEqual({
-                'mortar:S': 40,
-                'mortar:M': 250,
-                'mortar:L': 1000,
+                'mortar:S': 10,
+                'mortar:M': 50,
+                'mortar:L': 100,
             });
         });
 
