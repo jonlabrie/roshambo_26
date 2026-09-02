@@ -9,7 +9,6 @@ import { StatsView } from './components/StatsView'
 import { ArenaVisuals } from './components/ArenaVisuals'
 import { RiveArena } from './components/RiveArena'
 import { VideoArena } from './components/VideoArena'
-import { MobileAd } from './components/MobileAd'
 import { AuthView } from './components/AuthView'
 import { StoreView } from './components/StoreView'
 import { cn } from './lib/utils'
@@ -230,9 +229,6 @@ export default function App() {
                         {visualTier}
                     </button>
                 </div>
-
-                {/* Mobile Ad Space - Hides during reveal results */}
-                <MobileAd isVisible={!showResult} />
 
                 {/* Message Area */}
                 <div className="min-h-[60px] flex items-center justify-center p-4">
