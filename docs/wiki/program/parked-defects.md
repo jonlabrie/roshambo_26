@@ -218,7 +218,7 @@ run `TEST_MODE`, which keeps the R→P→S cycle. Defect (e) therefore still sta
 - **Fix sketch:** after each connect, loop existing players through the same handler (idempotent
   guards where needed), the standard Roblox join-race idiom.
 
-## (o) `resolveUser` upserts on ANY truthy robloxUserId — a garbage path id mints a junk user (2026-09-05)
+## ~~(o) `resolveUser` upserts on ANY truthy robloxUserId — a garbage path id mints a junk user~~ FIXED 2026-09-05 (`568cdec`: digits-only router.param guard over all /players routes)
 
 - **Where:** `server/src/identity.ts` `resolveUser` — `if (identifier.robloxUserId)` then
   `findOneAndUpdate(..., { upsert: true })`. Every `/api/v1/players/:robloxUserId/...` route
