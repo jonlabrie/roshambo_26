@@ -69,7 +69,7 @@ bury real 500s in logs. Fix: a 4xx. Verified present 2026-08-27.
 - **Weight:** every F&F guest is a first-time player on a fresh account, so every guest
   would hit this. The content/pacing design pass is separate — see [[backlog]].
 
-## (e) TEST_MODE world-throw phase is seeded from a document count
+## ~~(e) TEST_MODE world-throw phase is seeded from a document count~~ FIXED 2026-09-05 (`testModePhaseShift`: the cycle continues from the newest persisted round's face; deploys no longer re-roll the phase)
 
 - **Where:** `server/src/index.ts`, `pickWorldThrow` — `TEST_MODE ? THROWS[roundCount % 3] : random`;
   `roundCount` is in-memory on `RoundEngine`, seeded at boot from
