@@ -41,6 +41,9 @@ end
 -- promotion the pin drops and SHELL_MORTAR's mortar:L resolves it. Ladder varies hang time.
 local function kamuro(burstAt: number, boost: any?)
     return {
+        -- The L class (owner, 2026-09-06: "this shell really needs to be impressive"):
+        -- double sprites via the weighted budget, double radius via spread 60 (neutral 30).
+        heavy = true,
         phases = {
             { at = 0.0, kind = "report", anchor = "origin", sound = BurstStyles.SOUNDS.launch_heavy },
             { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 200, 120 } },
@@ -51,6 +54,7 @@ local function kamuro(burstAt: number, boost: any?)
                 style = "kamuro",
                 color = { 255, 170, 40 },
                 edgeColor = { 255, 220, 140 },
+                spread = 60,
                 droop = false,
                 sound = BurstStyles.SOUNDS.salute_single, -- the always-boom, every shell
                 boost = boost,

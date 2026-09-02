@@ -30,6 +30,13 @@ function FireworkRecipes.validate(recipe: any): (boolean, string?)
     if typeof(recipe) ~= "table" or typeof(recipe.phases) ~= "table" or #recipe.phases == 0 then
         return false, "a recipe is a table with a non-empty phases array"
     end
+    -- heavy (owner, 2026-09-06: L shells "really need to be impressive"): the shell emits
+    -- at WEIGHT_HEAVY x the particle budget and is charged that many admission slots, so
+    -- the weighted sky total the mobile floor was measured against never grows. Catalog
+    -- heavies must live in the L tube -- FireworkCatalog.spec holds that line.
+    if recipe.heavy ~= nil and typeof(recipe.heavy) ~= "boolean" then
+        return false, "heavy must be a boolean"
+    end
     local prevAt = 0
     for i, ph in recipe.phases :: { any } do
         if typeof(ph) ~= "table" then

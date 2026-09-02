@@ -127,6 +127,15 @@ describe("FireworkRecipes.validate — the one recipe schema", function()
         end
     end)
 
+    test("heavy is an optional boolean -- the L-class budget weight", function()
+        local r = goodRecipe();
+        (r :: any).heavy = true
+        expect(FireworkRecipes.validate(r)).toBe(true)
+        local bad = goodRecipe();
+        (bad :: any).heavy = 2
+        expect(FireworkRecipes.validate(bad)).toBe(false)
+    end)
+
     test("EVERY SHIPPED CATALOG RECIPE PASSES — one schema, not two", function()
         for id, recipe in FireworkCatalog.RECIPES do
             local ok, err = FireworkRecipes.validate(recipe)

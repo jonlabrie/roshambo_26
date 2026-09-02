@@ -32,6 +32,12 @@ FireworkDirector.DROP_STUDS = 1400
 FireworkDirector.PARTICLES_NEAR = 400
 FireworkDirector.PARTICLES_FAR = 90
 
+-- A HEAVY shell (recipe.heavy — the L tube's class; owner, 2026-09-06: "this shell really
+-- needs to be impressive") emits at WEIGHT x the budget AND is charged WEIGHT admission
+-- slots by the controller, so the weighted sky total never exceeds what the mobile floor
+-- was measured against — a volley of heavies staggers sooner instead of costing more.
+FireworkDirector.WEIGHT_HEAVY = 2
+
 local STAGGER_MIN_MS = 100
 local STAGGER_MAX_MS = 300
 
@@ -56,8 +62,9 @@ function FireworkDirector.admit(activeCount: number, distance: number): { render
 end
 
 -- Particle budget and whether the burst is audible. Linear between the bands, so there is no visible
--- step as a burst recedes.
-function FireworkDirector.lodFor(distance: number): { particles: number, sound: boolean }
+-- step as a burst recedes. `weight` (default 1) multiplies the budget for heavy shells — legitimate
+-- ONLY because the controller charges the same weight against the concurrency ledger.
+function FireworkDirector.lodFor(distance: number, weight: number?): { particles: number, sound: boolean }
     local near, far = FireworkDirector.NEAR_STUDS, FireworkDirector.FAR_STUDS
     local pNear, pFar = FireworkDirector.PARTICLES_NEAR, FireworkDirector.PARTICLES_FAR
     local particles
@@ -69,7 +76,7 @@ function FireworkDirector.lodFor(distance: number): { particles: number, sound: 
         local t = (distance - near) / (far - near)
         particles = math.floor(pNear + (pFar - pNear) * t)
     end
-    return { particles = particles, sound = distance <= FireworkDirector.AUDIBLE_STUDS }
+    return { particles = particles * (weight or 1), sound = distance <= FireworkDirector.AUDIBLE_STUDS }
 end
 
 return FireworkDirector

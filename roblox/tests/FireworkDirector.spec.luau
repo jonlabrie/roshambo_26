@@ -80,3 +80,35 @@ describe("FireworkDirector — distance LOD", function()
         )
     end)
 end)
+
+describe("FireworkDirector — heavy shells (the L tube's weight)", function()
+    test("weight multiplies the particle budget at every band", function()
+        for _, d in { 0, FireworkDirector.NEAR_STUDS + 100, FireworkDirector.DROP_STUDS } do
+            local base = FireworkDirector.lodFor(d).particles
+            local heavy = FireworkDirector.lodFor(d, FireworkDirector.WEIGHT_HEAVY).particles
+            expect(heavy).toBe(base * FireworkDirector.WEIGHT_HEAVY)
+        end
+    end)
+
+    test("weight 1 (and nil) is byte-identical to today's budget", function()
+        for d = 0, FireworkDirector.DROP_STUDS, 50 do
+            expect(FireworkDirector.lodFor(d, 1).particles).toBe(FireworkDirector.lodFor(d).particles)
+        end
+    end)
+
+    test("THE WEIGHTED CEILING HOLDS: no burst exceeds NEAR x its declared weight", function()
+        -- The mobile-floor measurement's invariant, restated for weights: a heavy shell
+        -- spends more because it is CHARGED more (weighted admission), never for free.
+        for d = 0, FireworkDirector.DROP_STUDS, 10 do
+            local heavy = FireworkDirector.lodFor(d, FireworkDirector.WEIGHT_HEAVY).particles
+            expect(heavy <= FireworkDirector.PARTICLES_NEAR * FireworkDirector.WEIGHT_HEAVY).toBe(true)
+        end
+    end)
+
+    test("weight never changes the sound gate", function()
+        local d = FireworkDirector.AUDIBLE_STUDS - 1
+        expect(FireworkDirector.lodFor(d, FireworkDirector.WEIGHT_HEAVY).sound).toBe(true)
+        local far = FireworkDirector.AUDIBLE_STUDS + 1
+        expect(FireworkDirector.lodFor(far, FireworkDirector.WEIGHT_HEAVY).sound).toBe(false)
+    end)
+end)

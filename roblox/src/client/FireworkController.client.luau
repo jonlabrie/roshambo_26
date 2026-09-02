@@ -397,7 +397,11 @@ local function play(payload: any, distance: number)
     local slot = pool[poolNext]
     poolNext = (poolNext % POOL_SIZE) + 1
 
-    local lod = FireworkDirector.lodFor(distance)
+    -- A heavy shell (the L class) emits at WEIGHT_HEAVY x the budget and is CHARGED
+    -- WEIGHT_HEAVY admission slots below -- the weighted sky total never exceeds what
+    -- the mobile floor was measured against; a volley of heavies staggers sooner.
+    local weight = if recipe.heavy then FireworkDirector.WEIGHT_HEAVY else 1
+    local lod = FireworkDirector.lodFor(distance, weight)
     local schedule = FireworkSchedule.compile(recipe, lod.particles)
 
     -- THE SEED IS WHY EVERY CLIENT SEES THE SAME SHOW. Without it each machine rolls its own
@@ -510,7 +514,7 @@ local function play(payload: any, distance: number)
         apex = origin + (apex - origin) + dir * ((apex - origin):Dot(dir) * (BurstStyles.BONUS.apexScale - 1))
     end
 
-    active += 1
+    active += weight
     for _, ev in schedule do
         -- The at=0 report runs INLINE: task.delay(0) costs a Heartbeat, and that frame plus
         -- playSound's own hop plus the clip's attack was the launch-thump lag a listener at
@@ -908,7 +912,7 @@ local function play(payload: any, distance: number)
     -- Released after the last phase plus the longest burst style's release tail, so the slot is
     -- not reused — and its parts repositioned — while its own sparks are still on screen.
     task.delay(last + tail + 0.2, function()
-        active -= 1
+        active -= weight
         slot.trail.Enabled = false
     end)
 end
