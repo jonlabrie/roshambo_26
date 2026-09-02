@@ -54,6 +54,8 @@ export function validateShojiOpen(value: unknown): Check {
 
 export const PLACEMENT_FACINGS = new Set(['N', 'E', 'S', 'W']);
 export const MAX_PLACEMENT_OFFSET = 32;
+const MORTAR_MOUNTS = new Set(['floor', 'rail']);
+const MORTAR_AIMS = new Set(['L', 'C', 'R']);
 
 export function validatePlacement(value: unknown): Check {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
@@ -180,17 +182,36 @@ export function validateMortarPlacements(value: unknown, owned: string[]): Check
         if (typeof p !== 'object' || p === null) return { ok: false, error: 'PLACEMENT_NOT_OBJECT' };
         const obj = p as Record<string, unknown>;
         for (const k of Object.keys(obj)) {
-            if (k !== 'offset' && k !== 'facing') return { ok: false, error: 'BAD_PLACEMENT' };
+            if (k !== 'offset' && k !== 'facing' && k !== 'mount' && k !== 'aim') {
+                return { ok: false, error: 'BAD_PLACEMENT' };
+            }
         }
-        const { offset, facing } = obj as { offset?: unknown; facing?: unknown };
+        const { offset, facing, mount, aim } = obj as {
+            offset?: unknown;
+            facing?: unknown;
+            mount?: unknown;
+            aim?: unknown;
+        };
         if (!Array.isArray(offset) || offset.length !== 2) return { ok: false, error: 'BAD_OFFSET' };
         for (const n of offset) {
             if (typeof n !== 'number' || !Number.isFinite(n) || Math.abs(n) > MAX_PLACEMENT_OFFSET) {
                 return { ok: false, error: 'BAD_OFFSET' };
             }
         }
-        if (typeof facing !== 'string' || !PLACEMENT_FACINGS.has(facing)) {
-            return { ok: false, error: 'BAD_FACING' };
+        if (facing !== undefined) {
+            if (typeof facing !== 'string' || !PLACEMENT_FACINGS.has(facing)) {
+                return { ok: false, error: 'BAD_FACING' };
+            }
+        }
+        if (mount !== undefined) {
+            if (typeof mount !== 'string' || !MORTAR_MOUNTS.has(mount)) {
+                return { ok: false, error: 'BAD_MOUNT' };
+            }
+        }
+        if (aim !== undefined) {
+            if (typeof aim !== 'string' || !MORTAR_AIMS.has(aim)) {
+                return { ok: false, error: 'BAD_AIM' };
+            }
         }
     }
     return { ok: true };
