@@ -227,7 +227,11 @@ list.Size = UDim2.new(1, -20, 1, -70)
 list.Position = UDim2.fromOffset(10, 64)
 list.BackgroundTransparency = 1
 list.BorderSizePixel = 0
-list.CanvasSize = UDim2.new()
+-- ⚠ THE CANVAS NEEDS ITS WIDTH STATED. Scale-sized children measure against the
+-- CANVAS, not the frame — with CanvasSize zero and automatic sizing on Y only, the
+-- canvas was 0 wide and every row rendered 0px (owner, 2026-09-06: "menus doesn't
+-- show on entering the shop"). Width = the frame's own, minus scrollbar room.
+list.CanvasSize = UDim2.new(1, -8, 0, 0)
 -- selene: allow(incorrect_standard_library_use) -- selene 0.31's Roblox std predates AutomaticCanvasSize.Y; the enum is real
 list.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y
 list.ScrollingDirection = Enum.ScrollingDirection.Y
@@ -255,7 +259,7 @@ local rows: { Row } = {}
 local function makeRow(order: number, item: string, label: string): Row
     local b = Instance.new("TextButton")
     b.LayoutOrder = order
-    b.Size = UDim2.new(1, -8, 0, 38) -- -8: clear of the scrollbar
+    b.Size = UDim2.new(1, 0, 0, 38) -- full canvas width; the canvas already clears the scrollbar
     b.BackgroundColor3 = WASHI
     b.BackgroundTransparency = 0.3
     b.BorderSizePixel = 0
