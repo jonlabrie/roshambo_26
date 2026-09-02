@@ -498,7 +498,14 @@ local function play(payload: any, distance: number)
             end
         end
         if chance then
-            shellBoosted = rng:NextNumber() < chance
+            -- The seeded draw ALWAYS happens (stream stability), but the SERVER's pity-ramp
+            -- verdict wins when the payload carries one (owner, 2026-09-06; BoostLuck):
+            -- per-player miss streaks live server-side, every client renders the same luck,
+            -- and a paying player's drought is bounded. The local roll remains the fallback
+            -- for launches with no verdict -- the proving range, deliberately: auditions
+            -- judge the recipe's floor, not the ramp.
+            local rolled = rng:NextNumber() < chance
+            shellBoosted = if typeof(payload.boosted) == "boolean" then payload.boosted else rolled
         end
     end
 

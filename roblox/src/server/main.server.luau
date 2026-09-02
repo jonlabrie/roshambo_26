@@ -55,6 +55,8 @@ local RoundClock = require(shared:WaitForChild("RoundClock"))
 local CollectionService = game:GetService("CollectionService")
 local LaunchSites = require(shared:WaitForChild("LaunchSites"))
 local MortarPlacement = require(shared:WaitForChild("MortarPlacement"))
+local FireworkCatalog = require(shared:WaitForChild("FireworkCatalog"))
+local BoostLuck = require(shared:WaitForChild("BoostLuck"))
 local GameRules = require(shared:WaitForChild("GameRules"))
 local PlayerProfiles = require(shared:WaitForChild("PlayerProfiles"))
 local ThemeManifest = require(shared:WaitForChild("ThemeManifest"))
@@ -788,6 +790,10 @@ FateResolved.OnServerEvent:Connect(function(player, reason)
     end
 end)
 
+-- Per-player, per-shell consecutive boost misses (the pity ramp's only state; BoostLuck
+-- owns the math). Session-lived by design -- a rejoin starts at the honest floor.
+local boostMisses: { [string]: { [string]: number } } = {}
+
 Players.PlayerRemoving:Connect(function(player)
     fates:remove(tostring(player.UserId))
     -- Drop them from the roster and tell everyone, or their bird outlives them on every other
@@ -798,6 +804,7 @@ Players.PlayerRemoving:Connect(function(player)
     ledgerCounters[tostring(player.UserId)] = nil
     lastLedgerFetch[tostring(player.UserId)] = nil
     hudSeenBeats[tostring(player.UserId)] = nil
+    boostMisses[tostring(player.UserId)] = nil
     hudWriteSeq[tostring(player.UserId)] = nil
 end)
 
@@ -1525,12 +1532,27 @@ RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
                 origin = root.Position + Vector3.new(0, 6, 0)
             end
         end
+        -- THE PITY RAMP (owner, 2026-09-06; math in BoostLuck): the server rolls this
+        -- shell's luck against a per-player per-shell miss streak and sends the VERDICT --
+        -- every client renders the same luck, and a paying player's drought is bounded.
+        -- Recipes without boost get no field; the client's seeded roll stays the fallback.
+        -- Streaks are session-lived by design: a rejoin starts at the honest floor.
+        local boosted: boolean? = nil
+        local baseChance = BoostLuck.baseChance(FireworkCatalog.RECIPES[shellId])
+        if baseChance then
+            local streaks = boostMisses[uid] or {}
+            boostMisses[uid] = streaks
+            local verdict, newMisses = BoostLuck.roll(baseChance, streaks[shellId] or 0, math.random())
+            streaks[shellId] = newMisses
+            boosted = verdict
+        end
         FireworkLaunched:FireAllClients({
             shellId = shellId,
             origin = origin,
             heading = heading and { x = heading.X, y = heading.Y, z = heading.Z } or nil,
             seed = math.random(1, 2 ^ 31 - 1),
             by = uid,
+            boosted = boosted,
         })
         if pushFireworkState then
             pushFireworkState(player)
