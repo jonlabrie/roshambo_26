@@ -52,7 +52,7 @@ Thirteen sites in `apiV1.ts` answer a `resolveUser` miss with
 `res.status(500).json({ error: 'RESOLVE_FAILED' })`. It is a client condition and will
 bury real 500s in logs. Fix: a 4xx. Verified present 2026-08-27.
 
-## (d) Onboarding empty-card layout defect — CONFIRM FIRST
+## ~~(d) Onboarding empty-card layout defect~~ FIXED 2026-09-05 (`4cf73ce`) — the AutomaticSize diagnosis was WRONG: ZIndexBehavior.Global ranked the opaque card above its own labels; confirmed and fixed live at the gate (seenBeats cleared on dev to reproduce)
 
 - **Symptom** (owner, 2026-08-05, published place, Android, fresh device account): large,
   mostly-empty toast/card windows repeatedly opening, sometimes with a glyph.
