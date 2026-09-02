@@ -1,12 +1,17 @@
 --!strict
--- Owner-only in-world controls for placed deck decorations (2026-07-19 framework). Mirrors
--- BackDoorController's geometry-driven binding, but keyed on the CollectionService "Decoration"
--- tag: whenever a Decoration Model whose padId attribute matches THIS client's claimed pad
--- replicates in, it gets Move + Remove ProximityPrompts. Tag replication + GetInstanceAddedSignal
--- make RemoteEvent/replication ordering irrelevant (same lesson as the back-door rebind). A buy
--- fires DecorationPlaced{ id, propId }; we enter ghost-drag IMMEDIATELY off the propId (part=nil),
--- independent of the built instance — the freshly-bought prop's centred default can be auto-hidden
--- under the teahouse, so waiting for its instance would strand it invisibly.
+-- Owner-only in-world controls for placed deck decorations (2026-07-19 framework), extended
+-- (deck-mortars, 2026-09-04) to cover mortar tubes too. Mirrors BackDoorController's
+-- geometry-driven binding, but keyed on CollectionService tags: whenever a Decoration OR Mortar
+-- Model whose padId attribute matches THIS client's claimed pad replicates in, it gets a Move
+-- ProximityPrompt (decorations also get Remove -- mortars deliberately never do: gear is
+-- move/rotate-only, no sell affordance, per the deck-mortars spec). Tag replication +
+-- GetInstanceAddedSignal make RemoteEvent/replication ordering irrelevant (same lesson as the
+-- back-door rebind). A decoration buy fires DecorationPlaced{ id, propId }; we enter ghost-drag
+-- IMMEDIATELY off the propId (part=nil), independent of the built instance — the freshly-bought
+-- prop's centred default can be auto-hidden under the teahouse, so waiting for its instance would
+-- strand it invisibly. Mortars have no such case: a tier renders at a resolved default the
+-- instant it's owned (MortarPlacement.resolve), so its Move prompt always has a real instance to
+-- ghost-clone (see MoveController.enterMortar).
 local CollectionService = game:GetService("CollectionService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
@@ -17,7 +22,7 @@ local SetDecorationRemove = remotes:WaitForChild("SetDecorationRemove") :: Remot
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local myPadId: string? = nil
-local bound: { [Instance]: boolean } = {} -- decoration Model -> prompts added
+local bound: { [Instance]: boolean } = {} -- decoration/mortar Model -> prompts added
 
 local function anchorPart(model: Model): BasePart?
     if model.PrimaryPart then
@@ -31,7 +36,12 @@ local function propIdOf(model: Instance): string?
     return model:GetAttribute("propId") :: string?
 end
 
-local function addPrompts(model: Model)
+-- MortarId is written by TreatmentApplier._buildMortars as a model attribute (Task 5 rework).
+local function mortarIdOf(model: Instance): string?
+    return model:GetAttribute("MortarId") :: string?
+end
+
+local function addPrompts(model: Model, isMortar: boolean)
     if bound[model] then
         return
     end
@@ -44,18 +54,30 @@ local function addPrompts(model: Model)
     local move = Instance.new("ProximityPrompt")
     move.Name = "DecorMove"
     move.ActionText = "Move"
-    move.ObjectText = "Decoration"
+    move.ObjectText = if isMortar then "Mortar" else "Decoration"
     move.KeyboardKeyCode = Enum.KeyCode.E
     move.MaxActivationDistance = 10
     move.RequiresLineOfSight = false
     move.Parent = anchor
     move.Triggered:Connect(function()
-        local id = model:GetAttribute("id")
-        local propId = propIdOf(model)
-        if typeof(id) == "number" and typeof(propId) == "string" then
-            EventBus.MoveDecoration:Fire({ padId = myPadId, id = id, propId = propId, part = model })
+        if isMortar then
+            local mortarId = mortarIdOf(model)
+            if typeof(mortarId) == "string" then
+                EventBus.MoveMortar:Fire({ padId = myPadId, mortarId = mortarId, part = model })
+            end
+        else
+            local id = model:GetAttribute("id")
+            local propId = propIdOf(model)
+            if typeof(id) == "number" and typeof(propId) == "string" then
+                EventBus.MoveDecoration:Fire({ padId = myPadId, id = id, propId = propId, part = model })
+            end
         end
     end)
+
+    -- NO remove/sell affordance for mortars (deck-mortars spec): gear is move/rotate-only.
+    if isMortar then
+        return
+    end
 
     local remove = Instance.new("ProximityPrompt")
     remove.Name = "DecorRemove"
@@ -73,8 +95,8 @@ local function addPrompts(model: Model)
     end)
 end
 
--- Bind a tagged decoration IF it belongs to this client's claimed pad.
-local function tryBind(inst: Instance)
+-- Bind a tagged decoration/mortar IF it belongs to this client's claimed pad.
+local function tryBind(inst: Instance, isMortar: boolean)
     if not inst:IsA("Model") then
         return
     end
@@ -82,17 +104,28 @@ local function tryBind(inst: Instance)
     if myPadId == nil or padId ~= myPadId then
         return
     end
-    addPrompts(inst)
+    addPrompts(inst, isMortar)
 end
 
 local function rescanAll()
     for _, inst in CollectionService:GetTagged("Decoration") do
-        tryBind(inst)
+        tryBind(inst, false)
+    end
+    for _, inst in CollectionService:GetTagged("Mortar") do
+        tryBind(inst, true)
     end
 end
 
-CollectionService:GetInstanceAddedSignal("Decoration"):Connect(tryBind)
+CollectionService:GetInstanceAddedSignal("Decoration"):Connect(function(inst)
+    tryBind(inst, false)
+end)
 CollectionService:GetInstanceRemovedSignal("Decoration"):Connect(function(inst)
+    bound[inst] = nil
+end)
+CollectionService:GetInstanceAddedSignal("Mortar"):Connect(function(inst)
+    tryBind(inst, true)
+end)
+CollectionService:GetInstanceRemovedSignal("Mortar"):Connect(function(inst)
     bound[inst] = nil
 end)
 

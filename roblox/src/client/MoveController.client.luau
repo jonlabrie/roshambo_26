@@ -23,7 +23,9 @@ local SizeClasses = require(shared:WaitForChild("SizeClasses"))
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local SetPlacement = remotes:WaitForChild("SetPlacement") :: RemoteEvent
 local SetDecorationPlacement = remotes:WaitForChild("SetDecorationPlacement") :: RemoteEvent
+local SetMortarPlacement = remotes:WaitForChild("SetMortarPlacement") :: RemoteEvent
 local DecorationCatalog = require(shared:WaitForChild("DecorationCatalog"))
+local MortarPlacement = require(shared:WaitForChild("MortarPlacement"))
 
 local player = Players.LocalPlayer
 local FACING_ORDER = { "N", "E", "S", "W" }
@@ -393,5 +395,50 @@ local function enterDecoration(payload: any)
     })
 end
 
+-- Mortar entry: unlike a decoration, a mortar tier always has a rendered instance the instant
+-- it's owned (MortarPlacement.resolve gives every owned tier a default spot; there is no
+-- "freshly bought, no instance yet" case), so the Move prompt (DecorationController) always
+-- supplies a real `part`. That means the ghost can just clone the REAL model directly -- same as
+-- enterTeahouse does with the Structure -- with no separate mortar catalog/builder needed.
+-- Bounds = MortarPlacement.FOOTPRINT, the SAME size-independent gear footprint the server's
+-- MortarPlacement.resolve clamps against, so the drag UI and the server's eventual re-resolve
+-- never disagree about how big a mortar's "footprint" is. commit -> SetMortarPlacement{ mortarId }.
+local function enterMortar(payload: any)
+    if
+        active
+        or typeof(payload) ~= "table"
+        or typeof(payload.mortarId) ~= "string"
+        or typeof(payload.padId) ~= "string"
+        or typeof(payload.part) ~= "Instance"
+    then
+        return
+    end
+    local part = payload.part :: Model
+    local folder = part.Parent
+    local m, deckSize = siteInfo(folder)
+    if m == nil or deckSize == nil then
+        return
+    end
+    local dx, dz, facing = facingFromPivotOf(part, m)
+    local mortarId = payload.mortarId :: string
+    startMove({
+        original = part,
+        ghost = ghostify(part:Clone()),
+        footprint = MortarPlacement.FOOTPRINT,
+        deckFP = SizeClasses.deckFootprint(deckSize),
+        mountCF = m,
+        initialOffset = { math.round(dx), math.round(dz) },
+        initialFacing = facing,
+        commit = function(offset, f)
+            SetMortarPlacement:FireServer({
+                mortarId = mortarId,
+                offset = { offset[1], offset[2] },
+                facing = f,
+            })
+        end,
+    })
+end
+
 EventBus.MoveTeahouse.Event:Connect(enterTeahouse)
 EventBus.MoveDecoration.Event:Connect(enterDecoration)
+EventBus.MoveMortar.Event:Connect(enterMortar)

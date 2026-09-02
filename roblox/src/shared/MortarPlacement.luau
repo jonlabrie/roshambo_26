@@ -51,6 +51,18 @@ local BASE_TOP = 0.5
 -- footprint) since a mortar's tube is a thin vertical prop, not a wide base.
 local PLACEMENT_HALF = 0.5
 
+-- Exported centered footprint for the client's editor drag (MoveController): the SAME
+-- size-independent half-extent every tier clamps against above, just shaped like
+-- DecorationCatalog.footprint()'s {minX,maxX,minZ,maxZ} so BuildingPlacer.clamp/canFitFacing
+-- can consume it identically to a decoration's footprint. One tier-agnostic table, not a
+-- per-id lookup -- there is only one gear footprint, same as the clamp above.
+MortarPlacement.FOOTPRINT = {
+    minX = -PLACEMENT_HALF,
+    maxX = PLACEMENT_HALF,
+    minZ = -PLACEMENT_HALF,
+    maxZ = PLACEMENT_HALF,
+} :: Bounds
+
 local function clamp(v: number, lo: number, hi: number): number
     return math.clamp(v, lo, hi)
 end

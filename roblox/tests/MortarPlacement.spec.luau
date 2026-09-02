@@ -67,6 +67,16 @@ describe("MortarPlacement — default-first gear placement", function()
         expect(out["mortar:S"] ~= nil).toBe(true)
     end)
 
+    test(
+        "FOOTPRINT is a centered, size-independent gear footprint (matches the resolve clamp inset)",
+        function()
+            expect(MortarPlacement.FOOTPRINT.minX).toBe(-0.5)
+            expect(MortarPlacement.FOOTPRINT.maxX).toBe(0.5)
+            expect(MortarPlacement.FOOTPRINT.minZ).toBe(-0.5)
+            expect(MortarPlacement.FOOTPRINT.maxZ).toBe(0.5)
+        end
+    )
+
     test("muzzleWorld transforms deck-local to world through the 12-number row", function()
         -- identity rotation, deck origin at (100, 50, -20)
         local row = { 100, 50, -20, 1, 0, 0, 0, 1, 0, 0, 0, 1 }
