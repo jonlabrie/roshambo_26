@@ -3332,3 +3332,24 @@ colorway ruling reframes ao/midori/murasaki as collection palette material --
 families pruned, archived at `2cd90b4`. Worksheet remainder: hotaru, kamuro,
 dan. Dev backend redeployed (App Runner op 6032e84c). Server suite green
 (one socketAdapter identity-claim flake observed, passed on rerun).
+
+## [2026-09-06] built | The salute class, first-class -- and the L budget weight
+
+A day of owner-driven iteration on kamuro ("not flashy enough"):
+(1) boost.salvo machinery -- N flash-and-bang salutes, variable grouping, each
+its own eagerly-pooled voice (count 1..8 validated; 3-4 kamuro, 5-8 reserved
+for standalone salute shells); eardeer explosion cuts as the voices (3.5s
+slap-echo single = every kamuro break's boom, 3s rolloff = salvo voice).
+(2) Purpose-made flare art ("salutes are a first class effect") -- four
+seeded-numpy star textures (make_salute_flares.py), noisy-edged at owner
+request, uploaded via the Studio MCP's upload_image (images only -- audio/mesh
+stay owner uploads), shuffled+rotated per shot from the seeded stream.
+(3) First-salvo pileup fixed: lazy voices played before their clip bound and
+the engine released all booms at once, late (owner reproduced 6x); voices now
+eager with preassigned clip, IsLoaded guard, deduped priority preloader.
+(4) THE L CLASS: recipe.heavy doubles the particle budget under WEIGHTED
+ADMISSION (2 concurrency slots) -- sky total capped at the measured floor;
+heavy-must-be-mortar:L fixture-enforced. Kamuro: heavy, spread 60, streaks
++50%, salvo in the falling crown. Owner: "looking and sounding good."
+Also: proving panel now opens at night (owner default), drive-by rng lockstep
+fix (double-tap draw was inside the per-client audio gate).
