@@ -465,6 +465,53 @@ local function play(payload: any, distance: number)
                         bev.glow = (ev.glow or 1) * (ev.boost.glow or 1)
                         bev.points = math.min(MAX_POINTS, ev.points + (ev.boost.points or 0))
                         phaseLife = lifeScale * (ev.boost.lifeScale or 1)
+
+                        -- ⚠ LUCK MUST BE LEGIBLE (owner, 2026-09-04: "hard to know you've
+                        -- landed a bonus by sight"). Two sellers, both at ~75% of the
+                        -- boosted break's life, as the stars begin to fade:
+                        -- 1. THE KICKER — a tight white-hot pop of stars at the anchor
+                        --    (fixed 16 sparks, the muzzle-flash budget disclosure applies).
+                        -- 2. THE DOUBLE-TAP — a second, sharper report on the tail voice,
+                        --    skipped when the style owns its tail (hotaru's sizzle).
+                        local style = BurstStyles.styleOf(ev.style)
+                        local kickAt = style.lifetime[2] * phaseLife * 0.75
+                        task.delay(kickAt, function()
+                            local kp = slot.points[MAX_POINTS]
+                            local kem = slot.emitters[MAX_POINTS]
+                            kp.CFrame = CFrame.new(anchorPos)
+                            kem.Texture = BurstStyles.TEXTURES.dot
+                            kem.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(255, 220, 160))
+                            kem.Size = NumberSequence.new(0.5)
+                            kem.Speed = NumberRange.new(14, 26)
+                            kem.Drag = 3
+                            kem.Lifetime = NumberRange.new(0.25, 0.4)
+                            kem.Brightness = 4
+                            kem.SpreadAngle = Vector2.new(360, 360)
+                            kem.Acceleration = Vector3.new(0, -4, 0)
+                            kem.Transparency = NumberSequence.new({
+                                NumberSequenceKeypoint.new(0, 0),
+                                NumberSequenceKeypoint.new(0.7, 0.1),
+                                NumberSequenceKeypoint.new(1, 1),
+                            })
+                            kem.Orientation = Enum.ParticleOrientation.FacingCamera
+                            kem.Rotation = NumberRange.new(0)
+                            kem.LightEmission = 1
+                            kem:Emit(16)
+                        end)
+                        if not style.tailSound and lod.sound then
+                            local pool = BurstStyles.SOUNDS[style.soundRole]
+                            local tapId = if typeof(pool) == "table"
+                                then pool[rng:NextInteger(1, #pool)]
+                                else pool
+                            local cam = workspace.CurrentCamera
+                            local dist = if cam then (cam.CFrame.Position - anchorPos).Magnitude else 0
+                            task.delay(kickAt + dist / BurstStyles.SOUND_LEVELS.speedOfSound, function()
+                                slot.tail.SoundId = tapId
+                                slot.tail.Volume = BurstStyles.SOUND_LEVELS.volume * 0.45
+                                slot.tail.PlaybackSpeed = soundSpeed * 1.12 -- sharper than the main
+                                slot.tail:Play()
+                            end)
+                        end
                     end
                 end
                 -- A recipe may pin a burst sound; otherwise the style's role resolves to a
