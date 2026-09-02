@@ -152,7 +152,7 @@ BurstStyles.STYLES = {
         soundRole = "burst_kamuro",
         pointRule = "single",
         orientation = "velocity",
-        sizeScale = 2.4,
+        sizeScale = 3.6, -- 2.4 + 50% (owner, 2026-09-06: "kamuro streaks that are 50% larger")
         lightEmission = 0.85,
         tailSound = false,
     },

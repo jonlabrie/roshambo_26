@@ -673,37 +673,48 @@ local function play(payload: any, distance: number)
                             local cam = workspace.CurrentCamera
                             local dist = if cam then (cam.CFrame.Position - anchorPos).Magnitude else 0
                             local travel = dist / BurstStyles.SOUND_LEVELS.speedOfSound
+                            -- Half a second EARLIER than the star-pop kicker's mark (owner,
+                            -- 2026-09-06: "the kicker salutes trigger too late") — the salvo
+                            -- opens while the crown still burns, not as it fades.
+                            local salvoAt = math.max(0.1, kickAt - 0.5)
                             for i, shot in shots do
-                                task.delay(kickAt + shot.at, function()
-                                    -- THE FLASH: a salute is a bang you SEE. One hot white-gold
-                                    -- pop per shot — 22 sparks (up to 4 shots ≈ 88, ~15% of a
-                                    -- shell's budget), FULL property write (shared emitters).
-                                    -- Shots are sequential, so they share the kicker's point.
+                                task.delay(salvoAt + shot.at, function()
+                                    -- THE FLASH: no starburst (owner, 2026-09-06: "a single,
+                                    -- bright white flash... as dazzling as possible"). ONE
+                                    -- particle at the emitter's 10-stud size cap, pure white,
+                                    -- held solid then snapped off — Brightness 8 under full
+                                    -- additive drives it through the bloom threshold, so the
+                                    -- post pass blooms it well past its own sprite. FULL
+                                    -- property write (shared emitters); shots are sequential,
+                                    -- so they share the kicker's point.
                                     local kp = slot.points[MAX_POINTS]
                                     local kem = slot.emitters[MAX_POINTS]
                                     kp.CFrame = CFrame.new(anchorPos + shot.offset)
                                     kem.Texture = BurstStyles.TEXTURES.dot
-                                    kem.Color =
-                                        ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(255, 214, 150))
-                                    kem.Size = NumberSequence.new(1.1, 0.35)
-                                    kem.Speed = NumberRange.new(30, 55)
-                                    kem.Drag = 4
-                                    kem.Lifetime = NumberRange.new(0.25, 0.45)
-                                    kem.Brightness = 3
-                                    kem.SpreadAngle = Vector2.new(360, 360)
-                                    kem.Acceleration = Vector3.new(0, -3, 0)
+                                    kem.Color = ColorSequence.new(Color3.new(1, 1, 1))
+                                    kem.Size = NumberSequence.new({
+                                        NumberSequenceKeypoint.new(0, 6),
+                                        NumberSequenceKeypoint.new(0.2, 10),
+                                        NumberSequenceKeypoint.new(1, 8),
+                                    })
+                                    kem.Speed = NumberRange.new(0, 0)
+                                    kem.Drag = 0
+                                    kem.Lifetime = NumberRange.new(0.25, 0.3)
+                                    kem.Brightness = 8
+                                    kem.SpreadAngle = Vector2.new(0, 0)
+                                    kem.Acceleration = Vector3.zero
                                     kem.Transparency = NumberSequence.new({
                                         NumberSequenceKeypoint.new(0, 0),
-                                        NumberSequenceKeypoint.new(0.5, 0.05),
+                                        NumberSequenceKeypoint.new(0.6, 0),
                                         NumberSequenceKeypoint.new(1, 1),
                                     })
                                     kem.Orientation = Enum.ParticleOrientation.FacingCamera
                                     kem.Rotation = NumberRange.new(0)
                                     kem.LightEmission = 1
-                                    kem:Emit(22)
+                                    kem:Emit(1)
                                 end)
                                 if lod.sound then
-                                    task.delay(kickAt + shot.at + travel, function()
+                                    task.delay(salvoAt + shot.at + travel, function()
                                         local voice = salvoVoiceFor(slot, i)
                                         voice.SoundId = BurstStyles.SOUNDS.salute
                                         voice.Volume = BurstStyles.SOUND_LEVELS.volume * 0.9
