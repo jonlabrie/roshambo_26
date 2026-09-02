@@ -38,8 +38,44 @@ end
 FireworkDrafts.FAMILIES = {
     hotaru = {
         v1 = hotaru(24),
-        v2 = hotaru(36),
+        v2 = hotaru(36), -- owner's floor (2026-09-06)
         v3 = hotaru(48),
+        -- BOOST PREVIEW at chance = 1 (owner, 2026-09-06: "I like the second flicker"):
+        -- the structural surprise, wa-style -- a SECOND, wider flicker cloud blooms 0.5s
+        -- behind the first (boostOnly), so a lucky shell shimmers twice as long and twice
+        -- as wide. No kicker: the double wave IS the tell. Both clouds carry the sizzle
+        -- tail; the second restarts it -- audition decides whether that reads as layered
+        -- shimmer or needs the longer c3-canyon-v4 clip. Deleted at promotion.
+        boosted = {
+            phases = {
+                { at = 0.0, kind = "report", anchor = "origin" },
+                { at = 0.02, kind = "ascent", anchor = "origin", color = { 210, 225, 245 } },
+                {
+                    at = 3.0,
+                    kind = "burst",
+                    anchor = "apex",
+                    style = "strobe",
+                    color = { 235, 245, 255 },
+                    edgeColor = { 180, 220, 255 },
+                    spread = 36,
+                    droop = false,
+                    share = 3,
+                    boost = { chance = 1, kicker = false },
+                },
+                {
+                    at = 3.5,
+                    kind = "burst",
+                    anchor = "apex",
+                    style = "strobe",
+                    color = { 235, 245, 255 },
+                    edgeColor = { 180, 220, 255 },
+                    spread = 46,
+                    droop = false,
+                    share = 2,
+                    boostOnly = true,
+                },
+            },
+        },
     },
     dan = {
         v1 = {
