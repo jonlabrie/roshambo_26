@@ -69,6 +69,13 @@ type Slot = {
     -- before their clip bound, and the engine released all three booms together, late, while
     -- the 0.1s flashes died unloaded (owner, 2026-09-06, reproduced six times).
     salvoVoices: { Sound },
+    -- Launch voices, one per thump clip, PREASSIGNED at pool build (owner, 2026-09-06:
+    -- "sometimes the thump doesn't actually play until the shell is already high overhead").
+    -- The slot's main Sound swaps SoundId between thump and break clips, and a Play() before
+    -- the new clip binds is QUEUED by the engine until it does -- usually ~30ms, occasionally
+    -- seconds. A launch never has slack to hide that; the break at t+3s does. So launches get
+    -- voices that never swap and never bind at fire time; slot.sound keeps the breaks.
+    launchVoices: { [string]: Sound },
 }
 local pool: { Slot } = {}
 local poolNext = 1
@@ -152,6 +159,22 @@ for _ = 1, POOL_SIZE do
         table.insert(emitters, em)
     end
 
+    local launchVoices: { [string]: Sound } = {}
+    local function addLaunchVoice(id: string)
+        local v = Instance.new("Sound")
+        v.SoundId = id
+        v.Volume = BurstStyles.SOUND_LEVELS.volume
+        v.RollOffMode = Enum.RollOffMode.InverseTapered
+        v.RollOffMinDistance = BurstStyles.SOUND_LEVELS.rolloffMin
+        v.RollOffMaxDistance = BurstStyles.SOUND_LEVELS.rolloffMax
+        v.Parent = shell
+        launchVoices[id] = v
+    end
+    for _, id in BurstStyles.SOUNDS.launch do
+        addLaunchVoice(id)
+    end
+    addLaunchVoice(BurstStyles.SOUNDS.launch_heavy)
+
     -- 8 = the salvo count ceiling (FireworkRecipes: boost.salvo.count admits 1..8; 5-8 is
     -- the reserved standalone-salute range). All voices share one loaded buffer.
     local salvoVoices = {}
@@ -173,6 +196,7 @@ for _ = 1, POOL_SIZE do
         sound = snd,
         tail = tailSnd,
         salvoVoices = salvoVoices,
+        launchVoices = launchVoices,
     })
 end
 
@@ -213,6 +237,36 @@ local function playSound(slot: Slot, id: string?, audible: boolean, from: Vector
     -- Heartbeat — a whole frame of silence for a listener standing AT the tube, where the
     -- ear is least forgiving (owner, 2026-09-06: lag persisted after the head trim; the
     -- residue was frame-hops, not the clip).
+    if delay < 1 / 60 then
+        fire()
+    else
+        task.delay(delay, fire)
+    end
+end
+
+-- The launch thump's own player: uses the slot's PREASSIGNED voice for the clip, so the
+-- fire-time path touches no SoundId — nothing to bind, nothing for the engine to queue.
+-- A clip outside the launch set (a draft's pinned launch sound) falls back to the swap path.
+local function playLaunch(slot: Slot, id: string?, audible: boolean, from: Vector3, speed: number?)
+    if not (id and audible) then
+        return
+    end
+    local voice = slot.launchVoices[id]
+    if voice == nil then
+        playSound(slot, id, audible, from, speed)
+        return
+    end
+    local cam = workspace.CurrentCamera
+    local dist = if cam then (cam.CFrame.Position - from).Magnitude else 0
+    local function fire()
+        voice.PlaybackSpeed = speed or 1
+        voice:Play()
+        local trim = BurstStyles.SOUND_TRIMS[id]
+        if trim then
+            voice.TimePosition = trim
+        end
+    end
+    local delay = dist / BurstStyles.SOUND_LEVELS.speedOfSound
     if delay < 1 / 60 then
         fire()
     else
@@ -543,7 +597,7 @@ local function play(payload: any, distance: number)
                         launchId = launchPool[rng:NextInteger(1, #launchPool)]
                     end
                 end
-                playSound(slot, launchId, lod.sound, origin, soundSpeed)
+                playLaunch(slot, launchId, lod.sound, origin, soundSpeed)
                 -- THE MUZZLE FLASH: the visual partner of the launch thump, anchoring the
                 -- launch to the tube the way the ribbon alone could not. A fixed ~14 sparks
                 -- (2% of a shell's budget; the mobile floor was measured at 500-700) with the

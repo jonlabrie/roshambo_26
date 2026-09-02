@@ -198,11 +198,11 @@ BurstStyles.SOUND_TRIMS = {
     ["rbxassetid://87713703495045"] = 0.15, -- launch-deck-2: peak at 185ms
     ["rbxassetid://122319288610707"] = 0.14, -- launch-deck-1: peak at 175ms
     ["rbxassetid://92892667329683"] = 0.135, -- launch-deck-3: peak at 170ms
-    -- deck-4 rides deeper than the peak-minus-35ms rule: its bass swell reads LATE to the
-    -- ear even with the peak at 50ms post-Play (measured in-engine; owner, 2026-09-06:
-    -- "a lot of delay on the L mortar thump when I'm right next to it"). Trading ~15ms of
-    -- body for snap.
-    ["rbxassetid://77117688726913"] = 0.19, -- launch-deck-4: peak at 195ms in the raw clip
+    -- deck-4 stays on the peak-minus-35ms rule. A deeper 0.19 was tried for the perceived
+    -- lag and REVERTED (owner, 2026-09-06: "far less satisfying" -- the bass swell IS the
+    -- grunt); the real intermittent lag was fire-time SoundId binding, fixed structurally
+    -- in the controller (dedicated preassigned launch voices).
+    ["rbxassetid://77117688726913"] = 0.16, -- launch-deck-4: peak at 195ms in the raw clip
 } :: { [string]: number }
 
 BurstStyles.SOUND_LEVELS = {
