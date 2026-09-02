@@ -3088,3 +3088,21 @@ have to know how to place a mortar before they can use it"); one tube per owned 
 cap. Gear-requiring shells launch from the required tier's muzzle; firecracker stays
 hand-launched. Root cause it fixes: deck launches originated 6 studs above the
 player's head since the August build.
+
+## [2026-09-04] ship | Deck mortars merged and dev-deployed -- owner Play gate pending
+
+`bc82000..31dcd6f` (9 commits, fast-forward to main), SDD-executed from
+docs/superpowers/plans/2026-09-04-deck-mortars.md, ledger
+`.superpowers/sdd/2026-09-04-deck-mortars/progress.md`. Backend `mortarPlacements`
+(Mixed + markModified, validated PUT mirroring decorations), pure
+`MortarPlacement.luau` (front-edge defaults, clamp, teahouse nudge, muzzle math),
+server-built tubes in `TreatmentApplier:_buildMortars`, muzzle-true launches via
+shared `BuildingPlacer.resolveFit`, move-only editor flow. Two plan/reality
+corrections mid-execution: decorations render SERVER-side (plan's Task 5 assumed
+client-side; spec's visitor-visibility won) and the editor lives in
+DecorationController+MoveController (not BackDoorController). Final review caught
+pre-ship: stale rejoin fingerprint (invisible mortars on same-server rejoin -- the
+Play gate MUST include a same-server rejoin; fresh sessions can't surface it) and a
+muzzle deck-size mismatch on display-shrunk decks. SHELL_MORTAR joined the fixture
+CI gate -- gear-shell promotion is now a guarded FIFTH step (proving-range spec §5
+amended). Suites at merge: Lune 1649, Vitest 486, lint clean.

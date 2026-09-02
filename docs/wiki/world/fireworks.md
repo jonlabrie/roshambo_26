@@ -59,6 +59,27 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   fade at duration). Families: kiku, wa, yashi, hotaru (+tail), kamuro, ao (blue),
   midori (green), murasaki (violet) — the last three as shape/hue ladders; willow
   re-authored gold. Spec docs/superpowers/specs/2026-09-02-fireworks-vocabulary-design.md.
+- **Deck mortars (2026-09-04, merged `bc82000..31dcd6f`, dev-deployed — owner Play
+  gate pending)**: owned mortars render as tubes ON the owner's deck and gear shells
+  launch from the required tier's MUZZLE (kiku/peony → S, willow → M);
+  `firecracker` stays hand-launched; public sites unchanged. Default-first (owner
+  ruling): S/M/L auto-stagger along the canyon-facing front edge, movable (never
+  removable) through the decoration drag flow — `SetMortarPlacement` remote, gear
+  exempt from the 24-decoration cap. Decisions in pure
+  `src/shared/MortarPlacement.luau` (defaults/clamp/teahouse-nudge/muzzle math);
+  tubes are SERVER-built in `TreatmentApplier:_buildMortars` so visitors see every
+  deck's arsenal (a mid-plan correction — the plan assumed client-side render, which
+  would have been owner-only; spec's "visible to every visitor" won). Muzzle-truth
+  is structural: `BuildingPlacer.resolveFit` feeds both the rendered tube and
+  `muzzleOriginFor`, so the shell leaves the tube you see, nudge included.
+  Persistence mirrors `deckDecorations` (`User.mortarPlacements`, validated PUT,
+  Mixed + `markModified`). Final review caught pre-ship: a rejoin-invisibility
+  fingerprint bug (fresh Play sessions can't surface it — the gate must include a
+  same-server rejoin) and a muzzle deck-size mismatch on display-shrunk decks.
+  `SHELL_MORTAR` is fixture-enforced in both suites (see promotion pipeline
+  amendment in the proving-range spec §5). Spec
+  docs/superpowers/specs/2026-09-04-deck-mortars-design.md; ledger
+  `.superpowers/sdd/2026-09-04-deck-mortars/progress.md`.
 - VFX recipe (proven on device): rising Trail comet → flash core → radial burst →
   glitter/willow, glow via LightEmission + the one global Bloom, ~500–700
   particles/shell, client-side emission (server `Emit()` does not replicate).

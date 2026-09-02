@@ -119,6 +119,14 @@ step — the shop panel's display name/order tables, hardcoded in `ShopControlle
 The kiku shipped server-side and silently missed the counter. Display metadata now
 lives in `src/shared/ShellDisplay.luau`, fixture-tested, so the pipeline is truly
 three-files-plus-nothing again.
+**Amended 2026-09-04 (deck mortars):** a gear-requiring shell adds a FIFTH entry —
+its required mortar tier in `MortarPlacement.SHELL_MORTAR`
+(`roblox/src/shared/MortarPlacement.luau`), which decides which deck tube the shell
+launches from. This one IS CI-guarded from day one: `shared-fixtures/firework-shells.json`
+carries a `mortars` map and both suites assert their tables against it
+(`server/src/fireworks.test.ts` for `REQUIREMENTS`, `MortarPlacement.spec.luau` for
+`SHELL_MORTAR`), so a half-promoted gear shell fails CI rather than silently
+launching from the eye-level fallback.
 
 Rejected variants are deleted from `FireworkDrafts` in the same commit as the
 promotion (or a pruning commit), with the verdict in the commit message — the git
