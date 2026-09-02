@@ -56,11 +56,6 @@ local POOL_SIZE = FireworkDirector.MAX_CONCURRENT + 4
 type Slot = {
     shell: BasePart,
     trail: Trail,
-    -- The comet's width IS this attachment pair's separation; the ascent phase widens it
-    -- for heavy shells and restores it for the rest (owner, 2026-09-06: L trails "twice
-    -- the width").
-    trailA0: Attachment,
-    trailA1: Attachment,
     points: { BasePart },
     emitters: { ParticleEmitter },
     sound: Sound,
@@ -197,8 +192,6 @@ for _ = 1, POOL_SIZE do
     table.insert(pool, {
         shell = shell,
         trail = trail,
-        trailA0 = a0,
-        trailA1 = a1,
         points = points,
         emitters = emitters,
         sound = snd,
@@ -658,12 +651,6 @@ local function play(payload: any, distance: number)
                 -- stale segment history — streaks hanging at the LAST apex (owner, 2026-09-03:
                 -- "trails soared many studs above the launch tubes").
                 slot.trail:Clear()
-                -- A heavy shell rides a comet as big as its bore: the attachment span (the
-                -- Trail's width) scales with the admission weight — 1 stud for S/M, 2 for L.
-                -- Written every launch because slots are shared.
-                local halfSpan = 0.5 * weight
-                slot.trailA0.Position = Vector3.new(0, -halfSpan, 0)
-                slot.trailA1.Position = Vector3.new(0, halfSpan, 0)
                 slot.trail.Color = ColorSequence.new(colorOf(ev.color))
                 slot.trail.Enabled = true
                 playSound(slot, ev.sound, lod.sound, origin, soundSpeed)
