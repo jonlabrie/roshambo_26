@@ -80,7 +80,10 @@ BurstStyles.STYLES = {
     palm = {
         speed = { 26, 34 },
         drag = 1.4,
-        lifetime = { 1.8, 2.6 },
+        -- was {1.8, 2.6}: +0.4s (owner at the yashi audition, 2026-09-05: "yashi streaks
+        -- should have a longer life... to really let them rain down") -- the arms arc out,
+        -- die back, and visibly FALL before they fade.
+        lifetime = { 2.2, 3.0 },
         acceleration = { 0, -22, 0 },
         brightness = 2.2,
         spreadAngle = { 12, 12 }, -- narrow cone per arm

@@ -608,7 +608,11 @@ local function play(payload: any, distance: number)
                                     then NumberRange.new(24, 38)
                                     else NumberRange.new(16, 30)
                                 kem.Drag = 3
-                                kem.Lifetime = NumberRange.new(0.45, 0.7)
+                                -- streak kickers rain (owner, 2026-09-05): the violet streaks
+                                -- get the time to arc out and fall; dot pops stay snappy.
+                                kem.Lifetime = if streaks
+                                    then NumberRange.new(0.85, 1.2)
+                                    else NumberRange.new(0.45, 0.7)
                                 kem.Brightness = 2.5
                                 kem.SpreadAngle = Vector2.new(360, 360)
                                 kem.Acceleration = Vector3.new(0, -4, 0)
