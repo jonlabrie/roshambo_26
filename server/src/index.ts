@@ -13,6 +13,7 @@ import { ResultsStore } from './engine/ResultsStore';
 import { attachSocketAdapter } from './transports/socketAdapter';
 import { Throw, deriveWorldThrow } from './engine/GameRules';
 import { closeStaleSessions, SESSION_HEARTBEAT_MS } from './sessions';
+import { testModePhaseShift } from './testModeCycle';
 
 dotenv.config();
 
@@ -66,7 +67,7 @@ function envPositiveNumber(name: string, fallback: number): number {
     return n;
 }
 
-function makeEngine(initialRoundCount: number): RoundEngine {
+function makeEngine(initialRoundCount: number, testCycleShift = 0): RoundEngine {
     const openSeconds = envPositiveNumber('ROUND_OPEN_SECONDS', 51);
     const lockSeconds = envPositiveNumber('ROUND_LOCK_SECONDS', 2);
     const revealSeconds = envPositiveNumber('ROUND_REVEAL_SECONDS', 7);
@@ -85,7 +86,7 @@ function makeEngine(initialRoundCount: number): RoundEngine {
         // else it is derived from the round's own tally. See GameRules.deriveWorldThrow.
         pickWorldThrow: (roundCount, counts) =>
             TEST_MODE
-                ? THROWS[roundCount % 3]
+                ? THROWS[(roundCount + testCycleShift) % 3]
                 : deriveWorldThrow(counts, { minParticipants: worldThrowMinParticipants }),
         makeRoundId: () => Math.random().toString(36).substring(2, 9),
         nowMs: () => Date.now(),
@@ -111,7 +112,12 @@ mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
             totalPlayers: r.totalPlayers, timestamp: r.timestamp,
         })));
         const totalRounds = await Round.countDocuments();
-        const engine = makeEngine(totalRounds); // legacy roundCount continuity
+        // Defect (e): the TEST_MODE cycle continues from the last face a player actually SAW
+        // (the newest persisted round), not from the document count -- a deploy mid-session no
+        // longer re-rolls the phase and lands the same face twice. lastRounds is already the
+        // newest-first fetch the tape seeds from.
+        const cycleShift = TEST_MODE ? testModePhaseShift(lastRounds[0]?.worldThrow, totalRounds) : 0;
+        const engine = makeEngine(totalRounds, cycleShift); // legacy roundCount continuity
         // The '/api/v1' mounts, in the order they must be registered — see mountRoutes for
         // why that order is load-bearing. Extracted so the mount-order test binds to this
         // exact function instead of re-declaring the order alongside it.
