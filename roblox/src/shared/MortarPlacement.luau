@@ -16,8 +16,8 @@
 local MortarPlacement = {}
 
 export type Bounds = { minX: number, maxX: number, minZ: number, maxZ: number }
-export type Placement = { x: number, z: number, facing: string }
-export type StoredPlacement = { offset: { number }, facing: string }
+export type Resolved = { mount: string, x: number, z: number, aim: string }
+export type StoredPlacement = { offset: { number }, facing: string?, mount: string?, aim: string? }
 export type Tube = { bore: number, length: number }
 
 -- ⚠ Mirrors MORTAR_IDS in server/src/fireworks.ts (Object.keys(MORTAR_PRICES)) -- both are the
@@ -47,8 +47,32 @@ MortarPlacement.TUBE = {
     ["mortar:L"] = { bore = 0.5, length = 2.5 },
 } :: { [string]: Tube }
 
--- Timber base height the render task sits every mortar tube on top of.
-local BASE_TOP = 0.5
+-- The three aims a mount can fire along, deck-local: L/R yaw off center, C fires straight
+-- over the front edge.
+MortarPlacement.AIMS = { "L", "C", "R" }
+
+-- Elevation angle (degrees from vertical) each mount fires its tube at -- owner-tunable art
+-- knob, not derived from anything.
+MortarPlacement.ELEVATION = { floor = 12, rail = 25 }
+
+-- ⚠ Mirrors PadOps' CAP_TOP/CAP_W/NEWEL_W (src/server/PadOps.luau: charcoal top rail + corner
+-- newels) -- a rail-mounted mortar sits on the SAME cap rail PadOps builds, so if PadOps' cap
+-- height/width or newel width change, this table must follow or a rail mortar renders floating
+-- off (or clipping into) the actual rail. newelMargin = NEWEL_W (0.45) + 0.5 breathing room so
+-- the mortar's own footprint never overlaps a corner post.
+MortarPlacement.RAIL = { capTop = 2.75, capWidth = 0.45, newelMargin = 0.95 }
+
+-- Tube-bottom height above the mount point: timber base block on the floor, rail saddle block
+-- on the cap rail.
+MortarPlacement.BASE_OFFSET = { floor = 0.5, rail = 0.35 }
+
+-- Deck-local aim direction (unit XZ, no Y) for each named aim: C points straight over the
+-- front edge (-Z); L/R yaw 30 degrees off center. File-local -- only axisLocal consumes it.
+local AIM_DIR = {
+    L = { -0.5, -0.8660254037844386 },
+    C = { 0, -1 },
+    R = { 0.5, -0.8660254037844386 },
+}
 
 -- Generic gear footprint half-extent used to clamp a placement's center onto the deck --
 -- deliberately size-independent (unlike buildings/decorations, which clamp by their own
@@ -126,13 +150,16 @@ end
 
 -- Resolves every OWNED mortar's deck-local placement: defaults for anything not in `stored`,
 -- stored overrides (clamped) otherwise, then a teahouse nudge if `teahouseFP` is given.
--- Unknown/unowned ids in `stored` are ignored; every owned id always gets a row.
+-- Unknown/unowned ids in `stored` are ignored; every owned id always gets a row. A stored
+-- record's `mount`/`aim` pass through (missing -> "floor"/"C"); `facing` is legacy and ignored.
+-- A rail mount clamps its OWN way (RAIL.newelMargin inset, cap-rail z) and never nudges --
+-- the teahouse cannot occupy the rail, so there is nothing to escape.
 function MortarPlacement.resolve(
     deckBounds: Bounds,
     owned: { string },
     stored: { [string]: StoredPlacement }?,
     teahouseFP: Bounds?
-): { [string]: Placement }
+): { [string]: Resolved }
     local ownedSet: { [string]: boolean } = {}
     for _, id in owned do
         ownedSet[id] = true
@@ -145,49 +172,96 @@ function MortarPlacement.resolve(
         end
     end
 
-    local out: { [string]: Placement } = {}
+    local out: { [string]: Resolved } = {}
     local n = #orderedOwned
     for i, id in orderedOwned do
-        local x, z, facing
         local override = stored and stored[id]
-        if override then
-            x, z = clampPoint(deckBounds, override.offset[1], override.offset[2])
-            facing = override.facing
+        local mount = (override and override.mount) or "floor"
+        local aim = (override and override.aim) or "C"
+        local x, z
+        if mount == "rail" then
+            assert(override, "mount = 'rail' requires a stored override")
+            x = clamp(
+                override.offset[1],
+                deckBounds.minX + MortarPlacement.RAIL.newelMargin,
+                deckBounds.maxX - MortarPlacement.RAIL.newelMargin
+            )
+            z = deckBounds.minZ + MortarPlacement.RAIL.capWidth / 2
         else
-            x, z = clampPoint(deckBounds, defaultX(deckBounds, i, n), deckBounds.minZ + 1)
-            facing = "N"
+            if override then
+                x, z = clampPoint(deckBounds, override.offset[1], override.offset[2])
+            else
+                x, z = clampPoint(deckBounds, defaultX(deckBounds, i, n), deckBounds.minZ + 1)
+            end
+            if teahouseFP then
+                x, z = nudge(deckBounds, x, z, teahouseFP)
+            end
         end
-        if teahouseFP then
-            x, z = nudge(deckBounds, x, z, teahouseFP)
-        end
-        out[id] = { x = x, z = z, facing = facing }
+        out[id] = { mount = mount, x = x, z = z, aim = aim }
     end
     return out
 end
 
--- World x,y,z of a mortar tube's muzzle: transforms the deck-local point
--- (placement.x, BASE_TOP + tube.length, placement.z) through the 12-number row-major deck
--- CFrame (PadSites.deckPlacements convention: position then 3x3 rotation), world = pos + R *
--- local, with R's rows {r[4],r[5],r[6]; r[7],r[8],r[9]; r[10],r[11],r[12]} -- matching how
--- Spec.cframe lays out model.json CFrames.
-function MortarPlacement.muzzleWorld(
+-- The tube's deck-local unit axis for a mount/aim pair: elevation tilts it off vertical (+Y),
+-- aim yaws it left/right/center. Always unit length (sin/cos of one angle, rotated by a unit
+-- XZ direction).
+function MortarPlacement.axisLocal(mount: string, aim: string): (number, number, number)
+    local el = math.rad(MortarPlacement.ELEVATION[mount])
+    local dir = AIM_DIR[aim]
+    local ax, az = dir[1], dir[2]
+    return math.sin(el) * ax, math.cos(el), math.sin(el) * az
+end
+
+-- World mount point and world unit axis for a resolved mortar: the mount local point is
+-- (resolved.x, mountY, resolved.z) with mountY = 0 for a floor mortar or RAIL.capTop for a
+-- rail mortar (the rail's cap-rail top surface); both the point and the axis are transformed
+-- through the SAME 12-number row-major deck row `muzzleWorld` used (PadSites.deckPlacements
+-- convention: position then 3x3 rotation, world = pos + R * local, R's rows
+-- {r[4],r[5],r[6]; r[7],r[8],r[9]; r[10],r[11],r[12]}) -- the point gets the translation, the
+-- axis (a direction, not a point) gets only R * axis.
+function MortarPlacement.pose(
     deckRow: { number },
-    placement: Placement,
-    mortarId: string
-): (number, number, number)
-    local tube = MortarPlacement.TUBE[mortarId]
-    if tube == nil then
-        error(`MortarPlacement.muzzleWorld: unknown mortar id '{mortarId}'`)
-    end
-    local lx, ly, lz = placement.x, BASE_TOP + tube.length, placement.z
+    resolved: Resolved,
+    _mortarId: string
+): (number, number, number, number, number, number)
+    local mountY = resolved.mount == "rail" and MortarPlacement.RAIL.capTop or 0
+    local lx, ly, lz = resolved.x, mountY, resolved.z
+    local ax, ay, az = MortarPlacement.axisLocal(resolved.mount, resolved.aim)
+
     local px, py, pz = deckRow[1], deckRow[2], deckRow[3]
     local r1, r2, r3 = deckRow[4], deckRow[5], deckRow[6]
     local r4, r5, r6 = deckRow[7], deckRow[8], deckRow[9]
     local r7, r8, r9 = deckRow[10], deckRow[11], deckRow[12]
-    local wx = px + r1 * lx + r2 * ly + r3 * lz
-    local wy = py + r4 * lx + r5 * ly + r6 * lz
-    local wz = pz + r7 * lx + r8 * ly + r9 * lz
-    return wx, wy, wz
+
+    local mx = px + r1 * lx + r2 * ly + r3 * lz
+    local my = py + r4 * lx + r5 * ly + r6 * lz
+    local mz = pz + r7 * lx + r8 * ly + r9 * lz
+
+    local axx = r1 * ax + r2 * ay + r3 * az
+    local axy = r4 * ax + r5 * ay + r6 * az
+    local axz = r7 * ax + r8 * ay + r9 * az
+
+    return mx, my, mz, axx, axy, axz
+end
+
+-- World muzzle origin and heading for a resolved mortar: the origin sits up the tube's world
+-- axis from the mount point by BASE_OFFSET[mount] (base/saddle block) plus the tube's own
+-- length -- render AND trajectory read these same six numbers. Replaces `muzzleWorld`.
+function MortarPlacement.launch(
+    deckRow: { number },
+    resolved: Resolved,
+    mortarId: string
+): (number, number, number, number, number, number)
+    local tube = MortarPlacement.TUBE[mortarId]
+    if tube == nil then
+        error(`MortarPlacement.launch: unknown mortar id '{mortarId}'`)
+    end
+    local mx, my, mz, hx, hy, hz = MortarPlacement.pose(deckRow, resolved, mortarId)
+    local run = MortarPlacement.BASE_OFFSET[resolved.mount] + tube.length
+    local ox = mx + hx * run
+    local oy = my + hy * run
+    local oz = mz + hz * run
+    return ox, oy, oz, hx, hy, hz
 end
 
 return MortarPlacement
