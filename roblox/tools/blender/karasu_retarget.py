@@ -2235,11 +2235,11 @@ def assert_writable(path):
             f"OWNER_AUTHORED deliberately, which is a decision and should look like one.")
     return path
 
-# The derived PBR channels that ship with it. ⚠ ALL OR NOTHING -- a partial set renders WORSE than
-# none (practice/material-and-mesh-traps.md §8): Roblox substitutes its own defaults for whatever
-# is missing and a ColorMap-only SurfaceAppearance comes out warm and shiny.
-PBR_MAPS = {"roughness": "karasu_roughness.png", "normal": "karasu_normal.png",
-            "metalness": "karasu_metalness.png"}
+# ⚠ PBR is ALL OR NOTHING -- a partial set renders WORSE than none
+# (practice/material-and-mesh-traps.md §8): Roblox substitutes its own defaults for whatever is
+# missing and a ColorMap-only SurfaceAppearance comes out warm and shiny. (A PBR_MAPS constant
+# naming the files sat here unused from 2026-08-30 to 2026-09-04; the warning is the part that
+# earns its keep.)
 
 LAST_TRANSFORM = None       # (uniform scale, translation) applied by normalise_size
 

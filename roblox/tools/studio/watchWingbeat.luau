@@ -456,6 +456,10 @@ local function runPerch()
         local torii = workspace:FindFirstChild("RoshamboStage")
             and workspace.RoshamboStage:FindFirstChild("Torii")
         assert(torii, "watchWingbeat: PERCH_AT is TORII but Workspace.RoshamboStage.Torii is missing")
+        -- ⚠ STREAMING IS NOT A RISK HERE, verified 2026-09-04: main.server marks every direct
+        -- child Model of RoshamboStage ModelStreamingMode.Persistent, so the Torii's parts are
+        -- fully replicated regardless of where the player stands. The assert above is the whole
+        -- guard this needs; a parked note claiming otherwise is resolved, not deferred.
         local cf, size = (torii :: Model):GetBoundingBox()
         -- ⚠ THE BOUNDING BOX TOP IS NOT THE SURFACE. A torii's kasagi curves upward at both ends,
         -- so the axis-aligned box is as tall as the HIGHEST point -- the ends -- while the middle,
