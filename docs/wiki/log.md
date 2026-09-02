@@ -3164,3 +3164,13 @@ two, instrument the live system before writing a third.
 
 Same-server rejoin verification (deck-mortars carryover) STILL awaits the published
 place. Suites at close: Lune 1653, Vitest 489, lint clean, CI green.
+
+## [2026-09-05] gate | Wobble and break gated -- "perfect, looks great"
+
+Post-gate owner direction ("we're currently just throwing fastballs from a pitching
+machine on the deck") shipped and gated same-session (`d7eb85f`): heading launches
+draw a seeded +-2.5-degree exit-axis wobble (angle/curve/reach cascade together
+through the ballistics) and a +-12-stud late-arc break perpendicular to the flight
+(zero at the muzzle, emerging near the peak). Drawn after the base scatter, so the
+nil-heading rng stream -- public sites, proving range, firecrackers -- stays
+byte-identical. Both numbers are one-line tunables in FireworkController.
