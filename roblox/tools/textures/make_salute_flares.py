@@ -48,6 +48,16 @@ def make_flare(seed: int, spikes: int, core_r: float, spike_len: tuple, spike_w:
         spike = np.where(along > 0, spike, 0)
         alpha = np.maximum(alpha, spike)
 
+    # Noisy edges (owner, 2026-09-06: "the edges of those images should be a
+    # little noisier"): multiplicative grain weighted toward LOW alpha, so the
+    # hot core stays solid while spike edges go ragged. Two octaves -- chunky
+    # quarter-res grain (survives mipmapping at distance) plus fine per-pixel
+    # sparkle.
+    chunky = np.kron(rng.uniform(0, 1, (size // 4, size // 4)), np.ones((4, 4)))
+    fine = rng.uniform(0, 1, (size, size))
+    grain = 0.65 * chunky + 0.35 * fine
+    alpha = alpha * (1 - 0.5 * (1 - alpha) ** 1.5 * grain)
+
     # Border window: alpha reaches EXACTLY zero before the quad's edge, so a
     # rotated sprite never shows a hard cut.
     edge = np.clip((0.98 - np.maximum(np.abs(x), np.abs(y))) / 0.08, 0, 1)

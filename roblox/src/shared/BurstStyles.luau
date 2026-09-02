@@ -167,10 +167,10 @@ BurstStyles.TEXTURES = {
     -- art -- salutes are a FIRST-CLASS effect (owner ruling; crossed streak sprites read as
     -- a line whenever the random rotations aligned). Four silhouettes, star baked into the
     -- texture: a 4-point, b 6-point, c 5-point, d 8-spike pop.
-    flare_a = "rbxassetid://83712003749470",
-    flare_b = "rbxassetid://116765991891671",
-    flare_c = "rbxassetid://95333004243985",
-    flare_d = "rbxassetid://116492224039177",
+    flare_a = "rbxassetid://97945892165096",
+    flare_b = "rbxassetid://106113269280235",
+    flare_c = "rbxassetid://107807952502084",
+    flare_d = "rbxassetid://82438585464749",
 }
 
 -- The shuffle deck for salute flashes: one seeded draw per shot in the controller.
