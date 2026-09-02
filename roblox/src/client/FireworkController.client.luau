@@ -161,7 +161,7 @@ end
 -- over the speed of sound — the flash is instant, the thump crosses the canyon. Per client,
 -- so the bridge hears it tight and FallsLanding hears the ~0.17s of physics. Phase order is
 -- safe: every phase of one shell gets a near-identical delay, so nothing reorders.
-local function playSound(slot: Slot, id: string?, audible: boolean, from: Vector3)
+local function playSound(slot: Slot, id: string?, audible: boolean, from: Vector3, speed: number?)
     if not (id and audible) then
         return
     end
@@ -169,6 +169,11 @@ local function playSound(slot: Slot, id: string?, audible: boolean, from: Vector
     local dist = if cam then (cam.CFrame.Position - from).Magnitude else 0
     task.delay(dist / BurstStyles.SOUND_LEVELS.speedOfSound, function()
         slot.sound.SoundId = id
+        -- Per-shell jitter (seeded, so every client hears the same shell the same way):
+        -- ±8% speed shifts pitch and length together, and even one clip stops sounding
+        -- like itself on repeat (owner, 2026-09-04: "they all sound the same"). The birds
+        -- run ±3% for the same reason.
+        slot.sound.PlaybackSpeed = speed or 1
         slot.sound:Play()
     end)
 end
@@ -333,6 +338,8 @@ local function play(payload: any, distance: number)
     -- apex and its own scatter, and two people watching one firework cannot talk about what they
     -- saw. The server sends one per launch.
     local rng = Random.new(payload.seed)
+    -- One voice-speed per shell, drawn FIRST so its position in the stream is stable.
+    local soundSpeed = 0.92 + rng:NextNumber() * 0.16
     local origin = payload.origin
     local apex = origin
         + Vector3.new(rng:NextNumber(-8, 8), 60 + rng:NextNumber(-6, 6), rng:NextNumber(-8, 8)) -- 60: owner, 2026-09-03 ("bursts should ride higher")
@@ -354,7 +361,7 @@ local function play(payload: any, distance: number)
             local anchorPos = if ev.anchor == "apex" then apex else origin
             if ev.kind == "report" then
                 slot.shell.Position = origin
-                playSound(slot, ev.sound, lod.sound, origin)
+                playSound(slot, ev.sound, lod.sound, origin, soundSpeed)
                 -- THE MUZZLE FLASH: the visual partner of the launch thump, anchoring the
                 -- launch to the tube the way the ribbon alone could not. A fixed ~14 sparks
                 -- (2% of a shell's budget; the mobile floor was measured at 500-700) with the
@@ -390,7 +397,7 @@ local function play(payload: any, distance: number)
                 slot.trail:Clear()
                 slot.trail.Color = ColorSequence.new(colorOf(ev.color))
                 slot.trail.Enabled = true
-                playSound(slot, ev.sound, lod.sound, origin)
+                playSound(slot, ev.sound, lod.sound, origin, soundSpeed)
                 -- The comet rises to the apex over whatever time the next phase leaves it —
                 -- in TWO stages: straight out of the tube for the first ~60% of the height,
                 -- then easing into the apex's lateral drift. One straight slanted tween read
@@ -437,7 +444,7 @@ local function play(payload: any, distance: number)
                         soundId = pool
                     end
                 end
-                playSound(slot, soundId, lod.sound, anchorPos)
+                playSound(slot, soundId, lod.sound, anchorPos, soundSpeed)
                 -- The tail voice: a style's second sound, entering its own delay after the
                 -- break (plus the same speed-of-sound travel), on the slot's SEPARATE tail
                 -- Sound so it can overlap the burst clip's decay.
