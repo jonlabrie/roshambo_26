@@ -123,6 +123,17 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   (`dcdffed`). Same-server rejoin verification PASSED live 2026-09-05. Spec
   docs/superpowers/specs/2026-09-04-rail-mounts-design.md; ledger
   `.superpowers/sdd/2026-09-04-rail-mounts/progress.md`.
+- **Promotion worksheet (as of 2026-09-06)**: shipped through the five guarded steps —
+  **wa** (red double-ring, M tube, 5; boost 30% = structural second ring via the first
+  `boostOnly` phase, no kicker — "the double ring IS the tell") and **yashi** (palm,
+  M tube, 10; boost 30% = fifth arm via `boost.points` + violet `kickerStreaks` rain,
+  `e791ebd`). **Colorway ruling (owner, 2026-09-06): signature hues sell in the shop,
+  colorways live in collections** — ao/midori/murasaki reframed as collection palette
+  material, drafts pruned (archived at `2cd90b4`). Remaining shop families on the
+  worksheet: hotaru, kamuro, dan. Launch audio: thumps are now a 3-clip seeded
+  rotation (launch-deck-1/2/3) with launch-deck-4 reserved as the **L tube's grunt**
+  (`292e978`, dormant until the first L SKU — remember it when pricing a big shell);
+  per-clip head trims measured from source WAVs (peak−35ms).
 - VFX recipe (proven on device): rising Trail comet → flash core → radial burst →
   glitter/willow, glow via LightEmission + the one global Bloom, ~500–700
   particles/shell, client-side emission (server `Emit()` does not replicate).

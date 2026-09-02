@@ -3321,3 +3321,14 @@ dormant until the first L SKU ships. Recipes no longer hardcode the report
 sound; the controller resolves it, explicit phase sound still overrides. Trims
 measured from source WAVs (peak minus ~35ms; offline envelope matched
 in-engine within 3ms -- future clips can be trimmed before upload).
+
+## [2026-09-06] shipped | Yashi promoted; colorway ruling lands
+
+Owner rulings: yashi M tube at 10; "signature hues in shop, colorways in
+collections." Yashi ran the five guarded steps (`e791ebd`: catalog 4-arm palm
+with 30% fifth-arm boost + violet streak-rain kicker, fixture, server,
+ShellDisplay, SHELL_MORTAR) and its draft family pruned behind it. The
+colorway ruling reframes ao/midori/murasaki as collection palette material --
+families pruned, archived at `2cd90b4`. Worksheet remainder: hotaru, kamuro,
+dan. Dev backend redeployed (App Runner op 6032e84c). Server suite green
+(one socketAdapter identity-claim flake observed, passed on rerun).
