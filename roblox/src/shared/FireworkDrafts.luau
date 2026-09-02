@@ -28,6 +28,9 @@ local function kiku(spread: number, edge: { number })
                 edgeColor = edge,
                 spread = spread,
                 glow = 1.5, -- owner 2026-09-04: kiku burns hotter
+                -- The kiku is a DISTRIBUTION, not a recording (owner design, 2026-09-04):
+                -- ~30% of fires upgrade to roughly v3's size plus break points v3 never had.
+                boost = { chance = 0.3, spread = 1.32, glow = 1.2, points = 2, lifeScale = 1.15 },
                 droop = false,
             },
         },

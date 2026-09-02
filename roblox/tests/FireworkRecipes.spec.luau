@@ -76,6 +76,32 @@ describe("FireworkRecipes.validate — the one recipe schema", function()
         expect(FireworkRecipes.validate("peony")).toBe(false)
     end)
 
+    test("a boost is bounded: chance (0,1], multipliers (0,4], points 1..7, bursts only", function()
+        local r = goodRecipe()
+        r.phases[3].boost = { chance = 0.3, spread = 1.32, glow = 1.2, points = 2, lifeScale = 1.15 }
+        expect(FireworkRecipes.validate(r)).toBe(true)
+        local cases: { { field: string, value: any } } = {
+            { field = "chance", value = 0 },
+            { field = "chance", value = 1.1 },
+            { field = "spread", value = 5 },
+            { field = "glow", value = -1 },
+            { field = "points", value = 0 },
+            { field = "points", value = 8 },
+            { field = "points", value = 2.5 },
+            { field = "lifeScale", value = 0 },
+        }
+        for _, c in cases do
+            local bad = goodRecipe()
+            local boost: any = { chance = 0.3 }
+            boost[c.field] = c.value
+            bad.phases[3].boost = boost
+            expect(FireworkRecipes.validate(bad)).toBe(false)
+        end
+        local onAscent = goodRecipe();
+        (onAscent.phases[2] :: any).boost = { chance = 0.3 }
+        expect(FireworkRecipes.validate(onAscent)).toBe(false)
+    end)
+
     test("EVERY SHIPPED CATALOG RECIPE PASSES — one schema, not two", function()
         for id, recipe in FireworkCatalog.RECIPES do
             local ok, err = FireworkRecipes.validate(recipe)

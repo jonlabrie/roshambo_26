@@ -62,8 +62,14 @@ function FireworkRecipes.validate(recipe: any): (boolean, string?)
                 return false, `phase {i}: '{key}' must be three numbers in 0..255`
             end
         end
-        local staged =
-            { style = ph.style, points = ph.points, scatter = ph.scatter, share = ph.share, glow = ph.glow }
+        local staged = {
+            style = ph.style,
+            points = ph.points,
+            scatter = ph.scatter,
+            share = ph.share,
+            glow = ph.glow,
+            boost = ph.boost,
+        }
         if ph.kind ~= "burst" then
             for field, v in staged do
                 if v ~= nil then
@@ -92,6 +98,37 @@ function FireworkRecipes.validate(recipe: any): (boolean, string?)
             end
             if ph.glow ~= nil and (typeof(ph.glow) ~= "number" or ph.glow <= 0 or ph.glow > 4) then
                 return false, `phase {i}: glow must be a number in (0, 4]`
+            end
+            -- A burst may carry a BOOST: a seeded per-phase chance of an upgraded break
+            -- (owner design, 2026-09-04: "v2 is the floor but there's a 30% chance you'll
+            -- get a larger radius, more stars"). All multipliers are budget-neutral by
+            -- construction -- extra points DIVIDE the budget, never add particles.
+            if ph.boost ~= nil then
+                local b = ph.boost
+                if typeof(b) ~= "table" then
+                    return false, `phase {i}: boost must be a table`
+                end
+                if typeof(b.chance) ~= "number" or b.chance <= 0 or b.chance > 1 then
+                    return false, `phase {i}: boost.chance must be a number in (0, 1]`
+                end
+                for _, key in { "spread", "glow", "lifeScale" } do
+                    local v = (b :: any)[key]
+                    if v ~= nil and (typeof(v) ~= "number" or v <= 0 or v > 4) then
+                        return false, `phase {i}: boost.{key} must be a number in (0, 4]`
+                    end
+                end
+                if
+                    b.points ~= nil
+                    and (
+                        typeof(b.points) ~= "number"
+                        or b.points % 1 ~= 0
+                        or b.points < 1
+                        or b.points > BurstStyles.MAX_POINTS - 1
+                    )
+                then
+                    return false,
+                        `phase {i}: boost.points must be an integer 1..{BurstStyles.MAX_POINTS - 1} (added to the base)`
+                end
             end
         end
     end

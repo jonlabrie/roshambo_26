@@ -360,7 +360,10 @@ local function play(payload: any, distance: number)
     for _, ev in schedule do
         last = math.max(last, ev.at)
         if ev.kind == "burst" then
-            tail = math.max(tail, BurstStyles.releaseTail(ev.style))
+            -- Pessimistic: assume a phase's boost hits, so a lucky long-lived break is
+            -- never cut down by slot reuse.
+            local boostLife = if ev.boost then (ev.boost.lifeScale or 1) else 1
+            tail = math.max(tail, BurstStyles.releaseTail(ev.style) * boostLife)
         end
     end
 
@@ -447,6 +450,23 @@ local function play(payload: any, distance: number)
                 end)
             elseif ev.kind == "burst" then
                 slot.trail.Enabled = false
+                -- THE BOOST ROLL (owner design, 2026-09-04): a burst phase carrying `boost`
+                -- has a seeded chance of an upgraded break — wider, brighter, MORE POINTS
+                -- (which divide the budget, never add particles), longer-lived. Per phase,
+                -- so each stage of a staged shell gets independently lucky; drawn whenever
+                -- the field exists, so the stream stays a pure function of the recipe.
+                local bev = ev
+                local phaseLife = lifeScale
+                if ev.boost then
+                    local boosted = rng:NextNumber() < ev.boost.chance
+                    if boosted then
+                        bev = table.clone(ev)
+                        bev.spread = (ev.spread or 30) * (ev.boost.spread or 1)
+                        bev.glow = (ev.glow or 1) * (ev.boost.glow or 1)
+                        bev.points = math.min(MAX_POINTS, ev.points + (ev.boost.points or 0))
+                        phaseLife = lifeScale * (ev.boost.lifeScale or 1)
+                    end
+                end
                 -- A recipe may pin a burst sound; otherwise the style's role resolves to a
                 -- VARIANT POOL and the shell's seeded rng picks one — same clip on every
                 -- client, different clip per shell, so a show is not one boom on repeat.
@@ -497,7 +517,7 @@ local function play(payload: any, distance: number)
                         end)
                     end)
                 end
-                fireBurst(slot, ev, anchorPos, rng, lifeScale)
+                fireBurst(slot, bev, anchorPos, rng, phaseLife)
             end
         end)
     end

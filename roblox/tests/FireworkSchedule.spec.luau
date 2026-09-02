@@ -146,6 +146,24 @@ describe("FireworkSchedule — THE BUDGET IS PER SHELL", function()
         expect(ev[1].particles).toBe(0)
     end)
 
+    test("boost and glow pass through compile untouched", function()
+        local recipe = {
+            phases = {
+                {
+                    at = 0,
+                    kind = "burst",
+                    anchor = "apex",
+                    glow = 1.5,
+                    boost = { chance = 0.3, points = 2 },
+                    texture = "t",
+                },
+            },
+        }
+        local events = FireworkSchedule.compile(recipe :: any, 300)
+        expect(events[1].glow).toBe(1.5)
+        expect(events[1].boost ~= nil and events[1].boost.chance == 0.3).toBe(true)
+    end)
+
     test("style passes through compile untouched", function()
         local recipe = {
             phases = {
