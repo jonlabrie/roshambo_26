@@ -23,6 +23,7 @@ export type Phase = {
     spread: number?,
     droop: boolean?,
     style: string?,
+    glow: number?, -- per-shell brightness multiplier on the style (owner, 2026-09-04)
 }
 export type Recipe = { phases: { Phase } }
 
@@ -40,6 +41,7 @@ export type Event = {
     spread: number?,
     droop: boolean?,
     style: string?,
+    glow: number?,
 }
 
 function FireworkSchedule.compile(recipe: Recipe, budget: number): { Event }
@@ -81,6 +83,7 @@ function FireworkSchedule.compile(recipe: Recipe, budget: number): { Event }
             spread = ph.spread,
             droop = ph.droop,
             style = ph.style,
+            glow = ph.glow,
         })
     end
     table.sort(out, function(a, b)

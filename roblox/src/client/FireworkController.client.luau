@@ -314,7 +314,7 @@ local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random, l
         em.Speed = speed
         em.Drag = style.drag
         em.Lifetime = lifetime
-        em.Brightness = style.brightness
+        em.Brightness = style.brightness * (ev.glow or 1)
         em.SpreadAngle = spreadAngle
         em.Acceleration = acceleration
         em.Transparency = transparency

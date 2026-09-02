@@ -27,6 +27,7 @@ local function kiku(spread: number, edge: { number })
                 color = { 255, 190, 90 },
                 edgeColor = edge,
                 spread = spread,
+                glow = 1.5, -- owner 2026-09-04: kiku burns hotter
                 droop = false,
             },
         },
