@@ -173,6 +173,7 @@ for _ = 1, POOL_SIZE do
     for _, id in BurstStyles.SOUNDS.launch do
         addLaunchVoice(id)
     end
+    addLaunchVoice(BurstStyles.SOUNDS.launch_medium)
     addLaunchVoice(BurstStyles.SOUNDS.launch_heavy)
 
     -- 8 = the salvo count ceiling (FireworkRecipes: boost.salvo.count admits 1..8; 5-8 is
@@ -305,6 +306,7 @@ task.spawn(function()
     for _, id in BurstStyles.SOUNDS.launch do
         add(id)
     end
+    add(BurstStyles.SOUNDS.launch_medium)
     add(BurstStyles.SOUNDS.launch_heavy)
     add(BurstStyles.SOUNDS.salute)
     add(BurstStyles.SOUNDS.salute_single)
@@ -590,8 +592,13 @@ local function play(payload: any, distance: number)
                 -- shellId (identical on every client), so clients stay in rng lockstep.
                 local launchId = ev.sound
                 if not launchId then
-                    if MortarPlacement.SHELL_MORTAR[payload.shellId] == "mortar:L" then
+                    local tube = MortarPlacement.SHELL_MORTAR[payload.shellId]
+                    if tube == "mortar:L" then
                         launchId = BurstStyles.SOUNDS.launch_heavy
+                    elseif tube == "mortar:M" then
+                        -- The middle rung (owner, 2026-09-06: the rotation "sounds a little
+                        -- thin" from an M tube next to the L grunt).
+                        launchId = BurstStyles.SOUNDS.launch_medium
                     else
                         local launchPool = BurstStyles.SOUNDS.launch
                         launchId = launchPool[rng:NextInteger(1, #launchPool)]

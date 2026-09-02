@@ -198,6 +198,7 @@ BurstStyles.SOUND_TRIMS = {
     ["rbxassetid://87713703495045"] = 0.15, -- launch-deck-2: peak at 185ms
     ["rbxassetid://122319288610707"] = 0.14, -- launch-deck-1: peak at 175ms
     ["rbxassetid://92892667329683"] = 0.135, -- launch-deck-3: peak at 170ms
+    ["rbxassetid://79843927797938"] = 0.16, -- launch-deck-m3: peak at 195ms (aligned to deck-4)
     -- deck-4 stays on the peak-minus-35ms rule. A deeper 0.19 was tried for the perceived
     -- lag and REVERTED (owner, 2026-09-06: "far less satisfying" -- the bass swell IS the
     -- grunt); the real intermittent lag was fire-time SoundId binding, fixed structurally
@@ -247,6 +248,10 @@ BurstStyles.SOUNDS = {
         "rbxassetid://92892667329683", -- launch-deck-3
     },
     launch_heavy = "rbxassetid://77117688726913", -- launch-deck-4: the L tube's grunt
+    -- The M tube's voice (owner, 2026-09-06: "sounds a little thin now" next to the L
+    -- grunt): launch-deck-3's crack over deck-4's low-passed chest at heavy gain, blended
+    -- offline (fireworks_cuts/launch-deck-m3.wav), peaks aligned so the trim rule holds.
+    launch_medium = "rbxassetid://79843927797938", -- launch-deck-m3: the M tube's chest
     -- The salute voices (owner uploads 2026-09-06, cut from 390182__eardeer__explosion:
     -- echo-y canyon punch, ZERO pre-roll -- peak 50ms in, no trim needed). The 3.5s cut
     -- keeps the 2.75s slap-back echo: a break's single big boom. The 3s cut rolls off
