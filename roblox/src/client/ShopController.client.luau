@@ -24,6 +24,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local ShopThreshold = require(shared:WaitForChild("ShopThreshold"))
+local ShellDisplay = require(shared:WaitForChild("ShellDisplay"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local player = Players.LocalPlayer
@@ -33,13 +34,11 @@ local EconomyState = remotes:WaitForChild("EconomyState") :: RemoteEvent
 local FireworkState = remotes:WaitForChild("FireworkState") :: RemoteEvent
 local RequestPurchase = remotes:WaitForChild("RequestPurchase") :: RemoteEvent
 
-local SHELL_ORDER = { "firecracker", "peony", "willow", "ishibana" }
-local SHELL_NAME: { [string]: string } = {
-    firecracker = "Firecracker",
-    peony = "Peony",
-    willow = "Willow",
-    ishibana = "Ishibana",
-}
+-- Display names/order moved to shared/ShellDisplay.luau (2026-09-04): the kiku shipped
+-- server-side and silently missed this counter, because these tables were hardcoded here
+-- with nothing holding them to the fixture. ShellDisplay's spec now does.
+local SHELL_ORDER = ShellDisplay.ORDER
+local SHELL_NAME = ShellDisplay.NAME
 -- Presentation order, and the ONLY thing this file knows about mortars beyond their names. It is
 -- not the tier rule — the rule (you must own the tier below) lives on the server. What the order
 -- buys us is the ability to NAME the tier the server would have demanded, so a row the server would

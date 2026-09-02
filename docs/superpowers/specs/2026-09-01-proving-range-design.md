@@ -113,7 +113,12 @@ When the owner approves a variant:
 3. `server/src/fireworks.ts` gets the id's price and requirements.
 
 The existing CI contract already guards this: both sides' tests assert coverage of
-every fixture id, so a half-promoted shell fails CI. No new machinery.
+every fixture id, so a half-promoted shell fails CI. ~~No new machinery.~~
+**Corrected 2026-09-04, by the first real promotion:** there was a FOURTH, unguarded
+step — the shop panel's display name/order tables, hardcoded in `ShopController`.
+The kiku shipped server-side and silently missed the counter. Display metadata now
+lives in `src/shared/ShellDisplay.luau`, fixture-tested, so the pipeline is truly
+three-files-plus-nothing again.
 
 Rejected variants are deleted from `FireworkDrafts` in the same commit as the
 promotion (or a pruning commit), with the verdict in the commit message — the git

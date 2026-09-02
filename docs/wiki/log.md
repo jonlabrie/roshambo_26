@@ -3070,3 +3070,11 @@ boost distribution is now catalog id `kiku`, fixture-listed, priced 4 points beh
 a mortar S. v1/v3 pruned from drafts (this commit is their archive). The promotion
 pipeline worked exactly as the 2026-09-01 spec drew it: recipe move + one fixture
 line + one server ledger row, CI holding both sides.
+
+## [2026-09-04] defect | The promotion pipeline had an unguarded fourth step -- the shop's display tables
+
+The kiku shipped server-side (deployed, CI green) and silently missed the Hanabiya
+counter: ShopController hardcoded SHELL_ORDER/SHELL_NAME and renders only shells it
+can name. Display metadata moved to shared/ShellDisplay.luau with a spec holding it
+to the fixture -- the next forgotten shell is a CI failure, not an empty counter.
+The proving-range spec's "no new machinery" promotion claim corrected in place.
