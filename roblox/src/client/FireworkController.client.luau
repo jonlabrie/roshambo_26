@@ -66,6 +66,11 @@ type Slot = {
     -- shot needs its own Sound. Created lazily on first use, then pooled on the slot forever
     -- -- the churn ban is on per-shell instance creation, and after warmup there is none.
     salvoVoices: { Sound },
+    -- The flare's center spot rides the kicker point as a SECOND emitter: streaks and spot
+    -- emit in the same instant with different textures/sizes, and a shared emitter cannot
+    -- do that -- Texture/Size/Color are live-evaluated, so a second write would retro-style
+    -- the particles already in the air.
+    flashCore: ParticleEmitter,
 }
 local pool: { Slot } = {}
 local poolNext = 1
@@ -149,6 +154,12 @@ for _ = 1, POOL_SIZE do
         table.insert(emitters, em)
     end
 
+    local flashCore = Instance.new("ParticleEmitter")
+    flashCore.Enabled = false
+    flashCore.LightInfluence = 0
+    flashCore.Rate = 0
+    flashCore.Parent = points[MAX_POINTS]
+
     table.insert(pool, {
         shell = shell,
         trail = trail,
@@ -157,6 +168,7 @@ for _ = 1, POOL_SIZE do
         sound = snd,
         tail = tailSnd,
         salvoVoices = {},
+        flashCore = flashCore,
     })
 end
 
@@ -727,6 +739,31 @@ local function play(payload: any, distance: number)
                                     kem.Rotation = NumberRange.new(0, 180)
                                     kem.LightEmission = 1
                                     kem:Emit(3)
+                                    -- The center spot (owner, 2026-09-06): a small hot core
+                                    -- the streaks flare out of, on its own emitter.
+                                    local core = slot.flashCore
+                                    core.Texture = BurstStyles.TEXTURES.dot
+                                    core.Color = ColorSequence.new(Color3.new(1, 1, 1))
+                                    core.Size = NumberSequence.new({
+                                        NumberSequenceKeypoint.new(0, 0.6),
+                                        NumberSequenceKeypoint.new(0.3, 1.6),
+                                        NumberSequenceKeypoint.new(1, 0.6),
+                                    })
+                                    core.Speed = NumberRange.new(0, 0)
+                                    core.Drag = 0
+                                    core.Lifetime = NumberRange.new(0.09, 0.12)
+                                    core.Brightness = 8
+                                    core.SpreadAngle = Vector2.new(0, 0)
+                                    core.Acceleration = Vector3.zero
+                                    core.Transparency = NumberSequence.new({
+                                        NumberSequenceKeypoint.new(0, 0),
+                                        NumberSequenceKeypoint.new(0.9, 0),
+                                        NumberSequenceKeypoint.new(1, 1),
+                                    })
+                                    core.Orientation = Enum.ParticleOrientation.FacingCamera
+                                    core.Rotation = NumberRange.new(0)
+                                    core.LightEmission = 1
+                                    core:Emit(1)
                                 end)
                                 if lod.sound then
                                     task.delay(salvoAt + shot.at + travel, function()
