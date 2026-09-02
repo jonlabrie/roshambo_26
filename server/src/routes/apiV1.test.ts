@@ -697,6 +697,26 @@ describe('/api/v1', () => {
             expect(after!.totalPoints).toBe(winner.body.totalPoints); // deducted exactly once
         });
 
+        it('PUT decorations rejects instances the player never bought', async () => {
+            // Parked defect (b): the PUT validated shape but never ownership.
+            await User.create({
+                robloxId: '900052', totalPoints: 0, maxDeckSize: 'S',
+                deckDecorations: [{ id: 1, propId: 'bonsai', offset: [0, 0], facing: 'N' }],
+            });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const put = (decorations: unknown) => request(app)
+                .put('/api/v1/players/900052/decorations').set('X-API-Key', API_KEY)
+                .send({ decorations });
+            // rearranging the owned instance: fine
+            await put([{ id: 1, propId: 'bonsai', offset: [2, 3], facing: 'E' }]).expect(200);
+            // minting an unowned instance: refused
+            const minted = await put([
+                { id: 1, propId: 'bonsai', offset: [2, 3], facing: 'E' },
+                { id: 2, propId: 'tsukubai', offset: [0, 0], facing: 'N' },
+            ]).expect(400);
+            expect(minted.body.error).toBe('DECORATION_NOT_OWNED');
+        });
+
         it('GET economy returns display fields (null by default)', async () => {
             await User.create({ robloxId: '900006', totalPoints: 0, maxDeckSize: 'L', teahouses: { S: {}, M: {}, L: {} } });
             const res = await request(makeApp(makeEngine(), new ResultsStore()))

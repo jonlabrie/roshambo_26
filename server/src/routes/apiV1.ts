@@ -480,7 +480,9 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
             if (!user) { res.status(500).json({ error: 'RESOLVE_FAILED' }); return; }
             const decorations = req.body?.decorations;
-            const check = validateDecorations(decorations);
+            // Ownership against the STORED instances (parked defect (b)): rearrange/remove only,
+            // never mint -- new instances enter through /purchase alone.
+            const check = validateDecorations(decorations, user.deckDecorations ?? []);
             if (!check.ok) { res.status(400).json({ error: check.error }); return; }
             user.deckDecorations = decorations;
             await user.save();

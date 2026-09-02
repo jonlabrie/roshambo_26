@@ -79,9 +79,13 @@ export function validatePlacement(value: unknown): Check {
     return { ok: true };
 }
 
-export function validateDecorations(value: unknown): Check {
+export function validateDecorations(value: unknown, owned?: ReadonlyArray<{ id: number; propId: string }>): Check {
     if (!Array.isArray(value)) return { ok: false, error: 'BAD_DECORATION' };
     if (value.length > MAX_DECORATIONS) return { ok: false, error: 'BAD_DECORATION' };
+    // Ownership (parked defect (b), fixed 2026-09-05): a full-replace PUT may rearrange or
+    // remove what the player bought, never MINT -- every submitted (id, propId) pair must be a
+    // stored instance. Callers without a stored list (shape-only validation) omit `owned`.
+    const ownedPairs = owned && new Set(owned.map((d) => `${d.id}:${d.propId}`));
     const seen = new Set<number>();
     for (const entry of value) {
         if (typeof entry !== 'object' || entry === null || Array.isArray(entry)) {
@@ -99,6 +103,9 @@ export function validateDecorations(value: unknown): Check {
         seen.add(obj.id);
         if (typeof obj.propId !== 'string' || !DECORATION_PROPS.has(obj.propId)) {
             return { ok: false, error: 'BAD_DECORATION' };
+        }
+        if (ownedPairs && !ownedPairs.has(`${obj.id}:${obj.propId}`)) {
+            return { ok: false, error: 'DECORATION_NOT_OWNED' };
         }
         if (!Array.isArray(obj.offset) || obj.offset.length !== 2) {
             return { ok: false, error: 'BAD_DECORATION' };
