@@ -3386,3 +3386,11 @@ All four commits reverted (`fbe1014..8e988ed`); shipped look restored.
 PARKED as a design item: a bigger heavy ascent probably wants a different
 tool -- e.g. a per-slot particle-emitter comet for heavy shells -- and a
 Studio session with screenshots, not live iteration on a player's evening.
+
+## [2026-09-06] shipped | The heavy comet layer -- the L ascent reads big without touching the Trail
+
+After the three-failure retreat, the layered approach worked first try: a
+dedicated Rate-driven emitter (the system's only one) streams burning-debris
+sparks behind the rising heavy shell; the pinned trails-approved Trail is
+untouched. Owner-tuned in one pass (rate 90, size 0.45->0.12, fall -18) and
+approved: "looking good. ship it." `7c96c43`, `6a0974b`.

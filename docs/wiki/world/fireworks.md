@@ -142,8 +142,11 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   behavior for every style. Three widening strategies for a fatter L trail all failed
   (see log 2026-09-06 "clean retreat" -- the thin comet IS the collapse of a
   span-parallel Trail; widening un-collapses it into the band). The one untried avenue
-  for a bigger heavy ascent is a LAYERED particle comet on heavy shells, leaving the
-  Trail untouched -- parked for a screenshot-driven Studio session.
+  for a bigger heavy ascent was a LAYERED particle comet on heavy shells, leaving the
+  Trail untouched -- BUILT and owner-approved same day (`7c96c43` + tuning `6a0974b`):
+  a dedicated Rate-driven emitter streams glow sparks behind the rising L shell
+  (rate 90, ~50 alive, ~6% of the heavy budget), colored from the ascent, doused at
+  the break. The pinned Trail is byte-untouched.
 - VFX recipe (proven on device): rising Trail comet → flash core → radial burst →
   glitter/willow, glow via LightEmission + the one global Bloom, ~500–700
   particles/shell, client-side emission (server `Emit()` does not replicate).
