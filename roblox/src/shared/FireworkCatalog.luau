@@ -18,14 +18,13 @@ local FireworkCatalog = {}
 -- phases carry NO sound (owner ruling: a real aerial shell's rise is mostly quiet from the
 -- ground), and burst phases name none either -- the style's variant pool in BurstStyles.SOUNDS
 -- covers them, one seeded pick per shell.
-local S_REPORT = "rbxassetid://87713703495045" -- launch-deck-2 (owner pick, 2026-09-03)
 
 FireworkCatalog.RECIPES = {
     -- Hand-launched: low, fast, cheap. Deliberately the least spectacular — it is the one everybody
     -- has, and the mortar shells must feel like an upgrade.
     firecracker = {
         phases = {
-            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.0, kind = "report", anchor = "origin" },
             { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 200, 120 } },
             {
                 at = 1.2,
@@ -41,7 +40,7 @@ FireworkCatalog.RECIPES = {
     -- The bench's proven radial break.
     peony = {
         phases = {
-            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.0, kind = "report", anchor = "origin" },
             { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 190, 200 } },
             {
                 at = 3.0,
@@ -57,7 +56,7 @@ FireworkCatalog.RECIPES = {
     -- The bench's proven drooping break.
     willow = {
         phases = {
-            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.0, kind = "report", anchor = "origin" },
             { at = 0.02, kind = "ascent", anchor = "origin", color = { 220, 240, 255 } },
             {
                 at = 3.1,
@@ -74,7 +73,7 @@ FireworkCatalog.RECIPES = {
     -- an R round reads differently from the ones that fly any time.
     ishibana = {
         phases = {
-            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.0, kind = "report", anchor = "origin" },
             { at = 0.02, kind = "ascent", anchor = "origin", color = { 198, 194, 186 } },
             {
                 at = 3.2,
@@ -97,7 +96,7 @@ FireworkCatalog.RECIPES = {
     -- boostOnly shell -- with the kicker's stars burning bright orange (owner's pick).
     wa = {
         phases = {
-            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.0, kind = "report", anchor = "origin" },
             { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 180, 100 } },
             {
                 at = 3.0,
@@ -130,7 +129,7 @@ FireworkCatalog.RECIPES = {
     },
     kiku = {
         phases = {
-            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.0, kind = "report", anchor = "origin" },
             { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 214, 130 } },
             {
                 at = 3.0,

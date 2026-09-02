@@ -11,13 +11,11 @@
 -- Pure data + string parsing, no Roblox globals; runs under Lune.
 local FireworkDrafts = {}
 
-local S_REPORT = "rbxassetid://87713703495045" -- launch-deck-2 (owner pick, 2026-09-03)
-
 -- 椰子 yashi, palm: thick outward-aimed arms. The ladder varies point count.
 local function yashi(points: number)
     return {
         phases = {
-            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.0, kind = "report", anchor = "origin" },
             { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 210, 140 } },
             {
                 at = 3.0,
@@ -38,7 +36,7 @@ end
 local function hotaru(spread: number)
     return {
         phases = {
-            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.0, kind = "report", anchor = "origin" },
             { at = 0.02, kind = "ascent", anchor = "origin", color = { 210, 225, 245 } },
             {
                 at = 3.0,
@@ -58,7 +56,7 @@ end
 local function kamuro(burstAt: number)
     return {
         phases = {
-            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.0, kind = "report", anchor = "origin" },
             { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 200, 120 } },
             {
                 at = burstAt,
@@ -77,7 +75,7 @@ end
 local function ao(core: { number }, edge: { number })
     return {
         phases = {
-            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.0, kind = "report", anchor = "origin" },
             { at = 0.02, kind = "ascent", anchor = "origin", color = { 160, 200, 255 } },
             {
                 at = 3.0,
@@ -98,7 +96,7 @@ local function shapeTrio(core: { number }, edge: { number }, ascent: { number })
     local function shell(style: string?, spread: number, points: number?, scatter: number?)
         return {
             phases = {
-                { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+                { at = 0.0, kind = "report", anchor = "origin" },
                 { at = 0.02, kind = "ascent", anchor = "origin", color = ascent },
                 {
                     at = 3.0,
@@ -132,7 +130,7 @@ FireworkDrafts.FAMILIES = {
         -- the pop is violet velocity-parallel streaks. Deleted at promotion.
         boosted = {
             phases = {
-                { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+                { at = 0.0, kind = "report", anchor = "origin" },
                 { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 210, 140 } },
                 {
                     at = 3.0,
@@ -182,7 +180,7 @@ FireworkDrafts.FAMILIES = {
     dan = {
         v1 = {
             phases = {
-                { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+                { at = 0.0, kind = "report", anchor = "origin" },
                 {
                     at = 0.02,
                     kind = "ascent",

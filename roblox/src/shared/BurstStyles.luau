@@ -177,7 +177,12 @@ BurstStyles.TEXTURES = {
 -- stacked on frame-hop dispatch. 0.15 keeps ~35ms of rise so the transient still reads as a
 -- thump, not a click.
 BurstStyles.SOUND_TRIMS = {
-    ["rbxassetid://87713703495045"] = 0.15, -- launch-deck-2: keep a breath of attack, cut the rest
+    -- Launch thumps, each trimmed to peak-minus-~35ms (measured from the source WAVs; the
+    -- offline envelope agreed with the in-engine PlaybackLoudness curve within 3ms).
+    ["rbxassetid://87713703495045"] = 0.15, -- launch-deck-2: peak at 185ms
+    ["rbxassetid://122319288610707"] = 0.14, -- launch-deck-1: peak at 175ms
+    ["rbxassetid://92892667329683"] = 0.135, -- launch-deck-3: peak at 170ms
+    ["rbxassetid://77117688726913"] = 0.16, -- launch-deck-4: peak at 195ms
 } :: { [string]: number }
 
 BurstStyles.SOUND_LEVELS = {
@@ -211,7 +216,17 @@ BurstStyles.SOUNDS = {
     -- seeded rng, so a show is not one clip on repeat. Strobe and kamuro share the
     -- aerial pool as stand-ins until the firecracker-string and glitter-sizzle
     -- recordings land (owner ruling 2026-09-03).
-    report = "rbxassetid://87713703495045", -- launch-deck-2: the tube thump
+    -- The tube thumps. S/M launches rotate through the pool (seeded per shell, like the
+    -- burst pools); an L tube speaks with the heavy voice alone (owner, 2026-09-06:
+    -- deck-4 is "heavier/gruntier and much more close range... like from a bigger tube").
+    -- Recipes normally omit the report sound and let the controller resolve it here; an
+    -- explicit phase `sound` still overrides for a shell with its own launch voice.
+    launch = {
+        "rbxassetid://122319288610707", -- launch-deck-1
+        "rbxassetid://87713703495045", -- launch-deck-2 (the original, owner pick 2026-09-03)
+        "rbxassetid://92892667329683", -- launch-deck-3
+    },
+    launch_heavy = "rbxassetid://77117688726913", -- launch-deck-4: the L tube's grunt
     tail_strobe = "rbxassetid://92069275413514", -- jon-sizzle-c3-canyon-v6: 0.8s sizzle body, vast dark returns, lows shaved
     burst_peony = {
         "rbxassetid://89225206152876", -- burst-aerial-1

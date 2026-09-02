@@ -27,6 +27,7 @@ local FireworkDrafts = require(shared:WaitForChild("FireworkDrafts"))
 local FireworkSchedule = require(shared:WaitForChild("FireworkSchedule"))
 local FireworkDirector = require(shared:WaitForChild("FireworkDirector"))
 local BurstStyles = require(shared:WaitForChild("BurstStyles"))
+local MortarPlacement = require(shared:WaitForChild("MortarPlacement"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local FireworkLaunched = remotes:WaitForChild("FireworkLaunched") :: RemoteEvent
@@ -206,12 +207,15 @@ task.spawn(function()
         s.SoundId = id
         table.insert(warm, s)
     end
-    -- The launch thump warms FIRST. PreloadAsync works the list in order, and hash
-    -- iteration left the thump's place in line to luck — the one clip every show opens
+    -- The launch thumps warm FIRST. PreloadAsync works the list in order, and hash
+    -- iteration left the thump's place in line to luck — the clips every show opens
     -- with (owner, 2026-09-06: launches lag for a few moments after start, then settle).
-    add(BurstStyles.SOUNDS.report)
+    for _, id in BurstStyles.SOUNDS.launch do
+        add(id)
+    end
+    add(BurstStyles.SOUNDS.launch_heavy)
     for role, v in BurstStyles.SOUNDS do
-        if role ~= "report" then
+        if role ~= "launch" and role ~= "launch_heavy" then
             if typeof(v) == "table" then
                 for _, id in v do
                     add(id)
@@ -480,7 +484,20 @@ local function play(payload: any, distance: number)
             local anchorPos = if ev.anchor == "apex" then apex else origin
             if ev.kind == "report" then
                 slot.shell.Position = origin
-                playSound(slot, ev.sound, lod.sound, origin, soundSpeed)
+                -- The tube's voice: an explicit recipe sound wins; otherwise an L-tube shell
+                -- speaks with the heavy close-miked grunt and everything else rotates through
+                -- the launch pool. The pool draw is seeded, and the branch is decided by
+                -- shellId (identical on every client), so clients stay in rng lockstep.
+                local launchId = ev.sound
+                if not launchId then
+                    if MortarPlacement.SHELL_MORTAR[payload.shellId] == "mortar:L" then
+                        launchId = BurstStyles.SOUNDS.launch_heavy
+                    else
+                        local launchPool = BurstStyles.SOUNDS.launch
+                        launchId = launchPool[rng:NextInteger(1, #launchPool)]
+                    end
+                end
+                playSound(slot, launchId, lod.sound, origin, soundSpeed)
                 -- THE MUZZLE FLASH: the visual partner of the launch thump, anchoring the
                 -- launch to the tube the way the ribbon alone could not. A fixed ~14 sparks
                 -- (2% of a shell's budget; the mobile floor was measured at 500-700) with the
