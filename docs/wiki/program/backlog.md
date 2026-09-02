@@ -499,3 +499,18 @@ Two threads named for the next session:
 Context that survives the night: rail mounts GATED with wobble+break ("perfect, looks
 great"); place save/publish still pending (unlocks the same-server rejoin verification);
 parked defects (i)-(k) untouched.
+
+## The onboarding JOURNEY — a crafted path an 8-year-old can walk (owner, 2026-09-05)
+
+Owner direction, verbatim intent, queued for AFTER the fireworks sprint: the current beat
+copy is correct "but only if you know what a 'pot' or a 'ride' is. These are gambling terms
+-- fine -- but Roblox is, first and foremost, a kid's environment so we need to be
+thoughtful and precise in the journey we're taking them on as we answer the most important
+questions: what is this place? How does it work? What can I do? What makes it special? The
+onboarding path needs to be so smooth that even an 8-year old can do it."
+
+This extends the standing no-sports-book-language rule into the onboarding voice, and it is
+a JOURNEY design (sequence, pacing, vocabulary, the four questions above), not a copy edit.
+To be crafted owner+Claude together (owner: "together you and I need to craft this journey").
+Context: the beats now RENDER (defect (d) fixed 2026-09-05 -- every F&F guest would have seen
+empty boxes); the four existing beats are placeholders for this pass.
