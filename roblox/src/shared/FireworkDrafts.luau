@@ -124,9 +124,37 @@ end
 
 FireworkDrafts.FAMILIES = {
     yashi = {
-        v1 = yashi(4),
+        v1 = yashi(4), -- owner's floor (2026-09-05: "four standard")
         v2 = yashi(5),
         v3 = yashi(6),
+        -- BOOST PREVIEW at chance = 1 (owner, 2026-09-05: "sometimes 5 with a violet center
+        -- kicker that is also streaks, not stars"): the fifth arm arrives via boost.points,
+        -- the pop is violet velocity-parallel streaks. Deleted at promotion.
+        boosted = {
+            phases = {
+                { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+                { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 210, 140 } },
+                {
+                    at = 3.0,
+                    kind = "burst",
+                    anchor = "apex",
+                    style = "palm",
+                    color = { 255, 180, 60 },
+                    edgeColor = { 255, 230, 160 },
+                    points = 4,
+                    scatter = 6,
+                    droop = false,
+                    boost = {
+                        chance = 1,
+                        points = 1,
+                        glow = 1.15,
+                        lifeScale = 1.1,
+                        kickerColor = { 190, 90, 255 },
+                        kickerStreaks = true,
+                    },
+                },
+            },
+        },
     },
     hotaru = {
         v1 = hotaru(24),

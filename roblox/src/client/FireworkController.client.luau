@@ -581,7 +581,15 @@ local function play(payload: any, distance: number)
                                 local kp = slot.points[MAX_POINTS]
                                 local kem = slot.emitters[MAX_POINTS]
                                 kp.CFrame = CFrame.new(anchorPos)
-                                kem.Texture = BurstStyles.TEXTURES.dot
+                                -- kickerStreaks (owner, 2026-09-05: yashi's violet center pop
+                                -- is "streaks, not stars"): the streak sprite runs its length
+                                -- along the velocity, which needs VelocityParallel PLUS
+                                -- Rotation -90 -- the sprite is authored vertical (the kamuro
+                                -- orientation saga) -- and real speed to streak along.
+                                local streaks = ev.boost.kickerStreaks == true
+                                kem.Texture = if streaks
+                                    then BurstStyles.TEXTURES.streak
+                                    else BurstStyles.TEXTURES.dot
                                 -- THE READABLE KICKER (owner, 2026-09-05: "not enough stars to
                                 -- carry the color"). Four levers, because glow alone whitens:
                                 -- at LightEmission 1 / Brightness 4 the pileup blew out to white
@@ -595,8 +603,10 @@ local function play(payload: any, distance: number)
                                     then Color3.fromRGB(kc[1], kc[2], kc[3])
                                     else Color3.fromRGB(255, 220, 160)
                                 kem.Color = ColorSequence.new(hue:Lerp(Color3.new(1, 1, 1), 0.35), hue)
-                                kem.Size = NumberSequence.new(0.5)
-                                kem.Speed = NumberRange.new(16, 30)
+                                kem.Size = NumberSequence.new(if streaks then 0.8 else 0.5)
+                                kem.Speed = if streaks
+                                    then NumberRange.new(24, 38)
+                                    else NumberRange.new(16, 30)
                                 kem.Drag = 3
                                 kem.Lifetime = NumberRange.new(0.45, 0.7)
                                 kem.Brightness = 2.5
@@ -607,8 +617,12 @@ local function play(payload: any, distance: number)
                                     NumberSequenceKeypoint.new(0.7, 0.1),
                                     NumberSequenceKeypoint.new(1, 1),
                                 })
-                                kem.Orientation = Enum.ParticleOrientation.FacingCamera
-                                kem.Rotation = NumberRange.new(0)
+                                kem.Orientation = if streaks
+                                    then Enum.ParticleOrientation.VelocityParallel
+                                    else Enum.ParticleOrientation.FacingCamera
+                                kem.Rotation = if streaks
+                                    then NumberRange.new(-90, -90)
+                                    else NumberRange.new(0)
                                 kem.LightEmission = 0.85
                                 kem:Emit(28)
                             end)

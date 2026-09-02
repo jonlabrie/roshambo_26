@@ -31,6 +31,7 @@ export type Phase = {
         points: number?,
         lifeScale: number?,
         kicker: boolean?, -- false: this recipe's tell is structural; no star pop, no double-tap
+        kickerStreaks: boolean?, -- the pop is streaks (velocity-parallel), not dots (owner: yashi)
         kickerColor: { number }?,
     }?,
     -- fires ONLY when the shell's boost roll hits -- the structural half of a surprise
@@ -61,6 +62,7 @@ export type Event = {
         points: number?,
         lifeScale: number?,
         kicker: boolean?, -- false: this recipe's tell is structural; no star pop, no double-tap
+        kickerStreaks: boolean?, -- the pop is streaks (velocity-parallel), not dots (owner: yashi)
         kickerColor: { number }?,
     }?,
     -- fires ONLY when the shell's boost roll hits -- the structural half of a surprise

@@ -139,6 +139,11 @@ function FireworkRecipes.validate(recipe: any): (boolean, string?)
                 if b.kicker ~= nil and typeof(b.kicker) ~= "boolean" then
                     return false, `phase {i}: boost.kicker must be a boolean`
                 end
+                -- kickerStreaks: the pop renders as velocity-parallel streaks instead of dots
+                -- (owner, 2026-09-05: yashi's violet center kicker "is also streaks, not stars").
+                if b.kickerStreaks ~= nil and typeof(b.kickerStreaks) ~= "boolean" then
+                    return false, `phase {i}: boost.kickerStreaks must be a boolean`
+                end
             end
             -- boostOnly (owner, 2026-09-05): the structural half of a surprise -- a phase that
             -- exists only when the shell's boost roll hits (wa's second concentric ring). It
