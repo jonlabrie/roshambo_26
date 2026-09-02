@@ -201,7 +201,7 @@ run `TEST_MODE`, which keeps the R→P→S cycle. Defect (e) therefore still sta
 - **Fix sketch:** one line, same shape as the mortar fix: `basin.PivotOffset =
   basin.CFrame:Inverse()` in the builder. Owner was offered the fix mid-gate and deferred.
 
-## (m) proving-range tube bores a hair undersized under the bore-is-inner ruling (2026-09-04)
+## ~~(m) proving-range tube bores a hair undersized under the bore-is-inner ruling~~ FIXED 2026-09-05 (rebaked, drawn = bore + 2*0.06)
 
 - **Where:** `roblox/tools/builders/ProvingGround.luau` `TUBE*_SIZE` — outer diameter = bore.
   The 2026-09-04 owner ruling (deck mortars): 2"/4"/6" are INNER diameters; the deck tubes
