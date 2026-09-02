@@ -206,13 +206,19 @@ task.spawn(function()
         s.SoundId = id
         table.insert(warm, s)
     end
-    for _, v in BurstStyles.SOUNDS do
-        if typeof(v) == "table" then
-            for _, id in v do
-                add(id)
+    -- The launch thump warms FIRST. PreloadAsync works the list in order, and hash
+    -- iteration left the thump's place in line to luck — the one clip every show opens
+    -- with (owner, 2026-09-06: launches lag for a few moments after start, then settle).
+    add(BurstStyles.SOUNDS.report)
+    for role, v in BurstStyles.SOUNDS do
+        if role ~= "report" then
+            if typeof(v) == "table" then
+                for _, id in v do
+                    add(id)
+                end
+            else
+                add(v)
             end
-        else
-            add(v)
         end
     end
     for _, id in BurstStyles.TEXTURES do
