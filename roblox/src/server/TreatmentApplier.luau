@@ -52,11 +52,18 @@ function TreatmentApplier.new(deps: Deps)
         _folders = {} :: { [string]: Folder },
         _tubeTemplates = {} :: { [string]: BasePart },
     }, TreatmentApplier)
-    -- Hollow-tube templates: one SubtractAsync per tier, HERE at construction (boot -- a yield
-    -- is harmless), never in the rebuild path (which must stay yield-free; clones only there).
+    -- Hollow-tube templates: one SubtractAsync per tier, built ONCE here and cloned in the
+    -- rebuild path (which stays yield-free). ⚠ DEFERRED, never inline: SubtractAsync yields,
+    -- and a yield inside new() -- which runs mid-bootstrap in main.server.luau -- let the
+    -- player's join fire before the PlayerAdded handlers were connected (2026-09-04 owner
+    -- gate: "no data from the server... have no teahouse"; the join was simply missed, since
+    -- those handlers have no catch-up loop for players already present). Any build that races
+    -- the templates gets the solid-cylinder fallback and self-heals on the next rebuild.
     -- Guarded: padOccupancyPreview constructs without mortarPlacement and previews no mortars.
     if deps.mortarPlacement ~= nil then
-        self:_initTubeTemplates()
+        task.spawn(function()
+            self:_initTubeTemplates()
+        end)
     end
     return self
 end
