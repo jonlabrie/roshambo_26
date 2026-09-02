@@ -145,4 +145,71 @@ describe("FireworkSchedule — THE BUDGET IS PER SHELL", function()
         expect(#ev).toBe(1)
         expect(ev[1].particles).toBe(0)
     end)
+
+    test("boost and glow pass through compile untouched", function()
+        local recipe = {
+            phases = {
+                {
+                    at = 0,
+                    kind = "burst",
+                    anchor = "apex",
+                    glow = 1.5,
+                    boost = { chance = 0.3, points = 2 },
+                    texture = "t",
+                },
+            },
+        }
+        local events = FireworkSchedule.compile(recipe :: any, 300)
+        expect(events[1].glow).toBe(1.5)
+        expect(events[1].boost ~= nil and events[1].boost.chance == 0.3).toBe(true)
+    end)
+
+    test("style passes through compile untouched", function()
+        local recipe = {
+            phases = {
+                { at = 0, kind = "burst", anchor = "apex", style = "ring", texture = "t" },
+            },
+        }
+        local events = FireworkSchedule.compile(recipe :: any, 300)
+        expect(events[1].style).toBe("ring")
+    end)
+
+    test("A STYLE NEVER TOUCHES COST: particle totals identical with styles stripped", function()
+        local styled = {
+            phases = {
+                { at = 0, kind = "report", anchor = "origin" },
+                { at = 0.02, kind = "ascent", anchor = "origin" },
+                { at = 1.0, kind = "burst", anchor = "apex", style = "ring", share = 2, texture = "t" },
+                {
+                    at = 1.5,
+                    kind = "burst",
+                    anchor = "apex",
+                    style = "strobe",
+                    points = 5,
+                    scatter = 8,
+                    share = 1,
+                    texture = "t",
+                },
+                { at = 2.0, kind = "burst", anchor = "apex", style = "kamuro", share = 1, texture = "t" },
+            },
+        }
+        local stripped = { phases = {} }
+        for _, ph in styled.phases do
+            local copy = table.clone(ph)
+            copy.style = nil
+            table.insert(stripped.phases, copy)
+        end
+        for _, budget in { 60, 300, 700 } do
+            local a = FireworkSchedule.compile(styled :: any, budget)
+            local b = FireworkSchedule.compile(stripped :: any, budget)
+            local ta, tb = 0, 0
+            for _, ev in a do
+                ta += ev.particles * ev.points
+            end
+            for _, ev in b do
+                tb += ev.particles * ev.points
+            end
+            expect(ta).toBe(tb)
+        end
+    end)
 end)

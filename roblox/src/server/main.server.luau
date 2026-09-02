@@ -4,6 +4,7 @@ local HttpService = game:GetService("HttpService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Players = game:GetService("Players")
 local LocalizationService = game:GetService("LocalizationService")
+local RunService = game:GetService("RunService")
 
 -- Day/Night cycle: publish the fixed, global cycle constants once at boot as attributes on a
 -- replicated Configuration. Clients derive t locally from workspace:GetServerTimeNow() (Roblox's
@@ -53,6 +54,7 @@ local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local RoundClock = require(shared:WaitForChild("RoundClock"))
 local CollectionService = game:GetService("CollectionService")
 local LaunchSites = require(shared:WaitForChild("LaunchSites"))
+local MortarPlacement = require(shared:WaitForChild("MortarPlacement"))
 local GameRules = require(shared:WaitForChild("GameRules"))
 local PlayerProfiles = require(shared:WaitForChild("PlayerProfiles"))
 local ThemeManifest = require(shared:WaitForChild("ThemeManifest"))
@@ -91,6 +93,7 @@ local RequestSync = remotes:WaitForChild("RequestSync") :: RemoteEvent
 local SetDisplay = remotes:WaitForChild("SetDisplay") :: RemoteEvent
 local SetPlacement = remotes:WaitForChild("SetPlacement") :: RemoteEvent
 local SetDecorationPlacement = remotes:WaitForChild("SetDecorationPlacement") :: RemoteEvent
+local SetMortarPlacement = remotes:WaitForChild("SetMortarPlacement") :: RemoteEvent
 local SetDecorationRemove = remotes:WaitForChild("SetDecorationRemove") :: RemoteEvent
 local DecorationPlaced = remotes:WaitForChild("DecorationPlaced") :: RemoteEvent
 local SetAccess = remotes:WaitForChild("SetAccess") :: RemoteEvent
@@ -101,6 +104,7 @@ local AccessBlocked = remotes:WaitForChild("AccessBlocked") :: RemoteEvent
 local RequestFireworkLaunch = remotes:WaitForChild("RequestFireworkLaunch") :: RemoteEvent
 local FireworkLaunched = remotes:WaitForChild("FireworkLaunched") :: RemoteEvent
 local FireworkState = remotes:WaitForChild("FireworkState") :: RemoteEvent
+local RequestProvingFire = remotes:WaitForChild("RequestProvingFire") :: RemoteEvent
 local StatsData = remotes:WaitForChild("StatsData") :: RemoteEvent
 local StatsPersonal = remotes:WaitForChild("StatsPersonal") :: RemoteEvent
 local TextService = game:GetService("TextService")
@@ -367,6 +371,21 @@ local lastStats: any = nil
 -- below; but the reveal fan-out just above here has to re-push shell state the moment a round
 -- closes. Declared here, assigned once those exist.
 local pushFireworkState: ((Player) -> ())? = nil
+
+-- FORWARD DECLARATION. pushFireworkState (below, but textually BEFORE rebuildClaimedPad is
+-- declared) needs to trigger the same pad rebuild the decoration flow uses whenever the fireworks
+-- GET's mortars/mortarPlacements actually changed -- mortars now render server-side (TreatmentApplier)
+-- like decorations, so late-arriving mortar data needs the identical rebuild, not just a state echo.
+-- Assigned right after `local function rebuildClaimedPad` is defined.
+local rebuildClaimedPadFn: ((string) -> ())? = nil
+
+-- FORWARD DECLARATION (final-review fix round). muzzleOriginFor (below, but textually BEFORE
+-- deckCFForUid is declared) must resolve the SAME (row, deckSize) pair the render path actually
+-- built with -- deckCFForUid already runs SizeClasses.resolveBuilt + DeckPlacement.resolve(...,
+-- built.deckSize, spec.maxSize), the exact call rebuildClaimedPad/TreatmentApplier use, honoring
+-- an active display-shrink (SetDisplay) or pad cap (spec.maxSize) that deckRowFor's raw
+-- `e.maxDeckSize or "S"` lookup does not. Assigned right after `local function deckCFForUid`.
+local deckCFForUidFn: ((string) -> ({ number }?, string?))? = nil
 
 local coordinator = RoundCoordinator.new({
     net = net,
@@ -1059,6 +1078,11 @@ local playerEconomy: {
         portalOwned: boolean,
         deckDecorations: { any },
         teahouseAccess: { mode: string, invited: { number } },
+        -- owned mortar tiers + their stored placements (deck-mortars, 2026-09-04): both arrive
+        -- on the fireworks GET (pushFireworkState), not the economy GET -- bootstrapped empty
+        -- here, filled moments later once that first pushFireworkState lands.
+        mortars: { string },
+        mortarPlacements: { [string]: MortarPlacement.StoredPlacement }?,
     },
 } =
     {}
@@ -1084,6 +1108,8 @@ local function echoEconomy(player: Player, uid: string)
         teahouseDisplay = e.teahouseDisplay,
         portalOwned = e.portalOwned,
         deckDecorations = e.deckDecorations,
+        mortars = e.mortars,
+        mortarPlacements = e.mortarPlacements,
     })
 end
 
@@ -1247,21 +1273,142 @@ end
 -- A player's own deck is a site for that player ALONE. Returns nil when they own no deck, which is
 -- the common case for a new player: they use the public sites. The deck does NOT lend a mortar —
 -- gear is personal, and the tube is the thing you bought.
-local function deckSiteFor(uid: string): LaunchSites.Site?
+-- (row, deckSize) for uid's claimed pad -- the exact `spec.deckPlacements` row deckSiteFor turns
+-- into a launch-site position. Shared so RequestFireworkLaunch's muzzle math reads the IDENTICAL
+-- row a launch was just validated against, rather than a second lookup that could drift from it.
+local function deckRowFor(uid: string): ({ number }?, string?)
     local e = playerEconomy[uid]
     if e == nil or e.claimedPadId == nil then
+        return nil, nil
+    end
+    local spec = PadSites[e.claimedPadId]
+    if spec == nil then
+        return nil, nil
+    end
+    local deckSize = e.maxDeckSize or "S"
+    local row = spec.deckPlacements[deckSize] or spec.deckPlacements.S
+    if row == nil then
+        return nil, nil
+    end
+    return row, deckSize
+end
+
+local function deckSiteFor(uid: string): LaunchSites.Site?
+    local row = deckRowFor(uid)
+    if row == nil then
+        return nil
+    end
+    return { pos = { x = row[1], y = row[2], z = row[3] }, radius = SITE_RADIUS, ownerUserId = uid }
+end
+
+-- The built teahouse's deck-local AABB for uid, or nil for a bare/vacant deck -- computed by the
+-- IDENTICAL pure math TreatmentApplier itself uses (SizeClasses.buildingFootprint +
+-- BuildingPlacer.resolveFit + BuildingPlacer.footprintBounds) from the SAME state `e` and
+-- rebuildClaimedPad already read (built teahouse size/placement via SizeClasses.resolveBuilt).
+-- Muzzle alignment (Task 5's controller ruling): muzzleOriginFor calls this so the mortar tube
+-- TreatmentApplier renders and the muzzle origin the server computes resolve from the identical
+-- footprint -- they can never drift onto two different answers for the same stored placement.
+local function teahouseFootprintFor(e: any): any
+    if e.claimedPadId == nil then
         return nil
     end
     local spec = PadSites[e.claimedPadId]
     if spec == nil then
         return nil
     end
-    local row = spec.deckPlacements[e.maxDeckSize or "S"] or spec.deckPlacements.S
-    if row == nil then
+    local teaSizes = {}
+    for s in e.teahouses do
+        table.insert(teaSizes, s)
+    end
+    local built =
+        SizeClasses.resolveBuilt(e.maxDeckSize, teaSizes, spec.maxSize, e.deckDisplay, e.teahouseDisplay)
+    if built == nil or built.teahouseSize == nil then
+        return nil -- bare deck: nothing to nudge away from
+    end
+    local teaLoadout = e.teahouses[built.teahouseSize]
+    local requested = (teaLoadout and teaLoadout.placement) or CENTERED_PLACEMENT
+    local buildingFP = SizeClasses.buildingFootprint(built.teahouseSize)
+    -- placementBounds, not deckFootprint: mirrors TreatmentApplier._buildBuilding exactly (the
+    -- railings occupy the deck footprint's perimeter).
+    local deckFP = SizeClasses.placementBounds(built.deckSize)
+    local placement = BuildingPlacer.resolveFit(buildingFP, deckFP, requested)
+    if placement == nil then
+        return nil -- pathological: even the N fallback doesn't fit; TreatmentApplier renders deck-only too
+    end
+    return BuildingPlacer.footprintBounds(buildingFP, placement)
+end
+
+-- Muzzle-true origin for a gear-required shell fired from the player's OWN deck: runs
+-- MortarPlacement's resolved deck-local spot for the shell's required tier through the SAME
+-- (row, deckSize) the render path actually built with. Deliberately NOT deckRowFor/deckSiteFor's
+-- row (final-review fix round): deckSiteFor's own site-radius check just above stays on
+-- deckRowFor's row (its tolerance makes the raw `e.maxDeckSize or "S"` lookup benign there, and
+-- that's out of scope by controller ruling) -- but the MUZZLE math below needs deckCFForUid's
+-- pair specifically, since that's the one SizeClasses.resolveBuilt + DeckPlacement.resolve(...,
+-- built.deckSize, spec.maxSize) run through, matching rebuildClaimedPad/TreatmentApplier exactly.
+-- Using deckRowFor here (as this used to) would transform through the WRONG row and feed
+-- MortarPlacement.resolve the WRONG deck bounds whenever a display-shrink (SetDisplay) or pad cap
+-- (spec.maxSize) is active -- while teahouseFootprintFor below already used resolveBuilt, so the
+-- two halves of this same function were resolving two different deck sizes.
+-- Returns nil (fall back to the eye-level origin) when: the shell needs no gear
+-- (MortarPlacement.SHELL_MORTAR has no entry for it, e.g. firecracker); the player isn't standing
+-- at THIS deck specifically (a public site takes the eye-level origin even where it happens to
+-- overlap someone's deck); or the required tier isn't actually owned/resolved there. Whether the
+-- launch was even ALLOWED for a missing tier is the backend's call (postFireworkSpend already ran
+-- by the time this is consulted) -- this only decides where an already-granted shell leaves from.
+local function muzzleOriginFor(uid: string, pos: Vector3, deck: LaunchSites.Site?, shellId: string): Vector3?
+    local requiredMortar = MortarPlacement.SHELL_MORTAR[shellId]
+    if requiredMortar == nil or deck == nil then
         return nil
     end
-    return { pos = { x = row[1], y = row[2], z = row[3] }, radius = SITE_RADIUS, ownerUserId = uid }
+    local dx, dz = pos.X - deck.pos.x, pos.Z - deck.pos.z
+    if dx * dx + dz * dz > deck.radius * deck.radius then
+        return nil -- admitted by some OTHER site (e.g. a public plaza), not this deck
+    end
+    local row: { number }? = nil
+    local deckSize: string? = nil
+    if deckCFForUidFn then
+        row, deckSize = deckCFForUidFn(uid)
+    end
+    local e = playerEconomy[uid]
+    if row == nil or deckSize == nil or e == nil then
+        return nil
+    end
+    local bounds = SizeClasses.deckFootprint(deckSize)
+    local teahouseFP = teahouseFootprintFor(e)
+    local placement = MortarPlacement.resolve(bounds, e.mortars, e.mortarPlacements, teahouseFP)
+    local spot = placement[requiredMortar]
+    if spot == nil then
+        return nil -- required tier not owned; nothing to be muzzle-true FROM
+    end
+    local wx, wy, wz = MortarPlacement.muzzleWorld(row, spot, requiredMortar)
+    return Vector3.new(wx, wy, wz)
 end
+
+-- Cheap dirty-check for "did this uid's owned mortars/placements actually change since the pad
+-- last rendered them": a deterministic string (ordered by MORTAR_ORDER, not raw table iteration
+-- order, which Lua/HTTP-JSON round-trips don't guarantee stays stable). Pure; no Roblox datatypes.
+local function mortarFingerprint(mortars: { string }, placements: { [string]: any }?): string
+    local ownedSet: { [string]: boolean } = {}
+    for _, id in mortars do
+        ownedSet[id] = true
+    end
+    local parts = {}
+    for _, id in MortarPlacement.MORTAR_ORDER do
+        if ownedSet[id] then
+            local p = placements and placements[id]
+            if p then
+                table.insert(parts, `{id}:{p.offset[1]},{p.offset[2]},{p.facing}`)
+            else
+                table.insert(parts, id)
+            end
+        end
+    end
+    return table.concat(parts, "|")
+end
+-- Last fingerprint a uid's claimed pad was actually REBUILT with, so pushFireworkState's frequent
+-- polling (every reveal, after every launch) doesn't rebuild the pad when nothing changed.
+local mortarRenderedFingerprint: { [string]: string } = {}
 
 -- Push the whole shell state to one player: after every launch (their count changed), at every
 -- reveal (the window moved, a grant may have landed) and once on join. HTTP-yielding, so it runs on
@@ -1271,6 +1418,40 @@ pushFireworkState = function(player: Player)
     handlerQueue:run(uid, function()
         local res = net:getFireworks(uid, lastWorldThrow())
         if res.ok and player:IsDescendantOf(Players) then
+            -- Tell the client where its OWN deck-site is. The deck was always a valid
+            -- launch site server-side, but the HUD's affordance only knew the tagged
+            -- public sites — so at your own teahouse the fire button never appeared
+            -- (owner, 2026-09-04: "we haven't made that work yet!"). It had; it hid.
+            local deck = deckSiteFor(uid)
+            res.data.deckSite = if deck then deck.pos else nil
+            -- Mirror the fireworks GET's mortar fields into playerEconomy (deck-mortars,
+            -- 2026-09-04) -- this is the ONLY place e.mortars/e.mortarPlacements get their real
+            -- values (neither rides the economy GET); every treatment/echo table that already
+            -- carries deckDecorations reads them from here. res.data.mortarPlacements may
+            -- legitimately be nil/absent (a fresh player with no stored overrides), so it is
+            -- adopted directly, not defaulted away.
+            local e = playerEconomy[uid]
+            if e ~= nil then
+                e.mortars = res.data.mortars or e.mortars
+                e.mortarPlacements = res.data.mortarPlacements
+                -- Mortars render server-side now (TreatmentApplier, like decorations), so
+                -- late-arriving/changed mortar state needs the same pad rebuild the decoration
+                -- flow uses -- guarded by the fingerprint so a reveal where nothing changed
+                -- doesn't rebuild the pad (this fires far more often than any decoration event).
+                -- Belt-and-braces (final-review fix round): only RECORD the fingerprint when a
+                -- rebuild actually ran while the pad is claimed -- an unclaimed uid has no pad to
+                -- render, so remembering "rendered with fp X" here would be a lie that could later
+                -- suppress the real first rebuild once they do claim.
+                if e.claimedPadId ~= nil then
+                    local fp = mortarFingerprint(e.mortars, e.mortarPlacements)
+                    if mortarRenderedFingerprint[uid] ~= fp then
+                        mortarRenderedFingerprint[uid] = fp
+                        if rebuildClaimedPadFn then
+                            rebuildClaimedPadFn(uid)
+                        end
+                    end
+                end
+            end
             FireworkState:FireClient(player, res.data)
         end
     end)
@@ -1305,9 +1486,12 @@ RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
             end
             return
         end
+        -- Firecracker and public-site launches keep the eye-level origin; a gear-required shell
+        -- fired from the player's own deck launches from its mortar's actual muzzle instead.
+        local origin = muzzleOriginFor(uid, pos, deck, shellId) or (root.Position + Vector3.new(0, 6, 0))
         FireworkLaunched:FireAllClients({
             shellId = shellId,
-            origin = root.Position + Vector3.new(0, 6, 0),
+            origin = origin,
             seed = math.random(1, 2 ^ 31 - 1),
             by = uid,
         })
@@ -1315,6 +1499,33 @@ RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
             pushFireworkState(player)
         end
     end)
+end)
+
+-- THE PROVING RANGE (spec 2026-09-01-proving-range-design). Studio-only: fires any shell or
+-- draft id from a named proving rack through the SAME FireworkLaunched broadcast the spend
+-- path uses — director, LOD, pooling all engaged — but with NO inventory spend and NO backend
+-- call. The IsStudio gate is the whole security model: a published client's request dies here.
+RequestProvingFire.OnServerEvent:Connect(function(_player, shellId, rackName)
+    if not RunService:IsStudio() then
+        return
+    end
+    if typeof(shellId) ~= "string" or typeof(rackName) ~= "string" then
+        return
+    end
+    local stageForProving = workspace:FindFirstChild("RoshamboStage")
+    local ground = stageForProving and stageForProving:FindFirstChild("ProvingGround")
+    local rack = ground and ground:FindFirstChild(rackName)
+    if not (rack and rack:IsA("BasePart")) then
+        return
+    end
+    FireworkLaunched:FireAllClients({
+        shellId = shellId,
+        -- rack.Position is the 6" tube's CENTER; +1.25 (its half-length) is the MUZZLE.
+        -- +3 floated shells two studs above the tube (owner, 2026-09-03).
+        origin = rack.Position + Vector3.new(0, 1.25, 0),
+        seed = math.random(1, 2 ^ 31 - 1),
+        by = "proving",
+    })
 end)
 
 -- B3 gate fix: mid-session live rebuilds (buy-to-claim, upgrade, display change) destroy the
@@ -1349,6 +1560,7 @@ local applier = TreatmentApplier.new({
     decorationLayout = DecorationLayout,
     decorationCatalog = DecorationCatalog,
     kamonDraw = KamonDraw,
+    mortarPlacement = MortarPlacement,
 })
 
 -- Rebuild the player's claimed pad at its currently-resolved sizes/placement, threading the
@@ -1387,6 +1599,8 @@ local function rebuildClaimedPad(uid: string)
         crest = Kamon.forUserId(uid),
         portalOwned = e.portalOwned,
         deckDecorations = e.deckDecorations,
+        mortarPlacements = e.mortarPlacements,
+        mortars = e.mortars,
     }
     applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
     if built.teahouseSize ~= nil then
@@ -1395,6 +1609,7 @@ local function rebuildClaimedPad(uid: string)
         playerHouse[uid] = nil
     end
 end
+rebuildClaimedPadFn = rebuildClaimedPad
 
 -- (deckCF12, deckSize) for a claimed owner's currently-built deck, or nil,nil.
 local function deckCFForUid(uid: string): ({ number }?, string?)
@@ -1417,6 +1632,7 @@ local function deckCFForUid(uid: string): ({ number }?, string?)
     end
     return DeckPlacement.resolve(spec.deckPlacements, built.deckSize, spec.maxSize), built.deckSize
 end
+deckCFForUidFn = deckCFForUid
 
 -- friend cache keyed "viewerId:ownerId" (friendship is static within a session).
 local friendCache: { [string]: boolean } = {}
@@ -1619,6 +1835,10 @@ Players.PlayerAdded:Connect(function(player)
             portalOwned = (ecoData and ecoData.portalOwned) or false,
             deckDecorations = (ecoData and ecoData.deckDecorations) or {},
             teahouseAccess = (ecoData and ecoData.teahouseAccess) or { mode = "public", invited = {} },
+            -- neither rides the economy GET (ecoData above) -- both arrive moments later off
+            -- the fireworks GET, in pushFireworkState below.
+            mortars = {},
+            mortarPlacements = nil,
         }
         local action = siteCoordinator:onJoin(uid, {
             maxDeckSize = playerEconomy[uid].maxDeckSize,
@@ -1642,6 +1862,8 @@ Players.PlayerAdded:Connect(function(player)
             end
             action.treatment.portalOwned = playerEconomy[uid].portalOwned
             action.treatment.deckDecorations = playerEconomy[uid].deckDecorations
+            action.treatment.mortarPlacements = playerEconomy[uid].mortarPlacements
+            action.treatment.mortars = playerEconomy[uid].mortars
             applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
             playerEconomy[uid].claimedPadId = action.padId
             local tsize = action.teahouse and action.teahouse.size or "bare"
@@ -1738,6 +1960,13 @@ Players.PlayerRemoving:Connect(function(player)
     flushShojiForUid(uid)
     playerHouse[uid] = nil
     playerEconomy[uid] = nil
+    -- Final-review fix round: a stale entry here survives a rejoin to the SAME server instance.
+    -- The join bootstraps e.mortars/e.mortarPlacements empty (pushFireworkState fills them
+    -- moments later); if the fresh pushFireworkState's fingerprint happens to match what this
+    -- uid's PREVIOUS session last rendered, the rebuild is skipped and the deck stays tubeless
+    -- for the whole session while muzzleOriginFor keeps firing shells from the (now invisible)
+    -- resolved muzzle. Clearing it here forces the next pushFireworkState to always rebuild once.
+    mortarRenderedFingerprint[uid] = nil
     recomputeAllAccess()
     local action = siteCoordinator:onLeave(uid)
     if action then
@@ -2195,6 +2424,8 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
                 if action ~= nil and action.padId == claimPadId then
                     action.treatment.portalOwned = e.portalOwned
                     action.treatment.deckDecorations = e.deckDecorations
+                    action.treatment.mortarPlacements = e.mortarPlacements
+                    action.treatment.mortars = e.mortars
                     applier:apply(
                         action.padId,
                         action.spec,
@@ -2264,6 +2495,8 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
                         crest = Kamon.forUserId(uid),
                         portalOwned = e.portalOwned,
                         deckDecorations = e.deckDecorations,
+                        mortarPlacements = e.mortarPlacements,
+                        mortars = e.mortars,
                     }
                     applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
                     -- keep playerHouse in sync with the just-rebuilt structure (B3 final review):
@@ -2342,6 +2575,8 @@ SetDisplay.OnServerEvent:Connect(function(player, payload)
                     crest = Kamon.forUserId(uid),
                     portalOwned = e.portalOwned,
                     deckDecorations = e.deckDecorations,
+                    mortarPlacements = e.mortarPlacements,
+                    mortars = e.mortars,
                 }
                 applier:apply(e.claimedPadId, spec, treatment, built.deckSize, teahouse)
                 -- keep playerHouse in sync with the just-rebuilt structure (B3 final review): a
@@ -2465,6 +2700,8 @@ SetPlacement.OnServerEvent:Connect(function(player, payload)
             crest = Kamon.forUserId(uid),
             portalOwned = e.portalOwned,
             deckDecorations = e.deckDecorations,
+            mortarPlacements = e.mortarPlacements,
+            mortars = e.mortars,
         }
         applier:apply(e.claimedPadId, spec, treatment, builtNow.deckSize, teahouse)
         playerHouse[uid] = { padId = e.claimedPadId, size = size, loadout = fresh }
@@ -2544,6 +2781,74 @@ SetDecorationPlacement.OnServerEvent:Connect(function(player, payload)
             return
         end
         e.deckDecorations = newList
+        rebuildClaimedPad(uid)
+        echoBackDoor(player, uid) -- rebuild replaced the Structure; re-arm the F prompts (parity)
+        echoEconomy(player, uid)
+    end)
+end)
+
+-- Mirrors SetDecorationPlacement's shape exactly, keyed on mortarId instead of a decoration
+-- instance id (a mortar has no separate instance -- owning a tier IS the instance). Mortars ARE
+-- server-built props now (TreatmentApplier:_buildMortars, alongside _buildDecorations -- Task 5's
+-- controller ruling superseded the original client-side-render plan so every visitor sees them,
+-- not just the owner), so a moved mortar needs the SAME rebuildClaimedPad/echoBackDoor step
+-- SetDecorationPlacement uses to redraw for everyone, not just echoEconomy back to the mover.
+SetMortarPlacement.OnServerEvent:Connect(function(player, payload)
+    handlerQueue:run(tostring(player.UserId), function()
+        local uid = tostring(player.UserId)
+        local e = playerEconomy[uid]
+        if e == nil or e.claimedPadId == nil then
+            return -- occupant-only, same discipline as SetDecorationPlacement
+        end
+        if
+            typeof(payload) ~= "table"
+            or typeof(payload.mortarId) ~= "string"
+            or typeof(payload.offset) ~= "table"
+        then
+            return
+        end
+        local mortarId = payload.mortarId
+        local dx, dz = payload.offset[1], payload.offset[2]
+        local facing = payload.facing
+        local isKnownMortar = false
+        for _, id in MortarPlacement.MORTAR_ORDER do
+            isKnownMortar = isKnownMortar or id == mortarId
+        end
+        if not isKnownMortar then
+            return
+        end
+        local owned = false
+        for _, id in e.mortars do
+            owned = owned or id == mortarId
+        end
+        if not owned then
+            return -- gear is personal: standing on your own deck doesn't lend a tier you don't own
+        end
+        if typeof(dx) ~= "number" or dx ~= dx or math.abs(dx) == math.huge then
+            return
+        end
+        if typeof(dz) ~= "number" or dz ~= dz or math.abs(dz) == math.huge then
+            return
+        end
+        if facing ~= "N" and facing ~= "E" and facing ~= "S" and facing ~= "W" then
+            return
+        end
+        -- build a NEW map (pre-persist clone discipline); resolve()'s own clamp handles
+        -- out-of-bounds values at read time, so nothing is clamped here (Task 2's module owns
+        -- that decision, not this runtime file).
+        local newMap = table.clone(e.mortarPlacements or {})
+        newMap[mortarId] = { offset = { dx, dz }, facing = facing }
+        local persisted = net:putMortarPlacements(uid, newMap)
+        if not persisted.ok then
+            warn(`[MORTAR] putMortarPlacements failed for {uid}: {tostring(persisted.error)}`)
+            echoEconomy(player, uid) -- resync
+            return
+        end
+        if not player:IsDescendantOf(Players) then
+            return
+        end
+        e.mortarPlacements = newMap
+        mortarRenderedFingerprint[uid] = mortarFingerprint(e.mortars, e.mortarPlacements) -- rendering NOW; pushFireworkState's next poll must not redundantly re-rebuild
         rebuildClaimedPad(uid)
         echoBackDoor(player, uid) -- rebuild replaced the Structure; re-arm the F prompts (parity)
         echoEconomy(player, uid)

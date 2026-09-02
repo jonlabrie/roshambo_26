@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-15
+updated: 2026-09-04
 checked: 2026-08-27
 ---
 
@@ -24,6 +24,65 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   — `Site_SuspensionBridge`, `Site_FallsDock`, `Site_Overlook` under
   `CanyonWorld.LaunchSites` (verified in the place 2026-08-15).
 - Shop front-end: [[hanabiya]].
+- **Proving range (2026-09-01, branch `proving-range`, working — owner comments pending)**:
+  the authoring loop for new shells. Draft recipes in `src/shared/FireworkDrafts.luau`
+  (families of variants, ids `draft:<family>/<variant>`, never in the CI fixture);
+  schema `FireworkRecipes.luau` makes the blank-sky trap a test failure; Studio-gated
+  `RequestProvingFire` fires any draft/shipped id from five mortar racks ON THE
+  SUSPENSION BRIDGE (owner siting; surveyed catenary — per-station height + inward
+  tilt), judged from FallsLanding ~190 studs west at burst eye level. Panel opens
+  ANYWHERE in Studio (P key / top-right chip, left-edge rail — a location-bound panel
+  was ruled theater and the FiringPost deleted); modes single (rack A–E selector),
+  ladder (variants side-by-side), sequence (2s apart); night via `ProvingNightOverride`
+  Lighting attribute that DayNightController's tick respects. Mortars are accurate
+  2"/4"/6" at ~4–5:1 (owner ruling; **yonshakudama parked as a future premium
+  spectacle**). Spec `docs/superpowers/specs/2026-09-01-proving-range-design.md`.
+- ⚠ **Every shipped burst 2026-08-05 → 2026-09-01 rendered as a flat vertical line**:
+  the bench's `SpreadAngle (360,360)`, drag and fade curve never made it into
+  `FireworkController`'s pool, so particles fired straight up. Invisible from below at
+  the Overlook; exposed by the proving range's first eye-level sightline and fixed in
+  `adaa1fe`. Reaches players on the next place publish.
+- **Vocabulary wave one (2026-09-04, merged)**: five burst styles (peony/ring/palm/
+  strobe/kamuro) as a `style` field on burst phases — `BurstStyles.luau` is the one
+  source of truth (emitter config, point rules, texture/sound ROLE tables, tail
+  voices, completeness test-enforced because pool emitters are shared). Staged
+  multi-burst shells work (`points`/`scatter`/`share` validated; `dan` is the
+  three-act demo). Glow stack: LightInfluence 0, per-style Brightness ~2-3,
+  color-over-life (white ignition → saturated burn → blackbody ember → near-black
+  death = additive glow to zero), per-style lightEmission <1 as the stacking law.
+  Flights ~3s (owner ruling), apex 60, per-frame bezier ascent (TweenService stepped
+  at ~15Hz — measured — and was replaced), 2.4s fading trail, muzzle flash. Audio:
+  owner-picked kingsrow launch thump, SILENT ascents (owner ruling), 4-variant
+  seeded aerial burst pool, speed-of-sound delay per listener (1125 studs/s),
+  startup preload, volume 2 / rolloff 45-400. Hotaru carries the owner's own
+  canyon-echoed sizzle as a phase-bound TAIL VOICE (second Sound per slot, engine
+  fade at duration). Families: kiku, wa, yashi, hotaru (+tail), kamuro, ao (blue),
+  midori (green), murasaki (violet) — the last three as shape/hue ladders; willow
+  re-authored gold. Spec docs/superpowers/specs/2026-09-02-fireworks-vocabulary-design.md.
+- **Deck mortars (2026-09-04, merged `bc82000..31dcd6f`, dev-deployed — owner Play
+  gate pending)**: owned mortars render as tubes ON the owner's deck and gear shells
+  launch from the required tier's MUZZLE (kiku/peony → S, willow → M);
+  `firecracker` stays hand-launched; public sites unchanged. Default-first (owner
+  ruling): S/M/L auto-stagger along the canyon-facing front edge, movable (never
+  removable) through the decoration drag flow — `SetMortarPlacement` remote, gear
+  exempt from the 24-decoration cap. Decisions in pure
+  `src/shared/MortarPlacement.luau` (defaults/clamp/teahouse-nudge/muzzle math);
+  tubes are SERVER-built in `TreatmentApplier:_buildMortars` so visitors see every
+  deck's arsenal (a mid-plan correction — the plan assumed client-side render, which
+  would have been owner-only; spec's "visible to every visitor" won). Muzzle-truth
+  is structural: `BuildingPlacer.resolveFit` feeds both the rendered tube and
+  `muzzleOriginFor`, so the shell leaves the tube you see, nudge included.
+  Persistence mirrors `deckDecorations` (`User.mortarPlacements`, validated PUT,
+  Mixed + `markModified`). Final review caught pre-ship: a rejoin-invisibility
+  fingerprint bug (fresh Play sessions can't surface it — the gate must include a
+  same-server rejoin) and a muzzle deck-size mismatch on display-shrunk decks.
+  `SHELL_MORTAR` is fixture-enforced in both suites (see promotion pipeline
+  amendment in the proving-range spec §5). Spec
+  docs/superpowers/specs/2026-09-04-deck-mortars-design.md and plan
+  docs/superpowers/plans/2026-09-04-deck-mortars.md. ⚠ **No SDD ledger was created** —
+  `.superpowers/sdd/2026-09-04-deck-mortars/` does not exist, <!-- lint-ok: naming the ledger path in order to say it was never created -->
+  so the raw layer here is the spec, the plan and the branch's own commits. Same
+  shape as item 5's missing ledger on [[friends-family-baseline]].
 - VFX recipe (proven on device): rising Trail comet → flash core → radial burst →
   glitter/willow, glow via LightEmission + the one global Bloom, ~500–700
   particles/shell, client-side emission (server `Emit()` does not replicate).

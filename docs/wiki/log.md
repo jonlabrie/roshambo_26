@@ -2542,7 +2542,7 @@ degrees multiplier, so the gape angle is still unchosen (25° was a test value).
 UVs are one tiny disc per face, not a real island. `BirdFlight.luau:200` still cites a stale 0.30
 `CAW_GAPE_SECONDS` against a 0.48 gap; both numbers are wrong.
 
-## [2026-08-30] ship | `art/` — a formal in-repo home for what no script can reproduce
+## [2026-08-30] decision | `art/`: a formal in-repo home for what no script can reproduce
 
 `karasu_authored.blend` was irreplaceable and lived in exactly one place on one disk, outside the
 repo. It and `karasu_colormap_graded_2.png` now live in `art/birds/karasu/`, and Blender saves
@@ -2767,58 +2767,423 @@ Two findings recorded against the ambient design, neither built:
 in the whole canyon are on a tree**. The perch graph is a ROAD MAP, not a habitat map; it is
 correct for familiars, which follow players who walk on paths, and wrong for territories.
 
-## [2026-08-31] lint | Prose lint — a withdrawn eye still shipped as as-built on the familiars page
+### Contract tests — the gap conventional testing still fills
 
-`tools/wiki/lint.mjs` reported **10 errors** and 7 warnings at the start of this run; it ends at
-**0 and 0** across 56 pages. The mechanical half was the cheap half. The prose half found a page
-arguing with its own heading.
+⚠ **ELEVEN REAL DEFECTS WERE FOUND ACROSS THIS SESSION AND A UNIT TEST CAUGHT NONE OF THEM.**
+Five came from measuring geometry (vertex valence, signed volume, ray casts, texel run lengths),
+three from assertions embedded in the doing, two from reading a code path before running it, and
+three from the owner's eye. That is the honest case against writing tests for generative work: no
+assertion substitutes for "does this read as a crow".
 
-⚠ **`world/familiars.md` CARRIED ~160 LINES DESCRIBING A MECHANISM WITHDRAWN TWO DAYS EARLIER.**
-Its heading said the karasu's eye is PAINTED; the section immediately under it said *"Built, kept
-and now wired… a `KarasuEyes` MeshPart… `BirdController` clones it, paints it from
-`BirdSpecies.eye`, and places it every frame"*, and then spent a hundred lines on the rest pose,
-the frame ordering, the lid loft and the ring width. Every one of those is gone: the `.rbxm` is
-deleted, the Rojo entry is removed, `BirdController` carries a **DO NOT REINTRODUCE** comment, and
-`tests/BirdEyeConvention.spec.luau` fails on the names. The withdrawal is recorded here under
-2026-08-29 and the page was never touched. ⚠ **The lint was green on that page the whole time** —
-it cites `tests/BirdEyeConvention.spec.luau`, which exists, and `BirdSpecies.eye`, whose leaf
-`eye` matches somewhere in every source tree. A citation check cannot tell a live claim from a
-dead one. Superseded per schema rule 2 rather than annotated; the chronology stays here.
+But there is one class conventional testing still owns — **the contract between DATA and the code
+that reads it** — and it was going unchecked. Both halves now exist and both were mutation-proven
+rather than merely written.
 
-**Also corrected on that page, each verified against code:** `SPECIES` was quoted as `"Uguisu"`
-and reads `"Karasu"`, so the page said *"none of the karasu is reachable"* about the bird every
-player currently gets; the "Import verified 2026-08-26" note still claimed no `SurfaceAppearance`
-and a `TextureID`, three sections after the same page recorded the full PBR set; the wingspan
-figure was carried as `⚠ unverified` in two places after a third paragraph announced it verified;
-`watchWingbeat`'s mode list omitted PERCH; and a transcribed **326** perches stood forty lines
-above the page's own instruction to count them with `CollectionService` (schema rule 9).
+**`tools/blender/test_bake_contracts.py`** runs the real shaders over the real palettes with
+`bpy` stubbed (they are pure numpy). ⚠ **IT RUNS THEM RATHER THAN PARSING THEM**: grepping the
+source for `C["..."]` would be guessing, and a key read inside a conditional is only checked if
+the condition is true — `shade` looks up `eyeline` and `supercilium` inside `if head.any()`, so
+the probe points deliberately include the head band 0.082 < y < 0.168. Seven planted defects, all
+caught: a missing palette key, a species naming a shader that does not exist, an inverted eye-ring
+stack, roughening that dies before the ring's outer edge, a lore that stops reading off `EYE`,
+colour leaking into a scalar roughness channel, and a throat running past the bill line. Wired
+into `roblox-ci.yml`.
 
-⚠ **`practice/blender-working-rules.md` RULE 8 DESCRIBED THE `ART_SOURCES` SPLIT AS LIVE.**
-`8d69da6` collapsed it the same day it was invented — `OWNER_AUTHORED` is `{COLORMAP_AUTHORITY,
-AUTHORED_BLEND}`, `karasu_body.fbx` is deliberately NOT guarded, and the second CI step is
-deleted — and that commit updated this log but not the page. The rule now records the finding
-that commit reached: guard the source, never the derivative. The two `bpy` operator names the
-symbol check fires on are third-party API, and are exempted rather than "fixed".
+**`tests/BirdSpeciesContract.spec.luau`** tests the SHAPE every species must have, where
+`BirdGape.spec` tests the karasu's measured onsets specifically. Six planted defects, all caught:
+a duplicate clip id inside one voice (which errors nowhere and merely makes one call twice as
+likely as the weights say), an onset that leaves the beak open after the sound stops, two onsets
+closer together than the gape window, a reversed rolloff pair, a zero clip weight, and a
+`bodyLength` of 0 — which would otherwise surface at spawn as NaN positions and "the bird
+vanished". 1562 tests -> 1568.
 
-**`log.md` itself was malformed** in six entries — four written with kind `fix`, which schema
-rule 8 does not define, and two with no `[date] kind |` header at all. Headers repaired to the
-defined vocabulary (`defect` / `ship`); no entry's body was touched and nothing was reordered.
+⚠ **A GUARD THAT HAS NEVER FIRED IS NOT KNOWN TO WORK.** Every check added here was made to fail
+once, deliberately, before being trusted. That is cheaper than the check itself and worth more.
 
-**Read at depth (19 shelf pages + index, schema and this file):** the changed-code set —
-`familiars`, `ambient-birds`, `blender-working-rules`, `blender-pipeline`, `core-loop`,
-`world-throw`, `round-and-hud`, `status-display`, `rojo-meshpart-rbxm`, `parallel-threads`,
-`duplicated-server-constants` — plus the rotating slice by oldest stamp:
+### The beak learns to warble — an envelope alongside the onsets
+
+⚠ **ONSETS ARE THE WRONG MODEL FOR A CONTINUOUS SINGER, AND THE MEJIRO PROVED IT.** `gapeAt` takes
+a list of onsets and opens the beak for a fixed window at each, which describes a karasu exactly:
+two or three caws of 0.18–0.24s separated by 0.775s of silence. A mejiro's 5.3s clip is **voiced
+46% of its own length** in an unbroken warble — asked for onsets you would be picking arbitrary
+points in a run of sound. So a clip now carries **either** `caws` **or** `env`, and the choice
+belongs to the bird rather than to us. Neither leaves the beak shut, which is correct for a dove.
+
+⚠ **NORMALISE THE ENVELOPE BY A HIGH PERCENTILE, NOT THE PEAK.** The peak of a warble is one
+transient; dividing by it left the mejiro's mean gape at **0.25 with 12% of frames above half** —
+a bird mumbling through its own song. At p85 it is **0.53 with 52% above half and 10% shut**: a
+beak that sits open, modulates, and closes in the breaths. Same class of error as peak-normalising
+a colour palette.
+
+⚠ **SMOOTH BEFORE SAMPLING, AND STORE SLOWER THAN YOU MEASURE.** A jaw has mass and cannot track
+syllables; 150 ms smoothing at a 12 Hz storage rate costs **106 numbers for all four mejiro
+clips**, and `gapeFromEnvelope` interpolates so the jaw does not tick at the storage rate.
+
+**Clip selection, measured not guessed.** Whole-file SNR picked mejiro_3 at 56 dB — and that was
+the WRONG STATISTIC: the file is clean because most of it is quiet, containing a *second, distant
+bird*. Only 2 of its 8 phrases are usable; the rest run 21–36 dB down. Per-phrase SNR is the right
+measure, and by it mejiro_3's two loud phrases (59–62 dB) still beat everything in the other files
+(36–45 dB) by 15 dB. The short "remark" came from inside the 1.64s song, which turned out to be
+three motifs separated by >60 ms of near-silence. ⚠ The long clip is capped at 5.3s by the **8s
+leak guard in `sing()`** — the two best long passages are 7.75s and 8.40s and would be truncated
+mid-song by a safety net meant for failed loads.
+
+`tools/audio/measure_envelope.py` is the sibling of `measure_caws.py` and shares its WAV reader.
+Its `--check` mode and a new contract test both catch the same defect: **an edited `seconds` with
+a stale `env`**, which slides the beak out of sync with its own audio, silently and worse the
+further into the clip you get.
+
+Mutation-proven: a clip carrying both onsets and an envelope, an envelope too short for its
+duration, and a value outside 0–1 all fail. 1571 → 1573 tests.
+
+⚠ **NOT YET SHIPPED:** no species carries an `env`, because the mejiro has no uploaded clip ids.
+The two new contracts are therefore vacuous until it does — which is why they were mutation-tested
+against a temporarily-envelope'd karasu rather than trusted.
+
+### The mejiro is a species — and the contract caught a defect on its first real use
+
+Four clips shipped with measured envelopes and ids. Weights follow the karasu's rhetoric rather
+than being uniform — 40/30/20/10 from the 0.46s remark to the 5.3s full warble — because a thing
+heard every fourth time is not a declaration. `volume = 0.85`, the uguisu's rather than the
+karasu's, and for the same measured reason: these clips peak −3.3 to −7.8 dBFS (mean ≈ −5.5)
+against the uguisu's −5.4 and the karasu's −7.4 to −9.9. `bodyLength = 0.640`, measured off the
+shipped asset, sharing the uguisu's mesh scaled 0.7729 on **both** halves.
+
+⚠ **THE ENVELOPE CONTRACT FIRED THE MOMENT IT STOPPED BEING VACUOUS, AND IT WAS RIGHT.**
+`measure_envelope` computed its frame count as `(len - hop) // hop`, dropping the trailing partial
+frame — mejiro-4's 62 samples spanned **5.167s of a 5.30s clip**, so the beak would have shut
+0.13s before the song ended. Every clip was short by a frame or two. The fix is `ceil` with the
+final frame taking whatever samples remain; the test's ±1.5-sample tolerance is what made it
+visible, and a looser one would have hidden it.
+
+⚠ **THAT IS THE ARGUMENT FOR CONTRACT TESTS IN ONE EXAMPLE.** It is not a defect anybody would
+report — nobody watches a beak for the last eighth of a second of a song — and no amount of
+looking at the bird would have found it. It is exactly the mechanical, invisible class that
+conventional testing still owns.
+
+Proven live rather than assumed: editing `seconds` to 7.0 while leaving `env` stale fails both the
+Luau contract and `measure_envelope.py --check`, which report the same defect from two directions.
+1573 tests green.
+
+⚠ **STILL PLACE-ONLY:** `MejiroBody`/`MejiroWings` exist in the place with their SurfaceAppearances
+but are not saved to `assets/meshes/` and not declared in `default.project.json`. `SPECIES =
+"Mejiro"` therefore works in the owner's session and nowhere else until they are.
+
+### The export stops naming its rig, and finds a second bird's defect on first use
+
+`export()` hardcoded `Karasu_Rig`, one of nine places in the pipeline that did, which is why the
+uguisu — whose retarget was never a script — could use none of it. It now derives the armature
+from the mesh's own modifier (`rig_of`). ⚠ **A RIG NAME IS THE WRONG THING TO PASS:** the object
+already knows what deforms it, and a derived value cannot be typed wrong. An unrigged mesh now
+raises instead of exporting a static one, which imports successfully with no bones.
+
+⚠ **AND THE FIRST USE ON A SECOND BIRD FOUND A DEFECT.** `UguisuWings` carried every weight
+**twice** — once at its own group indices 0–3 and once at 17–20, which is where those four bones
+sit in `Uguisu_R`, the object it was separated from. **832 stale entries across all 416 vertices**,
+summing every vertex to 2.0. `normalise_weights` had reported it clean, correctly: it filters to
+groups NAMED after deform bones, and a stale index names nothing. Only summing the raw entries
+showed it. Cleaned by rebuilding the deform layer against the declared groups.
+
+⚠ **THE LESSON IS ABOUT THE CHECK, NOT THE BUG.** Three separate measures disagreed about the same
+mesh — `normalise_weights` said 1.0, a naive sum said 2.0, and the truth was that both were right
+about different sets. When two measurements of one thing disagree, the definitions are the
+difference; that is the second time this session that has been the answer.
+
+Both uguisu FBXs re-exported with the rigid bill, normalised weights, no `bill_lower`, and no
+stale entries.
+
+### The uguisu and mejiro re-ship on a repaired mesh
+
+Both birds now share mesh `125989270453965` (body) and `122044327250866` (wings): 16 bones, no
+`bill_lower`, weights normalised, bill rigid to `joint4`. The karasu keeps its 15 bones INCLUDING
+`bill_lower` — its bill is genuinely cut, so it is the one bird that should have a jaw.
+
+⚠ **A SHARED MESH MUST EXPORT WITHOUT EITHER BIRD'S PAINT.** `export()` uses `path_mode='COPY'`,
+which copies whatever material the object is wearing into the FBX's `.fbm` for the Studio importer
+to offer as a TextureID. The uguisu FBX shipped the MEJIRO's colormap — `MejiroPreview` had been
+left on the uguisu meshes after the bake — and the owner caught it in the import dialog. `export()`
+now takes `textures=False`, which strips the slots for the duration and restores them after.
+
+⚠ **DO NOT SWAP `MeshId` TO KEEP A SurfaceAppearance.** `Bone` instances are CHILDREN of the
+MeshPart, created by the importer; changing `MeshId` swaps the geometry and leaves the old skeleton,
+so new weights would bind to a stale rig. Import fresh and transfer the SurfaceAppearance, the
+size and the name onto the new part instead.
+
+⚠ **THREE MEASUREMENTS WERE WRONG TODAY AND THE DATA WAS RIGHT EVERY TIME.** `strings` on a
+compressed `.rbxl` said a mesh id was missing; a regex for `MeshId`/`<url>` said every MeshPart was
+blank, when the modern serialisation is **`MeshContent`/`<uri>`**; and a per-part regex bounded by
+lookahead swept to end-of-file and reported `bill_lower` on the wings. Each nearly became a bug
+report. **Verify the instrument before trusting a surprising reading** — see also
+`practice/blender-working-rules.md` rule 9.
+
+The Rojo round-trip is sound: a `rojo build` carries every bird's `MeshContent` and the uguisu's
+`TextureContent`. The blank duplicates that appeared under `RoshamboBirds` were a LIVE-SYNC
+artifact — Rojo created the newly declared Mejiro children before their `.rbxm`s had content —
+not a defect in the committed files.
+
+### "Only the mejiro" — one observation that falsified a whole diagnosis
+
+The owner saw flat polygonal blobs on the toes and I traced it to an asymmetric rig: the uguisu's
+RIGHT leg chain sat **0.049 studs outboard of its own geometry**, so posing it swung the leg about
+a pivot outside the limb. Mirroring the chain took toe-deformation asymmetry from **0.042 to
+0.0119 studs** and mismatched mirror pairs from **197 to 1**. Real defect, worth keeping — the
+mesh is symmetric to 0.0012 and the rig was not.
+
+⚠ **AND IT WAS NOT THE CAUSE.** The owner then said *"only the mejiro"*. The two birds share the
+mesh AND the rig, so anything in either must show on both. That single sentence falsified the
+whole line of investigation, and I would have gone on believing it.
+
+What differs between them is **Size and paint**, and the scaling is uniform to six decimal places
+(x = y = z = 0.772899, spread 0.000000). So it was the SurfaceAppearance — and specifically the
+roughness map, which the uguisu does not have at all.
+
+⚠ **GLOSS REVEALS FACETS, AND LOW-POLY GEOMETRY HAS NOTHING TO SPARE.** `shade_roughness` gave
+legs **0.42** against plumage's 0.88 — the toes were twice as glossy as the feathers, and a
+specular that tight picks out each facet's normal. The geometry was blameless: all **324 toe faces
+are smooth-shaded**, no custom normals, no sharp edges. Legs raised to 0.70 and the bill from 0.34
+to 0.55 — the bill is the same mechanism on the same mesh with 66 vertices carrying the whole
+thing, so it was raised pre-emptively rather than after another cycle.
+
+⚠ **A BIRD WITH NO ROUGHNESS MAP IS A CONTROL GROUP.** The uguisu could not show this defect, and
+that is what identified the cause. Two assets differing in exactly one property is worth more than
+any amount of staring at the one that is broken.
+
+The mirrored rig and the new roughness map ship together, so it is one import cycle rather than
+two. `joint15` now carries 355 vertices where it had none — it was the only deform bone in the rig
+with nothing bound to it, which is why the left front toe rode the ankle while the right rode its
+own toe bone.
+
+## [2026-08-31] defect | the birds' heads never pitched, and their feet never touched the perch
+
+Two silent faults under one session, both surfaced by the owner looking rather than by
+any check. **`CFrame.Angles(pitch, yaw, 0)` assumed the bone's local axes were the
+body's.** Measured on `MejiroBody`, pitch is slot **Z** on both neck bones: the pitch we
+wrote yawed the neck and rolled the head, the yaw rolled the neck, and the song's
+head-lift had never fired on any bird since they shipped. The two neck bones also yawed
+against each other (−body Y against +body Y), an S-bend that read as a side-to-side
+wobble — which I had spent a commit tuning `SING_STILLNESS` against, treating a broken
+axis as a damping problem. Owner: *"the head rotates (yaw) and tilts side to side (roll)
+but does NOT lift up it's beak (pitch) at all."* Nothing flagged it because a head that
+yaws when asked to pitch is still a moving head.
+
+**And `PivotOffset` is not the feet once a mesh is resized.** The mejiro is the uguisu's
+mesh scaled to 0.773; the mesh scaled, the pivot did not, and the two now seat 0.054
+studs apart on a byte-identical pivot — 15% of the mejiro's height. The comment
+justifying the pivot cited "feet land within 0.021 of the target", which was the uguisu's
+own residual accepted once and then generalised to every bird.
+
+⚠ **And the seat was still wrong after that.** The box bottom is the lowest toe *tip*, and the
+toes are modelled curled, so the pad the bird stands on is above them. Two seating models both
+measured correct — the second to within 0.004 studs — and both read as a sunk bird to the owner,
+because neither was solving for the pad. Settled the only way it could be: three identical mejiros
+on the rail at +0.00 / +0.05 / +0.10 studs, owner picked +0.05, giving
+`PERCH_CLEARANCE_FRAC = 0.078` of body length. Recorded in the source as the owner's eye, not a
+derivation. The owner also challenged the perch height itself, which was worth checking and turned
+out sound — a probe cube on the same raycast sat correctly, and the rail's profile is flat at
+127.598 across the bird's whole footprint, rising to 128.480 only at the curved tips.
+
+Both faults now read from the rig instead of assuming it: `BirdFlight.toBoneSpace` and
+`BirdFlight.footOffset` are pure (Lune has no `CFrame`), with `BirdRig` the Roblox half
+that resolves each bone's axes at spawn and seats by the rendered box bottom. Recorded in
+[[blender-pipeline]], including the trap that `Bone.WorldCFrame` reads back **unscaled**
+on a resized MeshPart and so cannot be used to find the feet. 1579 → 1588 tests.
+
+## [2026-08-31] ship | the mejiro is exported at its own size, and stops being a special case
+
+The perch seat was chased through three models in one session and the owner's eye rejected two
+that measured correct. What settled it was putting all three species on one plank at once:
+pivot-seating is exact on the karasu and 0.002 out on the uguisu, and **only the mejiro missed**,
+because it was the uguisu's MeshPart resized inside Studio — which scales the mesh and leaves the
+pivot data behind. It had been carrying a 0.0164 correction no other bird needed.
+
+Re-exported from `uguisu_authored.blend` at its own 0.640 nose-to-tail: data-level scale on meshes
+and armature, no re-centring, `textures=False`. Verified round-tripping with 21 bones on both
+halves and no materials. Its `seatNudge` is now the uguisu's −0.002, because it *is* the uguisu at
+0.773 — two birds, one measured number, no hack. A test now fails if any bird's nudge grows past a
+hair, which the old 0.0164 does.
+
+⚠ Owner ruling that drove this: *"we don't want one bird to be a hack."* Recipe for scaled siblings
+recorded in [[blender-pipeline]], along with the MCP trap that `import_scene.fbx` needs a full
+window override.
+
+
+## [2026-09-01] decision | Fireworks proving range spec approved; in-Play only, at FallsLanding
+
+Spec: docs/superpowers/specs/2026-09-01-proving-range-design.md. First of four
+fireworks sub-projects (range → vocabulary → handheld → distribution). Owner rulings
+folded in: review loop is IN-PLAY ONLY (an edit-mode/MCP proofing tier was offered and
+declined — the true runtime path every time); the yard sits on FallsLanding; rack
+labels are physical plaques, never BillboardGuis ("always floating strangely in
+screen space"). Drafts live in src/shared/FireworkDrafts.luau as families of
+variants, namespaced draft:family/variant, absent from the shared fixture so CI
+never prices a draft.
+
+## [2026-09-01] ship | Proving range working in Play; first session catches a shipped VFX bug
+
+Branch `proving-range` (12 commits, base 8ed22e5): drafts/schema/plan modules,
+Studio-gated remote, bridge racks (surveyed catenary: per-station dy + inward tilt),
+open-anywhere panel, night attribute gate. Owner rulings during the gate: 2"/4"/6"
+mortars (yonshakudama parked for later), racks on the suspension bridge + judging from
+FallsLanding, FiringPost/location-bound panel killed ("what's the point of a panel
+location…"). THE RANGE PAID FOR ITSELF IMMEDIATELY: every shipped burst since
+2026-08-05 was a flat vertical line (SpreadAngle/drag/fade lost between bench and
+controller) — caught at the range's first eye-level look, fixed in adaa1fe. Owner,
+end of session: night toggle works, ladder looks right, "a lot of comments in the
+morning… well done." NOT merged; comments pending. Place not yet saved/published.
+
+## [2026-09-02] gate | Proving range merged to main -- owner: "good for now"
+
+Fast-forward 8ed22e5..4967872 (13 commits), suite green on the merged result
+(1611). Range is live in the place (saved 2026-09-01). Next per program order:
+the VOCABULARY sub-project (new phase kinds; multi-break/sub-bursts, break
+geometries, the crisp round-dot texture upload the 2026-07-20 bench left open).
+
+## [2026-09-02] decision | Vocabulary wave-one spec approved: style-on-burst, glow stack, staged shells now
+
+Spec: docs/superpowers/specs/2026-09-02-fireworks-vocabulary-design.md. Owner
+decisions: styles ring/palm/strobe/kamuro (+peony default); both textures; done =
+styles + seed drafts (promotion stays per-shell); vibrancy in scope (LightInfluence
+0, per-style Brightness through the one Bloom, saturated authoring); audio in scope
+(87 files/573MB in Roshambo Reference/sound/fireworks, titles untrusted -> manifest
+triage, composite boom+tail clips per style). Load-bearing find: the schedule
+compiler already supports staged shells (points/scatter/share) -- staging is wave
+one via validation + seed drafts, no compiler change. Style is a burst FIELD, not a
+new kind; budget logic untouched.
+
+## [2026-09-04] gate | Vocabulary wave one gated live and merged -- the range did its job all week
+
+Owner iterated the whole vocabulary AT the range across 2026-09-03/04: caught the
+unreachable sprite textures (recipes pinned SPARKLE over the roles), the 15Hz
+TweenService chunking (fixed with per-frame bezier), upside-down and perpendicular
+streaks (VelocityParallel + rotation -90), launch-read failures (2s->3s flights,
+apex 60, trail 2.4s, muzzle flash), the glow stack (brightness vs color-over-life
+vs lightEmission-as-stacking-law), sound physics (preload, speed-of-sound delay,
+volume/rolloff), and hotaru's bespoke tail voice from the owner's OWN recording
+(cut, slowed by resample, canyon-echoed, low-shaved, phase-bound). Green/violet
+shape-trio families added on request. Owner: "pretty awesome. Let's merge."
+Next named: variation in the aerial burst sounds (the 4-clip pool is one recording).
+
+## [2026-09-04] ship | The kiku ships -- first shell promoted through the proving range
+
+Owner gate: "that's the one, ship v2 kiku." v2 (spread 38, glow 1.5) with the 30%
+boost distribution is now catalog id `kiku`, fixture-listed, priced 4 points behind
+a mortar S. v1/v3 pruned from drafts (this commit is their archive). The promotion
+pipeline worked exactly as the 2026-09-01 spec drew it: recipe move + one fixture
+line + one server ledger row, CI holding both sides.
+
+## [2026-09-04] defect | The promotion pipeline had an unguarded fourth step -- the shop's display tables
+
+The kiku shipped server-side (deployed, CI green) and silently missed the Hanabiya
+counter: ShopController hardcoded SHELL_ORDER/SHELL_NAME and renders only shells it
+can name. Display metadata moved to shared/ShellDisplay.luau with a spec holding it
+to the fixture -- the next forgotten shell is a CI failure, not an empty counter.
+The proving-range spec's "no new machinery" promotion claim corrected in place.
+
+## [2026-09-04] decision | Deck mortars spec approved -- default-first placeable gear
+
+Spec: docs/superpowers/specs/2026-09-04-deck-mortars-design.md. Owner rulings: owning
+a mortar puts it on the deck at a front-edge default immediately ("players shouldn't
+have to know how to place a mortar before they can use it"); one tube per owned tier
+(S/M/L staggered -- the deck shows the arsenal); gear exempt from the 24-decoration
+cap. Gear-requiring shells launch from the required tier's muzzle; firecracker stays
+hand-launched. Root cause it fixes: deck launches originated 6 studs above the
+player's head since the August build.
+
+## [2026-09-04] ship | Deck mortars merged and dev-deployed -- owner Play gate pending
+
+`bc82000..31dcd6f` (9 commits, fast-forward to main), SDD-executed from
+docs/superpowers/plans/2026-09-04-deck-mortars.md, ledger
+`.superpowers/sdd/2026-09-04-deck-mortars/progress.md`. Backend `mortarPlacements`
+(Mixed + markModified, validated PUT mirroring decorations), pure
+`MortarPlacement.luau` (front-edge defaults, clamp, teahouse nudge, muzzle math),
+server-built tubes in `TreatmentApplier:_buildMortars`, muzzle-true launches via
+shared `BuildingPlacer.resolveFit`, move-only editor flow. Two plan/reality
+corrections mid-execution: decorations render SERVER-side (plan's Task 5 assumed
+client-side; spec's visitor-visibility won) and the editor lives in
+DecorationController+MoveController (not BackDoorController). Final review caught
+pre-ship: stale rejoin fingerprint (invisible mortars on same-server rejoin -- the
+Play gate MUST include a same-server rejoin; fresh sessions can't surface it) and a
+muzzle deck-size mismatch on display-shrunk decks. SHELL_MORTAR joined the fixture
+CI gate -- gear-shell promotion is now a guarded FIFTH step (proving-range spec §5
+amended). Suites at merge: Lune 1649, Vitest 486, lint clean.
+
+## [2026-09-02] lint | Prose lint — the withdrawn karasu eye survived a lint-clean of its own page
+
+A prose-lint run opened 2026-08-31 against `ef63c65`; `main` moved ~120 commits under it before
+review, including `35cbb6a` — an independent lint-clean by another session that touched four of the
+same five files. What survived that overlap is the finding.
+
+⚠ **`world/familiars.md` STILL DESCRIBED THE WITHDRAWN `KarasuEyes` PART AS SHIPPING**, and a
+lint-clean pass over that very page did not catch it. Under a heading reading *"THE KARASU'S EYE
+IS PAINTED"* sat *"**Built, kept and now wired**… `BirdController` clones it, paints it from
+`BirdSpecies.eye`, and places it every frame"*, then a hundred lines on the rest pose, the frame
+ordering, the lid loft and the ring width. All withdrawn 2026-08-29: no eye mesh asset, no Rojo
+entry, `BirdController` carries a **DO NOT REINTRODUCE** comment, and
+`tests/BirdEyeConvention.spec.luau` fails on the names. ⚠ **The mechanical lint was green on that
+page throughout, and stayed green through a dedicated clean-up pass** — it cites a test file that
+exists and `BirdSpecies.eye`, whose leaf `eye` matches somewhere in every source tree. A citation
+check cannot tell a live claim from a dead one, and neither can a pass that only follows citations.
+Superseded per rule 2.
+
+⚠ **A RENAME IS NOT A CORRECTION.** `35cbb6a` folded `ART_SOURCES` into `OWNER_AUTHORED` on
+[[blender-working-rules]] and carried both of that section's false claims across intact: that the
+registry *"gained `karasu_authored.blend` and `karasu_body.fbx`"*, and that CI keeps `art/` and the
+registry in agreement. Neither holds — `OWNER_AUTHORED` is `{COLORMAP_AUTHORITY, AUTHORED_BLEND}`,
+`8d69da6` deleted the second CI step, and that commit's own message says the `karasu_body.fbx`
+entry is *"what made the guard refuse the very export the authored blend exists to produce"*. The
+symbol the lint could see was fixed; the sentence around it was not.
+
+⚠ **`world/fireworks.md` CITED AN SDD LEDGER THAT WAS NEVER CREATED** —
+`.superpowers/sdd/2026-09-04-deck-mortars/` does not exist, and no 2026-09 ledger does. The
+markdown under `.superpowers/sdd/` is tracked (the bare `*` ignore was narrowed 2026-08-27), so
+this is an absent ledger rather than an invisible one: the same shape as item 5's missing shoji
+ledger on [[friends-family-baseline]]. Recorded as absent rather than quietly dropped.
+
+**Also corrected on `familiars`:** a transcribed **326** perches forty lines above the page's own
+instruction to count them (rule 9); the wingspan carried as `⚠ unverified` in two places after a
+third paragraph declared it verified; the "Import verified 2026-08-26" note, superseded by the
+2026-08-29 PBR re-import; and `watchWingbeat`'s mode list, which omitted PERCH and told the reader
+to run in Edit, where PERCH deliberately refuses.
+
+**Dropped as already fixed on `main`:** the four `fix` → `defect` log kinds and two dateless
+headers, the two `bpy` API symbol exemptions, and the `SPECIES = "Uguisu"` claim (now
+*"currently `Karasu`"*). Found independently by both passes within a day of each other.
+
+⚠ **THREE PAGES CARRY A FUTURE `updated:` — reported, not changed.** `fireworks`, `familiars` and
+`blender-working-rules` are stamped **2026-09-04** while the newest commit on `main` is dated
+2026-09-01. A stamp ahead of today silences check 9 (cited code committed after `updated:`) until
+that date arrives, so those three are immune to the staleness prompt for two days. Rule 10 made
+staleness blocking; a future date is a way past it, whether or not anyone meant it as one.
+
+**Read at depth (19 shelf pages + index, schema and this file):** `familiars`, `ambient-birds`,
+`blender-working-rules`, `blender-pipeline`, `core-loop`, `world-throw`, `round-and-hud`,
+`status-display`, `rojo-meshpart-rbxm`, `parallel-threads`, `duplicated-server-constants`,
 `material-and-mesh-traps`, `replication-races`, `visible-is-not-pixels`, `toolbox-backdoor-scan`,
 `image-moderation`, `misc-engine-traps`, `falls-dock`, `friends-family-baseline`.
 
-⚠ **NOT READ THIS RUN — 37 pages, and no claim is made about them.** All of `systems/`; the rest
-of `program/` (`item-4-merchant-row`, `parked-defects`, `backlog`); 15 `world/` pages (`canyon`,
-`arena-square`, `bell-engine`, `hanabiya`, `chaya`, `fireworks`, `day-night`,
-`viewing-platform`, `stats-room`, `switchback-deck`, `paths`, `teahouses`, `foliage`,
-`water-audio`, `place-state`); and 15 `practice/` pages. Next run should start there.
+⚠ **NOT READ — 37 pages, and no claim is made about them.** All of `systems/`; the rest of
+`program/`; 15 `world/` pages (`canyon`, `arena-square`, `bell-engine`, `hanabiya`, `chaya`,
+`fireworks`, `day-night`, `viewing-platform`, `stats-room`, `switchback-deck`, `paths`,
+`teahouses`, `foliage`, `water-audio`, `place-state`); 15 `practice/` pages. ⚠ **`fireworks` and
+`parked-defects` changed heavily in the commits this branch merged and were NOT re-read** — only
+the one dead citation above was fixed on `fireworks`. Start there next run.
 
 ⚠ **`falls-dock` and `blender-pipeline` were read and deliberately NOT stamped `checked:`.**
-`falls-dock` rests on emitter positions, a place-only `UguisuScheduler` Script and asset ids that
-only Studio can confirm; `blender-pipeline` still teaches the plane bisect as the way to split a
-bill, which owner ruling 2026-08-30 retired, and does not carry the `holes_fill` fan-vertex
-finding that made the cut unnecessary. Both want the owner.
+`falls-dock` rests on emitter positions, a place-only `UguisuScheduler` Script and asset ids only
+Studio can confirm; `blender-pipeline` still teaches the plane bisect for splitting a bill, which
+owner ruling 2026-08-30 retired, and lacks the `holes_fill` fan-vertex finding that made the cut
+unnecessary. Both want the owner.
+
+⚠ **AND ONE STAMP WAS WITHDRAWN RATHER THAN LEFT.** [[ambient-birds]] was read end to end and
+stamped `checked: 2026-08-31`; `main` then shipped the mejiro and the hiyodori, so its *"Two
+species built, one reachable"* is now wrong — `BirdSpecies.SPECIES` carries four. The stamp was
+removed rather than carried forward: it was honest on the day and is not honest now, and the page
+needs a re-read against the two new species rather than a one-word patch, because its whole
+"species list — started 2026-08-30" section plans as FUTURE the birds that have since shipped.
+
+⚠ **THE CURRENCY CHECK COULD NOT HAVE CAUGHT THAT, AND THE REASON GENERALISES.** That page cites
+its modules by bare name — `` `BirdController.client.luau` ``, `` `BirdFlight` ``, `` `BirdSpecies` ``
+— and never as a repo PATH, so `CITE_RE` matches nothing on it and checks 8 and 9 have no anchor to
+fire from. **A page with no path citation is exempt from every currency check by construction**, and
+it is exempt silently. The pages most worth watching are the architectural ones, which are exactly
+the ones that name modules rather than paths.

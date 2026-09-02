@@ -235,6 +235,139 @@ function BirdFlight.gapeAt(elapsed: number, caws: { number }, open: number): num
     return best
 end
 
+-- ⚠ THE OTHER HALF OF THE GAPE, FOR BIRDS THAT DO NOT PUNCTUATE. `gapeAt` above takes a list of
+-- ONSETS and opens the beak for a fixed window at each, which describes a karasu exactly: two or
+-- three caws of 0.18-0.24s separated by 0.775s of silence. It describes a mejiro not at all --
+-- its 5.3s clip is voiced 46% of its own length in a continuous warble, and there is no honest
+-- place to put an onset in a run of sound.
+--
+-- ⚠ SO THE ENVELOPE IS THE DESCRIPTION, AND IT IS MEASURED. `tools/audio/measure_envelope.py`
+-- reads the loudness off the source WAV at `BirdSpecies.ENV_HZ`, smoothed to something a jaw can
+-- actually follow and normalised by a high percentile rather than the peak -- peak-normalising
+-- left the mejiro's mean gape at 0.25 and the bird mumbled through its own song.
+--
+-- ⚠ IT INTERPOLATES RATHER THAN STEPPING. Reading the nearest sample would tick the jaw at the
+-- storage rate, which is a buzz at 12 Hz, not a mouth.
+--
+-- ⚠ AND IT IS SHUT OUTSIDE THE CLIP. `sing` clears the song on `Ended`, but a frame can land
+-- between the audio finishing and that firing, and a beak parked open is worse than a late one.
+function BirdFlight.gapeFromEnvelope(elapsed: number, env: { number }, hz: number): number
+    -- Refused, not clamped -- the same contract as `profile` and `gapeAt`. A zero rate is a
+    -- division, and NaN surfaces frames later as a jaw that has vanished.
+    if not (hz > 0) or hz ~= hz or hz == math.huge then
+        error(`BirdFlight.gapeFromEnvelope: hz must be a positive finite number, got {hz}`, 2)
+    end
+    local n = #env
+    if n == 0 or elapsed < 0 then
+        return 0
+    end
+    local x = elapsed * hz -- position in samples, measured from the clip's start
+    local last = n - 1
+    if x > last then
+        return 0
+    end
+    local i = math.floor(x)
+    local a = env[i + 1]
+    local b = env[math.min(i + 2, n)]
+    return a + (b - a) * (x - i)
+end
+
+-- ⚠ ONE PLACE DECIDES WHICH DESCRIPTION A CLIP CARRIES. Two callers have to turn a clip plus a
+-- playhead into a gape -- `BirdController` and `watchWingbeat`'s PERCH mode -- and when they each
+-- did it themselves they diverged: PERCH implemented only the `caws` branch, so the mejiro sang
+-- in the diagnostic tool with nothing moving, which reads as a broken feature rather than an
+-- incomplete tool. A shared function is the whole fix.
+--
+-- ⚠ ONSETS WIN IF A CLIP SOMEHOW CARRIES BOTH. The contract test forbids it; this is what
+-- happens anyway rather than an error, because a bird that sings wrongly beats a bird that
+-- throws mid-song.
+function BirdFlight.gapeForClip(
+    elapsed: number,
+    caws: { number }?,
+    env: { number }?,
+    open: number,
+    hz: number
+): number
+    if caws then
+        return BirdFlight.gapeAt(elapsed, caws, open)
+    elseif env then
+        return BirdFlight.gapeFromEnvelope(elapsed, env, hz)
+    end
+    return 0
+end
+
+-- ⚠ WHAT SINGING LOOKS LIKE ON A BIRD TOO SMALL FOR A GAPE TO READ, in degrees for the neck and
+-- the head. A 20 degree jaw is 6.8 pixels on a karasu at ordinary third-person distance and 2.6
+-- on a mejiro, so the POSTURE carries it: a small bird throws its head back to sing.
+--
+-- ⚠ THE NECK LEADS, as it does in the idle pose -- splitting the lift across two joints is what
+-- makes the bird arch rather than hinge at one point. Returns both so no caller has to know the
+-- split, which is the mistake this pair of functions exists to prevent.
+--
+-- ⚠ TAKES ITS NUMBERS RATHER THAN READING `BirdSpecies`, like `gapeAt` takes `open`. This module
+-- is motion and that one is data; a require from here to there would invert that and would put a
+-- Roblox-free module behind a table of asset ids for no gain.
+-- ⚠ AND IT RETURNS A THIRD VALUE: HOW MUCH IDLE MOTION TO KEEP. The first version added the lift
+-- on top of the idle pose and read as a head wobble rather than a song (owner, 2026-08-31),
+-- because the bird carried on glancing about while it sang and the two motions were
+-- indistinguishable. A bird that is singing holds still and sings. `stillness` is how much of the
+-- look-around to remove at full gape; callers multiply their idle angles by the returned scale.
+
+export type Basis = { { number } }
+
+-- ⚠ WHICH WAY IS UP FOR THIS BONE. `CFrame.Angles(pitch, yaw, 0)` is only pitch and yaw if the
+-- bone's local axes happen to be the body's, and on the uguisu/mejiro rig they are not: pitch
+-- lives in slot Z on both neck bones, and the neck's yaw is slot X INVERTED against the head's
+-- slot Y. Writing Euler slots by hand turned the song's head-lift into a sideways S-bend.
+--
+-- `basis` is the bone's local X, Y and Z axes each written in BODY space; `want` is a direction in
+-- body space. The result is that direction in the bone's own space, ready for `fromAxisAngle`.
+-- Both frames are orthonormal, so the change of basis is three dot products -- the transpose is
+-- the inverse.
+--
+-- ⚠ READ FROM THE RIG AT SPAWN, NEVER HARDCODED. More birds are coming and nothing promises the
+-- next armature is built like this one.
+function BirdFlight.toBoneSpace(basis: Basis, want: { number }): (number, number, number)
+    local function dot(a: { number }): number
+        return a[1] * want[1] + a[2] * want[2] + a[3] * want[3]
+    end
+    return dot(basis[1]), dot(basis[2]), dot(basis[3])
+end
+
+-- ⚠ IS THE BIRD SINGING AT ALL -- a flat 1 across the phrase, ramped at both ends. NOT the gape.
+-- Damping the look-around by the gape modulated it at `ENV_HZ`, twelve times a second, which is
+-- a wobble generator rather than a bird settling. A bird settles when it begins to sing and stays
+-- settled until it stops.
+--
+-- ⚠ STATELESS, DERIVED FROM THE PLAYHEAD. A smoothed per-bird flag would need memory that can
+-- drift out of step with the audio; the clip's own position cannot.
+function BirdFlight.songGate(elapsed: number, length: number, ramp: number): number
+    if elapsed < 0 or elapsed > length or length <= 0 then
+        return 0
+    end
+    if ramp <= 0 then
+        return 1
+    end
+    local rise = smoothstep(0, math.min(ramp, length * 0.5), elapsed)
+    local fall = 1 - smoothstep(length - math.min(ramp, length * 0.5), length, elapsed)
+    return math.min(rise, fall)
+end
+
+function BirdFlight.singLift(
+    gape: number,
+    deg: number,
+    neckFrac: number,
+    stillness: number,
+    gate: number
+): (number, number, number)
+    local total = deg * gape
+    local neck = total * neckFrac
+    -- ⚠ THE GATE DAMPS, THE GAPE LIFTS. They are different signals on purpose: the lift should
+    -- follow the syllables and the settling should not.
+    local idleScale = math.max(0, 1 - stillness * gate)
+    return neck, total - neck, idleScale
+end
+
 function BirdFlight.profile(scale: number): Profile
     -- ⚠ REFUSED, not clamped. A zero or negative scale makes every duration zero and every
     -- clock a division by zero, and NaN positions surface frames later as "the bird vanished" --

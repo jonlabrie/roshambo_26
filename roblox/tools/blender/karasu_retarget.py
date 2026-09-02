@@ -2235,11 +2235,11 @@ def assert_writable(path):
             f"OWNER_AUTHORED deliberately, which is a decision and should look like one.")
     return path
 
-# The derived PBR channels that ship with it. ⚠ ALL OR NOTHING -- a partial set renders WORSE than
-# none (practice/material-and-mesh-traps.md §8): Roblox substitutes its own defaults for whatever
-# is missing and a ColorMap-only SurfaceAppearance comes out warm and shiny.
-PBR_MAPS = {"roughness": "karasu_roughness.png", "normal": "karasu_normal.png",
-            "metalness": "karasu_metalness.png"}
+# ⚠ PBR is ALL OR NOTHING -- a partial set renders WORSE than none
+# (practice/material-and-mesh-traps.md §8): Roblox substitutes its own defaults for whatever is
+# missing and a ColorMap-only SurfaceAppearance comes out warm and shiny. (A PBR_MAPS constant
+# naming the files sat here unused from 2026-08-30 to 2026-09-04; the warning is the part that
+# earns its keep.)
 
 LAST_TRANSFORM = None       # (uniform scale, translation) applied by normalise_size
 
@@ -2292,7 +2292,31 @@ def landmarks_final(spec=KARASU):
             "scale": round(S, 6), "translate": [round(v, 5) for v in T]}
 
 
-def export(part, filepath):
+def rig_of(part):
+    """The armature that actually deforms `part`, read off its modifier rather than typed.
+
+    ⚠ THIS EXISTS BECAUSE THE PIPELINE HARDCODED `Karasu_Rig` IN NINE PLACES, and the uguisu --
+    whose retarget was never a script (practice/blender-pipeline.md) -- could not use any of it.
+    With more birds coming, a rig NAME is the wrong thing to pass around: the object already
+    knows which armature deforms it, and reading it back cannot be typed wrong.
+
+    ⚠ FIRST USE ON A SECOND BIRD FOUND A DEFECT NO NAMED RIG WOULD HAVE. `UguisuWings` carried
+    every weight TWICE -- once at its own group indices 0-3 and once at 17-20, where those bones
+    sit in `Uguisu_R`, the object it was separated from. 832 stale entries across all 416
+    vertices, summing every vertex to 2.0. `normalise_weights` reported it clean because it
+    filters to groups NAMED after deform bones, and the stale entries name nothing. Cleaned by
+    rebuilding the deform layer against the declared groups.
+    """
+    obj = bpy.data.objects[part] if isinstance(part, str) else part
+    for m in obj.modifiers:
+        if m.type == 'ARMATURE' and m.object:
+            return m.object
+    raise RuntimeError(
+        f"{obj.name} has no armature modifier, so nothing can say which rig deforms it. "
+        f"An unrigged mesh exports as a static one and the import SUCCEEDS with no bones.")
+
+
+def export(part, filepath, arm=None, textures=True):
     """One FBX per MeshPart, BOTH around the same origin and carrying the SAME rig.
 
     ⚠ Export both halves seated on the SAME origin or they mate with an offset that looks like a
@@ -2301,8 +2325,21 @@ def export(part, filepath):
     reimport with an identical 22-bone armature at identical loc/rot/scale).
     """
     assert_writable(filepath)
-    arm = bpy.data.objects["Karasu_Rig"]
+    # ⚠ DERIVED, NOT NAMED. Passing `arm` is for the rare case of exporting a mesh whose modifier
+    # points somewhere you do not want; every ordinary call should let it be read off the mesh.
+    arm = arm or rig_of(part)
     scene = bpy.context.scene
+    # ⚠ `textures=False` FOR A MESH TWO BIRDS SHARE. `path_mode='COPY'` copies whatever material
+    # the object happens to be wearing into the FBX's .fbm folder, and the Studio importer offers
+    # it as a TextureID. That is convenient for a bird that owns its mesh and actively wrong for
+    # one that does not: the uguisu and mejiro are the same geometry with different paint, so an
+    # FBX carrying either is a trap. It shipped the MEJIRO's colormap inside `uguisu_body.fbm`
+    # once, and the owner caught it in the import dialog. Bare geometry, paint set in Studio.
+    stripped = {}
+    if not textures:
+        po = bpy.data.objects[part] if isinstance(part, str) else part
+        stripped[po] = [sl.material for sl in po.material_slots]
+        po.data.materials.clear()
     others = [o for o in bpy.data.objects
               if o.type == 'MESH' and o.name != part and o.name in scene.collection.all_objects]
     holders = {}
@@ -2349,6 +2386,9 @@ def export(part, filepath):
                 path_mode='COPY', embed_textures=False,
                 axis_forward='-Z', axis_up='Y')
     finally:
+        for po, mats in stripped.items():
+            for m in mats:
+                po.data.materials.append(m)
         arm.rotation_euler = prev
         for o, cs in holders.items():
             for c in cs:

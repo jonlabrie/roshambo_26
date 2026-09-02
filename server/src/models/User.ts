@@ -64,6 +64,7 @@ export interface IUser extends Document {
     deckDecorations: { id: number; propId: string; offset: [number, number]; facing: 'N' | 'E' | 'S' | 'W' }[];
     fireworks: Map<string, number>;
     mortars: string[];
+    mortarPlacements: Record<string, { offset: [number, number]; facing: 'N' | 'E' | 'S' | 'W' }>;
     teahouseAccess: { mode: 'public' | 'friends' | 'private'; invited: number[] };
     updatedAt: Date;
 }
@@ -117,6 +118,7 @@ const UserSchema: Schema = new Schema({
     // loses a launch, not just points.
     fireworks: { type: Map, of: Number, default: {} },
     mortars: { type: [String], default: [] },
+    mortarPlacements: { type: Schema.Types.Mixed, default: {} },
     teahouseAccess: {
         type: { mode: { type: String, enum: ['public', 'friends', 'private'], default: 'public' }, invited: { type: [Number], default: [] } },
         default: () => ({ mode: 'public', invited: [] }),

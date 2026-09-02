@@ -170,6 +170,32 @@ export function validatePadPreferences(value: unknown): Check {
     return { ok: true };
 }
 
+export function validateMortarPlacements(value: unknown, owned: string[]): Check {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+        return { ok: false, error: 'MORTAR_PLACEMENTS_NOT_OBJECT' };
+    }
+    const ownedSet = new Set(owned);
+    for (const [id, p] of Object.entries(value as Record<string, unknown>)) {
+        if (!ownedSet.has(id)) return { ok: false, error: 'MORTAR_NOT_OWNED' };
+        if (typeof p !== 'object' || p === null) return { ok: false, error: 'PLACEMENT_NOT_OBJECT' };
+        const obj = p as Record<string, unknown>;
+        for (const k of Object.keys(obj)) {
+            if (k !== 'offset' && k !== 'facing') return { ok: false, error: 'BAD_PLACEMENT' };
+        }
+        const { offset, facing } = obj as { offset?: unknown; facing?: unknown };
+        if (!Array.isArray(offset) || offset.length !== 2) return { ok: false, error: 'BAD_OFFSET' };
+        for (const n of offset) {
+            if (typeof n !== 'number' || !Number.isFinite(n) || Math.abs(n) > MAX_PLACEMENT_OFFSET) {
+                return { ok: false, error: 'BAD_OFFSET' };
+            }
+        }
+        if (typeof facing !== 'string' || !PLACEMENT_FACINGS.has(facing)) {
+            return { ok: false, error: 'BAD_FACING' };
+        }
+    }
+    return { ok: true };
+}
+
 export function validateAccess(value: unknown): Check {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
         return { ok: false, error: 'BAD_ACCESS' };

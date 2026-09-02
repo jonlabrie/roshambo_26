@@ -363,6 +363,31 @@ describe("NetworkClient.setTeahouse", function()
     end)
 end)
 
+describe("NetworkClient.putMortarPlacements", function()
+    test("PUTs the placements map to /mortar-placements and returns the echo", function()
+        local f = makeDeps({
+            { ok = true, statusCode = 200, body = '{"mortarPlacements":{"T06":{"tier":1}}}' },
+        })
+        local net = NetworkClient.new(CONFIG, f.deps)
+        local res = net:putMortarPlacements("9", { T06 = { tier = 1 } })
+        expect(res.ok).toBe(true)
+        expect(res.data.mortarPlacements.T06.tier).toBe(1)
+        expect(f.calls[1].method).toBe("PUT")
+        expect(f.calls[1].url).toBe("http://x/api/v1/players/9/mortar-placements")
+        local sent = serde.decode("json", f.calls[1].body :: string)
+        expect(sent.placements.T06.tier).toBe(1)
+    end)
+
+    test("surfaces a 400 BAD_REQUEST fail-fast", function()
+        local f = makeDeps({ { ok = true, statusCode = 400, body = '{"error":"BAD_REQUEST"}' } })
+        local net = NetworkClient.new(CONFIG, f.deps)
+        local res = net:putMortarPlacements("9", { T06 = { tier = 1 } })
+        expect(res.ok).toBe(false)
+        expect(res.error).toBe("BAD_REQUEST")
+        expect(#f.calls).toBe(1)
+    end)
+end)
+
 describe("NetworkClient.getEconomy + postPurchase", function()
     test("getEconomy GETs the economy path and decodes it", function()
         local f = makeDeps({

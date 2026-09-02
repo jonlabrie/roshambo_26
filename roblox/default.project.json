@@ -13,7 +13,11 @@
                 "UguisuBody": { "$path": "assets/meshes/UguisuBody.rbxm" },
                 "UguisuWings": { "$path": "assets/meshes/UguisuWings.rbxm" },
                 "KarasuBody": { "$path": "assets/meshes/KarasuBody.rbxm" },
-                "KarasuWings": { "$path": "assets/meshes/KarasuWings.rbxm" }
+                "KarasuWings": { "$path": "assets/meshes/KarasuWings.rbxm" },
+                "MejiroBody": { "$path": "assets/meshes/MejiroBody.rbxm" },
+                "MejiroWings": { "$path": "assets/meshes/MejiroWings.rbxm" },
+                "HiyodoriBody": { "$path": "assets/meshes/HiyodoriBody.rbxm" },
+                "HiyodoriWings": { "$path": "assets/meshes/HiyodoriWings.rbxm" }
             },
             "RoshamboRemotes": {
                 "$className": "Folder",
@@ -31,6 +35,7 @@
                 "RequestFireworkLaunch": { "$className": "RemoteEvent" },
                 "FireworkLaunched": { "$className": "RemoteEvent" },
                 "FireworkState": { "$className": "RemoteEvent" },
+                "RequestProvingFire": { "$className": "RemoteEvent" },
                 "SetPadPreference": { "$className": "RemoteEvent" },
                 "PreferenceState": { "$className": "RemoteEvent" },
                 "SetBackDoor": { "$className": "RemoteEvent" },
@@ -42,6 +47,7 @@
                 "SetDisplay": { "$className": "RemoteEvent" },
                 "SetPlacement": { "$className": "RemoteEvent" },
                 "SetDecorationPlacement": { "$className": "RemoteEvent" },
+                "SetMortarPlacement": { "$className": "RemoteEvent" },
                 "SetDecorationRemove": { "$className": "RemoteEvent" },
                 "DecorationPlaced": { "$className": "RemoteEvent" },
                 "SetAccess": { "$className": "RemoteEvent" },
@@ -69,6 +75,7 @@
                 "Overlook": { "$path": "assets/Overlook.model.json" },
                 "SwitchbackDeck": { "$path": "assets/SwitchbackDeck.model.json" },
                 "FallsDock": { "$path": "assets/FallsDock.model.json" },
+                "ProvingGround": { "$path": "assets/ProvingGround.model.json" },
                 "Karesansui": { "$path": "assets/Karesansui.model.json" },
                 "Hanabiya": { "$path": "assets/Hanabiya.model.json" },
                 "MachiyaApparel": { "$path": "assets/MachiyaApparel.model.json" },

@@ -37,6 +37,14 @@ jobs:
             exit 1
           fi
           echo "OK — art/ holds no derived files."
+      - name: Bird palette / shader contracts
+        working-directory: ${{ github.workspace }}/roblox
+        run: |
+          # Runs the real shaders over the real palettes with bpy stubbed -- a palette missing a
+          # key its shader reads, or a species naming a shader that does not exist, otherwise
+          # fails deep inside a bake on whichever bird someone happened to be working on.
+          python3 -m pip install --quiet numpy
+          python3 tools/blender/test_bake_contracts.py
       - name: Install Rokit
         run: |
           curl -sSf https://raw.githubusercontent.com/rojo-rbx/rokit/main/scripts/install.sh | bash

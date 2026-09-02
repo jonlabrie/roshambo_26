@@ -54,6 +54,7 @@ local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local HudModel = require(shared:WaitForChild("HudModel"))
 local HudLayout = require(shared:WaitForChild("HudLayout"))
 local Glyphs = require(shared:WaitForChild("Glyphs"))
+local ShellDisplay = require(shared:WaitForChild("ShellDisplay"))
 local RollingNumber = require(shared:WaitForChild("RollingNumber"))
 local RingTimer = require(shared:WaitForChild("RingTimer"))
 local RevealBeat = require(shared:WaitForChild("RevealBeat"))
@@ -1582,6 +1583,9 @@ end)
 local CollectionService = game:GetService("CollectionService")
 local SITE_RADIUS = 24
 local atLaunchSite = false
+-- The player's own deck-site (from FireworkState via the aux publish) — the engawa is a
+-- launch site too, and the affordance must say so (owner, 2026-09-04).
+local deckSitePos: Vector3? = nil
 
 -- Polled rather than checked per frame: the answer changes at walking pace and this runs on phones.
 task.spawn(function()
@@ -1600,19 +1604,21 @@ task.spawn(function()
                     end
                 end
             end
+            if not near and deckSitePos then
+                local d = deckSitePos - root.Position
+                near = d.X * d.X + d.Z * d.Z <= SITE_RADIUS * SITE_RADIUS
+            end
         end
         atLaunchSite = near
         task.wait(0.5)
     end
 end)
 
-local SHELL_ORDER = { "firecracker", "peony", "willow", "ishibana" }
-local SHELL_NAME: { [string]: string } = {
-    firecracker = "Firecracker",
-    peony = "Peony",
-    willow = "Willow",
-    ishibana = "Ishibana",
-}
+-- Display names/order from shared/ShellDisplay.luau (2026-09-04) — this file held the
+-- SECOND hardcoded copy of these tables, found the same day the shop's copy hid the
+-- freshly shipped kiku. ShellDisplay's spec holds the one copy to the fixture.
+local SHELL_ORDER = ShellDisplay.ORDER
+local SHELL_NAME = ShellDisplay.NAME
 -- Reasons arrive as symbols from the server and are turned into copy HERE. An unmapped reason falls
 -- back to the symbol rather than to an empty label: a player seeing "NEEDS_MORTAR_XL" learns
 -- something; a player seeing a blank row learns nothing and reports a bug that is really a typo.
@@ -1913,6 +1919,7 @@ local function render(inputs: any, aux: any)
 
     -- The picker is the only HUD element gated on WHERE the player is standing. Everything else in
     -- this cluster is about the round; this is about the ground under their feet.
+    deckSitePos = aux.deckSite
     local canLaunch = atLaunchSite and aux.fireworkShells ~= nil
     fireworkButton.Visible = canLaunch
     if not canLaunch then

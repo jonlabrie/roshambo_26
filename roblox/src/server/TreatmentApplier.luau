@@ -31,10 +31,11 @@ export type Deps = {
     decorationLayout: any, -- pure DecorationLayout.resolve
     decorationCatalog: any, -- DecorationCatalog (footprint pure; build is Roblox-only)
     kamonDraw: any, -- KamonDraw: CLOTH/INK + draw(gui, crest, cellPx). Renderer, not chooser.
+    mortarPlacement: any, -- pure MortarPlacement: TUBE/MORTAR_ORDER/resolve (placement decisions live THERE, not here)
 }
 
 function TreatmentApplier.new(deps: Deps)
-    return setmetatable({
+    local self = setmetatable({
         _c = deps.container,
         _padBuilder = deps.padBuilder,
         _structureBuilder = deps.structureBuilder,
@@ -47,8 +48,24 @@ function TreatmentApplier.new(deps: Deps)
         _decorationLayout = deps.decorationLayout,
         _decorationCatalog = deps.decorationCatalog,
         _kamonDraw = deps.kamonDraw,
+        _mortarPlacement = deps.mortarPlacement,
         _folders = {} :: { [string]: Folder },
+        _tubeTemplates = {} :: { [string]: BasePart },
     }, TreatmentApplier)
+    -- Hollow-tube templates: one SubtractAsync per tier, built ONCE here and cloned in the
+    -- rebuild path (which stays yield-free). ⚠ DEFERRED, never inline: SubtractAsync yields,
+    -- and a yield inside new() -- which runs mid-bootstrap in main.server.luau -- let the
+    -- player's join fire before the PlayerAdded handlers were connected (2026-09-04 owner
+    -- gate: "no data from the server... have no teahouse"; the join was simply missed, since
+    -- those handlers have no catch-up loop for players already present). Any build that races
+    -- the templates gets the solid-cylinder fallback and self-heals on the next rebuild.
+    -- Guarded: padOccupancyPreview constructs without mortarPlacement and previews no mortars.
+    if deps.mortarPlacement ~= nil then
+        task.spawn(function()
+            self:_initTubeTemplates()
+        end)
+    end
+    return self
 end
 
 function TreatmentApplier:_folder(padId: string): Folder
@@ -101,25 +118,17 @@ function TreatmentApplier:_buildBuilding(
     local deckFP = self._sizeClasses.placementBounds(deckSize)
     local buildingFP = self._sizeClasses.buildingFootprint(teahouse.size)
     -- B4: clamp the SAVED placement into this deck at render time (stored values never change;
-    -- a display-shrunk deck slides the building minimally back into bounds). fits() stays only
-    -- as a last-ditch guard for pathological data.
-    local placement = self._buildingPlacer.clamp(buildingFP, deckFP, teahouse.placement)
-    if not self._buildingPlacer.fits(buildingFP, deckFP, placement) then
-        -- a persisted facing can stop fitting when the deck display shrinks (e.g. an L teahouse
-        -- facing E/W on its own L deck, post-shrink); teahouse <= deck guarantees the N facing
-        -- always fits, so fall back to it once (same offset, re-clamped) rather than vanishing
-        -- the building. Only if even THAT fails (pathological data) do we skip to deck-only.
-        placement = self._buildingPlacer.clamp(
-            buildingFP,
-            deckFP,
-            { offset = teahouse.placement.offset, facing = "N" }
+    -- a display-shrunk deck slides the building minimally back into bounds), falling back to
+    -- N-facing once if the requested facing still doesn't fit after clamping. Extracted to
+    -- BuildingPlacer.resolveFit (pure, Lune-tested) so muzzleOriginFor's mortar math resolves
+    -- the SAME footprint from the SAME stored placement — the rendered teahouse and the muzzle
+    -- origin can never drift onto two different footprints for one deck.
+    local placement = self._buildingPlacer.resolveFit(buildingFP, deckFP, teahouse.placement)
+    if placement == nil then
+        warn(
+            `[D.6] {padId}: {teahouse.size} building does not fit the {deckSize} deck at its placement; deck only`
         )
-        if not self._buildingPlacer.fits(buildingFP, deckFP, placement) then
-            warn(
-                `[D.6] {padId}: {teahouse.size} building does not fit the {deckSize} deck at its placement; deck only`
-            )
-            return nil
-        end
+        return nil
     end
     -- world pivot = deck CFrame composed with the local placement transform (offset + facing)
     local deckCF = CFrame.new(table.unpack(deckCF12))
@@ -179,6 +188,178 @@ function TreatmentApplier:_buildDecorations(
         model:SetAttribute("padId", padId)
         model:SetAttribute("propId", r.propId)
         model:AddTag("Decoration")
+        model.Parent = staging
+    end
+end
+
+-- ===== MORTARS — one tube per owned tier, rendered like a decoration =====
+-- A mortar is an EMPTY tube (owner, 2026-09-04 gate — a faked dark-disc "bore" was rejected
+-- twice): real hollow geometry via one SubtractAsync per tier at construction time, cached and
+-- CLONED per deck so the rebuild path never runs CSG and never yields. Built INLINE here (not
+-- via an injected catalog) the same way _buildNobori/_buildPortalControl are: one fixed shape
+-- per tier, not a chooseable prop list.
+local MORTAR_BASE_COLOR = Color3.fromRGB(216, 214, 206)
+local MORTAR_TUBE_COLOR = Color3.fromRGB(58, 60, 66)
+-- The bore is the INNER diameter (owner nb, 2026-09-04): the 2"/4"/6" void is TUBE.bore, with
+-- the wall AROUND it. (The proving-range racks draw outer = bore — a hair undersized under
+-- this ruling; parked, not touched here.)
+local MORTAR_WALL = 0.06
+local MORTAR_BREECH = 0.12 -- solid floor left at the bottom of the bore
+-- Must match MortarPlacement's own (unexported) BASE_TOP: muzzleWorld assumes the tube's local
+-- top sits at exactly BASE_TOP + tube.length above the deck.
+local MORTAR_BASE_TOP = 0.5
+
+local function mortarPart(name: string, size: Vector3, color: Color3, material: Enum.Material): BasePart
+    local p = Instance.new("Part")
+    p.Name = name
+    p.Size = size
+    p.Color = color
+    p.Material = material
+    p.Anchored = true
+    p.CanCollide = false
+    p.CanQuery = false
+    p.CanTouch = false
+    return p
+end
+
+-- One-time hollow-tube template for a tier: outer cylinder minus a bore-deep void, leaving
+-- MORTAR_BREECH of floor. CSG requires DataModel-linked parts, so the temporaries pass through
+-- `container`; the result is unparented and held as a clone source. Returns nil on CSG failure
+-- (the caller falls back to a solid cylinder — a deck must never blank over a CSG hiccup).
+local function hollowTubeTemplate(container: Instance, tube: { bore: number, length: number }): BasePart?
+    local outer = mortarPart(
+        "Tube",
+        Vector3.new(tube.length, tube.bore + MORTAR_WALL * 2, tube.bore + MORTAR_WALL * 2),
+        MORTAR_TUBE_COLOR,
+        Enum.Material.Metal
+    )
+    outer.Shape = Enum.PartType.Cylinder
+    outer.CFrame = CFrame.new(0, -500, 0) -- out of sight for the one boot-time subtract
+    outer.Parent = container
+    local depth = tube.length - MORTAR_BREECH
+    local inner =
+        mortarPart("Void", Vector3.new(depth, tube.bore, tube.bore), MORTAR_TUBE_COLOR, Enum.Material.Metal)
+    inner.Shape = Enum.PartType.Cylinder
+    -- the void opens at the muzzle end (+X of the cylinder axis), poking slightly past the rim
+    inner.CFrame = outer.CFrame * CFrame.new((tube.length - depth) / 2 + 0.01, 0, 0)
+    inner.Parent = container
+    local ok, union = pcall(function()
+        return outer:SubtractAsync({ inner })
+    end)
+    inner:Destroy()
+    outer:Destroy()
+    if not ok or union == nil then
+        warn(`[MORTAR] hollow-tube CSG failed ({tostring(union)}); solid-cylinder fallback`)
+        return nil
+    end
+    union.Name = "Tube"
+    union.UsePartColor = true
+    union.Color = MORTAR_TUBE_COLOR
+    union.Anchored = true
+    union.CanCollide = false
+    union.CanQuery = false
+    union.CanTouch = false
+    union.Parent = nil
+    return union
+end
+
+function TreatmentApplier:_initTubeTemplates()
+    for _, mortarId in self._mortarPlacement.MORTAR_ORDER do
+        local tube = self._mortarPlacement.TUBE[mortarId]
+        if tube then
+            self._tubeTemplates[mortarId] = hollowTubeTemplate(self._c, tube)
+        end
+    end
+end
+
+local function buildMortarModel(
+    mortarId: string,
+    tube: { bore: number, length: number },
+    template: BasePart?
+): Model?
+    local tier = mortarId:match("^mortar:(%u)$")
+    if tier == nil then
+        return nil
+    end
+    local m = Instance.new("Model")
+    m.Name = "Mortar_" .. tier
+
+    -- True-bore proportions per the owner's 2026-09-01 accuracy ruling (the first deck render
+    -- drew diameter at bore*3 and the owner immediately caught the fattening at the gate).
+    local baseSide = tube.bore * 2 + 0.4
+    local base = mortarPart(
+        "Base",
+        Vector3.new(baseSide, MORTAR_BASE_TOP, baseSide),
+        MORTAR_BASE_COLOR,
+        Enum.Material.Wood
+    )
+    base.CFrame = CFrame.new(0, MORTAR_BASE_TOP / 2, 0)
+    base.Parent = m
+
+    local barrel: BasePart
+    if template then
+        barrel = template:Clone()
+    else
+        -- CSG-failure fallback: solid cylinder at the same outer silhouette
+        barrel = mortarPart(
+            "Tube",
+            Vector3.new(tube.length, tube.bore + MORTAR_WALL * 2, tube.bore + MORTAR_WALL * 2),
+            MORTAR_TUBE_COLOR,
+            Enum.Material.Metal
+        )
+        barrel.Shape = Enum.PartType.Cylinder
+    end
+    barrel.CFrame = CFrame.new(0, MORTAR_BASE_TOP + tube.length / 2, 0) * CFrame.Angles(0, 0, math.rad(90))
+    barrel.Parent = m
+
+    m.PrimaryPart = barrel
+    -- PivotTo aligns a model by its PrimaryPart's PIVOT. The barrel's CFrame carries the
+    -- 90-degree roll that stands the cylinder up, so left alone, PivotTo would map that rolled
+    -- frame onto the upright deck target and lay the whole assembly on its side (shipped that
+    -- way 2026-09-04; caught at the owner gate). This PivotOffset cancels the barrel's own
+    -- frame so the model pivot is identity at the model origin (the base's bottom center).
+    barrel.PivotOffset = barrel.CFrame:Inverse()
+    return m
+end
+
+-- Build the owner's visible mortar tubes onto the staged deck: one Model per owned tier,
+-- resolved (defaults / stored overrides / teahouse nudge) by the SAME pure
+-- MortarPlacement.resolve, fed the SAME teahouseFP `_buildDecorations` uses -- a mortar nudged
+-- away from under the teahouse and a decoration hidden under it read from the identical
+-- footprint. Rendered like a decoration: server-built here, so it replicates to every visitor,
+-- not just the owner. Placement DECISIONS stay in MortarPlacement (pure, Lune-tested); this is
+-- only the Roblox-only render step, same division as DecorationLayout/DecorationCatalog. May
+-- throw on bad build data; fault-isolated by the caller (a bad tier must never blank the deck).
+function TreatmentApplier:_buildMortars(
+    padId: string,
+    deckCF12: { number },
+    deckSize: string,
+    teahouseFP: any,
+    mortars: { string }?,
+    mortarPlacements: any,
+    staging: Instance
+)
+    if mortars == nil or #mortars == 0 then
+        return
+    end
+    local deckFP = self._sizeClasses.deckFootprint(deckSize)
+    local resolved = self._mortarPlacement.resolve(deckFP, mortars, mortarPlacements, teahouseFP)
+    local deckCF = CFrame.new(table.unpack(deckCF12))
+    for mortarId, placement in resolved do
+        local tube = self._mortarPlacement.TUBE[mortarId]
+        if tube == nil then
+            continue
+        end
+        local model = buildMortarModel(mortarId, tube, self._tubeTemplates[mortarId])
+        if model == nil then
+            continue
+        end
+        local placeCF =
+            self._buildingPlacer.placeCF({ offset = { placement.x, placement.z }, facing = placement.facing })
+        model:PivotTo(deckCF * CFrame.new(table.unpack(placeCF)))
+        model:SetAttribute("padId", padId)
+        model:SetAttribute("MortarId", mortarId)
+        model:AddTag("Mortar")
         model.Parent = staging
     end
 end
@@ -352,20 +533,43 @@ function TreatmentApplier:apply(padId: string, spec: any, treatment: any, deckSi
             warn(`[D.6] building step failed for {padId}: {placementOrErr}; deck only`)
         end
     end
-    -- decorations: owner's placed props, hidden under the built teahouse. teahouseFP is the built
-    -- teahouse's deck-local AABB (nil when deck-only). Fault-isolated: a bad prop never blanks the deck.
+    -- teahouseFP: the built teahouse's deck-local AABB (nil when deck-only). Hoisted out of the
+    -- decorations block so mortars (below) hide/nudge off the IDENTICAL footprint decorations do
+    -- -- one teahouse, one footprint, never two different ones for the two prop kinds.
+    local teahouseFP: any = nil
+    if builtPlacement ~= nil and teahouse ~= nil then
+        local buildingFP = self._sizeClasses.buildingFootprint(teahouse.size)
+        teahouseFP = self._buildingPlacer.footprintBounds(buildingFP, builtPlacement)
+    end
+    -- decorations: owner's placed props, hidden under the built teahouse. Fault-isolated: a bad
+    -- prop never blanks the deck.
     local decorations = treatment.deckDecorations
     if treatment.lit == true and decorations ~= nil and #decorations > 0 then
-        local teahouseFP: any = nil
-        if builtPlacement ~= nil and teahouse ~= nil then
-            local buildingFP = self._sizeClasses.buildingFootprint(teahouse.size)
-            teahouseFP = self._buildingPlacer.footprintBounds(buildingFP, builtPlacement)
-        end
         local okDecor, decorErr = pcall(function()
             self:_buildDecorations(padId, deckCF12, deckSize, teahouseFP, decorations, staging)
         end)
         if not okDecor then
             warn(`[DECOR] decoration step failed for {padId}: {decorErr}; deck without props`)
+        end
+    end
+    -- mortars: owned fireworks gear, rendered the same way decorations are -- server-built here,
+    -- so it replicates to every visitor, not just the owner (Task 5's controller ruling). Only
+    -- on a lit deck, same gate as decorations/flag/portal control. Fault-isolated: a bad tier
+    -- must never blank the deck.
+    if treatment.lit == true then
+        local okMortar, mortarErr = pcall(function()
+            self:_buildMortars(
+                padId,
+                deckCF12,
+                deckSize,
+                teahouseFP,
+                treatment.mortars,
+                treatment.mortarPlacements,
+                staging
+            )
+        end)
+        if not okMortar then
+            warn(`[MORTAR] mortar step failed for {padId}: {mortarErr}; deck without mortars`)
         end
     end
     -- THE FLAG. Only for a lit deck: a vacant pad flying somebody's crest would say a house is

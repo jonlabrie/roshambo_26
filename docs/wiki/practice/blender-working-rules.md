@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-31
+updated: 2026-09-04
 ---
 
 # Blender Working Rules
@@ -144,17 +144,20 @@ the till. Move `AUTHORED_BLEND` aside to rebuild the base bird — an action, no
 
 **Where the guarded files live (2026-08-30).** `art/` at the repo root is the in-repo home for
 hand-authored source; `art/README.md` carries the admission rule. CI enforces one half of it:
-`art/` must contain no derived files.
+`art/` must contain no derived files. ⚠ **There is no longer a second check tying the registry's
+names to `art/`** — `8d69da6` deleted it along with the split below, so nothing mechanical now
+notices if a guarded name stops being stored.
 
-⚠ **GUARD THE SOURCE, AND ONLY THE SOURCE.** `karasu_body.fbx` was briefly in `OWNER_AUTHORED` on
-the day the registry grew, and that **single wrong entry generated every tangle that followed**: a
-CI check that demanded the FBX be stored under `art/` while the rule above rejects `.fbx` there, an
-`ART_SOURCES` split invented to paper over the contradiction, <!-- lint-ok: naming the retired split in order to bury it --> and a guard that refused the very
-export the authored blend exists to produce. A derivative can always be re-exported, so guarding
-one buys nothing and costs the legitimate path. The correct model is **one source of truth per
-asset, changing hands exactly once**: `run()` owns a bird until a human makes an edit the script
-cannot reproduce, and from that moment the `.blend` owns it. The one-way door is
-`assert_authored_bill_absent()`; nothing else needs guarding.
+⚠ **`OWNER_AUTHORED` IS THE ONE REGISTRY, AND IT GUARDS THE SOURCE ONLY.** It is
+`{COLORMAP_AUTHORITY, AUTHORED_BLEND}` — read it rather than this line. `karasu_body.fbx` was
+briefly in it on the day the registry grew, and that **single wrong entry generated every tangle
+that followed**: a CI check that demanded the FBX be stored under `art/` while the rule above
+rejects `.fbx` there, an `ART_SOURCES` split invented to paper over the contradiction, <!-- lint-ok: naming the retired split in order to bury it --> and a guard
+that refused the very export the authored blend exists to produce. A derivative can always be
+re-exported, so guarding one buys nothing and costs the legitimate path. The correct model is
+**one source of truth per asset, changing hands exactly once**: `run()` owns a bird until a human
+makes an edit the script cannot reproduce, and from that moment the `.blend` owns it. The one-way
+door is `assert_authored_bill_absent()`; nothing else needs guarding.
 
 ⚠ **BLEND SAVES ARE MILESTONE-ONLY, AND THAT IS A SIZE CONSTRAINT, NOT ETIQUETTE.** Git cannot
 diff a `.blend`; every save is a full copy kept forever, and Blender writes a `.blend1` backup
@@ -205,6 +208,6 @@ bpy.ops.render.opengl(write_still=True, view_context=True)   # what the viewport
 bpy.ops.screen.screenshot(filepath=...)                      # the whole window, for panels/nodes
 ```
 
-Both verified working 2026-08-30; `screen.screenshot_area` is not (writes 250 bytes). <!-- lint-ok: bpy operator names, third-party API — not repo symbols -->
-⚠ `render.opengl` needs a `temp_override` carrying the VIEW_3D area and its WINDOW region. <!-- lint-ok: bpy operator name, third-party API — not a repo symbol -->
+Both verified working 2026-08-30; bpy.ops.screen.screenshot_area is not (writes 250 bytes).
+⚠ The opengl render op needs a `temp_override` carrying the VIEW_3D area and its WINDOW region.
 

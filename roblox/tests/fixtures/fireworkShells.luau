@@ -18,4 +18,12 @@ local decoded = serde.decode("json", fs.readFile(PATH))
 assert(type(decoded) == "table" and type(decoded.shells) == "table", `{PATH} has no shells array`)
 assert(#decoded.shells > 0, `{PATH} lists no shells`)
 
-return { shells = decoded.shells :: { string } }
+-- Final-review fix round (deck-mortars): the gear-required subset of `shells` + the mortar tier
+-- each needs, read the same way -- MortarPlacement.spec asserts SHELL_MORTAR against this instead
+-- of the two tables trusting a comment to stay in sync.
+assert(type(decoded.mortars) == "table", `{PATH} has no mortars array`)
+
+return {
+    shells = decoded.shells :: { string },
+    mortars = decoded.mortars :: { { shell: string, mortar: string } },
+}

@@ -39,7 +39,7 @@
 -- ReplicatedStorage.RoshamboBirds, so this is the only line to change to look at a different one.
 -- Every framing number below is DERIVED from the chosen bird's own size, because the karasu is
 -- twice the uguisu and a distance tuned for one is wrong by 2x for the other.
-local SPECIES: string = "Uguisu" -- "Uguisu" | "Karasu"
+local SPECIES: string = "Mejiro" -- "Uguisu" | "Karasu" | "Mejiro"
 
 local MODE: string = "PERCH" -- "ISOLATED" | "FLIGHT" | "PERCH"
 -- PERCH only. Where to stand the bird. CAMERA puts it an arm's length in front of wherever you are
@@ -97,6 +97,7 @@ end
 local sharedFolder = ReplicatedStorage:WaitForChild("RoshamboShared")
 local BirdFlight = freshRequire(sharedFolder:WaitForChild("BirdFlight") :: ModuleScript)
 local BirdSpecies = freshRequire(sharedFolder:WaitForChild("BirdSpecies") :: ModuleScript)
+local BirdRig = freshRequire(sharedFolder:WaitForChild("BirdRig") :: ModuleScript)
 
 -- Accept either a MeshPart or the Model the 3D Importer wraps it in — same reason BirdController
 -- does: which of the two reached the .rbxm depends on what was right-clicked.
@@ -172,12 +173,24 @@ local function spawnBird(): (BasePart, BasePart, { [string]: Bone })
     return body, wings, bones
 end
 
--- Seat both halves by their SHARED ORIGIN (the feet), never by the part centre, and take the
--- rotation from `base` — PivotOffset's rotation carries the FBX axis conversion and reintroduces a
--- nose-up attitude. Exactly what BirdController does, and for the same reasons.
+-- ⚠ ASK THE RIG WHICH WAY IS UP, once. PERCH used to write `CFrame.Angles(pitch, yaw, 0)` and get
+-- neither: on this armature pitch is slot Z on both neck bones, so the song's head-lift went into
+-- a yaw on the neck and a roll on the head and the beak never rose at all.
+local function headAxes(body: BasePart, bones: { [string]: Bone }): { [string]: BirdRig.Axes }
+    local axes = {}
+    for _, name in { "joint3", "joint4" } do
+        if bones[name] then
+            axes[name] = BirdRig.axesOf(bones[name], body)
+        end
+    end
+    return axes
+end
+
+-- Seat both halves on their FEET, never the part centre, and take the rotation from `base`.
+-- ⚠ THIS USED TO PLACE THE PIVOT AND CALL THAT THE FEET, which floated the mejiro 0.033 studs off
+-- the torii rail (owner, 2026-08-31); see BirdRig.seat and BirdSeat.spec.
 local function seat(body: BasePart, wings: BasePart, base: CFrame)
-    body.CFrame = base * CFrame.new(-body.PivotOffset.Position)
-    wings.CFrame = base * CFrame.new(-wings.PivotOffset.Position)
+    BirdRig.seat(body, wings, base, BirdSpecies.seatNudgeOf(SPECIES))
 end
 
 local function pose(bones: { [string]: Bone }, open: number, beatX: number, beatZ: number)
@@ -443,8 +456,29 @@ local function runPerch()
         local torii = workspace:FindFirstChild("RoshamboStage")
             and workspace.RoshamboStage:FindFirstChild("Torii")
         assert(torii, "watchWingbeat: PERCH_AT is TORII but Workspace.RoshamboStage.Torii is missing")
+        -- ⚠ STREAMING IS NOT A RISK HERE, verified 2026-09-04: main.server marks every direct
+        -- child Model of RoshamboStage ModelStreamingMode.Persistent, so the Torii's parts are
+        -- fully replicated regardless of where the player stands. The assert above is the whole
+        -- guard this needs; a parked note claiming otherwise is resolved, not deferred.
         local cf, size = (torii :: Model):GetBoundingBox()
-        base = CFrame.new(cf.Position + Vector3.new(0, size.Y / 2, 0))
+        -- ⚠ THE BOUNDING BOX TOP IS NOT THE SURFACE. A torii's kasagi curves upward at both ends,
+        -- so the axis-aligned box is as tall as the HIGHEST point -- the ends -- while the middle,
+        -- where the bird stands, sits lower. Seating at `size.Y / 2` floated it about a stud above
+        -- the rail (owner, 2026-08-31). Raycast down onto the model instead and stand on what is
+        -- actually there.
+        local params = RaycastParams.new()
+        params.FilterType = Enum.RaycastFilterType.Include
+        params.FilterDescendantsInstances = { torii }
+        local from = cf.Position + Vector3.new(0, size.Y, 0)
+        local hit = workspace:Raycast(from, Vector3.new(0, -size.Y * 2, 0), params)
+        local top = if hit then hit.Position.Y else cf.Position.Y + size.Y / 2
+        if not hit then
+            warn(
+                "[watchWingbeat] nothing under the ray over the Torii -- falling back to its "
+                    .. "bounding-box top, which sits above a curved rail."
+            )
+        end
+        base = CFrame.new(Vector3.new(cf.Position.X, top, cf.Position.Z))
     else
         -- Face the bird back at the lens, three body-lengths out: a gape is a FRONT-ON read, unlike
         -- the wingbeat, which ISOLATED deliberately shows side-on.
@@ -454,6 +488,7 @@ local function runPerch()
 
     local body, wings, bones = spawnBird()
     seat(body, wings, base)
+    local axes = headAxes(body, bones)
 
     -- ⚠ SAY IT AT THE START, NOT AT 12 SECONDS. The file's default SPECIES is the uguisu, which
     -- has no measured caws, so the single most likely way to reach PERCH is with the one bird whose
@@ -484,6 +519,7 @@ local function runPerch()
 
     local song: Sound? = nil
     local caws: { number }? = nil
+    local env: { number }? = nil
     -- ⚠ A DEADLINE AS WELL AS `Ended`. A clip that fails to load never fires Ended, and without
     -- this the tool would fall silent after one song and look like the gape had broken --
     -- `BirdController` carries the same guard for the same reason.
@@ -521,11 +557,12 @@ local function runPerch()
                 s.Parent = body
                 s.Ended:Once(function()
                     if song == s then
-                        song, caws = nil, nil
+                        song, caws, env = nil, nil, nil
                     end
                     s:Destroy()
                 end)
                 song, caws = s, record and record.caws or nil
+                env = record and record.env or nil
                 songUntil = t + 8
                 sung += 1
                 s:Play()
@@ -535,22 +572,42 @@ local function runPerch()
 
         if song and t > songUntil then
             song:Destroy()
-            song, caws = nil, nil
+            song, caws, env = nil, nil, nil
         end
 
-        -- --- the gape, off the clip's own playhead. Identical call to BirdController's. ---
+        -- --- the song, off the clip's own playhead ---
+        -- ⚠ THIS BLOCK ONCE HAD ITS OWN COPY OF THE DECISION AND ONLY IMPLEMENTED `caws`, so a
+        -- mejiro -- an envelope bird -- sang in PERCH with nothing moving at all. That reads as a
+        -- broken feature rather than an incomplete tool, and cost the owner a viewing session.
+        -- The choice now lives in `BirdFlight.gapeForClip`, which the real controller calls too.
+        local g, songGate = 0, 0
+        if song and song.IsPlaying then
+            songGate = BirdFlight.songGate(song.TimePosition, song.TimeLength, BirdSpecies.SING_GATE_RAMP)
+            g = BirdFlight.gapeForClip(
+                song.TimePosition,
+                caws,
+                env,
+                BirdSpecies.CAW_GAPE_SECONDS,
+                BirdSpecies.ENV_HZ
+            )
+        end
+        if g > 0 then
+            gaped += 1
+        end
+        -- The jaw, on the birds that have one. The uguisu and mejiro share a bill that is one
+        -- closed shell, so they carry no `bill_lower` and the lift below is their whole song.
         if bones.bill_lower then
-            local g = 0
-            if song and caws and song.IsPlaying then
-                g = BirdFlight.gapeAt(song.TimePosition, caws, BirdSpecies.CAW_GAPE_SECONDS)
-            end
-            if g > 0 then
-                gaped += 1
-            end
             bones.bill_lower.Transform = if g > 0
                 then CFrame.Angles(math.rad(BirdSpecies.CAW_GAPE_DEGREES * g), 0, 0)
                 else CFrame.identity
         end
+        local liftNeck, liftHead, idleScale = BirdFlight.singLift(
+            g,
+            BirdSpecies.SING_LIFT_DEG,
+            BirdSpecies.SING_NECK_FRAC,
+            BirdSpecies.SING_STILLNESS,
+            songGate
+        )
 
         -- --- flutter: a short burst of real wingbeat, then folded again ---
         local open = 0
@@ -576,10 +633,12 @@ local function runPerch()
         -- --- idle: the head and tail keep the bird alive between events ---
         local idleYaw, idlePitch, idleTail = BirdFlight.idlePose(t, 0, PROFILE)
         if bones.joint3 then
-            bones.joint3.Transform = CFrame.Angles(math.rad(idlePitch * 0.35), math.rad(idleYaw * 0.4), 0)
+            bones.joint3.Transform =
+                BirdRig.pose(axes.joint3, idlePitch * 0.35 * idleScale - liftNeck, idleYaw * 0.4 * idleScale)
         end
         if bones.joint4 then
-            bones.joint4.Transform = CFrame.Angles(math.rad(idlePitch * 0.65), math.rad(idleYaw * 0.6), 0)
+            bones.joint4.Transform =
+                BirdRig.pose(axes.joint4, idlePitch * 0.65 * idleScale - liftHead, idleYaw * 0.6 * idleScale)
         end
         if bones.joint8 then
             bones.joint8.Transform = CFrame.Angles(math.rad(idleTail), 0, 0)
@@ -588,20 +647,27 @@ local function runPerch()
 
     task.delay(12, function()
         if rig.Parent then
+            -- ⚠ REPORT THE SIGNAL, NOT THE BEAK. This used to warn "the beak never opened" and
+            -- lead with "this bird has NO bill_lower bone", which for a mejiro is neither a fault
+            -- nor the interesting fact: its bill is one closed shell and its song is the HEAD
+            -- LIFT. Naming the wrong organ sends the reader hunting a bone that should not exist.
+            local jaw = if bones.bill_lower then "jaw + lift" else "lift only (no bill_lower)"
             print(
-                ("[watchWingbeat] PERCH after 12s: %d songs, %d frames with the beak open."):format(
+                ("[watchWingbeat] PERCH after 12s: %d songs, %d frames singing, driving %s."):format(
                     sung,
-                    gaped
+                    gaped,
+                    jaw
                 )
             )
-            if bones.bill_lower == nil then
-                warn("[watchWingbeat] this bird has NO bill_lower bone -- the beak cannot open.")
-            elseif gaped == 0 then
+            if gaped == 0 then
                 warn(
-                    ("[watchWingbeat] the beak never opened. %s"):format(
-                        if caws == nil and sung > 0
-                            then `{SPECIES} clips carry no measured caws -- correct, not a bug; run tools/audio/measure_caws.py.`
-                            else "Songs are not playing, or TimePosition is not advancing."
+                    ("[watchWingbeat] nothing moved during a song. %s"):format(
+                        if sung == 0
+                            then "No song played at all -- check the Volume and that clips exist."
+                            elseif
+                                caws == nil and env == nil
+                            then `{SPECIES} clips carry neither onsets nor an envelope, so the bird is silent-bodied by design (correct for a dove). Run tools/audio/measure_envelope.py to give it one.`
+                            else "Songs play but TimePosition is not advancing -- are you in Play, on the Client?"
                     )
                 )
             end

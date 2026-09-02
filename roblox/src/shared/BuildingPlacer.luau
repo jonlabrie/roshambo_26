@@ -83,6 +83,28 @@ function BuildingPlacer.canFitFacing(buildingFP: FP, boundsFP: FP, facing: strin
     return halfX * 2 <= (boundsFP.maxX - boundsFP.minX) and halfZ * 2 <= (boundsFP.maxZ - boundsFP.minZ)
 end
 
+-- Resolves a REQUESTED placement into what actually gets BUILT, extracted from
+-- TreatmentApplier._buildBuilding so the mortar muzzle math (main.server.luau's
+-- muzzleOriginFor) and the rendered teahouse (TreatmentApplier) can never drift onto two
+-- different footprints for the same stored placement. B4: clamp the saved placement into the
+-- deck at render time (stored values never change; a display-shrunk deck slides the building
+-- minimally back into bounds). If the requested facing still doesn't fit after clamping (e.g.
+-- an L building facing E/W on a deck that shrank to also-L), retry ONCE at facing "N" (same
+-- offset, re-clamped) rather than vanishing the building -- N on its own deck always fits.
+-- Returns nil only if even that fallback doesn't fit (pathological data); the caller decides
+-- what "nothing fits" means for it (TreatmentApplier: deck-only, no building built).
+function BuildingPlacer.resolveFit(buildingFP: FP, deckFP: FP, requested: Placement): Placement?
+    local placement = BuildingPlacer.clamp(buildingFP, deckFP, requested)
+    if BuildingPlacer.fits(buildingFP, deckFP, placement) then
+        return placement
+    end
+    local fallback = BuildingPlacer.clamp(buildingFP, deckFP, { offset = requested.offset, facing = "N" })
+    if BuildingPlacer.fits(buildingFP, deckFP, fallback) then
+        return fallback
+    end
+    return nil
+end
+
 -- Deck-local axis-aligned bounds of a centered footprint placed at p.offset with p.facing.
 -- 90/270 swap the half-extents (rotation-aware), matching fits()/clamp(). Used to test
 -- decoration-vs-teahouse overlap and to clamp decorations to the deck.

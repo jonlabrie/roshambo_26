@@ -19,12 +19,14 @@
 -- appears — that needs eyes in Studio.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
-local TweenService = game:GetService("TweenService")
+local RunService = game:GetService("RunService")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local FireworkCatalog = require(shared:WaitForChild("FireworkCatalog"))
+local FireworkDrafts = require(shared:WaitForChild("FireworkDrafts"))
 local FireworkSchedule = require(shared:WaitForChild("FireworkSchedule"))
 local FireworkDirector = require(shared:WaitForChild("FireworkDirector"))
+local BurstStyles = require(shared:WaitForChild("BurstStyles"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local FireworkLaunched = remotes:WaitForChild("FireworkLaunched") :: RemoteEvent
@@ -47,7 +49,7 @@ folder.Parent = workspace
 
 -- MAX_POINTS burst parts per slot, because a nested break happens at several places AT ONCE and
 -- :Emit() fires wherever its part currently is — one part cannot be in six places in one frame.
-local MAX_POINTS = 8
+local MAX_POINTS = BurstStyles.MAX_POINTS
 local POOL_SIZE = FireworkDirector.MAX_CONCURRENT + 4
 
 type Slot = {
@@ -56,6 +58,9 @@ type Slot = {
     points: { BasePart },
     emitters: { ParticleEmitter },
     sound: Sound,
+    tail: Sound, -- the SECOND voice: a style's tailSound (the owner's canyon sizzle over
+    -- hotaru's final flicker) deliberately OVERLAPS the burst's decay, so it cannot share
+    -- the main Sound -- that one's SoundId swap would cut whichever clip was still playing.
 }
 local pool: { Slot } = {}
 local poolNext = 1
@@ -77,7 +82,27 @@ for _ = 1, POOL_SIZE do
     a0.Parent, a1.Parent = shell, shell
     local trail = Instance.new("Trail")
     trail.Attachment0, trail.Attachment1 = a0, a1
-    trail.Lifetime = 0.45
+    -- ⚠ LONG ENOUGH TO STAY ROOTED AT THE TUBE. At 0.45 the tail end of the ribbon faded
+    -- before the eye caught the comet, so every launch read as starting mid-air (owner,
+    -- 2026-09-03: "launch beginnings still well overhead"). 2.4s keeps the ribbon anchored
+    -- at the muzzle for most of a ~3s flight (owner ruling 2026-09-03: ~3s average).
+    trail.Lifetime = 2.4
+    -- ⚠ THE TAIL DIES BY FADING, NOT BY ERASURE (owner, 2026-09-03: the hard Lifetime
+    -- eraser read as a constant-rate wipe; "the last thing we see should be the last bit
+    -- of trail fading to full transparency"). The gradient runs head (0) -> oldest (1):
+    -- fully transparent well before the eraser, so the cut edge is never visible; the
+    -- PERCEIVED tail end is the fade, which retraces the shell's own decelerating path.
+    trail.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.1),
+        NumberSequenceKeypoint.new(0.6, 0.45),
+        NumberSequenceKeypoint.new(0.85, 1),
+        NumberSequenceKeypoint.new(1, 1),
+    })
+    -- comet taper: full width at the shell, needle at the tail
+    trail.WidthScale = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 1),
+        NumberSequenceKeypoint.new(1, 0.2),
+    })
     trail.LightEmission = 1
     trail.Enabled = false
     trail.Parent = shell
@@ -87,8 +112,16 @@ for _ = 1, POOL_SIZE do
     -- times the mixer cost.
     local snd = Instance.new("Sound")
     snd.RollOffMode = Enum.RollOffMode.InverseTapered
-    snd.RollOffMaxDistance = FireworkDirector.NEAR_STUDS
+    snd.Volume = BurstStyles.SOUND_LEVELS.volume
+    snd.RollOffMinDistance = BurstStyles.SOUND_LEVELS.rolloffMin
+    snd.RollOffMaxDistance = BurstStyles.SOUND_LEVELS.rolloffMax
     snd.Parent = shell
+
+    local tailSnd = Instance.new("Sound")
+    tailSnd.RollOffMode = Enum.RollOffMode.InverseTapered
+    tailSnd.RollOffMinDistance = BurstStyles.SOUND_LEVELS.rolloffMin
+    tailSnd.RollOffMaxDistance = BurstStyles.SOUND_LEVELS.rolloffMax
+    tailSnd.Parent = shell
 
     local points, emitters = {}, {}
     for _ = 1, MAX_POINTS do
@@ -100,16 +133,21 @@ for _ = 1, POOL_SIZE do
         p.Parent = folder
         local em = Instance.new("ParticleEmitter")
         em.Enabled = false -- burst-only; :Emit() drives it
-        em.LightEmission = 1
+        em.LightInfluence = 0 -- default 1 lets scene light DIM the stars, worst at night (spec §7)
         em.Rate = 0
-        em.Speed = NumberRange.new(20, 60)
-        em.Lifetime = NumberRange.new(1.2, 2.4)
+        -- Everything else — LightEmission (the stacking law, per style since 2026-09-03),
+        -- SpreadAngle, Drag, Transparency, Speed, Lifetime, Brightness, Acceleration — is a
+        -- style property (BurstStyles.STYLES), applied per emit by fireBurst below. The pool
+        -- sets only what's invariant across every style and shell.
         em.Parent = p
         table.insert(points, p)
         table.insert(emitters, em)
     end
 
-    table.insert(pool, { shell = shell, trail = trail, points = points, emitters = emitters, sound = snd })
+    table.insert(
+        pool,
+        { shell = shell, trail = trail, points = points, emitters = emitters, sound = snd, tail = tailSnd }
+    )
 end
 
 local WHITE = { 255, 255, 255 }
@@ -119,37 +157,179 @@ local function colorOf(rgb: { number }?): Color3
     return Color3.fromRGB(c[1], c[2], c[3])
 end
 
-local function playSound(slot: Slot, id: string?, audible: boolean)
-    if id and audible then
-        slot.sound.SoundId = id
-        slot.sound:Play()
+-- ⚠ SOUND TRAVELS. Each phase sound is delayed by this listener's distance to its source
+-- over the speed of sound — the flash is instant, the thump crosses the canyon. Per client,
+-- so the bridge hears it tight and FallsLanding hears the ~0.17s of physics. Phase order is
+-- safe: every phase of one shell gets a near-identical delay, so nothing reorders.
+local function playSound(slot: Slot, id: string?, audible: boolean, from: Vector3, speed: number?)
+    if not (id and audible) then
+        return
     end
+    local cam = workspace.CurrentCamera
+    local dist = if cam then (cam.CFrame.Position - from).Magnitude else 0
+    task.delay(dist / BurstStyles.SOUND_LEVELS.speedOfSound, function()
+        slot.sound.SoundId = id
+        -- Per-shell jitter (seeded, so every client hears the same shell the same way):
+        -- ±8% speed shifts pitch and length together, and even one clip stops sounding
+        -- like itself on repeat (owner, 2026-09-04: "they all sound the same"). The birds
+        -- run ±3% for the same reason.
+        slot.sound.PlaybackSpeed = speed or 1
+        slot.sound:Play()
+    end)
 end
 
-local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random)
-    -- `points` break locations scattered around the anchor. `particles` is PER POINT — the schedule
-    -- already divided the shell's budget, so this must never multiply it back up.
-    local n = math.min(ev.points, MAX_POINTS)
-    for i = 1, n do
+-- ⚠ PRELOAD EVERY SOUND AND SPRITE ONCE, AT STARTUP. A Sound's first :Play() otherwise
+-- streams the asset from the CDN mid-show, and the session's first launch thump arrives
+-- while the shell is already climbing (owner, 2026-09-03). Async: the show can start
+-- before this finishes; it only moves the cost off the first shell.
+task.spawn(function()
+    local ContentProvider = game:GetService("ContentProvider")
+    local warm = {}
+    local function add(id: string)
+        local s = Instance.new("Sound")
+        s.SoundId = id
+        table.insert(warm, s)
+    end
+    for _, v in BurstStyles.SOUNDS do
+        if typeof(v) == "table" then
+            for _, id in v do
+                add(id)
+            end
+        else
+            add(v)
+        end
+    end
+    for _, id in BurstStyles.TEXTURES do
+        table.insert(warm, id)
+    end
+    pcall(function()
+        ContentProvider:PreloadAsync(warm)
+    end)
+    for _, w in warm do
+        if typeof(w) == "Instance" then
+            w:Destroy()
+        end
+    end
+end)
+
+-- The keypoint list -> NumberSequence conversion, memoized per style table identity so it isn't
+-- rebuilt on every emit (styles are static module-level tables, so identity is stable for the
+-- program's whole life — nothing to evict).
+local transparencyCache: { [BurstStyles.Style]: NumberSequence } = {}
+local function transparencyOf(style: BurstStyles.Style): NumberSequence
+    local cached = transparencyCache[style]
+    if cached then
+        return cached
+    end
+    local keypoints = {}
+    for i, kp in style.transparency do
+        keypoints[i] = NumberSequenceKeypoint.new(kp[1], kp[2])
+    end
+    local seq = NumberSequence.new(keypoints)
+    transparencyCache[style] = seq
+    return seq
+end
+
+local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random, lifeScale: number)
+    -- `frames` are the style's point rule turning ev.points into per-part placement/orientation —
+    -- ring/kamuro's rules always collapse to a single frame, so this iterates #frames, NOT
+    -- ev.points: one part cannot stand in for eight positions in one frame.
+    local style = BurstStyles.styleOf(ev.style)
+    local frames = BurstStyles.pointFrames(ev.style, math.min(ev.points, MAX_POINTS), ev.scatter, function()
+        return rng:NextNumber()
+    end)
+
+    -- Budget is sacred: normally `particles` is PER POINT, exactly as scheduled. Compensation
+    -- only applies to the deliberate single-frame collapse (tilted/single rules, ring/kamuro),
+    -- where one physical frame stands in for the whole points' worth of break locations, so that
+    -- frame emits ev.particles * ev.points to match the scheduled total. Any other shortfall —
+    -- e.g. pointFrames clamping scatter/circle to MAX_POINTS frames — is left alone: the frames
+    -- that exist each emit their per-point share, which UNDER-emits relative to what was
+    -- scheduled. Budget is never exceeded, only sometimes not fully spent.
+    local particles = if #frames == 1 and ev.points > 1 then ev.particles * ev.points else ev.particles
+
+    local texture = ev.texture or BurstStyles.TEXTURES[style.textureRole]
+    -- COLOR OVER LIFE (owner, 2026-09-03): the star IGNITES near-white, settles to the
+    -- shell's saturated color for the body of the burn, and embers into the edge color at
+    -- death. The heat lives HERE, not in Brightness — brightness past ~8 saturated every
+    -- overlap to white and the color drowned.
+    local core = colorOf(ev.color)
+    local edge = colorOf(ev.edgeColor or ev.color)
+    local flash = core:Lerp(Color3.new(1, 1, 1), 0.75)
+    -- A dying star cools like a blackbody: dim orange-brown, whatever color it burned.
+    -- Using the raw edgeColor here read as "blue grey white" on pale-edged shells
+    -- (owner, 2026-09-03); the ember keeps only a hint of the shell's own tint.
+    local ember = Color3.fromRGB(150, 70, 25):Lerp(edge, 0.2)
+    -- With additive blending, BLACK IS OFF: driving the color to near-black at death is
+    -- what ramps the glow to zero as the star fades (owner, 2026-09-03: end-of-life reads
+    -- soft). Transparency alone dims the sprite but leaves its bloom halo mushy.
+    local dark = ember:Lerp(Color3.new(0, 0, 0), 0.85)
+    local color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, flash),
+        ColorSequenceKeypoint.new(0.12, core),
+        ColorSequenceKeypoint.new(0.7, core),
+        ColorSequenceKeypoint.new(0.9, ember),
+        ColorSequenceKeypoint.new(1, dark),
+    })
+    -- The star SHRINKS as it burns out -- a dying spark tightens to a point, it does not
+    -- linger at full size behind a transparency curtain.
+    local s0 = (ev.spread or 30) / 80 * style.sizeScale -- /80: owner halved star size 2026-09-03
+    local size = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, s0),
+        NumberSequenceKeypoint.new(0.7, s0),
+        NumberSequenceKeypoint.new(1, s0 * 0.3),
+    })
+    -- Velocity-parallel aligns each sprite to its own path, so a streak's bright head
+    -- LEADS and its tail trails behind — camera billboards wore the streak upside down
+    -- on falling stars (owner, 2026-09-03).
+    local orientation = if style.orientation == "velocity"
+        then Enum.ParticleOrientation.VelocityParallel
+        else Enum.ParticleOrientation.FacingCamera
+    -- VelocityParallel runs the sprite's HORIZONTAL axis along the motion; the streak is
+    -- authored vertical, so unrotated it lay perpendicular to its own path (owner,
+    -- 2026-09-03). 90° turns it into the direction of travel; dots are symmetric, 0.
+    local rotation = if style.orientation == "velocity" then NumberRange.new(-90) else NumberRange.new(0)
+    local acceleration = if ev.droop == true
+        then Vector3.new(0, -28, 0)
+        else Vector3.new(style.acceleration[1], style.acceleration[2], style.acceleration[3])
+    -- `spread` scales the BURST RADIUS (emission speed), with 30 as the neutral value --
+    -- before 2026-09-04 it only scaled sprite size, and a "spread ladder" (kiku 28/38/50)
+    -- was three near-identical bursts (owner: "can't tell much of a difference").
+    local radiusScale = (ev.spread or 30) / 30
+    local speed = NumberRange.new(style.speed[1] * radiusScale, style.speed[2] * radiusScale)
+    -- lifeScale > 1 only on a bonus shell: its stars simply live longer.
+    local lifetime = NumberRange.new(style.lifetime[1] * lifeScale, style.lifetime[2] * lifeScale)
+    local spreadAngle = Vector2.new(style.spreadAngle[1], style.spreadAngle[2])
+    local transparency = transparencyOf(style)
+
+    for i, f in frames do
         local p, em = slot.points[i], slot.emitters[i]
-        local off = if ev.scatter > 0
-            then Vector3.new(
-                rng:NextNumber(-ev.scatter, ev.scatter),
-                rng:NextNumber(-ev.scatter, ev.scatter) * 0.6,
-                rng:NextNumber(-ev.scatter, ev.scatter)
-            )
-            else Vector3.zero
-        p.Position = anchorPos + off
-        em.Texture = ev.texture or ""
-        em.Color = ColorSequence.new(colorOf(ev.color), colorOf(ev.edgeColor or ev.color))
-        em.Size = NumberSequence.new((ev.spread or 30) / 40)
-        em.Acceleration = if ev.droop then Vector3.new(0, -28, 0) else Vector3.new(0, -6, 0)
-        em:Emit(ev.particles)
+        -- Frame `rot` is an XYZ Euler triple authored against RotX*RotY*RotZ composition;
+        -- CFrame.Angles applies in exactly that order (it IS fromEulerAnglesXYZ).
+        p.CFrame = CFrame.new(anchorPos + Vector3.new(f.pos[1], f.pos[2], f.pos[3]))
+            * CFrame.Angles(math.rad(f.rot[1]), math.rad(f.rot[2]), math.rad(f.rot[3]))
+        em.Texture = texture
+        em.Color = color
+        em.Size = size
+        em.Speed = speed
+        em.Drag = style.drag
+        em.Lifetime = lifetime
+        em.Brightness = style.brightness * (ev.glow or 1)
+        em.SpreadAngle = spreadAngle
+        em.Acceleration = acceleration
+        em.Transparency = transparency
+        em.Orientation = orientation
+        em.Rotation = rotation
+        em.LightEmission = style.lightEmission
+        em:Emit(particles)
     end
 end
 
 local function play(payload: any, distance: number)
-    local recipe = FireworkCatalog.RECIPES[payload.shellId]
+    -- Shipped shells first, then proving drafts ("draft:family/variant" — Studio only;
+    -- resolve() is nil for anything else). Same interpreter either way: what the range
+    -- proves is exactly what a player will get.
+    local recipe = FireworkCatalog.RECIPES[payload.shellId] or FireworkDrafts.resolve(payload.shellId)
     if not recipe then
         return -- the contract test exists so this cannot happen in a shipped build
     end
@@ -163,13 +343,36 @@ local function play(payload: any, distance: number)
     -- apex and its own scatter, and two people watching one firework cannot talk about what they
     -- saw. The server sends one per launch.
     local rng = Random.new(payload.seed)
+    -- One voice-speed per shell, drawn FIRST so its position in the stream is stable.
+    local soundSpeed = 0.92 + rng:NextNumber() * 0.16
+    -- THE BONUS ROLL is drawn unconditionally (stream stability) and applied only to
+    -- mortar-class flights below. Occasionally a shell is simply BIGGER (owner,
+    -- 2026-09-04): higher apex, longer-lived stars, the heavyweight boom.
+    local bonusRoll = rng:NextNumber()
     local origin = payload.origin
     local apex = origin
-        + Vector3.new(rng:NextNumber(-8, 8), 46 + rng:NextNumber(-6, 6), rng:NextNumber(-8, 8))
+        + Vector3.new(rng:NextNumber(-8, 8), 60 + rng:NextNumber(-6, 6), rng:NextNumber(-8, 8)) -- 60: owner, 2026-09-03 ("bursts should ride higher")
 
+    -- `tail` is the longest release-worthy lifetime among this shell's burst styles (kamuro's
+    -- 4.2s crown must not have its slot's parts re-positioned under it while it's still hanging).
     local last = 0
+    local tail = 0
     for _, ev in schedule do
         last = math.max(last, ev.at)
+        if ev.kind == "burst" then
+            -- Pessimistic: assume a phase's boost hits, so a lucky long-lived break is
+            -- never cut down by slot reuse.
+            local boostLife = if ev.boost then (ev.boost.lifeScale or 1) else 1
+            tail = math.max(tail, BurstStyles.releaseTail(ev.style) * boostLife)
+        end
+    end
+
+    local bonus = last >= BurstStyles.BONUS.minFlight and bonusRoll < BurstStyles.BONUS.chance
+    local lifeScale = 1
+    if bonus then
+        lifeScale = BurstStyles.BONUS.lifeScale
+        tail *= lifeScale
+        apex = origin + (apex - origin) * Vector3.new(1, BurstStyles.BONUS.apexScale, 1)
     end
 
     active += 1
@@ -178,30 +381,197 @@ local function play(payload: any, distance: number)
             local anchorPos = if ev.anchor == "apex" then apex else origin
             if ev.kind == "report" then
                 slot.shell.Position = origin
-                playSound(slot, ev.sound, lod.sound)
+                playSound(slot, ev.sound, lod.sound, origin, soundSpeed)
+                -- THE MUZZLE FLASH: the visual partner of the launch thump, anchoring the
+                -- launch to the tube the way the ribbon alone could not. A fixed ~14 sparks
+                -- (2% of a shell's budget; the mobile floor was measured at 500-700) with the
+                -- FULL property set written -- pool emitters are shared, so a partial write
+                -- would inherit the previous shell's style.
+                local fp = slot.points[1]
+                local fem = slot.emitters[1]
+                fp.CFrame = CFrame.new(origin)
+                fem.Texture = BurstStyles.TEXTURES.dot
+                fem.Color = ColorSequence.new(Color3.fromRGB(255, 236, 200), Color3.fromRGB(255, 200, 120))
+                fem.Size = NumberSequence.new(0.45)
+                fem.Orientation = Enum.ParticleOrientation.FacingCamera
+                fem.Rotation = NumberRange.new(0)
+                fem.LightEmission = 1 -- the flash IS a light source; few sparks, no stacking risk
+                fem.Speed = NumberRange.new(8, 18)
+                fem.Drag = 2
+                fem.Lifetime = NumberRange.new(0.2, 0.4)
+                fem.Brightness = 2
+                fem.SpreadAngle = Vector2.new(20, 20)
+                fem.Acceleration = Vector3.new(0, -4, 0)
+                fem.Transparency = NumberSequence.new({
+                    NumberSequenceKeypoint.new(0, 0),
+                    NumberSequenceKeypoint.new(0.6, 0.2),
+                    NumberSequenceKeypoint.new(1, 1),
+                })
+                fem:Emit(14)
             elseif ev.kind == "ascent" then
                 slot.shell.Position = origin
+                -- ⚠ CLEAR BEFORE ENABLE. The slot's shell TELEPORTS here from wherever its
+                -- previous shell died; a re-enabled Trail can draw ghost geometry from its
+                -- stale segment history — streaks hanging at the LAST apex (owner, 2026-09-03:
+                -- "trails soared many studs above the launch tubes").
+                slot.trail:Clear()
                 slot.trail.Color = ColorSequence.new(colorOf(ev.color))
                 slot.trail.Enabled = true
-                playSound(slot, ev.sound, lod.sound)
-                -- The comet rises to the apex over whatever time the next phase leaves it.
+                playSound(slot, ev.sound, lod.sound, origin, soundSpeed)
+                -- The comet rises to the apex over whatever time the next phase leaves it —
+                -- in TWO stages: straight out of the tube for the first ~60% of the height,
+                -- then easing into the apex's lateral drift. One straight slanted tween read
+                -- as "tilted trajectories" (owner, 2026-09-03); a mortar leaves its tube
+                -- vertically. Two chained tweens cost what one does; the trail rounds the knee.
                 local rise = math.max(0.05, last - ev.at)
-                TweenService:Create(
-                    slot.shell,
-                    TweenInfo.new(rise, Enum.EasingStyle.Quad, Enum.EasingDirection.Out),
-                    { Position = apex }
-                ):Play()
+                -- ⚠ DRIVEN PER FRAME, NOT TWEENED. TweenService stepped this shell in
+                -- 1.8-stud chunks at ~15Hz (measured 2026-09-03), and the trail drew the
+                -- chunks -- the owner read it instantly ("feels like screen space"). A
+                -- quadratic bezier from the muzzle through a straight-up control point to
+                -- the apex, advanced on Heartbeat, is smooth at true framerate and is the
+                -- honest ballistic shape: vertical at the tube, decelerating into the drift.
+                local control = origin + Vector3.new(0, (apex.Y - origin.Y) * 0.9, 0)
+                local t0 = os.clock()
+                local flight: RBXScriptConnection
+                flight = RunService.Heartbeat:Connect(function()
+                    local k = math.min((os.clock() - t0) / rise, 1)
+                    -- ⚠ CUBIC ease-out, and the exponent IS the ballistics (owner asked after
+                    -- gravity, 2026-09-03: there is none simulated -- the curve implies it).
+                    -- Exponent 3 fronts the deceleration like air drag on a fast muzzle exit
+                    -- (~50%% faster launch than quadratic for the same flight) and floats the
+                    -- shell into its break, which is how a real mortar shell rises.
+                    local e = 1 - (1 - k) * (1 - k) * (1 - k)
+                    local a = origin:Lerp(control, e)
+                    local b = control:Lerp(apex, e)
+                    slot.shell.Position = a:Lerp(b, e)
+                    if k >= 1 then
+                        flight:Disconnect()
+                    end
+                end)
             elseif ev.kind == "burst" then
                 slot.trail.Enabled = false
-                playSound(slot, ev.sound, lod.sound)
-                fireBurst(slot, ev, anchorPos, rng)
+                -- THE BOOST ROLL (owner design, 2026-09-04): a burst phase carrying `boost`
+                -- has a seeded chance of an upgraded break — wider, brighter, MORE POINTS
+                -- (which divide the budget, never add particles), longer-lived. Per phase,
+                -- so each stage of a staged shell gets independently lucky; drawn whenever
+                -- the field exists, so the stream stays a pure function of the recipe.
+                local bev = ev
+                local phaseLife = lifeScale
+                if ev.boost then
+                    local boosted = rng:NextNumber() < ev.boost.chance
+                    if boosted then
+                        bev = table.clone(ev)
+                        bev.spread = (ev.spread or 30) * (ev.boost.spread or 1)
+                        bev.glow = (ev.glow or 1) * (ev.boost.glow or 1)
+                        bev.points = math.min(MAX_POINTS, ev.points + (ev.boost.points or 0))
+                        phaseLife = lifeScale * (ev.boost.lifeScale or 1)
+
+                        -- ⚠ LUCK MUST BE LEGIBLE (owner, 2026-09-04: "hard to know you've
+                        -- landed a bonus by sight"). Two sellers, both at ~75% of the
+                        -- boosted break's life, as the stars begin to fade:
+                        -- 1. THE KICKER — a tight white-hot pop of stars at the anchor
+                        --    (fixed 16 sparks, the muzzle-flash budget disclosure applies).
+                        -- 2. THE DOUBLE-TAP — a second, sharper report on the tail voice,
+                        --    skipped when the style owns its tail (hotaru's sizzle).
+                        local style = BurstStyles.styleOf(ev.style)
+                        local kickAt = style.lifetime[2] * phaseLife * 0.75
+                        task.delay(kickAt, function()
+                            local kp = slot.points[MAX_POINTS]
+                            local kem = slot.emitters[MAX_POINTS]
+                            kp.CFrame = CFrame.new(anchorPos)
+                            kem.Texture = BurstStyles.TEXTURES.dot
+                            kem.Color = ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(255, 220, 160))
+                            kem.Size = NumberSequence.new(0.5)
+                            kem.Speed = NumberRange.new(14, 26)
+                            kem.Drag = 3
+                            kem.Lifetime = NumberRange.new(0.25, 0.4)
+                            kem.Brightness = 4
+                            kem.SpreadAngle = Vector2.new(360, 360)
+                            kem.Acceleration = Vector3.new(0, -4, 0)
+                            kem.Transparency = NumberSequence.new({
+                                NumberSequenceKeypoint.new(0, 0),
+                                NumberSequenceKeypoint.new(0.7, 0.1),
+                                NumberSequenceKeypoint.new(1, 1),
+                            })
+                            kem.Orientation = Enum.ParticleOrientation.FacingCamera
+                            kem.Rotation = NumberRange.new(0)
+                            kem.LightEmission = 1
+                            kem:Emit(16)
+                        end)
+                        if not style.tailSound and lod.sound then
+                            local soundPool = BurstStyles.SOUNDS[style.soundRole]
+                            local tapId = if typeof(soundPool) == "table"
+                                then soundPool[rng:NextInteger(1, #soundPool)]
+                                else soundPool
+                            local cam = workspace.CurrentCamera
+                            local dist = if cam then (cam.CFrame.Position - anchorPos).Magnitude else 0
+                            task.delay(kickAt + dist / BurstStyles.SOUND_LEVELS.speedOfSound, function()
+                                slot.tail.SoundId = tapId
+                                slot.tail.Volume = BurstStyles.SOUND_LEVELS.volume * 0.45
+                                slot.tail.PlaybackSpeed = soundSpeed * 1.12 -- sharper than the main
+                                slot.tail:Play()
+                            end)
+                        end
+                    end
+                end
+                -- A recipe may pin a burst sound; otherwise the style's role resolves to a
+                -- VARIANT POOL and the shell's seeded rng picks one — same clip on every
+                -- client, different clip per shell, so a show is not one boom on repeat.
+                -- ⚠ The draw sits immediately before fireBurst's own draws, so the per-burst
+                -- rng order stays a pure function of the payload.
+                local soundId = ev.sound
+                if not soundId then
+                    local soundPool = BurstStyles.SOUNDS[BurstStyles.styleOf(ev.style).soundRole]
+                    if typeof(soundPool) == "table" then
+                        soundId = soundPool[rng:NextInteger(1, #soundPool)]
+                    else
+                        soundId = soundPool
+                    end
+                    -- the draw above still happens on bonus shells (stream stability);
+                    -- the heavyweight boom then takes the slot.
+                    if bonus then
+                        soundId = BurstStyles.BONUS.sound
+                    end
+                end
+                playSound(slot, soundId, lod.sound, anchorPos, soundSpeed)
+                -- The tail voice: a style's second sound, entering its own delay after the
+                -- break (plus the same speed-of-sound travel), on the slot's SEPARATE tail
+                -- Sound so it can overlap the burst clip's decay.
+                local tailSpec = BurstStyles.styleOf(ev.style).tailSound
+                if tailSpec and lod.sound then
+                    local tailId = BurstStyles.SOUNDS[tailSpec.role]
+                    local cam = workspace.CurrentCamera
+                    local dist = if cam then (cam.CFrame.Position - anchorPos).Magnitude else 0
+                    task.delay(tailSpec.delay + dist / BurstStyles.SOUND_LEVELS.speedOfSound, function()
+                        local vol = BurstStyles.SOUND_LEVELS.volume * tailSpec.volume
+                        slot.tail.SoundId = tailId
+                        slot.tail.Volume = vol
+                        slot.tail:Play()
+                        -- THE SOUND OBEYS THE PHASE, not the clip: fade out over 0.35s once
+                        -- the style's declared duration is up, however long the file runs.
+                        local mySound = slot.tail
+                        task.delay(tailSpec.duration, function()
+                            for step = 1, 7 do
+                                task.delay(0.05 * step, function()
+                                    if mySound.SoundId == tailId then
+                                        mySound.Volume = vol * (1 - step / 7)
+                                        if step == 7 then
+                                            mySound:Stop()
+                                        end
+                                    end
+                                end)
+                            end
+                        end)
+                    end)
+                end
+                fireBurst(slot, bev, anchorPos, rng, phaseLife)
             end
         end)
     end
 
-    -- Released after the last phase plus the longest particle lifetime, so the slot is not reused
-    -- while its own sparks are still on screen.
-    task.delay(last + 2.6, function()
+    -- Released after the last phase plus the longest burst style's release tail, so the slot is
+    -- not reused — and its parts repositioned — while its own sparks are still on screen.
+    task.delay(last + tail + 0.2, function()
         active -= 1
         slot.trail.Enabled = false
     end)

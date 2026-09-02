@@ -833,6 +833,7 @@ describe('/api/v1', () => {
                 peony: 3,
                 willow: 4,
                 ishibana: 6,
+                kiku: 4,
             });
             expect(res.body.catalog.mortars).toEqual({
                 'mortar:S': 40,
@@ -852,6 +853,30 @@ describe('/api/v1', () => {
             for (const id of SHELL_IDS) {
                 expect(typeof res.body.catalog.fireworks[id]).toBe('number');
             }
+        });
+
+        it('mortar placements round-trip and ride the fireworks GET', async () => {
+            await User.create({ robloxId: '911', totalPoints: 0, mortars: ['mortar:S'] });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const put = await request(app)
+                .put('/api/v1/players/911/mortar-placements')
+                .set('X-API-Key', API_KEY)
+                .send({ placements: { 'mortar:S': { offset: [2, -3], facing: 'E' } } })
+                .expect(200);
+            expect(put.body.mortarPlacements['mortar:S']).toEqual({ offset: [2, -3], facing: 'E' });
+            const get = await request(app)
+                .get('/api/v1/players/911/fireworks')
+                .set('X-API-Key', API_KEY)
+                .expect(200);
+            expect(get.body.mortarPlacements['mortar:S']).toEqual({ offset: [2, -3], facing: 'E' });
+        });
+        it('rejects placements for unowned mortars', async () => {
+            await User.create({ robloxId: '912', totalPoints: 0, mortars: [] });
+            await request(makeApp(makeEngine(), new ResultsStore()))
+                .put('/api/v1/players/912/mortar-placements')
+                .set('X-API-Key', API_KEY)
+                .send({ placements: { 'mortar:S': { offset: [0, 0], facing: 'N' } } })
+                .expect(400);
         });
     });
 });

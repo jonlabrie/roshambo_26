@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-28
+updated: 2026-08-31
 ---
 
 # Blender Pipeline
@@ -378,6 +378,152 @@ atlas in fragments, so a block request that does not fit is normal. `UVAllocator
 down rather than failing — and RECORDS what it actually gave, because "no silent caps" applies to
 texture space as much as to coverage.
 
+
+## ⚠ A BONE'S LOCAL AXES ARE NOT THE BODY'S — `CFrame.Angles(pitch, yaw, 0)` is a guess
+
+Measured 2026-08-31 on `MejiroBody`, each bone-local axis written in body space (body X = right,
+Y = up, Z = length):
+
+| bone | local X | local Y | local Z |
+|---|---|---|---|
+| `joint3` (neck) | −body Y | −body Z | **+body X** |
+| `joint4` (head) | −body Z | +body Y | **+body X** |
+
+So pitch is slot **Z** on both neck bones. `BirdController` and `watchWingbeat` had written
+`CFrame.Angles(pitch, yaw, 0)` since the birds shipped: the pitch went into a yaw on the neck and a
+roll on the head, the yaw rolled the neck, and **the song's head-lift never fired once on any
+bird**. The two bones also yawed against each other (−body Y against +body Y), producing an S-bend
+that read as a side-to-side wobble and was mistaken for a damping fault.
+
+⚠ **NOTHING FLAGS THIS, BECAUSE THE WRONG ANSWER STILL LOOKS ALIVE.** A head that yaws and rolls
+when you asked for pitch is still a moving head. It took an owner saying "it does NOT lift up its
+beak" to surface it.
+
+**Read the axes off the rig**: `BirdRig.axesOf(bone, body)` converts a body-space direction into
+bone-local space via `BirdFlight.toBoneSpace` (pure, so Lune can test it — Lune has no `CFrame`),
+and `BirdRig.pose` builds the Transform with `CFrame.fromAxisAngle`, yaw first so a bird that has
+looked left raises its beak along the way it faces. Resolved once at spawn; the axes are constants
+of the armature. A hardcoded slot permutation would be the same silent failure on the next rig.
+
+## ⚠ ADDING A BIRD TO `default.project.json` MID-SESSION SERVES IT WITHOUT ITS MESH
+
+**Confirmed 2026-08-31.** Adding `HiyodoriBody` / `HiyodoriWings` to the project file while Rojo
+was already serving created both instances with correct `Size`, correct `PivotOffset`, both
+SurfaceAppearance maps and all 17 bones — and `MeshContent = SourceType=None`. No geometry, so the
+bird is invisible. **Disconnecting and reconnecting the Rojo plugin fixed it**, and every bird then
+reported a mesh uri. The `.rbxm` files were correct throughout.
+
+**So: after adding an entry to `default.project.json`, reconnect Rojo. An incremental sync does not
+populate `MeshContent`.**
+
+⚠ **A WRONG EXPLANATION WAS PUBLISHED HERE FIRST, and is kept so it is not re-proposed.** It was
+blamed on the `.rbxm` being saved before the uploaded mesh ids resolved, and the owner was sent to
+re-save both files. They came back **byte-identical**, and one `strings` call showed the mesh ids
+had been in them all along (`116753878826591`, `126780011949127`) — a check that would have killed
+the theory before it cost a round trip.
+
+⚠ **`Size` IS STORED INDEPENDENTLY OF THE MESH**, which is what makes this worth a page: a property
+dump reads entirely correct. Length, pivot, maps and bone count all passed on a part containing
+nothing. Check after every bird sync:
+
+```lua
+p.MeshContent          -- SourceType=None instead of Uri  <- the only reliable tell
+p.CollisionFidelity    -- falls back to Box; a real import is Default
+p.MeshSize             -- (0,0,0), so Size/MeshSize is inf rather than 1.0
+```
+
+`MeshContent` is the one property that cannot be inferred from the others, and Studio's property
+panel does not show it.
+
+## ⚠ ONE ROUGHNESS MAP PER MESH, NOT PER SPECIES — and 1024 is a ceiling, not a default
+
+`shade_roughness` accepts a palette and never reads it. Roughness describes the **material**
+(feather, ventral, covert, leg, bill, orbital, eye) and those zones are geometry, so two birds
+sharing a mesh bake a byte-identical map. The hiyodori's came out SHA-identical to the mejiro's
+(`a6fc657f…`) and Roblox refused it as a duplicate of an asset the owner already had — correct
+behaviour on both sides, and it cost an upload attempt to discover.
+
+| mesh | roughness asset | birds |
+|---|---|---|
+| warbler | `rbxassetid://111059118365271` | uguisu, mejiro, hiyodori, + yamagara, sekirei |
+| karasu | `rbxassetid://138781967530157` | karasu |
+
+Colormaps *are* per species — those read the palette. A contract test now fails if
+`shade_roughness` ever starts depending on one, because that would silently invalidate the shared
+asset above.
+
+⚠ **STUDIO ENFORCES 1024** (owner, 2026-08-31), so "bake this bird larger" is not an available
+answer to a marking that will not resolve. On a 1.15-stud bird that is ~0.0034 studs per texel.
+A black eye-rim requested at hairline width came out **0.20 texels** and could only land on
+whichever texels it happened to straddle; the separation is a multiplicative orbital shadow
+~2.5 texels wide instead, with a contract that fails under 2. **Any feature finer than about two
+texels is not a design choice — it is a request the renderer will refuse.**
+
+## Recipe: exporting a scaled sibling (a second bird from one authored mesh)
+
+The mejiro is the uguisu at 0.773. Do this in Blender, **never** by resizing the MeshPart in Studio.
+
+1. **`save_as_mainfile` to a scratch path FIRST.** It switches the session off the authored blend,
+   so nothing that follows can reach `art/` — a stronger guarantee than remembering not to save.
+2. `S = target_length / body_data_y_span`. The uguisu's span is 0.82805 and matches `bodyLength`.
+3. **Transform the DATA, never the object**: `o.data.transform(Matrix.Scale(S, 4))` for every mesh
+   bound to the rig, and `arm.data.transform(M)` for the armature. An object-level scale rides on
+   the armature and `Bone.Transform` **discards scale** in Roblox — the bird imports at the right
+   size and animates at the wrong one.
+4. **Do not re-centre.** `normalise_size()` also re-seats feet at z = 0, which would put the pivot
+   at the feet and make the sibling behave unlike the bird it is. Leaving the origin alone keeps
+   them identical up to scale, so they share one measured seat number.
+5. Rename the objects, then `export(part, path, textures=False)` — the shared-mesh trap.
+6. Verify the round trip before anyone imports: **21 bones on both halves** and `materials=NONE`.
+
+⚠ **UVs DO NOT MOVE UNDER A VERTEX SCALE**, so an already-baked colormap stays valid and does not
+need re-uploading. Re-bakes are safe too: `bake()` derives `landmark_scale` from the mesh's own span
+against `ref_length`, so landmarks follow the new size on their own.
+
+⚠ **`import_scene.fbx` FAILS UNDER THE MCP WITHOUT A FULL WINDOW OVERRIDE** — its armature branch
+calls `mode_set()`, whose poll needs an active object, and it dies mid-hierarchy with
+`Context missing active object`. Use the same `temp_override(window, screen, area, region, …)` that
+`export()` uses. An empty startup file is not enough on its own.
+
+## ⚠ RESIZING A MESHPART DOES NOT RESIZE ITS `PivotOffset`
+
+The mejiro is the uguisu's mesh scaled to 0.773 in Studio. The mesh scaled; the pivot did not, and
+the two carry a byte-identical `PivotOffset.Position` of −0.215. Measured with each pivot placed at
+y = 100, reading the rendered box bottom:
+
+| part | centre | size Y | bottom | offset from pivot |
+|---|---|---|---|---|
+| `KarasuBody` | 100.449 | 0.897 | 100.000 | **0.000** — the pivot *is* the feet |
+| `UguisuBody` | 100.215 | 0.472 | 99.979 | −0.021 |
+| `MejiroBody` | 100.215 | 0.365 | 100.033 | **+0.033**, the other way |
+
+Both seating paths placed the **pivot** on the perch and a comment cited "feet land within 0.021 of
+the target" as verification — that 0.021 was the uguisu's own residual, accepted once and then
+treated as a property of all birds. Two birds sharing a mesh, a rig and a pivot now land 0.054
+apart, 15% of the mejiro's height, and the error grows with the scale factor.
+
+**Seat by the pivot** — the authored origin — and that was right before any of it. Measured against
+the owner's eye on a flat plank at kasagi height, pivot-seating lands the karasu exactly and the
+uguisu within 0.002 studs. Only the resized bird missed.
+
+⚠ **TWO MODELS WERE FITTED TO THE MEJIRO ALONE AND EACH BROKE A SPECIES THAT HAD BEEN CORRECT.**
+First the mesh bounds — measured right to 0.004 studs and read as a bird sunk into the rail. Then a
+"toe droop" clearance scaled by body length, which predicted the *larger* uguisu wanted *more* lift;
+put side by side, it wanted none. Both had passing tests and mutation-proven constants. Neither had
+a mechanism anyone had verified, and the tests only confirmed arithmetic that was already assumed.
+
+⚠ **THE MEASUREMENT THAT SETTLED IT WAS THREE SPECIES ON ONE PLANK AT ONCE.** One bird at a time
+cannot distinguish "this bird is wrong" from "the rule is wrong", and three rounds were spent
+before that was done. `BirdSpecies.seatNudge` now carries only the eye-measured residual — 0.000
+karasu, −0.002 uguisu and mejiro — and a value larger than a hair is a smell, not a setting.
+
+**Root cause, and the actual fix**: the mejiro was the uguisu's MeshPart *resized inside Studio*,
+so it alone needed a 0.0164 correction. It is now exported from Blender at its own 0.640 and the
+special case is gone. See the recipe below.
+
+⚠ **`Bone.WorldCFrame` IS NOT A USABLE MEASUREMENT ON A RESIZED MESHPART.** The mejiro and the
+uguisu report their lowest bone at an identical −0.093 from the pivot despite a 0.773 scale factor
+between them, so bone positions read back unscaled. Measure feet from `Size`, not from bones.
 
 ## ⚠ MIRRORING A MEASUREMENT ASSUMES A SYMMETRY THE MESH DOES NOT HAVE
 

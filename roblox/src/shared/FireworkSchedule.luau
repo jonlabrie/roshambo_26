@@ -22,6 +22,9 @@ export type Phase = {
     edgeColor: { number }?,
     spread: number?,
     droop: boolean?,
+    style: string?,
+    glow: number?, -- per-shell brightness multiplier on the style (owner, 2026-09-04)
+    boost: { chance: number, spread: number?, glow: number?, points: number?, lifeScale: number? }?,
 }
 export type Recipe = { phases: { Phase } }
 
@@ -38,6 +41,9 @@ export type Event = {
     edgeColor: { number }?,
     spread: number?,
     droop: boolean?,
+    style: string?,
+    glow: number?,
+    boost: { chance: number, spread: number?, glow: number?, points: number?, lifeScale: number? }?,
 }
 
 function FireworkSchedule.compile(recipe: Recipe, budget: number): { Event }
@@ -78,6 +84,9 @@ function FireworkSchedule.compile(recipe: Recipe, budget: number): { Event }
             edgeColor = ph.edgeColor,
             spread = ph.spread,
             droop = ph.droop,
+            style = ph.style,
+            glow = ph.glow,
+            boost = ph.boost,
         })
     end
     table.sort(out, function(a, b)

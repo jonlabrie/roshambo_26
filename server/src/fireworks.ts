@@ -7,13 +7,16 @@ import { Throw } from './engine/GameRules';
 // Prices are deliberately tiny. totalPoints changes ONLY on bank, and at a 60-second round banking
 // every win is about one point every three minutes — so a shell must cost about one banked win or
 // nobody ever fires one. The 50-point deck is already hours of play.
-export const SHELL_IDS = ['firecracker', 'peony', 'willow', 'ishibana'] as const;
+export const SHELL_IDS = ['firecracker', 'peony', 'willow', 'ishibana', 'kiku'] as const;
 
 export const SHELL_PRICES: Record<string, number> = {
     firecracker: 1,
     peony: 3,
     willow: 4,
     ishibana: 6,
+    // The first range-promoted shell (2026-09-04): a hot gold chrysanthemum that ~30% of
+    // the time upgrades itself mid-air. Priced above peony for the luck, below willow.
+    kiku: 4,
 };
 
 // Gear, not real estate — deliberately under the deck ladder (50 / 500 / 3000).
@@ -29,18 +32,24 @@ export const MORTAR_IDS = Object.keys(MORTAR_PRICES) as MortarId[];
 const MORTAR_RANK: Record<MortarId, number> = { 'mortar:S': 1, 'mortar:M': 2, 'mortar:L': 3 };
 
 // What a shell needs. Three kinds, one evaluator — a fourth kind is a branch below, not a redesign.
-type Requirement =
+export type Requirement =
     | { kind: 'none' }
     | { kind: 'gear'; mortar: MortarId }
     | { kind: 'condition'; afterWorldThrow: Throw };
 
-const REQUIREMENTS: Record<string, Requirement> = {
+// Exported so the gear-requirement half of shared-fixtures/firework-shells.json (the `mortars`
+// list) can be asserted against it directly, the same way SHELL_IDS is asserted against
+// `fixtures.shells` below — see fireworks.test.ts's "the fixture is the contract" describe block.
+// roblox/src/shared/MortarPlacement.luau's SHELL_MORTAR is asserted against the SAME fixture list
+// on the Lune side (tests/MortarPlacement.spec.luau), so the two can no longer drift silently.
+export const REQUIREMENTS: Record<string, Requirement> = {
     firecracker: { kind: 'none' },
     peony: { kind: 'gear', mortar: 'mortar:S' },
     willow: { kind: 'gear', mortar: 'mortar:M' },
     // Reads the round's outcome; never influences it. That line is what keeps fireworks a safe
     // cosmetic rather than pay-to-win, and it must not be crossed.
     ishibana: { kind: 'condition', afterWorldThrow: 'R' },
+    kiku: { kind: 'gear', mortar: 'mortar:S' },
 };
 
 export type LaunchContext = { mortars: string[]; lastWorldThrow: Throw | null };

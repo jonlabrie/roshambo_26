@@ -50,6 +50,15 @@ local function publish(t: number)
 end
 
 local function tick()
+    -- ProvingController (Studio-only) sets this attribute while its night toggle is on, so
+    -- its own Lighting.ClockTime = 22 write survives instead of being overwritten within
+    -- 100ms by this WRITE_HZ-10 loop. The attribute never exists outside Studio, so this
+    -- gate is inert in a published place. Gate the WHOLE write, not just ClockTime -- publish()
+    -- also derives from t via currentT(), and skipping it keeps nightFactor/phase subscribers
+    -- (glyphs, waterfall glow) agreeing with what the sky actually shows during an override.
+    if Lighting:GetAttribute("ProvingNightOverride") then
+        return
+    end
     local t = currentT()
     Lighting.ClockTime = DayNight.clockTimeAt(t) % 24 -- the ONLY thing we set on Lighting
     publish(t)

@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-31
+updated: 2026-09-04
 ---
 
 # Familiars
@@ -479,19 +479,23 @@ and two-caw clips is sample-identical to a baked recording apart from 0.48s of r
 −56 dBFS — verified by diffing, not by ear. `GROUP_GAP_SECONDS` is the delay it needs, and it is
 NOT the 0.76s gap you would measure off the source: the clips carry their own padding.
 
-⚠ **ONE HARDCODED NAME IS THE WHOLE SELECTION MECHANISM, and it currently reads `Karasu`.**
-`BirdController` hardcodes `SPECIES` because nothing selects a bird per player, so **every player
-gets the same bird** and today that bird is the crow. That ONE name drives the mesh
-(`{SPECIES}Body` / `{SPECIES}Wings`, both declared in `default.project.json`), the voice and the
-motion scale — so flipping it changes the whole bird rather than half of it. A test pins that the
-three cannot drift apart, because a bird wearing a crow's body with a warbler's song is the failure
-that has nothing positioned to notice it. Read the constant rather than this line.
+⚠ **AND ONLY ONE SPECIES IS REACHABLE AT A TIME, but the gap is one line.** `BirdController`
+hardcodes `SPECIES` (currently `"Karasu"`) because nothing selects a bird per player (F&F
+item 6). The registered roster grew 2026-09-02: the **hiyodori** joined with a full voice —
+five envelope clips cut from the owner's xeno-canto sourcing (`bodyLength 1.15`, warbler
+seat), verified singing on the torii 2026-09-03. As of 2026-08-28 that
+ONE name drives the mesh (`{SPECIES}Body` / `{SPECIES}Wings`, both already declared in
+`default.project.json`), the voice and the motion scale — so flipping it changes the whole bird
+rather than half of it. A test pins that the three cannot drift apart, because a bird wearing a
+crow's body with a warbler's song is the failure that has nothing positioned to notice it.
 
-⚠ **The familiar sings ONLY on a win, and that is a RULING, not an implementation detail.** It
-protects the falls-dock uguisu's gate — *"this bird lives here and you have to be close to hear
-it"* ([[falls-dock]]). Owner 2026-08-27: birds will eventually be found around the world,
-flying and perching and calling occasionally, which **reverses that premise**. Design that
-before building it.
+⚠ **The victory song fires on a win; since 2026-09-03 a perched familiar ALSO sings idly,
+rarely** (owner: "it's only natural... relatively rare"). The idle song runs on a free-running
+90–240s clock through `sing()`'s crowd chance and concurrency cap — the clock reschedules
+whether or not a song plays, because pausing it until conditions allow would recreate the
+sing-on-arrival behavior the falls-dock gate forbids (*"this bird lives here and you have to
+be close to hear it"*, [[falls-dock]]). The dock bird's specialness now rests on rarity and
+rolloff rather than the familiar's total silence.
 
 ⚠ **AND MUCH OF THE MACHINERY ALREADY EXISTS — a claim written here on 2026-08-27 that "there is
 no world population, no perching" was WRONG and is deleted.** It came from grepping for
@@ -546,7 +550,6 @@ does not have.
 ⚠ **THREE THINGS HAVE NOW BEEN BUILT ON THIS HEAD AND WITHDRAWN** — the modelled eye, its lid
 collar, and (2026-08-30) the plane-cut jaw. The full chronology, with the measurements that settled
 each, is in [log.md](../log.md) under 2026-08-28..30; it is deliberately not restated here.
-
 
 ## Motion scales with the bird — built 2026-08-28
 
@@ -651,22 +654,21 @@ Note the legibility complaint on record — *"a 7-inch bird cannot carry status 
 distance"* — was made about a bird SMALLER than what shipped: seven inches is ~0.55 studs, and
 the uguisu ships larger than that. The bird you have is already the answer to that objection.
 
-**Import verified in the place, and RE-IMPORTED 2026-08-29** with the full PBR set — so the
-first import's own notes (no `SurfaceAppearance`, a `TextureID` on both parts) describe a bird that
-no longer ships; the current rule is step 2 of the checklist above. `HasSkinnedMesh` is true and
-every bone-drive pair passes — non-zero on the chain, exactly 0.0000 off it. ⚠ **Bone counts and
-asset ids move with each re-import; read them from
-`roblox/tools/studio/measureBirds.luau` rather than here.** The axis contract is the part that
-governs, and it reproduces the uguisu's: local X +40 moves BOTH tips −0.6579 vertically and 0.0000
-fore-aft, local Z +40 moves them +0.6579 and −0.6579 fore-aft and 0.0000 vertically.
+**Import verified in the place, and RE-IMPORTED 2026-08-29** with the full PBR set — so the first
+import's own notes (no `SurfaceAppearance`, a `TextureID` on both parts) describe a bird that no
+longer ships; the current rule is step 2 of the checklist above. `HasSkinnedMesh` is true and every
+bone-drive pair passes — non-zero on the chain, exactly 0.0000 off it. ⚠ **Bone counts and asset
+ids move with each re-import; read them from `roblox/tools/studio/measureBirds.luau` rather than
+here.** The axis contract is the part that governs, and it reproduces the uguisu's: local X +40
+moves BOTH tips −0.6579 vertically and 0.0000 fore-aft, local
+Z +40 moves them +0.6579 and −0.6579 fore-aft and 0.0000 vertically.
 ⚠ Those magnitudes differ from the Blender-side figures recorded above (+0.7413 / +0.7984 /
 −0.7060). The SIGN RELATIONSHIPS — which are what the beat and fold depend on — agree exactly; the
 absolute numbers do not, and the in-place measurement is the one that governs.
 
 Not yet done, and it is code rather than asset work: **nothing selects a bird per player.** The
-motion constants are no longer uguisu-only — see the scale section above — so the karasu is
-playable and is in fact what everyone currently gets; what is missing is the CHOICE, which is what
-[[status-display]]'s unlock model needs.
+motion constants are no longer uguisu-only — see the scale section above — so selection is now
+the single thing standing between the karasu and being playable.
 
 ## Still thin
 

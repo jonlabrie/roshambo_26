@@ -6,6 +6,7 @@ local NAMES = {
     "TickerMessage",
     "MoveTeahouse",
     "MoveDecoration",
+    "MoveMortar",
     "DayNight",
     "HudState",
     "HudPick",

@@ -14,12 +14,11 @@
 -- error, no warning. Learned on the 2026-07-20 bench; see the roshambo-fireworks memory.
 local FireworkCatalog = {}
 
-local SPARKLE = "rbxasset://textures/particles/sparkles_main.dds"
--- Built-in stand-ins, replaced at the art pass. Named here rather than inline so the swap is one
--- edit per sound rather than one per shell.
-local S_REPORT = "rbxasset://sounds/collide.wav"
-local S_ASCENT = "rbxasset://sounds/swoosh.wav"
-local S_BURST = "rbxasset://sounds/impact_explosion_03.mp3"
+-- The launch thump (owner's pick, 2026-09-03: launch-deck-2 from the kingsrow deck set). Ascent
+-- phases carry NO sound (owner ruling: a real aerial shell's rise is mostly quiet from the
+-- ground), and burst phases name none either -- the style's variant pool in BurstStyles.SOUNDS
+-- covers them, one seeded pick per shell.
+local S_REPORT = "rbxassetid://87713703495045" -- launch-deck-2 (owner pick, 2026-09-03)
 
 FireworkCatalog.RECIPES = {
     -- Hand-launched: low, fast, cheap. Deliberately the least spectacular — it is the one everybody
@@ -27,13 +26,11 @@ FireworkCatalog.RECIPES = {
     firecracker = {
         phases = {
             { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
-            { at = 0.02, kind = "ascent", anchor = "origin", sound = S_ASCENT, color = { 255, 200, 120 } },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 200, 120 } },
             {
-                at = 0.7,
+                at = 1.2,
                 kind = "burst",
                 anchor = "apex",
-                sound = S_BURST,
-                texture = SPARKLE,
                 color = { 255, 236, 170 },
                 edgeColor = { 255, 200, 120 },
                 spread = 18,
@@ -45,13 +42,11 @@ FireworkCatalog.RECIPES = {
     peony = {
         phases = {
             { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
-            { at = 0.02, kind = "ascent", anchor = "origin", sound = S_ASCENT, color = { 255, 190, 200 } },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 190, 200 } },
             {
-                at = 1.1,
+                at = 3.0,
                 kind = "burst",
                 anchor = "apex",
-                sound = S_BURST,
-                texture = SPARKLE,
                 color = { 255, 120, 140 },
                 edgeColor = { 255, 190, 200 },
                 spread = 42,
@@ -63,15 +58,13 @@ FireworkCatalog.RECIPES = {
     willow = {
         phases = {
             { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
-            { at = 0.02, kind = "ascent", anchor = "origin", sound = S_ASCENT, color = { 220, 240, 255 } },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 220, 240, 255 } },
             {
-                at = 1.2,
+                at = 3.1,
                 kind = "burst",
                 anchor = "apex",
-                sound = S_BURST,
-                texture = SPARKLE,
-                color = { 180, 220, 255 },
-                edgeColor = { 220, 240, 255 },
+                color = { 255, 190, 90 }, -- molten gold: a willow is golden by definition (owner caught the pale blue, 2026-09-03)
+                edgeColor = { 255, 226, 160 },
                 spread = 34,
                 droop = true,
             },
@@ -82,16 +75,36 @@ FireworkCatalog.RECIPES = {
     ishibana = {
         phases = {
             { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
-            { at = 0.02, kind = "ascent", anchor = "origin", sound = S_ASCENT, color = { 198, 194, 186 } },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 198, 194, 186 } },
             {
-                at = 1.3,
+                at = 3.2,
                 kind = "burst",
                 anchor = "apex",
-                sound = S_BURST,
-                texture = SPARKLE,
                 color = { 226, 222, 210 },
                 edgeColor = { 198, 194, 186 },
                 spread = 26,
+                droop = false,
+            },
+        },
+    },
+    -- 菊 kiku, chrysanthemum — the first shell promoted THROUGH the proving range
+    -- (owner gate 2026-09-04: "that's the one, ship v2 kiku"). A tight gold peony that
+    -- burns hot, and a DISTRIBUTION rather than a recording: ~30% of fires upgrade —
+    -- wider, brighter, two extra break points, longer hang — announced by the white
+    -- kicker pop and the double-tap report.
+    kiku = {
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 214, 130 } },
+            {
+                at = 3.0,
+                kind = "burst",
+                anchor = "apex",
+                color = { 255, 190, 90 },
+                edgeColor = { 255, 150, 60 },
+                spread = 38,
+                glow = 1.5,
+                boost = { chance = 0.3, spread = 1.32, glow = 1.2, points = 2, lifeScale = 1.15 },
                 droop = false,
             },
         },

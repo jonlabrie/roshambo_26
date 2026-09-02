@@ -19,6 +19,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local BirdFlight = require(shared:WaitForChild("BirdFlight"))
 local BirdSpecies = require(shared:WaitForChild("BirdSpecies"))
+local BirdRig = require(shared:WaitForChild("BirdRig"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local CollectionService = game:GetService("CollectionService")
@@ -38,6 +39,7 @@ local SPECIES = "Karasu" -- ⚠ hardcoded: nothing selects a bird per player yet
 -- ⚠ NO FALLBACK. `scaleOf` returns nil for an unregistered species and this refuses to start
 -- rather than moving a crow on uguisu timings, which would present as "the animation is wrong".
 local SPECIES_SCALE = BirdSpecies.scaleOf(SPECIES)
+local SEAT_NUDGE = BirdSpecies.seatNudgeOf(SPECIES)
 if not SPECIES_SCALE then
     warn(`BirdController: species "{SPECIES}" is not in BirdSpecies.SPECIES; no familiars.`)
     return
@@ -114,6 +116,12 @@ local SONG_STAGGER = 2.2 -- seconds of jitter before a bird decides to sing
 -- point. Other people's birds sing sometimes, which is what keeps a crowd from becoming a wall
 -- of noise. The stagger still applies to both.
 local SONG_CHANCE_OWN = 1.0
+-- ⚠ THE IDLE SONG (owner, 2026-09-03: "we should probably let the familiars sing occasionally
+-- when perched... It should be relatively rare"). An opportunity comes on a FREE-RUNNING clock —
+-- the dock scheduler's own rule: never keyed to the player — and each opportunity still passes
+-- through sing()'s crowd chance and concurrency cap, so the average perched bird sings unprompted
+-- every several minutes and the win song remains the event.
+local IDLE_SONG_MIN, IDLE_SONG_MAX = 90, 240 -- seconds between idle-song opportunities
 local SONG_CHANCE_OTHER = 0.3
 local MAX_CONCURRENT_SONGS = 6
 
@@ -144,6 +152,8 @@ type Bird = {
     wristR: Bone?,
     head: Bone?,
     neck: Bone?,
+    headAxes: BirdRig.Axes?,
+    neckAxes: BirdRig.Axes?,
     tail: Bone?,
     hipL: Bone?,
     hipR: Bone?,
@@ -152,6 +162,7 @@ type Bird = {
     -- ⚠ THE SOUND ITSELF, not a timestamp. The gape reads `TimePosition` off it -- see `sing()`.
     song: Sound?,
     songCaws: { number }?,
+    songEnv: { number }?,
     seed: number,
     flyingSince: number?,
     -- A perched flutter is EVENT-TRIGGERED (landing, winning) with a slow idle rate underneath
@@ -172,6 +183,7 @@ type Bird = {
     singArmed: boolean,
     singOwn: boolean,
     singAt: number?,
+    nextIdleSongAt: number, -- the idle song's free-running clock; see IDLE_SONG_MIN
     flightFrom: Vector3?, -- a flight is a PATH between two points, so both ends must be held
     flightTo: Vector3?,
     flightAt: number,
@@ -265,6 +277,7 @@ local function makeBird(userId: string): Bird
     end
 
     local head = bone("joint4")
+    local neck = bone("joint3")
     return {
         part = part,
         wings = wings,
@@ -279,7 +292,11 @@ local function makeBird(userId: string): Bird
         -- head turn across TWO bones is what keeps the neck from shearing: the neck takes the
         -- lead and the head follows, which is also the order a real bird moves in.
         head = head,
-        neck = bone("joint3"),
+        neck = neck,
+        -- ⚠ WHICH LOCAL AXIS IS PITCH, ASKED OF THE RIG RATHER THAN ASSUMED. Resolved once here
+        -- because the answer is a constant of the armature; see BirdRig for what assuming it cost.
+        headAxes = head and BirdRig.axesOf(head, part),
+        neckAxes = neck and BirdRig.axesOf(neck, part),
         tail = bone("joint8"),
         -- The two leg chains: joint12 -> joint13 -> joint14 and joint25 -> joint13.001 -> ...
         -- Rotating the HIP swings the whole leg, which is the lift; the knee would only fold it.
@@ -291,6 +308,7 @@ local function makeBird(userId: string): Bird
         billLower = bone("bill_lower"),
         song = nil,
         songCaws = nil,
+        songEnv = nil,
         seed = seedFor(userId),
         flyingSince = nil,
         flutterSince = nil,
@@ -306,6 +324,7 @@ local function makeBird(userId: string): Bird
         singArmed = false,
         singOwn = false,
         singAt = nil,
+        nextIdleSongAt = os.clock() + IDLE_SONG_MIN + math.random() * (IDLE_SONG_MAX - IDLE_SONG_MIN),
         flightFrom = nil,
         flightTo = nil,
         flightAt = 0,
@@ -348,9 +367,11 @@ local function sing(b: Bird, isOwn: boolean)
     local record = BirdSpecies.clipById(SPECIES, clip)
     b.song = s
     b.songCaws = record and record.caws or nil
+    b.songEnv = record and record.env or nil
     local function release()
         b.song = nil
         b.songCaws = nil
+        b.songEnv = nil
         if b.billLower then
             b.billLower.Transform = CFrame.identity
         end
@@ -744,17 +765,13 @@ RunService.RenderStepped:Connect(function()
         -- part's BOUNDING-BOX CENTRE at the perch, and the body's centre rides 0.236 studs above
         -- its feet -- half the bird's height -- so the bird sank into whatever it landed on.
         --
-        -- `PivotOffset.POSITION` is the offset from the part centre to the origin both halves
-        -- were exported around, which is the feet. Verified: feet land within 0.021 of the target
-        -- and the two halves agree to 0.00000 studs at a shared bone.
-        --
-        -- ⚠ ITS *ROTATION* MUST BE IGNORED. PivotOffset also carries the FBX axis conversion
-        -- (90, 0, -180), so `PivotTo` reintroduces exactly the nose-up attitude that was fixed a
-        -- moment ago. Take the position, take the rotation from `base`.
-        b.part.CFrame = base * CFrame.new(-b.part.PivotOffset.Position)
-        if b.wings then
-            b.wings.CFrame = base * CFrame.new(-b.wings.PivotOffset.Position)
-        end
+        -- ⚠ AND `PivotOffset.POSITION` IS NOT THE FEET EITHER, though this comment said it was
+        -- and cited "feet land within 0.021 of the target" as the verification. 0.021 was the
+        -- uguisu's residual; the mejiro is that same mesh scaled to 0.773 and a resize does not
+        -- move PivotOffset, so its feet land 0.033 the OTHER way. BirdRig.seat places the pair by
+        -- the pivot -- which is what locks the two halves together -- then drops both so the
+        -- rendered bottom rests on `base`. See BirdSeat.spec for the measurements.
+        BirdRig.seat(b.part, b.wings, base, SEAT_NUDGE)
 
         if far <= DETAIL_DISTANCE then
             -- FLYING IS A FACT ABOUT MOVEMENT, NOT ABOUT STATE. A bird hopping on a shoulder is
@@ -846,6 +863,19 @@ RunService.RenderStepped:Connect(function()
                 end
             end
 
+            -- ===== THE IDLE SONG =====
+            -- Perched, still, nothing pending: occasionally a bird just sings (owner ruling,
+            -- 2026-09-03). ⚠ The clock RESCHEDULES WHETHER OR NOT a song plays — pausing it
+            -- until conditions allow would recreate the sing-on-arrival behavior the dock
+            -- scheduler's gate exists to forbid. sing(b, false) applies the crowd chance and
+            -- the concurrency cap, which is where the rarity comes from.
+            if now >= b.nextIdleSongAt then
+                b.nextIdleSongAt = now + IDLE_SONG_MIN + math.random() * (IDLE_SONG_MAX - IDLE_SONG_MIN)
+                if not flying and not resting and k >= 1 and b.song == nil and not b.singArmed then
+                    sing(b, false)
+                end
+            end
+
             if flying then
                 local tuck = math.rad(BirdFlight.legTuck(k) * BirdFlight.LEG_TUCK_DEG)
                 if b.hipL then
@@ -878,6 +908,62 @@ RunService.RenderStepped:Connect(function()
                 end
             end
 
+            -- ===== SONG =====
+            -- ⚠ COMPUTED BEFORE THE IDLE POSE, because the sing lift is ADDED to the idle head
+            -- and neck angles. The idle block writes those bones, so anything set first would
+            -- simply be overwritten.
+            --
+            -- ⚠ AND COMPUTED WHETHER OR NOT THERE IS A JAW. This used to sit inside
+            -- `if b.billLower then`, which was harmless while every bird had that bone -- but the
+            -- uguisu and mejiro share a bill that is ONE CLOSED SHELL with zero boundary edges,
+            -- so the bone was removed rather than left to stretch a bill that cannot open. Nested
+            -- as it was, those birds would compute no gape and get no lift either: silent AND
+            -- still, while singing.
+            --
+            -- ⚠ DRIVEN OFF THE AUDIO'S OWN PLAYHEAD, NOT A CLOCK STARTED AT `:Play()`. Calling
+            -- `:Play()` on a sound that has not loaded does not start the audio -- it starts it
+            -- when the load finishes -- so an elapsed timer runs ahead of the song. That happens
+            -- on a cold load, which is the first time anyone sees the bird.
+            local gape, songGate = 0, 0
+            do
+                local song, caws, env = b.song, b.songCaws, b.songEnv
+                -- Onsets for a punctuated caller, an envelope for a warbler; a clip with neither
+                -- leaves the bird still, which is correct for a dove rather than missing data.
+                if song and song.IsPlaying then
+                    -- ⚠ THE GATE IS FLAT ACROSS THE PHRASE; the gape is not. Damping the
+                    -- look-around by the gape modulates it at ENV_HZ and reads as a wobble.
+                    songGate =
+                        BirdFlight.songGate(song.TimePosition, song.TimeLength, BirdSpecies.SING_GATE_RAMP)
+                    gape = BirdFlight.gapeForClip(
+                        song.TimePosition,
+                        caws,
+                        env,
+                        BirdSpecies.CAW_GAPE_SECONDS,
+                        BirdSpecies.ENV_HZ
+                    )
+                end
+                -- The jaw, on the birds that have one. ⚠ LOCAL +X, POSITIVE, AND THE SIGN IS
+                -- OPPOSITE TO BLENDER'S -- measured in Studio on the shipped asset: a probe one
+                -- jaw-length out along the bone's local +Y drops 0.0641 studs under rad(+20).
+                if b.billLower then
+                    b.billLower.Transform = if gape > 0
+                        then CFrame.Angles(math.rad(BirdSpecies.CAW_GAPE_DEGREES * gape), 0, 0)
+                        else CFrame.identity
+                end
+            end
+
+            -- ⚠ AND THE SONG LIFTS THE HEAD, WHICH IS THE WHOLE READ ON A SMALL BIRD. A 20 degree
+            -- gape is 6.8 pixels on a karasu at ordinary third-person distance and 2.6 on a
+            -- mejiro; the POSTURE is what carries at that size, and a small bird throws its head
+            -- back to sing. Split across neck and head so the bird arches rather than hinging.
+            local liftNeck, liftHead, idleScale = BirdFlight.singLift(
+                gape,
+                BirdSpecies.SING_LIFT_DEG,
+                BirdSpecies.SING_NECK_FRAC,
+                BirdSpecies.SING_STILLNESS,
+                songGate
+            )
+
             -- ===== IDLE =====
             -- ⚠ ONLY WHILE PERCHED. A bird in the air is not looking around; it is going
             -- somewhere, and a head snapping about mid-flight reads as a glitch.
@@ -885,42 +971,22 @@ RunService.RenderStepped:Connect(function()
             if not flying then
                 idleYaw, idlePitch, idleTail = BirdFlight.idlePose(now, b.seed, PROFILE)
             end
-            if b.neck then
-                b.neck.Transform = CFrame.Angles(math.rad(idlePitch * 0.35), math.rad(idleYaw * 0.4), 0)
+            if b.neck and b.neckAxes then
+                b.neck.Transform = BirdRig.pose(
+                    b.neckAxes,
+                    idlePitch * 0.35 * idleScale - liftNeck,
+                    idleYaw * 0.4 * idleScale
+                )
             end
-            if b.head then
-                b.head.Transform = CFrame.Angles(math.rad(idlePitch * 0.65), math.rad(idleYaw * 0.6), 0)
+            if b.head and b.headAxes then
+                b.head.Transform = BirdRig.pose(
+                    b.headAxes,
+                    idlePitch * 0.65 * idleScale - liftHead,
+                    idleYaw * 0.6 * idleScale
+                )
             end
             if b.tail then
                 b.tail.Transform = CFrame.Angles(math.rad(idleTail), 0, 0)
-            end
-
-            -- ===== GAPE =====
-            -- ⚠ DRIVEN OFF THE AUDIO'S OWN PLAYHEAD, NOT A CLOCK STARTED AT `:Play()`. Calling
-            -- `:Play()` on a sound that has not loaded does not start the audio -- it starts it
-            -- when the load finishes -- so an elapsed timer runs ahead of the caw and the beak
-            -- opens before the sound. That happens on a cold load, which is the first time anyone
-            -- sees the bird. The onsets in `BirdSpecies` were MEASURED off the source WAVs by
-            -- `tools/audio/measure_caws.py`; comparing them against a guessed playhead throws away
-            -- the only reason they were measured.
-            --
-            -- ⚠ LOCAL +X, POSITIVE, AND THE SIGN IS OPPOSITE TO BLENDER'S. Measured in Studio on
-            -- the shipped asset: a probe one jaw-length out along the bone's local +Y drops 0.0641
-            -- studs under `CFrame.Angles(rad(+20), 0, 0)`. Local +Z points at the floor and local
-            -- Z rotation is lateral yaw -- neither is the hinge.
-            --
-            -- A clip with no measured onsets leaves the beak SHUT rather than guessing a rhythm,
-            -- which is every uguisu clip today. The predecessor here was `sin(now * 9) ^ 2` gated
-            -- on the WIN state: birds that never sang still sat there mouthing.
-            if b.billLower then
-                local gape = 0
-                local song, caws = b.song, b.songCaws
-                if song and caws and song.IsPlaying then
-                    gape = BirdFlight.gapeAt(song.TimePosition, caws, BirdSpecies.CAW_GAPE_SECONDS)
-                end
-                b.billLower.Transform = if gape > 0
-                    then CFrame.Angles(math.rad(BirdSpecies.CAW_GAPE_DEGREES * gape), 0, 0)
-                    else CFrame.identity
             end
         end
     end

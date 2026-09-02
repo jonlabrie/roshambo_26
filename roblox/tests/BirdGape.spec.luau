@@ -41,9 +41,128 @@ describe("BirdFlight.gapeAt", function()
         -- nothing if the playhead they are compared against is guessed.
         local fs = require("@lune/fs")
         local src = harness.stripComments(fs.readFile("src/client/BirdController.client.luau"))
-        for _, needed in { "bill_lower", "billLower", "TimePosition" } do
+        -- ⚠ AND THE LIFT MUST BE THERE TOO. The gape used to be computed INSIDE
+        -- `if b.billLower then`, which was harmless while every bird had that bone -- but the
+        -- uguisu and mejiro share a bill that cannot open and no longer carry it, so nested
+        -- that way they would compute no gape and get no lift: silent AND still, while singing.
+        for _, needed in { "bill_lower", "billLower", "TimePosition", "gapeForClip", "singLift" } do
             expect(string.find(src, needed, 1, true) ~= nil).toBe(true)
         end
+    end)
+
+    test("the diagnostic tool drives the song the same way the controller does", function()
+        -- ⚠ THE TOOL REIMPLEMENTS THE WIRING, WHICH IS THE ONE THING IT CANNOT PROVE ABOUT
+        -- ITSELF. PERCH mode had its own copy of the gape decision and implemented only the
+        -- `caws` branch, so a mejiro sang in it with nothing moving -- indistinguishable, to
+        -- someone watching, from the feature being broken. Both now call the same two functions,
+        -- and this fails if either drifts back to a private copy.
+        local fs = require("@lune/fs")
+        local tool = harness.stripComments(fs.readFile("tools/studio/watchWingbeat.luau"))
+        for _, needed in { "gapeForClip", "singLift" } do
+            expect(string.find(tool, needed, 1, true) ~= nil).toBe(true)
+        end
+    end)
+
+    test("an envelope drives the gape for a bird that warbles", function()
+        -- ⚠ ONSETS ARE THE WRONG MODEL FOR A CONTINUOUS SINGER. A karasu's clip is two or three
+        -- discrete caws separated by 0.775s of silence; a mejiro's 5.3s clip is voiced 46% of its
+        -- own length in an unbroken stream. Asked for onsets you would be picking arbitrary
+        -- points in a run of sound, so the envelope IS the description.
+        local env = { 0.0, 0.5, 1.0, 0.25 }
+        local hz = 4 -- samples at t = 0, 0.25, 0.5, 0.75
+        expect(BirdFlight.gapeFromEnvelope(0.0, env, hz)).toBe(0)
+        expect(BirdFlight.gapeFromEnvelope(0.25, env, hz)).toBe(0.5)
+        expect(BirdFlight.gapeFromEnvelope(0.5, env, hz)).toBe(1)
+        -- between samples it interpolates rather than stepping, or a 12Hz table would make the
+        -- jaw tick twelve times a second
+        expect(BirdFlight.gapeFromEnvelope(0.125, env, hz)).toBe(0.25)
+        expect(BirdFlight.gapeFromEnvelope(0.375, env, hz)).toBe(0.75)
+    end)
+
+    test("the envelope gape is shut outside the clip", function()
+        -- A clip that has ended must not leave the beak parked open: `sing` clears the song on
+        -- Ended, but a frame can land after the audio finishes and before that fires.
+        local env = { 0.8, 0.9 }
+        expect(BirdFlight.gapeFromEnvelope(-0.1, env, 4)).toBe(0)
+        expect(BirdFlight.gapeFromEnvelope(99, env, 4)).toBe(0)
+    end)
+
+    test("gapeFromEnvelope refuses a bad rate rather than clamping it", function()
+        -- Same contract as `profile` and `gapeAt`: a zero rate is a division, and NaN surfaces
+        -- frames later as a jaw that has vanished.
+        local ok = pcall(function()
+            return BirdFlight.gapeFromEnvelope(0.1, { 0.5 }, 0)
+        end)
+        expect(ok).toBe(false)
+    end)
+
+    test("one function decides the gape, whichever the clip carries", function()
+        -- ⚠ THIS EXISTS BECAUSE THE CHOICE WAS DUPLICATED AND THE COPIES DIVERGED. Both
+        -- `BirdController` and `watchWingbeat`'s PERCH mode have to turn a clip plus a playhead
+        -- into a gape; PERCH implemented only the `caws` branch, so the mejiro -- an envelope
+        -- bird -- sang in PERCH with nothing moving at all, and the owner reasonably read that
+        -- as the feature being broken rather than the tool being incomplete.
+        local caws = { 0.10 }
+        local env = { 0.0, 1.0 }
+        expect(BirdFlight.gapeForClip(0.10 + OPEN * 0.3, caws, nil, OPEN, 4)).toBe(1)
+        expect(BirdFlight.gapeForClip(0.25, nil, env, OPEN, 4)).toBe(1)
+        -- onsets win when a clip somehow carries both; the contract forbids it, this is the
+        -- behaviour if it ever slips through
+        expect(BirdFlight.gapeForClip(0.0, caws, env, OPEN, 4)).toBe(0)
+        -- and a clip with neither is simply still: correct for a dove, not a gap in the data
+        expect(BirdFlight.gapeForClip(0.5, nil, nil, OPEN, 4)).toBe(0)
+    end)
+
+    test("the sing lift splits between neck and head and never exceeds its budget", function()
+        local DEG, FRAC, STILL =
+            BirdSpecies.SING_LIFT_DEG, BirdSpecies.SING_NECK_FRAC, BirdSpecies.SING_STILLNESS
+        local neck, head = BirdFlight.singLift(1.0, DEG, FRAC, STILL, 1)
+        expect(neck + head).toBe(BirdSpecies.SING_LIFT_DEG)
+        expect(neck > head).toBe(true) -- the neck leads, as it does in the idle pose
+        local n0, h0 = BirdFlight.singLift(0.0, DEG, FRAC, STILL, 1)
+        expect(n0).toBe(0)
+        expect(h0).toBe(0)
+        local nh, hh = BirdFlight.singLift(0.5, DEG, FRAC, STILL, 1)
+        expect(nh * 2).toBe(neck)
+        expect(hh * 2).toBe(head)
+    end)
+
+    test("the stillness gate follows the SONG, not the syllables", function()
+        -- ⚠ TYING IT TO `gape` BUILT A WOBBLE GENERATOR. The gape is the envelope and moves at
+        -- ENV_HZ, so damping the look-around by it modulated the yaw twelve times a second --
+        -- the owner saw "a side to side head wobble", which is exactly what that is. A bird
+        -- settles when it begins to sing and stays settled through the phrase.
+        -- Stateless on purpose: derived from the playhead, so no per-bird memory can drift.
+        local RAMP = 0.15
+        expect(BirdFlight.songGate(-1, 2.0, RAMP)).toBe(0) -- before the clip
+        expect(BirdFlight.songGate(3.0, 2.0, RAMP)).toBe(0) -- after it
+        expect(BirdFlight.songGate(1.0, 2.0, RAMP)).toBe(1) -- settled, mid-phrase
+        -- and it ramps rather than snapping, at both ends
+        local a = BirdFlight.songGate(RAMP / 2, 2.0, RAMP)
+        expect(a > 0 and a < 1).toBe(true)
+        local b = BirdFlight.songGate(2.0 - RAMP / 2, 2.0, RAMP)
+        expect(b > 0 and b < 1).toBe(true)
+        -- ⚠ FLAT ACROSS THE MIDDLE is the whole point: two samples a syllable apart must agree,
+        -- or the damping animates and we are back to the wobble.
+        expect(BirdFlight.songGate(0.9, 2.0, RAMP)).toBe(BirdFlight.songGate(1.0, 2.0, RAMP))
+    end)
+
+    test("singing stills the idle look-around, so the lift reads as posture not wobble", function()
+        -- ⚠ THE FIRST VERSION ADDED THE LIFT ON TOP OF THE IDLE POSE AND READ AS A HEAD WOBBLE
+        -- (owner, 2026-08-31). A bird that is singing holds still and sings; it does not carry on
+        -- glancing about. Superimposing the two made the lift indistinguishable from more idle.
+        local DEG, FRAC, STILL =
+            BirdSpecies.SING_LIFT_DEG, BirdSpecies.SING_NECK_FRAC, BirdSpecies.SING_STILLNESS
+        local _, _, quiet = BirdFlight.singLift(0.0, DEG, FRAC, STILL, 0)
+        expect(quiet).toBe(1) -- not singing: the idle pose is untouched
+        -- ⚠ THE GATE, NOT THE GAPE, decides the damping: a bird mid-phrase between two syllables
+        -- is still settled, so gape 0 with the gate open must still be quiet.
+        local _, _, between = BirdFlight.singLift(0.0, DEG, FRAC, STILL, 1)
+        expect(between).toBe(1 - STILL)
+        local _, _, loud = BirdFlight.singLift(1.0, DEG, FRAC, STILL, 1)
+        expect(loud).toBe(1 - STILL)
+        expect(loud < quiet).toBe(true)
+        expect(loud >= 0).toBe(true) -- never inverts the idle motion
     end)
 
     test("the gape angle is a real angle, and shared rather than per-species", function()

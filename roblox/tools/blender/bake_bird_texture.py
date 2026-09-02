@@ -16,6 +16,7 @@
 # Run inside Blender (the MCP execs this file):  bake(object_name, species) -> dict
 
 import bpy
+import math
 import numpy as np
 from mathutils import Vector
 
@@ -40,6 +41,61 @@ UGUISU = {
     "leg":         (168, 136, 110),
     "gape":        (58, 42, 38),      # the interior faces the split exposed
 }
+# --- mejiro ---------------------------------------------------------------------------
+# ⚠ A THIRD VENTRAL ZONE, WHICH THE WARBLER LAW DOES NOT HAVE. An uguisu is pale below and
+# buffier at the flank -- two zones, and `shade` blends exactly those. A mejiro is THREE: a
+# saturated yellow throat, a near-neutral white breast, and a warm buff flank. Sampled off
+# `birds/mejiro/mejiro_1.jpg`, the throat reads (207,184,46) against a belly at (157,155,142) --
+# not a shade of the same colour, a different one. Painting it with two zones loses the bird.
+#
+# ⚠ AND THE FIELD MARK IS A RING, NOT A BROW. That is why this needs its own shader rather than
+# the warbler's with different numbers: `shade` draws a supercilium ALONG a segment over an
+# eye-line along another, and a white-eye's mark is an annulus AROUND a point. Same reason
+# `shade_corvid` is its own function.
+#
+# ⚠ VALUES ARE FOR GAME LIGHT, NOT FOR THE PHOTOGRAPH. Same discipline as the karasu below: the
+# reference was shot in shade under foliage and its absolute values are darker and less saturated
+# than the bird needs to read at arena distance. What was taken from it is the RELATIONS -- throat
+# brighter and warmer than the mantle, belly near-neutral, flank warm.
+MEJIRO = {
+    # (2) BRIGHTER AND MORE SATURATED THAN THE PHOTOGRAPH, on the owner's eye (2026-08-30). The
+    # first pass ran the mantle at (146,158,74) -- V 0.62, S 0.53 -- which is close to what the
+    # reference samples, and read as a dull olive bird rather than a mejiro. The reference was
+    # shot in shade under foliage; a photograph is a record of ITS light, not of this one. Same
+    # lesson the karasu palette carries from the other direction.
+    "dorsal":      (168, 186, 62),    # mantle: yellow-green      V 0.73  S 0.67
+    "crown":       (182, 200, 64),    # crown and nape: brighter  V 0.78  S 0.68
+    "wing_tail":   (122, 138, 58),    # flight feathers: darker and greener
+    "ventral":     (232, 230, 222),   # breast and belly: near-white
+    "throat":      (226, 216, 72),    # THE second yellow -- brighter and warmer than the mantle
+    "flank":       (178, 168, 122),   # buff, where the white meets the folded wing
+    # (2) SOFTENED FROM (250,250,246): a pure white ring read as decal rather than feather.
+    # (5) RAISED AGAIN to (246,248,242) once the ring was narrowed, broken by the lore and set on
+    # orbital grey -- the boldness that had to come out was WIDTH and closure, not value. Stopping
+    # a few points short of 255 leaves room for a lit highlight to sit above it instead of
+    # clipping flat.
+    "eyering":     (246, 248, 242),   # THE field mark, and the whole identity of the bird
+    # (2) ONE GREY FOR THREE THINGS -- the orbital skin between the eye and the white ring, the
+    # line from the eye to the gape, and a near-match to the bill. The owner describes them as
+    # the same colour (2026-08-30), so they share a key rather than drifting apart. It was
+    # (66,64,54) and read as black next to a light grey bill.
+    "lore":        (112, 112, 108),
+    # A pale golden iris around a black pupil. One flat dark disc read as a bead; the iris is
+    # what makes it an eye, and on a mejiro it is the second-brightest thing on the face.
+    "iris":        (198, 162, 78),
+    "eye":         (22, 20, 18),
+    # (2) A LIGHT GREY BILL, NOT A BLACK ONE (owner, 2026-08-30). A mejiro's bill is fine and
+    # pale-based; painting it near-black made the whole face front heavy. Literal streaking is
+    # below one texel at this size and is deliberately not attempted -- the lighter value is what
+    # carries the impression.
+    "bill_upper":  (128, 130, 128),
+    "bill_lower":  (158, 158, 152),
+    "covert":      (146, 162, 58),    # follows the mantle up, or the wing panel goes muddy
+    "covert_edge": (110, 122, 52),
+    "leg":         (96, 98, 104),     # blue-grey
+    "gape":        (70, 50, 46),
+}
+
 # --- karasu ---------------------------------------------------------------------------
 # ⚠ A CROW IS NOT A PALETTE EDIT, AND SAYING SO EARLY SAVES THE NEXT BIRD. What transfers from
 # the uguisu is the MACHINERY -- the triangle rasteriser, the adaptive face/vertex normal blend,
@@ -92,12 +148,139 @@ KARASU = {
     "gape":        (84, 54, 54),
 }
 
+# ⚠ READ OFF THE OWNER'S REFERENCES, AND ONE THING IN THEM IS NOT THE BIRD. Both photographs show
+# yellow at the bill base and forehead. That is POLLEN -- the birds are feeding in cherry blossom
+# -- not plumage, and painting it would give every hiyodori a permanent yellow face. A photograph
+# is a record of one bird on one day; the palette has to be the species.
+HIYODORI = {
+    # A grey-brown bird, browner behind and greyer forward. Values sit close together on purpose:
+    # the identity is the EAR PATCH and the mottling, not a bold field of colour.
+    "dorsal":      (128, 120, 112),   # mantle: grey-brown
+    "crown":       (152, 148, 144),   # crown and nape: paler grey, shaggy
+    "wing_tail":   (104, 96, 90),     # flight feathers and the long tail: darker, browner
+    "ventral":     (176, 174, 172),   # breast ground, BEFORE the mottling breaks it up
+    "mottle":      (226, 226, 224),   # the pale scale tips -- see MOTTLE_* below
+    "throat":      (166, 166, 166),   # slightly cooler than the breast, no strong boundary
+    "flank":       (168, 150, 124),   # warm buff, low and aft -- the vent
+    # ⚠ THE BIRD'S NAME. Hypsipetes amaurotis is the brown-EARED bulbul; a chestnut patch behind
+    # and below the eye is the one mark that reads at distance and the one that must not be timid.
+    # ⚠ HUE 22 DEGREES, ARRIVED AT FROM BOTH SIDES. (146,84,58) at hue 18 read as a red-brown;
+    # (172,106,60) at hue 25 went "too orange" (owner, 2026-08-31). This sits between them, still
+    # leaning toward the warm rear-underside buff the owner pointed at.
+    "ear":         (158, 94, 58),
+    # ⚠ NEARLY BLACK. Was (28,22,20), which sat only a little under the iris and let the two blur
+    # into one dark bead at any distance. The pupil has to be the darkest thing on the bird for the
+    # iris to read as a ring at all.
+    "eye":         (12, 10, 10),
+    # ⚠ PUNCHED UP from (96,60,44) (owner, 2026-08-31: "I can barely see that golden iris"). That
+    # value was chosen to be "not the mejiro's bright gold" and overshot into invisibility -- it
+    # was within 60 units of the pupil it was meant to surround.
+    "iris":        (168, 118, 54),
+    "lore":        (92, 88, 86),
+    "bill_upper":  (54, 50, 50),      # dark, unlike the mejiro's pale bill
+    "bill_lower":  (72, 68, 66),
+    "covert":      (120, 112, 104),
+    "covert_edge": (146, 140, 132),   # pale feather EDGES -- what makes the wing look scalloped
+    "leg":         (150, 118, 112),   # dull pink-grey
+    "gape":        (70, 50, 46),
+}
+
+# ⚠ THE MOTTLING IS THE SECOND IDENTITY MARK and it is stronger in the references than expected:
+# the breast is scaled rather than plain. Amplitude is a parameter because it is exactly the kind
+# of thing that has to be judged side by side rather than argued.
+# ⚠ DERIVED FROM A TARGET SPOT SIZE, NOT PICKED BY EYE. Measured over a 0.160 x 0.100 stud patch
+# of real breast: at 120/0.25 the field gives 27 separated blobs about 0.0105 studs across and 15%
+# coverage; 210 halves that to 0.0063 and 320 to 0.0043. A first attempt set 26.0 by guesswork
+# when the noise was swapped and the field then barely completed a cycle across the breast --
+# coverage came out at 0.0% and the spots vanished entirely.
+# ⚠ CELL FREQUENCY for `_spots`: cell size is 1/MOTTLE_FREQ studs and each cell holds one spot,
+# so this sets both the count and the spacing. Derived below against a target of ~0.006 studs.
+MOTTLE_FREQ = 150.0
+# ⚠ RADIUS AND SHARP TOGETHER SET COVERAGE, and they fight: past ~0.60 the blobs MERGE and the
+# count falls even as coverage climbs (0.60 gave 49% coverage from only 108 blobs, against 176 at
+# 0.52). Measured over a 0.160 x 0.100 stud patch of breast: 150/0.52/1.5 -> 176 separate blobs,
+# 33% coverage, 0.0062 studs across. That is the density the owner asked for after 120/0.25 read
+# as "barely there" at 27 spots over 15%.
+MOTTLE_RADIUS = 0.52
+# >1 shrinks each blob toward its centre, separating neighbours without changing the count
+MOTTLE_SHARP = 1.5
+MOTTLE_AMP = 0.55
+MOTTLE_Y0, MOTTLE_Y1 = 0.16, -0.10   # fades out forward of the throat and aft into the vent
+
+# ⚠ TRACED FROM A CUTOUT THE OWNER SUPPLIED, not from my own segmentation and not parameterised.
+# Three attempts to describe this patch as a swept bezier each failed on a different seam, and a
+# fourth traced MY OWN read of the patch out of the photograph -- which had the right edge
+# treatment and the wrong shape. The owner then cut the shape out directly, which removes the
+# judgement call entirely.
+#
+# ⚠ THE CUTOUT WAS A SCREENSHOT OF A TRANSPARENT IMAGE, so its alpha is 255 everywhere and the
+# checkerboard is real pixels. Segmented on saturation instead (> 0.18; the checkerboard is
+# neutral), interior holes filled, then Moore-neighbour boundary trace -- an ORDERED contour,
+# which radial ray-casting is not and which this shape needs, being a curved wedge rather than a
+# star-convex blob. Resampled to 40 points by arc length and lightly smoothed: 92% of the mask
+# falls inside, area ratio 0.93.
+#
+# Normalised: centroid at the origin, largest extent 1.0. The photographed bird faces LEFT, so
+# image +x maps to model -y (aft) and image +y maps to model -z (down).
+EAR_OUTLINE = (
+    (+0.1131, +0.8921), (-0.0229, +0.9011), (-0.1620, +0.8741), (-0.2894, +0.8212),
+    (-0.3987, +0.7526), (-0.4847, +0.6692), (-0.5412, +0.5794), (-0.5771, +0.4808),
+    (-0.5888, +0.3752), (-0.5815, +0.2560), (-0.5636, +0.1341), (-0.5370, -0.0055),
+    (-0.5021, -0.1437), (-0.4617, -0.2765), (-0.4099, -0.3998), (-0.3521, -0.5141),
+    (-0.2855, -0.6213), (-0.2137, -0.7210), (-0.1395, -0.8129), (-0.0485, -0.8860),
+    (+0.0591, -0.9506), (+0.1765, -0.9937), (+0.2978, -1.0000), (+0.4036, -0.9601),
+    (+0.4768, -0.8910), (+0.5098, -0.7932), (+0.5057, -0.6690), (+0.4842, -0.5397),
+    (+0.4541, -0.4175), (+0.4134, -0.2961), (+0.3945, -0.1686), (+0.3918, -0.0411),
+    (+0.3999, +0.0890), (+0.4322, +0.2179), (+0.4694, +0.3468), (+0.4770, +0.4680),
+    (+0.4658, +0.5870), (+0.4263, +0.6974), (+0.3428, +0.7898), (+0.2322, +0.8544),
+)
+# ⚠ PINNED BY THE FLAT FORWARD-UPPER EDGE, which the owner identified as the part that sits behind
+# the eye. Anchoring there rather than at the centroid keeps that edge against the eye when the
+# scale changes, instead of the whole patch sliding.
+EAR_ANCHOR = (0.3888, 0.6793)       # that edge, in normalised outline coordinates
+EAR_ANCHOR_AT = (0.1235, 0.2605)    # where it sits on the head: just aft of and below EYE
+EAR_SCALE = 0.0256                  # studs per unit: patch height ~3.2 eye diameters
+EAR_SOFT = 0.0075                   # ONE falloff width for the entire boundary
+EAR_ROUGH = 0.0016                  # ragged edge, on that same signed distance
+EAR_ROUGH_FREQ = 150.0
+
+
+def _ear(y, z, P):
+    """Coverage in [0,1] of the traced patch: signed distance to one polygon, one soft falloff."""
+    centre = np.asarray(EAR_ANCHOR_AT) - EAR_SCALE * np.asarray(EAR_ANCHOR)
+    poly = np.asarray(EAR_OUTLINE) * EAR_SCALE + centre
+    n = len(poly)
+    d = np.full(len(y), 1e9)
+    inside = np.zeros(len(y), bool)
+    j = n - 1
+    for i in range(n):
+        a = poly[i]
+        b = poly[(i + 1) % n]
+        ab = b - a
+        t = np.clip(((y - a[0]) * ab[0] + (z - a[1]) * ab[1]) / (ab @ ab), 0.0, 1.0)
+        d = np.minimum(d, np.hypot(y - (a[0] + t * ab[0]), z - (a[1] + t * ab[1])))
+        yi, zi = poly[i]
+        yj, zj = poly[j]
+        inside ^= ((zi > z) != (zj > z)) & (y < (yj - yi) * (z - zi) / (zj - zi + 1e-12) + yi)
+        j = i
+    sd = np.where(inside, -d, d) + EAR_ROUGH * _scatter(P, EAR_ROUGH_FREQ)
+    return 1.0 - _smooth(-EAR_SOFT * 0.5, EAR_SOFT * 0.5, sd)
+
+
 # `landmarks` are in the FINAL mesh's own coordinates. `ref_length` is the nose-to-tail span they
 # were measured at, and bake() rescales them if the mesh it is handed differs -- see the warning
 # on LANDMARK_REF_LENGTH below, which was written after a 1.5x scale-up painted the supercilium
 # across the breast.
 SPECIES = {
     "uguisu": {"palette": UGUISU, "shader": "warbler", "ref_length": 0.552},
+    # (2) SHARES THE UGUISU REF LENGTH BECAUSE IT SHARES THE MESH. Both are the vendor
+    # sparrow, so the landmarks above describe this bird as it stands. When the mejiro
+    # gets proportions of its own, this number moves with them or the ring slides off
+    # the eye -- the exact failure this file already carries a scar from.
+    "mejiro": {"palette": MEJIRO, "shader": "white_eye", "ref_length": 0.552},
+    # ⚠ ref_length 0.552 LIKE THE OTHERS, because the hiyodori is baked on the UNWARPED uguisu
+    # mesh -- the warp moves vertices, not UVs, so the texture transfers unchanged.
+    "hiyodori": {"palette": HIYODORI, "shader": "bulbul", "ref_length": 0.552},
     "karasu": {"palette": KARASU, "shader": "corvid", "ref_length": 1.640,
                # ⚠ THESE ARE A FALLBACK AND A RECORD, NOT THE VALUES ACTUALLY USED.
                # `karasu_retarget.bake_and_finish` now OVERWRITES this dict from
@@ -126,6 +309,8 @@ SPECIES = {
                }},
 }
 
+
+
 # --- landmarks, measured off the retargeted mesh -----------------------------------------
 # ⚠ THESE ARE ABSOLUTE COORDINATES, AND THE MESH CAN BE RESCALED UNDER THEM. Every landmark below
 # was measured on a bird whose body ran LANDMARK_REF_LENGTH studs nose to tail. Scale the mesh and
@@ -144,6 +329,112 @@ BILL_Y = 0.1480
 GAPE_P = (0.0, 0.1480, 0.2641)
 GAPE_N = (0.0, -0.4510, -0.8924)      # >0 is below the gape
 
+# ⚠ THE WHITE-EYE'S RING, AS MULTIPLES OF `EYE_R` RATHER THAN ABSOLUTE. The ring is defined by
+# the eye it surrounds, so tying it to the eye's own radius keeps it correct if the eye ever
+# moves or resizes -- the failure mode this file already carries a scar from is a landmark that
+# stops describing the geometry it draws.
+# (2) THE WHITE DOES NOT TOUCH THE EYE. A ring of dark orbital skin sits between them -- without
+# it the white abuts the iris and the eye reads as a hole punched in a white disc. So the stack
+# from the centre out is: pupil, iris, ORBITAL GREY, white ring.
+# (3) THE GREY IS A RIM, NOT A ZONE. At 1.25/1.45 it ate most of the space between the iris and
+# the white and the ring went narrow; the white is the field mark and should own that width.
+ORBIT_OUT0, ORBIT_OUT1 = 1.06, 1.22   # outer edge of the grey, in EYE_R multiples
+# (2) TIGHTER, 1.80/2.15 -> 1.62/1.85: a thinner ring sitting closer to the eye.
+# (3) AND WIDER INWARD, 1.30/1.50 -> 1.10/1.26, taking back what the grey gave up.
+RING_IN0, RING_IN1 = 1.10, 1.26
+RING_OUT0, RING_OUT1 = 1.62, 1.85     # outer edge, feathered so it is a ring and not a washer
+# The lore, in (y, z) -- drawn OVER the ring on purpose: a white-eye's ring is open at the front,
+# not a closed hoop.
+# (2) IT IS THE GAPE LINE EXTENDED BACK, not a free segment: `LORE_B` is `GAPE_P` exactly and an
+# assert in the bake fails if the two ever drift apart.
+# (4) BOTH ENDS ARE NOW MEASURED OFF THE MESH, not fitted to `GAPE_P`. The owner selected the 14
+# vertices (7 a side, mirrored) that mark where the bill actually wants to split, 2026-08-31.
+# Their REAR end -- the end nearest the eye -- averages (0.1544, 0.2613) in reference space, which
+# is 0.006 FORWARD of `GAPE_P` and 0.003 BELOW it. That gap is why two hand-aimed versions of this
+# line looked wrong: it was being drawn to a midline plane point rather than to the crease a
+# viewer actually sees on the side of the head.
+# (5) THE EYE END IS THE PUPIL CENTRE, AND IT IS DERIVED, NOT TYPED. `LORE_A` reads straight off
+# `EYE`, so the line always points at the middle of the eye and follows it if the eye ever moves.
+# A level segment at gape height (z 0.2613) sat too low and read as passing under the bird rather
+# than emerging from its eye.
+# (2) An earlier pass ran to the eye centre too and looked wrong -- but that was with the forward
+# end at `GAPE_P`, so the line stopped short and ABOVE the real crease. With `LORE_B` measured,
+# aiming at the pupil is correct rather than "too high": the two faults were the same fault.
+LORE_A = (EYE[1], EYE[2])
+# The measured end, then the owner's adjustment to it, kept SEPARATE so neither is lost: the
+# first is what the mesh said, the second is a judgement about how the line should sit.
+LORE_B_MEASURED = (0.1544, 0.2613)    # averaged rear end of the 14 selected vertices
+LORE_SWEEP_DEG = -4.0                 # owner, 2026-08-31: sweep the bill end down
+LORE_EXTEND = 1.15                    # owner: reach a little further along the bill
+# Roughening where the lore runs into the eye. A ruled segment meeting a perfect circle reads as
+# vector art (owner, 2026-08-31: "a little too precise"), so both edges are perturbed by ONE
+# shared noise field -- they have to break up together or the wobble reads as two mistakes rather
+# than one texture. Amplitude is in reference-space distance; ~0.00048 is one texel at 1024.
+GRAIN_AMP = 0.00055
+GRAIN_FREQ = 1700.0
+# How far out the roughening reaches, in EYE_R multiples: full at the eye, gone by the time the
+# white ring reaches its outer edge, so the ring keeps a clean silhouette.
+# (7) IT NOW COVERS THE WHOLE MARK, INNER EDGE AND OUTER. First written at 2.6 by accident and
+# pulled back to 1.55 to keep the silhouette crisp; the owner then asked for the outer edge
+# roughened too (2026-08-31), so the fade deliberately reaches past `RING_OUT1` (1.85). The
+# earlier caution was not wrong, it was a different decision -- a ring roughened on one side only
+# reads as a printing error rather than as a feathered edge.
+GRAIN_FADE0, GRAIN_FADE1 = 0.8, 2.15
+
+
+def _swept(a, b, deg, scale=1.0):
+    """Rotate `b` about `a` in the (y, z) plane and scale the reach.
+
+    Angle and length are separate knobs on purpose: the DIRECTION came off the mesh and was then
+    adjusted once, while the REACH is pure judgement about how far the line should run. Folding
+    them into a typed endpoint would lose which was which.
+    """
+    dy, dz = b[0] - a[0], b[1] - a[1]
+    r = math.hypot(dy, dz) * scale
+    th = math.atan2(dz, dy) + math.radians(deg)
+    return (a[0] + r * math.cos(th), a[1] + r * math.sin(th))
+
+
+LORE_B = _swept(LORE_A, LORE_B_MEASURED, LORE_SWEEP_DEG, LORE_EXTEND)
+# (2) finer: was 0.0010/0.0034.  (6) finer again by a further 25%, owner 2026-08-31.
+LORE_W0, LORE_W1 = 0.000375, 0.0015
+# Where the bill colour takes over from the head. (2) PUSHED FORWARD from (-0.004, +0.006): the
+# dark started behind the feather line and made the bill root look heavy and glued on.
+# (2) PUSHED FORWARD AGAIN, 0.003/0.016 -> 0.010/0.026: the head colour -- green above, yellow
+# below -- has to carry onto the bill root, or the bill starts where the feathers stop and reads
+# as a separate part.
+BILL_FADE0, BILL_FADE1 = 0.010, 0.026
+# Pupil radius as a fraction of EYE_R, feathered. The rest of the eye disc is iris.
+PUPIL0, PUPIL1 = 0.40, 0.58
+# ⚠ THE HIYODORI GETS ITS OWN, and must: PUPIL0/PUPIL1 above are the MEJIRO's and changing them
+# would repaint a bird that is already approved. A smaller pupil leaves more of the iris showing,
+# which is half of why the iris was invisible -- the other half was its colour.
+HIYO_PUPIL0, HIYO_PUPIL1 = 0.38, 0.56
+# ⚠ A THIN BLACK RIM AT THE OUTER EDGE, owner-requested 2026-08-31: "a very thin ring of black at
+# the outside edge to set it apart from the rest of the bird." Without it the iris fades straight
+# into grey plumage and the eye has no boundary -- the mejiro gets the same separation from its
+# white ring, which this bird does not have. An annulus in the same radial distance the iris and
+# pupil use, so all three stay concentric by construction.
+HIYO_RIM_IN0, HIYO_RIM_IN1 = 0.86, 0.97
+HIYO_RIM_OUT0, HIYO_RIM_OUT1 = 1.06, 1.18
+# ⚠ AND A SOFT ORBITAL SHADOW BEHIND IT, because the rim alone cannot survive the bake. At 1024
+# that annulus is 0.2 TEXELS wide -- it renders as inconsistent speckle, not a ring.
+#
+# ⚠ 1024 IS A HARD CEILING, NOT A DEFAULT. Studio enforces it (owner, 2026-08-31), so "bake this
+# bird at 2048" is not an available answer to a feature that will not resolve. Every marking has
+# to earn its place in ~0.0034 studs per texel on a 1.15-stud bird, and a line finer than that is
+# not a design choice, it is a request the renderer will refuse.
+# This darkens the plumage around the eye over ~3.5 texels instead, which reads as a boundary at
+# any resolution. MULTIPLICATIVE, so it shades whatever it lands on -- grey cheek or chestnut ear
+# patch -- rather than stamping one colour across both.
+HIYO_ORBIT_IN0, HIYO_ORBIT_IN1 = 0.84, 1.00
+HIYO_ORBIT_OUT0, HIYO_ORBIT_OUT1 = 1.02, 2.10
+HIYO_ORBIT_DARK = 0.31
+# The yellow throat, in reference-space y. Forward of the breast and behind the bill.
+# (2) SHORTENED 0.052 -> 0.082 on the owner's eye: the first pass ran the yellow too far back
+# down the breast, which made the bird look yellow-fronted rather than yellow-throated.
+THROAT_Y0, THROAT_Y1 = 0.082, 0.128
+
 
 def _srgb_to_linear(c):
     c = np.asarray(c, dtype=np.float64) / 255.0
@@ -153,6 +444,90 @@ def _srgb_to_linear(c):
 def _smooth(e0, e1, x):
     t = np.clip((x - e0) / (e1 - e0), 0.0, 1.0)
     return t * t * (3.0 - 2.0 * t)
+
+
+def _grain(P, freq, phase=0.0):
+    """Deterministic sub-texel noise in [-1, 1] as a function of 3D POSITION.
+
+    Evaluated in 3D rather than in UV, which matters: the ring straddles a UV seam, and a noise
+    field in texel space would break differently on the two sides of it and read as a tear. In
+    3D the same point gets the same value however it was unwrapped.
+
+    A product of three offset sines rather than a real value noise -- it is cheap, vectorised,
+    seedless and reproducible, and at these frequencies nobody can tell the difference.
+    """
+    q = P * freq
+    return (np.sin(q[:, 0] * 1.0 + phase)
+            * np.sin(q[:, 1] * 1.7 + 2.1 * phase)
+            * np.sin(q[:, 2] * 2.3 + 4.3 * phase))
+
+
+# ⚠ DIRECTIONS OFF A GOLDEN-ANGLE SPIRAL, so no two are axis-aligned and none are parallel.
+# Fixed, not random: the bake must be reproducible without carrying a seed.
+def _wave_dirs(n=7):
+    i = np.arange(n) + 0.5
+    phi = np.arccos(1 - 2 * i / n)
+    theta = np.pi * (1 + 5 ** 0.5) * i
+    return np.stack([np.sin(phi) * np.cos(theta), np.sin(phi) * np.sin(theta), np.cos(phi)], 1)
+
+
+_WAVE_D = _wave_dirs()
+# irrational-ish ratios so the sum never repeats over the bird
+_WAVE_F = np.array([1.00, 1.37, 1.61, 2.13, 2.71, 3.19, 4.11])
+_WAVE_P = np.array([0.0, 1.7, 3.4, 0.9, 2.6, 4.2, 5.1])
+
+
+def _scatter(P, freq):
+    """Isotropic blob noise in [-1, 1]. A SUM OF PLANE WAVES, not a product of axis sines.
+
+    ⚠ `_grain` IS SEPARABLE AND THEREFORE A LATTICE. sin(x)*sin(y)*sin(z) is zero on every plane
+    where any one factor is zero, so its structure is rows and columns aligned to the axes. At
+    GRAIN_FREQ (1700) that is sub-texel and nobody can see it, which is why it was fine for
+    roughening an edge. At MOTTLE_FREQ (210) the cells are spot-sized and the owner read the
+    breast as "rows and columns of spots" -- correctly.
+
+    A sum of waves along non-parallel, non-axis-aligned directions has no such planes. The result
+    is near-Gaussian, so thresholding its upper tail gives ISOLATED blobs rather than a grid.
+    """
+    q = (P * freq) @ _WAVE_D.T
+    return np.sin(q * _WAVE_F + _WAVE_P).sum(axis=1) / len(_WAVE_F)
+
+
+def _hash3(c):
+    """(N,3) integer cell coords -> (N,3) deterministic floats in [0,1). No seed, no RNG state."""
+    x = (c[:, 0].astype(np.int64) * 73856093) ^ (c[:, 1].astype(np.int64) * 19349663) \
+        ^ (c[:, 2].astype(np.int64) * 83492791)
+    x = x.astype(np.uint64)
+    out = np.empty((len(c), 3))
+    for k in range(3):
+        x = x * np.uint64(6364136223846793005) + np.uint64(1442695040888963407)
+        out[:, k] = (x >> np.uint64(11)).astype(np.float64) / float(1 << 53)
+    return out
+
+
+def _spots(P, freq, radius=0.42):
+    """Scattered blobs in [0,1] -- CELLULAR noise: one jittered feature point per cell, coverage
+    falling off with distance to the nearest.
+
+    ⚠ THIS IS THE THIRD NOISE, AND THE FIRST TWO BOTH READ AS ROWS AND COLUMNS.
+      * `_grain` is sin(x)*sin(y)*sin(z): separable, so it is zero on planes normal to each axis.
+        A literal lattice.
+      * `_scatter` is a sum of seven plane waves. No zero planes, but seven sinusoids INTERFERE
+        into a quasi-periodic pattern -- the structure is rotated, not removed, and the owner read
+        rows and columns in it too.
+    Cellular noise has no directional content at all: the feature point in each cell is placed by
+    a hash, so nothing lines up. The cells are axis-aligned but full jitter hides them.
+    """
+    q = P * freq
+    base = np.floor(q).astype(np.int64)
+    best = np.full(len(q), 1e9)
+    for dx in (-1, 0, 1):
+        for dy in (-1, 0, 1):
+            for dz in (-1, 0, 1):
+                c = base + np.array([dx, dy, dz], dtype=np.int64)
+                d = np.linalg.norm(q - (c + _hash3(c)), axis=1)
+                best = np.minimum(best, d)
+    return np.clip(1.0 - best / radius, 0.0, 1.0)
 
 
 def _seg_dist(py, pz, a, b):
@@ -235,6 +610,291 @@ def shade(P, N, pal, S=1.0):
     out = np.where(inner[:, None], C["gape"], out)
 
     # 5. Legs and feet
+    leg = _smooth(0.090, 0.055, z) * ((y > -0.09) & (y < 0.09)).astype(float)
+    out = out * (1 - leg)[:, None] + C["leg"] * leg[:, None]
+    return np.clip(out, 0.0, 1.0)
+
+
+# Roughness by REGION, 0 = mirror, 1 = fully matte. These are the whole map: it says nothing
+# else, but what it says is true of every bird rather than of one.
+ROUGH = {
+    "eye": 0.16,        # wet. The entire reason a roughness map exists here.
+    "orbital": 0.46,    # bare skin around the eye: damp, not wet
+    # ⚠ GLOSS REVEALS FACETS, AND A LOW-POLY TOE HAS NOTHING TO SPARE. At 0.42 the mejiro's toes
+    # were twice as glossy as its plumage, and the specular picked out each facet's normal --
+    # the owner saw "strange quads" on the talons. The geometry was not at fault: all 324 toe
+    # faces are smooth-shaded with no custom normals and no sharp edges. The uguisu could never
+    # show it because it has no roughness map at all, which is what identified the cause.
+    # ⚠ THE BILL IS THE SAME MECHANISM ON THE SAME MESH and was raised with it, pre-emptively --
+    # 66 vertices carry the whole bill, so it has even less to spare than the foot.
+    "bill": 0.55,       # keratin, semi-gloss -- was 0.34
+    "leg": 0.70,        # scaly -- was 0.42
+    "covert": 0.80,     # flight and covert feathers keep a little sheen
+    "feather": 0.88,    # body plumage
+    "ventral": 0.93,    # soft underside, the most matte thing on the bird
+}
+
+
+def shade_roughness(P, N, pal, S=1.0, lm=None):
+    """⚠ SPECIES-AGNOSTIC BY CONSTRUCTION -- `pal` IS ACCEPTED AND NEVER READ. Roughness is a
+    property of the MATERIAL (feather, bill, leg, orbital), and those zones are geometry, so two
+    birds sharing a mesh get a byte-identical map.
+
+    ⚠ THEREFORE: ONE ROUGHNESS UPLOAD PER MESH, NOT PER SPECIES. The hiyodori's bake came out
+    SHA-identical to the mejiro's (a6fc657f...) and Roblox refused it as a duplicate of an asset
+    the owner already had -- which is correct behaviour on both sides. Every warbler-mesh bird
+    (uguisu, mejiro, hiyodori, and yamagara and sekirei to come) shares one roughness asset; the
+    karasu has its own because it has its own mesh.
+
+    `pal` stays in the signature so this matches every other shader and can be dispatched the same
+    way. If a future bird ever needs species-dependent roughness, that is a real change and the
+    contract test below is what will catch the assumption going stale.
+    """
+    """Per-texel roughness as a function of 3D position -- the SAME law as the colour shaders.
+
+    ⚠ THIS REPLACES A SECOND, WORSE RASTERISER. `roughness_map` painted each triangle's
+    distance-to-eye across its whole UV BOUNDING BOX, so 1024 squared carried 15 distinct values
+    with a median flat run of 25 texels -- visibly stepped once a bird's eye is large in frame.
+    Running roughness through `bake()` instead means it inherits the per-texel interpolation the
+    colormap already had, for free, and there is one rasteriser in this file instead of two.
+
+    ⚠ AND IT CAN NOW SAY MORE THAN "EYE OR NOT EYE". The old mask knew where the eyes were and
+    nothing else; a bill, legs and coverts are all genuinely less matte than body plumage.
+
+    ⚠ RETURNS GREY IN ALL THREE CHANNELS, and `bake(channel="roughness")` writes it into a
+    NON-COLOUR image. Written into an sRGB one, every value would be gamma-encoded on save and
+    the bird would come back uniformly glossier than authored.
+    """
+    P = P / S
+    x, y, z = np.abs(P[:, 0]), P[:, 1], P[:, 2]
+    r = np.full(len(y), ROUGH["feather"])
+
+    # underside: the softest, most matte feathers
+    dorsal = _smooth(-0.42, 0.52, N[:, 2])
+    r = r * dorsal + ROUGH["ventral"] * (1.0 - dorsal)
+
+    # the folded wing panel, using the warbler law so it lands on the same texels as the colour
+    edge_z = 0.200 + (y - 0.050) * (0.120 - 0.200) / (-0.220 - 0.050)
+    zone = _smooth(0.012, -0.004, z - edge_z) * _smooth(0.020, 0.032, x) \
+        * _smooth(-0.265, -0.235, y) * (1.0 - _smooth(0.030, 0.070, y)) \
+        * _smooth(0.075, 0.100, z) * dorsal
+    r = r * (1 - zone) + ROUGH["covert"] * zone
+
+    # legs and feet
+    leg = _smooth(0.090, 0.055, z) * ((y > -0.09) & (y < 0.09)).astype(float)
+    r = r * (1 - leg) + ROUGH["leg"] * leg
+
+    # bill
+    blend = _smooth(BILL_Y + BILL_FADE0, BILL_Y + BILL_FADE1, y)
+    r = r * (1 - blend) + ROUGH["bill"] * blend
+
+    # orbital skin, then the eye itself -- same radii the colour shader uses, so the gloss lands
+    # exactly on the paint rather than near it
+    de = np.sqrt((x - EYE[0]) ** 2 + (y - EYE[1]) ** 2 + (z - EYE[2]) ** 2)
+    side = _smooth(0.010, 0.020, x)
+    orb = (1.0 - _smooth(EYE_R * RING_OUT0, EYE_R * RING_OUT1, de)) * side
+    r = r * (1 - orb) + ROUGH["orbital"] * orb
+    eye = (1.0 - _smooth(EYE_R * 0.85, EYE_R * 1.15, de)) * side
+    r = r * (1 - eye) + ROUGH["eye"] * eye
+
+    return np.clip(np.repeat(r[:, None], 3, axis=1), 0.0, 1.0)
+
+
+def shade_whiteeye(P, N, pal, S=1.0, lm=None):
+    """A mejiro: yellow-green above, THREE ventral zones, and a bold white ring around the eye.
+
+    (2) ITS OWN FUNCTION, NOT `shade` WITH FLAGS, for the same reason `shade_corvid` is: the
+    marking LAW differs, not the numbers. A warbler is a stripe over a stripe along two
+    segments; a white-eye is an annulus around a point. Cramming both into one would make
+    neither easier to change.
+
+    What IS shared with the warbler and copied deliberately rather than factored out: the
+    countershading off the normal, the folded-wing panel, the bill split and the legs. This file
+    already accepts that duplication between shaders -- a shared helper would couple three
+    shaders that are meant to be free to diverge.
+    """
+    C = {k: _srgb_to_linear(v) for k, v in pal.items()}
+    P = P / S
+    x, y, z = np.abs(P[:, 0]), P[:, 1], P[:, 2]
+    M = len(y)
+
+    # 1. COUNTERSHADING, off the normal -- the warbler law, unchanged.
+    dorsal = _smooth(-0.42, 0.52, N[:, 2])
+    warm = _smooth(0.02, -0.14, y)
+    upper = C["dorsal"] * (1 - warm)[:, None] + C["wing_tail"] * warm[:, None]
+    crown = _smooth(0.070, 0.115, y)
+    upper = upper * (1 - crown)[:, None] + C["crown"] * crown[:, None]
+
+    # 1b. THREE VENTRAL ZONES. White breast, buff flank where it meets the wing, and a yellow
+    #     throat forward of both. The throat is gated on being genuinely UNDERSIDE (low
+    #     `flankish`) or it climbs the cheek and the bird grows a yellow jaw.
+    lower = np.tile(np.asarray(C["ventral"], dtype=np.float64), (M, 1))
+    flankish = _smooth(0.15, 0.55, dorsal)
+    lower = lower * (1 - flankish)[:, None] + C["flank"] * flankish[:, None]
+    # (2) NO GREEN COLLAR BETWEEN THE THROAT AND THE BELLY. One was built and rejected on sight
+    # (owner, 2026-08-30) -- the throat meets the breast directly. Do not reintroduce it: the
+    # separation the eye wants comes from the throat being SHORT and BRIGHT, not from a band.
+    throat = _smooth(THROAT_Y0, THROAT_Y1, y) * (1.0 - flankish)
+    lower = lower * (1 - throat)[:, None] + C["throat"] * throat[:, None]
+    out = lower * (1 - dorsal)[:, None] + upper * dorsal[:, None]
+
+    # 1c. THE FOLDED WING, as the warbler draws it: a panel a shade darker than the mantle plus
+    #     a line along its top edge, or the wing vanishes into the back at distance.
+    edge_z = 0.200 + (y - 0.050) * (0.120 - 0.200) / (-0.220 - 0.050)
+    under = _smooth(0.012, -0.004, z - edge_z)
+    zone = under * _smooth(0.020, 0.032, x) * _smooth(-0.265, -0.235, y) \
+        * (1.0 - _smooth(0.030, 0.070, y)) * _smooth(0.075, 0.100, z) * dorsal
+    out = out * (1 - zone)[:, None] + C["covert"] * zone[:, None]
+    line_w = (1.0 - _smooth(0.0015, 0.0055, np.abs(z - edge_z))) * _smooth(0.020, 0.032, x) \
+        * _smooth(-0.265, -0.235, y) * (1.0 - _smooth(0.030, 0.070, y)) * dorsal
+    out = out * (1 - line_w)[:, None] + C["covert_edge"] * line_w[:, None]
+
+    # 2. THE RING -- an annulus in 3D distance from the eye centre, feathered at both edges so it
+    #    reads as a ring rather than a washer. Gated on |x| to keep it off the midline crown.
+    de = np.sqrt((x - EYE[0]) ** 2 + (y - EYE[1]) ** 2 + (z - EYE[2]) ** 2)
+    side = _smooth(0.010, 0.020, x)
+    # ONE grain field for the orbital edge and the lore, faded out before the ring's outer edge
+    # so the mark stays crisp in silhouette while its inner junction goes soft.
+    amp = GRAIN_AMP * (1.0 - _smooth(EYE_R * GRAIN_FADE0, EYE_R * GRAIN_FADE1, de))
+    g = amp * _grain(P, GRAIN_FREQ)
+    de_r = de + g
+
+    # 2a. Orbital skin first: a grey disc a little larger than the eye, so the white ring lands
+    #     on grey rather than on the iris. Its outer edge takes the grain.
+    orbit = (1.0 - _smooth(EYE_R * ORBIT_OUT0, EYE_R * ORBIT_OUT1, de_r)) * side
+    out = out * (1 - orbit)[:, None] + C["lore"] * orbit[:, None]
+    # BOTH edges on the grained radius: inner so grey and white share one boundary, outer so the
+    # mark is feathered all the way round.
+    ring = _smooth(EYE_R * RING_IN0, EYE_R * RING_IN1, de_r) \
+        * (1.0 - _smooth(EYE_R * RING_OUT0, EYE_R * RING_OUT1, de_r)) \
+        * side
+    out = out * (1 - ring)[:, None] + C["eyering"] * ring[:, None]
+
+    # 2b. THE LORE, DRAWN OVER THE RING SO IT BREAKS IT. This is what stops the mark reading as a
+    #     decal: a real white-eye has a thin dark line running from the eye to the bill, so the
+    #     ring is open at the front rather than a closed hoop.
+    lore = (1.0 - _smooth(LORE_W0, LORE_W1,
+                          _seg_dist(y, z, LORE_A, LORE_B) + g)) * side
+    out = out * (1 - lore)[:, None] + C["lore"] * lore[:, None]
+
+    # 3. Eye, drawn AFTER the ring and the lore so it sits on top of both. TWO discs: a golden
+    #    iris filling the eye, then a black pupil inside it. A single dark disc read as a bead.
+    iris = 1.0 - _smooth(EYE_R * 0.78, EYE_R, de)
+    out = out * (1 - iris)[:, None] + C["iris"] * iris[:, None]
+    pupil = 1.0 - _smooth(EYE_R * PUPIL0, EYE_R * PUPIL1, de)
+    out = out * (1 - pupil)[:, None] + C["eye"] * pupil[:, None]
+
+    # 4. Bill, split at the gape plane
+    gp, gn = np.array(GAPE_P), np.array(GAPE_N)
+    sd = (P - gp) @ gn
+    bill = y > BILL_Y - 0.004
+    wu = (bill & (sd <= 0)).astype(float)
+    wl2 = (bill & (sd > 0)).astype(float)
+    blend = _smooth(BILL_Y + BILL_FADE0, BILL_Y + BILL_FADE1, y)
+    out = out * (1 - wu * blend)[:, None] + C["bill_upper"] * (wu * blend)[:, None]
+    out = out * (1 - wl2 * blend)[:, None] + C["bill_lower"] * (wl2 * blend)[:, None]
+    inner = bill & (np.abs(sd) < 0.0035) & (np.abs(N[:, 2]) > 0.35)
+    out = np.where(inner[:, None], C["gape"], out)
+
+    # 5. Legs and feet
+    leg = _smooth(0.090, 0.055, z) * ((y > -0.09) & (y < 0.09)).astype(float)
+    out = out * (1 - leg)[:, None] + C["leg"] * leg[:, None]
+    return np.clip(out, 0.0, 1.0)
+
+
+
+def shade_bulbul(P, N, pal, S=1.0, lm=None):
+    """A hiyodori: grey-brown countershading, a chestnut ear patch, and a MOTTLED breast.
+
+    ⚠ ITS OWN FUNCTION for the reason the others are: the marking law differs. A warbler is a
+    stripe over a stripe; a white-eye is an annulus around a point; a bulbul is a patch plus a
+    NOISE FIELD, and the noise is the part no other shader has.
+
+    ⚠ BAKED ON THE UNWARPED MESH. The hiyodori's geometry is the uguisu's with an elongated tail
+    and a 0.90 cross-section (warbler_proportions.py), but a vertex warp does not move UVs -- so
+    the texture is baked here in uguisu space and applies to the warped bird unchanged, landing on
+    the same feathers. That is why every landmark constant in this file stays valid.
+    """
+    C = {k: _srgb_to_linear(v) for k, v in pal.items()}
+    P = P / S
+    x, y, z = np.abs(P[:, 0]), P[:, 1], P[:, 2]
+
+    # 1. COUNTERSHADING off the normal, the shared law.
+    dorsal = _smooth(-0.42, 0.52, N[:, 2])
+    warm = _smooth(0.02, -0.14, y)
+    upper = C["dorsal"] * (1 - warm)[:, None] + C["wing_tail"] * warm[:, None]
+    crown = _smooth(0.070, 0.115, y)
+    upper = upper * (1 - crown)[:, None] + C["crown"] * crown[:, None]
+
+    # 2. THE BREAST, MOTTLED. A flat ventral colour reads as a grey sparrow; the scaling is what
+    #    says bulbul, and in the owner's references it is stronger than expected. Deterministic in
+    #    POSITION, so it never crawls between bakes.
+    # ⚠ `_scatter`, NOT `_grain`. See _scatter: the old field is separable and lays the spots out
+    # in rows and columns. Thresholding the upper tail turns a near-Gaussian field into isolated
+    # blobs, which is what a mottled breast is.
+    m = _spots(P, MOTTLE_FREQ, MOTTLE_RADIUS) ** MOTTLE_SHARP
+    band = _smooth(MOTTLE_Y0, MOTTLE_Y1, y)
+    speck = m * MOTTLE_AMP * band
+    lower = C["ventral"] * (1 - speck)[:, None] + C["mottle"] * speck[:, None]
+    # ⚠ ASCENDING, edge0 < edge1, so the throat is FORWARD. Written the other way round first,
+    # which made `throat` equal 1 everywhere aft of y=0.105 and painted flat throat colour over the
+    # entire mottled breast -- MOTTLE_AMP then did nothing at all, from 0.0 to 1.0, and three
+    # "variants" baked byte-identical. The owner asking what the mottle was is what surfaced it.
+    throat = _smooth(0.105, 0.155, y)
+    lower = lower * (1 - throat)[:, None] + C["throat"] * throat[:, None]
+    # the warm vent, low and aft -- gated on facing DOWNWARD so it stays off the flanks
+    vent = _smooth(-0.02, -0.13, y) * _smooth(0.45, 0.15, N[:, 2])
+    lower = lower * (1 - vent)[:, None] + C["flank"] * vent[:, None]
+
+    out = lower * (1 - dorsal)[:, None] + upper * dorsal[:, None]
+
+    # 2b. The folded wing panel and its pale edge -- copied from the warbler deliberately, as this
+    #     file already accepts duplication between shaders rather than coupling them.
+    edge_z = 0.200 + (y - 0.050) * (0.120 - 0.200) / (-0.220 - 0.050)
+    under = _smooth(0.012, -0.004, z - edge_z)
+    zone = under * _smooth(0.020, 0.032, x) * _smooth(-0.265, -0.235, y) \
+        * (1.0 - _smooth(0.030, 0.070, y)) * _smooth(0.075, 0.100, z) * dorsal
+    out = out * (1 - zone)[:, None] + C["covert"] * zone[:, None]
+    line_w = (1.0 - _smooth(0.0015, 0.0055, np.abs(z - edge_z))) * _smooth(0.020, 0.032, x) \
+        * _smooth(-0.265, -0.235, y) * (1.0 - _smooth(0.030, 0.070, y)) * dorsal
+    out = out * (1 - line_w)[:, None] + C["covert_edge"] * line_w[:, None]
+
+    # 3. THE EAR PATCH -- the bird's name, and the one mark allowed to be bold. An ellipse behind
+    #    and below the eye, gated on |x| so it never crosses the midline crown.
+    ear = _ear(y, z, P) * _smooth(0.012, 0.024, x)
+    out = out * (1 - ear)[:, None] + C["ear"] * ear[:, None]
+
+    # 4. Eye: a dark reddish iris and a black pupil. No white ring -- that is the mejiro's mark and
+    #    putting one here would make two different birds read as the same one.
+    de = np.sqrt((x - EYE[0]) ** 2 + (y - EYE[1]) ** 2 + (z - EYE[2]) ** 2)
+    iris = 1.0 - _smooth(EYE_R * 0.82, EYE_R, de)
+    out = out * (1 - iris)[:, None] + C["iris"] * iris[:, None]
+    pupil = 1.0 - _smooth(EYE_R * HIYO_PUPIL0, EYE_R * HIYO_PUPIL1, de)
+    out = out * (1 - pupil)[:, None] + C["eye"] * pupil[:, None]
+    # the orbital shadow FIRST, so the rim lands on top of an already-darkened ground
+    side = _smooth(0.010, 0.020, x)
+    orb = _smooth(EYE_R * HIYO_ORBIT_IN0, EYE_R * HIYO_ORBIT_IN1, de) \
+        * (1.0 - _smooth(EYE_R * HIYO_ORBIT_OUT0, EYE_R * HIYO_ORBIT_OUT1, de)) * side
+    out = out * (1.0 - orb * HIYO_ORBIT_DARK)[:, None]
+    # then the rim, drawn LAST so it sits over the iris's outer fade
+    rim = _smooth(EYE_R * HIYO_RIM_IN0, EYE_R * HIYO_RIM_IN1, de) \
+        * (1.0 - _smooth(EYE_R * HIYO_RIM_OUT0, EYE_R * HIYO_RIM_OUT1, de)) * side
+    out = out * (1 - rim)[:, None] + C["eye"] * rim[:, None]
+
+    # 5. Bill, split at the gape plane -- the shared law, with a DARK bill rather than the
+    #    mejiro's pale one.
+    gp, gn = np.array(GAPE_P), np.array(GAPE_N)
+    sd = (P - gp) @ gn
+    bill = y > BILL_Y - 0.004
+    wu = (bill & (sd <= 0)).astype(float)
+    wl2 = (bill & (sd > 0)).astype(float)
+    blend = _smooth(BILL_Y + BILL_FADE0, BILL_Y + BILL_FADE1, y)
+    out = out * (1 - wu * blend)[:, None] + C["bill_upper"] * (wu * blend)[:, None]
+    out = out * (1 - wl2 * blend)[:, None] + C["bill_lower"] * (wl2 * blend)[:, None]
+    inner = bill & (np.abs(sd) < 0.0035) & (np.abs(N[:, 2]) > 0.35)
+    out = np.where(inner[:, None], C["gape"], out)
+
+    # 6. Legs and feet
     leg = _smooth(0.090, 0.055, z) * ((y > -0.09) & (y < 0.09)).astype(float)
     out = out * (1 - leg)[:, None] + C["leg"] * leg[:, None]
     return np.clip(out, 0.0, 1.0)
@@ -373,6 +1033,20 @@ def find_free_uv_block(me, w, h, res=512):
     return None
 
 
+def shade_wing_roughness(P, N, pal, S=1.0):
+    """Flat flight-feather roughness across the wing plate.
+
+    ⚠ THE WING NEEDS ITS OWN ROUGHNESS SHADER OR THE CHANNEL LEAKS. `bake` hardcoded `shade_wing`
+    for the wing region whatever channel it was baking, so a roughness pass wrote wing COLOUR --
+    linear RGB, three different values -- into a map read as a scalar. The bird would have come
+    back with a wing glossier on one side than the other for no reason anybody could trace.
+
+    Flat rather than shaded, for the same reason `shade_wing` is flat: gradients along a wing
+    alias into visible banding at this resolution.
+    """
+    return np.full((len(P), 3), ROUGH["covert"])
+
+
 def shade_wing(P, N, pal, S=1.0):
     """FLAT per surface — dark above, pale below, and nothing else.
 
@@ -426,7 +1100,9 @@ def _raster(me, uvl, co, no, img, hit, res, shader, pal, S=1.0, lm=None):
 
 
 SHADERS = {"warbler": lambda P, N, pal, S, lm: shade(P, N, pal, S),
-           "corvid": shade_corvid}
+           "white_eye": shade_whiteeye,
+           "corvid": shade_corvid,
+           "bulbul": shade_bulbul}
 
 
 def base_from_image(name, res):
@@ -649,8 +1325,8 @@ def eye_preserve(eyes_name="KarasuEyes", inner=1.9, outer=3.2):
     return out
 
 
-def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name=None,
-         base_image=None, preserve=None, grade=None, paint_attr=None):
+def bake(obj_name="UguisuBody", species="uguisu", uv_name=None, res=RES, wing_name=None,
+         base_image=None, preserve=None, grade=None, paint_attr=None, channel="color"):
     ob = bpy.data.objects[obj_name]
     me = ob.data
     uv_name = uv_name or me.uv_layers[0].name
@@ -660,7 +1336,10 @@ def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name
     # HOW BIG IS THIS BIRD, relative to the one the landmarks were measured on?
     sp = SPECIES[species]
     lm = sp.get("landmarks")
-    shader = SHADERS[sp["shader"]]
+    # ⚠ ONE RASTERISER, TWO CHANNELS. Roughness is not a different KIND of thing from colour --
+    # both are functions of 3D position -- so it rides the same path rather than owning a second,
+    # cruder one. See `shade_roughness`.
+    shader = shade_roughness if channel == "roughness" else SHADERS[sp["shader"]]
     ys = [v.co.y for v in me.vertices]
     S = (max(ys) - min(ys)) / sp.get("ref_length", LANDMARK_REF_LENGTH)
 
@@ -755,7 +1434,9 @@ def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name
         _raster(wme, wme.uv_layers[0].data,
                 np.array([v.co[:] for v in wme.vertices]),
                 np.array([v.normal[:] for v in wme.vertices]),
-                img, hit, res, shade_wing, pal, S)  # flat per surface -- see shade_wing
+                img, hit, res,
+                shade_wing_roughness if channel == "roughness" else shade_wing,
+                pal, S)  # flat per surface -- see shade_wing
         filled = int(hit.sum())
 
     # ⚠ HAND BACK THE EYE. Everything above painted the whole bird, this returns the one region
@@ -796,11 +1477,13 @@ def bake(obj_name="Uguisu_R", species="uguisu", uv_name=None, res=RES, wing_name
         img[grow] = acc[grow] / cnt[grow][:, None]
         hit |= grow
 
-    name = f"{species}_colormap"
+    name = f"{species}_colormap" if channel == "color" else f"{species}_{channel}"
     if name in bpy.data.images:
         bpy.data.images.remove(bpy.data.images[name])
     bi = bpy.data.images.new(name, res, res, alpha=True)
-    bi.colorspace_settings.name = 'sRGB'
+    # ⚠ NON-COLOUR FOR ANYTHING THAT IS NOT COLOUR. Roughness is a measurement, not a picture;
+    # in an sRGB slot every value would be gamma-encoded on save.
+    bi.colorspace_settings.name = 'sRGB' if channel == "color" else 'Non-Color'
     px = np.concatenate([img, np.ones((res, res, 1))], axis=2).astype(np.float32)
     bi.pixels.foreach_set(px.ravel())
     bi.update()

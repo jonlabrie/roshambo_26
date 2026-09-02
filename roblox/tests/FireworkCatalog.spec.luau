@@ -38,10 +38,12 @@ describe("FireworkCatalog — the other half of the contract", function()
         end
     end)
 
-    test("every burst names a texture — an empty Texture renders NOTHING", function()
+    test("a burst's texture, when named, is non-empty — an empty Texture renders NOTHING", function()
+        -- Since 2026-09-03 a burst may omit `texture` entirely: the style's textureRole
+        -- resolves one at render, and BurstStyles' own tests keep every role id non-empty.
         for _, recipe in FireworkCatalog.RECIPES do
             for _, ph in recipe.phases do
-                if ph.kind == "burst" then
+                if ph.kind == "burst" and ph.texture ~= nil then
                     expect(typeof(ph.texture)).toBe("string")
                     expect(#ph.texture > 0).toBe(true)
                 end

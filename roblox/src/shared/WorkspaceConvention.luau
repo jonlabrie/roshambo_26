@@ -18,6 +18,7 @@ WorkspaceConvention.DECLARED_STAGE_CHILDREN = {
     "Overlook",
     "SwitchbackDeck",
     "FallsDock", -- the 6x8 posted timber dock on pool 2 (assets/FallsDock.model.json)
+    "ProvingGround", -- fireworks proving range at FallsLanding (assets/ProvingGround.model.json)
     "Karesansui",
     "Hanabiya", -- 花火屋, the firework shop machiya (assets/Hanabiya.model.json)
     "MachiyaApparel", -- apparel machiya, merchant row (assets/MachiyaApparel.model.json)
