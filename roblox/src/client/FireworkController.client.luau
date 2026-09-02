@@ -708,9 +708,9 @@ local function play(payload: any, distance: number)
                                     -- cap ("might be a little too big", and the roundness reads
                                     -- less at the smaller size).
                                     kem.Size = NumberSequence.new({
-                                        NumberSequenceKeypoint.new(0, 1.6),
-                                        NumberSequenceKeypoint.new(0.3, 5),
-                                        NumberSequenceKeypoint.new(1, 1.6),
+                                        NumberSequenceKeypoint.new(0, 1.2),
+                                        NumberSequenceKeypoint.new(0.3, 3.5),
+                                        NumberSequenceKeypoint.new(1, 1.2),
                                     })
                                     kem.Speed = NumberRange.new(0, 0)
                                     kem.Drag = 0
@@ -726,7 +726,7 @@ local function play(payload: any, distance: number)
                                     kem.Orientation = Enum.ParticleOrientation.FacingCamera
                                     kem.Rotation = NumberRange.new(0, 180)
                                     kem.LightEmission = 1
-                                    kem:Emit(2)
+                                    kem:Emit(3)
                                 end)
                                 if lod.sound then
                                     task.delay(salvoAt + shot.at + travel, function()
