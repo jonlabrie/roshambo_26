@@ -149,11 +149,12 @@ local function nudge(bounds: Bounds, x: number, z: number, teahouseFP: Bounds?):
 end
 
 -- The gear's default mount when there is no stored record at all (every owned id not present
--- in `stored`). Flipping this ONE constant from "floor" to "rail" is the owner's rail-mount
--- gate lever (Task 7 wires a UI toggle to it) -- the no-override rail path is fully
--- implemented below via `railDefault` (staggered, clamped to the newel margins, aim "C"), so
--- pulling the lever cannot error.
-local DEFAULT_MOUNT = "floor"
+-- in `stored`). PULLED by the owner at the 2026-09-05 gate: a new owner's tubes saddle the
+-- front rail out of the box (staggered via `railDefault`, aimed "C" over the canyon).
+-- ⚠ This governs ABSENT records only -- a stored record without a `mount` field is a LEGACY
+-- placement and reads "floor" at its saved spot (see `resolve`); the lever must never
+-- relocate what a player already placed.
+local DEFAULT_MOUNT = "rail"
 
 -- The staggered default deck-local spot for the i-th of n owned mortars mounted on the rail
 -- with NO stored override: the SAME i/n stagger the floor defaults use (defaultX), clamped
@@ -198,7 +199,11 @@ function MortarPlacement.resolve(
     local n = #orderedOwned
     for i, id in orderedOwned do
         local override = stored and stored[id]
-        local mount = (override and override.mount) or DEFAULT_MOUNT
+        -- A stored record missing `mount` is LEGACY (pre-rail-mounts) and means floor-at-its-
+        -- saved-spot -- never DEFAULT_MOUNT, which would relocate saved placements onto the
+        -- rail now that the lever is pulled. DEFAULT_MOUNT applies only when there is no
+        -- record at all.
+        local mount = if override then (override.mount or "floor") else DEFAULT_MOUNT
         local aim = (override and override.aim) or "C"
         local x, z
         if mount == "rail" then
