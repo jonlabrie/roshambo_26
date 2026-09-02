@@ -692,20 +692,25 @@ local function play(payload: any, distance: number)
                                     kp.CFrame = CFrame.new(anchorPos + shot.offset)
                                     kem.Texture = BurstStyles.TEXTURES.dot
                                     kem.Color = ColorSequence.new(Color3.new(1, 1, 1))
+                                    -- Rise-and-fall, not fade (owner, 2026-09-06): the SIZE is
+                                    -- the envelope — snaps up, collapses — and the sprite stays
+                                    -- solid until the last instant. Peak pulled off the 10-stud
+                                    -- cap ("might be a little too big", and the roundness reads
+                                    -- less at the smaller size).
                                     kem.Size = NumberSequence.new({
-                                        NumberSequenceKeypoint.new(0, 6),
-                                        NumberSequenceKeypoint.new(0.2, 10),
-                                        NumberSequenceKeypoint.new(1, 8),
+                                        NumberSequenceKeypoint.new(0, 2.5),
+                                        NumberSequenceKeypoint.new(0.3, 8),
+                                        NumberSequenceKeypoint.new(1, 2.5),
                                     })
                                     kem.Speed = NumberRange.new(0, 0)
                                     kem.Drag = 0
-                                    kem.Lifetime = NumberRange.new(0.25, 0.3)
+                                    kem.Lifetime = NumberRange.new(0.15, 0.18)
                                     kem.Brightness = 8
                                     kem.SpreadAngle = Vector2.new(0, 0)
                                     kem.Acceleration = Vector3.zero
                                     kem.Transparency = NumberSequence.new({
                                         NumberSequenceKeypoint.new(0, 0),
-                                        NumberSequenceKeypoint.new(0.6, 0),
+                                        NumberSequenceKeypoint.new(0.9, 0),
                                         NumberSequenceKeypoint.new(1, 1),
                                     })
                                     kem.Orientation = Enum.ParticleOrientation.FacingCamera
