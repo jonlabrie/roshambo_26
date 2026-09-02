@@ -3361,3 +3361,14 @@ the big gun." Price 10, mortar:L, five guarded steps run (`3115d8d`), kamuro
 draft family pruned. First shell of the heavy class -- weighted-admission
 budget, L grunt launch, always-boom break, salvo kicker -- all live in one
 SKU. Dev backend redeployed (op 962b864b). Worksheet remainder: hotaru, dan.
+
+## [2026-09-06] shipped | The pity ramp -- bounded droughts on every boosted shell
+
+The owner lived the flat-30% failure mode (0 boosts in 10 kamuro, filed as a
+bug; a live rng tap proved the math healthy -- 3 boosted in the next 13,
+matching 3 kickers seen) and ruled: add a pity ramp. `c92a6ee`: each miss
+adds half the base chance (30 -> 45/60/75/90/100; worst drought 5), hit
+resets to the recipe's floor. Pure BoostLuck.luau; server-side per-player
+per-shell streaks (session-lived); verdict in the launch payload -- all
+clients render the same luck; proving range deliberately stays on the raw
+floor. Applies to every boosted shell automatically (kiku, wa, yashi, kamuro).
