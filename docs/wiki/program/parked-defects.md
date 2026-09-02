@@ -30,7 +30,7 @@ not, and a stale one sends a reader to unrelated code and quietly costs their tr
   read-then-save pattern would let both read 1 and both write 0").
 - Verified present 2026-08-27. Behind `requireApiKey`.
 
-## (b) `PUT /players/:id/decorations` never checks ownership
+## ~~(b) `PUT /players/:id/decorations` never checks ownership~~ FIXED 2026-09-05 (`validateDecorations` takes the stored list; rearrange/remove only, never mint -- DECORATION_NOT_OWNED)
 
 - **Where:** `apiV1.ts`, `PUT /players/:robloxUserId/decorations` — `validateDecorations`
   (`server/src/loadout.ts`) checks
