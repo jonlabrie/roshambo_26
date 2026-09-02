@@ -12,6 +12,8 @@
 --
 -- THE TEXTURE IS NOT OPTIONAL. A ParticleEmitter with Texture == "" renders nothing at all — no
 -- error, no warning. Learned on the 2026-07-20 bench; see the roshambo-fireworks memory.
+local BurstStyles = require("./BurstStyles")
+
 local FireworkCatalog = {}
 
 -- The launch thump (owner's pick, 2026-09-03: launch-deck-2 from the kingsrow deck set). Ascent
@@ -153,6 +155,30 @@ FireworkCatalog.RECIPES = {
                     kickerColor = { 190, 90, 255 },
                     kickerStreaks = true,
                 },
+            },
+        },
+    },
+    -- 黄金 kamuro, the golden crown (promoted 2026-09-06; owner: "an inexpensive shell for
+    -- the large tube -- a cheap round to show off the big gun"). THE FIRST L SHELL: heavy
+    -- (double sprites under weighted admission), double-radius crown (spread 60), the big
+    -- eardeer boom on EVERY break, launch grunt via the L tube. The boost (30%) is the
+    -- salvo kicker: 3-4 aerial salutes in variable grouping down in the falling crown.
+    kamuro = {
+        heavy = true,
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin" },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 200, 120 } },
+            {
+                at = 3.0,
+                kind = "burst",
+                anchor = "apex",
+                style = "kamuro",
+                color = { 255, 170, 40 },
+                edgeColor = { 255, 220, 140 },
+                spread = 60,
+                droop = false,
+                sound = BurstStyles.SOUNDS.salute_single, -- the always-boom, every shell
+                boost = { chance = 0.3, salvo = { count = { 3, 4 } } },
             },
         },
     },
