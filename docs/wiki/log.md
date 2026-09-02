@@ -3142,6 +3142,26 @@ ShopController commit touched shop display tables, leaving `CURSOR_PRIORITY`, th
 both recorded rejected approaches exactly as described. Stamped `checked:` on the strength of the
 read, not of the citation.
 
+**A third base advance landed clean, and one stamped page needed a correction anyway.**
+`13ee64e` fixed parked defect (a) — the purchase read-modify-write race — but
+[[friends-family-baseline]] item 6 still listed *"the parked economy-API defects (a)–(c)"*.
+Corrected to (b)–(c). ⚠ **A FIX ON ONE PAGE IS AN EDIT TO EVERY PAGE THAT CITES IT**, and a letter
+is the easiest citation in this wiki to leave behind: nothing links it, so nothing breaks visibly.
+The `checked:` stamp came off that page rather than sitting beside a body edit, per rule 6.
+
+**The relabel that came with it was done right, and is worth recording as the good case.**
+`44e691c` moved the mortar-gate defects to (l)–(n) *"because (i)-(k) were already taken"* — so the
+citations from [[identity]], [[data]] and [[deploy]] still land on the identity and JWT defects
+they were written for. That is the failure mode this run was watching for and did not find.
+
+**Re-verified rather than assumed, because the grace period would have hidden it:** the same
+advance touched `apiV1.ts`, `economy.ts` and `DecorationCatalog.luau`, all cited by pages stamped
+hours earlier. `MAX_DECORATIONS = 24` and `MAX_INVITED = 50` are still mirrored on both sides, and
+the `apiV1.ts` change is confined to purchase atomicity rather than the loadout contract
+[[teahouses]] describes. Both stamps stand. ⚠ **The lint reported 0 warnings throughout that
+check** — the changes were same-day, so the three-day grace suppressed every prompt. A stamp is
+only as good as the last read behind it, and the grace window is exactly where that gap opens.
+
 ⚠ **`falls-dock` and `blender-pipeline` were read and deliberately NOT stamped `checked:`.**
 `falls-dock` rests on emitter positions, a place-only `UguisuScheduler` Script and asset ids only
 Studio can confirm; `blender-pipeline` still teaches the plane bisect for splitting a bill, which
