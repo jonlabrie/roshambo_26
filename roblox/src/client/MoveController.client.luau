@@ -42,6 +42,11 @@ local mountCF: CFrame? = nil
 local buildingFP: any = nil
 local deckFP: any = nil
 local current = { offset = { 0, 0 }, facing = "N" }
+-- Present only during a mortar drag (nil for every other drag -- decoration/teahouse flows
+-- never touch it). Seeded in startMove from the model's own Mount/Aim attributes (Task 3's
+-- TreatmentApplier._buildMortars); mutated by applyMortarGhost's drop-decides-the-mount band
+-- snap and rotate()'s aim cycle; read at commit to build SetMortarPlacement's payload.
+local mortarState: { mount: string, aim: string }? = nil
 local commitFn: ((offset: { number }, facing: string) -> ())? = nil
 local conns: { RBXScriptConnection } = {}
 local hud: ScreenGui? = nil
@@ -90,9 +95,91 @@ local function facingFromPivotOf(structure: Model, mount: CFrame): (number, numb
     return rel.Position.X, rel.Position.Z, facing
 end
 
+-- How close to the deck's front edge (deck-local z, same frame as `current.offset`) a dragged
+-- mortar has to get before the drop mounts it on the rail instead of the floor. Not a rail
+-- dimension itself (those live in MortarPlacement.RAIL) -- this editor's own snap tolerance.
+local RAIL_SNAP_BAND = 1.25
+
+-- Mirrors TreatmentApplier.tubeOrientation (src/server/TreatmentApplier.luau) so a ghost's
+-- barrel retilts the same yaw-stable way the server's build does: X column IS `axis` (a Part
+-- Shape=Cylinder runs its length along local X); Y/Z come off a fixed deck-local +Z reference,
+-- falling back to +Y only if ever parallel to axis, so the frame tilts without spinning or
+-- flipping as aim sweeps L/C/R. A small local copy, not a shared-module extraction -- a ghost
+-- is the only other caller, and duplicating six lines beats reaching a client script across the
+-- server/client require boundary into TreatmentApplier.
+local function tubeOrientation(axis: Vector3): (Vector3, Vector3, Vector3)
+    local ref = Vector3.new(0, 0, 1)
+    local y = ref:Cross(axis)
+    if y.Magnitude < 1e-4 then
+        ref = Vector3.new(0, 1, 0)
+        y = ref:Cross(axis)
+    end
+    y = y.Unit
+    local z = axis:Cross(y)
+    return axis, y, z
+end
+
+-- Retilt the mortar ghost's barrel (its PrimaryPart) to the current mount/aim's axis, mirroring
+-- buildMortarModel's own center/orientation construction (TreatmentApplier.luau) so the ghost
+-- previews exactly what the server will build. `pivot` is the ghost's just-set world pivot (the
+-- mount point); the barrel's PivotOffset is re-baked to the new local pose so a later PivotTo of
+-- the whole model keeps landing on that same mount point -- the same idiom buildMortarModel
+-- uses at build time.
+local function retiltMortarGhost(g: Model, pivot: CFrame, mount: string, aim: string)
+    local barrel = g.PrimaryPart
+    local mortarId = g:GetAttribute("MortarId")
+    local tube = typeof(mortarId) == "string" and MortarPlacement.TUBE[mortarId]
+    if barrel == nil or tube == nil then
+        return
+    end
+    local baseOffset = MortarPlacement.BASE_OFFSET[mount]
+    local axis = Vector3.new(MortarPlacement.axisLocal(mount, aim))
+    local center = axis * (baseOffset + tube.length / 2)
+    local x, y, z = tubeOrientation(axis)
+    local localCF = CFrame.fromMatrix(center, x, y, z)
+    barrel.CFrame = pivot * localCF
+    barrel.PivotOffset = localCF:Inverse()
+end
+
+-- Mortar branch of applyGhost: the drop decides the mount (Task 6). Inside RAIL_SNAP_BAND of
+-- the deck's front edge, the ghost snaps onto the rail cap (elevation to RAIL.capTop, z to the
+-- cap line, x clamped by RAIL.newelMargin -- the SAME inset MortarPlacement.resolve's rail
+-- branch clamps to server-side); otherwise it clamps like a floor mortar always has
+-- (BuildingPlacer.clamp against MortarPlacement.FOOTPRINT). Retilts on every call -- cheap, and
+-- the only way to catch both an aim cycle and a band enter/exit without separate change-
+-- tracking -- so the lean always matches what's about to be sent.
+local function applyMortarGhost(g: Model, m: CFrame)
+    local ms = mortarState :: { mount: string, aim: string }
+    local rawX, rawZ = current.offset[1], current.offset[2]
+    local x, z, mountY
+    if rawZ <= deckFP.minZ + RAIL_SNAP_BAND then
+        ms.mount = "rail"
+        x = math.clamp(
+            rawX,
+            deckFP.minX + MortarPlacement.RAIL.newelMargin,
+            deckFP.maxX - MortarPlacement.RAIL.newelMargin
+        )
+        z = deckFP.minZ + MortarPlacement.RAIL.capWidth / 2
+        mountY = MortarPlacement.RAIL.capTop
+        current.offset = { x, z }
+    else
+        ms.mount = "floor"
+        current = BuildingPlacer.clamp(buildingFP, deckFP, current)
+        x, z = current.offset[1], current.offset[2]
+        mountY = 0
+    end
+    local pivot = m * CFrame.new(x, mountY, z)
+    g:PivotTo(pivot)
+    retiltMortarGhost(g, pivot, ms.mount, ms.aim)
+end
+
 local function applyGhost()
     local g, m = ghost, mountCF
     if g == nil or m == nil then
+        return
+    end
+    if mortarState ~= nil then
+        applyMortarGhost(g, m)
         return
     end
     current = BuildingPlacer.clamp(buildingFP, deckFP, current)
@@ -105,6 +192,17 @@ end
 -- is a no-op (stays on the current facing). Shared by both the HUD button and the R key so they
 -- can't drift apart.
 local function rotate()
+    if mortarState ~= nil then
+        -- Mortar drags cycle L -> C -> R (the aim), never a facing: a mortar's built model
+        -- carries no facing rotation at all (TreatmentApplier._buildMortars pivots by
+        -- translation only), so FACING_ORDER's fit-screening loop below does not apply here --
+        -- every aim always fits (aim never changes the footprint).
+        local aims = MortarPlacement.AIMS
+        local idx = table.find(aims, mortarState.aim) or 1
+        mortarState.aim = aims[(idx % #aims) + 1]
+        applyGhost()
+        return
+    end
     local idx = table.find(FACING_ORDER, current.facing) or 1
     for _ = 1, #FACING_ORDER - 1 do
         idx = (idx % #FACING_ORDER) + 1
@@ -172,6 +270,7 @@ local function exit()
         hud = nil
     end
     commitFn = nil
+    mortarState = nil
 end
 
 local function commit()
@@ -254,6 +353,9 @@ local function startMove(descriptor: any)
         offset = { descriptor.initialOffset[1], descriptor.initialOffset[2] },
         facing = descriptor.initialFacing,
     }
+    mortarState = if descriptor.mortar ~= nil
+        then { mount = descriptor.mortar.mount, aim = descriptor.mortar.aim }
+        else nil
     ghost = descriptor.ghost
     if descriptor.original ~= nil then
         fadeOriginal(descriptor.original, 0.7)
@@ -419,8 +521,21 @@ local function enterMortar(payload: any)
     if m == nil or deckSize == nil then
         return
     end
-    local dx, dz, facing = facingFromPivotOf(part, m)
+    -- facing (3rd return) is unused: a mortar's built model carries no facing rotation at all
+    -- (TreatmentApplier._buildMortars pivots by translation only), so the ghost stays at "N"
+    -- and R cycles the aim (L/C/R) instead -- see mortarState/rotate() above.
+    local dx, dz = facingFromPivotOf(part, m)
     local mortarId = payload.mortarId :: string
+    -- Attribute-seed choice (Task 6 brief): read Mount/Aim off `part` rather than widening
+    -- EventBus.MoveMortar's payload -- Task 3's TreatmentApplier._buildMortars already stamps
+    -- both attributes onto the built model, so the drag state can seed from the SAME instance
+    -- DecorationController already hands over, with no event-shape change.
+    local rawMount = part:GetAttribute("Mount")
+    local rawAim = part:GetAttribute("Aim")
+    local seedMount = if rawMount == "rail" then "rail" else "floor"
+    local seedAim = if typeof(rawAim) == "string" and table.find(MortarPlacement.AIMS, rawAim)
+        then rawAim
+        else "C"
     startMove({
         original = part,
         ghost = ghostify(part:Clone()),
@@ -428,12 +543,24 @@ local function enterMortar(payload: any)
         deckFP = SizeClasses.deckFootprint(deckSize),
         mountCF = m,
         initialOffset = { math.round(dx), math.round(dz) },
-        initialFacing = facing,
-        commit = function(offset, f)
+        initialFacing = "N",
+        mortar = { mount = seedMount, aim = seedAim },
+        commit = function(offset, _facing)
+            -- mount/aim come from mortarState (mutated live by applyMortarGhost's band snap
+            -- and rotate()'s aim cycle), not from the initial seed -- this closure runs AFTER
+            -- the drag, before exit() clears mortarState (commit() calls commitFn then exit()).
+            local ms = mortarState
+            local mount = (ms and ms.mount) or "floor"
+            local aim = (ms and ms.aim) or "C"
+            -- Rail offset.z is a placeholder (0): the server never reads it for a rail mount --
+            -- MortarPlacement.resolve recomputes rail z itself from RAIL.capWidth, the same way
+            -- applyMortarGhost's ghost snap did on this side.
+            local payloadOffset = if mount == "rail" then { offset[1], 0 } else { offset[1], offset[2] }
             SetMortarPlacement:FireServer({
                 mortarId = mortarId,
-                offset = { offset[1], offset[2] },
-                facing = f,
+                mount = mount,
+                offset = payloadOffset,
+                aim = aim,
             })
         end,
     })
