@@ -62,7 +62,8 @@ function FireworkRecipes.validate(recipe: any): (boolean, string?)
                 return false, `phase {i}: '{key}' must be three numbers in 0..255`
             end
         end
-        local staged = { style = ph.style, points = ph.points, scatter = ph.scatter, share = ph.share }
+        local staged =
+            { style = ph.style, points = ph.points, scatter = ph.scatter, share = ph.share, glow = ph.glow }
         if ph.kind ~= "burst" then
             for field, v in staged do
                 if v ~= nil then
@@ -88,6 +89,9 @@ function FireworkRecipes.validate(recipe: any): (boolean, string?)
             end
             if ph.share ~= nil and (typeof(ph.share) ~= "number" or ph.share <= 0) then
                 return false, `phase {i}: share must be a positive number`
+            end
+            if ph.glow ~= nil and (typeof(ph.glow) ~= "number" or ph.glow <= 0 or ph.glow > 4) then
+                return false, `phase {i}: glow must be a number in (0, 4]`
             end
         end
     end
