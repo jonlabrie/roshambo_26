@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: open
-updated: 2026-08-28
+updated: 2026-09-05
 ---
 
 # Backlog
@@ -477,3 +477,25 @@ moves them, which is the accretion this page is trying to stop.
   at the 1024 atlas so it may need 2048, and the feather look needs re-verifying.
   Three options were put to the owner: full PBR + eye in the body mesh; keep the part but re-export
   it unskinned; or pull the eye work entirely. See [[familiars]].
+
+## MORNING AGENDA (owner, 2026-09-05 close): promotion worksheets, then Hanabiya shop dressing
+
+Two threads named for the next session:
+
+1. **Promotion worksheets** — get more shells into the shop. Outstanding verdicts from the
+   vocabulary wave: wa, yashi, hotaru (with its canyon-sizzle tail), kamuro, ao (the blue
+   pick), midori/murasaki (shape picks), dan. The pipeline is FIVE guarded steps now
+   (catalog recipe + fixture id + server price/requirement + ShellDisplay + SHELL_MORTAR for
+   gear shells — the last two both CI-enforced). Proving range is the audition stage;
+   rail-mounted deck tubes are the buyer's experience.
+
+2. **Hanabiya shop dressing** — owner: the shop is "nothing but a table and bare walls";
+   wants box art and merchandising mocked up for the shelves. New art/design thread: shell
+   packaging (each catalog shell as a boxed product — name, hue, style iconography),
+   shelving/wall treatment for the interior ([[hanabiya]] has the as-built), possibly tying
+   box art to the ShellDisplay metadata so a promotion dresses its own shelf. Nothing
+   designed yet; classify (likely brainstorm -> spec) at session start.
+
+Context that survives the night: rail mounts GATED with wobble+break ("perfect, looks
+great"); place save/publish still pending (unlocks the same-server rejoin verification);
+parked defects (i)-(k) untouched.
