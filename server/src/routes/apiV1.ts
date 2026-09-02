@@ -56,6 +56,16 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     const router = express.Router();
     router.use(requireApiKey);
 
+    // Parked defect (o), fixed 2026-09-05: resolveUser UPSERTS on any truthy robloxUserId, so
+    // an unvalidated path segment ('%20', a typo, "null") permanently mints a junk User --
+    // identity-root pollution the presence route already guards against by hand. One param
+    // guard covers every /players/:robloxUserId route: Roblox ids are digits, nothing else
+    // reaches a resolver.
+    router.param('robloxUserId', (req, res, next, id) => {
+        if (typeof id === 'string' && /^\d+$/.test(id)) { next(); return; }
+        res.status(400).json({ error: 'BAD_PLAYER_ID' });
+    });
+
     router.get('/state', (_req, res) => {
         const snap = engine.snapshot();
         const now = Date.now();
