@@ -698,7 +698,27 @@ local function play(payload: any, distance: number)
                     local e = 1 - (1 - k) * (1 - k) * (1 - k)
                     local a = origin:Lerp(control, e)
                     local b = control:Lerp(apex, e)
-                    slot.shell.Position = a:Lerp(b, e)
+                    local p = a:Lerp(b, e)
+                    -- ⚠ THE SPAN FOLLOWS THE TANGENT, EVERY FRAME (owner, 2026-09-06: the
+                    -- widened heavy comet "reverted to that ribbon quality"). Orientation
+                    -- was set once at launch, but the bezier CURVES — near the apex the
+                    -- path is almost horizontal while the span still points along the
+                    -- muzzle axis, and any perpendicular residue unfolds the Trail into
+                    -- the old band; doubling the span made the residue visible again.
+                    -- The tangent is the bezier's own derivative direction, b - a, free.
+                    local tangent = b - a
+                    if tangent.Magnitude > 1e-3 then
+                        local yAxis = tangent.Unit
+                        local xAxis = yAxis:Cross(Vector3.new(0, 1, 0))
+                        if xAxis.Magnitude < 1e-3 then
+                            slot.shell.CFrame = CFrame.new(p)
+                        else
+                            xAxis = xAxis.Unit
+                            slot.shell.CFrame = CFrame.fromMatrix(p, xAxis, yAxis, xAxis:Cross(yAxis))
+                        end
+                    else
+                        slot.shell.Position = p
+                    end
                     if k >= 1 then
                         flight:Disconnect()
                     end
