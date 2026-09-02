@@ -60,9 +60,10 @@ describe('prices', () => {
         expect(SHELL_PRICES.ishibana).toBe(6);
     });
     it('tubes sit below the deck ladder', () => {
-        expect(MORTAR_PRICES['mortar:S']).toBe(40);
-        expect(MORTAR_PRICES['mortar:M']).toBe(250);
-        expect(MORTAR_PRICES['mortar:L']).toBe(1000);
+        // Owner re-priced 2026-09-05 (was 40/250/1000): gear is a step, not a wall.
+        expect(MORTAR_PRICES['mortar:S']).toBe(10);
+        expect(MORTAR_PRICES['mortar:M']).toBe(50);
+        expect(MORTAR_PRICES['mortar:L']).toBe(100);
     });
 });
 
