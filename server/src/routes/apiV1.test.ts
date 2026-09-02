@@ -662,6 +662,41 @@ describe('/api/v1', () => {
             expect(badItem.body.error).toBe('BAD_ITEM');
         });
 
+        it('two concurrent purchases on one item\'s balance resolve to exactly one sale', async () => {
+            // Parked defect (a): the read-modify-write purchase let both racers read the
+            // pre-purchase balance and both save -- two items for one item's points.
+            await User.create({ robloxId: '900050', totalPoints: 3 }); // exactly one peony
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const fire = () => request(app)
+                .post('/api/v1/players/900050/purchase').set('X-API-Key', API_KEY)
+                .send({ item: 'firework:peony' });
+            const [a, b] = await Promise.all([fire(), fire()]);
+            const statuses = [a.status, b.status].sort();
+            expect(statuses[0]).toBe(200);
+            expect(statuses[1]).toBeGreaterThanOrEqual(400); // the loser is refused, not granted
+            const after = await User.findOne({ robloxId: '900050' });
+            expect(after!.totalPoints).toBe(0); // never negative, never double-deducted
+            expect(after!.fireworks.get('peony') ?? 0).toBe(1); // exactly one shell granted
+        });
+
+        it('two concurrent portal purchases with money for both still sell exactly one portal', async () => {
+            // The unique-item variant: both racers read portalOwned=false; without the
+            // uniqueness in the atomic filter the player pays twice for one portal.
+            await User.create({ robloxId: '900051', totalPoints: 100000, maxDeckSize: 'S' });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const fire = () => request(app)
+                .post('/api/v1/players/900051/purchase').set('X-API-Key', API_KEY)
+                .send({ item: 'portal' });
+            const [a, b] = await Promise.all([fire(), fire()]);
+            const statuses = [a.status, b.status].sort();
+            expect(statuses[0]).toBe(200);
+            expect(statuses[1]).toBeGreaterThanOrEqual(400);
+            const after = await User.findOne({ robloxId: '900051' });
+            expect(after!.portalOwned).toBe(true);
+            const winner = a.status === 200 ? a : b;
+            expect(after!.totalPoints).toBe(winner.body.totalPoints); // deducted exactly once
+        });
+
         it('GET economy returns display fields (null by default)', async () => {
             await User.create({ robloxId: '900006', totalPoints: 0, maxDeckSize: 'L', teahouses: { S: {}, M: {}, L: {} } });
             const res = await request(makeApp(makeEngine(), new ResultsStore()))

@@ -37,7 +37,7 @@ export type EconomyState = { totalPoints: number; maxDeckSize: Size | null; teah
 type Check = { ok: true; cost: number } | { ok: false; error: string };
 
 // the tier that must be owned before buying `size` (null = nothing below S)
-const below = (size: Size): Size | null => (size === 'S' ? null : size === 'M' ? 'S' : 'M');
+export const below = (size: Size): Size | null => (size === 'S' ? null : size === 'M' ? 'S' : 'M');
 
 export function validatePurchase(state: EconomyState, item: string): Check {
     if (item === 'portal') {
