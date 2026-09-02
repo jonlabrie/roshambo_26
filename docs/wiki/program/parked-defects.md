@@ -191,7 +191,7 @@ _(h) — the World Throw picked at random — was FIXED 2026-08-16, see [[world-
 `log.md`. It is deliberately NOT active in any deployed environment yet: both prod and dev
 run `TEST_MODE`, which keeps the R→P→S cycle. Defect (e) therefore still stands._
 
-## (l) tsukubai renders lying on its side — rolled-PrimaryPart PivotTo bug (2026-09-04)
+## ~~(l) tsukubai renders lying on its side~~ FIXED 2026-09-05 (`1684976`)
 
 - **Where:** `roblox/src/shared/DecorationCatalog.luau`, the `tsukubai` builder: `basin` is a
   cylinder stood up with `CFrame.Angles(0, 0, rad(90))` AND set as `PrimaryPart`;
