@@ -35,7 +35,7 @@ export type Deps = {
 }
 
 function TreatmentApplier.new(deps: Deps)
-    return setmetatable({
+    local self = setmetatable({
         _c = deps.container,
         _padBuilder = deps.padBuilder,
         _structureBuilder = deps.structureBuilder,
@@ -50,7 +50,15 @@ function TreatmentApplier.new(deps: Deps)
         _kamonDraw = deps.kamonDraw,
         _mortarPlacement = deps.mortarPlacement,
         _folders = {} :: { [string]: Folder },
+        _tubeTemplates = {} :: { [string]: BasePart },
     }, TreatmentApplier)
+    -- Hollow-tube templates: one SubtractAsync per tier, HERE at construction (boot -- a yield
+    -- is harmless), never in the rebuild path (which must stay yield-free; clones only there).
+    -- Guarded: padOccupancyPreview constructs without mortarPlacement and previews no mortars.
+    if deps.mortarPlacement ~= nil then
+        self:_initTubeTemplates()
+    end
+    return self
 end
 
 function TreatmentApplier:_folder(padId: string): Folder
@@ -178,12 +186,18 @@ function TreatmentApplier:_buildDecorations(
 end
 
 -- ===== MORTARS — one tube per owned tier, rendered like a decoration =====
--- Geometry idiom copied from DecorationCatalog's tsukubai builder: Shape = Cylinder, then
--- CFrame.Angles(0, 0, rad(90)) to stand the part's default horizontal axis upright on a timber
--- base. Built INLINE here (not via an injected catalog) the same way _buildNobori/
--- _buildPortalControl are: one fixed shape per tier, not a chooseable prop list.
+-- A mortar is an EMPTY tube (owner, 2026-09-04 gate — a faked dark-disc "bore" was rejected
+-- twice): real hollow geometry via one SubtractAsync per tier at construction time, cached and
+-- CLONED per deck so the rebuild path never runs CSG and never yields. Built INLINE here (not
+-- via an injected catalog) the same way _buildNobori/_buildPortalControl are: one fixed shape
+-- per tier, not a chooseable prop list.
 local MORTAR_BASE_COLOR = Color3.fromRGB(216, 214, 206)
 local MORTAR_TUBE_COLOR = Color3.fromRGB(58, 60, 66)
+-- The bore is the INNER diameter (owner nb, 2026-09-04): the 2"/4"/6" void is TUBE.bore, with
+-- the wall AROUND it. (The proving-range racks draw outer = bore — a hair undersized under
+-- this ruling; parked, not touched here.)
+local MORTAR_WALL = 0.06
+local MORTAR_BREECH = 0.12 -- solid floor left at the bottom of the bore
 -- Must match MortarPlacement's own (unexported) BASE_TOP: muzzleWorld assumes the tube's local
 -- top sits at exactly BASE_TOP + tube.length above the deck.
 local MORTAR_BASE_TOP = 0.5
@@ -201,7 +215,61 @@ local function mortarPart(name: string, size: Vector3, color: Color3, material: 
     return p
 end
 
-local function buildMortarModel(mortarId: string, tube: { bore: number, length: number }): Model?
+-- One-time hollow-tube template for a tier: outer cylinder minus a bore-deep void, leaving
+-- MORTAR_BREECH of floor. CSG requires DataModel-linked parts, so the temporaries pass through
+-- `container`; the result is unparented and held as a clone source. Returns nil on CSG failure
+-- (the caller falls back to a solid cylinder — a deck must never blank over a CSG hiccup).
+local function hollowTubeTemplate(container: Instance, tube: { bore: number, length: number }): BasePart?
+    local outer = mortarPart(
+        "Tube",
+        Vector3.new(tube.length, tube.bore + MORTAR_WALL * 2, tube.bore + MORTAR_WALL * 2),
+        MORTAR_TUBE_COLOR,
+        Enum.Material.Metal
+    )
+    outer.Shape = Enum.PartType.Cylinder
+    outer.CFrame = CFrame.new(0, -500, 0) -- out of sight for the one boot-time subtract
+    outer.Parent = container
+    local depth = tube.length - MORTAR_BREECH
+    local inner =
+        mortarPart("Void", Vector3.new(depth, tube.bore, tube.bore), MORTAR_TUBE_COLOR, Enum.Material.Metal)
+    inner.Shape = Enum.PartType.Cylinder
+    -- the void opens at the muzzle end (+X of the cylinder axis), poking slightly past the rim
+    inner.CFrame = outer.CFrame * CFrame.new((tube.length - depth) / 2 + 0.01, 0, 0)
+    inner.Parent = container
+    local ok, union = pcall(function()
+        return outer:SubtractAsync({ inner })
+    end)
+    inner:Destroy()
+    outer:Destroy()
+    if not ok or union == nil then
+        warn(`[MORTAR] hollow-tube CSG failed ({tostring(union)}); solid-cylinder fallback`)
+        return nil
+    end
+    union.Name = "Tube"
+    union.UsePartColor = true
+    union.Color = MORTAR_TUBE_COLOR
+    union.Anchored = true
+    union.CanCollide = false
+    union.CanQuery = false
+    union.CanTouch = false
+    union.Parent = nil
+    return union
+end
+
+function TreatmentApplier:_initTubeTemplates()
+    for _, mortarId in self._mortarPlacement.MORTAR_ORDER do
+        local tube = self._mortarPlacement.TUBE[mortarId]
+        if tube then
+            self._tubeTemplates[mortarId] = hollowTubeTemplate(self._c, tube)
+        end
+    end
+end
+
+local function buildMortarModel(
+    mortarId: string,
+    tube: { bore: number, length: number },
+    template: BasePart?
+): Model?
     local tier = mortarId:match("^mortar:(%u)$")
     if tier == nil then
         return nil
@@ -209,7 +277,9 @@ local function buildMortarModel(mortarId: string, tube: { bore: number, length: 
     local m = Instance.new("Model")
     m.Name = "Mortar_" .. tier
 
-    local baseSide = tube.bore * 3 + 0.4
+    -- True-bore proportions per the owner's 2026-09-01 accuracy ruling (the first deck render
+    -- drew diameter at bore*3 and the owner immediately caught the fattening at the gate).
+    local baseSide = tube.bore * 2 + 0.4
     local base = mortarPart(
         "Base",
         Vector3.new(baseSide, MORTAR_BASE_TOP, baseSide),
@@ -219,13 +289,19 @@ local function buildMortarModel(mortarId: string, tube: { bore: number, length: 
     base.CFrame = CFrame.new(0, MORTAR_BASE_TOP / 2, 0)
     base.Parent = m
 
-    local barrel = mortarPart(
-        "Tube",
-        Vector3.new(tube.length, tube.bore * 3, tube.bore * 3),
-        MORTAR_TUBE_COLOR,
-        Enum.Material.Metal
-    )
-    barrel.Shape = Enum.PartType.Cylinder
+    local barrel: BasePart
+    if template then
+        barrel = template:Clone()
+    else
+        -- CSG-failure fallback: solid cylinder at the same outer silhouette
+        barrel = mortarPart(
+            "Tube",
+            Vector3.new(tube.length, tube.bore + MORTAR_WALL * 2, tube.bore + MORTAR_WALL * 2),
+            MORTAR_TUBE_COLOR,
+            Enum.Material.Metal
+        )
+        barrel.Shape = Enum.PartType.Cylinder
+    end
     barrel.CFrame = CFrame.new(0, MORTAR_BASE_TOP + tube.length / 2, 0) * CFrame.Angles(0, 0, math.rad(90))
     barrel.Parent = m
 
@@ -267,7 +343,7 @@ function TreatmentApplier:_buildMortars(
         if tube == nil then
             continue
         end
-        local model = buildMortarModel(mortarId, tube)
+        local model = buildMortarModel(mortarId, tube, self._tubeTemplates[mortarId])
         if model == nil then
             continue
         end
