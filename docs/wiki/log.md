@@ -3198,3 +3198,16 @@ backlog: the onboarding JOURNEY pass (kid-legible, no gambling vocabulary, the
 four questions), queued after the fireworks sprint. Suites at close: Lune 1654,
 Vitest 498. Still parked: (f) undetermined, (i)/(j) identity gates (decision-gated,
 not code-gated).
+
+## [2026-09-05] ship | PLACE PUBLISHED -- the whole fireworks arc reaches players
+
+Owner published the place. Everything since the last publish goes live at once: the
+vertical-line burst fix (adaa1fe -- shipped broken 2026-08-05 to 2026-09-01), the
+full vocabulary wave (five styles, staged shells, sound physics, hotaru's sizzle),
+kiku, deck mortars, rail mounts with wobble/break and DEFAULT_MOUNT=rail, the
+onboarding-card fix, the drum-never-lies build, and the day's defect sweep.
+Verified at publish time: the published place targets the DEV backend
+(SecretsLocal -> zzaw22ugpq / roshambo-dev) -- the service that carries every
+route and fix; prod (the PWA's backend) is untouched by this arc, by design.
+UNLOCKED: the same-server rejoin verification (deck-mortars fingerprint fix) --
+recipe: two sessions hold the server open, leave+rejoin on one.
