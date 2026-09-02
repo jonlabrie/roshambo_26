@@ -3296,3 +3296,18 @@ at the range (close vantage, no physics-delay mask; fixed same day, SOUND_TRIMS)
 Worksheet note: yashi v3 (6 arms) "particularly bad" -- consistent with the budget
 law (points DIVIDE the budget; six ways is where the palm goes wispy, worse under
 the longer rain). Floor stands at v1 (4 arms).
+
+## [2026-09-06] fixed | Launch-thump lag: frame-hops, not just the clip head
+
+The 0.12 head trim helped but "not fixed" (owner). Per-stage measurement in
+Studio found no single culprit -- a STACK: the report's task.delay(0) parks a
+Heartbeat, playSound's distance delay parks another, the trimmed clip still
+ramped 68ms to peak, plus ~30ms SoundId swap: ~150ms+ at the tube. Fixed
+`0e8433e`: zero-delay dispatch runs inline (at=0 phases and sub-frame sound
+delays), trim deepened to 0.15 (peak ~38ms post-Play, thump not click). The
+"settles after start" residue was preload order -- hash iteration left the
+thump's queue position to luck; `00d4ebe` warms it first. Owner: "thump timing
+pretty good now." Lesson twice-earned this sprint: measure each stage of the
+real path; components that are individually fine can sum to a defect.
+Also confirmed: RequestProvingFire is Studio-only by design (main.server.luau
+IsStudio gate) -- live-place testing means deck launches with owned shells.
