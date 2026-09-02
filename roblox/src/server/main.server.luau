@@ -1486,9 +1486,19 @@ RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
             end
             return
         end
-        -- Firecracker and public-site launches keep the eye-level origin; a gear-required shell
-        -- fired from the player's own deck launches from its mortar's actual muzzle instead.
-        local origin = muzzleOriginFor(uid, pos, deck, shellId) or (root.Position + Vector3.new(0, 6, 0))
+        -- A gear-required shell fired from the player's own deck launches from its mortar's
+        -- actual muzzle. A NON-gear shell (firecracker) is "the shell you hold": hand height in
+        -- character space -- right, half a stud up, a touch forward -- never the old 6-studs-
+        -- overhead placeholder (owner gate, 2026-09-04: "firecrackers fire from over my head").
+        -- Gear shells at PUBLIC sites keep the invisible overhead origin (spec: unchanged).
+        local origin = muzzleOriginFor(uid, pos, deck, shellId)
+        if origin == nil then
+            if MortarPlacement.SHELL_MORTAR[shellId] == nil then
+                origin = root.CFrame:PointToWorldSpace(Vector3.new(1.2, 0.6, -0.8))
+            else
+                origin = root.Position + Vector3.new(0, 6, 0)
+            end
+        end
         FireworkLaunched:FireAllClients({
             shellId = shellId,
             origin = origin,
