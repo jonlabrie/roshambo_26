@@ -227,13 +227,13 @@ list.Size = UDim2.new(1, -20, 1, -70)
 list.Position = UDim2.fromOffset(10, 64)
 list.BackgroundTransparency = 1
 list.BorderSizePixel = 0
--- ⚠ THE CANVAS NEEDS ITS WIDTH STATED. Scale-sized children measure against the
--- CANVAS, not the frame — with CanvasSize zero and automatic sizing on Y only, the
--- canvas was 0 wide and every row rendered 0px (owner, 2026-09-06: "menus doesn't
--- show on entering the shop"). Width = the frame's own, minus scrollbar room.
+-- ⚠ NO Enum.AutomaticCanvasSize IN THIS ENGINE — selene said so and was RIGHT; the
+-- "stale std" allow shipped a hard crash that killed this whole controller (owner,
+-- 2026-09-06: "menus doesn't show on entering the shop"; console: "AutomaticCanvasSize
+-- is not a valid member of Enum"). Believe the linter. The canvas is sized by hand
+-- below, from the layout's measured content height. Width is stated too: scale-sized
+-- children measure against the CANVAS, and a zero-width canvas renders 0px rows.
 list.CanvasSize = UDim2.new(1, -8, 0, 0)
--- selene: allow(incorrect_standard_library_use) -- selene 0.31's Roblox std predates AutomaticCanvasSize.Y; the enum is real
-list.AutomaticCanvasSize = Enum.AutomaticCanvasSize.Y
 list.ScrollingDirection = Enum.ScrollingDirection.Y
 list.ScrollBarThickness = 6
 list.ScrollBarImageColor3 = DIM
@@ -242,6 +242,9 @@ local layout = Instance.new("UIListLayout")
 layout.SortOrder = Enum.SortOrder.LayoutOrder
 layout.Padding = UDim.new(0, 4)
 layout.Parent = list
+layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    list.CanvasSize = UDim2.new(1, -8, 0, layout.AbsoluteContentSize.Y + 4)
+end)
 
 -- `live` and `priceKnown` are written by paint() and read by the click handler. They are the row's
 -- rendered state, not a judgement made at click time — the button does exactly what it looks like
