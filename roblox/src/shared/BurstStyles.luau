@@ -166,9 +166,11 @@ BurstStyles.TEXTURES = {
 -- canyon. Never left to Sound defaults again (Volume 0.5 / RollOffMin 10 made the whole
 -- show a whisper from FallsLanding -- owner, 2026-09-03: "they don't seem very loud").
 BurstStyles.SOUND_LEVELS = {
-    volume = 2,
-    rolloffMin = 45, -- studs of full volume around the shell
-    rolloffMax = 400, -- audible reach; the director's NEAR_STUDS (250) sits inside it
+    -- Turned up 2026-09-05 (owner: inaudible at a teahouse from the bridge): volume 2 -> 2.4,
+    -- reach 400 -> 900 so the far decks hear the show, min 45 -> 60 for a fuller plateau near.
+    volume = 2.4,
+    rolloffMin = 60, -- studs of full volume around the shell
+    rolloffMax = 900, -- audible reach; keep FireworkDirector.AUDIBLE_STUDS aligned with this
     -- Light is instant; sound is not. 1 stud = 1 foot and sound runs ~1125 ft/s, so every
     -- phase sound arrives distance/1125 late for THIS listener (owner, 2026-09-03: "the
     -- sound from an aerial burst should be slightly delayed"). ~0.17s from FallsLanding
