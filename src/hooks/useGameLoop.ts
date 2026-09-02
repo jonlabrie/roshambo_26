@@ -313,7 +313,15 @@ export function useGameLoop() {
             // bell is missing again" and cleared itself at random. A healthy context makes
             // this handler a one-comparison no-op, so listening forever costs nothing and
             // every tap for the rest of the session is a repair opportunity.
-            if (!ctx || ctx.state === 'running') return
+            if (!ctx) return
+            // LOAD FIRST, UNCONDITIONALLY (2026-09-05, the regression the never-disarm fix
+            // shipped): fetching and decoding the bell needs no gesture and no running
+            // context, but it used to live only behind the resume() below -- so when a
+            // desktop context was born already 'running', the early return skipped the ONLY
+            // call that ever loads the buffer and the bell went silent everywhere. loadBell
+            // is ref-guarded idempotent; after the first success this line costs nothing.
+            void loadBell(ctx)
+            if (ctx.state === 'running') return
             // iOS wants a source actually STARTED inside the gesture, not merely a resume().
             try {
                 const src = ctx.createBufferSource()
@@ -324,9 +332,7 @@ export function useGameLoop() {
                 // A context too dead to make a one-sample buffer is not worth failing over;
                 // the resume below is the part that matters.
             }
-            void ctx.resume().then(() => {
-                if (ctx.state === 'running') void loadBell(ctx) // idempotent via its refs
-            }).catch(() => {})
+            void ctx.resume().catch(() => {})
         }
         events.forEach(e => document.addEventListener(e, unlock, true))
         return remove // unmount only -- the session itself never disarms
