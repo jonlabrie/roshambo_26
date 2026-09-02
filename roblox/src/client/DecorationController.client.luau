@@ -17,6 +17,7 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local EconomyState = remotes:WaitForChild("EconomyState") :: RemoteEvent
+local FireworkState = remotes:WaitForChild("FireworkState") :: RemoteEvent
 local DecorationPlaced = remotes:WaitForChild("DecorationPlaced") :: RemoteEvent
 local SetDecorationRemove = remotes:WaitForChild("SetDecorationRemove") :: RemoteEvent
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
@@ -111,6 +112,13 @@ local function tryBind(inst: Instance, isMortar: boolean)
             conn:Disconnect()
             tryBind(inst, isMortar)
         end)
+        -- Close the read-connect window (2026-09-05 gate, second miss): the attribute can
+        -- apply BETWEEN the nil read above and the Connect — then the signal never fires and
+        -- nothing retries. Re-read after connecting; if it landed in the gap, retry now.
+        if inst:GetAttribute("padId") ~= nil then
+            conn:Disconnect()
+            tryBind(inst, isMortar)
+        end
         return
     end
     if myPadId == nil or padId ~= myPadId then
@@ -146,6 +154,15 @@ EconomyState.OnClientEvent:Connect(function(p)
     -- rescan on EVERY echo, not just a pad change: the bound-guard makes it idempotent and the
     -- model count is tiny, and it closes every models-before-echo / echo-before-models ordering
     -- (the change-only guard left join-time builds unbound with nothing to retry them).
+    rescanAll()
+end)
+
+-- The join's LAST rebuild is the mortar-bearing one, triggered by pushFireworkState (the
+-- fireworks GET landing) -- it fires FireworkState, NOT an EconomyState echo, so the
+-- rescan-on-echo belt above never sees those models (2026-09-05 gate, second miss). Rescan on
+-- this event too; idempotent, and FireworkState fires at join/launch/reveal so it doubles as a
+-- periodic self-heal.
+FireworkState.OnClientEvent:Connect(function()
     rescanAll()
 end)
 
