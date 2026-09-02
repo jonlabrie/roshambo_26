@@ -3372,3 +3372,17 @@ resets to the recipe's floor. Pure BoostLuck.luau; server-side per-player
 per-shell streaks (session-lived); verdict in the launch payload -- all
 clients render the same luck; proving range deliberately stays on the raw
 floor. Applies to every boosted shell automatically (kiku, wa, yashi, kamuro).
+
+## [2026-09-06] reverted | The fat L trail: three geometry strategies, three failures, clean retreat
+
+Attempted to double heavy shells' comet width. What was learned, at the cost
+of an hour of owner-in-the-loop darts: a Trail draws its FULL attachment span
+as width, so span-parallel-to-motion collapses to a hairline (segments
+overlap collinearly -- this overlap IS the shipped thin-comet look), any
+fixed tilt unfolds the band, per-frame exact tangency reads near-invisible,
+and FaceCamera + perpendicular span produced "ridiculously huge ribbons
+across all styles" (mechanism NOT understood -- do not retry blind).
+All four commits reverted (`fbe1014..8e988ed`); shipped look restored.
+PARKED as a design item: a bigger heavy ascent probably wants a different
+tool -- e.g. a per-slot particle-emitter comet for heavy shells -- and a
+Studio session with screenshots, not live iteration on a player's evening.
