@@ -350,8 +350,20 @@ local function play(payload: any, distance: number)
     -- 2026-09-04): higher apex, longer-lived stars, the heavyweight boom.
     local bonusRoll = rng:NextNumber()
     local origin = payload.origin
-    local apex = origin
-        + Vector3.new(rng:NextNumber(-8, 8), 60 + rng:NextNumber(-6, 6), rng:NextNumber(-8, 8)) -- 60: owner, 2026-09-03 ("bursts should ride higher")
+    -- THE HEADING (rail-mounts, 2026-09-04): a muzzle launch from a player's own deck sends a
+    -- unit vector the flight rides along; every other launch site (public sites, proving range,
+    -- hand firecrackers) sends no heading, and the vertical default reproduces today's flight
+    -- exactly -- same rng stream, same vectors.
+    local dir = if payload.heading
+        then Vector3.new(payload.heading.x, payload.heading.y, payload.heading.z).Unit
+        else Vector3.new(0, 1, 0)
+    -- ⚠ RNG DRAW ORDER IS CROSS-CLIENT DETERMINISM: x, then height, then z -- exactly the order
+    -- the old `Vector3.new(rng(-8,8), 60 + rng(-6,6), rng(-8,8))` consumed the stream in. Drawing
+    -- into locals in this order and assembling afterward keeps every client's rng in lockstep.
+    local scatterX = rng:NextNumber(-8, 8)
+    local heightJitter = rng:NextNumber(-6, 6)
+    local scatterZ = rng:NextNumber(-8, 8)
+    local apex = origin + dir * (60 + heightJitter) + Vector3.new(scatterX, 0, scatterZ) -- 60: owner, 2026-09-03 ("bursts should ride higher")
 
     -- `tail` is the longest release-worthy lifetime among this shell's burst styles (kamuro's
     -- 4.2s crown must not have its slot's parts re-positioned under it while it's still hanging).
@@ -372,7 +384,11 @@ local function play(payload: any, distance: number)
     if bonus then
         lifeScale = BurstStyles.BONUS.lifeScale
         tail *= lifeScale
-        apex = origin + (apex - origin) * Vector3.new(1, BurstStyles.BONUS.apexScale, 1)
+        -- Stretches only the along-heading component of the flight; the lateral/along-tube
+        -- scatter is untouched. With a vertical dir this reproduces the old Y-only scaling to
+        -- within the scatter's own (unscaled, ±8-stud) contribution -- exactly as before, since
+        -- the old expression never scaled X/Z either.
+        apex = origin + (apex - origin) + dir * ((apex - origin):Dot(dir) * (BurstStyles.BONUS.apexScale - 1))
     end
 
     active += 1
@@ -421,16 +437,18 @@ local function play(payload: any, distance: number)
                 -- The comet rises to the apex over whatever time the next phase leaves it —
                 -- in TWO stages: straight out of the tube for the first ~60% of the height,
                 -- then easing into the apex's lateral drift. One straight slanted tween read
-                -- as "tilted trajectories" (owner, 2026-09-03); a mortar leaves its tube
-                -- vertically. Two chained tweens cost what one does; the trail rounds the knee.
+                -- as "tilted trajectories" (owner, 2026-09-03); a mortar leaves its tube along
+                -- its own heading (vertical, absent one). Two chained tweens cost what one
+                -- does; the trail rounds the knee.
                 local rise = math.max(0.05, last - ev.at)
                 -- ⚠ DRIVEN PER FRAME, NOT TWEENED. TweenService stepped this shell in
                 -- 1.8-stud chunks at ~15Hz (measured 2026-09-03), and the trail drew the
                 -- chunks -- the owner read it instantly ("feels like screen space"). A
-                -- quadratic bezier from the muzzle through a straight-up control point to
-                -- the apex, advanced on Heartbeat, is smooth at true framerate and is the
-                -- honest ballistic shape: vertical at the tube, decelerating into the drift.
-                local control = origin + Vector3.new(0, (apex.Y - origin.Y) * 0.9, 0)
+                -- quadratic bezier from the muzzle through a control point along the heading
+                -- to the apex, advanced on Heartbeat, is smooth at true framerate and is the
+                -- honest ballistic shape: true to the tube at launch, decelerating into the drift.
+                local run = (apex - origin):Dot(dir)
+                local control = origin + dir * (run * 0.9)
                 local t0 = os.clock()
                 local flight: RBXScriptConnection
                 flight = RunService.Heartbeat:Connect(function()
