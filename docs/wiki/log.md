@@ -3285,3 +3285,14 @@ platform's autoplay rule, invisible in real play where the first throw IS the
 first touch. Deploys: Amplify jobs 53-55 via the newly-documented start-job
 procedure. Also gone at owner request (`aa813c8`, job 55): the Antigravity-era
 "Sponsored Intelligence" mock ad squatting on the Arena.
+
+## [2026-09-05] correction | The proving range's real vantage -- and yashi v3 rejected
+
+Owner: "I'm not using FallsLanding AT ALL for proving range, I'm standing on the
+south terminus of the suspension bridge and looking at the 5 mortar racks edge on."
+The recorded ~190-stud FallsLanding sightline was design assumption, not practice;
+fireworks.md corrected. It also explains why the launch-thump pre-roll registered
+at the range (close vantage, no physics-delay mask; fixed same day, SOUND_TRIMS).
+Worksheet note: yashi v3 (6 arms) "particularly bad" -- consistent with the budget
+law (points DIVIDE the budget; six ways is where the palm goes wispy, worse under
+the longer rain). Floor stands at v1 (4 arms).
