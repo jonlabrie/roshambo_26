@@ -63,8 +63,11 @@ type Slot = {
     -- hotaru's final flicker) deliberately OVERLAPS the burst's decay, so it cannot share
     -- the main Sound -- that one's SoundId swap would cut whichever clip was still playing.
     -- Salvo voices (owner, 2026-09-06): a salute grouping overlaps its own 3s clips, so each
-    -- shot needs its own Sound. Created lazily on first use, then pooled on the slot forever
-    -- -- the churn ban is on per-shell instance creation, and after warmup there is none.
+    -- shot needs its own Sound. Built at pool construction with the salute clip PREASSIGNED
+    -- -- they only ever play that one clip, and eager creation means they are loaded before
+    -- the first fire. Lazy creation was the first-shell bug: three fresh Sounds all played
+    -- before their clip bound, and the engine released all three booms together, late, while
+    -- the 0.1s flashes died unloaded (owner, 2026-09-06, reproduced six times).
     salvoVoices: { Sound },
 }
 local pool: { Slot } = {}
@@ -149,6 +152,19 @@ for _ = 1, POOL_SIZE do
         table.insert(emitters, em)
     end
 
+    -- 8 = the salvo count ceiling (FireworkRecipes: boost.salvo.count admits 1..8; 5-8 is
+    -- the reserved standalone-salute range). All voices share one loaded buffer.
+    local salvoVoices = {}
+    for _ = 1, 8 do
+        local voice = Instance.new("Sound")
+        voice.SoundId = BurstStyles.SOUNDS.salute
+        voice.RollOffMode = Enum.RollOffMode.InverseTapered
+        voice.RollOffMinDistance = BurstStyles.SOUND_LEVELS.rolloffMin
+        voice.RollOffMaxDistance = BurstStyles.SOUND_LEVELS.rolloffMax
+        voice.Parent = shell
+        table.insert(salvoVoices, voice)
+    end
+
     table.insert(pool, {
         shell = shell,
         trail = trail,
@@ -156,7 +172,7 @@ for _ = 1, POOL_SIZE do
         emitters = emitters,
         sound = snd,
         tail = tailSnd,
-        salvoVoices = {},
+        salvoVoices = salvoVoices,
     })
 end
 
@@ -204,19 +220,6 @@ local function playSound(slot: Slot, id: string?, audible: boolean, from: Vector
     end
 end
 
-local function salvoVoiceFor(slot: Slot, i: number): Sound
-    local s = slot.salvoVoices[i]
-    if s == nil then
-        s = Instance.new("Sound")
-        s.RollOffMode = Enum.RollOffMode.InverseTapered
-        s.RollOffMinDistance = BurstStyles.SOUND_LEVELS.rolloffMin
-        s.RollOffMaxDistance = BurstStyles.SOUND_LEVELS.rolloffMax
-        s.Parent = slot.shell
-        slot.salvoVoices[i] = s
-    end
-    return s
-end
-
 -- ⚠ PRELOAD EVERY SOUND AND SPRITE ONCE, AT STARTUP. A Sound's first :Play() otherwise
 -- streams the asset from the CDN mid-show, and the session's first launch thump arrives
 -- while the shell is already climbing (owner, 2026-09-03). Async: the show can start
@@ -224,31 +227,41 @@ end
 task.spawn(function()
     local ContentProvider = game:GetService("ContentProvider")
     local warm = {}
+    local seen: { [string]: boolean } = {}
     local function add(id: string)
+        -- Dedupe: the three burst roles share one 5-clip pool, and warming the same
+        -- asset three times just pushes everything behind it further down the queue.
+        if seen[id] then
+            return
+        end
+        seen[id] = true
         local s = Instance.new("Sound")
         s.SoundId = id
         table.insert(warm, s)
     end
-    -- The launch thumps warm FIRST. PreloadAsync works the list in order, and hash
-    -- iteration left the thump's place in line to luck — the clips every show opens
-    -- with (owner, 2026-09-06: launches lag for a few moments after start, then settle).
+    -- Textures first — they are tiny next to audio, and an unloaded texture is an
+    -- INVISIBLE burst (lesson 2 in the header). Then the launch thumps and the salute
+    -- voices, the clips a show opens with and the kicker cannot be late for; hash
+    -- iteration used to leave their queue position to luck (owner, 2026-09-06 twice:
+    -- launches lagged until settle, and a session's first salvo piled its three booms
+    -- into one late burst).
+    for _, id in BurstStyles.TEXTURES do
+        table.insert(warm, id)
+    end
     for _, id in BurstStyles.SOUNDS.launch do
         add(id)
     end
     add(BurstStyles.SOUNDS.launch_heavy)
-    for role, v in BurstStyles.SOUNDS do
-        if role ~= "launch" and role ~= "launch_heavy" then
-            if typeof(v) == "table" then
-                for _, id in v do
-                    add(id)
-                end
-            else
-                add(v)
+    add(BurstStyles.SOUNDS.salute)
+    add(BurstStyles.SOUNDS.salute_single)
+    for _, v in BurstStyles.SOUNDS do
+        if typeof(v) == "table" then
+            for _, id in v do
+                add(id)
             end
+        else
+            add(v)
         end
-    end
-    for _, id in BurstStyles.TEXTURES do
-        table.insert(warm, id)
     end
     pcall(function()
         ContentProvider:PreloadAsync(warm)
@@ -716,9 +729,9 @@ local function play(payload: any, distance: number)
                                     -- the envelope — snaps up, collapses — and the sprite stays
                                     -- solid until the last instant.
                                     kem.Size = NumberSequence.new({
-                                        NumberSequenceKeypoint.new(0, 1),
-                                        NumberSequenceKeypoint.new(0.3, 3),
-                                        NumberSequenceKeypoint.new(1, 1),
+                                        NumberSequenceKeypoint.new(0, 2),
+                                        NumberSequenceKeypoint.new(0.3, 6),
+                                        NumberSequenceKeypoint.new(1, 2),
                                     })
                                     kem.Speed = NumberRange.new(0, 0)
                                     kem.Drag = 0
@@ -738,11 +751,16 @@ local function play(payload: any, distance: number)
                                 end)
                                 if lod.sound then
                                     task.delay(salvoAt + shot.at + travel, function()
-                                        local voice = salvoVoiceFor(slot, i)
-                                        voice.SoundId = BurstStyles.SOUNDS.salute
-                                        voice.Volume = BurstStyles.SOUND_LEVELS.volume * 0.9
-                                        voice.PlaybackSpeed = shot.speed
-                                        voice:Play()
+                                        local voice = slot.salvoVoices[i]
+                                        -- A cold-cache voice stays SILENT rather than queueing:
+                                        -- a Play() before the clip binds is released whenever
+                                        -- the download lands — one late pile of simultaneous
+                                        -- booms, worse than a quiet first shell.
+                                        if voice and voice.IsLoaded then
+                                            voice.Volume = BurstStyles.SOUND_LEVELS.volume * 0.9
+                                            voice.PlaybackSpeed = shot.speed
+                                            voice:Play()
+                                        end
                                     end)
                                 end
                             end
