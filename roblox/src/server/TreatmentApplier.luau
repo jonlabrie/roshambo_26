@@ -230,6 +230,12 @@ local function buildMortarModel(mortarId: string, tube: { bore: number, length: 
     barrel.Parent = m
 
     m.PrimaryPart = barrel
+    -- PivotTo aligns a model by its PrimaryPart's PIVOT. The barrel's CFrame carries the
+    -- 90-degree roll that stands the cylinder up, so left alone, PivotTo would map that rolled
+    -- frame onto the upright deck target and lay the whole assembly on its side (shipped that
+    -- way 2026-09-04; caught at the owner gate). This PivotOffset cancels the barrel's own
+    -- frame so the model pivot is identity at the model origin (the base's bottom center).
+    barrel.PivotOffset = barrel.CFrame:Inverse()
     return m
 end
 

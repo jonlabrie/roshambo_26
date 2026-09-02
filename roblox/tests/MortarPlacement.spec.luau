@@ -15,7 +15,9 @@ describe("MortarPlacement — default-first gear placement", function()
             local p = out[id]
             expect(p ~= nil).toBe(true)
             assert(p)
-            expect(p.z).toBe(BOUNDS.maxZ - 1)
+            -- front edge = local MINZ (canyon-facing; verified against the live place --
+            -- Nobori on -Z, back-door PortalControl on +Z)
+            expect(p.z).toBe(BOUNDS.minZ + 1)
             table.insert(xs, p.x)
         end
         expect(xs[1] < xs[2] and xs[2] < xs[3]).toBe(true) -- S left of M left of L
@@ -37,8 +39,8 @@ describe("MortarPlacement — default-first gear placement", function()
     end)
 
     test("a spot inside the teahouse footprint NUDGES clear -- mortars never hide", function()
-        local teahouse = { minX = -8, maxX = 8, minZ = 2, maxZ = 6 } -- swallows the front edge
-        local stored = { ["mortar:S"] = { offset = { 0, 5 }, facing = "N" } }
+        local teahouse = { minX = -8, maxX = 8, minZ = -6, maxZ = -2 } -- swallows the front (minZ) edge
+        local stored = { ["mortar:S"] = { offset = { 0, -5 }, facing = "N" } }
         local out = MortarPlacement.resolve(BOUNDS, { "mortar:S" }, stored, teahouse)
         local p = out["mortar:S"]
         local inside = p.x > teahouse.minX

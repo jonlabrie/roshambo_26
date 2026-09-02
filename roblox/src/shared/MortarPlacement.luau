@@ -6,8 +6,10 @@
 -- files only call it. Consumes nothing -- bounds are passed in. Lune-tested; no Roblox
 -- datatypes.
 --
--- Front edge = local maxZ: deck rows are view-oriented, and the canyon-facing side is +Z in
--- deck-local space -- the same convention DecorationLayout/BuildingPlacer use for "front".
+-- Front edge = local MINZ. The canyon-facing side is -Z in deck-local space: verified in the
+-- live place 2026-09-04 against T01 -- the Nobori (built to read from across the canyon) sits
+-- on the -Z side and the back-door PortalControl on +Z. (The plan originally asserted +Z and
+-- shipped the tubes onto the back edge, behind the teahouse.)
 --
 -- Clamp philosophy mirrors DecorationLayout/BuildingPlacer: a STORED placement is never
 -- mutated, only what resolve() returns adapts.
@@ -99,7 +101,7 @@ local function nudge(bounds: Bounds, x: number, z: number, teahouseFP: Bounds?):
     if teahouseFP == nil or not strictlyInside(x, z, teahouseFP) then
         return x, z
     end
-    local frontZ = bounds.maxZ - 1
+    local frontZ = bounds.minZ + 1
     if not strictlyInside(x, frontZ, teahouseFP) then
         return x, frontZ
     end
@@ -152,7 +154,7 @@ function MortarPlacement.resolve(
             x, z = clampPoint(deckBounds, override.offset[1], override.offset[2])
             facing = override.facing
         else
-            x, z = clampPoint(deckBounds, defaultX(deckBounds, i, n), deckBounds.maxZ - 1)
+            x, z = clampPoint(deckBounds, defaultX(deckBounds, i, n), deckBounds.minZ + 1)
             facing = "N"
         end
         if teahouseFP then
