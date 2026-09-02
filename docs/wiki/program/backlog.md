@@ -532,3 +532,13 @@ Rulings from the wa worksheet session, shaping everything downstream:
 5. **Mystery boxes**: purchasable containers holding random firework assortments.
 6. **Firework boxes**: clearly identified contents at a bundled price. Interlocks directly
    with the Hanabiya box-art/merchandising pass (the box IS the shelf product).
+
+## Toolbox idea: mid-life color shift (owner, 2026-09-05, from the wa worksheet)
+
+The blue-edge surprise candidate was rejected at the range ("blue is unreadable" as an edge
+tint); owner: "you're going to have to do it halfway through" -- i.e., the burst blooms in
+its base color and SHIFTS hue partway through the burn. Needs a color-over-life override
+knob in the recipe/controller (the current ramp is style-fixed: white ignition -> color ->
+ember -> black). A natural surprise flavor for the hue families (ao/midori/murasaki) if
+they become colorways, or for any shell whose "different ending color" surprise should read
+clearly. Not built; banked.
