@@ -99,6 +99,29 @@ describe("MortarPlacement — default-first gear placement", function()
         expect(math.abs(out["mortar:M"].z - (BOUNDS.minZ + 0.225)) < 1e-9).toBe(true)
     end)
 
+    -- Final-review fix round: the spec's "one-line lever" (flipping the default mount from
+    -- "floor" to "rail") must not error when NO stored record exists at all -- that is the
+    -- only case where `resolve`'s rail branch sees a nil override. `resolve` itself can't be
+    -- driven down that path while the default mount stays "floor" this round, so this tests
+    -- the shared mechanism directly: the same i/n stagger the floor defaults use, clamped into
+    -- the rail's newel margins, pinned to the cap rail z, aimed C.
+    test(
+        "railDefault: staggers S/M/L along the cap, clamped to the newel margins, aim C, never throws",
+        function()
+            local n = 3
+            local xs = {}
+            for i = 1, n do
+                local x, z, aim = MortarPlacement.railDefault(BOUNDS, i, n)
+                table.insert(xs, x)
+                expect(aim).toBe("C")
+                expect(math.abs(z - (BOUNDS.minZ + 0.225)) < 1e-9).toBe(true)
+                expect(x >= BOUNDS.minX + 0.95 - 1e-9).toBe(true)
+                expect(x <= BOUNDS.maxX - 0.95 + 1e-9).toBe(true)
+            end
+            expect(xs[1] < xs[2] and xs[2] < xs[3]).toBe(true) -- same i/n stagger the floor defaults use
+        end
+    )
+
     test("axisLocal: C leans toward -Z by the mount's elevation; L/R yaw 30 degrees", function()
         local x, y, z = MortarPlacement.axisLocal("rail", "C")
         expect(math.abs(x) < 1e-9).toBe(true)

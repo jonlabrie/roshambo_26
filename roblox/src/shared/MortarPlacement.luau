@@ -148,12 +148,34 @@ local function nudge(bounds: Bounds, x: number, z: number, teahouseFP: Bounds?):
     return x, frontZ -- exhausted the deck without clearing; still must return a position
 end
 
+-- The gear's default mount when there is no stored record at all (every owned id not present
+-- in `stored`). Flipping this ONE constant from "floor" to "rail" is the owner's rail-mount
+-- gate lever (Task 7 wires a UI toggle to it) -- the no-override rail path is fully
+-- implemented below via `railDefault` (staggered, clamped to the newel margins, aim "C"), so
+-- pulling the lever cannot error.
+local DEFAULT_MOUNT = "floor"
+
+-- The staggered default deck-local spot for the i-th of n owned mortars mounted on the rail
+-- with NO stored override: the SAME i/n stagger the floor defaults use (defaultX), clamped
+-- into the rail's newel margins instead of the floor placement inset, pinned to the cap rail's
+-- z, aimed straight ("C"). Exported so it's directly testable even while DEFAULT_MOUNT stays
+-- "floor" this round and `resolve`'s public surface can't otherwise reach this branch.
+function MortarPlacement.railDefault(deckBounds: Bounds, i: number, n: number): (number, number, string)
+    local x = clamp(
+        defaultX(deckBounds, i, n),
+        deckBounds.minX + MortarPlacement.RAIL.newelMargin,
+        deckBounds.maxX - MortarPlacement.RAIL.newelMargin
+    )
+    local z = deckBounds.minZ + MortarPlacement.RAIL.capWidth / 2
+    return x, z, "C"
+end
+
 -- Resolves every OWNED mortar's deck-local placement: defaults for anything not in `stored`,
 -- stored overrides (clamped) otherwise, then a teahouse nudge if `teahouseFP` is given.
 -- Unknown/unowned ids in `stored` are ignored; every owned id always gets a row. A stored
--- record's `mount`/`aim` pass through (missing -> "floor"/"C"); `facing` is legacy and ignored.
--- A rail mount clamps its OWN way (RAIL.newelMargin inset, cap-rail z) and never nudges --
--- the teahouse cannot occupy the rail, so there is nothing to escape.
+-- record's `mount`/`aim` pass through (missing -> DEFAULT_MOUNT/"C"); `facing` is legacy and
+-- ignored. A rail mount clamps its OWN way (RAIL.newelMargin inset, cap-rail z) and never
+-- nudges -- the teahouse cannot occupy the rail, so there is nothing to escape.
 function MortarPlacement.resolve(
     deckBounds: Bounds,
     owned: { string },
@@ -176,17 +198,20 @@ function MortarPlacement.resolve(
     local n = #orderedOwned
     for i, id in orderedOwned do
         local override = stored and stored[id]
-        local mount = (override and override.mount) or "floor"
+        local mount = (override and override.mount) or DEFAULT_MOUNT
         local aim = (override and override.aim) or "C"
         local x, z
         if mount == "rail" then
-            assert(override, "mount = 'rail' requires a stored override")
-            x = clamp(
-                override.offset[1],
-                deckBounds.minX + MortarPlacement.RAIL.newelMargin,
-                deckBounds.maxX - MortarPlacement.RAIL.newelMargin
-            )
-            z = deckBounds.minZ + MortarPlacement.RAIL.capWidth / 2
+            if override then
+                x = clamp(
+                    override.offset[1],
+                    deckBounds.minX + MortarPlacement.RAIL.newelMargin,
+                    deckBounds.maxX - MortarPlacement.RAIL.newelMargin
+                )
+                z = deckBounds.minZ + MortarPlacement.RAIL.capWidth / 2
+            else
+                x, z = MortarPlacement.railDefault(deckBounds, i, n)
+            end
         else
             if override then
                 x, z = clampPoint(deckBounds, override.offset[1], override.offset[2])
