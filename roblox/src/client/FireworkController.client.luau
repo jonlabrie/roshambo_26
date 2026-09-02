@@ -664,8 +664,8 @@ local function play(payload: any, distance: number)
                             -- speeds — never inside a per-client gate, so all clients keep rng
                             -- lockstep whether or not they can hear it.
                             local count = rng:NextInteger(salvo.count[1], salvo.count[2])
-                            local gapMin = if salvo.gap then salvo.gap[1] else 0.12
-                            local gapMax = if salvo.gap then salvo.gap[2] else 0.42
+                            local gapMin = if salvo.gap then salvo.gap[1] else 0.08
+                            local gapMax = if salvo.gap then salvo.gap[2] else 0.25
                             local shotAt = 0
                             local shots = {}
                             for i = 1, count do
@@ -681,9 +681,9 @@ local function play(payload: any, distance: number)
                                     -- time kamuro's arms have drooped 10-20 studs under the
                                     -- anchor; the flashes land among them.
                                     offset = Vector3.new(
-                                        rng:NextNumber(-14, 14),
-                                        rng:NextNumber(-22, -8),
-                                        rng:NextNumber(-14, 14)
+                                        rng:NextNumber(-9, 9),
+                                        rng:NextNumber(-16, -7),
+                                        rng:NextNumber(-9, 9)
                                     ),
                                     speed = 0.94 + rng:NextNumber() * 0.12,
                                 }
@@ -720,9 +720,9 @@ local function play(payload: any, distance: number)
                                     -- cap ("might be a little too big", and the roundness reads
                                     -- less at the smaller size).
                                     kem.Size = NumberSequence.new({
-                                        NumberSequenceKeypoint.new(0, 0.7),
-                                        NumberSequenceKeypoint.new(0.3, 2),
-                                        NumberSequenceKeypoint.new(1, 0.7),
+                                        NumberSequenceKeypoint.new(0, 0.35),
+                                        NumberSequenceKeypoint.new(0.3, 1),
+                                        NumberSequenceKeypoint.new(1, 0.35),
                                     })
                                     kem.Speed = NumberRange.new(0, 0)
                                     kem.Drag = 0
