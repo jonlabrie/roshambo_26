@@ -76,6 +76,14 @@ type Slot = {
     -- seconds. A launch never has slack to hide that; the break at t+3s does. So launches get
     -- voices that never swap and never bind at fire time; slot.sound keeps the breaks.
     launchVoices: { [string]: Sound },
+    -- The HEAVY ascent's second layer (owner, 2026-09-06, after the Trail-widening
+    -- retreat): a particle comet streaming glow sparks behind the rising shell — how a
+    -- big shell reads in a real display (burning debris, not a wider ribbon). Purely
+    -- ADDITIVE: the pinned trails-approved Trail is untouched; killing this layer
+    -- restores it exactly. Dedicated emitter, so its properties are set ONCE at pool
+    -- build (only Color and Rate move per launch) — the shared-emitter full-write
+    -- discipline doesn't apply.
+    comet: ParticleEmitter,
 }
 local pool: { Slot } = {}
 local poolNext = 1
@@ -159,6 +167,34 @@ for _ = 1, POOL_SIZE do
         table.insert(emitters, em)
     end
 
+    -- The heavy comet layer: Rate-driven (the one emitter in the system that is — the
+    -- shell's continuous motion does the streaming; particles spawn at the shell and lag
+    -- behind in world space). Budget disclosure: rate 70 x ~0.55s mean life ≈ 40 alive,
+    -- ~5% of a heavy shell's doubled (800) budget.
+    local comet = Instance.new("ParticleEmitter")
+    comet.Enabled = false
+    comet.Rate = 0 -- armed per heavy launch
+    comet.LightInfluence = 0
+    comet.Texture = BurstStyles.TEXTURES.dot
+    comet.Lifetime = NumberRange.new(0.35, 0.7)
+    comet.Speed = NumberRange.new(2, 6)
+    comet.SpreadAngle = Vector2.new(180, 180)
+    comet.Size = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.55),
+        NumberSequenceKeypoint.new(1, 0.15),
+    })
+    comet.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.1),
+        NumberSequenceKeypoint.new(0.7, 0.3),
+        NumberSequenceKeypoint.new(1, 1),
+    })
+    comet.Acceleration = Vector3.new(0, -12, 0)
+    comet.Drag = 1.5
+    comet.Brightness = 2.5
+    comet.LightEmission = 0.85 -- the stacking law: sparks overlap the Trail constantly
+    comet.Orientation = Enum.ParticleOrientation.FacingCamera
+    comet.Parent = shell
+
     local launchVoices: { [string]: Sound } = {}
     local function addLaunchVoice(id: string)
         local v = Instance.new("Sound")
@@ -198,6 +234,7 @@ for _ = 1, POOL_SIZE do
         tail = tailSnd,
         salvoVoices = salvoVoices,
         launchVoices = launchVoices,
+        comet = comet,
     })
 end
 
@@ -653,6 +690,16 @@ local function play(payload: any, distance: number)
                 slot.trail:Clear()
                 slot.trail.Color = ColorSequence.new(colorOf(ev.color))
                 slot.trail.Enabled = true
+                -- The heavy comet layer rides ONLY the L class; explicitly doused for
+                -- everything else because slots are shared.
+                if recipe.heavy then
+                    local c = colorOf(ev.color)
+                    slot.comet.Color = ColorSequence.new(c:Lerp(Color3.new(1, 1, 1), 0.25), c)
+                    slot.comet.Rate = 70
+                    slot.comet.Enabled = true
+                else
+                    slot.comet.Enabled = false
+                end
                 playSound(slot, ev.sound, lod.sound, origin, soundSpeed)
                 -- The comet rises to the apex over whatever time the next phase leaves it —
                 -- in TWO stages: straight out of the tube for the first ~60% of the height,
@@ -698,6 +745,7 @@ local function play(payload: any, distance: number)
                     return
                 end
                 slot.trail.Enabled = false
+                slot.comet.Enabled = false -- the ascent layer ends where the break begins
                 -- THE BOOST (owner design, 2026-09-04; roll hoisted to the SHELL 2026-09-05):
                 -- a burst phase carrying `boost` upgrades on the shell's one seeded roll —
                 -- wider, brighter, MORE POINTS (which divide the budget, never add
@@ -982,6 +1030,7 @@ local function play(payload: any, distance: number)
     task.delay(last + tail + 0.2, function()
         active -= weight
         slot.trail.Enabled = false
+        slot.comet.Enabled = false -- belt: a boostOnly-skipped burst must not leak the layer
     end)
 end
 
