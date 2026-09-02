@@ -59,8 +59,9 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   fade at duration). Families: kiku, wa, yashi, hotaru (+tail), kamuro, ao (blue),
   midori (green), murasaki (violet) — the last three as shape/hue ladders; willow
   re-authored gold. Spec docs/superpowers/specs/2026-09-02-fireworks-vocabulary-design.md.
-- **Deck mortars (2026-09-04, merged `bc82000..31dcd6f`, dev-deployed — owner Play
-  gate pending)**: owned mortars render as tubes ON the owner's deck and gear shells
+- **Deck mortars (2026-09-04, merged `bc82000..31dcd6f`, dev-deployed, GATED
+  2026-09-04 — gate fixes `9d3cd3c..9aa660a`)**: owned mortars render as tubes ON
+  the owner's deck and gear shells
   launch from the required tier's MUZZLE (kiku/peony → S, willow → M);
   `firecracker` stays hand-launched; public sites unchanged. Default-first (owner
   ruling): S/M/L auto-stagger along the canyon-facing front edge, movable (never
@@ -77,7 +78,19 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   fingerprint bug (fresh Play sessions can't surface it — the gate must include a
   same-server rejoin) and a muzzle deck-size mismatch on display-shrunk decks.
   `SHELL_MORTAR` is fixture-enforced in both suites (see promotion pipeline
-  amendment in the proving-range spec §5). Spec
+  amendment in the proving-range spec §5). The owner gate found six more (all fixed
+  same-day, see log): front edge is local MINZ not maxZ (verified against the live
+  place: Nobori on −Z, back-door PortalControl on +Z — the plan's +Z premise was
+  wrong), PivotTo un-rolled the stood-up tube (rolled-cylinder PrimaryPart), tubes
+  drew 3× fat (bore is the INNER diameter — owner ruling), a mortar is an EMPTY tube
+  (real CSG hollow, one SubtractAsync per tier at boot, cloned after; two fake-disc
+  attempts rejected), the boot-time CSG yield made the server MISS the joining
+  player (PlayerAdded handlers have no catch-up loop — deferred via task.spawn), and
+  join-time replication fired the tag signal before the padId attribute applied so
+  no Move prompts bound (decorations included — a latent shipped bug). Firecracker
+  now launches from HAND height, not 6 studs overhead. ⚠ The same-server-rejoin
+  fingerprint fix is code-reviewed but NOT live-verified — solo Studio cannot
+  rejoin; verify on the published place. Spec
   docs/superpowers/specs/2026-09-04-deck-mortars-design.md; ledger
   `.superpowers/sdd/2026-09-04-deck-mortars/progress.md`.
 - VFX recipe (proven on device): rising Trail comet → flash core → radial burst →

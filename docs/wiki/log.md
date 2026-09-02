@@ -3106,3 +3106,34 @@ Play gate MUST include a same-server rejoin; fresh sessions can't surface it) an
 muzzle deck-size mismatch on display-shrunk decks. SHELL_MORTAR joined the fixture
 CI gate -- gear-shell promotion is now a guarded FIFTH step (proving-range spec §5
 amended). Suites at merge: Lune 1649, Vitest 486, lint clean.
+
+## [2026-09-04] gate | Deck mortars gated -- six finds in one Play session, all fixed same-day
+
+Gate fixes `9d3cd3c..9aa660a` on main. The finds, in order of discovery: (1) tubes
+shipped onto the BACK edge -- the plan asserted front = local +Z; the live place says
+-Z (Nobori canyon-side, PortalControl back-side); (2) PivotTo un-rolled the stood-up
+cylinder (rolled PrimaryPart pivot) -- tubes lay flat at deck level, near-invisible;
+(3) tubes drew 3x fat (plan's bore*3) -- bore is the INNER diameter, owner ruling;
+(4) a mortar is an EMPTY tube: two faked bore-disc attempts rejected ("filled",
+"overfilled"), replaced with real CSG hollow -- one SubtractAsync per tier, cached at
+boot, cloned per rebuild; (5) the boot CSG yield let the player join BEFORE
+PlayerAdded connected (no catch-up loop) -- dead session, no claim; deferred via
+task.spawn; (6) join-time tag signals beat the padId attribute so NO Move prompts
+bound at session start -- decorations included, a LATENT SHIPPED BUG (mid-session
+rebuilds always bound, masking it). Bonus: firecracker now fires from hand height,
+not the 6-studs-overhead placeholder. Gate steps passed: front-edge defaults, kiku
+from the S muzzle, move-persist across Plays, hand firecracker, no phantom tubes.
+NOT passed (untestable in solo Studio): same-server rejoin -- the fingerprint fix is
+re-review-verified only; VERIFY ON THE PUBLISHED PLACE. Next: rail-mounts spec
+(tubes clamp to the engawa's front rail, aimed out over the canyon; launch heading
+follows the visible tilt -- owner direction, 2026-09-04).
+
+## [2026-09-04] defect | Parked from the mortar gate: tsukubai lies down, proving bores undersized, bootstrap races
+
+Three pre-existing issues surfaced by the gate, parked not fixed: (a)
+DecorationCatalog's tsukubai builder has the same rolled-PrimaryPart PivotTo bug --
+any placed tsukubai renders on its side (one-line fix, same shape as the mortar
+one); (b) the proving-range racks draw outer diameter = bore, a hair undersized
+under the bore-is-inner ruling; (c) main.server.luau's PlayerAdded handlers have no
+catch-up for players already present -- any future yield added to bootstrap
+re-opens the missed-join window (the mortar CSG was the first to hit it).
