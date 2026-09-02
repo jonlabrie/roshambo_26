@@ -30,6 +30,7 @@ export type Phase = {
         glow: number?,
         points: number?,
         lifeScale: number?,
+        kicker: boolean?, -- false: this recipe's tell is structural; no star pop, no double-tap
         kickerColor: { number }?,
     }?,
     -- fires ONLY when the shell's boost roll hits -- the structural half of a surprise
@@ -59,6 +60,7 @@ export type Event = {
         glow: number?,
         points: number?,
         lifeScale: number?,
+        kicker: boolean?, -- false: this recipe's tell is structural; no star pop, no double-tap
         kickerColor: { number }?,
     }?,
     -- fires ONLY when the shell's boost roll hits -- the structural half of a surprise

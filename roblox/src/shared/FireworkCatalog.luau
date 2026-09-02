@@ -109,7 +109,10 @@ FireworkCatalog.RECIPES = {
                 spread = 42,
                 droop = false,
                 share = 3,
-                boost = { chance = 0.3, glow = 1.15, lifeScale = 1.1, kickerColor = { 255, 140, 30 } },
+                -- kicker = false (owner, 2026-09-05): the double ring IS the tell -- "it's
+                -- already obvious it was a bonus shell". The kicker stays in the engine for
+                -- shells whose surprise needs selling.
+                boost = { chance = 0.3, glow = 1.15, lifeScale = 1.1, kicker = false },
             },
             {
                 at = 3.4,

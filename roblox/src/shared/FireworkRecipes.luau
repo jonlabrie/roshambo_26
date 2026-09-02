@@ -129,10 +129,15 @@ function FireworkRecipes.validate(recipe: any): (boolean, string?)
                     return false,
                         `phase {i}: boost.points must be an integer 1..{BurstStyles.MAX_POINTS - 1} (added to the base)`
                 end
-                -- The kicker's star color (owner, 2026-09-05: wa's kicker is bright orange).
-                -- Optional; absent means the default warm white.
+                -- The kicker's star color. Optional; absent means the default warm white.
                 if b.kickerColor ~= nil and not validColor(b.kickerColor) then
                     return false, `phase {i}: boost.kickerColor must be a 3-element 0-255 array`
+                end
+                -- kicker = false opts a recipe out of the star pop + double-tap entirely
+                -- (owner, 2026-09-05: wa's double ring IS the tell; the kicker is for shells
+                -- whose surprise needs selling). Absent means true.
+                if b.kicker ~= nil and typeof(b.kicker) ~= "boolean" then
+                    return false, `phase {i}: boost.kicker must be a boolean`
                 end
             end
             -- boostOnly (owner, 2026-09-05): the structural half of a surprise -- a phase that

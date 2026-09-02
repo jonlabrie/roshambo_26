@@ -122,48 +122,7 @@ local function shapeTrio(core: { number }, edge: { number }, ascent: { number })
     }
 end
 
--- KICKER-COLOR AUDITION for the shipped wa (owner, 2026-09-05: "not liking orange... what's a
--- better contrast for red?"). The full boosted package at chance = 1.0, so EVERY shot shows
--- the double ring + kicker; only the kicker's fade color varies. Deleted when the owner picks.
-local function waKick(kickerColor: { number })
-    return {
-        phases = {
-            { at = 0.0, kind = "report", anchor = "origin", sound = S_REPORT },
-            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 180, 100 } },
-            {
-                at = 3.0,
-                kind = "burst",
-                anchor = "apex",
-                style = "ring",
-                color = { 255, 60, 40 },
-                edgeColor = { 255, 240, 220 },
-                spread = 42,
-                droop = false,
-                share = 3,
-                boost = { chance = 1, glow = 1.15, lifeScale = 1.1, kickerColor = kickerColor },
-            },
-            {
-                at = 3.4,
-                kind = "burst",
-                anchor = "apex",
-                style = "ring",
-                color = { 255, 90, 60 },
-                edgeColor = { 255, 240, 220 },
-                spread = 60,
-                droop = false,
-                share = 2,
-                boostOnly = true,
-            },
-        },
-    }
-end
-
 FireworkDrafts.FAMILIES = {
-    kick = {
-        gold = waKick({ 255, 220, 80 }), -- hotter fire: max brightness, same warm family
-        ice = waKick({ 150, 215, 255 }), -- white-hot cooling to cyan: max hue+temperature contrast
-        silver = waKick({ 235, 240, 245 }), -- the classic pyro salute flash, hue-neutral
-    },
     yashi = {
         v1 = yashi(4),
         v2 = yashi(5),

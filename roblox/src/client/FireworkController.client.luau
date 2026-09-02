@@ -567,60 +567,65 @@ local function play(payload: any, distance: number)
                         -- ⚠ LUCK MUST BE LEGIBLE (owner, 2026-09-04: "hard to know you've
                         -- landed a bonus by sight"). Two sellers, both at ~75% of the
                         -- boosted break's life, as the stars begin to fade:
-                        -- 1. THE KICKER — a tight white-hot pop of stars at the anchor
-                        --    (fixed 16 sparks, the muzzle-flash budget disclosure applies).
+                        -- 1. THE KICKER — a tight pop of stars at the anchor (28 sparks,
+                        --    the muzzle-flash budget disclosure applies).
                         -- 2. THE DOUBLE-TAP — a second, sharper report on the tail voice,
                         --    skipped when the style owns its tail (hotaru's sizzle).
+                        -- boost.kicker = false skips BOTH (owner, 2026-09-05): a shell whose
+                        -- surprise is structural (wa's double ring) needs no selling.
                         local style = BurstStyles.styleOf(ev.style)
                         local kickAt = style.lifetime[2] * phaseLife * 0.75
-                        task.delay(kickAt, function()
-                            local kp = slot.points[MAX_POINTS]
-                            local kem = slot.emitters[MAX_POINTS]
-                            kp.CFrame = CFrame.new(anchorPos)
-                            kem.Texture = BurstStyles.TEXTURES.dot
-                            -- THE READABLE KICKER (owner, 2026-09-05: "not enough stars to
-                            -- carry the color"). Four levers, because glow alone whitens:
-                            -- at LightEmission 1 / Brightness 4 the pileup blew out to white
-                            -- (the vocabulary's stacking law), and the old white->color fade
-                            -- spent most of a 0.25-0.4s life in its white half. Hue from
-                            -- birth (color warmed 35% toward white), longer life, blowout
-                            -- pulled under full additive, and 28 stars (~4% of a shell's
-                            -- 500-700 budget -- the honest disclosure, up from 16/2%).
-                            local kc = ev.boost.kickerColor
-                            local hue = if kc
-                                then Color3.fromRGB(kc[1], kc[2], kc[3])
-                                else Color3.fromRGB(255, 220, 160)
-                            kem.Color = ColorSequence.new(hue:Lerp(Color3.new(1, 1, 1), 0.35), hue)
-                            kem.Size = NumberSequence.new(0.5)
-                            kem.Speed = NumberRange.new(16, 30)
-                            kem.Drag = 3
-                            kem.Lifetime = NumberRange.new(0.45, 0.7)
-                            kem.Brightness = 2.5
-                            kem.SpreadAngle = Vector2.new(360, 360)
-                            kem.Acceleration = Vector3.new(0, -4, 0)
-                            kem.Transparency = NumberSequence.new({
-                                NumberSequenceKeypoint.new(0, 0),
-                                NumberSequenceKeypoint.new(0.7, 0.1),
-                                NumberSequenceKeypoint.new(1, 1),
-                            })
-                            kem.Orientation = Enum.ParticleOrientation.FacingCamera
-                            kem.Rotation = NumberRange.new(0)
-                            kem.LightEmission = 0.85
-                            kem:Emit(28)
-                        end)
-                        if not style.tailSound and lod.sound then
-                            local soundPool = BurstStyles.SOUNDS[style.soundRole]
-                            local tapId = if typeof(soundPool) == "table"
-                                then soundPool[rng:NextInteger(1, #soundPool)]
-                                else soundPool
-                            local cam = workspace.CurrentCamera
-                            local dist = if cam then (cam.CFrame.Position - anchorPos).Magnitude else 0
-                            task.delay(kickAt + dist / BurstStyles.SOUND_LEVELS.speedOfSound, function()
-                                slot.tail.SoundId = tapId
-                                slot.tail.Volume = BurstStyles.SOUND_LEVELS.volume * 0.45
-                                slot.tail.PlaybackSpeed = soundSpeed * 1.12 -- sharper than the main
-                                slot.tail:Play()
+                        local wantKicker = ev.boost.kicker ~= false
+                        if wantKicker then
+                            task.delay(kickAt, function()
+                                local kp = slot.points[MAX_POINTS]
+                                local kem = slot.emitters[MAX_POINTS]
+                                kp.CFrame = CFrame.new(anchorPos)
+                                kem.Texture = BurstStyles.TEXTURES.dot
+                                -- THE READABLE KICKER (owner, 2026-09-05: "not enough stars to
+                                -- carry the color"). Four levers, because glow alone whitens:
+                                -- at LightEmission 1 / Brightness 4 the pileup blew out to white
+                                -- (the vocabulary's stacking law), and the old white->color fade
+                                -- spent most of a 0.25-0.4s life in its white half. Hue from
+                                -- birth (color warmed 35% toward white), longer life, blowout
+                                -- pulled under full additive, and 28 stars (~4% of a shell's
+                                -- 500-700 budget -- the honest disclosure, up from 16/2%).
+                                local kc = ev.boost.kickerColor
+                                local hue = if kc
+                                    then Color3.fromRGB(kc[1], kc[2], kc[3])
+                                    else Color3.fromRGB(255, 220, 160)
+                                kem.Color = ColorSequence.new(hue:Lerp(Color3.new(1, 1, 1), 0.35), hue)
+                                kem.Size = NumberSequence.new(0.5)
+                                kem.Speed = NumberRange.new(16, 30)
+                                kem.Drag = 3
+                                kem.Lifetime = NumberRange.new(0.45, 0.7)
+                                kem.Brightness = 2.5
+                                kem.SpreadAngle = Vector2.new(360, 360)
+                                kem.Acceleration = Vector3.new(0, -4, 0)
+                                kem.Transparency = NumberSequence.new({
+                                    NumberSequenceKeypoint.new(0, 0),
+                                    NumberSequenceKeypoint.new(0.7, 0.1),
+                                    NumberSequenceKeypoint.new(1, 1),
+                                })
+                                kem.Orientation = Enum.ParticleOrientation.FacingCamera
+                                kem.Rotation = NumberRange.new(0)
+                                kem.LightEmission = 0.85
+                                kem:Emit(28)
                             end)
+                            if not style.tailSound and lod.sound then
+                                local soundPool = BurstStyles.SOUNDS[style.soundRole]
+                                local tapId = if typeof(soundPool) == "table"
+                                    then soundPool[rng:NextInteger(1, #soundPool)]
+                                    else soundPool
+                                local cam = workspace.CurrentCamera
+                                local dist = if cam then (cam.CFrame.Position - anchorPos).Magnitude else 0
+                                task.delay(kickAt + dist / BurstStyles.SOUND_LEVELS.speedOfSound, function()
+                                    slot.tail.SoundId = tapId
+                                    slot.tail.Volume = BurstStyles.SOUND_LEVELS.volume * 0.45
+                                    slot.tail.PlaybackSpeed = soundSpeed * 1.12 -- sharper than the main
+                                    slot.tail:Play()
+                                end)
+                            end
                         end
                     end
                 end
