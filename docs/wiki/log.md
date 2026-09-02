@@ -3257,3 +3257,17 @@ it lives in another region or another account, and the frontend deploy path is
 undocumented from this repo's seat; (2) CLAUDE.md's "dist/ is committed" is stale
 (gitignored); (3) the iOS bell fix (`d5187da`) is committed but not live until an
 Amplify build runs from wherever the app lives.
+
+## [2026-09-05] correction | Second retraction on the same thread: the Amplify app was HERE all along
+
+The retraction above kept one false residue: "not visible to this machine's AWS
+credentials." Owner, looking at the console: "the roshambo_26 Amplify app is
+sitting right there, in us-east-1, under that account." Correct. The region scan
+omitted exactly us-east-1 (the default profile region is us-west-1; the loop
+checked us-west-2/us-west-1/us-east-2). App: roshambo_26, appId dnlwlh7md4i46,
+us-east-1, account 198886313292. Frontend deploy procedure, now DOCUMENTED:
+`aws amplify start-job --region us-east-1 --app-id dnlwlh7md4i46 --branch-name
+main --job-type RELEASE` (auto-deploy stays off per the 2026-08-25 ruling). The
+iOS bell fix (`d5187da`) shipped via job 53. Lesson, same family as the headers
+overreach: an absence claim is only as good as the completeness of the search --
+name the regions you scanned when you claim "not found".
