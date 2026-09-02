@@ -514,3 +514,21 @@ a JOURNEY design (sequence, pacing, vocabulary, the four questions above), not a
 To be crafted owner+Claude together (owner: "together you and I need to craft this journey").
 Context: the beats now RENDER (defect (d) fixed 2026-09-05 -- every F&F guest would have seen
 empty boxes); the four existing beats are placeholders for this pass.
+
+## Fireworks monetization vocabulary: boosts standard, surprises typed, mystery + bundle SKUs (owner, 2026-09-05)
+
+Rulings from the wa worksheet session, shaping everything downstream:
+
+1. **The boost package is the STANDARD shape for most fireworks**: a quality floor with an
+   occasional "surprise and delight" (the kiku 30%-class luck design generalizes).
+2. **The surprise VARIES BY TYPE** — e.g., a blue ending burst instead of white, or a loud
+   bang at the end. Each family's promotion verdict should pick its own surprise.
+3. **Salutes are a missing vocabulary class**: "we haven't built any big bright single or
+   multiple bangs yet" — big flash+boom shells (single salute, multi-salute finale crackle)
+   are a planted wave-2 style, AND the raw material for bang-type surprises.
+4. **Mystery shells**: relatively inexpensive, reasonable price, ALWAYS a surprise and NEVER
+   a disappointment when consumed. (Design note: "never a disappointment" is a content-floor
+   constraint, not just randomness -- the pool must contain only delight.)
+5. **Mystery boxes**: purchasable containers holding random firework assortments.
+6. **Firework boxes**: clearly identified contents at a bundled price. Interlocks directly
+   with the Hanabiya box-art/merchandising pass (the box IS the shelf product).
