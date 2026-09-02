@@ -88,9 +88,9 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   player (PlayerAdded handlers have no catch-up loop — deferred via task.spawn), and
   join-time replication fired the tag signal before the padId attribute applied so
   no Move prompts bound (decorations included — a latent shipped bug). Firecracker
-  now launches from HAND height, not 6 studs overhead. ⚠ The same-server-rejoin
-  fingerprint fix is code-reviewed but NOT live-verified — solo Studio cannot
-  rejoin; verify on the published place. Spec
+  now launches from HAND height, not 6 studs overhead. The same-server-rejoin
+  fingerprint fix was LIVE-VERIFIED 2026-09-05 on the published place (two-device
+  hold-open, leave/rejoin: tubes present at their placements). Spec
   docs/superpowers/specs/2026-09-04-deck-mortars-design.md; ledger
   `.superpowers/sdd/2026-09-04-deck-mortars/progress.md`.
 - **Rail mounts (2026-09-05, merged `24c6da9..8e1a61b` + gate fixes `27b410d..dcdffed`,
@@ -116,7 +116,7 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   plus a 3s rescan heartbeat that makes binding converge from ANY join interleaving
   (`27b410d`, `862568c` — five orderings were patched before instrumentation found the truth);
   (3) the lever's fall-through would have swept legacy records onto the rail — guarded
-  (`dcdffed`). ⚠ Same-server rejoin verification STILL pending the published place. Spec
+  (`dcdffed`). Same-server rejoin verification PASSED live 2026-09-05. Spec
   docs/superpowers/specs/2026-09-04-rail-mounts-design.md; ledger
   `.superpowers/sdd/2026-09-04-rail-mounts/progress.md`.
 - VFX recipe (proven on device): rising Trail comet → flash core → radial burst →

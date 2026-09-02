@@ -3211,3 +3211,14 @@ Verified at publish time: the published place targets the DEV backend
 route and fix; prod (the PWA's backend) is untouched by this arc, by design.
 UNLOCKED: the same-server rejoin verification (deck-mortars fingerprint fix) --
 recipe: two sessions hold the server open, leave+rejoin on one.
+
+## [2026-09-05] gate | Live verifications on the published place -- rejoin PASSES, shop heals
+
+Minutes after publish the owner found the shop showing zero holdings while the
+picker was accurate -- the late-listener class's third victim (FireworkState was
+the one payload RequestSync never re-echoed). Fixed same-hour (`a3c4c74`):
+RequestSync now re-delivers the COMPLETE join state and ShopController pulls until
+fed. Owner republished and verified live: shop totals correct, AND the two-device
+same-server rejoin recipe (hold the instance open on Android, leave/rejoin on
+desktop) proved the deck-mortars fingerprint fix -- tubes present at their
+placements on rejoin. The deck-mortars arc has no open verifications left.
