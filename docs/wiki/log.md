@@ -3242,3 +3242,18 @@ zero buckets, zero distributions; the only Amplify app in reach is an unrelated
 README_DEPLOY.md or the wiki describes the S3/CF path. The unlock fix is committed
 but NOT live until whoever owns that account syncs a fresh build. Also stale:
 CLAUDE.md's "dist/ is committed build output" -- dist/ is gitignored.
+
+## [2026-09-05] correction | The "S3+CF migration" claim two entries up is RETRACTED -- overreach, owner caught it
+
+Amplify Hosting serves `server: AmazonS3` + `via: cloudfront` headers -- they cannot
+distinguish Amplify from hand-rolled S3+CF, and the `last-modified: 2026-08-25` I
+read as a migration date is better explained as the LAST AUTO-BUILD, made minutes
+before auto-deploy was switched off that same day (the 08-25 entry, written from
+live console observation, which necessarily had the Amplify app in hand). The wiki's
+hosting claim STANDS: playroshambo.com is Amplify, frozen since 08-25. What remains
+true and unresolved from the retracted entry: (1) the Amplify app is not visible to
+this machine's AWS credentials (account 198886313292, us-east-1/2, us-west-1/2) --
+it lives in another region or another account, and the frontend deploy path is
+undocumented from this repo's seat; (2) CLAUDE.md's "dist/ is committed" is stale
+(gitignored); (3) the iOS bell fix (`d5187da`) is committed but not live until an
+Amplify build runs from wherever the app lives.
