@@ -292,7 +292,11 @@ local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random, l
     local acceleration = if ev.droop == true
         then Vector3.new(0, -28, 0)
         else Vector3.new(style.acceleration[1], style.acceleration[2], style.acceleration[3])
-    local speed = NumberRange.new(style.speed[1], style.speed[2])
+    -- `spread` scales the BURST RADIUS (emission speed), with 30 as the neutral value --
+    -- before 2026-09-04 it only scaled sprite size, and a "spread ladder" (kiku 28/38/50)
+    -- was three near-identical bursts (owner: "can't tell much of a difference").
+    local radiusScale = (ev.spread or 30) / 30
+    local speed = NumberRange.new(style.speed[1] * radiusScale, style.speed[2] * radiusScale)
     -- lifeScale > 1 only on a bonus shell: its stars simply live longer.
     local lifetime = NumberRange.new(style.lifetime[1] * lifeScale, style.lifetime[2] * lifeScale)
     local spreadAngle = Vector2.new(style.spreadAngle[1], style.spreadAngle[2])
