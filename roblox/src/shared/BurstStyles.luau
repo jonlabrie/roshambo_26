@@ -227,6 +227,12 @@ BurstStyles.SOUNDS = {
         "rbxassetid://92892667329683", -- launch-deck-3
     },
     launch_heavy = "rbxassetid://77117688726913", -- launch-deck-4: the L tube's grunt
+    -- The salute voices (owner uploads 2026-09-06, cut from 390182__eardeer__explosion:
+    -- echo-y canyon punch, ZERO pre-roll -- peak 50ms in, no trim needed). The 3.5s cut
+    -- keeps the 2.75s slap-back echo: a break's single big boom. The 3s cut rolls off
+    -- earlier: the salvo voice, tuned to stack 3-6 deep without going to mud.
+    salute_single = "rbxassetid://130448210140184", -- eardeer 3.5s: the always-boom
+    salute = "rbxassetid://133126105159507", -- eardeer 3s: the salvo voice
     tail_strobe = "rbxassetid://92069275413514", -- jon-sizzle-c3-canyon-v6: 0.8s sizzle body, vast dark returns, lows shaved
     burst_peony = {
         "rbxassetid://89225206152876", -- burst-aerial-1

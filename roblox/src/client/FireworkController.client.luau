@@ -62,6 +62,10 @@ type Slot = {
     tail: Sound, -- the SECOND voice: a style's tailSound (the owner's canyon sizzle over
     -- hotaru's final flicker) deliberately OVERLAPS the burst's decay, so it cannot share
     -- the main Sound -- that one's SoundId swap would cut whichever clip was still playing.
+    -- Salvo voices (owner, 2026-09-06): a salute grouping overlaps its own 3s clips, so each
+    -- shot needs its own Sound. Created lazily on first use, then pooled on the slot forever
+    -- -- the churn ban is on per-shell instance creation, and after warmup there is none.
+    salvoVoices: { Sound },
 }
 local pool: { Slot } = {}
 local poolNext = 1
@@ -145,10 +149,15 @@ for _ = 1, POOL_SIZE do
         table.insert(emitters, em)
     end
 
-    table.insert(
-        pool,
-        { shell = shell, trail = trail, points = points, emitters = emitters, sound = snd, tail = tailSnd }
-    )
+    table.insert(pool, {
+        shell = shell,
+        trail = trail,
+        points = points,
+        emitters = emitters,
+        sound = snd,
+        tail = tailSnd,
+        salvoVoices = {},
+    })
 end
 
 local WHITE = { 255, 255, 255 }
@@ -193,6 +202,19 @@ local function playSound(slot: Slot, id: string?, audible: boolean, from: Vector
     else
         task.delay(delay, fire)
     end
+end
+
+local function salvoVoiceFor(slot: Slot, i: number): Sound
+    local s = slot.salvoVoices[i]
+    if s == nil then
+        s = Instance.new("Sound")
+        s.RollOffMode = Enum.RollOffMode.InverseTapered
+        s.RollOffMinDistance = BurstStyles.SOUND_LEVELS.rolloffMin
+        s.RollOffMaxDistance = BurstStyles.SOUND_LEVELS.rolloffMax
+        s.Parent = slot.shell
+        slot.salvoVoices[i] = s
+    end
+    return s
 end
 
 -- ⚠ PRELOAD EVERY SOUND AND SPRITE ONCE, AT STARTUP. A Sound's first :Play() otherwise
@@ -618,7 +640,79 @@ local function play(payload: any, distance: number)
                         local style = BurstStyles.styleOf(ev.style)
                         local kickAt = style.lifetime[2] * phaseLife * 0.75
                         local wantKicker = ev.boost.kicker ~= false
-                        if wantKicker then
+                        local salvo = ev.boost.salvo
+                        if salvo then
+                            -- THE SALVO KICKER (owner, 2026-09-06: kamuro "needs a big boom at
+                            -- starburst, always, and the kicker should be a follow-up of a
+                            -- half-dozen aerial explosions/salutes" — 3-4 for kamuro's kicker,
+                            -- 5-8 reserved for standalone salute shells): N flash-and-bang
+                            -- salutes in a tight VARIABLE grouping above the break, each its own
+                            -- 3D voice at its own pitch. Replaces the star pop + double-tap.
+                            -- ⚠ EVERY DRAW HAPPENS HERE, UNCONDITIONALLY — count, gaps, offsets,
+                            -- speeds — never inside a per-client gate, so all clients keep rng
+                            -- lockstep whether or not they can hear it.
+                            local count = rng:NextInteger(salvo.count[1], salvo.count[2])
+                            local gapMin = if salvo.gap then salvo.gap[1] else 0.12
+                            local gapMax = if salvo.gap then salvo.gap[2] else 0.42
+                            local shotAt = 0
+                            local shots = {}
+                            for i = 1, count do
+                                if i > 1 then
+                                    shotAt += rng:NextNumber(gapMin, gapMax)
+                                end
+                                shots[i] = {
+                                    at = shotAt,
+                                    offset = Vector3.new(
+                                        rng:NextNumber(-14, 14),
+                                        rng:NextNumber(6, 16),
+                                        rng:NextNumber(-14, 14)
+                                    ),
+                                    speed = 0.94 + rng:NextNumber() * 0.12,
+                                }
+                            end
+                            local cam = workspace.CurrentCamera
+                            local dist = if cam then (cam.CFrame.Position - anchorPos).Magnitude else 0
+                            local travel = dist / BurstStyles.SOUND_LEVELS.speedOfSound
+                            for i, shot in shots do
+                                task.delay(kickAt + shot.at, function()
+                                    -- THE FLASH: a salute is a bang you SEE. One hot white-gold
+                                    -- pop per shot — 22 sparks (up to 4 shots ≈ 88, ~15% of a
+                                    -- shell's budget), FULL property write (shared emitters).
+                                    -- Shots are sequential, so they share the kicker's point.
+                                    local kp = slot.points[MAX_POINTS]
+                                    local kem = slot.emitters[MAX_POINTS]
+                                    kp.CFrame = CFrame.new(anchorPos + shot.offset)
+                                    kem.Texture = BurstStyles.TEXTURES.dot
+                                    kem.Color =
+                                        ColorSequence.new(Color3.new(1, 1, 1), Color3.fromRGB(255, 214, 150))
+                                    kem.Size = NumberSequence.new(1.1, 0.35)
+                                    kem.Speed = NumberRange.new(30, 55)
+                                    kem.Drag = 4
+                                    kem.Lifetime = NumberRange.new(0.25, 0.45)
+                                    kem.Brightness = 3
+                                    kem.SpreadAngle = Vector2.new(360, 360)
+                                    kem.Acceleration = Vector3.new(0, -3, 0)
+                                    kem.Transparency = NumberSequence.new({
+                                        NumberSequenceKeypoint.new(0, 0),
+                                        NumberSequenceKeypoint.new(0.5, 0.05),
+                                        NumberSequenceKeypoint.new(1, 1),
+                                    })
+                                    kem.Orientation = Enum.ParticleOrientation.FacingCamera
+                                    kem.Rotation = NumberRange.new(0)
+                                    kem.LightEmission = 1
+                                    kem:Emit(22)
+                                end)
+                                if lod.sound then
+                                    task.delay(kickAt + shot.at + travel, function()
+                                        local voice = salvoVoiceFor(slot, i)
+                                        voice.SoundId = BurstStyles.SOUNDS.salute
+                                        voice.Volume = BurstStyles.SOUND_LEVELS.volume * 0.9
+                                        voice.PlaybackSpeed = shot.speed
+                                        voice:Play()
+                                    end)
+                                end
+                            end
+                        elseif wantKicker then
                             task.delay(kickAt, function()
                                 local kp = slot.points[MAX_POINTS]
                                 local kem = slot.emitters[MAX_POINTS]
@@ -672,19 +766,29 @@ local function play(payload: any, distance: number)
                                 kem.LightEmission = 0.85
                                 kem:Emit(28)
                             end)
-                            if not style.tailSound and lod.sound then
+                            if not style.tailSound then
                                 local soundPool = BurstStyles.SOUNDS[style.soundRole]
+                                -- ⚠ drawn OUTSIDE the lod.sound gate: audibility is per-client
+                                -- (distance), and a draw skipped by a far client would desync
+                                -- every rng draw after it — the burst geometry included.
                                 local tapId = if typeof(soundPool) == "table"
                                     then soundPool[rng:NextInteger(1, #soundPool)]
                                     else soundPool
-                                local cam = workspace.CurrentCamera
-                                local dist = if cam then (cam.CFrame.Position - anchorPos).Magnitude else 0
-                                task.delay(kickAt + dist / BurstStyles.SOUND_LEVELS.speedOfSound, function()
-                                    slot.tail.SoundId = tapId
-                                    slot.tail.Volume = BurstStyles.SOUND_LEVELS.volume * 0.45
-                                    slot.tail.PlaybackSpeed = soundSpeed * 1.12 -- sharper than the main
-                                    slot.tail:Play()
-                                end)
+                                if lod.sound then
+                                    local cam = workspace.CurrentCamera
+                                    local dist = if cam
+                                        then (cam.CFrame.Position - anchorPos).Magnitude
+                                        else 0
+                                    task.delay(
+                                        kickAt + dist / BurstStyles.SOUND_LEVELS.speedOfSound,
+                                        function()
+                                            slot.tail.SoundId = tapId
+                                            slot.tail.Volume = BurstStyles.SOUND_LEVELS.volume * 0.45
+                                            slot.tail.PlaybackSpeed = soundSpeed * 1.12 -- sharper than the main
+                                            slot.tail:Play()
+                                        end
+                                    )
+                                end
                             end
                         end
                     end

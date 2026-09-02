@@ -33,6 +33,9 @@ export type Phase = {
         kicker: boolean?, -- false: this recipe's tell is structural; no star pop, no double-tap
         kickerStreaks: boolean?, -- the pop is streaks (velocity-parallel), not dots (owner: yashi)
         kickerColor: { number }?,
+        -- the kicker as a grouped volley of aerial salutes (owner, 2026-09-06); replaces
+        -- the star pop + double-tap when present. count drawn per shell, gap per shot.
+        salvo: { count: { number }, gap: { number }? }?,
     }?,
     -- fires ONLY when the shell's boost roll hits -- the structural half of a surprise
     -- (owner, 2026-09-05: wa's second concentric ring; later, salute endings)
@@ -64,6 +67,9 @@ export type Event = {
         kicker: boolean?, -- false: this recipe's tell is structural; no star pop, no double-tap
         kickerStreaks: boolean?, -- the pop is streaks (velocity-parallel), not dots (owner: yashi)
         kickerColor: { number }?,
+        -- the kicker as a grouped volley of aerial salutes (owner, 2026-09-06); replaces
+        -- the star pop + double-tap when present. count drawn per shell, gap per shot.
+        salvo: { count: { number }, gap: { number }? }?,
     }?,
     -- fires ONLY when the shell's boost roll hits -- the structural half of a surprise
     -- (owner, 2026-09-05: wa's second concentric ring; later, salute endings)

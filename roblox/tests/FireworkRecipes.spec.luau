@@ -102,6 +102,31 @@ describe("FireworkRecipes.validate — the one recipe schema", function()
         expect(FireworkRecipes.validate(onAscent)).toBe(false)
     end)
 
+    test("a salvo kicker is bounded: count int pair 1..8 ordered, gap pair 0.05..1", function()
+        local r = goodRecipe()
+        r.phases[3].boost = { chance = 0.3, salvo = { count = { 3, 4 } } }
+        expect(FireworkRecipes.validate(r)).toBe(true)
+        local withGap = goodRecipe()
+        withGap.phases[3].boost = { chance = 0.3, salvo = { count = { 3, 4 }, gap = { 0.12, 0.42 } } }
+        expect(FireworkRecipes.validate(withGap)).toBe(true)
+        local cases: { any } = {
+            true, -- not a table
+            {}, -- no count
+            { count = { 0, 4 } }, -- below 1
+            { count = { 3, 9 } }, -- above 8
+            { count = { 4, 3 } }, -- unordered
+            { count = { 2.5, 4 } }, -- not an integer
+            { count = { 3, 4 }, gap = { 0.42, 0.12 } }, -- unordered gap
+            { count = { 3, 4 }, gap = { 0, 0.3 } }, -- gap below floor
+            { count = { 3, 4 }, gap = { 0.3, 2 } }, -- gap above ceiling
+        }
+        for _, salvo in cases do
+            local bad = goodRecipe()
+            bad.phases[3].boost = { chance = 0.3, salvo = salvo }
+            expect(FireworkRecipes.validate(bad)).toBe(false)
+        end
+    end)
+
     test("EVERY SHIPPED CATALOG RECIPE PASSES — one schema, not two", function()
         for id, recipe in FireworkCatalog.RECIPES do
             local ok, err = FireworkRecipes.validate(recipe)

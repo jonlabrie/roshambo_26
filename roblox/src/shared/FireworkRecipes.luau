@@ -144,6 +144,43 @@ function FireworkRecipes.validate(recipe: any): (boolean, string?)
                 if b.kickerStreaks ~= nil and typeof(b.kickerStreaks) ~= "boolean" then
                     return false, `phase {i}: boost.kickerStreaks must be a boolean`
                 end
+                -- salvo (owner, 2026-09-06): the kicker as a GROUPING of aerial salutes --
+                -- count drawn per lucky shell, gaps drawn per shot ("variable grouping").
+                -- Replaces the star pop + double-tap when present. Count admits 1..8: 3-4
+                -- is kamuro's kicker, 5-8 reserved for standalone salute shells.
+                if b.salvo ~= nil then
+                    local s = b.salvo
+                    if typeof(s) ~= "table" then
+                        return false, `phase {i}: boost.salvo must be a table`
+                    end
+                    local c = s.count
+                    if
+                        typeof(c) ~= "table"
+                        or typeof(c[1]) ~= "number"
+                        or typeof(c[2]) ~= "number"
+                        or c[1] % 1 ~= 0
+                        or c[2] % 1 ~= 0
+                        or c[1] < 1
+                        or c[2] > 8
+                        or c[1] > c[2]
+                    then
+                        return false, `phase {i}: boost.salvo.count must be an ordered integer pair in 1..8`
+                    end
+                    local g = s.gap
+                    if
+                        g ~= nil
+                        and (
+                            typeof(g) ~= "table"
+                            or typeof(g[1]) ~= "number"
+                            or typeof(g[2]) ~= "number"
+                            or g[1] < 0.05
+                            or g[2] > 1
+                            or g[1] > g[2]
+                        )
+                    then
+                        return false, `phase {i}: boost.salvo.gap must be an ordered seconds pair in 0.05..1`
+                    end
+                end
             end
             -- boostOnly (owner, 2026-09-05): the structural half of a surprise -- a phase that
             -- exists only when the shell's boost roll hits (wa's second concentric ring). It
