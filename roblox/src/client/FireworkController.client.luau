@@ -499,10 +499,10 @@ local function play(payload: any, distance: number)
                             kem:Emit(16)
                         end)
                         if not style.tailSound and lod.sound then
-                            local pool = BurstStyles.SOUNDS[style.soundRole]
-                            local tapId = if typeof(pool) == "table"
-                                then pool[rng:NextInteger(1, #pool)]
-                                else pool
+                            local soundPool = BurstStyles.SOUNDS[style.soundRole]
+                            local tapId = if typeof(soundPool) == "table"
+                                then soundPool[rng:NextInteger(1, #soundPool)]
+                                else soundPool
                             local cam = workspace.CurrentCamera
                             local dist = if cam then (cam.CFrame.Position - anchorPos).Magnitude else 0
                             task.delay(kickAt + dist / BurstStyles.SOUND_LEVELS.speedOfSound, function()
@@ -521,11 +521,11 @@ local function play(payload: any, distance: number)
                 -- rng order stays a pure function of the payload.
                 local soundId = ev.sound
                 if not soundId then
-                    local pool = BurstStyles.SOUNDS[BurstStyles.styleOf(ev.style).soundRole]
-                    if typeof(pool) == "table" then
-                        soundId = pool[rng:NextInteger(1, #pool)]
+                    local soundPool = BurstStyles.SOUNDS[BurstStyles.styleOf(ev.style).soundRole]
+                    if typeof(soundPool) == "table" then
+                        soundId = soundPool[rng:NextInteger(1, #soundPool)]
                     else
-                        soundId = pool
+                        soundId = soundPool
                     end
                     -- the draw above still happens on bonus shells (stream stability);
                     -- the heavyweight boom then takes the slot.
