@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-30
+updated: 2026-09-04
 ---
 
 # Blender Working Rules
@@ -144,13 +144,14 @@ the till. Move `AUTHORED_BLEND` aside to rebuild the base bird — an action, no
 
 **Where the guarded files live (2026-08-30).** `art/` at the repo root is the in-repo home for
 hand-authored source; `art/README.md` carries the admission rule. The two halves are kept in
-agreement by CI: `art/` must contain no derived files, and every name in
-`karasu_retarget.ART_SOURCES` must actually be stored there.
+agreement by CI: `art/` must contain no derived files, and every hand-authored name the
+registry guards must actually be stored there.
 
-⚠ **`OWNER_AUTHORED` AND `ART_SOURCES` ARE NOT THE SAME SET.** `ART_SOURCES` was made by hand
-and is stored in `art/`. `karasu_body.fbx` is guarded but *derived*, so it is deliberately NOT in
-`art/` — it is in `OWNER_AUTHORED` only because it is what Studio imports, and a rebuild would
-replace the shipping bird with one carrying none of the authored bill.
+⚠ **`OWNER_AUTHORED` IS NOW THE ONE REGISTRY** (the separate ART_SOURCES set was folded into
+it; `art/README.md` §8 records the storage-half/guard-half split). Hand-made sources are stored
+in `art/`; a guarded-but-*derived* file like `karasu_body.fbx` is deliberately NOT in `art/` —
+it is guarded only because it is what Studio imports, and a rebuild would replace the shipping
+bird with one carrying none of the authored bill.
 
 ⚠ **BLEND SAVES ARE MILESTONE-ONLY, AND THAT IS A SIZE CONSTRAINT, NOT ETIQUETTE.** Git cannot
 diff a `.blend`; every save is a full copy kept forever, and Blender writes a `.blend1` backup
@@ -201,6 +202,6 @@ bpy.ops.render.opengl(write_still=True, view_context=True)   # what the viewport
 bpy.ops.screen.screenshot(filepath=...)                      # the whole window, for panels/nodes
 ```
 
-Both verified working 2026-08-30; `screen.screenshot_area` is not (writes 250 bytes).
-⚠ `render.opengl` needs a `temp_override` carrying the VIEW_3D area and its WINDOW region.
+Both verified working 2026-08-30; bpy.ops.screen.screenshot_area is not (writes 250 bytes).
+⚠ The opengl render op needs a `temp_override` carrying the VIEW_3D area and its WINDOW region.
 

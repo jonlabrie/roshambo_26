@@ -2191,7 +2191,7 @@ effect. Then the three derived maps being 16-bit PNGs, reasoned to break the pac
 not this. And a diagnostic A/B built on setting a packaged map as a plain `TextureID` proved nothing,
 because a TexturePack member need not be usable standalone. See [[familiars]].
 
-## [2026-08-30] fix | 148 faces had zero-area UVs, and the roughness map made the flattest paint the shiniest
+## [2026-08-30] defect | 148 faces had zero-area UVs, and the roughness map made the flattest paint the shiniest
 
 Two defects the owner found in Studio, both from the same habit — inferring a per-face answer from
 a per-piece rule.
@@ -2223,7 +2223,7 @@ start; a general signal was reached for because it felt more principled.
 Also fixed: the three derived maps were **16-bit** PNGs (`float_buffer=True` on the Blender image);
 all four are 8-bit now. See [[familiars]].
 
-## [2026-08-30] fix | 539 body vertices under-deformed — skin weights that did not sum to 1
+## [2026-08-30] defect | 539 body vertices under-deformed — skin weights that did not sum to 1
 
 Backlogged since 2026-08-28, fixed now. Measured before: **539 of 1351 body vertices** summed to
 anything from **0.046 to 1.5079**, while the wings were clean at exactly 1.000 — which is what makes
@@ -2281,7 +2281,7 @@ that system does not exist yet. The phrase composition it would use is designed 
 GROUP_GAP_SECONDS 0.48 is already measured for composing a 3+2 from the baked clips. Also still
 open on that page: an ambient karasu must not read as somebody's familiar.
 
-## [2026-08-30] fix | The caw onsets were modelled, the WAVs were on disk, and every number was wrong
+## [2026-08-30] defect | The caw onsets were modelled, the WAVs were on disk, and every number was wrong
 
 Owner: *"what do you mean you have no way to open the audio? You created the clips"*. Correct — the
 source WAVs are in `Roshambo Reference/sound/birds/` and a session shipped MODELLED onsets while
@@ -2478,7 +2478,7 @@ because its mandible tip carried a mean `bill_lower` weight of 0.167.
 indices and a rebuild renumbers underneath them. `ROI_lower_beak_tip` read 0/0 on the very check
 that confirmed the new derivation. Nothing now depends on them.
 
-## [2026-08-30] fix | The jaw bone was slung 0.088 studs under the mandible it drives
+## [2026-08-30] defect | The jaw bone was slung 0.088 studs under the mandible it drives
 
 Owner, looking at the rig: *"why does your new lower mandible bone on the rig appear so much lower
 than the part it drives?"*
@@ -2497,7 +2497,7 @@ The hinge is now DERIVED — the centroid of the mandible's own rear-most vertic
 correctly in whatever coordinate space the function runs in. ⚠ A corrected constant would have been
 the same trap one coordinate space over.
 
-## 2026-08-30 — the karasu's bill: traced from the photograph, and the pipeline hands it over
+## [2026-08-30] ship | The karasu's bill: traced from the photograph, and the pipeline hands it over
 
 The culmen was **fitted to a profile traced from the reference photograph** rather than to typed
 control points. The bird is black on blurred green, so the dorsal silhouette is a colour boundary,
@@ -2542,7 +2542,7 @@ degrees multiplier, so the gape angle is still unchosen (25° was a test value).
 UVs are one tiny disc per face, not a real island. `BirdFlight.luau:200` still cites a stale 0.30
 `CAW_GAPE_SECONDS` against a 0.48 gap; both numbers are wrong.
 
-## 2026-08-30 — `art/`: a formal in-repo home for what no script can reproduce
+## [2026-08-30] decision | `art/`: a formal in-repo home for what no script can reproduce
 
 `karasu_authored.blend` was irreplaceable and lived in exactly one place on one disk, outside the
 repo. It and `karasu_colormap_graded_2.png` now live in `art/birds/karasu/`, and Blender saves

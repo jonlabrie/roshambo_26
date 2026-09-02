@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-28
+updated: 2026-09-04
 ---
 
 # Familiars
@@ -476,18 +476,23 @@ and two-caw clips is sample-identical to a baked recording apart from 0.48s of r
 −56 dBFS — verified by diffing, not by ear. `GROUP_GAP_SECONDS` is the delay it needs, and it is
 NOT the 0.76s gap you would measure off the source: the clips carry their own padding.
 
-⚠ **AND NONE OF THE KARASU IS REACHABLE, but the gap is now one line.** `BirdController`
-hardcodes `SPECIES = "Uguisu"` because nothing selects a bird per player. As of 2026-08-28 that
+⚠ **AND ONLY ONE SPECIES IS REACHABLE AT A TIME, but the gap is one line.** `BirdController`
+hardcodes `SPECIES` (currently `"Karasu"`) because nothing selects a bird per player (F&F
+item 6). The registered roster grew 2026-09-02: the **hiyodori** joined with a full voice —
+five envelope clips cut from the owner's xeno-canto sourcing (`bodyLength 1.15`, warbler
+seat), verified singing on the torii 2026-09-03. As of 2026-08-28 that
 ONE name drives the mesh (`{SPECIES}Body` / `{SPECIES}Wings`, both already declared in
 `default.project.json`), the voice and the motion scale — so flipping it changes the whole bird
 rather than half of it. A test pins that the three cannot drift apart, because a bird wearing a
 crow's body with a warbler's song is the failure that has nothing positioned to notice it.
 
-⚠ **The familiar sings ONLY on a win, and that is a RULING, not an implementation detail.** It
-protects the falls-dock uguisu's gate — *"this bird lives here and you have to be close to hear
-it"* ([[falls-dock]]). Owner 2026-08-27: birds will eventually be found around the world,
-flying and perching and calling occasionally, which **reverses that premise**. Design that
-before building it.
+⚠ **The victory song fires on a win; since 2026-09-03 a perched familiar ALSO sings idly,
+rarely** (owner: "it's only natural... relatively rare"). The idle song runs on a free-running
+90–240s clock through `sing()`'s crowd chance and concurrency cap — the clock reschedules
+whether or not a song plays, because pausing it until conditions allow would recreate the
+sing-on-arrival behavior the falls-dock gate forbids (*"this bird lives here and you have to
+be close to hear it"*, [[falls-dock]]). The dock bird's specialness now rests on rarity and
+rolloff rather than the familiar's total silence.
 
 ⚠ **AND MUCH OF THE MACHINERY ALREADY EXISTS — a claim written here on 2026-08-27 that "there is
 no world population, no perching" was WRONG and is deleted.** It came from grepping for
