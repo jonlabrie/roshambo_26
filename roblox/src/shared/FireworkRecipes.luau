@@ -69,6 +69,23 @@ function FireworkRecipes.validate(recipe: any): (boolean, string?)
                 return false, `phase {i}: '{key}' must be three numbers in 0..255`
             end
         end
+        -- colorPool (owner, 2026-09-06, dan's act one): a deck of colors the shell draws
+        -- from per phase -- shuffled once per shell (seeded, so every client deals the same
+        -- hand), consumed in phase order, wrapping if phases outnumber colors. Overrides
+        -- color/edgeColor; the edge derives from the drawn core (lightened toward white).
+        if ph.colorPool ~= nil then
+            if ph.kind ~= "burst" then
+                return false, `phase {i}: colorPool is burst-only`
+            end
+            if typeof(ph.colorPool) ~= "table" or #ph.colorPool < 2 or #ph.colorPool > 8 then
+                return false, `phase {i}: colorPool must be 2..8 colors`
+            end
+            for _, c in ph.colorPool :: { any } do
+                if not validColor(c) then
+                    return false, `phase {i}: colorPool entries must be three numbers in 0..255`
+                end
+            end
+        end
         local staged = {
             style = ph.style,
             points = ph.points,

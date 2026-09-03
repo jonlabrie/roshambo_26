@@ -19,6 +19,8 @@ export type Phase = {
     sound: string?,
     texture: string?,
     color: { number }?,
+    colorPool: { { number } }?, -- a per-shell shuffled deck; overrides color when present
+
     edgeColor: { number }?,
     spread: number?,
     droop: boolean?,
@@ -53,6 +55,7 @@ export type Event = {
     sound: string?,
     texture: string?,
     color: { number }?,
+    colorPool: { { number } }?,
     edgeColor: { number }?,
     spread: number?,
     droop: boolean?,
@@ -111,6 +114,7 @@ function FireworkSchedule.compile(recipe: Recipe, budget: number): { Event }
             sound = ph.sound,
             texture = ph.texture,
             color = ph.color,
+            colorPool = ph.colorPool,
             edgeColor = ph.edgeColor,
             spread = ph.spread,
             droop = ph.droop,

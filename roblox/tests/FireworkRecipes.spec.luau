@@ -127,6 +127,25 @@ describe("FireworkRecipes.validate — the one recipe schema", function()
         end
     end)
 
+    test("colorPool is a burst-only deck of 2..8 valid colors", function()
+        local r = goodRecipe()
+        r.phases[3].colorPool = { { 170, 60, 255 }, { 60, 255, 110 }, { 70, 150, 255 } }
+        expect(FireworkRecipes.validate(r)).toBe(true)
+        local cases: { any } = {
+            { { 170, 60, 255 } }, -- one color is not a pool
+            { { 170, 60, 255 }, { 60, 999, 110 } }, -- invalid color
+            "violet", -- not a table
+        }
+        for _, pool in cases do
+            local bad = goodRecipe()
+            bad.phases[3].colorPool = pool
+            expect(FireworkRecipes.validate(bad)).toBe(false)
+        end
+        local onAscent = goodRecipe();
+        (onAscent.phases[2] :: any).colorPool = { { 170, 60, 255 }, { 60, 255, 110 } }
+        expect(FireworkRecipes.validate(onAscent)).toBe(false)
+    end)
+
     test("heavy is an optional boolean -- the L-class budget weight", function()
         local r = goodRecipe();
         (r :: any).heavy = true

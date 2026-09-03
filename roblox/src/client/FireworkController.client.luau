@@ -639,6 +639,10 @@ local function play(payload: any, distance: number)
 
     active += weight
     local burstsPlayed = 0 -- rotates this shell's break audio across the slot's burst voices
+    -- One shuffled deck per colorPool table, per shell (dan's act one draws four hands
+    -- from one five-color pool). Keyed by pool identity; recipes are module-level tables,
+    -- so identity is stable.
+    local colorDecks: { [any]: { list: { { number } }, next: number } } = {}
     for _, ev in schedule do
         -- The at=0 report runs INLINE: task.delay(0) costs a Heartbeat, and that frame plus
         -- playSound's own hop plus the clip's attack was the launch-thump lag a listener at
@@ -1000,6 +1004,35 @@ local function play(payload: any, distance: number)
                             end
                         end
                     end
+                end
+                -- THE COLOR DECK (owner, 2026-09-06, dan's act one: small peonies in
+                -- "violet, green, blue, orange, red -- chosen randomly per shell"): a
+                -- colorPool phase draws its core from the shell's shuffled deck --
+                -- shuffled ONCE per pool per shell (seeded: every client deals the same
+                -- hand, and the draws are fixed-count for stream stability), consumed in
+                -- phase order, wrapping. The edge derives from the core, lightened.
+                if ev.colorPool then
+                    if bev == ev then
+                        bev = table.clone(ev)
+                    end
+                    local deck = colorDecks[ev.colorPool]
+                    if deck == nil then
+                        local order = table.clone(ev.colorPool)
+                        for i = #order, 2, -1 do
+                            local j = rng:NextInteger(1, i)
+                            order[i], order[j] = order[j], order[i]
+                        end
+                        deck = { list = order, next = 1 }
+                        colorDecks[ev.colorPool] = deck
+                    end
+                    local core = deck.list[deck.next]
+                    deck.next = (deck.next % #deck.list) + 1
+                    bev.color = core
+                    bev.edgeColor = {
+                        core[1] + (255 - core[1]) * 0.55,
+                        core[2] + (255 - core[2]) * 0.55,
+                        core[3] + (255 - core[3]) * 0.55,
+                    }
                 end
                 -- A recipe may pin a burst sound; otherwise the style's role resolves to a
                 -- VARIANT POOL and the shell's seeded rng picks one — same clip on every

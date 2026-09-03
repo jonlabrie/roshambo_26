@@ -35,7 +35,7 @@ export type Style = {
     -- -- the transparency square-wave's rising edges -- and a soft report belongs. The
     -- controller plays the phase's own break clip quieter/sharper at each. false = none.
     rePops: { number } | false,
-    pointRule: string, -- "scatter" | "circle" | "tilted" | "single"
+    pointRule: string, -- "scatter" | "circle" | "tilted" | "single" | "wild"
 }
 
 export type Frame = {
@@ -170,6 +170,28 @@ BurstStyles.STYLES = {
         tailSound = false,
         rePops = false,
     },
+    -- Whizzers (owner, 2026-09-06, dan's third act): "2-5 'comets' that race off in
+    -- random directions trailing sparks and whistling over a very short life span of
+    -- about half a second." Each point is one comet: a tight fast cone of streaks whose
+    -- speed VARIANCE strings them into a head-and-spark-trail; the "wild" point rule
+    -- aims every comet somewhere different, steeply-up to just-below-horizontal.
+    whizzer = {
+        speed = { 55, 110 },
+        drag = 0.4,
+        lifetime = { 0.35, 0.55 },
+        acceleration = { 0, -10, 0 },
+        brightness = 2.6,
+        spreadAngle = { 5, 5 },
+        transparency = { { 0, 0 }, { 0.7, 0.1 }, { 1, 1 } },
+        textureRole = "streak",
+        soundRole = "burst_whizzer",
+        pointRule = "wild",
+        orientation = "velocity",
+        sizeScale = 1.6,
+        lightEmission = 0.85,
+        tailSound = false,
+        rePops = false,
+    },
 } :: { [string]: Style }
 
 -- Role tables (built-in stand-ins until the owner's uploads clear, per spec §4/§8).
@@ -287,6 +309,12 @@ BurstStyles.SOUNDS = {
         "rbxassetid://110252668535781",
         "rbxassetid://108527933513449", -- report-jakub
     },
+    -- ⚠ PLACEHOLDER until the whistle uploads land (whistle-whizzer-1.wav 0.97s and
+    -- whistle-element.wav 1.03s are cut and measured, owner to upload): the whizzer act
+    -- borrows one aerial clip so the range audition isn't silent. Swap ids on upload.
+    burst_whizzer = {
+        "rbxassetid://89225206152876", -- burst-aerial-1 (STAND-IN for the whistles)
+    },
     burst_kamuro = {
         "rbxassetid://89225206152876",
         "rbxassetid://91810415393899",
@@ -377,6 +405,28 @@ local POINT_RULES: { [string]: (n: number, scatter: number, rand: () -> number) 
             frames[i] = {
                 pos = { radius * cosA, 0, radius * sinA },
                 rot = { rx, 0, rz },
+            }
+        end
+        return frames
+    end,
+
+    -- Every comet aimed somewhere different: random azimuth, tilt 45..105 degrees off
+    -- vertical (steeply up through just below horizontal). Same rotation math as circle,
+    -- with the tilt drawn per point instead of fixed.
+    wild = function(n, _scatter, rand)
+        local frames = {}
+        for i = 1, n do
+            local angleRad = math.rad(rand() * 360)
+            local tiltRad = math.rad(45 + rand() * 60)
+            local sinT, cosT = math.sin(tiltRad), math.cos(tiltRad)
+            local cosA, sinA = math.cos(angleRad), math.sin(angleRad)
+            frames[i] = {
+                pos = { 0, 0, 0 },
+                rot = {
+                    math.deg(math.atan2(sinT * sinA, cosT)),
+                    0,
+                    -math.deg(math.asin(sinT * cosA)),
+                },
             }
         end
         return frames
