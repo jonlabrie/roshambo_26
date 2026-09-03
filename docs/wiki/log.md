@@ -3585,3 +3585,13 @@ owner has never heard the idle perch song and will test it; expected rate from t
 opportunity every 90-240 s, each passing a 0.3 crowd chance, so roughly one song per nine
 minutes per perched bird. Per-player selection (F&F item 6) is still unbuilt.
 
+## [2026-09-03] gate | Idle perch song retuned: once or twice a minute, not once per nine
+
+Owner on the first cut: "bird never sings, those settings are way off. familiars should sing
+once or twice per minute, so the opportunity should arise every 20 seconds or so."
+`IDLE_SONG_MIN..MAX` 90–240 -> 15–25 s and a dedicated `IDLE_SONG_CHANCE` 0.5 (the idle path
+used to ride the 0.3 crowd chance). The gate condition itself was checked and is sound: `k`
+reaches exactly 1 when the flight completes, so the earlier silence was rate, not a bug.
+Applied in the open place and on the branch; 1825 Lune tests green. The "relatively rare"
+ruling of earlier the same day is superseded.
+

@@ -488,12 +488,15 @@ rather than half of it. A test pins that the three cannot drift apart, because a
 crow's body with a warbler's song is the failure that has nothing positioned to notice it.
 
 ⚠ **The victory song fires on a win; since 2026-09-03 a perched familiar ALSO sings idly,
-rarely** (owner: "it's only natural... relatively rare"). The idle song runs on a free-running
-90–240s clock through `sing()`'s crowd chance and concurrency cap — the clock reschedules
-whether or not a song plays, because pausing it until conditions allow would recreate the
-sing-on-arrival behavior the falls-dock gate forbids (*"this bird lives here and you have to
-be close to hear it"*, [[falls-dock]]). The dock bird's specialness now rests on rarity and
-rolloff rather than the familiar's total silence.
+once or twice a minute.** The first cut (90–240 s opportunities through the 0.3 crowd chance,
+about one song per nine minutes) was ruled "way off" the same day: "familiars should sing once
+or twice per minute, so the opportunity should arise every 20 seconds or so." So the clock is
+`IDLE_SONG_MIN..MAX` (15–25 s) and each opportunity passes its own `IDLE_SONG_CHANCE` (0.5),
+not the crowd chance; read the constants in `BirdController` rather than this line. The clock
+reschedules whether or not a song plays, because pausing it until conditions allow would
+recreate the sing-on-arrival behavior the falls-dock gate forbids (*"this bird lives here and
+you have to be close to hear it"*, [[falls-dock]]). The concurrency cap still applies. The dock
+bird's specialness now rests on rolloff and its bout pattern rather than the familiar's silence.
 
 ⚠ **AND MUCH OF THE MACHINERY ALREADY EXISTS — a claim written here on 2026-08-27 that "there is
 no world population, no perching" was WRONG and is deleted.** It came from grepping for

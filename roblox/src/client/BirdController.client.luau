@@ -117,12 +117,14 @@ local SONG_STAGGER = 2.2 -- seconds of jitter before a bird decides to sing
 -- point. Other people's birds sing sometimes, which is what keeps a crowd from becoming a wall
 -- of noise. The stagger still applies to both.
 local SONG_CHANCE_OWN = 1.0
--- ⚠ THE IDLE SONG (owner, 2026-09-03: "we should probably let the familiars sing occasionally
--- when perched... It should be relatively rare"). An opportunity comes on a FREE-RUNNING clock —
--- the dock scheduler's own rule: never keyed to the player — and each opportunity still passes
--- through sing()'s crowd chance and concurrency cap, so the average perched bird sings unprompted
--- every several minutes and the win song remains the event.
-local IDLE_SONG_MIN, IDLE_SONG_MAX = 90, 240 -- seconds between idle-song opportunities
+-- ⚠ THE IDLE SONG. An opportunity comes on a FREE-RUNNING clock — the dock scheduler's own
+-- rule: never keyed to the player — and each opportunity passes IDLE_SONG_CHANCE and sing()'s
+-- concurrency cap. Owner, 2026-09-03, after the first cut (90–240 s at the 0.3 crowd chance,
+-- about one song per nine minutes) was heard as "bird never sings, those settings are way off":
+-- "familiars should sing once or twice per minute, so the opportunity should arise every
+-- 20 seconds or so." Three opportunities a minute at a coin flip is ~1.5 songs a minute.
+local IDLE_SONG_MIN, IDLE_SONG_MAX = 15, 25 -- seconds between idle-song opportunities
+local IDLE_SONG_CHANCE = 0.5 -- per opportunity; its own knob, not the crowd chance below
 local SONG_CHANCE_OTHER = 0.3
 local MAX_CONCURRENT_SONGS = 6
 
@@ -340,8 +342,8 @@ end
 
 local singing = 0
 
-local function sing(b: Bird, isOwn: boolean)
-    local chance = if isOwn then SONG_CHANCE_OWN else SONG_CHANCE_OTHER
+local function sing(b: Bird, isOwn: boolean, chanceOverride: number?)
+    local chance = chanceOverride or (if isOwn then SONG_CHANCE_OWN else SONG_CHANCE_OTHER)
     -- The owner's own bird is never crowded out: it bypasses the concurrency ceiling.
     if not isOwn and (singing >= MAX_CONCURRENT_SONGS or math.random() > chance) then
         return
@@ -868,12 +870,12 @@ RunService.RenderStepped:Connect(function()
             -- Perched, still, nothing pending: occasionally a bird just sings (owner ruling,
             -- 2026-09-03). ⚠ The clock RESCHEDULES WHETHER OR NOT a song plays — pausing it
             -- until conditions allow would recreate the sing-on-arrival behavior the dock
-            -- scheduler's gate exists to forbid. sing(b, false) applies the crowd chance and
-            -- the concurrency cap, which is where the rarity comes from.
+            -- scheduler's gate exists to forbid. IDLE_SONG_CHANCE sets the rate; the concurrency
+            -- cap still applies, so a crowd of perched birds cannot become a wall of song.
             if now >= b.nextIdleSongAt then
                 b.nextIdleSongAt = now + IDLE_SONG_MIN + math.random() * (IDLE_SONG_MAX - IDLE_SONG_MIN)
                 if not flying and not resting and k >= 1 and b.song == nil and not b.singArmed then
-                    sing(b, false)
+                    sing(b, false, IDLE_SONG_CHANCE)
                 end
             end
 
