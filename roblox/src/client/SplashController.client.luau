@@ -44,10 +44,15 @@ local HudLayout =
 local BACKING_W = 320
 local BACKING_MIN_W = 240
 
-local TOUCH = game:GetService("UserInputService").TouchEnabled
+-- HudController's tier test EXACTLY (`TouchEnabled and not KeyboardEnabled`) — this file used
+-- bare TouchEnabled, so on a touch laptop the splash sized itself to the touch tier while the
+-- cluster it parks on rendered the desktop one. Tracking a thing means computing its numbers
+-- from the same inputs.
+local UserInputService = game:GetService("UserInputService")
+local TOUCH = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 local SPLASH_BTN_H = if TOUCH then HudLayout.BTN_H_TOUCH else HudLayout.BTN_H
 local SPLASH_AREA_H = if TOUCH then HudLayout.AREA_H_TOUCH else HudLayout.AREA_H
-local SPLASH_AREA_W = 3 * SPLASH_BTN_H + 2 * (if TOUCH then 8 else 10)
+local SPLASH_AREA_W = if TOUCH then HudLayout.AREA_W_TOUCH else HudLayout.AREA_W
 local SPLASH_EDGE_BOTTOM = 6
 
 local player = Players.LocalPlayer
@@ -80,9 +85,18 @@ local backing = Instance.new("Frame")
 backing.Name = "Backing"
 backing.Active = false
 backing.AnchorPoint = Vector2.new(1, 1)
-backing.Position =
-    UDim2.new(1 - HudLayout.JUMP_CLEARANCE, 0, 1, -(SPLASH_EDGE_BOTTOM + SPLASH_AREA_H - SPLASH_BTN_H)) -- the throw button row's own bottom edge; was fromScale(0.5, 0.42), which
--- stacked on the throw cluster below it
+-- The throw button row's own bottom edge (was fromScale(0.5, 0.42), which stacked on the throw
+-- cluster below it). Horizontal reference comes from HudLayout.clusterRef — the SAME function
+-- HudController's pinToCluster uses — because the cluster MOVES now (portrait centres it,
+-- 2026-09-03) and this notice's whole claim to its spot is that it covers that exact, briefly
+-- inert ground. Re-derived on rotation, exactly as the cluster is.
+local function placeBacking()
+    local size = gui.AbsoluteSize
+    local rs, ro = HudLayout.clusterRef(size.X, size.Y, TOUCH)
+    backing.Position = UDim2.new(rs, ro, 1, -(SPLASH_EDGE_BOTTOM + SPLASH_AREA_H - SPLASH_BTN_H))
+end
+placeBacking()
+gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(placeBacking)
 -- As wide as the throw cluster, but never narrower than the existing legibility floor: on touch
 -- the cluster is only ~148px and a 36px headline in that is unreadable. Where the floor wins the
 -- box simply overhangs the cluster to the LEFT, which is empty screen, not another control.

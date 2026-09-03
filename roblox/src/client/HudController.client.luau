@@ -103,11 +103,10 @@ local THROWS = { "R", "P", "S" }
 local TOUCH = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
 -- The skeleton — every number OnboardingController also has to know, so that it can place a card
--- beside this HUD without covering a live button — lives in shared/HudLayout. SCALE, not pixels, for
--- the jump-button clearance: the jump button occupies roughly the right 3-13% of the screen, and a
--- pixel offset guessed against a desktop viewport is wrong on every phone. Numbers only this file
--- uses stay here.
-local JUMP_CLEARANCE = HudLayout.JUMP_CLEARANCE
+-- beside this HUD without covering a live button — lives in shared/HudLayout. So does the whole
+-- horizontal registration now (HudLayout.clusterRef, 2026-09-03): JUMP_CLEARANCE is no longer
+-- read directly in this file, because the reference it fed is orientation-dependent and shared
+-- with SplashController.
 -- ⚠ `HudLayout.EDGE` IS NO LONGER READ IN THIS FILE, and that is not an invitation to shrink it.
 -- The toast was its last reader here and moved onto the throw cluster on 2026-08-18 (see the
 -- Toast section). The constant is still load-bearing elsewhere: `HudLayout.CLUSTER_TOP_FROM_BOTTOM`
@@ -133,7 +132,7 @@ local BANK_GAP = HudLayout.BANK_GAP
 -- the cluster in both axes rather than leaving three squat letterboxes.
 local BTN_H = if TOUCH then HudLayout.BTN_H_TOUCH else HudLayout.BTN_H
 local BTN_W = BTN_H
-local BTN_GAP = if TOUCH then 8 else 10
+local BTN_GAP = if TOUCH then HudLayout.BTN_GAP_TOUCH else HudLayout.BTN_GAP
 local TAPE_N = 5
 local TILE = if TOUCH then HudLayout.TILE_TOUCH else HudLayout.TILE
 local TILE_GAP = if TOUCH then 4 else 6
@@ -141,7 +140,7 @@ local TILE_GAP = if TOUCH then 4 else 6
 -- Size uses it too, so it is pulled out here rather than left as a repeated inline expression.
 local TAPE_W = TAPE_N * (TILE + TILE_GAP) - TILE_GAP
 local BADGE = if TOUCH then 7 else 9
-local AREA_W = 3 * BTN_W + 2 * BTN_GAP
+local AREA_W = if TOUCH then HudLayout.AREA_W_TOUCH else HudLayout.AREA_W
 local AREA_H = if TOUCH then HudLayout.AREA_H_TOUCH else HudLayout.AREA_H
 local TOAST_SECONDS = 4
 local TOAST_MAX = 6
@@ -178,13 +177,12 @@ local pinToCluster: (item: GuiObject, dx: number, dy: number) -> ()
 do
     local clusterPinned: { { item: GuiObject, dx: number, dy: number } } = {}
 
+    -- The maths lives in HudLayout.clusterRef (2026-09-03): SplashController parks its
+    -- round-result notice ON this cluster and has to compute the identical reference, and a
+    -- private copy here is exactly how the splash drifted when portrait centring arrived.
     local function clusterRef(): (number, number)
         local size = gui.AbsoluteSize
-        if size.Y > size.X then
-            local ringD = if TOUCH then HudLayout.RING_D_TOUCH else HudLayout.RING_D
-            return 0.5, (ringD + RING_GAP + AREA_W) / 2
-        end
-        return 1 - JUMP_CLEARANCE, 0
+        return HudLayout.clusterRef(size.X, size.Y, TOUCH)
     end
 
     pinToCluster = function(item: GuiObject, dx: number, dy: number)

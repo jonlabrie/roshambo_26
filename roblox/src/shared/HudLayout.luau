@@ -9,7 +9,7 @@
 -- went on believing the old height, and the safe band is the only thing standing between a card and
 -- the BANK THESE button. One source, imported by both.
 --
--- Numbers that only ONE file uses (BTN_W/BTN_GAP, TILE_GAP, the toast sizes, the plate's own
+-- Numbers that only ONE file uses (BTN_W, TILE_GAP, the toast sizes, the plate's own
 -- reveal/fade timing) stay local to that file — this module is for the shared skeleton, not for
 -- every constant in the HUD. The round-timer ring is the exception among "timer" numbers: it
 -- replaced the bottom hairline and its geometry has to agree with BTN_H, so it lives here too —
@@ -93,6 +93,37 @@ HudLayout.BANK_GAP = 8
 -- this derivation is untouched by the ring's arrival.
 HudLayout.AREA_H = HudLayout.BTN_H + HudLayout.ROW_GAP + HudLayout.TILE
 HudLayout.AREA_H_TOUCH = HudLayout.BTN_H_TOUCH + HudLayout.ROW_GAP + HudLayout.TILE_TOUCH
+
+-- The throw-button row's width — promoted from HudController on 2026-09-03, when
+-- SplashController turned out to be the second file deriving it (with hand-copied literals),
+-- and clusterRef below needed it too. The buttons are square (BTN_W tracks BTN_H), so the row
+-- is three button-heights plus two gaps.
+HudLayout.BTN_GAP = 10
+HudLayout.BTN_GAP_TOUCH = 8
+HudLayout.AREA_W = 3 * HudLayout.BTN_H + 2 * HudLayout.BTN_GAP
+HudLayout.AREA_W_TOUCH = 3 * HudLayout.BTN_H_TOUCH + 2 * HudLayout.BTN_GAP_TOUCH
+
+-- ===== The cluster's horizontal reference (owner's portrait gate, 2026-09-03) =====
+-- Returns (scale, offset): the right edge of the throw area sits at
+-- `UDim2.new(scale, offset + inboardDx, ...)`. LANDSCAPE is the owner's untouched right-thumb
+-- registration ("players need to be able to reach it with their right thumbs to throw").
+-- PORTRAIT breaks that expression — JUMP_CLEARANCE is a fraction of the WIDTH, and a portrait
+-- phone's width makes 15% narrower than the jump button itself, which buried the scissors
+-- button — so portrait centres the always-visible row (ring + gap + three buttons) at the
+-- bottom, between Roblox's thumbstick and jump zones. A square viewport counts as landscape.
+--
+-- A PURE function of this module's own numbers — no Roblox globals, no runtime measuring —
+-- which is what keeps it inside this module's Lune-testability rule (see HudLayout.spec's
+-- amended numbers-only test). Callers pass their gui's AbsoluteSize and their own touch tier,
+-- and MUST re-call on AbsoluteSize changes: rotation moves the reference.
+function HudLayout.clusterRef(viewportX: number, viewportY: number, touch: boolean): (number, number)
+    if viewportY > viewportX then
+        local ringD = if touch then HudLayout.RING_D_TOUCH else HudLayout.RING_D
+        local areaW = if touch then HudLayout.AREA_W_TOUCH else HudLayout.AREA_W
+        return 0.5, (ringD + HudLayout.RING_GAP + areaW) / 2
+    end
+    return 1 - HudLayout.JUMP_CLEARANCE, 0
+end
 
 -- Where the bank+throws+tape cluster's footprint begins, measured UP from the bottom edge.
 -- The bank row counts whether or not its button is visible, exactly as the old slot did.
