@@ -146,9 +146,11 @@ BurstStyles.STYLES = {
         -- strobe's square wave reads as 3-4 sequential re-bursts and the last one
         -- shimmers -- that is the phase this voice belongs to (~70% of star lifetime).
         tailSound = { role = "tail_strobe", delay = 1.75, volume = 0.35, duration = 1.6 },
-        -- The square wave's rising edges (see transparency above: on-phases begin at 0,
-        -- 0.22, 0.46, 0.74 of life) -- the first edge is the break itself.
-        rePops = { 0.22, 0.46, 0.74 },
+        -- The square wave's MIDDLE rising edges only (on-phases begin at 0, 0.22, 0.46,
+        -- 0.74 of life): the first edge is the break itself, and the LAST wave is the
+        -- shimmer the sizzle owns -- a pop there read as an extra, unmotivated burst
+        -- (owner, 2026-09-06). Three audible bursts, then the shimmer.
+        rePops = { 0.22, 0.46 },
     },
     -- The golden crown: long, heavy, drooping to the water.
     kamuro = {
