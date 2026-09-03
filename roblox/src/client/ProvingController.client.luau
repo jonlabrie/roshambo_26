@@ -366,8 +366,8 @@ local function makeRow(order: number): Frame
     return row
 end
 
-local function fireSingle(id: string, rack: string)
-    RequestProvingFire:FireServer(id, rack)
+local function fireSingle(id: string, rack: string, forceBoost: boolean?)
+    RequestProvingFire:FireServer(id, rack, forceBoost == true)
 end
 
 -- ===== section header =====
@@ -449,7 +449,7 @@ for _, id in shippedIds do
     local row = makeRow(order)
 
     local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size = UDim2.fromOffset(150, 26)
+    nameLabel.Size = UDim2.fromOffset(92, 26)
     nameLabel.Position = UDim2.fromOffset(0, 2)
     nameLabel.BackgroundTransparency = 1
     nameLabel.TextColor3 = INK_CREAM
@@ -459,8 +459,30 @@ for _, id in shippedIds do
     nameLabel.Text = id
     nameLabel.Parent = row
 
-    local fireButton = makeButton(row, "Fire", 50, 154)
+    -- The full mode set for shipped shells (owner, 2026-09-06: single-only was "no
+    -- fun"): Fire = natural odds at the selected rack; Ladder = the volley, one from
+    -- every rack; Seq = clean-air repeats; Boost = the lucky roll FORCED, so a shipped
+    -- shell's surprise can be audited without fishing for the 30%.
+    local fireButton = makeButton(row, "Fire", 40, 96)
     fireButton.MouseButton1Click:Connect(function()
         fireSingle(id, selectedRack)
+    end)
+    local ladderButton = makeButton(row, "Ladder", 52, 140)
+    ladderButton.MouseButton1Click:Connect(function()
+        for _, entry in ProvingPlan.shippedLadder(id) do
+            fireSingle(entry.id, entry.rack)
+        end
+    end)
+    local seqButton = makeButton(row, "Seq", 38, 196)
+    seqButton.MouseButton1Click:Connect(function()
+        for _, entry in ProvingPlan.shippedSequence(id) do
+            task.delay(entry.delaySeconds, function()
+                fireSingle(entry.id, ProvingPlan.SEQUENCE_RACK)
+            end)
+        end
+    end)
+    local boostButton = makeButton(row, "Boost", 46, 238)
+    boostButton.MouseButton1Click:Connect(function()
+        fireSingle(id, selectedRack, true)
     end)
 end

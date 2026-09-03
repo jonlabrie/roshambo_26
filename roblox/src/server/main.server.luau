@@ -1564,7 +1564,7 @@ end)
 -- draft id from a named proving rack through the SAME FireworkLaunched broadcast the spend
 -- path uses — director, LOD, pooling all engaged — but with NO inventory spend and NO backend
 -- call. The IsStudio gate is the whole security model: a published client's request dies here.
-RequestProvingFire.OnServerEvent:Connect(function(_player, shellId, rackName)
+RequestProvingFire.OnServerEvent:Connect(function(_player, shellId, rackName, forceBoost)
     if not RunService:IsStudio() then
         return
     end
@@ -1584,6 +1584,9 @@ RequestProvingFire.OnServerEvent:Connect(function(_player, shellId, rackName)
         origin = rack.Position + Vector3.new(0, 1.25, 0),
         seed = math.random(1, 2 ^ 31 - 1),
         by = "proving",
+        -- The panel's Boost button forces the lucky roll (Studio-only path); absent,
+        -- the client's seeded roll keeps the recipe's natural odds.
+        boosted = if forceBoost == true then true else nil,
     })
 end)
 

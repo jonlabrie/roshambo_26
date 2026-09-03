@@ -32,4 +32,26 @@ function ProvingPlan.sequence(family: string, variants: { string }): { { id: str
     return plan
 end
 
+-- A SHIPPED shell has one recipe, but the modes still earn their keep (owner,
+-- 2026-09-06: "once a shell is published, I only get single fire options... give them
+-- back"): ladder fires it from EVERY rack at once -- a volley, and once the racks
+-- scatter across the canyon, a show -- and sequence gives it clean-air repeats.
+ProvingPlan.SHIPPED_SEQUENCE_COUNT = 3
+
+function ProvingPlan.shippedLadder(id: string): { { id: string, rack: string } }
+    local plan = {}
+    for _, rack in ProvingPlan.RACKS do
+        table.insert(plan, { id = id, rack = rack })
+    end
+    return plan
+end
+
+function ProvingPlan.shippedSequence(id: string): { { id: string, delaySeconds: number } }
+    local plan = {}
+    for i = 1, ProvingPlan.SHIPPED_SEQUENCE_COUNT do
+        table.insert(plan, { id = id, delaySeconds = (i - 1) * ProvingPlan.SEQUENCE_GAP })
+    end
+    return plan
+end
+
 return ProvingPlan
