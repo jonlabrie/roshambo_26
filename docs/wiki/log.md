@@ -3519,3 +3519,17 @@ CanvasSize -- no AutomaticCanvasSize in this engine) + one FIRE button, so a
 volley is repeated taps on FIRE. Selection persists; dimmed rows selectable so
 FIRE wears the reason. Pixel offsets, not width fractions, clear the jump
 zone. Client-only; reaches players on next publish.
+
+## [2026-09-03] fixed | HUD wipeout -- Luau's 200-register ceiling, and a compile gate
+
+The mobile pass's new top-level locals pushed HudController's main chunk past
+Luau's 200-local-register COMPILER limit; the whole script failed to compile
+("Out of local registers... exceeded limit 200") and the play HUD vanished
+entirely -- while stylua, selene and the 1671-test suite all stayed green,
+because none of them compile. Fix (`4d46aba`): self-contained sections scope
+their locals in do-blocks behind one forward-declared name (pinToCluster,
+fireworkUI); registers release at `end`. STANDING GATE: tests/
+Compiles.spec.luau now runs every src file through Lune's embedded Luau
+compiler (O0 + O2) -- it reproduced the exact Studio error before the fix.
+Rule for new HUD sections: one top-level register per section, do-block the
+rest.
