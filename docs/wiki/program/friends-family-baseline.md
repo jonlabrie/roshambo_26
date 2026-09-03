@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: open
-updated: 2026-09-02
+updated: 2026-09-03
 ---
 
 # Friends & Family Baseline
@@ -22,8 +22,12 @@ rounds skippable, no penalty) — hangout is the product.
 1. **Foliage finish** — closed 2026-08-05 (arrangements sweep `82313a4`, as-built
    `a294e59`/`687ccab`/`5357c2b`, text manifest `6473252`, pad keep-out fix
    `2b07380`/`4a82491`).
-2. **HUD minimal+maximal + onboarding bones** — closed (HUD half) 2026-08-05; onboarding
-   half deferred to [[backlog]] and carries a layout defect in [[parked-defects]].
+2. **HUD minimal+maximal + onboarding bones** — closed (HUD half) 2026-08-05. ⚠ **The
+   onboarding half is no longer merely deferred**: the onboarding JOURNEY was spec'd and built
+   2026-09-03 (`98df9f6..8b0eb9d`) — starter SKU, an 8-beat chain with a 3-page welcome,
+   `TourGuide`, `TourStep` broadcast, tour beam and model pad. Its layout defect,
+   [[parked-defects]] (d), was fixed 2026-09-05. ⚠ **Whether that closes this item is the
+   owner's call** — it was deferred by an owner gate, so only an owner gate reopens or closes it.
 3. **Fireworks core** — closed 2026-08-13: loop verified in-game end to end (owner bought
    shells, consumed them at the Overlook, `ishibana` available/unavailable at the right
    moments); the fireworks shop owner-gated the same day (fixes `322d948`, `22bcf2e`).

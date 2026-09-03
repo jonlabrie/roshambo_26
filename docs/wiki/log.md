@@ -3254,6 +3254,23 @@ mobile-orientation behaviour at all. Its constants were re-verified and still ho
 6, `RingTimer.MIN_SWEEP_DEGREES` 6, `HudModel.ESCALATE_AT` 5 — so nothing there is WRONG; it is
 incomplete, which no check can see.
 
+**An eighth advance, and defect (d) turned up stale on a THIRD page.**
+[[friends-family-baseline]] item 2 still read *"onboarding half deferred… and carries a layout
+defect in [[parked-defects]]"* — (d) was fixed 2026-09-05, and the onboarding JOURNEY has since
+been spec'd and built end to end (`98df9f6..8b0eb9d`: starter SKU, 8-beat chain, `TourGuide`, tour
+beam, model pad). Corrected, with the closing question left explicitly to the owner: item 2 was
+deferred by an owner gate, so only an owner gate closes it. ⚠ **Three pages have now been found
+citing (d) after it was fixed** — round-and-hud, this board, and the board's own item 6 for
+(a)–(c). A bare letter is the cheapest possible citation to write and the most expensive to
+maintain, because nothing links it and nothing checks it.
+
+**[[teahouses]] re-verified rather than stamped on trust**, after `apiV1.ts` changed again inside
+the grace window: `LOADOUT_KEYS` and `validateShojiOpen` are unchanged, so nothing on the page is
+wrong. ⚠ **It is now INCOMPLETE, which no check can see**: the **starter SKU** (S deck + S
+teahouse, 20 points, atomic first-property grant, sold from the vacant-site prompt) is a new way to
+come by a teahouse, and a page whose first line calls a teahouse *"earned"* does not mention it.
+Reported rather than authored.
+
 ⚠ **`falls-dock` and `blender-pipeline` were read and deliberately NOT stamped `checked:`.**
 `falls-dock` rests on emitter positions, a place-only `UguisuScheduler` Script and asset ids only
 Studio can confirm; `blender-pipeline` still teaches the plane bisect for splitting a bill, which
