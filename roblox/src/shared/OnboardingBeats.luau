@@ -38,7 +38,7 @@ OnboardingBeats.BEATS = {
     {
         id = "win",
         event = "win",
-        copy = "You won! Every win triples your pile — or BANK THESE keeps it forever.",
+        copy = "You won! Every win triples your pile — or tap BANK to keep it forever.",
         anchor = "potIndicator",
     },
     {
@@ -72,6 +72,8 @@ OnboardingBeats.BEATS = {
     {
         id = "modelHome",
         event = "modelArrival",
+        -- "20 points" mirrors PRICES.starter in server/src/economy.ts — a price change there
+        -- must update the copy here too (see the matching comment on that constant).
         copy = "A teahouse of your very own — 20 points. Every win gets you closer.",
         anchor = "tour",
     },

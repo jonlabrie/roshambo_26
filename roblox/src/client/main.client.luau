@@ -828,13 +828,21 @@ FireworkState.OnClientEvent:Connect(function(state)
     if typeof(state) == "table" then
         fireworkShells = state.shells
         local total = totalShellCount(state.shells)
+        -- `profileSeen` guards these two fires the same way it guards join/throwsUnlocked/win/bank
+        -- above (see the standing note at knownSeenBeats' declaration): firing into an empty
+        -- `knownSeenBeats` before the profile has answered re-shows a dismissed card and latches
+        -- it. The edge detection itself (comparing `total` to `knownShellTotal`) still runs
+        -- unconditionally — only whether it FIRES depends on the profile.
         if knownShellTotal ~= nil then
-            if total > knownShellTotal then
+            if profileSeen and total > knownShellTotal then
                 EventBus.Onboard:Fire("shellBought", knownSeenBeats)
-            elseif total < knownShellTotal then
+            elseif profileSeen and total < knownShellTotal then
                 EventBus.Onboard:Fire("shellLaunched", knownSeenBeats)
             end
         end
+        -- Baseline bookkeeping stays OUTSIDE the profileSeen guard: the edge detector must track
+        -- the real total regardless of whether the profile has answered yet, or the first fire
+        -- after it answers would see a stale baseline and mis-fire (or miss) the edge.
         knownShellTotal = total
         -- The player's OWN deck-site position, when they have a deck. The HUD's launch
         -- affordance only knew the tagged public sites, so the fire button never appeared

@@ -51,7 +51,29 @@ local function buildBeam(at: BasePart)
     target = at
 end
 
+-- Factored out of `retarget` (F2) so the Heartbeat poll below can retry the SAME lookup once a
+-- streamed-in tag becomes available, without duplicating the tag->part resolution.
+local function resolveTagged(step: string): BasePart?
+    local tag = TourGuide.beamTag(step)
+    if tag == nil then
+        return nil
+    end
+    local tagged = CollectionService:GetTagged(tag)
+    for _, inst in tagged do
+        if inst:IsA("BasePart") then
+            return inst
+        end
+    end
+    return nil
+end
+
 local function retarget(step: string)
+    -- F6: idempotent. A redundant TourStep fire for the step we're already showing must not
+    -- blink the beam or re-arm `arrivalFired` — that would let the arrival beat re-fire, or the
+    -- beam flicker, on a resend that changed nothing.
+    if step == currentStep and beam ~= nil then
+        return
+    end
     currentStep = step
     arrivalFired = false
     local tag = TourGuide.beamTag(step)
@@ -59,14 +81,7 @@ local function retarget(step: string)
         clearBeam()
         return
     end
-    local tagged = CollectionService:GetTagged(tag)
-    local part: BasePart? = nil
-    for _, inst in tagged do
-        if inst:IsA("BasePart") then
-            part = inst
-            break
-        end
-    end
+    local part = resolveTagged(step)
     if part == nil then
         clearBeam()
         if not warnedStep[step] then
@@ -90,6 +105,18 @@ RunService.Heartbeat:Connect(function(dt: number)
         return
     end
     sincePoll = 0
+    -- F2: under StreamingEnabled the next stop's tagged part is usually far away and may be
+    -- streamed out when its TourStep fires — `target == nil` then latches forever with only
+    -- `retarget`'s one-shot lookup to blame. Re-attempt the same resolution here every poll
+    -- while the current step still wants a beam but has none, so a tag that streams in a few
+    -- seconds later still gets picked up. `warnedStep` still gates the warn to once per step —
+    -- it must not gate the retry itself, or a miss would be permanent again.
+    if target == nil and TourGuide.beamTag(currentStep) ~= nil then
+        local part = resolveTagged(currentStep)
+        if part then
+            buildBeam(part)
+        end
+    end
     local at = target
     local b = beam
     if at == nil or b == nil then

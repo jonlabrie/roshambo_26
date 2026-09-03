@@ -507,6 +507,17 @@ EventBus.Onboard.Event:Connect(function(event: string, serverSeenBeats: { string
     if beat then
         showCard(beat)
         EventBus.OnboardShown:Fire(event, "shown")
+        -- F5: the beam must not lag the card it goes with. Seen ids are marked at DISMISSAL, so
+        -- deriving the step from `seenLocal` alone would still point the beam at the PREVIOUS
+        -- stop for as long as this card is up (load-bearing on the MODEL leg: modelArrival can't
+        -- fire until modelDoor is dismissed, so a guest who just walks there without tapping the
+        -- card would never see the beam move and never get beat 8). Broadcast the step as though
+        -- the showing card were already seen — a throwaway copy, never mutating `seenLocal` — so
+        -- the card's words and the beam agree while the card is up; dismissal (broadcastTourStep
+        -- above, in `dismiss`/advance-through) then makes the same derivation permanent.
+        local seenWithShown = table.clone(seenLocal)
+        table.insert(seenWithShown, beat.id)
+        EventBus.TourStep:Fire(TourGuide.step(seenWithShown))
     else
         -- Nothing to show — not because of stacking, but because this beat is already in
         -- seenLocal (a prior session, or an earlier occurrence this one). Also NOT a reason to

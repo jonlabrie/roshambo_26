@@ -8,6 +8,8 @@ export const PRICES = {
     // The beginner's bundle (owner, 2026-09-03): S deck + S teahouse together for "an hour's
     // play" (~1 banked pt / 3 min), first property only. 80 pts of ladder for 20 — the ladder
     // itself is untouched; upgrades from S price normally.
+    // "20 points" is also hardcoded into beat 8's copy in roblox/src/shared/OnboardingBeats.luau
+    // (modelHome) — a change here must update that copy too.
     starter: 20,
     portal: 500,
     decoration: { ishidoro: 40, tsukubai: 60, bonsai: 25, bench: 35 },

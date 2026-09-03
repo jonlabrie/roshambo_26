@@ -1973,6 +1973,17 @@ do
         local action = siteCoordinator:claimModel("TOUR_MODEL", modelPadId)
         if action ~= nil then
             applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
+            -- F1: TourStop_Model cannot be tagged in Studio — this site is runtime-built
+            -- (TeahouseSites above), and tagLaunchSites.luau's own rule forbids tagging
+            -- rebuilt geometry (a tag on a deck plank disappears with the plank, silently).
+            -- Tag the built site's deck server-side instead, right after it materializes.
+            local siteFolder = sitesFolder:FindFirstChild("MaterializedSite_" .. modelPadId)
+            local deckPart = siteFolder and siteFolder:FindFirstChild("PadDeck", true)
+            if deckPart then
+                CollectionService:AddTag(deckPart, "TourStop_Model")
+            else
+                warn(`[Tour] MaterializedSite_{modelPadId} has no PadDeck — TourStop_Model not tagged`)
+            end
         else
             warn(`[Tour] TourModelPadId={modelPadId} could not be claimed — unknown or occupied pad`)
         end

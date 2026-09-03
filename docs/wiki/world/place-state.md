@@ -22,14 +22,15 @@ Everything below marked *verified* was checked live via the Studio MCP on 2026-0
 
 ## Publish checklist
 
-1. `Workspace.DayNightLockT` must be at 0.19 (the daytime working value) or cleared —
-   never publish a dusk/night lock. **F&F-demo exception (owner ruling 2026-09-03,
-   spec `docs/superpowers/specs/2026-09-03-onboarding-journey-design.md` §7):
-   publish with `DayNightLockT = 0.40`** (the documented dusk knob — see
-   `docs/wiki/world/day-night.md` for the dawn/day/dusk/night bands, 0.40 is the
-   sanctioned dusk value) **for the demo window** — the onboarding journey ends on a
-   firework, and a noon sky kills the payoff. This resolves the ⚠ OPEN QUESTION below
-   **for the demo period only**; the post-demo default remains open.
+1. **For the demo window** (F&F-demo exception, owner ruling 2026-09-03, spec
+   `docs/superpowers/specs/2026-09-03-onboarding-journey-design.md` §7): publish with
+   **`Workspace.DayNightLockT = 0.40`** — the documented dusk knob (see
+   `docs/wiki/world/day-night.md` for the dawn/day/dusk/night bands; 0.40 is the
+   sanctioned dusk value) — because the onboarding journey ends on a firework, and a
+   noon sky kills the payoff. **Post-demo default**: `DayNightLockT` must be at 0.19
+   (the daytime working value) or cleared — never publish a dusk/night lock outside
+   the demo window. This resolves the ⚠ OPEN QUESTION below **for the demo period
+   only**; the post-demo default remains open.
    Verified 2026-09-03: `DayNightLockT = 1.19` (same phase as 0.19 — the controller
    wraps the fraction — set by the owner while making daytime changes, "wasn't
    recent"), `DayNightStartT` cleared. ⚠ OPEN QUESTION (owner, 2026-09-03, deferred:
@@ -49,9 +50,17 @@ Everything below marked *verified* was checked live via the Studio MCP on 2026-0
 4. Save/publish the place after ANY place-only work — a session's live edits are
    worthless until saved.
 5. Onboarding tour stops (spec `docs/superpowers/specs/2026-09-03-onboarding-journey-design.md`):
-   tag `TourStop_Shop` (hanabiya), `TourStop_Launch` (the chosen riverside
-   `FireworkLaunchSite`), `TourStop_Model` (the model pad's anchor part).
-6. Set the `Workspace.TourModelPadId` attribute to the model pad's `T##` id.
+   tag `TourStop_Shop` (hanabiya's threshold, or another PLACE-OWNED part near it) and
+   `TourStop_Launch` on a DEDICATED MARKER part — never a rebuilt deck or structure.
+   Same rule as `tagLaunchSites.luau`'s own header: decks and teahouses are destroyed
+   and rebuilt on upgrade/display-change/claim, and a tag on one of their parts
+   disappears with it, silently. `TourStop_Model` is **not** a hand-tag any more — the
+   server tags it itself at boot, on the runtime-built model pad's `PadDeck` (see item
+   6 below and the `TourModelPadId` block in `main.server.luau`), because that site is
+   also runtime-built and the same rule forbids tagging it by hand.
+6. Set the `Workspace.TourModelPadId` attribute to the model pad's `T##` id — this is
+   what lets the server find and tag that pad's `TourStop_Model` automatically at
+   boot; there is nothing further to do for that stop.
 
 ## Workspace (verified 2026-08-15)
 
