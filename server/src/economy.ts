@@ -5,6 +5,10 @@ export const SIZE_RANK: Record<Size, number> = { S: 1, M: 2, L: 3 };
 export const PRICES = {
     deck: { S: 50, M: 500, L: 3000 },
     teahouse: { S: 30, M: 300, L: 2000 },
+    // The beginner's bundle (owner, 2026-09-03): S deck + S teahouse together for "an hour's
+    // play" (~1 banked pt / 3 min), first property only. 80 pts of ladder for 20 — the ladder
+    // itself is untouched; upgrades from S price normally.
+    starter: 20,
     portal: 500,
     decoration: { ishidoro: 40, tsukubai: 60, bonsai: 25, bench: 35 },
 } as const;
@@ -40,6 +44,12 @@ type Check = { ok: true; cost: number } | { ok: false; error: string };
 export const below = (size: Size): Size | null => (size === 'S' ? null : size === 'M' ? 'S' : 'M');
 
 export function validatePurchase(state: EconomyState, item: string): Check {
+    if (item === 'starter') {
+        // First property only: owning any deck means the bundle's moment has passed.
+        if (state.maxDeckSize !== null) return { ok: false, error: 'ALREADY_OWNED' };
+        if (state.totalPoints < PRICES.starter) return { ok: false, error: 'INSUFFICIENT_POINTS' };
+        return { ok: true, cost: PRICES.starter };
+    }
     if (item === 'portal') {
         if (state.maxDeckSize === null) return { ok: false, error: 'NEEDS_DECK' };
         if (state.portalOwned) return { ok: false, error: 'ALREADY_OWNED' };
@@ -120,6 +130,11 @@ export function applyPurchase(state: EconomyState, item: string): EconomyState {
     }
     if (item.startsWith('mortar:')) {
         next.mortars = [...(next.mortars ?? []), item];
+        return next;
+    }
+    if (item === 'starter') {
+        next.maxDeckSize = 'S';
+        next.teahouseSizes.push('S');
         return next;
     }
     const [kind, size] = item.split(':') as [string, Size];
