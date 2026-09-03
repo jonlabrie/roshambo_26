@@ -64,32 +64,22 @@ label.TextScaled = true
 label.Text = "Model Teahouse"
 label.Parent = gui
 
--- The arrow: shaft + two chevron strokes meeting at a RIGHT-side tip. GuiObject.Rotation
--- rotates about the frame's CENTRE (AnchorPoint moves only the position reference), so each
--- stroke's centre is computed by walking back from the tip along the stroke's own axis —
--- the first attempt anchored the strokes' ends instead and produced a "<".
-local TIP = Vector2.new(500, 70) -- canvas is 520 x 140
-local STROKE_L = 34
-local shaft = Instance.new("Frame")
-shaft.BackgroundColor3 = COPY
-shaft.BorderSizePixel = 0
-shaft.Size = UDim2.fromOffset(70, 12)
-shaft.AnchorPoint = Vector2.new(0.5, 0.5)
-shaft.Position = UDim2.fromOffset(TIP.X - 4 - 35, TIP.Y)
-shaft.Parent = gui
-for _, sign in { -1, 1 } do
-    -- direction from the stroke's far end TO the tip: down-right for the top stroke
-    -- (gui Y grows downward), up-right for the bottom one.
-    local dir = Vector2.new(math.cos(math.rad(40)), sign * math.sin(math.rad(40)))
-    local centre = TIP - dir * (STROKE_L / 2)
-    local stroke = Instance.new("Frame")
-    stroke.BackgroundColor3 = COPY
-    stroke.BorderSizePixel = 0
-    stroke.Size = UDim2.fromOffset(STROKE_L, 12)
-    stroke.AnchorPoint = Vector2.new(0.5, 0.5)
-    stroke.Position = UDim2.fromOffset(centre.X, centre.Y)
-    stroke.Rotation = sign * 40
-    stroke.Parent = gui
-end
+-- The arrow IS the identity (owner, 2026-09-03, replacing two hand-drawn chevron strokes
+-- the gate called ugly): the scissors caret from shared/Glyphs, rotated 90° clockwise so
+-- ∧ points right. (The owner said "paper glyph", but paper is the horizontal BAR — rotated
+-- it stands vertical; the mark that becomes a right arrow is the caret.) Rendered from the
+-- real glyph assets — identity stroke weight, round caps — tinted monochrome cream on the
+-- dark board. Requires RoshamboShared synced (rojo serve connected), like
+-- verifyWorkspaceConvention.
+local Glyphs = require(game:GetService("ReplicatedStorage").RoshamboShared.Glyphs)
+local arrowBox = Instance.new("Frame")
+arrowBox.Name = "Arrow"
+arrowBox.BackgroundTransparency = 1
+arrowBox.Size = UDim2.fromOffset(84, 84)
+arrowBox.AnchorPoint = Vector2.new(0.5, 0.5)
+arrowBox.Position = UDim2.fromOffset(455, 70) -- canvas is 520 x 140
+arrowBox.Rotation = 90 -- clockwise: caret's apex swings to the right
+arrowBox.Parent = gui
+Glyphs.render(arrowBox, "S", COPY, COPY)
 
 print("[ModelTeahouseSign] placed at the tunnel branch. Eyeball it, then SAVE AND PUBLISH.")
