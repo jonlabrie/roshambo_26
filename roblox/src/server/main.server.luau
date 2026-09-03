@@ -1963,6 +1963,24 @@ for i = 1, 14 do
         siteCoordinator:registerPad(id, spec)
     end
 end
+
+-- The model teahouse (onboarding journey): the place names its pad via the Workspace
+-- attribute TourModelPadId (owner sets it in Studio next to the TourStop_* tags). Absent
+-- attribute = no model pad — a warn, not an error, so an untagged place still boots.
+do
+    local modelPadId = workspace:GetAttribute("TourModelPadId")
+    if typeof(modelPadId) == "string" and modelPadId ~= "" then
+        local action = siteCoordinator:claimModel("TOUR_MODEL", modelPadId)
+        if action ~= nil then
+            applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
+        else
+            warn(`[Tour] TourModelPadId={modelPadId} could not be claimed — unknown or occupied pad`)
+        end
+    else
+        warn("[Tour] TourModelPadId attribute unset — no model teahouse this server")
+    end
+end
+
 for _, action in siteCoordinator:vacantActions() do
     applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
 end
