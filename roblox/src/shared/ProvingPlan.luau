@@ -17,6 +17,10 @@ ProvingPlan.RACKS = { "north arena", "bridge", "upper north", "mid pool", "hi we
 -- clean-air repeats, visible from the arena basin.
 ProvingPlan.SEQUENCE_RACK = "mid pool"
 ProvingPlan.SEQUENCE_GAP = 2 -- seconds between sequence launches
+-- The walk (owner, 2026-09-06): Ladder steps across the SELECTED stations in order,
+-- one launch per beat -- a barrage walking the canyon, distinct from Fire's
+-- simultaneous volley and Seq's same-spot repeats.
+ProvingPlan.LADDER_GAP = 0.7
 
 local function draftId(family: string, variant: string): string
     return "draft:" .. family .. "/" .. variant

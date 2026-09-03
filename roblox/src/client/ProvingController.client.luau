@@ -480,17 +480,29 @@ for _, id in shippedIds do
     -- fun"): Fire = natural odds at the selected rack; Ladder = the volley, one from
     -- every rack; Seq = clean-air repeats; Boost = the lucky roll FORCED, so a shipped
     -- shell's surprise can be audited without fishing for the 30%.
-    -- Fire, Seq and Boost all honor the toggle set (owner, 2026-09-06: Seq pinned to
-    -- mid pool "even if it's not selected" was wrong); Ladder ignores it and fires
-    -- from EVERY station, rooftop included -- the one-press canyon-wide volley.
+    -- Every mode honors the toggle set. Fire = the selection at once; Ladder = THE
+    -- WALK (owner, 2026-09-06: ladder ignoring the selection was wrong) -- the selected
+    -- stations in RACKS order, one launch per LADDER_GAP, a barrage walking the canyon;
+    -- empty selection walks every station. Seq = clean-air repeats on the selection.
     local fireButton = makeButton(row, "Fire", 40, 96)
     fireButton.MouseButton1Click:Connect(function()
         fireSelected(id)
     end)
     local ladderButton = makeButton(row, "Ladder", 52, 140)
     ladderButton.MouseButton1Click:Connect(function()
+        local racks = {}
         for _, rack in ProvingPlan.RACKS do
-            fireSingle(id, rack)
+            if selectedRacks[rack] then
+                table.insert(racks, rack)
+            end
+        end
+        if #racks == 0 then
+            racks = ProvingPlan.RACKS
+        end
+        for i, rack in racks do
+            task.delay((i - 1) * ProvingPlan.LADDER_GAP, function()
+                fireSingle(id, rack)
+            end)
         end
     end)
     local seqButton = makeButton(row, "Seq", 38, 196)
