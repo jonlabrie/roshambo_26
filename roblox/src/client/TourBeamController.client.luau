@@ -6,9 +6,11 @@
 -- show — warn once per step, never error.
 local CollectionService = game:GetService("CollectionService")
 local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local RunService = game:GetService("RunService")
 
-local TourGuide = require(script.Parent.Parent:WaitForChild("shared"):WaitForChild("TourGuide"))
+local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
+local TourGuide = require(shared:WaitForChild("TourGuide"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local ARRIVE_STUDS = 30 -- inside this range the beam dims; at the MODEL stop it also fires arrival
