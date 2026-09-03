@@ -133,7 +133,9 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   (`3115d8d`): the L tube's "cheap round to show off the big gun" (owner), price 10,
   mortar:L — the first `heavy` shell (double sprites under weighted admission, spread
   60, the eardeer boom on every break, 30% salvo kicker of 3-4 aerial salutes with
-  purpose-made flare art). Remaining shop families on the worksheet: hotaru, dan.
+  purpose-made flare art). **hotaru** shipped 2026-09-06 (`439aae1`: v3 floor, second-shimmer structural boost,
+  M tube, 8 -- plus the strobe re-pop machinery and rotated burst voices the audition
+  surfaced). Remaining shop family on the worksheet: dan.
   Launch audio: thumps are a 3-clip seeded rotation (launch-deck-1/2/3) with
   launch-deck-4 as the **L tube's grunt** (`292e978`, live via kamuro); per-clip head
   trims measured from source WAVs (peak−35ms).

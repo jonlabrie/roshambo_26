@@ -3394,3 +3394,17 @@ dedicated Rate-driven emitter (the system's only one) streams burning-debris
 sparks behind the rising heavy shell; the pinned trails-approved Trail is
 untouched. Owner-tuned in one pass (rate 90, size 0.45->0.12, fall -18) and
 approved: "looking good. ship it." `7c96c43`, `6a0974b`.
+
+## [2026-09-06] shipped | Hotaru: the firefly, and the strobe finds its voice
+
+Worksheet session closed three audio defects before the ship: (1) multi-burst
+shells were cutting their own booms -- the "one Sound per slot, phases never
+overlap" assumption died silently with multi-burst recipes; three rotated
+burst voices per slot now (`6db5ef4`, dan un-muted as a side effect);
+(2) re-pops: the strobe's flicker waves each get a soft report on the middle
+rising edges (0.22/0.46 of life; the last wave belongs to the sizzle --
+a third pop there read as "extra" and was trimmed, `60a7558`); (3) add-on
+spacing: the boosted second cloud waits 0.9s (was 0.5). Rulings: v3 floor
+(spread 48), the structural second cloud with its own sizzle IS the kicker,
+M tube (comet automatic), price 8. Five steps run (`439aae1`), drafts pruned
+-- ONLY DAN remains on the worksheet. Dev backend op de6d2346.
