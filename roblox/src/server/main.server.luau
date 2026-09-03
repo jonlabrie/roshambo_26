@@ -2522,7 +2522,9 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
         -- buy-to-claim: a non-owner buying a deck:* claims the specific pad named in the payload.
         -- Validate + reserve-check the pad BEFORE spending points, so a full/occupied pad doesn't
         -- silently strand the player on a different pad (or no pad at all) after paying.
-        local isBuyToClaim = e.claimedPadId == nil and kindPre == "deck"
+        -- "starter" is deck:S + teahouse:S in one purchase (owner, 2026-09-03) — it claims a pad
+        -- exactly the way a bare deck:S does.
+        local isBuyToClaim = e.claimedPadId == nil and (kindPre == "deck" or item == "starter")
         local claimPadId: string? = nil
         if isBuyToClaim then
             local padId = if typeof(payload) == "table" and typeof(payload.padId) == "string"
@@ -2589,6 +2591,12 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
         local kind, size = string.match(item, "^(%a+):(%a+)$")
         if kind == "teahouse" and size then
             e.teahouses[size] = { baseStyle = "teahouse-1story" }
+        end
+        if item == "starter" then
+            -- the /purchase response carries teahouseSizes = {"S"} but the adopt above keys off
+            -- the item string; without this the claim below builds a bare deck and the guest's
+            -- bundle looks like half of what they paid for until next join.
+            e.teahouses.S = { baseStyle = "teahouse-1story" }
         end
         if isBuyToClaim and claimPadId then
             -- postPurchase yielded; re-check vacancy, a claim could have raced in meanwhile.
