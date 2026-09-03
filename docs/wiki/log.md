@@ -3229,6 +3229,31 @@ not a missing vocabulary at all.
 week. Whoever owns the schema should either alias the tenses in `LOG_KINDS` or state the required
 form in rule 8 loudly enough to be obeyed.
 
+⚠ **A STANDING RULE AND ITS GATE LANDED IN THE CHRONOLOGY AND NOWHERE ELSE — reported, not
+moved.** `4d46aba` records that the mobile pass pushed `HudController`'s main chunk past **Luau's
+200-local-register COMPILER limit**: the whole script failed to compile, the play HUD vanished
+entirely, and **stylua, selene and the 1671-test suite all stayed green, because none of them
+compile**. The fix scopes each self-contained section's locals in a do-block behind one
+forward-declared name, and `tests/Compiles.spec.luau` now runs every `src` file through Lune's
+embedded Luau compiler at O0 and O2 — it reproduced the exact Studio error before the fix. The
+entry closes with a rule for the next author: *one top-level register per section, do-block the
+rest.*
+
+**That is a durable engine trap and a standing rule, and it exists only in `log.md`** — grep finds
+"register" on no `practice/` page. [[misc-engine-traps]] opens *"small, self-contained Roblox
+engine and pipeline traps that don't belong to a bigger recipe; each cost real time once"*, which
+is exactly its home, and the incident is fresh evidence for a theme the wiki already carries (four
+green checks passing on a bird whose face was torn open, [[blender-working-rules]] rule 4). Left
+for the owner because moving live knowledge between shelves is a judgement call, not a lint fix —
+but the next person adding a HUD section will not find this where it currently sits.
+
+**Also not carried across, and also reported rather than authored:** the same pass added a
+portrait-centred cluster, a tap-to-fire fireworks rail with per-orientation caps, and
+`HudLayout.clusterRef`. [[round-and-hud]]'s HUD section describes the bottom-right cluster with no
+mobile-orientation behaviour at all. Its constants were re-verified and still hold — `EDGE_BOTTOM`
+6, `RingTimer.MIN_SWEEP_DEGREES` 6, `HudModel.ESCALATE_AT` 5 — so nothing there is WRONG; it is
+incomplete, which no check can see.
+
 ⚠ **`falls-dock` and `blender-pipeline` were read and deliberately NOT stamped `checked:`.**
 `falls-dock` rests on emitter positions, a place-only `UguisuScheduler` Script and asset ids only
 Studio can confirm; `blender-pipeline` still teaches the plane bisect for splitting a bill, which
@@ -3689,7 +3714,7 @@ NOTE: shells reach the live place's players on next publish (server already
 sells them; the published client renders them fine -- recipes ship in
 ReplicatedStorage... NO: recipes are Luau in the place. Next publish needed.)
 
-## [2026-09-03] fixed | Mobile HUD -- portrait centring and the fireworks rail
+## [2026-09-03] defect | Mobile HUD -- portrait centring and the fireworks rail
 
 Owner's iPhone report on the published place: in PORTRAIT the scissors throw
 button sat 3/4 under Roblox's jump button (JUMP_CLEARANCE is 15% of WIDTH;
@@ -3706,7 +3731,7 @@ volley is repeated taps on FIRE. Selection persists; dimmed rows selectable so
 FIRE wears the reason. Pixel offsets, not width fractions, clear the jump
 zone. Client-only; reaches players on next publish.
 
-## [2026-09-03] fixed | HUD wipeout -- Luau's 200-register ceiling, and a compile gate
+## [2026-09-03] defect | HUD wipeout -- Luau's 200-register ceiling, and a compile gate
 
 The mobile pass's new top-level locals pushed HudController's main chunk past
 Luau's 200-local-register COMPILER limit; the whole script failed to compile
