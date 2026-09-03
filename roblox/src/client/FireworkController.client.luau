@@ -614,7 +614,10 @@ local function play(payload: any, distance: number)
     -- today's HEIGHT (h = run * dir.Y) and put the horizontal displacement where physics puts
     -- it. dir vertical => horizontal term is exactly zero and this is byte-identical to the
     -- old `origin + dir * run + scatter` (public sites, proving range, firecrackers untouched).
-    local run = 60 + heightJitter
+    -- Per-source apex (owner, 2026-09-06: the rooftop and mid pool sit low -- "more
+    -- launch velocity to get a bit higher"): the server may send apexHeight with the
+    -- launch; absent, the 2026-09-03 default 60 stands.
+    local run = (if typeof(payload.apexHeight) == "number" then payload.apexHeight else 60) + heightJitter
     local h = run * dir.Y
     local horiz = Vector3.new(dir.X, 0, dir.Z)
     local horizMag = horiz.Magnitude

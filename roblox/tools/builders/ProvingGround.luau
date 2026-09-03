@@ -231,6 +231,10 @@ function ProvingGround.build(): Spec.PartSpec
     local children: { Spec.PartSpec } = {}
     for _, station in ProvingGround.STATIONS do
         local rack = buildRack(station.name, 0)
+        if station.apex then
+            local props = rack.properties :: any
+            props.Attributes = { LaunchApex = station.apex }
+        end
         -- the rack part's own local CFrame, exactly as buildRack/tube composed it
         local rackLocal = { TUBE6_X, tubeY(TUBE6_SIZE), 0 }
         local localCF = Spec.cframe(rackLocal, Spec.ROT.CYL_VERTICAL)

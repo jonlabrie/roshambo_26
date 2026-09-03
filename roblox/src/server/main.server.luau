@@ -1525,6 +1525,7 @@ RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
         -- overhead placeholder (owner gate, 2026-09-04: "firecrackers fire from over my head").
         -- Gear shells at PUBLIC sites keep the invisible overhead origin (spec: unchanged).
         local origin, heading = muzzleOriginFor(uid, pos, deck, shellId)
+        local publicApex: number? = nil
         if origin == nil and MortarPlacement.SHELL_MORTAR[shellId] ~= nil then
             -- PUBLIC TUBES (owner, 2026-09-06: shells from the arena square used to
             -- detonate "right above you: worst possible position"): a gear shell fired
@@ -1540,7 +1541,10 @@ RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
             if #nearTubes > 0 then
                 local mount = nearTubes[math.random(1, #nearTubes)]
                 local muzzle = mount.Size.Y / 2 + MortarPlacement.TUBE["mortar:L"].length
-                origin = mount.Position + Vector3.new(0, muzzle + 0.2, 0)
+                origin = mount.CFrame:PointToWorldSpace(Vector3.new(0, muzzle + 0.2, 0))
+                local up = mount.CFrame.UpVector
+                heading = up
+                publicApex = mount:GetAttribute("LaunchApex")
             end
         end
         if origin == nil then
@@ -1571,6 +1575,7 @@ RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
             seed = math.random(1, 2 ^ 31 - 1),
             by = uid,
             boosted = boosted,
+            apexHeight = publicApex,
         })
         if pushFireworkState then
             pushFireworkState(player)
@@ -1606,12 +1611,15 @@ RequestProvingFire.OnServerEvent:Connect(function(_player, shellId, rackName, fo
             if #mounts > 0 then
                 local mount = mounts[math.random(1, #mounts)]
                 local muzzle = mount.Size.Y / 2 + MortarPlacement.TUBE["mortar:L"].length
+                local up = mount.CFrame.UpVector
                 FireworkLaunched:FireAllClients({
                     shellId = shellId,
-                    origin = mount.Position + Vector3.new(0, muzzle + 0.2, 0),
+                    origin = mount.CFrame:PointToWorldSpace(Vector3.new(0, muzzle + 0.2, 0)),
+                    heading = { x = up.X, y = up.Y, z = up.Z },
                     seed = math.random(1, 2 ^ 31 - 1),
                     by = "proving",
                     boosted = if forceBoost == true then true else nil,
+                    apexHeight = mount:GetAttribute("LaunchApex"),
                 })
             end
         end
@@ -1627,6 +1635,9 @@ RequestProvingFire.OnServerEvent:Connect(function(_player, shellId, rackName, fo
         shellId = shellId,
         origin = rack.Position + axis * (rack.Size.X / 2 + 0.1),
         heading = { x = axis.X, y = axis.Y, z = axis.Z },
+        -- a station may carry LaunchApex (mid pool does: its bursts sat AT bridge
+        -- height -- owner: "in the thick of an explosion, not watching overhead")
+        apexHeight = rack:GetAttribute("LaunchApex"),
         seed = math.random(1, 2 ^ 31 - 1),
         by = "proving",
         -- The panel's Boost button forces the lucky roll (Studio-only path); absent,
