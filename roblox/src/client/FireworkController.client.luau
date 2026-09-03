@@ -463,7 +463,11 @@ local function fireBurst(
     })
     -- The star SHRINKS as it burns out -- a dying spark tightens to a point, it does not
     -- linger at full size behind a transparency curtain.
-    local s0 = (ev.spread or 30) / 80 * style.sizeScale -- /80: owner halved star size 2026-09-03
+    -- ⚠ THE FLOOR: sprite size rides spread (below), which silently made SMALL bursts
+    -- grow SMALL STARS -- dan's spread-22 mini-peonies wore 0.28-stud stars against a
+    -- standard peony's 0.53 and read as haze (owner, 2026-09-06: "the stars themselves
+    -- are smaller somehow?"). A small burst keeps readable stars.
+    local s0 = math.max((ev.spread or 30) / 80 * style.sizeScale, 0.5)
     local size = NumberSequence.new({
         NumberSequenceKeypoint.new(0, s0),
         NumberSequenceKeypoint.new(0.7, s0),
@@ -487,7 +491,7 @@ local function fireBurst(
     -- was three near-identical bursts (owner: "can't tell much of a difference").
     local radiusScale = (ev.spread or 30) / 30
     local speed = NumberRange.new(style.speed[1] * radiusScale, style.speed[2] * radiusScale)
-    -- lifeScale > 1 only on a bonus shell: its stars simply live longer.
+    -- lifeScale > 1 only via boost.lifeScale: a lucky shell's stars simply live longer.
     local lifetime = NumberRange.new(style.lifetime[1] * lifeScale, style.lifetime[2] * lifeScale)
     local spreadAngle = Vector2.new(style.spreadAngle[1], style.spreadAngle[2])
     local transparency = transparencyOf(style)
@@ -543,10 +547,6 @@ local function play(payload: any, distance: number)
     local rng = Random.new(payload.seed)
     -- One voice-speed per shell, drawn FIRST so its position in the stream is stable.
     local soundSpeed = 0.92 + rng:NextNumber() * 0.16
-    -- THE BONUS ROLL is drawn unconditionally (stream stability) and applied only to
-    -- mortar-class flights below. Occasionally a shell is simply BIGGER (owner,
-    -- 2026-09-04): higher apex, longer-lived stars, the heavyweight boom.
-    local bonusRoll = rng:NextNumber()
     local origin = payload.origin
     -- THE HEADING (rail-mounts, 2026-09-04): a muzzle launch from a player's own deck sends a
     -- unit vector the flight rides along; every other launch site (public sites, proving range,
@@ -642,17 +642,9 @@ local function play(payload: any, distance: number)
         end
     end
 
-    local bonus = last >= BurstStyles.BONUS.minFlight and bonusRoll < BurstStyles.BONUS.chance
+    -- (The random BONUS shell was removed 2026-09-06 at owner request; lifeScale is now
+    -- moved only by boost.lifeScale, per phase.)
     local lifeScale = 1
-    if bonus then
-        lifeScale = BurstStyles.BONUS.lifeScale
-        tail *= lifeScale
-        -- Stretches only the along-heading component of the flight; the lateral/along-tube
-        -- scatter is untouched. With a vertical dir this reproduces the old Y-only scaling to
-        -- within the scatter's own (unscaled, ±8-stud) contribution -- exactly as before, since
-        -- the old expression never scaled X/Z either.
-        apex = origin + (apex - origin) + dir * ((apex - origin):Dot(dir) * (BurstStyles.BONUS.apexScale - 1))
-    end
 
     active += weight
     local burstsPlayed = 0 -- rotates this shell's break audio across the slot's burst voices
@@ -1064,11 +1056,6 @@ local function play(payload: any, distance: number)
                         soundId = soundPool[rng:NextInteger(1, #soundPool)]
                     else
                         soundId = soundPool
-                    end
-                    -- the draw above still happens on bonus shells (stream stability);
-                    -- the heavyweight boom then takes the slot.
-                    if bonus then
-                        soundId = BurstStyles.BONUS.sound
                     end
                 end
                 -- Rotate the burst voice so this break never cuts the previous one's clip.
