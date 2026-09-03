@@ -26,15 +26,16 @@
 
 local AssetService = game:GetService("AssetService")
 
--- MeshPart.MeshId read off the parts the 3D Importer created (2026-09-03). NOT the ids the
+-- MeshPart.MeshId read off the parts the 3D Importer created (v2 set, AGGRESSION 0.5,
+-- 2026-09-03). NOT the ids the
 -- importer reports in its dialog — those are the wrapper assets and fail to load as meshes.
 local MESH_IDS: { [string]: string } = {
-    RangeNearA = "rbxassetid://103781309355938",
-    RangeNearB = "rbxassetid://111609705703999",
-    RangeNearC = "rbxassetid://80010923872086",
-    RangeFarA = "rbxassetid://119851467306690",
-    RangeFarB = "rbxassetid://108093568696221",
-    RangeFarC = "rbxassetid://107831693918331",
+    RangeNearA = "rbxassetid://115476551193756",
+    RangeNearB = "rbxassetid://90424823762099",
+    RangeNearC = "rbxassetid://106604576915651",
+    RangeFarA = "rbxassetid://140344372112284",
+    RangeFarB = "rbxassetid://89471080330286",
+    RangeFarC = "rbxassetid://135779735348956",
 }
 
 local BOX_X, BOX_Z = 460, 320 -- terrain footprint half-extents
@@ -45,7 +46,8 @@ local STRIP_BASE_Y = -6 -- mesh base sits under the ground plane so its zero-hei
 local ROCK = Color3.fromRGB(36, 52, 30)
 local GROUND = Color3.fromRGB(44, 52, 38)
 
-local CLEAR_DEG = 8 -- crest must clear the terrain skyline by this much from every counted vantage
+local CLEAR_DEG = 15 -- crest must clear the terrain skyline by this much from every counted vantage
+-- (8 was "still too low on the horizon" -- owner, 2026-09-03)
 local SKYLINE_IGNORE_DEG = 40 -- steeper than this is a cliff face in front of the vantage; skip
 local MAX_AXIS = 2000 -- engine cap is 2048
 local VANTAGES: { { name: string, pos: Vector3 } } = {
@@ -70,21 +72,21 @@ type Ring = {
 local RINGS: { Ring } = {
     {
         name = "NearRange",
-        rx = 1150,
-        rz = 1000,
+        rx = 950, -- as close as a 760-deep strip can sit and still clear the terrain box
+        rz = 800,
         count = 6,
-        depth = 900,
-        minCrest = 800,
+        depth = 760, -- height/depth stays near 1.3; shallower re-sharpens the peaks
+        minCrest = 900,
         variants = { "RangeNearA", "RangeNearB", "RangeNearC" },
         phase = 0.0,
     },
     {
         name = "FarRange",
-        rx = 2000,
-        rz = 1750,
+        rx = 1450, -- "too far in the distance" at 2000 (owner, 2026-09-03)
+        rz = 1250,
         count = 8,
-        depth = 1400,
-        minCrest = 1200,
+        depth = 1300, -- capped 2000-tall strips stay under 1.6 height/depth
+        minCrest = 1300,
         variants = { "RangeFarA", "RangeFarB", "RangeFarC" },
         phase = 0.5,
     },

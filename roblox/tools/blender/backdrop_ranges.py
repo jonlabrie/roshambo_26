@@ -39,6 +39,12 @@ from mathutils import Vector, noise
 
 # Canonical export box (studs). Placement rescales; keep the aspect plausible so preview reads.
 L, D, H = 1000.0, 500.0, 400.0
+
+# How jagged the skyline is. 1.0 was the first import (2026-09-03): the owner's verdict was
+# "peaks a bit jagged and sharp, make them half as aggressive" -> 0.5. It scales the crest's
+# height variance, the meander, the spur/sub-peak detail and the cross-profile concavity.
+AGGRESSION = 0.5
+VERSION = "v2"  # suffix on exported files so a re-import never collides with the previous set
 RES_U, RES_V = 160, 48          # grid before decimation (15,360 tris)
 TARGET_TRIS = 3000              # after decimation; silhouette over detail
 
@@ -92,17 +98,19 @@ def height(u: float, v: float, seed: float, kind: str) -> float:
     s = Vector((seed * 7.31, seed * 3.17, seed * 1.73))
 
     # crest meanders across the depth; shape differs per seed
-    crest = 0.22 * math.sin(2 * math.pi * (1.15 * u + seed * 0.37)) + 0.12 * fbm(s + Vector((u * 3.0, 0.0, 0.0)), 3)
+    A = AGGRESSION
+    crest = A * (0.22 * math.sin(2 * math.pi * (1.15 * u + seed * 0.37)) + 0.12 * fbm(s + Vector((u * 3.0, 0.0, 0.0)), 3))
     # crest height along the strip: ridged so peaks are sharp and saddles are real
-    peaks_freq = 4.0 if kind == "near" else 2.6
-    crestH = 0.45 + 0.55 * ridged(s + Vector((u * peaks_freq, 0.5, 0.0)), 4)
+    peaks_freq = (4.0 if kind == "near" else 2.6) * (0.5 + 0.5 * A)
+    var = 0.55 * A
+    crestH = (1.0 - var) + var * ridged(s + Vector((u * peaks_freq, 0.5, 0.0)), 4)
     # cross profile: concave alpine — steep at the crest, flaring at the base
     halfWidth = 0.75 + 0.25 * fbm(s + Vector((u * 2.0, 9.0, 0.0)), 2)
     d = abs(v - crest) / halfWidth
-    profile = max(0.0, 1.0 - d) ** 1.35
+    profile = max(0.0, 1.0 - d) ** (1.0 + 0.35 * A)  # concave alpine at full aggression, straight at zero
     # 2D detail: spurs and sub-peaks down the faces; stronger on 'near' strips
-    detail_amp = 0.42 if kind == "near" else 0.28
-    detail_freq = 6.0 if kind == "near" else 4.0
+    detail_amp = (0.42 if kind == "near" else 0.28) * A
+    detail_freq = (6.0 if kind == "near" else 4.0) * (0.5 + 0.5 * A)
     detail = ridged(s + Vector((u * detail_freq, v * detail_freq * 0.5 + 20.0, 0.0)), 4)
     h = crestH * profile * (1.0 - detail_amp + detail_amp * detail)
     # foothill apron on the front face of 'near' strips: a low second ridge toward -v
@@ -209,7 +217,7 @@ def run(outdir: str = DEFAULT_OUT) -> dict:
         ob = build_strip(name, seed, kind, col)
         # lay the strips out in two rows for viewing; export zeroes the location
         ob.location = ((idx % 3) * (L * 1.15) - L * 1.15, row[kind], 0.0)
-        fbx = os.path.join(outdir, f"{name}.fbx")
+        fbx = os.path.join(outdir, f"{name}_{VERSION}.fbx")
         export_strip(ob, fbx)
         report[name] = {"tris": len(ob.data.polygons), "verts": len(ob.data.vertices), "fbx": fbx}
 
@@ -221,7 +229,7 @@ def run(outdir: str = DEFAULT_OUT) -> dict:
                     if space.type == "VIEW_3D":
                         space.shading.type = "SOLID"
                         space.clip_end = 50000.0
-    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(outdir, "backdrop_ranges_scratch.blend"), copy=True)
+    bpy.ops.wm.save_as_mainfile(filepath=os.path.join(outdir, f"backdrop_ranges_{VERSION}_scratch.blend"), copy=True)
     return report
 
 
