@@ -4,6 +4,8 @@
 -- so every shell of a style looks the same), plus the point rules that turn a
 -- requested point count into per-part placement/orientation frames, and the
 -- role tables the styles' textureRole/soundRole fields resolve through.
+local Glyphs = require("./Glyphs")
+
 local BurstStyles = {}
 
 export type Style = {
@@ -30,7 +32,12 @@ export type Style = {
     -- (owner ruling: "the sizzle clip should only run as long as the final phase").
     -- false = the style has no tail.
     soundRole: string, -- key into SOUNDS (burst roles are variant pools)
-    pointRule: string, -- "scatter" | "circle" | "tilted" | "single"
+    -- RE-POPS (owner, 2026-09-06: hotaru's flicker waves read as re-bursts and "burst 2 is
+    -- almost always silent"): fractions of star lifetime where the style visibly re-ignites
+    -- -- the transparency square-wave's rising edges -- and a soft report belongs. The
+    -- controller plays the phase's own break clip quieter/sharper at each. false = none.
+    rePops: { number } | false,
+    pointRule: string, -- "scatter" | "circle" | "tilted" | "single" | "wild"
 }
 
 export type Frame = {
@@ -58,6 +65,7 @@ BurstStyles.STYLES = {
         sizeScale = 1,
         lightEmission = 0.7,
         tailSound = false,
+        rePops = false,
     },
     -- Planar circle of stars, tilted per shell ("tilted" point rule).
     ring = {
@@ -75,6 +83,7 @@ BurstStyles.STYLES = {
         sizeScale = 1,
         lightEmission = 0.7,
         tailSound = false,
+        rePops = false,
     },
     -- Few thick arms, aimed outward-up by the "circle" point rule, falling hard.
     palm = {
@@ -95,6 +104,7 @@ BurstStyles.STYLES = {
         sizeScale = 2.2,
         lightEmission = 0.85,
         tailSound = false,
+        rePops = false,
     },
     -- A hanging cloud that flickers: the 18-keypoint square-wave transparency.
     strobe = {
@@ -138,6 +148,11 @@ BurstStyles.STYLES = {
         -- strobe's square wave reads as 3-4 sequential re-bursts and the last one
         -- shimmers -- that is the phase this voice belongs to (~70% of star lifetime).
         tailSound = { role = "tail_strobe", delay = 1.75, volume = 0.35, duration = 1.6 },
+        -- The square wave's MIDDLE rising edges only (on-phases begin at 0, 0.22, 0.46,
+        -- 0.74 of life): the first edge is the break itself, and the LAST wave is the
+        -- shimmer the sizzle owns -- a pop there read as an extra, unmotivated burst
+        -- (owner, 2026-09-06). Three audible bursts, then the shimmer.
+        rePops = { 0.22, 0.46 },
     },
     -- The golden crown: long, heavy, drooping to the water.
     kamuro = {
@@ -152,9 +167,54 @@ BurstStyles.STYLES = {
         soundRole = "burst_kamuro",
         pointRule = "single",
         orientation = "velocity",
-        sizeScale = 2.4,
+        sizeScale = 3.6, -- 2.4 + 50% (owner, 2026-09-06: "kamuro streaks that are 50% larger")
         lightEmission = 0.85,
         tailSound = false,
+        rePops = false,
+    },
+    -- Whizzers (owner, 2026-09-06, dan's third act): "2-5 'comets' that race off in
+    -- random directions trailing sparks and whistling over a very short life span of
+    -- about half a second." Each point is one comet: a tight fast cone of streaks whose
+    -- speed VARIANCE strings them into a head-and-spark-trail; the "wild" point rule
+    -- aims every comet somewhere different, steeply-up to just-below-horizontal.
+    whizzer = {
+        speed = { 55, 110 },
+        drag = 0.4,
+        lifetime = { 0.35, 0.55 },
+        acceleration = { 0, -10, 0 },
+        brightness = 2.6,
+        spreadAngle = { 5, 5 },
+        transparency = { { 0, 0 }, { 0.7, 0.1 }, { 1, 1 } },
+        textureRole = "streak",
+        soundRole = "burst_whizzer",
+        pointRule = "wild",
+        orientation = "velocity",
+        sizeScale = 1.6,
+        lightEmission = 0.85,
+        tailSound = false,
+        rePops = false,
+    },
+    -- Glyph fall, take two (owner, 2026-09-06: "a triple 'yashi' bloom, each of which
+    -- carries one of the glyphs"): the palm's exact motion -- arms arcing out and
+    -- raining -- but CAMERA-FACING so the glyphs read, each arm pinned to its own mark
+    -- via the phase's per-point `textures`. What follows the bloom is an open design
+    -- question; no flicker, no tail yet.
+    glyphfall = {
+        speed = { 26, 34 },
+        drag = 1.4,
+        lifetime = { 2.2, 3.0 },
+        acceleration = { 0, -22, 0 },
+        brightness = 2.2,
+        spreadAngle = { 12, 12 },
+        transparency = { { 0, 0 }, { 0.85, 0.1 }, { 1, 1 } },
+        textureRole = "dot", -- pinned per point (textures) in practice
+        soundRole = "burst_peony",
+        pointRule = "circle",
+        orientation = "camera",
+        sizeScale = 1.4, -- ~0.7-stud marks at dan's spread 40 (walked down from 4.0, owner 2026-09-06)
+        lightEmission = 0.7,
+        tailSound = false,
+        rePops = false,
     },
 } :: { [string]: Style }
 
@@ -163,6 +223,30 @@ BurstStyles.TEXTURES = {
     -- Owner uploads 2026-09-02 (sources: tools/textures/firework_dot.png / firework_streak.png).
     dot = "rbxassetid://87559558731370",
     streak = "rbxassetid://136219621015067",
+    -- Salute flares (2026-09-06, tools/textures/make_salute_flares.py): purpose-made burst
+    -- art -- salutes are a FIRST-CLASS effect (owner ruling; crossed streak sprites read as
+    -- a line whenever the random rotations aligned). Four silhouettes, star baked into the
+    -- texture: a 4-point, b 6-point, c 5-point, d 8-spike pop.
+    -- ⚠ THE CANONICAL THROW GLYPHS -- shared/Glyphs.luau's white cores (ring / bar /
+    -- caret), the SAME marks on the throw buttons, the drum, the chochin lanterns and
+    -- the PWA. Aliased here so the preloader warms them and burst phases can pin them.
+    -- NEVER redraw these (2026-09-06: a session generated literal rock/paper/scissors
+    -- art before finding this module -- wrong provenance AND wrong iconography).
+    glyph_R = Glyphs.IMAGE.R.core,
+    glyph_P = Glyphs.IMAGE.P.core,
+    glyph_S = Glyphs.IMAGE.S.core,
+    flare_a = "rbxassetid://97945892165096",
+    flare_b = "rbxassetid://106113269280235",
+    flare_c = "rbxassetid://107807952502084",
+    flare_d = "rbxassetid://82438585464749",
+}
+
+-- The shuffle deck for salute flashes: one seeded draw per shot in the controller.
+BurstStyles.SALUTE_FLARES = {
+    BurstStyles.TEXTURES.flare_a,
+    BurstStyles.TEXTURES.flare_b,
+    BurstStyles.TEXTURES.flare_c,
+    BurstStyles.TEXTURES.flare_d,
 }
 -- How LOUD and how FAR. Fireworks are shared spectacle, the opposite of the familiars'
 -- deliberately intimate 9-34 rolloff: full volume out to a plateau, audible across the
@@ -182,7 +266,12 @@ BurstStyles.SOUND_TRIMS = {
     ["rbxassetid://87713703495045"] = 0.15, -- launch-deck-2: peak at 185ms
     ["rbxassetid://122319288610707"] = 0.14, -- launch-deck-1: peak at 175ms
     ["rbxassetid://92892667329683"] = 0.135, -- launch-deck-3: peak at 170ms
-    ["rbxassetid://77117688726913"] = 0.16, -- launch-deck-4: peak at 195ms
+    ["rbxassetid://79843927797938"] = 0.16, -- launch-deck-m3: peak at 195ms (aligned to deck-4)
+    -- deck-4 stays on the peak-minus-35ms rule. A deeper 0.19 was tried for the perceived
+    -- lag and REVERTED (owner, 2026-09-06: "far less satisfying" -- the bass swell IS the
+    -- grunt); the real intermittent lag was fire-time SoundId binding, fixed structurally
+    -- in the controller (dedicated preassigned launch voices).
+    ["rbxassetid://77117688726913"] = 0.16, -- launch-deck-4: peak at 195ms in the raw clip
 } :: { [string]: number }
 
 BurstStyles.SOUND_LEVELS = {
@@ -198,17 +287,9 @@ BurstStyles.SOUND_LEVELS = {
     speedOfSound = 1125,
 }
 
--- THE BONUS SHELL (owner, 2026-09-04): occasionally a shell is simply BIGGER -- it
--- climbs much higher, its stars live longer, and it speaks with the heavyweight boom.
--- Seeded per shell, so every client sees the same lucky ones; rolls only on
--- mortar-class flights (>= 2s), never hand firecrackers.
-BurstStyles.BONUS = {
-    chance = 0.08,
-    apexScale = 1.6,
-    lifeScale = 1.45,
-    sound = "rbxassetid://126255239203597", -- boom-parasonya
-    minFlight = 2,
-}
+-- (The 2026-09-04 BONUS shell -- the random bigger-shell with the heavyweight boom --
+-- was REMOVED 2026-09-06 at owner request ("it almost never works"): the boost/pity
+-- machinery is the surprise system now, per shell, designed and sold.)
 
 BurstStyles.SOUNDS = {
     -- Owner uploads 2026-09-03 (sources: Roshambo Reference/sound/fireworks_cuts/).
@@ -227,6 +308,16 @@ BurstStyles.SOUNDS = {
         "rbxassetid://92892667329683", -- launch-deck-3
     },
     launch_heavy = "rbxassetid://77117688726913", -- launch-deck-4: the L tube's grunt
+    -- The M tube's voice (owner, 2026-09-06: "sounds a little thin now" next to the L
+    -- grunt): launch-deck-3's crack over deck-4's low-passed chest at heavy gain, blended
+    -- offline (fireworks_cuts/launch-deck-m3.wav), peaks aligned so the trim rule holds.
+    launch_medium = "rbxassetid://79843927797938", -- launch-deck-m3: the M tube's chest
+    -- The salute voices (owner uploads 2026-09-06, cut from 390182__eardeer__explosion:
+    -- echo-y canyon punch, ZERO pre-roll -- peak 50ms in, no trim needed). The 3.5s cut
+    -- keeps the 2.75s slap-back echo: a break's single big boom. The 3s cut rolls off
+    -- earlier: the salvo voice, tuned to stack 3-6 deep without going to mud.
+    salute_single = "rbxassetid://130448210140184", -- eardeer 3.5s: the always-boom
+    salute = "rbxassetid://133126105159507", -- eardeer 3s: the salvo voice
     tail_strobe = "rbxassetid://92069275413514", -- jon-sizzle-c3-canyon-v6: 0.8s sizzle body, vast dark returns, lows shaved
     burst_peony = {
         "rbxassetid://89225206152876", -- burst-aerial-1
@@ -241,6 +332,12 @@ BurstStyles.SOUNDS = {
         "rbxassetid://84490753811521",
         "rbxassetid://110252668535781",
         "rbxassetid://108527933513449", -- report-jakub
+    },
+    -- ⚠ PLACEHOLDER until the whistle uploads land (whistle-whizzer-1.wav 0.97s and
+    -- whistle-element.wav 1.03s are cut and measured, owner to upload): the whizzer act
+    -- borrows one aerial clip so the range audition isn't silent. Swap ids on upload.
+    burst_whizzer = {
+        "rbxassetid://89225206152876", -- burst-aerial-1 (STAND-IN for the whistles)
     },
     burst_kamuro = {
         "rbxassetid://89225206152876",
@@ -267,6 +364,7 @@ BurstStyles.APPLIED = {
     "lightEmission",
     "tailSound",
     "soundRole",
+    "rePops",
     "pointRule",
 }
 
@@ -331,6 +429,28 @@ local POINT_RULES: { [string]: (n: number, scatter: number, rand: () -> number) 
             frames[i] = {
                 pos = { radius * cosA, 0, radius * sinA },
                 rot = { rx, 0, rz },
+            }
+        end
+        return frames
+    end,
+
+    -- Every comet aimed somewhere different: random azimuth, tilt 45..105 degrees off
+    -- vertical (steeply up through just below horizontal). Same rotation math as circle,
+    -- with the tilt drawn per point instead of fixed.
+    wild = function(n, _scatter, rand)
+        local frames = {}
+        for i = 1, n do
+            local angleRad = math.rad(rand() * 360)
+            local tiltRad = math.rad(45 + rand() * 60)
+            local sinT, cosT = math.sin(tiltRad), math.cos(tiltRad)
+            local cosA, sinA = math.cos(angleRad), math.sin(angleRad)
+            frames[i] = {
+                pos = { 0, 0, 0 },
+                rot = {
+                    math.deg(math.atan2(sinT * sinA, cosT)),
+                    0,
+                    -math.deg(math.asin(sinT * cosA)),
+                },
             }
         end
         return frames

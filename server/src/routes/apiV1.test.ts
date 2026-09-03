@@ -905,6 +905,8 @@ describe('/api/v1', () => {
                 kiku: 4,
                 wa: 5,
                 yashi: 10,
+                kamuro: 10,
+                hotaru: 8,
             });
             expect(res.body.catalog.mortars).toEqual({
                 'mortar:S': 10,

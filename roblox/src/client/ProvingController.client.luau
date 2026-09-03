@@ -115,6 +115,10 @@ end
 local function setOpen(open: boolean)
     if open then
         gripCursor()
+        -- Night is the range's DEFAULT (owner, 2026-09-06: "getting tired of having to
+        -- switch it every time I enter") — shells are judged against a dark sky. The
+        -- button still toggles day back on for a daylight check.
+        enableNight()
     else
         releaseCursor()
         disableNight()

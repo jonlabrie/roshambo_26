@@ -132,11 +132,26 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   M tube, 10; boost 30% = fifth arm via `boost.points` + violet `kickerStreaks` rain,
   `e791ebd`). **Colorway ruling (owner, 2026-09-06): signature hues sell in the shop,
   colorways live in collections** — ao/midori/murasaki reframed as collection palette
-  material, drafts pruned (archived at `2cd90b4`). Remaining shop families on the
-  worksheet: hotaru, kamuro, dan. Launch audio: thumps are now a 3-clip seeded
-  rotation (launch-deck-1/2/3) with launch-deck-4 reserved as the **L tube's grunt**
-  (`292e978`, dormant until the first L SKU — remember it when pricing a big shell);
-  per-clip head trims measured from source WAVs (peak−35ms).
+  material, drafts pruned (archived at `2cd90b4`). **kamuro** shipped 2026-09-06
+  (`3115d8d`): the L tube's "cheap round to show off the big gun" (owner), price 10,
+  mortar:L — the first `heavy` shell (double sprites under weighted admission, spread
+  60, the eardeer boom on every break, 30% salvo kicker of 3-4 aerial salutes with
+  purpose-made flare art). **hotaru** shipped 2026-09-06 (`439aae1`: v3 floor, second-shimmer structural boost,
+  M tube, 8 -- plus the strobe re-pop machinery and rotated burst voices the audition
+  surfaced). Remaining shop family on the worksheet: dan.
+  Launch audio: thumps are a 3-clip seeded rotation (launch-deck-1/2/3) with
+  launch-deck-4 as the **L tube's grunt** (`292e978`, live via kamuro); per-clip head
+  trims measured from source WAVs (peak−35ms).
+- **The comet look is PINNED** (owner, 2026-09-06: "yes, these are the ones. Let's not
+  lose this place!"): tag `trails-approved` (= `8232c98`) is the approved ascent-trail
+  behavior for every style. Three widening strategies for a fatter L trail all failed
+  (see log 2026-09-06 "clean retreat" -- the thin comet IS the collapse of a
+  span-parallel Trail; widening un-collapses it into the band). The one untried avenue
+  for a bigger heavy ascent was a LAYERED particle comet on heavy shells, leaving the
+  Trail untouched -- BUILT and owner-approved same day (`7c96c43` + tuning `6a0974b`):
+  a dedicated Rate-driven emitter streams glow sparks behind the rising L shell
+  (rate 90, ~50 alive, ~6% of the heavy budget), colored from the ascent, doused at
+  the break. The pinned Trail is byte-untouched.
 - VFX recipe (proven on device): rising Trail comet → flash core → radial burst →
   glitter/willow, glow via LightEmission + the one global Bloom, ~500–700
   particles/shell, client-side emission (server `Emit()` does not replicate).

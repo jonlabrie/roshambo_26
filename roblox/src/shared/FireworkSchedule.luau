@@ -18,7 +18,10 @@ export type Phase = {
     share: number?, -- this burst's weight in the shell's budget
     sound: string?,
     texture: string?,
+    textures: { string }?, -- per-point pins; point i wears textures[i]
     color: { number }?,
+    colorPool: { { number } }?, -- a per-shell shuffled deck; overrides color when present
+
     edgeColor: { number }?,
     spread: number?,
     droop: boolean?,
@@ -33,6 +36,9 @@ export type Phase = {
         kicker: boolean?, -- false: this recipe's tell is structural; no star pop, no double-tap
         kickerStreaks: boolean?, -- the pop is streaks (velocity-parallel), not dots (owner: yashi)
         kickerColor: { number }?,
+        -- the kicker as a grouped volley of aerial salutes (owner, 2026-09-06); replaces
+        -- the star pop + double-tap when present. count drawn per shell, gap per shot.
+        salvo: { count: { number }, gap: { number }? }?,
     }?,
     -- fires ONLY when the shell's boost roll hits -- the structural half of a surprise
     -- (owner, 2026-09-05: wa's second concentric ring; later, salute endings)
@@ -49,7 +55,9 @@ export type Event = {
     particles: number, -- PER BREAK POINT, not per phase
     sound: string?,
     texture: string?,
+    textures: { string }?, -- per-point pins; point i wears textures[i]
     color: { number }?,
+    colorPool: { { number } }?,
     edgeColor: { number }?,
     spread: number?,
     droop: boolean?,
@@ -64,6 +72,9 @@ export type Event = {
         kicker: boolean?, -- false: this recipe's tell is structural; no star pop, no double-tap
         kickerStreaks: boolean?, -- the pop is streaks (velocity-parallel), not dots (owner: yashi)
         kickerColor: { number }?,
+        -- the kicker as a grouped volley of aerial salutes (owner, 2026-09-06); replaces
+        -- the star pop + double-tap when present. count drawn per shell, gap per shot.
+        salvo: { count: { number }, gap: { number }? }?,
     }?,
     -- fires ONLY when the shell's boost roll hits -- the structural half of a surprise
     -- (owner, 2026-09-05: wa's second concentric ring; later, salute endings)
@@ -104,7 +115,9 @@ function FireworkSchedule.compile(recipe: Recipe, budget: number): { Event }
             particles = particles,
             sound = ph.sound,
             texture = ph.texture,
+            textures = ph.textures,
             color = ph.color,
+            colorPool = ph.colorPool,
             edgeColor = ph.edgeColor,
             spread = ph.spread,
             droop = ph.droop,

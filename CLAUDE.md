@@ -37,6 +37,11 @@ A demo is live at **playroshambo.com**, running in TEST_MODE (deterministic R→
 
 `requirements.md` is the original spec — the implementation has since diverged from it (e.g., the spec says matching the World Throw is a LOSS; the code treats a match as SAFE with pot preserved). The code is generally the source of truth, **except on the World Throw rule** (see Architecture below). The game implements **US 8,025,570 B2, a patent owned by Jon Labrie**.
 
+**The R/P/S throw glyphs are ABSTRACT brand marks** — ring / bar / caret, single source
+`roblox/src/shared/Glyphs.luau`, shared with the PWA — and they appear on nearly every
+surface. Never draw new art for a concept a player already sees somewhere: read
+`docs/wiki/world/visual-identity.md` before generating any art.
+
 ## Commands
 
 Frontend (repo root):

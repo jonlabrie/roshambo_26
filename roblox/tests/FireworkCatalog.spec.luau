@@ -3,9 +3,23 @@ local harness = require("./harness")
 local describe, test, expect = harness.describe, harness.test, harness.expect
 local FireworkCatalog = require("../src/shared/FireworkCatalog")
 local FireworkSchedule = require("../src/shared/FireworkSchedule")
+local MortarPlacement = require("../src/shared/MortarPlacement")
 local fixture = require("./fixtures/fireworkShells")
 
 describe("FireworkCatalog — the other half of the contract", function()
+    test("A HEAVY CATALOG SHELL LIVES IN THE L TUBE", function()
+        -- recipe.heavy doubles the particle budget under weighted admission; the class
+        -- exists FOR the L tube. A heavy S/M shell would be a budget cheat wearing a flag.
+        for id, recipe in FireworkCatalog.RECIPES do
+            if (recipe :: any).heavy then
+                if MortarPlacement.SHELL_MORTAR[id] ~= "mortar:L" then
+                    error(`catalog shell '{id}' declares heavy but is not a mortar:L shell`)
+                end
+                expect(MortarPlacement.SHELL_MORTAR[id]).toBe("mortar:L")
+            end
+        end
+    end)
+
     test("EVERY SHELL THE SERVER CAN SELL HAS A RECIPE", function()
         -- The gate this fixture exists for. A shell in the shop with no recipe here is a blank sky
         -- — no error, no log, and nobody would think to look for it.

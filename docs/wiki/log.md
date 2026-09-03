@@ -3476,3 +3476,94 @@ colorway ruling reframes ao/midori/murasaki as collection palette material --
 families pruned, archived at `2cd90b4`. Worksheet remainder: hotaru, kamuro,
 dan. Dev backend redeployed (App Runner op 6032e84c). Server suite green
 (one socketAdapter identity-claim flake observed, passed on rerun).
+
+## [2026-09-06] built | The salute class, first-class -- and the L budget weight
+
+A day of owner-driven iteration on kamuro ("not flashy enough"):
+(1) boost.salvo machinery -- N flash-and-bang salutes, variable grouping, each
+its own eagerly-pooled voice (count 1..8 validated; 3-4 kamuro, 5-8 reserved
+for standalone salute shells); eardeer explosion cuts as the voices (3.5s
+slap-echo single = every kamuro break's boom, 3s rolloff = salvo voice).
+(2) Purpose-made flare art ("salutes are a first class effect") -- four
+seeded-numpy star textures (make_salute_flares.py), noisy-edged at owner
+request, uploaded via the Studio MCP's upload_image (images only -- audio/mesh
+stay owner uploads), shuffled+rotated per shot from the seeded stream.
+(3) First-salvo pileup fixed: lazy voices played before their clip bound and
+the engine released all booms at once, late (owner reproduced 6x); voices now
+eager with preassigned clip, IsLoaded guard, deduped priority preloader.
+(4) THE L CLASS: recipe.heavy doubles the particle budget under WEIGHTED
+ADMISSION (2 concurrency slots) -- sky total capped at the measured floor;
+heavy-must-be-mortar:L fixture-enforced. Kamuro: heavy, spread 60, streaks
++50%, salvo in the falling crown. Owner: "looking and sounding good."
+Also: proving panel now opens at night (owner default), drive-by rng lockstep
+fix (double-tap draw was inside the per-client audio gate).
+
+## [2026-09-06] shipped | Kamuro: the L tube's cheap round
+
+Owner: "an inexpensive shell for the large tube -- a cheap round to show off
+the big gun." Price 10, mortar:L, five guarded steps run (`3115d8d`), kamuro
+draft family pruned. First shell of the heavy class -- weighted-admission
+budget, L grunt launch, always-boom break, salvo kicker -- all live in one
+SKU. Dev backend redeployed (op 962b864b). Worksheet remainder: hotaru, dan.
+
+## [2026-09-06] shipped | The pity ramp -- bounded droughts on every boosted shell
+
+The owner lived the flat-30% failure mode (0 boosts in 10 kamuro, filed as a
+bug; a live rng tap proved the math healthy -- 3 boosted in the next 13,
+matching 3 kickers seen) and ruled: add a pity ramp. `c92a6ee`: each miss
+adds half the base chance (30 -> 45/60/75/90/100; worst drought 5), hit
+resets to the recipe's floor. Pure BoostLuck.luau; server-side per-player
+per-shell streaks (session-lived); verdict in the launch payload -- all
+clients render the same luck; proving range deliberately stays on the raw
+floor. Applies to every boosted shell automatically (kiku, wa, yashi, kamuro).
+
+## [2026-09-06] reverted | The fat L trail: three geometry strategies, three failures, clean retreat
+
+Attempted to double heavy shells' comet width. What was learned, at the cost
+of an hour of owner-in-the-loop darts: a Trail draws its FULL attachment span
+as width, so span-parallel-to-motion collapses to a hairline (segments
+overlap collinearly -- this overlap IS the shipped thin-comet look), any
+fixed tilt unfolds the band, per-frame exact tangency reads near-invisible,
+and FaceCamera + perpendicular span produced "ridiculously huge ribbons
+across all styles" (mechanism NOT understood -- do not retry blind).
+All four commits reverted (`fbe1014..8e988ed`); shipped look restored.
+PARKED as a design item: a bigger heavy ascent probably wants a different
+tool -- e.g. a per-slot particle-emitter comet for heavy shells -- and a
+Studio session with screenshots, not live iteration on a player's evening.
+
+## [2026-09-06] shipped | The heavy comet layer -- the L ascent reads big without touching the Trail
+
+After the three-failure retreat, the layered approach worked first try: a
+dedicated Rate-driven emitter (the system's only one) streams burning-debris
+sparks behind the rising heavy shell; the pinned trails-approved Trail is
+untouched. Owner-tuned in one pass (rate 90, size 0.45->0.12, fall -18) and
+approved: "looking good. ship it." `7c96c43`, `6a0974b`.
+
+## [2026-09-06] shipped | Hotaru: the firefly, and the strobe finds its voice
+
+Worksheet session closed three audio defects before the ship: (1) multi-burst
+shells were cutting their own booms -- the "one Sound per slot, phases never
+overlap" assumption died silently with multi-burst recipes; three rotated
+burst voices per slot now (`6db5ef4`, dan un-muted as a side effect);
+(2) re-pops: the strobe's flicker waves each get a soft report on the middle
+rising edges (0.22/0.46 of life; the last wave belongs to the sizzle --
+a third pop there read as "extra" and was trimmed, `60a7558`); (3) add-on
+spacing: the boosted second cloud waits 0.9s (was 0.5). Rulings: v3 floor
+(spread 48), the structural second cloud with its own sizzle IS the kicker,
+M tube (comet automatic), price 8. Five steps run (`439aae1`), drafts pruned
+-- ONLY DAN remains on the worksheet. Dev backend op de6d2346.
+
+## [2026-09-06] correction | Invented glyphs ripped out; the canonical marks fly instead
+
+A session generated literal rock/paper/scissors sprites for dan's glyph act
+while the approved marks (ring/bar/caret, `Glyphs.luau`, shared with the PWA,
+on the buttons/drum/lanterns) sat in the repo. Owner: "there are approved
+versions of the RPS glyphs literally all over this experience. Get rid of this
+crap" -- and the process question: why isn't this front and center in what a
+new session grounds on? Answer: it wasn't anywhere. Fixed both layers: dan now
+pins Glyphs.IMAGE cores (aliased as BurstStyles.TEXTURES.glyph_R/P/S,
+preloader-warmed); the invented art and generator are deleted (three orphaned
+uploads: 125188469013966 / 116127703739592 / 91746777964130); and
+world/visual-identity.md now exists, linked READ-BEFORE-MAKING-ART from the
+index, with a CLAUDE.md pointer -- plus the general rule: search before
+generate, always.

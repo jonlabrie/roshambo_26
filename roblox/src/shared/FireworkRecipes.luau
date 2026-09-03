@@ -30,6 +30,13 @@ function FireworkRecipes.validate(recipe: any): (boolean, string?)
     if typeof(recipe) ~= "table" or typeof(recipe.phases) ~= "table" or #recipe.phases == 0 then
         return false, "a recipe is a table with a non-empty phases array"
     end
+    -- heavy (owner, 2026-09-06: L shells "really need to be impressive"): the shell emits
+    -- at WEIGHT_HEAVY x the particle budget and is charged that many admission slots, so
+    -- the weighted sky total the mobile floor was measured against never grows. Catalog
+    -- heavies must live in the L tube -- FireworkCatalog.spec holds that line.
+    if recipe.heavy ~= nil and typeof(recipe.heavy) ~= "boolean" then
+        return false, "heavy must be a boolean"
+    end
     local prevAt = 0
     for i, ph in recipe.phases :: { any } do
         if typeof(ph) ~= "table" then
@@ -60,6 +67,38 @@ function FireworkRecipes.validate(recipe: any): (boolean, string?)
         for _, key in { "color", "edgeColor" } do
             if ph[key] ~= nil and not validColor(ph[key]) then
                 return false, `phase {i}: '{key}' must be three numbers in 0..255`
+            end
+        end
+        -- textures (owner, 2026-09-06, dan's triple glyph bloom): per-POINT texture pins
+        -- -- point i wears textures[i], falling back to the phase texture / style role.
+        if ph.textures ~= nil then
+            if ph.kind ~= "burst" then
+                return false, `phase {i}: textures is burst-only`
+            end
+            if typeof(ph.textures) ~= "table" or #ph.textures < 1 or #ph.textures > 8 then
+                return false, `phase {i}: textures must be 1..8 asset strings`
+            end
+            for _, t in ph.textures :: { any } do
+                if typeof(t) ~= "string" or t == "" then
+                    return false, `phase {i}: textures entries must be non-empty strings`
+                end
+            end
+        end
+        -- colorPool (owner, 2026-09-06, dan's act one): a deck of colors the shell draws
+        -- from per phase -- shuffled once per shell (seeded, so every client deals the same
+        -- hand), consumed in phase order, wrapping if phases outnumber colors. Overrides
+        -- color/edgeColor; the edge derives from the drawn core (lightened toward white).
+        if ph.colorPool ~= nil then
+            if ph.kind ~= "burst" then
+                return false, `phase {i}: colorPool is burst-only`
+            end
+            if typeof(ph.colorPool) ~= "table" or #ph.colorPool < 2 or #ph.colorPool > 8 then
+                return false, `phase {i}: colorPool must be 2..8 colors`
+            end
+            for _, c in ph.colorPool :: { any } do
+                if not validColor(c) then
+                    return false, `phase {i}: colorPool entries must be three numbers in 0..255`
+                end
             end
         end
         local staged = {
@@ -143,6 +182,43 @@ function FireworkRecipes.validate(recipe: any): (boolean, string?)
                 -- (owner, 2026-09-05: yashi's violet center kicker "is also streaks, not stars").
                 if b.kickerStreaks ~= nil and typeof(b.kickerStreaks) ~= "boolean" then
                     return false, `phase {i}: boost.kickerStreaks must be a boolean`
+                end
+                -- salvo (owner, 2026-09-06): the kicker as a GROUPING of aerial salutes --
+                -- count drawn per lucky shell, gaps drawn per shot ("variable grouping").
+                -- Replaces the star pop + double-tap when present. Count admits 1..8: 3-4
+                -- is kamuro's kicker, 5-8 reserved for standalone salute shells.
+                if b.salvo ~= nil then
+                    local s = b.salvo
+                    if typeof(s) ~= "table" then
+                        return false, `phase {i}: boost.salvo must be a table`
+                    end
+                    local c = s.count
+                    if
+                        typeof(c) ~= "table"
+                        or typeof(c[1]) ~= "number"
+                        or typeof(c[2]) ~= "number"
+                        or c[1] % 1 ~= 0
+                        or c[2] % 1 ~= 0
+                        or c[1] < 1
+                        or c[2] > 8
+                        or c[1] > c[2]
+                    then
+                        return false, `phase {i}: boost.salvo.count must be an ordered integer pair in 1..8`
+                    end
+                    local g = s.gap
+                    if
+                        g ~= nil
+                        and (
+                            typeof(g) ~= "table"
+                            or typeof(g[1]) ~= "number"
+                            or typeof(g[2]) ~= "number"
+                            or g[1] < 0.05
+                            or g[2] > 1
+                            or g[1] > g[2]
+                        )
+                    then
+                        return false, `phase {i}: boost.salvo.gap must be an ordered seconds pair in 0.05..1`
+                    end
                 end
             end
             -- boostOnly (owner, 2026-09-05): the structural half of a surprise -- a phase that

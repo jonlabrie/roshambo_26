@@ -102,6 +102,73 @@ describe("FireworkRecipes.validate — the one recipe schema", function()
         expect(FireworkRecipes.validate(onAscent)).toBe(false)
     end)
 
+    test("a salvo kicker is bounded: count int pair 1..8 ordered, gap pair 0.05..1", function()
+        local r = goodRecipe()
+        r.phases[3].boost = { chance = 0.3, salvo = { count = { 3, 4 } } }
+        expect(FireworkRecipes.validate(r)).toBe(true)
+        local withGap = goodRecipe()
+        withGap.phases[3].boost = { chance = 0.3, salvo = { count = { 3, 4 }, gap = { 0.12, 0.42 } } }
+        expect(FireworkRecipes.validate(withGap)).toBe(true)
+        local cases: { any } = {
+            true, -- not a table
+            {}, -- no count
+            { count = { 0, 4 } }, -- below 1
+            { count = { 3, 9 } }, -- above 8
+            { count = { 4, 3 } }, -- unordered
+            { count = { 2.5, 4 } }, -- not an integer
+            { count = { 3, 4 }, gap = { 0.42, 0.12 } }, -- unordered gap
+            { count = { 3, 4 }, gap = { 0, 0.3 } }, -- gap below floor
+            { count = { 3, 4 }, gap = { 0.3, 2 } }, -- gap above ceiling
+        }
+        for _, salvo in cases do
+            local bad = goodRecipe()
+            bad.phases[3].boost = { chance = 0.3, salvo = salvo }
+            expect(FireworkRecipes.validate(bad)).toBe(false)
+        end
+    end)
+
+    test("colorPool is a burst-only deck of 2..8 valid colors", function()
+        local r = goodRecipe()
+        r.phases[3].colorPool = { { 170, 60, 255 }, { 60, 255, 110 }, { 70, 150, 255 } }
+        expect(FireworkRecipes.validate(r)).toBe(true)
+        local cases: { any } = {
+            { { 170, 60, 255 } }, -- one color is not a pool
+            { { 170, 60, 255 }, { 60, 999, 110 } }, -- invalid color
+            "violet", -- not a table
+        }
+        for _, pool in cases do
+            local bad = goodRecipe()
+            bad.phases[3].colorPool = pool
+            expect(FireworkRecipes.validate(bad)).toBe(false)
+        end
+        local onAscent = goodRecipe();
+        (onAscent.phases[2] :: any).colorPool = { { 170, 60, 255 }, { 60, 255, 110 } }
+        expect(FireworkRecipes.validate(onAscent)).toBe(false)
+    end)
+
+    test("textures is a burst-only per-point pin list of 1..8 asset strings", function()
+        local r = goodRecipe()
+        r.phases[3].textures = { "rbxassetid://1", "rbxassetid://2", "rbxassetid://3" }
+        expect(FireworkRecipes.validate(r)).toBe(true)
+        for _, bad in { {}, { "" }, { "rbxassetid://1", 2 }, "rbxassetid://1" } :: { any } do
+            local b = goodRecipe()
+            b.phases[3].textures = bad
+            expect(FireworkRecipes.validate(b)).toBe(false)
+        end
+        local onAscent = goodRecipe();
+        (onAscent.phases[2] :: any).textures = { "rbxassetid://1" }
+        expect(FireworkRecipes.validate(onAscent)).toBe(false)
+    end)
+
+    test("heavy is an optional boolean -- the L-class budget weight", function()
+        local r = goodRecipe();
+        (r :: any).heavy = true
+        expect(FireworkRecipes.validate(r)).toBe(true)
+        local bad = goodRecipe();
+        (bad :: any).heavy = 2
+        expect(FireworkRecipes.validate(bad)).toBe(false)
+    end)
+
     test("EVERY SHIPPED CATALOG RECIPE PASSES — one schema, not two", function()
         for id, recipe in FireworkCatalog.RECIPES do
             local ok, err = FireworkRecipes.validate(recipe)

@@ -9,106 +9,95 @@
 -- the server price it. Every entry here is schema-checked by FireworkDrafts.spec against
 -- FireworkRecipes, so a typo fails `lune run tests/run` rather than rendering a blank sky.
 -- Pure data + string parsing, no Roblox globals; runs under Lune.
+local BurstStyles = require("./BurstStyles")
+
 local FireworkDrafts = {}
-
--- 蛍 hotaru, strobe: a hanging cloud that flickers. The ladder varies spread.
-local function hotaru(spread: number)
-    return {
-        phases = {
-            { at = 0.0, kind = "report", anchor = "origin" },
-            { at = 0.02, kind = "ascent", anchor = "origin", color = { 210, 225, 245 } },
-            {
-                at = 3.0,
-                kind = "burst",
-                anchor = "apex",
-                style = "strobe",
-                color = { 235, 245, 255 },
-                edgeColor = { 180, 220, 255 },
-                spread = spread,
-                droop = false,
-            },
-        },
-    }
-end
-
--- 黄金 kamuro, golden crown: long heavy drooping arms. The ladder varies burst hang time.
-local function kamuro(burstAt: number)
-    return {
-        phases = {
-            { at = 0.0, kind = "report", anchor = "origin" },
-            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 200, 120 } },
-            {
-                at = burstAt,
-                kind = "burst",
-                anchor = "apex",
-                style = "kamuro",
-                color = { 255, 170, 40 },
-                edgeColor = { 255, 220, 140 },
-                droop = false,
-            },
-        },
-    }
-end
 
 -- Colorway ruling (owner, 2026-09-06): signature hues sell in the shop, colorways live in
 -- COLLECTIONS. The ao/midori/murasaki hue families that auditioned here were reframed as
 -- collection palette material and pruned -- git history is the archive (last present at
 -- commit 2cd90b4, with the ao and shapeTrio helpers).
-FireworkDrafts.FAMILIES = {
-    hotaru = {
-        v1 = hotaru(24),
-        v2 = hotaru(36),
-        v3 = hotaru(48),
-    },
-    kamuro = {
-        v1 = kamuro(2.8),
-        v2 = kamuro(3.0),
-        v3 = kamuro(3.2),
-    },
-    dan = {
-        v1 = {
-            phases = {
-                { at = 0.0, kind = "report", anchor = "origin" },
-                {
-                    at = 0.02,
-                    kind = "ascent",
-                    anchor = "origin",
-                    color = { 255, 214, 130 },
-                },
-                {
-                    at = 3.0,
-                    kind = "burst",
-                    anchor = "apex",
-                    color = { 255, 190, 90 },
-                    edgeColor = { 200, 100, 50 },
-                    spread = 30,
-                    droop = false,
-                    share = 2,
-                },
-                {
-                    at = 3.6,
-                    kind = "burst",
-                    anchor = "apex",
-                    style = "strobe",
-                    color = { 235, 245, 255 },
-                    edgeColor = { 180, 220, 255 },
-                    points = 5,
-                    scatter = 9,
-                    droop = false,
-                    share = 1,
-                },
-                {
-                    at = 4.5,
-                    kind = "burst",
-                    anchor = "apex",
-                    style = "kamuro",
-                    color = { 255, 170, 40 },
-                    edgeColor = { 255, 220, 140 },
-                    droop = false,
-                    share = 1,
-                },
+-- 段 dan, the three-act show (owner design 2026-09-06): act one, four SMALL peonies in
+-- colors dealt per shell from this five-color deck; acts two and three below. L + heavy.
+local DAN_COLORS = {
+    { 170, 60, 255 }, -- violet
+    { 60, 255, 110 }, -- green
+    { 70, 150, 255 }, -- blue
+    { 255, 160, 60 }, -- orange
+    { 255, 60, 50 }, -- red
+}
+-- The bloom deals from ITS OWN copy of the full palette (owner, 2026-09-06: "all the
+-- colors we currently have"): a distinct table, because decks are keyed by pool
+-- identity -- sharing DAN_COLORS would hand the bloom whatever fifth color act one
+-- happened to leave, not an independent draw.
+local DAN_BLOOM_COLORS = table.clone(DAN_COLORS)
+
+-- Act redesign 2026-09-06 (owner, superseding the whizzer act same day): act two is
+-- three CLUSTERS OF THROW GLYPHS -- the CANONICAL ring/bar/caret marks from
+-- shared/Glyphs.luau, one texture pin per phase --
+-- that fall and then FLICKER into the shimmer (glyphfall's transparency curve carries
+-- the act-two-to-three transition per glyph; whizzers stay in the vocabulary for a
+-- future shell). The ladder varies ACT-ONE SEPARATION -- the owner's note: the small
+-- peonies "should be spread out" -- via scatter (each mini-peony's single break point
+-- lands that far from the apex), with glow 1.5 for the brightness note.
+local function dan(separation: number, boost: any?)
+    local function act1(at: number)
+        return {
+            at = at,
+            kind = "burst",
+            anchor = "apex",
+            colorPool = DAN_COLORS,
+            spread = 22, -- "smaller versions of our peony burst"
+            scatter = separation,
+            glow = 1.5,
+            droop = false,
+            share = 2, -- doubled 2026-09-06 (owner: act-one peonies barely visible)
+        }
+    end
+    local function glyphBloom(at: number, boostArg: any?)
+        return {
+            at = at,
+            kind = "burst",
+            anchor = "apex",
+            style = "glyphfall",
+            points = 3,
+            textures = {
+                BurstStyles.TEXTURES.glyph_R,
+                BurstStyles.TEXTURES.glyph_P,
+                BurstStyles.TEXTURES.glyph_S,
             },
+            -- One draw per SHELL colors the whole bloom (colorPool is phase-level; the
+            -- three arms differ by texture, not color): all violet this shell, all
+            -- orange the next (owner, 2026-09-06: the full palette).
+            colorPool = DAN_BLOOM_COLORS,
+            spread = 40,
+            droop = false,
+            share = 4,
+            boost = boostArg,
+        }
+    end
+    return {
+        heavy = true,
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin" },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 214, 130 } },
+            act1(3.0),
+            act1(3.25),
+            act1(3.5),
+            act1(3.75),
+            glyphBloom(4.8, boost),
         },
+    }
+end
+
+FireworkDrafts.FAMILIES = {
+    dan = {
+        v1 = dan(16),
+        v2 = dan(26),
+        v3 = dan(36),
+        -- BOOST PREVIEW at chance = 1: the encore -- a 3-4 salute salvo as the glyph
+        -- shimmer fades. Deleted at promotion.
+        boosted = dan(26, { chance = 1, salvo = { count = { 3, 4 } } }),
     },
 } :: { [string]: { [string]: any } }
 
