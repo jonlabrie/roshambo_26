@@ -583,3 +583,14 @@ native to the canyon where literal drones would not be.
 - Monetization interlock: the banked "shared show" SKU (buy the whole server a finale)
   is made for this; the personalized face show sits above it as ultra-premium.
 - Interlock: hotaru is already the shelf's firefly (蛍); naming/lore should connect.
+
+## Rooftop MC experience (banked 2026-09-06)
+
+**Owner design:** players will "buy or win access" to the Hanabiya rooftop battery and
+"a proving-ground-like console that lets them MC some fireworks until they're out of
+time or points. It will be a peak experience in the place." Access likely a ladder
+climbing through the roof onto the platform -- NOT built yet, deliberately, so access
+stays gateable; the platform's back-rail gap (x 5.5..9.1) is the reserved hatch spot.
+The platform (assets/HanabiyaRooftop.model.json) is sized for 3 players + a console
+footprint + the three-tube battery. The proving panel's mode set (Fire/Ladder/Seq/
+Boost, 2026-09-06) is the natural seed for the MC console's verbs.

@@ -3446,3 +3446,16 @@ Owner's better path: "a drone swarm" -- per-entity positions render arbitrary
 imagery -- themed as the canyon's own fireflies, built as an occasional
 display mode of the coming ambient-firefly system, one pool serving both.
 Banked in backlog with full restart context.
+
+## [2026-09-06] built | Proving modes for shipped shells; the Hanabiya rooftop battery
+
+Housecleaning session: (1) shipped shells regained Ladder/Seq and gained
+BOOST (forced lucky roll via RequestProvingFire's new Studio-only flag)
+(`4b8d169`); (2) rack scatter agreed: owner will place four of the five
+bridge racks around the canyon in Studio, then their CFrames get read out
+and codified into ProvingGround.model.json -- PENDING owner placement;
+(3) the arena's overhead-burst complaint fixed structurally (`2f339d0`):
+new Rojo asset HanabiyaRooftop -- railed platform over the shop ridge,
+three real CSG tubes stood at boot on tagged mounts, public gear launches
+fire from the nearest battery muzzle within 140 studs. Rooftop MC
+experience banked in backlog (access deliberately unbuilt = gateable).
