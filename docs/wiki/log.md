@@ -3595,3 +3595,10 @@ reaches exactly 1 when the flight completes, so the earlier silence was rate, no
 Applied in the open place and on the branch; 1825 Lune tests green. The "relatively rare"
 ruling of earlier the same day is superseded.
 
+## [2026-09-03] decision | Default familiar is the mejiro; the uguisu stays the falls-dock bird
+
+Superseding the Uguisu flip from earlier today: "the uguisu is a special bird for the falls
+dock area (for now, at least) so let's make the white-eyed warbler the default for now."
+`SPECIES` = Mejiro (registered with three clips, its own body length and the uguisu's seat
+nudge; meshes declared in `default.project.json`). Applied in the open place and on the branch.
+
