@@ -144,8 +144,11 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   "right above kamuro... there's some Roshambo promo built in"). New vocabulary built
   for it: colorPool decks, per-point texture pins, the point-rotation fix for
   overlapping phases, the star-size floor; the whizzer style + wild point rule wait
-  unused for a future shell; the random BONUS shell was removed. **THE WORKSHEET IS
-  EMPTY** -- all judged families shipped or moved to collections.
+  unused for a future shell; the random BONUS shell was removed. **rai** and **banrai** shipped 2026-09-06 (`dd0d1ce`, the first NO-AUDITION
+  promotion, owner-delegated): the salute class standalone -- 雷 rai (S, 4; 3-4 bangs)
+  and 万雷 banrai (M, 7; 6-8 bangs), a small pop carrying an always-on salvo
+  (chance = 1). **THE WORKSHEET IS EMPTY** -- all judged families shipped or moved to
+  collections. Twelve shells on the shelf.
   Launch audio: thumps are a 3-clip seeded rotation (launch-deck-1/2/3) with
   launch-deck-4 as the **L tube's grunt** (`292e978`, live via kamuro); per-clip head
   trims measured from source WAVs (peak−35ms).

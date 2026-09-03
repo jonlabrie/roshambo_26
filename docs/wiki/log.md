@@ -3489,3 +3489,16 @@ Owner saved and published the place: ten shells (janken at the top), the
 thump ladder, salvo art, pity ramp, rooftop battery, scattered stations and
 fuse variance are all LIVE. Morning decision pending: a little more fireworks
 vs the onboarding pass ("onboarding is critical soon").
+
+## [2026-09-06] shipped | Rai and banrai -- the salute class standalone, first no-audition promotion
+
+Owner delegation ("you have sufficient context... I don't need to see them to
+approve"): 雷 rai (S, 4; 3-4 bangs) and 万雷 banrai (M, 7; 6-8 bangs, wider
+gap so the barrage rolls). Design: small warm pop carrying boost chance = 1
+-- the salvo IS the payload, always; the pity ramp holds certainty; the
+reserved 5-8 count range and eighth salvo voice debut. `dd0d1ce`, dev op
+89428d27. Twelve shells on the shelf. Salute vocabulary CLOSED as a class:
+kamuro kicker, janken encore, rai/banrai standalone. Prices provisional.
+NOTE: shells reach the live place's players on next publish (server already
+sells them; the published client renders them fine -- recipes ship in
+ReplicatedStorage... NO: recipes are Luau in the place. Next publish needed.)
