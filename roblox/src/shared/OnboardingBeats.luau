@@ -87,7 +87,7 @@ OnboardingBeats.BEATS = {
         event = "modelArrival",
         -- "20 points" mirrors PRICES.starter in server/src/economy.ts — a price change there
         -- must update the copy here too (see the matching comment on that constant).
-        copy = "A teahouse of your very own — 20 points. Every win gets you closer.",
+        copy = "A small teahouse of your own costs 20 points.",
         anchor = "tour",
     },
 } :: { Beat }
