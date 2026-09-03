@@ -63,7 +63,9 @@ FireworkDrafts.FAMILIES = {
                     boost = { chance = 1, kicker = false },
                 },
                 {
-                    at = 3.5,
+                    -- 0.9s behind the first (was 0.5; owner, 2026-09-06: "a little more
+                    -- time between the two shimmers so it reads as an 'add-on'").
+                    at = 3.9,
                     kind = "burst",
                     anchor = "apex",
                     style = "strobe",
