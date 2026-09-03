@@ -3471,3 +3471,14 @@ Renames: A/B/C/D/E -> north arena / bridge / upper north / mid pool / hi west
 two-down). The server now fires along each station's own axis with a heading,
 so the rail-mounts ballistics carry the owner's aim. Future public access =
 jukebox queueing, banked. Ladder mode is now a five-point canyon-wide volley.
+
+## [2026-09-06] gated | Rooftop battery aimed and gated; the housecleaning day closes
+
+Owner ground-gated the platform ("looks good"), then aimed the guns: mounts
+lean 16 deg north over the arena (fanned, LaunchApex 85 via new per-launch
+apexHeight payload field), mid pool lifted to LaunchApex 115 (bursts sat AT
+bridge height). Panel grammar settled: Fire = selected volley, Ladder = the
+walk (selected stations in order, 0.7s beats), Seq = clean-air repeats on the
+selection, Boost = forced luck; "hanabiya roof" is the virtual sixth station.
+Fuse variance (+-6% seeded per shell) ended lockstep volleys. All owner-gated
+live. PENDING: place publish carries everything to players.
