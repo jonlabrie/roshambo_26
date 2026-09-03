@@ -4,37 +4,76 @@
 -- before they know what a win is. Bones, not a tutorial: the owner is narrating in person.
 --
 -- There is deliberately NO beat about movement or exploration. The HUD is designed to
--- de-emphasise movement, and a beat pointing at the thumbstick would undo that.
+-- de-emphasise movement DURING PLAY; tour beats direct travel between stops, which is a tour's
+-- job, but none of them may point at the thumbstick itself.
 local OnboardingBeats = {}
 
-export type Beat = { id: string, event: string, copy: string, anchor: string }
+export type Beat = {
+    id: string,
+    event: string,
+    copy: string,
+    anchor: string,
+    -- The welcome's tap-through pages (copy == pages[1]); nil for every single-card beat.
+    pages: { string }?,
+    -- The tour's advance-through hook: an event arriving while THIS beat's card is still up
+    -- normally drops (never stack) — but if it equals advanceOn, the controller dismisses this
+    -- card (the guest has plainly done the thing) and shows the next. Without it a guest who
+    -- launched before dismissing "follow the light to the river" would strand the tour: the
+    -- modelDoor beat would report "dropped" and shellLaunched may never fire again.
+    advanceOn: string?,
+}
+
+-- The welcome sequence (owner, 2026-09-03): the one deliberate exception to "never read
+-- ahead" — a cold F&F guest needs the core context at join. Three pages, one tap each:
+-- the new kind of RPS / the world throw's source + streaks / what points are for.
+local WELCOME_PAGES = {
+    "This is Roshambo — Rock, Paper, Scissors, but you're playing against the whole world at once.",
+    "Every minute the big drum throws what most of the world picked. Beat it and your pile grows — every win in a row triples it. Read the crowd.",
+    "Bank your points and they're yours — for fireworks, and one day a teahouse of your own. The drum's about to throw.",
+}
 
 OnboardingBeats.BEATS = {
-    { id = "drum", event = "join", copy = "The drum throws every minute. Beat it.", anchor = "drum" },
-    { id = "throw", event = "throwsUnlocked", copy = "Tap a throw.", anchor = "throwArea" },
+    { id = "welcome", event = "join", copy = WELCOME_PAGES[1], pages = WELCOME_PAGES, anchor = "drum" },
+    { id = "throw", event = "throwsUnlocked", copy = "Pick your throw — tap one.", anchor = "throwArea" },
     {
         id = "win",
         event = "win",
-        copy = "You won. Take it, or ride it — a win triples your pot.",
-        -- Was "choiceOverlay": the blocking RISK/BANK overlay this pointed at was withdrawn
-        -- (spec "Decisions taken" #6/7) and replaced by the persistent pot indicator in the slot
-        -- above the throw row. Renamed to name what is actually on screen today.
+        copy = "You won! Every win triples your pile — or BANK THESE keeps it forever.",
         anchor = "potIndicator",
     },
-    -- Was anchored "plate": the plate moved into the bottom row (spec §2, 2026-08-03) and is
-    -- normally hidden, so a card can no longer point at where it used to sit. "wallet" names what
-    -- this beat actually explains — the balance the plate displays — not a screen position.
-    --
-    -- Was "Banked. That's yours to keep." — the hamburger was deleted and the round-timer ring
-    -- inherited its two-stage gesture (spec §6, Task 5), but a ring that looks like a readout
-    -- does not invite a tap. The bank TOAST already says "banked" (main.client.luau), so this
-    -- beat's copy no longer needs to; its job is teaching the gesture, at the moment it becomes
-    -- useful — the first time there is a balance worth checking.
     {
         id = "bank",
         event = "bank",
-        copy = "Tap the clock for your points. Tap again for everything.",
+        copy = "Yours forever! Tap the clock to see your points. Tap again for everything.",
         anchor = "wallet",
+    },
+    -- ===== The tour (spec §2/§4): earned by banking, walked by the beam =====
+    {
+        id = "shopDoor",
+        event = "bankDismissed",
+        copy = "Points buy fireworks. Follow the light!",
+        anchor = "tour",
+        advanceOn = "shellBought",
+    },
+    {
+        id = "launchDoor",
+        event = "shellBought",
+        copy = "A firecracker! Follow the light to the river.",
+        anchor = "tour",
+        advanceOn = "shellLaunched",
+    },
+    {
+        id = "modelDoor",
+        event = "shellLaunched",
+        copy = "Beautiful. One more stop — follow the light.",
+        anchor = "tour",
+        advanceOn = "modelArrival",
+    },
+    {
+        id = "modelHome",
+        event = "modelArrival",
+        copy = "A teahouse of your very own — 20 points. Every win gets you closer.",
+        anchor = "tour",
     },
 } :: { Beat }
 
