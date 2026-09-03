@@ -69,6 +69,21 @@ function FireworkRecipes.validate(recipe: any): (boolean, string?)
                 return false, `phase {i}: '{key}' must be three numbers in 0..255`
             end
         end
+        -- textures (owner, 2026-09-06, dan's triple glyph bloom): per-POINT texture pins
+        -- -- point i wears textures[i], falling back to the phase texture / style role.
+        if ph.textures ~= nil then
+            if ph.kind ~= "burst" then
+                return false, `phase {i}: textures is burst-only`
+            end
+            if typeof(ph.textures) ~= "table" or #ph.textures < 1 or #ph.textures > 8 then
+                return false, `phase {i}: textures must be 1..8 asset strings`
+            end
+            for _, t in ph.textures :: { any } do
+                if typeof(t) ~= "string" or t == "" then
+                    return false, `phase {i}: textures entries must be non-empty strings`
+                end
+            end
+        end
         -- colorPool (owner, 2026-09-06, dan's act one): a deck of colors the shell draws
         -- from per phase -- shuffled once per shell (seeded, so every client deals the same
         -- hand), consumed in phase order, wrapping if phases outnumber colors. Overrides

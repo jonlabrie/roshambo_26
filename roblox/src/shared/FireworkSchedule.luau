@@ -18,6 +18,7 @@ export type Phase = {
     share: number?, -- this burst's weight in the shell's budget
     sound: string?,
     texture: string?,
+    textures: { string }?, -- per-point pins; point i wears textures[i]
     color: { number }?,
     colorPool: { { number } }?, -- a per-shell shuffled deck; overrides color when present
 
@@ -54,6 +55,7 @@ export type Event = {
     particles: number, -- PER BREAK POINT, not per phase
     sound: string?,
     texture: string?,
+    textures: { string }?, -- per-point pins; point i wears textures[i]
     color: { number }?,
     colorPool: { { number } }?,
     edgeColor: { number }?,
@@ -113,6 +115,7 @@ function FireworkSchedule.compile(recipe: Recipe, budget: number): { Event }
             particles = particles,
             sound = ph.sound,
             texture = ph.texture,
+            textures = ph.textures,
             color = ph.color,
             colorPool = ph.colorPool,
             edgeColor = ph.edgeColor,

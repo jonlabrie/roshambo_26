@@ -407,7 +407,20 @@ local function transparencyOf(style: BurstStyles.Style): NumberSequence
     return seq
 end
 
-local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random, lifeScale: number)
+-- `pointOffset` rotates which pooled point/emitter each frame claims (wrapping over
+-- 1..MAX_POINTS-1; index MAX_POINTS is the kicker/flash reserve). Overlapping burst
+-- phases used to ALL start at point 1, and emitter properties are live-evaluated -- so
+-- a staggered phase REWROTE the airborne particles of the one before it, texture
+-- included (owner, 2026-09-06: dan's three glyph clusters all turned into "the same
+-- paper glyph" and faded early). Returns the frame count so the caller advances.
+local function fireBurst(
+    slot: Slot,
+    ev: any,
+    anchorPos: Vector3,
+    rng: Random,
+    lifeScale: number,
+    pointOffset: number
+): number
     -- `frames` are the style's point rule turning ev.points into per-part placement/orientation —
     -- ring/kamuro's rules always collapse to a single frame, so this iterates #frames, NOT
     -- ev.points: one part cannot stand in for eight positions in one frame.
@@ -480,12 +493,15 @@ local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random, l
     local transparency = transparencyOf(style)
 
     for i, f in frames do
-        local p, em = slot.points[i], slot.emitters[i]
+        local idx = ((pointOffset + i - 2) % (MAX_POINTS - 1)) + 1
+        local p, em = slot.points[idx], slot.emitters[idx]
         -- Frame `rot` is an XYZ Euler triple authored against RotX*RotY*RotZ composition;
         -- CFrame.Angles applies in exactly that order (it IS fromEulerAnglesXYZ).
         p.CFrame = CFrame.new(anchorPos + Vector3.new(f.pos[1], f.pos[2], f.pos[3]))
             * CFrame.Angles(math.rad(f.rot[1]), math.rad(f.rot[2]), math.rad(f.rot[3]))
-        em.Texture = texture
+        -- Per-POINT texture pins (owner, 2026-09-06: dan's triple bloom, one throw
+        -- glyph per arm) override the phase texture, which overrides the style role.
+        em.Texture = (ev.textures and ev.textures[i]) or texture
         em.Color = color
         em.Size = size
         em.Speed = speed
@@ -500,6 +516,7 @@ local function fireBurst(slot: Slot, ev: any, anchorPos: Vector3, rng: Random, l
         em.LightEmission = style.lightEmission
         em:Emit(particles)
     end
+    return #frames
 end
 
 local function play(payload: any, distance: number)
@@ -639,6 +656,7 @@ local function play(payload: any, distance: number)
 
     active += weight
     local burstsPlayed = 0 -- rotates this shell's break audio across the slot's burst voices
+    local pointCursor = 0 -- rotates point/emitter claims so overlapping phases never collide
     -- One shuffled deck per colorPool table, per shell (dan's act one draws four hands
     -- from one five-color pool). Keyed by pool identity; recipes are module-level tables,
     -- so identity is stable.
@@ -1104,7 +1122,7 @@ local function play(payload: any, distance: number)
                         end)
                     end)
                 end
-                fireBurst(slot, bev, anchorPos, rng, phaseLife)
+                pointCursor += fireBurst(slot, bev, anchorPos, rng, phaseLife, pointCursor)
             end
         end
         if ev.at > 0 then

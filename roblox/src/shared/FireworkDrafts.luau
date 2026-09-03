@@ -46,19 +46,25 @@ local function dan(separation: number, boost: any?)
             scatter = separation,
             glow = 1.5,
             droop = false,
-            share = 1,
+            share = 2, -- doubled 2026-09-06 (owner: act-one peonies barely visible)
         }
     end
-    local function glyphs(at: number, texture: string, boostArg: any?)
+    local function glyphBloom(at: number, boostArg: any?)
         return {
             at = at,
             kind = "burst",
             anchor = "apex",
             style = "glyphfall",
-            texture = texture,
+            points = 3,
+            textures = {
+                BurstStyles.TEXTURES.glyph_R,
+                BurstStyles.TEXTURES.glyph_P,
+                BurstStyles.TEXTURES.glyph_S,
+            },
             color = { 255, 255, 255 },
+            spread = 40,
             droop = false,
-            share = 2,
+            share = 4,
             boost = boostArg,
         }
     end
@@ -71,11 +77,7 @@ local function dan(separation: number, boost: any?)
             act1(3.25),
             act1(3.5),
             act1(3.75),
-            glyphs(4.8, BurstStyles.TEXTURES.glyph_R),
-            glyphs(4.95, BurstStyles.TEXTURES.glyph_P),
-            -- boost rides the LAST glyph phase: the salvo encore keys off its life and
-            -- lands as the shimmer fades.
-            glyphs(5.1, BurstStyles.TEXTURES.glyph_S, boost),
+            glyphBloom(4.8, boost),
         },
     }
 end

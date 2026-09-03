@@ -146,6 +146,20 @@ describe("FireworkRecipes.validate — the one recipe schema", function()
         expect(FireworkRecipes.validate(onAscent)).toBe(false)
     end)
 
+    test("textures is a burst-only per-point pin list of 1..8 asset strings", function()
+        local r = goodRecipe()
+        r.phases[3].textures = { "rbxassetid://1", "rbxassetid://2", "rbxassetid://3" }
+        expect(FireworkRecipes.validate(r)).toBe(true)
+        for _, bad in { {}, { "" }, { "rbxassetid://1", 2 }, "rbxassetid://1" } :: { any } do
+            local b = goodRecipe()
+            b.phases[3].textures = bad
+            expect(FireworkRecipes.validate(b)).toBe(false)
+        end
+        local onAscent = goodRecipe();
+        (onAscent.phases[2] :: any).textures = { "rbxassetid://1" }
+        expect(FireworkRecipes.validate(onAscent)).toBe(false)
+    end)
+
     test("heavy is an optional boolean -- the L-class budget weight", function()
         local r = goodRecipe();
         (r :: any).heavy = true

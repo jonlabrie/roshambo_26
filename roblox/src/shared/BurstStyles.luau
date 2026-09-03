@@ -194,37 +194,26 @@ BurstStyles.STYLES = {
         tailSound = false,
         rePops = false,
     },
-    -- Glyph fall (owner, 2026-09-06, dan's acts two AND three as one mechanism):
-    -- "falling bunches of glyphs that become flickering shimmers in the style of
-    -- hotaru." Bunches of throw glyphs (per-phase texture pins) arc out and fall,
-    -- SOLID for the first half of life, then the transparency square-wave flickers
-    -- them into the shimmer -- the act-two-to-three transition happens per glyph,
-    -- organically, with the sizzle riding the shimmer. Camera-facing so glyphs READ.
+    -- Glyph fall, take two (owner, 2026-09-06: "a triple 'yashi' bloom, each of which
+    -- carries one of the glyphs"): the palm's exact motion -- arms arcing out and
+    -- raining -- but CAMERA-FACING so the glyphs read, each arm pinned to its own mark
+    -- via the phase's per-point `textures`. What follows the bloom is an open design
+    -- question; no flicker, no tail yet.
     glyphfall = {
-        speed = { 14, 24 },
-        drag = 1.2,
-        lifetime = { 2.6, 3.4 },
-        acceleration = { 0, -16, 0 },
+        speed = { 26, 34 },
+        drag = 1.4,
+        lifetime = { 2.2, 3.0 },
+        acceleration = { 0, -22, 0 },
         brightness = 2.2,
-        spreadAngle = { 35, 35 },
-        transparency = {
-            { 0, 0 },
-            { 0.5, 0 },
-            { 0.55, 1 },
-            { 0.62, 0 },
-            { 0.7, 1 },
-            { 0.78, 0 },
-            { 0.86, 1 },
-            { 0.9, 0 },
-            { 1, 1 },
-        },
-        textureRole = "dot", -- pinned per phase to a glyph in practice
-        soundRole = "burst_strobe",
-        pointRule = "wild",
+        spreadAngle = { 12, 12 },
+        transparency = { { 0, 0 }, { 0.85, 0.1 }, { 1, 1 } },
+        textureRole = "dot", -- pinned per point (textures) in practice
+        soundRole = "burst_peony",
+        pointRule = "circle",
         orientation = "camera",
-        sizeScale = 2.0,
+        sizeScale = 4.0, -- glyphs must READ: ~2-stud marks at neutral spread
         lightEmission = 0.7,
-        tailSound = { role = "tail_strobe", delay = 1.5, volume = 0.35, duration = 1.6 },
+        tailSound = false,
         rePops = false,
     },
 } :: { [string]: Style }
