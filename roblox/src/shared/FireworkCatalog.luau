@@ -182,6 +182,41 @@ FireworkCatalog.RECIPES = {
             },
         },
     },
+    -- 蛍 hotaru, the firefly (promoted 2026-09-06; owner: v3 floor, M tube, 8). A wide
+    -- flickering strobe cloud -- break, two re-pops on the middle waves, then the shimmer
+    -- carrying the owner's own canyon sizzle. The boost (30%) is STRUCTURAL, the wa
+    -- pattern: a second, wider cloud blooms 0.9s behind ("the add-on" -- owner-tuned
+    -- spacing) with its own pops and its own sizzle -- the extra sizzle IS the kicker.
+    hotaru = {
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin" },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 210, 225, 245 } },
+            {
+                at = 3.0,
+                kind = "burst",
+                anchor = "apex",
+                style = "strobe",
+                color = { 235, 245, 255 },
+                edgeColor = { 180, 220, 255 },
+                spread = 48,
+                droop = false,
+                share = 3,
+                boost = { chance = 0.3, kicker = false },
+            },
+            {
+                at = 3.9,
+                kind = "burst",
+                anchor = "apex",
+                style = "strobe",
+                color = { 235, 245, 255 },
+                edgeColor = { 180, 220, 255 },
+                spread = 60, -- the audition's 36->46 proportion, carried to the v3 floor
+                droop = false,
+                share = 2,
+                boostOnly = true,
+            },
+        },
+    },
     kiku = {
         phases = {
             { at = 0.0, kind = "report", anchor = "origin" },
