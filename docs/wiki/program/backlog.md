@@ -560,3 +560,26 @@ Direction banked from the wa promotion session; none of it is build-now:
 Interlocks: drops and return rewards are delight-delivery channels for the mystery-pool
 rule ("never a disappointment"); all reward framing must clear the onboarding voice ruling
 (kid-legible, no gambling vocabulary -- a drop is a GIFT, not a jackpot).
+
+## Firefly swarm shows (banked 2026-09-06)
+
+**Owner ruling:** fireflies are coming as AMBIENCE, and the swarm-display system is an
+EXTENSION of that system -- "something we can occasionally turn into a display" -- not a
+separate drone machine. The insight that seeded it: a swarm solves what particle bursts
+cannot (owner: "there's a different way to skin that cat... a drone swarm" -- per-entity
+POSITIONS, so arbitrary imagery becomes a point cloud), and the firefly theming keeps it
+native to the canyon where literal drones would not be.
+
+**Shape when taken up (brainstorm -> spec -> plan):**
+- One pool serves both modes: ambient drift (the default, always alive) and FORMATION
+  (borrowed for shows, returned to drift after). Anchored Neon parts, BulkMoveTo batched
+  -- cheaper than particles, no additive pileup; budget/LOD via a director like fireworks.
+- The hard system is the FORMATION COMPILER: image/text/shape -> point cloud -> drone
+  assignment (nearest-match so morphs look intentional) -> timeline. Formations morph;
+  that is the show.
+- Face shows: EditableImage samples an avatar headshot into ~200 points -- the workable
+  "kao" (the particle face-burst was assessed 2026-09-06 and rejected: emitters cannot
+  place individual particles).
+- Monetization interlock: the banked "shared show" SKU (buy the whole server a finale)
+  is made for this; the personalized face show sits above it as ultra-premium.
+- Interlock: hotaru is already the shelf's firefly (蛍); naming/lore should connect.

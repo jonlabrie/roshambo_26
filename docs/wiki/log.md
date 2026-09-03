@@ -3437,3 +3437,12 @@ of the legacy BONUS shell. Whizzers (style + wild rule + measured whistle
 cuts) wait for a future shell. Price 12, L + heavy, five steps run
 (`559c850`), dev deploy op 3d6bc70d. THE SHELF: firecracker, peony, willow,
 ishibana, kiku, wa, yashi, kamuro, hotaru, janken. THE WORKSHEET IS EMPTY.
+
+## [2026-09-06] ruling | Swarm shows will be fireflies -- an extension of planned ambience
+
+Kao (avatar-face shell) assessed: face-on-particles workable but parked; the
+face-SHAPED burst is architecturally out (emitters cannot position particles).
+Owner's better path: "a drone swarm" -- per-entity positions render arbitrary
+imagery -- themed as the canyon's own fireflies, built as an occasional
+display mode of the coming ambient-firefly system, one pool serving both.
+Banked in backlog with full restart context.
