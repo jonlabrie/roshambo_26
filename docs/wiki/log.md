@@ -3408,3 +3408,18 @@ spacing: the boosted second cloud waits 0.9s (was 0.5). Rulings: v3 floor
 (spread 48), the structural second cloud with its own sizzle IS the kicker,
 M tube (comet automatic), price 8. Five steps run (`439aae1`), drafts pruned
 -- ONLY DAN remains on the worksheet. Dev backend op de6d2346.
+
+## [2026-09-06] correction | Invented glyphs ripped out; the canonical marks fly instead
+
+A session generated literal rock/paper/scissors sprites for dan's glyph act
+while the approved marks (ring/bar/caret, `Glyphs.luau`, shared with the PWA,
+on the buttons/drum/lanterns) sat in the repo. Owner: "there are approved
+versions of the RPS glyphs literally all over this experience. Get rid of this
+crap" -- and the process question: why isn't this front and center in what a
+new session grounds on? Answer: it wasn't anywhere. Fixed both layers: dan now
+pins Glyphs.IMAGE cores (aliased as BurstStyles.TEXTURES.glyph_R/P/S,
+preloader-warmed); the invented art and generator are deleted (three orphaned
+uploads: 125188469013966 / 116127703739592 / 91746777964130); and
+world/visual-identity.md now exists, linked READ-BEFORE-MAKING-ART from the
+index, with a CLAUDE.md pointer -- plus the general rule: search before
+generate, always.

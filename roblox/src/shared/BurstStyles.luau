@@ -4,6 +4,8 @@
 -- so every shell of a style looks the same), plus the point rules that turn a
 -- requested point count into per-part placement/orientation frames, and the
 -- role tables the styles' textureRole/soundRole fields resolve through.
+local Glyphs = require("./Glyphs")
+
 local BurstStyles = {}
 
 export type Style = {
@@ -236,12 +238,14 @@ BurstStyles.TEXTURES = {
     -- art -- salutes are a FIRST-CLASS effect (owner ruling; crossed streak sprites read as
     -- a line whenever the random rotations aligned). Four silhouettes, star baked into the
     -- texture: a 4-point, b 6-point, c 5-point, d 8-spike pop.
-    -- Throw glyphs (2026-09-06, tools/textures/make_throw_glyphs.py): rock, paper,
-    -- scissors as bold white silhouettes -- dan's glyph act pins one per phase. The
-    -- Roshambo signature, in the sky.
-    glyph_rock = "rbxassetid://125188469013966",
-    glyph_paper = "rbxassetid://116127703739592",
-    glyph_scissors = "rbxassetid://91746777964130",
+    -- ⚠ THE CANONICAL THROW GLYPHS -- shared/Glyphs.luau's white cores (ring / bar /
+    -- caret), the SAME marks on the throw buttons, the drum, the chochin lanterns and
+    -- the PWA. Aliased here so the preloader warms them and burst phases can pin them.
+    -- NEVER redraw these (2026-09-06: a session generated literal rock/paper/scissors
+    -- art before finding this module -- wrong provenance AND wrong iconography).
+    glyph_R = Glyphs.IMAGE.R.core,
+    glyph_P = Glyphs.IMAGE.P.core,
+    glyph_S = Glyphs.IMAGE.S.core,
     flare_a = "rbxassetid://97945892165096",
     flare_b = "rbxassetid://106113269280235",
     flare_c = "rbxassetid://107807952502084",

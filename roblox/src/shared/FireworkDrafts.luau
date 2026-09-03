@@ -28,7 +28,8 @@ local DAN_COLORS = {
 }
 
 -- Act redesign 2026-09-06 (owner, superseding the whizzer act same day): act two is
--- three CLUSTERS OF THROW GLYPHS -- rock, paper, scissors, one texture pin per phase --
+-- three CLUSTERS OF THROW GLYPHS -- the CANONICAL ring/bar/caret marks from
+-- shared/Glyphs.luau, one texture pin per phase --
 -- that fall and then FLICKER into the shimmer (glyphfall's transparency curve carries
 -- the act-two-to-three transition per glyph; whizzers stay in the vocabulary for a
 -- future shell). The ladder varies ACT-ONE SEPARATION -- the owner's note: the small
@@ -70,11 +71,11 @@ local function dan(separation: number, boost: any?)
             act1(3.25),
             act1(3.5),
             act1(3.75),
-            glyphs(4.8, BurstStyles.TEXTURES.glyph_rock),
-            glyphs(4.95, BurstStyles.TEXTURES.glyph_paper),
+            glyphs(4.8, BurstStyles.TEXTURES.glyph_R),
+            glyphs(4.95, BurstStyles.TEXTURES.glyph_P),
             -- boost rides the LAST glyph phase: the salvo encore keys off its life and
             -- lands as the shimmer fades.
-            glyphs(5.1, BurstStyles.TEXTURES.glyph_scissors, boost),
+            glyphs(5.1, BurstStyles.TEXTURES.glyph_S, boost),
         },
     }
 end
