@@ -73,6 +73,10 @@ ProvingGround.STATIONS = {
     },
     {
         name = "mid pool",
+        -- apex 115 (owner, 2026-09-06): mid pool sits at y~177 and the default 60-stud
+        -- apex broke AT suspension-bridge height -- "anyone standing on the suspension
+        -- bridge is in the thick of an explosion, not watching overhead."
+        apex = 115,
         cf = {
             -263.5037,
             176.5959,
@@ -232,8 +236,11 @@ function ProvingGround.build(): Spec.PartSpec
     for _, station in ProvingGround.STATIONS do
         local rack = buildRack(station.name, 0)
         if station.apex then
+            -- Rojo's model.json wants attributes EXPLICITLY TYPED ({ Float64 = n });
+            -- a raw number map fails `rojo build` ("untagged enum UnresolvedValue" --
+            -- the 2026-09-06 CI red).
             local props = rack.properties :: any
-            props.Attributes = { LaunchApex = station.apex }
+            props.Attributes = { LaunchApex = { Float64 = station.apex } }
         end
         -- the rack part's own local CFrame, exactly as buildRack/tube composed it
         local rackLocal = { TUBE6_X, tubeY(TUBE6_SIZE), 0 }
