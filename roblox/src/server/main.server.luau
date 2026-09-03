@@ -1595,11 +1595,16 @@ RequestProvingFire.OnServerEvent:Connect(function(_player, shellId, rackName, fo
     if not (rack and rack:IsA("BasePart")) then
         return
     end
+    -- THE STATION'S ORIENTATION IS ITS LAUNCH HEADING (owner, 2026-09-06, with the
+    -- rack scatter: racks are "oriented in the angle of elevation and direction I'd
+    -- like to be used"). The rack part is the 6" tube, a cylinder whose axis is local
+    -- X; the muzzle sits half its length along that axis, and the shell rides the
+    -- same vector -- the rail-mounts ballistic machinery does the rest.
+    local axis = rack.CFrame.RightVector
     FireworkLaunched:FireAllClients({
         shellId = shellId,
-        -- rack.Position is the 6" tube's CENTER; +1.25 (its half-length) is the MUZZLE.
-        -- +3 floated shells two studs above the tube (owner, 2026-09-03).
-        origin = rack.Position + Vector3.new(0, 1.25, 0),
+        origin = rack.Position + axis * (rack.Size.X / 2 + 0.1),
+        heading = { x = axis.X, y = axis.Y, z = axis.Z },
         seed = math.random(1, 2 ^ 31 - 1),
         by = "proving",
         -- The panel's Boost button forces the lucky roll (Studio-only path); absent,

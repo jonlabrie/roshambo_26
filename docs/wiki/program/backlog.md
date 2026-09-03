@@ -594,3 +594,13 @@ stays gateable; the platform's back-rail gap (x 5.5..9.1) is the reserved hatch 
 The platform (assets/HanabiyaRooftop.model.json) is sized for 3 players + a console
 footprint + the three-tube battery. The proving panel's mode set (Fire/Ladder/Seq/
 Boost, 2026-09-06) is the natural seed for the MC console's verbs.
+
+## Public station access via play queueing (banked 2026-09-06)
+
+**Owner:** the five scattered proving stations ("north arena", "bridge", "upper north",
+"mid pool", "hi west") are Studio-only today, but "in future we'll offer some kind of
+public access to them, probably involving something like jukebox play queueing" --
+players queue shells at a station and the station fires them in order. Interlocks with
+the rooftop MC experience (same fire-things-from-a-console family) and the shared-show
+SKU. Station orientations are owner-aimed launch headings, already honored by the fire
+path.

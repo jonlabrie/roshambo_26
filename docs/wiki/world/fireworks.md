@@ -28,9 +28,11 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   the authoring loop for new shells. Draft recipes in `src/shared/FireworkDrafts.luau`
   (families of variants, ids `draft:<family>/<variant>`, never in the CI fixture);
   schema `FireworkRecipes.luau` makes the blank-sky trap a test failure; Studio-gated
-  `RequestProvingFire` fires any draft/shipped id from five mortar racks ON THE
-  SUSPENSION BRIDGE (owner siting; surveyed catenary — per-station height + inward
-  tilt). ⚠ VANTAGE CORRECTED 2026-09-05 (owner): the range is judged from the SOUTH
+  `RequestProvingFire` fires any draft/shipped id from five mortar STATIONS SCATTERED
+  ACROSS THE CANYON (owner placement 2026-09-06, superseding the bridge line: "north
+  arena", "bridge", "upper north", "mid pool", "hi west" — each station's tube
+  orientation IS its launch heading, honored by the fire path; positions live-surveyed
+  and baked into tools/builders/ProvingGround.luau STATIONS, spec-enforced). ⚠ VANTAGE CORRECTED 2026-09-05 (owner): the range is judged from the SOUTH
   TERMINUS of the suspension bridge, edge-on to the five racks and close -- NOT from
   FallsLanding ("I'm not using FallsLanding AT ALL"). The ~190-stud FallsLanding sightline
   was the design assumption (the plaques were sized to it) and never the practice; tuning

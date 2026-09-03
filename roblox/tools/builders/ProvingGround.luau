@@ -1,15 +1,12 @@
 --!strict
--- The fireworks proving range: five mortar racks on the suspension bridge deck
--- (ProvingPlan.RACKS names them Rack_A..Rack_E), fired from ProvingController's
--- anywhere-in-Studio panel and judged from FallsLanding, ~190 studs west and 30
--- above, where the bursts break at roughly the viewer's eye level (owner's siting,
--- 2026-09-01; the FiringPost died the same day — a location-bound panel was
--- theater, so no standing spot needs marking). NO Tags
--- anywhere here — racks stand in a world with real FireworkLaunchSites and must
--- never be mistaken for one; the server fires by looking up a rack's Position.
---
--- Structured like FallsDock: baked placement constants from the owner-dragged
--- marker survey, pure geometry, then a rotate-about-origin pass.
+-- The fireworks proving range: five mortar stations SCATTERED across the canyon
+-- (owner placement 2026-09-06, superseding the 2026-09-01 suspension-bridge line),
+-- fired from ProvingController's anywhere-in-Studio panel. Each station is placed AND
+-- AIMED by the owner: the 6" tube's own orientation is the launch heading the server
+-- fires along ("oriented in the angle of elevation and direction I'd like to be used").
+-- Future: public access with jukebox-style play queueing (backlog). NO Tags anywhere
+-- here — stations stand in a world with real FireworkLaunchSites and must never be
+-- mistaken for one; the server fires by looking up a rack by name.
 --
 -- Tube bores are the owner's 2026-09-01 ruling: 2", 4" and 6" shells for now
 -- (yonshakudama noted for the future). 1 stud = 1 foot, and real display mortars
@@ -19,34 +16,106 @@ local ProvingPlan = require("../../src/shared/ProvingPlan")
 
 local ProvingGround = {}
 
--- ===== baked placement (surveyed 2026-09-01, owner-dragged markers) =====
--- Rack line: atop the suspension bridge cross members (the walk surface the
--- ProvingRackMarker rested on — NOT the model bbox, whose towers reach far higher).
-ProvingGround.RACK_ORIGIN = { -246.67, 210.45, -0.01 }
--- Plaques (+Z) face the owner-aimed arrow: due west, up-canyon at FallsLanding;
--- the rack line (local X) runs along the deck.
-ProvingGround.RACK_YAW_DEG = -91.22
-
--- ===== dimensions =====
--- Racks along local X, 12 studs apart. ProvingPlan.RACKS pairs with stations by index.
--- THE DECK IS A CATENARY (owner, 2026-09-01: "the C platform is the lowest, because
--- it's in the center… the other 4 would naturally tilt inwards"): each station carries
--- the deck height offset (dy, relative to RACK_ORIGIN's surveyed center height) and the
--- local slope's tilt, both measured in-Studio 2026-09-01 by raycasting the deck at
--- station ±1.5 studs along the line (origin + rotY(RACK_YAW)·(offset,0,0), cast down
--- from y 226). A rack is tilted about local Z at its deck contact point, so it lies ON
--- the curve rather than hovering over it.
-local RACK_STATIONS = {
-    { offset = -24, dy = 1.377, tiltDeg = -7.69 },
-    { offset = -12, dy = 0.325, tiltDeg = -4.43 },
-    { offset = 0, dy = -0.017, tiltDeg = 0.11 },
-    { offset = 12, dy = 0.349, tiltDeg = 2.48 },
-    { offset = 24, dy = 1.514, tiltDeg = 4.73 },
+-- ===== baked placement (surveyed 2026-09-06: the owner dragged and aimed each station
+-- live in Studio; these are the 6" tubes' world CFrames read back out and re-orthonormalized).
+-- Paired with ProvingPlan.RACKS by index (the A..E lineage order).
+ProvingGround.STATIONS = {
+    {
+        name = "north arena",
+        cf = {
+            -48.37,
+            244.1778,
+            -81.1563,
+            -0.004721,
+            0.020782,
+            -0.999773,
+            0.974915,
+            0.222576,
+            2.3e-05,
+            0.222526,
+            -0.974694,
+            -0.021312,
+        },
+    },
+    {
+        name = "bridge",
+        cf = {
+            -240.9508,
+            221.8876,
+            53.0429,
+            0.005024,
+            0.020696,
+            -0.999773,
+            0.971515,
+            -0.236978,
+            -2.4e-05,
+            -0.236924,
+            -0.971295,
+            -0.021297,
+        },
+    },
+    {
+        name = "upper north",
+        cf = {
+            -298.1053,
+            263.1958,
+            -84.7032,
+            -0.010115,
+            0.018718,
+            -0.999774,
+            0.879669,
+            0.475587,
+            4e-06,
+            0.475479,
+            -0.87947,
+            -0.021276,
+        },
+    },
+    {
+        name = "mid pool",
+        cf = {
+            -263.5037,
+            176.5959,
+            -1.5086,
+            0.000911,
+            0.02129,
+            -0.999773,
+            0.999062,
+            -0.043305,
+            -1.2e-05,
+            -0.043295,
+            -0.998835,
+            -0.02131,
+        },
+    },
+    {
+        name = "hi west",
+        cf = {
+            -454.1745,
+            273.8061,
+            -35.5307,
+            0.498644,
+            0.021279,
+            -0.866546,
+            0.86472,
+            0.05711,
+            0.498996,
+            0.060106,
+            -0.998141,
+            0.010077,
+        },
+    },
 }
 assert(
-    #RACK_STATIONS == #ProvingPlan.RACKS,
-    `ProvingGround has {#RACK_STATIONS} rack stations but ProvingPlan names {#ProvingPlan.RACKS} racks`
+    #ProvingGround.STATIONS == #ProvingPlan.RACKS,
+    `ProvingGround has {#ProvingGround.STATIONS} stations but ProvingPlan names {#ProvingPlan.RACKS} racks`
 )
+for i, st in ProvingGround.STATIONS do
+    assert(
+        st.name == ProvingPlan.RACKS[i],
+        `station {i} is '{st.name}' but ProvingPlan.RACKS[{i}] is '{ProvingPlan.RACKS[i]}'`
+    )
+end
 
 local BASE_SIZE = { 3, 0.6, 3 } -- timber base block
 -- Mortar tubes at real proportions (cylinder Size is {length, dia, dia}; length -> world-up
@@ -61,8 +130,8 @@ local TUBE6_SIZE = { 2.5, 0.5 + 2 * TUBE_WALL, 0.5 + 2 * TUBE_WALL } -- 6" bore,
 local TUBE4_SIZE = { 1.5, 1 / 3 + 2 * TUBE_WALL, 1 / 3 + 2 * TUBE_WALL } -- 4" bore, 1.5 ft
 local TUBE2_SIZE = { 0.85, 1 / 6 + 2 * TUBE_WALL, 1 / 6 + 2 * TUBE_WALL } -- 2" bore, 10 in
 local TUBE6_X, TUBE4_X, TUBE2_X = -0.8, 0.1, 0.75 -- spread across the base, local X
--- Plaque sized to read from the FallsLanding sightline (~190 studs); it STANDS ON the
--- base's west edge rather than floating at tube height (the final review's float note).
+-- Plaque: read CLOSE-UP now (stations are visited, not sighted from 190 studs);
+-- it carries the station's full name, wrapped.
 local PLAQUE_SIZE = { 2, 2, 0.15 }
 
 -- Grey-cypress timber treatment (216/214/206) — the base and plaque wear it.
@@ -85,7 +154,7 @@ local PLAQUE_Z = BASE_SIZE[3] / 2 + PLAQUE_SIZE[3] / 2
 -- is unreliable and TextSize caps near 100px, so big lettering always wants a small canvas, not
 -- a big canvas with big text.
 local PLAQUE_PPS = 48
-local PLAQUE_TEXT_SIZE = 90
+local PLAQUE_TEXT_SIZE = 26 -- full names, wrapped (was 90 for single letters)
 
 local function plaqueFace(letter: string): Spec.PartSpec
     return {
@@ -111,6 +180,7 @@ local function plaqueFace(letter: string): Spec.PartSpec
                     Text = letter,
                     TextColor3 = INK,
                     TextSize = PLAQUE_TEXT_SIZE,
+                    TextWrapped = true,
                     Font = "GothamBold",
                 },
             },
@@ -154,92 +224,72 @@ local function buildRack(name: string, letter: string, x: number): Spec.PartSpec
     return main
 end
 
--- Tilt a rack about local Z through its deck contact point (station, 0, 0), then lift
--- it by the station's dy — the "laid on the curved deck" pose. Row-major rotZ, same
--- layout as Spec's matrices; rotZ(atan(slope)) aligns the rack's local X with the
--- deck tangent, which is exactly what a platform resting on the slope does.
-local function rotZMat(deg: number): { number }
-    local r = math.rad(deg)
-    local c, s = math.cos(r), math.sin(r)
-    return { c, -s, 0, s, c, 0, 0, 0, 1 }
+-- Seat a rack tree at its station: T = stationCF · (rackLocalCF)⁻¹ applied to every
+-- part, so the 6" tube lands EXACTLY on the owner-surveyed CFrame and its base,
+-- plaque and sibling tubes ride along rigidly — the same relative composition the
+-- old bridge line had, at whatever position and aim the owner chose.
+local function invertCF(cf: { number }): { number }
+    -- rotation transpose; position = -Rᵀ·p
+    local px, py, pz = cf[1], cf[2], cf[3]
+    local r = { cf[4], cf[5], cf[6], cf[7], cf[8], cf[9], cf[10], cf[11], cf[12] }
+    local t = { r[1], r[4], r[7], r[2], r[5], r[8], r[3], r[6], r[9] }
+    return {
+        -(t[1] * px + t[2] * py + t[3] * pz),
+        -(t[4] * px + t[5] * py + t[6] * pz),
+        -(t[7] * px + t[8] * py + t[9] * pz),
+        t[1],
+        t[2],
+        t[3],
+        t[4],
+        t[5],
+        t[6],
+        t[7],
+        t[8],
+        t[9],
+    }
 end
 
-local function tiltAtStation(spec: Spec.PartSpec, tiltDeg: number, dy: number, px: number)
-    local m = rotZMat(tiltDeg)
+local function composeCF(a: { number }, b: { number }): { number }
+    local ra = { a[4], a[5], a[6], a[7], a[8], a[9], a[10], a[11], a[12] }
+    local rb = { b[4], b[5], b[6], b[7], b[8], b[9], b[10], b[11], b[12] }
+    local r = Spec.matMul(ra, rb)
+    local bx, by, bz = b[1], b[2], b[3]
+    return {
+        a[1] + ra[1] * bx + ra[2] * by + ra[3] * bz,
+        a[2] + ra[4] * bx + ra[5] * by + ra[6] * bz,
+        a[3] + ra[7] * bx + ra[8] * by + ra[9] * bz,
+        r[1],
+        r[2],
+        r[3],
+        r[4],
+        r[5],
+        r[6],
+        r[7],
+        r[8],
+        r[9],
+    }
+end
+
+local function seatAtStation(spec: Spec.PartSpec, transform: { number })
     local props = spec.properties
     if props and props.CFrame then
-        local cf = props.CFrame :: { number }
-        local rx, ry, rz = cf[1] - px, cf[2], cf[3]
-        local nx = m[1] * rx + m[2] * ry + m[3] * rz
-        local ny = m[4] * rx + m[5] * ry + m[6] * rz
-        local nz = m[7] * rx + m[8] * ry + m[9] * rz
-        local localRot = { cf[4], cf[5], cf[6], cf[7], cf[8], cf[9], cf[10], cf[11], cf[12] }
-        local rot = Spec.matMul(m, localRot)
-        props.CFrame = {
-            nx + px,
-            ny + dy,
-            nz,
-            rot[1],
-            rot[2],
-            rot[3],
-            rot[4],
-            rot[5],
-            rot[6],
-            rot[7],
-            rot[8],
-            rot[9],
-        }
+        props.CFrame = composeCF(transform, props.CFrame :: { number })
     end
     if spec.children then
         for _, child in spec.children do
-            tiltAtStation(child, tiltDeg, dy, px)
-        end
-    end
-end
-
--- Rotate a tree about an origin by yawDeg and translate to it — walking every nested
--- child (Base/Plaque/tubes are parented under their rack, and Roblox parts do not
--- inherit a parent's CFrame). Composes each part's OWN local rotation (a tube's
--- CYL_VERTICAL) with the yaw rather than replacing it, so cylinders stay vertical
--- under a nonzero yaw.
-local function seatInWorld(spec: Spec.PartSpec, yawDeg: number, origin: { number })
-    local props = spec.properties
-    if props and props.CFrame then
-        local cf = props.CFrame :: { number }
-        local localRot = { cf[4], cf[5], cf[6], cf[7], cf[8], cf[9], cf[10], cf[11], cf[12] }
-        local pos = Spec.rotY({ cf[1], cf[2], cf[3] }, yawDeg)
-        local yawRot = Spec.rotYMat(yawDeg)
-        local finalRot = Spec.matMul(yawRot, localRot)
-        props.CFrame = {
-            pos[1] + origin[1],
-            pos[2] + origin[2],
-            pos[3] + origin[3],
-            finalRot[1],
-            finalRot[2],
-            finalRot[3],
-            finalRot[4],
-            finalRot[5],
-            finalRot[6],
-            finalRot[7],
-            finalRot[8],
-            finalRot[9],
-        }
-    end
-    if spec.children then
-        for _, child in spec.children do
-            seatInWorld(child, yawDeg, origin)
+            seatAtStation(child, transform)
         end
     end
 end
 
 function ProvingGround.build(): Spec.PartSpec
     local children: { Spec.PartSpec } = {}
-    for i, rackName in ProvingPlan.RACKS do
-        local letter = string.sub(rackName, -1)
-        local station = RACK_STATIONS[i]
-        local rack = buildRack(rackName, letter, station.offset)
-        tiltAtStation(rack, station.tiltDeg, station.dy, station.offset)
-        seatInWorld(rack, ProvingGround.RACK_YAW_DEG, ProvingGround.RACK_ORIGIN)
+    for _, station in ProvingGround.STATIONS do
+        local rack = buildRack(station.name, station.name, 0)
+        -- the rack part's own local CFrame, exactly as buildRack/tube composed it
+        local rackLocal = { TUBE6_X, tubeY(TUBE6_SIZE), 0 }
+        local localCF = Spec.cframe(rackLocal, Spec.ROT.CYL_VERTICAL)
+        seatAtStation(rack, composeCF(station.cf, invertCF(localCF)))
         table.insert(children, rack)
     end
     return Spec.model("ProvingGround", children)

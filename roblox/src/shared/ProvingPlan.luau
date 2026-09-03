@@ -1,12 +1,18 @@
 --!strict
 -- HOW A FAMILY OF DRAFTS BECOMES A FIRING PLAN. Pure: the panel controller executes these
--- plans (one RequestProvingFire per entry); the server never learns about modes. Ladder is
--- the range's whole reason to have five racks — variants burst side by side for comparison;
--- sequence is for shells whose read needs clean air.
+-- plans (one RequestProvingFire per entry); the server never learns about modes. Ladder
+-- fires across all five stations at once; sequence is for shells whose read needs clean air.
+--
+-- The five stations were SCATTERED and renamed 2026-09-06 (owner placement, superseding
+-- the bridge line): each station's tube orientation is its LAUNCH HEADING, and the future
+-- plan is public access with jukebox-style play queueing (see backlog). Order below keeps
+-- the A..E lineage.
 local ProvingPlan = {}
 
-ProvingPlan.RACKS = { "Rack_A", "Rack_B", "Rack_C", "Rack_D", "Rack_E" }
-ProvingPlan.SEQUENCE_RACK = "Rack_C"
+ProvingPlan.RACKS = { "north arena", "bridge", "upper north", "mid pool", "hi west" }
+-- "mid pool": the central, lowest, near-vertical station -- the most neutral tube for
+-- clean-air repeats, visible from the arena basin.
+ProvingPlan.SEQUENCE_RACK = "mid pool"
 ProvingPlan.SEQUENCE_GAP = 2 -- seconds between sequence launches
 
 local function draftId(family: string, variant: string): string

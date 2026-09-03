@@ -234,7 +234,7 @@ end)
 -- target. Ladder and sequence ignore this entirely -- ladder always spans all five racks by
 -- definition, and sequence is pinned to ProvingPlan.SEQUENCE_RACK for clean-air comparison. =====
 local rackRow = Instance.new("Frame")
-rackRow.Size = UDim2.new(1, -20, 0, 26)
+rackRow.Size = UDim2.new(1, -20, 0, 56)
 rackRow.Position = UDim2.fromOffset(10, 44)
 rackRow.BackgroundTransparency = 1
 rackRow.Parent = panel
@@ -267,17 +267,18 @@ local function paintRackButtons()
     end
 end
 
-local rackButtonX = 54
-for _, rack in ProvingPlan.RACKS do
-    local letter = rack:sub(-1)
+-- Named station buttons (owner renames, 2026-09-06), three up two down.
+for i, rack in ProvingPlan.RACKS do
+    local col = (i - 1) % 3
+    local rowN = math.floor((i - 1) / 3)
     local rb = Instance.new("TextButton")
-    rb.Size = UDim2.fromOffset(30, 26)
-    rb.Position = UDim2.fromOffset(rackButtonX, 0)
+    rb.Size = UDim2.fromOffset(90, 24)
+    rb.Position = UDim2.fromOffset(54 + col * 94, rowN * 28)
     rb.BorderSizePixel = 0
     rb.AutoButtonColor = false
-    rb.Text = letter
+    rb.Text = rack
     rb.Font = Enum.Font.Code
-    rb.TextSize = 13
+    rb.TextSize = 11
     rb.Parent = rackRow
     local rc = Instance.new("UICorner")
     rc.CornerRadius = UDim.new(0, 5)
@@ -287,13 +288,12 @@ for _, rack in ProvingPlan.RACKS do
         selectedRack = rack
         paintRackButtons()
     end)
-    rackButtonX += 34
 end
 paintRackButtons()
 
 local scroll = Instance.new("ScrollingFrame")
-scroll.Size = UDim2.new(1, -20, 1, -140)
-scroll.Position = UDim2.fromOffset(10, 74)
+scroll.Size = UDim2.new(1, -20, 1, -170)
+scroll.Position = UDim2.fromOffset(10, 104)
 scroll.BackgroundTransparency = 1
 scroll.BorderSizePixel = 0
 scroll.ScrollBarThickness = 6

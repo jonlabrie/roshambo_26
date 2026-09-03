@@ -3459,3 +3459,15 @@ new Rojo asset HanabiyaRooftop -- railed platform over the shop ridge,
 three real CSG tubes stood at boot on tagged mounts, public gear launches
 fire from the nearest battery muzzle within 140 studs. Rooftop MC
 experience banked in backlog (access deliberately unbuilt = gateable).
+
+## [2026-09-06] codified | The five stations scatter -- owner-placed, aimed, renamed
+
+Owner dragged and AIMED all five racks live in Studio; their CFrames were read
+out, re-orthonormalized, and baked into ProvingGround.luau as STATIONS (the
+builder's bridge-line/catenary machinery retired; model.json regenerated via
+genmodels; spec now asserts owner-survey fidelity + muzzle-skyward safety).
+Renames: A/B/C/D/E -> north arena / bridge / upper north / mid pool / hi west
+(parts, plaques -- full names wrapped -- ProvingPlan, panel buttons three-up-
+two-down). The server now fires along each station's own axis with a heading,
+so the rail-mounts ballistics carry the owner's aim. Future public access =
+jukebox queueing, banked. Ladder mode is now a five-point canyon-wide volley.
