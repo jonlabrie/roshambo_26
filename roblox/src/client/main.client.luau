@@ -804,9 +804,38 @@ EventBus.HudFireworkLaunch.Event:Connect(function(shellId: string)
     RequestFireworkLaunch:FireServer(shellId)
 end)
 
+-- Tour events derived from inventory EDGES, not requests: RequestFireworkLaunch can be
+-- refused (site, gear, condition), and the shop's ShopPurchase fire can fail server-side —
+-- but a total count that ROSE is a completed purchase, and one that FELL is a shell the
+-- server actually consumed (a refused launch echoes an unchanged count). nil until the first
+-- echo lands: the first FireworkState is a BASELINE, never an edge, so a returning player
+-- holding shells does not get a spurious "shellBought" at join.
+local knownShellTotal: number? = nil
+
+local function totalShellCount(shells: any): number
+    local total = 0
+    if typeof(shells) == "table" then
+        for _, st in shells do
+            if typeof(st) == "table" and typeof(st.count) == "number" then
+                total += st.count
+            end
+        end
+    end
+    return total
+end
+
 FireworkState.OnClientEvent:Connect(function(state)
     if typeof(state) == "table" then
         fireworkShells = state.shells
+        local total = totalShellCount(state.shells)
+        if knownShellTotal ~= nil then
+            if total > knownShellTotal then
+                EventBus.Onboard:Fire("shellBought", knownSeenBeats)
+            elseif total < knownShellTotal then
+                EventBus.Onboard:Fire("shellLaunched", knownSeenBeats)
+            end
+        end
+        knownShellTotal = total
         -- The player's OWN deck-site position, when they have a deck. The HUD's launch
         -- affordance only knew the tagged public sites, so the fire button never appeared
         -- on a player's own engawa even though the server allowed the launch (owner,
