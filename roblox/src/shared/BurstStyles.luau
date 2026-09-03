@@ -192,6 +192,39 @@ BurstStyles.STYLES = {
         tailSound = false,
         rePops = false,
     },
+    -- Glyph fall (owner, 2026-09-06, dan's acts two AND three as one mechanism):
+    -- "falling bunches of glyphs that become flickering shimmers in the style of
+    -- hotaru." Bunches of throw glyphs (per-phase texture pins) arc out and fall,
+    -- SOLID for the first half of life, then the transparency square-wave flickers
+    -- them into the shimmer -- the act-two-to-three transition happens per glyph,
+    -- organically, with the sizzle riding the shimmer. Camera-facing so glyphs READ.
+    glyphfall = {
+        speed = { 14, 24 },
+        drag = 1.2,
+        lifetime = { 2.6, 3.4 },
+        acceleration = { 0, -16, 0 },
+        brightness = 2.2,
+        spreadAngle = { 35, 35 },
+        transparency = {
+            { 0, 0 },
+            { 0.5, 0 },
+            { 0.55, 1 },
+            { 0.62, 0 },
+            { 0.7, 1 },
+            { 0.78, 0 },
+            { 0.86, 1 },
+            { 0.9, 0 },
+            { 1, 1 },
+        },
+        textureRole = "dot", -- pinned per phase to a glyph in practice
+        soundRole = "burst_strobe",
+        pointRule = "wild",
+        orientation = "camera",
+        sizeScale = 2.0,
+        lightEmission = 0.7,
+        tailSound = { role = "tail_strobe", delay = 1.5, volume = 0.35, duration = 1.6 },
+        rePops = false,
+    },
 } :: { [string]: Style }
 
 -- Role tables (built-in stand-ins until the owner's uploads clear, per spec §4/§8).
@@ -203,6 +236,12 @@ BurstStyles.TEXTURES = {
     -- art -- salutes are a FIRST-CLASS effect (owner ruling; crossed streak sprites read as
     -- a line whenever the random rotations aligned). Four silhouettes, star baked into the
     -- texture: a 4-point, b 6-point, c 5-point, d 8-spike pop.
+    -- Throw glyphs (2026-09-06, tools/textures/make_throw_glyphs.py): rock, paper,
+    -- scissors as bold white silhouettes -- dan's glyph act pins one per phase. The
+    -- Roshambo signature, in the sky.
+    glyph_rock = "rbxassetid://125188469013966",
+    glyph_paper = "rbxassetid://116127703739592",
+    glyph_scissors = "rbxassetid://91746777964130",
     flare_a = "rbxassetid://97945892165096",
     flare_b = "rbxassetid://106113269280235",
     flare_c = "rbxassetid://107807952502084",
