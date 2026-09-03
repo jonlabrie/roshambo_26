@@ -3602,3 +3602,13 @@ dock area (for now, at least) so let's make the white-eyed warbler the default f
 `SPECIES` = Mejiro (registered with three clips, its own body length and the uguisu's seat
 nudge; meshes declared in `default.project.json`). Applied in the open place and on the branch.
 
+## [2026-09-03] defect | The idle perch song never fired: `not resting` meant "only during a result"
+
+Owner: "mejiro familiar didn't sing in two minutes of observation." At 15–25 s opportunities
+and a 0.5 chance that is a <2% outcome, so the gate was read from source: in `BirdController`
+`resting` means no round result pending — the perched world state — and the idle gate required
+`not resting`, so an idle song could fire only during a WIN/LOSS act-out. Fixed to
+`resting and b.perch ~= nil and ...`; new source-scanning spec `tests/BirdIdleSong.spec.luau`
+failed on the old line and passes on the new. Applied in the open place too. 1827 Lune tests
+green.
+

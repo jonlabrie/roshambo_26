@@ -873,9 +873,21 @@ RunService.RenderStepped:Connect(function()
             -- until conditions allow would recreate the sing-on-arrival behavior the dock
             -- scheduler's gate exists to forbid. IDLE_SONG_CHANCE sets the rate; the concurrency
             -- cap still applies, so a crowd of perched birds cannot become a wall of song.
+            -- ⚠ `resting` means NO RESULT PENDING — the bird's ordinary world state, the one
+            -- where it sits on a perch — not "in the resting orbit". The first gate said
+            -- `not resting`, which confined the idle song to the WIN/LOSS act-outs and so
+            -- silenced every perched bird (owner: "didn't sing in two minutes"). Guarded by
+            -- `tests/BirdIdleSong.spec.luau`, which reads this condition from source.
             if now >= b.nextIdleSongAt then
                 b.nextIdleSongAt = now + IDLE_SONG_MIN + math.random() * (IDLE_SONG_MAX - IDLE_SONG_MIN)
-                if not flying and not resting and k >= 1 and b.song == nil and not b.singArmed then
+                if
+                    resting
+                    and b.perch ~= nil
+                    and not flying
+                    and k >= 1
+                    and b.song == nil
+                    and not b.singArmed
+                then
                     sing(b, false, IDLE_SONG_CHANCE)
                 end
             end

@@ -499,6 +499,14 @@ recreate the sing-on-arrival behavior the falls-dock gate forbids (*"this bird l
 you have to be close to hear it"*, [[falls-dock]]). The concurrency cap still applies. The dock
 bird's specialness now rests on rolloff and its bout pattern rather than the familiar's silence.
 
+⚠ **The gate fires while the bird is `resting` AND on a perch — `resting` means NO RESULT
+PENDING, not "in the resting orbit".** The first gate (2026-09-03) said `not resting`, which
+confined the idle song to the WIN/LOSS act-outs and silenced every perched bird; the retuned
+rate then produced nothing in two minutes, and the numbers (three opportunities a minute at a
+coin flip) said gate, not luck. `tests/BirdIdleSong.spec.luau` reads the condition from source
+and refuses `not resting` or a missing `b.perch`, the same way `BirdScaleConvention` polices
+the profile argument.
+
 ⚠ **AND MUCH OF THE MACHINERY ALREADY EXISTS — a claim written here on 2026-08-27 that "there is
 no world population, no perching" was WRONG and is deleted.** It came from grepping for
 "ambient" and from a stale comment in `BirdFlight` calling the resting orbit a placeholder. The
