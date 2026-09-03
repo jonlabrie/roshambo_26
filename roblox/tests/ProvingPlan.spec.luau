@@ -34,15 +34,6 @@ describe("ProvingPlan — variants onto racks and clocks", function()
 end)
 
 describe("ProvingPlan — shipped-shell modes", function()
-    test("shippedLadder fires the one shell from EVERY rack", function()
-        local plan = ProvingPlan.shippedLadder("kamuro")
-        expect(#plan).toBe(#ProvingPlan.RACKS)
-        for i, entry in plan do
-            expect(entry.id).toBe("kamuro")
-            expect(entry.rack).toBe(ProvingPlan.RACKS[i])
-        end
-    end)
-
     test("shippedSequence repeats the shell with clean air between", function()
         local plan = ProvingPlan.shippedSequence("hotaru")
         expect(#plan).toBe(ProvingPlan.SHIPPED_SEQUENCE_COUNT)

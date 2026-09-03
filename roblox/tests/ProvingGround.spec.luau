@@ -36,19 +36,15 @@ end
 describe("ProvingGround — the yard the range fires from", function()
     local model = ProvingGround.build()
 
-    test("every rack ProvingPlan can name exists as a BasePart with its named plaque", function()
+    test("every rack ProvingPlan can name exists as a BasePart -- and wears NO plaque", function()
+        -- Owner, 2026-09-06: plaques off; station names live in the panel, not the world.
         for _, rackName in ProvingPlan.RACKS do
             local rack = childNamed(model, rackName)
             expect(rack ~= nil).toBe(true)
             assert(rack)
             expect(rack.className).toBe("Part") -- the server fires from the rack's CFrame
-            local gui = findClass(rack, "SurfaceGui")
-            expect(gui ~= nil).toBe(true)
-            assert(gui)
-            local label = findClass(gui, "TextLabel") or gui.children and gui.children[1]
-            expect(label ~= nil).toBe(true)
-            assert(label)
-            expect(label.properties.Text).toBe(rackName)
+            expect(childNamed(rack, "Plaque") == nil).toBe(true)
+            expect(findClass(rack, "SurfaceGui") == nil).toBe(true)
         end
     end)
 

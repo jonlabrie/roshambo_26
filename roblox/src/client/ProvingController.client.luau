@@ -247,15 +247,18 @@ rackRowLabel.TextColor3 = INK_CREAM
 rackRowLabel.Font = Enum.Font.Code
 rackRowLabel.TextSize = 12
 rackRowLabel.TextXAlignment = Enum.TextXAlignment.Left
-rackRowLabel.Text = "Rack:"
+rackRowLabel.Text = "Racks:"
 rackRowLabel.Parent = rackRow
 
-local selectedRack = ProvingPlan.SEQUENCE_RACK
+-- MULTI-SELECT (owner, 2026-09-06: "I should be able to choose any or all of the
+-- racks to launch a selection, simultaneously"). Toggled stations fire together;
+-- an empty selection falls back to the sequence rack so Fire never no-ops.
+local selectedRacks: { [string]: boolean } = { [ProvingPlan.SEQUENCE_RACK] = true }
 local rackButtons: { [string]: TextButton } = {}
 
 local function paintRackButtons()
     for rack, b in rackButtons do
-        if rack == selectedRack then
+        if selectedRacks[rack] then
             b.BackgroundColor3 = GOLD
             b.BackgroundTransparency = 0
             b.TextColor3 = WASHI
@@ -267,7 +270,7 @@ local function paintRackButtons()
     end
 end
 
--- Named station buttons (owner renames, 2026-09-06), three up two down.
+-- Named station toggles (owner renames, 2026-09-06), three up two down.
 for i, rack in ProvingPlan.RACKS do
     local col = (i - 1) % 3
     local rowN = math.floor((i - 1) / 3)
@@ -285,7 +288,7 @@ for i, rack in ProvingPlan.RACKS do
     rc.Parent = rb
     rackButtons[rack] = rb
     rb.MouseButton1Click:Connect(function()
-        selectedRack = rack
+        selectedRacks[rack] = not selectedRacks[rack] or nil
         paintRackButtons()
     end)
 end
@@ -370,6 +373,20 @@ local function fireSingle(id: string, rack: string, forceBoost: boolean?)
     RequestProvingFire:FireServer(id, rack, forceBoost == true)
 end
 
+-- One press, every toggled station at once.
+local function fireSelected(id: string, forceBoost: boolean?)
+    local any = false
+    for _, rack in ProvingPlan.RACKS do
+        if selectedRacks[rack] then
+            any = true
+            fireSingle(id, rack, forceBoost)
+        end
+    end
+    if not any then
+        fireSingle(id, ProvingPlan.SEQUENCE_RACK, forceBoost)
+    end
+end
+
 -- ===== section header =====
 local function makeHeader(order: number, text: string): Frame
     local row = makeRow(order)
@@ -428,7 +445,7 @@ for _, family in FireworkDrafts.familyNames() do
         local vButton = makeButton(row, variant, 40, variantX)
         local id = ("draft:%s/%s"):format(family, variant)
         vButton.MouseButton1Click:Connect(function()
-            fireSingle(id, selectedRack)
+            fireSelected(id)
         end)
         variantX += 44
     end
@@ -463,17 +480,13 @@ for _, id in shippedIds do
     -- fun"): Fire = natural odds at the selected rack; Ladder = the volley, one from
     -- every rack; Seq = clean-air repeats; Boost = the lucky roll FORCED, so a shipped
     -- shell's surprise can be audited without fishing for the 30%.
+    -- Fire and Boost hit every toggled station at once (the old Ladder is just
+    -- select-all now); Seq keeps its clean-air pin on the sequence rack.
     local fireButton = makeButton(row, "Fire", 40, 96)
     fireButton.MouseButton1Click:Connect(function()
-        fireSingle(id, selectedRack)
+        fireSelected(id)
     end)
-    local ladderButton = makeButton(row, "Ladder", 52, 140)
-    ladderButton.MouseButton1Click:Connect(function()
-        for _, entry in ProvingPlan.shippedLadder(id) do
-            fireSingle(entry.id, entry.rack)
-        end
-    end)
-    local seqButton = makeButton(row, "Seq", 38, 196)
+    local seqButton = makeButton(row, "Seq", 38, 140)
     seqButton.MouseButton1Click:Connect(function()
         for _, entry in ProvingPlan.shippedSequence(id) do
             task.delay(entry.delaySeconds, function()
@@ -481,8 +494,8 @@ for _, id in shippedIds do
             end)
         end
     end)
-    local boostButton = makeButton(row, "Boost", 46, 238)
+    local boostButton = makeButton(row, "Boost", 46, 182)
     boostButton.MouseButton1Click:Connect(function()
-        fireSingle(id, selectedRack, true)
+        fireSelected(id, true)
     end)
 end

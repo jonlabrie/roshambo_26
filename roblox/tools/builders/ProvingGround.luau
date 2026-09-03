@@ -130,62 +130,15 @@ local TUBE6_SIZE = { 2.5, 0.5 + 2 * TUBE_WALL, 0.5 + 2 * TUBE_WALL } -- 6" bore,
 local TUBE4_SIZE = { 1.5, 1 / 3 + 2 * TUBE_WALL, 1 / 3 + 2 * TUBE_WALL } -- 4" bore, 1.5 ft
 local TUBE2_SIZE = { 0.85, 1 / 6 + 2 * TUBE_WALL, 1 / 6 + 2 * TUBE_WALL } -- 2" bore, 10 in
 local TUBE6_X, TUBE4_X, TUBE2_X = -0.8, 0.1, 0.75 -- spread across the base, local X
--- Plaque: read CLOSE-UP now (stations are visited, not sighted from 190 studs);
--- it carries the station's full name, wrapped.
-local PLAQUE_SIZE = { 2, 2, 0.15 }
 
 -- Grey-cypress timber treatment (216/214/206) — the base and plaque wear it.
 local TIMBER_GREY = { 0.847, 0.839, 0.808 }
 local TUBE_COLOR = { 0.20, 0.20, 0.22 }
-local INK = { 0.15, 0.13, 0.11 }
 
 -- Local ground datum is y = 0 (each origin's y carries the surveyed ground height).
 local BASE_Y = BASE_SIZE[2] / 2
 local function tubeY(size: { number }): number
     return BASE_SIZE[2] + size[1] / 2
-end
-local PLAQUE_Y = BASE_SIZE[2] + PLAQUE_SIZE[2] / 2
--- Against the base's +Z face, flush.
-local PLAQUE_Z = BASE_SIZE[3] / 2 + PLAQUE_SIZE[3] / 2
-
--- ===== the plaque letter — Machiya's `kanjiLabel` canvas recipe (tools/builders/Machiya.luau,
--- ~lines 37-104), copied rather than shared: SizingMode "PixelsPerStud" (the default FixedSize
--- IGNORES PixelsPerStud and renders specks), a SMALL canvas with a fixed TextSize — TextScaled
--- is unreliable and TextSize caps near 100px, so big lettering always wants a small canvas, not
--- a big canvas with big text.
-local PLAQUE_PPS = 48
-local PLAQUE_TEXT_SIZE = 26 -- full names, wrapped (was 90 for single letters)
-
-local function plaqueFace(letter: string): Spec.PartSpec
-    return {
-        name = "Face",
-        className = "SurfaceGui",
-        properties = {
-            -- Back = +Z outward normal; with RACK_YAW_DEG aiming local +Z at FallsLanding,
-            -- this is the face the owner reads across the canyon.
-            Face = "Back",
-            SizingMode = "PixelsPerStud",
-            PixelsPerStud = PLAQUE_PPS,
-            AlwaysOnTop = false,
-            ZIndexBehavior = "Sibling",
-        },
-        children = {
-            {
-                name = "Letter",
-                className = "TextLabel",
-                properties = {
-                    Position = { UDim2 = { { 0, 0 }, { 0, 0 } } },
-                    Size = { UDim2 = { { 1, 0 }, { 1, 0 } } },
-                    BackgroundTransparency = 1,
-                    Text = letter,
-                    TextColor3 = INK,
-                    TextSize = PLAQUE_TEXT_SIZE,
-                    TextWrapped = true,
-                    Font = "GothamBold",
-                },
-            },
-        },
-    }
 end
 
 local function tube(name: string, size: { number }, x: number): Spec.PartSpec
@@ -201,7 +154,9 @@ end
 
 -- One rack: the 6" tube IS Rack_X (the server fires from its Position); the base, the
 -- smaller tubes and the lettered plaque are its children.
-local function buildRack(name: string, letter: string, x: number): Spec.PartSpec
+-- No plaques (owner, 2026-09-06: "you can take the name plaques off the racks") —
+-- the station names live in the panel, not the world.
+local function buildRack(name: string, x: number): Spec.PartSpec
     local base = Spec.part("Base", {
         Size = BASE_SIZE,
         CFrame = Spec.cframe({ x, BASE_Y, 0 }),
@@ -209,18 +164,9 @@ local function buildRack(name: string, letter: string, x: number): Spec.PartSpec
         Color = TIMBER_GREY,
         CanCollide = true,
     })
-    local plaque = Spec.part("Plaque", {
-        Size = PLAQUE_SIZE,
-        CFrame = Spec.cframe({ x, PLAQUE_Y, PLAQUE_Z }),
-        Material = "Wood",
-        Color = TIMBER_GREY,
-        CanCollide = false,
-        children = { plaqueFace(letter) },
-    })
     local main = tube(name, TUBE6_SIZE, x + TUBE6_X)
     main.properties.CanCollide = false
-    main.children =
-        { base, plaque, tube("Tube4", TUBE4_SIZE, x + TUBE4_X), tube("Tube2", TUBE2_SIZE, x + TUBE2_X) }
+    main.children = { base, tube("Tube4", TUBE4_SIZE, x + TUBE4_X), tube("Tube2", TUBE2_SIZE, x + TUBE2_X) }
     return main
 end
 
@@ -285,7 +231,7 @@ end
 function ProvingGround.build(): Spec.PartSpec
     local children: { Spec.PartSpec } = {}
     for _, station in ProvingGround.STATIONS do
-        local rack = buildRack(station.name, station.name, 0)
+        local rack = buildRack(station.name, 0)
         -- the rack part's own local CFrame, exactly as buildRack/tube composed it
         local rackLocal = { TUBE6_X, tubeY(TUBE6_SIZE), 0 }
         local localCF = Spec.cframe(rackLocal, Spec.ROT.CYL_VERTICAL)
