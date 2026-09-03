@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-27
+updated: 2026-09-03
 ---
 
 # Place State
@@ -42,9 +42,14 @@ Everything below marked *verified* was checked live via the Studio MCP on 2026-0
   SwitchbackDeck, BellDrive, FallsDock, BonshoBell, Torii, Shoro, ArenaSpawn,
   ShoroRoof, RanmaCarvings — matches the Rojo declaration; the once-noted stray
   top-level ShoroRoof/BonshoBell dupes are gone (0 found). Since 2026-08-15 the
-  declaration has also gained MachiyaApparel, MachiyaAccessories, MachiyaStats and
-  **Chaya** ([[chaya]], saved 2026-08-17) — a new stage child needs a Rojo RESTART, not
+  declaration has also gained MachiyaApparel, MachiyaAccessories, MachiyaStats,
+  **Chaya** ([[chaya]], saved 2026-08-17), **ProvingGround** and **HanabiyaRooftop**
+  ([[fireworks]]) — a new stage child needs a Rojo RESTART, not
   just a plugin reconnect, because `rojo serve` reads the project file once at startup.
+  ⚠ The two 2026-09 additions are read from `roblox/default.project.json` and
+  `WorkspaceConvention`, NOT from the place: **their presence in the saved place is
+  unverified here** and wants a Studio pass. Count the declaration rather than trusting
+  this list — it has been short before.
 - `CanyonWorld`: Arena (incl. `W##_*_Rocks/_VFX`, `FallsLanding`), Paths
   (`PathRailings` 5,186 descendants, `PathLanterns` 2,599), Structures (incl.
   `Chochin_Hanabiya`), **Legacy (empty — the 14 legacy teahouses were retired to

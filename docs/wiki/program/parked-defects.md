@@ -1,16 +1,19 @@
 ---
 shelf: program
 status: parked
-updated: 2026-09-04
-checked: 2026-09-04
+updated: 2026-09-03
 ---
 
 # Parked Defects
 
 Defects known and deliberately parked rather than fixed. (a)–(c) are parked at item 6 of
 [[friends-family-baseline]] by owner direction (2026-08-02: "log them for item 6").
-Every code claim below was re-verified against the working tree on **2026-08-27**, and every
-one is still present.
+**Most of this page is now history**: a struck-through heading carries the fix and its commit,
+and only **(f)**, **(i)** and **(j)** are still open — (f) undiagnosed, (i) and (j) gates on
+future work rather than live defects. The blanket line that used to sit here — *"every code
+claim below was re-verified on 2026-08-27, and every one is still present"* — was true when
+written and became false over the 2026-09-05 fix sweep; a struck heading is now the only
+statement of a defect's state.
 ⚠ **LINE NUMBERS HAVE BEEN REMOVED — they were wrong in 8 of 9 citations** while the page
 carried a `checked:` stamp asserting a re-read. Symbol names survive a refactor; line numbers do
 not, and a stale one sends a reader to unrelated code and quietly costs their trust in the page
@@ -189,7 +192,7 @@ which no test can see.)
 
 _(h) — the World Throw picked at random — was FIXED 2026-08-16, see [[world-throw]] and
 `log.md`. It is deliberately NOT active in any deployed environment yet: both prod and dev
-run `TEST_MODE`, which keeps the R→P→S cycle. Defect (e) therefore still stands._
+run `TEST_MODE`, which keeps the R→P→S cycle._
 
 ## ~~(l) tsukubai renders lying on its side~~ FIXED 2026-09-05 (`1684976`)
 

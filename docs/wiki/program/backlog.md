@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: open
-updated: 2026-09-05
+updated: 2026-09-03
 ---
 
 # Backlog
@@ -482,12 +482,15 @@ moves them, which is the accretion this page is trying to stop.
 
 Two threads named for the next session:
 
-1. **Promotion worksheets** — get more shells into the shop. Outstanding verdicts from the
-   vocabulary wave: wa, yashi, hotaru (with its canyon-sizzle tail), kamuro, ao (the blue
-   pick), midori/murasaki (shape picks), dan. The pipeline is FIVE guarded steps now
-   (catalog recipe + fixture id + server price/requirement + ShellDisplay + SHELL_MORTAR for
-   gear shells — the last two both CI-enforced). Proving range is the audition stage;
-   rail-mounted deck tubes are the buyer's experience.
+1. ~~**Promotion worksheets** — get more shells into the shop.~~ **CLOSED 2026-09-06: the
+   worksheet is empty.** Every family it listed as an outstanding verdict shipped (wa,
+   yashi, hotaru, kamuro, and dan — which shipped as **janken**), and ao/midori/murasaki
+   were reframed as collection colorways rather than shop shells by owner ruling, their
+   drafts pruned. `shared-fixtures/firework-shells.json` is the count. The pipeline is
+   still FIVE guarded steps (catalog recipe + fixture id + server price/requirement +
+   ShellDisplay + SHELL_MORTAR for gear shells — the last two both CI-enforced); proving
+   range is the audition stage, rail-mounted deck tubes are the buyer's experience. See
+   [[fireworks]].
 
 2. **Hanabiya shop dressing** — owner: the shop is "nothing but a table and bare walls";
    wants box art and merchandising mocked up for the shelves. New art/design thread: shell
@@ -497,8 +500,9 @@ Two threads named for the next session:
    designed yet; classify (likely brainstorm -> spec) at session start.
 
 Context that survives the night: rail mounts GATED with wobble+break ("perfect, looks
-great"); place save/publish still pending (unlocks the same-server rejoin verification);
-parked defects (i)-(k) untouched.
+great"); the place was saved and PUBLISHED 2026-09-06, which closed the pending
+same-server rejoin verification; parked defects (i)-(j) untouched — (k) was rotated
+and closed 2026-08-27 ([[parked-defects]]).
 
 ## The onboarding JOURNEY — a crafted path an 8-year-old can walk (owner, 2026-09-05)
 

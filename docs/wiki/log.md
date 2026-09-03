@@ -3744,3 +3744,105 @@ Compiles.spec.luau now runs every src file through Lune's embedded Luau
 compiler (O0 + O2) -- it reproduced the exact Studio error before the fix.
 Rule for new HUD sections: one top-level register per section, do-block the
 rest.
+
+## [2026-09-03] lint | Prose lint — a published rooftop battery filed as future work, and nine stamps dated in the future
+
+Third scheduled prose-lint run. It opens on `wiki/prose-lint-2026-08-31` rather than `main`,
+because **that branch's PR is still open and unmerged, and every one of `main`'s 33 lint errors
+is one of its pending fixes** — a fresh branch would have re-found and re-fixed the same
+defects. Its head is lint-clean and carries `main` through `b15d128`, so it is the honest
+baseline. Merging this branch delivers both runs.
+
+⚠ **THE HANABIYA ROOFTOP BATTERY IS BUILT, GATED AND PUBLISHED TO PLAYERS, AND THE `world/`
+SHELF DOES NOT KNOW IT EXISTS.** It is a Rojo-managed stage child
+(`roblox/assets/HanabiyaRooftop.model.json`, declared in `default.project.json`, listed in
+`WorkspaceConvention`), it is the SIXTH entry in `ProvingPlan.RACKS` — a virtual rack the server
+resolves to one of the rooftop's tube mounts — and it reached players in the 2026-09-06 publish.
+Its only prose records were `log.md` and the **future** "Rooftop MC experience" item on
+[[backlog]]. **Live as-built knowledge filed on the status shelf is the dominant defect class
+this pass exists to find**, and this is the largest instance yet: a whole structure. Recorded as
+a gap on [[fireworks]] and [[hanabiya]] rather than authored — writing the as-built is the
+owner's or the authoring session's, not a lint pass's.
+
+⚠ **NINE PAGES CARRY A STAMP DATED AFTER TODAY, AND THE COUNT IS GROWING.** The 2026-08-31 run
+reported three (`fireworks`, `familiars`, `blender-working-rules`, all 2026-09-04); it is now
+nine, spanning 2026-09-04 to **2026-09-06**, plus **34 `log.md` entries** dated 2026-09-04..06
+that sit ABOVE entries dated 2026-09-03 — so the append-only chronology no longer reads in
+order. The newest commit on `main` is dated 2026-09-03 and so is this container's clock.
+**This is not cosmetic: a future `updated:` silences rule 10's staleness block until that date
+arrives**, and the harm is demonstrable — [[fireworks]] cites code committed 2026-09-02 while
+stamped 2026-09-04, so check 9 never fired, and nobody re-read it while a twelve-shell sprint
+and a rooftop battery landed on its subject. The four pages this run edited now carry honest
+2026-09-03 stamps; the other five, and the log headings, need a ruling on whose clock was right
+before anyone rewrites recorded history in an append-only file.
+
+⚠ **[[parked-defects]] OPENED BY CONTRADICTING ITS OWN BODY.** Its header asserted *"every code
+claim below was re-verified on 2026-08-27, and every one is still present"* over a page where
+ten of fifteen headings are struck through as FIXED. Worse, its closing note still read
+*"Defect (e) therefore still stands"* — (e) is fixed, verified: `testModePhaseShift` continues
+the TEST_MODE cycle from the newest persisted round's face (`server/src/index.ts`,
+`testModeCycle.ts`, with its own test file). Both superseded per rule 2. The struck headings
+themselves were spot-checked and are honest: (a) is one atomic `findOneAndUpdate`, (c) has 14
+`RESOLVE_FAILED` sites answering 404 and none answering 500, (o) is a digits-only
+`router.param` guard. Only **(f)**, **(i)** and **(j)** are still open.
+
+**[[fireworks]]'s proving-panel grammar described a UI that no longer exists.** It named modes
+*"single (rack A–E selector), ladder (variants side-by-side), sequence (2s apart)"*; the racks
+were renamed and scattered, the plaques came off, stations went multi-select, and the verbs are
+now Fire / Ladder / Seq / Boost with Ladder walking the SELECTED stations one beat apart.
+Replaced with the current grammar and a pointer to `ProvingPlan`'s constants rather than fresh
+transcriptions (rule 9).
+
+**[[backlog]]'s morning agenda listed as outstanding what had already shipped.** Its promotion
+worksheet named wa, yashi, hotaru, kamuro, ao, midori/murasaki and dan as awaiting verdicts;
+all shipped (dan as **janken**) or moved to collections, and `shared-fixtures/firework-shells.json`
+carries twelve ids. Its overnight context also said the place publish was still pending — it
+happened 2026-09-06 — and listed parked defects "(i)-(k)" when (k) closed 2026-08-27. ⚠ **A
+dated agenda is the shortest-lived thing on a status page and nothing expires it**; this is the
+same shape as the (a)–(c) letter drift the last run caught on [[friends-family-baseline]].
+
+**[[place-state]]'s stage-child list was two short.** The declaration has gained `ProvingGround`
+and `HanabiyaRooftop`; both are added, and marked as read from the declaration rather than from
+the place, which no session can check from git.
+
+### Read at depth (11 shelf pages, plus index, schema and this file)
+
+Cited code changed: [[fireworks]], [[backlog]], [[parked-defects]], [[place-state]],
+[[hanabiya]] — the four the 2026-08-31 run named as "changed heavily and NOT re-read; start
+there next run", plus the shop page the rooftop hangs off. Rotation, oldest stamps first (the
+2026-08-15 cohort): [[bake-isolation]], [[destructive-bake-guard]], [[editablemesh-gotchas]],
+[[perf-harness-contamination]], [[build-recipes]], [[bell-engine]], [[paths]], [[water-audio]].
+
+All seven rotation pages but `water-audio` verified clean and are stamped. Verifications that
+could have changed a verdict and did not: every builder and tool path on [[build-recipes]]
+resolves (12 of 12); `TRAIL_MAX_GRADE` 0.34, `FLAT_MAX_GRADE` 0.10 and `SURFACE_K` 0.47 hold
+for [[paths]]; [[bell-engine]]'s mirrored constants all hold — `CAM_AXLE_YZ` (120.7, 11),
+`JACK_AXLE_XZ` (−15, 11), `LANTERN_RATIO` 12/9, `faceWheelMainPhaseDeg` −7,
+`bearingPlinthTop` 113.6 — and its `gongStrike`, which resolves nowhere, is CORRECT writing:
+the event existed and was deleted by `a77fe4f`, and the page names it only to say the drum is
+keyed off `gongHit` instead.
+
+⚠ **[[water-audio]] was read end to end and deliberately NOT stamped.** Its load-bearing facts
+are all place-only — 17 emitters, their volumes, rolloffs and stagger attributes — and nothing
+in git can confirm them. Nothing on it contradicts anything; a `checked:` would assert a
+verification this session cannot perform. Left for a Studio pass.
+
+⚠ **NOT READ — 43 pages, and no claim is made about them.** All of `systems/`; the rest of
+`program/`; 14 `world/` pages; 16 `practice/` pages. The 2026-08-31 run's two standing reports
+are still unactioned and are inherited rather than re-found: the Luau 200-register compiler
+trap and its `Compiles.spec.luau` gate live only in this chronology and belong on
+[[misc-engine-traps]], and the mobile pass's portrait cluster, tap-to-fire rail and
+`HudLayout.clusterRef` are still absent from [[round-and-hud]], which describes a
+bottom-right cluster with no orientation behaviour at all.
+
+⚠ **Studio-dependent and NOT verified:** whether `ProvingGround` and `HanabiyaRooftop` are
+actually present in the saved place; the rooftop's aim and tube mounts; all 17 water emitters
+and the stagger Script; [[paths]]'s railing and lantern descendant counts and its six yamadoro;
+[[bell-engine]]'s live-tune stage attributes and geometry.
+
+**A false positive worth recording, because it nearly became a finding.** A sweep for a term
+across `docs/wiki/` filtered with `grep -v log.md` reported the rooftop appearing NOWHERE
+outside the chronology. **`backlog.md` contains the substring `log.md`**, so the filter was
+silently eating the one page that mattered — and the first draft of this run's headline was
+therefore wrong in a way that read more alarming than the truth. Use `--exclude=log.md`. The
+finding survived re-checking; the phrasing did not.

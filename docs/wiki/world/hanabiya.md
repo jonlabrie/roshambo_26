@@ -1,7 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-15
-checked: 2026-08-26
+updated: 2026-09-03
 ---
 
 # Hanabiya
@@ -36,6 +35,14 @@ Program context: [[item-4-merchant-row]].
   `MouseBehavior = Default` from `BindToRenderStep` at RenderPriority.Camera+1 and
   touches the camera not at all — took three commits; the owner caught both wrong
   ones.
+- ⚠ **THE ROOFTOP BATTERY IS BUILT AND NOT WRITTEN UP HERE.** A second Rojo-managed
+  stage child hangs off this building — `roblox/assets/HanabiyaRooftop.model.json`,
+  declared in `default.project.json` and listed in `WorkspaceConvention` — a launch
+  platform carrying a three-tube battery, aimed north over the arena, gated and
+  published to players 2026-09-06. Nothing on this shelf describes it; its only prose
+  records are `log.md` and the FUTURE "Rooftop MC experience" item on [[backlog]]. See
+  [[fireworks]], where it is also the sixth virtual proving rack. The as-built section
+  is owed and needs the owner or the authoring session, not a lint pass.
 
 ## Gates & decisions
 
