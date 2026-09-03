@@ -17,12 +17,8 @@ local FireworkDrafts = {}
 -- COLLECTIONS. The ao/midori/murasaki hue families that auditioned here were reframed as
 -- collection palette material and pruned -- git history is the archive (last present at
 -- commit 2cd90b4, with the ao and shapeTrio helpers).
--- 段 dan, the three-act show (owner design 2026-09-06, superseding the vocabulary-era
--- demo): act one, four SMALL peonies in colors dealt per shell from a five-color deck,
--- staggered; act two, the strobe with its pops and sizzle; act three, WHIZZERS -- comets
--- racing off in random directions, whistling, dead in half a second. The boost (the
--- audition's `boosted`) adds the encore: a salute salvo after the whizzers. L tube +
--- heavy (owner ruling). The ladder varies WHIZZER COUNT: v1 = 3, v2 = 4, v3 = 5.
+-- 段 dan, the three-act show (owner design 2026-09-06): act one, four SMALL peonies in
+-- colors dealt per shell from this five-color deck; acts two and three below. L + heavy.
 local DAN_COLORS = {
     { 170, 60, 255 }, -- violet
     { 60, 255, 110 }, -- green
