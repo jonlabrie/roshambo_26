@@ -33,7 +33,8 @@ local board = Instance.new("Part")
 board.Name = "ModelTeahouseSign"
 board.Size = SIGN_SIZE
 -- centre a half-thickness proud of the wall, at head height, front face toward the path
-local pos = WALL_HIT + NORMAL * (SIGN_SIZE.Z / 2 + 0.05) + Vector3.new(0, 0.5, 0)
+-- was +0.5; owner gate 2026-09-03: "needs to drop a stud"
+local pos = WALL_HIT + NORMAL * (SIGN_SIZE.Z / 2 + 0.05) + Vector3.new(0, -0.5, 0)
 board.CFrame = CFrame.lookAt(pos, pos + NORMAL)
 board.Anchored = true
 board.CanCollide = false
@@ -53,28 +54,41 @@ local label = Instance.new("TextLabel")
 label.BackgroundTransparency = 1
 label.Size = UDim2.fromScale(0.78, 1)
 label.Position = UDim2.new(0, 0, 0, 0)
-label.Font = Enum.Font.GothamBold
+-- Josefin Sans (owner direction 2026-09-03: "a sans that's a little less modern...
+-- part of the 'resort-ish' identity"): a 1920s-flavoured geometric — deco-resort,
+-- where GothamBold read contemporary. Pending the owner's look; record in
+-- docs/wiki/world/visual-identity.md once gated.
+label.FontFace = Font.new("rbxasset://fonts/families/JosefinSans.json", Enum.FontWeight.SemiBold)
 label.TextColor3 = COPY
 label.TextScaled = true
 label.Text = "Model Teahouse"
 label.Parent = gui
 
--- the arrow: shaft + two chevron strokes, viewer's right
+-- The arrow: shaft + two chevron strokes meeting at a RIGHT-side tip. GuiObject.Rotation
+-- rotates about the frame's CENTRE (AnchorPoint moves only the position reference), so each
+-- stroke's centre is computed by walking back from the tip along the stroke's own axis —
+-- the first attempt anchored the strokes' ends instead and produced a "<".
+local TIP = Vector2.new(500, 70) -- canvas is 520 x 140
+local STROKE_L = 34
 local shaft = Instance.new("Frame")
 shaft.BackgroundColor3 = COPY
 shaft.BorderSizePixel = 0
 shaft.Size = UDim2.fromOffset(70, 12)
-shaft.AnchorPoint = Vector2.new(0, 0.5)
-shaft.Position = UDim2.fromScale(0.8, 0.5)
+shaft.AnchorPoint = Vector2.new(0.5, 0.5)
+shaft.Position = UDim2.fromOffset(TIP.X - 4 - 35, TIP.Y)
 shaft.Parent = gui
-for _, rot in { -40, 40 } do
+for _, sign in { -1, 1 } do
+    -- direction from the stroke's far end TO the tip: down-right for the top stroke
+    -- (gui Y grows downward), up-right for the bottom one.
+    local dir = Vector2.new(math.cos(math.rad(40)), sign * math.sin(math.rad(40)))
+    local centre = TIP - dir * (STROKE_L / 2)
     local stroke = Instance.new("Frame")
     stroke.BackgroundColor3 = COPY
     stroke.BorderSizePixel = 0
-    stroke.Size = UDim2.fromOffset(34, 12)
-    stroke.AnchorPoint = Vector2.new(1, 0.5)
-    stroke.Position = UDim2.new(0.8, 78, 0.5, rot < 0 and -9 or 9)
-    stroke.Rotation = rot
+    stroke.Size = UDim2.fromOffset(STROKE_L, 12)
+    stroke.AnchorPoint = Vector2.new(0.5, 0.5)
+    stroke.Position = UDim2.fromOffset(centre.X, centre.Y)
+    stroke.Rotation = sign * 40
     stroke.Parent = gui
 end
 
