@@ -33,11 +33,13 @@ describe("OnboardingBeats — the journey's chain", function()
         expect(byId.modelHome.advanceOn).toBe(nil)
     end)
 
-    test("the welcome carries three pages and copy is page one", function()
+    test("the welcome carries four pages and copy is page one", function()
+        -- Four, not three, since the owner's 2026-09-03 copy pass: what this is / the drum
+        -- and the world throw / reading the crowd via the tape / the handoff into throwing.
         local welcome = Beats.BEATS[1]
         expect(welcome.event).toBe("join")
         expect(welcome.pages ~= nil).toBe(true)
-        expect(#welcome.pages).toBe(3)
+        expect(#welcome.pages).toBe(4)
         for _, page in welcome.pages do
             expect(#page > 0).toBe(true)
         end
@@ -60,15 +62,19 @@ describe("OnboardingBeats — the journey's chain", function()
         end
     end)
 
-    test("no copy uses gambling vocabulary (owner ruling)", function()
-        -- 'pot', 'ride', 'stake', 'wager', 'bet' are banned near points; 'pile' is the
-        -- sanctioned replacement. Checked on WORD BOUNDARIES ('%f[%a]bet%f[%A]') so 'better'
-        -- or a future 'bets' can't slip past on a substring technicality.
+    test("no copy uses wager vocabulary (owner ruling)", function()
+        -- 'ride', 'stake', 'wager', 'bet' are banned near points. 'pot' left this list on
+        -- 2026-09-03: the ruling's target was UNEXPLAINED gambling jargon ("only if you know
+        -- what a 'pot' is"), and the owner's win-beat copy now TEACHES the term in the same
+        -- breath it uses it ("BANK it, or leave it in the POT") — teach-then-use is the
+        -- standard, not a euphemism treadmill. Checked on WORD BOUNDARIES
+        -- ('%f[%a]bet%f[%A]') so 'better' or a future 'bets' can't slip past on a substring
+        -- technicality.
         for _, b in Beats.BEATS do
             local pages = b.pages or { b.copy }
             for _, text in pages do
                 local lower = text:lower()
-                for _, banned in { "pot", "ride", "stake", "wager", "bet" } do
+                for _, banned in { "ride", "stake", "wager", "bet" } do
                     expect(lower:find("%f[%a]" .. banned .. "%f[%A]")).toBe(nil)
                 end
             end

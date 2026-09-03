@@ -24,12 +24,14 @@ export type Beat = {
 }
 
 -- The welcome sequence (owner, 2026-09-03): the one deliberate exception to "never read
--- ahead" — a cold F&F guest needs the core context at join. Three pages, one tap each:
--- the new kind of RPS / the world throw's source + streaks / what points are for.
+-- ahead" — a cold F&F guest needs the core context at join. Four pages, one tap each, in the
+-- owner's own words (copy-workshop pass, same day): what this is / where the world throw
+-- shows / how to read the crowd / the handoff into the first throw.
 local WELCOME_PAGES = {
-    "This is Roshambo — Rock, Paper, Scissors, but you're playing against the whole world at once.",
-    "Every minute the big drum throws what most of the world picked. Beat it and your pile grows — every win in a row triples it. Read the crowd.",
-    "Bank your points and they're yours — for fireworks, and one day a teahouse of your own. The drum's about to throw.",
+    "Welcome to Roshambo — Rock, Paper, Scissors against Everyone, Everywhere, at the same time.",
+    "The Throw drum atop the Bonsho bell spins every minute to show the world throw — what most people threw.",
+    "You want to beat that throw, so you need to read the crowd. The last five world throws are below the throw buttons, left to right.",
+    "Go ahead and try to beat the world by choosing your first throw now.",
 }
 
 OnboardingBeats.BEATS = {
@@ -38,13 +40,24 @@ OnboardingBeats.BEATS = {
     {
         id = "win",
         event = "win",
-        copy = "You won! Every win triples your pile — or tap BANK to keep it forever.",
+        -- Owner's words (2026-09-03 copy workshop). "POT" is deliberate: the original ruling's
+        -- target was UNEXPLAINED gambling jargon ("only if you know what a 'pot' is"), and this
+        -- line teaches the term in the same breath it uses it. The wager-class words (ride,
+        -- stake, wager, bet) stay banned — see the vocabulary test.
+        copy = "You won your first point! You can BANK it, or leave it in the POT."
+            .. " If you win again (before a loss) then points in the pot are tripled!",
         anchor = "potIndicator",
     },
     {
         id = "bank",
         event = "bank",
-        copy = "Yours forever! Tap the clock to see your points. Tap again for everything.",
+        -- Owner's words, plus one kept sentence: the clock-gesture teach. The ring looks like
+        -- a readout, not a button (spec §6 ruling), and this beat is the only surface that
+        -- ever teaches the tap — the gesture test below pins it.
+        copy = "You're on your way to becoming a globally ranked Roshambo player!"
+            .. " Points earned always count towards leveling, but they can also be spent to buy"
+            .. " stuff like fireworks and a private place to hang out with friends."
+            .. " Tap the clock to see your points; tap again for everything.",
         anchor = "wallet",
     },
     -- ===== The tour (spec §2/§4): earned by banking, walked by the beam =====
