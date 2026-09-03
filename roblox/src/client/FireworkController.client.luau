@@ -439,6 +439,18 @@ local function fireBurst(
     local particles = if #frames == 1 and ev.points > 1 then ev.particles * ev.points else ev.particles
 
     local texture = ev.texture or BurstStyles.TEXTURES[style.textureRole]
+    -- Per-point texture pins SHUFFLE per shell (owner, 2026-09-06: the glyph-to-arm
+    -- assignment was frozen -- "rock top right, paper top left, scissors below" every
+    -- time). Seeded Fisher-Yates on a copy: same deal on every client, different deal
+    -- per shell.
+    local pointTextures = ev.textures
+    if pointTextures then
+        pointTextures = table.clone(pointTextures)
+        for i = #pointTextures, 2, -1 do
+            local j = rng:NextInteger(1, i)
+            pointTextures[i], pointTextures[j] = pointTextures[j], pointTextures[i]
+        end
+    end
     -- COLOR OVER LIFE (owner, 2026-09-03): the star IGNITES near-white, settles to the
     -- shell's saturated color for the body of the burn, and embers into the edge color at
     -- death. The heat lives HERE, not in Brightness — brightness past ~8 saturated every
@@ -505,7 +517,7 @@ local function fireBurst(
             * CFrame.Angles(math.rad(f.rot[1]), math.rad(f.rot[2]), math.rad(f.rot[3]))
         -- Per-POINT texture pins (owner, 2026-09-06: dan's triple bloom, one throw
         -- glyph per arm) override the phase texture, which overrides the style role.
-        em.Texture = (ev.textures and ev.textures[i]) or texture
+        em.Texture = (pointTextures and pointTextures[i]) or texture
         em.Color = color
         em.Size = size
         em.Speed = speed

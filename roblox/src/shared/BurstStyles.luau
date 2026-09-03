@@ -419,9 +419,13 @@ local POINT_RULES: { [string]: (n: number, scatter: number, rand: () -> number) 
 
     circle = function(n, scatter, rand)
         local radius = math.max(scatter, 2)
+        -- The whole circle spins to a random heading per shell (2026-09-06): invisible
+        -- on symmetric arms (a palm's arms are identical), it un-pins textured arms --
+        -- dan's glyph triangle sat in the same orientation every shell.
+        local baseRot = rand() * 360
         local frames = {}
         for i = 1, n do
-            local angleDeg = (i - 1) / n * 360 + rand() * 20
+            local angleDeg = baseRot + (i - 1) / n * 360 + rand() * 20
             local angleRad = math.rad(angleDeg)
             local cosA, sinA = math.cos(angleRad), math.sin(angleRad)
             local rx = math.deg(math.atan2(CIRCLE_TILT_SIN * sinA, CIRCLE_TILT_COS))
