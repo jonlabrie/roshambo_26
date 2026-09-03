@@ -559,6 +559,18 @@ local function play(payload: any, distance: number)
     local rng = Random.new(payload.seed)
     -- One voice-speed per shell, drawn FIRST so its position in the stream is stable.
     local soundSpeed = 0.92 + rng:NextNumber() * 0.16
+    -- FUSE VARIANCE (owner, 2026-09-06: a six-station volley broke in perfect lockstep —
+    -- "they all detonate simultaneously... isn't there variability between shells?").
+    -- Every shell's build was already its own — scatter, apex, boost roll, sounds — but
+    -- the TIMELINE was recipe-exact, so same-frame launches broke same-frame. A seeded
+    -- ±6% stretch on every phase time gives each shell its own fuse, the way real fuses
+    -- run fast or slow: a 3s flight lands anywhere in ~2.82-3.18s, multi-act spacing
+    -- scales with it, and the at=0 launch stays on the command. Drawn here (before
+    -- last/tail derive) so release margins ride the stretched clock too.
+    local fuseScale = 0.94 + rng:NextNumber() * 0.12
+    for _, ev in schedule do
+        ev.at *= fuseScale
+    end
     local origin = payload.origin
     -- THE HEADING (rail-mounts, 2026-09-04): a muzzle launch from a player's own deck sends a
     -- unit vector the flight rides along; every other launch site (public sites, proving range,
