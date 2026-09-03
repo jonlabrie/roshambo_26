@@ -58,7 +58,8 @@ type Slot = {
     trail: Trail,
     points: { BasePart },
     emitters: { ParticleEmitter },
-    sound: Sound,
+    sound: Sound, -- burstVoices[1]; kept as the named main voice
+    burstVoices: { Sound }, -- rotated per break phase so adjacent breaks never share
     tail: Sound, -- the SECOND voice: a style's tailSound (the owner's canyon sizzle over
     -- hotaru's final flicker) deliberately OVERLAPS the burst's decay, so it cannot share
     -- the main Sound -- that one's SoundId swap would cut whichever clip was still playing.
@@ -130,15 +131,24 @@ for _ = 1, POOL_SIZE do
     trail.Enabled = false
     trail.Parent = shell
 
-    -- ONE Sound per slot, not one per phase. A shell's phases never overlap in time, and a
-    -- sub-burst volley plays ONE report rather than six — six voices of one clip is noise and six
-    -- times the mixer cost.
-    local snd = Instance.new("Sound")
-    snd.RollOffMode = Enum.RollOffMode.InverseTapered
-    snd.Volume = BurstStyles.SOUND_LEVELS.volume
-    snd.RollOffMinDistance = BurstStyles.SOUND_LEVELS.rolloffMin
-    snd.RollOffMaxDistance = BurstStyles.SOUND_LEVELS.rolloffMax
-    snd.Parent = shell
+    -- THREE burst voices, rotated per break. The original "one Sound per slot -- a shell's
+    -- phases never overlap" assumption died with multi-burst shells: hotaru-boosted's two
+    -- clouds sit 0.5s apart and dan's acts 0.6s, while a break clip runs ~2s -- one voice
+    -- meant every following break CUT the previous boom mid-ring (owner, 2026-09-06:
+    -- "at least one burst has no associated aerial audio... cut off by the previous or
+    -- next wave"). Three voices cover any adjacent trio; a sub-burst volley still plays
+    -- ONE report per phase, never one per point.
+    local burstVoices: { Sound } = {}
+    for _ = 1, 3 do
+        local v = Instance.new("Sound")
+        v.RollOffMode = Enum.RollOffMode.InverseTapered
+        v.Volume = BurstStyles.SOUND_LEVELS.volume
+        v.RollOffMinDistance = BurstStyles.SOUND_LEVELS.rolloffMin
+        v.RollOffMaxDistance = BurstStyles.SOUND_LEVELS.rolloffMax
+        v.Parent = shell
+        table.insert(burstVoices, v)
+    end
+    local snd = burstVoices[1]
 
     local tailSnd = Instance.new("Sound")
     tailSnd.RollOffMode = Enum.RollOffMode.InverseTapered
@@ -231,6 +241,7 @@ for _ = 1, POOL_SIZE do
         points = points,
         emitters = emitters,
         sound = snd,
+        burstVoices = burstVoices,
         tail = tailSnd,
         salvoVoices = salvoVoices,
         launchVoices = launchVoices,
@@ -249,25 +260,33 @@ end
 -- over the speed of sound — the flash is instant, the thump crosses the canyon. Per client,
 -- so the bridge hears it tight and FallsLanding hears the ~0.17s of physics. Phase order is
 -- safe: every phase of one shell gets a near-identical delay, so nothing reorders.
-local function playSound(slot: Slot, id: string?, audible: boolean, from: Vector3, speed: number?)
+local function playSound(
+    slot: Slot,
+    id: string?,
+    audible: boolean,
+    from: Vector3,
+    speed: number?,
+    voice: Sound?
+)
     if not (id and audible) then
         return
     end
     local cam = workspace.CurrentCamera
     local dist = if cam then (cam.CFrame.Position - from).Magnitude else 0
+    local snd = voice or slot.sound
     local function fire()
-        slot.sound.SoundId = id
+        snd.SoundId = id
         -- Per-shell jitter (seeded, so every client hears the same shell the same way):
         -- ±8% speed shifts pitch and length together, and even one clip stops sounding
         -- like itself on repeat (owner, 2026-09-04: "they all sound the same"). The birds
         -- run ±3% for the same reason.
-        slot.sound.PlaybackSpeed = speed or 1
-        slot.sound:Play()
+        snd.PlaybackSpeed = speed or 1
+        snd:Play()
         -- Seek past a clip's measured pre-roll so the transient lands ON the event
         -- (BurstStyles.SOUND_TRIMS; the deck-launch thump carried ~0.2s of head).
         local trim = BurstStyles.SOUND_TRIMS[id]
         if trim then
-            slot.sound.TimePosition = trim
+            snd.TimePosition = trim
         end
     end
     local delay = dist / BurstStyles.SOUND_LEVELS.speedOfSound
@@ -615,6 +634,7 @@ local function play(payload: any, distance: number)
     end
 
     active += weight
+    local burstsPlayed = 0 -- rotates this shell's break audio across the slot's burst voices
     for _, ev in schedule do
         -- The at=0 report runs INLINE: task.delay(0) costs a Heartbeat, and that frame plus
         -- playSound's own hop plus the clip's attack was the launch-thump lag a listener at
@@ -996,7 +1016,10 @@ local function play(payload: any, distance: number)
                         soundId = BurstStyles.BONUS.sound
                     end
                 end
-                playSound(slot, soundId, lod.sound, anchorPos, soundSpeed)
+                -- Rotate the burst voice so this break never cuts the previous one's clip.
+                burstsPlayed += 1
+                local burstVoice = slot.burstVoices[((burstsPlayed - 1) % #slot.burstVoices) + 1]
+                playSound(slot, soundId, lod.sound, anchorPos, soundSpeed, burstVoice)
                 -- The tail voice: a style's second sound, entering its own delay after the
                 -- break (plus the same speed-of-sound travel), on the slot's SEPARATE tail
                 -- Sound so it can overlap the burst clip's decay.
