@@ -3187,6 +3187,36 @@ same as right. **Either add `fix` and `correction` to `LOG_KINDS` in `tools/wiki
 8, or expect this correction every run** — authors reach for these words because the vocabulary is
 missing them.
 
+**A fifth advance, and it retired a standing rule this run had already stamped.**
+[[misc-engine-traps]]'s iOS WebAudio section told the reader to *"keep listening until
+`ctx.state === 'running'` is actually observed, and only then unbind."* `d5187da` proves that
+insufficient: iOS re-suspends or INTERRUPTS the context on lock, backgrounding and calls, the
+`visibilitychange` nudge's `resume()` is refused outside a gesture, and with the listeners gone no
+tap can repair it — audio death was sticky until a lucky reload, which is exactly why the flake
+read as random. The rule is now **never disarm**. ⚠ **A PAGE THAT TELLS YOU TO DO THE THING THAT
+WAS JUST PROVEN INSUFFICIENT IS WORSE THAN A SILENT ONE**, and this one carried a `checked:` stamp
+from two days earlier — correct when written, wrong within 48 hours. Corrected, and the stamp came
+off with the body edit. Its own regression (`6f8e2c0` — the buffer load sat behind the resume's
+early return, so a desktop context born `running` never loaded the bell at all) is recorded beside
+it: work needing no gesture and no running context must run BEFORE the state check.
+
+⚠ **THE NEW `visual-identity` PAGE SHIPPED AS AN ORPHAN.** It says *"check here before generating
+ANY art that represents a game concept"* and exists because a session invented literal
+rock/paper/scissors sprites while the approved glyphs sat in the repo — yet no page linked to it,
+so nobody about to make art would arrive. [[blender-pipeline]]'s SDF-glyph section now points at
+it: that section is how the glyph images are RASTERISED, and the new page is what the marks ARE.
+⚠ **A rule page nothing links to is a rule nobody reads**, and `index.md` alone does not close
+that — the lint's orphan check is the only thing that noticed.
+
+⚠ **AND THE LOG VOCABULARY IS NOT SETTLING — this is the third normalisation in a week.** Seven
+more entries arrived outside rule 8, adding `built` and `reverted` to the pile: the undefined
+kinds now number SIX (`fix`, `fixed`, `shipped`, `correction`, `built`, `reverted`) against the
+eight that are defined. Mapped `shipped`/`built` → `ship`, `reverted` → `drop`, `correction` →
+`audit`. **The vocabulary is being voted against by everyone writing in it.** `fix` and
+`correction` in particular name events this project has constantly and rule 8 cannot express;
+adding them to `LOG_KINDS` costs one line and ends a recurring correction that is otherwise
+permanent.
+
 ⚠ **`falls-dock` and `blender-pipeline` were read and deliberately NOT stamped `checked:`.**
 `falls-dock` rests on emitter positions, a place-only `UguisuScheduler` Script and asset ids only
 Studio can confirm; `blender-pipeline` still teaches the plane bisect for splitting a bill, which
@@ -3477,7 +3507,7 @@ families pruned, archived at `2cd90b4`. Worksheet remainder: hotaru, kamuro,
 dan. Dev backend redeployed (App Runner op 6032e84c). Server suite green
 (one socketAdapter identity-claim flake observed, passed on rerun).
 
-## [2026-09-06] built | The salute class, first-class -- and the L budget weight
+## [2026-09-06] ship | The salute class, first-class -- and the L budget weight
 
 A day of owner-driven iteration on kamuro ("not flashy enough"):
 (1) boost.salvo machinery -- N flash-and-bang salutes, variable grouping, each
@@ -3498,7 +3528,7 @@ heavy-must-be-mortar:L fixture-enforced. Kamuro: heavy, spread 60, streaks
 Also: proving panel now opens at night (owner default), drive-by rng lockstep
 fix (double-tap draw was inside the per-client audio gate).
 
-## [2026-09-06] shipped | Kamuro: the L tube's cheap round
+## [2026-09-06] ship | Kamuro: the L tube's cheap round
 
 Owner: "an inexpensive shell for the large tube -- a cheap round to show off
 the big gun." Price 10, mortar:L, five guarded steps run (`3115d8d`), kamuro
@@ -3506,7 +3536,7 @@ draft family pruned. First shell of the heavy class -- weighted-admission
 budget, L grunt launch, always-boom break, salvo kicker -- all live in one
 SKU. Dev backend redeployed (op 962b864b). Worksheet remainder: hotaru, dan.
 
-## [2026-09-06] shipped | The pity ramp -- bounded droughts on every boosted shell
+## [2026-09-06] ship | The pity ramp -- bounded droughts on every boosted shell
 
 The owner lived the flat-30% failure mode (0 boosts in 10 kamuro, filed as a
 bug; a live rng tap proved the math healthy -- 3 boosted in the next 13,
@@ -3517,7 +3547,7 @@ per-shell streaks (session-lived); verdict in the launch payload -- all
 clients render the same luck; proving range deliberately stays on the raw
 floor. Applies to every boosted shell automatically (kiku, wa, yashi, kamuro).
 
-## [2026-09-06] reverted | The fat L trail: three geometry strategies, three failures, clean retreat
+## [2026-09-06] drop | The fat L trail: three geometry strategies, three failures, clean retreat
 
 Attempted to double heavy shells' comet width. What was learned, at the cost
 of an hour of owner-in-the-loop darts: a Trail draws its FULL attachment span
@@ -3531,7 +3561,7 @@ PARKED as a design item: a bigger heavy ascent probably wants a different
 tool -- e.g. a per-slot particle-emitter comet for heavy shells -- and a
 Studio session with screenshots, not live iteration on a player's evening.
 
-## [2026-09-06] shipped | The heavy comet layer -- the L ascent reads big without touching the Trail
+## [2026-09-06] ship | The heavy comet layer -- the L ascent reads big without touching the Trail
 
 After the three-failure retreat, the layered approach worked first try: a
 dedicated Rate-driven emitter (the system's only one) streams burning-debris
@@ -3539,7 +3569,7 @@ sparks behind the rising heavy shell; the pinned trails-approved Trail is
 untouched. Owner-tuned in one pass (rate 90, size 0.45->0.12, fall -18) and
 approved: "looking good. ship it." `7c96c43`, `6a0974b`.
 
-## [2026-09-06] shipped | Hotaru: the firefly, and the strobe finds its voice
+## [2026-09-06] ship | Hotaru: the firefly, and the strobe finds its voice
 
 Worksheet session closed three audio defects before the ship: (1) multi-burst
 shells were cutting their own booms -- the "one Sound per slot, phases never
@@ -3553,7 +3583,7 @@ spacing: the boosted second cloud waits 0.9s (was 0.5). Rulings: v3 floor
 M tube (comet automatic), price 8. Five steps run (`439aae1`), drafts pruned
 -- ONLY DAN remains on the worksheet. Dev backend op de6d2346.
 
-## [2026-09-06] correction | Invented glyphs ripped out; the canonical marks fly instead
+## [2026-09-06] audit | Invented glyphs ripped out; the canonical marks fly instead
 
 A session generated literal rock/paper/scissors sprites for dan's glyph act
 while the approved marks (ring/bar/caret, `Glyphs.luau`, shared with the PWA,
