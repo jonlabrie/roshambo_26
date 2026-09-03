@@ -774,6 +774,44 @@ describe('/api/v1', () => {
             const u = await User.findOne({ robloxId: '971402' });
             expect(u?.portalOwned).toBe(true);
         });
+
+        it('POST purchase starter grants deck S + teahouse S and deducts 20', async () => {
+            await User.create({ robloxId: '900060', totalPoints: 25 });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const res = await request(app)
+                .post('/api/v1/players/900060/purchase').set('X-API-Key', API_KEY).send({ item: 'starter' }).expect(200);
+            expect(res.body.maxDeckSize).toBe('S');
+            expect(res.body.teahouseSizes).toEqual(['S']);
+            expect(res.body.totalPoints).toBe(5);
+        });
+
+        it('POST purchase starter rejects an existing owner with ALREADY_OWNED', async () => {
+            await User.create({ robloxId: '900061', totalPoints: 1000, maxDeckSize: 'S' });
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .post('/api/v1/players/900061/purchase').set('X-API-Key', API_KEY).send({ item: 'starter' }).expect(400);
+            expect(res.body.error).toBe('ALREADY_OWNED');
+        });
+
+        it('two concurrent starter purchases resolve to exactly one sale', async () => {
+            await User.create({ robloxId: '900062', totalPoints: 40 });
+            const app = makeApp(makeEngine(), new ResultsStore());
+            const fire = () => request(app)
+                .post('/api/v1/players/900062/purchase').set('X-API-Key', API_KEY).send({ item: 'starter' });
+            const [a, b] = await Promise.all([fire(), fire()]);
+            const statuses = [a.status, b.status].sort();
+            expect(statuses[0]).toBe(200);
+            expect(statuses[1]).toBeGreaterThanOrEqual(400);
+            const after = await User.findOne({ robloxId: '900062' });
+            expect(after!.totalPoints).toBe(20); // one deduction, never two
+            expect(after!.maxDeckSize).toBe('S');
+        });
+
+        it('GET economy catalog carries the starter price', async () => {
+            await User.create({ robloxId: '900063', totalPoints: 0 });
+            const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                .get('/api/v1/players/900063/economy').set('X-API-Key', API_KEY).expect(200);
+            expect(res.body.catalog.starter).toBe(20);
+        });
     });
 
     describe('fireworks', () => {

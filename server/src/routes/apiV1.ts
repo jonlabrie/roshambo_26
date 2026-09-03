@@ -433,6 +433,15 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
                     const e = readEconomy(u);
                     res.json({ item, totalPoints: e.totalPoints, maxDeckSize: e.maxDeckSize, teahouseSizes: e.teahouseSizes, portalOwned: true });
                 };
+            } else if (item === 'starter') {
+                // First-property-only, atomically: {maxDeckSize: null} matches absent too, so a
+                // racing second starter (or a racing deck:S) matches no document and 409s.
+                filter.maxDeckSize = null;
+                update.$set = { maxDeckSize: 'S', 'teahouses.S': { ...DEFAULT_TEAHOUSE_LOADOUT } };
+                respond = (u) => {
+                    const e = readEconomy(u);
+                    res.json({ item, totalPoints: e.totalPoints, maxDeckSize: e.maxDeckSize, teahouseSizes: e.teahouseSizes, portalOwned: e.portalOwned ?? false });
+                };
             } else {
                 const [kind, size] = item.split(':') as [string, Size];
                 if (kind === 'deck') {
