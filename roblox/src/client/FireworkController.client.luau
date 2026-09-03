@@ -266,7 +266,8 @@ local function playSound(
     audible: boolean,
     from: Vector3,
     speed: number?,
-    voice: Sound?
+    voice: Sound?,
+    volumeScale: number?
 )
     if not (id and audible) then
         return
@@ -275,6 +276,9 @@ local function playSound(
     local dist = if cam then (cam.CFrame.Position - from).Magnitude else 0
     local snd = voice or slot.sound
     local function fire()
+        -- Set EVERY play: a re-pop leaves its voice quiet, and the next break on that
+        -- voice must come back at full volume.
+        snd.Volume = BurstStyles.SOUND_LEVELS.volume * (volumeScale or 1)
         snd.SoundId = id
         -- Per-shell jitter (seeded, so every client hears the same shell the same way):
         -- ±8% speed shifts pitch and length together, and even one clip stops sounding
@@ -1020,6 +1024,23 @@ local function play(payload: any, distance: number)
                 burstsPlayed += 1
                 local burstVoice = slot.burstVoices[((burstsPlayed - 1) % #slot.burstVoices) + 1]
                 playSound(slot, soundId, lod.sound, anchorPos, soundSpeed, burstVoice)
+                -- RE-POPS (owner, 2026-09-06: the strobe's flicker waves read as re-bursts
+                -- and "burst 2 is almost always silent"): the style's square wave re-ignites
+                -- at declared fractions of star life, and each re-burst gets a soft report --
+                -- the SAME clip, quieter and a touch sharper, on the rotated voices. No new
+                -- rng draws, so the stream stays in lockstep.
+                local rePops = BurstStyles.styleOf(ev.style).rePops
+                if rePops then
+                    local popStyle = BurstStyles.styleOf(ev.style)
+                    local meanLife = (popStyle.lifetime[1] + popStyle.lifetime[2]) / 2 * phaseLife
+                    for _, frac in rePops do
+                        burstsPlayed += 1
+                        local popVoice = slot.burstVoices[((burstsPlayed - 1) % #slot.burstVoices) + 1]
+                        task.delay(frac * meanLife, function()
+                            playSound(slot, soundId, lod.sound, anchorPos, soundSpeed * 1.06, popVoice, 0.45)
+                        end)
+                    end
+                end
                 -- The tail voice: a style's second sound, entering its own delay after the
                 -- break (plus the same speed-of-sound travel), on the slot's SEPARATE tail
                 -- Sound so it can overlap the burst clip's decay.

@@ -30,6 +30,11 @@ export type Style = {
     -- (owner ruling: "the sizzle clip should only run as long as the final phase").
     -- false = the style has no tail.
     soundRole: string, -- key into SOUNDS (burst roles are variant pools)
+    -- RE-POPS (owner, 2026-09-06: hotaru's flicker waves read as re-bursts and "burst 2 is
+    -- almost always silent"): fractions of star lifetime where the style visibly re-ignites
+    -- -- the transparency square-wave's rising edges -- and a soft report belongs. The
+    -- controller plays the phase's own break clip quieter/sharper at each. false = none.
+    rePops: { number } | false,
     pointRule: string, -- "scatter" | "circle" | "tilted" | "single"
 }
 
@@ -58,6 +63,7 @@ BurstStyles.STYLES = {
         sizeScale = 1,
         lightEmission = 0.7,
         tailSound = false,
+        rePops = false,
     },
     -- Planar circle of stars, tilted per shell ("tilted" point rule).
     ring = {
@@ -75,6 +81,7 @@ BurstStyles.STYLES = {
         sizeScale = 1,
         lightEmission = 0.7,
         tailSound = false,
+        rePops = false,
     },
     -- Few thick arms, aimed outward-up by the "circle" point rule, falling hard.
     palm = {
@@ -95,6 +102,7 @@ BurstStyles.STYLES = {
         sizeScale = 2.2,
         lightEmission = 0.85,
         tailSound = false,
+        rePops = false,
     },
     -- A hanging cloud that flickers: the 18-keypoint square-wave transparency.
     strobe = {
@@ -138,6 +146,9 @@ BurstStyles.STYLES = {
         -- strobe's square wave reads as 3-4 sequential re-bursts and the last one
         -- shimmers -- that is the phase this voice belongs to (~70% of star lifetime).
         tailSound = { role = "tail_strobe", delay = 1.75, volume = 0.35, duration = 1.6 },
+        -- The square wave's rising edges (see transparency above: on-phases begin at 0,
+        -- 0.22, 0.46, 0.74 of life) -- the first edge is the break itself.
+        rePops = { 0.22, 0.46, 0.74 },
     },
     -- The golden crown: long, heavy, drooping to the water.
     kamuro = {
@@ -155,6 +166,7 @@ BurstStyles.STYLES = {
         sizeScale = 3.6, -- 2.4 + 50% (owner, 2026-09-06: "kamuro streaks that are 50% larger")
         lightEmission = 0.85,
         tailSound = false,
+        rePops = false,
     },
 } :: { [string]: Style }
 
@@ -298,6 +310,7 @@ BurstStyles.APPLIED = {
     "lightEmission",
     "tailSound",
     "soundRole",
+    "rePops",
     "pointRule",
 }
 
