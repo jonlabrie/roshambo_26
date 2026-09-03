@@ -542,6 +542,19 @@ hanabiya is the only shell-purchase surface). Shape when taken up: brainstorm �
 (it interlocks with the shop-dressing/box-art thread — what does a rack SELL, shells
 or boxes?).
 
+## Tunnel lighting pass (banked 2026-09-03)
+
+Owner observation at the T13 tunnel branch: "Tunnels seem to be self-lit — is that a
+setting? It would be more interesting visually if we actually put lights in them."
+Diagnosis: yes, a setting — `Lighting.Ambient`/`OutdoorAmbient` fill enclosed spaces
+uniformly (ambient is not occluded; the day/night controller moves ClockTime only and
+deliberately never touches Ambient). Making tunnels genuinely dark means lowering
+`Ambient` toward black — at which point they need PLACED light, which is the owner's
+instinct anyway. Shape when taken up: an art pass — yamadoro/chōchin recipes exist;
+tune Ambient + place fixtures per tunnel, judged at the dusk lock (and again against
+the natural cycle if the day lock is ever cleared). Interlocks with the parked
+firebox/care-gradient thread on the yamadoro item above.
+
 ## Fireworks monetization vocabulary: boosts standard, surprises typed, mystery + bundle SKUs (owner, 2026-09-05)
 
 Rulings from the wa worksheet session, shaping everything downstream:
