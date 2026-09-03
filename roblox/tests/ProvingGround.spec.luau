@@ -36,9 +36,11 @@ end
 describe("ProvingGround — the yard the range fires from", function()
     local model = ProvingGround.build()
 
-    test("every rack ProvingPlan can name exists as a BasePart -- and wears NO plaque", function()
-        -- Owner, 2026-09-06: plaques off; station names live in the panel, not the world.
-        for _, rackName in ProvingPlan.RACKS do
+    test("every physical station exists as a BasePart -- and wears NO plaque", function()
+        -- Owner, 2026-09-06: plaques off; station names live in the panel, not the
+        -- world. Iterates STATIONS, not RACKS: "hanabiya roof" is virtual.
+        for _, station in ProvingGround.STATIONS do
+            local rackName = station.name
             local rack = childNamed(model, rackName)
             expect(rack ~= nil).toBe(true)
             assert(rack)
@@ -72,8 +74,8 @@ describe("ProvingGround — the yard the range fires from", function()
     end)
 
     test("every rack carries all three bores at mortar proportions (owner ruling: 2/4/6 inch)", function()
-        for _, rackName in ProvingPlan.RACKS do
-            local rack = childNamed(model, rackName)
+        for _, station in ProvingGround.STATIONS do
+            local rack = childNamed(model, station.name)
             assert(rack)
             -- Rack_X is itself the 6" tube; Tube4 and Tube2 stand beside it.
             local tubes = { rack, childNamed(rack, "Tube4"), childNamed(rack, "Tube2") }

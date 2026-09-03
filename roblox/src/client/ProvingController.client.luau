@@ -435,7 +435,7 @@ for _, family in FireworkDrafts.familyNames() do
     seqButton.MouseButton1Click:Connect(function()
         for _, entry in ProvingPlan.sequence(family, variants) do
             task.delay(entry.delaySeconds, function()
-                fireSingle(entry.id, ProvingPlan.SEQUENCE_RACK)
+                fireSelected(entry.id)
             end)
         end
     end)
@@ -480,21 +480,28 @@ for _, id in shippedIds do
     -- fun"): Fire = natural odds at the selected rack; Ladder = the volley, one from
     -- every rack; Seq = clean-air repeats; Boost = the lucky roll FORCED, so a shipped
     -- shell's surprise can be audited without fishing for the 30%.
-    -- Fire and Boost hit every toggled station at once (the old Ladder is just
-    -- select-all now); Seq keeps its clean-air pin on the sequence rack.
+    -- Fire, Seq and Boost all honor the toggle set (owner, 2026-09-06: Seq pinned to
+    -- mid pool "even if it's not selected" was wrong); Ladder ignores it and fires
+    -- from EVERY station, rooftop included -- the one-press canyon-wide volley.
     local fireButton = makeButton(row, "Fire", 40, 96)
     fireButton.MouseButton1Click:Connect(function()
         fireSelected(id)
     end)
-    local seqButton = makeButton(row, "Seq", 38, 140)
+    local ladderButton = makeButton(row, "Ladder", 52, 140)
+    ladderButton.MouseButton1Click:Connect(function()
+        for _, rack in ProvingPlan.RACKS do
+            fireSingle(id, rack)
+        end
+    end)
+    local seqButton = makeButton(row, "Seq", 38, 196)
     seqButton.MouseButton1Click:Connect(function()
         for _, entry in ProvingPlan.shippedSequence(id) do
             task.delay(entry.delaySeconds, function()
-                fireSingle(entry.id, ProvingPlan.SEQUENCE_RACK)
+                fireSelected(entry.id)
             end)
         end
     end)
-    local boostButton = makeButton(row, "Boost", 46, 182)
+    local boostButton = makeButton(row, "Boost", 46, 238)
     boostButton.MouseButton1Click:Connect(function()
         fireSelected(id, true)
     end)

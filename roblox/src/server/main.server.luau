@@ -1593,6 +1593,28 @@ RequestProvingFire.OnServerEvent:Connect(function(_player, shellId, rackName, fo
     local ground = stageForProving and stageForProving:FindFirstChild("ProvingGround")
     local rack = ground and ground:FindFirstChild(rackName)
     if not (rack and rack:IsA("BasePart")) then
+        -- THE VIRTUAL SIXTH STATION (owner, 2026-09-06): "hanabiya roof" is the rooftop
+        -- battery -- one tagged public tube mount drawn per shot, vertical muzzle (the
+        -- rooftop tubes stand straight; nil heading = the vertical default flight).
+        if rackName == "hanabiya roof" then
+            local mounts = {}
+            for _, m in CollectionService:GetTagged("FireworkTubeMount") do
+                if m:IsA("BasePart") then
+                    table.insert(mounts, m)
+                end
+            end
+            if #mounts > 0 then
+                local mount = mounts[math.random(1, #mounts)]
+                local muzzle = mount.Size.Y / 2 + MortarPlacement.TUBE["mortar:L"].length
+                FireworkLaunched:FireAllClients({
+                    shellId = shellId,
+                    origin = mount.Position + Vector3.new(0, muzzle + 0.2, 0),
+                    seed = math.random(1, 2 ^ 31 - 1),
+                    by = "proving",
+                    boosted = if forceBoost == true then true else nil,
+                })
+            end
+        end
         return
     end
     -- THE STATION'S ORIENTATION IS ITS LAUNCH HEADING (owner, 2026-09-06, with the

@@ -9,7 +9,10 @@
 -- the A..E lineage.
 local ProvingPlan = {}
 
-ProvingPlan.RACKS = { "north arena", "bridge", "upper north", "mid pool", "hi west" }
+-- "hanabiya roof" is VIRTUAL: not a ProvingGround rack but the rooftop battery's
+-- tagged public tube mounts (owner, 2026-09-06: "the sixth rack... should be added");
+-- the server resolves it to one of the mounts per shot.
+ProvingPlan.RACKS = { "north arena", "bridge", "upper north", "mid pool", "hi west", "hanabiya roof" }
 -- "mid pool": the central, lowest, near-vertical station -- the most neutral tube for
 -- clean-air repeats, visible from the arena basin.
 ProvingPlan.SEQUENCE_RACK = "mid pool"

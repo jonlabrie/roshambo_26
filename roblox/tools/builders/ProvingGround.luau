@@ -106,10 +106,9 @@ ProvingGround.STATIONS = {
         },
     },
 }
-assert(
-    #ProvingGround.STATIONS == #ProvingPlan.RACKS,
-    `ProvingGround has {#ProvingGround.STATIONS} stations but ProvingPlan names {#ProvingPlan.RACKS} racks`
-)
+-- ProvingPlan.RACKS may name MORE than these (the virtual "hanabiya roof" resolves to
+-- the rooftop battery's mounts, not a yard rack) -- but every physical station here
+-- must be nameable by the plan, in lineage order.
 for i, st in ProvingGround.STATIONS do
     assert(
         st.name == ProvingPlan.RACKS[i],

@@ -12,10 +12,10 @@ describe("ProvingPlan — variants onto racks and clocks", function()
         expect(plan[3].rack).toBe("upper north")
     end)
 
-    test("ladder caps at the five racks", function()
+    test("ladder caps at the rack count -- rooftop included", function()
         local plan = ProvingPlan.ladder("x", { "a", "b", "c", "d", "e", "f", "g" })
-        expect(#plan).toBe(5)
-        expect(plan[5].rack).toBe("hi west")
+        expect(#plan).toBe(#ProvingPlan.RACKS)
+        expect(plan[6].rack).toBe("hanabiya roof")
     end)
 
     test("sequence fires everything from the sequence rack's clock, SEQUENCE_GAP apart", function()
