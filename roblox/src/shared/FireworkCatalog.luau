@@ -279,6 +279,44 @@ FireworkCatalog.RECIPES = {
             },
         }
     end)(),
+    -- 雷 rai, thunder (2026-09-06, built to owner spec without audition -- "you know how
+    -- they're built"): the SALUTE class standalone. A small warm pop, then the salvo --
+    -- every shell, always (chance = 1; the pity ramp holds it at certainty): 3-4
+    -- flash-and-bang salutes on the flare art. S tube.
+    rai = {
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin" },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 226, 190 } },
+            {
+                at = 3.0,
+                kind = "burst",
+                anchor = "apex",
+                color = { 255, 230, 200 },
+                edgeColor = { 255, 200, 140 },
+                spread = 18,
+                droop = false,
+                boost = { chance = 1, salvo = { count = { 3, 4 } } },
+            },
+        },
+    },
+    -- 万雷 banrai, ten thousand thunders: rai's big sibling -- 6-8 bangs, M tube. The
+    -- salvo gap widens a touch so the longer barrage rolls instead of stacking.
+    banrai = {
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin" },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 226, 190 } },
+            {
+                at = 3.0,
+                kind = "burst",
+                anchor = "apex",
+                color = { 255, 230, 200 },
+                edgeColor = { 255, 200, 140 },
+                spread = 22,
+                droop = false,
+                boost = { chance = 1, salvo = { count = { 6, 8 }, gap = { 0.12, 0.3 } } },
+            },
+        },
+    },
     kiku = {
         phases = {
             { at = 0.0, kind = "report", anchor = "origin" },

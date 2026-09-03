@@ -7,8 +7,20 @@
 -- Pure data; runs under Lune.
 local ShellDisplay = {}
 
-ShellDisplay.ORDER =
-    { "firecracker", "peony", "willow", "ishibana", "kiku", "wa", "yashi", "kamuro", "hotaru", "janken" }
+ShellDisplay.ORDER = {
+    "firecracker",
+    "peony",
+    "willow",
+    "ishibana",
+    "kiku",
+    "wa",
+    "yashi",
+    "kamuro",
+    "hotaru",
+    "janken",
+    "rai",
+    "banrai",
+}
 
 ShellDisplay.NAME = {
     firecracker = "Firecracker",
@@ -21,6 +33,8 @@ ShellDisplay.NAME = {
     kamuro = "Kamuro",
     hotaru = "Hotaru",
     janken = "Janken",
+    rai = "Rai",
+    banrai = "Banrai",
 } :: { [string]: string }
 
 return ShellDisplay
