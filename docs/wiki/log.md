@@ -3612,3 +3612,8 @@ and a 0.5 chance that is a <2% outcome, so the gate was read from source: in `Bi
 failed on the old line and passes on the new. Applied in the open place too. 1827 Lune tests
 green.
 
+## [2026-09-03] gate | Idle perch song confirmed by ear on the mejiro
+
+Owner, after the `resting` gate fix and the 15–25 s / 0.5 retune: "seems to be working as
+expected." Rate and gate stand as recorded on `docs/wiki/world/familiars.md`.
+
