@@ -3423,3 +3423,17 @@ uploads: 125188469013966 / 116127703739592 / 91746777964130); and
 world/visual-identity.md now exists, linked READ-BEFORE-MAKING-ART from the
 index, with a CLAUDE.md pointer -- plus the general rule: search before
 generate, always.
+
+## [2026-09-06] shipped | JANKEN -- the signature shell closes the worksheet
+
+The dan redesign became the game's flagship and took its true name (owner:
+"janken it is"). A long owner-driven session built real vocabulary on the way:
+colorPool decks (seeded per-shell color deals), per-point texture pins, the
+circle rule's whole-bloom spin, the overlapping-phase emitter-collision fix
+(point rotation -- owner-found: "always the same paper glyph"), the star-size
+floor (sprite size rode spread; small bursts grew unreadable stars), the
+canonical-glyph correction (visual-identity page born of it), and the removal
+of the legacy BONUS shell. Whizzers (style + wild rule + measured whistle
+cuts) wait for a future shell. Price 12, L + heavy, five steps run
+(`559c850`), dev deploy op 3d6bc70d. THE SHELF: firecracker, peony, willow,
+ishibana, kiku, wa, yashi, kamuro, hotaru, janken. THE WORKSHEET IS EMPTY.
