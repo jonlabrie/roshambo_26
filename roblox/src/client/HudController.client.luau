@@ -1672,11 +1672,12 @@ local REASON_COPY: { [string]: string } = {
 -- The old picker was a FIXED column off the cluster's reference: every shell a 150×40 row, no
 -- scrolling. At 12 shells that is ~524px of column — taller than a phone's landscape screen,
 -- and a third of a portrait one. Replaced by a narrow rail on the RIGHT EDGE, the same layout
--- in both orientations: a scrollable list of small rows to SELECT a shell, and one FIRE button
--- that launches the selection — so firing kamuro five times is five taps on FIRE, not five
--- trips through a list. The right edge is camera-drag ground on touch, and scroll and drag are
--- both vertical swipes, so the rail stays narrow (the conflict is proportional to the area
--- claimed) and its rows keep crisp edges so a thumb knows which surface it is on.
+-- in both orientations: a scrollable list of small rows, tap a row to fire it. There was
+-- briefly a select-then-FIRE button between the rail and the toggle; the owner cut it ("the
+-- FIRE button takes up space; lose it") and its footprint went back to the list. The right
+-- edge is camera-drag ground on touch, and scroll and drag are both vertical swipes, so the
+-- rail stays narrow (the conflict is proportional to the area claimed) and its rows keep
+-- crisp edges so a thumb knows which surface it is on.
 local SHELL_ROW_H = 34
 local SHELL_ROW_GAP = 4
 local RAIL_W = 112
@@ -1687,7 +1688,6 @@ local RAIL_EDGE = 8 -- inset from the right screen edge
 -- button's corner zone in both orientations.
 local RAIL_BOTTOM = 140
 local FW_TOGGLE_H = 32
-local FW_FIRE_H = 40
 local RAIL_GAP = 6
 
 -- The collapsed toggle: a small pill on the right edge, no longer stacked over the bank button.
@@ -1714,37 +1714,14 @@ fireworkButton.Parent = gui
 corner(fireworkButton, 8)
 stroke(fireworkButton, GOLD, 1, 0.3)
 
--- FIRE, directly above the toggle: the money button, sized to the 44px-adjacent touch floor.
--- When the selection can't fly it wears the REASON instead of going inert-blank — the dimmed
--- rows keep teaching what a mortar buys, from the button itself.
-local fireworkFire = Instance.new("TextButton")
-fireworkFire.Name = "FireworkFire"
-fireworkFire.AnchorPoint = Vector2.new(1, 1)
-fireworkFire.Position = UDim2.new(1, -RAIL_EDGE, 1, -(RAIL_BOTTOM + FW_TOGGLE_H + RAIL_GAP))
-fireworkFire.Size = UDim2.fromOffset(RAIL_W, FW_FIRE_H)
-fireworkFire.BackgroundColor3 = WASHI
-fireworkFire.BorderSizePixel = 0
-fireworkFire.AutoButtonColor = false
-fireworkFire.TextColor3 = INK_CREAM
-fireworkFire.TextSize = 13
-fireworkFire.Font = Enum.Font.GothamBold
-fireworkFire.TextWrapped = true
-fireworkFire.Text = ""
-fireworkFire.Visible = false
-fireworkFire.ZIndex = 6
-fireworkFire.Parent = gui
-corner(fireworkFire, 8)
-local fireworkFireStroke = stroke(fireworkFire, GOLD, 1, 0.3)
-
--- The rail itself, above FIRE: a ScrollingFrame with a MANUAL CanvasSize driven by the layout's
--- AbsoluteContentSize — ⚠ NO Enum.AutomaticCanvasSize IN THIS ENGINE (the ShopController
--- lesson, 2026-09-06: the enum's absence killed the whole controller). Height is content-sized
--- until 40% of the screen, then it scrolls.
+-- The rail itself, directly above the toggle: a ScrollingFrame with a MANUAL CanvasSize driven
+-- by the layout's AbsoluteContentSize — ⚠ NO Enum.AutomaticCanvasSize IN THIS ENGINE (the
+-- ShopController lesson, 2026-09-06: the enum's absence killed the whole controller). Height is
+-- content-sized until the per-orientation cap (see sizeFireworkRail), then it scrolls.
 local fireworkRail = Instance.new("ScrollingFrame")
 fireworkRail.Name = "FireworkRail"
 fireworkRail.AnchorPoint = Vector2.new(1, 1)
-fireworkRail.Position =
-    UDim2.new(1, -RAIL_EDGE, 1, -(RAIL_BOTTOM + FW_TOGGLE_H + RAIL_GAP + FW_FIRE_H + RAIL_GAP))
+fireworkRail.Position = UDim2.new(1, -RAIL_EDGE, 1, -(RAIL_BOTTOM + FW_TOGGLE_H + RAIL_GAP))
 fireworkRail.Size = UDim2.fromOffset(RAIL_W, 0)
 fireworkRail.CanvasSize = UDim2.fromOffset(0, 0)
 fireworkRail.BackgroundTransparency = 1
@@ -1763,7 +1740,17 @@ fireworkRailLayout.Parent = fireworkRail
 
 local function sizeFireworkRail()
     local content = fireworkRailLayout.AbsoluteContentSize.Y
-    local maxH = math.floor(gui.AbsoluteSize.Y * 0.4)
+    local size = gui.AbsoluteSize
+    local maxH
+    if size.Y > size.X then
+        -- Portrait: exactly five rows on show (owner's cap, down from ~7) — the rest scroll.
+        maxH = 5 * SHELL_ROW_H + 4 * SHELL_ROW_GAP
+    else
+        -- Landscape: the cut FIRE button's footprint (40px + its 6px gap) handed back to the
+        -- list, on top of the old 40%-of-height budget — one more row on show, and the partial
+        -- row at the cap's edge is its own "there's more" affordance.
+        maxH = math.floor(size.Y * 0.4) + 46
+    end
     fireworkRail.CanvasSize = UDim2.fromOffset(0, content)
     fireworkRail.Size = UDim2.fromOffset(RAIL_W, math.min(content, maxH))
 end
@@ -1771,15 +1758,10 @@ fireworkRailLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(sizeF
 gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(sizeFireworkRail)
 
 local expanded = false
--- The selection persists across fires and across open/close: repeat-firing a volley from the
--- deck is taps on FIRE, nothing else. Rows stay tappable even when dimmed, so selecting an
--- un-flyable shell is how a player reads WHY it can't fly.
-local selectedShell: string? = nil
-local shellTiles: { [string]: { button: TextButton, title: TextLabel, sub: TextLabel, rim: UIStroke } } = {}
+local shellTiles: { [string]: { button: TextButton, title: TextLabel, sub: TextLabel } } = {}
 -- Declared BEFORE the loop so the click handlers close over it. `paintFireworkRail` is the only
 -- writer, so a tap always tests exactly the state the row was painted from.
 local shellStates: any = nil
-local paintFireworkRail: (states: any) -> ()
 
 for i, id in SHELL_ORDER do
     local b = Instance.new("TextButton")
@@ -1794,7 +1776,7 @@ for i, id in SHELL_ORDER do
     b.Text = ""
     b.ZIndex = 6
     corner(b, 8)
-    local rim = stroke(b, GOLD, 1, 0.5)
+    stroke(b, GOLD, 1, 0.5)
     b.Parent = fireworkRail
 
     local title = Instance.new("TextLabel")
@@ -1818,69 +1800,52 @@ for i, id in SHELL_ORDER do
     sub.ZIndex = 6
     sub.Parent = b
 
-    -- A tap SELECTS — it never fires. Firing belongs to the one FIRE button, so a browsing
-    -- thumb can't launch a shell it was only reading about.
+    -- A tap FIRES (owner's ruling — the intermediate FIRE button was cut). Only a launchable
+    -- shell fires; the server repeats the check, so this is an affordance rather than a gate —
+    -- but a row that does nothing when tapped reads as broken, so the dimmed state has to be
+    -- visibly un-tappable, not silently inert. A scroll-drag that starts on a row never
+    -- clicks it: the engine cancels the click once the touch becomes a drag.
     b.MouseButton1Click:Connect(function()
-        selectedShell = id
-        if shellStates then
-            paintFireworkRail(shellStates)
+        local st = shellStates and shellStates[id]
+        if st and st.launchable then
+            EventBus.HudFireworkLaunch:Fire(id)
         end
     end)
 
-    shellTiles[id] = { button = b, title = title, sub = sub, rim = rim }
+    shellTiles[id] = { button = b, title = title, sub = sub }
 end
 
--- Bring the selected row into view: the rail shows ~4 of 12 rows, and an opened list whose
--- selection is off-screen reads as "my shell is gone".
-local function scrollToSelected()
-    local sid = selectedShell
-    if sid == nil then
-        return
-    end
+-- On open, bring the BEST flyable shell into view: rows sit in catalogue order, so the biggest
+-- thing the player can actually fly — the one they climbed the catalogue for — is the LAST
+-- launchable row, and an opened list showing only the firecracker end reads as "my shells are
+-- gone".
+local function scrollToBest()
+    local best = 0
     for i, id in SHELL_ORDER do
-        if id == sid then
-            local y = (i - 1) * (SHELL_ROW_H + SHELL_ROW_GAP)
-            local maxScroll = math.max(0, fireworkRail.CanvasSize.Y.Offset - fireworkRail.AbsoluteSize.Y)
-            fireworkRail.CanvasPosition =
-                Vector2.new(0, math.clamp(y - fireworkRail.AbsoluteSize.Y / 2, 0, maxScroll))
-            return
+        local st = shellStates and shellStates[id]
+        if st and st.launchable then
+            best = i
         end
     end
+    if best == 0 then
+        return
+    end
+    local y = (best - 1) * (SHELL_ROW_H + SHELL_ROW_GAP)
+    local maxScroll = math.max(0, fireworkRail.CanvasSize.Y.Offset - fireworkRail.AbsoluteSize.Y)
+    fireworkRail.CanvasPosition =
+        Vector2.new(0, math.clamp(y - fireworkRail.AbsoluteSize.Y / 2, 0, maxScroll))
 end
 
 fireworkButton.MouseButton1Click:Connect(function()
     expanded = not expanded
-    fireworkFire.Visible = expanded
     fireworkRail.Visible = expanded
     if expanded then
-        scrollToSelected()
+        scrollToBest()
     end
 end)
 
-fireworkFire.MouseButton1Click:Connect(function()
-    local sid = selectedShell
-    local st = if sid then shellStates and shellStates[sid] else nil
-    if sid and st and st.launchable then
-        EventBus.HudFireworkLaunch:Fire(sid)
-    end
-end)
-
-paintFireworkRail = function(states: any)
+local function paintFireworkRail(states: any)
     shellStates = states
-    -- Default selection — and re-selection when the server stops mentioning the held one: the
-    -- LAST launchable shell in catalogue order, i.e. the biggest thing the player can actually
-    -- fly right now, which is the one they climbed the catalogue for.
-    local sid = selectedShell
-    if sid == nil or states[sid] == nil then
-        sid = nil
-        for _, id in SHELL_ORDER do
-            local st = states[id]
-            if st and st.launchable then
-                sid = id
-            end
-        end
-        selectedShell = sid
-    end
     for _, id in SHELL_ORDER do
         local st = states[id]
         local tile = shellTiles[id]
@@ -1893,23 +1858,6 @@ paintFireworkRail = function(states: any)
         tile.button.BackgroundTransparency = if live then 0.3 else 0.65
         tile.title.TextTransparency = if live then 0 else 0.4
         tile.sub.TextTransparency = if live then 0.15 else 0.5
-        local isSel = id == sid
-        tile.rim.Thickness = if isSel then 2 else 1
-        tile.rim.Transparency = if isSel then 0 else 0.5
-    end
-    local st = if sid then states[sid] else nil
-    if sid and st and st.launchable then
-        fireworkFire.Text = `FIRE  {SHELL_NAME[sid]}`
-        fireworkFire.TextTransparency = 0
-        fireworkFire.BackgroundTransparency = 0.15
-        fireworkFireStroke.Transparency = 0
-    else
-        fireworkFire.Text = if sid
-            then REASON_COPY[st and st.reason or ""] or (st and st.reason or "pick a shell")
-            else "pick a shell"
-        fireworkFire.TextTransparency = 0.4
-        fireworkFire.BackgroundTransparency = 0.55
-        fireworkFireStroke.Transparency = 0.6
     end
 end
 
@@ -2087,7 +2035,6 @@ local function render(inputs: any, aux: any)
         -- at a spot where nothing can be launched from.
         expanded = false
     end
-    fireworkFire.Visible = canLaunch and expanded
     fireworkRail.Visible = canLaunch and expanded
     if canLaunch then
         paintFireworkRail(aux.fireworkShells)
