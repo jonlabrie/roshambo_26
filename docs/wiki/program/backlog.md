@@ -16,8 +16,8 @@ area up at the west end of the canyon, with fireflies and fog in the trees up th
 
 **Atmosphere CANNOT do this and it is worth knowing before anyone tries.** `Lighting.Atmosphere`
 is a single global object — no zones — and it has **no height falloff**, so it cannot be dense at
-ground level and clear above. The place already runs one (Density 0.34 / Offset 0.15 / Haze 1.90 /
-Glare 0.25), and the legacy `FogStart 180` / `FogEnd 900` beside it is **inert**: once an
+ground level and clear above. The place already runs one (read its values off `Lighting.Atmosphere` in Studio; Density and
+Offset were retuned for the [[horizon-backdrop]] on 2026-09-03), and the legacy `FogStart 180` / `FogEnd 900` beside it is **inert**: once an
 Atmosphere exists the legacy fog properties are ignored.
 
 Two techniques that DO work, both already proven in this repo:
@@ -616,3 +616,22 @@ players queue shells at a station and the station fires them in order. Interlock
 the rooftop MC experience (same fire-things-from-a-console family) and the shared-show
 SKU. Station orientations are owner-aimed launch headings, already honored by the fire
 path.
+
+## Horizon backdrop — trial in Sandbox, promotion open
+
+The mountain ranges outside the terrain box ([[horizon-backdrop]]) are built and owner-approved
+as a direction ("pretty good, let's run with that for now", 2026-09-03) but still live in
+`Workspace.Sandbox.SkyBackdropTrial`. Open before it is shipped content:
+
+- **Promote out of Sandbox** into a `CanyonWorld` home and retarget the builder's root; the
+  Sandbox convention on [[place-state]] says prototypes only.
+- **Preload the six range meshes at join** (`ContentProvider:PreloadAsync` on the builder's
+  `MESH_IDS`) so the horizon is there before a new player looks up — assets load near-to-far,
+  which puts the ranges last.
+- **Variety**: the owner found the six strips "a little bit the same". More seeds, or
+  mirroring alternate placements, is a one-line change in `backdrop_ranges.py` plus one
+  re-import.
+- The near ring cannot come closer without its footprint crossing the terrain box; if "too
+  far" comes back, the lever is letting the low aprons run under the plateau, which needs a
+  height-aware intrusion check instead of the corner check.
+

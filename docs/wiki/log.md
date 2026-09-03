@@ -3556,3 +3556,23 @@ before this entry: roblox stylua/selene/1826 Lune tests/rojo build, server's
 moves from queued to IN EXECUTION; open gates remaining are the copy workshop
 (beat copy still leans on gambling vocabulary pending the kid-legible rewrite)
 and the owner's unrehearsed cold phone walk.
+
+## [2026-09-03] decision | Horizon backdrop -- mesh ranges outside the terrain box, Atmosphere retuned
+
+The terrain's cut edges against empty sky are now hidden by two rings of mountain-range
+MeshParts outside the box plus a ground plane under the horizon, trial home
+`Workspace.Sandbox.SkyBackdropTrial` (`docs/wiki/world/horizon-backdrop.md`). Approach A
+(geometry + the existing Atmosphere) was chosen over terrain feathering and a painted cubemap
+because a skybox has no parallax and cannot follow the atmosphere's tint through the
+night-first cycle. Two part-built silhouettes were rejected in-session (rolled blocks "read as
+boxes"; wedge pyramids "still just look like triangles"), so the strips are Blender
+height-fields (`roblox/tools/blender/backdrop_ranges.py`, commit `75b4de2`) placed by
+`roblox/tools/studio/buildSkyBackdrop.luau`, which derives each crest from the terrain skyline
+seen from five vantages after the first mesh pass "lost altitude" from the suspension bridge.
+v2 (`4308c22`) halved the peaks' aggression and moved both rings in after the owner's verdict.
+Atmosphere was retuned live for the ranges: Offset 0.15 -> 0.35, Density 0.34 -> 0.22 ("too
+much") -> 0.30 ("pretty good, let's run with that for now"); written to Edit, saved with the
+place. Trap recorded: the 3D Importer's dialog reports wrapper asset ids, and only the created
+MeshPart's `MeshId` loads via `CreateMeshPartAsync`. Promotion out of Sandbox, join-time
+preload and strip variety are open on `docs/wiki/program/backlog.md`.
+

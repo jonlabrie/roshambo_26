@@ -78,7 +78,8 @@ Everything below marked *verified* was checked live via the Studio MCP on 2026-0
   Foliage (Heroes, Preserve, ShoreRocks, ArrangementsDraft ×22, EastBackdrop), Water
   (runs + `FallsAudio` with 17 emitters), Ambience (`Audio_Dock_Uguisu` +
   `UguisuScheduler`), LaunchSites (3 tagged `FireworkLaunchSite` parts).
-- `Sandbox` present (throwaway prototypes; also `PlantDepthRig`).
+- `Sandbox` present (throwaway prototypes; also `PlantDepthRig`, and since 2026-09-03
+  `SkyBackdropTrial` — the [[horizon-backdrop]] rings and ground plane, promotion open).
 - Attributes/registrations that exist only in the place: the **`EngawaBarrier`
   collision group** (verified registered; blocks players, passes `Projectile` — if
   barriers ever stop working, check this first), stage live-tune attributes
@@ -101,6 +102,8 @@ Everything below marked *verified* was checked live via the Studio MCP on 2026-0
   `Sandbox_PARKED_2026_08_01`, `Scaffolding_PARKED`, `WorkspaceStrays_PARKED`,
   `FireworkBench_PARKED` ([[fireworks]]), `ParkedFoliage`
   (`MossTransitions_2026_08_01`, `MuhlyKit_2026_07_31`, `MarginCull_2026_07_30`).
+- **Import records**: `BackdropImports` — the 3D Importer originals of the [[horizon-backdrop]]
+  range strips (v1 and v2 sets, 2026-09-03); not scenery.
 - **Libraries/tools**: `FoliageZones` (35 zone volumes), `FoliageKit`, `MossLibrary`,
   `IrisLibrary`, `TrailStoneLibrary`, `RockLibrary`, `YamadoroLibrary`,
   `StructurePrefabs` (**teahouse-1story-s/m/l — three authored sizes**),
