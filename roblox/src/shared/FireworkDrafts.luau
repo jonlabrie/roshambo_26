@@ -26,6 +26,11 @@ local DAN_COLORS = {
     { 255, 160, 60 }, -- orange
     { 255, 60, 50 }, -- red
 }
+-- The bloom deals from ITS OWN copy of the full palette (owner, 2026-09-06: "all the
+-- colors we currently have"): a distinct table, because decks are keyed by pool
+-- identity -- sharing DAN_COLORS would hand the bloom whatever fifth color act one
+-- happened to leave, not an independent draw.
+local DAN_BLOOM_COLORS = table.clone(DAN_COLORS)
 
 -- Act redesign 2026-09-06 (owner, superseding the whizzer act same day): act two is
 -- three CLUSTERS OF THROW GLYPHS -- the CANONICAL ring/bar/caret marks from
@@ -62,13 +67,9 @@ local function dan(separation: number, boost: any?)
                 BurstStyles.TEXTURES.glyph_S,
             },
             -- One draw per SHELL colors the whole bloom (colorPool is phase-level; the
-            -- three arms differ by texture, not color): all white this shell, all gold
-            -- the next (owner, 2026-09-06).
-            colorPool = {
-                { 255, 255, 255 }, -- white
-                { 255, 220, 80 }, -- gold
-                { 110, 255, 140 }, -- green
-            },
+            -- three arms differ by texture, not color): all violet this shell, all
+            -- orange the next (owner, 2026-09-06: the full palette).
+            colorPool = DAN_BLOOM_COLORS,
             spread = 40,
             droop = false,
             share = 4,
