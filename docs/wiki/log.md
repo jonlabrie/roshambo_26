@@ -3502,3 +3502,20 @@ kamuro kicker, janken encore, rai/banrai standalone. Prices provisional.
 NOTE: shells reach the live place's players on next publish (server already
 sells them; the published client renders them fine -- recipes ship in
 ReplicatedStorage... NO: recipes are Luau in the place. Next publish needed.)
+
+## [2026-09-03] fixed | Mobile HUD -- portrait centring and the fireworks rail
+
+Owner's iPhone report on the published place: in PORTRAIT the scissors throw
+button sat 3/4 under Roblox's jump button (JUMP_CLEARANCE is 15% of WIDTH;
+portrait width makes that ~59px, narrower than the jump button), and the
+fireworks picker -- a fixed 150x40-per-shell column, ~524px at 12 shells --
+outgrew both orientations. Two changes in HudController: (1) orientation-aware
+cluster registration (`pinToCluster`/`clusterRef`) -- portrait centres the
+ring+throw row at the bottom between the thumbstick and jump zones, LANDSCAPE
+IS UNCHANGED by owner ruling ("players need to be able to reach it with their
+right thumbs"), re-laid live on rotation; (2) the picker became a right-edge
+RAIL, same in both orientations: scrollable 112px-wide select list (manual
+CanvasSize -- no AutomaticCanvasSize in this engine) + one FIRE button, so a
+volley is repeated taps on FIRE. Selection persists; dimmed rows selectable so
+FIRE wears the reason. Pixel offsets, not width fractions, clear the jump
+zone. Client-only; reaches players on next publish.
