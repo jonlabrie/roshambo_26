@@ -3208,14 +3208,26 @@ it: that section is how the glyph images are RASTERISED, and the new page is wha
 ⚠ **A rule page nothing links to is a rule nobody reads**, and `index.md` alone does not close
 that — the lint's orphan check is the only thing that noticed.
 
-⚠ **AND THE LOG VOCABULARY IS NOT SETTLING — this is the third normalisation in a week.** Seven
-more entries arrived outside rule 8, adding `built` and `reverted` to the pile: the undefined
-kinds now number SIX (`fix`, `fixed`, `shipped`, `correction`, `built`, `reverted`) against the
-eight that are defined. Mapped `shipped`/`built` → `ship`, `reverted` → `drop`, `correction` →
-`audit`. **The vocabulary is being voted against by everyone writing in it.** `fix` and
-`correction` in particular name events this project has constantly and rule 8 cannot express;
-adding them to `LOG_KINDS` costs one line and ends a recurring correction that is otherwise
-permanent.
+⚠ **THE LOG-KIND DRIFT HAS A CAUSE, AND IT IS GRAMMATICAL — this is the finding, not the
+normalisation.** Across four passes this run corrected **22 headers** carrying TEN undefined kinds:
+`fix`, `fixed`, `shipped`, `built`, `gated`, `published`, `ruling`, `codified`, `reverted`,
+`correction`. Tallied against the whole file, the shape is unmistakable — **`gated` (1) beside
+`gate` (17), `shipped` (2) beside `ship` (37), `published`/`built` beside `ship`, `ruling`/`codified`
+beside `decision` (26).** Authors are writing the PAST TENSE of what happened; rule 8 wants the bare
+form. The concept is nearly always already defined — only the grammar differs — so most of this is
+not a missing vocabulary at all.
+
+**That splits the remedy in two, and only the second half is a judgement call:**
+- **Mechanical:** the lint could accept `-ed`/`-d` forms of the eight defined kinds as aliases.
+  `gated`, `shipped`, `reverted` and `fixed` all resolve unambiguously; that alone would have
+  prevented 16 of the 22.
+- **A real gap:** `fix` and `correction` name events with no defined home. `fix` was mapped to
+  `defect` and `correction` to `audit`, both approximations — a retraction of a wrong wiki claim is
+  a first-class event here and rule 8 cannot say it.
+
+⚠ **Normalising by hand every run is not a fix, it is a tax**, and it is the third such pass in a
+week. Whoever owns the schema should either alias the tenses in `LOG_KINDS` or state the required
+form in rule 8 loudly enough to be obeyed.
 
 ⚠ **`falls-dock` and `blender-pipeline` were read and deliberately NOT stamped `checked:`.**
 `falls-dock` rests on emitter positions, a place-only `UguisuScheduler` Script and asset ids only
@@ -3598,7 +3610,7 @@ world/visual-identity.md now exists, linked READ-BEFORE-MAKING-ART from the
 index, with a CLAUDE.md pointer -- plus the general rule: search before
 generate, always.
 
-## [2026-09-06] shipped | JANKEN -- the signature shell closes the worksheet
+## [2026-09-06] ship | JANKEN -- the signature shell closes the worksheet
 
 The dan redesign became the game's flagship and took its true name (owner:
 "janken it is"). A long owner-driven session built real vocabulary on the way:
@@ -3612,7 +3624,7 @@ cuts) wait for a future shell. Price 12, L + heavy, five steps run
 (`559c850`), dev deploy op 3d6bc70d. THE SHELF: firecracker, peony, willow,
 ishibana, kiku, wa, yashi, kamuro, hotaru, janken. THE WORKSHEET IS EMPTY.
 
-## [2026-09-06] ruling | Swarm shows will be fireflies -- an extension of planned ambience
+## [2026-09-06] decision | Swarm shows will be fireflies -- an extension of planned ambience
 
 Kao (avatar-face shell) assessed: face-on-particles workable but parked; the
 face-SHAPED burst is architecturally out (emitters cannot position particles).
@@ -3621,7 +3633,7 @@ imagery -- themed as the canyon's own fireflies, built as an occasional
 display mode of the coming ambient-firefly system, one pool serving both.
 Banked in backlog with full restart context.
 
-## [2026-09-06] built | Proving modes for shipped shells; the Hanabiya rooftop battery
+## [2026-09-06] ship | Proving modes for shipped shells; the Hanabiya rooftop battery
 
 Housecleaning session: (1) shipped shells regained Ladder/Seq and gained
 BOOST (forced lucky roll via RequestProvingFire's new Studio-only flag)
@@ -3634,7 +3646,7 @@ three real CSG tubes stood at boot on tagged mounts, public gear launches
 fire from the nearest battery muzzle within 140 studs. Rooftop MC
 experience banked in backlog (access deliberately unbuilt = gateable).
 
-## [2026-09-06] codified | The five stations scatter -- owner-placed, aimed, renamed
+## [2026-09-06] decision | The five stations scatter -- owner-placed, aimed, renamed
 
 Owner dragged and AIMED all five racks live in Studio; their CFrames were read
 out, re-orthonormalized, and baked into ProvingGround.luau as STATIONS (the
@@ -3646,7 +3658,7 @@ two-down). The server now fires along each station's own axis with a heading,
 so the rail-mounts ballistics carry the owner's aim. Future public access =
 jukebox queueing, banked. Ladder mode is now a five-point canyon-wide volley.
 
-## [2026-09-06] gated | Rooftop battery aimed and gated; the housecleaning day closes
+## [2026-09-06] gate | Rooftop battery aimed and gated; the housecleaning day closes
 
 Owner ground-gated the platform ("looks good"), then aimed the guns: mounts
 lean 16 deg north over the arena (fanned, LaunchApex 85 via new per-launch
@@ -3657,14 +3669,14 @@ selection, Boost = forced luck; "hanabiya roof" is the virtual sixth station.
 Fuse variance (+-6% seeded per shell) ended lockstep volleys. All owner-gated
 live. PENDING: place publish carries everything to players.
 
-## [2026-09-06] published | The fireworks sprint reaches players
+## [2026-09-06] ship | The fireworks sprint reaches players
 
 Owner saved and published the place: ten shells (janken at the top), the
 thump ladder, salvo art, pity ramp, rooftop battery, scattered stations and
 fuse variance are all LIVE. Morning decision pending: a little more fireworks
 vs the onboarding pass ("onboarding is critical soon").
 
-## [2026-09-06] shipped | Rai and banrai -- the salute class standalone, first no-audition promotion
+## [2026-09-06] ship | Rai and banrai -- the salute class standalone, first no-audition promotion
 
 Owner delegation ("you have sufficient context... I don't need to see them to
 approve"): 雷 rai (S, 4; 3-4 bangs) and 万雷 banrai (M, 7; 6-8 bangs, wider
