@@ -3482,3 +3482,10 @@ walk (selected stations in order, 0.7s beats), Seq = clean-air repeats on the
 selection, Boost = forced luck; "hanabiya roof" is the virtual sixth station.
 Fuse variance (+-6% seeded per shell) ended lockstep volleys. All owner-gated
 live. PENDING: place publish carries everything to players.
+
+## [2026-09-06] published | The fireworks sprint reaches players
+
+Owner saved and published the place: ten shells (janken at the top), the
+thump ladder, salvo art, pity ramp, rooftop battery, scattered stations and
+fuse variance are all LIVE. Morning decision pending: a little more fireworks
+vs the onboarding pass ("onboarding is critical soon").
