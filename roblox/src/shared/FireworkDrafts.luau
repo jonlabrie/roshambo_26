@@ -61,7 +61,14 @@ local function dan(separation: number, boost: any?)
                 BurstStyles.TEXTURES.glyph_P,
                 BurstStyles.TEXTURES.glyph_S,
             },
-            color = { 255, 255, 255 },
+            -- One draw per SHELL colors the whole bloom (colorPool is phase-level; the
+            -- three arms differ by texture, not color): all white this shell, all gold
+            -- the next (owner, 2026-09-06).
+            colorPool = {
+                { 255, 255, 255 }, -- white
+                { 255, 220, 80 }, -- gold
+                { 110, 255, 140 }, -- green
+            },
             spread = 40,
             droop = false,
             share = 4,
