@@ -3576,3 +3576,12 @@ place. Trap recorded: the 3D Importer's dialog reports wrapper asset ids, and on
 MeshPart's `MeshId` loads via `CreateMeshPartAsync`. Promotion out of Sandbox, join-time
 preload and strip variety are open on `docs/wiki/program/backlog.md`.
 
+## [2026-09-03] decision | The uguisu is the familiar; the karasu becomes an ambient bird
+
+`BirdController.client.luau`'s hardcoded `SPECIES` flipped Karasu -> Uguisu (the reference
+species, whose scale-1 output is the bit-identical baseline). Owner: "flip to the uguisu, the
+karasu is going to be an ambient bird." Gates: stylua/selene clean, 1825 Lune tests green. The
+owner has never heard the idle perch song and will test it; expected rate from the code is one
+opportunity every 90-240 s, each passing a 0.3 crowd chance, so roughly one song per nine
+minutes per perched bird. Per-player selection (F&F item 6) is still unbuilt.
+

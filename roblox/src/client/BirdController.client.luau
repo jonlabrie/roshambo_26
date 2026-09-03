@@ -35,7 +35,8 @@ local FamiliarRoster = remotes:WaitForChild("FamiliarRoster") :: RemoteEvent
 -- ⚠ WHICH BIRD, and it is ONE name feeding assets, voice AND proportion. Splitting it -- a
 -- hardcoded "UguisuBody" here and a separate "Uguisu" for the voice -- is how a bird ends up
 -- wearing a crow's body with a warbler's song, with nothing to catch it.
-local SPECIES = "Karasu" -- ⚠ hardcoded: nothing selects a bird per player yet (F&F item 6)
+local SPECIES = "Uguisu" -- ⚠ hardcoded: nothing selects a bird per player yet (F&F item 6).
+-- Owner, 2026-09-03: the uguisu is the familiar; the karasu is to become an AMBIENT bird.
 -- ⚠ NO FALLBACK. `scaleOf` returns nil for an unregistered species and this refuses to start
 -- rather than moving a crow on uguisu timings, which would present as "the animation is wrong".
 local SPECIES_SCALE = BirdSpecies.scaleOf(SPECIES)

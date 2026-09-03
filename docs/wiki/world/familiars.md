@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-09-04
+updated: 2026-09-03
 ---
 
 # Familiars
@@ -477,8 +477,9 @@ and two-caw clips is sample-identical to a baked recording apart from 0.48s of r
 NOT the 0.76s gap you would measure off the source: the clips carry their own padding.
 
 ⚠ **AND ONLY ONE SPECIES IS REACHABLE AT A TIME, but the gap is one line.** `BirdController`
-hardcodes `SPECIES` (currently `"Karasu"`) because nothing selects a bird per player (F&F
-item 6). The registered roster grew 2026-09-02: the **hiyodori** joined with a full voice —
+hardcodes `SPECIES` — **`"Uguisu"` since 2026-09-03** (owner: the uguisu is the familiar; the
+karasu is to become an AMBIENT bird, see [[ambient-birds]]) — because nothing selects a bird
+per player (F&F item 6). The registered roster grew 2026-09-02: the **hiyodori** joined with a full voice —
 five envelope clips cut from the owner's xeno-canto sourcing (`bodyLength 1.15`, warbler
 seat), verified singing on the torii 2026-09-03. As of 2026-08-28 that
 ONE name drives the mesh (`{SPECIES}Body` / `{SPECIES}Wings`, both already declared in
