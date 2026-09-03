@@ -439,6 +439,18 @@ local function fireBurst(
     local particles = if #frames == 1 and ev.points > 1 then ev.particles * ev.points else ev.particles
 
     local texture = ev.texture or BurstStyles.TEXTURES[style.textureRole]
+    -- Per-point texture pins SHUFFLE per shell (owner, 2026-09-06: the glyph-to-arm
+    -- assignment was frozen -- "rock top right, paper top left, scissors below" every
+    -- time). Seeded Fisher-Yates on a copy: same deal on every client, different deal
+    -- per shell.
+    local pointTextures = ev.textures
+    if pointTextures then
+        pointTextures = table.clone(pointTextures)
+        for i = #pointTextures, 2, -1 do
+            local j = rng:NextInteger(1, i)
+            pointTextures[i], pointTextures[j] = pointTextures[j], pointTextures[i]
+        end
+    end
     -- COLOR OVER LIFE (owner, 2026-09-03): the star IGNITES near-white, settles to the
     -- shell's saturated color for the body of the burn, and embers into the edge color at
     -- death. The heat lives HERE, not in Brightness — brightness past ~8 saturated every
@@ -505,7 +517,7 @@ local function fireBurst(
             * CFrame.Angles(math.rad(f.rot[1]), math.rad(f.rot[2]), math.rad(f.rot[3]))
         -- Per-POINT texture pins (owner, 2026-09-06: dan's triple bloom, one throw
         -- glyph per arm) override the phase texture, which overrides the style role.
-        em.Texture = (ev.textures and ev.textures[i]) or texture
+        em.Texture = (pointTextures and pointTextures[i]) or texture
         em.Color = color
         em.Size = size
         em.Speed = speed
@@ -547,6 +559,18 @@ local function play(payload: any, distance: number)
     local rng = Random.new(payload.seed)
     -- One voice-speed per shell, drawn FIRST so its position in the stream is stable.
     local soundSpeed = 0.92 + rng:NextNumber() * 0.16
+    -- FUSE VARIANCE (owner, 2026-09-06: a six-station volley broke in perfect lockstep —
+    -- "they all detonate simultaneously... isn't there variability between shells?").
+    -- Every shell's build was already its own — scatter, apex, boost roll, sounds — but
+    -- the TIMELINE was recipe-exact, so same-frame launches broke same-frame. A seeded
+    -- ±6% stretch on every phase time gives each shell its own fuse, the way real fuses
+    -- run fast or slow: a 3s flight lands anywhere in ~2.82-3.18s, multi-act spacing
+    -- scales with it, and the at=0 launch stays on the command. Drawn here (before
+    -- last/tail derive) so release margins ride the stretched clock too.
+    local fuseScale = 0.94 + rng:NextNumber() * 0.12
+    for _, ev in schedule do
+        ev.at *= fuseScale
+    end
     local origin = payload.origin
     -- THE HEADING (rail-mounts, 2026-09-04): a muzzle launch from a player's own deck sends a
     -- unit vector the flight rides along; every other launch site (public sites, proving range,
@@ -590,7 +614,10 @@ local function play(payload: any, distance: number)
     -- today's HEIGHT (h = run * dir.Y) and put the horizontal displacement where physics puts
     -- it. dir vertical => horizontal term is exactly zero and this is byte-identical to the
     -- old `origin + dir * run + scatter` (public sites, proving range, firecrackers untouched).
-    local run = 60 + heightJitter
+    -- Per-source apex (owner, 2026-09-06: the rooftop and mid pool sit low -- "more
+    -- launch velocity to get a bit higher"): the server may send apexHeight with the
+    -- launch; absent, the 2026-09-03 default 60 stands.
+    local run = (if typeof(payload.apexHeight) == "number" then payload.apexHeight else 60) + heightJitter
     local h = run * dir.Y
     local horiz = Vector3.new(dir.X, 0, dir.Z)
     local horizMag = horiz.Magnitude

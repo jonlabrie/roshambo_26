@@ -260,6 +260,15 @@ local function hollowTubeTemplate(container: Instance, tube: { bore: number, len
     return union
 end
 
+-- The rooftop battery borrows the deck mortars' own CSG clones (owner, 2026-09-06:
+-- real public tubes on the Hanabiya roof; a mortar is an EMPTY tube, and the fake-disc
+-- shortcut was rejected twice at the deck-mortars gate). nil until the deferred boot
+-- CSG lands -- callers retry.
+function TreatmentApplier:cloneTube(mortarId: string): BasePart?
+    local tpl = self._tubeTemplates[mortarId]
+    return if tpl then tpl:Clone() else nil
+end
+
 function TreatmentApplier:_initTubeTemplates()
     for _, mortarId in self._mortarPlacement.MORTAR_ORDER do
         local tube = self._mortarPlacement.TUBE[mortarId]

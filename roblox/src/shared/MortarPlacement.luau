@@ -42,6 +42,9 @@ MortarPlacement.SHELL_MORTAR = {
     yashi = "mortar:M",
     kamuro = "mortar:L",
     hotaru = "mortar:M",
+    janken = "mortar:L",
+    rai = "mortar:S",
+    banrai = "mortar:M",
 } :: { [string]: string }
 
 -- Proving-range proportions (1 stud = 1 ft): bore is tube inner diameter, length is tube length.

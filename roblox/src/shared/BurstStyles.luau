@@ -194,26 +194,38 @@ BurstStyles.STYLES = {
         tailSound = false,
         rePops = false,
     },
-    -- Glyph fall, take two (owner, 2026-09-06: "a triple 'yashi' bloom, each of which
-    -- carries one of the glyphs"): the palm's exact motion -- arms arcing out and
-    -- raining -- but CAMERA-FACING so the glyphs read, each arm pinned to its own mark
-    -- via the phase's per-point `textures`. What follows the bloom is an open design
-    -- question; no flicker, no tail yet.
+    -- Glyph fall (owner, 2026-09-06: "a triple 'yashi' bloom, each of which carries one
+    -- of the glyphs... let the glyphs fall a bit longer, and make them start flickering,
+    -- while playing the flicker audio"): the palm's motion, CAMERA-FACING so the marks
+    -- read, each arm pinned via per-point `textures`. The glyphs fall SOLID for the
+    -- first ~55% of life, then the square wave flickers them out -- the act-three
+    -- transition happens per glyph -- with the owner's canyon sizzle entering at the
+    -- flicker onset (delay 1.75 ≈ 0.55 x mean life).
     glyphfall = {
         speed = { 26, 34 },
         drag = 1.4,
-        lifetime = { 2.2, 3.0 },
+        lifetime = { 2.8, 3.6 }, -- "a bit longer" than the palm's 2.2-3.0
         acceleration = { 0, -22, 0 },
         brightness = 2.2,
         spreadAngle = { 12, 12 },
-        transparency = { { 0, 0 }, { 0.85, 0.1 }, { 1, 1 } },
+        transparency = {
+            { 0, 0 },
+            { 0.55, 0 },
+            { 0.58, 1 },
+            { 0.65, 0 },
+            { 0.72, 1 },
+            { 0.78, 0 },
+            { 0.85, 1 },
+            { 0.9, 0 },
+            { 1, 1 },
+        },
         textureRole = "dot", -- pinned per point (textures) in practice
         soundRole = "burst_peony",
         pointRule = "circle",
         orientation = "camera",
         sizeScale = 1.4, -- ~0.7-stud marks at dan's spread 40 (walked down from 4.0, owner 2026-09-06)
         lightEmission = 0.7,
-        tailSound = false,
+        tailSound = { role = "tail_strobe", delay = 1.75, volume = 0.35, duration = 1.5 },
         rePops = false,
     },
 } :: { [string]: Style }
@@ -419,9 +431,13 @@ local POINT_RULES: { [string]: (n: number, scatter: number, rand: () -> number) 
 
     circle = function(n, scatter, rand)
         local radius = math.max(scatter, 2)
+        -- The whole circle spins to a random heading per shell (2026-09-06): invisible
+        -- on symmetric arms (a palm's arms are identical), it un-pins textured arms --
+        -- dan's glyph triangle sat in the same orientation every shell.
+        local baseRot = rand() * 360
         local frames = {}
         for i = 1, n do
-            local angleDeg = (i - 1) / n * 360 + rand() * 20
+            local angleDeg = baseRot + (i - 1) / n * 360 + rand() * 20
             local angleRad = math.rad(angleDeg)
             local cosA, sinA = math.cos(angleRad), math.sin(angleRad)
             local rx = math.deg(math.atan2(CIRCLE_TILT_SIN * sinA, CIRCLE_TILT_COS))

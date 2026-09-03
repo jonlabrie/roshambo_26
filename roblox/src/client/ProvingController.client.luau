@@ -234,7 +234,7 @@ end)
 -- target. Ladder and sequence ignore this entirely -- ladder always spans all five racks by
 -- definition, and sequence is pinned to ProvingPlan.SEQUENCE_RACK for clean-air comparison. =====
 local rackRow = Instance.new("Frame")
-rackRow.Size = UDim2.new(1, -20, 0, 26)
+rackRow.Size = UDim2.new(1, -20, 0, 56)
 rackRow.Position = UDim2.fromOffset(10, 44)
 rackRow.BackgroundTransparency = 1
 rackRow.Parent = panel
@@ -247,15 +247,18 @@ rackRowLabel.TextColor3 = INK_CREAM
 rackRowLabel.Font = Enum.Font.Code
 rackRowLabel.TextSize = 12
 rackRowLabel.TextXAlignment = Enum.TextXAlignment.Left
-rackRowLabel.Text = "Rack:"
+rackRowLabel.Text = "Racks:"
 rackRowLabel.Parent = rackRow
 
-local selectedRack = ProvingPlan.SEQUENCE_RACK
+-- MULTI-SELECT (owner, 2026-09-06: "I should be able to choose any or all of the
+-- racks to launch a selection, simultaneously"). Toggled stations fire together;
+-- an empty selection falls back to the sequence rack so Fire never no-ops.
+local selectedRacks: { [string]: boolean } = { [ProvingPlan.SEQUENCE_RACK] = true }
 local rackButtons: { [string]: TextButton } = {}
 
 local function paintRackButtons()
     for rack, b in rackButtons do
-        if rack == selectedRack then
+        if selectedRacks[rack] then
             b.BackgroundColor3 = GOLD
             b.BackgroundTransparency = 0
             b.TextColor3 = WASHI
@@ -267,33 +270,33 @@ local function paintRackButtons()
     end
 end
 
-local rackButtonX = 54
-for _, rack in ProvingPlan.RACKS do
-    local letter = rack:sub(-1)
+-- Named station toggles (owner renames, 2026-09-06), three up two down.
+for i, rack in ProvingPlan.RACKS do
+    local col = (i - 1) % 3
+    local rowN = math.floor((i - 1) / 3)
     local rb = Instance.new("TextButton")
-    rb.Size = UDim2.fromOffset(30, 26)
-    rb.Position = UDim2.fromOffset(rackButtonX, 0)
+    rb.Size = UDim2.fromOffset(90, 24)
+    rb.Position = UDim2.fromOffset(54 + col * 94, rowN * 28)
     rb.BorderSizePixel = 0
     rb.AutoButtonColor = false
-    rb.Text = letter
+    rb.Text = rack
     rb.Font = Enum.Font.Code
-    rb.TextSize = 13
+    rb.TextSize = 11
     rb.Parent = rackRow
     local rc = Instance.new("UICorner")
     rc.CornerRadius = UDim.new(0, 5)
     rc.Parent = rb
     rackButtons[rack] = rb
     rb.MouseButton1Click:Connect(function()
-        selectedRack = rack
+        selectedRacks[rack] = not selectedRacks[rack] or nil
         paintRackButtons()
     end)
-    rackButtonX += 34
 end
 paintRackButtons()
 
 local scroll = Instance.new("ScrollingFrame")
-scroll.Size = UDim2.new(1, -20, 1, -140)
-scroll.Position = UDim2.fromOffset(10, 74)
+scroll.Size = UDim2.new(1, -20, 1, -170)
+scroll.Position = UDim2.fromOffset(10, 104)
 scroll.BackgroundTransparency = 1
 scroll.BorderSizePixel = 0
 scroll.ScrollBarThickness = 6
@@ -366,8 +369,22 @@ local function makeRow(order: number): Frame
     return row
 end
 
-local function fireSingle(id: string, rack: string)
-    RequestProvingFire:FireServer(id, rack)
+local function fireSingle(id: string, rack: string, forceBoost: boolean?)
+    RequestProvingFire:FireServer(id, rack, forceBoost == true)
+end
+
+-- One press, every toggled station at once.
+local function fireSelected(id: string, forceBoost: boolean?)
+    local any = false
+    for _, rack in ProvingPlan.RACKS do
+        if selectedRacks[rack] then
+            any = true
+            fireSingle(id, rack, forceBoost)
+        end
+    end
+    if not any then
+        fireSingle(id, ProvingPlan.SEQUENCE_RACK, forceBoost)
+    end
 end
 
 -- ===== section header =====
@@ -418,7 +435,7 @@ for _, family in FireworkDrafts.familyNames() do
     seqButton.MouseButton1Click:Connect(function()
         for _, entry in ProvingPlan.sequence(family, variants) do
             task.delay(entry.delaySeconds, function()
-                fireSingle(entry.id, ProvingPlan.SEQUENCE_RACK)
+                fireSelected(entry.id)
             end)
         end
     end)
@@ -428,7 +445,7 @@ for _, family in FireworkDrafts.familyNames() do
         local vButton = makeButton(row, variant, 40, variantX)
         local id = ("draft:%s/%s"):format(family, variant)
         vButton.MouseButton1Click:Connect(function()
-            fireSingle(id, selectedRack)
+            fireSelected(id)
         end)
         variantX += 44
     end
@@ -449,7 +466,7 @@ for _, id in shippedIds do
     local row = makeRow(order)
 
     local nameLabel = Instance.new("TextLabel")
-    nameLabel.Size = UDim2.fromOffset(150, 26)
+    nameLabel.Size = UDim2.fromOffset(92, 26)
     nameLabel.Position = UDim2.fromOffset(0, 2)
     nameLabel.BackgroundTransparency = 1
     nameLabel.TextColor3 = INK_CREAM
@@ -459,8 +476,45 @@ for _, id in shippedIds do
     nameLabel.Text = id
     nameLabel.Parent = row
 
-    local fireButton = makeButton(row, "Fire", 50, 154)
+    -- The full mode set for shipped shells (owner, 2026-09-06: single-only was "no
+    -- fun"): Fire = natural odds at the selected rack; Ladder = the volley, one from
+    -- every rack; Seq = clean-air repeats; Boost = the lucky roll FORCED, so a shipped
+    -- shell's surprise can be audited without fishing for the 30%.
+    -- Every mode honors the toggle set. Fire = the selection at once; Ladder = THE
+    -- WALK (owner, 2026-09-06: ladder ignoring the selection was wrong) -- the selected
+    -- stations in RACKS order, one launch per LADDER_GAP, a barrage walking the canyon;
+    -- empty selection walks every station. Seq = clean-air repeats on the selection.
+    local fireButton = makeButton(row, "Fire", 40, 96)
     fireButton.MouseButton1Click:Connect(function()
-        fireSingle(id, selectedRack)
+        fireSelected(id)
+    end)
+    local ladderButton = makeButton(row, "Ladder", 52, 140)
+    ladderButton.MouseButton1Click:Connect(function()
+        local racks = {}
+        for _, rack in ProvingPlan.RACKS do
+            if selectedRacks[rack] then
+                table.insert(racks, rack)
+            end
+        end
+        if #racks == 0 then
+            racks = ProvingPlan.RACKS
+        end
+        for i, rack in racks do
+            task.delay((i - 1) * ProvingPlan.LADDER_GAP, function()
+                fireSingle(id, rack)
+            end)
+        end
+    end)
+    local seqButton = makeButton(row, "Seq", 38, 196)
+    seqButton.MouseButton1Click:Connect(function()
+        for _, entry in ProvingPlan.shippedSequence(id) do
+            task.delay(entry.delaySeconds, function()
+                fireSelected(entry.id)
+            end)
+        end
+    end)
+    local boostButton = makeButton(row, "Boost", 46, 238)
+    boostButton.MouseButton1Click:Connect(function()
+        fireSelected(id, true)
     end)
 end

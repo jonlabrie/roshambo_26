@@ -28,9 +28,11 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   the authoring loop for new shells. Draft recipes in `src/shared/FireworkDrafts.luau`
   (families of variants, ids `draft:<family>/<variant>`, never in the CI fixture);
   schema `FireworkRecipes.luau` makes the blank-sky trap a test failure; Studio-gated
-  `RequestProvingFire` fires any draft/shipped id from five mortar racks ON THE
-  SUSPENSION BRIDGE (owner siting; surveyed catenary — per-station height + inward
-  tilt). ⚠ VANTAGE CORRECTED 2026-09-05 (owner): the range is judged from the SOUTH
+  `RequestProvingFire` fires any draft/shipped id from five mortar STATIONS SCATTERED
+  ACROSS THE CANYON (owner placement 2026-09-06, superseding the bridge line: "north
+  arena", "bridge", "upper north", "mid pool", "hi west" — each station's tube
+  orientation IS its launch heading, honored by the fire path; positions live-surveyed
+  and baked into tools/builders/ProvingGround.luau STATIONS, spec-enforced). ⚠ VANTAGE CORRECTED 2026-09-05 (owner): the range is judged from the SOUTH
   TERMINUS of the suspension bridge, edge-on to the five racks and close -- NOT from
   FallsLanding ("I'm not using FallsLanding AT ALL"). The ~190-stud FallsLanding sightline
   was the design assumption (the plaques were sized to it) and never the practice; tuning
@@ -138,7 +140,18 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   60, the eardeer boom on every break, 30% salvo kicker of 3-4 aerial salutes with
   purpose-made flare art). **hotaru** shipped 2026-09-06 (`439aae1`: v3 floor, second-shimmer structural boost,
   M tube, 8 -- plus the strobe re-pop machinery and rotated burst voices the audition
-  surfaced). Remaining shop family on the worksheet: dan.
+  surfaced). **janken** shipped 2026-09-06 (`559c850`, born as "dan": THE SIGNATURE SHELL -- four
+  color-dealt mini-peonies, then the triple palm bloom carrying the three CANONICAL
+  throw glyphs, spun and re-dealt per shell in one dealt color, falling long and
+  flickering out under the owner's sizzle; 30% salute-salvo encore; L + heavy, 12 --
+  "right above kamuro... there's some Roshambo promo built in"). New vocabulary built
+  for it: colorPool decks, per-point texture pins, the point-rotation fix for
+  overlapping phases, the star-size floor; the whizzer style + wild point rule wait
+  unused for a future shell; the random BONUS shell was removed. **rai** and **banrai** shipped 2026-09-06 (`dd0d1ce`, the first NO-AUDITION
+  promotion, owner-delegated): the salute class standalone -- 雷 rai (S, 4; 3-4 bangs)
+  and 万雷 banrai (M, 7; 6-8 bangs), a small pop carrying an always-on salvo
+  (chance = 1). **THE WORKSHEET IS EMPTY** -- all judged families shipped or moved to
+  collections. Twelve shells on the shelf.
   Launch audio: thumps are a 3-clip seeded rotation (launch-deck-1/2/3) with
   launch-deck-4 as the **L tube's grunt** (`292e978`, live via kamuro); per-clip head
   trims measured from source WAVs (peak−35ms).

@@ -78,6 +78,7 @@
                 "ProvingGround": { "$path": "assets/ProvingGround.model.json" },
                 "Karesansui": { "$path": "assets/Karesansui.model.json" },
                 "Hanabiya": { "$path": "assets/Hanabiya.model.json" },
+                "HanabiyaRooftop": { "$path": "assets/HanabiyaRooftop.model.json" },
                 "MachiyaApparel": { "$path": "assets/MachiyaApparel.model.json" },
                 "MachiyaAccessories": { "$path": "assets/MachiyaAccessories.model.json" },
                 "MachiyaStats": { "$path": "assets/MachiyaStats.model.json" },

@@ -217,6 +217,106 @@ FireworkCatalog.RECIPES = {
             },
         },
     },
+    -- じゃんけん janken (promoted 2026-09-06; born as the "dan" three-act demo, renamed
+    -- for what it became): THE SIGNATURE SHELL -- the game itself in the sky. Owner:
+    -- "price it reasonably, right above kamuro, because there's some Roshambo promo
+    -- built in." Three acts: four small peonies in colors dealt per shell from the
+    -- five-color deck, scattered and staggered; then the glyph bloom -- three palm arms,
+    -- each carrying one CANONICAL throw mark (Glyphs.luau via the TEXTURES aliases),
+    -- triangle spun and glyphs re-dealt per shell, the whole bloom in one dealt color;
+    -- the glyphs fall long, then flicker out under the owner's canyon sizzle. The boost
+    -- (30%) is the encore: a 3-4 salute salvo as the flicker dies. L + heavy.
+    janken = (function()
+        local COLORS = {
+            { 170, 60, 255 }, -- violet
+            { 60, 255, 110 }, -- green
+            { 70, 150, 255 }, -- blue
+            { 255, 160, 60 }, -- orange
+            { 255, 60, 50 }, -- red
+        }
+        -- The bloom deals from its OWN copy: decks are keyed by pool identity, and
+        -- sharing would hand the bloom act one's leftover fifth color, not a draw.
+        local BLOOM_COLORS = table.clone(COLORS)
+        local function act1(at: number)
+            return {
+                at = at,
+                kind = "burst",
+                anchor = "apex",
+                colorPool = COLORS,
+                spread = 22,
+                scatter = 26, -- the v2 separation (owner-auditioned middle)
+                glow = 1.5,
+                droop = false,
+                share = 2,
+            }
+        end
+        return {
+            heavy = true,
+            phases = {
+                { at = 0.0, kind = "report", anchor = "origin" },
+                { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 214, 130 } },
+                act1(3.0),
+                act1(3.25),
+                act1(3.5),
+                act1(3.75),
+                {
+                    at = 4.8,
+                    kind = "burst",
+                    anchor = "apex",
+                    style = "glyphfall",
+                    points = 3,
+                    textures = {
+                        BurstStyles.TEXTURES.glyph_R,
+                        BurstStyles.TEXTURES.glyph_P,
+                        BurstStyles.TEXTURES.glyph_S,
+                    },
+                    colorPool = BLOOM_COLORS,
+                    spread = 40,
+                    droop = false,
+                    share = 4,
+                    boost = { chance = 0.3, salvo = { count = { 3, 4 } } },
+                },
+            },
+        }
+    end)(),
+    -- 雷 rai, thunder (2026-09-06, built to owner spec without audition -- "you know how
+    -- they're built"): the SALUTE class standalone. A small warm pop, then the salvo --
+    -- every shell, always (chance = 1; the pity ramp holds it at certainty): 3-4
+    -- flash-and-bang salutes on the flare art. S tube.
+    rai = {
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin" },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 226, 190 } },
+            {
+                at = 3.0,
+                kind = "burst",
+                anchor = "apex",
+                color = { 255, 230, 200 },
+                edgeColor = { 255, 200, 140 },
+                spread = 18,
+                droop = false,
+                boost = { chance = 1, salvo = { count = { 3, 4 } } },
+            },
+        },
+    },
+    -- 万雷 banrai, ten thousand thunders: rai's big sibling -- 6-8 bangs, M tube. The
+    -- salvo gap widens a touch so the longer barrage rolls instead of stacking.
+    banrai = {
+        phases = {
+            { at = 0.0, kind = "report", anchor = "origin" },
+            { at = 0.02, kind = "ascent", anchor = "origin", color = { 255, 226, 190 } },
+            {
+                at = 3.0,
+                kind = "burst",
+                anchor = "apex",
+                color = { 255, 230, 200 },
+                edgeColor = { 255, 200, 140 },
+                spread = 22,
+                droop = false,
+                boost = { chance = 1, salvo = { count = { 6, 8 }, gap = { 0.12, 0.3 } } },
+            },
+        },
+    },
     kiku = {
         phases = {
             { at = 0.0, kind = "report", anchor = "origin" },

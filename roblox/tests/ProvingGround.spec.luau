@@ -4,8 +4,6 @@ local describe, test, expect = harness.describe, harness.test, harness.expect
 local ProvingGround = require("../tools/builders/ProvingGround")
 local ProvingPlan = require("../src/shared/ProvingPlan")
 
-local LETTERS = { Rack_A = "A", Rack_B = "B", Rack_C = "C", Rack_D = "D", Rack_E = "E" }
-
 local function childNamed(spec: any, name: string): any?
     for _, c in (spec.children or {}) :: { any } do
         if c.name == name then
@@ -38,41 +36,34 @@ end
 describe("ProvingGround — the yard the range fires from", function()
     local model = ProvingGround.build()
 
-    test("every rack ProvingPlan can name exists as a BasePart with its plaque letter", function()
-        for _, rackName in ProvingPlan.RACKS do
+    test("every physical station exists as a BasePart -- and wears NO plaque", function()
+        -- Owner, 2026-09-06: plaques off; station names live in the panel, not the
+        -- world. Iterates STATIONS, not RACKS: "hanabiya roof" is virtual.
+        for _, station in ProvingGround.STATIONS do
+            local rackName = station.name
             local rack = childNamed(model, rackName)
             expect(rack ~= nil).toBe(true)
             assert(rack)
-            expect(rack.className).toBe("Part") -- the server fires from rack.Position
-            local gui = findClass(rack, "SurfaceGui")
-            expect(gui ~= nil).toBe(true)
-            assert(gui)
-            local label = findClass(gui, "TextLabel") or gui.children and gui.children[1]
-            expect(label ~= nil).toBe(true)
-            assert(label)
-            expect(label.properties.Text).toBe(LETTERS[rackName])
+            expect(rack.className).toBe("Part") -- the server fires from the rack's CFrame
+            expect(childNamed(rack, "Plaque") == nil).toBe(true)
+            expect(findClass(rack, "SurfaceGui") == nil).toBe(true)
         end
     end)
 
-    test("racks sit 12 studs apart along one line", function()
-        -- 3D distance between adjacent racks (in ProvingPlan.RACKS order, which is the
-        -- rack line's spatial order), not raw X: distance is yaw-invariant, so this
-        -- keeps holding once Task 8 bakes a nonzero YAW_DEG.
-        local positions = {}
-        for _, rackName in ProvingPlan.RACKS do
-            local rack = childNamed(model, rackName)
+    test("EVERY STATION STANDS EXACTLY WHERE THE OWNER PUT IT, muzzle skyward", function()
+        -- The 2026-09-06 scatter: STATIONS is the owner's live-dragged survey, and the
+        -- built rack must land on it -- position AND orientation, because the tube's
+        -- axis is the launch heading the server fires along. Skyward is the safety
+        -- half: a station accidentally flipped would fire into the deck it stands on.
+        for i, station in ProvingGround.STATIONS do
+            local rack = childNamed(model, ProvingPlan.RACKS[i])
             assert(rack)
             local cf = rack.properties.CFrame
-            table.insert(positions, { cf[1], cf[2], cf[3] })
-        end
-        for i = 2, #positions do
-            local a, b = positions[i - 1], positions[i]
-            local dx, dy, dz = b[1] - a[1], b[2] - a[2], b[3] - a[3]
-            local dist = math.sqrt(dx * dx + dy * dy + dz * dz)
-            -- Stations are 12 apart along the line; the bridge's catenary adds up to
-            -- ~1.2 studs of dy between neighbours plus a small tilt displacement, so
-            -- the tube-to-tube distance rides a little over 12, never exactly on it.
-            expect(math.abs(dist - 12) < 0.5).toBe(true)
+            for k = 1, 12 do
+                expect(math.abs(cf[k] - station.cf[k]) < 0.01).toBe(true)
+            end
+            -- muzzle axis = cylinder local X = rotation column one; its Y must be up
+            expect(cf[7] > 0.05).toBe(true)
         end
     end)
 
@@ -83,8 +74,8 @@ describe("ProvingGround — the yard the range fires from", function()
     end)
 
     test("every rack carries all three bores at mortar proportions (owner ruling: 2/4/6 inch)", function()
-        for _, rackName in ProvingPlan.RACKS do
-            local rack = childNamed(model, rackName)
+        for _, station in ProvingGround.STATIONS do
+            local rack = childNamed(model, station.name)
             assert(rack)
             -- Rack_X is itself the 6" tube; Tube4 and Tube2 stand beside it.
             local tubes = { rack, childNamed(rack, "Tube4"), childNamed(rack, "Tube2") }

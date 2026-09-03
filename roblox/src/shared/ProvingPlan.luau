@@ -1,13 +1,26 @@
 --!strict
 -- HOW A FAMILY OF DRAFTS BECOMES A FIRING PLAN. Pure: the panel controller executes these
--- plans (one RequestProvingFire per entry); the server never learns about modes. Ladder is
--- the range's whole reason to have five racks — variants burst side by side for comparison;
--- sequence is for shells whose read needs clean air.
+-- plans (one RequestProvingFire per entry); the server never learns about modes. Ladder
+-- fires across all five stations at once; sequence is for shells whose read needs clean air.
+--
+-- The five stations were SCATTERED and renamed 2026-09-06 (owner placement, superseding
+-- the bridge line): each station's tube orientation is its LAUNCH HEADING, and the future
+-- plan is public access with jukebox-style play queueing (see backlog). Order below keeps
+-- the A..E lineage.
 local ProvingPlan = {}
 
-ProvingPlan.RACKS = { "Rack_A", "Rack_B", "Rack_C", "Rack_D", "Rack_E" }
-ProvingPlan.SEQUENCE_RACK = "Rack_C"
+-- "hanabiya roof" is VIRTUAL: not a ProvingGround rack but the rooftop battery's
+-- tagged public tube mounts (owner, 2026-09-06: "the sixth rack... should be added");
+-- the server resolves it to one of the mounts per shot.
+ProvingPlan.RACKS = { "north arena", "bridge", "upper north", "mid pool", "hi west", "hanabiya roof" }
+-- "mid pool": the central, lowest, near-vertical station -- the most neutral tube for
+-- clean-air repeats, visible from the arena basin.
+ProvingPlan.SEQUENCE_RACK = "mid pool"
 ProvingPlan.SEQUENCE_GAP = 2 -- seconds between sequence launches
+-- The walk (owner, 2026-09-06): Ladder steps across the SELECTED stations in order,
+-- one launch per beat -- a barrage walking the canyon, distinct from Fire's
+-- simultaneous volley and Seq's same-spot repeats.
+ProvingPlan.LADDER_GAP = 0.7
 
 local function draftId(family: string, variant: string): string
     return "draft:" .. family .. "/" .. variant
@@ -28,6 +41,20 @@ function ProvingPlan.sequence(family: string, variants: { string }): { { id: str
             plan,
             { id = draftId(family, variant), delaySeconds = (i - 1) * ProvingPlan.SEQUENCE_GAP }
         )
+    end
+    return plan
+end
+
+-- A SHIPPED shell has one recipe, but the modes still earn their keep (owner,
+-- 2026-09-06): sequence gives it clean-air repeats. (The one-day shippedLadder was
+-- superseded the same day by the panel's MULTI-SELECT rack row -- "choose any or all
+-- of the racks to launch a selection, simultaneously" -- select-all IS the volley.)
+ProvingPlan.SHIPPED_SEQUENCE_COUNT = 3
+
+function ProvingPlan.shippedSequence(id: string): { { id: string, delaySeconds: number } }
+    local plan = {}
+    for i = 1, ProvingPlan.SHIPPED_SEQUENCE_COUNT do
+        table.insert(plan, { id = id, delaySeconds = (i - 1) * ProvingPlan.SEQUENCE_GAP })
     end
     return plan
 end

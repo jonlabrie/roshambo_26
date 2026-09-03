@@ -560,3 +560,47 @@ Direction banked from the wa promotion session; none of it is build-now:
 Interlocks: drops and return rewards are delight-delivery channels for the mystery-pool
 rule ("never a disappointment"); all reward framing must clear the onboarding voice ruling
 (kid-legible, no gambling vocabulary -- a drop is a GIFT, not a jackpot).
+
+## Firefly swarm shows (banked 2026-09-06)
+
+**Owner ruling:** fireflies are coming as AMBIENCE, and the swarm-display system is an
+EXTENSION of that system -- "something we can occasionally turn into a display" -- not a
+separate drone machine. The insight that seeded it: a swarm solves what particle bursts
+cannot (owner: "there's a different way to skin that cat... a drone swarm" -- per-entity
+POSITIONS, so arbitrary imagery becomes a point cloud), and the firefly theming keeps it
+native to the canyon where literal drones would not be.
+
+**Shape when taken up (brainstorm -> spec -> plan):**
+- One pool serves both modes: ambient drift (the default, always alive) and FORMATION
+  (borrowed for shows, returned to drift after). Anchored Neon parts, BulkMoveTo batched
+  -- cheaper than particles, no additive pileup; budget/LOD via a director like fireworks.
+- The hard system is the FORMATION COMPILER: image/text/shape -> point cloud -> drone
+  assignment (nearest-match so morphs look intentional) -> timeline. Formations morph;
+  that is the show.
+- Face shows: EditableImage samples an avatar headshot into ~200 points -- the workable
+  "kao" (the particle face-burst was assessed 2026-09-06 and rejected: emitters cannot
+  place individual particles).
+- Monetization interlock: the banked "shared show" SKU (buy the whole server a finale)
+  is made for this; the personalized face show sits above it as ultra-premium.
+- Interlock: hotaru is already the shelf's firefly (蛍); naming/lore should connect.
+
+## Rooftop MC experience (banked 2026-09-06)
+
+**Owner design:** players will "buy or win access" to the Hanabiya rooftop battery and
+"a proving-ground-like console that lets them MC some fireworks until they're out of
+time or points. It will be a peak experience in the place." Access likely a ladder
+climbing through the roof onto the platform -- NOT built yet, deliberately, so access
+stays gateable; the platform's back-rail gap (x 5.5..9.1) is the reserved hatch spot.
+The platform (assets/HanabiyaRooftop.model.json) is sized for 3 players + a console
+footprint + the three-tube battery. The proving panel's mode set (Fire/Ladder/Seq/
+Boost, 2026-09-06) is the natural seed for the MC console's verbs.
+
+## Public station access via play queueing (banked 2026-09-06)
+
+**Owner:** the five scattered proving stations ("north arena", "bridge", "upper north",
+"mid pool", "hi west") are Studio-only today, but "in future we'll offer some kind of
+public access to them, probably involving something like jukebox play queueing" --
+players queue shells at a station and the station fires them in order. Interlocks with
+the rooftop MC experience (same fire-things-from-a-console family) and the shared-show
+SKU. Station orientations are owner-aimed launch headings, already honored by the fire
+path.

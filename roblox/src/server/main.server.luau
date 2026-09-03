@@ -1525,6 +1525,28 @@ RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
         -- overhead placeholder (owner gate, 2026-09-04: "firecrackers fire from over my head").
         -- Gear shells at PUBLIC sites keep the invisible overhead origin (spec: unchanged).
         local origin, heading = muzzleOriginFor(uid, pos, deck, shellId)
+        local publicApex: number? = nil
+        if origin == nil and MortarPlacement.SHELL_MORTAR[shellId] ~= nil then
+            -- PUBLIC TUBES (owner, 2026-09-06: shells from the arena square used to
+            -- detonate "right above you: worst possible position"): a gear shell fired
+            -- at a public site launches from the nearest battery's muzzle when one is
+            -- in reach -- the Hanabiya rooftop serves the square. Several tubes: one
+            -- drawn at random per launch. Hand shells (firecracker) stay in hand.
+            local nearTubes = {}
+            for _, mount in CollectionService:GetTagged("FireworkTubeMount") do
+                if mount:IsA("BasePart") and (mount.Position - pos).Magnitude <= 140 then
+                    table.insert(nearTubes, mount)
+                end
+            end
+            if #nearTubes > 0 then
+                local mount = nearTubes[math.random(1, #nearTubes)]
+                local muzzle = mount.Size.Y / 2 + MortarPlacement.TUBE["mortar:L"].length
+                origin = mount.CFrame:PointToWorldSpace(Vector3.new(0, muzzle + 0.2, 0))
+                local up = mount.CFrame.UpVector
+                heading = up
+                publicApex = mount:GetAttribute("LaunchApex")
+            end
+        end
         if origin == nil then
             if MortarPlacement.SHELL_MORTAR[shellId] == nil then
                 origin = root.CFrame:PointToWorldSpace(Vector3.new(1.2, 0.6, -0.8))
@@ -1553,6 +1575,7 @@ RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
             seed = math.random(1, 2 ^ 31 - 1),
             by = uid,
             boosted = boosted,
+            apexHeight = publicApex,
         })
         if pushFireworkState then
             pushFireworkState(player)
@@ -1564,7 +1587,7 @@ end)
 -- draft id from a named proving rack through the SAME FireworkLaunched broadcast the spend
 -- path uses — director, LOD, pooling all engaged — but with NO inventory spend and NO backend
 -- call. The IsStudio gate is the whole security model: a published client's request dies here.
-RequestProvingFire.OnServerEvent:Connect(function(_player, shellId, rackName)
+RequestProvingFire.OnServerEvent:Connect(function(_player, shellId, rackName, forceBoost)
     if not RunService:IsStudio() then
         return
     end
@@ -1575,15 +1598,51 @@ RequestProvingFire.OnServerEvent:Connect(function(_player, shellId, rackName)
     local ground = stageForProving and stageForProving:FindFirstChild("ProvingGround")
     local rack = ground and ground:FindFirstChild(rackName)
     if not (rack and rack:IsA("BasePart")) then
+        -- THE VIRTUAL SIXTH STATION (owner, 2026-09-06): "hanabiya roof" is the rooftop
+        -- battery -- one tagged public tube mount drawn per shot, vertical muzzle (the
+        -- rooftop tubes stand straight; nil heading = the vertical default flight).
+        if rackName == "hanabiya roof" then
+            local mounts = {}
+            for _, m in CollectionService:GetTagged("FireworkTubeMount") do
+                if m:IsA("BasePart") then
+                    table.insert(mounts, m)
+                end
+            end
+            if #mounts > 0 then
+                local mount = mounts[math.random(1, #mounts)]
+                local muzzle = mount.Size.Y / 2 + MortarPlacement.TUBE["mortar:L"].length
+                local up = mount.CFrame.UpVector
+                FireworkLaunched:FireAllClients({
+                    shellId = shellId,
+                    origin = mount.CFrame:PointToWorldSpace(Vector3.new(0, muzzle + 0.2, 0)),
+                    heading = { x = up.X, y = up.Y, z = up.Z },
+                    seed = math.random(1, 2 ^ 31 - 1),
+                    by = "proving",
+                    boosted = if forceBoost == true then true else nil,
+                    apexHeight = mount:GetAttribute("LaunchApex"),
+                })
+            end
+        end
         return
     end
+    -- THE STATION'S ORIENTATION IS ITS LAUNCH HEADING (owner, 2026-09-06, with the
+    -- rack scatter: racks are "oriented in the angle of elevation and direction I'd
+    -- like to be used"). The rack part is the 6" tube, a cylinder whose axis is local
+    -- X; the muzzle sits half its length along that axis, and the shell rides the
+    -- same vector -- the rail-mounts ballistic machinery does the rest.
+    local axis = rack.CFrame.RightVector
     FireworkLaunched:FireAllClients({
         shellId = shellId,
-        -- rack.Position is the 6" tube's CENTER; +1.25 (its half-length) is the MUZZLE.
-        -- +3 floated shells two studs above the tube (owner, 2026-09-03).
-        origin = rack.Position + Vector3.new(0, 1.25, 0),
+        origin = rack.Position + axis * (rack.Size.X / 2 + 0.1),
+        heading = { x = axis.X, y = axis.Y, z = axis.Z },
+        -- a station may carry LaunchApex (mid pool does: its bursts sat AT bridge
+        -- height -- owner: "in the thick of an explosion, not watching overhead")
+        apexHeight = rack:GetAttribute("LaunchApex"),
         seed = math.random(1, 2 ^ 31 - 1),
         by = "proving",
+        -- The panel's Boost button forces the lucky roll (Studio-only path); absent,
+        -- the client's seeded roll keeps the recipe's natural odds.
+        boosted = if forceBoost == true then true else nil,
     })
 end)
 
@@ -1621,6 +1680,41 @@ local applier = TreatmentApplier.new({
     kamonDraw = KamonDraw,
     mortarPlacement = MortarPlacement,
 })
+
+-- THE PUBLIC BATTERY (owner, 2026-09-06): every part tagged FireworkTubeMount (the
+-- Hanabiya rooftop platform ships three) gets a REAL hollowed L tube stood on it at
+-- boot -- the deck mortars' own CSG clone -- and the launch handler fires public gear
+-- shells from these muzzles instead of the old invisible overhead origin. Deferred:
+-- the CSG templates themselves build deferred, so this retries until they exist.
+task.spawn(function()
+    local mounts = {}
+    for _, m in CollectionService:GetTagged("FireworkTubeMount") do
+        if m:IsA("BasePart") then
+            table.insert(mounts, m)
+        end
+    end
+    if #mounts == 0 then
+        return
+    end
+    local tubeLen = MortarPlacement.TUBE["mortar:L"].length
+    for _, mount in mounts do
+        local tube: BasePart? = nil
+        for _ = 1, 60 do
+            tube = applier:cloneTube("mortar:L")
+            if tube then
+                break
+            end
+            task.wait(0.5)
+        end
+        if tube then
+            -- the template cylinder's axis is local X; +90 deg roll stands it up,
+            -- muzzle skyward, seated on the mount plate.
+            tube.CFrame = CFrame.new(mount.Position + Vector3.new(0, mount.Size.Y / 2 + tubeLen / 2, 0))
+                * CFrame.Angles(0, 0, math.rad(90))
+            tube.Parent = mount
+        end
+    end
+end)
 
 -- Rebuild the player's claimed pad at its currently-resolved sizes/placement, threading the
 -- current portal + decoration state, keeping playerHouse in sync. Used by the decoration

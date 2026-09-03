@@ -3597,3 +3597,82 @@ uploads: 125188469013966 / 116127703739592 / 91746777964130); and
 world/visual-identity.md now exists, linked READ-BEFORE-MAKING-ART from the
 index, with a CLAUDE.md pointer -- plus the general rule: search before
 generate, always.
+
+## [2026-09-06] shipped | JANKEN -- the signature shell closes the worksheet
+
+The dan redesign became the game's flagship and took its true name (owner:
+"janken it is"). A long owner-driven session built real vocabulary on the way:
+colorPool decks (seeded per-shell color deals), per-point texture pins, the
+circle rule's whole-bloom spin, the overlapping-phase emitter-collision fix
+(point rotation -- owner-found: "always the same paper glyph"), the star-size
+floor (sprite size rode spread; small bursts grew unreadable stars), the
+canonical-glyph correction (visual-identity page born of it), and the removal
+of the legacy BONUS shell. Whizzers (style + wild rule + measured whistle
+cuts) wait for a future shell. Price 12, L + heavy, five steps run
+(`559c850`), dev deploy op 3d6bc70d. THE SHELF: firecracker, peony, willow,
+ishibana, kiku, wa, yashi, kamuro, hotaru, janken. THE WORKSHEET IS EMPTY.
+
+## [2026-09-06] ruling | Swarm shows will be fireflies -- an extension of planned ambience
+
+Kao (avatar-face shell) assessed: face-on-particles workable but parked; the
+face-SHAPED burst is architecturally out (emitters cannot position particles).
+Owner's better path: "a drone swarm" -- per-entity positions render arbitrary
+imagery -- themed as the canyon's own fireflies, built as an occasional
+display mode of the coming ambient-firefly system, one pool serving both.
+Banked in backlog with full restart context.
+
+## [2026-09-06] built | Proving modes for shipped shells; the Hanabiya rooftop battery
+
+Housecleaning session: (1) shipped shells regained Ladder/Seq and gained
+BOOST (forced lucky roll via RequestProvingFire's new Studio-only flag)
+(`4b8d169`); (2) rack scatter agreed: owner will place four of the five
+bridge racks around the canyon in Studio, then their CFrames get read out
+and codified into ProvingGround.model.json -- PENDING owner placement;
+(3) the arena's overhead-burst complaint fixed structurally (`2f339d0`):
+new Rojo asset HanabiyaRooftop -- railed platform over the shop ridge,
+three real CSG tubes stood at boot on tagged mounts, public gear launches
+fire from the nearest battery muzzle within 140 studs. Rooftop MC
+experience banked in backlog (access deliberately unbuilt = gateable).
+
+## [2026-09-06] codified | The five stations scatter -- owner-placed, aimed, renamed
+
+Owner dragged and AIMED all five racks live in Studio; their CFrames were read
+out, re-orthonormalized, and baked into ProvingGround.luau as STATIONS (the
+builder's bridge-line/catenary machinery retired; model.json regenerated via
+genmodels; spec now asserts owner-survey fidelity + muzzle-skyward safety).
+Renames: A/B/C/D/E -> north arena / bridge / upper north / mid pool / hi west
+(parts, plaques -- full names wrapped -- ProvingPlan, panel buttons three-up-
+two-down). The server now fires along each station's own axis with a heading,
+so the rail-mounts ballistics carry the owner's aim. Future public access =
+jukebox queueing, banked. Ladder mode is now a five-point canyon-wide volley.
+
+## [2026-09-06] gated | Rooftop battery aimed and gated; the housecleaning day closes
+
+Owner ground-gated the platform ("looks good"), then aimed the guns: mounts
+lean 16 deg north over the arena (fanned, LaunchApex 85 via new per-launch
+apexHeight payload field), mid pool lifted to LaunchApex 115 (bursts sat AT
+bridge height). Panel grammar settled: Fire = selected volley, Ladder = the
+walk (selected stations in order, 0.7s beats), Seq = clean-air repeats on the
+selection, Boost = forced luck; "hanabiya roof" is the virtual sixth station.
+Fuse variance (+-6% seeded per shell) ended lockstep volleys. All owner-gated
+live. PENDING: place publish carries everything to players.
+
+## [2026-09-06] published | The fireworks sprint reaches players
+
+Owner saved and published the place: ten shells (janken at the top), the
+thump ladder, salvo art, pity ramp, rooftop battery, scattered stations and
+fuse variance are all LIVE. Morning decision pending: a little more fireworks
+vs the onboarding pass ("onboarding is critical soon").
+
+## [2026-09-06] shipped | Rai and banrai -- the salute class standalone, first no-audition promotion
+
+Owner delegation ("you have sufficient context... I don't need to see them to
+approve"): 雷 rai (S, 4; 3-4 bangs) and 万雷 banrai (M, 7; 6-8 bangs, wider
+gap so the barrage rolls). Design: small warm pop carrying boost chance = 1
+-- the salvo IS the payload, always; the pity ramp holds certainty; the
+reserved 5-8 count range and eighth salvo voice debut. `dd0d1ce`, dev op
+89428d27. Twelve shells on the shelf. Salute vocabulary CLOSED as a class:
+kamuro kicker, janken encore, rai/banrai standalone. Prices provisional.
+NOTE: shells reach the live place's players on next publish (server already
+sells them; the published client renders them fine -- recipes ship in
+ReplicatedStorage... NO: recipes are Luau in the place. Next publish needed.)
