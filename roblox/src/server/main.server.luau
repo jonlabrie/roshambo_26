@@ -1525,6 +1525,24 @@ RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
         -- overhead placeholder (owner gate, 2026-09-04: "firecrackers fire from over my head").
         -- Gear shells at PUBLIC sites keep the invisible overhead origin (spec: unchanged).
         local origin, heading = muzzleOriginFor(uid, pos, deck, shellId)
+        if origin == nil and MortarPlacement.SHELL_MORTAR[shellId] ~= nil then
+            -- PUBLIC TUBES (owner, 2026-09-06: shells from the arena square used to
+            -- detonate "right above you: worst possible position"): a gear shell fired
+            -- at a public site launches from the nearest battery's muzzle when one is
+            -- in reach -- the Hanabiya rooftop serves the square. Several tubes: one
+            -- drawn at random per launch. Hand shells (firecracker) stay in hand.
+            local nearTubes = {}
+            for _, mount in CollectionService:GetTagged("FireworkTubeMount") do
+                if mount:IsA("BasePart") and (mount.Position - pos).Magnitude <= 140 then
+                    table.insert(nearTubes, mount)
+                end
+            end
+            if #nearTubes > 0 then
+                local mount = nearTubes[math.random(1, #nearTubes)]
+                local muzzle = mount.Size.Y / 2 + MortarPlacement.TUBE["mortar:L"].length
+                origin = mount.Position + Vector3.new(0, muzzle + 0.2, 0)
+            end
+        end
         if origin == nil then
             if MortarPlacement.SHELL_MORTAR[shellId] == nil then
                 origin = root.CFrame:PointToWorldSpace(Vector3.new(1.2, 0.6, -0.8))
@@ -1624,6 +1642,41 @@ local applier = TreatmentApplier.new({
     kamonDraw = KamonDraw,
     mortarPlacement = MortarPlacement,
 })
+
+-- THE PUBLIC BATTERY (owner, 2026-09-06): every part tagged FireworkTubeMount (the
+-- Hanabiya rooftop platform ships three) gets a REAL hollowed L tube stood on it at
+-- boot -- the deck mortars' own CSG clone -- and the launch handler fires public gear
+-- shells from these muzzles instead of the old invisible overhead origin. Deferred:
+-- the CSG templates themselves build deferred, so this retries until they exist.
+task.spawn(function()
+    local mounts = {}
+    for _, m in CollectionService:GetTagged("FireworkTubeMount") do
+        if m:IsA("BasePart") then
+            table.insert(mounts, m)
+        end
+    end
+    if #mounts == 0 then
+        return
+    end
+    local tubeLen = MortarPlacement.TUBE["mortar:L"].length
+    for _, mount in mounts do
+        local tube: BasePart? = nil
+        for _ = 1, 60 do
+            tube = applier:cloneTube("mortar:L")
+            if tube then
+                break
+            end
+            task.wait(0.5)
+        end
+        if tube then
+            -- the template cylinder's axis is local X; +90 deg roll stands it up,
+            -- muzzle skyward, seated on the mount plate.
+            tube.CFrame = CFrame.new(mount.Position + Vector3.new(0, mount.Size.Y / 2 + tubeLen / 2, 0))
+                * CFrame.Angles(0, 0, math.rad(90))
+            tube.Parent = mount
+        end
+    end
+end)
 
 -- Rebuild the player's claimed pad at its currently-resolved sizes/placement, threading the
 -- current portal + decoration state, keeping playerHouse in sync. Used by the decoration
