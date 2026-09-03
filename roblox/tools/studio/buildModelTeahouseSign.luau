@@ -12,12 +12,16 @@
 -- Place-only, own folder (terrain walls are as untaggable/unrebuildable as decks — same
 -- placement rules as the other place-only works). Palette: the deck family's black
 -- understructure (45, 48, 56) board with INK_CREAM copy (240, 234, 216) — the HUD/lantern
--- text tone — and the arrow drawn as GUI frames, not a unicode glyph (font coverage for
--- arrows is unreliable on device).
+-- text tone. Face + arrow are the signage identity (docs/wiki/world/visual-identity.md
+-- § Signage & wayfinding): Josefin Sans SemiBold, caret glyph rotated as the arrow.
 
 local WALL_HIT = Vector3.new(-62.5, 179.1, -85.4)
 local NORMAL = Vector3.new(0.97, 0, 0.05).Unit -- flattened: sign hangs plumb
-local SIGN_SIZE = Vector3.new(5.2, 1.4, 0.2)
+-- 1.4 -> 1.8 tall (owner gate 2026-09-03: "make wood a little higher, the text is
+-- currently right up at the top of the board") -- the board grows UPWARD (bottom edge
+-- kept, centre +0.2), and the label below is padded to 62% height so Josefin Sans's
+-- high-riding metrics sit centred instead of kissing the top edge.
+local SIGN_SIZE = Vector3.new(5.2, 1.8, 0.2)
 local BOARD = Color3.fromRGB(45, 48, 56)
 local COPY = Color3.fromRGB(240, 234, 216)
 
@@ -33,8 +37,8 @@ local board = Instance.new("Part")
 board.Name = "ModelTeahouseSign"
 board.Size = SIGN_SIZE
 -- centre a half-thickness proud of the wall, at head height, front face toward the path
--- was +0.5; owner gate 2026-09-03: "needs to drop a stud"
-local pos = WALL_HIT + NORMAL * (SIGN_SIZE.Z / 2 + 0.05) + Vector3.new(0, -0.5, 0)
+-- was +0.5, then -0.5 ("drop a stud"); -0.3 keeps that bottom edge as the board grew taller
+local pos = WALL_HIT + NORMAL * (SIGN_SIZE.Z / 2 + 0.05) + Vector3.new(0, -0.3, 0)
 board.CFrame = CFrame.lookAt(pos, pos + NORMAL)
 board.Anchored = true
 board.CanCollide = false
@@ -45,19 +49,19 @@ board.Parent = canyonWorld
 
 local gui = Instance.new("SurfaceGui")
 gui.Face = Enum.NormalId.Front
-gui.CanvasSize = Vector2.new(520, 140)
+gui.CanvasSize = Vector2.new(520, 180)
 gui.LightInfluence = 0.4
 gui.Brightness = 1.5
 gui.Parent = board
 
 local label = Instance.new("TextLabel")
 label.BackgroundTransparency = 1
-label.Size = UDim2.fromScale(0.78, 1)
-label.Position = UDim2.new(0, 0, 0, 0)
+label.Size = UDim2.fromScale(0.78, 0.62)
+label.AnchorPoint = Vector2.new(0, 0.5)
+label.Position = UDim2.fromScale(0, 0.5)
 -- Josefin Sans (owner direction 2026-09-03: "a sans that's a little less modern...
--- part of the 'resort-ish' identity"): a 1920s-flavoured geometric — deco-resort,
--- where GothamBold read contemporary. Pending the owner's look; record in
--- docs/wiki/world/visual-identity.md once gated.
+-- part of the 'resort-ish' identity"): gated same day ("font is good"), recorded as
+-- the signage face in docs/wiki/world/visual-identity.md.
 label.FontFace = Font.new("rbxasset://fonts/families/JosefinSans.json", Enum.FontWeight.SemiBold)
 label.TextColor3 = COPY
 label.TextScaled = true
@@ -77,7 +81,7 @@ arrowBox.Name = "Arrow"
 arrowBox.BackgroundTransparency = 1
 arrowBox.Size = UDim2.fromOffset(84, 84)
 arrowBox.AnchorPoint = Vector2.new(0.5, 0.5)
-arrowBox.Position = UDim2.fromOffset(455, 70) -- canvas is 520 x 140
+arrowBox.Position = UDim2.fromOffset(455, 90) -- canvas is 520 x 180
 arrowBox.Rotation = 90 -- clockwise: caret's apex swings to the right
 arrowBox.Parent = gui
 Glyphs.render(arrowBox, "S", COPY, COPY)
