@@ -106,16 +106,60 @@ describe("HudLayout — derivation of the cluster's own primitives", function()
     end)
 
     -- This module used to hold plain numbers only, then briefly gained `plateBottomOffset` (a
-    -- function) while the plate measured the jump button at runtime. The owner moved the plate
-    -- into the bottom row instead (2026-08-03, mid-execution) and that function was deleted with
-    -- its three tests below — this module is back to numbers only, so the assertion is back to
-    -- what it originally was. This is the only automated enforcement in this file that
-    -- `src/shared` stays Lune-testable (no tables, no Roblox instances, no functions) as the
-    -- module grows.
-    test("holds no Roblox globals — numbers only", function()
+    -- function) while the plate measured the jump button at runtime — deleted when the owner
+    -- moved the plate (2026-08-03), because it measured ROBLOX GEOMETRY at runtime. Amended
+    -- 2026-09-03 for `clusterRef`: PURE functions of this module's own numbers are allowed —
+    -- the enforcement's purpose is that `src/shared` stays Lune-testable (no tables, no Roblox
+    -- instances, no runtime measuring), and a pure function under its own specs below IS
+    -- Lune-tested. What stays banned is state and anything touching a Roblox global.
+    test("holds no Roblox globals — numbers and pure functions only", function()
         for key, value in HudLayout do
             expect(typeof(key)).toBe("string")
-            expect(typeof(value)).toBe("number")
+            expect(typeof(value) == "number" or typeof(value) == "function").toBe(true)
         end
+    end)
+end)
+
+describe("HudLayout — the cluster's horizontal reference (clusterRef)", function()
+    test("AREA_W is the three-button row, derived, both tiers", function()
+        expect(HudLayout.AREA_W).toBe(3 * HudLayout.BTN_H + 2 * HudLayout.BTN_GAP)
+        expect(HudLayout.AREA_W_TOUCH).toBe(3 * HudLayout.BTN_H_TOUCH + 2 * HudLayout.BTN_GAP_TOUCH)
+    end)
+
+    test("landscape keeps the owner's right-thumb registration, untouched", function()
+        -- "Don't move the landscape HUD, players need to be able to reach it with their right
+        -- thumbs to throw" (owner, 2026-09-03). Same answer at both tiers.
+        local s, o = HudLayout.clusterRef(844, 390, true)
+        expect(s).toBe(1 - HudLayout.JUMP_CLEARANCE)
+        expect(o).toBe(0)
+        s, o = HudLayout.clusterRef(1920, 1080, false)
+        expect(s).toBe(1 - HudLayout.JUMP_CLEARANCE)
+        expect(o).toBe(0)
+    end)
+
+    test("a square viewport is landscape — portrait is strictly taller than wide", function()
+        local s = HudLayout.clusterRef(500, 500, true)
+        expect(s).toBe(1 - HudLayout.JUMP_CLEARANCE)
+    end)
+
+    test("portrait centres the ring+buttons row between the thumbstick and jump zones", function()
+        -- The offset is HALF the always-visible row (ring + gap + three buttons): with the
+        -- right edge anchored at 0.5 + offset, the row's own centre lands on screen centre.
+        local s, o = HudLayout.clusterRef(390, 844, true)
+        expect(s).toBe(0.5)
+        expect(o).toBe((HudLayout.RING_D_TOUCH + HudLayout.RING_GAP + HudLayout.AREA_W_TOUCH) / 2)
+        s, o = HudLayout.clusterRef(390, 844, false)
+        expect(s).toBe(0.5)
+        expect(o).toBe((HudLayout.RING_D + HudLayout.RING_GAP + HudLayout.AREA_W) / 2)
+    end)
+
+    test("the portrait cluster fits a narrow phone with margin on both sides", function()
+        -- iPhone portrait is ~390 logical px. Right edge at 0.5*390 + offset must clear the
+        -- jump button's corner (~85px), and the ring's left edge must stay on screen.
+        local _, o = HudLayout.clusterRef(390, 844, true)
+        local rowW = HudLayout.RING_D_TOUCH + HudLayout.RING_GAP + HudLayout.AREA_W_TOUCH
+        local rightEdge = 390 * 0.5 + o
+        expect(rightEdge <= 390 - 85).toBe(true)
+        expect(rightEdge - rowW >= 0).toBe(true)
     end)
 end)

@@ -103,11 +103,10 @@ local THROWS = { "R", "P", "S" }
 local TOUCH = UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled
 
 -- The skeleton — every number OnboardingController also has to know, so that it can place a card
--- beside this HUD without covering a live button — lives in shared/HudLayout. SCALE, not pixels, for
--- the jump-button clearance: the jump button occupies roughly the right 3-13% of the screen, and a
--- pixel offset guessed against a desktop viewport is wrong on every phone. Numbers only this file
--- uses stay here.
-local JUMP_CLEARANCE = HudLayout.JUMP_CLEARANCE
+-- beside this HUD without covering a live button — lives in shared/HudLayout. So does the whole
+-- horizontal registration now (HudLayout.clusterRef, 2026-09-03): JUMP_CLEARANCE is no longer
+-- read directly in this file, because the reference it fed is orientation-dependent and shared
+-- with SplashController.
 -- ⚠ `HudLayout.EDGE` IS NO LONGER READ IN THIS FILE, and that is not an invitation to shrink it.
 -- The toast was its last reader here and moved onto the throw cluster on 2026-08-18 (see the
 -- Toast section). The constant is still load-bearing elsewhere: `HudLayout.CLUSTER_TOP_FROM_BOTTOM`
@@ -133,7 +132,7 @@ local BANK_GAP = HudLayout.BANK_GAP
 -- the cluster in both axes rather than leaving three squat letterboxes.
 local BTN_H = if TOUCH then HudLayout.BTN_H_TOUCH else HudLayout.BTN_H
 local BTN_W = BTN_H
-local BTN_GAP = if TOUCH then 8 else 10
+local BTN_GAP = if TOUCH then HudLayout.BTN_GAP_TOUCH else HudLayout.BTN_GAP
 local TAPE_N = 5
 local TILE = if TOUCH then HudLayout.TILE_TOUCH else HudLayout.TILE
 local TILE_GAP = if TOUCH then 4 else 6
@@ -141,7 +140,7 @@ local TILE_GAP = if TOUCH then 4 else 6
 -- Size uses it too, so it is pulled out here rather than left as a repeated inline expression.
 local TAPE_W = TAPE_N * (TILE + TILE_GAP) - TILE_GAP
 local BADGE = if TOUCH then 7 else 9
-local AREA_W = 3 * BTN_W + 2 * BTN_GAP
+local AREA_W = if TOUCH then HudLayout.AREA_W_TOUCH else HudLayout.AREA_W
 local AREA_H = if TOUCH then HudLayout.AREA_H_TOUCH else HudLayout.AREA_H
 local TOAST_SECONDS = 4
 local TOAST_MAX = 6
@@ -153,6 +152,52 @@ local gui = Instance.new("ScreenGui")
 gui.Name = "RoshamboHud"
 gui.ResetOnSpawn = false
 gui.Parent = playerGui
+
+-- ===== Orientation-aware registration (owner, 2026-09-03) =====
+-- In LANDSCAPE the cluster registers off `1 - JUMP_CLEARANCE`, as it always has — the
+-- right-thumb reach IS the layout, and the owner's ruling is explicit: "Don't move the
+-- landscape HUD, players need to be able to reach it with their right thumbs to throw."
+-- In PORTRAIT that expression breaks: JUMP_CLEARANCE is a fraction of the WIDTH, and a
+-- portrait phone's width (~390px) makes 15% ≈ 59px — narrower than the jump button itself,
+-- which is how the scissors button ended up three-quarters buried under it (owner, published
+-- place on an iPhone). Portrait re-registers the cluster to the bottom CENTRE, between
+-- Roblox's thumbstick (bottom-left) and jump (bottom-right) zones. The centring offset spans
+-- the always-visible row (ring + throw buttons), not the occasionally-revealed plate.
+--
+-- `pinToCluster` is the ONLY horizontal-reference writer for pinned elements: each records
+-- its inboard X offset and its Y once, and rotation replays them against whichever reference
+-- the current aspect calls for, via the gui's own AbsoluteSize.
+-- ⚠ REGISTER BUDGET: this chunk hit Luau's 200-local-register ceiling on 2026-09-03 — the
+-- script failed to COMPILE ("Out of local registers... exceeded limit 200") and the owner lost
+-- the whole play HUD, while stylua/selene/the spec suite stayed green (none of them compile;
+-- tests/Compiles.spec.luau now does). Self-contained sections therefore scope their locals in
+-- `do` blocks, exposing one forward-declared name — the block's registers come back at `end`.
+-- New HUD sections should follow that shape, not add top-level locals.
+local pinToCluster: (item: GuiObject, dx: number, dy: number) -> ()
+do
+    local clusterPinned: { { item: GuiObject, dx: number, dy: number } } = {}
+
+    -- The maths lives in HudLayout.clusterRef (2026-09-03): SplashController parks its
+    -- round-result notice ON this cluster and has to compute the identical reference, and a
+    -- private copy here is exactly how the splash drifted when portrait centring arrived.
+    local function clusterRef(): (number, number)
+        local size = gui.AbsoluteSize
+        return HudLayout.clusterRef(size.X, size.Y, TOUCH)
+    end
+
+    pinToCluster = function(item: GuiObject, dx: number, dy: number)
+        table.insert(clusterPinned, { item = item, dx = dx, dy = dy })
+        local rs, ro = clusterRef()
+        item.Position = UDim2.new(rs, ro + dx, 1, dy)
+    end
+
+    gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(function()
+        local rs, ro = clusterRef()
+        for _, pin in clusterPinned do
+            pin.item.Position = UDim2.new(rs, ro + pin.dx, 1, pin.dy)
+        end
+    end)
+end
 
 local function corner(parent: Instance, radius: number)
     local c = Instance.new("UICorner")
@@ -359,14 +404,13 @@ plate.AnchorPoint = Vector2.new(1, 1)
 plate.AutomaticSize = Enum.AutomaticSize.X
 plate.Size = UDim2.fromOffset(0, TILE)
 plate.Selectable = false -- see the button-consequences note above; this is not a d-pad target
--- Fixed off the SAME shared right reference (1 - JUMP_CLEARANCE) the throw cluster and the bank
+-- Pinned to the SAME shared cluster reference (see pinToCluster) the throw cluster and the bank
 -- button register to — RING_GAP left of the tape's own left edge (offset -TAPE_W from that
 -- reference), bottom-aligned with the tape at EDGE_BOTTOM from the gui's bottom (the cluster's
 -- new floor now the hairline is gone — see EDGE_BOTTOM, above). AutomaticSize grows the frame
 -- LEFTWARD from this anchored right edge, so a longer line (a streak riding) never creeps toward
--- the tape. It does NOT move horizontally here — only the vertical anchor changed from EDGE.
--- See the task report for the overlap arithmetic against the tape and the ring.
-plate.Position = UDim2.new(1 - JUMP_CLEARANCE, -(TAPE_W + RING_GAP), 1, -EDGE_BOTTOM)
+-- the tape.
+pinToCluster(plate, -(TAPE_W + RING_GAP), -EDGE_BOTTOM)
 plate.BackgroundColor3 = WASHI
 plate.BackgroundTransparency = 0.3
 plate.BorderSizePixel = 0
@@ -605,7 +649,7 @@ end)
 local throwArea = Instance.new("Frame")
 throwArea.Name = "ThrowArea"
 throwArea.AnchorPoint = Vector2.new(1, 1)
-throwArea.Position = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -EDGE_BOTTOM)
+pinToCluster(throwArea, 0, -EDGE_BOTTOM)
 throwArea.Size = UDim2.fromOffset(AREA_W, AREA_H)
 throwArea.BackgroundTransparency = 1
 throwArea.Parent = gui
@@ -980,7 +1024,7 @@ end
 local bankButton = Instance.new("TextButton")
 bankButton.Name = "Bank"
 bankButton.AnchorPoint = Vector2.new(1, 1)
-bankButton.Position = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE_BOTTOM + AREA_H + BANK_GAP))
+pinToCluster(bankButton, 0, -(EDGE_BOTTOM + AREA_H + BANK_GAP))
 bankButton.Size = UDim2.fromOffset(BANK_W, HudLayout.BANK_H)
 bankButton.BackgroundColor3 = POT_RED
 bankButton.BackgroundTransparency = 0.15
@@ -1167,10 +1211,10 @@ ring.AutoButtonColor = false
 ring.Text = ""
 ring.AnchorPoint = Vector2.new(1, 1)
 -- The hamburger's slot, exactly: inboard of the cluster by AREA_W + RING_GAP, off the SAME
--- right edge (1 - JUMP_CLEARANCE) everything else in the cluster registers to; bottom-aligned
+-- shared cluster reference (see pinToCluster) everything else registers to; bottom-aligned
 -- with the throw BUTTON row's own bottom edge (EDGE_BOTTOM + AREA_H - BTN_H from the gui's
 -- bottom), not the tape's.
-ring.Position = UDim2.new(1 - JUMP_CLEARANCE, -(AREA_W + RING_GAP), 1, -(EDGE_BOTTOM + AREA_H - BTN_H))
+pinToCluster(ring, -(AREA_W + RING_GAP), -(EDGE_BOTTOM + AREA_H - BTN_H))
 ring.Size = UDim2.fromOffset(RING_D, RING_D)
 -- The backing (owner's gate, design §5 "The ring sits on a backing"): a thin arc had nothing to
 -- hold it against the moving canyon. WASHI at 0.3 — exactly the hamburger's own fill before Task
@@ -1381,11 +1425,11 @@ toast.Name = "Toast"
 -- well before they do. Covering a live control would be unacceptable; covering one that is
 -- briefly inert is free real estate.
 --
--- Registered off the SAME expression the ring uses (`1 - JUMP_CLEARANCE`, and the button row's own
--- bottom edge at `EDGE_BOTTOM + AREA_H - BTN_H`), so it tracks the cluster if the cluster moves
--- rather than needing its own copy of the layout.
+-- Pinned off the SAME reference the ring uses (pinToCluster, and the button row's own bottom
+-- edge at `EDGE_BOTTOM + AREA_H - BTN_H`), so it tracks the cluster when the cluster moves —
+-- which, since the portrait re-registration, it actually does.
 toast.AnchorPoint = Vector2.new(1, 1)
-toast.Position = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE_BOTTOM + AREA_H - BTN_H))
+pinToCluster(toast, 0, -(EDGE_BOTTOM + AREA_H - BTN_H))
 toast.Size = UDim2.fromOffset(AREA_W, BTN_H)
 -- Above the buttons it covers, and above their halos.
 toast.ZIndex = 20
@@ -1614,143 +1658,233 @@ task.spawn(function()
     end
 end)
 
--- Display names/order from shared/ShellDisplay.luau (2026-09-04) — this file held the
--- SECOND hardcoded copy of these tables, found the same day the shop's copy hid the
--- freshly shipped kiku. ShellDisplay's spec holds the one copy to the fixture.
-local SHELL_ORDER = ShellDisplay.ORDER
-local SHELL_NAME = ShellDisplay.NAME
--- Reasons arrive as symbols from the server and are turned into copy HERE. An unmapped reason falls
--- back to the symbol rather than to an empty label: a player seeing "NEEDS_MORTAR_XL" learns
--- something; a player seeing a blank row learns nothing and reports a bug that is really a typo.
-local REASON_COPY: { [string]: string } = {
-    NONE_HELD = "none left",
-    NEEDS_MORTAR_S = "needs a small mortar",
-    NEEDS_MORTAR_M = "needs a medium mortar",
-    NEEDS_MORTAR_L = "needs a large mortar",
-    WAITING_FOR_R = "waiting for Rock",
-    BAD_SHELL = "unavailable",
-}
+-- The whole fireworks-picker UI costs the chunk ONE register (see the register-budget note at
+-- pinToCluster): everything it owns is scoped in the do-block below, and render() reaches it
+-- only through these two functions.
+local fireworkUI: { setVisible: (canLaunch: boolean) -> (), paint: (states: any) -> () }
+do
+    -- Display names/order from shared/ShellDisplay.luau (2026-09-04) — this file held the
+    -- SECOND hardcoded copy of these tables, found the same day the shop's copy hid the
+    -- freshly shipped kiku. ShellDisplay's spec holds the one copy to the fixture.
+    local SHELL_ORDER = ShellDisplay.ORDER
+    local SHELL_NAME = ShellDisplay.NAME
+    -- Reasons arrive as symbols from the server and are turned into copy HERE. An unmapped reason falls
+    -- back to the symbol rather than to an empty label: a player seeing "NEEDS_MORTAR_XL" learns
+    -- something; a player seeing a blank row learns nothing and reports a bug that is really a typo.
+    local REASON_COPY: { [string]: string } = {
+        NONE_HELD = "none left",
+        NEEDS_MORTAR_S = "needs a small mortar",
+        NEEDS_MORTAR_M = "needs a medium mortar",
+        NEEDS_MORTAR_L = "needs a large mortar",
+        WAITING_FOR_R = "waiting for Rock",
+        BAD_SHELL = "unavailable",
+    }
 
-local SHELL_ROW_H = 40
-local SHELL_ROW_GAP = 4
+    -- ===== The fireworks rail (owner, 2026-09-03) =====
+    -- The old picker was a FIXED column off the cluster's reference: every shell a 150×40 row, no
+    -- scrolling. At 12 shells that is ~524px of column — taller than a phone's landscape screen,
+    -- and a third of a portrait one. Replaced by a narrow rail on the RIGHT EDGE, the same layout
+    -- in both orientations: a scrollable list of small rows, tap a row to fire it. There was
+    -- briefly a select-then-FIRE button between the rail and the toggle; the owner cut it ("the
+    -- FIRE button takes up space; lose it") and its footprint went back to the list. The right
+    -- edge is camera-drag ground on touch, and scroll and drag are both vertical swipes, so the
+    -- rail stays narrow (the conflict is proportional to the area claimed) and its rows keep
+    -- crisp edges so a thumb knows which surface it is on.
+    local SHELL_ROW_H = 34
+    local SHELL_ROW_GAP = 4
+    local RAIL_W = 112
+    local RAIL_EDGE = 8 -- inset from the right screen edge
+    -- Bottom of the whole stack, up from the screen's bottom edge. A PIXEL offset, not a width
+    -- fraction: the portrait lesson (see clusterRef) is that fractions of the width stop clearing
+    -- Roblox's fixed-size jump button the moment the screen turns tall. 140px clears the jump
+    -- button's corner zone in both orientations.
+    local RAIL_BOTTOM = 140
+    local FW_TOGGLE_H = 32
+    local RAIL_GAP = 6
 
--- The collapsed button: the bank row's twin, one BANK_GAP above it, off the SAME right reference
--- the whole cluster registers to. NOT red — POT_RED is reserved for the one irreversible action on
--- this surface, and launching a firework is not that.
-local fireworkButton = Instance.new("TextButton")
-fireworkButton.Name = "FireworkToggle"
-fireworkButton.AnchorPoint = Vector2.new(1, 1)
-fireworkButton.Position =
-    UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(EDGE_BOTTOM + AREA_H + BANK_GAP + HudLayout.BANK_H + BANK_GAP))
-fireworkButton.Size = UDim2.fromOffset(BANK_W, HudLayout.BANK_H)
-fireworkButton.BackgroundColor3 = WASHI
-fireworkButton.BackgroundTransparency = 0.3
-fireworkButton.BorderSizePixel = 0
-fireworkButton.AutoButtonColor = false
-fireworkButton.TextColor3 = INK_CREAM
-fireworkButton.TextSize = 15
-fireworkButton.Font = Enum.Font.GothamBold
-fireworkButton.Text = "FIREWORKS"
-fireworkButton.Visible = false
-fireworkButton.ZIndex = 6
-fireworkButton.Parent = gui
-corner(fireworkButton, 8)
-stroke(fireworkButton, GOLD, 1, 0.3)
+    -- The collapsed toggle: a small pill on the right edge, no longer stacked over the bank button.
+    -- The picker left the cluster when the cluster learned to move (portrait centring): fireworks
+    -- are about the ground under your feet, not the round, and the right edge is reachable by the
+    -- same thumb in both orientations. NOT red — POT_RED is reserved for the one irreversible
+    -- action on this surface, and launching a firework is not that.
+    local fireworkButton = Instance.new("TextButton")
+    fireworkButton.Name = "FireworkToggle"
+    fireworkButton.AnchorPoint = Vector2.new(1, 1)
+    fireworkButton.Position = UDim2.new(1, -RAIL_EDGE, 1, -RAIL_BOTTOM)
+    fireworkButton.Size = UDim2.fromOffset(RAIL_W, FW_TOGGLE_H)
+    fireworkButton.BackgroundColor3 = WASHI
+    fireworkButton.BackgroundTransparency = 0.3
+    fireworkButton.BorderSizePixel = 0
+    fireworkButton.AutoButtonColor = false
+    fireworkButton.TextColor3 = INK_CREAM
+    fireworkButton.TextSize = 13
+    fireworkButton.Font = Enum.Font.GothamBold
+    fireworkButton.Text = "FIREWORKS"
+    fireworkButton.Visible = false
+    fireworkButton.ZIndex = 6
+    fireworkButton.Parent = gui
+    corner(fireworkButton, 8)
+    stroke(fireworkButton, GOLD, 1, 0.3)
 
--- The expanded list, growing UPWARD from the button's top edge. Anchored (1,1) at the button's own
--- right reference so the column and the button share an edge however wide the screen is.
-local fireworkList = Instance.new("Frame")
-fireworkList.Name = "FireworkList"
-fireworkList.AnchorPoint = Vector2.new(1, 1)
-fireworkList.Position = UDim2.new(
-    1 - JUMP_CLEARANCE,
-    0,
-    1,
-    -(EDGE_BOTTOM + AREA_H + BANK_GAP + HudLayout.BANK_H + BANK_GAP + HudLayout.BANK_H + BANK_GAP)
-)
-fireworkList.Size = UDim2.fromOffset(BANK_W, #SHELL_ORDER * SHELL_ROW_H + (#SHELL_ORDER - 1) * SHELL_ROW_GAP)
-fireworkList.BackgroundTransparency = 1
-fireworkList.Visible = false
-fireworkList.ZIndex = 6
-fireworkList.Parent = gui
+    -- The rail itself, directly above the toggle: a ScrollingFrame with a MANUAL CanvasSize driven
+    -- by the layout's AbsoluteContentSize — ⚠ NO Enum.AutomaticCanvasSize IN THIS ENGINE (the
+    -- ShopController lesson, 2026-09-06: the enum's absence killed the whole controller). Height is
+    -- content-sized until the per-orientation cap (see sizeFireworkRail), then it scrolls.
+    local fireworkRail = Instance.new("ScrollingFrame")
+    fireworkRail.Name = "FireworkRail"
+    fireworkRail.AnchorPoint = Vector2.new(1, 1)
+    fireworkRail.Position = UDim2.new(1, -RAIL_EDGE, 1, -(RAIL_BOTTOM + FW_TOGGLE_H + RAIL_GAP))
+    fireworkRail.Size = UDim2.fromOffset(RAIL_W, 0)
+    fireworkRail.CanvasSize = UDim2.fromOffset(0, 0)
+    fireworkRail.BackgroundTransparency = 1
+    fireworkRail.BorderSizePixel = 0
+    fireworkRail.ScrollBarThickness = 4
+    fireworkRail.ScrollBarImageColor3 = GOLD
+    fireworkRail.ScrollingDirection = Enum.ScrollingDirection.Y
+    fireworkRail.Visible = false
+    fireworkRail.ZIndex = 6
+    fireworkRail.Parent = gui
 
-local expanded = false
-local shellTiles: { [string]: { button: TextButton, title: TextLabel, sub: TextLabel } } = {}
--- Declared BEFORE the loop so the click handlers close over it. `paintFireworkTiles` is the only
--- writer, so a tap always tests exactly the state the row was painted from.
-local shellStates: any = nil
+    local fireworkRailLayout = Instance.new("UIListLayout")
+    fireworkRailLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    fireworkRailLayout.Padding = UDim.new(0, SHELL_ROW_GAP)
+    fireworkRailLayout.Parent = fireworkRail
 
-for i, id in SHELL_ORDER do
-    local b = Instance.new("TextButton")
-    b.Name = id
-    b.Size = UDim2.fromOffset(BANK_W, SHELL_ROW_H)
-    -- Newest at the BOTTOM of the column, nearest the button that opened it: the list grows up,
-    -- so the first row should be the one closest to the thumb.
-    b.Position = UDim2.fromOffset(0, (#SHELL_ORDER - i) * (SHELL_ROW_H + SHELL_ROW_GAP))
-    b.BackgroundColor3 = WASHI
-    b.BackgroundTransparency = 0.3
-    b.BorderSizePixel = 0
-    b.AutoButtonColor = false
-    b.Text = ""
-    b.ZIndex = 6
-    corner(b, 8)
-    stroke(b, GOLD, 1, 0.5)
-    b.Parent = fireworkList
+    local function sizeFireworkRail()
+        local content = fireworkRailLayout.AbsoluteContentSize.Y
+        local size = gui.AbsoluteSize
+        local maxH
+        if size.Y > size.X then
+            -- Portrait: exactly five rows on show (owner's cap, down from ~7) — the rest scroll.
+            maxH = 5 * SHELL_ROW_H + 4 * SHELL_ROW_GAP
+        else
+            -- Landscape: the cut FIRE button's footprint (40px + its 6px gap) handed back to the
+            -- list, on top of the old 40%-of-height budget — one more row on show, and the partial
+            -- row at the cap's edge is its own "there's more" affordance.
+            maxH = math.floor(size.Y * 0.4) + 46
+        end
+        fireworkRail.CanvasSize = UDim2.fromOffset(0, content)
+        fireworkRail.Size = UDim2.fromOffset(RAIL_W, math.min(content, maxH))
+    end
+    fireworkRailLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(sizeFireworkRail)
+    gui:GetPropertyChangedSignal("AbsoluteSize"):Connect(sizeFireworkRail)
 
-    local title = Instance.new("TextLabel")
-    title.Size = UDim2.new(1, -16, 0, 18)
-    title.Position = UDim2.fromOffset(8, 3)
-    title.BackgroundTransparency = 1
-    title.TextColor3 = INK_CREAM
-    title.TextSize = 14
-    title.Font = Enum.Font.GothamBold
-    title.TextXAlignment = Enum.TextXAlignment.Left
-    title.ZIndex = 6
-    title.Parent = b
+    local expanded = false
+    local shellTiles: { [string]: { button: TextButton, title: TextLabel, sub: TextLabel } } = {}
+    -- Declared BEFORE the loop so the click handlers close over it. `paintFireworkRail` is the only
+    -- writer, so a tap always tests exactly the state the row was painted from.
+    local shellStates: any = nil
 
-    local sub = Instance.new("TextLabel")
-    sub.Size = UDim2.new(1, -16, 0, 14)
-    sub.Position = UDim2.fromOffset(8, 21)
-    sub.BackgroundTransparency = 1
-    sub.TextColor3 = IVORY_DIM
-    sub.TextSize = 11
-    sub.TextXAlignment = Enum.TextXAlignment.Left
-    sub.ZIndex = 6
-    sub.Parent = b
+    for i, id in SHELL_ORDER do
+        local b = Instance.new("TextButton")
+        b.Name = id
+        b.LayoutOrder = i
+        -- -6 leaves the scrollbar its lane rather than running rows under it.
+        b.Size = UDim2.new(1, -6, 0, SHELL_ROW_H)
+        b.BackgroundColor3 = WASHI
+        b.BackgroundTransparency = 0.3
+        b.BorderSizePixel = 0
+        b.AutoButtonColor = false
+        b.Text = ""
+        b.ZIndex = 6
+        corner(b, 8)
+        stroke(b, GOLD, 1, 0.5)
+        b.Parent = fireworkRail
 
-    -- Only a launchable shell fires. The check is repeated on the server, so this is an affordance
-    -- rather than a gate — but a row that does nothing when tapped reads as broken, so the dimmed
-    -- state has to be visibly un-tappable, not silently inert.
-    b.MouseButton1Click:Connect(function()
-        local st = shellStates and shellStates[id]
-        if st and st.launchable then
-            EventBus.HudFireworkLaunch:Fire(id)
+        local title = Instance.new("TextLabel")
+        title.Size = UDim2.new(1, -14, 0, 15)
+        title.Position = UDim2.fromOffset(7, 3)
+        title.BackgroundTransparency = 1
+        title.TextColor3 = INK_CREAM
+        title.TextSize = 12
+        title.Font = Enum.Font.GothamBold
+        title.TextXAlignment = Enum.TextXAlignment.Left
+        title.ZIndex = 6
+        title.Parent = b
+
+        local sub = Instance.new("TextLabel")
+        sub.Size = UDim2.new(1, -14, 0, 12)
+        sub.Position = UDim2.fromOffset(7, 18)
+        sub.BackgroundTransparency = 1
+        sub.TextColor3 = IVORY_DIM
+        sub.TextSize = 10
+        sub.TextXAlignment = Enum.TextXAlignment.Left
+        sub.ZIndex = 6
+        sub.Parent = b
+
+        -- A tap FIRES (owner's ruling — the intermediate FIRE button was cut). Only a launchable
+        -- shell fires; the server repeats the check, so this is an affordance rather than a gate —
+        -- but a row that does nothing when tapped reads as broken, so the dimmed state has to be
+        -- visibly un-tappable, not silently inert. A scroll-drag that starts on a row never
+        -- clicks it: the engine cancels the click once the touch becomes a drag.
+        b.MouseButton1Click:Connect(function()
+            local st = shellStates and shellStates[id]
+            if st and st.launchable then
+                EventBus.HudFireworkLaunch:Fire(id)
+            end
+        end)
+
+        shellTiles[id] = { button = b, title = title, sub = sub }
+    end
+
+    -- On open, bring the BEST flyable shell into view: rows sit in catalogue order, so the biggest
+    -- thing the player can actually fly — the one they climbed the catalogue for — is the LAST
+    -- launchable row, and an opened list showing only the firecracker end reads as "my shells are
+    -- gone".
+    local function scrollToBest()
+        local best = 0
+        for i, id in SHELL_ORDER do
+            local st = shellStates and shellStates[id]
+            if st and st.launchable then
+                best = i
+            end
+        end
+        if best == 0 then
+            return
+        end
+        local y = (best - 1) * (SHELL_ROW_H + SHELL_ROW_GAP)
+        local maxScroll = math.max(0, fireworkRail.CanvasSize.Y.Offset - fireworkRail.AbsoluteSize.Y)
+        fireworkRail.CanvasPosition =
+            Vector2.new(0, math.clamp(y - fireworkRail.AbsoluteSize.Y / 2, 0, maxScroll))
+    end
+
+    fireworkButton.MouseButton1Click:Connect(function()
+        expanded = not expanded
+        fireworkRail.Visible = expanded
+        if expanded then
+            scrollToBest()
         end
     end)
 
-    shellTiles[id] = { button = b, title = title, sub = sub }
-end
-
-fireworkButton.MouseButton1Click:Connect(function()
-    expanded = not expanded
-    fireworkList.Visible = expanded
-end)
-
-local function paintFireworkTiles(states: any)
-    shellStates = states
-    for _, id in SHELL_ORDER do
-        local st = states[id]
-        local tile = shellTiles[id]
-        local live = st ~= nil and st.launchable == true
-        tile.title.Text = if st then `{SHELL_NAME[id]}  ×{st.count}` else SHELL_NAME[id]
-        tile.sub.Text = if live
-            then "ready"
-            else REASON_COPY[st and st.reason or ""] or (st and st.reason or "")
-        -- Dim rather than hide: the catalogue stays visible so a player can see what a mortar buys.
-        tile.button.BackgroundTransparency = if live then 0.3 else 0.65
-        tile.title.TextTransparency = if live then 0 else 0.4
-        tile.sub.TextTransparency = if live then 0.15 else 0.5
+    local function paintFireworkRail(states: any)
+        shellStates = states
+        for _, id in SHELL_ORDER do
+            local st = states[id]
+            local tile = shellTiles[id]
+            local live = st ~= nil and st.launchable == true
+            tile.title.Text = if st then `{SHELL_NAME[id]}  ×{st.count}` else SHELL_NAME[id]
+            tile.sub.Text = if live
+                then "ready"
+                else REASON_COPY[st and st.reason or ""] or (st and st.reason or "")
+            -- Dim rather than hide: the catalogue stays visible so a player can see what a mortar buys.
+            tile.button.BackgroundTransparency = if live then 0.3 else 0.65
+            tile.title.TextTransparency = if live then 0 else 0.4
+            tile.sub.TextTransparency = if live then 0.15 else 0.5
+        end
     end
+
+    fireworkUI = {
+        setVisible = function(canLaunch: boolean)
+            fireworkButton.Visible = canLaunch
+            if not canLaunch then
+                -- Walking away collapses it. Leaving the rail open would put a dozen rows over
+                -- the canyon at a spot where nothing can be launched from.
+                expanded = false
+            end
+            fireworkRail.Visible = canLaunch and expanded
+        end,
+        paint = paintFireworkRail,
+    }
 end
 
 local function render(inputs: any, aux: any)
@@ -1921,15 +2055,9 @@ local function render(inputs: any, aux: any)
     -- this cluster is about the round; this is about the ground under their feet.
     deckSitePos = aux.deckSite
     local canLaunch = atLaunchSite and aux.fireworkShells ~= nil
-    fireworkButton.Visible = canLaunch
-    if not canLaunch then
-        -- Walking away collapses it. Leaving the list open would put four rows over the canyon at
-        -- a spot where nothing can be launched from.
-        expanded = false
-    end
-    fireworkList.Visible = canLaunch and expanded
+    fireworkUI.setVisible(canLaunch)
     if canLaunch then
-        paintFireworkTiles(aux.fireworkShells)
+        fireworkUI.paint(aux.fireworkShells)
     end
 end
 
