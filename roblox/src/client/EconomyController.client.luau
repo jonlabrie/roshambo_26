@@ -23,6 +23,9 @@ local state = {
 local bound: { [string]: { prompt: ProximityPrompt, anchor: BasePart } } = {}
 
 local function priceOf(item: string): any
+    if item == "starter" and state.catalog then
+        return state.catalog.starter
+    end
     local kind, size = string.match(item, "^(%a+):(%a+)$")
     if state.catalog and kind and size and state.catalog[kind] then
         return state.catalog[kind][size]
@@ -34,13 +37,14 @@ end
 -- Owners (maxDeckSize ~= nil) get no world prompt here — upgrades are panel-only (B3).
 local function offerFor(_siteId: string, occupied: boolean): (string?, string?)
     if state.maxDeckSize == nil and not occupied then
-        -- non-owner on a vacant site. Show the shortfall in the label when unaffordable, so a new
-        -- player (starts at 0 pts, gateway deck costs 50) sees the goal instead of a silent dead-end.
-        local price = priceOf("deck:S")
+        -- non-owner on a vacant site: the starter bundle (deck S + teahouse S in one purchase,
+        -- owner 2026-09-03 — "an hour's play"). Show the shortfall when unaffordable, so a new
+        -- player (starts at 0 pts) sees the goal instead of a silent dead-end.
+        local price = priceOf("starter")
         if typeof(price) == "number" and state.totalPoints < price then
-            return "deck:S", `S deck & claim — earn {price - state.totalPoints} more pts`
+            return "starter", `Starter teahouse — earn {price - state.totalPoints} more pts`
         end
-        return "deck:S", `Buy S deck & claim — {priceOf("deck:S")} pts`
+        return "starter", `Starter teahouse — {price} pts`
     end
     return nil, nil
 end
@@ -98,7 +102,7 @@ local function refreshSite(folder: Instance)
                 -- can't afford it yet: acknowledge the tap + teach how to earn, instead of silently
                 -- firing a purchase the server would reject.
                 EventBus.TickerMessage:Fire(
-                    `Earn {price - state.totalPoints} more pts to claim a teahouse — win a round and bank your pot`
+                    `Earn {price - state.totalPoints} more pts for your own teahouse — win a round and bank your points`
                 )
                 return
             end

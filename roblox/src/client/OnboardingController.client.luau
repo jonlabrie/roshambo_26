@@ -34,6 +34,7 @@ local UserInputService = game:GetService("UserInputService")
 
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local OnboardingBeats = require(shared:WaitForChild("OnboardingBeats"))
+local TourGuide = require(shared:WaitForChild("TourGuide"))
 local HudLayout = require(shared:WaitForChild("HudLayout"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
@@ -226,6 +227,11 @@ local STATIC_ANCHORS: { [string]: { point: Vector2, offset: UDim2, width: number
         offset = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(CLUSTER_TOP_FROM_BOTTOM + BANK_GAP)),
         width = CARD_W,
     },
+    tour = {
+        point = Vector2.new(1, 1),
+        offset = UDim2.new(1 - JUMP_CLEARANCE, 0, 1, -(CLUSTER_TOP_FROM_BOTTOM + BANK_GAP)),
+        width = CARD_W,
+    },
 }
 -- Last-resort ONLY: used when there is no `workspace.CurrentCamera` at all to clamp against
 -- (should not happen in a live game — Roblox always has a camera once a character exists — but a
@@ -407,6 +413,10 @@ local currentBeat: any = nil
 -- and this session's own optimistic dismissals. Never shrinks.
 local seenLocal: { string } = {}
 
+local function broadcastTourStep()
+    EventBus.TourStep:Fire(TourGuide.step(seenLocal))
+end
+
 local function adoptServerSeen(list: { string }?)
     if type(list) ~= "table" then
         return
@@ -426,6 +436,7 @@ local function adoptServerSeen(list: { string }?)
             table.insert(seenLocal, id)
         end
     end
+    broadcastTourStep()
 end
 
 local function hideCard()
@@ -434,9 +445,12 @@ local function hideCard()
     currentBeat = nil
 end
 
+local currentPage = 1
+
 local function showCard(beat: any)
     currentBeat = beat
-    copyLabel.Text = beat.copy
+    currentPage = 1
+    copyLabel.Text = if beat.pages then beat.pages[1] else beat.copy
     positionCard(beat)
     card.Visible = true
 end
@@ -446,11 +460,25 @@ local function dismiss()
     if not beat then
         return
     end
+    -- The welcome's pages: a tap turns the page; only the LAST page's tap dismisses. seenLocal
+    -- is marked once, after the last page, so a guest who quits mid-welcome sees it again.
+    if beat.pages and currentPage < #beat.pages then
+        currentPage += 1
+        copyLabel.Text = beat.pages[currentPage]
+        return
+    end
     -- Optimistic: stops a re-fire before the round trip lands. The write rides the SAME remote
     -- Task 12's preference switch uses — SetHudPreference — never a second one.
     table.insert(seenLocal, beat.id)
     EventBus.HudPreference:Fire({ seenBeat = beat.id })
     hideCard()
+    broadcastTourStep()
+    if beat.id == "bank" then
+        -- The tour's front door (spec §2): dismissing the bank card is the moment the guest
+        -- stands there holding spendable points. BindableEvents are deferred, so this fires
+        -- AFTER currentBeat is nil — the handler below can show shopDoor immediately.
+        EventBus.Onboard:Fire("bankDismissed", nil)
+    end
 end
 
 card.MouseButton1Click:Connect(dismiss)
@@ -458,17 +486,38 @@ card.MouseButton1Click:Connect(dismiss)
 EventBus.Onboard.Event:Connect(function(event: string, serverSeenBeats: { string }?)
     adoptServerSeen(serverSeenBeats)
     if currentBeat then
-        -- NEVER STACK. A second event while a card is up is dropped, not queued — these are
-        -- bones, and a stack of cards is a tutorial. Reported as "dropped" (not "shown" and not
-        -- "alreadySeen") so the caller knows this specific occurrence taught nothing and may
-        -- retry on the beat's next natural occurrence.
-        EventBus.OnboardShown:Fire(event, "dropped")
-        return
+        if currentBeat.advanceOn == event then
+            -- A tour event arriving while its predecessor's card is still up: the guest has
+            -- plainly DONE the thing the card was asking, so the card's job is over. Dismiss it
+            -- (marking it seen, exactly as a tap would) and fall through to show this event's
+            -- own beat. Without this, the event would report "dropped" and — for one-shot
+            -- events like the only shell's launch — never come again, stranding the tour.
+            table.insert(seenLocal, currentBeat.id)
+            EventBus.HudPreference:Fire({ seenBeat = currentBeat.id })
+            hideCard()
+            broadcastTourStep()
+        else
+            -- NEVER STACK. A second event while a card is up is dropped, not queued — these
+            -- are bones, and a stack of cards is a tutorial.
+            EventBus.OnboardShown:Fire(event, "dropped")
+            return
+        end
     end
     local beat = OnboardingBeats.next(seenLocal, event)
     if beat then
         showCard(beat)
         EventBus.OnboardShown:Fire(event, "shown")
+        -- F5: the beam must not lag the card it goes with. Seen ids are marked at DISMISSAL, so
+        -- deriving the step from `seenLocal` alone would still point the beam at the PREVIOUS
+        -- stop for as long as this card is up (load-bearing on the MODEL leg: modelArrival can't
+        -- fire until modelDoor is dismissed, so a guest who just walks there without tapping the
+        -- card would never see the beam move and never get beat 8). Broadcast the step as though
+        -- the showing card were already seen — a throwaway copy, never mutating `seenLocal` — so
+        -- the card's words and the beam agree while the card is up; dismissal (broadcastTourStep
+        -- above, in `dismiss`/advance-through) then makes the same derivation permanent.
+        local seenWithShown = table.clone(seenLocal)
+        table.insert(seenWithShown, beat.id)
+        EventBus.TourStep:Fire(TourGuide.step(seenWithShown))
     else
         -- Nothing to show — not because of stacking, but because this beat is already in
         -- seenLocal (a prior session, or an earlier occurrence this one). Also NOT a reason to
@@ -476,3 +525,7 @@ EventBus.Onboard.Event:Connect(function(event: string, serverSeenBeats: { string
         EventBus.OnboardShown:Fire(event, "alreadySeen")
     end
 end)
+
+-- Fired once at startup so TourBeamController hears an initial step even before the first
+-- Onboard fire (e.g. a returning player rejoining mid-tour).
+broadcastTourStep()

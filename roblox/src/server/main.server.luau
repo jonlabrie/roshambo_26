@@ -1963,6 +1963,35 @@ for i = 1, 14 do
         siteCoordinator:registerPad(id, spec)
     end
 end
+
+-- The model teahouse (onboarding journey): the place names its pad via the Workspace
+-- attribute TourModelPadId (owner sets it in Studio next to the TourStop_* tags). Absent
+-- attribute = no model pad — a warn, not an error, so an untagged place still boots.
+do
+    local modelPadId = workspace:GetAttribute("TourModelPadId")
+    if typeof(modelPadId) == "string" and modelPadId ~= "" then
+        local action = siteCoordinator:claimModel("TOUR_MODEL", modelPadId)
+        if action ~= nil then
+            applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
+            -- F1: TourStop_Model cannot be tagged in Studio — this site is runtime-built
+            -- (TeahouseSites above), and tagLaunchSites.luau's own rule forbids tagging
+            -- rebuilt geometry (a tag on a deck plank disappears with the plank, silently).
+            -- Tag the built site's deck server-side instead, right after it materializes.
+            local siteFolder = sitesFolder:FindFirstChild("MaterializedSite_" .. modelPadId)
+            local deckPart = siteFolder and siteFolder:FindFirstChild("PadDeck", true)
+            if deckPart then
+                CollectionService:AddTag(deckPart, "TourStop_Model")
+            else
+                warn(`[Tour] MaterializedSite_{modelPadId} has no PadDeck — TourStop_Model not tagged`)
+            end
+        else
+            warn(`[Tour] TourModelPadId={modelPadId} could not be claimed — unknown or occupied pad`)
+        end
+    else
+        warn("[Tour] TourModelPadId attribute unset — no model teahouse this server")
+    end
+end
+
 for _, action in siteCoordinator:vacantActions() do
     applier:apply(action.padId, action.spec, action.treatment, action.deckSize, action.teahouse)
 end
@@ -2522,7 +2551,9 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
         -- buy-to-claim: a non-owner buying a deck:* claims the specific pad named in the payload.
         -- Validate + reserve-check the pad BEFORE spending points, so a full/occupied pad doesn't
         -- silently strand the player on a different pad (or no pad at all) after paying.
-        local isBuyToClaim = e.claimedPadId == nil and kindPre == "deck"
+        -- "starter" is deck:S + teahouse:S in one purchase (owner, 2026-09-03) — it claims a pad
+        -- exactly the way a bare deck:S does.
+        local isBuyToClaim = e.claimedPadId == nil and (kindPre == "deck" or item == "starter")
         local claimPadId: string? = nil
         if isBuyToClaim then
             local padId = if typeof(payload) == "table" and typeof(payload.padId) == "string"
@@ -2589,6 +2620,12 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
         local kind, size = string.match(item, "^(%a+):(%a+)$")
         if kind == "teahouse" and size then
             e.teahouses[size] = { baseStyle = "teahouse-1story" }
+        end
+        if item == "starter" then
+            -- the /purchase response carries teahouseSizes = {"S"} but the adopt above keys off
+            -- the item string; without this the claim below builds a bare deck and the guest's
+            -- bundle looks like half of what they paid for until next join.
+            e.teahouses.S = { baseStyle = "teahouse-1story" }
         end
         if isBuyToClaim and claimPadId then
             -- postPurchase yielded; re-check vacancy, a claim could have raced in meanwhile.

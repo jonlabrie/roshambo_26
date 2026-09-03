@@ -181,3 +181,26 @@ describe('access constants', () => {
         expect(DEFAULT_ACCESS).toEqual({ mode: 'public', invited: [] });
     });
 });
+
+describe('validatePurchase — the starter bundle', () => {
+    it('starter needs no property and costs 20', () => {
+        expect(validatePurchase(fresh(), 'starter')).toEqual({ ok: true, cost: PRICES.starter });
+        expect(PRICES.starter).toBe(20);
+    });
+    it('rejects starter for anyone who already owns a deck', () => {
+        expect(validatePurchase(fresh({ maxDeckSize: 'S' }), 'starter')).toEqual({ ok: false, error: 'ALREADY_OWNED' });
+        expect(validatePurchase(fresh({ maxDeckSize: 'L' }), 'starter')).toEqual({ ok: false, error: 'ALREADY_OWNED' });
+    });
+    it('rejects starter when unaffordable', () => {
+        expect(validatePurchase(fresh({ totalPoints: 19 }), 'starter')).toEqual({ ok: false, error: 'INSUFFICIENT_POINTS' });
+    });
+    it('applyPurchase grants deck S + teahouse S atomically and deducts 20', () => {
+        const next = applyPurchase(fresh({ totalPoints: 25 }), 'starter');
+        expect(next.maxDeckSize).toBe('S');
+        expect(next.teahouseSizes).toEqual(['S']);
+        expect(next.totalPoints).toBe(5);
+    });
+    it('the ladder is untouched: an owner still upgrades at full price', () => {
+        expect(validatePurchase(fresh({ maxDeckSize: 'S' }), 'deck:M')).toEqual({ ok: true, cost: PRICES.deck.M });
+    });
+});

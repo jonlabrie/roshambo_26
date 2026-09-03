@@ -185,4 +185,30 @@ function SiteCoordinator:isVacant(padId: string): boolean
     return rec ~= nil and rec.occupant == nil
 end
 
+-- The model teahouse (onboarding journey, owner 2026-09-03): one named pad claimed at boot
+-- by a sentinel "owner" and materialized as the lit stock S bundle — exactly what the
+-- starter SKU buys, standing built so a guest can walk its deck and slide its shoji
+-- (visitor slides are live-only, so the model tidies itself). Claimed through the SAME
+-- registry as every player claim, which is the whole trick: onJoin and buy-to-claim skip it
+-- because it is simply occupied.
+function SiteCoordinator:claimModel(ownerId: string, padId: string): Action?
+    if self._held[ownerId] ~= nil then
+        return nil
+    end
+    local rec = self._registry:get(padId)
+    if rec == nil or rec.occupant ~= nil then
+        return nil
+    end
+    local loadout = { baseStyle = "teahouse-1story" }
+    self._registry:claim(padId, ownerId)
+    self._held[ownerId] = padId
+    return {
+        padId = padId,
+        spec = rec.spec,
+        treatment = VacantState.resolve(ownerId, loadout, rec.spec and rec.spec.vacantForm),
+        deckSize = "S",
+        teahouse = { size = "S", loadout = loadout, placement = CENTERED },
+    }
+end
+
 return SiteCoordinator

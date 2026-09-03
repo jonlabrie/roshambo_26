@@ -27,6 +27,10 @@ local NAMES = {
     "HudPreference",
     "Onboard",
     "OnboardShown",
+    -- The tour's derived step (TourGuide.step over seenLocal), fired by OnboardingController
+    -- after every seen-list change. TourBeamController renders the beam from it; nothing else
+    -- may derive the step a second way.
+    "TourStep",
     -- The result splash (SplashController). Fired from main.client.luau's `maybeShowReveal`, on the
     -- SAME `drumRest` gate as the tape tile — never from RevealResult directly, which would spoil
     -- the wheel ~3s early. The drum is authoritative: nothing may reflect the world's throw

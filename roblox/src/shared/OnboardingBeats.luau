@@ -4,37 +4,91 @@
 -- before they know what a win is. Bones, not a tutorial: the owner is narrating in person.
 --
 -- There is deliberately NO beat about movement or exploration. The HUD is designed to
--- de-emphasise movement, and a beat pointing at the thumbstick would undo that.
+-- de-emphasise movement DURING PLAY; tour beats direct travel between stops, which is a tour's
+-- job, but none of them may point at the thumbstick itself.
 local OnboardingBeats = {}
 
-export type Beat = { id: string, event: string, copy: string, anchor: string }
+export type Beat = {
+    id: string,
+    event: string,
+    copy: string,
+    anchor: string,
+    -- The welcome's tap-through pages (copy == pages[1]); nil for every single-card beat.
+    pages: { string }?,
+    -- The tour's advance-through hook: an event arriving while THIS beat's card is still up
+    -- normally drops (never stack) — but if it equals advanceOn, the controller dismisses this
+    -- card (the guest has plainly done the thing) and shows the next. Without it a guest who
+    -- launched before dismissing "follow the light to the river" would strand the tour: the
+    -- modelDoor beat would report "dropped" and shellLaunched may never fire again.
+    advanceOn: string?,
+}
+
+-- The welcome sequence (owner, 2026-09-03): the one deliberate exception to "never read
+-- ahead" — a cold F&F guest needs the core context at join. Four pages, one tap each, in the
+-- owner's own words (copy-workshop pass, same day): what this is / where the world throw
+-- shows / how to read the crowd / the handoff into the first throw.
+local WELCOME_PAGES = {
+    "Welcome to Roshambo — Rock, Paper, Scissors against Everyone, Everywhere, at the same time.",
+    "The Throw drum atop the Bonsho bell spins every minute to show the world throw — what most people threw.",
+    "You want to beat that throw, so you need to read the crowd. The last five world throws are below the throw buttons, left to right.",
+    "Go ahead and try to beat the world by choosing your first throw now.",
+}
 
 OnboardingBeats.BEATS = {
-    { id = "drum", event = "join", copy = "The drum throws every minute. Beat it.", anchor = "drum" },
-    { id = "throw", event = "throwsUnlocked", copy = "Tap a throw.", anchor = "throwArea" },
+    { id = "welcome", event = "join", copy = WELCOME_PAGES[1], pages = WELCOME_PAGES, anchor = "drum" },
+    { id = "throw", event = "throwsUnlocked", copy = "Pick your throw — tap one.", anchor = "throwArea" },
     {
         id = "win",
         event = "win",
-        copy = "You won. Take it, or ride it — a win triples your pot.",
-        -- Was "choiceOverlay": the blocking RISK/BANK overlay this pointed at was withdrawn
-        -- (spec "Decisions taken" #6/7) and replaced by the persistent pot indicator in the slot
-        -- above the throw row. Renamed to name what is actually on screen today.
+        -- Owner's words (2026-09-03 copy workshop). "POT" is deliberate: the original ruling's
+        -- target was UNEXPLAINED gambling jargon ("only if you know what a 'pot' is"), and this
+        -- line teaches the term in the same breath it uses it. The wager-class words (ride,
+        -- stake, wager, bet) stay banned — see the vocabulary test.
+        copy = "You won your first point! You can BANK it, or leave it in the POT."
+            .. " If you win again (before a loss) then points in the pot are tripled!",
         anchor = "potIndicator",
     },
-    -- Was anchored "plate": the plate moved into the bottom row (spec §2, 2026-08-03) and is
-    -- normally hidden, so a card can no longer point at where it used to sit. "wallet" names what
-    -- this beat actually explains — the balance the plate displays — not a screen position.
-    --
-    -- Was "Banked. That's yours to keep." — the hamburger was deleted and the round-timer ring
-    -- inherited its two-stage gesture (spec §6, Task 5), but a ring that looks like a readout
-    -- does not invite a tap. The bank TOAST already says "banked" (main.client.luau), so this
-    -- beat's copy no longer needs to; its job is teaching the gesture, at the moment it becomes
-    -- useful — the first time there is a balance worth checking.
     {
         id = "bank",
         event = "bank",
-        copy = "Tap the clock for your points. Tap again for everything.",
+        -- Owner's words, plus one kept sentence: the clock-gesture teach. The ring looks like
+        -- a readout, not a button (spec §6 ruling), and this beat is the only surface that
+        -- ever teaches the tap — the gesture test below pins it.
+        copy = "You're on your way to becoming a globally ranked Roshambo player!"
+            .. " Points earned always count towards leveling, but they can also be spent to buy"
+            .. " stuff like fireworks and a private place to hang out with friends."
+            .. " Tap the clock to see your points; tap again for everything.",
         anchor = "wallet",
+    },
+    -- ===== The tour (spec §2/§4): earned by banking, walked by the beam =====
+    {
+        id = "shopDoor",
+        event = "bankDismissed",
+        copy = "You can buy fireworks with points. Follow the light to the Fireworks shop!",
+        anchor = "tour",
+        advanceOn = "shellBought",
+    },
+    {
+        id = "launchDoor",
+        event = "shellBought",
+        copy = "Nice! Now you need to find a public fireworks spot. Follow the light to find one.",
+        anchor = "tour",
+        advanceOn = "shellLaunched",
+    },
+    {
+        id = "modelDoor",
+        event = "shellLaunched",
+        copy = "Awesome! One more stop — follow the light to see a teahouse.",
+        anchor = "tour",
+        advanceOn = "modelArrival",
+    },
+    {
+        id = "modelHome",
+        event = "modelArrival",
+        -- "20 points" mirrors PRICES.starter in server/src/economy.ts — a price change there
+        -- must update the copy here too (see the matching comment on that constant).
+        copy = "A teahouse of your very own — 20 points. Every win gets you closer.",
+        anchor = "tour",
     },
 } :: { Beat }
 

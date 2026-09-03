@@ -244,3 +244,37 @@ describe("SiteCoordinator.vacantActions", function()
         expect(acts[1].padId).toBe("p2")
     end)
 end)
+
+describe("SiteCoordinator — the model pad (claimModel)", function()
+    local function coordinatorWithPads()
+        return coord({ spec("T01"), spec("T02", "M") })
+    end
+
+    test("claims the named pad, lit, with the stock S bundle", function()
+        local c = coordinatorWithPads()
+        local action = c:claimModel("TOUR_MODEL", "T02")
+        expect(action ~= nil).toBe(true)
+        expect(action.padId).toBe("T02")
+        expect(action.deckSize).toBe("S")
+        expect(action.teahouse.size).toBe("S")
+        expect(action.treatment.kind).toBe("structure")
+        expect(action.treatment.lit).toBe(true)
+        expect(c:isVacant("T02")).toBe(false)
+    end)
+
+    test("a joining owner is never assigned the model pad", function()
+        local c = coordinatorWithPads()
+        c:claimModel("TOUR_MODEL", "T01")
+        local action = c:onJoin("player9", { maxDeckSize = "S", teahouses = {} })
+        expect(action ~= nil).toBe(true)
+        expect(action.padId).toBe("T02")
+    end)
+
+    test("nil for an unknown or already-claimed pad, or a second model claim", function()
+        local c = coordinatorWithPads()
+        expect(c:claimModel("TOUR_MODEL", "T99")).toBe(nil)
+        expect(c:claimModel("TOUR_MODEL", "T01") ~= nil).toBe(true)
+        expect(c:claimModel("TOUR_MODEL_2", "T01")).toBe(nil) -- occupied
+        expect(c:claimModel("TOUR_MODEL", "T02")).toBe(nil) -- sentinel already holds a site
+    end)
+end)

@@ -3744,3 +3744,26 @@ Compiles.spec.luau now runs every src file through Lune's embedded Luau
 compiler (O0 + O2) -- it reproduced the exact Studio error before the fix.
 Rule for new HUD sections: one top-level register per section, do-block the
 rest.
+
+## [2026-09-03] ship | Onboarding journey spec'd and built -- 8 beats, tour beam, model pad, starter SKU
+
+Spec `docs/superpowers/specs/2026-09-03-onboarding-journey-design.md` and plan
+`docs/superpowers/plans/2026-09-03-onboarding-journey.md`, built end to end in
+commits `98df9f6..8b0eb9d`: the starter SKU (S deck + S teahouse, 20 pts, atomic
+first-property grant, vacant-site prompt), the beat chain grown 4 -> 8 with a
+3-page welcome sequence, `TourGuide` deriving the tour step purely from
+`seenBeats`, `TourStep` broadcast + advance-through, `shellBought`/`shellLaunched`
+fired from `FireworkState` inventory edges, `TourBeamController` (one client
+beam over the tour's next stop, fixed in `16331e6` after review caught it
+requiring `TourGuide` directly instead of via `ReplicatedStorage.RoshamboShared`),
+and the model pad (sentinel `claimModel` + `Workspace.TourModelPadId` boot
+wiring). Owner rulings folded into the design: mixed cold-join demo drives the
+shape, the classic beam over a chōchin/lit-path alternative, the model
+teahouse as the first step rather than the dream, and a dusk-lock demo
+exception (`DayNightLockT = 0.40`) so the closing firework reads against a
+dark sky -- recorded on `docs/wiki/world/place-state.md`. Full gate run green
+before this entry: roblox stylua/selene/1826 Lune tests/rojo build, server's
+507 Vitest tests. `docs/wiki/program/backlog.md`'s onboarding-JOURNEY section
+moves from queued to IN EXECUTION; open gates remaining are the copy workshop
+(beat copy still leans on gambling vocabulary pending the kid-legible rewrite)
+and the owner's unrehearsed cold phone walk.
