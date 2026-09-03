@@ -8,7 +8,7 @@
 local ShellDisplay = {}
 
 ShellDisplay.ORDER =
-    { "firecracker", "peony", "willow", "ishibana", "kiku", "wa", "yashi", "kamuro", "hotaru" }
+    { "firecracker", "peony", "willow", "ishibana", "kiku", "wa", "yashi", "kamuro", "hotaru", "janken" }
 
 ShellDisplay.NAME = {
     firecracker = "Firecracker",
@@ -20,6 +20,7 @@ ShellDisplay.NAME = {
     yashi = "Yashi",
     kamuro = "Kamuro",
     hotaru = "Hotaru",
+    janken = "Janken",
 } :: { [string]: string }
 
 return ShellDisplay
