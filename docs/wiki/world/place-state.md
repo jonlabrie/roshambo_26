@@ -23,8 +23,14 @@ Everything below marked *verified* was checked live via the Studio MCP on 2026-0
 ## Publish checklist
 
 1. `Workspace.DayNightLockT` must be at 0.19 (the daytime working value) or cleared —
-   never publish a dusk/night lock. Verified 2026-08-15: `DayNightLockT = 0.19`,
-   `PreNightTestLockT = 0.19`, `DayNightStartT` cleared — currently satisfied.
+   never publish a dusk/night lock. Verified 2026-09-03: `DayNightLockT = 1.19`
+   (same phase as 0.19 — the controller wraps the fraction — set by the owner while
+   making daytime changes, "wasn't recent"), `DayNightStartT` cleared. ⚠ OPEN QUESTION
+   (owner, 2026-09-03, deferred: "leave it for the moment, we'll discuss in a bit"):
+   whether the published game should keep a day lock at all — the owner noticed "the
+   day night cycle doesn't run, even in play" as a surprise, and fireworks/hotaru/the
+   whole shell shelf are judged against a dark sky. Clearing the attribute restores
+   the epoch-anchored 10-minute global cycle.
 2. Run `roblox/tools/studio/verifyWorkspaceConvention.luau` in Studio.
 3. ⚠ **Scan any newly imported toolbox/marketplace model for a require-backdoor** —
    [[toolbox-backdoor-scan]]. **This checklist is the ONLY place that can catch one**: the
