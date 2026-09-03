@@ -1,7 +1,6 @@
 ---
 shelf: world
-updated: 2026-09-04
-checked: 2026-08-27
+updated: 2026-09-03
 ---
 
 # Fireworks
@@ -23,6 +22,14 @@ Overlook, ishibana gated correctly on the world throwing Rock).
 - **Launch sites**: a player's own deck, plus three tagged `FireworkLaunchSite` parts
   — `Site_SuspensionBridge`, `Site_FallsDock`, `Site_Overlook` under
   `CanyonWorld.LaunchSites` (verified in the place 2026-08-15).
+- ⚠ **The Hanabiya ROOFTOP BATTERY is built, gated and PUBLISHED, and has no as-built
+  section anywhere on this shelf.** It is a Rojo-managed stage child
+  (`roblox/assets/HanabiyaRooftop.model.json`, declared in `default.project.json` and
+  listed in `WorkspaceConvention`), it aims north over the arena, and it is the sixth
+  virtual proving rack (above). Its only prose record is `log.md` (2026-09-06 entries)
+  and the FUTURE "Rooftop MC experience" item on [[backlog]] — i.e. live as-built
+  knowledge filed on the status shelf. Recorded as a gap rather than left invisible;
+  writing it up needs the owner or the authoring session.
 - Shop front-end: [[hanabiya]].
 - **Proving range (2026-09-01, branch `proving-range`, working — owner comments pending)**:
   the authoring loop for new shells. Draft recipes in `src/shared/FireworkDrafts.luau`
@@ -38,8 +45,16 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   was the design assumption (the plaques were sized to it) and never the practice; tuning
   targets the close, edge-on read. Panel opens
   ANYWHERE in Studio (P key / top-right chip, left-edge rail — a location-bound panel
-  was ruled theater and the FiringPost deleted); modes single (rack A–E selector),
-  ladder (variants side-by-side), sequence (2s apart); night via `ProvingNightOverride`
+  was ruled theater and the FiringPost deleted). ⚠ **The rack A–E selector and its
+  one-rack-at-a-time modes are GONE** (2026-09-06): plaques off, stations MULTI-SELECT,
+  and every mode honours the toggle set — **Fire** = the selection at once, **Ladder** =
+  the walk (selected stations in order, one launch per beat), **Seq** = clean-air repeats
+  at one neutral station, **Boost** = forced luck. The rack list, the sequence station and
+  both beat gaps are constants in `roblox/src/shared/ProvingPlan.luau` (`RACKS`,
+  `SEQUENCE_RACK`, `SEQUENCE_GAP`, `LADDER_GAP`) — read them rather than a number here.
+  ⚠ **`RACKS` carries SIX entries, not five**: the Hanabiya rooftop battery joins as a
+  VIRTUAL sixth rack (not a ProvingGround station — the server resolves it to one of the
+  rooftop's tagged tube mounts per shot). Night via `ProvingNightOverride`
   Lighting attribute that DayNightController's tick respects. Mortars are accurate
   2"/4"/6" at ~4–5:1 (owner ruling; **yonshakudama parked as a future premium
   spectacle**). Spec `docs/superpowers/specs/2026-09-01-proving-range-design.md`.
@@ -97,8 +112,10 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   now launches from HAND height, not 6 studs overhead. The same-server-rejoin
   fingerprint fix was LIVE-VERIFIED 2026-09-05 on the published place (two-device
   hold-open, leave/rejoin: tubes present at their placements). Spec
-  docs/superpowers/specs/2026-09-04-deck-mortars-design.md; ledger
-  `.superpowers/sdd/2026-09-04-deck-mortars/progress.md`.
+  docs/superpowers/specs/2026-09-04-deck-mortars-design.md and plan
+  docs/superpowers/plans/2026-09-04-deck-mortars.md. ⚠ **No SDD ledger was created** —
+  `.superpowers/sdd/2026-09-04-deck-mortars/` does not exist, <!-- lint-ok: naming the ledger path in order to say it was never created -->
+  so the raw layer here is the spec, the plan and the branch's own commits.
 - **Rail mounts (2026-09-05, merged `24c6da9..8e1a61b` + gate fixes `27b410d..dcdffed`,
   GATED)**: mortars are aimable hardware — `{mount: floor|rail, offset, aim: L|C|R}` records
   (legacy reads floor/C at the saved spot, never relocated), three aims in a 60° arc anchored
@@ -123,8 +140,9 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   (`27b410d`, `862568c` — five orderings were patched before instrumentation found the truth);
   (3) the lever's fall-through would have swept legacy records onto the rail — guarded
   (`dcdffed`). Same-server rejoin verification PASSED live 2026-09-05. Spec
-  docs/superpowers/specs/2026-09-04-rail-mounts-design.md; ledger
-  `.superpowers/sdd/2026-09-04-rail-mounts/progress.md`.
+  docs/superpowers/specs/2026-09-04-rail-mounts-design.md and plan
+  docs/superpowers/plans/2026-09-04-rail-mounts.md. ⚠ **No SDD ledger was created** here
+  either — `.superpowers/sdd/2026-09-04-rail-mounts/` does not exist. <!-- lint-ok: naming the ledger path in order to say it was never created -->
 - **Promotion worksheet (as of 2026-09-06)**: shipped through the five guarded steps —
   **wa** (red double-ring, M tube, 5; boost 30% = structural second ring via the first
   `boostOnly` phase, no kicker — "the double ring IS the tell") and **yashi** (palm,

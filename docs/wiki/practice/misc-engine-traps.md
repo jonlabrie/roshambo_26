@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-26
+updated: 2026-09-03
 ---
 
 # Misc Engine Traps
@@ -175,10 +175,21 @@ if (ctx.state === 'suspended') ctx.resume()   // WRONG on iOS
 if (ctx.state !== 'running') ctx.resume()     // right
 ```
 
-**`resume()` is async, so removing the unlock listeners on the first gesture removes them
-before you know it worked.** On desktop the first attempt always succeeds and the bug is
-invisible; on iOS a failed first attempt then means silence for the whole session. Keep
-listening until `ctx.state === 'running'` is actually observed, and only then unbind.
+⚠ **NEVER DISARM THE UNLOCK LISTENERS — not even once `running` is observed.** This section
+used to say "keep listening until `ctx.state === 'running'` is actually observed, and only then
+unbind." **That was tried and was not enough** (corrected 2026-09-05, `d5187da`): iOS re-suspends
+or INTERRUPTS the context on lock, backgrounding and incoming calls, the `visibilitychange`
+nudge's `resume()` is refused outside a gesture, and with the listeners gone **no tap could ever
+repair it** — audio death was sticky until a lucky reload, which is what made the flake read as
+"the bell is missing again" and clear itself at random. On a healthy context the handler is a
+one-comparison no-op, so listening for the whole session costs nothing and every tap becomes a
+repair opportunity. The `remove` returned from the effect is for unmount only.
+
+⚠ **AND THE FIX SHIPPED ITS OWN REGRESSION, which is the transferable half** (`6f8e2c0`, same
+day). Loading the bell buffer sat *behind* the `resume()` early-return, so a desktop context born
+already `running` hit `return` and skipped the only call that ever loads the buffer — silencing
+the bell everywhere while fixing it on iOS. **Work that needs no gesture and no running context
+must run BEFORE the state check**, not inside the branch that handles the unhealthy case.
 
 Also for iOS specifically: bind `click` and `touchend` (long-honoured gestures for audio;
 `pointerdown` is not reliably one), bind in **capture** phase so a `stopPropagation()`

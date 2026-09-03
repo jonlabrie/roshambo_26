@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: open
-updated: 2026-08-27
+updated: 2026-09-02
 ---
 
 # Friends & Family Baseline
@@ -40,7 +40,9 @@ rounds skippable, no penalty) — hangout is the product.
    fixed. **Cannot close on this alone**: the static half — nobori, crest on the noren, scrolls in
    the alcove — is unbuilt, and it is the piece that gives a visitor a reason to enter someone
    else's teahouse. Also thin: plumage is band colour only, and the progression is invisible to
-   the player who earned it. Carries the parked economy-API defects (a)–(c) in [[parked-defects]].
+   the player who earned it. ⚠ **The parked economy-API defects it carried — (a), (b) and (c) —
+   were ALL fixed 2026-09-05** (`13ee64e` atomic purchase, `1715c2f` decoration ownership,
+   `8651794` resolveUser 404); item 6 now carries none. See [[parked-defects]].
    Any badge that claims SKILL depends on (h) being ACTIVE, not merely fixed; volume badges do
    not — which is exactly why grade is built on milestones rather than on a rate.
    **2026-08-25: the worn sashimono is DROPPED**, and **deleted from the codebase 2026-08-26**
