@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: open
-updated: 2026-09-05
+updated: 2026-09-03
 ---
 
 # Backlog
@@ -502,18 +502,30 @@ parked defects (i)-(k) untouched.
 
 ## The onboarding JOURNEY — a crafted path an 8-year-old can walk (owner, 2026-09-05)
 
-Owner direction, verbatim intent, queued for AFTER the fireworks sprint: the current beat
-copy is correct "but only if you know what a 'pot' or a 'ride' is. These are gambling terms
--- fine -- but Roblox is, first and foremost, a kid's environment so we need to be
-thoughtful and precise in the journey we're taking them on as we answer the most important
-questions: what is this place? How does it work? What can I do? What makes it special? The
-onboarding path needs to be so smooth that even an 8-year old can do it."
+**STATUS: IN EXECUTION as of 2026-09-03** — supersedes "queued for AFTER the fireworks
+sprint" below. Spec `docs/superpowers/specs/2026-09-03-onboarding-journey-design.md` and
+plan `docs/superpowers/plans/2026-09-03-onboarding-journey.md` are written and built: the
+8-beat chain, 3-page welcome, TourGuide/TourStep advance-through, inventory-edge events,
+TourBeamController, the TourModelPadId model-pad claim, and the starter SKU (20 pts).
+Open gates before this closes: the **copy workshop** (the vocabulary rewrite this section
+was written to demand — beat copy still leans on "pot"/"ride" gambling terms pending the
+kid-legible pass) and the **owner's cold phone walk** (an unrehearsed run-through on a
+phone, unscripted).
+
+Owner direction, verbatim intent, originally queued for AFTER the fireworks sprint: the
+current beat copy is correct "but only if you know what a 'pot' or a 'ride' is. These are
+gambling terms -- fine -- but Roblox is, first and foremost, a kid's environment so we need
+to be thoughtful and precise in the journey we're taking them on as we answer the most
+important questions: what is this place? How does it work? What can I do? What makes it
+special? The onboarding path needs to be so smooth that even an 8-year old can do it."
 
 This extends the standing no-sports-book-language rule into the onboarding voice, and it is
 a JOURNEY design (sequence, pacing, vocabulary, the four questions above), not a copy edit.
-To be crafted owner+Claude together (owner: "together you and I need to craft this journey").
-Context: the beats now RENDER (defect (d) fixed 2026-09-05 -- every F&F guest would have seen
-empty boxes); the four existing beats are placeholders for this pass.
+The copy/vocabulary pass itself is still to be crafted owner+Claude together (owner:
+"together you and I need to craft this journey") — the mechanics above are the scaffolding
+it will run on, not that pass. Context: the beats now RENDER (defect (d) fixed 2026-09-05 --
+every F&F guest would have seen empty boxes); the eight beats built this pass are still
+placeholder copy pending the vocabulary workshop.
 
 ## Fireworks monetization vocabulary: boosts standard, surprises typed, mystery + bundle SKUs (owner, 2026-09-05)
 
