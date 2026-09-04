@@ -26,14 +26,29 @@ const MONGODB_URI = process.env.MONGODB_URI;
 
 // The synthetic crowd (spec §5). Refuses to boot on a malformed value, like MONGODB_URI does:
 // a crowd that silently fell back to defaults would run an experiment nobody configured.
-const crowdConfig = readCrowdConfig(process.env, {
-    testMode: TEST_MODE,
-    log: msg => console.warn(msg),
-    randomSeed,
-});
+function readCrowdConfigOrDie() {
+    try {
+        return readCrowdConfig(process.env, {
+            testMode: TEST_MODE,
+            log: msg => console.warn(msg),
+            randomSeed,
+        });
+    } catch (err) {
+        // Spec §5: refuse at boot with a clear line, the same shape MONGODB_URI uses. A raw
+        // stack trace in App Runner's log is not "a clear log line" — it reads as a crash.
+        console.error(`[FATAL] ${(err as Error).message}`);
+        process.exit(1);
+    }
+}
+const crowdConfig = readCrowdConfigOrDie();
+// ONE rng instance, shared by the crowd's sampling AND the plurality tie-break below. That
+// sharing is the whole of the "seeded crowd, zero humans -> deterministic sequence" property:
+// a tie broken by Math.random would fork the crowd's future the first time two throws tied,
+// and the live sequence would stop matching runSimulation({ humans: [] }) on the same seed.
+const crowdRng = crowdConfig ? mulberry32(crowdConfig.seed) : undefined;
 const crowd: CrowdSource | undefined = crowdConfig
     ? guardCrowd(
-        createCrowd({ size: crowdConfig.size, mix: crowdConfig.mix, rng: mulberry32(crowdConfig.seed) }),
+        createCrowd({ size: crowdConfig.size, mix: crowdConfig.mix, rng: crowdRng! }),
         msg => console.error(msg),
     )
     : undefined;
@@ -107,7 +122,9 @@ function makeEngine(initialRoundCount: number, testCycleShift = 0): RoundEngine 
         pickWorldThrow: (roundCount, counts) =>
             TEST_MODE
                 ? THROWS[(roundCount + testCycleShift) % 3]
-                : deriveWorldThrow(counts, { minParticipants: worldThrowMinParticipants }),
+                // crowdRng undefined (no crowd) -> omit `random` so deriveWorldThrow's
+                // Math.random default stands, exactly as before.
+                : deriveWorldThrow(counts, { minParticipants: worldThrowMinParticipants, ...(crowdRng ? { random: crowdRng } : {}) }),
         crowd,
         makeRoundId: () => Math.random().toString(36).substring(2, 9),
         nowMs: () => Date.now(),

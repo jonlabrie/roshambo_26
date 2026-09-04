@@ -28,7 +28,10 @@ export const freshMemory = (): Memory => ({ repeatRun: 0 });
 const THROWS: Throw[] = ['R', 'P', 'S'];
 export const WHAT_BEATS: Record<Throw, Throw> = { R: 'P', P: 'S', S: 'R' };
 export const CLOCKWISE: Record<Throw, Throw> = { R: 'S', S: 'P', P: 'R' };
-export const UNIFORM: Dist = { R: 1 / 3, P: 1 / 3, S: 1 / 3 };
+// Frozen: `random` and the zero-total fallback both return this object BY REFERENCE, so an
+// accidental write through one caller's Dist would silently re-weight every other one. All
+// write sites build fresh literals.
+export const UNIFORM: Dist = Object.freeze({ R: 1 / 3, P: 1 / 3, S: 1 / 3 });
 
 export function pointMass(t: Throw): Dist {
     return { R: t === 'R' ? 1 : 0, P: t === 'P' ? 1 : 0, S: t === 'S' ? 1 : 0 };
