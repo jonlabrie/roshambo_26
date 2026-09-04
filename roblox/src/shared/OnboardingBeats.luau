@@ -57,7 +57,7 @@ OnboardingBeats.BEATS = {
         copy = "You're on your way to becoming a globally ranked Roshambo player!"
             .. " Points earned always count towards leveling, but they can also be spent to buy"
             .. " stuff like fireworks and a private place to hang out with friends."
-            .. " Tap the clock to see your points; tap again for everything.",
+            .. " Tap the timer below to see your points, double-tap for details.",
         anchor = "wallet",
     },
     -- ===== The tour (spec §2/§4): earned by banking, walked by the beam =====
