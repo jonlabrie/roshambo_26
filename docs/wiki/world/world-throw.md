@@ -194,9 +194,28 @@ crowd   counter BEAT WORLD   ±95%
 
 **How the mix was settled, and against which targets.** Pre-registered before tuning (spec §2):
 a simple teachable rule beats the crowd clearly (**BEAT WORLD ≥ 45%**), nothing non-oracle
-exceeds **~60%**, and a blind human sits near chance. All three hold at seeds 1–3 — the best
-teachable rule (`second`, counter-the-counter) runs 51.4–52.4% across them, and nothing but
-`oracle` goes near 60%.
+exceeds **~60%**, and a blind human sits near chance. The table above says all three hold
+at seeds 1–3, with `second` at 51.4–52.4%.
+
+⚠ **CORRECTED 2026-09-04, the same day: that table is CONTAMINATED, and the 45% target was
+NOT met.** The readability experiment puts all six modelled humans into ONE tally, so their
+votes shape the World Throw each is scored against — `counter` and `oracle` both push the
+plurality forward, which is exactly the move `second` needs. Scored ALONE against the 30-bot
+crowd (seeds 1–3, 20000 rounds, re-measure with `runSimulation({ humans: [one spec] })`):
+
+| rule, alone vs 30 bots | BEAT WORLD |
+|---|---|
+| `counter` (throw what beats the last World Throw) | 44.0–44.5% |
+| `second` (throw what the last World Throw beat) | 41.8–42.2% |
+| `random` | 29.4–29.7% |
+
+So alone, the two teachable rules are near-equal at ~43% and neither clears 45%; the ceiling
+target holds trivially and the blind band holds. The mix is still readable-but-not-solved,
+which is what the crowd is for, but the "second beats counter by ten points" story below is an
+artifact of six humans voting together. The experiment is to be fixed to score each rule
+independently and the mix re-tuned against honest numbers (task spawned 2026-09-04; until it
+lands, read the table above as "six rule-followers in one arena", not as any one player's
+prospects).
 
 - ⚠ **The blind band is 29–34%, widened from "≈33%" by ruling 2026-09-04**, and the settled
   mix's 29.4% is inside it. A blind human's own throw is inside the tally it is judged
@@ -216,13 +235,16 @@ default crowd with the last-five HUD; **≥ 45% BEAT WORLD** reads as "crowd-rea
 here"; a rate down in the blind band (29–34%, above) means the crowd is too noisy or the HUD
 shows the wrong thing. Result: not yet run — dev flipped 2026-09-04, so it can be.
 ⚠ **The owner cannot run the discovery half of Q1** (they know the rules); their twenty rounds
-are a FEEL test plus a calibration check (play `second` deliberately → expect ~52%). Discovery is
+are a FEEL test plus a calibration check (play either rule deliberately → expect ~42–44%
+over a long run; twenty rounds is ±20 points, so read the tape's transition shape instead —
+forward a bit over half the time, repeat ~4 in 10, backward rarely). Discovery is
 for newcomers, read by trajectory (rounds 11–20 vs 1–10), by what they say the world was doing,
 and by whether they kept throwing — not by a 45% line in twenty rounds.
 
-Read a ~42% result as progress, not failure. At the settled mix the naive HUD reading —
-`counter`, throw what beats the last World Throw — scores ~42.2%, just under the 45% line; the
-rule that clears it is `second`, throw what the last World Throw *beat*, i.e. counter the
-counter. A first-time human will almost certainly try `counter` first, so ~42% means they found
-the first rule and not yet the second, and the question Q1 actually asks is whether the second
-one is findable.
+Read a ~42–44% result as "found a rule". Alone against the settled crowd the naive HUD reading
+(`counter`, throw what beats the last World Throw) and its counter (`second`, throw what the
+last World Throw *beat*) both score in the low 40s — see the correction above; the earlier
+claim that `second` clears 45% was the contaminated table. A first-time human will almost
+certainly try `counter` first, and against this crowd that is already most of the available
+edge. The 45% line was set for a single rule-follower and no rule reaches it alone; whether to
+move the line or re-tune the crowd is decided when the experiment is fixed.

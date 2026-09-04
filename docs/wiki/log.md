@@ -3739,3 +3739,15 @@ head. Recorded in the procedure on [[deploy]]. The four "not active anywhere" pa
 (deploy, world-throw, parked-defects (h), CLAUDE.md). Q1 reframed on [[world-throw]]: the owner's
 rounds are a feel + calibration test; discovery belongs to newcomers. Sim outputs and the ledger
 for the build are committed under `.superpowers/sdd/2026-09-04-synthetic-crowd/`.
+
+## [2026-09-04] defect | The readability table was contaminated by cross-voting -- no rule clears 45% alone
+
+Found by re-running the rules one at a time while answering "what does one player expect?".
+`experiments.readability` scores six modelled humans who all vote in the same tally, and
+`counter` + `oracle` push the plurality forward, which is the move `second` needs: in the shared
+table `second` 51.9% / `counter` 42.2%; ALONE vs the 30-bot crowd `second` 42.0% / `counter`
+44.3% / `random` 29.6% (seeds 1–3, 20000 rounds). The spec's "best teachable rule ≥ 45%" target
+was met only through the contamination. Wiki corrected on [[world-throw]] (§ Synthetic crowd);
+the `second`-clears-45% reading of Q1 withdrawn; calibration guidance changed to the tape's
+transition shape. Fix spawned: score each rule independently, re-tune if needed. Dev stays as
+flipped — the crowd is still readable-but-not-solved, which is what it is for.
