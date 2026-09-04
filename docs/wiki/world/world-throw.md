@@ -108,10 +108,9 @@ Two deliberate fallbacks to random:
 **Active on DEV since 2026-09-04**, against the synthetic crowd (§ Synthetic crowd below):
 `TEST_MODE=false`, `CROWD_SIZE=30`, and the boot log confirms it. **Prod still runs
 `TEST_MODE=true`**, the deterministic R→P→S cycle. Both are live facts — query the service
-([[deploy]]), do not trust this line. ⚠ Dev was flipped on the FIRST settled mix
-(`conform:30`, `random:20`); the re-tune later that day (`conform:35`, `random:15`, below)
-reaches dev only through a source redeploy (`start-deployment`, procedure on [[deploy]]) — the
-boot line's `mix …` says which one is running.
+([[deploy]]), do not trust this line. Dev was redeployed from source the same day after the
+mix re-tune (below), and its boot line read `mix random:15,wsls:30,counter:10,conform:35,rocky:10`
+— the boot line's `mix …` is the answer to "which mix is dev running", not this sentence.
 
 ## Synthetic crowd (built 2026-09-04)
 
@@ -252,8 +251,8 @@ How it got here, in order (chronology in `log.md`):
 **Pre-registered Q1** (owner decision 2026-09-04): one person, ~20 rounds on dev against the
 default crowd with the last-five HUD; **≥ 45% BEAT WORLD** reads as "crowd-reading is a skill
 here"; a rate down in the blind band (29–34%, above) means the crowd is too noisy or the HUD
-shows the wrong thing. Result: not yet run. Dev flipped 2026-09-04 but on the first settled
-mix — redeploy dev from source first (warning under As-built), then play.
+shows the wrong thing. Result: not yet run. Dev runs the re-tuned mix since the 2026-09-04
+source redeploy (As-built, above), so it can be.
 ⚠ **The owner cannot run the discovery half of Q1** (they know the rules); their twenty rounds
 are a FEEL test plus a calibration check: play `counter` deliberately → expect ~50% over a long
 run; twenty rounds is ±20 points, so read the tape's transition shape instead — the world

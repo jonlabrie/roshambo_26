@@ -3767,3 +3767,14 @@ naive read). Direction is the reverse of the Task 11 ruling's because the failur
 [[world-throw]]; raw outputs regenerated under `.superpowers/sdd/2026-09-04-synthetic-crowd/`.
 ⚠ Dev still runs the first settled mix until a source redeploy (`start-deployment`, [[deploy]]);
 prod untouched.
+
+## [2026-09-04] gate | Dev redeployed from source with the re-tuned crowd
+
+Owner: "redeploy dev." `685b54c` fast-forwarded to `main` (the branch `roshambo_server_dev`
+tracks, auto-deploy off, no `CROWD_MIX` override), then `start-deployment`; operation
+SUCCEEDED in ~7 minutes. Application log confirmed `[CROWD] on: size 30, seed …, mix
+random:15,wsls:30,counter:10,conform:35,rocky:10` and `[CROWD] round …` lines resumed. Prod
+untouched. Q1 can now run against the honest mix. Open design question raised in the same
+conversation: the winning rule (`counter`) loses only ~3.5% of rounds because nothing in the
+archetype set pushes the world backward, so Bank vs Stake may feel flat — watch for that in Q1
+before deciding on a loss-rate target (would need a new archetype, not a mix change).
