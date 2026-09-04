@@ -681,3 +681,44 @@ as a direction ("pretty good, let's run with that for now", 2026-09-03) but stil
   far" comes back, the lever is letting the low aprons run under the plateau, which needs a
   height-aware intrusion check instead of the corner check.
 
+## Low-end device tier — PARKED (owner, 2026-09-03: "hold on this for the moment")
+
+Owner's prompt: in its current form Roshambo "absolutely hammers my iPhone 15, hard on the
+battery, generates heat". Question was how practical a radically more efficient version is and
+how much of it needs the owner.
+
+**Shape ruled in the discussion: a device TIER inside the one place, not a second experience.**
+Roblox ships one build per experience; a lite place would split the player base and "you
+against the world" needs everyone in one round. The engine's own Graphics Quality (player-chosen
+in the escape menu, Automatic or 1–10; readable via `UserGameSettings.SavedQualityLevel`, never
+settable by us) already scales rendering. What it cannot touch is what we authored, which is
+where the heat is:
+
+- particle emitters: the 135 water VFX objects ([[day-night]]), the fireworks pool, mist
+- post effects on `Lighting`: SunRays, two Blooms, DepthOfField, two ColorCorrections
+- instance counts: 3,580 foliage MeshParts at the 2026-08-05 audit ([[foliage]]), the
+  [[horizon-backdrop]]
+- per-frame client loops: birds, day/night subscribers, water dim, glyph neon, HUD
+
+**How a tier would work**: a client-side decision at join about what to enable — emitters,
+post effects, bird count, streaming radius, loop tick rates — so the server stays one world.
+Default from auto-detect (touch without keyboard, as the HUD's touch tier already does; saved
+quality level; total memory; a frame-time sample over the first seconds), with a player
+"Performance mode" override in our settings, persisted, because auto-detect misreads tablets
+and gaming phones both ways. Precedent: the PWA's LITE/FULL/ULTRA visual tiers ("Data Thrift").
+⚠ Tiering hides and disables; it does not un-send. Replicated instances still reach a phone
+unless the streaming radius keeps them out — memory wins come from streaming, heat wins from
+what stops rendering and ticking.
+
+**What needs no guidance** (a couple of sessions): profile on the phone first (MicroProfiler),
+build the tier switch, gate the list above behind it, throttle per-frame loops to 30 Hz.
+
+**What needs owner rulings** — short yes/no gates, not open design: fireworks on a phone (half
+the stars vs the full show at a lower rate); water (static + foam vs motion at lower rates);
+lanterns and glyphs (glow kept vs flat); backdrop (kept vs a painted skybox on the low tier
+only).
+
+**Honest ceiling**: an iPhone 15 warms up on a bare baseplate at 60 fps. The reachable win is
+roughly halving what we ask of it, not a cool phone. The biggest battery lever is the frame-rate
+cap in Roblox's own settings, which belongs to the player.
+
