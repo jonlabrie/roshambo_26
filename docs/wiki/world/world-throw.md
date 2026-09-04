@@ -11,7 +11,11 @@ The mechanics it settles — outcomes, pot, banking, the points fields — are [
 
 ## What it is
 
-**The World Throw is the MAJORITY choice of the players in the round.** Not random.
+**The World Throw is the throw MOST players in the round made — the plurality of the tally,
+which with three options is often not a majority.** Not random. "Majority" is the product
+word and the patent's word; plurality is the implementation (§ As-built, and the claim-construction
+question under § Patent basis). Corrected 2026-09-04: this line said "MAJORITY choice" for three
+weeks after the page itself recorded that a true majority frequently does not exist.
 Roshambo is "you against the world" — a single player versus the aggregate crowd — and
 that framing is the product. Owner, 2026-08-16: *"we have to successfully embody 'the
 majority' as a worthwhile opponent or we'll fail entirely."*
