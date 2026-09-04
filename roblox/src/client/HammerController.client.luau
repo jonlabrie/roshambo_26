@@ -9,6 +9,8 @@ local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local ZenDojo = require(shared:WaitForChild("themes"):WaitForChild("ZenDojo"))
 local DrumStep = require(shared:WaitForChild("DrumStep"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
+local AmbientBudget = require(ReplicatedStorage:WaitForChild("RoshamboShared"):WaitForChild("AmbientBudget"))
+local AmbientConfig = require(script.Parent:WaitForChild("AmbientConfig"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local RoundUpdate = remotes:WaitForChild("RoundUpdate") :: RemoteEvent
@@ -352,7 +354,33 @@ end
 -- strike always fires before the round ends, so p is mid-climb at release and the swing
 -- takes over seamlessly.
 local DRAW_STUDS = 3.0 -- South draw at p=1; MIRRORS ArenaLayout.shuMoku.drawStuds (the cam flank is generated from it — keep DrawStuds attr ≤ it)
-RunService.Heartbeat:Connect(function()
+
+-- All three loops below animate one machine, so they share one cull anchor: the shu-moku itself.
+local function machineDrawable(c: AmbientBudget.Config): boolean
+    local cam = workspace.CurrentCamera
+    if cam == nil then
+        return false
+    end
+    local camCF = cam.CFrame
+    local d = arm.Position - camCF.Position
+    local distSq = d.X * d.X + d.Y * d.Y + d.Z * d.Z
+    if not AmbientBudget.inRange(distSq, c) then
+        return false
+    end
+    local dist = math.sqrt(distSq)
+    local look = camCF.LookVector
+    local fdot = if dist > 1e-3 then (d.X * look.X + d.Y * look.Y + d.Z * look.Z) / dist else 1
+    return AmbientBudget.inView(fdot, c)
+end
+
+local drawAcc = 0
+RunService.Heartbeat:Connect(function(dt: number)
+    local c = AmbientConfig.get()
+    local fire, nextAcc = AmbientBudget.step(drawAcc, dt, c.interval)
+    drawAcc = nextAcc
+    if not (fire and machineDrawable(c)) then
+        return
+    end
     -- DRAW HOLD (tuning): while the "DrawHold" attribute is set, pin the log at FULL draw
     -- (p=1, the top of its travel) and ignore the strike — so we can park the dowel at its
     -- pullback-top position and aim the cam's high point at it.
@@ -395,7 +423,8 @@ do
         stage:SetAttribute(attr, default)
     end
 end
-RunService.Heartbeat:Connect(function()
+local spinAcc = 0
+RunService.Heartbeat:Connect(function(dt: number)
     if #camSpinners == 0 then
         captureSpinners() -- parts hadn't replicated at init; keep trying until they do
     end
@@ -429,15 +458,28 @@ RunService.Heartbeat:Connect(function()
         -- directly (high point lands near the dowel from round one)
         camNet = CAM_DIR * r.camAngle
     end
+    -- DRIVER_DIR flips the whole shaft live.
+    local driverDir = (stage:GetAttribute("DriverDir") :: number) or DRIVER_DIR
+    -- Published for WheelController, which LOCKS the wheel to this shaft (matched rate + direction).
+    stage:SetAttribute("DriveOmega", driverDir * CAM_DIR * r.omega * REDUCTION) -- rad/s about Z
+
+    -- ⚠ EVERYTHING ABOVE THIS LINE RUNS EVERY FRAME AND MUST KEEP DOING SO. Strike detection reads
+    -- lastMetroNow as its previous sample, so throttling it makes the bonshō late and culling it
+    -- silences the bell; the backstop above keeps the machine from freezing on a dropped broadcast;
+    -- and WheelController reads DriveOmega as its rate every frame. Only the CFrame writes below are
+    -- worth culling, and they are also the only expensive part of this loop.
+    local c = AmbientConfig.get()
+    local fire, nextAcc = AmbientBudget.step(spinAcc, dt, c.interval)
+    spinAcc = nextAcc
+    if not (fire and machineDrawable(c)) then
+        return
+    end
     local rot = CFrame.Angles(camNet, 0, 0)
     for _, s in camSpinners do
         s.part.CFrame = s.pivotCF * rot * s.pivotCF:Inverse() * s.restCF
     end
     -- Driver gear + main shaft are CO-AXIAL with the waterwheel (one N-S shaft), so they
-    -- turn at the cam rate × REDUCTION. We publish that shaft's signed angular velocity so
-    -- WheelController can LOCK the wheel to it (matched rate + direction) instead of
-    -- free-spinning at its own constant. DRIVER_DIR flips the whole shaft live.
-    local driverDir = (stage:GetAttribute("DriverDir") :: number) or DRIVER_DIR
+    -- turn at the cam rate × REDUCTION.
     local drot = CFrame.Angles(0, 0, driverDir * camNet * REDUCTION)
     for _, s in driverSpinners do
         s.part.CFrame = s.pivotCF * drot * s.pivotCF:Inverse() * s.restCF
@@ -448,10 +490,19 @@ RunService.Heartbeat:Connect(function()
     for _, s in jackSpinners do
         s.part.CFrame = s.pivotCF * jrot * s.pivotCF:Inverse() * s.restCF
     end
-    stage:SetAttribute("DriveOmega", driverDir * CAM_DIR * r.omega * REDUCTION) -- rad/s about Z, for the wheel
 end)
 
 -- Chains + drive rope FOLLOW the log every frame, whether the log is posed by
 -- the draw heartbeat above or moved by the strike tweens. Single authority:
 -- always recompute from the log's live CFrame — never mirror offsets.
-RunService.Heartbeat:Connect(updateSuspension)
+local suspAcc = 0
+RunService.Heartbeat:Connect(function(dt: number)
+    local c = AmbientConfig.get()
+    local fire, nextAcc = AmbientBudget.step(suspAcc, dt, c.interval)
+    suspAcc = nextAcc
+    -- updateSuspension recomputes chains and dowels from the log's LIVE CFrame every time, so it
+    -- self-corrects on its first frame back and needs no reset after a cull.
+    if fire and machineDrawable(c) then
+        updateSuspension()
+    end
+end)
