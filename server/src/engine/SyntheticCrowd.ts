@@ -13,8 +13,16 @@ import {
 
 export type Mix = Partial<Record<PolicyId, number>>;
 
-// A hypothesis (spec §2), tuned by the simulator's readability experiment before it is trusted.
-export const DEFAULT_MIX: Mix = { wsls: 35, counter: 20, conform: 15, rocky: 10, random: 20 };
+// Settled 2026-09-04 by the simulator's readability experiment (spec §2, Q0), not by taste.
+// The first hypothesis (wsls:35, counter:20, conform:15) was a metronome: `wsls`'s lose-shift is
+// CLOCKWISE, which lands exactly on the counter-throw, so wsls and counter pulled the same way and
+// the World Throw rotated counter-wards 82% of the time — "throw what beats the counter" (`second`)
+// beat the world 82.4%, and the naive `counter` reader was punished at 6.8%. Halving `counter` and
+// doubling `conform` sets the counter-pull against a stay-put pull, so the world's transitions
+// spread. At 20000 rounds, crowd 30, seeds 1-3: `second` 51.4-52.4%, `counter` 42.0-42.6%,
+// `wsls` 32.8-33.0%, `random` 29.4-29.8%, oracle 56.0-56.5%. Readable, contested, and — because the
+// oracle now clears every teachable rule by ~4 points — not fully solved by any one of them.
+export const DEFAULT_MIX: Mix = { wsls: 30, counter: 10, conform: 30, rocky: 10, random: 20 };
 export const DEFAULT_STRENGTH = 0.7;
 
 export function parseMix(spec: string): Mix {

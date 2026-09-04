@@ -25,9 +25,17 @@ describe('parseMix', () => {
 
 describe('allocate', () => {
     it('splits a size across the mix exactly, largest remainder, in POLICY_IDS order', () => {
-        // 10 bots over wsls:35 counter:20 conform:15 rocky:10 random:20 -> quotas 3.5,2,1.5,1,2
-        // floors 3,2,1,1,2 = 9; one remainder -> largest fraction tie (wsls .5, conform .5) -> wsls first
+        // 10 bots over random:20 wsls:30 counter:10 conform:30 rocky:10 (POLICY_IDS order)
+        // -> quotas 2,3,1,3,1; floors sum to 10 exactly, so no remainder is handed out
         expect(allocate(10, DEFAULT_MIX)).toEqual([
+            'random', 'random', 'wsls', 'wsls', 'wsls', 'counter', 'conform', 'conform', 'conform', 'rocky',
+        ]);
+    });
+    it('hands remainders out by largest fraction, ties to the earlier POLICY_IDS entry', () => {
+        // 10 bots over wsls:35 counter:20 conform:15 rocky:10 random:20 -> quotas 2,3.5,2,1.5,1
+        // floors 2,3,2,1,1 = 9; one remainder -> fractions tie (wsls .5, conform .5) -> wsls, the
+        // earlier id, takes it. (This was the pre-2026-09-04 default mix; kept for the tie-break.)
+        expect(allocate(10, { wsls: 35, counter: 20, conform: 15, rocky: 10, random: 20 })).toEqual([
             'random', 'random', 'wsls', 'wsls', 'wsls', 'wsls', 'counter', 'counter', 'conform', 'rocky',
         ]);
     });
@@ -86,6 +94,6 @@ describe('createCrowd', () => {
 
     it('defaults to DEFAULT_MIX and DEFAULT_STRENGTH', () => {
         expect(DEFAULT_STRENGTH).toBe(0.7);
-        expect(DEFAULT_MIX).toEqual({ wsls: 35, counter: 20, conform: 15, rocky: 10, random: 20 });
+        expect(DEFAULT_MIX).toEqual({ wsls: 30, counter: 10, conform: 30, rocky: 10, random: 20 });
     });
 });
