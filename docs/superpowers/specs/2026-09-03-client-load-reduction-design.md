@@ -116,12 +116,46 @@ integrating while culled.
 
 ## 3. The loops
 
-### 3.1 `ChochinSway.client.luau`
+### 3.1 `ChochinSway.client.luau` — path poles stop swaying entirely
 
-Throttle to `interval` and gate per lantern on range then view. The entry table
-already caches `base` (a `CFrame`), so the position is in hand with no instance
-read. Expected shape change: from *every tagged lantern in the map at frame
-rate* to *the lanterns on screen at 30 Hz*.
+**Owner ruling, 2026-09-03: the pole-hung path chōchin do not sway at all.**
+Measured: the barrel is 2.02 studs wide hanging ~1.2 studs below its pivot and
+swinging 3.2° peak, which is about **an inch and a half of total travel on a
+two-foot lantern**, on a seven-second cycle. It is legible at
+arm's length and under a pixel past thirty feet, and a path is where the player
+is moving. The teahouse and hanabiya chōchin — seen from a standstill on an
+engawa or in a doorway — keep theirs.
+
+Verified before ruling: `ChochinSway` is the **only** reader or writer of these
+models' pivots anywhere in the codebase, so nothing is orphaned by the cut. The
+glyph telegraph is a separate system on the same prop — `LanternController`
+drives `RoundLantern`/`BlockLantern` faces through `CanvasGroup`s and never
+touches a pivot — so the throw display is unaffected.
+`TreatmentApplier.luau:99` looks the `ChochinSwing` node up by name when it
+shutters a vacant teahouse; that is a lookup, not an animation, and keeps
+working.
+
+**The discriminator already exists in the file.** `hangPointFor` returns a
+`CFrame` only when the model has a `CrossArm` sibling — which is exactly what
+`buildChochinPole` stamps and what the teahouse and hanabiya builders do not.
+So:
+
+- Replace `hangPointFor` with `isPoleHung(m): boolean` (the `CrossArm` sibling
+  test) and **skip registration entirely** for pole-hung lanterns.
+- Delete the hang-point derivation with it. It existed solely to make pole sway
+  pivot correctly after the poles were shortened; with pole sway gone it is dead
+  code. Keep its history in a comment so nobody re-derives the bug if sway ever
+  returns to the poles.
+- The `WorldPivot` write goes with it. The remaining population already falls
+  through the `derived == nil` path today and uses its stored pivot, so their
+  behaviour is unchanged.
+- **The remainder still gets the cull**: throttle to `interval`, gate per
+  lantern on range then view. Teahouse chōchin scale with occupied pads, so the
+  population is not fixed and the gating still earns its keep.
+
+Keep the tag as it is. Un-tagging at the builder would not touch the lanterns
+already stamped into the place, so the population split belongs in the client,
+where it is one predicate and reversible by one line.
 
 ### 3.2 `NorenSway.client.luau`
 
@@ -292,8 +326,8 @@ is the in-repo precedent for the property.
 ## 7. Build order
 
 1. `AmbientBudget` + spec (pure, no callers yet).
-2. `ChochinSway`, `NorenSway` — the biggest win, and the simplest proof the
-   module is shaped right.
+2. `ChochinSway` (pole sway removed, remainder culled), `NorenSway` — the
+   biggest win, and the simplest proof the module is shaped right.
 3. `WheelController` (integration preserved), then `HammerController` (the
    split).
 4. `ShopController`, `AccessGateController`, `AuraController`.
