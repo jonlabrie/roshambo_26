@@ -3,7 +3,7 @@ import { ResultsStore, TAPE_LENGTH } from './ResultsStore';
 import { GlobalResult, SettledPlayer } from './Settlement';
 
 function round(id: string): GlobalResult {
-    return { id, worldThrow: 'R', distribution: { R: 100, P: 0, S: 0 }, totalPlayers: 1, timestamp: new Date() };
+    return { id, worldThrow: 'R', distribution: { R: 100, P: 0, S: 0 }, totalPlayers: 1, synthetic: 0, timestamp: new Date() };
 }
 function player(key: string, instanceId?: string): SettledPlayer {
     return { key, platform: 'roblox', robloxUserId: key, instanceId, result: 'WIN', delta: 1, totalPoints: 1, pot: 1, streak: 1, user: {} as any };

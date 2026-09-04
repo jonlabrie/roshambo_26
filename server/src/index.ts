@@ -109,7 +109,7 @@ mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
         const lastRounds = await Round.find().sort({ timestamp: -1 }).limit(10);
         store.seed(lastRounds.map(r => ({
             id: r.id, worldThrow: r.worldThrow as Throw, distribution: r.distribution,
-            totalPlayers: r.totalPlayers, timestamp: r.timestamp,
+            totalPlayers: r.totalPlayers, synthetic: r.synthetic ?? 0, timestamp: r.timestamp,
         })));
         const totalRounds = await Round.countDocuments();
         // Defect (e): the TEST_MODE cycle continues from the last face a player actually SAW

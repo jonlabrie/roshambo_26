@@ -11,7 +11,8 @@ export interface GlobalResult {
     id: string;
     worldThrow: Throw;
     distribution: { R: number; P: number; S: number };
-    totalPlayers: number;
+    totalPlayers: number; // the size of the WORLD the player faced: humans + synthetic (spec §3)
+    synthetic: number;    // how many of those were bots; humans = totalPlayers - synthetic
     timestamp: Date;
 }
 
@@ -32,8 +33,9 @@ export interface SettledPlayer {
 export interface RoundToSettle {
     roundId: string;
     worldThrow: Throw;
-    counts: Record<Throw, number>;
-    throws: Map<string, ThrowEntry>;
+    counts: Record<Throw, number>;        // human + crowd
+    crowdCounts?: Record<Throw, number>;  // the crowd's share; absent/zeros when there is none
+    throws: Map<string, ThrowEntry>;      // humans only
     timestamp: Date;
 }
 
@@ -73,12 +75,17 @@ export function buildDistribution(counts: Record<Throw, number>, total: number) 
 }
 
 export async function settleRound(data: RoundToSettle): Promise<{ round: GlobalResult; players: SettledPlayer[] }> {
-    const totalPlayers = data.throws.size;
+    // sum(counts), not throws.size: the two were equal until the crowd existed. The
+    // distribution and the player count must describe the same world (spec §3).
+    const totalPlayers = data.counts.R + data.counts.P + data.counts.S;
+    const crowd = data.crowdCounts ?? { R: 0, P: 0, S: 0 };
+    const synthetic = crowd.R + crowd.P + crowd.S;
     const round: GlobalResult = {
         id: data.roundId,
         worldThrow: data.worldThrow,
         distribution: buildDistribution(data.counts, totalPlayers),
         totalPlayers,
+        synthetic,
         timestamp: data.timestamp,
     };
 

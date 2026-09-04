@@ -247,6 +247,43 @@ describe('settleRound', () => {
             expect((await User.findById(user._id))?.milestones).toEqual([]);
         });
     });
+
+    describe('the synthetic crowd is part of the world, never a participant (spec §3, §4)', () => {
+        it('totalPlayers counts humans + bots, synthetic records the bots, and only humans settle', async () => {
+            await User.create({ deviceId: 'devA' });
+            const { round, players } = await settleRound({
+                roundId: 'r-crowd',
+                worldThrow: 'R',
+                counts: { R: 21, P: 6, S: 4 },          // 1 human (P) + 30 bots
+                crowdCounts: { R: 21, P: 5, S: 4 },
+                throws: throwsMap([
+                    ['pwa:devA', { throw: 'P', seq: 1, platform: 'pwa', deviceId: 'devA' }],
+                ]),
+                timestamp: new Date(),
+            });
+            expect(round).toMatchObject({ totalPlayers: 31, synthetic: 30, distribution: { R: 68, P: 19, S: 13 } });
+            expect(players).toHaveLength(1);
+            expect(players[0]).toMatchObject({ key: 'pwa:devA', result: 'WIN' });
+            expect(await PlayerRound.countDocuments({ roundId: 'r-crowd' })).toBe(1);
+            expect(await User.countDocuments()).toBe(1);
+            const saved = await Round.findOne({ id: 'r-crowd' }).lean();
+            expect(saved).toMatchObject({ totalPlayers: 31, synthetic: 30 });
+        });
+
+        it('without crowdCounts, synthetic is 0 and totalPlayers is the humans, as before', async () => {
+            const { round } = await settleRound({
+                roundId: 'r-plain',
+                worldThrow: 'R',
+                counts: { R: 0, P: 2, S: 0 },
+                throws: throwsMap([
+                    ['pwa:x', { throw: 'P', seq: 1, platform: 'pwa', deviceId: 'x' }],
+                    ['pwa:y', { throw: 'P', seq: 1, platform: 'pwa', deviceId: 'y' }],
+                ]),
+                timestamp: new Date(),
+            });
+            expect(round).toMatchObject({ totalPlayers: 2, synthetic: 0 });
+        });
+    });
 });
 
 describe('buildCounterUpdate', () => {
