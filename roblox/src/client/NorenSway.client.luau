@@ -14,6 +14,10 @@
 -- builder's hang. Nothing here is tested — no harness in this repo loads a `.client.luau`.
 local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local AmbientBudget = require(ReplicatedStorage:WaitForChild("RoshamboShared"):WaitForChild("AmbientBudget"))
+local AmbientConfig = require(script.Parent:WaitForChild("AmbientConfig"))
 
 local TAG = "NorenSeg"
 local SWAY = 0.85 -- how far the lean breathes, as a fraction of itself
@@ -78,9 +82,33 @@ end
 CollectionService:GetInstanceAddedSignal(TAG):Connect(onTagged)
 CollectionService:GetInstanceRemovedSignal(TAG):Connect(onTagged)
 
-RunService.Heartbeat:Connect(function()
+local acc = 0
+RunService.Heartbeat:Connect(function(dt: number)
+    local c = AmbientConfig.get()
+    local fire, nextAcc = AmbientBudget.step(acc, dt, c.interval)
+    acc = nextAcc
+    if not fire then
+        return
+    end
+    local cam = workspace.CurrentCamera
+    if cam == nil then
+        return
+    end
+    local camCF = cam.CFrame
+    local camPos, look = camCF.Position, camCF.LookVector
     local t = os.clock()
     for _, panel in panels do
+        local d = panel.hinge - camPos
+        local distSq = d.X * d.X + d.Y * d.Y + d.Z * d.Z
+        if not AmbientBudget.inRange(distSq, c) then
+            continue
+        end
+        -- sqrt only for what survived the range test; see AmbientBudget.inRange
+        local dist = math.sqrt(distSq)
+        local fdot = if dist > 1e-3 then (d.X * look.X + d.Y * look.Y + d.Z * look.Z) / dist else 1
+        if not AmbientBudget.inView(fdot, c) then
+            continue
+        end
         -- Walk the chain from the rail: each segment hangs off the bottom of the one above, so
         -- the panel stays joined no matter how far any single joint bends.
         local pos = panel.hinge
