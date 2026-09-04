@@ -1,42 +1,45 @@
 --!strict
--- AUTO-LOOK, v2 (owner's phone gates, 2026-09-03). v1 took the camera (Scriptable), swept,
--- held, and handed it back — and the hand-back was the whole problem: the default camera's
--- stored orientation never moves while Scriptable, so restoring Custom SNAPPED the view to
--- where it was before the sweep. That is both gates in one: "tilts back down sharply...
--- a bit aggressively" and "doesn't allow the player to take control of the view".
+-- AUTO-LOOK, v3 (owner's phone gates, 2026-09-03). History in two lessons:
+--   v1 took the camera (Scriptable) — handing it back snapped, because the orbit camera's
+--   stored orientation never moves while Scriptable.
+--   v2 blended over the live camera — right idea, but writing the blend where the
+--   PlayerModule could see it fed the up-look back into the orbit camera's own state
+--   (it ADOPTS external CFrame writes) and it dove under the avatar. Hence the bracket:
+--   a restore binding hands the camera module back its own clean frame at Camera-1, the
+--   blend re-applies at Camera+1. Only the blend renders; only the base is adopted.
 --
--- v2 never takes the camera. It renders a BLEND on top of the normal camera, one priority
--- step after the camera writes its frame: view = base:Lerp(lookAt(base.Position, apex), w).
--- The default camera keeps processing input underneath the whole time, so control is never
--- somewhere the player can't reach. The owner's spec, verbatim ruleset:
---   * launch -> goto apex ("the current goto apex behavior on launch is perfect"): w 0->1
---     over the same 0.7s ease;
---   * untouched -> "it should start drifting back to normal view slowly": after the burst
---     hold, w drifts 1->0 over DRIFT_SECONDS, gentle ease both ends;
---   * touched -> "I now have control": any camera input eases w out fast — the player's
---     drag is moving the base under the fading blend, so the view follows their finger
---     from WHERE IT IS (keep looking up by simply aiming up), never snapping;
---   * fire again -> "goto should assert again", even mid-drift: a new OwnLaunch re-sweeps
---     from the current blend, whatever phase it was in.
+-- v3 adds the second-shell rules (owner: firing again mid-watch "snaps to watch the new
+-- firework... I wasn't really finished watching the first one"):
+--   * launch from idle -> goto the apex (0.7s ease — "perfect", unchanged);
+--   * launch while WATCHING, new burst already in view -> don't move at all; just extend
+--     the hold so the view doesn't drift away before the new shell breaks;
+--   * launch while watching, new burst off-view -> PAN: the aim point itself travels from
+--     where the view is pointing to the new apex, so the camera slides between bursts
+--     instead of snapping (the snap was retargeting at full blend weight);
+--   * untouched after the last hold -> slow drift home (4.5s);
+--   * any camera input -> the blend fades under the player's own drag — they own the view,
+--     and a further launch they can already see leaves them alone.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
-local SWEEP_SECONDS = 0.7 -- unchanged: the goto the owner called perfect
-local HOLD_AFTER_BURST = 1.0 -- linger past the first break so the bloom registers
+local SWEEP_SECONDS = 0.7 -- goto AND pan share the ease the owner called perfect
+local HOLD_AFTER_BURST = 1.0 -- linger past a break so the bloom registers
 local DRIFT_SECONDS = 4.5 -- the untouched return: a slow settle, not a countermove
 local TAKEOVER_SECONDS = 1.2 -- blend fade once the player takes the wheel
-local ON_SCREEN_MARGIN = 0.15 -- apex already in the central 70% from idle: no sweep needed
+local ON_SCREEN_MARGIN = 0.15 -- "in view" = inside the central 70% both axes
 
 local mode: "idle" | "sweep" | "hold" | "drift" | "takeover" = "idle"
 local w = 0 -- current blend weight
-local wFrom = 0 -- sweep/drift/takeover interpolate from this...
-local phaseAt = 0 -- ...starting at this clock
-local apex = Vector3.zero
-local burstAt = 3
-local sweptAt = 0 -- when the current launch's sweep began (the hold is timed from it)
+local wFrom = 0 -- sweep/takeover interpolate w from this...
+local wHold = 1 -- ...hold pins it here (1 normally; a frozen drift holds lower)
+local phaseAt = 0 -- when the current phase began
+local aim = Vector3.zero -- where the blend is currently pointing the view
+local aimFrom = Vector3.zero -- the pan's start point; sweep slides aimFrom -> aimTo
+local aimTo = Vector3.zero
+local holdUntil = 0 -- absolute clock: the watch ends here (extended per launch)
 
 local function easeOut(a: number): number
     return 1 - (1 - a) ^ 2
@@ -44,6 +47,16 @@ end
 
 local function easeInOut(a: number): number
     return if a < 0.5 then 2 * a * a else 1 - (2 * (1 - a)) ^ 2 / 2
+end
+
+local function inView(cam: Camera, point: Vector3): boolean
+    local vp, onScreen = cam:WorldToViewportPoint(point)
+    local size = cam.ViewportSize
+    return onScreen
+        and vp.X > size.X * ON_SCREEN_MARGIN
+        and vp.X < size.X * (1 - ON_SCREEN_MARGIN)
+        and vp.Y > size.Y * ON_SCREEN_MARGIN
+        and vp.Y < size.Y * (1 - ON_SCREEN_MARGIN)
 end
 
 UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
@@ -70,39 +83,58 @@ EventBus.OwnLaunch.Event:Connect(function(data: any)
     if cam == nil then
         return
     end
+    local newApex: Vector3 = data.apex
+    local newBurst = if typeof(data.burstAt) == "number" then data.burstAt else 3
+    local now = os.clock()
+
     if mode == "idle" then
-        -- Already comfortably watching the right patch of sky? Then the assist would be
-        -- motion for its own sake. Only an IDLE camera earns this skip: mid-drift or
-        -- mid-takeover, a new launch always re-asserts (the owner's rule).
-        local vp, onScreen = cam:WorldToViewportPoint(data.apex)
-        local size = cam.ViewportSize
-        if
-            onScreen
-            and vp.X > size.X * ON_SCREEN_MARGIN
-            and vp.X < size.X * (1 - ON_SCREEN_MARGIN)
-            and vp.Y > size.Y * ON_SCREEN_MARGIN
-            and vp.Y < size.Y * (1 - ON_SCREEN_MARGIN)
-        then
+        -- Already comfortably watching the right patch of sky? The assist would be motion
+        -- for its own sake.
+        if inView(cam, newApex) then
             return
         end
+        aim = newApex
+        aimFrom = newApex
+        aimTo = newApex
+        wFrom = 0
+        mode = "sweep"
+        phaseAt = now
+        holdUntil = now + newBurst + HOLD_AFTER_BURST
+        return
     end
-    apex = data.apex
-    burstAt = if typeof(data.burstAt) == "number" then data.burstAt else 3
+
+    -- Active. The camera holds the blended frame between steps, so this measures what the
+    -- player actually sees right now.
+    if inView(cam, newApex) then
+        if mode == "takeover" then
+            return -- their view already covers it; leave them entirely alone
+        end
+        -- Don't move at all — just don't leave early either.
+        holdUntil = math.max(holdUntil, now + newBurst + HOLD_AFTER_BURST)
+        if mode == "drift" then
+            -- freeze the drift where it stands until the new shell has had its moment
+            mode = "hold"
+            wHold = w
+        end
+        return
+    end
+
+    -- Off-view: PAN from where the view is pointing to the new apex — never a retarget at
+    -- full weight, which is exactly the snap the owner flagged. The pan starts from the
+    -- current view RAY (not the old aim), so it also composes correctly out of takeover
+    -- and drift, where the blend has partially faded.
+    local look = cam.CFrame
+    aimFrom = look.Position + look.LookVector * (newApex - look.Position).Magnitude
+    aimTo = newApex
+    wFrom = w
     mode = "sweep"
-    wFrom = w -- a re-assert mid-drift sweeps from the blend it still has, no jump
-    phaseAt = os.clock()
-    sweptAt = phaseAt
+    phaseAt = now
+    holdUntil = math.max(holdUntil, now + newBurst + HOLD_AFTER_BURST)
 end)
 
--- ⚠ THE BLEND MUST BE INVISIBLE TO THE DEFAULT CAMERA (owner's phone gate, 2026-09-03:
--- "placing the camera right underneath the avatar, looking up through its crotch"). The
--- PlayerModule camera ADOPTS externally written CFrames as its own orientation, so leaving
--- the blended frame in place fed the up-look back into the orbit camera every frame — it
--- pinned its pitch skyward and repositioned itself UNDER the subject. Two bindings bracket
--- the camera step instead: the restore below hands the camera module back the exact frame
--- it wrote last time (no external change to adopt), it computes a clean base from the
--- player's own input, and the blend re-applies on top afterward. Only the blended frame
--- ever renders; only the clean frame is ever seen by the camera module.
+-- ⚠ THE BLEND MUST BE INVISIBLE TO THE DEFAULT CAMERA (see the header's v2 lesson). The
+-- restore below hands the camera module back the exact frame it wrote last time, it
+-- computes a clean base from the player's own input, and the blend re-applies after.
 local savedBase: CFrame? = nil
 local blendedFrame: CFrame? = nil
 
@@ -125,12 +157,15 @@ RunService:BindToRenderStep("LaunchLookBlend", Enum.RenderPriority.Camera.Value 
     if mode == "sweep" then
         local a = math.clamp((now - phaseAt) / SWEEP_SECONDS, 0, 1)
         w = wFrom + (1 - wFrom) * easeOut(a)
+        aim = aimFrom:Lerp(aimTo, easeInOut(a))
         if a >= 1 then
             mode = "hold"
+            wHold = 1
+            aim = aimTo
         end
     elseif mode == "hold" then
-        w = 1
-        if now - sweptAt >= burstAt + HOLD_AFTER_BURST then
+        w = wHold
+        if now >= holdUntil then
             mode = "drift"
             wFrom = w
             phaseAt = now
@@ -157,7 +192,7 @@ RunService:BindToRenderStep("LaunchLookBlend", Enum.RenderPriority.Camera.Value 
         return
     end
     local base = cam.CFrame
-    local desired = CFrame.lookAt(base.Position, apex)
+    local desired = CFrame.lookAt(base.Position, aim)
     savedBase = base
     local blended = base:Lerp(desired, w)
     blendedFrame = blended
