@@ -31,6 +31,11 @@ local NAMES = {
     -- after every seen-list change. TourBeamController renders the beam from it; nothing else
     -- may derive the step a second way.
     "TourStep",
+    -- The LOCAL player's own shell is in the air: { apex: Vector3, burstAt: number }. Fired by
+    -- FireworkController at the one place the true burst point exists (after the seeded apex
+    -- derivation — any other consumer would have to replay the rng stream). LaunchLookController
+    -- sweeps the camera to it so a new player doesn't miss their own detonation.
+    "OwnLaunch",
     -- The result splash (SplashController). Fired from main.client.luau's `maybeShowReveal`, on the
     -- SAME `drumRest` gate as the tape tile — never from RevealResult directly, which would spoil
     -- the wheel ~3s early. The drum is authoritative: nothing may reflect the world's throw
