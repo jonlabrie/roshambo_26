@@ -87,7 +87,7 @@ stylua --check src tests tools && selene src tools   # format + lint (MATCH CI's
 
 Node version is pinned via `.nvmrc` (24.x).
 
-The server requires `MONGODB_URI` (exits immediately without it; `server/.env` holds local config — an Atlas `roshambo-dev` connection string, not a local database) and `API_KEY` (required for `/api/v1`; PWA works without it). The frontend needs `VITE_SOCKET_URL` pointing at the backend (defaults to same-origin if unset). Set `TEST_MODE=true` on the server for a deterministic World Throw cycle (R→P→S) instead of random.
+The server requires `MONGODB_URI` (exits immediately without it; `server/.env` holds local config — an Atlas `roshambo-dev` connection string, not a local database) and `API_KEY` (required for `/api/v1`; PWA works without it). The frontend needs `VITE_SOCKET_URL` pointing at the backend (defaults to same-origin if unset). Set `TEST_MODE=true` on the server for a deterministic World Throw cycle (R→P→S) instead of random. With `TEST_MODE` off, `CROWD_SIZE=<n>` adds a synthetic bot crowd to every round's tally (`CROWD_MIX`, `CROWD_SEED` optional; see `docs/wiki/world/world-throw.md` § Synthetic crowd). `cd server && npm run sim` runs the offline simulator over the same crowd.
 
 ## Architecture
 
@@ -106,7 +106,7 @@ Game rules live in THREE implementations, and all three are held to `shared-fixt
 - Player matches world → **SAFE**: pot preserved, streaks reset to 0
 - World beats player → **LOSS**: pot forfeited, streaks reset
 
-- At round end: the World Throw is chosen and each participant's result is computed and persisted. **The World Throw is DESIGNED to be the MAJORITY of player throws** — "you against the world" is the product premise, and it makes crowd-reading a skill (hence the last-five-rounds HUD). Implemented 2026-08-16 as `GameRules.deriveWorldThrow` — **plurality** (argmax of the round's tally), ties broken randomly among the tied, falling back to random below `WORLD_THROW_MIN_PARTICIPANTS` (5). **`TEST_MODE` still cycles R→P→S**, and BOTH prod and dev run TEST_MODE, so the rule is fixed but not yet exercised anywhere. Per-player `player-data` is then emitted to each device room, and `reveal` broadcasts the round to everyone. See `docs/wiki/world/world-throw.md`.
+- At round end: the World Throw is chosen and each participant's result is computed and persisted. **The World Throw is DESIGNED to be the MAJORITY of player throws** — "you against the world" is the product premise, and it makes crowd-reading a skill (hence the last-five-rounds HUD). Implemented 2026-08-16 as `GameRules.deriveWorldThrow` — **plurality** (argmax of the round's tally), ties broken randomly among the tied, falling back to random below `WORLD_THROW_MIN_PARTICIPANTS` (5). **`TEST_MODE` still cycles R→P→S**; prod runs TEST_MODE, and since 2026-09-04 dev runs the real rule against a 30-bot synthetic crowd (`CROWD_SIZE`, see `docs/wiki/world/world-throw.md` § Synthetic crowd) — verify with the App Runner query above before repeating either claim. Per-player `player-data` is then emitted to each device room, and `reveal` broadcasts the round to everyone. See `docs/wiki/world/world-throw.md`.
 
 ### Roblox client (`roblox/`, milestone 2+)
 

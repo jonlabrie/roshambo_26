@@ -1,5 +1,9 @@
 import { describe, it, expect, vi } from 'vitest';
 import { RoundEngine, Phase } from './RoundEngine';
+// Imported by the TEST only: the engine must stay ignorant of the crowd and of the rules.
+import { createCrowd } from './SyntheticCrowd';
+import { deriveWorldThrow } from './GameRules';
+import { mulberry32 } from './Prng';
 
 function makeEngine(overrides: Partial<ConstructorParameters<typeof RoundEngine>[0]> = {}) {
     let n = 0;
@@ -264,5 +268,119 @@ describe('RoundEngine exact phase clock', () => {
     });
     it('omits phaseEndsAtMs without an injected clock (quantized fallback stays)', () => {
         expect(makeEngine().snapshot().phaseEndsAtMs).toBeUndefined();
+    });
+});
+
+describe('the synthetic crowd merges into the tally at round close (spec §1)', () => {
+    const human = (t: 'R' | 'P' | 'S') => ({ throw: t, seq: 1, platform: 'pwa' as const, deviceId: `d-${t}` });
+
+    function fakeCrowd(counts: { R: number; P: number; S: number }) {
+        const throws = vi.fn(() => counts);
+        const observe = vi.fn();
+        return { throws, observe };
+    }
+
+    it('pickWorldThrow sees human + crowd counts, and roundClosed carries both', () => {
+        const crowd = fakeCrowd({ R: 10, P: 3, S: 0 });
+        const picker = vi.fn(() => 'R' as const);
+        const e = makeEngine({ pickWorldThrow: picker, crowd });
+        const closed: any[] = [];
+        e.on('roundClosed', ev => closed.push(ev));
+
+        e.submitThrow('pwa:a', human('P'));
+        e.submitThrow('pwa:b', human('S'));
+        for (let i = 0; i < 5; i++) e.tick();
+
+        expect(crowd.throws).toHaveBeenCalledWith(0);
+        expect(picker).toHaveBeenCalledWith(0, { R: 10, P: 4, S: 1 });
+        expect(closed).toHaveLength(1);
+        expect(closed[0].counts).toEqual({ R: 10, P: 4, S: 1 });
+        expect(closed[0].crowdCounts).toEqual({ R: 10, P: 3, S: 0 });
+    });
+
+    it('the throws map stays human-only — bots never reach settlement', () => {
+        const e = makeEngine({ crowd: fakeCrowd({ R: 10, P: 3, S: 0 }) });
+        const closed: any[] = [];
+        e.on('roundClosed', ev => closed.push(ev));
+        e.submitThrow('pwa:a', human('P'));
+        for (let i = 0; i < 5; i++) e.tick();
+        expect(closed[0].throws.size).toBe(1);
+        expect([...closed[0].throws.keys()]).toEqual(['pwa:a']);
+    });
+
+    it('observe() receives the DECIDED World Throw, after the picker ran', () => {
+        const crowd = fakeCrowd({ R: 0, P: 5, S: 0 });
+        const e = makeEngine({ pickWorldThrow: () => 'S', crowd });
+        for (let i = 0; i < 5; i++) e.tick();
+        expect(crowd.observe).toHaveBeenCalledExactlyOnceWith('S');
+        expect(crowd.throws.mock.invocationCallOrder[0]).toBeLessThan(crowd.observe.mock.invocationCallOrder[0]);
+    });
+
+    it('without a crowd, crowdCounts is zeros and counts are the humans alone', () => {
+        const e = makeEngine();
+        const closed: any[] = [];
+        e.on('roundClosed', ev => closed.push(ev));
+        e.submitThrow('pwa:a', human('R'));
+        for (let i = 0; i < 5; i++) e.tick();
+        expect(closed[0].counts).toEqual({ R: 1, P: 0, S: 0 });
+        expect(closed[0].crowdCounts).toEqual({ R: 0, P: 0, S: 0 });
+    });
+});
+
+// Finding #1/#3, 2026-09-04: the properties the composition root has to preserve. The engine
+// itself never imports the crowd or the rules — these are here because the LIVE wiring in
+// index.ts is what makes them true, and a test is the only thing that holds it to them.
+describe('a seeded crowd with no humans replays exactly (spec §5)', () => {
+    function seededEngine(seed: number): RoundEngine {
+        const rng = mulberry32(seed);
+        const crowd = createCrowd({ size: 30, rng });
+        let n = 0;
+        return new RoundEngine({
+            openSeconds: 3,
+            lockSeconds: 2,
+            revealSeconds: 2,
+            // The SAME rng instance feeds the crowd and the plurality tie-break — that shared
+            // instance is what index.ts wires, and what makes the sequence reproducible.
+            pickWorldThrow: (_roundCount, counts) =>
+                deriveWorldThrow(counts, { minParticipants: 5, random: rng }),
+            crowd,
+            makeRoundId: () => `round-${++n}`,
+        });
+    }
+
+    function run(engine: RoundEngine, rounds: number): Array<{ worldThrow: string; counts: unknown }> {
+        const out: Array<{ worldThrow: string; counts: unknown }> = [];
+        engine.on('roundClosed', ev => out.push({ worldThrow: ev.worldThrow, counts: ev.counts }));
+        // 3 + 2 + 2 = one full round per 7 ticks; a margin so the last round definitely closes.
+        for (let i = 0; i < rounds * 7 + 7; i++) engine.tick();
+        return out;
+    }
+
+    // Seed 7 is the dispatched case; seed 3 is here because seed 7 happens to draw NO tied
+    // plurality in its first 20 rounds, which would make this assertion vacuous — at seed 3 the
+    // crowd ties on round 0 and six times after, so an unseeded (Math.random) tie-break really
+    // does diverge the two runs.
+    it.each([7, 3])('two engines on seed %i produce an identical world-throw sequence', seed => {
+        const a = run(seededEngine(seed), 20);
+        const b = run(seededEngine(seed), 20);
+        expect(a.length).toBeGreaterThanOrEqual(20);
+        expect(a).toEqual(b);
+    });
+
+    it('a crowd of 30 alone clears the participant floor — the picker never sees an empty round', () => {
+        const rng = mulberry32(7);
+        const picker = vi.fn(() => 'R' as const);
+        const e = new RoundEngine({
+            openSeconds: 3,
+            lockSeconds: 2,
+            revealSeconds: 2,
+            pickWorldThrow: picker,
+            crowd: createCrowd({ size: 30, rng }),
+            makeRoundId: () => 'r',
+        });
+        for (let i = 0; i < 5; i++) e.tick();
+        expect(picker).toHaveBeenCalledTimes(1);
+        const counts = picker.mock.calls[0][1] as Record<string, number>;
+        expect(counts.R + counts.P + counts.S).toBe(30);
     });
 });

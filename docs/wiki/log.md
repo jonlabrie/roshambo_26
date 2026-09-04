@@ -3288,6 +3288,28 @@ the pass that files it owns un-filing it. The original observation still stands 
 page cited a raw layer that existed only on one machine for two days, which is exactly the gap
 schema rule 4 exists to close.
 
+**An eleventh advance made the World Throw rule LIVE, and the sweep that came with it was the
+good case.** The synthetic crowd shipped and dev now runs it, so [[world-throw]]'s closing claim —
+*"not active in any deployed environment"* — became false. `a38c6d3f` names every page that said
+so and fixed them, and a grep across the wiki confirms none is left. **That is what closing a
+defect should look like**, and it is the same discipline the (d)/(a)–(c) letters did not get.
+This branch's `checked:` stamp on the old body was superseded by that rewrite and dropped rather
+than carried.
+
+⚠ **A NEW LINT GAP, FOUND WHILE RESOLVING IT: a `checked:` older than `updated:` asserts nothing,
+and nothing catches it.** Rule 6 defines `checked:` as *"re-read on this date and still true"*. When
+a later body edit bumps `updated:` past it, the stamp now claims a read of text that no longer
+exists — it is false by construction, and the lint has no check for the ordering. Two pages were in
+that state at this merge ([[world-throw]] and [[fireworks]], both `updated: 2026-09-04` over
+`checked: 2026-08-27`); both stamps were dropped, since a stamp that predates the prose is worse
+than none. ⚠ **A one-line check — `checked:` must not be older than `updated:` — would make this
+self-correcting**, and it is the cheapest of the currency checks to add.
+
+**[[modal-cursor-grip]] re-verified rather than re-stamped on trust**, its `ShopController`
+citation having aged past the grace: `CURSOR_PRIORITY` at `Camera + 1`, the `holding` flag guarding
+both grip and release, and `MouseBehavior.Default` inside the bound function are all exactly as the
+page describes. Stamped.
+
 ⚠ **`falls-dock` and `blender-pipeline` were read and deliberately NOT stamped `checked:`.**
 `falls-dock` rests on emitter positions, a place-only `UguisuScheduler` Script and asset ids only
 Studio can confirm; `blender-pipeline` still teaches the plane bisect for splitting a bill, which
@@ -3958,3 +3980,68 @@ carries the walk list; the strike close-up and the far-deck view are the two tha
 Two tooling traps found along the way, both recorded: the SDD scripts clobber
 `.superpowers/sdd/.gitignore` on every invocation ([[schema]] rule 4) and
 `main.server.luau` is now at Luau's 200-local-register ceiling ([[misc-engine-traps]]).
+
+## [2026-09-04] ship | Synthetic crowd -- the World Throw rule can be played without a human crowd
+
+Spec `docs/superpowers/specs/2026-09-04-synthetic-crowd-design.md`, plan
+`docs/superpowers/plans/2026-09-04-synthetic-crowd.md`. `RoundEngine` merges a seeded,
+archetyped bot crowd into the tally at LOCK→REVEAL before `pickWorldThrow`; bots never enter
+the throws map, so settlement and presence stay human-only by construction. `Round.synthetic`
+added; `totalPlayers` now counts the world. Three env vars, refused when malformed, ignored
+under TEST_MODE. `npm run sim` runs readability / blind-spread / effective-n over the same
+module. Default mix settled by the readability experiment at
+`wsls:30,counter:10,conform:30,rocky:10,random:20`, strength 0.7 (numbers, targets and the
+widened blind band on [[world-throw]]). Dev NOT yet flipped — procedure on [[deploy]],
+owner-gated. Q1 (is crowd-reading fun?) not yet run.
+
+## [2026-09-04] gate | Dev flipped: TEST_MODE off, 30-bot synthetic crowd on
+
+Owner: "let's flip dev then." `roshambo_server_dev` now runs `TEST_MODE=false`, `CROWD_SIZE=30`,
+no seed (boot log names the generated one). Verified in the application log: `[CROWD] on: size
+30, seed …, mix random:20,wsls:30,counter:10,conform:30,rocky:10`, `world throw: crowd plurality,
+min 5 participants`, then `[CROWD] round … humans 0 crowd 30 | R 8 P 6 S 16 → S`. Prod untouched.
+⚠ Trap earned: an env-only `update-service` redeployed the OLD image (TEST_MODE took effect, no
+crowd code, no `[CROWD]` boot line); an explicit `start-deployment` was needed to build `main`'s
+head. Recorded in the procedure on [[deploy]]. The four "not active anywhere" pages corrected
+(deploy, world-throw, parked-defects (h), CLAUDE.md). Q1 reframed on [[world-throw]]: the owner's
+rounds are a feel + calibration test; discovery belongs to newcomers. Sim outputs and the ledger
+for the build are committed under `.superpowers/sdd/2026-09-04-synthetic-crowd/`.
+
+## [2026-09-04] defect | The readability table was contaminated by cross-voting -- no rule clears 45% alone
+
+Found by re-running the rules one at a time while answering "what does one player expect?".
+`experiments.readability` scores six modelled humans who all vote in the same tally, and
+`counter` + `oracle` push the plurality forward, which is the move `second` needs: in the shared
+table `second` 51.9% / `counter` 42.2%; ALONE vs the 30-bot crowd `second` 42.0% / `counter`
+44.3% / `random` 29.6% (seeds 1–3, 20000 rounds). The spec's "best teachable rule ≥ 45%" target
+was met only through the contamination. Wiki corrected on [[world-throw]] (§ Synthetic crowd);
+the `second`-clears-45% reading of Q1 withdrawn; calibration guidance changed to the tape's
+transition shape. Fix spawned: score each rule independently, re-tune if needed. Dev stays as
+flipped — the crowd is still readable-but-not-solved, which is what it is for.
+
+## [2026-09-04] decision | Readability scores each rule alone; DEFAULT_MIX re-tuned one bot from random to conform
+
+Fix for the cross-voting defect logged above. `experiments.readability` now runs one
+`runSimulation` per modelled human (same seed; transitions from the random-only run), and
+`experiments.test.ts` checks every row against a solo run. Honest table at the first settled mix:
+`counter` 44.0–44.5%, `second` 41.8–42.2%, `random` 29.4–29.7% (seeds 1–3, 20000 rounds) — the
+45% floor was NOT met. Re-tuned: `DEFAULT_MIX` → `wsls:30,counter:10,conform:35,rocky:10,random:15`
+(at crowd 30, one bot moves from random to conform). Seeds 1–5, each rule alone: `counter`
+49.9–50.8%, `second` 37.3–38.0%, `random` 29.6–30.0%, oracle 57.2–57.9%. Lever chosen over
+strength 0.8 (cleared 45% by ~1 point) and counter:15/random:15 (cleared it by punishing the
+naive read). Direction is the reverse of the Task 11 ruling's because the failure reversed
+(under- not over-readable); its constraints kept. New tables and the reasoning on
+[[world-throw]]; raw outputs regenerated under `.superpowers/sdd/2026-09-04-synthetic-crowd/`.
+⚠ Dev still runs the first settled mix until a source redeploy (`start-deployment`, [[deploy]]);
+prod untouched.
+
+## [2026-09-04] gate | Dev redeployed from source with the re-tuned crowd
+
+Owner: "redeploy dev." `685b54c` fast-forwarded to `main` (the branch `roshambo_server_dev`
+tracks, auto-deploy off, no `CROWD_MIX` override), then `start-deployment`; operation
+SUCCEEDED in ~7 minutes. Application log confirmed `[CROWD] on: size 30, seed …, mix
+random:15,wsls:30,counter:10,conform:35,rocky:10` and `[CROWD] round …` lines resumed. Prod
+untouched. Q1 can now run against the honest mix. Open design question raised in the same
+conversation: the winning rule (`counter`) loses only ~3.5% of rounds because nothing in the
+archetype set pushes the world backward, so Bank vs Stake may feel flat — watch for that in Q1
+before deciding on a loss-rate target (would need a new archetype, not a mix change).

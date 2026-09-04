@@ -8,7 +8,8 @@ export interface IRound extends Document {
         P: number;
         S: number;
     };
-    totalPlayers: number;
+    totalPlayers: number; // humans + synthetic
+    synthetic: number;    // bot count; default 0 keeps every historical row honest
     timestamp: Date;
 }
 
@@ -21,6 +22,7 @@ const RoundSchema: Schema = new Schema({
         S: { type: Number, default: 0 }
     },
     totalPlayers: { type: Number, default: 0 },
+    synthetic: { type: Number, default: 0 },
     timestamp: { type: Date, default: Date.now }
 });
 

@@ -188,8 +188,9 @@ which no test can see.)
   orphaned, so guest points and streaks are gone — the same hard cut as 2026-08-18.
 
 _(h) — the World Throw picked at random — was FIXED 2026-08-16, see [[world-throw]] and
-`log.md`. It is deliberately NOT active in any deployed environment yet: both prod and dev
-run `TEST_MODE`, which keeps the R→P→S cycle. Defect (e) therefore still stands._
+`log.md`. **Active on dev since 2026-09-04** (`TEST_MODE=false` + a 30-bot synthetic crowd —
+[[world-throw]] § Synthetic crowd). Prod still runs `TEST_MODE`, which keeps the R→P→S cycle
+there, so defect (e) still stands on prod and is moot on dev._
 
 ## ~~(l) tsukubai renders lying on its side~~ FIXED 2026-09-05 (`1684976`)
 

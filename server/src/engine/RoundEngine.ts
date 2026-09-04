@@ -20,6 +20,13 @@ export interface ThrowEntry {
     instanceId?: string;
 }
 
+// The synthetic crowd (spec §1). Structural on purpose: the engine needs "give me this round's
+// bot tally" and "here is what the world did", nothing about archetypes or seeds.
+export interface CrowdSource {
+    throws(roundCount: number): Record<Throw, number>;
+    observe(worldThrow: Throw): void;
+}
+
 export interface EngineConfig {
     openSeconds: number;
     lockSeconds: number;
@@ -27,6 +34,9 @@ export interface EngineConfig {
     // It does not scale with round length — the drum takes 3.45s at any period.
     revealSeconds: number;
     pickWorldThrow: (roundCount: number, counts: Record<Throw, number>) => Throw;
+    // Optional bot crowd merged into the tally BEFORE pickWorldThrow, so the distribution the
+    // player sees and the World Throw it produced always agree. Absent → today's behaviour.
+    crowd?: CrowdSource;
     makeRoundId: () => string;
     // Optional wall clock. When provided, each phase transition is stamped so
     // /state can report an EXACT phaseEndsAt: the integer-second countdown
@@ -46,8 +56,9 @@ export interface EngineSnapshot {
 export interface RoundClosedEvent {
     roundId: string;
     worldThrow: Throw;
-    counts: Record<Throw, number>;
-    throws: Map<string, ThrowEntry>;
+    counts: Record<Throw, number>;       // human + crowd: the world the player faced
+    crowdCounts: Record<Throw, number>;  // the synthetic part of it, zeros when no crowd
+    throws: Map<string, ThrowEntry>;     // humans only — the only thing settlement iterates
 }
 
 export class RoundEngine extends EventEmitter {
@@ -127,13 +138,24 @@ export class RoundEngine extends EventEmitter {
                 // same transition. roundClosed is async (settlement); revealStarted is
                 // synchronous. socketAdapter's revealPending guard makes whichever
                 // finishes last perform the broadcast, so the zero gap is safe.
-                const counts = this.countThrows();
+                //
+                // The crowd merges here and NOT inside pickWorldThrow: settlement builds the
+                // persisted distribution from `counts`, so bots added in the picker would decide
+                // the World Throw and then vanish from the card that explains it (spec §1).
+                const humanCounts = this.countThrows();
+                const crowdCounts = this.cfg.crowd ? this.cfg.crowd.throws(this.roundCount) : { R: 0, P: 0, S: 0 };
+                const counts: Record<Throw, number> = {
+                    R: humanCounts.R + crowdCounts.R,
+                    P: humanCounts.P + crowdCounts.P,
+                    S: humanCounts.S + crowdCounts.S,
+                };
                 const worldThrow = this.cfg.pickWorldThrow(this.roundCount, counts);
+                this.cfg.crowd?.observe(worldThrow);
                 this.phase = 'REVEAL';
                 this.secondsLeft = this.cfg.revealSeconds;
                 this.stampPhaseEnd(this.cfg.revealSeconds);
                 const event: RoundClosedEvent = {
-                    roundId: this.roundId, worldThrow, counts, throws: new Map(this.throws),
+                    roundId: this.roundId, worldThrow, counts, crowdCounts, throws: new Map(this.throws),
                 };
                 this.emit('roundClosed', event);
                 this.emit('revealStarted', { roundId: this.roundId });

@@ -1164,7 +1164,7 @@ The server exits before listening when `MONGODB_URI` is empty, but the crowd lin
 npx tsc && (MONGODB_URI= TEST_MODE=false CROWD_SIZE=30 CROWD_SEED=1 node dist/index.js; true)
 ```
 
-Expected output includes `[CROWD] on: size 30, seed 1, mix wsls:35,counter:20,conform:15,rocky:10,random:20` then `[FATAL] MONGODB_URI is not defined`. Then:
+Expected output includes `[CROWD] on: size 30, seed 1, mix random:20,wsls:30,counter:10,conform:30,rocky:10` then `[FATAL] MONGODB_URI is not defined`. Then:
 
 ```bash
 (MONGODB_URI= TEST_MODE=true CROWD_SIZE=30 node dist/index.js; true)
