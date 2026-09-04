@@ -641,12 +641,24 @@ RunService.RenderStepped:Connect(function()
                 -- needed (its origin sat at the body centre) is gone.
                 target = b.perch.WorldPosition
             else
-                -- ⚠ NOWHERE TO SIT: fall back to the orbit rather than freezing. This is also
-                -- what keeps a bird OUT of buildings (owner: birds do not go inside) — indoors
-                -- there are no perches, so a bird that already has one simply keeps it and waits
-                -- outside; only a bird with none at all follows its owner in.
-                local o = BirdFlight.offsetFor("RESTING", elapsed, b.seed, PROFILE)
-                target = (root.CFrame * CFrame.new(o.x, o.y, o.z)).Position
+                -- ⚠ NOWHERE TO SIT: the OWNER is the perch (owner, 2026-09-03: the familiar
+                -- "basically goes into a constant search for a perch bobbing around my head.
+                -- so why not make my head a perch, if none other is available?"). The old
+                -- fallback was the RESTING orbit, whose animated offset drifts with every
+                -- step — a permanent search that never settles. Sitting on the head is a
+                -- FIXED seat: still owner = still bird, and the bird still follows its owner
+                -- indoors only when it has nowhere else to sit (birds do not go inside
+                -- otherwise — a bird holding a real perch keeps it and waits).
+                local char = root.Parent
+                local head = if char then char:FindFirstChild("Head") else nil
+                if head and head:IsA("BasePart") then
+                    -- feet-origin mesh on the head's top, +0.2 so hair/hats don't swallow it
+                    target = head.Position + Vector3.new(0, head.Size.Y * 0.5 + 0.2, 0)
+                else
+                    -- no head yet (mid-spawn): the old orbit, briefly
+                    local o = BirdFlight.offsetFor("RESTING", elapsed, b.seed, PROFILE)
+                    target = (root.CFrame * CFrame.new(o.x, o.y, o.z)).Position
+                end
             end
         end
 

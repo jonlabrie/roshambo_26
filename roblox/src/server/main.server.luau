@@ -374,6 +374,13 @@ local lastStats: any = nil
 -- closes. Declared here, assigned once those exist.
 local pushFireworkState: ((Player) -> ())? = nil
 
+-- FORWARD DECLARATION. The bank handler (above the economy block) must refresh the shop's
+-- cached balance the moment a bank lands — the owner's cold walk (2026-09-03) entered the
+-- shop with 3 freshly banked points and "shop thinks I have zero": BankRequest updated the
+-- wallet path (profiles) but playerEconomy kept its join-time snapshot until some purchase
+-- echoed it. Assigned below, once playerEconomy and echoEconomy exist.
+local syncEconomyPoints: ((Player, number) -> ())? = nil
+
 -- FORWARD DECLARATION. pushFireworkState (below, but textually BEFORE rebuildClaimedPad is
 -- declared) needs to trigger the same pad rebuild the decoration flow uses whenever the fireworks
 -- GET's mortars/mortarPlacements actually changed -- mortars now render server-side (TreatmentApplier)
@@ -638,6 +645,11 @@ BankRequest.OnServerEvent:Connect(function(player, rawKeep)
             })
             pushStats(player)
             fireProfile(player, "banked")
+            -- the shop's balance rides EconomyState, not the profile — sync it or the
+            -- counter (and the starter prompt's countdown) shows the join-time snapshot
+            if syncEconomyPoints then
+                syncEconomyPoints(player, res.data.totalPoints)
+            end
         end
     end)
 end)
@@ -1138,6 +1150,16 @@ local function echoEconomy(player: Player, uid: string)
         mortars = e.mortars,
         mortarPlacements = e.mortarPlacements,
     })
+end
+
+-- assigns the forward declaration the bank handler holds (see its comment near the referee)
+syncEconomyPoints = function(player: Player, totalPoints: number)
+    local uid = tostring(player.UserId)
+    local e = playerEconomy[uid]
+    if e ~= nil then
+        e.totalPoints = totalPoints
+        echoEconomy(player, uid)
+    end
 end
 
 -- Persist ONE shoji slide's final travel, occupant-only: clone the loadout, set
