@@ -3271,6 +3271,15 @@ teahouse, 20 points, atomic first-property grant, sold from the vacant-site prom
 come by a teahouse, and a page whose first line calls a teahouse *"earned"* does not mention it.
 Reported rather than authored.
 
+**A ninth advance CLOSED a gap this run had reported, so the report itself became the stale
+claim.** `8aeef2a5` committed both SDD ledgers — deck-mortars and rail-mounts, `progress.md` plus
+six brief/report pairs each. This entry had recorded twice that neither existed and that
+[[fireworks]] cited them anyway; those notes were reverted and the citations restored, now naming
+the commit that landed them. ⚠ **A FINDING IS A CLAIM WITH THE SAME HALF-LIFE AS ANY OTHER**, and
+the pass that files it owns un-filing it. The original observation still stands as history: the
+page cited a raw layer that existed only on one machine for two days, which is exactly the gap
+schema rule 4 exists to close.
+
 ⚠ **`falls-dock` and `blender-pipeline` were read and deliberately NOT stamped `checked:`.**
 `falls-dock` rests on emitter positions, a place-only `UguisuScheduler` Script and asset ids only
 Studio can confirm; `blender-pipeline` still teaches the plane bisect for splitting a bill, which
@@ -3864,7 +3873,7 @@ couple of newbies tomorrow." Tomorrow's agenda captured on [[backlog]] — raili
 tunnel-cuts (owner-guided per pad), the unjumpable-railing ruling reversal, stats-cave
 onboarding, random familiar assignment.
 
-## [2026-09-03] fix | roblox-ci red nine pushes -- hand-edited Torii.model.json vs the genmodels gate
+## [2026-09-03] defect | roblox-ci red nine pushes -- hand-edited Torii.model.json vs the genmodels gate
 
 The torii's deck-centre move (`f66370a`) edited `roblox/assets/Torii.model.json` directly
 (x58 -> x74); the "Generated models are current" gate regenerated the old gate from

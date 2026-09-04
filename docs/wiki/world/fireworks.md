@@ -97,10 +97,10 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   now launches from HAND height, not 6 studs overhead. The same-server-rejoin
   fingerprint fix was LIVE-VERIFIED 2026-09-05 on the published place (two-device
   hold-open, leave/rejoin: tubes present at their placements). Spec
-  docs/superpowers/specs/2026-09-04-deck-mortars-design.md and plan
-  docs/superpowers/plans/2026-09-04-deck-mortars.md. ⚠ **No SDD ledger was created** —
-  `.superpowers/sdd/2026-09-04-deck-mortars/` does not exist, <!-- lint-ok: naming the ledger path in order to say it was never created -->
-  so the raw layer here is the spec, the plan and the branch's own commits.
+  docs/superpowers/specs/2026-09-04-deck-mortars-design.md, plan
+  docs/superpowers/plans/2026-09-04-deck-mortars.md, ledger
+  `.superpowers/sdd/2026-09-04-deck-mortars/progress.md` (committed 2026-09-04 in `8aeef2a5`,
+  after this page had cited it for two days while it existed only on one machine).
 - **Rail mounts (2026-09-05, merged `24c6da9..8e1a61b` + gate fixes `27b410d..dcdffed`,
   GATED)**: mortars are aimable hardware — `{mount: floor|rail, offset, aim: L|C|R}` records
   (legacy reads floor/C at the saved spot, never relocated), three aims in a 60° arc anchored
@@ -125,9 +125,9 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   (`27b410d`, `862568c` — five orderings were patched before instrumentation found the truth);
   (3) the lever's fall-through would have swept legacy records onto the rail — guarded
   (`dcdffed`). Same-server rejoin verification PASSED live 2026-09-05. Spec
-  docs/superpowers/specs/2026-09-04-rail-mounts-design.md and plan
-  docs/superpowers/plans/2026-09-04-rail-mounts.md. ⚠ **No SDD ledger was created** here
-  either — `.superpowers/sdd/2026-09-04-rail-mounts/` does not exist. <!-- lint-ok: naming the ledger path in order to say it was never created -->
+  docs/superpowers/specs/2026-09-04-rail-mounts-design.md, plan
+  docs/superpowers/plans/2026-09-04-rail-mounts.md, ledger
+  `.superpowers/sdd/2026-09-04-rail-mounts/progress.md` (committed 2026-09-04 in `8aeef2a5`).
 - **Promotion worksheet (as of 2026-09-06)**: shipped through the five guarded steps —
   **wa** (red double-ring, M tube, 5; boost 30% = structural second ring via the first
   `boostOnly` phase, no kicker — "the double ring IS the tell") and **yashi** (palm,
