@@ -217,7 +217,7 @@ cd server && npm run sim -- --rounds 20000 --seed 1 --mix <id:weight,…> [--str
 
 | preset | `CROWD_MIX` (or setting) | world: same / forward / backward | best rule → BEAT WORLD | blind | oracle | feel |
 |---|---|---|---|---|---|---|
-| off | `CROWD_SIZE=0` | random below 5 humans | none | 33% | — | blind world until five humans are in |
+| off | `CROWD_SIZE` of zero <!-- lint-ok: a setting, not the deployed value --> | random below 5 humans | none | 33% | — | blind world until five humans are in |
 | cycle (prod) | `TEST_MODE=true` (crowd ignored) | 0 / 100 / 0 | `second` 100% | — | — | not a crowd: the R→P→S demo; `counter` is SAFE forever |
 | pure random | `random:1` | 33 / 33 / 34 | none, all ~29% | 29% | 29% | the null; a plurality of noise |
 | pure rocky | `rocky:1` | 34 / 33 / 34 | none, all ~29% | 29% | 44% | blind to every rule; only the oracle sees the rock lean |
@@ -238,7 +238,7 @@ cd server && npm run sim -- --rounds 20000 --seed 1 --mix <id:weight,…> [--str
 Two levers the table makes visible. **Strength is the loss-rate dial**: lowering it adds
 backward rotations (0.85 → 2%, 0.7 → 4%, 0.5 → 9%) without moving the blind row, and it has no
 env var yet — `DEFAULT_STRENGTH` in `server/src/engine/SyntheticCrowd.ts` is code-only, so a
-`CROWD_STRENGTH` variable is the first thing to add if Q1 says banking feels unnecessary.
+strength env var (not yet built) is the first thing to add if Q1 says banking feels unnecessary.
 **`conform` vs `counter` weight is the sticky-vs-rotating dial**: it decides which of the two
 teachable rules the crowd rewards, and the pure rows show the extremes.
 
