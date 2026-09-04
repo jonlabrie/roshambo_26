@@ -94,8 +94,29 @@ EventBus.OwnLaunch.Event:Connect(function(data: any)
     sweptAt = phaseAt
 end)
 
--- One step AFTER the camera writes its frame: the default camera has already applied the
--- player's input to `cam.CFrame`; this composes the apex blend on top of that result.
+-- ⚠ THE BLEND MUST BE INVISIBLE TO THE DEFAULT CAMERA (owner's phone gate, 2026-09-03:
+-- "placing the camera right underneath the avatar, looking up through its crotch"). The
+-- PlayerModule camera ADOPTS externally written CFrames as its own orientation, so leaving
+-- the blended frame in place fed the up-look back into the orbit camera every frame — it
+-- pinned its pitch skyward and repositioned itself UNDER the subject. Two bindings bracket
+-- the camera step instead: the restore below hands the camera module back the exact frame
+-- it wrote last time (no external change to adopt), it computes a clean base from the
+-- player's own input, and the blend re-applies on top afterward. Only the blended frame
+-- ever renders; only the clean frame is ever seen by the camera module.
+local savedBase: CFrame? = nil
+local blendedFrame: CFrame? = nil
+
+RunService:BindToRenderStep("LaunchLookRestore", Enum.RenderPriority.Camera.Value - 1, function()
+    local cam = workspace.CurrentCamera
+    -- restore only if the frame is still ours — a cutscene or respawn that moved the
+    -- camera since must not be stomped with a stale base
+    if cam and savedBase and blendedFrame and cam.CFrame == blendedFrame then
+        cam.CFrame = savedBase
+    end
+    savedBase = nil
+    blendedFrame = nil
+end)
+
 RunService:BindToRenderStep("LaunchLookBlend", Enum.RenderPriority.Camera.Value + 1, function()
     if mode == "idle" then
         return
@@ -137,5 +158,8 @@ RunService:BindToRenderStep("LaunchLookBlend", Enum.RenderPriority.Camera.Value 
     end
     local base = cam.CFrame
     local desired = CFrame.lookAt(base.Position, apex)
-    cam.CFrame = base:Lerp(desired, w)
+    savedBase = base
+    local blended = base:Lerp(desired, w)
+    blendedFrame = blended
+    cam.CFrame = blended
 end)
