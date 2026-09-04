@@ -151,6 +151,57 @@ function TreatmentApplier:_buildBuilding(
         shutter(model)
     end
     model.Parent = staging
+    -- ⚠ PERSISTENT — INVESTIGATED 2026-09-04, DELIBERATELY LEFT AS IS. Read this before
+    -- deleting it; the investigation is the expensive part and it is written down here so the
+    -- next person starts where it stopped.
+    --
+    -- The cost is real and constant: every one of the 14 PadSites has vacantForm
+    -- "dormant-structure", so a Structure is built for EVERY pad, occupied or not
+    -- (VacantState.resolve), and Persistent means all 14 are replicated to every client forever,
+    -- uncapped by distance. Only the Structure carries this flag -- the deck (loose BaseParts from
+    -- PadOps), decorations, mortars, nobori and PortalControl in the same site folder are all
+    -- ordinary streaming content already.
+    --
+    -- WHY IT IS HERE is unknown. It has been in this file since its first commit (0566689, sub-D.2)
+    -- with no comment, and that commit's message does not mention streaming. It is NOT the
+    -- documented stage reason (main.server.luau:123-127, spawn-watchers 200 studs out + controllers
+    -- that capture parts once at startup): teahouses are built at runtime, after those controllers
+    -- have started.
+    --
+    -- WHAT WAS CHECKED (every client reach into a structure's parts):
+    --   own pad only, not a blocker: BackDoorController, MoveController, DecorationController
+    --     (tag-driven, own padId, 3s rescan heartbeat), TeahouseController (HUD panel, no workspace
+    --     reach at all).
+    --   all sites, but already exposed: EconomyController -- anchors on PadDeck, which is NOT
+    --     persistent today, and it re-checks `anchor.Parent == nil` on every folder ChildAdded.
+    --   all sites, rebuild-shaped lifecycle: ShojiController -- folder ChildAdded/ChildRemoved +
+    --     structure.ChildAdded, so a whole-Structure stream cycle should rebind. But it has no
+    --     ChildRemoved at the BAY level, which only streaming introduces: a bay that streams out
+    --     leaves a stale BayWatch/BayEntry holding a removed leaf, and its return overwrites
+    --     padState.entries[key] and orphans the old one.
+    --   ⚠ ALL SITES, NO RETRY PATH: PerchPreferenceController.attachToStructure captures
+    --     anchorPart(structure) ONCE per Structure arrival and early-returns if no BasePart is
+    --     reachable yet, with no structure.ChildAdded, no ChildRemoved and no heartbeat to try
+    --     again. Under Persistent the model and its parts arrive together so this never bites;
+    --     under Default a Model can replicate before its own parts (the exact race
+    --     BackDoorController and ShojiController both guard against explicitly, and this one does
+    --     not), and the Favorite prompt on that teahouse would then be silently missing for the
+    --     rest of the session.
+    --
+    -- WHAT REMAINS UNKNOWN, and needs Studio (two clients, both claiming, one walking out past
+    -- StreamingTargetRadius=512 and back): whether a Structure Model really can arrive on the
+    -- client ahead of its parts here, i.e. whether that PerchPreference race actually fires. Static
+    -- reading cannot settle it.
+    --
+    -- WHY NOT THE OBVIOUS NARROWING (Persistent only for the claiming player's own structure): the
+    -- dependencies found are on OTHER players' distant teahouses -- the all-sites prompt controllers
+    -- -- so that narrowing protects the one structure that was never at risk (you are standing on
+    -- it) and drops it exactly where the risk lives. It would also need PersistentPerPlayer +
+    -- Model:AddPersistentPlayer plus owner/claim plumbing, which is a feature, not a narrowing.
+    --
+    -- BEFORE REMOVING THIS: give PerchPreferenceController a retry (a structure.ChildAdded rebind,
+    -- or DecorationController's rescan heartbeat) and ShojiController a bay-level ChildRemoved.
+    -- Then the two-client walk test above is what clears it.
     if model:IsA("Model") then
         model.ModelStreamingMode = Enum.ModelStreamingMode.Persistent
     end
