@@ -3617,3 +3617,21 @@ green.
 Owner, after the `resting` gate fix and the 15–25 s / 0.5 retune: "seems to be working as
 expected." Rate and gate stand as recorded on `docs/wiki/world/familiars.md`.
 
+
+## [2026-09-03] gate | The onboarding journey survives its cold walks — demo-ready
+
+The owner walked the journey cold (fresh serene_blu profile each run) through several
+fix rounds in one day: the win-drop firecracker no longer spoofs the shop purchase
+(tour edges gated on the tour's own leg), the shop balance syncs on bank, public sites
+provide all mortar tiers (rack tubes now S/M/L, launches prefer the matching tube),
+the fireworks rail lists only owned shells (Bottle Rocket, née Firecracker), auto-look
+went through three versions to a camera-blend that never fights the player, the
+familiar perches on its owner's head when no perch is near, auto-jump is off, the
+portrait cluster cleared the jump button, the welcome/beat copy is the owner's
+end-to-end, the hanabiya wears twelve recipe-derived posters (owner-approved set), the
+torii crowns the Overlook deck with the spawn hidden beneath its arch, and a Josefin
+Sans + caret-glyph signage identity is recorded. Owner's close: today's walk "was
+great, right up to the teahouse... I feel like I could walk through a demo with a
+couple of newbies tomorrow." Tomorrow's agenda captured on [[backlog]] — railing
+tunnel-cuts (owner-guided per pad), the unjumpable-railing ruling reversal, stats-cave
+onboarding, random familiar assignment.

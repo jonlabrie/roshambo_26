@@ -9,6 +9,38 @@ updated: 2026-09-03
 Future work captured with enough context to restart cold. Nothing here is scheduled; the
 active program is [[friends-family-baseline]]. Ordering within this page is arbitrary.
 
+## TOMORROW'S AGENDA (owner, 2026-09-03 close — post-cold-walk)
+
+Owner's own list, verbatim intent, after a walk that was "great, right up to the
+teahouse" and left them feeling "I could walk through a demo with a couple of newbies
+tomorrow":
+
+1. **Engawa railing tunnel-exit cuts** — "the railings need to be aware of where the
+   tunnel exits are, because right now on many pads you exit into a closed railing and
+   have to jump over." Railings are procedurally built (`PadOps.luau` deck geometry;
+   see [[teahouses]] § deck fall-prevention), so this needs a per-pad CUT: "a one time
+   pass where I show you where it's needed and we make it happen, for each pad" —
+   owner-guided, pad by pad, likely a per-site cut spec (PadSites data or attributes)
+   the builder honours. Interlocks with the 2026-07-05 access decision ("access
+   infrastructure is hand-built per site") and its "occupancy-conditional access
+   objects" future hook.
+2. **⚠ RULING REVERSAL — teahouse railings become unjumpable, "full stop".** This
+   supersedes the settled 2026-07-13 fall-prevention design ("stop *accidental*
+   walk-offs only — a deliberate leap into the gorge still works... Do not resurrect
+   tall imprisoning walls"). The invisible fall-guard's `BARRIER_H` (3.5, "a pure
+   physics number") is the lever; fireworks must keep passing (the `EngawaBarrier`
+   collision group passes `Projectile`). Update [[teahouses]] when built.
+3. **Stats-cave onboarding** — "onboard the player to the stats cave (like Batman's
+   bat cave, get it?)... maybe the first time they level up or something." Folds into
+   the banked "teahouse/stats beats" item below; the trigger moment (first level-up?)
+   is a design question for the pass.
+4. **Random familiar assignment** — new players get a familiar randomly assigned "from
+   among the three (currently) available familiars. Not the crow, which we need to
+   make ambient." See [[familiars]] / [[ambient-birds]] for the current roster (the
+   mejiro is today's default; the karasu's ambient conversion was already directed on
+   the bird thread). This also finally moves [[friends-family-baseline]] item 6's
+   "roster selection is the smallest thing" blocker.
+
 ## A spooky area at the WEST END of the canyon — fireflies and fog in the trees
 
 Owner, 2026-08-19, parking the ground-fog question: *"I think we're going to do a little spooky
