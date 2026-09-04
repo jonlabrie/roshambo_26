@@ -3645,3 +3645,14 @@ pushing session looked at CI. Fixed in `b6ddb1a`: the layout constant moved to 7
 JSON is generator output again. Standing rule recorded on [[rojo-and-place]]:
 `assets/*.model.json` is never hand-edited, and a push is not done until its CI run is
 seen green.
+
+## [2026-09-04] decision | Synthetic crowd spec approved -- tally crowd in the engine, offline sim, three calls taken
+
+Spec `docs/superpowers/specs/2026-09-04-synthetic-crowd-design.md`. Owner: "yes to those
+three": (1) `totalPlayers` counts the world, with a new `Round.synthetic` field so humans stay
+recoverable; (2) the Q1 "is crowd-reading fun?" threshold is 45% BEAT WORLD over ~20 owner
+rounds, pre-registered; (3) once the sim lands a readable mix, dev runs `TEST_MODE=false` with
+a 30-bot crowd permanently, prod untouched. Bots merge into the tally inside `RoundEngine` at
+LOCK→REVEAL (not in `pickWorldThrow`, which would leave the reveal's distribution disagreeing
+with the throw) and never enter the throws map, so settlement and presence stay human-only by
+construction. Plan to follow.

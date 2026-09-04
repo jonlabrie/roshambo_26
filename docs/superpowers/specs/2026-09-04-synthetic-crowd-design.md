@@ -1,7 +1,7 @@
 # Synthetic Crowd — Design
 
 **Date:** 2026-09-04
-**Status:** Draft for owner review. Three decisions are held open in §11.
+**Status:** Approved in conversation (owner, 2026-09-04) — all three §11 decisions taken as recommended.
 **Program context:** Not on the [[friends-family-baseline]] board. This is the instrument that
 lets the game's premise be tested at all: the World Throw is the crowd's plurality, and no
 deployed environment has ever had a crowd ([[world-throw]] § As-built). Everything on the
@@ -260,7 +260,7 @@ No shared-fixture changes: the Luau side never derives the World Throw
 - Turning prod out of TEST_MODE.
 - The mix fitter (§8).
 
-## 11. Open decisions for the owner
+## 11. Owner decisions — all three DECIDED as recommended (owner, 2026-09-04: "yes to those three")
 
 1. **Does `totalPlayers` count the crowd?** Recommendation: yes, with `synthetic` recorded
    (§3). Alternative: keep it human-only and add `worldSize`, at the cost of a self-contradicting
