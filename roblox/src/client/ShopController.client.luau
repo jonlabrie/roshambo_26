@@ -25,6 +25,7 @@ local UserInputService = game:GetService("UserInputService")
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local ShopThreshold = require(shared:WaitForChild("ShopThreshold"))
 local ShellDisplay = require(shared:WaitForChild("ShellDisplay"))
+local AmbientBudget = require(shared:WaitForChild("AmbientBudget"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
 local player = Players.LocalPlayer
@@ -431,7 +432,14 @@ end
 CollectionService:GetInstanceAddedSignal("ShopThreshold"):Connect(register)
 
 local inside = false
-RunService.Heartbeat:Connect(function()
+local acc = 0
+local POLL = 0.25 -- matches TourBeamController; a threshold a walking player crosses in ~0.25s
+RunService.Heartbeat:Connect(function(dt: number)
+    local fire, nextAcc = AmbientBudget.step(acc, dt, POLL)
+    acc = nextAcc
+    if not fire then
+        return
+    end
     local char = player.Character
     local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
     local now = false
