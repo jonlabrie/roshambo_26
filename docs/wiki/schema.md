@@ -30,6 +30,19 @@ Sessions read `index.md` first. The pattern is Karpathy's LLM-wiki
 4. **Cite, don't duplicate.** `docs/superpowers/` specs/plans/SDD ledgers and git
    history are the immutable raw layer. Link to them; carry only synthesis and what
    they cannot record (owner decisions, place state).
+   ⚠ **The SDD tooling silently un-tracks the ledgers it creates, and it does so
+   repeatedly.** `superpowers/skills/subagent-driven-development/scripts/sdd-workspace`
+   ends with `printf '*\n' > "$base/.gitignore"`, overwriting `.superpowers/sdd/.gitignore`
+   with a bare `*` — the exact state that once left 11 citations across 7 pages pointing at
+   content no clone could resolve, and which the committed file's own header warns against.
+   It is not once per run: `review-package` and `task-brief` both invoke `sdd-workspace`
+   internally, so it is clobbered on every brief and every review package, dozens of times
+   in a single execution. **Check `git status` on that file before finishing any SDD run**,
+   restore it with `git checkout -- .superpowers/sdd/.gitignore`, and commit the ledger
+   markdown rather than deleting the workspace as the skill directs — this repo cites those
+   ledgers, so here they are a deliverable, not scratch. Found 2026-09-04 during the client
+   load-reduction run; the same regression had been repaired blind at least twice before
+   (`8aeef2a` rescued stranded ledgers) without anyone finding the cause.
 5. **`⚠ unverified`** marks any claim not checked against git or the live place.
    Never launder a memory into a fact.
 6. **Frontmatter**: every page has `shelf:` and `updated:` (absolute date, bumped on every edit

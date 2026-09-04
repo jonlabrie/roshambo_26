@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-09-03
+updated: 2026-09-04
 ---
 
 # Misc Engine Traps
@@ -160,6 +160,31 @@ no guard.
 ⚠ **The class is larger than this instance: cross-runtime path resolution is invisible to a test
 suite that runs in only one of the two runtimes.** Anything resolved by name rather than by value
 deserves the same suspicion.
+
+## `main.server.luau` is AT Luau's 200-local-register ceiling
+
+A Luau function body — including a script's main chunk — may hold at most **200 local
+registers**. Exceed it and the file does not compile at all; the error names the limit,
+not the line you added.
+
+`roblox/src/server/main.server.luau` reached that ceiling on 2026-09-04. Adding a
+`pcall` around the streaming-radius writes introduced **two** locals (`ok`, `err`) and
+that was enough to tip it. **Any new top-level local in that file now risks the same
+failure**, so add none: wrap new work in `do ... end`, which scopes its locals to the
+block and releases the registers at its end.
+
+```luau
+do
+    local ok, err = pcall(function() ... end)
+    if not ok then warn(...) end
+end   -- ok/err released here; nothing below sees them
+```
+
+This is the same wall `HudController.client.luau` hit during the 2026-09-03 mobile pass,
+which is why the tour beam went into its own file rather than into HudController. Two
+files have now paid for it. The general rule: **in a long-lived entry script, prefer a
+`do` block or a new file over another top-level local** — and when a file that has
+compiled for months suddenly will not, count locals before re-reading your change.
 
 ## iOS WebAudio: a third context state, and one unlock attempt is not enough
 

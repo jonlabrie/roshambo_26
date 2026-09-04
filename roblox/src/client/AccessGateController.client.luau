@@ -16,6 +16,7 @@ local Players = game:GetService("Players")
 local localPlayer = Players.LocalPlayer
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local AccessBlocked = remotes:WaitForChild("AccessBlocked") :: RemoteEvent
+local AmbientBudget = require(ReplicatedStorage:WaitForChild("RoshamboShared"):WaitForChild("AmbientBudget"))
 
 -- A client-only container under workspace. A part created with Instance.new ON THE CLIENT and
 -- parented to workspace exists only in THIS client's world (never replicated to the server or other
@@ -29,7 +30,14 @@ local NOREN = Color3.fromRGB(120, 40, 45) -- placeholder curtain color
 local SHOWN = 0.35 -- transparency when fully revealed
 local FADE_RATE = 8 -- transparency lerp speed (~0.2s fade in/out)
 
-type Pad = { parts: { Part }, center: Vector3, radius: number, alpha: number, collidable: boolean }
+type Pad = {
+    parts: { Part },
+    center: Vector3,
+    radius: number,
+    alpha: number,
+    collidable: boolean,
+    near: boolean,
+}
 local pads: { Pad } = {}
 
 -- Built hidden + inert; the proximity loop turns it solid/visible when the player is near.
@@ -82,6 +90,7 @@ local function rebuild(blocked: any)
                 radius = entry.revealRadius,
                 alpha = 1,
                 collidable = false,
+                near = false,
             })
         end
     end
@@ -89,28 +98,40 @@ end
 
 -- Proximity reveal: planar (X/Z) distance from the deck centre, so an elevated deck approached from
 -- a lower path still reveals correctly.
+local acc = 0
+local POLL = 0.25 -- the reveal radii are ~90 studs; a walking player cannot cross one in a tick
 RunService.Heartbeat:Connect(function(dt: number)
     if #pads == 0 then
         return
     end
-    local char = localPlayer.Character
-    local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
-    local pos = hrp and hrp.Position
-    for _, pad in pads do
-        local near = false
-        if pos ~= nil then
-            local dx = pos.X - pad.center.X
-            local dz = pos.Z - pad.center.Z
-            near = (dx * dx + dz * dz) <= (pad.radius * pad.radius)
-        end
-        -- collision snaps at the threshold (solid the instant you're in range); the visual fades.
-        if near ~= pad.collidable then
-            pad.collidable = near
-            for _, part in pad.parts do
-                part.CanCollide = near
+    -- The O(pads) distance test is the throttled half. The fade below is NOT: it integrates against
+    -- the real frame dt, and stepping it four times a second is a visible regression.
+    local fire, nextAcc = AmbientBudget.step(acc, dt, POLL)
+    acc = nextAcc
+    if fire then
+        local char = localPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+        local pos = hrp and hrp.Position
+        for _, pad in pads do
+            local near = false
+            if pos ~= nil then
+                local dx = pos.X - pad.center.X
+                local dz = pos.Z - pad.center.Z
+                near = (dx * dx + dz * dz) <= (pad.radius * pad.radius)
+            end
+            pad.near = near
+            -- collision snaps at the threshold (solid within a poll of entering range, not the
+            -- instant you're in range -- this block is throttled); the visual fades.
+            if near ~= pad.collidable then
+                pad.collidable = near
+                for _, part in pad.parts do
+                    part.CanCollide = near
+                end
             end
         end
-        local target = if near then SHOWN else 1
+    end
+    for _, pad in pads do
+        local target = if pad.near then SHOWN else 1
         if math.abs(pad.alpha - target) > 0.001 then
             pad.alpha += (target - pad.alpha) * math.clamp(dt * FADE_RATE, 0, 1)
             if math.abs(pad.alpha - target) <= 0.01 then

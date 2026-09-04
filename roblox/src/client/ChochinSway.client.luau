@@ -1,10 +1,15 @@
 --!strict
--- Gentle pendulum sway for the hanging path chōchin. Each lantern's "Swing" sub-model
--- (tagged "ChochinSwing", pivoted at its cross-arm hang point) rocks a few degrees on a
--- slow sine, desynced per-site so a row of them drifts independently — as if in a light
--- breeze. Pure cosmetic; the swinging body carries the RoundLantern glyph, which rides along.
+-- Gentle pendulum sway for the teahouse and hanabiya chōchin. Each lantern's "Swing" sub-model
+-- (tagged "ChochinSwing") rocks a few degrees on a slow sine, desynced per-site so a row of them
+-- drifts independently — as if in a light breeze. Path-pole chōchin are excluded by owner ruling
+-- (2026-09-03, see isPoleHung below) and never enter this system. Pure cosmetic; the swinging body
+-- carries the RoundLantern glyph, which rides along.
 local CollectionService = game:GetService("CollectionService")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local AmbientBudget = require(ReplicatedStorage:WaitForChild("RoshamboShared"):WaitForChild("AmbientBudget"))
+local AmbientConfig = require(script.Parent:WaitForChild("AmbientConfig"))
 
 local TAG = "ChochinSwing"
 local AMP = math.rad(3.2) -- peak sway angle
@@ -13,45 +18,40 @@ local SPEED = 0.9 -- base angular frequency (rad/s) — period ~7s
 type Entry = { model: Model, base: CFrame, phase: number, amp: number, speed: number }
 local entries: { Entry } = {}
 
--- ⚠ THE HANG POINT IS DERIVED FROM THE CROSS-ARM, NOT READ FROM THE STORED PIVOT.
+-- ⚠ POLE-HUNG CHŌCHIN DO NOT SWAY (owner ruling, 2026-09-03). Measured, the effect was ~1.5 inches
+-- of travel on a two-foot lantern over a seven-second cycle: legible at arm's length, under a pixel
+-- past thirty feet, and a path is exactly where the player is moving. The path population is also
+-- the large one (PathLanterns is 2,599 descendants). The teahouse and hanabiya chōchin -- seen from
+-- a standstill on an engawa or in a doorway -- keep theirs.
 --
--- `buildChochinPole` sets `swing.WorldPivot` to the hang point when it stamps a lantern, and that
--- was trusted here. But the pivot is PLACE DATA and the geometry is BUILDER data, so the two drift
--- the moment the builder changes: the poles were shortened (`armY = base.Y + poleH - 0.5`) and
--- every already-stamped lantern kept the pivot the taller pole had given it -- 3.4 studs up in the
--- air. They then swung about a point ABOVE the crosspiece instead of hanging from it, which at
--- AMP reads as the chochin floating a couple of inches off the end of the arm.
+-- A `CrossArm` sibling IS the discriminator: buildChochinPole stamps one, the teahouse and hanabiya
+-- builders do not.
 --
--- Deriving it from the sibling `CrossArm` makes that class of drift impossible: the arm IS what
--- the lantern hangs from, so a resize moves both together by construction. Falls back to the
--- stored pivot when there is no arm -- the teahouse and hanabiya chochin hang differently.
-local function hangPointFor(m: Model): CFrame?
-    local arm = m.Parent and m.Parent:FindFirstChild("CrossArm")
-    if not (arm and arm:IsA("BasePart")) then
-        return nil
+-- HISTORY, so nobody re-derives the bug if sway ever comes back to the poles: this used to derive
+-- the hang point from the cross-arm rather than trust the stored WorldPivot, because the pivot is
+-- place data and the geometry is builder data. When the poles were shortened, every already-stamped
+-- lantern kept the taller pole's pivot and swung about a point 3.4 studs up in the air. That
+-- derivation is gone with the sway it served; it is in git if it is ever needed again.
+local function isPoleHung(m: Model): boolean
+    local parent = m.Parent
+    if parent == nil then
+        return false
     end
-    local centre = m:GetBoundingBox().Position
-    -- the cross-arm's long axis is local X; the lantern hangs from whichever end it sits under
-    local a = (arm.CFrame * CFrame.new(arm.Size.X / 2, 0, 0)).Position
-    local b = (arm.CFrame * CFrame.new(-arm.Size.X / 2, 0, 0)).Position
-    local far = if (a - centre).Magnitude < (b - centre).Magnitude then a else b
-    return CFrame.new(far)
+    local arm = parent:FindFirstChild("CrossArm")
+    return if arm then arm:IsA("BasePart") else false
 end
 
 local function add(m: Instance)
     if not m:IsA("Model") then
         return
     end
+    if isPoleHung(m) then
+        return -- path poles never sway; see isPoleHung
+    end
     for _, e in entries do
         if e.model == m then
             return
         end
-    end
-    -- Setting WorldPivot does NOT move geometry -- it only says what the model turns about, which
-    -- is exactly what the PivotTo below needs to be right.
-    local derived = hangPointFor(m)
-    if derived then
-        m.WorldPivot = derived
     end
     local base = m:GetPivot()
     local p = base.Position
@@ -78,9 +78,33 @@ CollectionService:GetInstanceRemovedSignal(TAG):Connect(function(m)
     end
 end)
 
-RunService.Heartbeat:Connect(function()
+local acc = 0
+RunService.Heartbeat:Connect(function(dt: number)
+    local c = AmbientConfig.get()
+    local fire, nextAcc = AmbientBudget.step(acc, dt, c.interval)
+    acc = nextAcc
+    if not fire then
+        return
+    end
+    local cam = workspace.CurrentCamera
+    if cam == nil then
+        return
+    end
+    local camCF = cam.CFrame
+    local camPos, look = camCF.Position, camCF.LookVector
     local t = os.clock()
     for _, e in entries do
+        local d = e.base.Position - camPos
+        local distSq = d.X * d.X + d.Y * d.Y + d.Z * d.Z
+        if not AmbientBudget.inRange(distSq, c) then
+            continue
+        end
+        -- sqrt only for what survived the range test; see AmbientBudget.inRange
+        local dist = math.sqrt(distSq)
+        local fdot = if dist > 1e-3 then (d.X * look.X + d.Y * look.Y + d.Z * look.Z) / dist else 1
+        if not AmbientBudget.inView(fdot, c) then
+            continue
+        end
         local a = e.amp * math.sin(t * e.speed + e.phase)
         local b = e.amp * 0.45 * math.sin(t * e.speed * 0.7 + e.phase * 1.3) -- subtle cross-axis drift
         e.model:PivotTo(e.base * CFrame.Angles(a, 0, b))

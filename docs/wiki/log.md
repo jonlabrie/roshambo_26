@@ -3076,11 +3076,17 @@ registry in agreement. Neither holds — `OWNER_AUTHORED` is `{COLORMAP_AUTHORIT
 entry is *"what made the guard refuse the very export the authored blend exists to produce"*. The
 symbol the lint could see was fixed; the sentence around it was not.
 
-⚠ **`world/fireworks.md` CITED AN SDD LEDGER THAT WAS NEVER CREATED** —
-`.superpowers/sdd/2026-09-04-deck-mortars/` does not exist, and no 2026-09 ledger does. The
-markdown under `.superpowers/sdd/` is tracked (the bare `*` ignore was narrowed 2026-08-27), so
-this is an absent ledger rather than an invisible one: the same shape as item 5's missing shoji
-ledger on [[friends-family-baseline]]. Recorded as absent rather than quietly dropped.
+⚠ **`world/fireworks.md` CITED AN SDD LEDGER THAT RESOLVED NOWHERE** —
+`.superpowers/sdd/2026-09-04-deck-mortars/` was not in the tree, and no 2026-09 ledger was.
+⚠ **AND THE DIAGNOSIS WRITTEN HERE WAS WRONG, which is worth keeping.** This entry first
+concluded the ledger was *absent* rather than *invisible*, reasoning that the markdown under
+`.superpowers/sdd/` is tracked because the bare `*` ignore had been narrowed on 2026-08-27. That
+inference was sound and the premise had expired: 2026-09-04 found the cause (schema rule 4) — the
+SDD tooling's `sdd-workspace` script ends by rewriting that same `.gitignore` back to a bare `*`,
+and `review-package` and `task-brief` both call it, so it is clobbered dozens of times per run.
+The ledgers existed all along and were being un-tracked underneath. **A premise verified once is
+not verified forever**, and the check that would have caught it — `git status` on that file —
+costs nothing. `8aeef2a5` then committed both ledgers; the citations are restored.
 
 **Also corrected on `familiars`:** a transcribed **326** perches forty lines above the page's own
 instruction to count them (rule 9); the wingspan carried as `⚠ unverified` in two places after a
@@ -3221,9 +3227,11 @@ not a missing vocabulary at all.
 - **Mechanical:** the lint could accept `-ed`/`-d` forms of the eight defined kinds as aliases.
   `gated`, `shipped`, `reverted` and `fixed` all resolve unambiguously; that alone would have
   prevented 16 of the 22.
-- **A real gap:** `fix` and `correction` name events with no defined home. `fix` was mapped to
-  `defect` and `correction` to `audit`, both approximations — a retraction of a wrong wiki claim is
-  a first-class event here and rule 8 cannot say it.
+- **A real gap, and it is not tense-shaped:** `fix`, `correction` and `perf` name events with no
+  defined home. `fix` was mapped to `defect`, `correction` to `audit` and `perf` to `ship`, all
+  approximations — a retraction of a wrong wiki claim and a pure performance change are both
+  first-class events here, and rule 8 cannot say either. These are the ones an alias rule would
+  NOT catch.
 
 ⚠ **Normalising by hand every run is not a fix, it is a tax**, and it is the third such pass in a
 week. Whoever owns the schema should either alias the tenses in `LOG_KINDS` or state the required
@@ -3882,3 +3890,71 @@ pushing session looked at CI. Fixed in `b6ddb1a`: the layout constant moved to 7
 JSON is generator output again. Standing rule recorded on [[rojo-and-place]]:
 `assets/*.model.json` is never hand-edited, and a push is not done until its CI run is
 seen green.
+
+## [2026-09-04] decision | Synthetic crowd spec approved -- tally crowd in the engine, offline sim, three calls taken
+
+Spec `docs/superpowers/specs/2026-09-04-synthetic-crowd-design.md`. Owner: "yes to those
+three": (1) `totalPlayers` counts the world, with a new `Round.synthetic` field so humans stay
+recoverable; (2) the Q1 "is crowd-reading fun?" threshold is 45% BEAT WORLD over ~20 owner
+rounds, pre-registered; (3) once the sim lands a readable mix, dev runs `TEST_MODE=false` with
+a 30-bot crowd permanently, prod untouched. Bots merge into the tally inside `RoundEngine` at
+LOCK→REVEAL (not in `pickWorldThrow`, which would leave the reveal's distribution disagreeing
+with the throw) and never enter the throws map, so settlement and presence stay human-only by
+construction. Plan to follow.
+
+## [2026-09-04] ship | Client stops animating what nobody can see — phase 1, no visual change
+
+Plan `docs/superpowers/plans/2026-09-03-client-load-reduction.md` from spec
+`docs/superpowers/specs/2026-09-03-client-load-reduction-design.md`, executed
+subagent-driven: 11 commits `68a025c`..`46c8a2e`, 1847 Lune tests (three new).
+
+THE REFRAME THAT MADE IT PHASE 1. The parked "Low-end device tier" backlog item assumed
+the wins came from tiering. A survey of every client loop found otherwise: the largest
+continuous costs were unconditional. `ChochinSway` pivoted **every tagged lantern in the
+map every frame** with no distance or visibility check (PathLanterns alone is 2,599
+descendants); `NorenSway` walked every panel's segment chain the same way; Hammer and
+Wheel ran stacked Heartbeats of CFrame math regardless of where the camera pointed. None
+of it checked whether the player could see it. So phase 1 admits only changes with **no
+visual difference on any device** — the owner's ruling — and the device tier keeps its own
+spec.
+
+- New pure `AmbientBudget` (`inRange` takes distance SQUARED so the sqrt runs only for
+  survivors; `step` carries its remainder rather than zeroing, which is what stops a
+  nominal 30Hz sagging toward the frame rate). Client-side `AmbientConfig` holds the
+  live-tunable Workspace attributes, since those need the `workspace` global and
+  `AmbientBudget` must stay Lune-loadable.
+- **Path chōchin no longer sway at all** (owner ruling). Measured first: ~1.5 inches of
+  travel on a two-foot lantern over a seven-second cycle, legible at arm's length and
+  under a pixel past thirty feet. Teahouse and hanabiya chōchin keep theirs; the
+  discriminator (`CrossArm` sibling) already existed in the file.
+- Streaming radii are now **owned in code** (`StreamingTargetRadius = 512`). Nothing in
+  git had ever set them; the place ran on engine defaults.
+- ⚠ Teahouse `Persistent` INVESTIGATED AND DELIBERATELY LEFT (`d1d288b`, decision-rule
+  outcome 3). `PerchPreferenceController.attachToStructure` captures every site's
+  Structure anchor once with no retry path, so removing the flag opens a race. Two
+  corrections to our own assumptions: the cost is LARGER than believed (all 14 PadSites
+  use `vacantForm = "dormant-structure"`, so every pad builds a Structure whether claimed
+  or not — 14 persistent models per client, 13 of them dormant shells) and the scope
+  NARROWER (only the Structure carries the flag). The line has no recorded reason: present
+  since the file's first commit `0566689`, no comment. Unblocking it needs a retry in
+  PerchPreferenceController and a bay-level `ChildRemoved` in ShojiController — phase 2.
+
+THE DEFECT CLASS THIS WORK CREATES, twice, and worth naming: **state read by an ungated
+path but written only by a gated one.** `strike()` samples a dowel that only the
+now-gated `updateSuspension` maintains (fixed `e57f7e7`); and `updateSuspension` itself,
+throttled to 30Hz, was following a log driven by a display-rate TweenService tween during
+the swing, so the chains lagged up to 0.56 studs at the climax of every round (fixed
+`46c8a2e`, bypassing the throttle while `striking` but never the visibility gate). No test
+in this repo could have caught either — nothing here loads a `.client.luau`.
+
+Also from the final review: a radius chosen for two-foot lanterns (180) was culling the
+arena machinery, which sits 340–400 studs from the teahouse decks players watch fireworks
+from — so `AmbientConfig.arena()` now widens it separately, because one number cannot
+serve both a lantern and a landmark.
+
+⚠ **UNWALKED.** Nothing here has been seen running. `docs/superpowers/plans/2026-09-03-client-load-reduction.md`
+carries the walk list; the strike close-up and the far-deck view are the two that matter.
+
+Two tooling traps found along the way, both recorded: the SDD scripts clobber
+`.superpowers/sdd/.gitignore` on every invocation ([[schema]] rule 4) and
+`main.server.luau` is now at Luau's 200-local-register ceiling ([[misc-engine-traps]]).

@@ -142,6 +142,36 @@ for _, model in StagePersistence.persistTargets(persistRoots) do
     (model :: Model).ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 end
 
+-- STREAMING RADII, code-owned rather than left as place data. Nothing in git had ever set these and
+-- the place ran on the engine defaults (min 64, target 1024). The stage and the horizon backdrop are
+-- Persistent and unaffected; what tightens is the far canyon -- PathRailings (5,186 descendants),
+-- PathLanterns (2,599), foliage -- which is precisely the bulk a low-end phone is carrying.
+--
+-- ⚠ THE TARGET IS AN OWNER-TUNED NUMBER, not a computed one. The canyon has long sightlines and the
+-- failure mode is content popping in at the edge of view, which no test can see. Published as
+-- attributes so it can be turned during a walk; record what lands in docs/wiki/world/place-state.md.
+local STREAM_MIN, STREAM_TARGET = 64, 512
+do
+    -- Scoped to a `do` block (rather than two more file-scope locals) so their registers free up
+    -- for the rest of this 3,400+ line chunk once this check is done -- the file sits at the
+    -- Luau compiler's 200-local-register ceiling.
+    local streamOk, streamErr = pcall(function()
+        workspace.StreamingMinRadius = STREAM_MIN
+        workspace.StreamingTargetRadius = STREAM_TARGET
+    end)
+    if not streamOk then
+        -- Loud but NOT fatal. Every system below this line -- the round loop included -- boots
+        -- after it, so a throw here would take the whole game down with a symptom that points
+        -- nowhere near streaming. The likeliest cause is StreamingEnabled being off in the place,
+        -- which would contradict three separate code comments asserting it is on.
+        warn(`[STREAMING] could not set radii (is StreamingEnabled off?): {streamErr}`)
+    end
+end
+-- Attribute publishes stay outside the pcall so they still reflect what was attempted, whether
+-- or not the property writes above succeeded.
+workspace:SetAttribute("StreamMinRadius", STREAM_MIN)
+workspace:SetAttribute("StreamTargetRadius", STREAM_TARGET)
+
 -- Everyone arrives at ArenaSpawn: disable any other (place-only, e.g. leftover DevChannelSpawn)
 -- SpawnLocation, and make sure ArenaSpawn itself is enabled. Code-only + self-healing.
 for _, inst in workspace:GetDescendants() do
