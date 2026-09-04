@@ -155,9 +155,9 @@ world throw transitions (n=19999): same 42.2%  counter 51.9%  other 5.9%
 (a blind world is 33/33/33; "counter" high means the crowd rotates the way everyone-counters predicts)
 ```
 
-The `banked` and `max pot` figures for `second` and `oracle` are past 2^53 and are float
-approximations printed as digits, not exact counts — the ride-forever pot compounds without
-bound in the sim, so read those two rows as an order of magnitude and nothing finer.
+The `banked` and `max pot` figures for `counter` are past 2^53 and are float approximations
+printed as digits, not exact counts — a 52% SAFE rate lets its ratio-banked pot compound almost
+without bound in the sim, so read that row as an order of magnitude and nothing finer.
 
 Blind-field spread (`--experiment blind-spread --rounds 360 --seed 1`):
 
