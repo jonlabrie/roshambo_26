@@ -2,6 +2,7 @@
 // is config over commits (round durations, WORLD_THROW_MIN_PARTICIPANTS), so the crowd is a
 // service setting, not a deploy. Extracted from index.ts like testModeCycle.ts so it is testable.
 import { Mix, parseMix, DEFAULT_MIX } from './engine/SyntheticCrowd';
+import type { CrowdSource } from './engine/RoundEngine';
 
 export interface CrowdConfig {
     size: number;
@@ -46,4 +47,28 @@ export function readCrowdConfig(
         opts.log(`[CROWD] CROWD_SEED unset; using ${seed} (set CROWD_SEED=${seed} to reproduce this run)`);
     }
     return { size, mix, seed };
+}
+
+// A crowd that cannot take the server down with it. An exception inside throws() yields an
+// empty tally for that round; inside observe() it is swallowed. Either way one log line, and
+// the round proceeds as if no crowd were configured. The engine stays pure; the guard lives
+// where the crowd is composed.
+export function guardCrowd(crowd: CrowdSource, log: (msg: string) => void): CrowdSource {
+    return {
+        throws(roundCount) {
+            try {
+                return crowd.throws(roundCount);
+            } catch (err) {
+                log(`[CROWD] throws() failed on round ${roundCount}: ${(err as Error).message} — empty crowd this round`);
+                return { R: 0, P: 0, S: 0 };
+            }
+        },
+        observe(worldThrow) {
+            try {
+                crowd.observe(worldThrow);
+            } catch (err) {
+                log(`[CROWD] observe() failed: ${(err as Error).message}`);
+            }
+        },
+    };
 }

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { readCrowdConfig } from './crowdConfig';
+import { readCrowdConfig, guardCrowd } from './crowdConfig';
 import { DEFAULT_MIX } from './engine/SyntheticCrowd';
 
 const opts = (testMode = false) => ({ testMode, log: vi.fn(), randomSeed: () => 4242 });
@@ -54,5 +54,31 @@ describe('readCrowdConfig', () => {
         expect(readCrowdConfig({ CROWD_SIZE: '30' }, o)).toBeNull();
         expect(o.randomSeed).not.toHaveBeenCalled();
         expect(o.log).toHaveBeenCalledTimes(1);
+    });
+});
+
+describe('guardCrowd', () => {
+    it('passes calls through when the crowd behaves', () => {
+        const inner = { throws: vi.fn(() => ({ R: 1, P: 2, S: 3 })), observe: vi.fn() };
+        const log = vi.fn();
+        const g = guardCrowd(inner, log);
+        expect(g.throws(7)).toEqual({ R: 1, P: 2, S: 3 });
+        g.observe('P');
+        expect(inner.throws).toHaveBeenCalledWith(7);
+        expect(inner.observe).toHaveBeenCalledWith('P');
+        expect(log).not.toHaveBeenCalled();
+    });
+
+    it('a throwing crowd yields an empty tally and one log line, and observe() failures are swallowed', () => {
+        const inner = {
+            throws: vi.fn(() => { throw new Error('boom'); }),
+            observe: vi.fn(() => { throw new Error('bang'); }),
+        };
+        const log = vi.fn();
+        const g = guardCrowd(inner, log);
+        expect(g.throws(3)).toEqual({ R: 0, P: 0, S: 0 });
+        expect(() => g.observe('R')).not.toThrow();
+        expect(log).toHaveBeenCalledWith('[CROWD] throws() failed on round 3: boom — empty crowd this round');
+        expect(log).toHaveBeenCalledWith('[CROWD] observe() failed: bang');
     });
 });

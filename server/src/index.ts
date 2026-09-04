@@ -8,18 +8,38 @@ import Round from './models/Round';
 import authRouter from './routes/auth';
 import storeRouter from './routes/store';
 import { mountRoutes } from './routes/mount';
-import { RoundEngine } from './engine/RoundEngine';
+import { RoundEngine, CrowdSource, RoundClosedEvent } from './engine/RoundEngine';
 import { ResultsStore } from './engine/ResultsStore';
 import { attachSocketAdapter } from './transports/socketAdapter';
 import { Throw, deriveWorldThrow } from './engine/GameRules';
 import { closeStaleSessions, SESSION_HEARTBEAT_MS } from './sessions';
 import { testModePhaseShift } from './testModeCycle';
+import { readCrowdConfig, guardCrowd } from './crowdConfig';
+import { createCrowd, formatMix } from './engine/SyntheticCrowd';
+import { mulberry32, randomSeed } from './engine/Prng';
 
 dotenv.config();
 
 const TEST_MODE = process.env.TEST_MODE === 'true';
 const PORT = process.env.PORT || 3001;
 const MONGODB_URI = process.env.MONGODB_URI;
+
+// The synthetic crowd (spec §5). Refuses to boot on a malformed value, like MONGODB_URI does:
+// a crowd that silently fell back to defaults would run an experiment nobody configured.
+const crowdConfig = readCrowdConfig(process.env, {
+    testMode: TEST_MODE,
+    log: msg => console.warn(msg),
+    randomSeed,
+});
+const crowd: CrowdSource | undefined = crowdConfig
+    ? guardCrowd(
+        createCrowd({ size: crowdConfig.size, mix: crowdConfig.mix, rng: mulberry32(crowdConfig.seed) }),
+        msg => console.error(msg),
+    )
+    : undefined;
+console.log(crowdConfig
+    ? `[CROWD] on: size ${crowdConfig.size}, seed ${crowdConfig.seed}, mix ${formatMix(crowdConfig.mix)}`
+    : '[CROWD] off');
 
 // Presence heartbeats run at SESSION_HEARTBEAT_MS (sessions.ts) — a separate cadence from
 // the Roblox throw flush, which is 5s / 10 picks. Four missed heartbeats is long enough to
@@ -88,6 +108,7 @@ function makeEngine(initialRoundCount: number, testCycleShift = 0): RoundEngine 
             TEST_MODE
                 ? THROWS[(roundCount + testCycleShift) % 3]
                 : deriveWorldThrow(counts, { minParticipants: worldThrowMinParticipants }),
+        crowd,
         makeRoundId: () => Math.random().toString(36).substring(2, 9),
         nowMs: () => Date.now(),
     }, initialRoundCount);
@@ -118,6 +139,13 @@ mongoose.connect(MONGODB_URI, { serverSelectionTimeoutMS: 5000 })
         // newest-first fetch the tape seeds from.
         const cycleShift = TEST_MODE ? testModePhaseShift(lastRounds[0]?.worldThrow, totalRounds) : 0;
         const engine = makeEngine(totalRounds, cycleShift); // legacy roundCount continuity
+        if (crowd) {
+            // One line per round so a Studio session can read what the world did (spec §5).
+            engine.on('roundClosed', (e: RoundClosedEvent) => {
+                const bots = e.crowdCounts.R + e.crowdCounts.P + e.crowdCounts.S;
+                console.log(`[CROWD] round ${e.roundId} humans ${e.throws.size} crowd ${bots} | R ${e.counts.R} P ${e.counts.P} S ${e.counts.S} → ${e.worldThrow}`);
+            });
+        }
         // The '/api/v1' mounts, in the order they must be registered — see mountRoutes for
         // why that order is load-bearing. Extracted so the mount-order test binds to this
         // exact function instead of re-declaring the order alongside it.
