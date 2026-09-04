@@ -67,6 +67,15 @@ export type Config = {
 local PAD = 0.04
 local DEFAULT_STAGGER_MS = 60 -- matches FlapScheduler's own default
 
+-- The wall boards live in an enclosed room and are read from a few studs away; nothing outside the
+-- room can make out a flap. Without this they render from anywhere in the canyon -- ~8,400 GUI
+-- instances at roughly seven per cell, and the A13 measured this room as costing what the whole
+-- arena square costs (docs/wiki/world/stats-room.md, 2026-08-17).
+--
+-- FlapBoard's only caller is StatsController, which returns early for the round display, so this
+-- reaches the wall boards and cannot reach the cavern display.
+local BOARD_MAX_DISTANCE = 150
+
 local function toChars(str: string): { string }
     local out: { string } = {}
     for _, code in utf8.codes(str) do
@@ -176,6 +185,7 @@ local function buildFace(cfg: Config, faceEnum: Enum.NormalId): { { Cell } }
     gui.Face = faceEnum
     gui.SizingMode = Enum.SurfaceGuiSizingMode.FixedSize
     gui.CanvasSize = Vector2.new(cfg.metrics.canvasW, cfg.metrics.canvasH)
+    gui.MaxDistance = BOARD_MAX_DISTANCE
     gui.Parent = cfg.part
 
     -- Cumulative column layout. With uniform widths this reduces exactly to the old
