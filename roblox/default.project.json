@@ -86,7 +86,7 @@
                 "Chaya": { "$path": "assets/Chaya.model.json" },
                 "ArenaSpawn": {
                     "$className": "SpawnLocation",
-                    "$properties": { "Anchored": true, "Size": [8, 1, 8], "CFrame": [80, 113.8, 28, 0, 0, 1, 0, 1, 0, -1, 0, 0], "Neutral": true }
+                    "$properties": { "Anchored": true, "Size": [8, 1, 8], "CFrame": [74, 112.5, 24, 0, 0, 1, 0, 1, 0, -1, 0, 0], "Neutral": true }
                 }
             }
         },
