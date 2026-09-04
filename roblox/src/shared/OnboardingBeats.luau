@@ -64,7 +64,7 @@ OnboardingBeats.BEATS = {
     {
         id = "shopDoor",
         event = "bankDismissed",
-        copy = "You can buy fireworks with points. Follow the light to the Fireworks shop!",
+        copy = "You can buy fireworks with points. The Fireworks shop is highlighted for you!",
         anchor = "tour",
         advanceOn = "shellBought",
     },
