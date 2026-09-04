@@ -128,12 +128,15 @@ def draw_ring(img, spec, rng):
     cx, cy = CENTER
 
     def one_ring(radius, core, alpha):
-        glow(img, CENTER, core, radius * 1.06, 40)
+        # ON EDGE (owner, 2026-09-03): the ring drawn as a perspective ellipse, so wa
+        # reads as its own species next to the radial family.
+        squash = 0.40
+        glow(img, CENTER, core, radius * 0.8, 40)
         n = 64
         for i in range(n):
             a = 2 * math.pi * i / n + rng.uniform(-0.015, 0.015)
-            r = radius * rng.uniform(0.97, 1.03)
-            x, y = cx + math.cos(a) * r, cy + math.sin(a) * r
+            r = radius * rng.uniform(0.98, 1.02)
+            x, y = cx + math.cos(a) * r, cy + math.sin(a) * r * squash
             sz = rng.uniform(2.2, 3.4)
             d.ellipse([x - sz, y - sz, x + sz, y + sz], fill=core + (alpha,))
             d.ellipse([x - sz * 0.45, y - sz * 0.45, x + sz * 0.45, y + sz * 0.45], fill=spec["edge"] + (alpha,))
@@ -150,26 +153,37 @@ def draw_palm(img, spec, rng):
     core, edge = spec["core"], spec["edge"]
     glow(img, CENTER, core, 90, 70)
     n = spec.get("points", 4)
-    length = 40 + spec["spread"] * 3.2
+    # Owner correction (2026-09-03): "four clusters growing from the ends of those arms" —
+    # the arm is a short stem; the SHOW is the cluster at its end.
+    length = (40 + spec["spread"] * 3.2) * 0.55
     for i in range(n):
         theta = -math.pi / 2 + (i - (n - 1) / 2) * (2 * math.pi / (n + 1.6)) + rng.uniform(-0.06, 0.06)
-        samples = 30
+        samples = 16
         prev = None
         for sN in range(samples + 1):
             t = sN / samples
             r = length * t
             x = cx + math.cos(theta) * r
-            y = cy + math.sin(theta) * r + (t**2) * length * 0.85  # heavy fall: the palm's rain
+            y = cy + math.sin(theta) * r + (t**2) * length * 0.5
             color = lerp(core, edge, t)
-            width = 6.5 * (1 - t) + 1.6
+            width = 3.6 * (1 - t) + 1.2
             if prev:
-                d.line([prev, (x, y)], fill=color + (240,), width=int(round(width)))
+                d.line([prev, (x, y)], fill=color + (225,), width=int(round(width)))
             prev = (x, y)
         tx, ty = prev
-        for _ in range(7):  # rain strands off each arm tip
-            ra = rng.uniform(-0.35, 0.35)
-            rl = rng.uniform(18, 46)
-            d.line([(tx, ty), (tx + math.sin(ra) * 8, ty + rl)], fill=edge + (150,), width=1)
+        # the cluster: a mini golden break growing from the arm's end, then its rain
+        glow(img, (tx, ty), core, 34, 70)
+        for j in range(16):
+            ca = 2 * math.pi * j / 16 + rng.uniform(-0.06, 0.06)
+            cl = rng.uniform(22, 40)
+            ex, ey = tx + math.cos(ca) * cl, ty + math.sin(ca) * cl * 0.9 + cl * 0.25
+            d.line([(tx, ty), (ex, ey)], fill=lerp(core, edge, 0.5) + (235,), width=2)
+            d.ellipse([ex - 1.6, ey - 1.6, ex + 1.6, ey + 1.6], fill=edge + (255,))
+        for _ in range(9):  # rain strands falling from the cluster
+            ra = rng.uniform(-0.4, 0.4)
+            rl = rng.uniform(26, 56)
+            sx = tx + rng.uniform(-14, 14)
+            d.line([(sx, ty + 6), (sx + math.sin(ra) * 10, ty + 6 + rl)], fill=edge + (140,), width=1)
 
 
 def draw_crown(img, spec, rng):
@@ -245,18 +259,29 @@ def draw_salute(img, spec, rng):
         draw_flash(img, pos, rng.uniform(22, 34), spec["core"], spec["edge"], rng)
 
 
-def draw_glyph_marks(d, pos, kind, size, color):
+def draw_glyph_marks(d, pos, kind, k, color, alpha=255):
+    """The APPROVED marks, at the canonical proportions from src/components/Symbols.tsx
+    (24-unit box): R = circle r8; P = round-capped bar x 5..19; S = the SHALLOW caret
+    (6,15)-(12,9)-(18,15) — twice as wide as tall — with round caps and joins. Never an
+    ad-hoc shape (owner, 2026-09-03: "always use approved RPS glyphs"). k = px per unit."""
     x, y = pos
-    wline = max(3, int(size * 0.16))
-    if kind == "R":  # the ring: annulus
-        d.ellipse([x - size, y - size, x + size, y + size], outline=color + (255,), width=wline)
-    elif kind == "P":  # the bar: round-capped horizontal
-        d.line([(x - size, y), (x + size, y)], fill=color + (255,), width=wline)
-        for ex in (-size, size):
-            d.ellipse([x + ex - wline / 2, y - wline / 2, x + ex + wline / 2, y + wline / 2], fill=color + (255,))
-    else:  # the caret
-        for sx in (-1, 1):
-            d.line([(x, y - size * 0.8), (x + sx * size * 0.85, y + size * 0.8)], fill=color + (255,), width=wline)
+    w = max(2, int(round(2.5 * k)))
+    if kind == "R":
+        r = 8 * k
+        d.ellipse([x - r, y - r, x + r, y + r], outline=color + (alpha,), width=w)
+    elif kind == "P":
+        x0, x1 = x - 7 * k, x + 7 * k
+        d.line([(x0, y), (x1, y)], fill=color + (alpha,), width=w)
+        for ex in (x0, x1):
+            d.ellipse([ex - w / 2, y - w / 2, ex + w / 2, y + w / 2], fill=color + (alpha,))
+    else:
+        p1 = (x - 6 * k, y + 3 * k)
+        apex = (x, y - 3 * k)
+        p2 = (x + 6 * k, y + 3 * k)
+        d.line([p1, apex], fill=color + (alpha,), width=w)
+        d.line([apex, p2], fill=color + (alpha,), width=w)
+        for pt in (p1, apex, p2):  # round caps + fused joint, as the SDF renders them
+            d.ellipse([pt[0] - w / 2, pt[1] - w / 2, pt[0] + w / 2, pt[1] + w / 2], fill=color + (alpha,))
 
 
 def draw_glyph(img, spec, rng):
@@ -279,25 +304,19 @@ def draw_glyph(img, spec, rng):
                 fill=c + (95,),
                 width=2,
             )
-    # the glyph bloom: three arms at 120deg, one dealt color, canonical marks at the tips
-    bloom = deck[2]  # blue reads best on the dusk ground; the sky deals per shell, the poster picks one
-    length = 40 + spec["spread"] * 3.0
-    spin = rng.uniform(0, 2 * math.pi)
-    glow(img, CENTER, bloom, 80, 70)
-    for i, mark in enumerate(("R", "P", "S")):
-        theta = spin + i * 2 * math.pi / 3
-        samples = 24
-        prev = None
-        for sN in range(samples + 1):
-            t = sN / samples
-            r = length * t
-            x = cx + math.cos(theta) * r
-            y = cy + math.sin(theta) * r + (t**2) * length * 0.30
-            width = 5.0 * (1 - t) + 1.4
-            if prev:
-                d.line([prev, (x, y)], fill=lerp(bloom, spec["edge"], t * 0.5) + (235,), width=int(round(width)))
-            prev = (x, y)
-        draw_glyph_marks(d, prev, mark, 20, bloom)
+    # the glyph cascade (owner, 2026-09-03, replacing the arm spread: "a few smaller
+    # glyphs of each style cascading down between the other bursts"). One dealt color,
+    # as the sky deals the whole bloom; three of each mark, falling and fading.
+    bloom = deck[2]
+    glow(img, CENTER, bloom, 70, 55)
+    marks = ["R", "P", "S", "P", "S", "R", "S", "R", "P"]
+    for i, mark in enumerate(marks):
+        t = i / (len(marks) - 1)
+        x = cx + rng.uniform(-110, 110)
+        y = cy + 30 + t * 200 + rng.uniform(-14, 14)  # starts below the peony band
+        k = 2.3 - 1.0 * t  # smaller as they fall
+        alpha = int(255 - 110 * t)  # and fading out under the sizzle
+        draw_glyph_marks(d, (x, y), mark, k, bloom, alpha)
 
 
 def draw_rocket(img, spec, rng):
