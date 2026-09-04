@@ -1,0 +1,13 @@
+# effective-n  rounds=5000 crowd=30 strength=0.7 seed=1
+# mix random:20,wsls:30,counter:10,conform:30,rocky:10
+
+crowd   counter BEAT WORLD   ±95%
+    5                13.5%   0.9%
+    7                27.1%   1.2%
+   10                35.8%   1.3%
+   15                28.2%   1.2%
+   20                39.7%   1.4%
+   30                44.4%   1.4%
+   50                48.2%   1.4%
+  100                51.7%   1.4%
+(where the rate stops moving, the human's own throw has stopped moving the plurality)
