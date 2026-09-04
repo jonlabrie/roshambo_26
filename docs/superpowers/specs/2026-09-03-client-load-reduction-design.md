@@ -208,18 +208,38 @@ lanterns are off-camera almost all the time.
 
 ### 3.5 `ShopController.client.luau:434` and `AccessGateController.client.luau:92`
 
-Convert both per-frame proximity `Heartbeat`s to the 0.25 s poll
-`TourBeamController.client.luau:102` already uses. At walking speed the
-difference is imperceptible, and `AccessGateController`'s fade already
-interpolates independently of the test rate.
+`ShopController` converts wholesale to the 0.25 s poll
+`TourBeamController.client.luau:102` already uses: its loop is a pure
+inside/outside test with a state change, nothing interpolates, and at walking
+speed the difference is imperceptible.
 
-### 3.6 `AuraController.client.luau:363`
+⚠ **`AccessGateController` must NOT convert wholesale**, contrary to an earlier
+draft of this section. Its fade is frame-rate coupled —
+`pad.alpha += (target - pad.alpha) * math.clamp(dt * FADE_RATE, 0, 1)` at
+`:115` — so polling the whole body at 4 Hz would turn a smooth reveal into four
+visible steps a second, which is a visual regression and therefore out of scope
+by this spec's own scope ruling. Split it instead: the O(pads) planar distance
+test runs on the accumulator, the cached `near` result drives collision and the
+fade target, and **the fade itself keeps running every frame** on the real
+frame `dt`. The win is smaller and it is the only correct version.
 
-Wire the simultaneous-glow cap the file's own comment anticipates but never
-implemented ("too many players glow at once on a phone"). Cap the number of
-enabled `Highlight`s, preferring the nearest; the rest keep their row and get no
-highlight. This changes nothing on a normally-populated server and bounds the
-worst case.
+### 3.6 `AuraController.client.luau:363` — dropped from phase 1
+
+An earlier draft had this file wiring the simultaneous-glow cap its own comment
+anticipates. It is dropped, for two reasons that only surfaced on reading it:
+
+- **A cap is a visible change.** Players above the cap stop glowing, and the
+  aura is a status display other players read. That fails this spec's scope
+  ruling, which admits only changes with no visual difference on any device.
+- **The file already declines to invent the number, deliberately.** Its comment
+  at `:354-358` says the policy "is the owner's to set, and inventing one here
+  would be inventing a moment nobody asked for", and that the triggering number
+  is unmeasured. Overriding a documented refusal to guess, in order to save
+  frames the loop mostly does not spend, is the wrong trade.
+
+The loop is already self-gating — it re-applies only rows whose `Highlight` is
+enabled and does nothing when the arena is dark. It stays as it is, and the cap
+goes to phase 2 where it belongs, with a number the owner sets.
 
 ### 3.7 Explicitly not touched
 
@@ -285,10 +305,13 @@ seven GUI instances (`FlapBoard.luau:215-218`) and the room holds roughly 8,400;
 none of them are legible from outside the room, and today none of them stop
 rendering.
 
-Per board class, not one global number: the vestibule `fuda` and the three wall
-boards are read from within a few studs, while the cavern round display is read
-from across the cavern and needs a value that reaches. `StatusBarController.client.luau:49-50`
-is the in-repo precedent for the property.
+**The board-class split already exists and needs no new parameter.**
+`StatsController.client.luau:257` returns early for `isRoundDisplay(id)`, so the
+cavern round display never goes through `FlapBoard` at all — `StatsController`
+is `FlapBoard`'s only caller. A single default set once in
+`FlapBoard.buildFace` therefore reaches exactly the in-room wall boards and
+cannot touch the round display. `StatusBarController.client.luau:49-50` is the
+in-repo precedent for the property.
 
 ## 5. Risks
 
@@ -330,7 +353,8 @@ is the in-repo precedent for the property.
    biggest win, and the simplest proof the module is shaped right.
 3. `WheelController` (integration preserved), then `HammerController` (the
    split).
-4. `ShopController`, `AccessGateController`, `AuraController`.
+4. `ShopController` (full poll) and `AccessGateController` (split — fade stays
+   per-frame).
 5. Streaming radii, published as attributes.
 6. Stats-room `MaxDistance`.
 7. Teahouse persistence investigation, own commit, per §4.2's rule.
