@@ -142,6 +142,20 @@ for _, model in StagePersistence.persistTargets(persistRoots) do
     (model :: Model).ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 end
 
+-- STREAMING RADII, code-owned rather than left as place data. Nothing in git had ever set these and
+-- the place ran on the engine defaults (min 64, target 1024). The stage and the horizon backdrop are
+-- Persistent and unaffected; what tightens is the far canyon -- PathRailings (5,186 descendants),
+-- PathLanterns (2,599), foliage -- which is precisely the bulk a low-end phone is carrying.
+--
+-- ⚠ THE TARGET IS AN OWNER-TUNED NUMBER, not a computed one. The canyon has long sightlines and the
+-- failure mode is content popping in at the edge of view, which no test can see. Published as
+-- attributes so it can be turned during a walk; record what lands in docs/wiki/world/place-state.md.
+local STREAM_MIN, STREAM_TARGET = 64, 512
+workspace.StreamingMinRadius = STREAM_MIN
+workspace.StreamingTargetRadius = STREAM_TARGET
+workspace:SetAttribute("StreamMinRadius", STREAM_MIN)
+workspace:SetAttribute("StreamTargetRadius", STREAM_TARGET)
+
 -- Everyone arrives at ArenaSpawn: disable any other (place-only, e.g. leftover DevChannelSpawn)
 -- SpawnLocation, and make sure ArenaSpawn itself is enabled. Code-only + self-healing.
 for _, inst in workspace:GetDescendants() do
