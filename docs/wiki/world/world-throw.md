@@ -126,7 +126,10 @@ archetypes is the other dial. ⚠ **A hypothesis about a Roblox crowd, not a mea
 recalibration path is the persisted `Round.distribution` minus the synthetic share (spec §8).
 
 **Config** — `CROWD_SIZE` (0 = off), `CROWD_MIX` (`id:weight,…`), `CROWD_SEED`. Malformed
-values refuse to boot. `CROWD_SIZE` under `TEST_MODE=true` is ignored with a warning. Read the
+values refuse to boot. `CROWD_SIZE` under `TEST_MODE=true` is ignored with a warning. A
+malformed `CROWD_MIX` or `CROWD_SEED` refuses to boot in **every** mode, `TEST_MODE` included —
+so a typo cannot wait for flip day — except when the crowd is switched off outright, which is
+`CROWD_SIZE` of zero and skips parsing entirely (ruling 2026-09-04). Read the
 defaults from `DEFAULT_MIX` / `DEFAULT_STRENGTH` in `server/src/engine/SyntheticCrowd.ts`
 rather than from here.
 
@@ -151,6 +154,10 @@ oracle         56.5%   0.7%   26.9%   16.6% 22876792454961 2541865828329
 world throw transitions (n=19999): same 42.2%  counter 51.9%  other 5.9%
 (a blind world is 33/33/33; "counter" high means the crowd rotates the way everyone-counters predicts)
 ```
+
+The `banked` and `max pot` figures for `second` and `oracle` are past 2^53 and are float
+approximations printed as digits, not exact counts — the ride-forever pot compounds without
+bound in the sim, so read those two rows as an order of magnitude and nothing finer.
 
 Blind-field spread (`--experiment blind-spread --rounds 360 --seed 1`):
 
@@ -204,3 +211,10 @@ teachable rule (`second`, counter-the-counter) runs 51.4–52.4% across them, an
 default crowd with the last-five HUD; **≥ 45% BEAT WORLD** reads as "crowd-reading is a skill
 here"; a rate down in the blind band (29–34%, above) means the crowd is too noisy or the HUD
 shows the wrong thing. Result: not yet run.
+
+Read a ~42% result as progress, not failure. At the settled mix the naive HUD reading —
+`counter`, throw what beats the last World Throw — scores ~42.2%, just under the 45% line; the
+rule that clears it is `second`, throw what the last World Throw *beat*, i.e. counter the
+counter. A first-time human will almost certainly try `counter` first, so ~42% means they found
+the first rule and not yet the second, and the question Q1 actually asks is whether the second
+one is findable.
