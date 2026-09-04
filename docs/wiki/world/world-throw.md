@@ -204,6 +204,44 @@ crowd   counter BEAT WORLD   ±95%
 for crowd 30 — a bigger crowd is the same crowd with less of the human's own vote diluting the
 plurality. If `CROWD_SIZE` ever moves well above 30, re-run this and re-tune.
 
+**Crowd presets — a living table** (started 2026-09-04, owner request; extend it as presets
+are discovered, never prune a measured row). Every row is `CROWD_SIZE=30` at strength 0.7
+unless stated, measured by the simulator at 20000 rounds, seed 1, **each rule alone** in the
+tally, whole percentages. The transitions column is also `counter`'s fate in disguise: *same*
+is a `counter` WIN, *forward* a SAFE, *backward* a LOSS — so *backward* is the winning rule's
+loss rate, the number that decides whether banking ever feels necessary. To add a row:
+
+```bash
+cd server && npm run sim -- --rounds 20000 --seed 1 --mix <id:weight,…> [--strength p]
+```
+
+| preset | `CROWD_MIX` (or setting) | world: same / forward / backward | best rule → BEAT WORLD | blind | oracle | feel |
+|---|---|---|---|---|---|---|
+| off | `CROWD_SIZE=0` | random below 5 humans | none | 33% | — | blind world until five humans are in |
+| cycle (prod) | `TEST_MODE=true` (crowd ignored) | 0 / 100 / 0 | `second` 100% | — | — | not a crowd: the R→P→S demo; `counter` is SAFE forever |
+| pure random | `random:1` | 33 / 33 / 34 | none, all ~29% | 29% | 29% | the null; a plurality of noise |
+| pure rocky | `rocky:1` | 34 / 33 / 34 | none, all ~29% | 29% | 44% | blind to every rule; only the oracle sees the rock lean |
+| pure conform | `conform:1` | 100 / 0 / 0 | `counter` 100% | 33% | 100% | frozen world |
+| pure counter | `counter:1` | 0 / 100 / 0 | `second` 100% | 33% | 100% | metronome, forward |
+| pure wsls | `wsls:1` | 0 / 85 / 15 | `second` 80% | 31% | 80% | metronome with a stutter — the lose-shift is clockwise |
+| pre-tuning hypothesis | `wsls:35,counter:20,conform:15,rocky:10,random:20` | 9 / 84 / 7 | `second` 82% | 31% | 82% | metronome; `counter` punished at 5% |
+| first settled | `wsls:30,counter:10,conform:30,rocky:10,random:20` | 51 / 43 / 6 | `counter` 44% | 30% | 56% | contested: `counter` 44 vs `second` 42, neither clears 45 |
+| **default (dev)** | unset = `wsls:30,counter:10,conform:35,rocky:10,random:15` | 57 / 39 / 4 | `counter` 50% | 30% | 57% | sticky; readable by round ten; `counter` loses ~4% |
+| wsls-heavy, noise-light | `wsls:35,counter:10,conform:30,rocky:10,random:15` | 48 / 46 / 6 | `second` 44% | 30% | 58% | balanced; `counter` 41, `second` 44, neither clears 45 |
+| rotating | `wsls:30,counter:15,conform:30,rocky:10,random:15` | 46 / 49 / 5 | `second` 48% | 30% | 57% | rewards the second-order read; `counter` 38 |
+| wsls-heavy, conform-light | `wsls:35,counter:10,conform:25,rocky:10,random:20` | 33 / 57 / 9 | `second` 55% | 30% | 58% | rotating; `counter` 27; highest backward rate of any mix here |
+| strong rotation | `wsls:30,counter:15,conform:25,rocky:10,random:20` | 29 / 65 / 6 | `second` 62% | 30% | 63% | over the ~60% ceiling |
+| default @ strength 0.5 | *sim only* (`--strength 0.5`; no env var) | 52 / 39 / 9 | `counter` 46% | 29% | 49% | nearly solved by one rule (oracle 3 pts up) but `counter` loses ~9% |
+| default @ strength 0.8 | *sim only* | 52 / 43 / 4 | `counter` 46% | 30% | 63% | just over the floor; seeds 1–3 gave 45.7–46.2 |
+| default @ strength 0.85 | *sim only* | 59 / 39 / 2 | `counter` 53% | 30% | 67% | stickier still; `counter` almost never loses |
+
+Two levers the table makes visible. **Strength is the loss-rate dial**: lowering it adds
+backward rotations (0.85 → 2%, 0.7 → 4%, 0.5 → 9%) without moving the blind row, and it has no
+env var yet — `DEFAULT_STRENGTH` in `server/src/engine/SyntheticCrowd.ts` is code-only, so a
+`CROWD_STRENGTH` variable is the first thing to add if Q1 says banking feels unnecessary.
+**`conform` vs `counter` weight is the sticky-vs-rotating dial**: it decides which of the two
+teachable rules the crowd rewards, and the pure rows show the extremes.
+
 **How the mix was settled, and against which targets.** Pre-registered before tuning (spec §2,
 bands as amended in the build ledger): the best simple, teachable rule beats the crowd at
 **45–60%** BEAT WORLD, nothing non-oracle exceeds ~60%, and a blind human sits in **29–34%**. At
