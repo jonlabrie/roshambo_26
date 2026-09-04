@@ -150,8 +150,11 @@ that is a live fact, so step 1's query is the answer, not this line.
 4. Verify from the service logs (CloudWatch, application log group for the service): the boot
    prints `[CROWD] on: size 30, seed …, mix …` and `world throw: crowd plurality, min 5
    participants`, then one `[CROWD] round …` line per minute.
-5. Record the flip on `docs/wiki/log.md` and update the "live fact" lines on this page and on
-   [[world-throw]].
+5. Record the flip on `docs/wiki/log.md`, then correct every page that says the rule is not live
+   — there are **four**, and all four are true until this step and false the moment the flip lands:
+   the "live fact" lines on this page and on [[world-throw]], the closing paragraph of item (h) on
+   [[parked-defects]] ("deliberately NOT active in any deployed environment yet"), and the
+   Architecture paragraph in `CLAUDE.md` ("BOTH prod and dev run `TEST_MODE`…").
 
 To turn it back off, set `CROWD_SIZE` to `"0"` (and `TEST_MODE` back to `"true"` if the
 deterministic demo is wanted) by the same round-trip.
