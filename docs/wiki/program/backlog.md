@@ -531,6 +531,24 @@ the same session: launch stop = a NEW 4th public site at the **FW11 Switchback D
 (with a `FireworkTubeMount` rack), model pad = **T13** (owner stood on it), hanabiya
 stays the shop stop for the demo.
 
+## Onboarding: replayable journey + teahouse/stats beats (owner, 2026-09-03, banked mid-cold-walk)
+
+Two extensions the owner named while walking the journey cold:
+
+1. **Optional reset/re-run of the onboarding path** — "an option we'd place somewhere on
+   a config screen." Mechanically cheap on the surface (clear the profile's `seenBeats`
+   and the tour re-derives from empty — TourGuide has no state of its own), but it needs
+   a config-screen HOME first (no settings surface exists in the Roblox client today) and
+   a ruling on what reset does NOT touch (points/property stay; the starter prompt won't
+   re-offer to an owner, so a replayed tour ends on a pitch the player can't buy —
+   acceptable? copy fork?).
+2. **The journey never teaches the teahouse panel or the stats surfaces** — no beat
+   covers the ledger/stats dialogs or the teahouse management panel (B3), so those ship
+   as discovered-not-taught. New beats need their trigger moments chosen (first panel
+   open? first pad claim?) and kid-clean copy — a copy-workshop item, owner+Claude.
+
+Both queued behind the demo; neither blocks the walk.
+
 ## Rack-as-shop at the Switchback Deck (banked 2026-09-03)
 
 Owner direction, deferred past the F&F demo by the owner's own "hanabiya for the

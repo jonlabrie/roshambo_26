@@ -810,7 +810,23 @@ end)
 -- server actually consumed (a refused launch echoes an unchanged count). nil until the first
 -- echo lands: the first FireworkState is a BASELINE, never an edge, so a returning player
 -- holding shells does not get a spurious "shellBought" at join.
+--
+-- AND the edge must match the tour's own leg (owner's cold walk, 2026-09-03): every WIN
+-- grants a firecracker server-side (Settlement.ts's grant pathway), so a rising count does
+-- NOT always mean "bought at the shop" — on the very first win the drop's echo beat the
+-- drum-rest-gated `win` event and jumped the whole tour to "find a public fireworks spot",
+-- costing the win AND bank beats their turn. `tourStep` (OnboardingController's TourStep
+-- broadcast) says which leg the guest is actually on: a rise only counts as the shop
+-- purchase while the beam points at the shop, a fall only as the first launch while it
+-- points at the deck. Win-drops accumulate silently at every other step. One edge stays,
+-- and is benign: a win that settles while the guest is mid-walk to the shop still rises at
+-- step SHOP and fast-forwards the tour — but that guest is HOLDING the dropped firecracker,
+-- so the launch leg it skips to is valid; only the 1-pt purchase is skipped.
 local knownShellTotal: number? = nil
+local tourStep = "NONE"
+EventBus.TourStep.Event:Connect(function(step: string)
+    tourStep = step
+end)
 
 local function totalShellCount(shells: any): number
     local total = 0
@@ -834,9 +850,9 @@ FireworkState.OnClientEvent:Connect(function(state)
         -- it. The edge detection itself (comparing `total` to `knownShellTotal`) still runs
         -- unconditionally — only whether it FIRES depends on the profile.
         if knownShellTotal ~= nil then
-            if profileSeen and total > knownShellTotal then
+            if profileSeen and tourStep == "SHOP" and total > knownShellTotal then
                 EventBus.Onboard:Fire("shellBought", knownSeenBeats)
-            elseif profileSeen and total < knownShellTotal then
+            elseif profileSeen and tourStep == "LAUNCH" and total < knownShellTotal then
                 EventBus.Onboard:Fire("shellLaunched", knownSeenBeats)
             end
         end
