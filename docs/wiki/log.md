@@ -3635,3 +3635,13 @@ great, right up to the teahouse... I feel like I could walk through a demo with 
 couple of newbies tomorrow." Tomorrow's agenda captured on [[backlog]] — railing
 tunnel-cuts (owner-guided per pad), the unjumpable-railing ruling reversal, stats-cave
 onboarding, random familiar assignment.
+
+## [2026-09-03] fix | roblox-ci red nine pushes -- hand-edited Torii.model.json vs the genmodels gate
+
+The torii's deck-centre move (`f66370a`) edited `roblox/assets/Torii.model.json` directly
+(x58 -> x74); the "Generated models are current" gate regenerated the old gate from
+`ArenaLayout.toriiGate` and failed every push from `f0b5dbb` through `fea200f` -- and no
+pushing session looked at CI. Fixed in `b6ddb1a`: the layout constant moved to 74, the
+JSON is generator output again. Standing rule recorded on [[rojo-and-place]]:
+`assets/*.model.json` is never hand-edited, and a push is not done until its CI run is
+seen green.
