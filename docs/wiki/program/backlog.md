@@ -521,11 +521,39 @@ special? The onboarding path needs to be so smooth that even an 8-year old can d
 
 This extends the standing no-sports-book-language rule into the onboarding voice, and it is
 a JOURNEY design (sequence, pacing, vocabulary, the four questions above), not a copy edit.
-The copy/vocabulary pass itself is still to be crafted owner+Claude together (owner:
-"together you and I need to craft this journey") — the mechanics above are the scaffolding
-it will run on, not that pass. Context: the beats now RENDER (defect (d) fixed 2026-09-05 --
-every F&F guest would have seen empty boxes); the eight beats built this pass are still
-placeholder copy pending the vocabulary workshop.
+~~The copy/vocabulary pass itself is still to be crafted~~ **DONE 2026-09-03**: the
+copy workshop ran owner+Claude in-session. Owner wrote the four-page welcome, the win
+beat (teach-then-use POT — the vocabulary guard narrowed to the wager class
+ride/stake/wager/bet, rationale in `tests/OnboardingBeats.spec.luau`), the bank beat
+(+ kept clock-gesture sentence) and tour cards 8–10; Claude's drafts stand for the
+throw beat, the model-home close and the shop strings ("good for now"). Route rulings
+the same session: launch stop = a NEW 4th public site at the **FW11 Switchback Deck**
+(with a `FireworkTubeMount` rack), model pad = **T13** (owner stood on it), hanabiya
+stays the shop stop for the demo.
+
+## Rack-as-shop at the Switchback Deck (banked 2026-09-03)
+
+Owner direction, deferred past the F&F demo by the owner's own "hanabiya for the
+demo" ruling: *"the launch rack tied to it [the Switchback Deck] will be the
+fireworks shop"* — a purchase surface AT the rack, so buying and firing happen at one
+dramatic stop and the tour could collapse shop+launch into a single climb. Needs a
+buy prompt/panel on the rack wired to the existing `RequestPurchase` flow (today the
+hanabiya is the only shell-purchase surface). Shape when taken up: brainstorm → spec
+(it interlocks with the shop-dressing/box-art thread — what does a rack SELL, shells
+or boxes?).
+
+## Tunnel lighting pass (banked 2026-09-03)
+
+Owner observation at the T13 tunnel branch: "Tunnels seem to be self-lit — is that a
+setting? It would be more interesting visually if we actually put lights in them."
+Diagnosis: yes, a setting — `Lighting.Ambient`/`OutdoorAmbient` fill enclosed spaces
+uniformly (ambient is not occluded; the day/night controller moves ClockTime only and
+deliberately never touches Ambient). Making tunnels genuinely dark means lowering
+`Ambient` toward black — at which point they need PLACED light, which is the owner's
+instinct anyway. Shape when taken up: an art pass — yamadoro/chōchin recipes exist;
+tune Ambient + place fixtures per tunnel, judged at the dusk lock (and again against
+the natural cycle if the day lock is ever cleared). Interlocks with the parked
+firebox/care-gradient thread on the yamadoro item above.
 
 ## Fireworks monetization vocabulary: boosts standard, surprises typed, mystery + bundle SKUs (owner, 2026-09-05)
 

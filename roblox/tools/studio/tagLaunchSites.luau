@@ -39,6 +39,15 @@ local SITES = {
     { name = "Site_FallsDock", pos = Vector3.new(-345, 188, -15), note = "the falls dock" },
     { name = "Site_SuspensionBridge", pos = Vector3.new(-246, 222, 0), note = "the high mid-canyon bridge" },
     { name = "Site_Overlook", pos = Vector3.new(73, 110, 19), note = "the downcanyon viewing platform" },
+    -- The onboarding tour's launch stop (owner, 2026-09-03): a first firework off the FW11
+    -- hairpin, then a logical climb up the path to the model teahouse at T13. Coordinates are
+    -- the deck's walking surface per docs/wiki/world/switchback-deck.md (centre 159.7/−66.6,
+    -- top 138.46); the radius is horizontal-only, so the marker's Y is cosmetic.
+    {
+        name = "Site_SwitchbackDeck",
+        pos = Vector3.new(159.7, 138.5, -66.6),
+        note = "the FW11 switchback deck",
+    },
 }
 
 local canyonWorld = workspace:FindFirstChild("CanyonWorld")
