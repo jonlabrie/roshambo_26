@@ -1,64 +1,64 @@
 --!strict
--- AUTO-LOOK (owner, 2026-09-03, from the cold walk): "new players, especially, will miss the
--- detonation of their firework because they don't know to look up." When the LOCAL player's
--- own shell launches (EventBus.OwnLaunch, fired by FireworkController with the true seeded
--- apex), this sweeps the camera up to the burst point, holds through the break, and sweeps
--- back. No first-person needed: the camera's POSITION never moves — a pure rotation from
--- where it stands, so there is no swoop to feel sick about.
+-- AUTO-LOOK, v2 (owner's phone gates, 2026-09-03). v1 took the camera (Scriptable), swept,
+-- held, and handed it back — and the hand-back was the whole problem: the default camera's
+-- stored orientation never moves while Scriptable, so restoring Custom SNAPPED the view to
+-- where it was before the sweep. That is both gates in one: "tilts back down sharply...
+-- a bit aggressively" and "doesn't allow the player to take control of the view".
 --
--- THE PLAYER ALWAYS WINS. Any raw camera/world input (touch pan, right-mouse) or movement
--- releases the camera instantly, mid-sweep or mid-hold — a guest already looking up, or one
--- who fights the sweep, never loses control for more than a frame. UI taps (gameProcessed)
--- do NOT cancel: tapping the fireworks rail is not a camera gesture.
---
--- Other players' launches never grab the camera (OwnLaunch only carries the local player's).
--- Default on; the per-player toggle belongs to the future config screen (backlog:
--- "Onboarding: replayable journey" — same surface).
+-- v2 never takes the camera. It renders a BLEND on top of the normal camera, one priority
+-- step after the camera writes its frame: view = base:Lerp(lookAt(base.Position, apex), w).
+-- The default camera keeps processing input underneath the whole time, so control is never
+-- somewhere the player can't reach. The owner's spec, verbatim ruleset:
+--   * launch -> goto apex ("the current goto apex behavior on launch is perfect"): w 0->1
+--     over the same 0.7s ease;
+--   * untouched -> "it should start drifting back to normal view slowly": after the burst
+--     hold, w drifts 1->0 over DRIFT_SECONDS, gentle ease both ends;
+--   * touched -> "I now have control": any camera input eases w out fast — the player's
+--     drag is moving the base under the fading blend, so the view follows their finger
+--     from WHERE IT IS (keep looking up by simply aiming up), never snapping;
+--   * fire again -> "goto should assert again", even mid-drift: a new OwnLaunch re-sweeps
+--     from the current blend, whatever phase it was in.
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
 
-local SWEEP_SECONDS = 0.7 -- rotation out to the apex
-local RETURN_SECONDS = 0.5 -- rotation back after the hold (a snap reads as a glitch)
+local SWEEP_SECONDS = 0.7 -- unchanged: the goto the owner called perfect
 local HOLD_AFTER_BURST = 1.0 -- linger past the first break so the bloom registers
-local ON_SCREEN_MARGIN = 0.15 -- apex already inside the central 70% of the view: do nothing
+local DRIFT_SECONDS = 4.5 -- the untouched return: a slow settle, not a countermove
+local TAKEOVER_SECONDS = 1.2 -- blend fade once the player takes the wheel
+local ON_SCREEN_MARGIN = 0.15 -- apex already in the central 70% from idle: no sweep needed
 
-local active = false
-local conn: RBXScriptConnection? = nil
-local restoreType: Enum.CameraType? = nil
+local mode: "idle" | "sweep" | "hold" | "drift" | "takeover" = "idle"
+local w = 0 -- current blend weight
+local wFrom = 0 -- sweep/drift/takeover interpolate from this...
+local phaseAt = 0 -- ...starting at this clock
+local apex = Vector3.zero
+local burstAt = 3
+local sweptAt = 0 -- when the current launch's sweep began (the hold is timed from it)
 
--- Hands the camera back wherever it is. On a player takeover that means no return sweep —
--- their next input drives the camera anyway; on natural expiry the return sweep has already
--- landed the camera back on startCF, so restoring Custom is seamless either way.
-local function release()
-    if not active then
-        return
-    end
-    active = false
-    if conn then
-        conn:Disconnect()
-        conn = nil
-    end
-    local cam = workspace.CurrentCamera
-    if cam and restoreType then
-        cam.CameraType = restoreType
-    end
-    restoreType = nil
+local function easeOut(a: number): number
+    return 1 - (1 - a) ^ 2
+end
+
+local function easeInOut(a: number): number
+    return if a < 0.5 then 2 * a * a else 1 - (2 * (1 - a)) ^ 2 / 2
 end
 
 UserInputService.InputBegan:Connect(function(input: InputObject, gameProcessed: boolean)
-    if not active or gameProcessed then
+    if mode == "idle" or mode == "takeover" or gameProcessed then
         return
     end
     local t = input.UserInputType
-    if
-        t == Enum.UserInputType.Touch
+    local isCameraGesture = t == Enum.UserInputType.Touch
         or t == Enum.UserInputType.MouseButton2
         or t == Enum.UserInputType.MouseWheel
-    then
-        release()
+        or (t == Enum.UserInputType.Gamepad1 and input.KeyCode == Enum.KeyCode.Thumbstick2)
+    if isCameraGesture then
+        mode = "takeover"
+        wFrom = w
+        phaseAt = os.clock()
     end
 end)
 
@@ -70,59 +70,72 @@ EventBus.OwnLaunch.Event:Connect(function(data: any)
     if cam == nil then
         return
     end
-    -- Already comfortably in view? Then the guest is watching and the assist would only be
-    -- motion for its own sake.
-    local vp, onScreen = cam:WorldToViewportPoint(data.apex)
-    local size = cam.ViewportSize
-    if
-        onScreen
-        and vp.X > size.X * ON_SCREEN_MARGIN
-        and vp.X < size.X * (1 - ON_SCREEN_MARGIN)
-        and vp.Y > size.Y * ON_SCREEN_MARGIN
-        and vp.Y < size.Y * (1 - ON_SCREEN_MARGIN)
-    then
+    if mode == "idle" then
+        -- Already comfortably watching the right patch of sky? Then the assist would be
+        -- motion for its own sake. Only an IDLE camera earns this skip: mid-drift or
+        -- mid-takeover, a new launch always re-asserts (the owner's rule).
+        local vp, onScreen = cam:WorldToViewportPoint(data.apex)
+        local size = cam.ViewportSize
+        if
+            onScreen
+            and vp.X > size.X * ON_SCREEN_MARGIN
+            and vp.X < size.X * (1 - ON_SCREEN_MARGIN)
+            and vp.Y > size.Y * ON_SCREEN_MARGIN
+            and vp.Y < size.Y * (1 - ON_SCREEN_MARGIN)
+        then
+            return
+        end
+    end
+    apex = data.apex
+    burstAt = if typeof(data.burstAt) == "number" then data.burstAt else 3
+    mode = "sweep"
+    wFrom = w -- a re-assert mid-drift sweeps from the blend it still has, no jump
+    phaseAt = os.clock()
+    sweptAt = phaseAt
+end)
+
+-- One step AFTER the camera writes its frame: the default camera has already applied the
+-- player's input to `cam.CFrame`; this composes the apex blend on top of that result.
+RunService:BindToRenderStep("LaunchLookBlend", Enum.RenderPriority.Camera.Value + 1, function()
+    if mode == "idle" then
         return
     end
-
-    release() -- a second launch retargets cleanly
-    local startCF = cam.CFrame
-    local goal = CFrame.lookAt(startCF.Position, data.apex)
-    restoreType = cam.CameraType
-    cam.CameraType = Enum.CameraType.Scriptable
-    active = true
-
-    local burstAt = if typeof(data.burstAt) == "number" then data.burstAt else 3
-    local holdUntil = math.max(burstAt + HOLD_AFTER_BURST, SWEEP_SECONDS)
-    local t0 = os.clock()
-    conn = RunService.RenderStepped:Connect(function()
-        local cam2 = workspace.CurrentCamera
-        if cam2 == nil then
-            release()
+    local now = os.clock()
+    if mode == "sweep" then
+        local a = math.clamp((now - phaseAt) / SWEEP_SECONDS, 0, 1)
+        w = wFrom + (1 - wFrom) * easeOut(a)
+        if a >= 1 then
+            mode = "hold"
+        end
+    elseif mode == "hold" then
+        w = 1
+        if now - sweptAt >= burstAt + HOLD_AFTER_BURST then
+            mode = "drift"
+            wFrom = w
+            phaseAt = now
+        end
+    elseif mode == "drift" then
+        local a = math.clamp((now - phaseAt) / DRIFT_SECONDS, 0, 1)
+        w = wFrom * (1 - easeInOut(a))
+        if a >= 1 then
+            mode = "idle"
+            w = 0
             return
         end
-        local plr = Players.LocalPlayer
-        local hum = plr.Character and plr.Character:FindFirstChildOfClass("Humanoid")
-        if hum and hum.MoveDirection.Magnitude > 0.05 then
-            release() -- walking away: the player wins, immediately
+    elseif mode == "takeover" then
+        local a = math.clamp((now - phaseAt) / TAKEOVER_SECONDS, 0, 1)
+        w = wFrom * (1 - easeOut(a))
+        if a >= 1 then
+            mode = "idle"
+            w = 0
             return
         end
-        local dt = os.clock() - t0
-        if dt >= holdUntil + RETURN_SECONDS then
-            -- the return sweep below has already landed on startCF; restoring Custom here is
-            -- seamless because the camera is exactly where the orbit rig left it.
-            release()
-            return
-        end
-        local target: CFrame
-        if dt < SWEEP_SECONDS then
-            local a = dt / SWEEP_SECONDS
-            target = startCF:Lerp(goal, 1 - (1 - a) ^ 2) -- ease-out up
-        elseif dt < holdUntil then
-            target = goal
-        else
-            local a = (dt - holdUntil) / RETURN_SECONDS
-            target = goal:Lerp(startCF, a * a) -- ease-in back down
-        end
-        cam2.CFrame = target
-    end)
+    end
+    local cam = workspace.CurrentCamera
+    if cam == nil or Players.LocalPlayer.Character == nil then
+        return
+    end
+    local base = cam.CFrame
+    local desired = CFrame.lookAt(base.Position, apex)
+    cam.CFrame = base:Lerp(desired, w)
 end)
