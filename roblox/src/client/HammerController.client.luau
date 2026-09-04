@@ -355,6 +355,13 @@ end
 -- takes over seamlessly.
 local DRAW_STUDS = 3.0 -- South draw at p=1; MIRRORS ArenaLayout.shuMoku.drawStuds (the cam flank is generated from it — keep DrawStuds attr ≤ it)
 
+local function poseArm(p: number)
+    local studs = stage:GetAttribute("DrawStuds") or DRAW_STUDS -- live-tunable draw length
+    local drawZ = p * studs
+    local riseY = p * p * 0.45 -- pendulum rise on the arc; MIRRORS ArenaLayout.bellDrive.camDowelRise
+    arm.CFrame = CFrame.new(BACK * drawZ + Vector3.new(0, riseY, 0)) * restCFrame
+end
+
 -- All three loops below animate one machine, so they share one cull anchor: the shu-moku itself.
 local function machineDrawable(c: AmbientBudget.Config): boolean
     local cam = workspace.CurrentCamera
@@ -398,10 +405,7 @@ RunService.Heartbeat:Connect(function(dt: number)
         end
         p = r.drawP
     end
-    local studs = stage:GetAttribute("DrawStuds") or DRAW_STUDS -- live-tunable draw length
-    local drawZ = p * studs
-    local riseY = p * p * 0.45 -- pendulum rise on the arc; MIRRORS ArenaLayout.bellDrive.camDowelRise
-    arm.CFrame = CFrame.new(BACK * drawZ + Vector3.new(0, riseY, 0)) * restCFrame
+    poseArm(p)
 end)
 
 -- CONSTANT-SPEED cam. The cam turns continuously at the metronome's rate (omega = 2π/period),
@@ -434,6 +438,13 @@ RunService.Heartbeat:Connect(function(dt: number)
         return
     end
     if lastMetroNow and not striking and metronome:strikesBetween(lastMetroNow, nowSt) > 0 then
+        -- ⚠ THE CAM'S HIGH POINT IS PINNED TO THE DOWEL'S POSITION AT RELEASE, and both the draw
+        -- pose and the suspension carrying that dowel are behind the visibility gate below. A
+        -- culled machine would sample a frozen dowel and pin the cam tens of degrees out of phase
+        -- with the log it is supposed to be lifting. Refresh both here -- once per round, whether
+        -- or not anyone is watching, which is cheap enough at that rate to need no gate.
+        poseArm(r.drawP)
+        updateSuspension()
         strike(r.prevStrikeAt)
     end
     lastMetroNow = nowSt
