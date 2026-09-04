@@ -3726,3 +3726,16 @@ module. Default mix settled by the readability experiment at
 `wsls:30,counter:10,conform:30,rocky:10,random:20`, strength 0.7 (numbers, targets and the
 widened blind band on [[world-throw]]). Dev NOT yet flipped — procedure on [[deploy]],
 owner-gated. Q1 (is crowd-reading fun?) not yet run.
+
+## [2026-09-04] gate | Dev flipped: TEST_MODE off, 30-bot synthetic crowd on
+
+Owner: "let's flip dev then." `roshambo_server_dev` now runs `TEST_MODE=false`, `CROWD_SIZE=30`,
+no seed (boot log names the generated one). Verified in the application log: `[CROWD] on: size
+30, seed …, mix random:20,wsls:30,counter:10,conform:30,rocky:10`, `world throw: crowd plurality,
+min 5 participants`, then `[CROWD] round … humans 0 crowd 30 | R 8 P 6 S 16 → S`. Prod untouched.
+⚠ Trap earned: an env-only `update-service` redeployed the OLD image (TEST_MODE took effect, no
+crowd code, no `[CROWD]` boot line); an explicit `start-deployment` was needed to build `main`'s
+head. Recorded in the procedure on [[deploy]]. The four "not active anywhere" pages corrected
+(deploy, world-throw, parked-defects (h), CLAUDE.md). Q1 reframed on [[world-throw]]: the owner's
+rounds are a feel + calibration test; discovery belongs to newcomers. Sim outputs and the ledger
+for the build are committed under `.superpowers/sdd/2026-09-04-synthetic-crowd/`.

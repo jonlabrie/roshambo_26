@@ -105,10 +105,10 @@ Two deliberate fallbacks to random:
   *creates* the plurality they needed to beat, so they can only draw. A solo player would set
   the World Throw single-handedly and be permanently SAFE.
 
-⚠ **Not active in any deployed environment as of the date at the top of this page** — both
-services run `TEST_MODE=true`, which keeps the deterministic R→P→S cycle. Since 2026-09-04 the
-rule no longer needs a human crowd to be exercised: see § Synthetic crowd below. Whether dev
-has been flipped is a live fact — query the service ([[deploy]]), do not trust this line.
+**Active on DEV since 2026-09-04**, against the synthetic crowd (§ Synthetic crowd below):
+`TEST_MODE=false`, `CROWD_SIZE=30`, and the boot log confirms it. **Prod still runs
+`TEST_MODE=true`**, the deterministic R→P→S cycle. Both are live facts — query the service
+([[deploy]]), do not trust this line.
 
 ## Synthetic crowd (built 2026-09-04)
 
@@ -214,7 +214,11 @@ teachable rule (`second`, counter-the-counter) runs 51.4–52.4% across them, an
 **Pre-registered Q1** (owner decision 2026-09-04): one person, ~20 rounds on dev against the
 default crowd with the last-five HUD; **≥ 45% BEAT WORLD** reads as "crowd-reading is a skill
 here"; a rate down in the blind band (29–34%, above) means the crowd is too noisy or the HUD
-shows the wrong thing. Result: not yet run.
+shows the wrong thing. Result: not yet run — dev flipped 2026-09-04, so it can be.
+⚠ **The owner cannot run the discovery half of Q1** (they know the rules); their twenty rounds
+are a FEEL test plus a calibration check (play `second` deliberately → expect ~52%). Discovery is
+for newcomers, read by trajectory (rounds 11–20 vs 1–10), by what they say the world was doing,
+and by whether they kept throwing — not by a 45% line in twenty rounds.
 
 Read a ~42% result as progress, not failure. At the settled mix the naive HUD reading —
 `counter`, throw what beats the last World Throw — scores ~42.2%, just under the 45% line; the

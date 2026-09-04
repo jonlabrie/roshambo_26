@@ -101,10 +101,10 @@ like "my change did nothing".
   A repoint that omits `RuntimeEnvironmentSecrets` silently drops all three secrets and
   the service comes back unable to reach Mongo. Always `describe-service` first and
   round-trip every field; the 2026-08-16 repoint did exactly that.
-- **Both environments ran `TEST_MODE=true` as of 2026-08-16** (dev verified against the live
-  service config, prod set in `apprunner.yaml`). Since 2026-09-04 the crowd-plurality rule can
-  run without humans: the synthetic crowd ([[world-throw]] § Synthetic crowd) is three env vars
-  on the service. **Whether dev has been flipped is a live fact — run the query below.**
+- **Dev was FLIPPED 2026-09-04**: `TEST_MODE=false`, `CROWD_SIZE=30`, no seed (the boot log
+  names the generated one). Verified in the application log: `[CROWD] on: size 30 …` and one
+  `[CROWD] round …` line per minute with 30 crowd votes. **Prod still runs `TEST_MODE=true`**
+  (set in `apprunner.yaml`). Both are live facts — run the query below, do not trust this line.
 - Prod is a separate App Runner service (via `apprunner.yaml`) + Amplify frontend.
   Prod auto-deploy is **OFF** — a push to GitHub does not redeploy prod; trigger it
   manually (console "Deploy" or `aws apprunner start-deployment`) after the branch
@@ -124,8 +124,9 @@ like "my change did nothing".
 ## Flipping dev to the real World Throw with a synthetic crowd
 
 ⚠ Owner-run or owner-approved, announced first: it bounces the dev backend under any live
-Studio session. Prod is not touched by this procedure. **Not done as of 2026-09-04** — and
-that is a live fact, so step 1's query is the answer, not this line.
+Studio session. Prod is not touched by this procedure. **Done 2026-09-04** (see the bullet
+above) — a live fact, so step 1's query is the answer, not this line. The procedure stays
+here for the next flip in either direction.
 
 1. Read the current config and keep every field — `update-service` replaces
    `SourceConfiguration` wholesale (see the secrets warning above):
@@ -146,6 +147,15 @@ that is a live fact, so step 1's query is the answer, not this line.
    ```bash
    aws apprunner update-service --region us-east-1 --service-arn "$ARN" \
      --source-configuration file:///tmp/dev-source.json
+   ```
+   ⚠ **An env-only `update-service` does NOT rebuild the source.** Learned 2026-09-04: with
+   auto-deploy off, this step redeployed the previously built image with the new env — `TEST_MODE`
+   took effect, but the crowd code pushed minutes earlier was not in it, and the boot log had no
+   `[CROWD]` line. If the branch head has moved since the last build (check the service log group
+   for `[Build]`/`[PostBuild]` lines under the new deployment id), follow with an explicit source
+   deployment, which pulls the branch head:
+   ```bash
+   aws apprunner start-deployment --region us-east-1 --service-arn "$ARN"
    ```
 4. Verify from the service logs (CloudWatch, application log group for the service): the boot
    prints `[CROWD] on: size 30, seed …, mix …` and `world throw: crowd plurality, min 5
