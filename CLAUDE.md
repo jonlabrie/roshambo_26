@@ -87,7 +87,7 @@ stylua --check src tests tools && selene src tools   # format + lint (MATCH CI's
 
 Node version is pinned via `.nvmrc` (24.x).
 
-The server requires `MONGODB_URI` (exits immediately without it; `server/.env` holds local config — an Atlas `roshambo-dev` connection string, not a local database) and `API_KEY` (required for `/api/v1`; PWA works without it). The frontend needs `VITE_SOCKET_URL` pointing at the backend (defaults to same-origin if unset). Set `TEST_MODE=true` on the server for a deterministic World Throw cycle (R→P→S) instead of random.
+The server requires `MONGODB_URI` (exits immediately without it; `server/.env` holds local config — an Atlas `roshambo-dev` connection string, not a local database) and `API_KEY` (required for `/api/v1`; PWA works without it). The frontend needs `VITE_SOCKET_URL` pointing at the backend (defaults to same-origin if unset). Set `TEST_MODE=true` on the server for a deterministic World Throw cycle (R→P→S) instead of random. With `TEST_MODE` off, `CROWD_SIZE=<n>` adds a synthetic bot crowd to every round's tally (`CROWD_MIX`, `CROWD_SEED` optional; see `docs/wiki/world/world-throw.md` § Synthetic crowd). `cd server && npm run sim` runs the offline simulator over the same crowd.
 
 ## Architecture
 

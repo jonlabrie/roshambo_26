@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-16
+updated: 2026-09-04
 checked: 2026-08-27
 ---
 
@@ -101,9 +101,106 @@ Two deliberate fallbacks to random:
   *creates* the plurality they needed to beat, so they can only draw. A solo player would set
   the World Throw single-handedly and be permanently SAFE.
 
-⚠ **Not active in any deployed environment.** `apprunner.yaml` sets `TEST_MODE: "true"` for
-prod, and `roshambo_server_dev` is likewise in TEST_MODE (owner, 2026-08-16) — both keep the
-deterministic R→P→S cycle. The rule will not be exercised until TEST_MODE is turned off, which
-needs a crowd: below 5 participants it falls back to random anyway. A synthetic crowd is the
-likely route, and its bots must have READABLE PATTERNS — a uniformly random bot crowd produces
-a random plurality and reimplements the old defect.
+⚠ **Not active in any deployed environment as of the date at the top of this page** — both
+services run `TEST_MODE=true`, which keeps the deterministic R→P→S cycle. Since 2026-09-04 the
+rule no longer needs a human crowd to be exercised: see § Synthetic crowd below. Whether dev
+has been flipped is a live fact — query the service ([[deploy]]), do not trust this line.
+
+## Synthetic crowd (built 2026-09-04)
+
+Spec `docs/superpowers/specs/2026-09-04-synthetic-crowd-design.md`; plan
+`docs/superpowers/plans/2026-09-04-synthetic-crowd.md`.
+
+**What it is.** A tally crowd — bot throws that count toward the World Throw and appear in the
+reveal's distribution, with no avatars. `RoundEngine` merges the bots' counts into the tally at
+LOCK→REVEAL **before** `pickWorldThrow`, so the distribution on the card and the throw it
+produced always agree; the per-participant `throws` map stays human-only, which is why bots
+never reach settlement, `PlayerRound`, presence or any board. `Round.synthetic` records the
+bot count; **`totalPlayers` is the size of the world (humans + bots)** — owner decision
+2026-09-04, and the PLAYERS figure on the ledger and the stats board now means exactly that.
+
+**Archetypes** (`server/src/engine/CrowdPolicies.ts`): `wsls` (win-stay / lose-shift-clockwise,
+Wang–Xu–Zhou 2014), `counter`, `conform`, `rocky`, `random`, and the sim-only `second`. Each
+is a distribution given a small memory, blended with uniform at a strength; the mix across
+archetypes is the other dial. ⚠ **A hypothesis about a Roblox crowd, not a measurement.** The
+recalibration path is the persisted `Round.distribution` minus the synthetic share (spec §8).
+
+**Config** — `CROWD_SIZE` (0 = off), `CROWD_MIX` (`id:weight,…`), `CROWD_SEED`. Malformed
+values refuse to boot. `CROWD_SIZE` under `TEST_MODE=true` is ignored with a warning. Read the
+defaults from `DEFAULT_MIX` / `DEFAULT_STRENGTH` in `server/src/engine/SyntheticCrowd.ts`
+rather than from here.
+
+**The simulator** — `cd server && npm run sim -- --experiment readability|blind-spread|effective-n`.
+Re-run it rather than quoting the numbers below; they are one seed on one day.
+
+Readability at the settled default mix (`--rounds 20000 --seed 1`):
+
+```
+# readability  rounds=20000 crowd=30 strength=0.7 seed=1
+# mix random:20,wsls:30,counter:10,conform:30,rocky:10
+
+human     BEAT WORLD   ±95%    safe    loss    banked      max pot*
+random         29.4%   0.6%   40.8%   29.7%    137781        19683
+counter        42.2%   0.7%   51.9%    5.9% 6765376709498072000 1350851717672992000
+conform         5.9%   0.3%   42.2%   51.9%        27            9
+wsls           32.8%   0.7%   46.8%   20.4%  14348907      1594323
+second         51.9%   0.7%    5.9%   42.2%    177147        19683
+oracle         56.5%   0.7%   26.9%   16.6% 22876792454961 2541865828329
+* max pot is measured AFTER each round's bank decision
+
+world throw transitions (n=19999): same 42.2%  counter 51.9%  other 5.9%
+(a blind world is 33/33/33; "counter" high means the crowd rotates the way everyone-counters predicts)
+```
+
+Blind-field spread (`--experiment blind-spread --rounds 360 --seed 1`):
+
+```
+# blind-spread  rounds=360 crowd=30 strength=0.7 seed=1
+# mix random:20,wsls:30,counter:10,conform:30,rocky:10
+
+20 blind players, bank at 9, 20 runs of 360 rounds
+max ÷ median banked: mean 1.43  worst 1.66
+per run: 1.57 1.29 1.40 1.66 1.38 1.60 1.50 1.50 1.39 1.40 1.33 1.38 1.38 1.47 1.33 1.29 1.60 1.42 1.29 1.50
+```
+
+Effective N (`--experiment effective-n --rounds 5000 --seed 1`):
+
+```
+# effective-n  rounds=5000 crowd=30 strength=0.7 seed=1
+# mix random:20,wsls:30,counter:10,conform:30,rocky:10
+
+crowd   counter BEAT WORLD   ±95%
+    5                13.5%   0.9%
+    7                27.1%   1.2%
+   10                35.8%   1.3%
+   15                28.2%   1.2%
+   20                39.7%   1.4%
+   30                44.4%   1.4%
+   50                48.2%   1.4%
+  100                51.7%   1.4%
+(where the rate stops moving, the human's own throw has stopped moving the plurality)
+```
+
+**How the mix was settled, and against which targets.** Pre-registered before tuning (spec §2):
+a simple teachable rule beats the crowd clearly (**BEAT WORLD ≥ 45%**), nothing non-oracle
+exceeds **~60%**, and a blind human sits near chance. All three hold at seeds 1–3 — the best
+teachable rule (`second`, counter-the-counter) runs 51.4–52.4% across them, and nothing but
+`oracle` goes near 60%.
+
+- ⚠ **The blind band is 29–34%, widened from "≈33%" by ruling 2026-09-04**, and the settled
+  mix's 29.4% is inside it. A blind human's own throw is inside the tally it is judged
+  against, so it drags the plurality toward itself; once the best rule is held under 60% the
+  plurality margins are narrow enough that the blind rate sits near 29.5% *whatever* the mix —
+  probed across ~40 mix cells and it did not move. The `random` row is a null hypothesis, not a
+  design target, and treating it as one would have meant loosening the ceiling that matters.
+- **Why the pre-tuning default (`wsls:35,counter:20,conform:15,rocky:10,random:20`) was too
+  readable:** `wsls`'s lose-shift is *clockwise*, which lands on the counter-throw — so `wsls`
+  and `counter` pull the world the same way and their signals compound. Raising `conform`
+  rather than adding `random` was the fix: it opposes the rotation instead of blurring it.
+- Consequence, and expected: `conform` is now a near-dead rule (~6% BEAT WORLD). It only wins
+  on the rare "other" rotation, which the transitions line puts at ~6%.
+
+**Pre-registered Q1** (owner decision 2026-09-04): one person, ~20 rounds on dev against the
+default crowd with the last-five HUD; **≥ 45% BEAT WORLD** reads as "crowd-reading is a skill
+here"; a rate down in the blind band (29–34%, above) means the crowd is too noisy or the HUD
+shows the wrong thing. Result: not yet run.

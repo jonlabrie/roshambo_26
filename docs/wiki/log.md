@@ -3713,3 +3713,16 @@ carries the walk list; the strike close-up and the far-deck view are the two tha
 Two tooling traps found along the way, both recorded: the SDD scripts clobber
 `.superpowers/sdd/.gitignore` on every invocation ([[schema]] rule 4) and
 `main.server.luau` is now at Luau's 200-local-register ceiling ([[misc-engine-traps]]).
+
+## [2026-09-04] ship | Synthetic crowd -- the World Throw rule can be played without a human crowd
+
+Spec `docs/superpowers/specs/2026-09-04-synthetic-crowd-design.md`, plan
+`docs/superpowers/plans/2026-09-04-synthetic-crowd.md`. `RoundEngine` merges a seeded,
+archetyped bot crowd into the tally at LOCK→REVEAL before `pickWorldThrow`; bots never enter
+the throws map, so settlement and presence stay human-only by construction. `Round.synthetic`
+added; `totalPlayers` now counts the world. Three env vars, refused when malformed, ignored
+under TEST_MODE. `npm run sim` runs readability / blind-spread / effective-n over the same
+module. Default mix settled by the readability experiment at
+`wsls:30,counter:10,conform:30,rocky:10,random:20`, strength 0.7 (numbers, targets and the
+widened blind band on [[world-throw]]). Dev NOT yet flipped — procedure on [[deploy]],
+owner-gated. Q1 (is crowd-reading fun?) not yet run.
