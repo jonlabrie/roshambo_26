@@ -37,6 +37,23 @@ the RPS glyphs literally all over this experience").
 - Dragon King boards: `roblox/src/shared/DragonKings.luau`.
 - PWA character/tier assets: `server/src/constants/characters.ts` + `public/videos/`.
 
+## Signage & wayfinding (owner-gated 2026-09-03)
+
+- **Face: Josefin Sans SemiBold**
+  (`Font.new("rbxasset://fonts/families/JosefinSans.json", Enum.FontWeight.SemiBold)`) —
+  the owner's "sans that's a little less modern... part of the 'resort-ish' identity",
+  gated on the Model Teahouse sign ("font is good"). New world signage uses it;
+  GothamBold stays the HUD's face.
+- **Directional arrows are the caret glyph, rotated** — `Glyphs.render(box, "S", ...)`
+  with the container's `Rotation` set (90 = right). The owner replaced hand-drawn
+  chevron strokes with this on the first sign: the identity already ships an arrowhead,
+  so wayfinding reuses it rather than inventing one. (The owner's request said "paper
+  glyph", but paper is the bar — the mark that points when rotated is the caret.)
+- **Sign palette**: board 45/48/56 (the black understructure tone), copy/arrow
+  240/234/216 (INK_CREAM), wood material. First instance:
+  `Workspace.CanyonWorld.ModelTeahouseSign`, recipe
+  `roblox/tools/studio/buildModelTeahouseSign.luau`.
+
 ## The rule this page encodes
 
 Before creating art for anything a player already sees elsewhere — a throw, a rank, a

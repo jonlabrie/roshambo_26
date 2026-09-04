@@ -1627,6 +1627,12 @@ end)
 local CollectionService = game:GetService("CollectionService")
 local SITE_RADIUS = 24
 local atLaunchSite = false
+-- PUBLIC sites only — never the own deck. A public site provides ALL the gear (owner's
+-- cold walk, 2026-09-03: holding a Peony at the Switchback rack, "I can't shoot it because
+-- I need a small mortar? All three sizes should be here, it's a public site") — the rack's
+-- tubes are public hardware, so gear-blocked rows go live here. The engawa stays gated by
+-- the mortars its owner actually bought.
+local atPublicSite = false
 -- The player's own deck-site (from FireworkState via the aux publish) — the engawa is a
 -- launch site too, and the affordance must say so (owner, 2026-09-04).
 local deckSitePos: Vector3? = nil
@@ -1636,6 +1642,7 @@ task.spawn(function()
     while true do
         local char = Players.LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+        local nearPublic = false
         local near = false
         if root then
             for _, part in CollectionService:GetTagged("FireworkLaunchSite") do
@@ -1643,16 +1650,18 @@ task.spawn(function()
                     local d = part.Position - root.Position
                     -- Horizontal only, matching LaunchSites: a deck sits well above its marker.
                     if d.X * d.X + d.Z * d.Z <= SITE_RADIUS * SITE_RADIUS then
-                        near = true
+                        nearPublic = true
                         break
                     end
                 end
             end
+            near = nearPublic
             if not near and deckSitePos then
                 local d = deckSitePos - root.Position
                 near = d.X * d.X + d.Z * d.Z <= SITE_RADIUS * SITE_RADIUS
             end
         end
+        atPublicSite = nearPublic
         atLaunchSite = near
         task.wait(0.5)
     end
@@ -1775,6 +1784,22 @@ do
     -- writer, so a tap always tests exactly the state the row was painted from.
     local shellStates: any = nil
 
+    -- Whether a row fires HERE: the server's launchable flag, or a gear-only block while
+    -- standing at a PUBLIC site (see atPublicSite above — public racks carry every tier).
+    -- The server never enforces gear on the spend, so this affordance is the whole gate,
+    -- and it must agree between the paint, the tap and the scroll.
+    local function rowLive(st: any): boolean
+        if st == nil then
+            return false
+        end
+        if st.launchable == true then
+            return true
+        end
+        return atPublicSite
+            and typeof(st.reason) == "string"
+            and string.sub(st.reason, 1, 12) == "NEEDS_MORTAR"
+    end
+
     for i, id in SHELL_ORDER do
         local b = Instance.new("TextButton")
         b.Name = id
@@ -1819,7 +1844,7 @@ do
         -- clicks it: the engine cancels the click once the touch becomes a drag.
         b.MouseButton1Click:Connect(function()
             local st = shellStates and shellStates[id]
-            if st and st.launchable then
+            if rowLive(st) then
                 EventBus.HudFireworkLaunch:Fire(id)
             end
         end)
@@ -1827,16 +1852,42 @@ do
         shellTiles[id] = { button = b, title = title, sub = sub }
     end
 
+    -- The empty state: with zero-count rows hidden (owner, 2026-09-03), a shell-less player at
+    -- a launch site would open a BLANK rail — one un-tappable hint row keeps the surface
+    -- legible and points at the fix. A TextLabel, not a TextButton: nothing to press.
+    local emptyRow = Instance.new("TextLabel")
+    emptyRow.Name = "EmptyHint"
+    emptyRow.LayoutOrder = 0
+    emptyRow.Size = UDim2.new(1, -6, 0, SHELL_ROW_H)
+    emptyRow.BackgroundColor3 = WASHI
+    emptyRow.BackgroundTransparency = 0.55
+    emptyRow.BorderSizePixel = 0
+    emptyRow.TextColor3 = IVORY_DIM
+    emptyRow.TextSize = 11
+    emptyRow.Font = Enum.Font.GothamBold
+    emptyRow.TextWrapped = true
+    emptyRow.Text = "No fireworks yet — visit the shop"
+    emptyRow.Visible = false
+    emptyRow.ZIndex = 6
+    emptyRow.Parent = fireworkRail
+    corner(emptyRow, 8)
+
     -- On open, bring the BEST flyable shell into view: rows sit in catalogue order, so the biggest
     -- thing the player can actually fly — the one they climbed the catalogue for — is the LAST
     -- launchable row, and an opened list showing only the firecracker end reads as "my shells are
     -- gone".
     local function scrollToBest()
+        -- Positions count VISIBLE rows only: zero-count rows are hidden (below) and the
+        -- UIListLayout packs around them, so the catalogue index no longer maps to a y.
+        local visIndex = 0
         local best = 0
-        for i, id in SHELL_ORDER do
+        for _, id in SHELL_ORDER do
             local st = shellStates and shellStates[id]
-            if st and st.launchable then
-                best = i
+            if st and typeof(st.count) == "number" and st.count > 0 then
+                visIndex += 1
+                if rowLive(st) then
+                    best = visIndex
+                end
             end
         end
         if best == 0 then
@@ -1858,19 +1909,28 @@ do
 
     local function paintFireworkRail(states: any)
         shellStates = states
+        local ownedAny = false
         for _, id in SHELL_ORDER do
             local st = states[id]
             local tile = shellTiles[id]
-            local live = st ~= nil and st.launchable == true
+            -- Zero-count rows are HIDDEN (owner, 2026-09-03: the rail was "full of zero-count
+            -- candidates" for exactly the player it exists for — the SHOP is the catalogue's
+            -- surface, not the launch rail). Dimming remains the treatment for shells you OWN
+            -- but can't fly right now (mortar, condition): those rows still teach what the
+            -- gear buys, and a row that does nothing when tapped must look un-tappable.
+            local owned = st ~= nil and typeof(st.count) == "number" and st.count > 0
+            tile.button.Visible = owned
+            ownedAny = ownedAny or owned
+            local live = rowLive(st)
             tile.title.Text = if st then `{SHELL_NAME[id]}  ×{st.count}` else SHELL_NAME[id]
             tile.sub.Text = if live
                 then "ready"
                 else REASON_COPY[st and st.reason or ""] or (st and st.reason or "")
-            -- Dim rather than hide: the catalogue stays visible so a player can see what a mortar buys.
             tile.button.BackgroundTransparency = if live then 0.3 else 0.65
             tile.title.TextTransparency = if live then 0 else 0.4
             tile.sub.TextTransparency = if live then 0.15 else 0.5
         end
+        emptyRow.Visible = not ownedAny
     end
 
     fireworkUI = {

@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-09-04
+updated: 2026-09-03
 ---
 
 # Familiars
@@ -480,8 +480,10 @@ and two-caw clips is sample-identical to a baked recording apart from 0.48s of r
 NOT the 0.76s gap you would measure off the source: the clips carry their own padding.
 
 ⚠ **AND ONLY ONE SPECIES IS REACHABLE AT A TIME, but the gap is one line.** `BirdController`
-hardcodes `SPECIES` (currently `"Karasu"`) because nothing selects a bird per player (F&F
-item 6). The registered roster grew 2026-09-02: the **hiyodori** joined with a full voice —
+hardcodes `SPECIES` — **`"Mejiro"` since 2026-09-03** (owner: the white-eye is the default
+familiar "for now"; the uguisu is special to the [[falls-dock]] and stays there; the karasu is
+to become an AMBIENT bird, see [[ambient-birds]]) — because nothing selects a bird per player
+(F&F item 6). The registered roster grew 2026-09-02: the **hiyodori** joined with a full voice —
 five envelope clips cut from the owner's xeno-canto sourcing (`bodyLength 1.15`, warbler
 seat), verified singing on the torii 2026-09-03. As of 2026-08-28 that
 ONE name drives the mesh (`{SPECIES}Body` / `{SPECIES}Wings`, both already declared in
@@ -490,12 +492,23 @@ rather than half of it. A test pins that the three cannot drift apart, because a
 crow's body with a warbler's song is the failure that has nothing positioned to notice it.
 
 ⚠ **The victory song fires on a win; since 2026-09-03 a perched familiar ALSO sings idly,
-rarely** (owner: "it's only natural... relatively rare"). The idle song runs on a free-running
-90–240s clock through `sing()`'s crowd chance and concurrency cap — the clock reschedules
-whether or not a song plays, because pausing it until conditions allow would recreate the
-sing-on-arrival behavior the falls-dock gate forbids (*"this bird lives here and you have to
-be close to hear it"*, [[falls-dock]]). The dock bird's specialness now rests on rarity and
-rolloff rather than the familiar's total silence.
+once or twice a minute.** The first cut (90–240 s opportunities through the 0.3 crowd chance,
+about one song per nine minutes) was ruled "way off" the same day: "familiars should sing once
+or twice per minute, so the opportunity should arise every 20 seconds or so." So the clock is
+`IDLE_SONG_MIN..MAX` (15–25 s) and each opportunity passes its own `IDLE_SONG_CHANCE` (0.5),
+not the crowd chance; read the constants in `BirdController` rather than this line. The clock
+reschedules whether or not a song plays, because pausing it until conditions allow would
+recreate the sing-on-arrival behavior the falls-dock gate forbids (*"this bird lives here and
+you have to be close to hear it"*, [[falls-dock]]). The concurrency cap still applies. The dock
+bird's specialness now rests on rolloff and its bout pattern rather than the familiar's silence.
+
+⚠ **The gate fires while the bird is `resting` AND on a perch — `resting` means NO RESULT
+PENDING, not "in the resting orbit".** The first gate (2026-09-03) said `not resting`, which
+confined the idle song to the WIN/LOSS act-outs and silenced every perched bird; the retuned
+rate then produced nothing in two minutes, and the numbers (three opportunities a minute at a
+coin flip) said gate, not luck. `tests/BirdIdleSong.spec.luau` reads the condition from source
+and refuses `not resting` or a missing `b.perch`, the same way `BirdScaleConvention` polices
+the profile argument.
 
 ⚠ **AND MUCH OF THE MACHINERY ALREADY EXISTS — a claim written here on 2026-08-27 that "there is
 no world population, no perching" was WRONG and is deleted.** It came from grepping for

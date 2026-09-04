@@ -19,8 +19,10 @@
 -- appears — that needs eyes in Studio.
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Lighting = game:GetService("Lighting")
+local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
+local EventBus = require(script.Parent:WaitForChild("EventBus"))
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local FireworkCatalog = require(shared:WaitForChild("FireworkCatalog"))
 local FireworkDrafts = require(shared:WaitForChild("FireworkDrafts"))
@@ -640,6 +642,21 @@ local function play(payload: any, distance: number)
             local boostLife = if ev.boost then (ev.boost.lifeScale or 1) else 1
             tail = math.max(tail, BurstStyles.releaseTail(ev.style) * boostLife)
         end
+    end
+
+    -- AUTO-LOOK (owner, 2026-09-03, from the cold walk: new players "will miss the detonation
+    -- of their firework because they don't know to look up"). Tell the local camera where THIS
+    -- player's own shell will break — fired here, after the fuse stretch and the full seeded
+    -- apex derivation, because this is the only place the true burst point exists; any other
+    -- consumer would have to replay the rng stream to know it. LaunchLookController sweeps.
+    if payload.by == tostring(Players.LocalPlayer.UserId) then
+        local firstBurstAt: number? = nil
+        for _, ev in schedule do
+            if ev.kind == "burst" and (firstBurstAt == nil or ev.at < firstBurstAt) then
+                firstBurstAt = ev.at
+            end
+        end
+        EventBus.OwnLaunch:Fire({ apex = apex, burstAt = firstBurstAt or 3 })
     end
 
     -- THE SHELL-LEVEL BOOST ROLL (owner, 2026-09-05, superseding the per-phase roll): the

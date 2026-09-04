@@ -31,9 +31,8 @@ Everything below marked *verified* was checked live via the Studio MCP on 2026-0
    (the daytime working value) or cleared — never publish a dusk/night lock outside
    the demo window. This resolves the ⚠ OPEN QUESTION below **for the demo period
    only**; the post-demo default remains open.
-   Verified 2026-09-03: `DayNightLockT = 1.19` (same phase as 0.19 — the controller
-   wraps the fraction — set by the owner while making daytime changes, "wasn't
-   recent"), `DayNightStartT` cleared. ⚠ OPEN QUESTION (owner, 2026-09-03, deferred:
+   **Set 2026-09-03 via MCP: `DayNightLockT = 0.40`** (was 1.19; superseded that day's
+   earlier verification), `DayNightStartT` cleared. ⚠ OPEN QUESTION (owner, 2026-09-03, deferred:
    "leave it for the moment, we'll discuss in a bit"): whether the published game
    should keep a day lock at all past the demo — the owner noticed "the day night
    cycle doesn't run, even in play" as a surprise, and fireworks/hotaru/the whole
@@ -50,17 +49,22 @@ Everything below marked *verified* was checked live via the Studio MCP on 2026-0
 4. Save/publish the place after ANY place-only work — a session's live edits are
    worthless until saved.
 5. Onboarding tour stops (spec `docs/superpowers/specs/2026-09-03-onboarding-journey-design.md`):
-   tag `TourStop_Shop` (hanabiya's threshold, or another PLACE-OWNED part near it) and
-   `TourStop_Launch` on a DEDICATED MARKER part — never a rebuilt deck or structure.
-   Same rule as `tagLaunchSites.luau`'s own header: decks and teahouses are destroyed
-   and rebuilt on upgrade/display-change/claim, and a tag on one of their parts
-   disappears with it, silently. `TourStop_Model` is **not** a hand-tag any more — the
-   server tags it itself at boot, on the runtime-built model pad's `PadDeck` (see item
-   6 below and the `TourModelPadId` block in `main.server.luau`), because that site is
-   also runtime-built and the same rule forbids tagging it by hand.
+   the markers are built by `roblox/tools/studio/tagTourStops.luau` (dedicated invisible
+   parts under `Workspace.CanyonWorld.TourStops` — never a tag on rebuilt or Rojo-managed
+   geometry, same rule as `tagLaunchSites.luau`'s header). **Done 2026-09-03 via MCP**:
+   `TourStop_Shop` at the hanabiya, `TourStop_Launch` at the FW11 Switchback Deck (the
+   owner's pick over the Overlook — the tour's launch stop, a new 4th public launch site
+   `Site_SwitchbackDeck` added to `tagLaunchSites.luau` the same day, with a
+   `FireworkTubeMount` rack from `buildSwitchbackRack.luau` under
+   `Workspace.CanyonWorld.SwitchbackRack`). `TourStop_Model` is **not** a hand-tag —
+   the server tags the runtime-built model pad's `PadDeck` itself at boot (the
+   `TourModelPadId` block in `main.server.luau`), because that site is also
+   runtime-built and the same rule forbids tagging it by hand.
 6. Set the `Workspace.TourModelPadId` attribute to the model pad's `T##` id — this is
    what lets the server find and tag that pad's `TourStop_Model` automatically at
-   boot; there is nothing further to do for that stop.
+   boot; there is nothing further to do for that stop. **Set 2026-09-03: `T13`**
+   (owner stood on it in Play and chose it — "a logical progression up the path from
+   the Switchback Deck where they'll be launching their first firework").
 
 ## Workspace (verified 2026-08-15)
 
@@ -77,8 +81,13 @@ Everything below marked *verified* was checked live via the Studio MCP on 2026-0
   `ServerStorage.RetiredLegacyTeahouses`)**,
   Foliage (Heroes, Preserve, ShoreRocks, ArrangementsDraft ×22, EastBackdrop), Water
   (runs + `FallsAudio` with 17 emitters), Ambience (`Audio_Dock_Uguisu` +
-  `UguisuScheduler`), LaunchSites (3 tagged `FireworkLaunchSite` parts).
-- `Sandbox` present (throwaway prototypes; also `PlantDepthRig`).
+  `UguisuScheduler`), LaunchSites (**4** tagged `FireworkLaunchSite` parts since
+  2026-09-03 — `Site_SwitchbackDeck` joined the original three; recipe
+  `tagLaunchSites.luau`), TourStops (2 `TourStop_*` markers, recipe
+  `tagTourStops.luau`), SwitchbackRack (3 `FireworkTubeMount` plates, recipe
+  `buildSwitchbackRack.luau` — the public battery stands tubes on them at boot).
+- `Sandbox` present (throwaway prototypes; also `PlantDepthRig`, and since 2026-09-03
+  `SkyBackdropTrial` — the [[horizon-backdrop]] rings and ground plane, promotion open).
 - Attributes/registrations that exist only in the place: the **`EngawaBarrier`
   collision group** (verified registered; blocks players, passes `Projectile` — if
   barriers ever stop working, check this first), stage live-tune attributes
@@ -101,6 +110,8 @@ Everything below marked *verified* was checked live via the Studio MCP on 2026-0
   `Sandbox_PARKED_2026_08_01`, `Scaffolding_PARKED`, `WorkspaceStrays_PARKED`,
   `FireworkBench_PARKED` ([[fireworks]]), `ParkedFoliage`
   (`MossTransitions_2026_08_01`, `MuhlyKit_2026_07_31`, `MarginCull_2026_07_30`).
+- **Import records**: `BackdropImports` — the 3D Importer originals of the [[horizon-backdrop]]
+  range strips (v1 and v2 sets, 2026-09-03); not scenery.
 - **Libraries/tools**: `FoliageZones` (35 zone volumes), `FoliageKit`, `MossLibrary`,
   `IrisLibrary`, `TrailStoneLibrary`, `RockLibrary`, `YamadoroLibrary`,
   `StructurePrefabs` (**teahouse-1story-s/m/l — three authored sizes**),

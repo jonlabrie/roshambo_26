@@ -269,17 +269,16 @@ local ArenaLayout = {
     -- entrance marker at rim coordinates the canyon redesign abandoned; Graybox.luau is its only
     -- consumer. The torii that actually exists is toriiGate, below.
     bowlTorii = { pos = { 0, 28, -196 } },
-    -- THE TORII: myōjin form in shu-iro, standing on the Overlook deck's WESTERN EDGE — the
-    -- threshold between the deck a player spawns on and the square they walk out into.
+    -- THE TORII: myōjin form in shu-iro, standing at the CENTRE of the Overlook deck — the spawn
+    -- hides inside the slab beneath its arch, so a player materialises under the gate (owner's
+    -- move, 2026-09-03, commit f66370a; it stood on the western edge at x58 before that).
     --
-    -- ON THE DECK (113.30) rather than on the ground. West of the deck the terrain falls away —
-    -- measured 2026-08-14, 112.6 at x52 down to 109.7 at x57, with the two footings differing by
-    -- as much as 1.7 across the gate line. A built platform has no such argument.
-    --
-    -- The pillars stand just OUTSIDE the deck's exit gap (UpperStep spans z21.5..34.5) so the gate
-    -- frames the way out instead of standing in it, and clear of the corner newels at z13/z43.
+    -- ON THE DECK (113.30) rather than on the ground: west of the deck the terrain falls away —
+    -- measured 2026-08-14, 112.6 at x52 down to 109.7 at x57 — and a built platform has no such
+    -- argument. The pillars at z20.5/z35.5 still clear the exit gap (UpperStep spans z21.5..34.5)
+    -- and the corner newels at z13/z43.
     toriiGate = {
-        pos = { 58, 113.3, 28 },
+        pos = { 74, 113.3, 28 },
         span = 15, -- pillar centre to centre
         height = 14, -- deck to the top of the kasagi
         pillarD = 1.5,

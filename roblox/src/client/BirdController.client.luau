@@ -35,7 +35,9 @@ local FamiliarRoster = remotes:WaitForChild("FamiliarRoster") :: RemoteEvent
 -- ⚠ WHICH BIRD, and it is ONE name feeding assets, voice AND proportion. Splitting it -- a
 -- hardcoded "UguisuBody" here and a separate "Uguisu" for the voice -- is how a bird ends up
 -- wearing a crow's body with a warbler's song, with nothing to catch it.
-local SPECIES = "Karasu" -- ⚠ hardcoded: nothing selects a bird per player yet (F&F item 6)
+local SPECIES = "Mejiro" -- ⚠ hardcoded: nothing selects a bird per player yet (F&F item 6).
+-- Owner, 2026-09-03: the mejiro (white-eye) is the default familiar "for now". The uguisu is
+-- special to the falls dock and stays there; the karasu is to become an AMBIENT bird.
 -- ⚠ NO FALLBACK. `scaleOf` returns nil for an unregistered species and this refuses to start
 -- rather than moving a crow on uguisu timings, which would present as "the animation is wrong".
 local SPECIES_SCALE = BirdSpecies.scaleOf(SPECIES)
@@ -116,12 +118,14 @@ local SONG_STAGGER = 2.2 -- seconds of jitter before a bird decides to sing
 -- point. Other people's birds sing sometimes, which is what keeps a crowd from becoming a wall
 -- of noise. The stagger still applies to both.
 local SONG_CHANCE_OWN = 1.0
--- ⚠ THE IDLE SONG (owner, 2026-09-03: "we should probably let the familiars sing occasionally
--- when perched... It should be relatively rare"). An opportunity comes on a FREE-RUNNING clock —
--- the dock scheduler's own rule: never keyed to the player — and each opportunity still passes
--- through sing()'s crowd chance and concurrency cap, so the average perched bird sings unprompted
--- every several minutes and the win song remains the event.
-local IDLE_SONG_MIN, IDLE_SONG_MAX = 90, 240 -- seconds between idle-song opportunities
+-- ⚠ THE IDLE SONG. An opportunity comes on a FREE-RUNNING clock — the dock scheduler's own
+-- rule: never keyed to the player — and each opportunity passes IDLE_SONG_CHANCE and sing()'s
+-- concurrency cap. Owner, 2026-09-03, after the first cut (90–240 s at the 0.3 crowd chance,
+-- about one song per nine minutes) was heard as "bird never sings, those settings are way off":
+-- "familiars should sing once or twice per minute, so the opportunity should arise every
+-- 20 seconds or so." Three opportunities a minute at a coin flip is ~1.5 songs a minute.
+local IDLE_SONG_MIN, IDLE_SONG_MAX = 15, 25 -- seconds between idle-song opportunities
+local IDLE_SONG_CHANCE = 0.5 -- per opportunity; its own knob, not the crowd chance below
 local SONG_CHANCE_OTHER = 0.3
 local MAX_CONCURRENT_SONGS = 6
 
@@ -339,8 +343,8 @@ end
 
 local singing = 0
 
-local function sing(b: Bird, isOwn: boolean)
-    local chance = if isOwn then SONG_CHANCE_OWN else SONG_CHANCE_OTHER
+local function sing(b: Bird, isOwn: boolean, chanceOverride: number?)
+    local chance = chanceOverride or (if isOwn then SONG_CHANCE_OWN else SONG_CHANCE_OTHER)
     -- The owner's own bird is never crowded out: it bypasses the concurrency ceiling.
     if not isOwn and (singing >= MAX_CONCURRENT_SONGS or math.random() > chance) then
         return
@@ -637,12 +641,24 @@ RunService.RenderStepped:Connect(function()
                 -- needed (its origin sat at the body centre) is gone.
                 target = b.perch.WorldPosition
             else
-                -- ⚠ NOWHERE TO SIT: fall back to the orbit rather than freezing. This is also
-                -- what keeps a bird OUT of buildings (owner: birds do not go inside) — indoors
-                -- there are no perches, so a bird that already has one simply keeps it and waits
-                -- outside; only a bird with none at all follows its owner in.
-                local o = BirdFlight.offsetFor("RESTING", elapsed, b.seed, PROFILE)
-                target = (root.CFrame * CFrame.new(o.x, o.y, o.z)).Position
+                -- ⚠ NOWHERE TO SIT: the OWNER is the perch (owner, 2026-09-03: the familiar
+                -- "basically goes into a constant search for a perch bobbing around my head.
+                -- so why not make my head a perch, if none other is available?"). The old
+                -- fallback was the RESTING orbit, whose animated offset drifts with every
+                -- step — a permanent search that never settles. Sitting on the head is a
+                -- FIXED seat: still owner = still bird, and the bird still follows its owner
+                -- indoors only when it has nowhere else to sit (birds do not go inside
+                -- otherwise — a bird holding a real perch keeps it and waits).
+                local char = root.Parent
+                local head = if char then char:FindFirstChild("Head") else nil
+                if head and head:IsA("BasePart") then
+                    -- feet-origin mesh on the head's top, +0.2 so hair/hats don't swallow it
+                    target = head.Position + Vector3.new(0, head.Size.Y * 0.5 + 0.2, 0)
+                else
+                    -- no head yet (mid-spawn): the old orbit, briefly
+                    local o = BirdFlight.offsetFor("RESTING", elapsed, b.seed, PROFILE)
+                    target = (root.CFrame * CFrame.new(o.x, o.y, o.z)).Position
+                end
             end
         end
 
@@ -867,12 +883,24 @@ RunService.RenderStepped:Connect(function()
             -- Perched, still, nothing pending: occasionally a bird just sings (owner ruling,
             -- 2026-09-03). ⚠ The clock RESCHEDULES WHETHER OR NOT a song plays — pausing it
             -- until conditions allow would recreate the sing-on-arrival behavior the dock
-            -- scheduler's gate exists to forbid. sing(b, false) applies the crowd chance and
-            -- the concurrency cap, which is where the rarity comes from.
+            -- scheduler's gate exists to forbid. IDLE_SONG_CHANCE sets the rate; the concurrency
+            -- cap still applies, so a crowd of perched birds cannot become a wall of song.
+            -- ⚠ `resting` means NO RESULT PENDING — the bird's ordinary world state, the one
+            -- where it sits on a perch — not "in the resting orbit". The first gate said
+            -- `not resting`, which confined the idle song to the WIN/LOSS act-outs and so
+            -- silenced every perched bird (owner: "didn't sing in two minutes"). Guarded by
+            -- `tests/BirdIdleSong.spec.luau`, which reads this condition from source.
             if now >= b.nextIdleSongAt then
                 b.nextIdleSongAt = now + IDLE_SONG_MIN + math.random() * (IDLE_SONG_MAX - IDLE_SONG_MIN)
-                if not flying and not resting and k >= 1 and b.song == nil and not b.singArmed then
-                    sing(b, false)
+                if
+                    resting
+                    and b.perch ~= nil
+                    and not flying
+                    and k >= 1
+                    and b.song == nil
+                    and not b.singArmed
+                then
+                    sing(b, false, IDLE_SONG_CHANCE)
                 end
             end
 

@@ -3784,3 +3784,92 @@ before this entry: roblox stylua/selene/1826 Lune tests/rojo build, server's
 moves from queued to IN EXECUTION; open gates remaining are the copy workshop
 (beat copy still leans on gambling vocabulary pending the kid-legible rewrite)
 and the owner's unrehearsed cold phone walk.
+
+## [2026-09-03] decision | Horizon backdrop -- mesh ranges outside the terrain box, Atmosphere retuned
+
+The terrain's cut edges against empty sky are now hidden by two rings of mountain-range
+MeshParts outside the box plus a ground plane under the horizon, trial home
+`Workspace.Sandbox.SkyBackdropTrial` (`docs/wiki/world/horizon-backdrop.md`). Approach A
+(geometry + the existing Atmosphere) was chosen over terrain feathering and a painted cubemap
+because a skybox has no parallax and cannot follow the atmosphere's tint through the
+night-first cycle. Two part-built silhouettes were rejected in-session (rolled blocks "read as
+boxes"; wedge pyramids "still just look like triangles"), so the strips are Blender
+height-fields (`roblox/tools/blender/backdrop_ranges.py`, commit `75b4de2`) placed by
+`roblox/tools/studio/buildSkyBackdrop.luau`, which derives each crest from the terrain skyline
+seen from five vantages after the first mesh pass "lost altitude" from the suspension bridge.
+v2 (`4308c22`) halved the peaks' aggression and moved both rings in after the owner's verdict.
+Atmosphere was retuned live for the ranges: Offset 0.15 -> 0.35, Density 0.34 -> 0.22 ("too
+much") -> 0.30 ("pretty good, let's run with that for now"); written to Edit, saved with the
+place. Trap recorded: the 3D Importer's dialog reports wrapper asset ids, and only the created
+MeshPart's `MeshId` loads via `CreateMeshPartAsync`. Promotion out of Sandbox, join-time
+preload and strip variety are open on `docs/wiki/program/backlog.md`.
+
+## [2026-09-03] decision | The uguisu is the familiar; the karasu becomes an ambient bird
+
+`BirdController.client.luau`'s hardcoded `SPECIES` flipped Karasu -> Uguisu (the reference
+species, whose scale-1 output is the bit-identical baseline). Owner: "flip to the uguisu, the
+karasu is going to be an ambient bird." Gates: stylua/selene clean, 1825 Lune tests green. The
+owner has never heard the idle perch song and will test it; expected rate from the code is one
+opportunity every 90-240 s, each passing a 0.3 crowd chance, so roughly one song per nine
+minutes per perched bird. Per-player selection (F&F item 6) is still unbuilt.
+
+## [2026-09-03] gate | Idle perch song retuned: once or twice a minute, not once per nine
+
+Owner on the first cut: "bird never sings, those settings are way off. familiars should sing
+once or twice per minute, so the opportunity should arise every 20 seconds or so."
+`IDLE_SONG_MIN..MAX` 90–240 -> 15–25 s and a dedicated `IDLE_SONG_CHANCE` 0.5 (the idle path
+used to ride the 0.3 crowd chance). The gate condition itself was checked and is sound: `k`
+reaches exactly 1 when the flight completes, so the earlier silence was rate, not a bug.
+Applied in the open place and on the branch; 1825 Lune tests green. The "relatively rare"
+ruling of earlier the same day is superseded.
+
+## [2026-09-03] decision | Default familiar is the mejiro; the uguisu stays the falls-dock bird
+
+Superseding the Uguisu flip from earlier today: "the uguisu is a special bird for the falls
+dock area (for now, at least) so let's make the white-eyed warbler the default for now."
+`SPECIES` = Mejiro (registered with three clips, its own body length and the uguisu's seat
+nudge; meshes declared in `default.project.json`). Applied in the open place and on the branch.
+
+## [2026-09-03] defect | The idle perch song never fired: `not resting` meant "only during a result"
+
+Owner: "mejiro familiar didn't sing in two minutes of observation." At 15–25 s opportunities
+and a 0.5 chance that is a <2% outcome, so the gate was read from source: in `BirdController`
+`resting` means no round result pending — the perched world state — and the idle gate required
+`not resting`, so an idle song could fire only during a WIN/LOSS act-out. Fixed to
+`resting and b.perch ~= nil and ...`; new source-scanning spec `tests/BirdIdleSong.spec.luau`
+failed on the old line and passes on the new. Applied in the open place too. 1827 Lune tests
+green.
+
+## [2026-09-03] gate | Idle perch song confirmed by ear on the mejiro
+
+Owner, after the `resting` gate fix and the 15–25 s / 0.5 retune: "seems to be working as
+expected." Rate and gate stand as recorded on `docs/wiki/world/familiars.md`.
+
+
+## [2026-09-03] gate | The onboarding journey survives its cold walks — demo-ready
+
+The owner walked the journey cold (fresh serene_blu profile each run) through several
+fix rounds in one day: the win-drop firecracker no longer spoofs the shop purchase
+(tour edges gated on the tour's own leg), the shop balance syncs on bank, public sites
+provide all mortar tiers (rack tubes now S/M/L, launches prefer the matching tube),
+the fireworks rail lists only owned shells (Bottle Rocket, née Firecracker), auto-look
+went through three versions to a camera-blend that never fights the player, the
+familiar perches on its owner's head when no perch is near, auto-jump is off, the
+portrait cluster cleared the jump button, the welcome/beat copy is the owner's
+end-to-end, the hanabiya wears twelve recipe-derived posters (owner-approved set), the
+torii crowns the Overlook deck with the spawn hidden beneath its arch, and a Josefin
+Sans + caret-glyph signage identity is recorded. Owner's close: today's walk "was
+great, right up to the teahouse... I feel like I could walk through a demo with a
+couple of newbies tomorrow." Tomorrow's agenda captured on [[backlog]] — railing
+tunnel-cuts (owner-guided per pad), the unjumpable-railing ruling reversal, stats-cave
+onboarding, random familiar assignment.
+
+## [2026-09-03] fix | roblox-ci red nine pushes -- hand-edited Torii.model.json vs the genmodels gate
+
+The torii's deck-centre move (`f66370a`) edited `roblox/assets/Torii.model.json` directly
+(x58 -> x74); the "Generated models are current" gate regenerated the old gate from
+`ArenaLayout.toriiGate` and failed every push from `f0b5dbb` through `fea200f` -- and no
+pushing session looked at CI. Fixed in `b6ddb1a`: the layout constant moved to 74, the
+JSON is generator output again. Standing rule recorded on [[rojo-and-place]]:
+`assets/*.model.json` is never hand-edited, and a push is not done until its CI run is
+seen green.

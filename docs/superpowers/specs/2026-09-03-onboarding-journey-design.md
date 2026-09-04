@@ -100,6 +100,12 @@ Draft pages (copy workshop pending — the owner explicitly wants to work these,
   `FireworkLaunchSite`, `TourStop_Model` on the model pad's site.
 - **New events** on the onboarding channel, wired in `main.client.luau`:
   `bankCardDismissed` (OnboardingController), `shellBought` (purchase echo),
+  **amended after the owner's cold walk (2026-09-03): the inventory-edge fires are
+  gated on the tour's current step** — a rising shell count only fires `shellBought`
+  at step SHOP, a falling one only fires `shellLaunched` at step LAUNCH — because
+  every WIN grants a firecracker server-side (Settlement.ts's grant pathway), and the
+  first win's drop otherwise spoofs a purchase and jumps the tour past the win/bank
+  beats (exactly what the walk found),
   `shellLaunched` (launch confirm), `tourArrival` (beam controller).
 - Old hands and finished guests never see the beam: it exists only while a
   tour step is open.

@@ -9,6 +9,38 @@ updated: 2026-09-03
 Future work captured with enough context to restart cold. Nothing here is scheduled; the
 active program is [[friends-family-baseline]]. Ordering within this page is arbitrary.
 
+## TOMORROW'S AGENDA (owner, 2026-09-03 close — post-cold-walk)
+
+Owner's own list, verbatim intent, after a walk that was "great, right up to the
+teahouse" and left them feeling "I could walk through a demo with a couple of newbies
+tomorrow":
+
+1. **Engawa railing tunnel-exit cuts** — "the railings need to be aware of where the
+   tunnel exits are, because right now on many pads you exit into a closed railing and
+   have to jump over." Railings are procedurally built (`PadOps.luau` deck geometry;
+   see [[teahouses]] § deck fall-prevention), so this needs a per-pad CUT: "a one time
+   pass where I show you where it's needed and we make it happen, for each pad" —
+   owner-guided, pad by pad, likely a per-site cut spec (PadSites data or attributes)
+   the builder honours. Interlocks with the 2026-07-05 access decision ("access
+   infrastructure is hand-built per site") and its "occupancy-conditional access
+   objects" future hook.
+2. **⚠ RULING REVERSAL — teahouse railings become unjumpable, "full stop".** This
+   supersedes the settled 2026-07-13 fall-prevention design ("stop *accidental*
+   walk-offs only — a deliberate leap into the gorge still works... Do not resurrect
+   tall imprisoning walls"). The invisible fall-guard's `BARRIER_H` (3.5, "a pure
+   physics number") is the lever; fireworks must keep passing (the `EngawaBarrier`
+   collision group passes `Projectile`). Update [[teahouses]] when built.
+3. **Stats-cave onboarding** — "onboard the player to the stats cave (like Batman's
+   bat cave, get it?)... maybe the first time they level up or something." Folds into
+   the banked "teahouse/stats beats" item below; the trigger moment (first level-up?)
+   is a design question for the pass.
+4. **Random familiar assignment** — new players get a familiar randomly assigned "from
+   among the three (currently) available familiars. Not the crow, which we need to
+   make ambient." See [[familiars]] / [[ambient-birds]] for the current roster (the
+   mejiro is today's default; the karasu's ambient conversion was already directed on
+   the bird thread). This also finally moves [[friends-family-baseline]] item 6's
+   "roster selection is the smallest thing" blocker.
+
 ## A spooky area at the WEST END of the canyon — fireflies and fog in the trees
 
 Owner, 2026-08-19, parking the ground-fog question: *"I think we're going to do a little spooky
@@ -16,8 +48,8 @@ area up at the west end of the canyon, with fireflies and fog in the trees up th
 
 **Atmosphere CANNOT do this and it is worth knowing before anyone tries.** `Lighting.Atmosphere`
 is a single global object — no zones — and it has **no height falloff**, so it cannot be dense at
-ground level and clear above. The place already runs one (Density 0.34 / Offset 0.15 / Haze 1.90 /
-Glare 0.25), and the legacy `FogStart 180` / `FogEnd 900` beside it is **inert**: once an
+ground level and clear above. The place already runs one (read its values off `Lighting.Atmosphere` in Studio; Density and
+Offset were retuned for the [[horizon-backdrop]] on 2026-09-03), and the legacy `FogStart 180` / `FogEnd 900` beside it is **inert**: once an
 Atmosphere exists the legacy fog properties are ignored.
 
 Two techniques that DO work, both already proven in this repo:
@@ -521,11 +553,57 @@ special? The onboarding path needs to be so smooth that even an 8-year old can d
 
 This extends the standing no-sports-book-language rule into the onboarding voice, and it is
 a JOURNEY design (sequence, pacing, vocabulary, the four questions above), not a copy edit.
-The copy/vocabulary pass itself is still to be crafted owner+Claude together (owner:
-"together you and I need to craft this journey") — the mechanics above are the scaffolding
-it will run on, not that pass. Context: the beats now RENDER (defect (d) fixed 2026-09-05 --
-every F&F guest would have seen empty boxes); the eight beats built this pass are still
-placeholder copy pending the vocabulary workshop.
+~~The copy/vocabulary pass itself is still to be crafted~~ **DONE 2026-09-03**: the
+copy workshop ran owner+Claude in-session. Owner wrote the four-page welcome, the win
+beat (teach-then-use POT — the vocabulary guard narrowed to the wager class
+ride/stake/wager/bet, rationale in `tests/OnboardingBeats.spec.luau`), the bank beat
+(+ kept clock-gesture sentence) and tour cards 8–10; Claude's drafts stand for the
+throw beat, the model-home close and the shop strings ("good for now"). Route rulings
+the same session: launch stop = a NEW 4th public site at the **FW11 Switchback Deck**
+(with a `FireworkTubeMount` rack), model pad = **T13** (owner stood on it), hanabiya
+stays the shop stop for the demo.
+
+## Onboarding: replayable journey + teahouse/stats beats (owner, 2026-09-03, banked mid-cold-walk)
+
+Two extensions the owner named while walking the journey cold:
+
+1. **Optional reset/re-run of the onboarding path** — "an option we'd place somewhere on
+   a config screen." Mechanically cheap on the surface (clear the profile's `seenBeats`
+   and the tour re-derives from empty — TourGuide has no state of its own), but it needs
+   a config-screen HOME first (no settings surface exists in the Roblox client today) and
+   a ruling on what reset does NOT touch (points/property stay; the starter prompt won't
+   re-offer to an owner, so a replayed tour ends on a pitch the player can't buy —
+   acceptable? copy fork?).
+2. **The journey never teaches the teahouse panel or the stats surfaces** — no beat
+   covers the ledger/stats dialogs or the teahouse management panel (B3), so those ship
+   as discovered-not-taught. New beats need their trigger moments chosen (first panel
+   open? first pad claim?) and kid-clean copy — a copy-workshop item, owner+Claude.
+
+Both queued behind the demo; neither blocks the walk.
+
+## Rack-as-shop at the Switchback Deck (banked 2026-09-03)
+
+Owner direction, deferred past the F&F demo by the owner's own "hanabiya for the
+demo" ruling: *"the launch rack tied to it [the Switchback Deck] will be the
+fireworks shop"* — a purchase surface AT the rack, so buying and firing happen at one
+dramatic stop and the tour could collapse shop+launch into a single climb. Needs a
+buy prompt/panel on the rack wired to the existing `RequestPurchase` flow (today the
+hanabiya is the only shell-purchase surface). Shape when taken up: brainstorm → spec
+(it interlocks with the shop-dressing/box-art thread — what does a rack SELL, shells
+or boxes?).
+
+## Tunnel lighting pass (banked 2026-09-03)
+
+Owner observation at the T13 tunnel branch: "Tunnels seem to be self-lit — is that a
+setting? It would be more interesting visually if we actually put lights in them."
+Diagnosis: yes, a setting — `Lighting.Ambient`/`OutdoorAmbient` fill enclosed spaces
+uniformly (ambient is not occluded; the day/night controller moves ClockTime only and
+deliberately never touches Ambient). Making tunnels genuinely dark means lowering
+`Ambient` toward black — at which point they need PLACED light, which is the owner's
+instinct anyway. Shape when taken up: an art pass — yamadoro/chōchin recipes exist;
+tune Ambient + place fixtures per tunnel, judged at the dusk lock (and again against
+the natural cycle if the day lock is ever cleared). Interlocks with the parked
+firebox/care-gradient thread on the yamadoro item above.
 
 ## Fireworks monetization vocabulary: boosts standard, surprises typed, mystery + bundle SKUs (owner, 2026-09-05)
 
@@ -616,3 +694,63 @@ players queue shells at a station and the station fires them in order. Interlock
 the rooftop MC experience (same fire-things-from-a-console family) and the shared-show
 SKU. Station orientations are owner-aimed launch headings, already honored by the fire
 path.
+
+## Horizon backdrop — trial in Sandbox, promotion open
+
+The mountain ranges outside the terrain box ([[horizon-backdrop]]) are built and owner-approved
+as a direction ("pretty good, let's run with that for now", 2026-09-03) but still live in
+`Workspace.Sandbox.SkyBackdropTrial`. Open before it is shipped content:
+
+- **Promote out of Sandbox** into a `CanyonWorld` home and retarget the builder's root; the
+  Sandbox convention on [[place-state]] says prototypes only.
+- **Preload the six range meshes at join** (`ContentProvider:PreloadAsync` on the builder's
+  `MESH_IDS`) so the horizon is there before a new player looks up — assets load near-to-far,
+  which puts the ranges last.
+- **Variety**: the owner found the six strips "a little bit the same". More seeds, or
+  mirroring alternate placements, is a one-line change in `backdrop_ranges.py` plus one
+  re-import.
+- The near ring cannot come closer without its footprint crossing the terrain box; if "too
+  far" comes back, the lever is letting the low aprons run under the plateau, which needs a
+  height-aware intrusion check instead of the corner check.
+
+## Low-end device tier — PARKED (owner, 2026-09-03: "hold on this for the moment")
+
+Owner's prompt: in its current form Roshambo "absolutely hammers my iPhone 15, hard on the
+battery, generates heat". Question was how practical a radically more efficient version is and
+how much of it needs the owner.
+
+**Shape ruled in the discussion: a device TIER inside the one place, not a second experience.**
+Roblox ships one build per experience; a lite place would split the player base and "you
+against the world" needs everyone in one round. The engine's own Graphics Quality (player-chosen
+in the escape menu, Automatic or 1–10; readable via `UserGameSettings.SavedQualityLevel`, never
+settable by us) already scales rendering. What it cannot touch is what we authored, which is
+where the heat is:
+
+- particle emitters: the 135 water VFX objects ([[day-night]]), the fireworks pool, mist
+- post effects on `Lighting`: SunRays, two Blooms, DepthOfField, two ColorCorrections
+- instance counts: 3,580 foliage MeshParts at the 2026-08-05 audit ([[foliage]]), the
+  [[horizon-backdrop]]
+- per-frame client loops: birds, day/night subscribers, water dim, glyph neon, HUD
+
+**How a tier would work**: a client-side decision at join about what to enable — emitters,
+post effects, bird count, streaming radius, loop tick rates — so the server stays one world.
+Default from auto-detect (touch without keyboard, as the HUD's touch tier already does; saved
+quality level; total memory; a frame-time sample over the first seconds), with a player
+"Performance mode" override in our settings, persisted, because auto-detect misreads tablets
+and gaming phones both ways. Precedent: the PWA's LITE/FULL/ULTRA visual tiers ("Data Thrift").
+⚠ Tiering hides and disables; it does not un-send. Replicated instances still reach a phone
+unless the streaming radius keeps them out — memory wins come from streaming, heat wins from
+what stops rendering and ticking.
+
+**What needs no guidance** (a couple of sessions): profile on the phone first (MicroProfiler),
+build the tier switch, gate the list above behind it, throttle per-frame loops to 30 Hz.
+
+**What needs owner rulings** — short yes/no gates, not open design: fireworks on a phone (half
+the stars vs the full show at a lower rate); water (static + foam vs motion at lower rates);
+lanterns and glyphs (glow kept vs flat); backdrop (kept vs a painted skybox on the low tier
+only).
+
+**Honest ceiling**: an iPhone 15 warms up on a bare baseplate at 60 fps. The reachable win is
+roughly halving what we ask of it, not a cool phone. The biggest battery lever is the frame-rate
+cap in Roblox's own settings, which belongs to the player.
+

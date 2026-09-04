@@ -28,6 +28,15 @@ Current as-built inventory of place-only content: [[place-state]].
   - `Workspace.RoshamboStage` → hero props, from BOTH `assets/*.model.json` (baked from
     `tools/builders/` via `lune run tools/genmodels`) and `assets/meshes/*.rbxm`, plus
     `ArenaSpawn`.
+    - ⚠ **`assets/*.model.json` is generator OUTPUT — never hand-edit it.** Moving or
+      reshaping a prop means editing its `tools/builders/` layout constant and re-running
+      `lune run tools/genmodels`; CI's "Generated models are current" gate regenerates and
+      diffs, so a hand edit goes red on every push until someone notices. Earned
+      2026-09-03: the torii's deck-centre move (`f66370a`) edited the JSON directly and
+      roblox-ci stayed red for nine pushes — none of the pushing sessions checked it —
+      until `b6ddb1a` moved `ArenaLayout.toriiGate.pos` and regenerated. Two rules from
+      one incident: the layout is the single source, and **a push is not done until its
+      CI run is seen green**.
   - ⚠ **Rojo cannot change an instance's ClassName.** A node whose Studio instance is the
     wrong class is blocked permanently and silently — delete the instance, do not fight it.
 - Everything else in Workspace is **place-only**, living only in the saved

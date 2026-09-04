@@ -111,14 +111,20 @@ describe("OnboardingBeats — the journey's chain", function()
 
     test("the bank beat teaches the ring gesture, not just the bank itself", function()
         -- The ring replaced the hamburger but looks like a readout — this beat is the only thing
-        -- left to teach the tap. The copy must name the clock/ring itself AND describe what the
-        -- second tap reaches (the ledger's full detail), not just "tap...again".
+        -- left to teach the tap. The copy must name the control AND describe what the second tap
+        -- reaches, not just "tap...again". The word lists follow the owner's chosen vocabulary
+        -- (2026-09-03 copy pass: "timer" is the player-facing name for the clock/ring, "details"
+        -- for the ledger's full view); the guard is that BOTH halves stay taught, not the words.
         local b = Beats.next({}, "bank")
         expect(b ~= nil).toBe(true)
         expect(b.anchor).toBe("wallet")
         local lower = b.copy:lower()
-        expect(lower:find("clock") ~= nil or lower:find("ring") ~= nil).toBe(true)
-        expect(lower:find("everything") ~= nil or lower:find("ledger") ~= nil).toBe(true)
+        expect(lower:find("clock") ~= nil or lower:find("ring") ~= nil or lower:find("timer") ~= nil).toBe(
+            true
+        )
+        expect(lower:find("everything") ~= nil or lower:find("ledger") ~= nil or lower:find("details") ~= nil).toBe(
+            true
+        )
     end)
 end)
 

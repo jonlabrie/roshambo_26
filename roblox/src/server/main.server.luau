@@ -374,6 +374,13 @@ local lastStats: any = nil
 -- closes. Declared here, assigned once those exist.
 local pushFireworkState: ((Player) -> ())? = nil
 
+-- FORWARD DECLARATION. The bank handler (above the economy block) must refresh the shop's
+-- cached balance the moment a bank lands — the owner's cold walk (2026-09-03) entered the
+-- shop with 3 freshly banked points and "shop thinks I have zero": BankRequest updated the
+-- wallet path (profiles) but playerEconomy kept its join-time snapshot until some purchase
+-- echoed it. Assigned below, once playerEconomy and echoEconomy exist.
+local syncEconomyPoints: ((Player, number) -> ())? = nil
+
 -- FORWARD DECLARATION. pushFireworkState (below, but textually BEFORE rebuildClaimedPad is
 -- declared) needs to trigger the same pad rebuild the decoration flow uses whenever the fireworks
 -- GET's mortars/mortarPlacements actually changed -- mortars now render server-side (TreatmentApplier)
@@ -638,6 +645,11 @@ BankRequest.OnServerEvent:Connect(function(player, rawKeep)
             })
             pushStats(player)
             fireProfile(player, "banked")
+            -- the shop's balance rides EconomyState, not the profile — sync it or the
+            -- counter (and the starter prompt's countdown) shows the join-time snapshot
+            if syncEconomyPoints then
+                syncEconomyPoints(player, res.data.totalPoints)
+            end
         end
     end)
 end)
@@ -1140,6 +1152,16 @@ local function echoEconomy(player: Player, uid: string)
     })
 end
 
+-- assigns the forward declaration the bank handler holds (see its comment near the referee)
+syncEconomyPoints = function(player: Player, totalPoints: number)
+    local uid = tostring(player.UserId)
+    local e = playerEconomy[uid]
+    if e ~= nil then
+        e.totalPoints = totalPoints
+        echoEconomy(player, uid)
+    end
+end
+
 -- Persist ONE shoji slide's final travel, occupant-only: clone the loadout, set
 -- shojiOpen[side][index] to the bay's live ShojiOpen attribute, net:setTeahouse, mirror into
 -- playerEconomy -- the same three-step shape SetBackDoor uses further down (stash, mirror,
@@ -1539,8 +1561,25 @@ RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
                 end
             end
             if #nearTubes > 0 then
-                local mount = nearTubes[math.random(1, #nearTubes)]
-                local muzzle = mount.Size.Y / 2 + MortarPlacement.TUBE["mortar:L"].length
+                -- Prefer the tube whose tier matches the shell's own mortar (a peony flies
+                -- from the small tube, kamuro from the large); several matches or none, one
+                -- drawn at random — the pre-tier behaviour.
+                local wanted = MortarPlacement.SHELL_MORTAR[shellId]
+                local matching = {}
+                for _, m in nearTubes do
+                    if m:GetAttribute("Tier") == wanted then
+                        table.insert(matching, m)
+                    end
+                end
+                local pool = if #matching > 0 then matching else nearTubes
+                local mount = pool[math.random(1, #pool)]
+                -- the muzzle height follows the mount's tier (see the battery boot above)
+                local tierAttr = mount:GetAttribute("Tier")
+                local tier = if typeof(tierAttr) == "string"
+                        and MortarPlacement.TUBE[tierAttr] ~= nil
+                    then tierAttr
+                    else "mortar:L"
+                local muzzle = mount.Size.Y / 2 + MortarPlacement.TUBE[tier].length
                 origin = mount.CFrame:PointToWorldSpace(Vector3.new(0, muzzle + 0.2, 0))
                 local up = mount.CFrame.UpVector
                 heading = up
@@ -1696,11 +1735,18 @@ task.spawn(function()
     if #mounts == 0 then
         return
     end
-    local tubeLen = MortarPlacement.TUBE["mortar:L"].length
     for _, mount in mounts do
+        -- A mount may name its tier via the `Tier` attribute ("mortar:S"/"mortar:M"/"mortar:L")
+        -- — the Switchback rack shows one of each (owner, 2026-09-03: "it looks like they're
+        -- all the same?"). Absent or unknown attribute = L, the original battery's tube.
+        local tierAttr = mount:GetAttribute("Tier")
+        local tier = if typeof(tierAttr) == "string" and MortarPlacement.TUBE[tierAttr] ~= nil
+            then tierAttr
+            else "mortar:L"
+        local tubeLen = MortarPlacement.TUBE[tier].length
         local tube: BasePart? = nil
         for _ = 1, 60 do
-            tube = applier:cloneTube("mortar:L")
+            tube = applier:cloneTube(tier)
             if tube then
                 break
             end

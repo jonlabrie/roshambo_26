@@ -29,9 +29,9 @@ export type Beat = {
 -- shows / how to read the crowd / the handoff into the first throw.
 local WELCOME_PAGES = {
     "Welcome to Roshambo — Rock, Paper, Scissors against Everyone, Everywhere, at the same time.",
-    "The Throw drum atop the Bonsho bell spins every minute to show the world throw — what most people threw.",
+    "The Throw drum atop the Bonsho bell spins once a minute to reveal the world throw — what most people chose in the current round.",
     "You want to beat that throw, so you need to read the crowd. The last five world throws are below the throw buttons, left to right.",
-    "Go ahead and try to beat the world by choosing your first throw now.",
+    "Go ahead and try to beat the world! Choose your first throw below — Rock, Paper, or Scissors.",
 }
 
 OnboardingBeats.BEATS = {
@@ -57,28 +57,28 @@ OnboardingBeats.BEATS = {
         copy = "You're on your way to becoming a globally ranked Roshambo player!"
             .. " Points earned always count towards leveling, but they can also be spent to buy"
             .. " stuff like fireworks and a private place to hang out with friends."
-            .. " Tap the clock to see your points; tap again for everything.",
+            .. " Tap the timer below to see your points, double-tap for details.",
         anchor = "wallet",
     },
     -- ===== The tour (spec §2/§4): earned by banking, walked by the beam =====
     {
         id = "shopDoor",
         event = "bankDismissed",
-        copy = "You can buy fireworks with points. Follow the light to the Fireworks shop!",
+        copy = "You can buy fireworks with points. The Fireworks shop is highlighted for you!",
         anchor = "tour",
         advanceOn = "shellBought",
     },
     {
         id = "launchDoor",
         event = "shellBought",
-        copy = "Nice! Now you need to find a public fireworks spot. Follow the light to find one.",
+        copy = "Nice! Now you need a public fireworks spot — one is highlighted for you!",
         anchor = "tour",
         advanceOn = "shellLaunched",
     },
     {
         id = "modelDoor",
         event = "shellLaunched",
-        copy = "Awesome! One more stop — follow the light to see a teahouse.",
+        copy = "Awesome! One more stop — a teahouse is highlighted for you!",
         anchor = "tour",
         advanceOn = "modelArrival",
     },
@@ -87,7 +87,7 @@ OnboardingBeats.BEATS = {
         event = "modelArrival",
         -- "20 points" mirrors PRICES.starter in server/src/economy.ts — a price change there
         -- must update the copy here too (see the matching comment on that constant).
-        copy = "A teahouse of your very own — 20 points. Every win gets you closer.",
+        copy = "A small teahouse of your own costs 20 points.",
         anchor = "tour",
     },
 } :: { Beat }
