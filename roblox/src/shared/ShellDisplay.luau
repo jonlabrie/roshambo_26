@@ -23,7 +23,11 @@ ShellDisplay.ORDER = {
 }
 
 ShellDisplay.NAME = {
-    firecracker = "Firecracker",
+    -- Renamed from "Firecracker" (owner, 2026-09-03: "what we currently call a 'Firecracker'
+    -- is actually a 'Bottle Rocket'"). The ID stays `firecracker` on purpose: it keys every
+    -- user document's inventory map, the fixtures, the recipes and the win-drop grant —
+    -- renaming the id is a data migration; renaming the SHELL is this one line.
+    firecracker = "Bottle Rocket",
     peony = "Peony",
     willow = "Willow",
     ishibana = "Ishibana",
