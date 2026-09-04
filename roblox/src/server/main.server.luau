@@ -1561,7 +1561,18 @@ RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
                 end
             end
             if #nearTubes > 0 then
-                local mount = nearTubes[math.random(1, #nearTubes)]
+                -- Prefer the tube whose tier matches the shell's own mortar (a peony flies
+                -- from the small tube, kamuro from the large); several matches or none, one
+                -- drawn at random — the pre-tier behaviour.
+                local wanted = MortarPlacement.SHELL_MORTAR[shellId]
+                local matching = {}
+                for _, m in nearTubes do
+                    if m:GetAttribute("Tier") == wanted then
+                        table.insert(matching, m)
+                    end
+                end
+                local pool = if #matching > 0 then matching else nearTubes
+                local mount = pool[math.random(1, #pool)]
                 -- the muzzle height follows the mount's tier (see the battery boot above)
                 local tierAttr = mount:GetAttribute("Tier")
                 local tier = if typeof(tierAttr) == "string"
