@@ -24,6 +24,12 @@ export function readCrowdConfig(
     const size = nonNegativeInt('CROWD_SIZE', rawSize);
     if (size === 0) return null;
 
+    // Validate everything BEFORE the TEST_MODE guard: a typo must refuse to boot in every mode,
+    // not lie in wait until the day someone turns TEST_MODE off.
+    const mix = env.CROWD_MIX !== undefined && env.CROWD_MIX !== '' ? parseMix(env.CROWD_MIX) : DEFAULT_MIX;
+    const rawSeed = env.CROWD_SEED;
+    const configuredSeed = rawSeed !== undefined && rawSeed !== '' ? nonNegativeInt('CROWD_SEED', rawSeed) : null;
+
     // A cycled World Throw beside a plurality distribution that disagrees with it is exactly
     // the lie the engine-side merge exists to prevent (spec §1, §5).
     if (opts.testMode) {
@@ -31,11 +37,10 @@ export function readCrowdConfig(
         return null;
     }
 
-    const mix = env.CROWD_MIX !== undefined && env.CROWD_MIX !== '' ? parseMix(env.CROWD_MIX) : DEFAULT_MIX;
-
+    // Only a crowd that will actually run draws and announces a seed.
     let seed: number;
-    if (env.CROWD_SEED !== undefined && env.CROWD_SEED !== '') {
-        seed = nonNegativeInt('CROWD_SEED', env.CROWD_SEED);
+    if (configuredSeed !== null) {
+        seed = configuredSeed;
     } else {
         seed = opts.randomSeed();
         opts.log(`[CROWD] CROWD_SEED unset; using ${seed} (set CROWD_SEED=${seed} to reproduce this run)`);

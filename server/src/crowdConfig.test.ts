@@ -38,4 +38,21 @@ describe('readCrowdConfig', () => {
         expect(() => readCrowdConfig({ CROWD_SIZE: '5', CROWD_MIX: 'ninja:1' }, opts())).toThrow('CROWD_MIX: unknown archetype "ninja"');
         expect(() => readCrowdConfig({ CROWD_SIZE: '5', CROWD_SEED: 'abc' }, opts())).toThrow('CROWD_SEED="abc" must be a non-negative integer');
     });
+
+    it('still refuses a malformed CROWD_MIX under TEST_MODE, so a typo cannot lie in wait', () => {
+        expect(() => readCrowdConfig({ CROWD_SIZE: '5', CROWD_MIX: 'ninja:1' }, opts(true)))
+            .toThrow('CROWD_MIX: unknown archetype "ninja"');
+    });
+
+    it('still refuses a malformed CROWD_SEED under TEST_MODE', () => {
+        expect(() => readCrowdConfig({ CROWD_SIZE: '5', CROWD_SEED: 'abc' }, opts(true)))
+            .toThrow('CROWD_SEED="abc" must be a non-negative integer');
+    });
+
+    it('does not draw or announce a seed for a crowd TEST_MODE has disabled', () => {
+        const o = { testMode: true, log: vi.fn(), randomSeed: vi.fn(() => 4242) };
+        expect(readCrowdConfig({ CROWD_SIZE: '30' }, o)).toBeNull();
+        expect(o.randomSeed).not.toHaveBeenCalled();
+        expect(o.log).toHaveBeenCalledTimes(1);
+    });
 });
