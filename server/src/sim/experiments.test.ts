@@ -18,6 +18,14 @@ describe('parseArgs', () => {
         expect(() => parseArgs(['--experiment', 'vibes'])).toThrow('unknown experiment "vibes"');
         expect(() => parseArgs(['--bogus', '1'])).toThrow('unknown flag "--bogus"');
     });
+    it('refuses a non-numeric or empty numeric flag', () => {
+        expect(() => parseArgs(['--strength', 'abc'])).toThrow('flag --strength needs a finite number, got "abc"');
+        expect(() => parseArgs(['--rounds', ''])).toThrow('flag --rounds needs a finite number, got ""');
+        expect(() => parseArgs(['--seed', 'NaN'])).toThrow('flag --seed needs a finite number, got "NaN"');
+    });
+    it('refuses fewer than one round', () => {
+        expect(() => parseArgs(['--rounds', '0'])).toThrow('--rounds must be at least 1, got 0');
+    });
 });
 
 describe('experiments (small, deterministic)', () => {

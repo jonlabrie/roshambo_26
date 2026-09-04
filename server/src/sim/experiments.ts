@@ -15,6 +15,12 @@ export interface CliArgs {
 
 const EXPERIMENTS = ['readability', 'blind-spread', 'effective-n'] as const;
 
+function finite(flag: string, raw: string): number {
+    const n = Number(raw);
+    if (raw.trim() === '' || !Number.isFinite(n)) throw new Error(`flag ${flag} needs a finite number, got "${raw}"`);
+    return n;
+}
+
 export function parseArgs(argv: string[]): CliArgs {
     const a: CliArgs = {
         experiment: 'readability', rounds: 20000, crowd: 30, mix: DEFAULT_MIX, strength: DEFAULT_STRENGTH, seed: 1, json: false,
@@ -33,15 +39,16 @@ export function parseArgs(argv: string[]): CliArgs {
                 a.experiment = e as CliArgs['experiment'];
                 break;
             }
-            case '--rounds': a.rounds = Number(next()); break;
-            case '--crowd': a.crowd = Number(next()); break;
+            case '--rounds': a.rounds = finite(flag, next()); break;
+            case '--crowd': a.crowd = finite(flag, next()); break;
             case '--mix': a.mix = parseMix(next()); break;
-            case '--strength': a.strength = Number(next()); break;
-            case '--seed': a.seed = Number(next()); break;
+            case '--strength': a.strength = finite(flag, next()); break;
+            case '--seed': a.seed = finite(flag, next()); break;
             case '--json': a.json = true; break;
             default: throw new Error(`unknown flag "${flag}"`);
         }
     }
+    if (a.rounds < 1) throw new Error(`--rounds must be at least 1, got ${a.rounds}`);
     return a;
 }
 
