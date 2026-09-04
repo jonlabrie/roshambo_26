@@ -68,9 +68,12 @@ local PAD = 0.04
 local DEFAULT_STAGGER_MS = 60 -- matches FlapScheduler's own default
 
 -- The wall boards live in an enclosed room and are read from a few studs away; nothing outside the
--- room can make out a flap. Without this they render from anywhere in the canyon -- ~8,400 GUI
--- instances at roughly seven per cell, and the A13 measured this room as costing what the whole
--- arena square costs (docs/wiki/world/stats-room.md, 2026-08-17).
+-- room can make out a flap. This caps DRAW cost between the cavern and 512 studs (StreamingTargetRadius
+-- since one commit earlier already stops it rendering from "anywhere in the canyon" on its own) --
+-- it does NOT touch instantiation. MaxDistance suppresses rendering, not creation: the ~8,400 GUI
+-- instances at roughly seven per cell still exist and still cost memory regardless of this value,
+-- which is what the A13 measurement (docs/wiki/world/stats-room.md, 2026-08-17) was measuring. The
+-- instance count is a separate, still-open problem.
 --
 -- FlapBoard's only caller is StatsController, which returns early for the round display, so this
 -- reaches the wall boards and cannot reach the cavern display.

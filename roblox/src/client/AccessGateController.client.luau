@@ -120,7 +120,8 @@ RunService.Heartbeat:Connect(function(dt: number)
                 near = (dx * dx + dz * dz) <= (pad.radius * pad.radius)
             end
             pad.near = near
-            -- collision snaps at the threshold (solid the instant you're in range); the visual fades.
+            -- collision snaps at the threshold (solid within a poll of entering range, not the
+            -- instant you're in range -- this block is throttled); the visual fades.
             if near ~= pad.collidable then
                 pad.collidable = near
                 for _, part in pad.parts do

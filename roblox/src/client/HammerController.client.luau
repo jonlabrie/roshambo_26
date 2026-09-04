@@ -9,7 +9,7 @@ local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local ZenDojo = require(shared:WaitForChild("themes"):WaitForChild("ZenDojo"))
 local DrumStep = require(shared:WaitForChild("DrumStep"))
 local EventBus = require(script.Parent:WaitForChild("EventBus"))
-local AmbientBudget = require(ReplicatedStorage:WaitForChild("RoshamboShared"):WaitForChild("AmbientBudget"))
+local AmbientBudget = require(shared:WaitForChild("AmbientBudget"))
 local AmbientConfig = require(script.Parent:WaitForChild("AmbientConfig"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
@@ -382,7 +382,7 @@ end
 
 local drawAcc = 0
 RunService.Heartbeat:Connect(function(dt: number)
-    local c = AmbientConfig.get()
+    local c = AmbientConfig.arena()
     local fire, nextAcc = AmbientBudget.step(drawAcc, dt, c.interval)
     drawAcc = nextAcc
     if not (fire and machineDrawable(c)) then
@@ -479,7 +479,7 @@ RunService.Heartbeat:Connect(function(dt: number)
     -- silences the bell; the backstop above keeps the machine from freezing on a dropped broadcast;
     -- and WheelController reads DriveOmega as its rate every frame. Only the CFrame writes below are
     -- worth culling, and they are also the only expensive part of this loop.
-    local c = AmbientConfig.get()
+    local c = AmbientConfig.arena()
     local fire, nextAcc = AmbientBudget.step(spinAcc, dt, c.interval)
     spinAcc = nextAcc
     if not (fire and machineDrawable(c)) then
@@ -508,12 +508,23 @@ end)
 -- always recompute from the log's live CFrame — never mirror offsets.
 local suspAcc = 0
 RunService.Heartbeat:Connect(function(dt: number)
-    local c = AmbientConfig.get()
+    local c = AmbientConfig.arena()
     local fire, nextAcc = AmbientBudget.step(suspAcc, dt, c.interval)
     suspAcc = nextAcc
     -- updateSuspension recomputes chains and dowels from the log's LIVE CFrame every time, so it
     -- self-corrects on its first frame back and needs no reset after a cull.
-    if fire and machineDrawable(c) then
+    if not machineDrawable(c) then
+        return
+    end
+    -- While a strike is in flight, arm.CFrame is driven by a TweenService tween (see `strike`
+    -- above) that runs at DISPLAY rate and is gated by nothing -- the draw loop above deliberately
+    -- yields to it (`if striking and not hold then return`). The four hemp chains and twelve
+    -- dowels/bands/whips are rigid to the log and must track it every rendered frame during that
+    -- window, or they visibly detach from a log swinging at up to ~17 studs/s: at the throttled
+    -- 30 Hz they lag the tween by as much as 0.56 studs at peak velocity, on parts whose entire
+    -- job is to read as rigidly attached, at close range, at the climax of every round. So bypass
+    -- the throttle (not the visibility gate above) while the tween owns the log.
+    if striking or fire then
         updateSuspension()
     end
 end)

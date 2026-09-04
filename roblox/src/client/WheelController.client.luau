@@ -181,7 +181,7 @@ RunService.Heartbeat:Connect(function(dt)
     -- the player looks away would bring the wheel back at a stale phase.
     angle += dt * driveOmega * wheelDir
 
-    local c = AmbientConfig.get()
+    local c = AmbientConfig.arena()
     local fire, nextAcc = AmbientBudget.step(acc, dt, c.interval)
     acc = nextAcc
     local visible = drawable(c)

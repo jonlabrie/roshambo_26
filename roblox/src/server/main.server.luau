@@ -151,8 +151,24 @@ end
 -- failure mode is content popping in at the edge of view, which no test can see. Published as
 -- attributes so it can be turned during a walk; record what lands in docs/wiki/world/place-state.md.
 local STREAM_MIN, STREAM_TARGET = 64, 512
-workspace.StreamingMinRadius = STREAM_MIN
-workspace.StreamingTargetRadius = STREAM_TARGET
+do
+    -- Scoped to a `do` block (rather than two more file-scope locals) so their registers free up
+    -- for the rest of this 3,400+ line chunk once this check is done -- the file sits at the
+    -- Luau compiler's 200-local-register ceiling.
+    local streamOk, streamErr = pcall(function()
+        workspace.StreamingMinRadius = STREAM_MIN
+        workspace.StreamingTargetRadius = STREAM_TARGET
+    end)
+    if not streamOk then
+        -- Loud but NOT fatal. Every system below this line -- the round loop included -- boots
+        -- after it, so a throw here would take the whole game down with a symptom that points
+        -- nowhere near streaming. The likeliest cause is StreamingEnabled being off in the place,
+        -- which would contradict three separate code comments asserting it is on.
+        warn(`[STREAMING] could not set radii (is StreamingEnabled off?): {streamErr}`)
+    end
+end
+-- Attribute publishes stay outside the pcall so they still reflect what was attempted, whether
+-- or not the property writes above succeeded.
 workspace:SetAttribute("StreamMinRadius", STREAM_MIN)
 workspace:SetAttribute("StreamTargetRadius", STREAM_TARGET)
 
