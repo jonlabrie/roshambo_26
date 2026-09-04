@@ -266,3 +266,59 @@ describe('RoundEngine exact phase clock', () => {
         expect(makeEngine().snapshot().phaseEndsAtMs).toBeUndefined();
     });
 });
+
+describe('the synthetic crowd merges into the tally at round close (spec §1)', () => {
+    const human = (t: 'R' | 'P' | 'S') => ({ throw: t, seq: 1, platform: 'pwa' as const, deviceId: `d-${t}` });
+
+    function fakeCrowd(counts: { R: number; P: number; S: number }) {
+        const throws = vi.fn(() => counts);
+        const observe = vi.fn();
+        return { throws, observe };
+    }
+
+    it('pickWorldThrow sees human + crowd counts, and roundClosed carries both', () => {
+        const crowd = fakeCrowd({ R: 10, P: 3, S: 0 });
+        const picker = vi.fn(() => 'R' as const);
+        const e = makeEngine({ pickWorldThrow: picker, crowd });
+        const closed: any[] = [];
+        e.on('roundClosed', ev => closed.push(ev));
+
+        e.submitThrow('pwa:a', human('P'));
+        e.submitThrow('pwa:b', human('S'));
+        for (let i = 0; i < 5; i++) e.tick();
+
+        expect(crowd.throws).toHaveBeenCalledWith(0);
+        expect(picker).toHaveBeenCalledWith(0, { R: 10, P: 4, S: 1 });
+        expect(closed).toHaveLength(1);
+        expect(closed[0].counts).toEqual({ R: 10, P: 4, S: 1 });
+        expect(closed[0].crowdCounts).toEqual({ R: 10, P: 3, S: 0 });
+    });
+
+    it('the throws map stays human-only — bots never reach settlement', () => {
+        const e = makeEngine({ crowd: fakeCrowd({ R: 10, P: 3, S: 0 }) });
+        const closed: any[] = [];
+        e.on('roundClosed', ev => closed.push(ev));
+        e.submitThrow('pwa:a', human('P'));
+        for (let i = 0; i < 5; i++) e.tick();
+        expect(closed[0].throws.size).toBe(1);
+        expect([...closed[0].throws.keys()]).toEqual(['pwa:a']);
+    });
+
+    it('observe() receives the DECIDED World Throw, after the picker ran', () => {
+        const crowd = fakeCrowd({ R: 0, P: 5, S: 0 });
+        const e = makeEngine({ pickWorldThrow: () => 'S', crowd });
+        for (let i = 0; i < 5; i++) e.tick();
+        expect(crowd.observe).toHaveBeenCalledExactlyOnceWith('S');
+        expect(crowd.throws.mock.invocationCallOrder[0]).toBeLessThan(crowd.observe.mock.invocationCallOrder[0]);
+    });
+
+    it('without a crowd, crowdCounts is zeros and counts are the humans alone', () => {
+        const e = makeEngine();
+        const closed: any[] = [];
+        e.on('roundClosed', ev => closed.push(ev));
+        e.submitThrow('pwa:a', human('R'));
+        for (let i = 0; i < 5; i++) e.tick();
+        expect(closed[0].counts).toEqual({ R: 1, P: 0, S: 0 });
+        expect(closed[0].crowdCounts).toEqual({ R: 0, P: 0, S: 0 });
+    });
+});
