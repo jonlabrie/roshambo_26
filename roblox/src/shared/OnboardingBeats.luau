@@ -29,9 +29,9 @@ export type Beat = {
 -- shows / how to read the crowd / the handoff into the first throw.
 local WELCOME_PAGES = {
     "Welcome to Roshambo — Rock, Paper, Scissors against Everyone, Everywhere, at the same time.",
-    "The Throw drum atop the Bonsho bell spins every minute to show the world throw — what most people threw.",
+    "The Throw drum atop the Bonsho bell spins once a minute to reveal the world throw — what most people chose in the current round.",
     "You want to beat that throw, so you need to read the crowd. The last five world throws are below the throw buttons, left to right.",
-    "Go ahead and try to beat the world by choosing your first throw now.",
+    "Go ahead and try to beat the world! Choose your first throw below — Rock, Paper, or Scissors.",
 }
 
 OnboardingBeats.BEATS = {

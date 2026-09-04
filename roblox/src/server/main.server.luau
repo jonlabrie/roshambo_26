@@ -1562,7 +1562,13 @@ RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
             end
             if #nearTubes > 0 then
                 local mount = nearTubes[math.random(1, #nearTubes)]
-                local muzzle = mount.Size.Y / 2 + MortarPlacement.TUBE["mortar:L"].length
+                -- the muzzle height follows the mount's tier (see the battery boot above)
+                local tierAttr = mount:GetAttribute("Tier")
+                local tier = if typeof(tierAttr) == "string"
+                        and MortarPlacement.TUBE[tierAttr] ~= nil
+                    then tierAttr
+                    else "mortar:L"
+                local muzzle = mount.Size.Y / 2 + MortarPlacement.TUBE[tier].length
                 origin = mount.CFrame:PointToWorldSpace(Vector3.new(0, muzzle + 0.2, 0))
                 local up = mount.CFrame.UpVector
                 heading = up
@@ -1718,11 +1724,18 @@ task.spawn(function()
     if #mounts == 0 then
         return
     end
-    local tubeLen = MortarPlacement.TUBE["mortar:L"].length
     for _, mount in mounts do
+        -- A mount may name its tier via the `Tier` attribute ("mortar:S"/"mortar:M"/"mortar:L")
+        -- — the Switchback rack shows one of each (owner, 2026-09-03: "it looks like they're
+        -- all the same?"). Absent or unknown attribute = L, the original battery's tube.
+        local tierAttr = mount:GetAttribute("Tier")
+        local tier = if typeof(tierAttr) == "string" and MortarPlacement.TUBE[tierAttr] ~= nil
+            then tierAttr
+            else "mortar:L"
+        local tubeLen = MortarPlacement.TUBE[tier].length
         local tube: BasePart? = nil
         for _ = 1, 60 do
-            tube = applier:cloneTube("mortar:L")
+            tube = applier:cloneTube(tier)
             if tube then
                 break
             end

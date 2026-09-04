@@ -1627,6 +1627,12 @@ end)
 local CollectionService = game:GetService("CollectionService")
 local SITE_RADIUS = 24
 local atLaunchSite = false
+-- PUBLIC sites only — never the own deck. A public site provides ALL the gear (owner's
+-- cold walk, 2026-09-03: holding a Peony at the Switchback rack, "I can't shoot it because
+-- I need a small mortar? All three sizes should be here, it's a public site") — the rack's
+-- tubes are public hardware, so gear-blocked rows go live here. The engawa stays gated by
+-- the mortars its owner actually bought.
+local atPublicSite = false
 -- The player's own deck-site (from FireworkState via the aux publish) — the engawa is a
 -- launch site too, and the affordance must say so (owner, 2026-09-04).
 local deckSitePos: Vector3? = nil
@@ -1636,6 +1642,7 @@ task.spawn(function()
     while true do
         local char = Players.LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+        local nearPublic = false
         local near = false
         if root then
             for _, part in CollectionService:GetTagged("FireworkLaunchSite") do
@@ -1643,16 +1650,18 @@ task.spawn(function()
                     local d = part.Position - root.Position
                     -- Horizontal only, matching LaunchSites: a deck sits well above its marker.
                     if d.X * d.X + d.Z * d.Z <= SITE_RADIUS * SITE_RADIUS then
-                        near = true
+                        nearPublic = true
                         break
                     end
                 end
             end
+            near = nearPublic
             if not near and deckSitePos then
                 local d = deckSitePos - root.Position
                 near = d.X * d.X + d.Z * d.Z <= SITE_RADIUS * SITE_RADIUS
             end
         end
+        atPublicSite = nearPublic
         atLaunchSite = near
         task.wait(0.5)
     end
@@ -1775,6 +1784,22 @@ do
     -- writer, so a tap always tests exactly the state the row was painted from.
     local shellStates: any = nil
 
+    -- Whether a row fires HERE: the server's launchable flag, or a gear-only block while
+    -- standing at a PUBLIC site (see atPublicSite above — public racks carry every tier).
+    -- The server never enforces gear on the spend, so this affordance is the whole gate,
+    -- and it must agree between the paint, the tap and the scroll.
+    local function rowLive(st: any): boolean
+        if st == nil then
+            return false
+        end
+        if st.launchable == true then
+            return true
+        end
+        return atPublicSite
+            and typeof(st.reason) == "string"
+            and string.sub(st.reason, 1, 12) == "NEEDS_MORTAR"
+    end
+
     for i, id in SHELL_ORDER do
         local b = Instance.new("TextButton")
         b.Name = id
@@ -1819,7 +1844,7 @@ do
         -- clicks it: the engine cancels the click once the touch becomes a drag.
         b.MouseButton1Click:Connect(function()
             local st = shellStates and shellStates[id]
-            if st and st.launchable then
+            if rowLive(st) then
                 EventBus.HudFireworkLaunch:Fire(id)
             end
         end)
@@ -1860,7 +1885,7 @@ do
             local st = shellStates and shellStates[id]
             if st and typeof(st.count) == "number" and st.count > 0 then
                 visIndex += 1
-                if st.launchable then
+                if rowLive(st) then
                     best = visIndex
                 end
             end
@@ -1896,7 +1921,7 @@ do
             local owned = st ~= nil and typeof(st.count) == "number" and st.count > 0
             tile.button.Visible = owned
             ownedAny = ownedAny or owned
-            local live = st ~= nil and st.launchable == true
+            local live = rowLive(st)
             tile.title.Text = if st then `{SHELL_NAME[id]}  ×{st.count}` else SHELL_NAME[id]
             tile.sub.Text = if live
                 then "ready"

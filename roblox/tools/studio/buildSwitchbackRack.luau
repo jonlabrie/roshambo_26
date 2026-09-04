@@ -24,7 +24,14 @@ local CollectionService = game:GetService("CollectionService")
 local TAG = "FireworkTubeMount"
 local DECK_TOP = 138.46
 local MOUNT_X = 159.7 + 9 - 1.5 -- east edge, inset
-local MOUNTS_Z = { -71.6, -66.6, -61.6 }
+-- one mount per tier (owner, 2026-09-03: the three identical L tubes "look like they're
+-- all the same?" — a public rack shows the full range, and the battery boot in
+-- main.server.luau reads the Tier attribute to stand the matching tube + muzzle height)
+local MOUNTS = {
+    { z = -71.6, tier = "mortar:S" },
+    { z = -66.6, tier = "mortar:M" },
+    { z = -61.6, tier = "mortar:L" },
+}
 
 local canyonWorld = workspace:FindFirstChild("CanyonWorld")
 assert(canyonWorld, "Workspace.CanyonWorld is missing — is this the right place?")
@@ -38,11 +45,12 @@ local folder = Instance.new("Folder")
 folder.Name = "SwitchbackRack"
 folder.Parent = canyonWorld
 
-for i, z in MOUNTS_Z do
+for i, m in MOUNTS do
     local p = Instance.new("Part")
     p.Name = "TubeMount_" .. i
     p.Size = Vector3.new(1.4, 0.3, 1.4)
-    p.Position = Vector3.new(MOUNT_X, DECK_TOP + 0.15, z)
+    p.Position = Vector3.new(MOUNT_X, DECK_TOP + 0.15, m.z)
+    p:SetAttribute("Tier", m.tier)
     p.Anchored = true
     p.CanCollide = false
     p.CastShadow = false
@@ -53,8 +61,8 @@ for i, z in MOUNTS_Z do
 end
 
 print(
-    ("[SwitchbackRack] %d tube mounts under Workspace.CanyonWorld.SwitchbackRack at deck top %.2f. Tubes appear at runtime. NOW SAVE AND PUBLISH."):format(
-        #MOUNTS_Z,
+    ("[SwitchbackRack] %d tube mounts (S/M/L) under Workspace.CanyonWorld.SwitchbackRack at deck top %.2f. Tubes appear at runtime. NOW SAVE AND PUBLISH."):format(
+        #MOUNTS,
         DECK_TOP
     )
 )
