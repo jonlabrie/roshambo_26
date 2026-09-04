@@ -116,11 +116,19 @@ HudLayout.AREA_W_TOUCH = 3 * HudLayout.BTN_H_TOUCH + 2 * HudLayout.BTN_GAP_TOUCH
 -- which is what keeps it inside this module's Lune-testability rule (see HudLayout.spec's
 -- amended numbers-only test). Callers pass their gui's AbsoluteSize and their own touch tier,
 -- and MUST re-call on AbsoluteSize changes: rotation moves the reference.
+-- Portrait's leftward nudge, in pixels. Dead-centre portrait still grazed the jump button on
+-- the owner's iPhone (2026-09-03 cold walk: "the scissor throw button is still a bit beneath
+-- the Roblox Jump button"), because the jump button is a FIXED-size zone eating the right edge
+-- while the centred row scales with the screen. The whole cluster slides left by this much in
+-- portrait only; landscape is untouched (the standing right-thumb ruling). THE tuning knob for
+-- the next phone report — nothing downstream carries its own copy.
+HudLayout.PORTRAIT_NUDGE = 20
+
 function HudLayout.clusterRef(viewportX: number, viewportY: number, touch: boolean): (number, number)
     if viewportY > viewportX then
         local ringD = if touch then HudLayout.RING_D_TOUCH else HudLayout.RING_D
         local areaW = if touch then HudLayout.AREA_W_TOUCH else HudLayout.AREA_W
-        return 0.5, (ringD + HudLayout.RING_GAP + areaW) / 2
+        return 0.5, (ringD + HudLayout.RING_GAP + areaW) / 2 - HudLayout.PORTRAIT_NUDGE
     end
     return 1 - HudLayout.JUMP_CLEARANCE, 0
 end

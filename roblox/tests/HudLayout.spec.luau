@@ -142,15 +142,21 @@ describe("HudLayout — the cluster's horizontal reference (clusterRef)", functi
         expect(s).toBe(1 - HudLayout.JUMP_CLEARANCE)
     end)
 
-    test("portrait centres the ring+buttons row between the thumbstick and jump zones", function()
-        -- The offset is HALF the always-visible row (ring + gap + three buttons): with the
-        -- right edge anchored at 0.5 + offset, the row's own centre lands on screen centre.
+    test("portrait centres the ring+buttons row, nudged left of the jump button", function()
+        -- The offset is HALF the always-visible row (ring + gap + three buttons) MINUS the
+        -- portrait nudge: dead-centre still grazed the fixed-size jump button on the owner's
+        -- phone (2026-09-03), so the whole cluster slides left by PORTRAIT_NUDGE.
         local s, o = HudLayout.clusterRef(390, 844, true)
         expect(s).toBe(0.5)
-        expect(o).toBe((HudLayout.RING_D_TOUCH + HudLayout.RING_GAP + HudLayout.AREA_W_TOUCH) / 2)
+        expect(o).toBe(
+            (HudLayout.RING_D_TOUCH + HudLayout.RING_GAP + HudLayout.AREA_W_TOUCH) / 2
+                - HudLayout.PORTRAIT_NUDGE
+        )
         s, o = HudLayout.clusterRef(390, 844, false)
         expect(s).toBe(0.5)
-        expect(o).toBe((HudLayout.RING_D + HudLayout.RING_GAP + HudLayout.AREA_W) / 2)
+        expect(o).toBe(
+            (HudLayout.RING_D + HudLayout.RING_GAP + HudLayout.AREA_W) / 2 - HudLayout.PORTRAIT_NUDGE
+        )
     end)
 
     test("the portrait cluster fits a narrow phone with margin on both sides", function()

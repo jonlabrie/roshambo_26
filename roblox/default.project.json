@@ -92,6 +92,7 @@
         },
         "StarterPlayer": {
             "$className": "StarterPlayer",
+            "$properties": { "AutoJumpEnabled": false },
             "StarterPlayerScripts": {
                 "$className": "StarterPlayerScripts",
                 "RoshamboClient": { "$path": "src/client" }
