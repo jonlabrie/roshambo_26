@@ -71,14 +71,14 @@ OnboardingBeats.BEATS = {
     {
         id = "launchDoor",
         event = "shellBought",
-        copy = "Nice! Now you need to find a public fireworks spot. Follow the light to find one.",
+        copy = "Nice! Now you need a public fireworks spot — one is highlighted for you!",
         anchor = "tour",
         advanceOn = "shellLaunched",
     },
     {
         id = "modelDoor",
         event = "shellLaunched",
-        copy = "Awesome! One more stop — follow the light to see a teahouse.",
+        copy = "Awesome! One more stop — a teahouse is highlighted for you!",
         anchor = "tour",
         advanceOn = "modelArrival",
     },
