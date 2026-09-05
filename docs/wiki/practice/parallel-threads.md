@@ -1,6 +1,6 @@
 ---
 shelf: practice
-updated: 2026-08-28
+updated: 2026-09-05
 checked: 2026-09-04
 ---
 
@@ -35,6 +35,14 @@ at, it stops and hands over. That is the whole rule.
 
 ## Rules
 
+0. ⚠ **Never `git reset --soft origin/main` to re-base a commit over a moved `main`.** Earned
+   2026-09-05: a docs push was rejected because another session had pushed four commits; to avoid
+   the shared stash with an unrelated dirty tree, the session soft-reset onto `origin/main` and
+   re-committed — which staged the old tree against the NEW head and pushed a full reversion of
+   the other session's work (`0fa39b4`, reverted `97e84bd`, re-applied `e8d75c5`). With a dirty
+   tree, make a temporary WIP commit of the unrelated files (or `git rebase --autostash`) and then
+   `git rebase origin/main`; or do the work in your own worktree. After any re-base, verify
+   `git diff --stat origin/main HEAD` lists ONLY your files before pushing.
 1. **Never work in a thread that does not own the file.** If a thread needs a change outside what
    it owns, it writes the request into its branch's notes and main makes it.
 2. **Rebase on `main` before merging**, and merge to `main` through the main thread — so one place

@@ -42,6 +42,14 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   Lighting attribute that DayNightController's tick respects. Mortars are accurate
   2"/4"/6" at ~4–5:1 (owner ruling; **yonshakudama parked as a future premium
   spectacle**). Spec `docs/superpowers/specs/2026-09-01-proving-range-design.md`.
+- **The Hanabiya rooftop battery + the MC experience (built/gated/published 2026-09-06 per the
+  log; design banked on [[backlog]] § Rooftop MC experience)**: a railed platform over the shop
+  ridge (Rojo asset `HanabiyaRooftop`), three CSG tubes on tagged mounts aimed north over the
+  arena, the virtual sixth station; public gear launches within 140 studs fire from its nearest
+  muzzle. Access deliberately unbuilt so it stays gateable. Owner intent: buy/win access to a
+  proving-panel-like console and MC a show for the arena. Public access to the five stations by
+  jukebox-style play queueing is banked beside it. Cross-linked 2026-09-05 because neither this
+  page nor [[hanabiya]] pointed at either entry.
 - ⚠ **Every shipped burst 2026-08-05 → 2026-09-01 rendered as a flat vertical line**:
   the bench's `SpreadAngle (360,360)`, drag and fade curve never made it into
   `FireworkController`'s pool, so particles fired straight up. Invisible from below at

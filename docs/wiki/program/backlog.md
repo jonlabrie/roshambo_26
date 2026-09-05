@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: open
-updated: 2026-09-03
+updated: 2026-09-05
 ---
 
 # Backlog
@@ -754,3 +754,55 @@ only).
 roughly halving what we ask of it, not a cool phone. The biggest battery lever is the frame-rate
 cap in Roblox's own settings, which belongs to the player.
 
+
+## Fireworks show system — decisions taken in conversation (owner, 2026-09-05), spec pending
+
+Direction settled while brainstorming the show system (spec to follow):
+
+1. **Console = programmer first, with a fire-now button.** Compose a sequence, press go, watch it
+   with everyone; fire-now is a one-cue show. Instrument mode (live firing) is a later unlock.
+2. **A show is data** (cues of time, mortar, shell), played back server-authoritatively so every
+   phone sees the same program; the director guards the sky.
+3. **Three console tiers, one object:** the public rooftop console (access bought/won/queued; fires
+   the rooftop battery + the five stations — the arena stage); a whale-purchased teahouse console
+   (loadout item, fires that teahouse's OWN deck mortars only); and a primo teahouse console
+   fuelled not by owned shells but by a points-denominated budget topped up with points or Robux,
+   able to fire anything in the catalogue that is not flagged special/secret/rare, debiting list
+   price per firing. New catalogue flag: budget-eligible.
+4. **Teahouse shows are LOCAL by construction** — never the arena stations. Owner: "torn", but
+   agreed: it encourages GATHERING — an advertised show draws players to the good vantages.
+5. **Build the arena as a stage in the same model anyway**: every show has a stage; a stage has
+   an access policy (owner / booked / queued). The booking calendar and the jukebox queue for the
+   arena stations exist as data from day one for future use, even though only the rooftop is
+   booked at first.
+6. **Firing is always free; scheduling is voluntary** (owner ruling): anyone fires what they own,
+   any time, in any quantity, subject only to mortar access and the director's sky budget. A show
+   is a PARTY — impromptu or planned. You schedule because you want people to come (to that part
+   of the canyon, or to your deck) and so you do not unknowingly step on someone else's party.
+   The calendar is a social object, not an enforcement mechanism; no size threshold gates it. The
+   only enforced access is the shared rooftop stage.
+7. **Rooftop turns are three minutes, there is NO queue, and access is a GOLDEN TICKET** (owner):
+   five minutes is long, one is too short; queueing would make the roof default behaviour and
+   burn fireworks out; time on the roof must feel like a real perk. How a ticket is earned is
+   open — a rare win drop in place of the firecracker, or a streak milestone ("a 4-streak or
+   something") were floated. ⚠ Supply must be sized to capacity: the roof holds at most twenty
+   three-minute turns an hour. The hatch/ladder at the back-rail gap is unbuilt and becomes the
+   gate.
+
+## Audience handhelds — sparklers and whistlers (owner, 2026-09-05)
+
+Sharpens the fireworks program's existing third step (range → vocabulary → **handheld** →
+distribution): handhelds are what the CROWD expends while gathered for someone else's show —
+sparklers, whistlers, ground fireworks — cheap, plentiful, additive to a show rather than
+competing with it. Design them as audience participation, not as small shells.
+
+## Fireworks combat — bottle-rocket wars (owner, 2026-09-05, side idea, own spec)
+
+Owner: childhood bottle-rocket wars were "insanely fun." Sneak around with a backpack or
+bandolier of rockets (the loadout), fire at other players to score hits; a hit on the enemy's
+backpack ignites their entire loadout at once. In the canyon, or in tunnels/caverns designed for
+it. **A separate game mode with its own spec**, not part of the show system: it needs projectile
+physics and server-validated hit detection, which today's fireworks (client-side VFX from a tiny
+server launch event) do not have; it wants dedicated arenas so it never touches the hangout and
+the kid-first bar stays intact; the chain-ignited backpack is a volley the director already
+handles. Interlocks: loadouts, the handheld sub-project, the ambient/no-griefing rulings.
