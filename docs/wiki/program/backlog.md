@@ -781,6 +781,13 @@ Direction settled while brainstorming the show system (spec to follow):
    of the canyon, or to your deck) and so you do not unknowingly step on someone else's party.
    The calendar is a social object, not an enforcement mechanism; no size threshold gates it. The
    only enforced access is the shared rooftop stage.
+7. **Rooftop turns are three minutes, there is NO queue, and access is a GOLDEN TICKET** (owner):
+   five minutes is long, one is too short; queueing would make the roof default behaviour and
+   burn fireworks out; time on the roof must feel like a real perk. How a ticket is earned is
+   open — a rare win drop in place of the firecracker, or a streak milestone ("a 4-streak or
+   something") were floated. ⚠ Supply must be sized to capacity: the roof holds at most twenty
+   three-minute turns an hour. The hatch/ladder at the back-rail gap is unbuilt and becomes the
+   gate.
 
 ## Audience handhelds — sparklers and whistlers (owner, 2026-09-05)
 
