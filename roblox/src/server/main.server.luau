@@ -1527,6 +1527,56 @@ pushFireworkState = function(player: Player)
     end)
 end
 
+-- ONE NAMESPACE TABLE, NOT TEN LOCALS. This script sits TWO locals under Luau's 200 top-level
+-- register ceiling (measured 2026-09-05; tests/Compiles.spec.luau exists because that ceiling once
+-- silently killed the whole play HUD), so the shared launch helpers and the entire show runner hang
+-- off `Launch` as fields. Fields cost no registers; ten `local function`s here would not compile.
+local Launch = {}
+
+-- Mirrors `ShowPlan.Cue` structurally, declared here because a type alias costs no register while
+-- `local ShowPlan = require(...)` would cost one. ShowPlayer.luau already mirrors it the same way.
+type ShowCue = { t_ms: number, slot: string, shellId: string }
+
+-- THE PITY RAMP, shared by every launch path (owner, 2026-09-06; math in BoostLuck): roll this
+-- shell's luck against a per-player per-shell miss streak and return the VERDICT. Streaks are
+-- session-lived by design. Extracted 2026-09 so a show's cues get the same bounded drought as a
+-- hand launch — a show is not a way around the ramp, nor a way to be cheated by it.
+function Launch.rollBoost(uid: string, shellId: string): boolean?
+    local baseChance = BoostLuck.baseChance(FireworkCatalog.RECIPES[shellId])
+    if not baseChance then
+        return nil
+    end
+    local streaks = boostMisses[uid] or {}
+    boostMisses[uid] = streaks
+    local verdict, newMisses = BoostLuck.roll(baseChance, streaks[shellId] or 0, math.random())
+    streaks[shellId] = newMisses
+    return verdict
+end
+
+-- ONE broadcast shape for every path (hand launch, proving, shows). `showId` is additive; clients
+-- that do not know it ignore it. Field types are the contract FireworkController checks.
+function Launch.broadcastLaunch(fields: {
+    shellId: string,
+    origin: Vector3,
+    heading: Vector3?,
+    by: string,
+    boosted: boolean?,
+    apexHeight: number?,
+    showId: string?,
+})
+    FireworkLaunched:FireAllClients({
+        shellId = fields.shellId,
+        origin = fields.origin,
+        heading = fields.heading and { x = fields.heading.X, y = fields.heading.Y, z = fields.heading.Z }
+            or nil,
+        seed = math.random(1, 2 ^ 31 - 1),
+        by = fields.by,
+        boosted = fields.boosted,
+        apexHeight = fields.apexHeight,
+        showId = fields.showId,
+    })
+end
+
 RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
     if typeof(shellId) ~= "string" then
         return
@@ -1608,25 +1658,11 @@ RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
                 origin = root.Position + Vector3.new(0, 6, 0)
             end
         end
-        -- THE PITY RAMP (owner, 2026-09-06; math in BoostLuck): the server rolls this
-        -- shell's luck against a per-player per-shell miss streak and sends the VERDICT --
-        -- every client renders the same luck, and a paying player's drought is bounded.
-        -- Recipes without boost get no field; the client's seeded roll stays the fallback.
-        -- Streaks are session-lived by design: a rejoin starts at the honest floor.
-        local boosted: boolean? = nil
-        local baseChance = BoostLuck.baseChance(FireworkCatalog.RECIPES[shellId])
-        if baseChance then
-            local streaks = boostMisses[uid] or {}
-            boostMisses[uid] = streaks
-            local verdict, newMisses = BoostLuck.roll(baseChance, streaks[shellId] or 0, math.random())
-            streaks[shellId] = newMisses
-            boosted = verdict
-        end
-        FireworkLaunched:FireAllClients({
+        local boosted = Launch.rollBoost(uid, shellId)
+        Launch.broadcastLaunch({
             shellId = shellId,
             origin = origin,
-            heading = heading and { x = heading.X, y = heading.Y, z = heading.Z } or nil,
-            seed = math.random(1, 2 ^ 31 - 1),
+            heading = heading,
             by = uid,
             boosted = boosted,
             apexHeight = publicApex,
@@ -1634,6 +1670,152 @@ RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
         if pushFireworkState then
             pushFireworkState(player)
         end
+    end)
+end)
+
+-- ===== SHOWS (spec 2026-09-05-fireworks-show-system-design §2) =====
+-- The server owns playback: a reserved show plays to the end on the server's clock whether or
+-- not its owner is still here, and every client sees the same cues at the same moments. One show
+-- per stage at a time; a second go on a busy stage queues behind it (ShowPlayer.schedule).
+-- Everything here lives on `Launch` (see its comment): the register ceiling forbids new locals.
+Launch.plan = require(shared:WaitForChild("ShowPlan"))
+Launch.player = require(shared:WaitForChild("ShowPlayer"))
+-- Every shell the client can draw: the catalogue's recipe keys (there is no separate id list on
+-- this side; the fixture test asserts RECIPES covers every server id).
+Launch.knownShells = {} :: { [string]: boolean }
+do
+    for id in FireworkCatalog.RECIPES do
+        Launch.knownShells[id] = true
+    end
+end
+
+-- stage key -> the ms mark (same clock as Launch.nowMs) its current show finishes at.
+Launch.stageBusyUntilMs = {} :: { [string]: number }
+
+function Launch.nowMs(): number
+    return os.clock() * 1000
+end
+
+-- Play `cues` on `stageKey`. `originFor(cue)` resolves a cue's slot to (origin, heading, apex) at
+-- FIRE time; a nil origin skips that cue with a warning rather than firing from nowhere.
+function Launch.playShow(
+    stageKey: string,
+    ownerUid: string,
+    byLabel: string,
+    cues: { ShowCue },
+    originFor: (ShowCue) -> (Vector3?, Vector3?, number?),
+    showId: string
+)
+    local ShowPlayer = Launch.player
+    local sched = ShowPlayer.schedule(Launch.stageBusyUntilMs[stageKey], Launch.nowMs(), cues)
+    Launch.stageBusyUntilMs[stageKey] = sched.endAtMs
+    local timeline = ShowPlayer.timeline(cues, sched.startAtMs)
+    local delays = ShowPlayer.delaysFrom(Launch.nowMs(), timeline)
+    local startsIn = math.floor(delays[1] * 10) / 10
+    print(`[SHOW] {showId} on {stageKey} by {byLabel}: {#cues} cues, starts in {startsIn}s`)
+    for i, entry in timeline do
+        task.delay(delays[i], function()
+            local origin, heading, apex = originFor(entry.cue)
+            if origin == nil then
+                local what = `{entry.cue.shellId} @ {entry.cue.slot}`
+                warn(`[SHOW] {showId} cue {entry.index} ({what}) had no origin; skipped`)
+                return
+            end
+            Launch.broadcastLaunch({
+                shellId = entry.cue.shellId,
+                origin = origin,
+                heading = heading,
+                by = byLabel,
+                boosted = Launch.rollBoost(ownerUid, entry.cue.shellId),
+                apexHeight = apex,
+                showId = showId,
+            })
+        end)
+    end
+end
+
+-- HOLES ARE A HOSTILE INPUT (Task 2's review). ShowPlan.validate walks with `ipairs`, which stops
+-- at the first gap, so a client sending { [1] = cue, [3] = cue } would have only the PREFIX
+-- validated while the rest rode along into playback. Accept only a dense 1..n array -- every key a
+-- positive integer, and exactly `#t` of them -- and hand the COPY to everything downstream.
+function Launch.denseCues(t: any): { any }?
+    if type(t) ~= "table" then
+        return nil
+    end
+    local n = #t
+    local count = 0
+    for k in pairs(t) do
+        if type(k) ~= "number" or k % 1 ~= 0 or k < 1 then
+            return nil
+        end
+        count += 1
+    end
+    if count ~= n then
+        return nil
+    end
+    local out = table.create(n)
+    for i = 1, n do
+        out[i] = t[i]
+    end
+    return out
+end -- A player's show from their OWN deck: validate (same rule the backend applies), reserve (debit -- everything or nothing), then play. Origins are resolved per cue at fire time from the deck's -- mortar placements; a hand cue launches from where the player stood when they pressed go, so a -- show outlives the player walking away.
+Launch.RequestShowGo = remotes:WaitForChild("RequestShowGo") :: RemoteEvent
+Launch.RequestShowGo.OnServerEvent:Connect(function(player, show)
+    if typeof(show) ~= "table" or typeof(show.cues) ~= "table" then
+        return
+    end
+    local uid = tostring(player.UserId)
+    handlerQueue:run(uid, function()
+        local ShowPlan = Launch.plan
+        local char = player.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+        if not root then
+            return
+        end
+        local deck = deckSiteFor(uid)
+        if deck == nil then
+            return -- no deck, no stage (the client should not have offered go)
+        end
+        local pos = root.Position
+        if not LaunchSites.isValid({ x = pos.X, y = pos.Y, z = pos.Z }, { deck }, uid) then
+            return
+        end
+        local cues = Launch.denseCues(show.cues)
+        if cues == nil then
+            warn(`[SHOW] {uid} rejected: cues are not a dense array`)
+            return
+        end
+        local slots, shellMortar = ShowPlan.DECK_SLOTS, MortarPlacement.SHELL_MORTAR
+        local check = ShowPlan.validate(cues, slots, shellMortar, Launch.knownShells)
+        if not check.ok then
+            warn(`[SHOW] {uid} rejected: {check.error} cue {tostring(check.cue)}`)
+            return
+        end
+        local body = { stageId = `deck:{uid}`, fuel = "inventory", cues = cues, title = show.title }
+        local res = net:postShowReserve(uid, body)
+        if not res.ok then
+            -- Result carries `status` and `error` (and `data` when the body parsed) -- see NetworkClient.Result.
+            local bodyErr = tostring(res.data and res.data.error)
+            warn(`[SHOW] {uid} reserve failed: {tostring(res.status)} {tostring(res.error)} {bodyErr}`)
+            if pushFireworkState then
+                pushFireworkState(player)
+            end
+            return
+        end
+        if pushFireworkState then
+            pushFireworkState(player) -- their counts just dropped by the whole show
+        end
+        local showId = tostring((res.data and res.data.reservationId) or `local-{math.random(1, 1e9)}`)
+        local handFrame = root.CFrame
+        local function originFor(cue: ShowCue): (Vector3?, Vector3?, number?)
+            if cue.slot == "hand" then
+                return handFrame:PointToWorldSpace(Vector3.new(1.2, 0.6, -0.8)), nil, nil
+            end
+            local deckPos = Vector3.new(deck.pos.x, deck.pos.y, deck.pos.z)
+            local o, h = muzzleOriginFor(uid, deckPos, deck, cue.shellId)
+            return o, h, nil
+        end
+        Launch.playShow(`deck:{uid}`, uid, uid, cues, originFor, showId)
     end)
 end)
 
