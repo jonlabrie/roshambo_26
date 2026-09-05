@@ -171,7 +171,7 @@ describe('helpers', () => {
 - [ ] **Step 3: Run test to verify it fails**
 
 Run: `cd server && npx vitest run src/shows.test.ts`
-Expected: FAIL — `Cannot find module './shows'`. (If TypeScript complains about importing JSON, `tsconfig.json` needs `"resolveJsonModule": true` — check whether `fireworks.test.ts` already imports the shells fixture the same way and copy its approach.)
+Expected: FAIL — `Cannot find module './shows'`. (The TEST imports the JSON fixture exactly as `fireworks.test.ts` does; the module under test does not — see the literals note in Step 4.)
 
 - [ ] **Step 4: Write minimal implementation**
 
@@ -182,7 +182,6 @@ Expected: FAIL — `Cannot find module './shows'`. (If TypeScript complains abou
 // exists on one side only fails CI instead of letting a client author a show the backend refuses
 // (or worse, the reverse). Limits bound payload size, not spectacle — density is the director's
 // business, not the validator's.
-import fixture from '../../shared-fixtures/shows.json';
 import { SHELL_IDS, REQUIREMENTS } from './fireworks';
 
 export type Cue = { t_ms: number; slot: string; shellId: string };
@@ -193,8 +192,11 @@ export type ShowError =
     | 'CUES_OUT_OF_ORDER' | 'BAD_SLOT' | 'BAD_SHELL' | 'TIER_MISMATCH';
 export type ShowCheck = { ok: true } | { ok: false; error: ShowError; cue?: number };
 
-export const SHOW_LIMITS: { maxCues: number; maxDurationS: number } = fixture.limits;
-export const DECK_STAGE: StageSlots = fixture.stages.deck;
+// LITERALS, asserted equal to shared-fixtures/shows.json by shows.test.ts — the same pattern as
+// GameRules.ts vs game-rules.json. Runtime code never reads the fixture: `rootDir` is src/ and the
+// deployed container is built from server/ alone.
+export const SHOW_LIMITS = { maxCues: 120, maxDurationS: 300 };
+export const DECK_STAGE: StageSlots = { hand: 'none', 'mortar:S': 'mortar:S', 'mortar:M': 'mortar:M', 'mortar:L': 'mortar:L' };
 
 export function shellMortar(shellId: string): string | null {
     const req = REQUIREMENTS[shellId];
