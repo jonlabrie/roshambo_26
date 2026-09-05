@@ -775,6 +775,12 @@ Direction settled while brainstorming the show system (spec to follow):
    an access policy (owner / booked / queued). The booking calendar and the jukebox queue for the
    arena stations exist as data from day one for future use, even though only the rooftop is
    booked at first.
+6. **Firing is always free; scheduling is voluntary** (owner ruling): anyone fires what they own,
+   any time, in any quantity, subject only to mortar access and the director's sky budget. A show
+   is a PARTY — impromptu or planned. You schedule because you want people to come (to that part
+   of the canyon, or to your deck) and so you do not unknowingly step on someone else's party.
+   The calendar is a social object, not an enforcement mechanism; no size threshold gates it. The
+   only enforced access is the shared rooftop stage.
 
 ## Audience handhelds — sparklers and whistlers (owner, 2026-09-05)
 
