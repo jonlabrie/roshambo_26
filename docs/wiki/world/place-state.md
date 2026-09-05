@@ -22,6 +22,19 @@ Everything below marked *verified* was checked live via the Studio MCP on 2026-0
 
 ## Publish checklist
 
+0. ⚠ **AN A/B DIAGNOSTIC IS LIVE IN THE PLACE RIGHT NOW (set 2026-09-05). CLEAR IT
+   BEFORE ANY PUBLISH THAT IS NOT THE A/B ITSELF.** `Workspace` carries
+   `AmbientRadius = 100000`, `ArenaRadius = 100000`, `AmbientHz = 240` and a
+   `PerfABActive = true` marker. Together they disable the ambient visibility culling and
+   throttling shipped 2026-09-04, so the client behaves as it did before that work — the
+   point being to test whether it is responsible for the A13 regression the owner reported
+   (lower frame rate and hitching, almost entirely in the arena).
+   **All four were UNSET before, so the undo is to delete all four attributes**, not to
+   restore a value. Leaving them set silently reverts the whole load-reduction effort while
+   the wiki claims it shipped — the same shape as the 2026-08-05 bench that sat enabled in
+   `StarterPlayerScripts` and poisoned every reading for weeks ([[perf-harness-contamination]],
+   rule 1: park a harness the instant its reading is taken).
+
 1. **For the demo window** (F&F-demo exception, owner ruling 2026-09-03, spec
    `docs/superpowers/specs/2026-09-03-onboarding-journey-design.md` §7): publish with
    **`Workspace.DayNightLockT = 0.40`** — the documented dusk knob (see

@@ -3856,3 +3856,33 @@ playback over the existing `FireworkLaunched` broadcast, and a Studio-only "play
 verb on the proving panel — exiting on the A13 test of a large hand-authored show, which is where
 the director's scale assumption is finally measured. §9 (durables: one catalogue or two for
 Robux) stays open; it blocks only sub-project C.
+
+## [2026-09-05] fix | Arena overhead removed; an A/B armed to test whether the load-reduction work is even the cause
+
+Owner's A13 report — lower frame rate and hitching, **almost entirely in the arena** —
+localises the problem to the one place the 2026-09-04 work cannot help. In the arena the
+bell drive and waterwheel are always visible, so every visibility test returns true and
+nothing is ever culled, while the new code added per frame ~5 table allocations and ~19
+`workspace:GetAttribute` reads (HammerController alone called `AmbientConfig.arena()` three
+times a frame — each of its loops needs `interval` before it can decide to skip). Pure
+overhead against zero saving. Fixed in `2d8e2c5`: the config tables are built once and
+invalidated only on an attribute change, so a steady-state call is a table read. The trade
+is a shared table, so `arena()` now builds its own rather than mutating `get()`'s.
+
+⚠ **This is not claimed as the explanation.** Tens of microseconds against a 33 ms budget
+should not be *felt*, and the fireworks sprint landed in the same window carrying far
+heavier particle load near the arena (pooled thumps, the salute class, the heavy comet
+layer, hotaru, the rooftop battery). One device, one session, no baseline —
+[[perf-harness-contamination]] rule 5 says corroborate before re-planning, and that rule was
+earned by exactly this situation.
+
+**A/B armed 2026-09-05** (see the publish checklist, item 0): `AmbientRadius`/`ArenaRadius`
+100000 and `AmbientHz` 240 disable culling and throttling, so the client behaves as it did
+before 2026-09-04. Publish, replay the arena on the A13, and the answer is binary — if it
+still feels bad, the load-reduction work is not the cause and the fireworks sprint is where
+to look. **All four attributes were unset before, so clearing them is the undo.**
+
+Also corrected: the throttle was briefly suspected and is not the problem. At ~30 fps it
+fires every frame (dt ≥ the 1/30 s interval), costing an add and a compare and saving
+nothing — neutral, not harmful — while on a 60 fps device it genuinely halves the arena's
+CFrame writes, which is the iPhone 15 battery case this all started from. It stays.
