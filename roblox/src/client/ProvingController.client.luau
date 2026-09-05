@@ -29,12 +29,14 @@ end
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local FireworkDrafts = require(shared:WaitForChild("FireworkDrafts"))
 local ProvingPlan = require(shared:WaitForChild("ProvingPlan"))
+local FireworkShows = require(shared:WaitForChild("FireworkShows"))
 local FireworkCatalog = require(shared:WaitForChild("FireworkCatalog"))
 
 local player = Players.LocalPlayer
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
 local RequestProvingFire = remotes:WaitForChild("RequestProvingFire") :: RemoteEvent
+local RequestProvingShow = remotes:WaitForChild("RequestProvingShow") :: RemoteEvent
 
 local INK_CREAM = Color3.fromRGB(240, 234, 216)
 local WASHI = Color3.fromRGB(26, 24, 28)
@@ -516,5 +518,37 @@ for _, id in shippedIds do
     local boostButton = makeButton(row, "Boost", 46, 238)
     boostButton.MouseButton1Click:Connect(function()
         fireSelected(id, true)
+    end)
+end
+
+-- ===== Shows section: the hand-authored programs, one Play each =====
+-- A show is a whole timeline, not a shot, so it ignores the rack toggles entirely: every cue
+-- names its own station. The server plays it on its own clock (Studio-gated, no spend).
+order += 1
+makeHeader(order, "-- Shows --")
+
+for _, showName in FireworkShows.ORDER do
+    local draft = FireworkShows.DRAFTS[showName]
+    order += 1
+    local row = makeRow(order)
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Size = UDim2.fromOffset(286, 26)
+    nameLabel.Position = UDim2.fromOffset(0, 2)
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.TextColor3 = INK_CREAM
+    nameLabel.Font = Enum.Font.Code
+    nameLabel.TextSize = 13
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    -- Titles are authored prose, not ids, so they are the one label here that can outgrow its
+    -- box: truncate rather than let it paint under the Play button. ("Finale v1 (stress: volleys
+    -- + heavies)" is 36 chars ~= 281px at Code/13, which is why this row is the panel's widest.)
+    nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+    nameLabel.Text = draft.title
+    nameLabel.Parent = row
+
+    local playButton = makeButton(row, "Play", 44, 290)
+    playButton.MouseButton1Click:Connect(function()
+        RequestProvingShow:FireServer(showName)
     end)
 end

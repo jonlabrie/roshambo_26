@@ -1849,6 +1849,47 @@ Launch.RequestShowGo.OnServerEvent:Connect(function(player, show)
     end)
 end)
 
+-- Resolve a proving slot to a launch origin/heading/apex. Extracted so the show verb below fires
+-- from EXACTLY the muzzles a hand shot does -- one description of where a station points, not two
+-- that drift. Returns nils when the slot resolves to nothing (no rooftop mounts, no such rack);
+-- every caller treats that as "skip this shot".
+function Launch.provingOriginFor(rackName: string): (Vector3?, Vector3?, number?)
+    -- THE VIRTUAL SIXTH STATION (owner, 2026-09-06): "hanabiya roof" is the rooftop
+    -- battery -- one tagged public tube mount drawn per shot, vertical muzzle (the
+    -- rooftop tubes stand straight; nil heading = the vertical default flight).
+    if rackName == "hanabiya roof" then
+        local mounts = {}
+        for _, m in CollectionService:GetTagged("FireworkTubeMount") do
+            if m:IsA("BasePart") then
+                table.insert(mounts, m)
+            end
+        end
+        if #mounts == 0 then
+            return nil, nil, nil
+        end
+        local mount = mounts[math.random(1, #mounts)]
+        local muzzle = mount.Size.Y / 2 + MortarPlacement.TUBE["mortar:L"].length
+        return mount.CFrame:PointToWorldSpace(Vector3.new(0, muzzle + 0.2, 0)),
+            mount.CFrame.UpVector,
+            mount:GetAttribute("LaunchApex") :: number?
+    end
+    local stageForProving = workspace:FindFirstChild("RoshamboStage")
+    local ground = stageForProving and stageForProving:FindFirstChild("ProvingGround")
+    local rack = ground and ground:FindFirstChild(rackName)
+    if not (rack and rack:IsA("BasePart")) then
+        return nil, nil, nil
+    end
+    -- THE STATION'S ORIENTATION IS ITS LAUNCH HEADING (owner, 2026-09-06, with the
+    -- rack scatter: racks are "oriented in the angle of elevation and direction I'd
+    -- like to be used"). The rack part is the 6" tube, a cylinder whose axis is local
+    -- X; the muzzle sits half its length along that axis, and the shell rides the
+    -- same vector -- the rail-mounts ballistic machinery does the rest.
+    local axis = rack.CFrame.RightVector
+    -- a station may carry LaunchApex (mid pool does: its bursts sat AT bridge
+    -- height -- owner: "in the thick of an explosion, not watching overhead")
+    return rack.Position + axis * (rack.Size.X / 2 + 0.1), axis, rack:GetAttribute("LaunchApex") :: number?
+end
+
 -- THE PROVING RANGE (spec 2026-09-01-proving-range-design). Studio-only: fires any shell or
 -- draft id from a named proving rack through the SAME FireworkLaunched broadcast the spend
 -- path uses — director, LOD, pooling all engaged — but with NO inventory spend and NO backend
@@ -1860,57 +1901,52 @@ RequestProvingFire.OnServerEvent:Connect(function(_player, shellId, rackName, fo
     if typeof(shellId) ~= "string" or typeof(rackName) ~= "string" then
         return
     end
-    local stageForProving = workspace:FindFirstChild("RoshamboStage")
-    local ground = stageForProving and stageForProving:FindFirstChild("ProvingGround")
-    local rack = ground and ground:FindFirstChild(rackName)
-    if not (rack and rack:IsA("BasePart")) then
-        -- THE VIRTUAL SIXTH STATION (owner, 2026-09-06): "hanabiya roof" is the rooftop
-        -- battery -- one tagged public tube mount drawn per shot, vertical muzzle (the
-        -- rooftop tubes stand straight; nil heading = the vertical default flight).
-        if rackName == "hanabiya roof" then
-            local mounts = {}
-            for _, m in CollectionService:GetTagged("FireworkTubeMount") do
-                if m:IsA("BasePart") then
-                    table.insert(mounts, m)
-                end
-            end
-            if #mounts > 0 then
-                local mount = mounts[math.random(1, #mounts)]
-                local muzzle = mount.Size.Y / 2 + MortarPlacement.TUBE["mortar:L"].length
-                local up = mount.CFrame.UpVector
-                FireworkLaunched:FireAllClients({
-                    shellId = shellId,
-                    origin = mount.CFrame:PointToWorldSpace(Vector3.new(0, muzzle + 0.2, 0)),
-                    heading = { x = up.X, y = up.Y, z = up.Z },
-                    seed = math.random(1, 2 ^ 31 - 1),
-                    by = "proving",
-                    boosted = if forceBoost == true then true else nil,
-                    apexHeight = mount:GetAttribute("LaunchApex"),
-                })
-            end
-        end
-        return
+    local origin, heading, apex = Launch.provingOriginFor(rackName)
+    if origin == nil then
+        return -- no such station, or the rooftop battery has no tagged mounts yet
     end
-    -- THE STATION'S ORIENTATION IS ITS LAUNCH HEADING (owner, 2026-09-06, with the
-    -- rack scatter: racks are "oriented in the angle of elevation and direction I'd
-    -- like to be used"). The rack part is the 6" tube, a cylinder whose axis is local
-    -- X; the muzzle sits half its length along that axis, and the shell rides the
-    -- same vector -- the rail-mounts ballistic machinery does the rest.
-    local axis = rack.CFrame.RightVector
-    FireworkLaunched:FireAllClients({
+    Launch.broadcastLaunch({
         shellId = shellId,
-        origin = rack.Position + axis * (rack.Size.X / 2 + 0.1),
-        heading = { x = axis.X, y = axis.Y, z = axis.Z },
-        -- a station may carry LaunchApex (mid pool does: its bursts sat AT bridge
-        -- height -- owner: "in the thick of an explosion, not watching overhead")
-        apexHeight = rack:GetAttribute("LaunchApex"),
-        seed = math.random(1, 2 ^ 31 - 1),
+        origin = origin,
+        heading = heading,
         by = "proving",
+        apexHeight = apex,
         -- The panel's Boost button forces the lucky roll (Studio-only path); absent,
         -- the client's seeded roll keeps the recipe's natural odds.
         boosted = if forceBoost == true then true else nil,
     })
 end)
+
+-- THE SHOW VERB, behind the identical Studio gate: play one of the hand-authored drafts across
+-- the five stations and the rooftop battery. The drafts are pure repo data (FireworkShows.luau)
+-- rather than client input, so there is nothing to validate on the wire beyond the NAME -- and
+-- nothing to reserve, because the proving range never spends. One show per proving stage: a
+-- second Play queues behind the first through the same Launch.playShow scheduler decks use.
+Launch.FireworkShows = require(shared:WaitForChild("FireworkShows"))
+-- WITH A TIMEOUT (Task 5's review): a bare WaitForChild here would stall every remaining line of
+-- this script on a place whose remotes folder predates the show work. Missing = warn and skip.
+Launch.RequestProvingShow = remotes:WaitForChild("RequestProvingShow", 10) :: RemoteEvent?
+if Launch.RequestProvingShow == nil then
+    warn(
+        "[PROVING] RequestProvingShow remote is missing — the panel's Play buttons do nothing (re-sync from Rojo?)"
+    )
+else
+    Launch.RequestProvingShow.OnServerEvent:Connect(function(_player, name)
+        if not RunService:IsStudio() then
+            return -- the same gate as RequestProvingFire: a published client's request dies here
+        end
+        if typeof(name) ~= "string" then
+            return
+        end
+        local draft = Launch.FireworkShows.DRAFTS[name]
+        if draft == nil then
+            return
+        end
+        Launch.playShow("proving", "proving", "proving", draft.cues, function(c: ShowCue)
+            return Launch.provingOriginFor(c.slot)
+        end, `proving:{name}`)
+    end)
+end
 
 -- B3 gate fix: mid-session live rebuilds (buy-to-claim, upgrade, display change) destroy the
 -- old Structure (and its back-door prompts) and build a new one; re-fire BackDoorState so the
