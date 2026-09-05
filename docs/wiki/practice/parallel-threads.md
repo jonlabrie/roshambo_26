@@ -15,6 +15,7 @@ page is the contract between them. **Read it before starting work in any thread.
 |---|---|---|---|
 | **main** | the repo root | `main` | ⚠ the PLACE FILE and Studio. All implementation. All gating. |
 | **design** | `.worktrees/design` | `thread/design` | `docs/superpowers/specs/`, `docs/superpowers/plans/`. **No code, ever.** |
+|  | | | **Active again 2026-09-05** (owner ruling after a `main` collision): the Claude desktop-app session works here on the fireworks show-system spec; the terminal session owns the main checkout, Studio, dates fix and mobile perf. Docs merge to `main` by fast-forward when the main thread is quiet. |
 | ~~assets~~ | — | — | ⚠ **RETIRED 2026-08-26** — folded back into main, see below |
 
 ## ⚠ Why the split is by HALF, not by feature
