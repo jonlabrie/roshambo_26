@@ -90,7 +90,10 @@ and settling a round must not run a per-player aggregation for every participant
 
 ## Perches
 
-326 tagged `Attachment`s, name-encoded (`FamiliarPerch_rail` / `_post` / `_branch`). Search radius
+Tagged `Attachment`s, name-encoded (`FamiliarPerch_rail` / `_post` / `_branch`). ⚠ **How many there
+are is a place fact, not a prose one** — count them with
+`CollectionService:GetTagged("FamiliarPerch")`, as the ambient-birds section below already says to.
+Search radius
 20 studs from the **owner**; a new perch is picked at random from what is in range so a bird
 sometimes returns to the one it just left; held 10–60s; a 70-stud leash stops an owner walking off
 and stranding their familiar.
@@ -519,166 +522,47 @@ rather than an owner, so the seam is narrow, but nothing spawns a bird with no p
 nothing schedules its calls (the dock uguisu's bout pattern on [[falls-dock]] is the proven
 design), and nothing decides how many there are or stops one being mistaken for your familiar.
 
-## ⚠ THE KARASU'S EYE IS PAINTED, AND FOR TWO DAYS IT PAINTED NOTHING
+## ⚠ THE KARASU'S EYE IS PAINTED — and three of our own paints failed before the answer was found
 
 Owner, 2026-08-28, in play: *"nothing reads as an eye on the existing model."* The karasu's eye
-lives in the ColorMap — unlike the uguisu, which carries eye GEOMETRY from `bird_familiar._eyes`.
-⚠ **An untextured solid-shaded render of this bird therefore has no eyes at all**, which is worth
-knowing before it costs a look.
+lives in the **ColorMap** — unlike the uguisu, which carries eye GEOMETRY from
+`bird_familiar._eyes`. ⚠ **An untextured solid-shaded render of this bird therefore has no eyes at
+all**, which is worth knowing before it costs a look.
 
-⚠ **THE FIRST DIAGNOSIS WAS WRONG AND IS RECORDED SO IT IS NOT REACHED FOR AGAIN.** A session
-explained the miss as "a crow's eye is as dark as its head, so it cannot read" — an
-oversimplification the owner rejected with a reference photograph. Two measurements settled it:
+⚠ **WHAT SHIPS IS THE VENDOR'S HAND-PAINTED EYE, GRADED — not anything we painted.** The premise
+that drove two days of modelling — *"a painted eye cannot read"* — came from three bakes, **all of
+them our own procedural output**. The vendor's eye (iris, pupil, catchlight, lid line) was never in
+that sample and had been in the file the whole time. It ships graded to the corvid palette rather
+than repainted over, then hand-graded by the owner for black level and contrast, with a **derived
+roughness map** so the eye stays wet while the feathers stay matte. One scalar cannot serve both
+ends — at 0.10 the whole bird is glossy black plastic, at 0.78 the feathers are right and the eye
+dies — and that trade, not the eye alone, is what buys a full PBR set.
 
-- **The eye has 31 texels across** at the shipped 1024 atlas, computed from the UV area of the
-  faces around it. **Resolution was never the limit.** A flat near-black disc with a dot on it
-  spends all 31 of them saying nothing.
-- **Sampled off `birds/Jungle_crow_Close-up.jpg`**, as luminance ratios against the plain head
-  feather beside the eye — so they survive the palette's ~35% legibility lift:
+⚠ **THE EYE IS NOT A PART, AND MUST NOT BECOME ONE AGAIN.** Two were built and both were withdrawn
+(2026-08-29): a runtime `Part` ball parked on `eye_R`/`eye_L` bones, then a `KarasuEyes` MeshPart
+CFramed off the head bone. Four of the second's defects were ordinary bugs; the fifth was not — **a
+rigid eyeball cannot track a SMOOTH-SKINNED socket**, and at a 30° head yaw parts of the socket rim
+land 0.57 of an eyeball radius from where a rigid follow puts them, so the ball escapes on whichever
+side lags. No amount of care fixes that; the architecture was wrong. `BirdController` now carries no
+eye code at all, and `tests/BirdEyeConvention.spec.luau` guards the DIRECTION rather than a
+mechanism: it fails on the names each attempt introduced, and on any species carrying an
+eye-appearance record.
 
-| | vs the feathers |
-|---|---|
-| highlight (sky reflection) | **3.08×** |
-| ear-covert stipple | **1.37×** |
-| lid rim | 0.72× / 0.50× |
-| iris | **0.66×** |
-| pupil | 0.14× |
+⚠ **A PAINTED HIGHLIGHT IS A MARKING, WHICH IS WHY ALL THREE OF OUR PAINTS FAILED FOR ONE REASON.**
+A bright shape at a **fixed place** cannot move with the light or the camera, so it reads as a
+marking rather than as wetness — and every attempt to make it more visible only made it more
+obviously one. **That failure mode has no tuning fix**, which is why sampling colours off a
+photograph never helped. What survived from that work is the measurement, in `bake_bird_texture.py`:
+every part of a crow's eye except the glint is DARKER than the head around it, so what makes the eye
+read is contrast with its own surround, not a pale iris.
 
-⚠ **THE IRIS IS DARKER THAN THE FEATHERS, NOT LIGHTER.** Every part of the eye except the glint
-is darker than the head around it. What makes a crow's eye read is **contrast with its own
-surround** — a dark socket holding one big glint, framed by paler feathering — not a pale iris.
+⚠ **THE UGUISU MUST NOT GET AN EYE TREATMENT OF ANY KIND.** It carries eye GEOMETRY baked into its
+body from `bird_familiar._eyes`, so it already has eyes; anything added would float on bones its rig
+does not have.
 
-⚠ **And the catchlight's BRIGHTNESS was right all along, at 3.4× the crown against a measured
-3.08. Its SIZE was the bug**: 38% of the eye's radius, so ~15% of its area, where the real
-reflection covers about a third of the eyeball as a broad cap. That is why "add a catchlight"
-looked done and was not — the failing dimension was not the one anyone had checked. The glint is
-now an ellipse, wider in y than z because a reflection on a sphere lies along the horizon.
-
-**Five layers now**, painted outward-in, and the frame matters as much as the eye: pale ear-covert
-patch, dark socket rim, iris, pupil, glint. The periocular frame was **missing entirely** rather
-than mis-tuned, and on a bird with no other head markings it is what says "there is a face here".
-
-### ⚠ THE EYE IS A SEPARATE PART, because gloss cannot be localised on this bird
-
-Owner rejected three painted eyes — *"nothing reads as an eye"*, then *"cataracts and/or
-possessed"*, then their own repaint of the same map — and asked the question that broke the
-deadlock: *"wouldn't you put a separate sphere in that space and give it a material like an
-eyeball?"*
-
-⚠ **A SESSION HAD ASSERTED THE OPPOSITE AND IT WAS WRONG.** The claim was that the highlight must
-be painted because the bird is one MeshPart. **The wings have always been a separate part**,
-CFramed onto the body every frame — the architecture already had the pattern, and the constraint
-was self-imposed.
-
-**The real constraint, measured:** one MeshPart, one plain ColorMap, no SurfaceAppearance
-([[material-and-mesh-traps]] §8) means **no per-texel roughness** — an eye painted or modelled
-INTO the body cannot be wet unless the whole bird is wet. Tested at roughness 0.10: a glossy black
-plastic crow, and the eye still did not read.
-
-⚠ **AND THAT IS WHY ALL THREE PAINTED ATTEMPTS FAILED FOR ONE REASON.** A painted highlight is a
-bright shape at a **fixed place**. It cannot move with the light or the camera, so it reads as a
-**marking** rather than as wetness — and every attempt to make it more visible only made it more
-obviously a marking. **That failure mode has no tuning fix**, which is why the colours being
-sampled off a photograph never helped.
-
-**Built, kept and now wired** (owner, 2026-08-28: *"I'd like to keep the eye and girth/belly
-work"*): a `KarasuEyes` **MeshPart** exported from Blender like the wings — both eyeballs in one
-mesh, so one extra part per bird rather than two — plus a lofted lid ring merged into the body.
-`BirdController` clones it, paints it from `BirdSpecies.eye`, and places it every frame.
-
-⚠ **THE EYES ARE PLACED WITH ONE WRITE, AND THE OBVIOUS DESIGN COSTS FOUR.** Two MeshParts **do
-not share a skeleton** — the body's `joint4` and the eyes part's `joint4` are different instances,
-so driving one does nothing to the other. Making the eyes' own bones track the head means
-mirroring `joint1`, `joint3` and `joint4` every frame *on top of* the part CFrame. Eyeballs are
-**rigid relative to the skull**, so the correct amount of work is one rigid transform:
-`eyes.CFrame = head.TransformedWorldCFrame * eyeOffset`, with the offset measured once at spawn
-from the two **rest** poses. Nothing at runtime distinguishes the two designs — both put the eyes
-in the right place, one costs four times as much forever — so `tests/BirdEyeConvention.spec.luau`
-guards it by reading the controller's source.
-
-⚠ **SEAT THE REST POSE VIA THE SHARED ORIGIN, NEVER `part.CFrame`.** Shipped and seen in play as
-*"two blue-ish balls floating behind the bird, nearer the tail than the head, moving more than eyes
-would."* A part's CFrame is its BOUNDING-BOX CENTRE, and these two centres are far apart — body
-`PivotOffset` (0.0010, −0.4485, 0.0000) against eyes (0.0065, −0.8329, 0.5900) — so seating one to
-the other lands the eyes **0.59 studs down the nose-to-tail axis**. ⚠ **And a bad rest pose is
-AMPLIFIED, not merely offset**, because it is then measured into `eyeOffset`: a 0.7-stud lever arm
-replacing a 0.038-stud one swings the eyes through an arc **eighteen times** too large on every head
-turn. The symptom therefore presents as wrong MOTION, which is not where anyone looks for a seating
-bug. This is the same trap the body and the wings were already documented against, three lines
-above where it was reintroduced.
-
-⚠ **PLACE THE EYES LAST IN THE FRAME, AFTER `head.Transform` IS WRITTEN.** Shipped and seen in
-play as eyes that *"don't seem to turn accurately with the head"* and are *"popping in and out of
-the geometry"* — one defect, not two. `TransformedWorldCFrame` reports where a bone **is**, which
-is whatever `Transform` last said, so placing the eyes earlier in the loop reads **last frame's
-skull**. Standing still it is invisible, because the pose is unchanged; it appears only while the
-head moves, and it appears in exactly those two ways — the eyes trail the turn, and the skull moves
-out from under them and back, so they sink in and re-emerge. ⚠ **Ordering has no runtime signal**:
-both orders compile, run, and put the eyes on the head. Guarded by source position in
-`tests/BirdEyeConvention.spec.luau`.
-
-⚠ **`TransformedWorldCFrame` on the per-frame write, `WorldCFrame` on the spawn-time offset.** The
-first is where the bone currently is, the second where it was authored. Swapping them looks
-perfectly correct in every screenshot of a bird facing forward and only breaks when the head turns.
-
-⚠ **APPEARANCE IN THE MODULE, SIZE IN THE MESH.** `BirdSpecies.eye` carries colour, material and
-reflectance only. A `radius` lived there to size the retired ball and outlived it long enough to
-drift — 0.024 against a mesh measuring 0.0188. The importer sets **no** appearance, so a clone
-that skips the three paint lines ships the eyes of a mannequin.
-
-⚠ **THE `eye_R`/`eye_L` BONES ARE VESTIGIAL AND ALWAYS WERE.** They anchored the retired Part, and
-they could never have reached Roblox at all: the importer **strips any bone that influences no
-vertex**, so a position-only bone is unshippable however it is exported. A session spent two
-commits and two import cycles fixing an exporter flag to rescue them. See [[blender-pipeline]].
-
-⚠ **A RUNTIME `Part` BALL WAS TRIED FIRST AND WAS THE WRONG CALL**, chosen for a trade that does
-not exist: "tunable in Studio without a Blender round trip". Measured — a MeshPart keeps `Color`,
-`Material` AND `Reflectance` at runtime, every dial the Part was supposed to buy, **plus
-`TextureID`, which a Part does not have.** The ball gave up the iris and gave up being visible
-while authoring, and bought nothing back. Nor is it meaningfully cheaper: both are one Instance
-per eye, and instance count is what costs. See [[owner-rulings]] — model in Blender, approve in
-Studio.
-
-⚠ **THE HEAD IS NOT SYMMETRIC AND THE FIRST BUILD MIRRORED ONE MEASUREMENT.** Owner: *"the eye is
-very visible on one side of the head and missing on the other."* The surface stands at 0.0514 on
-the right against 0.0610 on the left, and the vendor head carries 120 vertices one side against
-163 the other. Each eye is now seated against **its own side**, and against the **footprint** it
-occupies rather than a single raycast at its centre — which had struck 0.0379 where nearby
-vertices reached 0.0514 and buried the ball entirely. Both protrusions are **asserted equal**, not
-eyeballed. See [[blender-pipeline]].
-
-### The lid — lofted, because displacement could not do it
-
-⚠ **THE APERTURE IS AN EDGE LOOP ON THE EYEBALL, bridged back to the head.** Three attempts to
-clip the ball to an oval by displacing whichever body vertices sat near that curve all came out
-visibly lumpy — the boundary lands where the vertices already are — and the last cost +630
-triangles for a finer lumpy edge. A curve needs a loop ON it, which is what the tail, the folded
-wing and this lid all now do.
-
-⚠ **THE BRIDGE RIDES A CONCENTRIC SPHERE out to the ball's own silhouette**, and only then peels
-back to the head. Anything else cuts through the eyeball: it is convex, so *any* chord between two
-points near it dips inside, and the skull falls away toward the crown so the return happens lower
-up top than at the sides. Measured before the fix, the ball escaped to 0.975r straight up while
-covered to 0.375r underneath; after it, exposure equals the aperture in every direction.
-
-⚠ **THE RING IS A CONSTANT-WIDTH BAND, offset along the ellipse's normal — not a scaled ellipse.**
-Scaling the semi-axes makes the band widest exactly where the aperture already is, which the owner
-caught: *"much larger than the eye it encloses, especially in the horizontal dimension."* The
-normal to `(a·cosθ, b·sinθ)` is proportional to `(b·cosθ, a·sinθ)` — the axes **swap**. Widths then
-vary by direction (deepest above and below, tightest behind) blended by a **weighted mean**, never
-a sum: summing inflates the diagonals past either and the ring bulges at the corners.
-
-**Every number is in `KARASU["eye"]`; read it there rather than here.**
-
-⚠ **THE UGUISU MUST NOT GET THIS TREATMENT.** It carries eye GEOMETRY baked into its body from
-`bird_familiar._eyes`, so it already has eyes; giving it a second pair would float them on bones
-its rig does not have.
-
-**`Reflectance` will be the one dial** once the eye is wired, and it is tuneable in Studio without
-a Blender round trip. ⚠ **Do not paint an eye back into the ColorMap**: it would sit still beside
-the moving specular and give the bird two highlights, one obviously fake. The texture now draws
-only the dark **socket** the ball sits in, and a socket is *darker* than what surrounds it — the
-opposite of the pale ring the failed versions kept reaching for.
+⚠ **THREE THINGS HAVE NOW BEEN BUILT ON THIS HEAD AND WITHDRAWN** — the modelled eye, its lid
+collar, and (2026-08-30) the plane-cut jaw. The full chronology, with the measurements that settled
+each, is in [log.md](../log.md) under 2026-08-28..30; it is deliberately not restated here.
 
 ## Motion scales with the bird — built 2026-08-28
 
@@ -762,10 +646,9 @@ reads as long-winged in life — loses more by it. This remains the cheapest lea
 than a bug.** The karasu measures life-size against a real hashibutogarasu, so "seems small" is a
 statement about how it READS, not about whether the number is right — and the same tension already
 has a ruling on the other bird, in the opposite direction, one section down. Do not resolve it by
-quietly rescaling the mesh. The most likely lead is already on record below as `⚠ unverified`: the
-**wingspan** ships at about 1.49× body length where a live crow is ~2.0×, and crows read as
-long-winged in flight, so short wings may be most of why a life-size body does not feel big.
-That would make it a wingspan question, not a size question. See [[backlog]].
+quietly rescaling the mesh. The most likely lead is the **wingspan** measured one paragraph up —
+short wings may be most of why a life-size body does not feel big, which would make it a wingspan
+question, not a size question. See [[backlog]].
 
 ## ⚠ THE UGUISU IS DELIBERATELY OVERSIZED — do not "correct" it toward life-size
 
@@ -784,17 +667,13 @@ Note the legibility complaint on record — *"a 7-inch bird cannot carry status 
 distance"* — was made about a bird SMALLER than what shipped: seven inches is ~0.55 studs, and
 the uguisu ships larger than that. The bird you have is already the answer to that objection.
 
-⚠ **unverified, worth a look if sizes are ever revisited:** the karasu's body is life-size but its
-wingspan measured ~75% of life (about 1.5x body length where a real crow is ~2.0x). Crows read as
-long-winged in flight, so short wings may be part of why it does not feel big. Taken from a
-bounding box on a rest pose, so confirm before acting on it.
-
-
-**Import verified 2026-08-26.** No `SurfaceAppearance` was created (the trap in step 2 did not
-fire); `TextureID` came through as `rbxassetid://129407256075817` on both parts; `HasSkinnedMesh`
-true; 15 bones on the body and 5 on the wings, sharing `joint1`, for the 19 claimed. All seven
-bone-drive pairs pass — non-zero on the chain, exactly 0.0000 off it — and the axis contract
-reproduces the uguisu's: local X +40 moves BOTH tips −0.6579 vertically and 0.0000 fore-aft, local
+**Import verified in the place, and RE-IMPORTED 2026-08-29** with the full PBR set — so the first
+import's own notes (no `SurfaceAppearance`, a `TextureID` on both parts) describe a bird that no
+longer ships; the current rule is step 2 of the checklist above. `HasSkinnedMesh` is true and every
+bone-drive pair passes — non-zero on the chain, exactly 0.0000 off it. ⚠ **Bone counts and asset
+ids move with each re-import; read them from `roblox/tools/studio/measureBirds.luau` rather than
+here.** The axis contract is the part that governs, and it reproduces the uguisu's: local X +40
+moves BOTH tips −0.6579 vertically and 0.0000 fore-aft, local
 Z +40 moves them +0.6579 and −0.6579 fore-aft and 0.0000 vertically.
 ⚠ Those magnitudes differ from the Blender-side figures recorded above (+0.7413 / +0.7984 /
 −0.7060). The SIGN RELATIONSHIPS — which are what the beat and fold depend on — agree exactly; the
@@ -819,11 +698,16 @@ the single thing standing between the karasu and being playable.
 
 `roblox/src/shared/BirdFlight.luau` (pure, Lune-tested), `roblox/src/client/BirdController.client.luau`,
 `roblox/tools/studio/watchWingbeat.luau` (⚠ **the only way to gate a beat change** — flights are on
-a 10–60s random hold, so watching one side-on otherwise means loitering and hoping; ISOLATED parks
-a bird in front of the camera at a fraction of speed with the wingtip path traced, FLIGHT sends a
-test-only bird back and forth along the Overlook's upper deck, north rail ↔ south rail, 30 studs.
-⚠ **RUN IT IN EDIT** — no Play, no datamodel to choose, no StreamingEnabled, free camera. In Play
-it must run on the CLIENT: server-built parts never reach the screen, which is why the real
+a 10–60s random hold, so watching one side-on otherwise means loitering and hoping. **Three modes,
+one per question**: ISOLATED parks a bird in front of the camera at a fraction of speed with the
+wingtip path traced; FLIGHT sends a test-only bird back and forth along the Overlook's upper deck,
+north rail ↔ south rail; PERCH (2026-08-30) stands one up doing what a perched familiar does —
+looking about, fluttering and singing on a tight loop with the jaw driven off the clip.
+⚠ **EDIT IS THE EASIER PATH for ISOLATED and FLIGHT** — no Play, no datamodel to choose, no
+StreamingEnabled, free camera — but **PERCH REFUSES TO RUN IN EDIT**, because a Sound's
+`TimePosition` never advances there and the gape is driven off it, so the beak would hang shut and
+the tool would look broken rather than unsupported. In Play any mode must run on the CLIENT:
+server-built parts never reach the screen, which is why the real
 familiars work at all — `Workspace.Familiars` does not exist on the server),
 `roblox/src/shared/ChoreographyMachine.luau`, `server/src/engine/Milestones.ts`,
 `roblox/tools/studio/sweepFamiliarPerches.luau`, `roblox/tools/builders/Spec.luau`

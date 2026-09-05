@@ -1,6 +1,7 @@
 ---
 shelf: practice
 updated: 2026-08-15
+checked: 2026-09-04
 ---
 
 # Modal Cursor Grip

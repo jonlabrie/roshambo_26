@@ -134,8 +134,8 @@ it was applied to.
 
 **Extended 2026-08-30 from a file to a whole asset.** The karasu's bill is now hand-finished in
 `karasu_authored.blend` — a traced culmen fit, a lined mouth, and owner vertex edits at the tip.
-The fit is reproducible; the hand edits are not. So the registry gained `karasu_authored.blend`
-and `karasu_body.fbx`, and `run()` gained `assert_authored_bill_absent()` as its FIRST statement.
+The fit is reproducible; the hand edits are not. So the registry gained `karasu_authored.blend`,
+and `run()` gained `assert_authored_bill_absent()` as its FIRST statement.
 
 ⚠ **THE BACKSTOP AT THE WRITE IS NOT ENOUGH ONCE A WHOLE ASSET IS AUTHORED.** `run()` rebuilds
 from the vendor blend, so by the time `assert_writable` fires at the export the run has already
@@ -143,15 +143,21 @@ thrown away everything it was going to. The guard has to be a stop sign at the d
 the till. Move `AUTHORED_BLEND` aside to rebuild the base bird — an action, not an accident.
 
 **Where the guarded files live (2026-08-30).** `art/` at the repo root is the in-repo home for
-hand-authored source; `art/README.md` carries the admission rule. The two halves are kept in
-agreement by CI: `art/` must contain no derived files, and every hand-authored name the
-registry guards must actually be stored there.
+hand-authored source; `art/README.md` carries the admission rule. CI enforces one half of it:
+`art/` must contain no derived files. ⚠ **There is no longer a second check tying the registry's
+names to `art/`** — `8d69da6` deleted it along with the split below, so nothing mechanical now
+notices if a guarded name stops being stored.
 
-⚠ **`OWNER_AUTHORED` IS NOW THE ONE REGISTRY** (the separate ART_SOURCES set was folded into
-it; `art/README.md` §8 records the storage-half/guard-half split). Hand-made sources are stored
-in `art/`; a guarded-but-*derived* file like `karasu_body.fbx` is deliberately NOT in `art/` —
-it is guarded only because it is what Studio imports, and a rebuild would replace the shipping
-bird with one carrying none of the authored bill.
+⚠ **`OWNER_AUTHORED` IS THE ONE REGISTRY, AND IT GUARDS THE SOURCE ONLY.** It is
+`{COLORMAP_AUTHORITY, AUTHORED_BLEND}` — read it rather than this line. `karasu_body.fbx` was
+briefly in it on the day the registry grew, and that **single wrong entry generated every tangle
+that followed**: a CI check that demanded the FBX be stored under `art/` while the rule above
+rejects `.fbx` there, an `ART_SOURCES` split invented to paper over the contradiction, <!-- lint-ok: naming the retired split in order to bury it --> and a guard
+that refused the very export the authored blend exists to produce. A derivative can always be
+re-exported, so guarding one buys nothing and costs the legitimate path. The correct model is
+**one source of truth per asset, changing hands exactly once**: `run()` owns a bird until a human
+makes an edit the script cannot reproduce, and from that moment the `.blend` owns it. The one-way
+door is `assert_authored_bill_absent()`; nothing else needs guarding.
 
 ⚠ **BLEND SAVES ARE MILESTONE-ONLY, AND THAT IS A SIZE CONSTRAINT, NOT ETIQUETTE.** Git cannot
 diff a `.blend`; every save is a full copy kept forever, and Blender writes a `.blend1` backup

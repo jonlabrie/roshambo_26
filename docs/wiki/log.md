@@ -3007,6 +3007,338 @@ recorded in [[blender-pipeline]], along with the MCP trap that `import_scene.fbx
 window override.
 
 
+## [2026-08-31] lint | Prose lint — the withdrawn karasu eye survived a lint-clean of its own page
+
+A prose-lint run opened 2026-08-31 against `ef63c65`; `main` moved ~120 commits under it before
+review, including `35cbb6a` — an independent lint-clean by another session that touched four of the
+same five files. What survived that overlap is the finding.
+
+⚠ **`world/familiars.md` STILL DESCRIBED THE WITHDRAWN `KarasuEyes` PART AS SHIPPING**, and a
+lint-clean pass over that very page did not catch it. Under a heading reading *"THE KARASU'S EYE
+IS PAINTED"* sat *"**Built, kept and now wired**… `BirdController` clones it, paints it from
+`BirdSpecies.eye`, and places it every frame"*, then a hundred lines on the rest pose, the frame
+ordering, the lid loft and the ring width. All withdrawn 2026-08-29: no eye mesh asset, no Rojo
+entry, `BirdController` carries a **DO NOT REINTRODUCE** comment, and
+`tests/BirdEyeConvention.spec.luau` fails on the names. ⚠ **The mechanical lint was green on that
+page throughout, and stayed green through a dedicated clean-up pass** — it cites a test file that
+exists and `BirdSpecies.eye`, whose leaf `eye` matches somewhere in every source tree. A citation
+check cannot tell a live claim from a dead one, and neither can a pass that only follows citations.
+Superseded per rule 2.
+
+⚠ **A RENAME IS NOT A CORRECTION.** `35cbb6a` folded `ART_SOURCES` into `OWNER_AUTHORED` on
+[[blender-working-rules]] and carried both of that section's false claims across intact: that the
+registry *"gained `karasu_authored.blend` and `karasu_body.fbx`"*, and that CI keeps `art/` and the
+registry in agreement. Neither holds — `OWNER_AUTHORED` is `{COLORMAP_AUTHORITY, AUTHORED_BLEND}`,
+`8d69da6` deleted the second CI step, and that commit's own message says the `karasu_body.fbx`
+entry is *"what made the guard refuse the very export the authored blend exists to produce"*. The
+symbol the lint could see was fixed; the sentence around it was not.
+
+⚠ **`world/fireworks.md` CITED AN SDD LEDGER THAT RESOLVED NOWHERE** —
+`.superpowers/sdd/2026-09-04-deck-mortars/` was not in the tree, and no 2026-09 ledger was.
+⚠ **AND THE DIAGNOSIS WRITTEN HERE WAS WRONG, which is worth keeping.** This entry first
+concluded the ledger was *absent* rather than *invisible*, reasoning that the markdown under
+`.superpowers/sdd/` is tracked because the bare `*` ignore had been narrowed on 2026-08-27. That
+inference was sound and the premise had expired: 2026-09-04 found the cause (schema rule 4) — the
+SDD tooling's `sdd-workspace` script ends by rewriting that same `.gitignore` back to a bare `*`,
+and `review-package` and `task-brief` both call it, so it is clobbered dozens of times per run.
+The ledgers existed all along and were being un-tracked underneath. **A premise verified once is
+not verified forever**, and the check that would have caught it — `git status` on that file —
+costs nothing. `8aeef2a5` then committed both ledgers; the citations are restored.
+
+**Also corrected on `familiars`:** a transcribed **326** perches forty lines above the page's own
+instruction to count them (rule 9); the wingspan carried as `⚠ unverified` in two places after a
+third paragraph declared it verified; the "Import verified 2026-08-26" note, superseded by the
+2026-08-29 PBR re-import; and `watchWingbeat`'s mode list, which omitted PERCH and told the reader
+to run in Edit, where PERCH deliberately refuses.
+
+**Dropped as already fixed on `main`:** the four `fix` → `defect` log kinds and two dateless
+headers, the two `bpy` API symbol exemptions, and the `SPECIES = "Uguisu"` claim (now
+*"currently `Karasu`"*). Found independently by both passes within a day of each other.
+
+⚠ **AND ONE STAMP WAS WITHDRAWN RATHER THAN LEFT.** [[ambient-birds]] was read end to end and
+stamped `checked: 2026-08-31`; `main` then shipped the mejiro and the hiyodori, so its *"Two
+species built, one reachable"* is now wrong — `BirdSpecies.SPECIES` carries four. The stamp was
+removed rather than carried forward: it was honest on the day and is not honest now, and the page
+needs a re-read against the two new species rather than a one-word patch, because its whole
+"species list — started 2026-08-30" section plans as FUTURE the birds that have since shipped.
+
+⚠ **THE CURRENCY CHECK COULD NOT HAVE CAUGHT THAT, AND THE REASON GENERALISES.** That page cites
+its modules by bare name — `` `BirdController.client.luau` ``, `` `BirdFlight` ``, `` `BirdSpecies` ``
+— and never as a repo PATH, so `CITE_RE` matches nothing on it and checks 8 and 9 have no anchor to
+fire from. **A page with no path citation is exempt from every currency check by construction**, and
+it is exempt silently. The pages most worth watching are the architectural ones, which are exactly
+the ones that name modules rather than paths.
+
+⚠ **THREE PAGES CARRY A FUTURE `updated:` — reported, not changed.** `fireworks`, `familiars` and
+`blender-working-rules` are stamped **2026-09-04** while the newest commit on `main` at the time of
+this run was dated 2026-09-01. A stamp ahead of today silences check 9 (cited code committed after
+`updated:`) until that date arrives. Rule 10 made staleness blocking; a future date is a way past
+it, whether or not anyone meant it as one.
+
+**Read at depth (19 shelf pages + index, schema and this file):** `familiars`, `ambient-birds`,
+`blender-working-rules`, `blender-pipeline`, `core-loop`, `world-throw`, `round-and-hud`,
+`status-display`, `rojo-meshpart-rbxm`, `parallel-threads`, `duplicated-server-constants`,
+`material-and-mesh-traps`, `replication-races`, `visible-is-not-pixels`, `toolbox-backdoor-scan`,
+`image-moderation`, `misc-engine-traps`, `falls-dock`, `friends-family-baseline`.
+
+⚠ **NOT READ — 37 pages, and no claim is made about them.** All of `systems/`; the rest of
+`program/`; 15 `world/` pages (`canyon`, `arena-square`, `bell-engine`, `hanabiya`, `chaya`,
+`fireworks`, `day-night`, `viewing-platform`, `stats-room`, `switchback-deck`, `paths`,
+`teahouses`, `foliage`, `water-audio`, `place-state`); 15 `practice/` pages. ⚠ **`fireworks`,
+`parked-defects` and `backlog` changed heavily in the commits this branch merged and were NOT
+re-read** — only the one dead citation was fixed on `fireworks`. Start there next run.
+
+⚠ **AND THE LEDGER GAP IS A PATTERN, NOT AN INCIDENT.** A second base advance during this run
+brought the rail-mounts work, which cites `.superpowers/sdd/2026-09-04-rail-mounts/progress.md` —
+also never created. Two consecutive features, two cited ledgers that do not exist. The spec and
+plan land under `docs/superpowers/`; the SDD ledger is the step being skipped. Both are now
+recorded as absent. ⚠ **Worth deciding rather than re-fixing every run**: either the ledger is part
+of shipping a feature, or the wiki should stop citing one by default.
+
+**Two blocking staleness errors came with that advance and were worked, not stamped away.**
+[[teahouses]] fired on `server/src/routes/apiV1.ts` and `server/src/loadout.ts`, and
+[[modal-cursor-grip]] on `roblox/src/client/ShopController.client.luau`. Both pages were read end
+to end and both are still correct: the mortar work added a SIBLING `User.mortarPlacements` field
+rather than changing the teahouse loadout contract (`LOADOUT_KEYS` is unchanged, and
+`validateShojiOpen`, `shoji.plain`/`shoji.crane` and `StructureOps.setTexture` all resolve), and the
+ShopController commit touched shop display tables, leaving `CURSOR_PRIORITY`, the `holding` flag and
+both recorded rejected approaches exactly as described. Stamped `checked:` on the strength of the
+read, not of the citation.
+
+**A third base advance landed clean, and one stamped page needed a correction anyway.**
+`13ee64e` fixed parked defect (a) — the purchase read-modify-write race — but
+[[friends-family-baseline]] item 6 still listed *"the parked economy-API defects (a)–(c)"*.
+Corrected to (b)–(c). ⚠ **A FIX ON ONE PAGE IS AN EDIT TO EVERY PAGE THAT CITES IT**, and a letter
+is the easiest citation in this wiki to leave behind: nothing links it, so nothing breaks visibly.
+The `checked:` stamp came off that page rather than sitting beside a body edit, per rule 6.
+
+**The relabel that came with it was done right, and is worth recording as the good case.**
+`44e691c` moved the mortar-gate defects to (l)–(n) *"because (i)-(k) were already taken"* — so the
+citations from [[identity]], [[data]] and [[deploy]] still land on the identity and JWT defects
+they were written for. That is the failure mode this run was watching for and did not find.
+
+**Re-verified rather than assumed, because the grace period would have hidden it:** the same
+advance touched `apiV1.ts`, `economy.ts` and `DecorationCatalog.luau`, all cited by pages stamped
+hours earlier. `MAX_DECORATIONS = 24` and `MAX_INVITED = 50` are still mirrored on both sides, and
+the `apiV1.ts` change is confined to purchase atomicity rather than the loadout contract
+[[teahouses]] describes. Both stamps stand. ⚠ **The lint reported 0 warnings throughout that
+check** — the changes were same-day, so the three-day grace suppressed every prompt. A stamp is
+only as good as the last read behind it, and the grace window is exactly where that gap opens.
+
+**A fourth base advance closed seven parked defects, and that broke citations on three pages.**
+(a)–(e), (m) and (o) were fixed and (g)'s residual overturned, all 2026-09-05. Corrected here:
+[[round-and-hud]] still called the world-throw-after-strike residual *"accepted"* and still sent the
+reader to (d) for a live onboarding layout defect; [[friends-family-baseline]] item 6 still carried
+economy-API defects (a)–(c), now all three fixed. ⚠ **A DEFECT FIX IS AN EDIT TO EVERY PAGE THAT
+CITES THE LETTER**, and nothing links a bare letter, so nothing breaks visibly when it moves. This
+is the second run in a row where closing defects left stale references behind.
+
+⚠ **AND ONE DEFECT WAS FIXED IN CODE WITHOUT BEING STRUCK OFF THE BOARD.** `f450905` closed (n) —
+all four `PlayerAdded` sites now sweep `Players:GetPlayers()` after connecting, and the code carries
+the comment *"Parked defect (n), fixed 2026-09-05"* — but [[parked-defects]] still listed it open.
+Struck. The commit that fixes a defect and the commit that records it are separate here, and the
+second one is the one that gets skipped.
+
+⚠ **THE LOG'S KIND VOCABULARY IS DRIFTING FASTER THAN IT IS BEING CORRECTED — this needs a ruling,
+not another normalisation pass.** Eight more entries arrived outside rule 8's
+`gate|ship|decision|drop|defect|migrate|lint|audit`, using FOUR undefined kinds: `fix`, `fixed`,
+`shipped` and `correction`. That is on top of the six corrected days earlier. `fixed`/`fix` → `defect`
+and `shipped` → `ship` are plainly synonyms and were normalised as such. **`correction` is not** —
+retracting a claim the wiki got wrong is a first-class event in this project, it happens constantly,
+and no defined kind names it; these were mapped to `audit` as the least-wrong fit, which is not the
+same as right. **Either add `fix` and `correction` to `LOG_KINDS` in `tools/wiki/lint.mjs` and rule
+8, or expect this correction every run** — authors reach for these words because the vocabulary is
+missing them.
+
+**A fifth advance, and it retired a standing rule this run had already stamped.**
+[[misc-engine-traps]]'s iOS WebAudio section told the reader to *"keep listening until
+`ctx.state === 'running'` is actually observed, and only then unbind."* `d5187da` proves that
+insufficient: iOS re-suspends or INTERRUPTS the context on lock, backgrounding and calls, the
+`visibilitychange` nudge's `resume()` is refused outside a gesture, and with the listeners gone no
+tap can repair it — audio death was sticky until a lucky reload, which is exactly why the flake
+read as random. The rule is now **never disarm**. ⚠ **A PAGE THAT TELLS YOU TO DO THE THING THAT
+WAS JUST PROVEN INSUFFICIENT IS WORSE THAN A SILENT ONE**, and this one carried a `checked:` stamp
+from two days earlier — correct when written, wrong within 48 hours. Corrected, and the stamp came
+off with the body edit. Its own regression (`6f8e2c0` — the buffer load sat behind the resume's
+early return, so a desktop context born `running` never loaded the bell at all) is recorded beside
+it: work needing no gesture and no running context must run BEFORE the state check.
+
+⚠ **THE NEW `visual-identity` PAGE SHIPPED AS AN ORPHAN.** It says *"check here before generating
+ANY art that represents a game concept"* and exists because a session invented literal
+rock/paper/scissors sprites while the approved glyphs sat in the repo — yet no page linked to it,
+so nobody about to make art would arrive. [[blender-pipeline]]'s SDF-glyph section now points at
+it: that section is how the glyph images are RASTERISED, and the new page is what the marks ARE.
+⚠ **A rule page nothing links to is a rule nobody reads**, and `index.md` alone does not close
+that — the lint's orphan check is the only thing that noticed.
+
+⚠ **THE LOG-KIND DRIFT HAS A CAUSE, AND IT IS GRAMMATICAL — this is the finding, not the
+normalisation.** Across four passes this run corrected **22 headers** carrying TEN undefined kinds:
+`fix`, `fixed`, `shipped`, `built`, `gated`, `published`, `ruling`, `codified`, `reverted`,
+`correction`. Tallied against the whole file, the shape is unmistakable — **`gated` (1) beside
+`gate` (17), `shipped` (2) beside `ship` (37), `published`/`built` beside `ship`, `ruling`/`codified`
+beside `decision` (26).** Authors are writing the PAST TENSE of what happened; rule 8 wants the bare
+form. The concept is nearly always already defined — only the grammar differs — so most of this is
+not a missing vocabulary at all.
+
+**That splits the remedy in two, and only the second half is a judgement call:**
+- **Mechanical:** the lint could accept `-ed`/`-d` forms of the eight defined kinds as aliases.
+  `gated`, `shipped`, `reverted` and `fixed` all resolve unambiguously; that alone would have
+  prevented 16 of the 22.
+- **A real gap, and it is not tense-shaped:** `fix`, `correction` and `perf` name events with no
+  defined home. `fix` was mapped to `defect`, `correction` to `audit` and `perf` to `ship`, all
+  approximations — a retraction of a wrong wiki claim and a pure performance change are both
+  first-class events here, and rule 8 cannot say either. These are the ones an alias rule would
+  NOT catch.
+
+⚠ **Normalising by hand every run is not a fix, it is a tax**, and it is the third such pass in a
+week. Whoever owns the schema should either alias the tenses in `LOG_KINDS` or state the required
+form in rule 8 loudly enough to be obeyed.
+
+⚠ **A STANDING RULE AND ITS GATE LANDED IN THE CHRONOLOGY AND NOWHERE ELSE — reported, not
+moved.** `4d46aba` records that the mobile pass pushed `HudController`'s main chunk past **Luau's
+200-local-register COMPILER limit**: the whole script failed to compile, the play HUD vanished
+entirely, and **stylua, selene and the 1671-test suite all stayed green, because none of them
+compile**. The fix scopes each self-contained section's locals in a do-block behind one
+forward-declared name, and `tests/Compiles.spec.luau` now runs every `src` file through Lune's
+embedded Luau compiler at O0 and O2 — it reproduced the exact Studio error before the fix. The
+entry closes with a rule for the next author: *one top-level register per section, do-block the
+rest.*
+
+**That is a durable engine trap and a standing rule, and it exists only in `log.md`** — grep finds
+"register" on no `practice/` page. [[misc-engine-traps]] opens *"small, self-contained Roblox
+engine and pipeline traps that don't belong to a bigger recipe; each cost real time once"*, which
+is exactly its home, and the incident is fresh evidence for a theme the wiki already carries (four
+green checks passing on a bird whose face was torn open, [[blender-working-rules]] rule 4). Left
+for the owner because moving live knowledge between shelves is a judgement call, not a lint fix —
+but the next person adding a HUD section will not find this where it currently sits.
+
+**Also not carried across, and also reported rather than authored:** the same pass added a
+portrait-centred cluster, a tap-to-fire fireworks rail with per-orientation caps, and
+`HudLayout.clusterRef`. [[round-and-hud]]'s HUD section describes the bottom-right cluster with no
+mobile-orientation behaviour at all. Its constants were re-verified and still hold — `EDGE_BOTTOM`
+6, `RingTimer.MIN_SWEEP_DEGREES` 6, `HudModel.ESCALATE_AT` 5 — so nothing there is WRONG; it is
+incomplete, which no check can see.
+
+**An eighth advance, and defect (d) turned up stale on a THIRD page.**
+[[friends-family-baseline]] item 2 still read *"onboarding half deferred… and carries a layout
+defect in [[parked-defects]]"* — (d) was fixed 2026-09-05, and the onboarding JOURNEY has since
+been spec'd and built end to end (`98df9f6..8b0eb9d`: starter SKU, 8-beat chain, `TourGuide`, tour
+beam, model pad). Corrected, with the closing question left explicitly to the owner: item 2 was
+deferred by an owner gate, so only an owner gate closes it. ⚠ **Three pages have now been found
+citing (d) after it was fixed** — round-and-hud, this board, and the board's own item 6 for
+(a)–(c). A bare letter is the cheapest possible citation to write and the most expensive to
+maintain, because nothing links it and nothing checks it.
+
+**[[teahouses]] re-verified rather than stamped on trust**, after `apiV1.ts` changed again inside
+the grace window: `LOADOUT_KEYS` and `validateShojiOpen` are unchanged, so nothing on the page is
+wrong. ⚠ **It is now INCOMPLETE, which no check can see**: the **starter SKU** (S deck + S
+teahouse, 20 points, atomic first-property grant, sold from the vacant-site prompt) is a new way to
+come by a teahouse, and a page whose first line calls a teahouse *"earned"* does not mention it.
+Reported rather than authored.
+
+**A ninth advance CLOSED a gap this run had reported, so the report itself became the stale
+claim.** `8aeef2a5` committed both SDD ledgers — deck-mortars and rail-mounts, `progress.md` plus
+six brief/report pairs each. This entry had recorded twice that neither existed and that
+[[fireworks]] cited them anyway; those notes were reverted and the citations restored, now naming
+the commit that landed them. ⚠ **A FINDING IS A CLAIM WITH THE SAME HALF-LIFE AS ANY OTHER**, and
+the pass that files it owns un-filing it. The original observation still stands as history: the
+page cited a raw layer that existed only on one machine for two days, which is exactly the gap
+schema rule 4 exists to close.
+
+**An eleventh advance made the World Throw rule LIVE, and the sweep that came with it was the
+good case.** The synthetic crowd shipped and dev now runs it, so [[world-throw]]'s closing claim —
+*"not active in any deployed environment"* — became false. `a38c6d3f` names every page that said
+so and fixed them, and a grep across the wiki confirms none is left. **That is what closing a
+defect should look like**, and it is the same discipline the (d)/(a)–(c) letters did not get.
+This branch's `checked:` stamp on the old body was superseded by that rewrite and dropped rather
+than carried.
+
+⚠ **A NEW LINT GAP, FOUND WHILE RESOLVING IT: a `checked:` older than `updated:` asserts nothing,
+and nothing catches it.** Rule 6 defines `checked:` as *"re-read on this date and still true"*. When
+a later body edit bumps `updated:` past it, the stamp now claims a read of text that no longer
+exists — it is false by construction, and the lint has no check for the ordering. Two pages were in
+that state at this merge ([[world-throw]] and [[fireworks]], both `updated: 2026-09-04` over
+`checked: 2026-08-27`); both stamps were dropped, since a stamp that predates the prose is worse
+than none. ⚠ **A one-line check — `checked:` must not be older than `updated:` — would make this
+self-correcting**, and it is the cheapest of the currency checks to add.
+
+**[[modal-cursor-grip]] re-verified rather than re-stamped on trust**, its `ShopController`
+citation having aged past the grace: `CURSOR_PRIORITY` at `Camera + 1`, the `holding` flag guarding
+both grip and release, and `MouseBehavior.Default` inside the bound function are all exactly as the
+page describes. Stamped.
+
+**A twelfth advance turned two of this run's own stamps into BLOCKING errors, and one was a real
+defect.** `b10a33f3` redefined `Round.totalPlayers` as **humans PLUS bots** and added `synthetic`
+beside it, so [[core-loop]]'s *"which number means what"* section — the page that exists to stop
+exactly this confusion — listed `totalPlayers` with neither the new meaning nor the new field.
+⚠ **A NUMBER WHOSE MEANING MOVES UNDER ITS NAME IS THE WORST KIND OF STALENESS**, because every
+consumer keeps compiling and keeps reading it: any stat meaning "how many people played" must now
+subtract `synthetic`, and on dev the difference is 30 bots. Corrected; historical rows default the
+field to 0, so the subtraction is honest all the way back.
+
+**[[status-display]] and [[round-and-hud]] fired on the same advance and were both still right.**
+Settlement still iterates `data.throws.entries()`, so *"an unthrown player is never settled"*
+holds; the round defaults are still 51/2/7 and the API still accepts through OPEN **and** LOCK.
+Both stamped on the strength of the read. ⚠ **Three pages flagged, one genuinely wrong** — which is
+the honest ratio, and the reason rule 10 says read rather than assume in either direction.
+
+⚠ **`falls-dock` and `blender-pipeline` were read and deliberately NOT stamped `checked:`.**
+`falls-dock` rests on emitter positions, a place-only `UguisuScheduler` Script and asset ids only
+Studio can confirm; `blender-pipeline` still teaches the plane bisect for splitting a bill, which
+owner ruling 2026-08-30 retired, and lacks the `holes_fill` fan-vertex finding that made the cut
+unnecessary. Both want the owner.
+
+⚠ **A SIXTH BASE ADVANCE AUDITED THE LOG'S DATES, AND IT CAUGHT THIS ENTRY TOO.** `f3d5aeb5`
+found **38 of 163 entries carrying a date no session could have known** and added rule 8's date
+clause. **This entry was one of them**: it was headed `[2026-09-02]` and `git log -S` puts its
+first commit at **2026-08-31**, so it was forward-dated by two days at the moment it was written —
+by the session whose whole job is catching claims that cannot be true. Re-headed `[2026-08-31]`
+and moved up into date order behind the 08-31 entries; the file now has **0 inversions**. ⚠ **The
+asymmetry in the new rule is the part to keep**: a forward date is impossible and always an error,
+a backdated one is normal and usually right, and the audit itself learned that the hard way by
+"correcting" six backdated karasu entries onto their commit dates and driving inversions from 1 to
+3.
+
+**The 23 merge conflicts that advance produced were resolved as date-from-`main`, kind-from-here**
+— `main` corrected the dates against git and left the kinds alone; this branch had normalised the
+kinds and left the dates alone. Neither side was wrong, and taking either wholesale would have
+dropped half the work. One new entry arrived with an undefined kind (`fix` → `defect`); that is
+the eleventh, and the ruling asked for above is still the ask.
+
+⚠ **AND ONE OF THIS BRANCH'S OWN FINDINGS CLOSED WITHOUT THE BRANCH NOTICING.** The 200-register
+Luau ceiling was reported here as living only in `log.md`; `39f3387b` wrote it onto
+[[misc-engine-traps]] on 2026-09-04 as its own section. The report is retired rather than carried.
+**A finding has the same half-life as any other claim, and the pass that files one owns un-filing
+it** — that is the second time this run.
+
+**Corrected on [[hanabiya]]:** the roof section cited its gate as *"built and gated 2026-09-06 per
+`docs/wiki/log.md`"*, a date the date-audit has since removed from the log entirely — the entry is
+`[2026-09-02] gate | Rooftop battery aimed and gated`. ⚠ **A transcribed date is a citation, and
+re-dating the log breaks every page that copied one** — the same shape as a defect letter moving.
+The page's void `checked: 2026-08-26` (older than its own `updated: 2026-09-05`) came off with it.
+
+⚠ **THE CURRENCY CHECK FIRES ON `docs/wiki/log.md`, AND IT ALWAYS WILL — a check defect, reported
+not patched.** Three pages cite `log.md` by path ([[deploy]] step 5, [[hanabiya]]'s roof,
+[[parallel-threads]] rule 3). `log.md` is append-only chronology written by every session daily, so
+check 9 will report those three pages stale forever, and it can never be reporting anything real —
+a chronology cannot contradict a page. ⚠ **`<!-- lint-ok -->` DOES NOT REACH IT**: the exemption set
+built at `tools/wiki/lint.mjs` is consulted by check 8 (dead citation) only, never by check 9, so
+the obvious fix is inert — three such comments were written here and removed again once tested
+rather than left standing as an exemption that does nothing. The real fix is a one-line tooling
+change (exclude `docs/wiki/**` from the currency check, or let the exemption set reach check 9) and
+belongs to whoever owns the lint. [[deploy]] was read end to end and stamped meanwhile — ⚠ its AWS
+facts (prod paused, both auto-deploys off, dev flipped) are **live state this session cannot reach**
+and the page already says to query them; the stamp covers what git can answer, and no more.
+
+**Verified by hand where the grace window would have hidden it:** today's `main.server.luau` and
+`AmbientConfig.luau` commits are cited by [[parked-defects]] (checked 09-04) and
+[[duplicated-server-constants]] (checked 09-03), both inside the three-day grace. Neither page says
+anything about streaming radii or the ambient config; `MAX_INVITED = 50` is still mirrored in
+`server/src/economy.ts` and `main.server.luau`, and `SetDecorationPlacement`,
+`SetDecorationRemove` and the `coordinator:pollOnce()` loop all still resolve. Both stamps stand,
+unchanged — the check that would have prompted this stayed silent throughout.
+
+
 ## [2026-09-01] decision | Fireworks proving range spec approved; in-Play only, at FallsLanding
 
 Spec: docs/superpowers/specs/2026-09-01-proving-range-design.md. First of four
@@ -3223,7 +3555,7 @@ same-server rejoin recipe (hold the instance open on Android, leave/rejoin on
 desktop) proved the deck-mortars fingerprint fix -- tubes present at their
 placements on rejoin. The deck-mortars arc has no open verifications left.
 
-## [2026-09-02] fix | The iOS flaky bell cornered -- and the frontend's hosting is not what the wiki says
+## [2026-09-02] defect | The iOS flaky bell cornered -- and the frontend's hosting is not what the wiki says
 
 Owner: "the bell is missing from the PWA on my iPhone again. Didn't we already fix
 that?" We had (2026-08-17) -- and the fix was live -- but it disarmed itself: the
@@ -3243,7 +3575,7 @@ README_DEPLOY.md or the wiki describes the S3/CF path. The unlock fix is committ
 but NOT live until whoever owns that account syncs a fresh build. Also stale:
 CLAUDE.md's "dist/ is committed build output" -- dist/ is gitignored.
 
-## [2026-09-02] correction | The "S3+CF migration" claim two entries up is RETRACTED -- overreach, owner caught it
+## [2026-09-02] audit | The "S3+CF migration" claim two entries up is RETRACTED -- overreach, owner caught it
 
 Amplify Hosting serves `server: AmazonS3` + `via: cloudfront` headers -- they cannot
 distinguish Amplify from hand-rolled S3+CF, and the `last-modified: 2026-08-25` I
@@ -3258,7 +3590,7 @@ undocumented from this repo's seat; (2) CLAUDE.md's "dist/ is committed" is stal
 (gitignored); (3) the iOS bell fix (`d5187da`) is committed but not live until an
 Amplify build runs from wherever the app lives.
 
-## [2026-09-02] correction | Second retraction on the same thread: the Amplify app was HERE all along
+## [2026-09-02] audit | Second retraction on the same thread: the Amplify app was HERE all along
 
 The retraction above kept one false residue: "not visible to this machine's AWS
 credentials." Owner, looking at the console: "the roshambo_26 Amplify app is
@@ -3272,7 +3604,7 @@ iOS bell fix (`d5187da`) shipped via job 53. Lesson, same family as the headers
 overreach: an absence claim is only as good as the completeness of the search --
 name the regions you scanned when you claim "not found".
 
-## [2026-09-02] fix | The PWA bell saga closes -- and the fake ad dies
+## [2026-09-02] defect | The PWA bell saga closes -- and the fake ad dies
 
 Three acts: (1) the flake diagnosis stood -- the unlock disarmed after first
 success and iOS interruptions made audio death sticky (`d5187da`); (2) that fix
@@ -3286,7 +3618,7 @@ first touch. Deploys: Amplify jobs 53-55 via the newly-documented start-job
 procedure. Also gone at owner request (`aa813c8`, job 55): the Antigravity-era
 "Sponsored Intelligence" mock ad squatting on the Arena.
 
-## [2026-09-02] correction | The proving range's real vantage -- and yashi v3 rejected
+## [2026-09-02] audit | The proving range's real vantage -- and yashi v3 rejected
 
 Owner: "I'm not using FallsLanding AT ALL for proving range, I'm standing on the
 south terminus of the suspension bridge and looking at the 5 mortar racks edge on."
@@ -3297,7 +3629,7 @@ Worksheet note: yashi v3 (6 arms) "particularly bad" -- consistent with the budg
 law (points DIVIDE the budget; six ways is where the palm goes wispy, worse under
 the longer rain). Floor stands at v1 (4 arms).
 
-## [2026-09-02] fixed | Launch-thump lag: frame-hops, not just the clip head
+## [2026-09-02] defect | Launch-thump lag: frame-hops, not just the clip head
 
 The 0.12 head trim helped but "not fixed" (owner). Per-stage measurement in
 Studio found no single culprit -- a STACK: the report's task.delay(0) parks a
@@ -3312,7 +3644,7 @@ real path; components that are individually fine can sum to a defect.
 Also confirmed: RequestProvingFire is Studio-only by design (main.server.luau
 IsStudio gate) -- live-place testing means deck launches with owned shells.
 
-## [2026-09-02] shipped | Launch thumps pool; deck-4 reserved as the L tube's grunt
+## [2026-09-02] ship | Launch thumps pool; deck-4 reserved as the L tube's grunt
 
 Owner uploaded launch-deck-1/3/4. 1 and 3 join deck-2 in a seeded rotation
 (`292e978`, verified by ear); deck-4 ("heavier/gruntier and much more close
@@ -3322,7 +3654,7 @@ sound; the controller resolves it, explicit phase sound still overrides. Trims
 measured from source WAVs (peak minus ~35ms; offline envelope matched
 in-engine within 3ms -- future clips can be trimmed before upload).
 
-## [2026-09-02] shipped | Yashi promoted; colorway ruling lands
+## [2026-09-02] ship | Yashi promoted; colorway ruling lands
 
 Owner rulings: yashi M tube at 10; "signature hues in shop, colorways in
 collections." Yashi ran the five guarded steps (`e791ebd`: catalog 4-arm palm
@@ -3333,7 +3665,7 @@ families pruned, archived at `2cd90b4`. Worksheet remainder: hotaru, kamuro,
 dan. Dev backend redeployed (App Runner op 6032e84c). Server suite green
 (one socketAdapter identity-claim flake observed, passed on rerun).
 
-## [2026-09-02] built | The salute class, first-class -- and the L budget weight
+## [2026-09-02] ship | The salute class, first-class -- and the L budget weight
 
 A day of owner-driven iteration on kamuro ("not flashy enough"):
 (1) boost.salvo machinery -- N flash-and-bang salutes, variable grouping, each
@@ -3354,7 +3686,7 @@ heavy-must-be-mortar:L fixture-enforced. Kamuro: heavy, spread 60, streaks
 Also: proving panel now opens at night (owner default), drive-by rng lockstep
 fix (double-tap draw was inside the per-client audio gate).
 
-## [2026-09-02] shipped | Kamuro: the L tube's cheap round
+## [2026-09-02] ship | Kamuro: the L tube's cheap round
 
 Owner: "an inexpensive shell for the large tube -- a cheap round to show off
 the big gun." Price 10, mortar:L, five guarded steps run (`3115d8d`), kamuro
@@ -3362,7 +3694,7 @@ draft family pruned. First shell of the heavy class -- weighted-admission
 budget, L grunt launch, always-boom break, salvo kicker -- all live in one
 SKU. Dev backend redeployed (op 962b864b). Worksheet remainder: hotaru, dan.
 
-## [2026-09-02] shipped | The pity ramp -- bounded droughts on every boosted shell
+## [2026-09-02] ship | The pity ramp -- bounded droughts on every boosted shell
 
 The owner lived the flat-30% failure mode (0 boosts in 10 kamuro, filed as a
 bug; a live rng tap proved the math healthy -- 3 boosted in the next 13,
@@ -3373,7 +3705,7 @@ per-shell streaks (session-lived); verdict in the launch payload -- all
 clients render the same luck; proving range deliberately stays on the raw
 floor. Applies to every boosted shell automatically (kiku, wa, yashi, kamuro).
 
-## [2026-09-02] reverted | The fat L trail: three geometry strategies, three failures, clean retreat
+## [2026-09-02] drop | The fat L trail: three geometry strategies, three failures, clean retreat
 
 Attempted to double heavy shells' comet width. What was learned, at the cost
 of an hour of owner-in-the-loop darts: a Trail draws its FULL attachment span
@@ -3387,7 +3719,7 @@ PARKED as a design item: a bigger heavy ascent probably wants a different
 tool -- e.g. a per-slot particle-emitter comet for heavy shells -- and a
 Studio session with screenshots, not live iteration on a player's evening.
 
-## [2026-09-02] shipped | The heavy comet layer -- the L ascent reads big without touching the Trail
+## [2026-09-02] ship | The heavy comet layer -- the L ascent reads big without touching the Trail
 
 After the three-failure retreat, the layered approach worked first try: a
 dedicated Rate-driven emitter (the system's only one) streams burning-debris
@@ -3395,7 +3727,7 @@ sparks behind the rising heavy shell; the pinned trails-approved Trail is
 untouched. Owner-tuned in one pass (rate 90, size 0.45->0.12, fall -18) and
 approved: "looking good. ship it." `7c96c43`, `6a0974b`.
 
-## [2026-09-02] shipped | Hotaru: the firefly, and the strobe finds its voice
+## [2026-09-02] ship | Hotaru: the firefly, and the strobe finds its voice
 
 Worksheet session closed three audio defects before the ship: (1) multi-burst
 shells were cutting their own booms -- the "one Sound per slot, phases never
@@ -3409,7 +3741,7 @@ spacing: the boosted second cloud waits 0.9s (was 0.5). Rulings: v3 floor
 M tube (comet automatic), price 8. Five steps run (`439aae1`), drafts pruned
 -- ONLY DAN remains on the worksheet. Dev backend op de6d2346.
 
-## [2026-09-02] correction | Invented glyphs ripped out; the canonical marks fly instead
+## [2026-09-02] audit | Invented glyphs ripped out; the canonical marks fly instead
 
 A session generated literal rock/paper/scissors sprites for dan's glyph act
 while the approved marks (ring/bar/caret, `Glyphs.luau`, shared with the PWA,
@@ -3424,7 +3756,7 @@ world/visual-identity.md now exists, linked READ-BEFORE-MAKING-ART from the
 index, with a CLAUDE.md pointer -- plus the general rule: search before
 generate, always.
 
-## [2026-09-02] shipped | JANKEN -- the signature shell closes the worksheet
+## [2026-09-02] ship | JANKEN -- the signature shell closes the worksheet
 
 The dan redesign became the game's flagship and took its true name (owner:
 "janken it is"). A long owner-driven session built real vocabulary on the way:
@@ -3438,7 +3770,7 @@ cuts) wait for a future shell. Price 12, L + heavy, five steps run
 (`559c850`), dev deploy op 3d6bc70d. THE SHELF: firecracker, peony, willow,
 ishibana, kiku, wa, yashi, kamuro, hotaru, janken. THE WORKSHEET IS EMPTY.
 
-## [2026-09-02] ruling | Swarm shows will be fireflies -- an extension of planned ambience
+## [2026-09-02] decision | Swarm shows will be fireflies -- an extension of planned ambience
 
 Kao (avatar-face shell) assessed: face-on-particles workable but parked; the
 face-SHAPED burst is architecturally out (emitters cannot position particles).
@@ -3447,7 +3779,7 @@ imagery -- themed as the canyon's own fireflies, built as an occasional
 display mode of the coming ambient-firefly system, one pool serving both.
 Banked in backlog with full restart context.
 
-## [2026-09-02] built | Proving modes for shipped shells; the Hanabiya rooftop battery
+## [2026-09-02] ship | Proving modes for shipped shells; the Hanabiya rooftop battery
 
 Housecleaning session: (1) shipped shells regained Ladder/Seq and gained
 BOOST (forced lucky roll via RequestProvingFire's new Studio-only flag)
@@ -3460,7 +3792,7 @@ three real CSG tubes stood at boot on tagged mounts, public gear launches
 fire from the nearest battery muzzle within 140 studs. Rooftop MC
 experience banked in backlog (access deliberately unbuilt = gateable).
 
-## [2026-09-02] codified | The five stations scatter -- owner-placed, aimed, renamed
+## [2026-09-02] decision | The five stations scatter -- owner-placed, aimed, renamed
 
 Owner dragged and AIMED all five racks live in Studio; their CFrames were read
 out, re-orthonormalized, and baked into ProvingGround.luau as STATIONS (the
@@ -3472,7 +3804,7 @@ two-down). The server now fires along each station's own axis with a heading,
 so the rail-mounts ballistics carry the owner's aim. Future public access =
 jukebox queueing, banked. Ladder mode is now a five-point canyon-wide volley.
 
-## [2026-09-02] gated | Rooftop battery aimed and gated; the housecleaning day closes
+## [2026-09-02] gate | Rooftop battery aimed and gated; the housecleaning day closes
 
 Owner ground-gated the platform ("looks good"), then aimed the guns: mounts
 lean 16 deg north over the arena (fanned, LaunchApex 85 via new per-launch
@@ -3483,14 +3815,14 @@ selection, Boost = forced luck; "hanabiya roof" is the virtual sixth station.
 Fuse variance (+-6% seeded per shell) ended lockstep volleys. All owner-gated
 live. PENDING: place publish carries everything to players.
 
-## [2026-09-02] published | The fireworks sprint reaches players
+## [2026-09-02] ship | The fireworks sprint reaches players
 
 Owner saved and published the place: ten shells (janken at the top), the
 thump ladder, salvo art, pity ramp, rooftop battery, scattered stations and
 fuse variance are all LIVE. Morning decision pending: a little more fireworks
 vs the onboarding pass ("onboarding is critical soon").
 
-## [2026-09-02] shipped | Rai and banrai -- the salute class standalone, first no-audition promotion
+## [2026-09-02] ship | Rai and banrai -- the salute class standalone, first no-audition promotion
 
 Owner delegation ("you have sufficient context... I don't need to see them to
 approve"): 雷 rai (S, 4; 3-4 bangs) and 万雷 banrai (M, 7; 6-8 bangs, wider
@@ -3503,7 +3835,7 @@ NOTE: shells reach the live place's players on next publish (server already
 sells them; the published client renders them fine -- recipes ship in
 ReplicatedStorage... NO: recipes are Luau in the place. Next publish needed.)
 
-## [2026-09-03] fixed | Mobile HUD -- portrait centring and the fireworks rail
+## [2026-09-03] defect | Mobile HUD -- portrait centring and the fireworks rail
 
 Owner's iPhone report on the published place: in PORTRAIT the scissors throw
 button sat 3/4 under Roblox's jump button (JUMP_CLEARANCE is 15% of WIDTH;
@@ -3520,7 +3852,7 @@ volley is repeated taps on FIRE. Selection persists; dimmed rows selectable so
 FIRE wears the reason. Pixel offsets, not width fractions, clear the jump
 zone. Client-only; reaches players on next publish.
 
-## [2026-09-03] fixed | HUD wipeout -- Luau's 200-register ceiling, and a compile gate
+## [2026-09-03] defect | HUD wipeout -- Luau's 200-register ceiling, and a compile gate
 
 The mobile pass's new top-level locals pushed HudController's main chunk past
 Luau's 200-local-register COMPILER limit; the whole script failed to compile
@@ -3636,7 +3968,7 @@ couple of newbies tomorrow." Tomorrow's agenda captured on [[backlog]] — raili
 tunnel-cuts (owner-guided per pad), the unjumpable-railing ruling reversal, stats-cave
 onboarding, random familiar assignment.
 
-## [2026-09-03] fix | roblox-ci red nine pushes -- hand-edited Torii.model.json vs the genmodels gate
+## [2026-09-03] defect | roblox-ci red nine pushes -- hand-edited Torii.model.json vs the genmodels gate
 
 The torii's deck-centre move (`f66370a`) edited `roblox/assets/Torii.model.json` directly
 (x58 -> x74); the "Generated models are current" gate regenerated the old gate from
@@ -3657,7 +3989,7 @@ LOCK→REVEAL (not in `pickWorldThrow`, which would leave the reveal's distribut
 with the throw) and never enter the throws map, so settlement and presence stay human-only by
 construction. Plan to follow.
 
-## [2026-09-04] perf | Client stops animating what nobody can see — phase 1, no visual change
+## [2026-09-04] ship | Client stops animating what nobody can see — phase 1, no visual change
 
 Plan `docs/superpowers/plans/2026-09-03-client-load-reduction.md` from spec
 `docs/superpowers/specs/2026-09-03-client-load-reduction-design.md`, executed
@@ -3857,7 +4189,7 @@ verb on the proving panel — exiting on the A13 test of a large hand-authored s
 the director's scale assumption is finally measured. §9 (durables: one catalogue or two for
 Robux) stays open; it blocks only sub-project C.
 
-## [2026-09-05] fix | Arena overhead removed; an A/B armed to test whether the load-reduction work is even the cause
+## [2026-09-05] defect | Arena overhead removed; an A/B armed to test whether the load-reduction work is even the cause
 
 Owner's A13 report — lower frame rate and hitching, **almost entirely in the arena** —
 localises the problem to the one place the 2026-09-04 work cannot help. In the arena the

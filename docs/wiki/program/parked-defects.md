@@ -209,7 +209,7 @@ there, so defect (e) still stands on prod and is moot on dev._
   hollow at true bore with a 0.06 wall AROUND it. The proving racks' solid tubes read ~11%
   thin by comparison. Cosmetic; fixing means re-running the model bake.
 
-## (n) bootstrap PlayerAdded handlers have no catch-up for players already present (2026-09-04)
+## ~~(n) bootstrap PlayerAdded handlers have no catch-up for players already present~~ FIXED 2026-09-05 (`f450905`: all four PlayerAdded sites sweep `Players:GetPlayers()` after connecting, each handler join-idempotent)
 
 - **Where:** `roblox/src/server/main.server.luau` — none of the `Players.PlayerAdded:Connect`
   sites iterate `Players:GetPlayers()` after connecting. Any yield added to top-level bootstrap
