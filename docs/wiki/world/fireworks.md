@@ -256,13 +256,36 @@ concurrent-shell budget at scale for the first time. Its size is authored, not f
 the proving slots, shipped shells only). As authored 2026-09-05 it is 109 cues, the last at
 71.3 s, with its densest window six cues inside 300 ms.
 
-**The A13 gate — measure, don't assume.** Run `finale_v1` from the panel with the A13 joined to the
-same server, standing at the arena square and again at a west teahouse. Record: frame-rate
-behaviour during the 15 s, 32–33 s and 62–65 s volleys; whether bursts are visibly staggered
-(expected: yes, by a few hundred ms) or dropped (never expected); audio reach. Also watch whether
-the owner's camera hunts during `finale_v1` — every show cue carries `by = owner`, so each one
-fires the own-launch look; gating that to cues without `showId` is the fix if it does. Park the
-bench per the standing rule. Result: **not yet run** at merge — this line is the live fact.
+**The A13 gate — measure, don't assume — and the plan's procedure for it was WRONG.** The plan
+said "run `finale_v1` from the panel with the A13 joined to the same server." That cannot happen:
+the proving panel and both proving verbs are Studio-only by the 2026-09-01 ruling ("everything
+Studio-gated, nothing allowlisted"), a phone can only join the PUBLISHED place, and there is one
+place — no dev place. So the gate is necessarily post-merge and post-publish, and it needs a path
+that exists in the published place. Three ways to get a large show in front of the A13, owner's
+choice (recorded 2026-09-05, corrected the same day it was written):
+
+1. **Use the player path that already exists.** In the published place, from the desktop client,
+   the owner sends `RequestShowGo` with a large DECK show (own mortars: one tube per owned tier;
+   density, not tube count, is what the director budget cares about). The A13 joins the same server
+   on a second account and watches from the arena. No code change; needs a way to send the remote
+   without a console — the Developer Console's command bar (edit-permission holders can run Luau
+   on the client in a live server; ⚠ verify this before relying on it) — and a deck-stage draft
+   authored beside `finale_v1`. Costs the owner's shells.
+2. **Reverse the allowlist ruling for the SHOW verb only.** Gate `RequestProvingShow` and the
+   panel's Shows section on `IsStudio() or player.UserId == <owner>` (id from a place attribute,
+   never git). Puts `finale_v1` on the five stations in front of the phone. Smallest surface that
+   plays only pre-authored drafts and touches no economy — but it is a userId gate in the shipped
+   place, which the 2026-09-01 ruling rejected on purpose.
+3. **Defer the gate to sub-project C**, when the rooftop console gives the owner a published,
+   ticketed way to play a station show.
+
+Whatever the path, record: frame-rate behaviour during the 15 s, 32–33 s and 62–65 s volleys;
+whether bursts are visibly staggered (expected: yes, by a few hundred ms) or dropped (never
+expected); audio reach; and whether the owner's camera hunts — every show cue carries
+`by = owner`, so each one fires the own-launch look; gating that to cues without `showId` is the
+fix if it does. Park the bench per the standing rule. Result: **not yet run** — this line is the
+live fact, and the Studio-only proving verb remains the right tool for judging a show's SHAPE on
+the desktop before any of the above.
 
 ## Raw layer
 
