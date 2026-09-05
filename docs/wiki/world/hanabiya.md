@@ -1,7 +1,6 @@
 ---
 shelf: world
 updated: 2026-09-05
-checked: 2026-08-26
 ---
 
 # Hanabiya
@@ -59,7 +58,7 @@ Program context: [[item-4-merchant-row]].
 ## The roof (added 2026-09-05 — the page did not mention its own roof)
 
 A railed rooftop battery platform (Rojo asset `HanabiyaRooftop`, three aimed tubes, sized for
-three players plus a console) was built and gated 2026-09-06 per `docs/wiki/log.md`; it is the fireworks
+three players plus a console) was built and gated 2026-09-02 per `docs/wiki/log.md`; it is the fireworks
 system's virtual sixth station and the future home of the MC console. As-built and design intent
 live on [[fireworks]] and on [[backlog]] § Rooftop MC experience; access (a hatch through the
 roof at the back-rail gap) is deliberately unbuilt so it can be gated.

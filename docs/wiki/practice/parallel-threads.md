@@ -15,6 +15,7 @@ page is the contract between them. **Read it before starting work in any thread.
 |---|---|---|---|
 | **main** | the repo root | `main` | ⚠ the PLACE FILE and Studio. All implementation. All gating. |
 | **design** | `.worktrees/design` | `thread/design` | `docs/superpowers/specs/`, `docs/superpowers/plans/`. **No code, ever.** |
+|  | | | **Superseded the same day.** The desktop-app session tried working here for the show-system spec; a spec on an unmerged branch was invisible from the main folder and the merge step was fumbled twice. **Arrangement from 2026-09-05 evening:** the desktop session writes specs and wiki entries DIRECTLY on `main` in the main checkout — small commits, `git fetch` before every push, never rebase or reset there (rule 0); its CODE work goes to a fresh `thread/<name>` worktree. The terminal session owns the place, Studio and all Roblox/server code and pulls (`--ff-only`, or `--rebase` on a clean tree) before pushing. Only `log.md`/`backlog.md` appends can collide; keep both sides. |
 | ~~assets~~ | — | — | ⚠ **RETIRED 2026-08-26** — folded back into main, see below |
 
 ## ⚠ Why the split is by HALF, not by feature

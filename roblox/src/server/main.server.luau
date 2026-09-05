@@ -142,35 +142,20 @@ for _, model in StagePersistence.persistTargets(persistRoots) do
     (model :: Model).ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 end
 
--- STREAMING RADII, code-owned rather than left as place data. Nothing in git had ever set these and
--- the place ran on the engine defaults (min 64, target 1024). The stage and the horizon backdrop are
--- Persistent and unaffected; what tightens is the far canyon -- PathRailings (5,186 descendants),
--- PathLanterns (2,599), foliage -- which is precisely the bulk a low-end phone is carrying.
+-- ⚠ THE STREAMING RADII CANNOT BE SET FROM CODE. DO NOT ADD THAT CODE BACK.
+-- `Workspace.StreamingMinRadius` and `StreamingTargetRadius` are NOT SCRIPTABLE: reading or
+-- writing either from Luau throws `... is not a valid member of Workspace`. They are editable
+-- only in Studio's Properties panel, so they are PLACE data and belong in [[place-state]] --
+-- the one thing the version of this block that lived here (2026-09-04, `34c3ded`) asserted
+-- they were not.
 --
--- ⚠ THE TARGET IS AN OWNER-TUNED NUMBER, not a computed one. The canyon has long sightlines and the
--- failure mode is content popping in at the edge of view, which no test can see. Published as
--- attributes so it can be turned during a walk; record what lands in docs/wiki/world/place-state.md.
-local STREAM_MIN, STREAM_TARGET = 64, 512
-do
-    -- Scoped to a `do` block (rather than two more file-scope locals) so their registers free up
-    -- for the rest of this 3,400+ line chunk once this check is done -- the file sits at the
-    -- Luau compiler's 200-local-register ceiling.
-    local streamOk, streamErr = pcall(function()
-        workspace.StreamingMinRadius = STREAM_MIN
-        workspace.StreamingTargetRadius = STREAM_TARGET
-    end)
-    if not streamOk then
-        -- Loud but NOT fatal. Every system below this line -- the round loop included -- boots
-        -- after it, so a throw here would take the whole game down with a symptom that points
-        -- nowhere near streaming. The likeliest cause is StreamingEnabled being off in the place,
-        -- which would contradict three separate code comments asserting it is on.
-        warn(`[STREAMING] could not set radii (is StreamingEnabled off?): {streamErr}`)
-    end
-end
--- Attribute publishes stay outside the pcall so they still reflect what was attempted, whether
--- or not the property writes above succeeded.
-workspace:SetAttribute("StreamMinRadius", STREAM_MIN)
-workspace:SetAttribute("StreamTargetRadius", STREAM_TARGET)
+-- That block shipped and did nothing for a day. It was wrapped in a `pcall` on review, which
+-- turned a boot-killing throw into a `warn` nobody read -- so the whole task read as done while
+-- being inert, and the wiki carried "streaming radii are now owned in code" as an as-built fact.
+-- Verified inert 2026-09-05 by running the exact assignment in the live place. The lesson is
+-- neither "pcall it" nor "let it throw": it is to check a property is scriptable BEFORE writing
+-- a task around it. `StreamingEnabled` reads `true` and is fine; it is only the radii that are
+-- closed to scripts.
 
 -- Everyone arrives at ArenaSpawn: disable any other (place-only, e.g. leftover DevChannelSpawn)
 -- SpawnLocation, and make sure ArenaSpawn itself is enabled. Code-only + self-healing.
