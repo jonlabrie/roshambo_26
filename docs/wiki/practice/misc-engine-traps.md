@@ -161,6 +161,36 @@ no guard.
 suite that runs in only one of the two runtimes.** Anything resolved by name rather than by value
 deserves the same suspicion.
 
+## The streaming radii are NOT scriptable — and a `pcall` hid that for a day
+
+`Workspace.StreamingMinRadius` and `Workspace.StreamingTargetRadius` cannot be read or
+written from Luau. Both throw `... is not a valid member of Workspace`. They are editable
+**only in Studio's Properties panel**, which makes them place data ([[place-state]]), not
+something code can own. `StreamingEnabled` *is* readable and reads `true`; it is only the
+radii that are closed.
+
+⚠ **The expensive part was not the mistake, it was the concealment.** `34c3ded`
+(2026-09-04) shipped a block setting both radii, presented as "streaming radii owned in
+code". Review then wrapped it in a `pcall` — correctly reasoning that a throw 150 lines
+into `main.server.luau` would kill the whole boot, round loop included, with a symptom
+pointing nowhere near streaming. That turned a fatal, instantly-diagnosable error into a
+`warn` in a console nobody reads. The task passed its review, the plan called it done, and
+the wiki carried the claim as an as-built fact for a day while the code did nothing. The
+`warn` even guessed the wrong cause ("is StreamingEnabled off?" — it is on).
+
+**Neither `pcall` nor bare-throw was the right call. Checking the property is scriptable
+before writing a task around it was**, and it costs thirty seconds in the Studio command
+bar:
+
+```luau
+print(pcall(function() return (workspace :: any).StreamingTargetRadius end))  --> false, "not a valid member"
+```
+
+Do that for any engine property a plan proposes to set, before the plan is written. The
+broader rule: **a `pcall` around an assertion of fact converts a loud failure into a silent
+one.** Guard operations that may legitimately fail; never guard a claim you are relying on
+being true, unless something reads the failure back.
+
 ## `main.server.luau` is AT Luau's 200-local-register ceiling
 
 A Luau function body — including a script's main chunk — may hold at most **200 local

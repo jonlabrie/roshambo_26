@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-09-03
+updated: 2026-09-05
 ---
 
 # Place State
@@ -128,6 +128,19 @@ Everything below marked *verified* was checked live via the Studio MCP on 2026-0
   cannot restore them; roll back added terrain with `pasteEmptyCells = true`.
 - `RetiredLegacyTeahouses`, `RetiredTeahouse3Access`, `NW1012Retired` — retired
   geometry kept out of Workspace.
+
+## Streaming (place data — code cannot set it)
+
+`StreamingEnabled` is **on** (read from the live place 2026-09-05). The radii —
+`StreamingMinRadius` and `StreamingTargetRadius` — are **not scriptable** and are editable
+only in Studio's Properties panel on `Workspace`, so they are place data and their values
+belong here rather than in `main.server.luau`. A 2026-09-04 attempt to own them in code
+(`34c3ded`) was inert for a day before being removed; see [[misc-engine-traps]].
+
+⚠ **Their current values are unrecorded.** Nothing in git has ever set them and nobody has
+read them off the Properties panel, so the place is running whatever it has always run —
+possibly the engine defaults (min 64, target 1024), possibly not. Read them in Studio and
+record them here; until then, any claim about this place's streaming radii is a guess.
 
 ## Standing cautions
 

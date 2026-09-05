@@ -3682,8 +3682,12 @@ spec.
   travel on a two-foot lantern over a seven-second cycle, legible at arm's length and
   under a pixel past thirty feet. Teahouse and hanabiya chōchin keep theirs; the
   discriminator (`CrossArm` sibling) already existed in the file.
-- Streaming radii are now **owned in code** (`StreamingTargetRadius = 512`). Nothing in
-  git had ever set them; the place ran on engine defaults.
+- ~~Streaming radii are now **owned in code** (`StreamingTargetRadius = 512`).~~
+  ⚠ **STRUCK 2026-09-05 — THIS WAS NEVER TRUE.** `StreamingMinRadius` and
+  `StreamingTargetRadius` are not scriptable; the assignment throws, a `pcall` added on
+  review swallowed it into an unread `warn`, and the radii never changed. Removed in
+  `2026-09-05`; they are place data, set in Studio's Properties panel. See the entry for
+  that date.
 - ⚠ Teahouse `Persistent` INVESTIGATED AND DELIBERATELY LEFT (`d1d288b`, decision-rule
   outcome 3). `PerchPreferenceController.attachToStructure` captures every site's
   Structure anchor once with no retry path, so removing the flag opens a race. Two
@@ -3810,3 +3814,34 @@ the state the audit started from. Forward dates get fixed; backdated ones are le
 Frontmatter was checked and is clean: no `updated:` or `checked:` value anywhere in
 `docs/wiki/` is in the future, so the currency machinery ([[schema]] rule 10) was never
 compromised — only the narrative chronology was.
+
+## [2026-09-05] defect | The streaming radii were never scriptable — a day of inert code, and a pcall that hid it
+
+Owner reported the A13 felt WORSE after the load-reduction work — lower frame rate and
+hitching, almost entirely in the arena. Checking the leading suspect (the halved streaming
+target) against the live place found the suspect does not exist: **`StreamingMinRadius` and
+`StreamingTargetRadius` are not scriptable.** Running the exact boot assignment in the open
+place returns `false, "StreamingMinRadius is not a valid member of Workspace"`.
+
+So `34c3ded` shipped and did nothing. `StreamingEnabled` is on; only the radii are closed
+to scripts. They are place data ([[place-state]]), set in Studio's Properties panel, and
+their current values are unrecorded — nobody has ever read them off the panel.
+
+⚠ **The `pcall` is what cost the day.** Task 7's brief deliberately said *no pcall*, so a
+failure would surface. The final review argued a throw 150 lines into `main.server.luau`
+would kill the whole boot with a symptom pointing nowhere near streaming, and I agreed and
+reversed it. Both of us reasoned about what happens WHEN it fails; neither checked WHETHER
+the property was writable. The result passed review, was logged as an as-built fact, and
+warned into a console nobody reads — with a guessed cause that was wrong ("is
+StreamingEnabled off?"; it is on). Rule recorded on [[misc-engine-traps]]: a `pcall` around
+an assertion of fact converts a loud failure into a silent one. Guard operations that may
+legitimately fail; never guard a claim you are relying on being true.
+
+Struck the false line from the 2026-09-04 entry, removed the dead block, and left a
+do-not-re-add note in its place — the next session to notice the radii are unset would
+otherwise write exactly the same code.
+
+**The A13 regression is therefore still unexplained, and streaming is off the list.** The
+remaining candidates are both in the arena, where nothing is ever culled and the new work is
+pure overhead: the 1/30 s throttle (which at ~30 fps fires every frame and saves nothing)
+and `AmbientConfig.get()` allocating a fresh table per call, four to six times a frame.
