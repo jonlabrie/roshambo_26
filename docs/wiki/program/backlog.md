@@ -792,6 +792,11 @@ Direction settled while brainstorming the show system (spec to follow):
    minutes on the party calendar in advance — announced, roof guaranteed — or spends the ticket
    on the spot if the roof is free. Booked time is visible, so impromptu use only happens on an
    empty roof; nobody climbs up to find it taken. This replaces the queue.
+9. **Tickets are TRANSFERABLE — shipped on** (owner: "ship transferable"), under three
+   constraints: transferable ONCE, in person (proximity gift; a gifted ticket cannot be re-gifted);
+   a DAILY CAP on roof time per player regardless of ticket source (the anti-hog rule); and the
+   show's credits name both ("MC: X, ticket from Y"). Never exchangeable for points, shells or
+   anything else; a slot can only be booked by the player holding the ticket.
 
 ## Audience handhelds — sparklers and whistlers (owner, 2026-09-05)
 
