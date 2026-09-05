@@ -41,8 +41,15 @@ export function validateShow(cues: unknown, stage: StageSlots): ShowCheck {
         if (c.t_ms < 0) return { ok: false, error: 'NEGATIVE_TIME', cue: i };
         if (c.t_ms < last) return { ok: false, error: 'CUES_OUT_OF_ORDER', cue: i };
         last = c.t_ms;
-        const accepts = stage[c.slot];
-        if (accepts === undefined) return { ok: false, error: 'BAD_SLOT', cue: i };
+        // Own-property only: `stage['toString']` would otherwise resolve to an inherited function,
+        // pass an `undefined` check, and crash the tier test below — while the Luau twin, whose
+        // tables have no inherited string keys, returned BAD_SLOT. The value must also be one of
+        // the three shapes the grammar defines, so a typo'd tier in a stage definition is a bad
+        // slot rather than silently degrading to 'any'.
+        const accepts = Object.prototype.hasOwnProperty.call(stage, c.slot) ? stage[c.slot] : undefined;
+        if (accepts !== 'none' && accepts !== 'any' && !(typeof accepts === 'string' && accepts.startsWith('mortar:'))) {
+            return { ok: false, error: 'BAD_SLOT', cue: i };
+        }
         if (!(SHELL_IDS as readonly string[]).includes(c.shellId)) return { ok: false, error: 'BAD_SHELL', cue: i };
         const needs = shellMortar(c.shellId);
         if (accepts === 'none' && needs !== null) return { ok: false, error: 'TIER_MISMATCH', cue: i };

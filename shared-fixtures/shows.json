@@ -16,6 +16,7 @@
         { "name": "cues must be in time order", "stage": "deck", "cues": [{ "t_ms": 1000, "slot": "hand", "shellId": "firecracker" }, { "t_ms": 500, "slot": "hand", "shellId": "firecracker" }], "expect": "CUES_OUT_OF_ORDER", "cue": 1 },
         { "name": "no negative times", "stage": "deck", "cues": [{ "t_ms": -1, "slot": "hand", "shellId": "firecracker" }], "expect": "NEGATIVE_TIME", "cue": 0 },
         { "name": "unknown slot", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "mortar:XL", "shellId": "peony" }], "expect": "BAD_SLOT", "cue": 0 },
+        { "name": "a slot named after an Object.prototype member is just an unknown slot", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "toString", "shellId": "firecracker" }], "expect": "BAD_SLOT", "cue": 0 },
         { "name": "unknown shell", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "hand", "shellId": "moonshot" }], "expect": "BAD_SHELL", "cue": 0 },
         { "name": "a gear shell cannot fire from the hand", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "hand", "shellId": "peony" }], "expect": "TIER_MISMATCH", "cue": 0 },
         { "name": "a gear shell cannot fire from another tier's mortar", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "mortar:M", "shellId": "peony" }], "expect": "TIER_MISMATCH", "cue": 0 },
