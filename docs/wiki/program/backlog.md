@@ -816,7 +816,8 @@ Direction settled while brainstorming the show system (spec to follow):
     ⚠ **Clarified 2026-09-05: the seal is on POWDER, not on Robux.** Robux may buy durables
     directly (avatar gear, teahouse items) — the meta-game spec's dual-currency shape. **OPEN,
     owner's call, does not block the show spec:** the spec's "Robux catalogue never overlaps
-    point items" (a purchased pagoda proves nothing) vs the 2026-09-05 fireworks ruling
+    point items" (the spec's words: "a purchased pagoda proves nothing" — a bought teahouse must
+    not pass for an earned one) vs the 2026-09-05 fireworks ruling
     "everything sells for Robux". Recommended resolution: consumables sell for both currencies;
     durables split into an earned catalogue and a non-overlapping Robux cosmetic catalogue.
 
