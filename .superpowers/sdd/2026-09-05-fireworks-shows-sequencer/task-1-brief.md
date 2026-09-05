@@ -1,0 +1,208 @@
+### Task 1: The show fixture and the TypeScript validator
+
+**Files:**
+- Create: `shared-fixtures/shows.json`
+- Create: `server/src/shows.ts`
+- Test: `server/src/shows.test.ts`
+
+**Interfaces:**
+- Consumes: `SHELL_IDS`, `REQUIREMENTS` from `server/src/fireworks.ts` (a requirement of kind `gear` carries `mortar: 'mortar:S'|'mortar:M'|'mortar:L'`).
+- Produces:
+  - `type Cue = { t_ms: number; slot: string; shellId: string }`
+  - `type ShowInput = { stageId: string; fuel: 'inventory' | 'powder'; cues: Cue[]; title?: string }`
+  - `type StageSlots = Record<string, string>` — slot name → `'none' | 'any' | 'mortar:S' | 'mortar:M' | 'mortar:L'`
+  - `SHOW_LIMITS = { maxCues: 120, maxDurationS: 300 }` (read from the fixture)
+  - `DECK_STAGE: StageSlots` (read from the fixture's `stages.deck`)
+  - `validateShow(cues: unknown, stage: StageSlots): { ok: true } | { ok: false; error: ShowError; cue?: number }` where `ShowError = 'EMPTY' | 'TOO_MANY_CUES' | 'TOO_LONG' | 'BAD_CUE' | 'NEGATIVE_TIME' | 'CUES_OUT_OF_ORDER' | 'BAD_SLOT' | 'BAD_SHELL' | 'TIER_MISMATCH'`
+  - `tallyShells(cues: Cue[]): Record<string, number>`
+  - `shellMortar(shellId: string): string | null` (from `REQUIREMENTS`; `null` for no-gear shells)
+
+- [ ] **Step 1: Write the fixture**
+
+```json
+{
+    "comment": "The show grammar — the contract between server/src/shows.ts and roblox/src/shared/ShowPlan.luau. Both validators run every case below; a rule that exists on one side only is a CI failure, not a drift. Cue shells must be ids from firework-shells.json; the tier each needs comes from that fixture's `mortars` list.",
+    "limits": { "maxCues": 120, "maxDurationS": 300 },
+    "stagesComment": "slot -> what may fire from it. 'none' = only shells with no gear requirement (the hand); 'mortar:X' = only shells whose required mortar is X; 'any' = anything (public tubes accept every shell, as the proving path does today).",
+    "stages": {
+        "deck": { "hand": "none", "mortar:S": "mortar:S", "mortar:M": "mortar:M", "mortar:L": "mortar:L" },
+        "proving": { "north arena": "any", "bridge": "any", "upper north": "any", "mid pool": "any", "hi west": "any", "hanabiya roof": "any" }
+    },
+    "cases": [
+        { "name": "one firecracker from the hand is a valid show", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "hand", "shellId": "firecracker" }], "expect": "ok" },
+        { "name": "a gear shell from its own tier's mortar", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "mortar:S", "shellId": "peony" }, { "t_ms": 1500, "slot": "mortar:M", "shellId": "willow" }], "expect": "ok" },
+        { "name": "equal times are allowed — a volley", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "mortar:S", "shellId": "peony" }, { "t_ms": 0, "slot": "mortar:M", "shellId": "wa" }], "expect": "ok" },
+        { "name": "a condition shell is allowed; the condition is checked at fire time", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "hand", "shellId": "ishibana" }], "expect": "ok" },
+        { "name": "public tubes accept any shell", "stage": "proving", "cues": [{ "t_ms": 0, "slot": "mid pool", "shellId": "kamuro" }, { "t_ms": 700, "slot": "hanabiya roof", "shellId": "firecracker" }], "expect": "ok" },
+        { "name": "an empty show is not a show", "stage": "deck", "cues": [], "expect": "EMPTY" },
+        { "name": "cues must be in time order", "stage": "deck", "cues": [{ "t_ms": 1000, "slot": "hand", "shellId": "firecracker" }, { "t_ms": 500, "slot": "hand", "shellId": "firecracker" }], "expect": "CUES_OUT_OF_ORDER", "cue": 1 },
+        { "name": "no negative times", "stage": "deck", "cues": [{ "t_ms": -1, "slot": "hand", "shellId": "firecracker" }], "expect": "NEGATIVE_TIME", "cue": 0 },
+        { "name": "unknown slot", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "mortar:XL", "shellId": "peony" }], "expect": "BAD_SLOT", "cue": 0 },
+        { "name": "unknown shell", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "hand", "shellId": "moonshot" }], "expect": "BAD_SHELL", "cue": 0 },
+        { "name": "a gear shell cannot fire from the hand", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "hand", "shellId": "peony" }], "expect": "TIER_MISMATCH", "cue": 0 },
+        { "name": "a gear shell cannot fire from another tier's mortar", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "mortar:M", "shellId": "peony" }], "expect": "TIER_MISMATCH", "cue": 0 },
+        { "name": "a no-gear shell cannot fire from a mortar", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "mortar:S", "shellId": "firecracker" }], "expect": "TIER_MISMATCH", "cue": 0 },
+        { "name": "a malformed cue", "stage": "deck", "cues": [{ "t_ms": "soon", "slot": "hand", "shellId": "firecracker" }], "expect": "BAD_CUE", "cue": 0 },
+        { "name": "too long", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "hand", "shellId": "firecracker" }, { "t_ms": 300001, "slot": "hand", "shellId": "firecracker" }], "expect": "TOO_LONG" }
+    ],
+    "tooManyComment": "The TOO_MANY_CUES case is generated by each test (maxCues + 1 hand firecrackers) rather than written out here."
+}
+```
+
+- [ ] **Step 2: Write the failing test**
+
+```ts
+// server/src/shows.test.ts
+import { describe, it, expect } from 'vitest';
+import fixture from '../../shared-fixtures/shows.json';
+import shellFixture from '../../shared-fixtures/firework-shells.json';
+import { validateShow, tallyShells, shellMortar, SHOW_LIMITS, DECK_STAGE, Cue } from './shows';
+
+describe('the fixture is the contract', () => {
+    it('limits come from the fixture', () => {
+        expect(SHOW_LIMITS).toEqual(fixture.limits);
+    });
+    it('DECK_STAGE is the fixture deck stage', () => {
+        expect(DECK_STAGE).toEqual(fixture.stages.deck);
+    });
+    it('every case shell is a catalogued shell or deliberately unknown', () => {
+        for (const c of fixture.cases) {
+            for (const cue of c.cues) {
+                if (c.expect !== 'BAD_SHELL') expect(shellFixture.shells).toContain(cue.shellId);
+            }
+        }
+    });
+});
+
+describe('validateShow — every fixture case', () => {
+    for (const c of fixture.cases) {
+        it(c.name, () => {
+            const stage = (fixture.stages as Record<string, Record<string, string>>)[c.stage];
+            const r = validateShow(c.cues, stage);
+            if (c.expect === 'ok') {
+                expect(r).toEqual({ ok: true });
+            } else {
+                expect(r.ok).toBe(false);
+                if (!r.ok) {
+                    expect(r.error).toBe(c.expect);
+                    if ('cue' in c) expect(r.cue).toBe(c.cue);
+                }
+            }
+        });
+    }
+    it('TOO_MANY_CUES at maxCues + 1', () => {
+        const cues: Cue[] = Array.from({ length: SHOW_LIMITS.maxCues + 1 }, (_, i) => ({ t_ms: i * 10, slot: 'hand', shellId: 'firecracker' }));
+        expect(validateShow(cues, DECK_STAGE)).toEqual({ ok: false, error: 'TOO_MANY_CUES' });
+        expect(validateShow(cues.slice(0, SHOW_LIMITS.maxCues), DECK_STAGE)).toEqual({ ok: true });
+    });
+    it('rejects non-array input as EMPTY', () => {
+        expect(validateShow(undefined, DECK_STAGE)).toEqual({ ok: false, error: 'EMPTY' });
+        expect(validateShow('nope', DECK_STAGE)).toEqual({ ok: false, error: 'EMPTY' });
+    });
+});
+
+describe('helpers', () => {
+    it('shellMortar reads REQUIREMENTS', () => {
+        expect(shellMortar('peony')).toBe('mortar:S');
+        expect(shellMortar('kamuro')).toBe('mortar:L');
+        expect(shellMortar('firecracker')).toBeNull();
+        expect(shellMortar('ishibana')).toBeNull();
+        expect(shellMortar('nope')).toBeNull();
+    });
+    it('tallyShells counts per id', () => {
+        expect(tallyShells([
+            { t_ms: 0, slot: 'hand', shellId: 'firecracker' },
+            { t_ms: 0, slot: 'mortar:S', shellId: 'peony' },
+            { t_ms: 500, slot: 'hand', shellId: 'firecracker' },
+        ])).toEqual({ firecracker: 2, peony: 1 });
+    });
+});
+```
+
+- [ ] **Step 3: Run test to verify it fails**
+
+Run: `cd server && npx vitest run src/shows.test.ts`
+Expected: FAIL — `Cannot find module './shows'`. (The TEST imports the JSON fixture exactly as `fireworks.test.ts` does; the module under test does not — see the literals note in Step 4.)
+
+- [ ] **Step 4: Write minimal implementation**
+
+```ts
+// server/src/shows.ts
+// A SHOW IS DATA (spec 2026-09-05-fireworks-show-system-design §1). This is the TypeScript twin of
+// roblox/src/shared/ShowPlan.luau; both are held to shared-fixtures/shows.json so a rule that
+// exists on one side only fails CI instead of letting a client author a show the backend refuses
+// (or worse, the reverse). Limits bound payload size, not spectacle — density is the director's
+// business, not the validator's.
+import { SHELL_IDS, REQUIREMENTS } from './fireworks';
+
+export type Cue = { t_ms: number; slot: string; shellId: string };
+export type ShowInput = { stageId: string; fuel: 'inventory' | 'powder'; cues: Cue[]; title?: string };
+export type StageSlots = Record<string, string>; // slot -> 'none' | 'any' | 'mortar:S' | 'mortar:M' | 'mortar:L'
+export type ShowError =
+    | 'EMPTY' | 'TOO_MANY_CUES' | 'TOO_LONG' | 'BAD_CUE' | 'NEGATIVE_TIME'
+    | 'CUES_OUT_OF_ORDER' | 'BAD_SLOT' | 'BAD_SHELL' | 'TIER_MISMATCH';
+export type ShowCheck = { ok: true } | { ok: false; error: ShowError; cue?: number };
+
+// LITERALS, asserted equal to shared-fixtures/shows.json by shows.test.ts — the same pattern as
+// GameRules.ts vs game-rules.json. Runtime code never reads the fixture: `rootDir` is src/ and the
+// deployed container is built from server/ alone.
+export const SHOW_LIMITS = { maxCues: 120, maxDurationS: 300 };
+export const DECK_STAGE: StageSlots = { hand: 'none', 'mortar:S': 'mortar:S', 'mortar:M': 'mortar:M', 'mortar:L': 'mortar:L' };
+
+export function shellMortar(shellId: string): string | null {
+    const req = REQUIREMENTS[shellId];
+    return req && req.kind === 'gear' ? req.mortar : null;
+}
+
+function isCue(c: unknown): c is Cue {
+    if (typeof c !== 'object' || c === null) return false;
+    const o = c as Record<string, unknown>;
+    return typeof o.t_ms === 'number' && Number.isFinite(o.t_ms)
+        && typeof o.slot === 'string' && typeof o.shellId === 'string';
+}
+
+export function validateShow(cues: unknown, stage: StageSlots): ShowCheck {
+    if (!Array.isArray(cues) || cues.length === 0) return { ok: false, error: 'EMPTY' };
+    if (cues.length > SHOW_LIMITS.maxCues) return { ok: false, error: 'TOO_MANY_CUES' };
+    let last = -Infinity;
+    for (let i = 0; i < cues.length; i++) {
+        const c = cues[i];
+        if (!isCue(c)) return { ok: false, error: 'BAD_CUE', cue: i };
+        if (c.t_ms < 0) return { ok: false, error: 'NEGATIVE_TIME', cue: i };
+        if (c.t_ms < last) return { ok: false, error: 'CUES_OUT_OF_ORDER', cue: i };
+        last = c.t_ms;
+        const accepts = stage[c.slot];
+        if (accepts === undefined) return { ok: false, error: 'BAD_SLOT', cue: i };
+        if (!(SHELL_IDS as readonly string[]).includes(c.shellId)) return { ok: false, error: 'BAD_SHELL', cue: i };
+        const needs = shellMortar(c.shellId);
+        if (accepts === 'none' && needs !== null) return { ok: false, error: 'TIER_MISMATCH', cue: i };
+        if (accepts.startsWith('mortar:') && needs !== accepts) return { ok: false, error: 'TIER_MISMATCH', cue: i };
+        // 'any' accepts everything (public tubes).
+    }
+    if (last > SHOW_LIMITS.maxDurationS * 1000) return { ok: false, error: 'TOO_LONG' };
+    return { ok: true };
+}
+
+export function tallyShells(cues: Cue[]): Record<string, number> {
+    const out: Record<string, number> = {};
+    for (const c of cues) out[c.shellId] = (out[c.shellId] ?? 0) + 1;
+    return out;
+}
+```
+
+- [ ] **Step 5: Run test to verify it passes**
+
+Run: `cd server && npx vitest run src/shows.test.ts && npx tsc --noEmit`
+Expected: PASS, no type errors.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add shared-fixtures/shows.json server/src/shows.ts server/src/shows.test.ts
+git commit -m "feat(shows): the show grammar as a shared fixture, and its TypeScript validator
+
+Co-Authored-By: Claude Fable 5.1 <noreply@anthropic.com>"
+```
+
+---
+
