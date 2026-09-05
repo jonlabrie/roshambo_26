@@ -797,6 +797,28 @@ Direction settled while brainstorming the show system (spec to follow):
    a DAILY CAP on roof time per player regardless of ticket source (the anti-hog rule); and the
    show's credits name both ("MC: X, ticket from Y"). Never exchangeable for points, shells or
    anything else; a slot can only be booked by the player holding the ticket.
+10. **Two economies, one seal — POWDER BUYS ONLY THINGS THAT BURN** (owner: "confirmed").
+    Points are the durable economy (score, standings, things that last). Powder (owner's
+    working name; "sparks" was the alternative) is the consumable fireworks economy: a bottle
+    rocket is one powder, win drops are powder income, and the primo console is simply a tap that
+    fires from a player's powder balance without buying a shell first — there is NO separate
+    "firework credit" ledger. Flows: points → powder/shells one way (existing sink); Robux →
+    powder/shells; shells ⇄ powder within the economy (the Hanabiya MELTS shells back at list
+    price — safe precisely because powder cannot leave the economy); shells/powder → points
+    NEVER (the standing Robux-buys-points ruling, two steps removed); powder → anything durable
+    NEVER (the seal: win drops have a free inflow, so any durable powder could buy would be
+    earnable without banking). Rare/secret/special shells and golden tickets sit outside powder
+    in both directions (not buyable with it, not meltable, or melt for a token). Win drops are
+    ITEMS keyed to streak milestones (rocket, rocket, small shell, better shell, … ticket at a
+    rarity sized to the roof), awarded on the WIN event so they stay neutral to Bank vs Stake —
+    not powder proportional to the pot (exponential, and a number is less legible to a kid than
+    "you got a peony").
+    ⚠ **Clarified 2026-09-05: the seal is on POWDER, not on Robux.** Robux may buy durables
+    directly (avatar gear, teahouse items) — the meta-game spec's dual-currency shape. **OPEN,
+    owner's call, does not block the show spec:** the spec's "Robux catalogue never overlaps
+    point items" (a purchased pagoda proves nothing) vs the 2026-09-05 fireworks ruling
+    "everything sells for Robux". Recommended resolution: consumables sell for both currencies;
+    durables split into an earned catalogue and a non-overlapping Robux cosmetic catalogue.
 
 ## Audience handhelds — sparklers and whistlers (owner, 2026-09-05)
 
