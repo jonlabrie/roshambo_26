@@ -1,7 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-27
-checked: 2026-08-31
+updated: 2026-09-05
 ---
 
 # The Core Loop
@@ -115,7 +114,14 @@ bank events or `lifetimeBanked`, not from a naive sum.
 
 ## What is recorded per round
 
-- `Round` — `worldThrow`, `distribution {R,P,S}`, `totalPlayers`, `timestamp`. The
+- `Round` — `worldThrow`, `distribution {R,P,S}`, `totalPlayers`, `synthetic`, `timestamp`.
+  ⚠ **`totalPlayers` IS THE SIZE OF THE WORLD, NOT THE NUMBER OF PEOPLE** (changed 2026-09-04,
+  `b10a33f3`): since the synthetic crowd shipped it counts humans **plus bots**, and `synthetic`
+  records how many were bots — humans are `totalPlayers - synthetic`. Historical rows default
+  `synthetic` to 0, so the subtraction is honest all the way back. **Any stat that means "how
+  many people played" must do that subtraction**; reading `totalPlayers` alone now reports the
+  crowd, and on dev the crowd is 30 bots ([[world-throw]] § Synthetic crowd). This is the same
+  class of trap as the four fields above — a number whose meaning moved under its name. The
   distribution means the crowd's shape is preserved for every round ever played, which is
   what makes retrospective skill analysis possible.
 - `PlayerRound` — one row per player per round: `playerThrow`, `playerResult`,

@@ -3310,6 +3310,21 @@ citation having aged past the grace: `CURSOR_PRIORITY` at `Camera + 1`, the `hol
 both grip and release, and `MouseBehavior.Default` inside the bound function are all exactly as the
 page describes. Stamped.
 
+**A twelfth advance turned two of this run's own stamps into BLOCKING errors, and one was a real
+defect.** `b10a33f3` redefined `Round.totalPlayers` as **humans PLUS bots** and added `synthetic`
+beside it, so [[core-loop]]'s *"which number means what"* section — the page that exists to stop
+exactly this confusion — listed `totalPlayers` with neither the new meaning nor the new field.
+⚠ **A NUMBER WHOSE MEANING MOVES UNDER ITS NAME IS THE WORST KIND OF STALENESS**, because every
+consumer keeps compiling and keeps reading it: any stat meaning "how many people played" must now
+subtract `synthetic`, and on dev the difference is 30 bots. Corrected; historical rows default the
+field to 0, so the subtraction is honest all the way back.
+
+**[[status-display]] and [[round-and-hud]] fired on the same advance and were both still right.**
+Settlement still iterates `data.throws.entries()`, so *"an unthrown player is never settled"*
+holds; the round defaults are still 51/2/7 and the API still accepts through OPEN **and** LOCK.
+Both stamped on the strength of the read. ⚠ **Three pages flagged, one genuinely wrong** — which is
+the honest ratio, and the reason rule 10 says read rather than assume in either direction.
+
 ⚠ **`falls-dock` and `blender-pipeline` were read and deliberately NOT stamped `checked:`.**
 `falls-dock` rests on emitter positions, a place-only `UguisuScheduler` Script and asset ids only
 Studio can confirm; `blender-pipeline` still teaches the plane bisect for splitting a bill, which
