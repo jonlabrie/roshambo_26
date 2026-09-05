@@ -1758,7 +1758,12 @@ function Launch.denseCues(t: any): { any }?
         out[i] = t[i]
     end
     return out
-end -- A player's show from their OWN deck: validate (same rule the backend applies), reserve (debit -- everything or nothing), then play. Origins are resolved per cue at fire time from the deck's -- mortar placements; a hand cue launches from where the player stood when they pressed go, so a -- show outlives the player walking away.
+end
+
+-- A player's show from their OWN deck: validate (same rule the backend applies), reserve (debit
+-- everything or nothing), then play. Every origin is snapshotted at go -- muzzles from the deck's
+-- mortar placements, hand cues from where the player stood -- so a reserved show plays out even
+-- if its owner walks away or disconnects.
 Launch.RequestShowGo = remotes:WaitForChild("RequestShowGo") :: RemoteEvent
 Launch.RequestShowGo.OnServerEvent:Connect(function(player, show)
     if typeof(show) ~= "table" or typeof(show.cues) ~= "table" then
@@ -1807,13 +1812,38 @@ Launch.RequestShowGo.OnServerEvent:Connect(function(player, show)
         end
         local showId = tostring((res.data and res.data.reservationId) or `local-{math.random(1, 1e9)}`)
         local handFrame = root.CFrame
+        -- SNAPSHOT the muzzles here, at go, not per cue at fire time: the owner may leave
+        -- mid-show (PlayerRemoving nils playerEconomy[uid], so muzzleOriginFor would resolve nil
+        -- for every remaining cue) while the reserve has already debited the whole show -- and
+        -- origins do not move during a show, so resolving them now is exact, not an approximation.
+        -- One call per DISTINCT slot is enough: muzzleOriginFor keys on the SHELL's required
+        -- mortar, and the validator guarantees every shell in a `mortar:X` slot requires exactly
+        -- `mortar:X`, so any one of that slot's shells resolves that slot's muzzle.
+        local muzzles: { [string]: { origin: Vector3, heading: Vector3? } } = {}
+        do
+            local shellPerSlot: { [string]: string } = {}
+            for _, cue in cues do
+                if cue.slot ~= "hand" then
+                    shellPerSlot[cue.slot] = cue.shellId
+                end
+            end
+            local deckPos = Vector3.new(deck.pos.x, deck.pos.y, deck.pos.z)
+            for slot, shellId in shellPerSlot do
+                local o, h = muzzleOriginFor(uid, deckPos, deck, shellId)
+                if o ~= nil then
+                    muzzles[slot] = { origin = o, heading = h }
+                end
+            end
+        end
         local function originFor(cue: ShowCue): (Vector3?, Vector3?, number?)
             if cue.slot == "hand" then
                 return handFrame:PointToWorldSpace(Vector3.new(1.2, 0.6, -0.8)), nil, nil
             end
-            local deckPos = Vector3.new(deck.pos.x, deck.pos.y, deck.pos.z)
-            local o, h = muzzleOriginFor(uid, deckPos, deck, cue.shellId)
-            return o, h, nil
+            local m = muzzles[cue.slot]
+            if m == nil then
+                return nil, nil, nil -- unresolved slot: playShow warns and skips the cue
+            end
+            return m.origin, m.heading, nil
         end
         Launch.playShow(`deck:{uid}`, uid, uid, cues, originFor, showId)
     end)
