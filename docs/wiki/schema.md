@@ -57,6 +57,20 @@ Sessions read `index.md` first. The pattern is Karpathy's LLM-wiki
 7. **Links** are `[[wikilinks]]` between pages; `index.md` uses markdown links.
 8. **`log.md`** entries: `## [YYYY-MM-DD] <kind> | <title>`, kind ∈
    gate | ship | decision | drop | defect | migrate | lint | audit. Append-only.
+   ⚠ **The date comes from git, never from a session's belief about today.** Run `date`, or
+   take it from the commit — a session's idea of the current date can be wrong by days, and
+   is not checkable from inside the session that holds it. Audited 2026-09-05: **38 of 163
+   entries carried a date no session could have known**, the worst block being the entire
+   fireworks sprint — 27 entries committed on 2026-09-02 and stamped 09-05 and 09-06,
+   presenting two days of work as if it had been spread across the following week. Corrected
+   in that audit against `git log`'s first-add date per entry.
+   **The asymmetry is the rule to remember: a FORWARD-dated entry is impossible and always an
+   error; a BACKdated one is normal and usually right**, because work is often logged a day or
+   two after it happened and the entry records when the WORK happened, not when it was
+   written. The audit initially "corrected" six backdated karasu entries onto their commit
+   date and broke the file's chronology doing it (inversions went 1 → 3); reverting them took
+   it to 0. So: verify forward dates against git and fix them; leave backdated ones alone
+   unless their content says otherwise.
 9. ⚠ **Never transcribe a measurable fact — record how to MEASURE it.** Sizes, counts, IDs, angles,
    service URLs, branch names: a number copied into prose has no source, cannot be re-derived, and
    is wrong the moment the artifact moves, with nothing positioned to notice.
