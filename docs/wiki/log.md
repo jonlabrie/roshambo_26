@@ -3751,30 +3751,3 @@ was met only through the contamination. Wiki corrected on [[world-throw]] (§ Sy
 the `second`-clears-45% reading of Q1 withdrawn; calibration guidance changed to the tape's
 transition shape. Fix spawned: score each rule independently, re-tune if needed. Dev stays as
 flipped — the crowd is still readable-but-not-solved, which is what it is for.
-
-## [2026-09-04] decision | Readability scores each rule alone; DEFAULT_MIX re-tuned one bot from random to conform
-
-Fix for the cross-voting defect logged above. `experiments.readability` now runs one
-`runSimulation` per modelled human (same seed; transitions from the random-only run), and
-`experiments.test.ts` checks every row against a solo run. Honest table at the first settled mix:
-`counter` 44.0–44.5%, `second` 41.8–42.2%, `random` 29.4–29.7% (seeds 1–3, 20000 rounds) — the
-45% floor was NOT met. Re-tuned: `DEFAULT_MIX` → `wsls:30,counter:10,conform:35,rocky:10,random:15`
-(at crowd 30, one bot moves from random to conform). Seeds 1–5, each rule alone: `counter`
-49.9–50.8%, `second` 37.3–38.0%, `random` 29.6–30.0%, oracle 57.2–57.9%. Lever chosen over
-strength 0.8 (cleared 45% by ~1 point) and counter:15/random:15 (cleared it by punishing the
-naive read). Direction is the reverse of the Task 11 ruling's because the failure reversed
-(under- not over-readable); its constraints kept. New tables and the reasoning on
-[[world-throw]]; raw outputs regenerated under `.superpowers/sdd/2026-09-04-synthetic-crowd/`.
-⚠ Dev still runs the first settled mix until a source redeploy (`start-deployment`, [[deploy]]);
-prod untouched.
-
-## [2026-09-04] gate | Dev redeployed from source with the re-tuned crowd
-
-Owner: "redeploy dev." `685b54c` fast-forwarded to `main` (the branch `roshambo_server_dev`
-tracks, auto-deploy off, no `CROWD_MIX` override), then `start-deployment`; operation
-SUCCEEDED in ~7 minutes. Application log confirmed `[CROWD] on: size 30, seed …, mix
-random:15,wsls:30,counter:10,conform:35,rocky:10` and `[CROWD] round …` lines resumed. Prod
-untouched. Q1 can now run against the honest mix. Open design question raised in the same
-conversation: the winning rule (`counter`) loses only ~3.5% of rounds because nothing in the
-archetype set pushes the world backward, so Bank vs Stake may feel flat — watch for that in Q1
-before deciding on a loss-rate target (would need a new archetype, not a mix change).

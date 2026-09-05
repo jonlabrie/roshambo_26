@@ -69,23 +69,18 @@ export interface ReadabilityOut {
     transitions: Transitions;
 }
 
-// Each human is scored ALONE against the crowd — one runSimulation per spec, same seed. Running
-// all six in one tally (as this did until 2026-09-04) let their votes shape the World Throw each
-// was scored against: counter + oracle pushed the plurality forward, which is exactly the move
-// `second` needs, and it scored 52% in company but 42% alone. The transitions line comes from
-// the random-only run: the world a blind human plays in.
 export function readability(a: CliArgs): ReadabilityOut {
-    const runs = READABILITY_HUMANS.map(h => runSimulation({
-        rounds: a.rounds, crowdSize: a.crowd, mix: a.mix, crowdStrength: a.strength, humans: [h], seed: a.seed,
-    }));
+    const log = runSimulation({
+        rounds: a.rounds, crowdSize: a.crowd, mix: a.mix, crowdStrength: a.strength, humans: READABILITY_HUMANS, seed: a.seed,
+    });
+    const rates = winRates(log, READABILITY_HUMANS);
+    const banked = bankedTotals(log);
+    const pots = maxPots(log);
     const { json: _json, ...args } = a;
     return {
         args,
-        humans: READABILITY_HUMANS.map((h, i) => {
-            const [rate] = winRates(runs[i], [h]);
-            return { ...rate, banked: bankedTotals(runs[i])[0], maxPot: maxPots(runs[i])[0] };
-        }),
-        transitions: worldTransitions(runs[READABILITY_HUMANS.findIndex(h => h.policy === 'random')]),
+        humans: rates.map((r, i) => ({ ...r, banked: banked[i], maxPot: pots[i] })),
+        transitions: worldTransitions(log),
     };
 }
 

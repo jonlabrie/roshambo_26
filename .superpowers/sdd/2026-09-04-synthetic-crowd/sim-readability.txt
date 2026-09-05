@@ -1,14 +1,14 @@
 # readability  rounds=20000 crowd=30 strength=0.7 seed=1
-# mix random:15,wsls:30,counter:10,conform:35,rocky:10
+# mix random:20,wsls:30,counter:10,conform:30,rocky:10
 
 human     BEAT WORLD   ±95%    safe    loss    banked      max pot*
-random         29.6%   0.6%   41.0%   29.5%    531441        59049
-counter        50.1%   0.7%   46.5%    3.4% 1.4780938567112483e+38 1.6423203268260662e+37
-conform         2.6%   0.2%   64.5%   32.9%        15            3
-wsls           34.9%   0.7%   43.4%   21.6%   3720087       531441
-second         37.8%   0.7%    6.9%   55.3%      1215          243
-oracle         57.4%   0.7%   26.0%   16.6% 17793060798303 2541865828329
+random         29.4%   0.6%   40.8%   29.7%    137781        19683
+counter        42.2%   0.7%   51.9%    5.9% 6765376709498072000 1350851717672992000
+conform         5.9%   0.3%   42.2%   51.9%        27            9
+wsls           32.8%   0.7%   46.8%   20.4%  14348907      1594323
+second         51.9%   0.7%    5.9%   42.2%    177147        19683
+oracle         56.5%   0.7%   26.9%   16.6% 22876792454961 2541865828329
 * max pot is measured AFTER each round's bank decision
 
-world throw transitions (n=19999): same 56.7%  counter 39.2%  other 4.1%
+world throw transitions (n=19999): same 42.2%  counter 51.9%  other 5.9%
 (a blind world is 33/33/33; "counter" high means the crowd rotates the way everyone-counters predicts)

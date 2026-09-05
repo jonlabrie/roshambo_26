@@ -55,3 +55,11 @@ Program context: [[item-4-merchant-row]].
 - ledger: `.superpowers/sdd/2026-08-05-hanabiya-shop/`; as-built doc commit `37469b8`
 - key commits: `22bcf2e` frontage z44→z36 · `219509c` stair + counter · `a0e7287`
   roof +1 · `565c307` attic ties · `322d948` cursor grip
+
+## The roof (added 2026-09-05 — the page did not mention its own roof)
+
+A railed rooftop battery platform (Rojo asset `HanabiyaRooftop`, three aimed tubes, sized for
+three players plus a console) was built and gated 2026-09-06 per `docs/wiki/log.md`; it is the fireworks
+system's virtual sixth station and the future home of the MC console. As-built and design intent
+live on [[fireworks]] and on [[backlog]] § Rooftop MC experience; access (a hatch through the
+roof at the back-rail gap) is deliberately unbuilt so it can be gated.

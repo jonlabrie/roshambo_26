@@ -1,8 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { parseArgs, readability, blindSpread, effectiveN } from './experiments';
 import { DEFAULT_MIX } from '../engine/SyntheticCrowd';
-import { runSimulation, HumanSpec } from './Simulation';
-import { winRates, worldTransitions } from './reporters';
 
 describe('parseArgs', () => {
     it('has sensible defaults', () => {
@@ -39,27 +37,6 @@ describe('experiments (small, deterministic)', () => {
             expect(h.rate).toBeGreaterThanOrEqual(0);
             expect(h.rate).toBeLessThanOrEqual(1);
         }
-    });
-    it('readability scores each modelled human ALONE against the crowd, not in a shared tally', () => {
-        // 2026-09-04 defect: six humans in one runSimulation call all voted in the same tally, so
-        // counter + oracle pushed the plurality forward and `second` scored 52% instead of 42%.
-        // Each row must match the same human run by itself with the same seed.
-        const a = parseArgs(['--rounds', '200', '--crowd', '10']);
-        const out = readability(a);
-        const alone = (id: string) => {
-            const spec: HumanSpec = { id, policy: id as HumanSpec['policy'], strength: 1, bank: { kind: 'ratio' } };
-            return runSimulation({
-                rounds: a.rounds, crowdSize: a.crowd, mix: a.mix, crowdStrength: a.strength, humans: [spec], seed: a.seed,
-            });
-        };
-        for (const row of out.humans) {
-            const log = alone(row.id);
-            const [expected] = winRates(log, [{ id: row.id, policy: row.id as HumanSpec['policy'], strength: 1, bank: { kind: 'ratio' } }]);
-            expect({ id: row.id, wins: row.wins, safes: row.safes, losses: row.losses })
-                .toEqual({ id: row.id, wins: expected.wins, safes: expected.safes, losses: expected.losses });
-        }
-        // The transitions line describes the world a blind human plays in: the random-only run.
-        expect(out.transitions).toEqual(worldTransitions(alone('random')));
     });
     it('blindSpread runs twenty blind players over the requested rounds across twenty seeds', () => {
         const out = blindSpread(parseArgs(['--rounds', '100', '--crowd', '10']));

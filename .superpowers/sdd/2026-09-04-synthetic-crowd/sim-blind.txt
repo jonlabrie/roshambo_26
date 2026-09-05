@@ -1,6 +1,6 @@
 # blind-spread  rounds=360 crowd=30 strength=0.7 seed=1
-# mix random:15,wsls:30,counter:10,conform:35,rocky:10
+# mix random:20,wsls:30,counter:10,conform:30,rocky:10
 
 20 blind players, bank at 9, 20 runs of 360 rounds
-max ÷ median banked: mean 1.32  worst 1.56
-per run: 1.20 1.25 1.22 1.50 1.42 1.13 1.29 1.38 1.21 1.27 1.38 1.24 1.47 1.56 1.33 1.17 1.19 1.52 1.53 1.25
+max ÷ median banked: mean 1.43  worst 1.66
+per run: 1.57 1.29 1.40 1.66 1.38 1.60 1.50 1.50 1.39 1.40 1.33 1.38 1.38 1.47 1.33 1.29 1.60 1.42 1.29 1.50

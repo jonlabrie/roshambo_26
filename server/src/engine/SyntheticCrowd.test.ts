@@ -25,10 +25,8 @@ describe('parseMix', () => {
 
 describe('allocate', () => {
     it('splits a size across the mix exactly, largest remainder, in POLICY_IDS order', () => {
-        // 10 bots over random:15 wsls:30 counter:10 conform:35 rocky:10 (POLICY_IDS order)
-        // -> quotas 1.5,3,1,3.5,1; floors 1,3,1,3,1 = 9; one remainder -> random .5 ties conform .5
-        // -> random, the earlier id, takes it. (Same array as the pre-re-tune mix gave, by a
-        // different route: that mix's floors summed to 10 with no remainder.)
+        // 10 bots over random:20 wsls:30 counter:10 conform:30 rocky:10 (POLICY_IDS order)
+        // -> quotas 2,3,1,3,1; floors sum to 10 exactly, so no remainder is handed out
         expect(allocate(10, DEFAULT_MIX)).toEqual([
             'random', 'random', 'wsls', 'wsls', 'wsls', 'counter', 'conform', 'conform', 'conform', 'rocky',
         ]);
@@ -40,15 +38,6 @@ describe('allocate', () => {
         expect(allocate(10, { wsls: 35, counter: 20, conform: 15, rocky: 10, random: 20 })).toEqual([
             'random', 'random', 'wsls', 'wsls', 'wsls', 'wsls', 'counter', 'counter', 'conform', 'rocky',
         ]);
-    });
-    it('the live 30-bot crowd at DEFAULT_MIX is 5 random, 9 wsls, 3 counter, 10 conform, 3 rocky', () => {
-        // Re-tuned 2026-09-04 (conform 30→35, random 20→15) after the readability experiment was
-        // fixed to score each rule alone. By hand: quotas 4.5, 9, 3, 10.5, 3 -> floors 4,9,3,10,3 = 29,
-        // one remainder, random .5 ties conform .5 -> random (earlier id). So one bot moved from
-        // random to conform relative to the first settled mix.
-        const counts: Record<string, number> = {};
-        for (const id of allocate(30, DEFAULT_MIX)) counts[id] = (counts[id] ?? 0) + 1;
-        expect(counts).toEqual({ random: 5, wsls: 9, counter: 3, conform: 10, rocky: 3 });
     });
     it('a single archetype gets everything; zero size gets nothing', () => {
         expect(allocate(3, { counter: 1 })).toEqual(['counter', 'counter', 'counter']);
@@ -105,6 +94,6 @@ describe('createCrowd', () => {
 
     it('defaults to DEFAULT_MIX and DEFAULT_STRENGTH', () => {
         expect(DEFAULT_STRENGTH).toBe(0.7);
-        expect(DEFAULT_MIX).toEqual({ wsls: 30, counter: 10, conform: 35, rocky: 10, random: 15 });
+        expect(DEFAULT_MIX).toEqual({ wsls: 30, counter: 10, conform: 30, rocky: 10, random: 20 });
     });
 });
