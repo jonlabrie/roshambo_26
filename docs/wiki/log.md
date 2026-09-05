@@ -3923,7 +3923,7 @@ fuel, own deck only); `roblox/src/shared/ShowPlayer.luau`; `RequestShowGo` playb
 origins snapshotted at go so a show outlives its owner leaving; boost roll, broadcast and proving
 origin resolution extracted and shared; `FireworkShows` drafts and the panel's Studio-only Play
 verb. The A13 stress run (`finale_v1`) is the exit gate and is owner-run; result recorded on
-[[fireworks]] when it happens.
+[[fireworks]] when it happens. Still on `thread/shows`, NOT merged to `main` — the merge goes through the main thread once the A13 gate has run (owner's call).
 
 Every server-side addition hangs off a single `Launch` namespace table because
 `roblox/src/server/main.server.luau` sits at Luau's 200-local-register ceiling with one top-level
