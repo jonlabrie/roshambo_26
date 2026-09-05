@@ -788,6 +788,10 @@ Direction settled while brainstorming the show system (spec to follow):
    something") were floated. ⚠ Supply must be sized to capacity: the roof holds at most twenty
    three-minute turns an hour. The hatch/ladder at the back-rail gap is unbuilt and becomes the
    gate.
+8. **A ticket unlocks BOOKING** (owner: "booking sounds right"): the holder puts their three
+   minutes on the party calendar in advance — announced, roof guaranteed — or spends the ticket
+   on the spot if the roof is free. Booked time is visible, so impromptu use only happens on an
+   empty roof; nobody climbs up to find it taken. This replaces the queue.
 
 ## Audience handhelds — sparklers and whistlers (owner, 2026-09-05)
 
