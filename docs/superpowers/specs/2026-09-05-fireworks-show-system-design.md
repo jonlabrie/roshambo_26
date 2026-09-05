@@ -60,8 +60,9 @@ Show {
 - **Validation is pure and shared**: a `ShowPlan.luau` module (Lune-tested) and a TypeScript twin
   in `server/src/shows.ts`, both held to a fixture (`shared-fixtures/shows.json`) the way the
   game rules are: cue ordering, slot ∈ the stage's slots, shell's gear requirement matches the
-  slot's tier (`MortarPlacement.SHELL_MORTAR`), condition shells (`ishibana`) allowed only if
-  the condition can be evaluated at fire time (it is re-checked per cue, never pre-cleared).
+  slot's tier (`MortarPlacement.SHELL_MORTAR`), condition shells (`ishibana`) are allowed; today
+  their condition is a client-side launchable gate on every launch path, and the per-cue
+  fire-time check is sub-project C's (amended 2026-09-05 after the final review).
 - **Fire-now is a one-cue show** on the same path. There is no second launch path.
 
 ## 2. The sequencer (server-authoritative playback)

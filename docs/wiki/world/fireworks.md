@@ -219,19 +219,26 @@ Spec `docs/superpowers/specs/2026-09-05-fireworks-show-system-design.md` §1–�
 **A show is data**: cues of `{ t_ms, slot, shellId }`, validated by twins held to
 `shared-fixtures/shows.json` (`server/src/shows.ts`, `roblox/src/shared/ShowPlan.luau`). Limits
 are config (`SHOW_LIMITS` / `ShowPlan.LIMITS`: read them, do not quote them). A hostile cue table
-with holes is refused before validation ever runs — `Launch.denseCues` accepts only a dense 1..n
-array and hands the copy downstream, because the validator walks with `ipairs`, which stops at the
-first gap and would have validated only the prefix. **Reserve, then play**:
+with holes is refused before validation ever runs — `ShowPlan.dense` accepts only keys that are
+positive integers running 1..n with no gap (`#t` is a border, not the largest key, so the count is
+checked against the largest key), and projects every entry down to exactly `t_ms` / `slot` /
+`shellId`, so extra fields never reach validation, the wire or playback; anything else is refused
+outright. The guard exists because the validator walks with `ipairs`, which stops at the first gap
+and would have validated only the prefix. Condition shells (`ishibana`) validate like any other:
+their condition is a client-side `launchable` gate today, on every launch path, and the per-cue
+fire-time re-check belongs to sub-project C. **Reserve, then play**:
 `POST /api/v1/players/:id/shows/reserve` debits every shell in ONE conditional update or nothing
 (inventory fuel only — powder is sub-project A; deck stage only — the rooftop and stations arrive
 with consoles in C). The game server plays a reserved show on its own clock
 (`roblox/src/shared/ShowPlayer.luau` timing; one show per stage, a second queues behind through
 `Launch.stageBusyUntilMs`), emitting each cue through the same `FireworkLaunched` broadcast as a
 hand launch, with `showId` added and the pity ramp applied per cue. **Origins are snapshotted at
-go** — one muzzle resolve per distinct mortar slot, plus the hand frame — so a show outlives its
-owner leaving, which otherwise nils their economy record and leaves every remaining cue with no
-origin to fire from. Origins do not move during a show, so the snapshot is exact, not an
-approximation.
+go, BEFORE the reserve** — one muzzle resolve per distinct mortar slot, plus the hand frame — so a
+show outlives its owner leaving, which otherwise nils their economy record and leaves every
+remaining cue with no origin to fire from. Resolving first also means a refusal never costs a
+shell: if any mortar slot the show uses has no muzzle on that deck, the whole show is refused with
+nothing debited, rather than debited and then played as its hand cues alone. Origins do not move
+during a show, so the snapshot is exact, not an approximation.
 
 ⚠ **`main.server.luau` is at Luau's 200-local-register ceiling**, so every server-side addition
 in this build hangs off a single `Launch` namespace table rather than taking top-level locals;
@@ -252,8 +259,10 @@ the proving slots, shipped shells only). As authored 2026-09-05 it is 109 cues, 
 **The A13 gate — measure, don't assume.** Run `finale_v1` from the panel with the A13 joined to the
 same server, standing at the arena square and again at a west teahouse. Record: frame-rate
 behaviour during the 15 s, 32–33 s and 62–65 s volleys; whether bursts are visibly staggered
-(expected: yes, by a few hundred ms) or dropped (never expected); audio reach. Park the bench per
-the standing rule. Result: **not yet run** at merge — this line is the live fact.
+(expected: yes, by a few hundred ms) or dropped (never expected); audio reach. Also watch whether
+the owner's camera hunts during `finale_v1` — every show cue carries `by = owner`, so each one
+fires the own-launch look; gating that to cues without `showId` is the fix if it does. Park the
+bench per the standing rule. Result: **not yet run** at merge — this line is the live fact.
 
 ## Raw layer
 

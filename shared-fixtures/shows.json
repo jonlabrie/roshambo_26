@@ -10,7 +10,7 @@
         { "name": "one firecracker from the hand is a valid show", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "hand", "shellId": "firecracker" }], "expect": "ok" },
         { "name": "a gear shell from its own tier's mortar", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "mortar:S", "shellId": "peony" }, { "t_ms": 1500, "slot": "mortar:M", "shellId": "willow" }], "expect": "ok" },
         { "name": "equal times are allowed — a volley", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "mortar:S", "shellId": "peony" }, { "t_ms": 0, "slot": "mortar:M", "shellId": "wa" }], "expect": "ok" },
-        { "name": "a condition shell is allowed; the condition is checked at fire time", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "hand", "shellId": "ishibana" }], "expect": "ok" },
+        { "name": "a condition shell is allowed; today its condition is a client-side launchable gate on every path (per-cue fire-time check: sub-project C)", "stage": "deck", "cues": [{ "t_ms": 0, "slot": "hand", "shellId": "ishibana" }], "expect": "ok" },
         { "name": "public tubes accept any shell", "stage": "proving", "cues": [{ "t_ms": 0, "slot": "mid pool", "shellId": "kamuro" }, { "t_ms": 700, "slot": "hanabiya roof", "shellId": "firecracker" }], "expect": "ok" },
         { "name": "an empty show is not a show", "stage": "deck", "cues": [], "expect": "EMPTY" },
         { "name": "cues must be in time order", "stage": "deck", "cues": [{ "t_ms": 1000, "slot": "hand", "shellId": "firecracker" }, { "t_ms": 500, "slot": "hand", "shellId": "firecracker" }], "expect": "CUES_OUT_OF_ORDER", "cue": 1 },
