@@ -3845,3 +3845,14 @@ otherwise write exactly the same code.
 remaining candidates are both in the arena, where nothing is ever culled and the new work is
 pure overhead: the 1/30 s throttle (which at ~30 fps fires every frame and saves nothing)
 and `AmbientConfig.get()` allocating a fresh table per call, four to six times a frame.
+
+## [2026-09-05] decision | Fireworks show-system spec approved; sub-project B (shows + sequencer) goes first
+
+Spec `docs/superpowers/specs/2026-09-05-fireworks-show-system-design.md`, built from the ten
+decisions on [[backlog]] § "Fireworks show system — decisions taken in conversation". Owner:
+"yes, start with B, write the plan." B = the Show format with shared fixture-held validation,
+`ShowPlayer.luau`, a backend reserve (inventory fuel; powder is sub-project A), game-server
+playback over the existing `FireworkLaunched` broadcast, and a Studio-only "play this show file"
+verb on the proving panel — exiting on the A13 test of a large hand-authored show, which is where
+the director's scale assumption is finally measured. §9 (durables: one catalogue or two for
+Robux) stays open; it blocks only sub-project C.

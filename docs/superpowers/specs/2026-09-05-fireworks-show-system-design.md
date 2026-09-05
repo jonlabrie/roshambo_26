@@ -1,7 +1,7 @@
 # Fireworks Show System — Design
 
 **Date:** 2026-09-05
-**Status:** Draft for owner review. Ten decisions were taken in conversation and are recorded on
+**Status:** Approved in conversation (owner, 2026-09-05: "yes, start with B, write the plan"). Ten decisions were taken in conversation and are recorded on
 [[backlog]] § "Fireworks show system — decisions taken in conversation"; this spec argues from
 them. One economy question is left open (§9) and does not block the first two sub-projects.
 **Program context:** The fireworks program's remaining steps (range → vocabulary → **handheld →
