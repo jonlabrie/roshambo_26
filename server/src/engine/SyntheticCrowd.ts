@@ -13,16 +13,20 @@ import {
 
 export type Mix = Partial<Record<PolicyId, number>>;
 
-// Settled 2026-09-04 by the simulator's readability experiment (spec §2, Q0), not by taste.
+// Settled 2026-09-04 by the simulator's readability experiment (spec §2, Q0), not by taste — and
+// re-tuned the same day after that experiment was fixed to score each modelled human ALONE.
 // The first hypothesis (wsls:35, counter:20, conform:15) was a metronome: `wsls`'s lose-shift is
 // CLOCKWISE, which lands exactly on the counter-throw, so wsls and counter pulled the same way and
 // the World Throw rotated counter-wards 82% of the time — "throw what beats the counter" (`second`)
 // beat the world 82.4%, and the naive `counter` reader was punished at 6.8%. Halving `counter` and
-// doubling `conform` sets the counter-pull against a stay-put pull, so the world's transitions
-// spread. At 20000 rounds, crowd 30, seeds 1-3: `second` 51.4-52.4%, `counter` 42.0-42.6%,
-// `wsls` 32.8-33.0%, `random` 29.4-29.8%, oracle 56.0-56.5%. Readable, contested, and — because the
-// oracle now clears every teachable rule by ~4 points — not fully solved by any one of them.
-export const DEFAULT_MIX: Mix = { wsls: 30, counter: 10, conform: 30, rocky: 10, random: 20 };
+// doubling `conform` (to 30/20 random) set the counter-pull against a stay-put pull, but the table
+// that settled it had all six rule-followers voting in one tally; scored alone, the best rule
+// (`counter`) reached only 44.0–44.5%, under the 45% floor. Moving one more bot from `random` to
+// `conform` (at crowd 30: 5 random, 9 wsls, 3 counter, 10 conform, 3 rocky) tips it: at 20000
+// rounds, crowd 30, seeds 1–5, each rule alone: `counter` 49.9–50.8%, `second` 37.3–38.0%,
+// `wsls` 34.6–34.9%, `random` 29.6–30.0%, `conform` ~2.5%, oracle 57.2–57.9%. The world repeats
+// itself ~57% of rounds and rotates forward ~39%: readable by the naive HUD read, not solved by it.
+export const DEFAULT_MIX: Mix = { wsls: 30, counter: 10, conform: 35, rocky: 10, random: 15 };
 export const DEFAULT_STRENGTH = 0.7;
 
 export function parseMix(spec: string): Mix {
