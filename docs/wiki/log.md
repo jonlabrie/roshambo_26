@@ -3886,3 +3886,30 @@ Also corrected: the throttle was briefly suspected and is not the problem. At ~3
 fires every frame (dt ≥ the 1/30 s interval), costing an add and a compare and saving
 nothing — neutral, not harmful — while on a 60 fps device it genuinely halves the arena's
 CFrame writes, which is the iPhone 15 battery case this all started from. It stays.
+
+## [2026-09-05] measured | A13 usable again — and the credit goes to the caching fix, not the A/B
+
+Owner replayed the A13 on the published place: **usable at both the lowest graphics setting
+and on Automatic**, fireworks better, less jerkiness, camera generally smooth. That closes
+the regression reported earlier the same day.
+
+⚠ **But the A/B did not cause the improvement, and reading it that way would have been the
+wrong lesson.** The place under test carried BOTH the A/B attributes and the `2d8e2c5`
+caching fix (verified in Studio: `AmbientConfig` contains `cachedArena`, `main.server`
+carries the `967c168` note). In the arena — where the owner played almost exclusively — the
+A/B is close to a no-op: the bell drive and waterwheel are always visible there, so culling
+never fired on them, and at ~30 fps the 1/30 s throttle already fired every frame. Disabling
+both should change nothing in the arena and *increase* work elsewhere. So the improvement
+came from the other change in that publish: dropping ~5 table allocations and ~19
+`workspace:GetAttribute` reads per frame.
+
+That also retires the earlier suspicion of the fireworks sprint. "Fireworks looked better"
+is consistent with the same cause — freeing per-frame client CPU lets `FireworkController`'s
+per-shell work keep up — rather than with anything in the shell code changing.
+
+**A/B parked immediately** ([[perf-harness-contamination]] rule 1), all four attributes back
+to unset, so culling and throttling are active again on top of the caching fix.
+**Prediction to confirm on the next A13 walk: it should stay at least as good, and improve
+outside the arena** (paths, machiya row), where culling actually does work. If it instead
+regresses, culling is harmful somewhere specific and that is worth knowing — the test is
+cheap and the outcome is informative either way.
