@@ -509,3 +509,22 @@ describe("NetworkClient.postBank", function()
         expect(res.status).toBe(409)
     end)
 end)
+
+describe("NetworkClient.postShowReserve", function()
+    test("POSTs the show under { show = ... } to the player's reserve route", function()
+        local f = makeDeps({ { ok = true, statusCode = 200, body = '{"reservationId":"abc"}' } })
+        local net = NetworkClient.new(CONFIG, f.deps)
+        local show = {
+            stageId = "deck:77",
+            fuel = "inventory",
+            cues = { { t_ms = 0, slot = "hand", shellId = "firecracker" } },
+        }
+        local res = net:postShowReserve("77", show)
+        expect(res.ok).toBe(true)
+        expect(res.data.reservationId).toBe("abc")
+        expect(f.calls[1].method).toBe("POST")
+        expect(f.calls[1].url).toBe("http://x/api/v1/players/77/shows/reserve")
+        expect(f.calls[1].headers["Content-Type"]).toBe("application/json")
+        expect(serde.decode("json", f.calls[1].body :: string).show.stageId).toBe("deck:77")
+    end)
+end)

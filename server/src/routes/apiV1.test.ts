@@ -992,5 +992,91 @@ describe('/api/v1', () => {
                 .send({ placements: { 'mortar:S': { offset: [0, 0], facing: 'N' } } })
                 .expect(400);
         });
+
+        describe('POST /players/:id/shows/reserve — a show debits everything up front, or nothing', () => {
+            const show = (cues: object[], extra: object = {}) => ({
+                show: { stageId: 'deck:910', fuel: 'inventory', cues, ...extra },
+            });
+
+            it('debits every shell a valid show needs in one step and reports what is left', async () => {
+                await User.create({ robloxId: '910', mortars: ['mortar:S', 'mortar:M'], fireworks: { firecracker: 3, peony: 2, wa: 1 } });
+                const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                    .post('/api/v1/players/910/shows/reserve')
+                    .set('X-API-Key', API_KEY)
+                    .send(show([
+                        { t_ms: 0, slot: 'hand', shellId: 'firecracker' },
+                        { t_ms: 1000, slot: 'mortar:S', shellId: 'peony' },
+                        { t_ms: 1000, slot: 'mortar:M', shellId: 'wa' },
+                        { t_ms: 2000, slot: 'hand', shellId: 'firecracker' },
+                    ]))
+                    .expect(200);
+                expect(res.body.reservationId).toMatch(/^[a-z0-9]{6,}$/);
+                expect(res.body.stageId).toBe('deck:910');
+                expect(res.body.debited).toEqual({ firecracker: 2, peony: 1, wa: 1 });
+                expect(res.body.remaining).toEqual({ firecracker: 1, peony: 1, wa: 0 });
+                const after = await User.findOne({ robloxId: '910' });
+                expect(after!.fireworks.get('firecracker')).toBe(1);
+                expect(after!.fireworks.get('wa')).toBe(0);
+            });
+
+            it('INSUFFICIENT debits nothing — all or nothing', async () => {
+                await User.create({ robloxId: '911', mortars: ['mortar:S'], fireworks: { firecracker: 5, peony: 1 } });
+                const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                    .post('/api/v1/players/911/shows/reserve')
+                    .set('X-API-Key', API_KEY)
+                    .send({ show: { stageId: 'deck:911', fuel: 'inventory', cues: [
+                        { t_ms: 0, slot: 'hand', shellId: 'firecracker' },
+                        { t_ms: 500, slot: 'mortar:S', shellId: 'peony' },
+                        { t_ms: 1000, slot: 'mortar:S', shellId: 'peony' },
+                    ] } })
+                    .expect(409);
+                expect(res.body).toEqual({ error: 'INSUFFICIENT', needed: { firecracker: 1, peony: 2 }, held: { firecracker: 5, peony: 1 } });
+                const after = await User.findOne({ robloxId: '911' });
+                expect(after!.fireworks.get('firecracker')).toBe(5); // the firecracker was NOT taken
+                expect(after!.fireworks.get('peony')).toBe(1);
+            });
+
+            it('refuses a mortar slot for a tier the player does not own, before debiting', async () => {
+                await User.create({ robloxId: '912', mortars: ['mortar:S'], fireworks: { firecracker: 1, willow: 1 } });
+                const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                    .post('/api/v1/players/912/shows/reserve')
+                    .set('X-API-Key', API_KEY)
+                    .send({ show: { stageId: 'deck:912', fuel: 'inventory', cues: [
+                        { t_ms: 0, slot: 'hand', shellId: 'firecracker' },
+                        { t_ms: 500, slot: 'mortar:M', shellId: 'willow' },
+                    ] } })
+                    .expect(409);
+                expect(res.body).toEqual({ error: 'MORTAR_MISSING', slot: 'mortar:M' });
+                const after = await User.findOne({ robloxId: '912' });
+                expect(after!.fireworks.get('firecracker')).toBe(1);
+            });
+
+            it('refuses powder fuel, other stages, malformed shows and invalid cues with the validator code', async () => {
+                await User.create({ robloxId: '913', fireworks: { firecracker: 1 } });
+                const app = makeApp(makeEngine(), new ResultsStore());
+                const post = (body: object) => request(app).post('/api/v1/players/913/shows/reserve').set('X-API-Key', API_KEY).send(body);
+                expect((await post({ show: { stageId: 'deck:913', fuel: 'powder', cues: [{ t_ms: 0, slot: 'hand', shellId: 'firecracker' }] } }).expect(400)).body.error).toBe('FUEL_UNSUPPORTED');
+                expect((await post({ show: { stageId: 'rooftop', fuel: 'inventory', cues: [{ t_ms: 0, slot: 'hand', shellId: 'firecracker' }] } }).expect(400)).body.error).toBe('BAD_STAGE');
+                expect((await post({ show: { stageId: 'deck:999', fuel: 'inventory', cues: [{ t_ms: 0, slot: 'hand', shellId: 'firecracker' }] } }).expect(400)).body.error).toBe('BAD_STAGE');
+                expect((await post({}).expect(400)).body.error).toBe('BAD_SHOW');
+                const bad = (await post({ show: { stageId: 'deck:913', fuel: 'inventory', cues: [{ t_ms: 0, slot: 'hand', shellId: 'peony' }] } }).expect(400)).body;
+                expect(bad).toEqual({ error: 'TIER_MISMATCH', cue: 0 });
+                const after = await User.findOne({ robloxId: '913' });
+                expect(after!.fireworks.get('firecracker')).toBe(1);
+            });
+
+            it('CONCURRENT RESERVES CANNOT OVERSPEND — one conditional update per reservation', async () => {
+                await User.create({ robloxId: '914', fireworks: { firecracker: 1 } });
+                const app = makeApp(makeEngine(), new ResultsStore());
+                const body = { show: { stageId: 'deck:914', fuel: 'inventory', cues: [{ t_ms: 0, slot: 'hand', shellId: 'firecracker' }] } };
+                const [a, b] = await Promise.all([
+                    request(app).post('/api/v1/players/914/shows/reserve').set('X-API-Key', API_KEY).send(body),
+                    request(app).post('/api/v1/players/914/shows/reserve').set('X-API-Key', API_KEY).send(body),
+                ]);
+                expect([a.status, b.status].sort()).toEqual([200, 409]);
+                const after = await User.findOne({ robloxId: '914' });
+                expect(after!.fireworks.get('firecracker')).toBe(0);
+            });
+        });
     });
 });

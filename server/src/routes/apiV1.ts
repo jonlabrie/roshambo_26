@@ -13,6 +13,7 @@ import { Throw } from '../engine/GameRules';
 import { topByCareer } from '../leaderboards';
 import { reconcilePresence } from '../sessions';
 import { shellStates, SHELL_IDS, LaunchContext, SHELL_PRICES, MORTAR_PRICES } from '../fireworks';
+import { validateShow, tallyShells, DECK_STAGE, Cue } from '../shows';
 import { validateLoadout, validateSizeClass, validatePadPreferences, validateDecorations, validateAccess, validateMortarPlacements } from '../loadout';
 import {
     validatePurchase, validateDisplay, PRICES, DEFAULT_TEAHOUSE_LOADOUT,
@@ -386,6 +387,63 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             );
             if (!updated) { res.status(409).json({ error: 'NONE_HELD' }); return; }
             res.json({ shellId, count: updated.fireworks.get(shellId) ?? 0 });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
+    // A SHOW IS RESERVED BEFORE IT PLAYS (spec 2026-09-05-fireworks-show-system-design §2.1).
+    // Everything the show needs is debited in ONE conditional update, so a show that cannot be
+    // fully paid takes nothing — the same all-or-nothing the single-shell spend gets from its
+    // conditional $inc, extended to a whole tally. Inventory fuel only here; powder is sub-project A.
+    // Players may only reserve for their OWN deck (spec §3, decision 4); stations and the rooftop
+    // arrive with consoles and tickets in sub-project C.
+    router.post('/players/:robloxUserId/shows/reserve', async (req, res) => {
+        try {
+            const show = req.body?.show;
+            if (typeof show !== 'object' || show === null) { res.status(400).json({ error: 'BAD_SHOW' }); return; }
+            if (show.fuel !== 'inventory') { res.status(400).json({ error: 'FUEL_UNSUPPORTED' }); return; }
+            if (show.stageId !== `deck:${req.params.robloxUserId}`) { res.status(400).json({ error: 'BAD_STAGE' }); return; }
+            const check = validateShow(show.cues, DECK_STAGE);
+            if (!check.ok) { res.status(400).json(check.cue === undefined ? { error: check.error } : { error: check.error, cue: check.cue }); return; }
+            const cues = show.cues as Cue[];
+
+            const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
+            if (!user) { res.status(404).json({ error: 'RESOLVE_FAILED' }); return; }
+
+            // Gear is personal: a mortar slot in the show must be a tier this player owns. Checked
+            // before the debit so a show that could never launch muzzle-true takes no shells.
+            const owned = new Set(user.mortars ?? []);
+            for (const c of cues) {
+                if (c.slot.startsWith('mortar:') && !owned.has(c.slot)) {
+                    res.status(409).json({ error: 'MORTAR_MISSING', slot: c.slot });
+                    return;
+                }
+            }
+
+            const needed = tallyShells(cues);
+            const filter: Record<string, unknown> = { _id: user._id };
+            const inc: Record<string, number> = {};
+            for (const [id, n] of Object.entries(needed)) {
+                filter[`fireworks.${id}`] = { $gte: n };
+                inc[`fireworks.${id}`] = -n;
+            }
+            const updated = await User.findOneAndUpdate(filter, { $inc: inc }, { new: true });
+            if (!updated) {
+                const held: Record<string, number> = {};
+                for (const id of Object.keys(needed)) held[id] = user.fireworks?.get(id) ?? 0;
+                res.status(409).json({ error: 'INSUFFICIENT', needed, held });
+                return;
+            }
+            const remaining: Record<string, number> = {};
+            for (const id of Object.keys(needed)) remaining[id] = updated.fireworks.get(id) ?? 0;
+            res.json({
+                reservationId: Math.random().toString(36).slice(2, 12),
+                stageId: show.stageId,
+                cues,
+                debited: needed,
+                remaining,
+            });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
         }

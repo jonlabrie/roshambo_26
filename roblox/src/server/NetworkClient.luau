@@ -218,6 +218,13 @@ function NetworkClient.postFireworkSpend(self: any, robloxUserId: string, shellI
     return self:_request("POST", `/api/v1/players/{robloxUserId}/fireworks/spend`, { shellId = shellId })
 end
 
+-- A SHOW IS RESERVED BEFORE IT PLAYS: the server debits every shell the cue list needs in one
+-- conditional update, so a show that cannot be fully paid takes nothing. 409 INSUFFICIENT (with
+-- needed/held) and 409 MORTAR_MISSING both arrive as ordinary failed Results.
+function NetworkClient.postShowReserve(self: any, robloxUserId: string, show: any): Result
+    return self:_request("POST", `/api/v1/players/{robloxUserId}/shows/reserve`, { show = show })
+end
+
 function NetworkClient.postDisplay(
     self: any,
     robloxUserId: string,
