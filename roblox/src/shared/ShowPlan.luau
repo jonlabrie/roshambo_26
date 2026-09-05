@@ -108,6 +108,40 @@ function ShowPlan.validate(
     return { ok = true }
 end
 
+-- HOLES ARE A HOSTILE INPUT (Task 2's review). ShowPlan.validate walks with `ipairs`, which stops
+-- at the first gap, so a client sending { [1] = cue, [3] = cue } would have only the PREFIX
+-- validated while the rest rode along into playback. Accept only a dense 1..n array -- every key a
+-- positive integer with no gap (`#t` is a BORDER, not the max key, so the count must be checked
+-- against the largest key, not against `#t`) -- and PROJECT every entry to exactly the three cue
+-- fields, so hostile extra fields never reach validation, the wire, or playback.
+function ShowPlan.dense(t: any): { Cue }?
+    if type(t) ~= "table" then
+        return nil
+    end
+    local count, maxKey = 0, 0
+    for k, v in pairs(t) do
+        if type(k) ~= "number" or k % 1 ~= 0 or k < 1 then
+            return nil
+        end
+        if type(v) ~= "table" then
+            return nil
+        end
+        count += 1
+        if k > maxKey then
+            maxKey = k
+        end
+    end
+    if maxKey ~= count then
+        return nil
+    end
+    local out = table.create(count)
+    for i = 1, count do
+        local v = t[i]
+        out[i] = { t_ms = v.t_ms, slot = v.slot, shellId = v.shellId }
+    end
+    return out
+end
+
 function ShowPlan.tally(cues: { Cue }): { [string]: number }
     local out: { [string]: number } = {}
     for _, c in cues do

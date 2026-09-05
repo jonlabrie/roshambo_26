@@ -1734,93 +1734,59 @@ function Launch.playShow(
     end
 end
 
--- HOLES ARE A HOSTILE INPUT (Task 2's review). ShowPlan.validate walks with `ipairs`, which stops
--- at the first gap, so a client sending { [1] = cue, [3] = cue } would have only the PREFIX
--- validated while the rest rode along into playback. Accept only a dense 1..n array -- every key a
--- positive integer, and exactly `#t` of them -- and hand the COPY to everything downstream.
-function Launch.denseCues(t: any): { any }?
-    if type(t) ~= "table" then
-        return nil
-    end
-    local n = #t
-    local count = 0
-    for k in pairs(t) do
-        if type(k) ~= "number" or k % 1 ~= 0 or k < 1 then
-            return nil
-        end
-        count += 1
-    end
-    if count ~= n then
-        return nil
-    end
-    local out = table.create(n)
-    for i = 1, n do
-        out[i] = t[i]
-    end
-    return out
-end
-
--- A player's show from their OWN deck: validate (same rule the backend applies), reserve (debit
--- everything or nothing), then play. Every origin is snapshotted at go -- muzzles from the deck's
--- mortar placements, hand cues from where the player stood -- so a reserved show plays out even
--- if its owner walks away or disconnects.
-Launch.RequestShowGo = remotes:WaitForChild("RequestShowGo") :: RemoteEvent
-Launch.RequestShowGo.OnServerEvent:Connect(function(player, show)
-    if typeof(show) ~= "table" or typeof(show.cues) ~= "table" then
-        return
-    end
-    local uid = tostring(player.UserId)
-    handlerQueue:run(uid, function()
-        local ShowPlan = Launch.plan
-        local char = player.Character
-        local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
-        if not root then
+-- A player's show from their OWN deck: validate (same rule the backend applies), RESOLVE AND CHECK
+-- every origin, then reserve (debit everything or nothing), then play. Origins are resolved BEFORE
+-- anything is paid for: a slot that resolves to no muzzle -- a bare deck, a mortar the backend
+-- thinks is placed and this server does not -- refuses the whole show at zero cost instead of
+-- debiting it and then firing only the hand cues. Once reserved, the snapshot means the show plays
+-- out even if its owner walks away or disconnects.
+Launch.RequestShowGo = remotes:WaitForChild("RequestShowGo", 10) :: RemoteEvent?
+-- WITH A TIMEOUT (final review): a bare WaitForChild here would stall every remaining line of this
+-- script on a place whose remotes folder predates the show work. Missing = warn and skip.
+if Launch.RequestShowGo == nil then
+    warn("[SHOW] RequestShowGo remote is missing — deck shows cannot be requested (re-sync from Rojo?)")
+else
+    Launch.RequestShowGo.OnServerEvent:Connect(function(player, show)
+        if typeof(show) ~= "table" or typeof(show.cues) ~= "table" then
             return
         end
-        local deck = deckSiteFor(uid)
-        if deck == nil then
-            return -- no deck, no stage (the client should not have offered go)
-        end
-        local pos = root.Position
-        if not LaunchSites.isValid({ x = pos.X, y = pos.Y, z = pos.Z }, { deck }, uid) then
-            return
-        end
-        local cues = Launch.denseCues(show.cues)
-        if cues == nil then
-            warn(`[SHOW] {uid} rejected: cues are not a dense array`)
-            return
-        end
-        local slots, shellMortar = ShowPlan.DECK_SLOTS, MortarPlacement.SHELL_MORTAR
-        local check = ShowPlan.validate(cues, slots, shellMortar, Launch.knownShells)
-        if not check.ok then
-            warn(`[SHOW] {uid} rejected: {check.error} cue {tostring(check.cue)}`)
-            return
-        end
-        local body = { stageId = `deck:{uid}`, fuel = "inventory", cues = cues, title = show.title }
-        local res = net:postShowReserve(uid, body)
-        if not res.ok then
-            -- Result carries `status` and `error` (and `data` when the body parsed) -- see NetworkClient.Result.
-            local bodyErr = tostring(res.data and res.data.error)
-            warn(`[SHOW] {uid} reserve failed: {tostring(res.status)} {tostring(res.error)} {bodyErr}`)
-            if pushFireworkState then
-                pushFireworkState(player)
+        local uid = tostring(player.UserId)
+        handlerQueue:run(uid, function()
+            local ShowPlan = Launch.plan
+            local char = player.Character
+            local root = char and char:FindFirstChild("HumanoidRootPart") :: BasePart?
+            if not root then
+                return
             end
-            return
-        end
-        if pushFireworkState then
-            pushFireworkState(player) -- their counts just dropped by the whole show
-        end
-        local showId = tostring((res.data and res.data.reservationId) or `local-{math.random(1, 1e9)}`)
-        local handFrame = root.CFrame
-        -- SNAPSHOT the muzzles here, at go, not per cue at fire time: the owner may leave
-        -- mid-show (PlayerRemoving nils playerEconomy[uid], so muzzleOriginFor would resolve nil
-        -- for every remaining cue) while the reserve has already debited the whole show -- and
-        -- origins do not move during a show, so resolving them now is exact, not an approximation.
-        -- One call per DISTINCT slot is enough: muzzleOriginFor keys on the SHELL's required
-        -- mortar, and the validator guarantees every shell in a `mortar:X` slot requires exactly
-        -- `mortar:X`, so any one of that slot's shells resolves that slot's muzzle.
-        local muzzles: { [string]: { origin: Vector3, heading: Vector3? } } = {}
-        do
+            local deck = deckSiteFor(uid)
+            if deck == nil then
+                return -- no deck, no stage (the client should not have offered go)
+            end
+            local pos = root.Position
+            if not LaunchSites.isValid({ x = pos.X, y = pos.Y, z = pos.Z }, { deck }, uid) then
+                return
+            end
+            local cues = ShowPlan.dense(show.cues)
+            if cues == nil then
+                warn(`[SHOW] {uid} rejected: cues are not a dense array`)
+                return
+            end
+            local slots, shellMortar = ShowPlan.DECK_SLOTS, MortarPlacement.SHELL_MORTAR
+            local check = ShowPlan.validate(cues, slots, shellMortar, Launch.knownShells)
+            if not check.ok then
+                warn(`[SHOW] {uid} rejected: {check.error} cue {tostring(check.cue)}`)
+                return
+            end
+            -- SNAPSHOT the origins here, at go and BEFORE the reserve, not per cue at fire time:
+            -- the owner may leave mid-show (PlayerRemoving nils playerEconomy[uid], so
+            -- muzzleOriginFor would resolve nil for every remaining cue) while the reserve has
+            -- already debited the whole show -- and origins do not move during a show, so
+            -- resolving them now is exact, not an approximation. One call per DISTINCT slot is
+            -- enough: muzzleOriginFor keys on the SHELL's required mortar, and the validator
+            -- guarantees every shell in a `mortar:X` slot requires exactly `mortar:X`, so any one
+            -- of that slot's shells resolves that slot's muzzle.
+            local handFrame = root.CFrame
+            local muzzles: { [string]: { origin: Vector3, heading: Vector3? } } = {}
             local shellPerSlot: { [string]: string } = {}
             for _, cue in cues do
                 if cue.slot ~= "hand" then
@@ -1830,24 +1796,46 @@ Launch.RequestShowGo.OnServerEvent:Connect(function(player, show)
             local deckPos = Vector3.new(deck.pos.x, deck.pos.y, deck.pos.z)
             for slot, shellId in shellPerSlot do
                 local o, h = muzzleOriginFor(uid, deckPos, deck, shellId)
-                if o ~= nil then
-                    muzzles[slot] = { origin = o, heading = h }
+                if o == nil then
+                    -- REFUSE BEFORE PAYING: a debited show that fires only its hand cues is worse
+                    -- than one that never starts.
+                    warn(`[SHOW] {uid} refused: slot {slot} has no muzzle on this deck`)
+                    return
                 end
+                muzzles[slot] = { origin = o, heading = h }
             end
-        end
-        local function originFor(cue: ShowCue): (Vector3?, Vector3?, number?)
-            if cue.slot == "hand" then
-                return handFrame:PointToWorldSpace(Vector3.new(1.2, 0.6, -0.8)), nil, nil
+            -- A title rides to the backend and back out to every viewer, so cap it here rather
+            -- than trusting the console's own field length.
+            local title = if typeof(show.title) == "string" and #show.title <= 80 then show.title else nil
+            local body = { stageId = `deck:{uid}`, fuel = "inventory", cues = cues, title = title }
+            local res = net:postShowReserve(uid, body)
+            if not res.ok then
+                -- Result carries `status` and `error` (and `data` when the body parsed) -- see NetworkClient.Result.
+                local bodyErr = tostring(res.data and res.data.error)
+                warn(`[SHOW] {uid} reserve failed: {tostring(res.status)} {tostring(res.error)} {bodyErr}`)
+                if pushFireworkState then
+                    pushFireworkState(player)
+                end
+                return
             end
-            local m = muzzles[cue.slot]
-            if m == nil then
-                return nil, nil, nil -- unresolved slot: playShow warns and skips the cue
+            if pushFireworkState then
+                pushFireworkState(player) -- their counts just dropped by the whole show
             end
-            return m.origin, m.heading, nil
-        end
-        Launch.playShow(`deck:{uid}`, uid, uid, cues, originFor, showId)
+            local showId = tostring((res.data and res.data.reservationId) or `local-{math.random(1, 1e9)}`)
+            local function originFor(cue: ShowCue): (Vector3?, Vector3?, number?)
+                if cue.slot == "hand" then
+                    return handFrame:PointToWorldSpace(Vector3.new(1.2, 0.6, -0.8)), nil, nil
+                end
+                local m = muzzles[cue.slot]
+                if m == nil then
+                    return nil, nil, nil -- unreachable: every slot resolved above, before the debit
+                end
+                return m.origin, m.heading, nil
+            end
+            Launch.playShow(`deck:{uid}`, uid, uid, cues, originFor, showId)
+        end)
     end)
-end)
+end
 
 -- Resolve a proving slot to a launch origin/heading/apex. Extracted so the show verb below fires
 -- from EXACTLY the muzzles a hand shot does -- one description of where a station points, not two
@@ -1922,15 +1910,17 @@ end)
 -- rather than client input, so there is nothing to validate on the wire beyond the NAME -- and
 -- nothing to reserve, because the proving range never spends. One show per proving stage: a
 -- second Play queues behind the first through the same Launch.playShow scheduler decks use.
-Launch.FireworkShows = require(shared:WaitForChild("FireworkShows"))
--- WITH A TIMEOUT (Task 5's review): a bare WaitForChild here would stall every remaining line of
--- this script on a place whose remotes folder predates the show work. Missing = warn and skip.
+-- WITH A TIMEOUT on BOTH fetches (Task 5's review, widened by the final one): a bare WaitForChild
+-- -- for the remote or for the module -- would stall every remaining line of this script on a
+-- place whose Rojo tree predates the show work. Missing = warn and skip this block.
+Launch.FireworkShowsModule = shared:WaitForChild("FireworkShows", 10) :: ModuleScript?
 Launch.RequestProvingShow = remotes:WaitForChild("RequestProvingShow", 10) :: RemoteEvent?
-if Launch.RequestProvingShow == nil then
+if Launch.FireworkShowsModule == nil or Launch.RequestProvingShow == nil then
     warn(
-        "[PROVING] RequestProvingShow remote is missing — the panel's Play buttons do nothing (re-sync from Rojo?)"
+        "[PROVING] FireworkShows or RequestProvingShow is missing — the panel's Play buttons do nothing (re-sync from Rojo?)"
     )
 else
+    Launch.FireworkShows = require(Launch.FireworkShowsModule)
     Launch.RequestProvingShow.OnServerEvent:Connect(function(_player, name)
         if not RunService:IsStudio() then
             return -- the same gate as RequestProvingFire: a published client's request dies here

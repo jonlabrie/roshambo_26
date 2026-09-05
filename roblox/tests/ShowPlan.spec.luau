@@ -100,6 +100,40 @@ describe("ShowPlan.validate -- every fixture case", function()
     end)
 end)
 
+describe("ShowPlan.dense -- holes are a hostile input", function()
+    local function cue(t: number)
+        return { t_ms = t, slot = "hand", shellId = "firecracker" }
+    end
+    test("a dense 1..n table round-trips, projected to the three fields", function()
+        local out = ShowPlan.dense({
+            { t_ms = 0, slot = "hand", shellId = "firecracker", evil = "dropped" },
+            cue(500),
+        })
+        expect(out).toEqual({
+            { t_ms = 0, slot = "hand", shellId = "firecracker" },
+            { t_ms = 500, slot = "hand", shellId = "firecracker" },
+        })
+    end)
+    test("a hole is refused whatever `#t` happens to report", function()
+        -- `#t` is a BORDER, not the max key: { [1], [3] } may report 1 and { [1], [3], [5] } may
+        -- report 3, so a count-vs-length test alone can pass a table with gaps in it.
+        expect(ShowPlan.dense({ [1] = cue(0), [3] = cue(1) })).toBeNil()
+        expect(ShowPlan.dense({ [1] = cue(0), [3] = cue(1), [5] = cue(2) })).toBeNil()
+    end)
+    test("a non-array key is refused", function()
+        expect(ShowPlan.dense({ [1] = cue(0), nope = cue(1) })).toBeNil()
+        expect(ShowPlan.dense({ [0] = cue(0), [1] = cue(1) })).toBeNil()
+        expect(ShowPlan.dense({ [1] = cue(0), [1.5] = cue(1) })).toBeNil()
+    end)
+    test("a non-table entry is refused", function()
+        expect(ShowPlan.dense({ cue(0), "boom" })).toBeNil()
+    end)
+    test("a non-table input is refused", function()
+        expect(ShowPlan.dense(nil)).toBeNil()
+        expect(ShowPlan.dense("nope")).toBeNil()
+    end)
+end)
+
 describe("ShowPlan.tally", function()
     test("counts per shell id", function()
         expect(ShowPlan.tally({

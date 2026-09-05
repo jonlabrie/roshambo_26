@@ -40,6 +40,19 @@ describe('validateShow — every fixture case', () => {
         expect(validateShow(cues, DECK_STAGE)).toEqual({ ok: false, error: 'TOO_MANY_CUES' });
         expect(validateShow(cues.slice(0, SHOW_LIMITS.maxCues), DECK_STAGE)).toEqual({ ok: true });
     });
+    it('TOO_LONG is strict: a show ending exactly at the limit is legal', () => {
+        const at = (t_ms: number) => validateShow([{ t_ms: 0, slot: 'hand', shellId: 'firecracker' }, { t_ms, slot: 'hand', shellId: 'firecracker' }], DECK_STAGE);
+        expect(at(SHOW_LIMITS.maxDurationS * 1000)).toEqual({ ok: true });
+        expect(at(SHOW_LIMITS.maxDurationS * 1000 + 1)).toEqual({ ok: false, error: 'TOO_LONG' });
+    });
+    it('a non-finite t_ms is a BAD_CUE, not a time error', () => {
+        // JSON cannot carry NaN or Infinity, so the fixture cannot express these -- and the Luau
+        // twin asserts the same two rows in ShowPlan.spec.luau.
+        for (const bad of [NaN, Infinity, -Infinity]) {
+            expect(validateShow([{ t_ms: bad, slot: 'hand', shellId: 'firecracker' }], DECK_STAGE))
+                .toEqual({ ok: false, error: 'BAD_CUE', cue: 0 });
+        }
+    });
     it('rejects non-array input as EMPTY', () => {
         expect(validateShow(undefined, DECK_STAGE)).toEqual({ ok: false, error: 'EMPTY' });
         expect(validateShow('nope', DECK_STAGE)).toEqual({ ok: false, error: 'EMPTY' });
