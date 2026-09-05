@@ -3913,3 +3913,18 @@ to unset, so culling and throttling are active again on top of the caching fix.
 outside the arena** (paths, machiya row), where culling actually does work. If it instead
 regresses, culling is harmful somewhere specific and that is worth knowing — the test is
 cheap and the outcome is informative either way.
+
+## [2026-09-05] ship | Fireworks shows + sequencer (sub-project B): shows are data, reserved atomically, played by the server
+
+Plan `docs/superpowers/plans/2026-09-05-fireworks-shows-sequencer.md`. Shared fixture
+`shared-fixtures/shows.json` with TS/Luau twins; `POST /shows/reserve` (all-or-nothing, inventory
+fuel, own deck only); `roblox/src/shared/ShowPlayer.luau`; `RequestShowGo` playback through
+`FireworkLaunched` with `showId`, with a hostile cue table refused before validation and mortar
+origins snapshotted at go so a show outlives its owner leaving; boost roll, broadcast and proving
+origin resolution extracted and shared; `FireworkShows` drafts and the panel's Studio-only Play
+verb. The A13 stress run (`finale_v1`) is the exit gate and is owner-run; result recorded on
+[[fireworks]] when it happens.
+
+Every server-side addition hangs off a single `Launch` namespace table because
+`roblox/src/server/main.server.luau` sits at Luau's 200-local-register ceiling with one top-level
+slot left; the file needs real module extraction before further server work.

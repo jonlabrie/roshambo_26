@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-09-04
+updated: 2026-09-05
 checked: 2026-08-27
 ---
 
@@ -210,6 +210,50 @@ Overlook, ishibana gated correctly on the world throwing Rock).
   game's financial success — shell taxonomy is a first-class design goal.
 - Eyeline analysis kept the bridge: western teahouses sit at ~bridge height and look
   down past it; only pillars-to-water would block.
+
+## Shows and the sequencer (sub-project B, built 2026-09-05)
+
+Spec `docs/superpowers/specs/2026-09-05-fireworks-show-system-design.md` §1–§3; plan
+`docs/superpowers/plans/2026-09-05-fireworks-shows-sequencer.md`.
+
+**A show is data**: cues of `{ t_ms, slot, shellId }`, validated by twins held to
+`shared-fixtures/shows.json` (`server/src/shows.ts`, `roblox/src/shared/ShowPlan.luau`). Limits
+are config (`SHOW_LIMITS` / `ShowPlan.LIMITS`: read them, do not quote them). A hostile cue table
+with holes is refused before validation ever runs — `Launch.denseCues` accepts only a dense 1..n
+array and hands the copy downstream, because the validator walks with `ipairs`, which stops at the
+first gap and would have validated only the prefix. **Reserve, then play**:
+`POST /api/v1/players/:id/shows/reserve` debits every shell in ONE conditional update or nothing
+(inventory fuel only — powder is sub-project A; deck stage only — the rooftop and stations arrive
+with consoles in C). The game server plays a reserved show on its own clock
+(`roblox/src/shared/ShowPlayer.luau` timing; one show per stage, a second queues behind through
+`Launch.stageBusyUntilMs`), emitting each cue through the same `FireworkLaunched` broadcast as a
+hand launch, with `showId` added and the pity ramp applied per cue. **Origins are snapshotted at
+go** — one muzzle resolve per distinct mortar slot, plus the hand frame — so a show outlives its
+owner leaving, which otherwise nils their economy record and leaves every remaining cue with no
+origin to fire from. Origins do not move during a show, so the snapshot is exact, not an
+approximation.
+
+⚠ **`main.server.luau` is at Luau's 200-local-register ceiling**, so every server-side addition
+in this build hangs off a single `Launch` namespace table rather than taking top-level locals;
+`roblox/tests/Compiles.spec.luau` is what makes the ceiling fail in CI instead of as a dead script
+in Studio. Exactly one top-level slot remained after this work. Further server work in that file
+needs real module extraction first — count the slots by compiling, not by trusting this line.
+
+**Studio-only proving verb**: the proving panel's *Shows* section plays `FireworkShows.DRAFTS`
+(`warmup`, `finale_v1`) from the five stations and the rooftop battery. `warmup` is a five-cue
+timing check by eye. `finale_v1` is the stress program — volleys that put six bursts in the sky
+inside 300 ms and a finale that stacks heavies — authored to exercise the director's
+concurrent-shell budget at scale for the first time. Its size is authored, not fixed: read
+`roblox/src/shared/FireworkShows.luau` for the current program and
+`roblox/tests/FireworkShows.spec.luau` for the floor it must clear (both drafts validate against
+the proving slots, shipped shells only). As authored 2026-09-05 it is 109 cues, the last at
+71.3 s, with its densest window six cues inside 300 ms.
+
+**The A13 gate — measure, don't assume.** Run `finale_v1` from the panel with the A13 joined to the
+same server, standing at the arena square and again at a west teahouse. Record: frame-rate
+behaviour during the 15 s, 32–33 s and 62–65 s volleys; whether bursts are visibly staggered
+(expected: yes, by a few hundred ms) or dropped (never expected); audio reach. Park the bench per
+the standing rule. Result: **not yet run** at merge — this line is the live fact.
 
 ## Raw layer
 
