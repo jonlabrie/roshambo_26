@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-09-05
+updated: 2026-09-06
 checked: 2026-08-27
 ---
 
@@ -215,6 +215,10 @@ Overlook, ishibana gated correctly on the world throwing Rock).
 
 Spec `docs/superpowers/specs/2026-09-05-fireworks-show-system-design.md` §1–§3; plan
 `docs/superpowers/plans/2026-09-05-fireworks-shows-sequencer.md`.
+
+⚠ In every cue, log line and API body the Bottle Rocket is `firecracker` — the id predates the
+player-facing rename and stays (it keys the win grant, the Mongo inventory field and the shared
+fixture); ids are for the machine, names are for the kid.
 
 **A show is data**: cues of `{ t_ms, slot, shellId }`, validated by twins held to
 `shared-fixtures/shows.json` (`server/src/shows.ts`, `roblox/src/shared/ShowPlan.luau`). Limits

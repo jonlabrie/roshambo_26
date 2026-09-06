@@ -3928,3 +3928,14 @@ verb. The A13 stress run (`finale_v1`) is the exit gate and is owner-run; result
 Every server-side addition hangs off a single `Launch` namespace table because
 `roblox/src/server/main.server.luau` sits at Luau's 200-local-register ceiling with one top-level
 slot left; the file needs real module extraction before further server work.
+
+## [2026-09-06] ship | Shows + sequencer merged to main; dev redeployed; first Studio run
+
+`thread/shows` rebased and fast-forwarded into `main` at `346e4b2` (owner: "merge") so Rojo,
+which serves the main checkout, could show the proving panel's Shows section. Dev App Runner
+redeployed from `main` (`start-deployment`, auto-deploy is off): the first `RequestShowGo` from
+the owner's deck reached the backend and got **404** because the service was still on the crowd
+build — the reserve route did not exist there yet. After the redeploy the route answers 401
+behind the key. Note for sub-project C: the per-player handler queue drops a `RequestShowGo`
+while a previous one is in flight (three command-bar sends → one `[SHOW]` line); a Go button
+needs feedback, not a silent drop. The A13 gate remains not yet run.
