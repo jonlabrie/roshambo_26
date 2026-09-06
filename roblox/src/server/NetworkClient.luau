@@ -225,6 +225,23 @@ function NetworkClient.postShowReserve(self: any, robloxUserId: string, show: an
     return self:_request("POST", `/api/v1/players/{robloxUserId}/shows/reserve`, { show = show })
 end
 
+function NetworkClient.postPowderTopup(self: any, robloxUserId: string, points: number): Result
+    return self:_request("POST", `/api/v1/players/{robloxUserId}/powder/topup`, { points = points })
+end
+
+function NetworkClient.postFireworkMelt(
+    self: any,
+    robloxUserId: string,
+    shellId: string,
+    count: number
+): Result
+    return self:_request(
+        "POST",
+        `/api/v1/players/{robloxUserId}/fireworks/melt`,
+        { shellId = shellId, count = count }
+    )
+end
+
 function NetworkClient.postDisplay(
     self: any,
     robloxUserId: string,
