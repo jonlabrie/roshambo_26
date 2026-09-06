@@ -15,7 +15,16 @@ local TAG = "ChochinSwing"
 local AMP = math.rad(3.2) -- peak sway angle
 local SPEED = 0.9 -- base angular frequency (rad/s) — period ~7s
 
-type Entry = { model: Model, base: CFrame, phase: number, amp: number, speed: number }
+-- `rootOffset` is filled lazily the first time the server's weld shows up as a PrimaryPart; nil
+-- means "not welded yet", which is also the signal to use the PivotTo path.
+type Entry = {
+    model: Model,
+    base: CFrame,
+    phase: number,
+    amp: number,
+    speed: number,
+    rootOffset: CFrame?,
+}
 local entries: { Entry } = {}
 
 -- ⚠ POLE-HUNG CHŌCHIN DO NOT SWAY (owner ruling, 2026-09-03). Measured, the effect was ~1.5 inches
@@ -131,6 +140,30 @@ RunService.Heartbeat:Connect(function(dt: number)
         end
         local a = e.amp * math.sin(t * e.speed + e.phase)
         local b = e.amp * 0.45 * math.sin(t * e.speed * 0.7 + e.phase * 1.3) -- subtle cross-axis drift
-        e.model:PivotTo(e.base * CFrame.Angles(a, 0, b))
+        local swung = e.base * CFrame.Angles(a, 0, b)
+        -- ONE WRITE when the server has welded this lantern into an assembly, ~58 when it has not.
+        -- `PrimaryPart` is the server's signal that the weld happened (AssemblyWeld.bindModel sets
+        -- it); resolved live rather than cached at registration, because the model replicates
+        -- before that property does and a lantern that streams in unwelded must pick the fast path
+        -- up when it lands.
+        --
+        -- ⚠ THE FALLBACK IS NOT DEAD CODE. PivotTo is correct precisely while PrimaryPart is nil,
+        -- i.e. while nothing is welded. Once parts ARE welded and unanchored, writing all of their
+        -- CFrames individually fights the constraints, so the two paths must never be mixed.
+        local root = e.model.PrimaryPart
+        if root then
+            -- The root's offset FROM THE PIVOT is invariant under PivotTo, so it can be taken at
+            -- any pose and cached -- reading it from the model's CURRENT pivot rather than from
+            -- `base` is what makes that true. Deriving it from `base` and the live root CFrame
+            -- instead would be self-referential: the root has already been swung.
+            local off = e.rootOffset
+            if off == nil then
+                off = e.model:GetPivot():ToObjectSpace(root.CFrame)
+                e.rootOffset = off
+            end
+            root.CFrame = swung * (off :: CFrame)
+        else
+            e.model:PivotTo(swung)
+        end
     end
 end)

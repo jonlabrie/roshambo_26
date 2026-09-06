@@ -160,25 +160,45 @@ end
 -- ⚠ WELD FIRST, UNANCHOR SECOND, and only unanchor what actually got a weld. Reverse the order
 -- and any part whose weld fails is briefly a loose unanchored board standing in a river.
 do
+    local AssemblyWeld = require(script.Parent:WaitForChild("AssemblyWeld"))
     local wheelRig = stage:FindFirstChild("Waterwheel")
     if wheelRig then
         for _, proxy in wheelRig:GetChildren() do
             local wi = proxy.Name:match("^Wheel(%d+)$")
             if wi and proxy:IsA("BasePart") then
+                local riding: { BasePart } = {}
                 for _, p in wheelRig:GetChildren() do
                     if p ~= proxy and p:IsA("BasePart") then
                         if p.Name:match(`^Paddle{wi}_%d+$`) or p.Name:match(`^Wheel{wi}T_`) then
-                            local weld = Instance.new("WeldConstraint")
-                            weld.Part0 = proxy :: BasePart
-                            weld.Part1 = p
-                            weld.Parent = proxy
-                            p.Anchored = false
+                            table.insert(riding, p)
                         end
                     end
                 end
+                AssemblyWeld.bind(proxy :: BasePart, riding)
             end
         end
     end
+
+    -- THE HANGING CHŌCHIN, same trick and the same reason. Each lantern is ~58 parts and the
+    -- client swings it with `Model:PivotTo`, which moves every one of them; welded, it is one
+    -- write. Bound by TAG rather than at a fixed point in boot, because the teahouse lanterns do
+    -- not exist yet -- their structures are materialized per pad at runtime, so the added-signal
+    -- is what catches them. On the server a model is fully built before it is parented, so the
+    -- tag always fires against a complete object; that is precisely why this cannot live in the
+    -- client controller (see AssemblyWeld's header).
+    --
+    -- Pole-hung path lanterns are welded too even though they no longer sway. It costs one weld
+    -- each at boot, and it means a lantern is in one state whether or not it animates rather than
+    -- two -- and if sway ever returns to the poles, it returns already cheap.
+    local function weldChochin(m: Instance)
+        if m:IsA("Model") and m.PrimaryPart == nil then
+            AssemblyWeld.bindModel(m)
+        end
+    end
+    for _, m in CollectionService:GetTagged("ChochinSwing") do
+        weldChochin(m)
+    end
+    CollectionService:GetInstanceAddedSignal("ChochinSwing"):Connect(weldChochin)
 end
 
 -- ⚠ THE STREAMING RADII CANNOT BE SET FROM CODE. DO NOT ADD THAT CODE BACK.
