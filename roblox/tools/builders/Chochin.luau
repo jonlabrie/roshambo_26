@@ -91,9 +91,17 @@ function Chochin.build(name: string, x: number, z: number, armY: number, paperRG
     if paperRGB255 then
         paper = { paperRGB255[1] / 255, paperRGB255[2] / 255, paperRGB255[3] / 255 }
     end
+    -- TWO GROUPS, because one of them moves. The Hook is fixed to the building; everything that
+    -- hangs from it -- ring, barrel, glyph plate -- goes into a `Swing` sub-model tagged
+    -- `ChochinSwing`, which is what `ChochinSway` (client) animates. That split is the one thing
+    -- this builder did NOT reproduce from `tools/studio/buildHanabiyaChochin.luau`: it copied the
+    -- lantern's geometry at full fidelity and left the rig behind, so every builder-made shop
+    -- lantern hung dead while the hanabiya's Studio-built pair swung. Owner ruling 2026-09-06:
+    -- all machiya chōchin swing.
     local kids: { any } = {}
+    local swinging: { any } = {}
 
-    -- the eye under the eave the ring hangs from
+    -- the eye under the eave the ring hangs from — STATIC, the one piece that does not swing
     table.insert(
         kids,
         Spec.part("Hook", {
@@ -120,7 +128,7 @@ function Chochin.build(name: string, x: number, z: number, armY: number, paperRG
             { ringCenter[1] + ringR * math.sin(a1), ringCenter[2] + ringR * math.cos(a1), ringCenter[3] }
         local pos, len, rot = Spec.segment(p0, p1)
         table.insert(
-            kids,
+            swinging,
             Spec.part("LoopSeg_" .. i, {
                 Shape = "Cylinder",
                 Size = { len + 0.02, 2 * tubeR, 2 * tubeR },
@@ -146,7 +154,7 @@ function Chochin.build(name: string, x: number, z: number, armY: number, paperRG
         local f = math.clamp(1 - 0.22 * d - (if tt > 0.5 then 0.15 * (2 * tt - 1) else 0), 0.4, 1)
         local isBody = i == Chochin.CENTER_IDX
         table.insert(
-            kids,
+            swinging,
             Spec.part(if isBody then "ChochinBody" else `Slice_{i}`, {
                 Shape = "Cylinder",
                 Size = { bodyH / Chochin.N * 1.15, 2 * r, 2 * r },
@@ -181,7 +189,7 @@ function Chochin.build(name: string, x: number, z: number, armY: number, paperRG
         local tt = (j - 0.5) / Chochin.RIBS
         local r = profile(tt) + 0.05 * LS
         table.insert(
-            kids,
+            swinging,
             Spec.part(`Rib_{j}`, {
                 Shape = "Cylinder",
                 Size = { 0.035 * LS, 2 * r, 2 * r },
@@ -199,7 +207,7 @@ function Chochin.build(name: string, x: number, z: number, armY: number, paperRG
     -- top and bottom caps
     for _, cap in { { "CapTop", bodyH / 2 }, { "CapBottom", -bodyH / 2 } } do
         table.insert(
-            kids,
+            swinging,
             Spec.part(cap[1] :: string, {
                 Shape = "Cylinder",
                 Size = { 0.26 * LS, 0.66 * LS, 0.66 * LS },
@@ -219,7 +227,7 @@ function Chochin.build(name: string, x: number, z: number, armY: number, paperRG
     -- from the plate at PixelsPerStud and fills 0.7 of it.
     for _, pl in { { "GlyphPlateA", -1, 90 }, { "GlyphPlateB", 1, -90 } } do
         table.insert(
-            kids,
+            swinging,
             Spec.part(pl[1] :: string, {
                 Size = { 1.2 * LS, 1.6 * LS, 0.05 },
                 CFrame = Spec.cframe(
@@ -236,6 +244,16 @@ function Chochin.build(name: string, x: number, z: number, armY: number, paperRG
         )
     end
 
+    -- The pivot is the HANG POINT (the ring's seat on the hook), not the bounding-box centre a
+    -- Model defaults to -- a lantern turned about its own middle swings from its waist. armY is
+    -- that point by construction: the hook's underside, where `Chochin.hemY` measures down from.
+    table.insert(
+        kids,
+        Spec.model("Swing", swinging, {
+            WorldPivot = Spec.cframe({ x, armY, z }),
+            Tags = { "ChochinSwing" },
+        })
+    )
     return Spec.model(`Chochin{name}`, kids)
 end
 

@@ -67,8 +67,12 @@ function Spec.perch(kind: string, offset: { number }): PartSpec
     }
 end
 
-function Spec.model(name: string, children: { PartSpec }): PartSpec
-    return { name = name, className = "Model", properties = {}, children = children }
+-- `props` is optional and exists for models that must carry state of their own — `Tags` for a
+-- CollectionService tag (the same key `Spec.perch` uses), and `WorldPivot` for anything a runtime
+-- controller rotates, since a Model with no explicit pivot pivots about its bounding-box centre.
+-- A hanging lantern turned about its centre swings from its own middle instead of its hook.
+function Spec.model(name: string, children: { PartSpec }, props: { [string]: any }?): PartSpec
+    return { name = name, className = "Model", properties = props or {}, children = children }
 end
 
 -- A cylinder (long axis = local X) spanning points a→b: returns midpoint pos,

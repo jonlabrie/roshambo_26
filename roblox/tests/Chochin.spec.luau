@@ -84,19 +84,32 @@ end)
 describe("Chochin.build — full-fidelity geometry", function()
     local m = Chochin.build("Test", 10, 20, 130)
 
+    -- Recursive for the same reason `find` is: the barrel, ribs and ring hang inside `Swing`.
     local function countPrefix(node, prefix)
         local n = 0
         for _, c in node.children do
             if (c.name :: string):sub(1, #prefix) == prefix then
                 n += 1
             end
+            if c.children then
+                n += countPrefix(c, prefix)
+            end
         end
         return n
     end
+    -- RECURSIVE, because the hanging pieces now live inside the `Swing` sub-model that
+    -- ChochinSway animates; only the Hook stays a direct child. Searching the whole subtree keeps
+    -- every assertion below about the LANTERN rather than about where the rig happens to nest it.
     local function find(node, name)
         for _, c in node.children do
             if c.name == name then
                 return c
+            end
+            if c.children then
+                local hit = find(c, name)
+                if hit then
+                    return hit
+                end
             end
         end
         return nil
@@ -104,6 +117,25 @@ describe("Chochin.build — full-fidelity geometry", function()
 
     test("model is named Chochin<suffix>", function()
         expect(m.name).toBe("ChochinTest")
+    end)
+    test("everything that hangs is inside a tagged Swing sub-model; only the Hook is not", function()
+        -- The rig ChochinSway drives. Before 2026-09-06 this builder emitted the lantern flat, so
+        -- shop lanterns hung dead while the hanabiya's Studio-built pair (which HAS this rig)
+        -- swung -- the whole reason for this structure.
+        local names = {}
+        for _, c in m.children do
+            names[c.name] = c
+        end
+        expect(names.Hook ~= nil).toBe(true)
+        expect(names.Swing ~= nil).toBe(true)
+        expect(#m.children).toBe(2)
+        expect(names.Swing.className).toBe("Model")
+        expect(names.Swing.properties.Tags).toEqual({ "ChochinSwing" })
+        -- pivot at the HANG POINT (armY), not the bounding-box centre a Model would default to:
+        -- a lantern turned about its middle swings from its waist.
+        expect(names.Swing.properties.WorldPivot[2]).toBeCloseTo(130, 1e-6)
+        expect(names.Swing.properties.WorldPivot[1]).toBeCloseTo(10, 1e-6)
+        expect(names.Swing.properties.WorldPivot[3]).toBeCloseTo(20, 1e-6)
     end)
     test("18 paper-barrel slices: 17 Slice_ parts + 1 ChochinBody", function()
         expect(countPrefix(m, "Slice_")).toBe(Chochin.N - 1)
@@ -156,10 +188,19 @@ describe("Chochin.hemY", function()
 end)
 
 describe("Chochin.build — per-shop paper tint", function()
+    -- RECURSIVE, because the hanging pieces now live inside the `Swing` sub-model that
+    -- ChochinSway animates; only the Hook stays a direct child. Searching the whole subtree keeps
+    -- every assertion below about the LANTERN rather than about where the rig happens to nest it.
     local function find(node, name)
         for _, c in node.children do
             if c.name == name then
                 return c
+            end
+            if c.children then
+                local hit = find(c, name)
+                if hit then
+                    return hit
+                end
             end
         end
         return nil

@@ -28,6 +28,14 @@ MachiyaShops.hanabiya = {
     yaw = 0,
     frontage = "open",
     interior = "full",
+    -- ⚠ 花火屋 STILL PASSES NO IDENTITY, and the owner's 2026-09-06 ruling to give it builder
+    -- lanterns is BLOCKED on a clearance decision, not on the code. Measured: builder-placed
+    -- chōchin at this shop's eave corners hang to y 118.49 where the promenade rule requires
+    -- FLOOR + 6.4 = 119.50 -- about a stud into avatar headroom, and tests/Machiya.spec's
+    -- "nothing stands on the ground inside the promenade" refuses it. Its existing place-only pair
+    -- hangs at ~118.93 and breaks the same rule; being place-only, it was simply never tested.
+    -- So this shop's eave sits lower than the row's and its lanterns have always hung low.
+    -- Resolve the hang height first; the one-line opt-in is `identity = { chochin = true }`.
 } :: Shop
 
 -- ===== 2026-08-15 survey — merchant row =====
