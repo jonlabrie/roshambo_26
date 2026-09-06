@@ -9,6 +9,7 @@ import { requireApiKey } from '../middleware/apiKey';
 import { resolveUser } from '../identity';
 import { bankPot } from '../wallet';
 import User, { IUser } from '../models/User';
+import PowderGrant from '../models/PowderGrant';
 import { Throw } from '../engine/GameRules';
 import { topByCareer } from '../leaderboards';
 import { reconcilePresence } from '../sessions';
@@ -409,6 +410,32 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             );
             if (!updated) { res.status(409).json({ error: 'INSUFFICIENT_POINTS', held: user.totalPoints }); return; }
             res.json({ powder: updated.powder, totalPoints: updated.totalPoints });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
+    // EXTERNAL GRANTS (Robux via ProcessReceipt, gifts, ops). Idempotent by receiptId: the grant
+    // row is inserted first behind a unique index, so a replay or a race credits at most once.
+    router.post('/players/:robloxUserId/powder/grant', async (req, res) => {
+        try {
+            const { amount, receiptId, source } = req.body ?? {};
+            if (!Number.isInteger(amount) || amount <= 0) { res.status(400).json({ error: 'BAD_AMOUNT' }); return; }
+            if (typeof receiptId !== 'string' || receiptId.length === 0 || receiptId.length > 128) { res.status(400).json({ error: 'BAD_RECEIPT' }); return; }
+            if (!['robux', 'gift', 'ops'].includes(source)) { res.status(400).json({ error: 'BAD_SOURCE' }); return; }
+            const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
+            if (!user) { res.status(404).json({ error: 'RESOLVE_FAILED' }); return; }
+            try {
+                await PowderGrant.create({ receiptId, userId: user._id, amount, source });
+            } catch (err) {
+                if ((err as { code?: number }).code === 11000) {
+                    res.json({ powder: user.powder ?? 0, credited: 0, duplicate: true });
+                    return;
+                }
+                throw err;
+            }
+            const updated = await User.findByIdAndUpdate(user._id, { $inc: { powder: amount } }, { new: true });
+            res.json({ powder: updated?.powder ?? 0, credited: amount, duplicate: false });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
         }

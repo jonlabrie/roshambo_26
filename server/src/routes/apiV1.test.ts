@@ -5,6 +5,7 @@ import { connectTestDb, clearTestDb, disconnectTestDb } from '../test/db';
 import User from '../models/User';
 import PlayerRound from '../models/PlayerRound';
 import Session from '../models/Session';
+import PowderGrant from '../models/PowderGrant';
 import { RoundEngine } from '../engine/RoundEngine';
 import { ResultsStore } from '../engine/ResultsStore';
 import { settleRound } from '../engine/Settlement';
@@ -31,7 +32,7 @@ function makeEngine(overrides: Partial<ConstructorParameters<typeof RoundEngine>
 }
 
 describe('/api/v1', () => {
-    beforeAll(async () => { process.env.API_KEY = API_KEY; await connectTestDb(); });
+    beforeAll(async () => { process.env.API_KEY = API_KEY; await connectTestDb(); await PowderGrant.syncIndexes(); });
     afterAll(disconnectTestDb);
     beforeEach(clearTestDb);
 
@@ -1077,6 +1078,36 @@ describe('/api/v1', () => {
                 expect([a.status, b.status].sort()).toEqual([200, 409]);
                 const after = await User.findOne({ robloxId: '926' });
                 expect([after!.fireworks.get('wa'), after!.powder]).toEqual([0, 5]); // wa is 5
+            });
+        });
+        describe('powder/grant — the external seam, idempotent by receipt', () => {
+            it('credits once and replays as a no-op', async () => {
+                await User.create({ robloxId: '930' });
+                const app = makeApp(makeEngine(), new ResultsStore());
+                const body = { amount: 25, receiptId: 'rcpt-abc', source: 'robux' };
+                const first = await request(app).post('/api/v1/players/930/powder/grant').set('X-API-Key', API_KEY).send(body).expect(200);
+                expect(first.body).toEqual({ powder: 25, credited: 25, duplicate: false });
+                const again = await request(app).post('/api/v1/players/930/powder/grant').set('X-API-Key', API_KEY).send(body).expect(200);
+                expect(again.body).toEqual({ powder: 25, credited: 0, duplicate: true });
+                expect((await User.findOne({ robloxId: '930' }))!.powder).toBe(25);
+                expect(await PowderGrant.countDocuments({ receiptId: 'rcpt-abc' })).toBe(1);
+            });
+            it('refuses bad amounts, receipts and sources without writing', async () => {
+                await User.create({ robloxId: '931' });
+                const app = makeApp(makeEngine(), new ResultsStore());
+                const post = (b: object) => request(app).post('/api/v1/players/931/powder/grant').set('X-API-Key', API_KEY).send(b);
+                expect((await post({ amount: 0, receiptId: 'r', source: 'robux' }).expect(400)).body.error).toBe('BAD_AMOUNT');
+                expect((await post({ amount: 5, receiptId: '', source: 'robux' }).expect(400)).body.error).toBe('BAD_RECEIPT');
+                expect((await post({ amount: 5, receiptId: 'r', source: 'points' }).expect(400)).body.error).toBe('BAD_SOURCE');
+                expect((await User.findOne({ robloxId: '931' }))!.powder).toBe(0);
+                expect(await PowderGrant.countDocuments()).toBe(0);
+            });
+            it('two concurrent grants with one receipt credit exactly once', async () => {
+                await User.create({ robloxId: '932' });
+                const app = makeApp(makeEngine(), new ResultsStore());
+                const body = { amount: 7, receiptId: 'rcpt-race', source: 'robux' };
+                await Promise.all([1, 2, 3].map(() => request(app).post('/api/v1/players/932/powder/grant').set('X-API-Key', API_KEY).send(body)));
+                expect((await User.findOne({ robloxId: '932' }))!.powder).toBe(7);
             });
         });
         describe('POST /players/:id/shows/reserve — a show debits everything up front, or nothing', () => {
