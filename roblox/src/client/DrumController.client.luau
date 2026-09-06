@@ -36,17 +36,16 @@ do
     end
 end
 
--- Capture each facet's offset from the hub so we can re-place it under any hub rotation.
--- Only the 12 facets spin (the shade posts/cap/base/lamp are static). The DAY glyph is a
--- SurfaceGui parented to each facet (rides along automatically). The NIGHT glyph is separate Neon
--- geometry (a SurfaceGui can't bloom) — those parts are captured into the spin set below so they
--- ride the drum the same way the facets do. Both crossfade with nightFactor (GlyphDayNight).
+-- Collect the parts that turn with the hub. Only the 12 facets spin (the shade posts/cap/base/lamp
+-- are static). The DAY glyph is a SurfaceGui parented to each facet (rides along automatically).
+-- The NIGHT glyph is separate Neon geometry (a SurfaceGui can't bloom) — those parts join the spin
+-- set so they ride the drum the same way the facets do. Both crossfade with nightFactor
+-- (GlyphDayNight). Only the ROOT's offset is captured: the set is welded below, so the rest follow
+-- it rather than being placed individually.
 local spinParts: { BasePart } = {}
-local spinOffsets: { CFrame } = {}
 for k = 0, FACES - 1 do
     local face = rig:WaitForChild("Face" .. k) :: BasePart
     table.insert(spinParts, face)
-    table.insert(spinOffsets, hub:ToObjectSpace(face.CFrame))
     -- DAY: the approved gilt-gold glyph on the facet's outward (Front, -Z) side. Match the canvas
     -- aspect to the facet (a 4:5 panel) so the ○ ring stays round rather than stretched to an oval.
     local fs = face.Size -- {faceW, h, thickness}
@@ -62,8 +61,43 @@ for k = 0, FACES - 1 do
     -- the drum (parenting to the anchored face alone would NOT carry it under our CFrame-driven spin).
     for _, np in Glyphs.buildNightNeon(face, SYMBOL_FOR_FACE[k]) do
         table.insert(spinParts, np)
-        table.insert(spinOffsets, hub:ToObjectSpace(np.CFrame))
     end
+end
+
+-- WELD THE SPIN SET INTO ONE ASSEMBLY (2026-09-06). Every member is placed by the SAME transform
+-- (`spun * offset`, one hub rotation about local Y), so the 12 facets and their 12 night glyphs are
+-- one rigid body by construction -- the drum turns, nothing inside it moves relative to anything
+-- else. Welded, `applyTheta` writes ONE CFrame per frame instead of 24.
+--
+-- ⚠ CHILDREN MUST BE UNANCHORED, and WELD FIRST / UNANCHOR SECOND, per part (see AssemblyWeld and
+-- [[misc-engine-traps]]): two anchored parts welded stay two independent anchored roots and the
+-- weld buys nothing, while the reverse order would leave a loose board mid-air if a weld failed.
+-- An anchored root carrying unanchored parts is a single ANCHORED assembly -- not simulated, not
+-- replicated as motion -- which is what makes it safe under a client-side animation.
+--
+-- ⚠ AND THIS ONE IS DELIBERATELY CLIENT-SIDE, against the server-side rule the other welds follow.
+-- Half the set does not exist on the server: `Glyphs.buildNightNeon` builds the 12 GlyphNight
+-- MeshParts HERE, at runtime, because Rojo cannot load mesh geometry from a MeshId in a
+-- `.model.json` ([[rojo-meshpart-rbxm]]) and ThrowDrum is generator output. Welding on the client
+-- is safe here only because ThrowDrum is a direct-child Model of RoshamboStage and so is marked
+-- ModelStreamingMode.Persistent by main.server.luau: its parts are always replicated, in full,
+-- rather than arriving piecemeal the way the ChochinSway registration race assumed they had.
+local spinRoot = spinParts[1]
+local spinRootOffset = hub:ToObjectSpace(spinRoot.CFrame)
+do
+    local bound = 0
+    for _, p in spinParts do
+        if p ~= spinRoot then
+            local weld = Instance.new("WeldConstraint")
+            weld.Part0 = spinRoot
+            weld.Part1 = p
+            weld.Parent = spinRoot
+            p.Anchored = false
+            bound += 1
+        end
+    end
+    spinRoot.Anchored = true
+    print(`[DRUM] welded {bound} parts into the spin assembly (root {spinRoot.Name})`)
 end
 
 -- MOTION (strike-keyed), preserved from the hex drum but on the VERTICAL axis.
@@ -131,11 +165,10 @@ local function applyKick(angle: number)
     end
 end
 
+-- ONE write: the spin set is a welded assembly, so placing its root places all 24 parts.
 local function applyTheta()
     local spun = hub * CFrame.Angles(0, theta, 0) -- LOCAL Y is the spin axis
-    for i, p in spinParts do
-        p.CFrame = spun * spinOffsets[i]
-    end
+    spinRoot.CFrame = spun * spinRootOffset
 end
 
 -- Resting θ showing `throw` at the −Z window, at least `dmin` below current θ (keeps the
