@@ -161,6 +161,12 @@ record them here; until then, any claim about this place's streaming radii is a 
   ("DevMarker")`, both empty). The River/T07Spur/Bridge* markers noted earlier are
   gone; the remaining `Bridge*`-marker thread on [[backlog]] (canyon path railings
   item) is resolved by their absence, not by a bake.
+- ⚠ **UNSAVED PLACE EDIT (2026-09-06): `CanyonWorld.Structures.Chochin_Hanabiya` was retired**
+  to `ServerStorage.RetiredPlaceOnly.Chochin_Hanabiya_RETIRED_2026_09_06` (4 sub-models, 106
+  parts), because 花火屋 now emits its own lanterns from the builder like every other shop —
+  leaving both would hang two lanterns in each corner. Parked, not deleted, same convention as
+  `RetiredLegacyTeahouses`. **The place must be SAVED for this to persist, and Rojo synced for
+  the builder pair to appear**; until both happen the shop's corners are bare in Edit.
 - The place-only `UguisuScheduler` Script has an out-of-place backup at
   `~/Desktop/Roshambo Reference/sound/UguisuScheduler.server.luau`; several audio
   masters and Blender sources live under `~/Desktop/Roshambo Reference/` — outside

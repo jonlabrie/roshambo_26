@@ -4005,3 +4005,35 @@ the branch tip ran green — server 647 passed + 1 skipped (`cd server && npm te
 `POWDER_INELIGIBLE` branch, unreachable while `powderIneligible` is empty) and Luau 1894
 (`cd roblox && lune run tests/run`) — re-run rather than quoting these. Dev needs a
 `start-deployment` to pick this up (auto-deploy is off). Still on `thread/powder`, NOT merged.
+
+## [2026-09-06] shipped | Every machiya chōchin swings, moves inward, and 花火屋 joins the builder
+
+Three owner rulings in one pass, after the owner asked why only the hanabiya lanterns animated.
+
+**The builder emitted the look and not the rig.** `tools/builders/Chochin.luau` was ported from
+`tools/studio/buildHanabiyaChochin.luau` "at full fidelity" and reproduced the lantern's geometry
+while silently dropping its `Swing` sub-model and `ChochinSwing` tag — so every builder-made shop
+lantern hung dead while 花火屋's older Studio-built pair swung. That is the whole reason for the
+difference. Fixed: the hanging pieces go into a tagged `Swing`; only the Hook stays fixed to the
+building. `Spec.model` now takes optional properties so that sub-model can carry the tag AND a
+`WorldPivot` — a Model without one pivots about its bounding-box centre, and a lantern turned
+about its middle swings from its waist.
+
+**Half a stud inward** (owner): adjacent shops sit 1.5 studs apart across the roji, so lanterns on
+two DIFFERENT buildings hung closer together than either sat from its own corner. The X inset is
+now its own constant — widening `CORNER_INSET` would also have dragged every lantern backwards
+under its eave, which is a depth, not a width.
+
+⚠ **THE CLEARANCE FINDING, which is the durable part.** Switching 花火屋 on made
+`tests/Machiya.spec`'s promenade rule fail, and the first read was "the hanabiya hangs low". It
+does not — measured, **apparel, accessories and stats all hang their hems 5.39 studs above their
+floors, the identical figure**, 1.01 short of the 6.4 avatar clearance. The whole row has SHIPPED
+that way. It was invisible because that describe block builds 花火屋, the one shop that had no
+lanterns to test. And it cannot be raised: the eave underside is ~8.4 studs up and the lantern
+~2.8 long, so clearing 6.4 needs the hook above its own eave; sliding back under the eave buys
+0.43, the eave's entire tilt. Owner ruling: exempt corner chōchin, which only makes explicit a
+ruling already recorded in `Machiya.luau`'s own assert ("it's okay if they're low", hem floor 5.0).
+**A test that fires on one shop is not a test of the row** — three shops carried this for weeks.
+
+**花火屋's place-only pair retired** to `ServerStorage.RetiredPlaceOnly` (parked, not deleted).
+⚠ That edit is UNSAVED — see the [[place-state]] caution.
