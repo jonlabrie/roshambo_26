@@ -1921,20 +1921,41 @@ if Launch.FireworkShowsModule == nil or Launch.RequestProvingShow == nil then
     )
 else
     Launch.FireworkShows = require(Launch.FireworkShowsModule)
-    Launch.RequestProvingShow.OnServerEvent:Connect(function(_player, name)
-        if not RunService:IsStudio() then
-            return -- the same gate as RequestProvingFire: a published client's request dies here
-        end
+    -- ONE draft player for two doors. `byLabel` names the door in the broadcast's `by` field so a
+    -- client (and the log) can tell a Studio play from a console play.
+    Launch.playDraft = function(name: any, byLabel: string)
         if typeof(name) ~= "string" then
             return
         end
         local draft = Launch.FireworkShows.DRAFTS[name]
         if draft == nil then
+            warn(`[PROVING] no draft named "{name}" (have: {table.concat(Launch.FireworkShows.ORDER, ", ")})`)
             return
         end
-        Launch.playShow("proving", "proving", "proving", draft.cues, function(c: ShowCue)
+        Launch.playShow("proving", byLabel, byLabel, draft.cues, function(c: ShowCue)
             return Launch.provingOriginFor(c.slot)
-        end, `proving:{name}`)
+        end, `{byLabel}:{name}`)
+    end
+    -- Door 1: the Studio-only panel verb (unchanged gate).
+    Launch.RequestProvingShow.OnServerEvent:Connect(function(_player, name)
+        if not RunService:IsStudio() then
+            return -- the same gate as RequestProvingFire: a published client's request dies here
+        end
+        Launch.playDraft(name, "proving")
+    end)
+    -- Door 2: THE PUBLISHED-PLACE TRIGGER (owner, 2026-09-06), so the A13 gate can run at all: a
+    -- phone can only join the published place, where the panel does not exist. A BindableEvent in
+    -- ServerStorage can be fired only by SERVER code, and the only way to run server code in a
+    -- live place is the Developer Console's server command bar, which Roblox grants to
+    -- edit-permission holders. So reachability is "can edit the experience" -- Roblox's own
+    -- permission model, not a userId list (the 2026-09-01 "nothing allowlisted" ruling stands).
+    -- Usage, from the console's Server tab:
+    --   game:GetService("ServerStorage").PlayProvingShow:Fire("finale_v1")
+    Launch.PlayProvingShow = Instance.new("BindableEvent")
+    Launch.PlayProvingShow.Name = "PlayProvingShow"
+    Launch.PlayProvingShow.Parent = game:GetService("ServerStorage")
+    Launch.PlayProvingShow.Event:Connect(function(name)
+        Launch.playDraft(name, "console")
     end)
 end
 
