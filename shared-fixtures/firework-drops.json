@@ -1,0 +1,19 @@
+{
+    "comment": "What a WIN drops, keyed to the streak AFTER the win (spec 2026-09-05 §7 'Drops by streak tier'). Awarded on the WIN event so it is neutral to Bank vs Stake. Drops are ITEMS, never powder amounts. Every shell here must be in firework-shells.json and must NOT be in its powderIneligible list (a drop you cannot fire yet must at least melt). server/src/drops.ts's DROP_TABLE is asserted equal to this.",
+    "default": "firecracker",
+    "tiers": { "3": "peony", "5": "wa" },
+    "ticketAtStreak": 6,
+    "cases": [
+        { "streak": 1, "shellId": "firecracker", "ticket": false, "why": "first win of a run" },
+        { "streak": 2, "shellId": "firecracker", "ticket": false },
+        { "streak": 3, "shellId": "peony", "ticket": false, "why": "the first tier" },
+        { "streak": 4, "shellId": "firecracker", "ticket": false, "why": "between tiers falls back to the default" },
+        { "streak": 5, "shellId": "wa", "ticket": false },
+        { "streak": 6, "shellId": "firecracker", "ticket": true, "why": "the golden ticket, with the default shell beside it" },
+        { "streak": 7, "shellId": "firecracker", "ticket": false, "why": "one ticket per crossing, not per round above it" },
+        { "streak": 12, "shellId": "firecracker", "ticket": false },
+        { "streak": 0, "shellId": "firecracker", "ticket": false, "why": "defensive: never called on a non-win, but must not throw" },
+        { "streak": -3, "shellId": "firecracker", "ticket": false },
+        { "streak": 2.5, "shellId": "firecracker", "ticket": false }
+    ]
+}
