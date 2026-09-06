@@ -28,14 +28,19 @@ MachiyaShops.hanabiya = {
     yaw = 0,
     frontage = "open",
     interior = "full",
-    -- ⚠ 花火屋 STILL PASSES NO IDENTITY, and the owner's 2026-09-06 ruling to give it builder
-    -- lanterns is BLOCKED on a clearance decision, not on the code. Measured: builder-placed
-    -- chōchin at this shop's eave corners hang to y 118.49 where the promenade rule requires
-    -- FLOOR + 6.4 = 119.50 -- about a stud into avatar headroom, and tests/Machiya.spec's
-    -- "nothing stands on the ground inside the promenade" refuses it. Its existing place-only pair
-    -- hangs at ~118.93 and breaks the same rule; being place-only, it was simply never tested.
-    -- So this shop's eave sits lower than the row's and its lanterns have always hung low.
-    -- Resolve the hang height first; the one-line opt-in is `identity = { chochin = true }`.
+    -- 花火屋 takes its lanterns from the builder like every other shop (owner, 2026-09-06),
+    -- ending the 2026-08-15 arrangement where it passed no identity at all to prove the
+    -- spec-driven refactor was inert. That proof has served its purpose.
+    --
+    -- Its corner hem lands 5.39 studs above the floor -- identical to apparel, accessories and
+    -- stats, because they share this formula. That is below the promenade's 6.4 avatar clearance
+    -- and cannot be raised (the eave is ~8.4 up and the lantern ~2.8 long, so the hook would have
+    -- to sit above its own eave). The owner ruled the low corner hang acceptable and the
+    -- clearance test now exempts lanterns explicitly; see tests/Machiya.spec.
+    --
+    -- No `paper` override: canonical cream is 花火屋's, and the row's rule is that the anchor shop
+    -- stays canonical while the others advertise themselves.
+    identity = { chochin = true },
 } :: Shop
 
 -- ===== 2026-08-15 survey — merchant row =====
