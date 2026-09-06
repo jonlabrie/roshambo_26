@@ -1703,6 +1703,15 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
             local hemY = Chochin.hemY(armY)
             assert(hemY - FLOOR >= 5.0, `chōchin hem {hemY} sits under 5 studs off the floor`)
             local eaveHalfX = (W + 1.0) / 2 -- the Eave part's own extents, not the wall's
+            -- ⚠ THE X INSET IS ITS OWN NUMBER, deliberately larger than the Z one. CORNER_INSET
+            -- sets how far back under the eave a lantern hangs (a depth); this sets how far in
+            -- from the eave's END it sits (a width), and the owner widened it half a stud on
+            -- 2026-09-06 for a reason the depth does not share: adjacent shops sit only 1.5 studs
+            -- apart across the roji, so two lanterns on two DIFFERENT buildings were hanging
+            -- closer to each other than either sat from its own corner. Half a stud each way puts
+            -- a stud of air between neighbours. Changing CORNER_INSET instead would have dragged
+            -- every lantern backwards under its eave as well, which is not what was asked.
+            local CORNER_INSET_X = CORNER_INSET + 0.5
             -- corners (stats, 2026-08-15): "west" | "east" hangs ONE lantern at that
             -- corner instead of the pair. The stats front's east corner sits on the 1.5
             -- roji, where a barrel would truly intersect apparel's own west lantern —
@@ -1713,7 +1722,7 @@ function Machiya.build(palette: any, _layout: any, shop: any): any
                 then identity.chochin.corners
                 else nil
             for _, corner in
-                { { "West", CX - eaveHalfX + CORNER_INSET }, { "East", CX + eaveHalfX - CORNER_INSET } }
+                { { "West", CX - eaveHalfX + CORNER_INSET_X }, { "East", CX + eaveHalfX - CORNER_INSET_X } }
             do
                 local cnm, lx = corner[1] :: string, corner[2] :: number
                 if corners == nil or string.lower(cnm) == corners then
