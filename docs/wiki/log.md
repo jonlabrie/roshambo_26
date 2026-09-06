@@ -4065,18 +4065,19 @@ across the arena, with the fixes shipped today:
 | Chōchin (each) | ~58 | ~58 | **1** (`7703ddf`) |
 | Shu-moku fittings | 12 | 12 | **0** — ride the log's own write (`4e24b71`) |
 | **BellDrive gears** | 94 | **57** (Cam ×38 + Jack ×19) | not done |
-| **ThrowDrum** | 84 + 12 runtime | **24** (12 facets + 12 neon) | not done |
+| **ThrowDrum** | 84 + 12 runtime | **24** (12 facets + 12 neon) | **1** (`ea41af9`) |
 | BonshoRig chains | 4 | 4 | correctly excluded — they RESIZE |
 | Shoro | 105 | 0 | static; it is the TOWER, not the log |
 
-**Two remain, and both are ready.** The **gears** are the bigger win and the same server-side
-`AssemblyWeld` pattern: every cam part pivots about an axle shared in Y and Z, each at its own X
-station along an 11.8-stud shaft, so cam and jack are two rigid bodies — 57 writes become 2. It
-needs `HammerController`'s three spinner loops to write only a root, which is why it was not
-bundled with the shu-moku's simpler change. The **drum** is rigid too (every part takes
-`spun * offset` from one hub rotation) but its weld must be CLIENT-side: half its parts are the
-night-glyph Neon that `Glyphs.buildNightNeon` builds at runtime, which is why it reads 84 parts in
-Edit and 96 in Play.
+**Two remained; the drum is now done and only the gears are left.** The **gears** are the bigger
+win and the same server-side `AssemblyWeld` pattern: every cam part pivots about an axle shared in
+Y and Z, each at its own X station along an 11.8-stud shaft, so cam and jack are two rigid bodies —
+57 writes become 2. It needs `HammerController`'s three spinner loops to write only a root, which is
+why it was not bundled with the shu-moku's simpler change. ⚠ **It was attempted the same day and
+reverted** — see the parked entry below before touching it again. The **drum** was rigid too (every
+part takes `spun * offset` from one hub rotation) and shipped in `ea41af9`; its weld had to be
+CLIENT-side, because half its parts are the night-glyph Neon that `Glyphs.buildNightNeon` builds at
+runtime, which is also why it reads 84 parts in Edit and 96 in Play.
 
 ⚠ **Terminology that cost a round trip: `Shoro` is the bell TOWER** (105 parts, all `Rafter*`,
 `Plinth*`, `Bracket*`) and is genuinely static. The striking log and its dress are `BonshoRig`.
@@ -4157,3 +4158,39 @@ double at the exact reach boundary, two tables allocated per reach check per tic
 Servers" test mode cannot stand in for a second account -- its Player1/Player2 carry
 negative UserIds, which the backend's digits-only player-id guard rejects with 400, and
 neither is the owner. Task 3 (StatsFeed) starts.
+
+## [2026-09-06] perf | The throw drum welded — and when a CLIENT-side weld is the right call
+
+Shipped `ea41af9`: the mawari-dōrō's spin set (12 facets + 12 night glyphs) is one welded assembly
+driven from `Face0`, so `DrumController`'s `applyTheta` writes **1 CFrame a frame instead of 24**.
+That closes the arena's weld survey except for the BellDrive gears.
+
+**The rigidity claim, and why it was safe to trust here.** Every member was already placed by the
+SAME expression — `spun * offset`, one hub rotation about local Y — in one loop, in one file, with
+nothing else in the codebase writing those parts. That is the definition of a rigid body, and it is
+exactly what the gears could NOT claim: there, three spinner lists were built by name-matching and
+a part could land in two of them. **The check that distinguishes the two cases: is the set built
+in one place from one rule, or assembled by pattern-matching names?** The second kind needs its
+membership read at runtime before anyone welds it.
+
+⚠ **This weld is CLIENT-side, breaking the server-side rule the other four follow, and the
+exception is narrow enough to state as a test.** Half the set does not exist on the server:
+`Glyphs.buildNightNeon` builds the 12 `GlyphNight` MeshParts at runtime because **Rojo cannot load
+mesh geometry from a `MeshId` in a `.model.json`** ([[rojo-meshpart-rbxm]]) and `ThrowDrum` is
+generator output — so a server weld could never include them. A client weld is only safe when the
+model's parts cannot arrive piecemeal, and here they cannot: `ThrowDrum` is a direct-child Model of
+`RoshamboStage`, which `main.server.luau` marks `ModelStreamingMode.Persistent` via
+[[StagePersistence]]. **Before welding on a client, confirm that Persistent mark** — without it this
+is the ChochinSway registration race again, binding whatever had streamed in and tearing the rest.
+
+**How to verify a weld, rather than trusting it** (this is the method; the numbers below are just
+one run of it). In Play, not Edit: capture each welded part's pose relative to the root
+(`root.CFrame:ToObjectSpace(p.CFrame)`), then sample that same quantity for a minute or more and
+take the maximum deviation from baseline. A rigid assembly holds it near float noise; an assembly
+being pulled apart does not. **Sample THROUGH the animation, not at rest** — track how far the root
+has travelled and refuse to believe a drift number taken while nothing moved. The drum: 723 samples
+over 80 s, drift **0.000003** studs, root travel 21.12 studs, so a real strike and spin are inside
+the window. Compare the reverted jack's **0.113661**. Afterwards, re-measure the authored geometry
+as an independent check that the weld did not distort anything — the 12 facets came back at radius
+10.62518 with gaps of exactly 30.0000°, and the static hub part `Drum` was still anchored and
+unmoved.
