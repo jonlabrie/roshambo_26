@@ -850,7 +850,9 @@ array cannot grow without bound.
 ⚠ **A `credited` flag on the grant row is NOT the fix**, and it is the obvious wrong answer: a
 crash between the `$inc` and the flip double-credits on retry, and a crash inside the recovery
 loses the credit with nothing left to detect it. Transactions would also work on Atlas, but the
-suite's single-node in-memory server cannot run them, so that fix would ship untested.
+suite's single-node in-memory server cannot run them, so that fix would ship untested. The
+rework's retry on a matched-nothing update must answer GRANTED (the credit already landed) — the
+opposite of today's `duplicate: true` meaning on a lost credit; do not copy today's semantics.
 
 ## Fireworks combat — bottle-rocket wars (owner, 2026-09-05, side idea, own spec)
 

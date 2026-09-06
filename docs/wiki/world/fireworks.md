@@ -292,7 +292,8 @@ that burn.** Flows: `POST …/powder/topup` (points → powder, one way, positiv
 ineligible shells is `shared-fixtures/firework-shells.json` `powderIneligible`, EMPTY today);
 `POST …/powder/grant` (external: Robux receipts, gifts, ops — idempotent by `receiptId` via the
 `PowderGrant` collection); `shows/reserve` accepts `fuel: "powder"` (summed list price, one
-conditional update). Every move is a conditional `$inc`. `powder` rides on `/economy` and
+conditional update). Every move is a conditional `$inc`, or on the grant path a plain `$inc`
+guarded by the receipt row's unique index. `powder` rides on `/economy` and
 `/fireworks`; `ShellState` carries `powderEligible`.
 
 **Drops by streak tier** replace the flat firecracker-per-WIN: `shared-fixtures/firework-drops.json`
@@ -302,7 +303,10 @@ Awarded on the WIN event inside settlement's single atomic write, so neutral to 
 Tickets are minted by `$push` with a random UUID (`server/src/engine/Settlement.ts`), which is
 idempotent only because settlement has exactly one caller — if sub-project C ever re-settles a
 round it would mint twice, and a deterministic id `${roundId}:${userId}` with `$addToSet` closes
-that in one line.
+that in one line. ⚠ Until the Hanabiya melt verb ships, a tier drop REPLACES that round's
+firecracker, so a player without the matching mortar receives a shell they can neither fire nor
+melt (peony needs `mortar:S`, wa `mortar:M`); the melt verb closes the window — weigh it before
+the dev redeploy.
 
 **Not here:** the Hanabiya's melt UI (a client change once `main.server.luau` is split — the
 `NetworkClient` calls exist), ticket redemption/gifting/booking (C), Robux product ids.

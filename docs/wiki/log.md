@@ -4000,7 +4000,7 @@ Plan `docs/superpowers/plans/2026-09-06-powder-and-drops.md`. `powder` and `gold
 user; topup (one way), melt (list price, eligible only), external grant (idempotent by receipt),
 powder fuel on `shows/reserve`; drop table as a fixture contract replacing the flat firecracker
 grant inside settlement's one atomic write. Backend + two NetworkClient calls only — no
-`main.server.luau` change (the split is in flight); the shop's melt verb is banked. At plan time
+`main.server.luau` change (the split is in flight); the shop's melt verb is banked. At close
 the branch tip ran green — server 647 passed + 1 skipped (`cd server && npm test`; the skip is the
 `POWDER_INELIGIBLE` branch, unreachable while `powderIneligible` is empty) and Luau 1894
 (`cd roblox && lune run tests/run`) — re-run rather than quoting these. Dev needs a
