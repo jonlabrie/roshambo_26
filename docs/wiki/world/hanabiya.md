@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-09-05
+updated: 2026-09-06
 checked: 2026-08-26
 ---
 
@@ -63,3 +63,10 @@ three players plus a console) was built and gated 2026-09-06 per `docs/wiki/log.
 system's virtual sixth station and the future home of the MC console. As-built and design intent
 live on [[fireworks]] and on [[backlog]] § Rooftop MC experience; access (a hatch through the
 roof at the back-rail gap) is deliberately unbuilt so it can be gated.
+
+## Melting (backend only, 2026-09-06)
+
+The shop will melt held shells back to powder at list price — the backend route exists
+(`POST …/fireworks/melt`, [[fireworks]] § Powder and drops) and `NetworkClient.postFireworkMelt`
+calls it, but **the counter has no melt verb yet**: the client half waits for the
+`main.server.luau` split ([[backlog]] § Hanabiya melt verb).

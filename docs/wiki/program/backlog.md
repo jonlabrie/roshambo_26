@@ -1,7 +1,7 @@
 ---
 shelf: program
 status: open
-updated: 2026-09-05
+updated: 2026-09-06
 ---
 
 # Backlog
@@ -827,6 +827,30 @@ Sharpens the fireworks program's existing third step (range → vocabulary → *
 distribution): handhelds are what the CROWD expends while gathered for someone else's show —
 sparklers, whistlers, ground fireworks — cheap, plentiful, additive to a show rather than
 competing with it. Design them as audience participation, not as small shells.
+
+## Hanabiya melt verb (banked 2026-09-06, after the server-file split)
+
+Sub-project A shipped the backend (`fireworks/melt`) and `NetworkClient.postFireworkMelt`; the shop
+row's "Melt" button and its `RequestMelt` remote handler were deliberately NOT added because
+`main.server.luau` sits at the register ceiling and is being split. First client task after the
+split: a Melt affordance per held, powder-eligible shell in `ShopController`, and a handler on the
+extracted fireworks controller.
+
+## Powder grant must be exactly-once before ProcessReceipt calls it (found 2026-09-06)
+
+`POST …/powder/grant` is **at-most-once, not exactly-once** (`server/src/routes/apiV1.ts`): the
+`PowderGrant` row is inserted behind its unique index first, then the balance moves in a separate
+`$inc`. A crash between the two loses a paid credit permanently — the retry finds the row and is
+answered `duplicate`. Harmless today (nothing calls it), **blocking the moment `ProcessReceipt`
+does**, because by then it is a player's money.
+Fix: fold the receipt into the balance document so one document takes one atomic op —
+`User.updateOne({ _id, appliedReceipts: { $ne: receiptId } }, { $inc: { powder: amount }, $push: { appliedReceipts: receiptId } })`
+— with `PowderGrant` demoted to an audit row. Needs a cap or rotation on `appliedReceipts` so the
+array cannot grow without bound.
+⚠ **A `credited` flag on the grant row is NOT the fix**, and it is the obvious wrong answer: a
+crash between the `$inc` and the flip double-credits on retry, and a crash inside the recovery
+loses the credit with nothing left to detect it. Transactions would also work on Atlas, but the
+suite's single-node in-memory server cannot run them, so that fix would ship untested.
 
 ## Fireworks combat — bottle-rocket wars (owner, 2026-09-05, side idea, own spec)
 

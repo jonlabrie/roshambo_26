@@ -284,6 +284,29 @@ fix if it does. Park the bench per the standing rule. Result: **not yet run** �
 live fact, and the Studio-only proving verb remains the right tool for judging a show's SHAPE on
 the desktop before any of the above.
 
+## Powder and drops (sub-project A, built 2026-09-06)
+
+Spec §7; plan `docs/superpowers/plans/2026-09-06-powder-and-drops.md`. **Powder buys only things
+that burn.** Flows: `POST …/powder/topup` (points → powder, one way, positive integers only);
+`POST …/fireworks/melt` (shells → powder at list price, `powderEligible` shells only — the list of
+ineligible shells is `shared-fixtures/firework-shells.json` `powderIneligible`, EMPTY today);
+`POST …/powder/grant` (external: Robux receipts, gifts, ops — idempotent by `receiptId` via the
+`PowderGrant` collection); `shows/reserve` accepts `fuel: "powder"` (summed list price, one
+conditional update). Every move is a conditional `$inc`. `powder` rides on `/economy` and
+`/fireworks`; `ShellState` carries `powderEligible`.
+
+**Drops by streak tier** replace the flat firecracker-per-WIN: `shared-fixtures/firework-drops.json`
+(default `firecracker`, tiers at 3 → `peony`, 5 → `wa`, a golden ticket at 6 with the default shell
+beside it; one ticket per crossing) — starting values, re-read the fixture rather than this line.
+Awarded on the WIN event inside settlement's single atomic write, so neutral to Bank vs Stake.
+Tickets are minted by `$push` with a random UUID (`server/src/engine/Settlement.ts`), which is
+idempotent only because settlement has exactly one caller — if sub-project C ever re-settles a
+round it would mint twice, and a deterministic id `${roundId}:${userId}` with `$addToSet` closes
+that in one line.
+
+**Not here:** the Hanabiya's melt UI (a client change once `main.server.luau` is split — the
+`NetworkClient` calls exist), ticket redemption/gifting/booking (C), Robux product ids.
+
 ## Raw layer
 
 - ledger: `.superpowers/sdd/2026-08-05-fireworks-core/progress.md`; device floor

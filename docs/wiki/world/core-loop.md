@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-08-27
+updated: 2026-09-06
 ---
 
 # The Core Loop
@@ -84,7 +84,7 @@ playing, and never stakes what they already own.
 
 ## The economy, and which number means what
 
-Four fields that are easy to confuse, and picking the wrong one produces a wrong
+Five fields that are easy to confuse, and picking the wrong one produces a wrong
 leaderboard:
 
 - `pointsAtStake` — the live pot. Volatile; one LOSS away from zero.
@@ -93,6 +93,10 @@ leaderboard:
 - `lifetimeBanked` — **career earnings**, monotonic. Never decreases.
 - `bestPot` — the largest pot ever *reached*, kept via `$max`. Note it records what was
   reached, not what was kept.
+- `powder` — **the second economy, and not points** (spec 2026-09-05 §7, decision 10). Points and
+  Robux flow in, melted shells flow in, and only fireworks flow out. Never rank by it, never sum it
+  into earnings, never let a route move it to `totalPoints` or a durable. Golden tickets
+  (`goldenTickets[]`) are minted beside it by the drop table and belong to sub-project C.
 
 ⚠ **Do not rank players by `totalPoints`.** It is a wallet, so a player who spends on
 fireworks or a teahouse *falls down the board*. `lifetimeBanked` is the correct basis for
