@@ -4119,3 +4119,26 @@ loop in the arena after the waterwheel.
 
 **The reusable lesson**: a rigid-body claim derived from the pivot MATH still needs the MEMBERSHIP
 verified. The axes were right; the sets were not.
+
+## [2026-09-06] gate | GATE 1 (Remotes extraction) passed; the drum's between-windows rest was an honest miss on a Studio-side poll stall, not the split
+
+Owner walk: join, throw, bank, ledger, shoji, Hanabiya firecracker from the deck --
+"2 - 5 all work correctly"; Output showed the normal `[ROSHAMBO] playable loop starting`
+/ `[ROUND …]` lines and no `WaitForChild` warning. Registers 198 → 163 (net −35; the
+commit subject's "36" is off by one). Task 1 is `356f47d` on main.
+
+The owner also saw the throw drum "come to rest between two glyphs, which I've never
+seen before and should never happen." It is the `drumMiss` cue from `9f17c90`
+(2026-09-02, the "drum never lies" ruling): the bell strikes on the published schedule,
+and if no World Throw has reached the client 7s after the strike (1s spin + 6s
+`STALL_MAX`) the drum rests between windows rather than show a stale face. Evidence
+that it fired honestly: Studio's Output for round 148473 `6k39i8f` has an OPEN line and
+then nothing -- no LOCK, no REVEAL, no WORLD THROW -- straight to 148474 OPEN, with one
+`[FLUSH] 1 pick(s) whiffed: ROUND_MISMATCH` in between; the dev backend's CloudWatch
+`[CROWD]` lines for 148472/3/4 are 60.005s apart (14:03:05 / 14:04:05 / 14:05:05 PDT)
+and 6k39i8f saw 0 humans. So the backend was on time and the Roblox server's serial
+poll loop did not complete a poll for ~30s+ -- the shape of one `HttpService` request
+hanging to its 30s timeout and succeeding on retry, which logs nothing (see
+parked-defects (p)). Nothing in Task 1 touches RoundCoordinator, NetworkClient or the
+poll loop, and the RevealTheater payload is byte-identical. Recorded (p) the poll-loop
+hazard and (q) a latent stale-face window in the miss path. Task 2 starts.

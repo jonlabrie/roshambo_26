@@ -231,3 +231,46 @@ there, so defect (e) still stands on prod and is moot on dev._
 - **Fix sketch:** validate the path id once (digits-only, as Roblox ids are) in a tiny
   middleware or at each route's top, 400 on failure — mirroring the presence route's guard;
   or make resolveUser itself refuse non-numeric robloxUserIds.
+
+## (p) One hung HTTP request stalls the whole Roblox round loop -- picks whiff, the drum misses (observed 2026-09-06)
+
+- **Observed:** Studio Play, dev backend, 14:04 PDT, round 148473 `6k39i8f`: the
+  coordinator logged OPEN, then nothing until 148474 OPEN; one pick flushed
+  `ROUND_MISMATCH`; the drum rested between windows (`drumMiss`, working as designed).
+  The backend's `[CROWD]` lines for the three rounds are exactly 60s apart -- it was
+  healthy. See log 2026-09-06 gate entry.
+- **Mechanism (inferred, not proven):** `RoundCoordinator.pollOnce` is serial --
+  `getState` → flush → `_fetchRevealIfDue` -- and runs in one `task.spawn` loop
+  (`main.server.luau`, the `coordinator:pollOnce()` loop). `NetworkClient._request`
+  retries up to 3 attempts, and Roblox `HttpService:RequestAsync` has a fixed ~30s
+  timeout with no per-request override. A first attempt that hangs and a second that
+  answers produces NO log line (`[NET]`/`[RESULT]` log only after all attempts fail).
+  A hang on the lockout flush POST fits every symptom: ~30s blocked, retry answers 409
+  `ROUND_MISMATCH` (whiff), LOCK/REVEAL of that round never observed, result never
+  fetched, next poll sees the next round -- while the client's self-timed bell struck
+  on schedule and the drum stalled out honestly.
+- **Blast radius:** every player on that server misses the reveal and whiffs any
+  unflushed pick for the round; TEST_MODE places hide it less (the drum still misses).
+- **Candidate fixes (unranked):** log every retried attempt with its elapsed ms so the
+  next occurrence is measurable; move the result fetch and the flush onto their own
+  tasks so a hung POST cannot starve `getState`; bound a request with `task.delay` +
+  abandon (HttpService offers no timeout). Instrument first (memory: instrument before
+  the third ordering fix).
+- Not caused by the server-file split: Task 1 (`356f47d`) touches none of these files.
+
+## (q) DrumController: a World Throw that lands just after a miss is shown one round late (latent, found 2026-09-06)
+
+- `DrumController.client.luau`: `RevealTheater` sets `latestWorldThrow` unconditionally
+  and the drum consumes it at the NEXT strike. After a `drumMiss` (strike + 7.0s) the
+  coordinator can still deliver that round's payload until REVEAL ends plus poll latency
+  (≈ strike + 7.9s). A payload in that ~0.9s window sits in `latestWorldThrow`, the next
+  round's spin sees `haveThrow` at once and lands on the STALE face -- the exact "drum
+  lies" case the 2026-09-05 ruling deleted -- and the real payload then arrives during
+  the glide and waits for the round after; the `RoundUpdate` OPEN guard never clears it
+  because the drum is in `hold`.
+- **Fix shape:** carry `roundId` on the `RevealTheater` payload (the coordinator already
+  passes it to `onReveal`; `main.server.luau` drops it) and have the drum consume only
+  the payload whose round matches the strike it is spinning for; `TheaterController`
+  already models payload-before-strike, so the round tag is the honest key, not `mode`.
+  Small; the server side is a one-field change in the reveal callback -- do it after the
+  split lands rather than inside it.
