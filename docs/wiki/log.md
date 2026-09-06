@@ -4037,3 +4037,18 @@ ruling already recorded in `Machiya.luau`'s own assert ("it's okay if they're lo
 
 **花火屋's place-only pair retired** to `ServerStorage.RetiredPlaceOnly` (parked, not deleted).
 ⚠ That edit is UNSAVED — see the [[place-state]] caution.
+
+## [2026-09-06] verified | The chōchin pass is live in the place
+
+Owner saved and synced. Checked live rather than assumed: `Chochin_Hanabiya` is gone from
+`CanyonWorld.Structures` and parked in `ServerStorage.RetiredPlaceOnly`; the shops carry 2/2/2/1/1
+tagged `Swing` lanterns (hanabiya, apparel, accessories, stats, chaya — the last two singles by
+their `corners = "west"` opt-in across the roji).
+
+Workspace holds **46** `ChochinSwing` models against 40 before — 38 path lanterns still excluded
+from sway plus 8 builder ones — so the old pair left and eight arrived, with nothing duplicated.
+That arithmetic is the check worth keeping: a lantern pass that ADDS without removing shows up as
+a count, long before anyone notices two barrels in one corner.
+
+The swaying population went from 2 to 8, and all eight are welded assemblies ([[misc-engine-traps]]
+has the weld rule), so the per-frame cost is 8 writes rather than 8 × ~55 part transforms.
