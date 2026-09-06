@@ -3939,3 +3939,12 @@ build — the reserve route did not exist there yet. After the redeploy the rout
 behind the key. Note for sub-project C: the per-player handler queue drops a `RequestShowGo`
 while a previous one is in flight (three command-bar sends → one `[SHOW]` line); a Go button
 needs feedback, not a silent drop. The A13 gate remains not yet run.
+
+## [2026-09-06] decision | The A13 gate's door: a server-only PlayProvingShow BindableEvent, not an allowlist
+
+Owner: "sure, start on 1." The proving panel cannot be seen from a phone (Studio-only by the
+2026-09-01 ruling), so the published place needed a door the owner can open without a userId
+gate. `PlayProvingShow` (`ServerStorage`, created at boot) fires `Launch.playDraft` — the same
+player the panel uses — and is reachable only from server code, i.e. the Developer Console's
+server command bar for edit-permission holders. Cues carry `by = "console"`. Procedure on
+[[fireworks]]. Still owner-run, still post-publish; result not yet recorded.
