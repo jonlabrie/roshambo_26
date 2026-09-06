@@ -1,6 +1,6 @@
 ---
 shelf: world
-updated: 2026-09-05
+updated: 2026-09-06
 ---
 
 # Place State
@@ -86,8 +86,8 @@ Everything below marked *verified* was checked live via the Studio MCP on 2026-0
   **Chaya** ([[chaya]], saved 2026-08-17) — a new stage child needs a Rojo RESTART, not
   just a plugin reconnect, because `rojo serve` reads the project file once at startup.
 - `CanyonWorld`: Arena (incl. `W##_*_Rocks/_VFX`, `FallsLanding`), Paths
-  (`PathRailings` 5,186 descendants, `PathLanterns` 2,599), Structures (incl.
-  `Chochin_Hanabiya`), **Legacy (empty — the 14 legacy teahouses were retired to
+  (`PathRailings` 5,186 descendants, `PathLanterns` 2,599), Structures (⚠ `Chochin_Hanabiya`
+  retired 2026-09-06 — see the caution below), **Legacy (empty — the 14 legacy teahouses were retired to
   `ServerStorage.RetiredLegacyTeahouses`)**,
   Foliage (Heroes, Preserve, ShoreRocks, ArrangementsDraft ×22, EastBackdrop), Water
   (runs + `FallsAudio` with 17 emitters), Ambience (`Audio_Dock_Uguisu` +
