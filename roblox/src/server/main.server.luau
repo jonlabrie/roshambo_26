@@ -50,6 +50,7 @@ local RoundCoordinator = require(script.Parent:WaitForChild("RoundCoordinator"))
 local ThrowBuffer = require(script.Parent:WaitForChild("ThrowBuffer"))
 local HandlerQueue = require(script.Parent:WaitForChild("HandlerQueue"))
 local PortalController = require(script.Parent:WaitForChild("PortalController"))
+local Remotes = require(script.Parent:WaitForChild("Remotes"))
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local RoundClock = require(shared:WaitForChild("RoundClock"))
 local CollectionService = game:GetService("CollectionService")
@@ -72,43 +73,7 @@ local PortalTarget = require(shared:WaitForChild("PortalTarget"))
 local ShojiRun = require(shared:WaitForChild("ShojiRun"))
 
 local remotes = ReplicatedStorage:WaitForChild("RoshamboRemotes")
-local SubmitPick = remotes:WaitForChild("SubmitPick") :: RemoteEvent
-local BankRequest = remotes:WaitForChild("BankRequest") :: RemoteEvent
-local SetHudPreference = remotes:WaitForChild("SetHudPreference") :: RemoteEvent
-local RequestLedger = remotes:WaitForChild("RequestLedger") :: RemoteEvent
-local RoundUpdate = remotes:WaitForChild("RoundUpdate") :: RemoteEvent
-local RevealResult = remotes:WaitForChild("RevealResult") :: RemoteEvent
-local ProfileUpdate = remotes:WaitForChild("ProfileUpdate") :: RemoteEvent
-local RevealTheater = remotes:WaitForChild("RevealTheater") :: RemoteEvent
-local FateResolved = remotes:WaitForChild("FateResolved") :: RemoteEvent
-local BoardData = remotes:WaitForChild("BoardData") :: RemoteEvent
-local FamiliarRoster = remotes:WaitForChild("FamiliarRoster") :: RemoteEvent
-local SetPadPreference = remotes:WaitForChild("SetPadPreference") :: RemoteEvent
-local PreferenceState = remotes:WaitForChild("PreferenceState") :: RemoteEvent
-local SetBackDoor = remotes:WaitForChild("SetBackDoor") :: RemoteEvent
-local BackDoorState = remotes:WaitForChild("BackDoorState") :: RemoteEvent
-local SlideShoji = remotes:WaitForChild("SlideShoji") :: RemoteEvent
-local ShojiState = remotes:WaitForChild("ShojiState") :: RemoteEvent
-local RequestPurchase = remotes:WaitForChild("RequestPurchase") :: RemoteEvent
-local EconomyState = remotes:WaitForChild("EconomyState") :: RemoteEvent
-local RequestSync = remotes:WaitForChild("RequestSync") :: RemoteEvent
-local SetDisplay = remotes:WaitForChild("SetDisplay") :: RemoteEvent
-local SetPlacement = remotes:WaitForChild("SetPlacement") :: RemoteEvent
-local SetDecorationPlacement = remotes:WaitForChild("SetDecorationPlacement") :: RemoteEvent
-local SetMortarPlacement = remotes:WaitForChild("SetMortarPlacement") :: RemoteEvent
-local SetDecorationRemove = remotes:WaitForChild("SetDecorationRemove") :: RemoteEvent
-local DecorationPlaced = remotes:WaitForChild("DecorationPlaced") :: RemoteEvent
-local SetAccess = remotes:WaitForChild("SetAccess") :: RemoteEvent
-local InviteUser = remotes:WaitForChild("InviteUser") :: RemoteEvent
-local RevokeUser = remotes:WaitForChild("RevokeUser") :: RemoteEvent
-local AccessState = remotes:WaitForChild("AccessState") :: RemoteEvent
-local AccessBlocked = remotes:WaitForChild("AccessBlocked") :: RemoteEvent
-local RequestFireworkLaunch = remotes:WaitForChild("RequestFireworkLaunch") :: RemoteEvent
-local FireworkLaunched = remotes:WaitForChild("FireworkLaunched") :: RemoteEvent
-local FireworkState = remotes:WaitForChild("FireworkState") :: RemoteEvent
-local RequestProvingFire = remotes:WaitForChild("RequestProvingFire") :: RemoteEvent
-local StatsData = remotes:WaitForChild("StatsData") :: RemoteEvent
-local StatsPersonal = remotes:WaitForChild("StatsPersonal") :: RemoteEvent
+local R = Remotes.bind(remotes)
 local TextService = game:GetService("TextService")
 
 local secretsModule = script.Parent:FindFirstChild("SecretsLocal")
@@ -333,7 +298,7 @@ end
 local familiarRoster: { [string]: any } = {}
 
 local function pushFamiliarRoster()
-    FamiliarRoster:FireAllClients(familiarRoster)
+    R.FamiliarRoster:FireAllClients(familiarRoster)
 end
 
 local hudPrefs: { [string]: HudPrefs.Prefs } = {}
@@ -406,7 +371,7 @@ end
 local function fireProfile(player: Player, source: string)
     local row = profiles:get(tostring(player.UserId))
     if row then
-        ProfileUpdate:FireClient(player, {
+        R.ProfileUpdate:FireClient(player, {
             totalPoints = row.totalPoints,
             pointsAtStake = row.pointsAtStake,
             currentStreak = row.currentStreak,
@@ -481,7 +446,7 @@ local coordinator = RoundCoordinator.new({
     instanceId = if game.JobId ~= "" then game.JobId else "studio-local",
     callbacks = {
         onRound = function(info)
-            RoundUpdate:FireAllClients(info)
+            R.RoundUpdate:FireAllClients(info)
             if info.tape then
                 -- PUSH THE TAPE THE MOMENT A ROUND SETTLES. It used to ride only on the 60s
                 -- stats poll, which is exactly the round period -- so the poll aliased with the
@@ -495,7 +460,7 @@ local coordinator = RoundCoordinator.new({
                 lastTapeId = newest
                 if grew and lastStats then
                     lastStats.tape = lastTape
-                    StatsData:FireAllClients(lastStats)
+                    R.StatsData:FireAllClients(lastStats)
                 end
             end
         end,
@@ -508,7 +473,7 @@ local coordinator = RoundCoordinator.new({
         -- And it has to be SERVER-side: Humanoid scale replicates server->client only, so an
         -- avatar effect triggered on the client is visible to nobody but its owner.
         onReveal = function(reveal)
-            RevealTheater:FireAllClients({
+            R.RevealTheater:FireAllClients({
                 worldThrow = reveal.worldThrow,
                 distribution = reveal.distribution,
                 totalPlayers = reveal.totalPlayers,
@@ -518,7 +483,7 @@ local coordinator = RoundCoordinator.new({
             for _, player in Players:GetPlayers() do
                 local userId = tostring(player.UserId)
                 local mine = reveal.results[userId]
-                RevealResult:FireClient(player, {
+                R.RevealResult:FireClient(player, {
                     worldThrow = reveal.worldThrow,
                     distribution = reveal.distribution,
                     totalPlayers = reveal.totalPlayers,
@@ -668,7 +633,7 @@ for _, p in Players:GetPlayers() do
     task.spawn(onPlayerJoinProfile, p)
 end
 
-SubmitPick.OnServerEvent:Connect(function(player, throwValue)
+R.SubmitPick.OnServerEvent:Connect(function(player, throwValue)
     if type(throwValue) ~= "string" then
         return
     end
@@ -697,7 +662,7 @@ local handlerQueue = HandlerQueue.new(task.spawn)
 -- reading would cash out the player's whole pot on a garbled message. The server then validates
 -- the value against that player's own pot and answers 409 if it is not a rung, so nothing here
 -- has to know the ladder.
-BankRequest.OnServerEvent:Connect(function(player, rawKeep)
+R.BankRequest.OnServerEvent:Connect(function(player, rawKeep)
     local keep = GameRules.keepFromWire(rawKeep)
     if keep == nil then
         warn(`[Bank] refusing malformed keep from {player.UserId}: {tostring(rawKeep)}`)
@@ -756,7 +721,7 @@ end)
 local lastLedgerFetch: { [string]: number } = {}
 local LEDGER_FETCH_DEBOUNCE = 3
 
-RequestLedger.OnServerEvent:Connect(function(player)
+R.RequestLedger.OnServerEvent:Connect(function(player)
     local uid = tostring(player.UserId)
     local now = os.clock()
     if lastLedgerFetch[uid] ~= nil and now - lastLedgerFetch[uid] < LEDGER_FETCH_DEBOUNCE then
@@ -783,7 +748,7 @@ RequestLedger.OnServerEvent:Connect(function(player)
     end)
 end)
 
-SetHudPreference.OnServerEvent:Connect(function(player, body)
+R.SetHudPreference.OnServerEvent:Connect(function(player, body)
     if type(body) ~= "table" then
         return
     end
@@ -866,13 +831,13 @@ SetHudPreference.OnServerEvent:Connect(function(player, body)
     end)
 end)
 
-FateResolved.OnServerEvent:Connect(function(player, reason)
+R.FateResolved.OnServerEvent:Connect(function(player, reason)
     if reason ~= "caught" and reason ~= "accepted" then
         return
     end
     local userId = tostring(player.UserId)
     if fates:resolve(userId) then
-        FateResolved:FireAllClients(userId, reason)
+        R.FateResolved:FireAllClients(userId, reason)
     end
 end)
 
@@ -927,14 +892,14 @@ task.spawn(function()
             hotStreak = hotStreak,
             playersNow = (lastTape[1] and lastTape[1].totalPlayers) or 0,
         }
-        BoardData:FireAllClients(lastBoard)
+        R.BoardData:FireAllClients(lastBoard)
         task.wait(30)
     end
 end)
 
 local function onPlayerJoinBoard(player: Player)
     if lastBoard then
-        BoardData:FireClient(player, lastBoard) -- re-fire is an idempotent client update
+        R.BoardData:FireClient(player, lastBoard) -- re-fire is an idempotent client update
     end
 end
 Players.PlayerAdded:Connect(onPlayerJoinBoard)
@@ -1037,7 +1002,7 @@ task.spawn(function()
             depths = if board.ok then board.data.depths else (lastStats and lastStats.depths),
             tape = lastTape,
         }
-        StatsData:FireAllClients(lastStats)
+        R.StatsData:FireAllClients(lastStats)
         -- 47, NOT 60. A 60s wait is exactly the round period (OPEN 51 + LOCK 2 +
         -- REVEAL 7), so the poll would alias with the round and refresh the slow
         -- boards at the same phase offset forever. 47 still clears the 30s and 15s
@@ -1057,7 +1022,7 @@ local function pushStatsPersonal(player: Player)
     local res = net:getStatsPlayer(tostring(player.UserId))
     -- A 404 is the NORMAL state for someone who has never thrown. Send the empty shape rather
     -- than nothing, so the slip renders its zeros instead of hanging on "no data".
-    StatsPersonal:FireClient(player, if res.ok then res.data else { displayName = player.DisplayName })
+    R.StatsPersonal:FireClient(player, if res.ok then res.data else { displayName = player.DisplayName })
     if res.ok then
         local d = res.data
         local standing = d.week and d.week.standing
@@ -1076,7 +1041,7 @@ end
 
 local function onPlayerJoinStats(player: Player)
     if lastStats then
-        StatsData:FireClient(player, lastStats) -- re-fire is an idempotent client update
+        R.StatsData:FireClient(player, lastStats) -- re-fire is an idempotent client update
     end
     task.spawn(pushStatsPersonal, player)
 end
@@ -1211,7 +1176,7 @@ local function echoEconomy(player: Player, uid: string)
     for size in e.teahouses do
         table.insert(teaSizes, size)
     end
-    EconomyState:FireClient(player, {
+    R.EconomyState:FireClient(player, {
         totalPoints = e.totalPoints,
         maxDeckSize = e.maxDeckSize,
         teahouseSizes = teaSizes,
@@ -1581,7 +1546,7 @@ pushFireworkState = function(player: Player)
                     end
                 end
             end
-            FireworkState:FireClient(player, res.data)
+            R.FireworkState:FireClient(player, res.data)
         end
     end)
 end
@@ -1623,7 +1588,7 @@ function Launch.broadcastLaunch(fields: {
     apexHeight: number?,
     showId: string?,
 })
-    FireworkLaunched:FireAllClients({
+    R.FireworkLaunched:FireAllClients({
         shellId = fields.shellId,
         origin = fields.origin,
         heading = fields.heading and { x = fields.heading.X, y = fields.heading.Y, z = fields.heading.Z }
@@ -1636,7 +1601,7 @@ function Launch.broadcastLaunch(fields: {
     })
 end
 
-RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
+R.RequestFireworkLaunch.OnServerEvent:Connect(function(player, shellId)
     if typeof(shellId) ~= "string" then
         return
     end
@@ -1941,7 +1906,7 @@ end
 -- draft id from a named proving rack through the SAME FireworkLaunched broadcast the spend
 -- path uses — director, LOD, pooling all engaged — but with NO inventory spend and NO backend
 -- call. The IsStudio gate is the whole security model: a published client's request dies here.
-RequestProvingFire.OnServerEvent:Connect(function(_player, shellId, rackName, forceBoost)
+R.RequestProvingFire.OnServerEvent:Connect(function(_player, shellId, rackName, forceBoost)
     if not RunService:IsStudio() then
         return
     end
@@ -2032,7 +1997,7 @@ end
 local function echoBackDoor(player: Player, uid: string)
     local house = playerHouse[uid]
     if house ~= nil and player:IsDescendantOf(Players) then
-        BackDoorState:FireClient(player, {
+        R.BackDoorState:FireClient(player, {
             padId = house.padId,
             backDoorIndex = BackDoorEditor.backDoorIndex(house.loadout.wallBays),
         })
@@ -2303,7 +2268,7 @@ local function recomputeAllAccess()
                 })
             end
         end
-        AccessBlocked:FireClient(viewer, { blocked = blocked })
+        R.AccessBlocked:FireClient(viewer, { blocked = blocked })
     end
 end
 
@@ -2336,7 +2301,7 @@ local function pushAccessState(player: Player, uid: string, notice: string?)
     if not player:IsDescendantOf(Players) then
         return
     end
-    AccessState:FireClient(player, { mode = e.teahouseAccess.mode, invited = invited, notice = notice })
+    R.AccessState:FireClient(player, { mode = e.teahouseAccess.mode, invited = invited, notice = notice })
 end
 
 -- Register all 14 surveyed perches in stable T01..T14 order (PadSites is a keyed dict
@@ -2454,7 +2419,7 @@ local function onPlayerJoinEconomy(player: Player)
                     loadout = action.teahouse.loadout,
                 }
                 if player:IsDescendantOf(Players) then
-                    BackDoorState:FireClient(player, {
+                    R.BackDoorState:FireClient(player, {
                         padId = action.padId,
                         backDoorIndex = BackDoorEditor.backDoorIndex(action.teahouse.loadout.wallBays),
                     })
@@ -2462,7 +2427,7 @@ local function onPlayerJoinEconomy(player: Player)
             end
         end
         if player:IsDescendantOf(Players) then
-            PreferenceState:FireClient(
+            R.PreferenceState:FireClient(
                 player,
                 { padPreferences = playerPrefs[uid], names = namesFor(playerPrefs[uid]) }
             )
@@ -2487,7 +2452,7 @@ end
 -- RequestSync on startup and retries until its EconomyState lands; we re-echo that player's full
 -- state (all guarded/idempotent). Light per-uid debounce so retries can't spin the server.
 local lastSync: { [string]: number } = {}
-RequestSync.OnServerEvent:Connect(function(player)
+R.RequestSync.OnServerEvent:Connect(function(player)
     local uid = tostring(player.UserId)
     local now = os.clock()
     if lastSync[uid] ~= nil and now - lastSync[uid] < 0.4 then
@@ -2496,7 +2461,7 @@ RequestSync.OnServerEvent:Connect(function(player)
     lastSync[uid] = now
     echoEconomy(player, uid)
     if playerPrefs[uid] ~= nil then
-        PreferenceState:FireClient(
+        R.PreferenceState:FireClient(
             player,
             { padPreferences = playerPrefs[uid], names = namesFor(playerPrefs[uid]) }
         )
@@ -2568,7 +2533,7 @@ Players.PlayerRemoving:Connect(function(player)
     end
 end)
 
-SetPadPreference.OnServerEvent:Connect(function(player, siteId)
+R.SetPadPreference.OnServerEvent:Connect(function(player, siteId)
     handlerQueue:run(tostring(player.UserId), function()
         if type(siteId) ~= "string" or PadSites[siteId] == nil then
             return -- ignore ill-typed / unknown site ids
@@ -2583,12 +2548,12 @@ SetPadPreference.OnServerEvent:Connect(function(player, siteId)
             playerPrefs[uid] = current
             if player:IsDescendantOf(Players) then
                 -- revert client, no toast
-                PreferenceState:FireClient(player, { padPreferences = current, names = namesFor(current) })
+                R.PreferenceState:FireClient(player, { padPreferences = current, names = namesFor(current) })
             end
             return
         end
         if player:IsDescendantOf(Players) then
-            PreferenceState:FireClient(player, {
+            R.PreferenceState:FireClient(player, {
                 padPreferences = newList,
                 names = namesFor(newList),
                 changed = siteId,
@@ -2599,7 +2564,7 @@ SetPadPreference.OnServerEvent:Connect(function(player, siteId)
     end)
 end)
 
-SetBackDoor.OnServerEvent:Connect(function(player, payload)
+R.SetBackDoor.OnServerEvent:Connect(function(player, payload)
     handlerQueue:run(tostring(player.UserId), function()
         local uid = tostring(player.UserId)
         local house = playerHouse[uid]
@@ -2645,7 +2610,7 @@ SetBackDoor.OnServerEvent:Connect(function(player, payload)
             warn(`[B1] setTeahouse failed for {uid}/{house.size}: {tostring(persisted.error)}`)
         end
         if player:IsDescendantOf(Players) then
-            BackDoorState:FireClient(player, {
+            R.BackDoorState:FireClient(player, {
                 padId = house.padId,
                 backDoorIndex = BackDoorEditor.backDoorIndex(newWallBays),
             })
@@ -2806,7 +2771,7 @@ end
 -- could drop a release outright and leave a screen sliding until the player walked out of reach.
 -- The one thing here that yields -- the persist -- still goes through the queue, from inside
 -- persistShojiNow, exactly like every other write in this file.
-SlideShoji.OnServerEvent:Connect(function(player, payload)
+R.SlideShoji.OnServerEvent:Connect(function(player, payload)
     local uid = tostring(player.UserId)
     local padId = if typeof(payload) == "table" then payload.padId else nil
     local side = if typeof(payload) == "table" then payload.side else nil
@@ -2882,7 +2847,7 @@ SlideShoji.OnServerEvent:Connect(function(player, payload)
         -- plausibly reach it. Tell the HOLDER only, so a refused hold doesn't leave their
         -- prompt looking stuck; the attribute itself is untouched.
         if player:IsDescendantOf(Players) then
-            ShojiState:FireClient(
+            R.ShojiState:FireClient(
                 player,
                 { padId = padId, side = side, bay = bayNumber, open = openNow, accepted = false }
             )
@@ -2913,7 +2878,7 @@ SlideShoji.OnServerEvent:Connect(function(player, payload)
     shojiSlides[uid] = slide
 
     if player:IsDescendantOf(Players) then
-        ShojiState:FireClient(
+        R.ShojiState:FireClient(
             player,
             { padId = padId, side = side, bay = bayNumber, open = openNow, accepted = true }
         )
@@ -2922,7 +2887,7 @@ SlideShoji.OnServerEvent:Connect(function(player, payload)
     task.spawn(runShojiSlide, player, uid, slide, direction)
 end)
 
-RequestPurchase.OnServerEvent:Connect(function(player, payload)
+R.RequestPurchase.OnServerEvent:Connect(function(player, payload)
     handlerQueue:run(tostring(player.UserId), function()
         local uid = tostring(player.UserId)
         local e = playerEconomy[uid]
@@ -2978,7 +2943,7 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
                 echoBackDoor(player, uid)
             end
             if player:IsDescendantOf(Players) and res.data.decoration ~= nil then
-                DecorationPlaced:FireClient(
+                R.DecorationPlaced:FireClient(
                     player,
                     { id = res.data.decoration.id, propId = res.data.decoration.propId }
                 )
@@ -3122,7 +3087,7 @@ RequestPurchase.OnServerEvent:Connect(function(player, payload)
     end)
 end)
 
-SetDisplay.OnServerEvent:Connect(function(player, payload)
+R.SetDisplay.OnServerEvent:Connect(function(player, payload)
     handlerQueue:run(tostring(player.UserId), function()
         local uid = tostring(player.UserId)
         local e = playerEconomy[uid]
@@ -3201,7 +3166,7 @@ SetDisplay.OnServerEvent:Connect(function(player, payload)
     end)
 end)
 
-SetPlacement.OnServerEvent:Connect(function(player, payload)
+R.SetPlacement.OnServerEvent:Connect(function(player, payload)
     handlerQueue:run(tostring(player.UserId), function()
         local uid = tostring(player.UserId)
         local e = playerEconomy[uid]
@@ -3310,7 +3275,7 @@ SetPlacement.OnServerEvent:Connect(function(player, payload)
     end)
 end)
 
-SetDecorationPlacement.OnServerEvent:Connect(function(player, payload)
+R.SetDecorationPlacement.OnServerEvent:Connect(function(player, payload)
     handlerQueue:run(tostring(player.UserId), function()
         local uid = tostring(player.UserId)
         local e = playerEconomy[uid]
@@ -3394,7 +3359,7 @@ end)
 -- controller ruling superseded the original client-side-render plan so every visitor sees them,
 -- not just the owner), so a moved mortar needs the SAME rebuildClaimedPad/echoBackDoor step
 -- SetDecorationPlacement uses to redraw for everyone, not just echoEconomy back to the mover.
-SetMortarPlacement.OnServerEvent:Connect(function(player, payload)
+R.SetMortarPlacement.OnServerEvent:Connect(function(player, payload)
     handlerQueue:run(tostring(player.UserId), function()
         local uid = tostring(player.UserId)
         local e = playerEconomy[uid]
@@ -3464,7 +3429,7 @@ SetMortarPlacement.OnServerEvent:Connect(function(player, payload)
     end)
 end)
 
-SetDecorationRemove.OnServerEvent:Connect(function(player, payload)
+R.SetDecorationRemove.OnServerEvent:Connect(function(player, payload)
     handlerQueue:run(tostring(player.UserId), function()
         local uid = tostring(player.UserId)
         local e = playerEconomy[uid]
@@ -3503,7 +3468,7 @@ SetDecorationRemove.OnServerEvent:Connect(function(player, payload)
     end)
 end)
 
-SetAccess.OnServerEvent:Connect(function(player, payload)
+R.SetAccess.OnServerEvent:Connect(function(player, payload)
     handlerQueue:run(tostring(player.UserId), function()
         local uid = tostring(player.UserId)
         local e = playerEconomy[uid]
@@ -3533,7 +3498,7 @@ SetAccess.OnServerEvent:Connect(function(player, payload)
     end)
 end)
 
-InviteUser.OnServerEvent:Connect(function(player, payload)
+R.InviteUser.OnServerEvent:Connect(function(player, payload)
     handlerQueue:run(tostring(player.UserId), function()
         local uid = tostring(player.UserId)
         local e = playerEconomy[uid]
@@ -3583,7 +3548,7 @@ InviteUser.OnServerEvent:Connect(function(player, payload)
     end)
 end)
 
-RevokeUser.OnServerEvent:Connect(function(player, payload)
+R.RevokeUser.OnServerEvent:Connect(function(player, payload)
     handlerQueue:run(tostring(player.UserId), function()
         local uid = tostring(player.UserId)
         local e = playerEconomy[uid]
