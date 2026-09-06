@@ -995,6 +995,90 @@ describe('/api/v1', () => {
                 .expect(400);
         });
 
+        describe('powder (spec §7): points and shells flow IN, nothing flows out but fireworks', () => {
+            it('economy and fireworks reads carry powder (default 0)', async () => {
+                await User.create({ robloxId: '920' });
+                const app = makeApp(makeEngine(), new ResultsStore());
+                expect((await request(app).get('/api/v1/players/920/economy').set('X-API-Key', API_KEY).expect(200)).body.powder).toBe(0);
+                expect((await request(app).get('/api/v1/players/920/fireworks').set('X-API-Key', API_KEY).expect(200)).body.powder).toBe(0);
+            });
+
+            it('topup moves points into powder, one way, atomically', async () => {
+                await User.create({ robloxId: '921', totalPoints: 10 });
+                const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                    .post('/api/v1/players/921/powder/topup').set('X-API-Key', API_KEY).send({ points: 4 }).expect(200);
+                expect(res.body).toEqual({ powder: 4, totalPoints: 6 });
+                const after = await User.findOne({ robloxId: '921' });
+                expect(after!.totalPoints).toBe(6);
+                expect(after!.powder).toBe(4);
+                expect(after!.lifetimeBanked ?? 0).toBe(0); // career earnings untouched
+            });
+
+            it('topup refuses more than the wallet holds, and moves nothing', async () => {
+                await User.create({ robloxId: '922', totalPoints: 3 });
+                const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                    .post('/api/v1/players/922/powder/topup').set('X-API-Key', API_KEY).send({ points: 4 }).expect(409);
+                expect(res.body).toEqual({ error: 'INSUFFICIENT_POINTS', held: 3 });
+                const after = await User.findOne({ robloxId: '922' });
+                expect([after!.totalPoints, after!.powder]).toEqual([3, 0]);
+            });
+
+            it('topup is ONE WAY: zero, negative, fractional and non-numeric amounts are refused', async () => {
+                await User.create({ robloxId: '923', totalPoints: 10, powder: 10 });
+                const app = makeApp(makeEngine(), new ResultsStore());
+                for (const points of [0, -4, 2.5, 'lots', undefined]) {
+                    const res = await request(app).post('/api/v1/players/923/powder/topup').set('X-API-Key', API_KEY).send({ points }).expect(400);
+                    expect(res.body.error).toBe('BAD_AMOUNT');
+                }
+                const after = await User.findOne({ robloxId: '923' });
+                expect([after!.totalPoints, after!.powder]).toEqual([10, 10]);
+            });
+
+            it('melt turns held shells into powder at list price, atomically', async () => {
+                await User.create({ robloxId: '924', fireworks: { peony: 3 } });
+                const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                    .post('/api/v1/players/924/fireworks/melt').set('X-API-Key', API_KEY).send({ shellId: 'peony', count: 2 }).expect(200);
+                expect(res.body).toEqual({ shellId: 'peony', count: 1, powder: 6, credited: 6 }); // peony is 3
+                const after = await User.findOne({ robloxId: '924' });
+                expect(after!.fireworks.get('peony')).toBe(1);
+                expect(after!.powder).toBe(6);
+                expect(after!.totalPoints).toBe(0); // never points
+            });
+
+            it('melt refuses more than held, bad counts, unknown shells — and moves nothing', async () => {
+                await User.create({ robloxId: '925', fireworks: { peony: 1 } });
+                const app = makeApp(makeEngine(), new ResultsStore());
+                const post = (body: object) => request(app).post('/api/v1/players/925/fireworks/melt').set('X-API-Key', API_KEY).send(body);
+                expect((await post({ shellId: 'peony', count: 2 }).expect(409)).body).toEqual({ error: 'NONE_HELD', held: 1 });
+                expect((await post({ shellId: 'peony', count: 0 }).expect(400)).body.error).toBe('BAD_COUNT');
+                expect((await post({ shellId: 'peony', count: 1.5 }).expect(400)).body.error).toBe('BAD_COUNT');
+                expect((await post({ shellId: 'moonshot', count: 1 }).expect(400)).body.error).toBe('BAD_SHELL');
+                const after = await User.findOne({ robloxId: '925' });
+                expect([after!.fireworks.get('peony'), after!.powder]).toEqual([1, 0]);
+            });
+
+            // un-skip when the first ineligible shell exists — POWDER_INELIGIBLE is unreachable
+            // while shared-fixtures/firework-shells.json's `powderIneligible` list is empty.
+            it.skip('melt refuses a powder-ineligible shell', async () => {
+                await User.create({ robloxId: '927', fireworks: { peony: 1 } });
+                const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                    .post('/api/v1/players/927/fireworks/melt').set('X-API-Key', API_KEY).send({ shellId: 'peony', count: 1 }).expect(400);
+                expect(res.body.error).toBe('POWDER_INELIGIBLE');
+            });
+
+            it('CONCURRENT MELTS CANNOT OVER-CREDIT — one conditional update per melt', async () => {
+                await User.create({ robloxId: '926', fireworks: { wa: 1 } });
+                const app = makeApp(makeEngine(), new ResultsStore());
+                const body = { shellId: 'wa', count: 1 };
+                const [a, b] = await Promise.all([
+                    request(app).post('/api/v1/players/926/fireworks/melt').set('X-API-Key', API_KEY).send(body),
+                    request(app).post('/api/v1/players/926/fireworks/melt').set('X-API-Key', API_KEY).send(body),
+                ]);
+                expect([a.status, b.status].sort()).toEqual([200, 409]);
+                const after = await User.findOne({ robloxId: '926' });
+                expect([after!.fireworks.get('wa'), after!.powder]).toEqual([0, 5]); // wa is 5
+            });
+        });
         describe('POST /players/:id/shows/reserve — a show debits everything up front, or nothing', () => {
             const show = (cues: object[], extra: object = {}) => ({
                 show: { stageId: 'deck:910', fuel: 'inventory', cues, ...extra },

@@ -12,7 +12,7 @@ import User, { IUser } from '../models/User';
 import { Throw } from '../engine/GameRules';
 import { topByCareer } from '../leaderboards';
 import { reconcilePresence } from '../sessions';
-import { shellStates, SHELL_IDS, LaunchContext, SHELL_PRICES, MORTAR_PRICES } from '../fireworks';
+import { shellStates, SHELL_IDS, LaunchContext, SHELL_PRICES, MORTAR_PRICES, isPowderEligible } from '../fireworks';
 import { validateShow, tallyShells, DECK_STAGE, Cue } from '../shows';
 import { validateLoadout, validateSizeClass, validatePadPreferences, validateDecorations, validateAccess, validateMortarPlacements } from '../loadout';
 import {
@@ -341,6 +341,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
                 portalOwned: st.portalOwned ?? false,
                 deckDecorations: user.deckDecorations ?? [],
                 teahouseAccess: user.teahouseAccess ?? DEFAULT_ACCESS,
+                powder: user.powder ?? 0,
             });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
@@ -361,7 +362,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             const held: Record<string, number> = {};
             for (const id of SHELL_IDS) held[id] = user.fireworks?.get(id) ?? 0;
             res.set('Cache-Control', 'no-store');
-            res.json({ shells: shellStates(held, ctx), mortars: ctx.mortars, mortarPlacements: user.mortarPlacements ?? {} });
+            res.json({ shells: shellStates(held, ctx), mortars: ctx.mortars, mortarPlacements: user.mortarPlacements ?? {}, powder: user.powder ?? 0 });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
         }
@@ -387,6 +388,52 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             );
             if (!updated) { res.status(409).json({ error: 'NONE_HELD' }); return; }
             res.json({ shellId, count: updated.fireworks.get(shellId) ?? 0 });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
+    // POINTS → POWDER, ONE WAY (spec 2026-09-05 §7, decision 10). The wallet is the durable
+    // economy; powder buys only things that burn. Nothing anywhere moves powder back, and this
+    // route refuses any amount that is not a positive integer so it cannot be run in reverse.
+    router.post('/players/:robloxUserId/powder/topup', async (req, res) => {
+        try {
+            const points = req.body?.points;
+            if (!Number.isInteger(points) || points <= 0) { res.status(400).json({ error: 'BAD_AMOUNT' }); return; }
+            const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
+            if (!user) { res.status(404).json({ error: 'RESOLVE_FAILED' }); return; }
+            const updated = await User.findOneAndUpdate(
+                { _id: user._id, totalPoints: { $gte: points } },
+                { $inc: { totalPoints: -points, powder: points } },
+                { new: true }
+            );
+            if (!updated) { res.status(409).json({ error: 'INSUFFICIENT_POINTS', held: user.totalPoints }); return; }
+            res.json({ powder: updated.powder, totalPoints: updated.totalPoints });
+        } catch (err) {
+            res.status(500).json({ error: (err as Error).message });
+        }
+    });
+
+    // SHELLS → POWDER at list price (the Hanabiya melts them). Safe because powder cannot leave
+    // the economy: a melted shell can only become another firework. Eligibility is the one gate —
+    // rare/secret/special shells are outside powder in both directions.
+    router.post('/players/:robloxUserId/fireworks/melt', async (req, res) => {
+        try {
+            const shellId = req.body?.shellId;
+            const count = req.body?.count;
+            if (typeof shellId !== 'string' || !SHELL_IDS.includes(shellId as never)) { res.status(400).json({ error: 'BAD_SHELL' }); return; }
+            if (!Number.isInteger(count) || count <= 0) { res.status(400).json({ error: 'BAD_COUNT' }); return; }
+            if (!isPowderEligible(shellId)) { res.status(400).json({ error: 'POWDER_INELIGIBLE' }); return; }
+            const user = await resolveUser({ robloxUserId: req.params.robloxUserId });
+            if (!user) { res.status(404).json({ error: 'RESOLVE_FAILED' }); return; }
+            const credited = count * SHELL_PRICES[shellId];
+            const updated = await User.findOneAndUpdate(
+                { _id: user._id, [`fireworks.${shellId}`]: { $gte: count } },
+                { $inc: { [`fireworks.${shellId}`]: -count, powder: credited } },
+                { new: true }
+            );
+            if (!updated) { res.status(409).json({ error: 'NONE_HELD', held: user.fireworks?.get(shellId) ?? 0 }); return; }
+            res.json({ shellId, count: updated.fireworks.get(shellId) ?? 0, powder: updated.powder, credited });
         } catch (err) {
             res.status(500).json({ error: (err as Error).message });
         }
