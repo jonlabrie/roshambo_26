@@ -1915,34 +1915,41 @@ end)
 -- place whose Rojo tree predates the show work. Missing = warn and skip this block.
 Launch.FireworkShowsModule = shared:WaitForChild("FireworkShows", 10) :: ModuleScript?
 Launch.RequestProvingShow = remotes:WaitForChild("RequestProvingShow", 10) :: RemoteEvent?
-if Launch.FireworkShowsModule == nil or Launch.RequestProvingShow == nil then
-    warn(
-        "[PROVING] FireworkShows or RequestProvingShow is missing — the panel's Play buttons do nothing (re-sync from Rojo?)"
-    )
+if Launch.FireworkShowsModule == nil then
+    warn("[PROVING] FireworkShows module is missing — no show drafts this session (re-sync from Rojo?)")
 else
     Launch.FireworkShows = require(Launch.FireworkShowsModule)
     -- ONE draft player for two doors. `byLabel` names the door in the broadcast's `by` field so a
     -- client (and the log) can tell a Studio play from a console play.
     Launch.playDraft = function(name: any, byLabel: string)
-        if typeof(name) ~= "string" then
-            return
-        end
-        local draft = Launch.FireworkShows.DRAFTS[name]
+        local draft = if typeof(name) == "string" then Launch.FireworkShows.DRAFTS[name] else nil
         if draft == nil then
-            warn(`[PROVING] no draft named "{name}" (have: {table.concat(Launch.FireworkShows.ORDER, ", ")})`)
+            warn(
+                `[PROVING] no draft named "{tostring(name)}" (have: {table.concat(
+                    Launch.FireworkShows.ORDER,
+                    ", "
+                )})`
+            )
             return
         end
         Launch.playShow("proving", byLabel, byLabel, draft.cues, function(c: ShowCue)
             return Launch.provingOriginFor(c.slot)
         end, `{byLabel}:{name}`)
     end
-    -- Door 1: the Studio-only panel verb (unchanged gate).
-    Launch.RequestProvingShow.OnServerEvent:Connect(function(_player, name)
-        if not RunService:IsStudio() then
-            return -- the same gate as RequestProvingFire: a published client's request dies here
-        end
-        Launch.playDraft(name, "proving")
-    end)
+    -- Door 1: the Studio-only panel verb (unchanged gate). Its remote may be absent on a stale
+    -- place; door 2 below must not depend on it.
+    if Launch.RequestProvingShow == nil then
+        warn(
+            "[PROVING] RequestProvingShow is missing — the panel's Play buttons do nothing (re-sync from Rojo?)"
+        )
+    else
+        Launch.RequestProvingShow.OnServerEvent:Connect(function(_player, name)
+            if not RunService:IsStudio() then
+                return -- the same gate as RequestProvingFire: a published client's request dies here
+            end
+            Launch.playDraft(name, "proving")
+        end)
+    end
     -- Door 2: THE PUBLISHED-PLACE TRIGGER (owner, 2026-09-06), so the A13 gate can run at all: a
     -- phone can only join the published place, where the panel does not exist. A BindableEvent in
     -- ServerStorage can be fired only by SERVER code, and the only way to run server code in a
