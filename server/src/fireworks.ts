@@ -70,10 +70,36 @@ export const REQUIREMENTS: Record<string, Requirement> = {
     banrai: { kind: 'gear', mortar: 'mortar:M' },
 };
 
+// OUTSIDE THE POWDER ECONOMY IN BOTH DIRECTIONS (spec 2026-09-05 §7): not buyable with powder, not
+// meltable. Prestige that converts to fungible value stops being prestige. Empty today — every
+// shipped shell is a shop shell — and asserted equal to shared-fixtures/firework-shells.json's
+// `powderIneligible` so the first rare shell is one line on each side.
+export const POWDER_INELIGIBLE: ReadonlySet<string> = new Set<string>([]);
+
+export function isPowderEligible(shellId: string): boolean {
+    return (SHELL_IDS as readonly string[]).includes(shellId) && !POWDER_INELIGIBLE.has(shellId);
+}
+
 export type LaunchContext = { mortars: string[]; lastWorldThrow: Throw | null };
-export type ShellState = { count: number; launchable: boolean; reason: string | null };
+export type ShellState = {
+    count: number;
+    launchable: boolean;
+    reason: string | null;
+    powderEligible: boolean;
+};
 
 export function evaluateShell(shellId: string, count: number, ctx: LaunchContext): ShellState {
+    return { ...evaluateLaunchable(shellId, count, ctx), powderEligible: isPowderEligible(shellId) };
+}
+
+// The launch verdict alone. Split out of evaluateShell so the powder flag — which depends on the
+// shell id and nothing about the player — is added in exactly one place rather than on each of the
+// five return paths below.
+function evaluateLaunchable(
+    shellId: string,
+    count: number,
+    ctx: LaunchContext
+): Omit<ShellState, 'powderEligible'> {
     const req = REQUIREMENTS[shellId];
     if (!req) return { count, launchable: false, reason: 'BAD_SHELL' };
     // Holding none outranks every other reason: "you have no peony" is more useful to a player

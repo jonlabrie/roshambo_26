@@ -57,5 +57,7 @@
             "shell": "banrai",
             "mortar": "mortar:M"
         }
-    ]
+    ],
+    "powderIneligibleComment": "Shells OUTSIDE the powder economy in both directions (spec 2026-09-05 §7): not buyable with powder, not meltable. Rare / secret / special shells go here when they exist. EMPTY today -- every shipped shell is a shop shell. server/src/fireworks.ts's POWDER_INELIGIBLE is asserted equal to this list.",
+    "powderIneligible": []
 }

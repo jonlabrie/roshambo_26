@@ -8,6 +8,8 @@ import {
     evaluateShell,
     shellStates,
     LaunchContext,
+    POWDER_INELIGIBLE,
+    isPowderEligible,
 } from './fireworks';
 
 const noGear: LaunchContext = { mortars: [], lastWorldThrow: null };
@@ -73,6 +75,7 @@ describe('requirement kind: none', () => {
             count: 1,
             launchable: true,
             reason: null,
+            powderEligible: true,
         });
     });
     it('holding none beats every other reason', () => {
@@ -80,6 +83,7 @@ describe('requirement kind: none', () => {
             count: 0,
             launchable: false,
             reason: 'NONE_HELD',
+            powderEligible: true,
         });
     });
 });
@@ -90,11 +94,17 @@ describe('requirement kind: gear', () => {
             count: 2,
             launchable: false,
             reason: 'NEEDS_MORTAR_S',
+            powderEligible: true,
         });
     });
     it('and flies once you own one', () => {
         const ctx: LaunchContext = { mortars: ['mortar:S'], lastWorldThrow: null };
-        expect(evaluateShell('peony', 2, ctx)).toEqual({ count: 2, launchable: true, reason: null });
+        expect(evaluateShell('peony', 2, ctx)).toEqual({
+            count: 2,
+            launchable: true,
+            reason: null,
+            powderEligible: true,
+        });
     });
     it('a bigger tube satisfies a smaller requirement', () => {
         const ctx: LaunchContext = { mortars: ['mortar:L'], lastWorldThrow: null };
@@ -107,6 +117,7 @@ describe('requirement kind: gear', () => {
             count: 1,
             launchable: false,
             reason: 'NEEDS_MORTAR_M',
+            powderEligible: true,
         });
     });
 });
@@ -118,6 +129,7 @@ describe('requirement kind: condition', () => {
             count: 1,
             launchable: false,
             reason: 'WAITING_FOR_R',
+            powderEligible: true,
         });
     });
     it('and flies in the round after the world throws Rock', () => {
@@ -126,6 +138,7 @@ describe('requirement kind: condition', () => {
             count: 1,
             launchable: true,
             reason: null,
+            powderEligible: true,
         });
     });
     it('an unknown last throw is not Rock', () => {
@@ -139,6 +152,7 @@ describe('unknown ids', () => {
             count: 5,
             launchable: false,
             reason: 'BAD_SHELL',
+            powderEligible: false,
         });
     });
 });
@@ -148,6 +162,29 @@ describe('shellStates', () => {
         const states = shellStates({ firecracker: 2 }, noGear);
         expect(Object.keys(states).sort()).toEqual([...SHELL_IDS].sort());
         expect(states.firecracker.count).toBe(2);
-        expect(states.peony).toEqual({ count: 0, launchable: false, reason: 'NONE_HELD' });
+        expect(states.peony).toEqual({
+            count: 0,
+            launchable: false,
+            reason: 'NONE_HELD',
+            powderEligible: true,
+        });
+    });
+});
+
+describe('the fixture is the powder-eligibility contract too', () => {
+    it('POWDER_INELIGIBLE equals the fixture list', () => {
+        expect([...POWDER_INELIGIBLE].sort()).toEqual([...fixtures.powderIneligible].sort());
+    });
+    it('every ineligible id is a real shell', () => {
+        for (const id of fixtures.powderIneligible) expect(fixtures.shells).toContain(id);
+    });
+    it('isPowderEligible: true for every shipped shell today, false for unknown ids', () => {
+        for (const id of SHELL_IDS) expect(isPowderEligible(id)).toBe(!POWDER_INELIGIBLE.has(id));
+        expect(isPowderEligible('moonshot')).toBe(false);
+    });
+    it('shellStates carries powderEligible per shell', () => {
+        const states = shellStates({ firecracker: 2 }, noGear);
+        expect(states.firecracker.powderEligible).toBe(true);
+        expect(states.kamuro.powderEligible).toBe(true);
     });
 });

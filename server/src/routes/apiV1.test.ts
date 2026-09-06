@@ -828,11 +828,13 @@ describe('/api/v1', () => {
                 count: 2,
                 launchable: true,
                 reason: null,
+                powderEligible: true,
             });
             expect(res.body.shells.peony).toEqual({
                 count: 0,
                 launchable: false,
                 reason: 'NONE_HELD',
+                powderEligible: true,
             });
             expect(res.body.mortars).toEqual([]);
             await User.deleteOne({ _id: u._id });
