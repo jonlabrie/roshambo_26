@@ -1060,6 +1060,8 @@ describe('/api/v1', () => {
 
             // un-skip when the first ineligible shell exists — POWDER_INELIGIBLE is unreachable
             // while shared-fixtures/firework-shells.json's `powderIneligible` list is empty.
+            // When un-skipping, repoint `shellId` at the first entry of `powderIneligible` —
+            // `peony` is an eligible placeholder.
             it.skip('melt refuses a powder-ineligible shell', async () => {
                 await User.create({ robloxId: '927', fireworks: { peony: 1 } });
                 const res = await request(makeApp(makeEngine(), new ResultsStore()))

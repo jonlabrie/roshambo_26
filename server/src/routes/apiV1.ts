@@ -469,7 +469,9 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
     // A SHOW IS RESERVED BEFORE IT PLAYS (spec 2026-09-05-fireworks-show-system-design §2.1).
     // Everything the show needs is debited in ONE conditional update, so a show that cannot be
     // fully paid takes nothing — the same all-or-nothing the single-shell spend gets from its
-    // conditional $inc, extended to a whole tally. Inventory fuel only here; powder is sub-project A.
+    // conditional $inc, extended to a whole tally. Inventory fuel debits the shells themselves;
+    // powder fuel (sub-project A) debits the summed list price from `powder` — both in one
+    // conditional update.
     // Players may only reserve for their OWN deck (spec §3, decision 4); stations and the rooftop
     // arrive with consoles and tickets in sub-project C.
     router.post('/players/:robloxUserId/shows/reserve', async (req, res) => {

@@ -65,7 +65,8 @@ export interface IUser extends Document {
     fireworks: Map<string, number>;
     // THE SECOND ECONOMY (spec 2026-09-05 §7). Powder buys only things that burn: points and Robux
     // flow IN, shells melt back INTO it, and nothing ever flows OUT to totalPoints or a durable.
-    // Never rank by it, never sum it into earnings. Every move is a conditional $inc.
+    // Never rank by it, never sum it into earnings. Every move is a conditional $inc, or a
+    // plain $inc guarded by the receipt row on the grant path.
     powder: number;
     // Minted by the drop table at the ticket streak (Settlement); redeemed, gifted and booked in
     // sub-project C. Append-only here.
