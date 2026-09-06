@@ -1,7 +1,7 @@
 # Splitting `main.server.luau` — Phase One Design
 
 **Date:** 2026-09-06
-**Status:** Draft for owner review. Two decisions already taken (owner, 2026-09-06: "phase one, one gate per extraction").
+**Status:** Approved (owner, 2026-09-06: "phase one, one gate per extraction"; "write the split spec plan").
 **Program context:** Prerequisite for every further server-side feature. `roblox/src/server/main.server.luau` is 3,703 lines and uses 199 of Luau's 200 top-level local registers; sub-project B had to hang all of its server code off a `Launch` namespace table to compile, and the next handler added to the file will not. The split is not a cleanup for its own sake: it is the headroom sub-project C (consoles, tickets) and the Hanabiya melt verb need. Map: the 2026-09-06 recon of the file (35 sections, 8 extraction candidates), summarised below.
 
 **Question** (owner): the file is at the ceiling; how far do we split now, and how is each step proven?

@@ -3996,3 +3996,11 @@ would have caught it before the spec was written:
 believed. The foliage 3,580, PathRailings 5,186 and stats-room ~8,400 figures are all
 instance counts from the same page, and their relevance to per-frame or per-draw cost is
 exactly the thing that was assumed here and turned out false. Measure the loop, not the tree.
+
+## [2026-09-06] decision | Server-file split spec approved: phase one, four extractions, one Studio gate each
+
+Spec `docs/superpowers/specs/2026-09-06-server-file-split-design.md`. `main.server.luau` sits at 199
+of Luau's 200 top-level registers; phase one moves the remotes table, the shoji slide controller,
+the stats-room feed and the teahouse rebuild into modules (~60 names freed), each as its own
+commit merged to `main` and walked by the owner in Studio before the next begins. The spec records
+the pure-module / runtime-adapter distinction the codebase already practises. Plan to follow.
