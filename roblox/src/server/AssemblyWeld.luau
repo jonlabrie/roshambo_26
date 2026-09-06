@@ -38,11 +38,25 @@ function AssemblyWeld.bind(root: BasePart, parts: { BasePart }): number
 end
 
 -- Collect a model's BaseParts and bind them to one root, chosen as the part nearest the model's
--- pivot so the assembly turns about roughly the point the animation pivots around. Sets
--- `model.PrimaryPart` to that root, which is how a client finds it without duplicating the choice
--- (and whose absence is a client's signal that this model has NOT been welded yet).
--- Returns the root and the number bound, or nil when the model holds no parts.
+-- pivot so the assembly turns about roughly the point the animation pivots around.
+--
+-- Publishes two things a client needs to drive the assembly the way `Model:PivotTo` would:
+--   * an `AssemblyRoot` ObjectValue pointing at the root part, and
+--   * an `AssemblyRootOffset` CFrame attribute = the root's pose RELATIVE TO THE AUTHORED PIVOT.
+-- A client then writes `root.CFrame = targetPivot * offset` and gets exactly PivotTo's result for
+-- one property write instead of one per part.
+--
+-- ⚠ DO NOT SET `model.PrimaryPart` TO THE ROOT, AND DO NOT DERIVE THE OFFSET AFTER DOING SO.
+-- `GetPivot()` returns the PrimaryPart's CFrame once one is set, so the offset computes as the
+-- IDENTITY and silently discards the ROTATION difference between the authored `WorldPivot` and the
+-- root part's own orientation. The positions coincide here -- the hang loop sits on the hang point
+-- -- so this reads correct in every position check and is wrong only in orientation. Shipped
+-- 2026-09-06 and the owner saw it immediately: the hanabiya chōchin hung with their bottoms 0.51
+-- studs east, swinging +/-0.045 about that lean, while at rest they are plumb to 0.03. Take the
+-- pivot BEFORE touching the model, and keep the full CFrame offset, rotation included.
 function AssemblyWeld.bindModel(model: Model): (BasePart?, number)
+    -- Read the authored pivot FIRST: nothing below may have moved or re-rooted the model yet.
+    local pivot = model:GetPivot()
     local parts: { BasePart } = {}
     for _, d in model:GetDescendants() do
         if d:IsA("BasePart") then
@@ -52,17 +66,21 @@ function AssemblyWeld.bindModel(model: Model): (BasePart?, number)
     if #parts == 0 then
         return nil, 0
     end
-    local pivot = model:GetPivot().Position
     local root = parts[1]
-    local best = (root.Position - pivot).Magnitude
+    local best = (root.Position - pivot.Position).Magnitude
     for i = 2, #parts do
-        local d = (parts[i].Position - pivot).Magnitude
+        local d = (parts[i].Position - pivot.Position).Magnitude
         if d < best then
             root, best = parts[i], d
         end
     end
+    local offset = pivot:ToObjectSpace(root.CFrame)
     local bound = AssemblyWeld.bind(root, parts)
-    model.PrimaryPart = root
+    model:SetAttribute("AssemblyRootOffset", offset)
+    local ref = Instance.new("ObjectValue")
+    ref.Name = "AssemblyRoot"
+    ref.Value = root
+    ref.Parent = model
     return root, bound
 end
 

@@ -15,16 +15,7 @@ local TAG = "ChochinSwing"
 local AMP = math.rad(3.2) -- peak sway angle
 local SPEED = 0.9 -- base angular frequency (rad/s) — period ~7s
 
--- `rootOffset` is filled lazily the first time the server's weld shows up as a PrimaryPart; nil
--- means "not welded yet", which is also the signal to use the PivotTo path.
-type Entry = {
-    model: Model,
-    base: CFrame,
-    phase: number,
-    amp: number,
-    speed: number,
-    rootOffset: CFrame?,
-}
+type Entry = { model: Model, base: CFrame, phase: number, amp: number, speed: number }
 local entries: { Entry } = {}
 
 -- ⚠ POLE-HUNG CHŌCHIN DO NOT SWAY (owner ruling, 2026-09-03). Measured, the effect was ~1.5 inches
@@ -142,25 +133,25 @@ RunService.Heartbeat:Connect(function(dt: number)
         local b = e.amp * 0.45 * math.sin(t * e.speed * 0.7 + e.phase * 1.3) -- subtle cross-axis drift
         local swung = e.base * CFrame.Angles(a, 0, b)
         -- ONE WRITE when the server has welded this lantern into an assembly, ~58 when it has not.
-        -- `PrimaryPart` is the server's signal that the weld happened (AssemblyWeld.bindModel sets
-        -- it); resolved live rather than cached at registration, because the model replicates
-        -- before that property does and a lantern that streams in unwelded must pick the fast path
-        -- up when it lands.
+        -- The server publishes both halves of what this needs (AssemblyWeld.bindModel): an
+        -- `AssemblyRoot` ObjectValue and an `AssemblyRootOffset` CFrame giving the root's pose
+        -- relative to the AUTHORED pivot. `swung * offset` is then exactly where PivotTo would put
+        -- that part. Resolved live rather than cached at registration, because the model replicates
+        -- before its attribute and child do, and a lantern that arrives unwelded must pick the fast
+        -- path up when they land.
         --
-        -- ⚠ THE FALLBACK IS NOT DEAD CODE. PivotTo is correct precisely while PrimaryPart is nil,
-        -- i.e. while nothing is welded. Once parts ARE welded and unanchored, writing all of their
-        -- CFrames individually fights the constraints, so the two paths must never be mixed.
-        local root = e.model.PrimaryPart
-        if root then
-            -- The root's offset FROM THE PIVOT is invariant under PivotTo, so it can be taken at
-            -- any pose and cached -- reading it from the model's CURRENT pivot rather than from
-            -- `base` is what makes that true. Deriving it from `base` and the live root CFrame
-            -- instead would be self-referential: the root has already been swung.
-            local off = e.rootOffset
-            if off == nil then
-                off = e.model:GetPivot():ToObjectSpace(root.CFrame)
-                e.rootOffset = off
-            end
+        -- ⚠ THE OFFSET MUST COME FROM THE SERVER, not be derived here from the live model. Once the
+        -- assembly is being driven, the root's pose is an OUTPUT of this loop, so measuring against
+        -- it is self-referential -- and the rotation half of the error is invisible to any position
+        -- check. That mistake shipped and hung the hanabiya lanterns 0.51 studs off plumb.
+        --
+        -- ⚠ THE FALLBACK IS NOT DEAD CODE. PivotTo is correct precisely while nothing is welded.
+        -- Once parts ARE welded and unanchored, writing every part's CFrame individually fights the
+        -- constraints, so the two paths must never be mixed.
+        local ref = e.model:FindFirstChild("AssemblyRoot")
+        local root = if ref and ref:IsA("ObjectValue") then ref.Value else nil
+        local off = e.model:GetAttribute("AssemblyRootOffset")
+        if root and root:IsA("BasePart") and typeof(off) == "CFrame" then
             root.CFrame = swung * (off :: CFrame)
         else
             e.model:PivotTo(swung)
