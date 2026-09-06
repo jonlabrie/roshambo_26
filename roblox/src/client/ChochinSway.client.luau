@@ -27,6 +27,18 @@ local entries: { Entry } = {}
 -- A `CrossArm` sibling IS the discriminator: buildChochinPole stamps one, the teahouse and hanabiya
 -- builders do not.
 --
+-- ⚠ AND IT MUST BE RE-TESTED EVERY TICK, NOT ONCE AT REGISTRATION. `PathLanterns` sits under
+-- `CanyonWorld.Paths`, which `main.server.luau` leaves unpersisted so it streams normally -- and
+-- under StreamingEnabled a Model tag-replicates BEFORE its siblings arrive. Asking for `CrossArm`
+-- at registration therefore usually asks too early, gets nil, and files a path lantern as a swayer
+-- for the rest of the session. That is exactly what shipped on 2026-09-04: the owner reported every
+-- path lantern still swaying in the published place, while an Edit-mode check said all 38 were
+-- excluded -- because Edit has no streaming and everything is already loaded, so that check could
+-- only ever pass. `FoliageImpostorController`'s header carries the same warning for the same reason
+-- ("models tag-replicate before their parts"); this file was written against that pattern and
+-- missed its point. Resolve live; the check is one FindFirstChild against at most a few dozen
+-- entries, which is nothing beside the PivotTo it decides.
+--
 -- HISTORY, so nobody re-derives the bug if sway ever comes back to the poles: this used to derive
 -- the hang point from the cross-arm rather than trust the stored WorldPivot, because the pivot is
 -- place data and the geometry is builder data. When the poles were shortened, every already-stamped
@@ -45,8 +57,11 @@ local function add(m: Instance)
     if not m:IsA("Model") then
         return
     end
+    -- A cheap early-out for the case where the arm HAS already streamed in. A `false` here means
+    -- "not known to be pole-hung yet", never "confirmed free to sway" -- the loop re-tests and
+    -- evicts. See the warning on isPoleHung.
     if isPoleHung(m) then
-        return -- path poles never sway; see isPoleHung
+        return
     end
     for _, e in entries do
         if e.model == m then
@@ -93,7 +108,16 @@ RunService.Heartbeat:Connect(function(dt: number)
     local camCF = cam.CFrame
     local camPos, look = camCF.Position, camCF.LookVector
     local t = os.clock()
-    for _, e in entries do
+    -- ⚠ BACKWARDS, because pole lanterns are evicted from this list as their CrossArm streams in
+    -- and removing during a forward walk would skip the next entry. Most evictions happen in the
+    -- first seconds after join, but a lantern that streams out and back is re-added by the tag
+    -- signal and must be caught again -- so this runs for the life of the session, not just once.
+    for i = #entries, 1, -1 do
+        local e = entries[i]
+        if isPoleHung(e.model) then
+            table.remove(entries, i)
+            continue
+        end
         local d = e.base.Position - camPos
         local distSq = d.X * d.X + d.Y * d.Y + d.Z * d.Z
         if not AmbientBudget.inRange(distSq, c) then
