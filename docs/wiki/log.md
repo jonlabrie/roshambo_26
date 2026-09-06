@@ -4088,3 +4088,34 @@ a weld to carry them — two anchored parts welded stay two independent anchored
 unanchor second, per part, so a failed weld leaves a part that does not follow rather than one that
 falls. And weld on the SERVER, because on a client a model's parts arrive piecemeal under streaming
 and welding at tag time binds only what has landed.
+
+## [2026-09-06] parked | BellDrive gear weld attempted, measured wrong, reverted
+
+The gears are three rigid groups on paper — each group's per-part `pivotCF` varies only along that
+group's own rotation axis (cam in X about X, driver in Z about Z, jack in Y about Y), so
+`pivotCF * rot * pivotCF:Inverse()` is identical for every member. Welded and driven from one root
+per group, 57 writes a frame become 3. Implemented client-side, because one cam part is built at
+RUNTIME by `HammerController` (the mesh flank) and a server weld could never include it, and that
+is safe here only because BellDrive sits under the Persistent `RoshamboStage`.
+
+⚠ **It did not hold, and the Play test caught it. Reverted, not shipped.** Measured with the game
+running: cam held to **0.000011 studs** of internal drift, jack drifted **0.113661** — an assembly
+being pulled apart. Two facts explain it, and both contradict assumptions made from reading:
+
+- **`driverSpinners` is NOT empty.** Its parts are `MainShaft*`, `FaceWheelMain*` and
+  `MainShaftCollar*` — nothing matching `^Driver`, which is what a name-based survey counted. 19
+  parts nobody had accounted for.
+- **A part can belong to more than one gear group**, and the `weldedParts` guard hands it to
+  whichever group binds first; the other group then turns without it. That is the drift.
+
+`VertShaft`/`VertPaddle` were checked and are clean — they stay anchored, so `DrumController`'s
+independent kick animation does not fight anything.
+
+**What a retry needs, before any code**: the actual membership of all three spinner lists read at
+runtime, and the overlap between them. A shared part has to be resolved deliberately — it belongs
+to one assembly and must be excluded from the others' lists, or the groups are not the rigid bodies
+the geometry says they are. The remaining prize is unchanged: 57 writes a frame, the second-heaviest
+loop in the arena after the waterwheel.
+
+**The reusable lesson**: a rigid-body claim derived from the pivot MATH still needs the MEMBERSHIP
+verified. The axes were right; the sets were not.
