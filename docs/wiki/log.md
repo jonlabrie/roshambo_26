@@ -3665,13 +3665,19 @@ subagent-driven: 11 commits `68a025c`..`46c8a2e`, 1847 Lune tests (three new).
 
 THE REFRAME THAT MADE IT PHASE 1. The parked "Low-end device tier" backlog item assumed
 the wins came from tiering. A survey of every client loop found otherwise: the largest
-continuous costs were unconditional. `ChochinSway` pivoted **every tagged lantern in the
-map every frame** with no distance or visibility check (PathLanterns alone is 2,599
-descendants); `NorenSway` walked every panel's segment chain the same way; Hammer and
-Wheel ran stacked Heartbeats of CFrame math regardless of where the camera pointed. None
-of it checked whether the player could see it. So phase 1 admits only changes with **no
-visual difference on any device** — the owner's ruling — and the device tier keeps its own
-spec.
+continuous costs were unconditional. `ChochinSway` pivoted every tagged lantern every
+frame with no distance or visibility check; `NorenSway` walked every panel's segment chain
+the same way; Hammer and Wheel ran stacked Heartbeats of CFrame math regardless of where
+the camera pointed. None of it checked whether the player could see it. So phase 1 admits
+only changes with **no visual difference on any device** — the owner's ruling — and the
+device tier keeps its own spec.
+
+⚠ **CORRECTED 2026-09-05.** This entry originally sized that first claim as "PathLanterns
+alone is 2,599 descendants", which is not what the loop touched and overstated it by ~68×.
+Measured live: **38** `ChochinSwing` Models in Workspace, and 25 noren panels. 2,599 is the
+instance count of all lantern infrastructure — poles, arms, every part — from
+[[place-state]]; the animated unit is the tagged `Swing` Model. Textbook rule 9: a number
+copied into prose has no source. See the 2026-09-05 entry for what this changes.
 
 - New pure `AmbientBudget` (`inRange` takes distance SQUARED so the sqrt runs only for
   survivors; `step` carries its remainder rather than zeroing, which is what stops a
@@ -3948,3 +3954,45 @@ gate. `PlayProvingShow` (`ServerStorage`, created at boot) fires `Launch.playDra
 player the panel uses — and is reachable only from server code, i.e. the Developer Console's
 server command bar for edit-permission holders. Cues carry `by = "console"`. Procedure on
 [[fireworks]]. Still owner-run, still post-publish; result not yet recorded.
+
+## [2026-09-05] correction | The whole load-reduction case rested on a number that was wrong by 68×
+
+Owner asked whether the path chōchin sway removal had actually shipped. It had — verified
+live: of 40 `ChochinSwing` Models in Workspace, **38 are pole-hung and now excluded**, and
+the 2 that still sway are the Hanabiya pair, which hang without a cross-arm and were meant
+to keep it. `isPoleHung` works exactly as designed.
+
+⚠ **But measuring it exposed that the effort's headline justification was wrong.** The spec
+and the 2026-09-04 entry both led with "`ChochinSway` pivots every tagged lantern in the map
+every frame — PathLanterns alone is 2,599 descendants." The animated unit is the tagged
+`Swing` **Model**, not a descendant. Measured in the live place:
+
+| loop | what it actually iterated per frame |
+|---|---|
+| `ChochinSway` | **40** models (38 path + 2 hanabiya) |
+| `NorenSway` | **25** panels (94 tagged segments) |
+| `WheelController` | up to **274** BaseParts — the real heavy one |
+| `HammerController` | 28 BaseParts in `BonshoRig`, plus chains and dowels |
+
+So the lantern loop — the case the spec opened with — was ~40 `PivotTo` calls a frame, not
+thousands. The gating machinery added to decide whether to skip them plausibly costs as much
+as the work it skips. The genuinely heavy loop was the **waterwheel at 274 parts**, and the
+spec mentioned it third.
+
+**This is why the A13 saw nothing until the caching fix.** The culling was never saving much;
+what the effort actually cost the arena was the per-frame allocations and attribute reads the
+culling machinery itself introduced, and removing those is what made the device usable. The
+optimisation's win came from undoing its own overhead.
+
+⚠ Failure mode, and it is [[schema]] rule 9 verbatim — *never transcribe a measurable fact,
+record how to MEASURE it*. 2,599 was read off [[place-state]], where it is a correct
+**instance count**, and carried into a performance argument as an **animation workload**.
+Same shape as the uguisu 0.552-vs-0.828 case that rule was written for: a real number from
+the wrong register, and nothing positioned to notice. One line in the Studio command bar
+would have caught it before the spec was written:
+`print(#game:GetService("CollectionService"):GetTagged("ChochinSwing"))`
+
+**What it changes going forward:** phase 2's premises need the same treatment before they are
+believed. The foliage 3,580, PathRailings 5,186 and stats-room ~8,400 figures are all
+instance counts from the same page, and their relevance to per-frame or per-draw cost is
+exactly the thing that was assumed here and turned out false. Measure the loop, not the tree.
