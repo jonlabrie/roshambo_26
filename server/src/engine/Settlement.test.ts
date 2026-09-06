@@ -52,21 +52,56 @@ describe('settleRound', () => {
         expect(u).toMatchObject({ pointsAtStake: 1, currentStreak: 1, stakingStreak: 1, bestStreak: 1 });
     });
 
-    it('a WIN grants one firecracker', async () => {
-        // The grant pathway's first source. A new player should see their own firework within
-        // minutes of joining, without buying anything.
-        const user = await User.create({ deviceId: 'grantWin', pointsAtStake: 0 });
-        await settleRound({
-            roundId: 'rGrantWin',
-            worldThrow: 'S', // R beats S -> WIN
+    describe('the drop table (spec §7): what a WIN grants depends on the streak after it', () => {
+        const winFor = (deviceId: string, currentStreak: number) => ({
+            roundId: `r-${deviceId}`,
+            worldThrow: 'S' as const, // R beats S -> WIN
             counts: { R: 1, P: 0, S: 0 },
-            throws: throwsMap([
-                ['pwa:grantWin', { throw: 'R', seq: 1, platform: 'pwa', deviceId: 'grantWin' }],
-            ]),
+            throws: throwsMap([[`pwa:${deviceId}`, { throw: 'R', seq: 1, platform: 'pwa', deviceId }]]),
             timestamp: new Date(),
         });
-        const after = await User.findById(user._id);
-        expect(after!.fireworks.get('firecracker')).toBe(1);
+
+        it('first win of a run: one firecracker, no ticket', async () => {
+            const user = await User.create({ deviceId: 'd1', currentStreak: 0 });
+            await settleRound(winFor('d1', 0));
+            const after = await User.findById(user._id);
+            expect(after!.fireworks.get('firecracker')).toBe(1);
+            expect(after!.goldenTickets).toEqual([]);
+            expect(after!.powder).toBe(0);
+        });
+
+        it('third win: a peony, no firecracker', async () => {
+            const user = await User.create({ deviceId: 'd3', currentStreak: 2 });
+            await settleRound(winFor('d3', 2));
+            const after = await User.findById(user._id);
+            expect(after!.fireworks.get('peony')).toBe(1);
+            expect(after!.fireworks.get('firecracker') ?? 0).toBe(0);
+        });
+
+        it('sixth win: the default shell AND a golden ticket with an id and a time', async () => {
+            const user = await User.create({ deviceId: 'd6', currentStreak: 5 });
+            await settleRound(winFor('d6', 5));
+            const after = await User.findById(user._id);
+            expect(after!.fireworks.get('firecracker')).toBe(1);
+            expect(after!.goldenTickets).toHaveLength(1);
+            expect(after!.goldenTickets[0].id).toMatch(/^[0-9a-f-]{36}$/);
+            expect(after!.goldenTickets[0].earnedAt).toBeInstanceOf(Date);
+        });
+
+        it('seventh win: no second ticket', async () => {
+            const user = await User.create({ deviceId: 'd7', currentStreak: 6, goldenTickets: [{ id: 'x', earnedAt: new Date() }] });
+            await settleRound(winFor('d7', 6));
+            const after = await User.findById(user._id);
+            expect(after!.goldenTickets).toHaveLength(1);
+        });
+
+        it('a SAFE grants nothing', async () => {
+            const user = await User.create({ deviceId: 'dS', currentStreak: 2 });
+            await settleRound({ ...winFor('dS', 2), worldThrow: 'R' }); // R vs R -> SAFE
+            const after = await User.findById(user._id);
+            expect(after!.fireworks.size).toBe(0);
+            expect(after!.goldenTickets).toEqual([]);
+        });
     });
 
     it('a LOSS grants nothing', async () => {

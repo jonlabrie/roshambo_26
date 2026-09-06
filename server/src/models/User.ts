@@ -63,6 +63,13 @@ export interface IUser extends Document {
     portalOwned: boolean;
     deckDecorations: { id: number; propId: string; offset: [number, number]; facing: 'N' | 'E' | 'S' | 'W' }[];
     fireworks: Map<string, number>;
+    // THE SECOND ECONOMY (spec 2026-09-05 §7). Powder buys only things that burn: points and Robux
+    // flow IN, shells melt back INTO it, and nothing ever flows OUT to totalPoints or a durable.
+    // Never rank by it, never sum it into earnings. Every move is a conditional $inc.
+    powder: number;
+    // Minted by the drop table at the ticket streak (Settlement); redeemed, gifted and booked in
+    // sub-project C. Append-only here.
+    goldenTickets: { id: string; earnedAt: Date }[];
     mortars: string[];
     mortarPlacements: Record<string, { offset: [number, number]; facing: 'N' | 'E' | 'S' | 'W' }>;
     teahouseAccess: { mode: 'public' | 'friends' | 'private'; invited: number[] };
@@ -117,6 +124,8 @@ const UserSchema: Schema = new Schema({
     // Decrementing must be a conditional $inc (see the spend route) — a lost update on a count
     // loses a launch, not just points.
     fireworks: { type: Map, of: Number, default: {} },
+    powder: { type: Number, default: 0 },
+    goldenTickets: { type: [Schema.Types.Mixed], default: [] },
     mortars: { type: [String], default: [] },
     mortarPlacements: { type: Schema.Types.Mixed, default: {} },
     teahouseAccess: {

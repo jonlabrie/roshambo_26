@@ -6,6 +6,8 @@ import { calculateResult, nextPot, potDelta, nextStreak, Throw, RoundResult } fr
 import { ThrowEntry } from './RoundEngine';
 import { resolveUser } from '../identity';
 import StreakEvent from '../models/StreakEvent';
+import { dropForStreak } from '../drops';
+import { randomUUID } from 'crypto';
 
 export interface GlobalResult {
     id: string;
@@ -141,6 +143,10 @@ export async function settleRound(data: RoundToSettle): Promise<{ round: GlobalR
                     });
                 }
 
+                // THE GRANT PATHWAY'S FIRST SOURCE, now a table (spec §7): what a WIN drops depends on
+                // the streak AFTER it, computed here so the grant stays inside the one atomic write.
+                const drop = result === 'WIN' ? dropForStreak(streak) : null;
+
                 const forfeited = result === 'LOSS' ? (user.pointsAtStake || 0) : 0;
                 const counters = buildCounterUpdate(entry.throw, result, pot, forfeited);
                 const updated = (await User.findByIdAndUpdate(user._id, {
@@ -153,12 +159,13 @@ export async function settleRound(data: RoundToSettle): Promise<{ round: GlobalR
                     },
                     $inc: {
                         ...counters.$inc,
-                        // THE GRANT PATHWAY'S FIRST SOURCE. A multi-day streak or a Robux pack is
-                        // the same operation with a different trigger — which is why acquisition is
-                        // one pathway and not a purchase feature with grants bolted on.
-                        ...(result === 'WIN' ? { 'fireworks.firecracker': 1 } : {}),
+                        // A multi-day streak or a Robux pack is the same operation with a different
+                        // trigger — which is why acquisition is one pathway and not a purchase
+                        // feature with grants bolted on.
+                        ...(drop ? { [`fireworks.${drop.shellId}`]: 1 } : {}),
                     },
                     $max: counters.$max,
+                    ...(drop?.ticket ? { $push: { goldenTickets: { id: randomUUID(), earnedAt: data.timestamp } } } : {}),
                 }, { new: true })) || user;
 
                 // AGAINST THE POST-WRITE STATE. `updated` already carries this round's bestPot,
