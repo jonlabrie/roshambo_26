@@ -3672,12 +3672,12 @@ the camera pointed. None of it checked whether the player could see it. So phase
 only changes with **no visual difference on any device** — the owner's ruling — and the
 device tier keeps its own spec.
 
-⚠ **CORRECTED 2026-09-05.** This entry originally sized that first claim as "PathLanterns
-alone is 2,599 descendants", which is not what the loop touched and overstated it by ~68×.
-Measured live: **38** `ChochinSwing` Models in Workspace, and 25 noren panels. 2,599 is the
-instance count of all lantern infrastructure — poles, arms, every part — from
-[[place-state]]; the animated unit is the tagged `Swing` Model. Textbook rule 9: a number
-copied into prose has no source. See the 2026-09-05 entry for what this changes.
+⚠ **A "correction" posted here on 2026-09-05 claiming this was overstated by ~68× was
+ITSELF WRONG and has been withdrawn.** It counted loop iterations (40 `ChochinSwing`
+models) instead of what each iteration moves: `Model:PivotTo` transforms the whole model,
+and these lanterns hold ~58 parts each. Measured live 2026-09-06: **40 models totalling
+2,308 BaseParts moved every frame.** The original figure was right in magnitude. Removing
+path sway is a real win, not a negligible one.
 
 - New pure `AmbientBudget` (`inRange` takes distance SQUARED so the sqrt runs only for
   survivors; `step` carries its remainder rather than zeroing, which is what stops a
@@ -3955,52 +3955,41 @@ player the panel uses — and is reachable only from server code, i.e. the Devel
 server command bar for edit-permission holders. Cues carry `by = "console"`. Procedure on
 [[fireworks]]. Still owner-run, still post-publish; result not yet recorded.
 
-## [2026-09-05] correction | The whole load-reduction case rested on a number that was wrong by 68×
+## [2026-09-06] correction | I withdrew a correct number and replaced it with a wrong one
 
-Owner asked whether the path chōchin sway removal had actually shipped. It had — verified
-live: of 40 `ChochinSwing` Models in Workspace, **38 are pole-hung and now excluded**, and
-the 2 that still sway are the Hanabiya pair, which hang without a cross-arm and were meant
-to keep it. `isPoleHung` works exactly as designed.
+Two things measured live, after the owner asked whether the path-chōchin sway removal had
+actually shipped and whether it was worth anything.
 
-⚠ **But measuring it exposed that the effort's headline justification was wrong.** The spec
-and the 2026-09-04 entry both led with "`ChochinSway` pivots every tagged lantern in the map
-every frame — PathLanterns alone is 2,599 descendants." The animated unit is the tagged
-`Swing` **Model**, not a descendant. Measured in the live place:
+**It shipped and it is worth something.** 38 of the 40 `ChochinSwing` models in Workspace
+are pole-hung and now excluded; the 2 that still sway are the Hanabiya pair, which hang
+without a cross-arm and were meant to keep it.
 
-| loop | what it actually iterated per frame |
-|---|---|
-| `ChochinSway` | **40** models (38 path + 2 hanabiya) |
-| `NorenSway` | **25** panels (94 tagged segments) |
-| `WheelController` | up to **274** BaseParts — the real heavy one |
-| `HammerController` | 28 BaseParts in `BonshoRig`, plus chains and dowels |
+⚠ **And the 2026-09-05 entry claiming the effort's justification was "wrong by 68×" was
+itself wrong. Withdrawn.** It counted how many things the loop iterated (40 models) rather
+than what each iteration moves. `Model:PivotTo` transforms the whole model, and these
+lanterns carry ~58 parts each — one sample, `ChochinPole_14.Swing`, has 58. Measured:
+**40 models, 2,308 BaseParts moved every frame.** The spec's original figure was right in
+magnitude; my correction of it was the error, and it sat in this log for a day saying the
+opposite.
 
-So the lantern loop — the case the spec opened with — was ~40 `PivotTo` calls a frame, not
-thousands. The gating machinery added to decide whether to skip them plausibly costs as much
-as the work it skips. The genuinely heavy loop was the **waterwheel at 274 parts**, and the
-spec mentioned it third.
+The lesson is not the one I wrote yesterday. It is: **when sizing a loop, measure what the
+work touches, not how many times the loop goes round.** An iteration count and a transform
+count differ here by 58×, in the direction that makes real work look like nothing.
 
-**This is why the A13 saw nothing until the caching fix.** The culling was never saving much;
-what the effort actually cost the arena was the per-frame allocations and attribute reads the
-culling machinery itself introduced, and removing those is what made the device usable. The
-optimisation's win came from undoing its own overhead.
+**The waterwheel, measured the same way** — the owner's question was whether building it
+from parts was a mistake:
 
-⚠ Failure mode, and it is [[schema]] rule 9 verbatim — *never transcribe a measurable fact,
-record how to MEASURE it*. 2,599 was read off [[place-state]], where it is a correct
-**instance count**, and carried into a performance argument as an **animation workload**.
-Same shape as the uguisu 0.552-vs-0.828 case that rule was written for: a real number from
-the wrong register, and nothing positioned to notice. One line in the Studio command bar
-would have caught it before the spec was written:
-`print(#game:GetService("CollectionService"):GetTagged("ChochinSwing"))`
+- 274 anchored parts in the rig, **0 welds of any kind**.
+- `WheelController` therefore writes **266 individual part CFrames every frame**, one at a
+  time, because nothing binds them into an assembly the engine can move as a unit.
 
-**What it changes going forward:** phase 2's premises need the same treatment before they are
-believed. The foliage 3,580, PathRailings 5,186 and stats-room ~8,400 figures are all
-instance counts from the same page, and their relevance to per-frame or per-draw cost is
-exactly the thing that was assumed here and turned out false. Measure the loop, not the tree.
+So the cost is not "it has a lot of parts" — it is that nothing welds them. Two independent
+fixes, either of which collapses 266 writes to 1: weld the lattice and paddles to the wheel
+and set only the wheel's CFrame, or replace the lattice with a single MeshPart (which also
+cuts draw calls, and is the better answer if the wheel is ever seen at distance). Neither is
+in scope for the shipped work; both belong in the phase-2 discussion, and the welding one is
+small enough to do on its own.
 
-## [2026-09-06] decision | Server-file split spec approved: phase one, four extractions, one Studio gate each
-
-Spec `docs/superpowers/specs/2026-09-06-server-file-split-design.md`. `main.server.luau` sits at 199
-of Luau's 200 top-level registers; phase one moves the remotes table, the shoji slide controller,
-the stats-room feed and the teahouse rebuild into modules (~60 names freed), each as its own
-commit merged to `main` and walked by the owner in Studio before the next begins. The spec records
-the pure-module / runtime-adapter distinction the codebase already practises. Plan to follow.
+Nothing in the builder or the wiki records WHY the rig is unwelded parts — it is generated by
+`tools/builders/`, and part-built props are the house pattern for anything meant to be tuned
+numerically, which is a plausible reason but not a recorded one.
