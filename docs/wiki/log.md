@@ -4052,3 +4052,39 @@ a count, long before anyone notices two barrels in one corner.
 
 The swaying population went from 2 to 8, and all eight are welded assemblies ([[misc-engine-traps]]
 has the weld rule), so the per-frame cost is 8 writes rather than 8 × ~55 part transforms.
+
+## [2026-09-06] perf | Welds: the wheel, the lanterns, the shu-moku's fittings — and what is left
+
+⚠ **NOTHING IN THIS PLACE WAS WELDED.** Every animated multi-part prop was being carried by hand,
+one `CFrame` write per part per frame, because no assembly existed for the engine to move. Measured
+across the arena, with the fixes shipped today:
+
+| prop | parts | writes/frame before | after |
+|---|---|---|---|
+| Waterwheel | 274 | 266 | **1** (`a600283`) |
+| Chōchin (each) | ~58 | ~58 | **1** (`7703ddf`) |
+| Shu-moku fittings | 12 | 12 | **0** — ride the log's own write (`4e24b71`) |
+| **BellDrive gears** | 94 | **57** (Cam ×38 + Jack ×19) | not done |
+| **ThrowDrum** | 84 + 12 runtime | **24** (12 facets + 12 neon) | not done |
+| BonshoRig chains | 4 | 4 | correctly excluded — they RESIZE |
+| Shoro | 105 | 0 | static; it is the TOWER, not the log |
+
+**Two remain, and both are ready.** The **gears** are the bigger win and the same server-side
+`AssemblyWeld` pattern: every cam part pivots about an axle shared in Y and Z, each at its own X
+station along an 11.8-stud shaft, so cam and jack are two rigid bodies — 57 writes become 2. It
+needs `HammerController`'s three spinner loops to write only a root, which is why it was not
+bundled with the shu-moku's simpler change. The **drum** is rigid too (every part takes
+`spun * offset` from one hub rotation) but its weld must be CLIENT-side: half its parts are the
+night-glyph Neon that `Glyphs.buildNightNeon` builds at runtime, which is why it reads 84 parts in
+Edit and 96 in Play.
+
+⚠ **Terminology that cost a round trip: `Shoro` is the bell TOWER** (105 parts, all `Rafter*`,
+`Plinth*`, `Bracket*`) and is genuinely static. The striking log and its dress are `BonshoRig`.
+A survey that reports "Shoro: nothing animates it" is true and still misleading, because the hero
+animation of the whole drive chain sits one model away.
+
+**The rule this all turns on**, recorded on [[misc-engine-traps]]: children must be UNANCHORED for
+a weld to carry them — two anchored parts welded stay two independent anchored roots. Weld first,
+unanchor second, per part, so a failed weld leaves a part that does not follow rather than one that
+falls. And weld on the SERVER, because on a client a model's parts arrive piecemeal under streaming
+and welding at tag time binds only what has landed.
