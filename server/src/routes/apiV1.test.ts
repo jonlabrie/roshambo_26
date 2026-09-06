@@ -1129,6 +1129,7 @@ describe('/api/v1', () => {
                     .expect(200);
                 expect(res.body.reservationId).toMatch(/^[a-z0-9]{6,}$/);
                 expect(res.body.stageId).toBe('deck:910');
+                expect(res.body.fuel).toBe('inventory');
                 expect(res.body.debited).toEqual({ firecracker: 2, peony: 1, wa: 1 });
                 expect(res.body.remaining).toEqual({ firecracker: 1, peony: 1, wa: 0 });
                 const after = await User.findOne({ robloxId: '910' });
@@ -1168,11 +1169,11 @@ describe('/api/v1', () => {
                 expect(after!.fireworks.get('firecracker')).toBe(1);
             });
 
-            it('refuses powder fuel, other stages, malformed shows and invalid cues with the validator code', async () => {
+            it('refuses an unknown fuel, other stages, malformed shows and invalid cues with the validator code', async () => {
                 await User.create({ robloxId: '913', fireworks: { firecracker: 1 } });
                 const app = makeApp(makeEngine(), new ResultsStore());
                 const post = (body: object) => request(app).post('/api/v1/players/913/shows/reserve').set('X-API-Key', API_KEY).send(body);
-                expect((await post({ show: { stageId: 'deck:913', fuel: 'powder', cues: [{ t_ms: 0, slot: 'hand', shellId: 'firecracker' }] } }).expect(400)).body.error).toBe('FUEL_UNSUPPORTED');
+                expect((await post({ show: { stageId: 'deck:913', fuel: 'wishes', cues: [{ t_ms: 0, slot: 'hand', shellId: 'firecracker' }] } }).expect(400)).body.error).toBe('FUEL_UNSUPPORTED');
                 expect((await post({ show: { stageId: 'rooftop', fuel: 'inventory', cues: [{ t_ms: 0, slot: 'hand', shellId: 'firecracker' }] } }).expect(400)).body.error).toBe('BAD_STAGE');
                 expect((await post({ show: { stageId: 'deck:999', fuel: 'inventory', cues: [{ t_ms: 0, slot: 'hand', shellId: 'firecracker' }] } }).expect(400)).body.error).toBe('BAD_STAGE');
                 expect((await post({}).expect(400)).body.error).toBe('BAD_SHOW');
@@ -1182,6 +1183,33 @@ describe('/api/v1', () => {
                 expect(after!.fireworks.get('firecracker')).toBe(1);
             });
 
+            it('powder fuel: debits the summed list price in one update, and owns no shells afterward', async () => {
+                await User.create({ robloxId: '940', mortars: ['mortar:S'], powder: 10 });
+                const res = await request(makeApp(makeEngine(), new ResultsStore()))
+                    .post('/api/v1/players/940/shows/reserve').set('X-API-Key', API_KEY)
+                    .send({ show: { stageId: 'deck:940', fuel: 'powder', cues: [
+                        { t_ms: 0, slot: 'hand', shellId: 'firecracker' },     // 1
+                        { t_ms: 1000, slot: 'mortar:S', shellId: 'peony' },     // 3
+                        { t_ms: 2000, slot: 'mortar:S', shellId: 'kiku' },      // 4
+                    ] } }).expect(200);
+                expect(res.body.fuel).toBe('powder');
+                expect(res.body.debited).toEqual({ powder: 8 });
+                const after = await User.findOne({ robloxId: '940' });
+                expect(after!.powder).toBe(2);
+                expect(after!.fireworks.size).toBe(0);
+            });
+            it('powder fuel: INSUFFICIENT_POWDER debits nothing; mortar ownership still applies', async () => {
+                await User.create({ robloxId: '941', mortars: [], powder: 100 });
+                const app = makeApp(makeEngine(), new ResultsStore());
+                const poor = await request(app).post('/api/v1/players/941/shows/reserve').set('X-API-Key', API_KEY)
+                    .send({ show: { stageId: 'deck:941', fuel: 'powder', cues: [{ t_ms: 0, slot: 'mortar:S', shellId: 'peony' }] } }).expect(409);
+                expect(poor.body).toEqual({ error: 'MORTAR_MISSING', slot: 'mortar:S' });
+                await User.updateOne({ robloxId: '941' }, { $set: { powder: 2 } });
+                const broke = await request(app).post('/api/v1/players/941/shows/reserve').set('X-API-Key', API_KEY)
+                    .send({ show: { stageId: 'deck:941', fuel: 'powder', cues: [{ t_ms: 0, slot: 'hand', shellId: 'firecracker' }, { t_ms: 500, slot: 'hand', shellId: 'firecracker' }, { t_ms: 900, slot: 'hand', shellId: 'firecracker' }] } }).expect(409);
+                expect(broke.body).toEqual({ error: 'INSUFFICIENT_POWDER', needed: 3, held: 2 });
+                expect((await User.findOne({ robloxId: '941' }))!.powder).toBe(2);
+            });
             it('CONCURRENT RESERVES CANNOT OVERSPEND — one conditional update per reservation', async () => {
                 await User.create({ robloxId: '914', fireworks: { firecracker: 1 } });
                 const app = makeApp(makeEngine(), new ResultsStore());

@@ -476,7 +476,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
         try {
             const show = req.body?.show;
             if (typeof show !== 'object' || show === null) { res.status(400).json({ error: 'BAD_SHOW' }); return; }
-            if (show.fuel !== 'inventory') { res.status(400).json({ error: 'FUEL_UNSUPPORTED' }); return; }
+            if (show.fuel !== 'inventory' && show.fuel !== 'powder') { res.status(400).json({ error: 'FUEL_UNSUPPORTED' }); return; }
             if (show.stageId !== `deck:${req.params.robloxUserId}`) { res.status(400).json({ error: 'BAD_STAGE' }); return; }
             const check = validateShow(show.cues, DECK_STAGE);
             if (!check.ok) { res.status(400).json(check.cue === undefined ? { error: check.error } : { error: check.error, cue: check.cue }); return; }
@@ -493,6 +493,27 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
                     res.status(409).json({ error: 'MORTAR_MISSING', slot: c.slot });
                     return;
                 }
+            }
+
+            // Powder buys the shells outright at list price: no inventory is touched, so the same
+            // conditional-update shape guards the balance instead of the per-shell counts.
+            if (show.fuel === 'powder') {
+                for (const c of cues) {
+                    if (!isPowderEligible(c.shellId)) { res.status(409).json({ error: 'POWDER_INELIGIBLE', shellId: c.shellId }); return; }
+                }
+                const cost = cues.reduce((s, c) => s + SHELL_PRICES[c.shellId], 0);
+                const updated = await User.findOneAndUpdate(
+                    { _id: user._id, powder: { $gte: cost } },
+                    { $inc: { powder: -cost } },
+                    { new: true }
+                );
+                if (!updated) { res.status(409).json({ error: 'INSUFFICIENT_POWDER', needed: cost, held: user.powder ?? 0 }); return; }
+                res.json({
+                    reservationId: Math.random().toString(36).slice(2, 12),
+                    stageId: show.stageId, fuel: 'powder', cues,
+                    debited: { powder: cost }, remaining: { powder: updated.powder },
+                });
+                return;
             }
 
             const needed = tallyShells(cues);
@@ -514,6 +535,7 @@ export function createApiV1(engine: RoundEngine, store: ResultsStore): Router {
             res.json({
                 reservationId: Math.random().toString(36).slice(2, 12),
                 stageId: show.stageId,
+                fuel: 'inventory',
                 cues,
                 debited: needed,
                 remaining,
