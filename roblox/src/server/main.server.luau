@@ -142,6 +142,45 @@ for _, model in StagePersistence.persistTargets(persistRoots) do
     (model :: Model).ModelStreamingMode = Enum.ModelStreamingMode.Persistent
 end
 
+-- WELD THE WATERWHEEL INTO ONE ASSEMBLY, so the client can turn it with a single write.
+--
+-- Measured 2026-09-06: the rig is 274 anchored parts with ZERO welds of any kind, so
+-- `WheelController` had to write 266 individual part CFrames EVERY FRAME to spin it -- by far
+-- the heaviest per-frame loop in the arena, which is where the owner actually plays. Welding the
+-- timbers and paddles to the invisible `Wheel{n}` proxy makes them one assembly the engine moves
+-- together, and the controller then writes exactly one CFrame.
+--
+-- ⚠ THE CHILDREN MUST BE UNANCHORED, and that is the whole mechanism. Two ANCHORED parts welded
+-- together stay two independent anchored roots: moving one does not move the other, and the weld
+-- buys nothing. An anchored root with unanchored parts welded to it is a single anchored assembly
+-- -- not simulated, not replicated as motion, and moved wholesale by setting the root. That is
+-- also why this is safe for a client-side animation: the assembly is still anchored, so the
+-- server never pushes a correcting CFrame, exactly as when every part was anchored individually.
+--
+-- ⚠ WELD FIRST, UNANCHOR SECOND, and only unanchor what actually got a weld. Reverse the order
+-- and any part whose weld fails is briefly a loose unanchored board standing in a river.
+do
+    local wheelRig = stage:FindFirstChild("Waterwheel")
+    if wheelRig then
+        for _, proxy in wheelRig:GetChildren() do
+            local wi = proxy.Name:match("^Wheel(%d+)$")
+            if wi and proxy:IsA("BasePart") then
+                for _, p in wheelRig:GetChildren() do
+                    if p ~= proxy and p:IsA("BasePart") then
+                        if p.Name:match(`^Paddle{wi}_%d+$`) or p.Name:match(`^Wheel{wi}T_`) then
+                            local weld = Instance.new("WeldConstraint")
+                            weld.Part0 = proxy :: BasePart
+                            weld.Part1 = p
+                            weld.Parent = proxy
+                            p.Anchored = false
+                        end
+                    end
+                end
+            end
+        end
+    end
+end
+
 -- ⚠ THE STREAMING RADII CANNOT BE SET FROM CODE. DO NOT ADD THAT CODE BACK.
 -- `Workspace.StreamingMinRadius` and `StreamingTargetRadius` are NOT SCRIPTABLE: reading or
 -- writing either from Luau throws `... is not a valid member of Workspace`. They are editable

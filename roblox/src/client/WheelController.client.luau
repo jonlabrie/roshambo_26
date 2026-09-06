@@ -186,12 +186,16 @@ RunService.Heartbeat:Connect(function(dt)
     acc = nextAcc
     local visible = drawable(c)
     if fire and visible then
+        -- ONE WRITE PER WHEEL. The timbers and paddles are welded to this proxy at server boot
+        -- (see main.server.luau), so the engine carries them; this loop used to write 266
+        -- individual part CFrames every frame to do the same thing.
+        --
+        -- `s.paddles` and `s.offsets` are still captured at startup and are now unused by the
+        -- spin. They are kept deliberately: the offsets are the exact relative poses the weld
+        -- now holds, so restoring the per-part write is a two-line revert if the weld ever has
+        -- to come out. Delete them only together with that option.
         for _, s in spins do
-            local spun = s.hub * CFrame.Angles(angle, 0, 0)
-            s.part.CFrame = spun
-            for i, p in s.paddles do
-                p.CFrame = spun * s.offsets[i]
-            end
+            s.part.CFrame = s.hub * CFrame.Angles(angle, 0, 0)
         end
     end
     -- splash when a paddle strikes the waterline: one boundary per 2π/paddleCount of
