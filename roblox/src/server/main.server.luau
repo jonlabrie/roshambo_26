@@ -52,6 +52,7 @@ local HandlerQueue = require(script.Parent:WaitForChild("HandlerQueue"))
 local PortalController = require(script.Parent:WaitForChild("PortalController"))
 local Remotes = require(script.Parent:WaitForChild("Remotes"))
 local ShojiSlideController = require(script.Parent:WaitForChild("ShojiSlideController"))
+local StatsFeed = require(script.Parent:WaitForChild("StatsFeed"))
 local shared = ReplicatedStorage:WaitForChild("RoshamboShared")
 local RoundClock = require(shared:WaitForChild("RoundClock"))
 local CollectionService = game:GetService("CollectionService")
@@ -427,11 +428,33 @@ local function playerByUserId(userId: string): Player?
     return nil
 end
 
-local lastTape: any = {}
-local lastTapeId: string? = nil
--- Declared up here because the round callback below re-broadcasts it the instant a
--- round settles, and that callback is wired long before the stats poller is built.
-local lastStats: any = nil
+-- THE STATS ROOM'S FEED (server-file split, phase one, task 3): the 47s poller, the personal
+-- slip's 60s loop, the external-name filters and the tape/stats state all live in StatsFeed.
+-- BUILT UP HERE, not where it starts far below, because the round callback just below
+-- re-broadcasts its stats with a fresh tape the instant a round settles and the BoardData poller
+-- reads its tape -- both are wired long before the feed's own loops are started.
+local statsFeed = StatsFeed.new({
+    net = net,
+    filterName = filterExternalName,
+    fireAll = function(payload: any)
+        R.StatsData:FireAllClients(payload)
+    end,
+    fireTo = function(player: Player, payload: any)
+        R.StatsData:FireClient(player, payload)
+    end,
+    firePersonal = function(player: Player, payload: any)
+        R.StatsPersonal:FireClient(player, payload)
+    end,
+    players = Players,
+    task = task,
+    getRosterEntry = function(uid: string)
+        return familiarRoster[uid]
+    end,
+    setRosterEntry = function(uid: string, entry: any)
+        familiarRoster[uid] = entry
+    end,
+    pushRoster = pushFamiliarRoster,
+})
 
 -- FORWARD DECLARATION. The referee's helpers need playerEconomy and PadSites, which are built far
 -- below; but the reveal fan-out just above here has to re-push shell state the moment a round
@@ -480,12 +503,11 @@ local coordinator = RoundCoordinator.new({
                 -- `onRound` fires on each phase change, but the tape only grows at settlement,
                 -- so this is gated on the newest entry's id rather than on the callback.
                 local newest = info.tape[1] and info.tape[1].id
-                local grew = newest ~= lastTapeId
-                lastTape = info.tape
-                lastTapeId = newest
-                if grew and lastStats then
-                    lastStats.tape = lastTape
-                    R.StatsData:FireAllClients(lastStats)
+                local grew = statsFeed:setTape(info.tape, newest)
+                local current = statsFeed:current()
+                if grew and current then
+                    current.tape = statsFeed:tape()
+                    R.StatsData:FireAllClients(current)
                 end
             end
         end,
@@ -911,11 +933,12 @@ task.spawn(function()
                 hotStreak = { streak = best, name = filterExternalName(bestName) }
             end
         end
+        local tape = statsFeed:tape()
         lastBoard = {
-            tape = lastTape,
+            tape = tape,
             worldRec = worldRec,
             hotStreak = hotStreak,
-            playersNow = (lastTape[1] and lastTape[1].totalPlayers) or 0,
+            playersNow = (tape[1] and tape[1].totalPlayers) or 0,
         }
         R.BoardData:FireAllClients(lastBoard)
         task.wait(30)
@@ -932,157 +955,11 @@ for _, p in Players:GetPlayers() do
     task.spawn(onPlayerJoinBoard, p) -- defect (n): catch a join that landed before this connect
 end
 
--- FIX 4: names in leaders/recordsWeek/recordsAll/heat are EXTERNAL (player-chosen display
--- names) and this feed broadcasts to every client, world-visible on the Stats room's walls —
--- unlike the pushStatsPersonal 404 fallback below, which sends a name Roblox has already
--- moderated. StatsBoardModel.sanitize is not a substitute: it only uppercases and strips
--- non-ASCII, so ASCII abuse (still filterable, still offensive) passes straight through.
---
--- Cached by raw name so a name that keeps ranking round after round costs one filter call, not
--- one per 60s cycle. UNBOUNDED on purpose: the key space is the set of names that have ever
--- ranked into a top-10 (leaderboard, streak/bank/round records, or heat) — small next to the
--- player population, and this table lives only for the game server's process lifetime anyway.
-local nameFilterCache: { [string]: string } = {}
-local function cachedFilterName(name: string): string
-    local cached = nameFilterCache[name]
-    if cached then
-        return cached
-    end
-    local filtered = filterExternalName(name)
-    nameFilterCache[name] = filtered
-    return filtered
-end
-
--- Filter only what is RENDERED: no board in the Stats room shows more than 10 rows, so rows
--- past the 10th are left as-is rather than spent on a filter call nothing will ever display.
-local STATS_BOARD_ROWS = 10
-local function filterTop(list: { any }?): { any }
-    local out = {}
-    for i, row in list or {} do
-        if i <= STATS_BOARD_ROWS then
-            local copy = table.clone(row)
-            copy.displayName = cachedFilterName(row.displayName or "?")
-            table.insert(out, copy)
-        else
-            table.insert(out, row)
-        end
-    end
-    return out
-end
-
-local function filterRecords(records: any?): any?
-    if not records then
-        return records
-    end
-    local copy = table.clone(records)
-    copy.longestStreaks = filterTop(records.longestStreaks)
-    copy.biggestBanks = filterTop(records.biggestBanks)
-    copy.biggestRounds = filterTop(records.biggestRounds)
-    return copy
-end
-
--- The board arrives already named and already gated by the server; the only thing left to strip
--- is anything a client has no business holding. Its own filter rather than folded into
--- filterRecords so a future field on either cannot silently ride along on the other.
-local function filterBoard(board: any?): any?
-    if not board then
-        return board
-    end
-    local copy = table.clone(board)
-    copy.rows = filterTop(board.rows)
-    return copy
-end
-
-local function filterHeat(heat: any?): any?
-    if not heat then
-        return heat
-    end
-    local copy = table.clone(heat)
-    copy.leaders = filterTop(heat.leaders)
-    return copy
-end
-
--- THE STATS ROOM'S FEED. Separate from the BoardData poller above on purpose: that one is the
--- arena's 30s heartbeat and these are four REST reads whose own Cache-Control is 15-30s, so
--- pulling them on the same tick would triple the arena's request rate for walls nobody may be
--- standing in front of. 60s is slower than any of the caches and still far finer than the
--- cadence at which a career board actually moves.
-task.spawn(function()
-    while true do
-        local leaders = net:getLeaderboards("world")
-        local week = net:getStatsRecords("week")
-        local all = net:getStatsRecords("all")
-        local heat = net:getStatsHeat("day", nil)
-        local board = net:getStatsBoard()
-        -- Each field is independently nil-able: one endpoint failing must leave the other three
-        -- boards showing their last good content rather than blanking the whole room.
-        lastStats = {
-            leaders = if leaders.ok
-                then filterTop(leaders.data.leaders)
-                else (lastStats and lastStats.leaders),
-            recordsWeek = if week.ok then filterRecords(week.data) else (lastStats and lastStats.recordsWeek),
-            recordsAll = if all.ok then filterRecords(all.data) else (lastStats and lastStats.recordsAll),
-            heat = if heat.ok then filterHeat(heat.data) else (lastStats and lastStats.heat),
-            board = if board.ok then filterBoard(board.data) else (lastStats and lastStats.board),
-            depths = if board.ok then board.data.depths else (lastStats and lastStats.depths),
-            tape = lastTape,
-        }
-        R.StatsData:FireAllClients(lastStats)
-        -- 47, NOT 60. A 60s wait is exactly the round period (OPEN 51 + LOCK 2 +
-        -- REVEAL 7), so the poll would alias with the round and refresh the slow
-        -- boards at the same phase offset forever. 47 still clears the 30s and 15s
-        -- Cache-Control windows on the endpoints it reads.
-        task.wait(47)
-    end
-end)
-
--- The personal slip. Per-player, so it is pushed per-player: on join, and on the same 60s beat.
---
--- ⚠ IT ALSO FEEDS THE ROSTER, AT NO EXTRA COST. The status bars over a player's head need that
--- player's GRADE and RANK, and this response already carries both — so harvesting them here means
--- the bars refresh on a beat that already exists rather than adding a per-player request per
--- round. Rank moves as OTHER people play, so it genuinely needs refreshing; grade only ever
--- increases and only for its owner, which is why a join-time snapshot was enough for it alone.
-local function pushStatsPersonal(player: Player)
-    local res = net:getStatsPlayer(tostring(player.UserId))
-    -- A 404 is the NORMAL state for someone who has never thrown. Send the empty shape rather
-    -- than nothing, so the slip renders its zeros instead of hanging on "no data".
-    R.StatsPersonal:FireClient(player, if res.ok then res.data else { displayName = player.DisplayName })
-    if res.ok then
-        local d = res.data
-        local standing = d.week and d.week.standing
-        local entry = familiarRoster[tostring(player.UserId)] or {}
-        entry.grade = d.grade or entry.grade
-        entry.gradeName = d.gradeName or entry.gradeName
-        entry.band = d.band or entry.band
-        -- ABSENT, not zero, when unqualified: the bar's absence is itself information — this
-        -- player has not put in the 360 throws to be measured at all.
-        entry.rank = standing and standing.rank or nil
-        entry.of = standing and standing.of or nil
-        familiarRoster[tostring(player.UserId)] = entry
-        pushFamiliarRoster()
-    end
-end
-
-local function onPlayerJoinStats(player: Player)
-    if lastStats then
-        R.StatsData:FireClient(player, lastStats) -- re-fire is an idempotent client update
-    end
-    task.spawn(pushStatsPersonal, player)
-end
-Players.PlayerAdded:Connect(onPlayerJoinStats)
-for _, p in Players:GetPlayers() do
-    task.spawn(onPlayerJoinStats, p) -- defect (n): catch a join that landed before this connect
-end
-
-task.spawn(function()
-    while true do
-        task.wait(60)
-        for _, player in Players:GetPlayers() do
-            task.spawn(pushStatsPersonal, player)
-        end
-    end
-end)
+-- The stats room's pollers and personal push (server-file split, phase one, task 3) live in
+-- StatsFeed, built above. STARTED HERE, at the exact point that machinery used to run inline, so
+-- its PlayerAdded connect keeps its place in this file's connect order (profile, board, stats,
+-- economy) and both loops keep their cadences.
+statsFeed:start()
 
 -- D.6: lifecycle + vacant state across all 14 surveyed perches; a joining owner claims
 -- one (lit), the rest stay dormant; release on leave. (D.2 proved this on a 2-3 pad subset.)
@@ -1196,7 +1073,8 @@ local SITE_RADIUS = 24
 -- The newest tape entry is the last CLOSED round, which is exactly what ishibana's condition is
 -- about. The tape already arrives on every poll — nothing extra is fetched to answer this.
 local function lastWorldThrow(): string?
-    local newest = lastTape and lastTape[1]
+    local tape = statsFeed:tape()
+    local newest = tape and tape[1]
     return newest and newest.worldThrow or nil
 end
 
