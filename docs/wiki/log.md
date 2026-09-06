@@ -4142,3 +4142,18 @@ hanging to its 30s timeout and succeeding on retry, which logs nothing (see
 parked-defects (p)). Nothing in Task 1 touches RoundCoordinator, NetworkClient or the
 poll loop, and the RevealTheater payload is byte-identical. Recorded (p) the poll-loop
 hazard and (q) a latent stale-face window in the miss path. Task 2 starts.
+
+## [2026-09-06] gate | GATE 2 (ShojiSlideController extraction) passed
+
+Owner walk, all three items: a slid shoji survives the owner leaving and returning; a
+second account's slide is visible to both and does not persist across their leave; a
+disconnect mid-hold leaves no error and the pad rebuilds clean on rejoin. Task 2 is
+`7dd380e` on main (rebased over the terminal session's shu-moku weld commit, no
+conflict); registers 163 → 151; `main.server.luau` 3727 → 3303 lines; Lune 1909/1909; CI
+green. Review approved with five minor notes parked in the SDD ledger (float32 vs
+double at the exact reach boundary, two tables allocated per reach check per tick, dead
+`pendingCount` until a test hook, a control character in a spec name, `Deps` typed
+`any` per the PortalController precedent). Note for future gates: Studio's "Clients and
+Servers" test mode cannot stand in for a second account -- its Player1/Player2 carry
+negative UserIds, which the backend's digits-only player-id guard rejects with 400, and
+neither is the owner. Task 3 (StatsFeed) starts.
