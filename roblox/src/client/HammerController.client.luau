@@ -281,8 +281,16 @@ local function updateSuspension()
         chain.CFrame = cf
         chain.Size = Vector3.new(len, 0.22, 0.22) -- hemp-rope cross-section (matches the builder)
     end
-    for i, d in dowels do
-        d.CFrame = delta * dowelRest[i]
+    -- ⚠ ONLY WHEN THE LOG IS NOT WELDED. The fittings -- bands, nose, whips, tail ring, both
+    -- dowels -- are welded to the log at server boot (main.server.luau), and the engine then
+    -- carries them; writing their CFrames here as well would fight the constraints. Resolved live
+    -- rather than assumed, so a client whose weld has not landed still gets the arithmetic and
+    -- nothing is ever left behind. The chains above are NOT welded and always recompute: they
+    -- resize as the log swings, which a weld cannot express.
+    if arm:FindFirstChildOfClass("WeldConstraint") == nil then
+        for i, d in dowels do
+            d.CFrame = delta * dowelRest[i]
+        end
     end
 end
 

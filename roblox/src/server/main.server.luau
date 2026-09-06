@@ -144,6 +144,30 @@ do
         end
     end
 
+    -- THE SHU-MOKU'S FITTINGS. The striking log is the hero animation of the whole drive chain --
+    -- drawn back by the snail cam and released once a minute -- and its steel and bronze bands,
+    -- nose, whips, tail ring and both dowels are RIGID TO IT. `HammerController` was carrying each
+    -- one by hand every frame (`d.CFrame = delta * dowelRest[i]`, twelve writes) rather than
+    -- attaching them, which is the same class of defect as the dowel-staleness fixed in `e57f7e7`:
+    -- arithmetic kept them in step at 30Hz while the strike tween moves the log at display rate.
+    -- Welded, the engine carries them and they cannot lag the log they are bolted to.
+    --
+    -- ⚠ THE FOUR `Chain*` PARTS ARE DELIBERATELY NOT INCLUDED. They are hemp: `updateSuspension`
+    -- both re-poses AND RESIZES them each frame as the log swings, and a weld cannot express a
+    -- length change. They stay hand-computed, correctly.
+    local bonsho = stage:FindFirstChild("BonshoRig")
+    local shuMoku = bonsho and bonsho:FindFirstChild("ShuMoku")
+    if shuMoku and shuMoku:IsA("BasePart") then
+        local fittings: { BasePart } = {}
+        for _, p in bonsho:GetChildren() do
+            -- exactly HammerController's `dowels` list: every ShuMoku* child but the log itself
+            if p ~= shuMoku and p:IsA("BasePart") and p.Name:sub(1, 7) == "ShuMoku" then
+                table.insert(fittings, p)
+            end
+        end
+        AssemblyWeld.bind(shuMoku :: BasePart, fittings)
+    end
+
     -- THE HANGING CHŌCHIN, same trick and the same reason. Each lantern is ~58 parts and the
     -- client swings it with `Model:PivotTo`, which moves every one of them; welded, it is one
     -- write. Bound by TAG rather than at a fixed point in boot, because the teahouse lanterns do
