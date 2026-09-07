@@ -4194,3 +4194,16 @@ the window. Compare the reverted jack's **0.113661**. Afterwards, re-measure the
 as an independent check that the weld did not distort anything — the 12 facets came back at radius
 10.62518 with gaps of exactly 30.0000°, and the static hub part `Drum` was still anchored and
 unmoved.
+
+## [2026-09-06] gate | GATE 3 (StatsFeed extraction) passed
+
+Owner walk: the stats cavern's boards populated within a minute; a bank refreshed the
+personal slip within the next minute; the HUD's last-five tape tiles were populated on
+join (the BoardData seed from the board poller, which now reads the tape through the
+feed). Correction to the plan's wording: there is no separate "board display at the
+arena" -- BoardData's `hotStreak`/`worldRec` fields have no client reader; only the tape
+strip renders. Task 3 is `3cbd9c5` on main (rebased over the terminal session's throw
+drum weld, no conflict); registers 151 → 141; Lune 1916/1916; CI green. Review approved;
+phase-two note parked in the SDD ledger: StatsData now has two senders (the feed's
+poller and the round callback's re-broadcast through `current()`), verbatim-preserving
+but worth one door. Task 4 (PadRender) starts.
